@@ -42,10 +42,10 @@
 |---|---|---|---|---|---|
 | member_id | BIGINT | 불가 | | FK fk_refresh_sessions_member | 회원 |
 | token_hash | VARCHAR(255) | 불가 | | UK | 갱신 토큰 해시. 원문 토큰은 저장하지 않음 |
-| keep_logged_in | BOOLEAN | 불가 | FALSE | | "로그인 상태 유지" 체크 여부. 의미는 Q-01 남은 질문 |
+| keep_logged_in | BOOLEAN | 불가 | FALSE | | 현재 로그인 요청에서는 항상 FALSE. 선택 입력은 제외 |
 | device_info | VARCHAR(255) | 허용 | NULL | | 기기별 로그아웃용(제안 기능) |
 | last_used_at | DATETIME(6) | 불가 | 현재 시각 | | 마지막 사용일시. 30분 미사용이면 만료 |
-| expires_at | DATETIME(6) | 불가 | | | 만료일시 |
+| expires_at | DATETIME(6) | 불가 | | | 로그인 후 최대 7일 만료일시 |
 | revoked_at | DATETIME(6) | 허용 | NULL | | 로그아웃·비밀번호 변경·정지 시 폐기일시 |
 | created_at | DATETIME(6) | 불가 | 현재 시각 | | 로그인일시 |
 
