@@ -284,6 +284,87 @@ class MemberControllerTest {
     }
 
     @Test
+    void changePasswordUsesAuthenticatedMemberAndSession() throws Exception {
+        mvc.perform(patch("/api/members/me/password")
+                        .with(csrf())
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                new AuthSessionService.AuthPrincipal(7L, 8L, Member.Role.USER), null,
+                                List.of(new SimpleGrantedAuthority("ROLE_USER")))))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"currentPassword\":\"Oldpassword1!\",\"newPassword\":\"Newpassword1!\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("SUCCESS"));
+
+        verify(memberService).changePassword(7L, 8L, "Oldpassword1!", "Newpassword1!");
+    }
+
+    @Test
+    void changePasswordRejectsInvalidNewPassword() throws Exception {
+        mvc.perform(patch("/api/members/me/password")
+                        .with(csrf())
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                new AuthSessionService.AuthPrincipal(7L, 8L, Member.Role.USER), null,
+                                List.of(new SimpleGrantedAuthority("ROLE_USER")))))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"currentPassword\":\"Oldpassword1!\",\"newPassword\":\"short\"}"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(memberService);
+    }
+
+    @Test
+    void changePasswordRejectsMissingAndMalformedFields() throws Exception {
+        for (String body : List.of(
+                "{}",
+                "{\"currentPassword\": \"\", \"newPassword\": \"Newpassword1!\"}",
+                "{\"currentPassword\": \"Oldpassword1!\", \"newPassword\": \"abcdefgh\"}",
+                "{\"currentPassword\": \"Oldpassword1!\", \"newPassword\": \"abcdefgh1 \"}",
+                "{\"currentPassword\": \"Oldpassword1!\", \"newPassword\": \"가나다abc1!\"}")) {
+            mvc.perform(patch("/api/members/me/password")
+                            .with(csrf())
+                            .with(authentication(new UsernamePasswordAuthenticationToken(
+                                    new AuthSessionService.AuthPrincipal(7L, 8L, Member.Role.USER), null,
+                                    List.of(new SimpleGrantedAuthority("ROLE_USER")))))
+                            .contentType(MediaType.APPLICATION_JSON).content(body))
+                    .andExpect(status().isBadRequest());
+        }
+        verifyNoInteractions(memberService);
+    }
+
+    @Test
+    void changePasswordRequiresLoginAndCsrf() throws Exception {
+        String body = "{\"currentPassword\":\"Oldpassword1!\",\"newPassword\":\"Newpassword1!\"}";
+        mvc.perform(patch("/api/members/me/password")
+                        .with(csrf()).contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(patch("/api/members/me/password")
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                new AuthSessionService.AuthPrincipal(7L, 8L, Member.Role.USER), null,
+                                List.of(new SimpleGrantedAuthority("ROLE_USER")))))
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(memberService);
+    }
+
+    @Test
+    void changePasswordReportsWrongCurrentPassword() throws Exception {
+        doThrow(new BusinessException(ErrorCode.INVALID_CURRENT_PASSWORD))
+                .when(memberService).changePassword(eq(7L), eq(8L), eq("Wrongpassword1!"),
+                        eq("Newpassword1!"));
+
+        mvc.perform(patch("/api/members/me/password")
+                        .with(csrf())
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                new AuthSessionService.AuthPrincipal(7L, 8L, Member.Role.USER), null,
+                                List.of(new SimpleGrantedAuthority("ROLE_USER")))))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"currentPassword\":\"Wrongpassword1!\",\"newPassword\":\"Newpassword1!\"}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("M006"));
+    }
+
+    @Test
     void changeTastesAcceptsDuplicateValuesAndEmptyList() throws Exception {
         var auth = authentication(new UsernamePasswordAuthenticationToken(
                 new AuthSessionService.AuthPrincipal(7L, 8L, Member.Role.USER), null,

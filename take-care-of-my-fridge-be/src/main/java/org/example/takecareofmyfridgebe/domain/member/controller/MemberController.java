@@ -4,6 +4,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.auth.service.AuthSessionService;
 import org.example.takecareofmyfridgebe.domain.member.dto.ChangeNicknameRequest;
+import org.example.takecareofmyfridgebe.domain.member.dto.ChangePasswordRequest;
 import org.example.takecareofmyfridgebe.domain.member.dto.ChangeTastesRequest;
 import org.example.takecareofmyfridgebe.domain.member.dto.EmailAvailabilityRequest;
 import org.example.takecareofmyfridgebe.domain.member.dto.EmailAvailabilityResponse;
@@ -58,6 +59,15 @@ public class MemberController {
             @AuthenticationPrincipal AuthSessionService.AuthPrincipal principal,
             @Valid @RequestBody ChangeNicknameRequest request) {
         memberService.changeNickname(principal.memberId(), request);
+        return ResponseEntity.ok(ApiResponse.ok());
+    }
+
+    @PatchMapping("/me/password")
+    public ResponseEntity<ApiResponse<Void>> changePassword(
+            @AuthenticationPrincipal AuthSessionService.AuthPrincipal principal,
+            @Valid @RequestBody ChangePasswordRequest request) {
+        memberService.changePassword(principal.memberId(), principal.sessionId(),
+                request.currentPassword(), request.newPassword());
         return ResponseEntity.ok(ApiResponse.ok());
     }
 
