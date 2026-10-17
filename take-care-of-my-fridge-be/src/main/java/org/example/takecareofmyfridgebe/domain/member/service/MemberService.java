@@ -62,11 +62,7 @@ public class MemberService {
         try {
             memberRepository.flush();
         } catch (DataIntegrityViolationException e) {
-            String detail = String.valueOf(e.getMostSpecificCause().getMessage()).toLowerCase(Locale.ROOT);
-            if (detail.contains("uk_members_nickname")) {
-                throw new BusinessException(ErrorCode.DUPLICATE_NICKNAME);
-            }
-            throw e;
+            throw translateDuplicate(e);
         }
     }
 
@@ -106,15 +102,19 @@ public class MemberService {
         try {
             return SignUpResponse.from(memberRepository.saveAndFlush(member));
         } catch (DataIntegrityViolationException e) {
-            String detail = String.valueOf(e.getMostSpecificCause().getMessage()).toLowerCase(Locale.ROOT);
-            if (detail.contains("uk_members_email")) {
-                throw new BusinessException(ErrorCode.DUPLICATE_EMAIL);
-            }
-            if (detail.contains("uk_members_nickname")) {
-                throw new BusinessException(ErrorCode.DUPLICATE_NICKNAME);
-            }
-            throw e;
+            throw translateDuplicate(e);
         }
+    }
+
+    private RuntimeException translateDuplicate(DataIntegrityViolationException e) {
+        String detail = String.valueOf(e.getMostSpecificCause().getMessage()).toLowerCase(Locale.ROOT);
+        if (detail.contains("uk_members_email")) {
+            return new BusinessException(ErrorCode.DUPLICATE_EMAIL);
+        }
+        if (detail.contains("uk_members_nickname")) {
+            return new BusinessException(ErrorCode.DUPLICATE_NICKNAME);
+        }
+        return e;
     }
 
     private Member getMember(Long memberId) {
