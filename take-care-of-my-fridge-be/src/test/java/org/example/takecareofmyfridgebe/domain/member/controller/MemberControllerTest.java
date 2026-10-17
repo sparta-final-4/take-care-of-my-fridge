@@ -101,7 +101,7 @@ class MemberControllerTest {
     void protectedRequestWithoutAccessCookieReturnsJsonUnauthorized() throws Exception {
         mvc.perform(get("/api/members/me"))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.code").value("AUTH_001"));
+                .andExpect(jsonPath("$.code").value("A003"));
     }
 
     @Test
