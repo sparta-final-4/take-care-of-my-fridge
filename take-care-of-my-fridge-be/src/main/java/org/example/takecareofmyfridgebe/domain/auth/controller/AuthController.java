@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.auth.dto.LoginMember;
 import org.example.takecareofmyfridgebe.domain.auth.dto.LoginRequest;
 import org.example.takecareofmyfridgebe.domain.auth.service.LoginService;
+import org.example.takecareofmyfridgebe.domain.auth.service.LogoutService;
 import org.example.takecareofmyfridgebe.domain.auth.service.RefreshService;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
@@ -24,6 +25,7 @@ public class AuthController {
 
     private final LoginService loginService;
     private final RefreshService refreshService;
+    private final LogoutService logoutService;
     private final AuthCookies cookies;
 
     @PostMapping("/login")
@@ -46,6 +48,17 @@ public class AuthController {
                 .header(HttpHeaders.SET_COOKIE, cookies.access(tokens.accessToken()).toString())
                 .header(HttpHeaders.SET_COOKIE,
                         cookies.refresh(tokens.refreshToken(), tokens.refreshMaxAge()).toString())
+                .body(ApiResponse.ok());
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<ApiResponse<Void>> logout(
+            @CookieValue(value = "access_token", required = false) String accessToken,
+            @CookieValue(value = "refresh_token", required = false) String refreshToken) {
+        logoutService.logout(accessToken, refreshToken);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, cookies.clearAccess().toString())
+                .header(HttpHeaders.SET_COOKIE, cookies.clearRefresh().toString())
                 .body(ApiResponse.ok());
     }
 }

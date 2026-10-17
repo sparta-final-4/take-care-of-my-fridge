@@ -5,6 +5,7 @@ import org.example.takecareofmyfridgebe.domain.auth.dto.LoginMember;
 import org.example.takecareofmyfridgebe.domain.auth.service.AuthSessionService;
 import org.example.takecareofmyfridgebe.domain.auth.service.JwtTokenService;
 import org.example.takecareofmyfridgebe.domain.auth.service.LoginService;
+import org.example.takecareofmyfridgebe.domain.auth.service.LogoutService;
 import org.example.takecareofmyfridgebe.domain.auth.service.RefreshService;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 import org.example.takecareofmyfridgebe.global.config.SecurityConfig;
@@ -28,6 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -48,9 +50,12 @@ class AuthControllerTest {
     @Autowired
     private RefreshService refreshService;
 
+    @Autowired
+    private LogoutService logoutService;
+
     @BeforeEach
     void resetMock() {
-        reset(loginService, refreshService);
+        reset(loginService, refreshService, logoutService);
     }
 
     @Test
@@ -152,8 +157,40 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.code").value("MEMBER_004"));
     }
 
+    @Test
+    void logoutClearsBothCookies() throws Exception {
+        List<String> cookies = mvc.perform(post("/api/auth/logout")
+                        .with(csrf())
+                        .cookie(new Cookie("refresh_token", "old")))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getHeaders(HttpHeaders.SET_COOKIE);
+
+        verify(logoutService).logout(null, "old");
+        assertEquals(2, cookies.size());
+        assertTrue(cookies.get(0).contains("access_token=;"));
+        assertTrue(cookies.get(0).contains("Path=/api"));
+        assertTrue(cookies.get(1).contains("refresh_token=;"));
+        assertTrue(cookies.get(1).contains("Path=/api/auth"));
+        cookies.forEach(cookie -> assertTrue(cookie.contains("Max-Age=0")));
+    }
+
+    @Test
+    void logoutWithoutCookiesSucceedsButCsrfIsRequired() throws Exception {
+        mvc.perform(post("/api/auth/logout").with(csrf()))
+                .andExpect(status().isOk());
+        verify(logoutService).logout(null, null);
+
+        mvc.perform(post("/api/auth/logout"))
+                .andExpect(status().isForbidden());
+    }
+
     @TestConfiguration
     static class TestConfig {
+        @Bean
+        LogoutService logoutService() {
+            return mock(LogoutService.class);
+        }
+
         @Bean
         LoginService loginService() {
             return mock(LoginService.class);

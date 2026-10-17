@@ -14,4 +14,7 @@ public interface RefreshSessionRepository extends JpaRepository<RefreshSession, 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select s from RefreshSession s join fetch s.member where s.tokenHash = :tokenHash")
     Optional<RefreshSession> findByTokenHashForUpdate(@Param("tokenHash") String tokenHash);
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select s from RefreshSession s join fetch s.member where s.id = :id")
+    Optional<RefreshSession> findByIdForUpdate(@Param("id") Long id);
 }
