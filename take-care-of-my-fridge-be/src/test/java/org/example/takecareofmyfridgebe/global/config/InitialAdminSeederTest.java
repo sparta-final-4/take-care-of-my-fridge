@@ -1,4 +1,4 @@
-package org.example.takecareofmyfridgebe.domain.member.service;
+package org.example.takecareofmyfridgebe.global.config;
 
 import jakarta.validation.Validator;
 import org.example.takecareofmyfridgebe.domain.member.dto.SignUpRequest;
