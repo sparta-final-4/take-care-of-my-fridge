@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Instant;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.Optional;
@@ -17,6 +18,7 @@ import java.util.Set;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -41,6 +43,7 @@ class RefreshServiceTest {
         assertEquals(4L, jwt.parseRefresh(tokens.refreshToken()));
         assertNotEquals(oldToken, tokens.refreshToken());
         assertEquals(jwt.hash(tokens.refreshToken()), session.getTokenHash());
+        assertTrue(tokens.refreshMaxAge().compareTo(Duration.ofDays(7)) < 0);
         BusinessException replay = assertThrows(BusinessException.class, () -> service.refresh(oldToken));
         assertEquals(ErrorCode.INVALID_REFRESH_TOKEN, replay.getErrorCode());
     }

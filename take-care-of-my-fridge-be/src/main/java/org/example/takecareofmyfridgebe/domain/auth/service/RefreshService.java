@@ -10,6 +10,7 @@ import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -43,9 +44,10 @@ public class RefreshService {
                 session.getExpiresAt().toInstant(ZoneOffset.UTC));
         session.rotateToken(jwtTokenService.hash(newRefresh), now);
         String access = jwtTokenService.issueAccess(memberId, session.getId(), issuedAt);
-        return new RefreshedTokens(access, newRefresh);
+        return new RefreshedTokens(access, newRefresh,
+                Duration.between(issuedAt, session.getExpiresAt().toInstant(ZoneOffset.UTC)));
     }
 
-    public record RefreshedTokens(String accessToken, String refreshToken) {
+    public record RefreshedTokens(String accessToken, String refreshToken, Duration refreshMaxAge) {
     }
 }
