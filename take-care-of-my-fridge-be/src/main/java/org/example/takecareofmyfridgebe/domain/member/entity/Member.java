@@ -69,4 +69,8 @@ public class Member extends BaseTimeEntity {
     public static Member create(String email, String passwordHash, String nickname, Set<Taste> tastes) {
         return new Member(email, passwordHash, nickname, tastes);
     }
+
+    public void changeNickname(String nickname) {
+        this.nickname = nickname;
+    }
 }

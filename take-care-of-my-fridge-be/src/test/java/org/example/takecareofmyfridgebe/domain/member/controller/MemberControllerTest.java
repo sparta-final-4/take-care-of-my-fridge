@@ -3,6 +3,7 @@ package org.example.takecareofmyfridgebe.domain.member.controller;
 import org.example.takecareofmyfridgebe.domain.auth.service.AuthSessionService;
 import org.example.takecareofmyfridgebe.domain.auth.service.JwtTokenService;
 import org.example.takecareofmyfridgebe.domain.member.dto.EmailAvailabilityResponse;
+import org.example.takecareofmyfridgebe.domain.member.dto.ChangeNicknameRequest;
 import org.example.takecareofmyfridgebe.domain.member.dto.MyInfoResponse;
 import org.example.takecareofmyfridgebe.domain.member.dto.NicknameAvailabilityResponse;
 import org.example.takecareofmyfridgebe.domain.member.dto.SignUpResponse;
@@ -28,11 +29,17 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -124,6 +131,70 @@ class MemberControllerTest {
                 .andExpect(jsonPath("$.data.status").value("ACTIVE"))
                 .andExpect(jsonPath("$.data.tastes[0]").value("SWEET"))
                 .andExpect(jsonPath("$.data.createdAt").value("2026-10-13T10:12:00"));
+    }
+
+    @Test
+    void loggedInMemberCanChangeNicknameWithStrippedValue() throws Exception {
+        mvc.perform(patch("/api/members/me/nickname")
+                        .with(csrf())
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                new AuthSessionService.AuthPrincipal(7L, Member.Role.USER), null,
+                                List.of(new SimpleGrantedAuthority("ROLE_USER")))))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"nickname\":\" 새닉네임 \"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("SUCCESS"));
+
+        verify(memberService).changeNickname(eq(7L),
+                argThat(request -> "새닉네임".equals(request.nickname())));
+    }
+
+    @Test
+    void changeNicknameRequiresLoginAndCsrf() throws Exception {
+        mvc.perform(patch("/api/members/me/nickname")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"nickname\":\"새닉네임\"}"))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(patch("/api/members/me/nickname")
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                new AuthSessionService.AuthPrincipal(7L, Member.Role.USER), null,
+                                List.of(new SimpleGrantedAuthority("ROLE_USER")))))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"nickname\":\"새닉네임\"}"))
+                .andExpect(status().isForbidden());
+        verifyNoInteractions(memberService);
+    }
+
+    @Test
+    void invalidChangeNicknameIsRejectedBeforeService() throws Exception {
+        for (String nickname : List.of("   ", "가".repeat(31))) {
+            mvc.perform(patch("/api/members/me/nickname")
+                            .with(csrf())
+                            .with(authentication(new UsernamePasswordAuthenticationToken(
+                                    new AuthSessionService.AuthPrincipal(7L, Member.Role.USER), null,
+                                    List.of(new SimpleGrantedAuthority("ROLE_USER")))))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"nickname\":\"" + nickname + "\"}"))
+                    .andExpect(status().isBadRequest());
+        }
+        verifyNoInteractions(memberService);
+    }
+
+    @Test
+    void duplicateChangeNicknameReturnsConflict() throws Exception {
+        doThrow(new BusinessException(ErrorCode.DUPLICATE_NICKNAME))
+                .when(memberService).changeNickname(eq(7L), any(ChangeNicknameRequest.class));
+
+        mvc.perform(patch("/api/members/me/nickname")
+                        .with(csrf())
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                new AuthSessionService.AuthPrincipal(7L, Member.Role.USER), null,
+                                List.of(new SimpleGrantedAuthority("ROLE_USER")))))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"nickname\":\"중복닉네임\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("M002"));
     }
 
     @Test

@@ -1,6 +1,7 @@
 package org.example.takecareofmyfridgebe.domain.member.service;
 
 import org.example.takecareofmyfridgebe.domain.member.dto.MyInfoResponse;
+import org.example.takecareofmyfridgebe.domain.member.dto.ChangeNicknameRequest;
 import org.example.takecareofmyfridgebe.domain.member.dto.SignUpRequest;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 import org.example.takecareofmyfridgebe.domain.member.repository.MemberRepository;
@@ -27,6 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -131,6 +133,55 @@ class MemberServiceTest {
         BusinessException exception = assertThrows(BusinessException.class, () -> memberService.getMyInfo(7L));
 
         assertEquals(ErrorCode.MEMBER_NOT_FOUND, exception.getErrorCode());
+    }
+
+    @Test
+    void changeNicknameUpdatesOnlyCurrentMember() {
+        Member member = Member.create("cook@example.com", "hash", "기존닉네임", Set.of());
+        when(memberRepository.findById(7L)).thenReturn(Optional.of(member));
+
+        memberService.changeNickname(7L, new ChangeNicknameRequest(" 새닉네임 "));
+
+        assertEquals("새닉네임", member.getNickname());
+        verify(memberRepository).existsByNicknameAndIdNot("새닉네임", 7L);
+        verify(memberRepository).flush();
+    }
+
+    @Test
+    void changeNicknameRejectsAnotherMembersNickname() {
+        Member member = Member.create("cook@example.com", "hash", "기존닉네임", Set.of());
+        when(memberRepository.findById(7L)).thenReturn(Optional.of(member));
+        when(memberRepository.existsByNicknameAndIdNot("중복닉네임", 7L)).thenReturn(true);
+
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> memberService.changeNickname(7L, new ChangeNicknameRequest("중복닉네임")));
+
+        assertEquals(ErrorCode.DUPLICATE_NICKNAME, exception.getErrorCode());
+        assertEquals("기존닉네임", member.getNickname());
+        verify(memberRepository, never()).flush();
+    }
+
+    @Test
+    void changeNicknameMapsConcurrentUniqueConstraintConflict() {
+        Member member = Member.create("cook@example.com", "hash", "기존닉네임", Set.of());
+        when(memberRepository.findById(7L)).thenReturn(Optional.of(member));
+        doThrow(new DataIntegrityViolationException("Duplicate entry for key 'uk_members_nickname'"))
+                .when(memberRepository).flush();
+
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> memberService.changeNickname(7L, new ChangeNicknameRequest("중복닉네임")));
+
+        assertEquals(ErrorCode.DUPLICATE_NICKNAME, exception.getErrorCode());
+    }
+
+    @Test
+    void changeNicknameToSameValueDoesNotWrite() {
+        Member member = Member.create("cook@example.com", "hash", "기존닉네임", Set.of());
+        when(memberRepository.findById(7L)).thenReturn(Optional.of(member));
+
+        memberService.changeNickname(7L, new ChangeNicknameRequest("기존닉네임"));
+
+        verify(memberRepository, never()).flush();
     }
 
     @Test

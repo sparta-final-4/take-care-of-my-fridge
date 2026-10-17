@@ -4,6 +4,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.auth.service.AuthSessionService;
 import org.example.takecareofmyfridgebe.domain.member.dto.EmailAvailabilityRequest;
+import org.example.takecareofmyfridgebe.domain.member.dto.ChangeNicknameRequest;
 import org.example.takecareofmyfridgebe.domain.member.dto.EmailAvailabilityResponse;
 import org.example.takecareofmyfridgebe.domain.member.dto.MyInfoResponse;
 import org.example.takecareofmyfridgebe.domain.member.dto.NicknameAvailabilityRequest;
@@ -17,6 +18,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -47,6 +49,14 @@ public class MemberController {
     public ResponseEntity<ApiResponse<MyInfoResponse>> getMyInfo(
             @AuthenticationPrincipal AuthSessionService.AuthPrincipal principal) {
         return ResponseEntity.ok(ApiResponse.ok(memberService.getMyInfo(principal.memberId())));
+    }
+
+    @PatchMapping("/me/nickname")
+    public ResponseEntity<ApiResponse<Void>> changeNickname(
+            @AuthenticationPrincipal AuthSessionService.AuthPrincipal principal,
+            @Valid @RequestBody ChangeNicknameRequest request) {
+        memberService.changeNickname(principal.memberId(), request);
+        return ResponseEntity.ok(ApiResponse.ok());
     }
 
     @PostMapping

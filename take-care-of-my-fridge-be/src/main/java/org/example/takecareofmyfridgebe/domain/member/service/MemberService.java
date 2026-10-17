@@ -2,6 +2,7 @@ package org.example.takecareofmyfridgebe.domain.member.service;
 
 import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.member.dto.EmailAvailabilityResponse;
+import org.example.takecareofmyfridgebe.domain.member.dto.ChangeNicknameRequest;
 import org.example.takecareofmyfridgebe.domain.member.dto.MyInfoResponse;
 import org.example.takecareofmyfridgebe.domain.member.dto.NicknameAvailabilityResponse;
 import org.example.takecareofmyfridgebe.domain.member.dto.SignUpRequest;
@@ -42,6 +43,28 @@ public class MemberService {
         return memberRepository.findById(memberId)
                 .map(MyInfoResponse::from)
                 .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
+    }
+
+    @Transactional
+    public void changeNickname(Long memberId, ChangeNicknameRequest request) {
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
+        if (member.getNickname().equals(request.nickname())) {
+            return;
+        }
+        if (memberRepository.existsByNicknameAndIdNot(request.nickname(), memberId)) {
+            throw new BusinessException(ErrorCode.DUPLICATE_NICKNAME);
+        }
+        member.changeNickname(request.nickname());
+        try {
+            memberRepository.flush();
+        } catch (DataIntegrityViolationException e) {
+            String detail = String.valueOf(e.getMostSpecificCause().getMessage()).toLowerCase(Locale.ROOT);
+            if (detail.contains("uk_members_nickname")) {
+                throw new BusinessException(ErrorCode.DUPLICATE_NICKNAME);
+            }
+            throw e;
+        }
     }
 
     @Transactional
