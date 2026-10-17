@@ -253,21 +253,30 @@ class MemberServiceTest {
     }
 
     @Test
-    void changeTastesReplacesListAndAcceptsDuplicates() {
+    void changeTastesReplacesListAndKeepsExistingRows() {
         Member member = Member.create("cook@example.com", "hash", "요리왕",
                 Set.of(Member.Taste.SWEET, Member.Taste.SALTY));
         MemberTaste existingSweet = member.getTastes().stream()
                 .filter(item -> item.getTaste() == Member.Taste.SWEET).findFirst().orElseThrow();
         when(memberRepository.findById(7L)).thenReturn(Optional.of(member));
 
-        memberService.changeTastes(7L,
-                List.of(Member.Taste.SWEET, Member.Taste.SWEET, Member.Taste.SPICY));
+        memberService.changeTastes(7L, List.of(Member.Taste.SWEET, Member.Taste.SPICY));
 
         assertEquals(2, member.getTastes().size());
         assertEquals(Set.of(Member.Taste.SWEET, Member.Taste.SPICY),
                 Set.copyOf(member.getTastes().stream().map(MemberTaste::getTaste).toList()));
         assertSame(existingSweet, member.getTastes().stream()
                 .filter(item -> item.getTaste() == Member.Taste.SWEET).findFirst().orElseThrow());
+    }
+
+    @Test
+    void changeTastesRejectsDuplicatesWithoutChanging() {
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> memberService.changeTastes(7L,
+                        List.of(Member.Taste.SWEET, Member.Taste.SWEET, Member.Taste.SPICY)));
+
+        assertEquals(ErrorCode.INVALID_INPUT_VALUE, exception.getErrorCode());
+        verify(memberRepository, never()).findById(any());
     }
 
     @Test

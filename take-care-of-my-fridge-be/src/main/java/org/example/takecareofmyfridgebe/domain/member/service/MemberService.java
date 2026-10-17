@@ -83,15 +83,13 @@ public class MemberService {
 
     @Transactional
     public void changeTastes(Long memberId, List<Member.Taste> tastes) {
-        getMember(memberId).replaceTastes(new HashSet<>(tastes));
+        Set<Member.Taste> uniqueTastes = toUniqueTastes(tastes);
+        getMember(memberId).replaceTastes(uniqueTastes);
     }
 
     @Transactional
     public SignUpResponse signUp(SignUpRequest request) {
-        Set<Member.Taste> tastes = new HashSet<>(request.tastes());
-        if (tastes.size() != request.tastes().size()) {
-            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "맛 선호는 중복해서 선택할 수 없습니다.");
-        }
+        Set<Member.Taste> tastes = toUniqueTastes(request.tastes());
 
         if (memberRepository.existsByEmail(request.email())) {
             throw new BusinessException(ErrorCode.DUPLICATE_EMAIL);
@@ -118,6 +116,14 @@ public class MemberService {
             return new BusinessException(ErrorCode.DUPLICATE_NICKNAME);
         }
         return e;
+    }
+
+    private Set<Member.Taste> toUniqueTastes(List<Member.Taste> tastes) {
+        Set<Member.Taste> unique = new HashSet<>(tastes);
+        if (unique.size() != tastes.size()) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "맛 선호는 중복해서 선택할 수 없습니다.");
+        }
+        return unique;
     }
 
     private Member getMember(Long memberId) {
