@@ -1,0 +1,24 @@
+package org.example.takecareofmyfridgebe.domain.auth.dto;
+
+import org.example.takecareofmyfridgebe.domain.member.entity.Member;
+import org.example.takecareofmyfridgebe.domain.member.entity.MemberTaste;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+public record LoginMember(
+        Long memberId,
+        String email,
+        String nickname,
+        Member.Role role,
+        Member.Status status,
+        List<Member.Taste> tastes,
+        LocalDateTime createdAt
+) {
+    public static LoginMember from(Member member) {
+        return new LoginMember(member.getId(), member.getEmail(), member.getNickname(),
+                member.getRole(), member.getStatus(),
+                member.getTastes().stream().map(MemberTaste::getTaste).toList(),
+                member.getCreatedAt());
+    }
+}
