@@ -76,6 +76,35 @@ class MemberServiceTest {
     }
 
     @Test
+    void nicknameIsAvailableWhenNoMemberUsesIt() {
+        when(memberRepository.existsByNickname("요리왕")).thenReturn(false);
+
+        assertTrue(memberService.checkNicknameAvailability("요리왕", null).available());
+    }
+
+    @Test
+    void nicknameIsUnavailableWhenMemberAlreadyUsesIt() {
+        when(memberRepository.existsByNickname("요리왕")).thenReturn(true);
+
+        assertFalse(memberService.checkNicknameAvailability("요리왕", null).available());
+    }
+
+    @Test
+    void loggedInMemberCheckingOwnNicknameExcludesThemself() {
+        when(memberRepository.existsByNicknameAndIdNot("요리왕", 7L)).thenReturn(false);
+
+        assertTrue(memberService.checkNicknameAvailability("요리왕", 7L).available());
+        verify(memberRepository, never()).existsByNickname(any());
+    }
+
+    @Test
+    void loggedInMemberSeesNicknameTakenByOtherMember() {
+        when(memberRepository.existsByNicknameAndIdNot("요리왕", 7L)).thenReturn(true);
+
+        assertFalse(memberService.checkNicknameAvailability("요리왕", 7L).available());
+    }
+
+    @Test
     void signUpRejectsExistingEmail() {
         SignUpRequest request = new SignUpRequest("cook@example.com", "password123", "요리왕", List.of());
         when(memberRepository.existsByEmail(request.email())).thenReturn(true);

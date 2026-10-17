@@ -2,6 +2,7 @@ package org.example.takecareofmyfridgebe.domain.member.service;
 
 import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.member.dto.EmailAvailabilityResponse;
+import org.example.takecareofmyfridgebe.domain.member.dto.NicknameAvailabilityResponse;
 import org.example.takecareofmyfridgebe.domain.member.dto.SignUpRequest;
 import org.example.takecareofmyfridgebe.domain.member.dto.SignUpResponse;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
@@ -27,6 +28,13 @@ public class MemberService {
 
     public EmailAvailabilityResponse checkEmailAvailability(String email) {
         return new EmailAvailabilityResponse(!memberRepository.existsByEmail(email));
+    }
+
+    public NicknameAvailabilityResponse checkNicknameAvailability(String nickname, Long memberId) {
+        boolean taken = memberId == null
+                ? memberRepository.existsByNickname(nickname)
+                : memberRepository.existsByNicknameAndIdNot(nickname, memberId);
+        return new NicknameAvailabilityResponse(!taken);
     }
 
     @Transactional
