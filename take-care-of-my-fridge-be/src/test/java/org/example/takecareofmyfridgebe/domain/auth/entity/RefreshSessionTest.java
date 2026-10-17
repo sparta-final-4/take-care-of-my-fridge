@@ -19,7 +19,11 @@ class RefreshSessionTest {
 
     @Test
     void expiresAfterThirtyMinutesWithoutUse() {
-        RefreshSession session = RefreshSession.create(member, "token-hash", now);
+        RefreshSession session = RefreshSession.builder()
+                .member(member)
+                .tokenHash("token-hash")
+                .issuedAt(now)
+                .build();
 
         assertTrue(session.isUsable(now.plusMinutes(29)));
         assertFalse(session.isUsable(now.plusMinutes(30)));
@@ -27,7 +31,11 @@ class RefreshSessionTest {
 
     @Test
     void useExtendsIdleWindowButNotSevenDayLimit() {
-        RefreshSession session = RefreshSession.create(member, "token-hash", now);
+        RefreshSession session = RefreshSession.builder()
+                .member(member)
+                .tokenHash("token-hash")
+                .issuedAt(now)
+                .build();
         session.markUsed(now.plusMinutes(20));
 
         assertTrue(session.isUsable(now.plusMinutes(49)));
@@ -37,7 +45,11 @@ class RefreshSessionTest {
 
     @Test
     void revokedSessionCannotBeUsed() {
-        RefreshSession session = RefreshSession.create(member, "token-hash", now);
+        RefreshSession session = RefreshSession.builder()
+                .member(member)
+                .tokenHash("token-hash")
+                .issuedAt(now)
+                .build();
         session.revoke(now.plusMinutes(1));
 
         assertFalse(session.isUsable(now.plusMinutes(2)));

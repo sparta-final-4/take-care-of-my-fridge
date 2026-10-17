@@ -25,8 +25,11 @@ public class LoginService {
         Member member = credentialService.authenticate(email, password);
         Instant now = Instant.now();
         String refreshToken = jwtTokenService.issueRefresh(member.getId(), now);
-        RefreshSession session = sessionRepository.saveAndFlush(RefreshSession.create(member,
-                jwtTokenService.hash(refreshToken), LocalDateTime.ofInstant(now, ZoneOffset.UTC)));
+        RefreshSession session = sessionRepository.saveAndFlush(RefreshSession.builder()
+                .member(member)
+                .tokenHash(jwtTokenService.hash(refreshToken))
+                .issuedAt(LocalDateTime.ofInstant(now, ZoneOffset.UTC))
+                .build());
         String accessToken = jwtTokenService.issueAccess(member.getId(), session.getId(), now);
         return new LoginResult(MyInfoResponse.from(member), accessToken, refreshToken);
     }

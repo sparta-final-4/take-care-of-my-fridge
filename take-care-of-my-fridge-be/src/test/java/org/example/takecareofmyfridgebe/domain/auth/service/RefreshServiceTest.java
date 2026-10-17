@@ -79,7 +79,11 @@ class RefreshServiceTest {
                 .nickname("요리왕")
                 .build();
         ReflectionTestUtils.setField(member, "id", 4L);
-        RefreshSession session = RefreshSession.create(member, jwt.hash(token), now);
+        RefreshSession session = RefreshSession.builder()
+                .member(member)
+                .tokenHash(jwt.hash(token))
+                .issuedAt(now)
+                .build();
         ReflectionTestUtils.setField(session, "id", 8L);
         return session;
     }

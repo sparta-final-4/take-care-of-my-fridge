@@ -76,7 +76,11 @@ class AuthSessionServiceTest {
                 .nickname("요리왕")
                 .build();
         ReflectionTestUtils.setField(member, "id", 4L);
-        RefreshSession session = RefreshSession.create(member, "hash", now);
+        RefreshSession session = RefreshSession.builder()
+                .member(member)
+                .tokenHash("hash")
+                .issuedAt(now)
+                .build();
         ReflectionTestUtils.setField(session, "id", 8L);
         return session;
     }

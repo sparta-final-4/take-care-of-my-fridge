@@ -59,8 +59,11 @@ class LogoutServiceTest {
                 .nickname("요리왕")
                 .build();
         ReflectionTestUtils.setField(member, "id", 4L);
-        RefreshSession session = RefreshSession.create(member, jwt.hash(refresh),
-                LocalDateTime.now(ZoneOffset.UTC));
+        RefreshSession session = RefreshSession.builder()
+                .member(member)
+                .tokenHash(jwt.hash(refresh))
+                .issuedAt(LocalDateTime.now(ZoneOffset.UTC))
+                .build();
         ReflectionTestUtils.setField(session, "id", 8L);
         return session;
     }

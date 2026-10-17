@@ -223,8 +223,11 @@ class MemberServiceTest {
         when(memberRepository.findById(7L)).thenReturn(Optional.of(member));
         when(passwordEncoder.matches("Oldpassword1!", "old-hash")).thenReturn(true);
         when(passwordEncoder.encode("Newpassword1!")).thenReturn("new-hash");
-        RefreshSession otherSession = RefreshSession.create(member, "token-hash",
-                LocalDateTime.now(ZoneOffset.UTC));
+        RefreshSession otherSession = RefreshSession.builder()
+                .member(member)
+                .tokenHash("token-hash")
+                .issuedAt(LocalDateTime.now(ZoneOffset.UTC))
+                .build();
         when(sessionRepository.findAllByMember_IdAndIdNotAndRevokedAtIsNull(7L, 8L))
                 .thenReturn(List.of(otherSession));
 

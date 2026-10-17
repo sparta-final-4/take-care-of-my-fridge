@@ -11,6 +11,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
@@ -48,15 +49,12 @@ public class RefreshSession extends BaseTimeEntity {
     @Column(name = "revoked_at")
     private LocalDateTime revokedAt;
 
-    private RefreshSession(Member member, String tokenHash, LocalDateTime now) {
+    @Builder
+    private RefreshSession(Member member, String tokenHash, LocalDateTime issuedAt) {
         this.member = member;
         this.tokenHash = tokenHash;
-        this.lastUsedAt = now;
-        this.expiresAt = now.plusDays(7);
-    }
-
-    public static RefreshSession create(Member member, String tokenHash, LocalDateTime now) {
-        return new RefreshSession(member, tokenHash, now);
+        this.lastUsedAt = issuedAt;
+        this.expiresAt = issuedAt.plusDays(7);
     }
 
     public boolean isUsable(LocalDateTime now) {
