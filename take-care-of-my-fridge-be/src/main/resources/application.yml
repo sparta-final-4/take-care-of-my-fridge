@@ -15,3 +15,8 @@ spring:
     properties:
       hibernate:
         format_sql: true
+
+app:
+  auth:
+    jwt-secret: ${JWT_SECRET}
+    cookie-secure: ${AUTH_COOKIE_SECURE:true}

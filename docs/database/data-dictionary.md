@@ -42,10 +42,10 @@
 |---|---|---|---|---|---|
 | member_id | BIGINT | 불가 | | FK fk_refresh_sessions_member | 회원 |
 | token_hash | VARCHAR(255) | 불가 | | UK | 갱신 토큰 해시. 원문 토큰은 저장하지 않음 |
-| keep_logged_in | BOOLEAN | 불가 | FALSE | | "로그인 상태 유지" 체크 여부. 의미는 Q-01 남은 질문 |
+| keep_logged_in | BOOLEAN | 불가 | FALSE | | 현재 로그인 요청에서는 항상 FALSE. 선택 입력은 제외 |
 | device_info | VARCHAR(255) | 허용 | NULL | | 기기별 로그아웃용(제안 기능) |
 | last_used_at | DATETIME(6) | 불가 | 현재 시각 | | 마지막 사용일시. 30분 미사용이면 만료 |
-| expires_at | DATETIME(6) | 불가 | | | 만료일시 |
+| expires_at | DATETIME(6) | 불가 | | | 로그인 후 최대 7일 만료일시 |
 | revoked_at | DATETIME(6) | 허용 | NULL | | 로그아웃·비밀번호 변경·정지 시 폐기일시 |
 | created_at | DATETIME(6) | 불가 | 현재 시각 | | 로그인일시 |
 
@@ -125,6 +125,7 @@
 | 컬럼 | 타입 | NULL | 기본값 | 제약 | 의미 |
 |---|---|---|---|---|---|
 | member_id | BIGINT | 불가 | | FK fk_admin_audit_logs_member | 작업한 회원. 권한 없이 시도한 일반 회원 포함 |
+| actor_role | ENUM('USER','ADMIN') | 허용 | NULL | | 작업 당시 역할. 기존 기록은 NULL |
 | action | ENUM('PRODUCT_CREATE','PRODUCT_DELETE','PRICE_UPDATE','DEAL_REVIEW','EVENT_REQUEST','ROLE_CHANGE') | 불가 | | | 작업 종류 |
 | target_type | VARCHAR(50) | 불가 | | | 대상 종류(Product, DealCandidate, Member 등) |
 | target_id | BIGINT | 허용 | NULL | | 대상 ID. 등록 실패처럼 대상이 없으면 NULL. FK 아님 |
@@ -133,6 +134,7 @@
 | after_value | JSON | 허용 | NULL | | 변경 후 값. 민감 값 제외 |
 | created_at | DATETIME(6) | 불가 | 현재 시각 | | 작업일시 |
 
+- 일반 작업 기록 서비스는 작업자·동작·대상·결과만 받습니다. 관리자 승격 기록은 role의 변경 전후 값만 JSON 컬럼에 저장합니다. 비밀번호 등 민감 값은 저장하지 않습니다.
 - 기록은 수정·삭제하지 않습니다. 보관 기간은 미정입니다.
 - 미인증 요청(로그인 전)의 실패는 회원을 특정할 수 없어 이 테이블에 남기지 않습니다. 필요하면 별도 로그로 다룹니다.
 

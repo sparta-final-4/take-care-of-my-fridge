@@ -3,7 +3,6 @@ package org.example.takecareofmyfridgebe.global.error;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.example.takecareofmyfridgebe.global.response.ApiResponse;
-import org.springframework.context.support.DefaultMessageSourceResolvable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -45,7 +44,9 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<Void>> handleMethodArgumentNotValidException(MethodArgumentNotValidException e) {
         String errorMessage = e.getBindingResult().getFieldErrors().stream()
                 .findFirst()
-                .map(DefaultMessageSourceResolvable::getDefaultMessage)
+                .map(error -> error.isBindingFailure()
+                        ? "요청 값의 형식이 올바르지 않습니다."
+                        : error.getDefaultMessage())
                 .orElse("입력 값이 올바르지 않습니다.");
 
         log.warn("Validation Error: {}", errorMessage);

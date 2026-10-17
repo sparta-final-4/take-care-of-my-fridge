@@ -1,0 +1,441 @@
+package org.example.takecareofmyfridgebe.domain.member.controller;
+
+import org.example.takecareofmyfridgebe.domain.auth.service.AuthSessionService;
+import org.example.takecareofmyfridgebe.domain.auth.service.JwtTokenService;
+import org.example.takecareofmyfridgebe.domain.member.dto.EmailAvailabilityResponse;
+import org.example.takecareofmyfridgebe.domain.member.dto.ChangeNicknameRequest;
+import org.example.takecareofmyfridgebe.domain.member.dto.MyInfoResponse;
+import org.example.takecareofmyfridgebe.domain.member.dto.NicknameAvailabilityResponse;
+import org.example.takecareofmyfridgebe.domain.member.dto.SignUpResponse;
+import org.example.takecareofmyfridgebe.domain.member.entity.Member;
+import org.example.takecareofmyfridgebe.domain.member.service.MemberService;
+import org.example.takecareofmyfridgebe.global.config.SecurityConfig;
+import org.example.takecareofmyfridgebe.global.error.BusinessException;
+import org.example.takecareofmyfridgebe.global.error.ErrorCode;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.test.web.servlet.MockMvc;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+@WebMvcTest(MemberController.class)
+@Import({SecurityConfig.class, MemberControllerTest.TestConfig.class})
+class MemberControllerTest {
+
+    @Autowired
+    private MockMvc mvc;
+
+    @Autowired
+    private MemberService memberService;
+
+    @BeforeEach
+    void resetMock() {
+        reset(memberService);
+    }
+
+    @Test
+    void anonymousUserCanSignUpWithoutCsrfToken() throws Exception {
+        when(memberService.signUp(any())).thenReturn(new SignUpResponse(10L));
+
+        mvc.perform(post("/api/members")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"cook@example.com","password":"abcdefgh12!","nickname":"요리왕","tastes":[]}
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.memberId").value(10));
+    }
+
+    @Test
+    void invalidPasswordIsRejectedBeforeCallingService() throws Exception {
+        mvc.perform(post("/api/members")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"cook@example.com","password":"ab1!","nickname":"요리왕","tastes":[]}
+                                """))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(memberService);
+    }
+
+    @Test
+    void duplicateEmailReturnsConflict() throws Exception {
+        when(memberService.signUp(any())).thenThrow(new BusinessException(ErrorCode.DUPLICATE_EMAIL));
+
+        mvc.perform(post("/api/members")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"cook@example.com","password":"abcdefgh12!","nickname":"요리왕","tastes":[]}
+                                """))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    @WithMockUser
+    void otherPostStillRequiresCsrfToken() throws Exception {
+        mvc.perform(post("/api/members/me/nickname")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code").value("AUTH_002"));
+    }
+
+    @Test
+    void protectedRequestWithoutAccessCookieReturnsJsonUnauthorized() throws Exception {
+        mvc.perform(get("/api/members/me"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error.code").value("A003"));
+    }
+
+    @Test
+    void loggedInMemberCanReadMyInfo() throws Exception {
+        when(memberService.getMyInfo(7L)).thenReturn(new MyInfoResponse(7L, "cook@example.com", "요리왕",
+                Member.Role.USER, Member.Status.ACTIVE, List.of(Member.Taste.SWEET),
+                LocalDateTime.of(2026, 10, 13, 10, 12)));
+
+        mvc.perform(get("/api/members/me")
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                new AuthSessionService.AuthPrincipal(7L, 8L, Member.Role.USER), null,
+                                List.of(new SimpleGrantedAuthority("ROLE_USER"))))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.memberId").value(7))
+                .andExpect(jsonPath("$.data.email").value("cook@example.com"))
+                .andExpect(jsonPath("$.data.nickname").value("요리왕"))
+                .andExpect(jsonPath("$.data.role").value("USER"))
+                .andExpect(jsonPath("$.data.status").value("ACTIVE"))
+                .andExpect(jsonPath("$.data.tastes[0]").value("SWEET"))
+                .andExpect(jsonPath("$.data.createdAt").value("2026-10-13T10:12:00"));
+    }
+
+    @Test
+    void loggedInMemberCanChangeNicknameWithStrippedValue() throws Exception {
+        mvc.perform(patch("/api/members/me/nickname")
+                        .with(csrf())
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                new AuthSessionService.AuthPrincipal(7L, 8L, Member.Role.USER), null,
+                                List.of(new SimpleGrantedAuthority("ROLE_USER")))))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"nickname\":\" 새닉네임 \"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+
+        verify(memberService).changeNickname(eq(7L),
+                argThat(request -> "새닉네임".equals(request.nickname())));
+    }
+
+    @Test
+    void changeNicknameRequiresLoginAndCsrf() throws Exception {
+        mvc.perform(patch("/api/members/me/nickname")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"nickname\":\"새닉네임\"}"))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(patch("/api/members/me/nickname")
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                new AuthSessionService.AuthPrincipal(7L, 8L, Member.Role.USER), null,
+                                List.of(new SimpleGrantedAuthority("ROLE_USER")))))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"nickname\":\"새닉네임\"}"))
+                .andExpect(status().isForbidden());
+        verifyNoInteractions(memberService);
+    }
+
+    @Test
+    void invalidChangeNicknameIsRejectedBeforeService() throws Exception {
+        for (String nickname : List.of("   ", "가".repeat(31))) {
+            mvc.perform(patch("/api/members/me/nickname")
+                            .with(csrf())
+                            .with(authentication(new UsernamePasswordAuthenticationToken(
+                                    new AuthSessionService.AuthPrincipal(7L, 8L, Member.Role.USER), null,
+                                    List.of(new SimpleGrantedAuthority("ROLE_USER")))))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"nickname\":\"" + nickname + "\"}"))
+                    .andExpect(status().isBadRequest());
+        }
+        verifyNoInteractions(memberService);
+    }
+
+    @Test
+    void duplicateChangeNicknameReturnsConflict() throws Exception {
+        doThrow(new BusinessException(ErrorCode.DUPLICATE_NICKNAME))
+                .when(memberService).changeNickname(eq(7L), any(ChangeNicknameRequest.class));
+
+        mvc.perform(patch("/api/members/me/nickname")
+                        .with(csrf())
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                new AuthSessionService.AuthPrincipal(7L, 8L, Member.Role.USER), null,
+                                List.of(new SimpleGrantedAuthority("ROLE_USER")))))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"nickname\":\"중복닉네임\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("M002"));
+    }
+
+    @Test
+    void anonymousUserCanCheckEmailAvailability() throws Exception {
+        when(memberService.checkEmailAvailability("cook@example.com"))
+                .thenReturn(new EmailAvailabilityResponse(false));
+
+        mvc.perform(get("/api/members/email-availability").param("email", "cook@example.com"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.available").value(false));
+    }
+
+    @Test
+    void invalidEmailFormatIsRejectedBeforeCallingService() throws Exception {
+        mvc.perform(get("/api/members/email-availability").param("email", "not-an-email"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value(ErrorCode.INVALID_INPUT_VALUE.getCode()));
+
+        verifyNoInteractions(memberService);
+    }
+
+    @Test
+    void missingEmailIsRejectedBeforeCallingService() throws Exception {
+        mvc.perform(get("/api/members/email-availability"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(memberService);
+    }
+
+    @Test
+    void emailLongerThan255IsRejectedBeforeCallingService() throws Exception {
+        String email = "a".repeat(64) + "@" + "b".repeat(63) + "." + "c".repeat(63) + "." + "d".repeat(63) + ".com";
+
+        mvc.perform(get("/api/members/email-availability").param("email", email))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(memberService);
+    }
+
+    @Test
+    void anonymousUserCanCheckNicknameWithStrippedValue() throws Exception {
+        when(memberService.checkNicknameAvailability("요리왕", null))
+                .thenReturn(new NicknameAvailabilityResponse(false));
+
+        mvc.perform(get("/api/members/nickname-availability").param("nickname", "  요리왕 "))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.available").value(false));
+    }
+
+    @Test
+    void loggedInMemberIdIsPassedToNicknameCheck() throws Exception {
+        when(memberService.checkNicknameAvailability("요리왕", 7L))
+                .thenReturn(new NicknameAvailabilityResponse(true));
+
+        mvc.perform(get("/api/members/nickname-availability").param("nickname", "요리왕")
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                new AuthSessionService.AuthPrincipal(7L, 8L, Member.Role.USER), null,
+                                List.of(new SimpleGrantedAuthority("ROLE_USER"))))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.available").value(true));
+    }
+
+    @Test
+    void blankNicknameIsRejectedBeforeCallingService() throws Exception {
+        mvc.perform(get("/api/members/nickname-availability").param("nickname", "   "))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value(ErrorCode.INVALID_INPUT_VALUE.getCode()));
+
+        verifyNoInteractions(memberService);
+    }
+
+    @Test
+    void missingNicknameIsRejectedBeforeCallingService() throws Exception {
+        mvc.perform(get("/api/members/nickname-availability"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(memberService);
+    }
+
+    @Test
+    void nicknameLongerThan30AfterStripIsRejectedBeforeCallingService() throws Exception {
+        mvc.perform(get("/api/members/nickname-availability").param("nickname", " " + "가".repeat(31) + " "))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(memberService);
+    }
+
+    @Test
+    void changePasswordUsesAuthenticatedMemberAndSession() throws Exception {
+        mvc.perform(patch("/api/members/me/password")
+                        .with(csrf())
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                new AuthSessionService.AuthPrincipal(7L, 8L, Member.Role.USER), null,
+                                List.of(new SimpleGrantedAuthority("ROLE_USER")))))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"currentPassword\":\"Oldpassword1!\",\"newPassword\":\"Newpassword1!\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+
+        verify(memberService).changePassword(7L, 8L, "Oldpassword1!", "Newpassword1!");
+    }
+
+    @Test
+    void changePasswordRejectsInvalidNewPassword() throws Exception {
+        mvc.perform(patch("/api/members/me/password")
+                        .with(csrf())
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                new AuthSessionService.AuthPrincipal(7L, 8L, Member.Role.USER), null,
+                                List.of(new SimpleGrantedAuthority("ROLE_USER")))))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"currentPassword\":\"Oldpassword1!\",\"newPassword\":\"short\"}"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(memberService);
+    }
+
+    @Test
+    void changePasswordRejectsMissingAndMalformedFields() throws Exception {
+        for (String body : List.of(
+                "{}",
+                "{\"currentPassword\": \"\", \"newPassword\": \"Newpassword1!\"}",
+                "{\"currentPassword\": \"Oldpassword1!\", \"newPassword\": \"abcdefgh\"}",
+                "{\"currentPassword\": \"Oldpassword1!\", \"newPassword\": \"abcdefgh1 \"}",
+                "{\"currentPassword\": \"Oldpassword1!\", \"newPassword\": \"가나다abc1!\"}")) {
+            mvc.perform(patch("/api/members/me/password")
+                            .with(csrf())
+                            .with(authentication(new UsernamePasswordAuthenticationToken(
+                                    new AuthSessionService.AuthPrincipal(7L, 8L, Member.Role.USER), null,
+                                    List.of(new SimpleGrantedAuthority("ROLE_USER")))))
+                            .contentType(MediaType.APPLICATION_JSON).content(body))
+                    .andExpect(status().isBadRequest());
+        }
+        verifyNoInteractions(memberService);
+    }
+
+    @Test
+    void changePasswordRequiresLoginAndCsrf() throws Exception {
+        String body = "{\"currentPassword\":\"Oldpassword1!\",\"newPassword\":\"Newpassword1!\"}";
+        mvc.perform(patch("/api/members/me/password")
+                        .with(csrf()).contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(patch("/api/members/me/password")
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                new AuthSessionService.AuthPrincipal(7L, 8L, Member.Role.USER), null,
+                                List.of(new SimpleGrantedAuthority("ROLE_USER")))))
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(memberService);
+    }
+
+    @Test
+    void changePasswordReportsWrongCurrentPassword() throws Exception {
+        doThrow(new BusinessException(ErrorCode.INVALID_CURRENT_PASSWORD))
+                .when(memberService).changePassword(eq(7L), eq(8L), eq("Wrongpassword1!"),
+                        eq("Newpassword1!"));
+
+        mvc.perform(patch("/api/members/me/password")
+                        .with(csrf())
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                new AuthSessionService.AuthPrincipal(7L, 8L, Member.Role.USER), null,
+                                List.of(new SimpleGrantedAuthority("ROLE_USER")))))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"currentPassword\":\"Wrongpassword1!\",\"newPassword\":\"Newpassword1!\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("M003"));
+    }
+
+    @Test
+    void changeTastesPassesRequestedListToService() throws Exception {
+        var auth = authentication(new UsernamePasswordAuthenticationToken(
+                new AuthSessionService.AuthPrincipal(7L, 8L, Member.Role.USER), null,
+                List.of(new SimpleGrantedAuthority("ROLE_USER"))));
+        mvc.perform(put("/api/members/me/tastes")
+                        .with(csrf()).with(auth)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"tastes\":[\"SWEET\",\"SWEET\",\"SPICY\"]}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+        verify(memberService).changeTastes(eq(7L), argThat(request ->
+                request.equals(List.of(Member.Taste.SWEET, Member.Taste.SWEET, Member.Taste.SPICY))));
+
+        mvc.perform(put("/api/members/me/tastes")
+                        .with(csrf()).with(auth)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"tastes\":[]}"))
+                .andExpect(status().isOk());
+        verify(memberService).changeTastes(eq(7L), argThat(List::isEmpty));
+    }
+
+    @Test
+    void changeTastesRequiresLoginAndCsrf() throws Exception {
+        mvc.perform(put("/api/members/me/tastes")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"tastes\":[]}"))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(put("/api/members/me/tastes")
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                new AuthSessionService.AuthPrincipal(7L, 8L, Member.Role.USER), null,
+                                List.of(new SimpleGrantedAuthority("ROLE_USER")))))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"tastes\":[]}"))
+                .andExpect(status().isForbidden());
+        verifyNoInteractions(memberService);
+    }
+
+    @Test
+    void changeTastesRejectsMissingNullAndUnknownValues() throws Exception {
+        for (String body : List.of("{}", "{\"tastes\":null}",
+                "{\"tastes\":[null]}", "{\"tastes\":[\"UNKNOWN\"]}")) {
+            mvc.perform(put("/api/members/me/tastes")
+                            .with(csrf())
+                            .with(authentication(new UsernamePasswordAuthenticationToken(
+                                    new AuthSessionService.AuthPrincipal(7L, 8L, Member.Role.USER), null,
+                                    List.of(new SimpleGrantedAuthority("ROLE_USER")))))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body))
+                    .andExpect(status().isBadRequest());
+        }
+        verifyNoInteractions(memberService);
+    }
+
+    @TestConfiguration
+    static class TestConfig {
+
+        @Bean
+        MemberService memberService() {
+            return mock(MemberService.class);
+        }
+
+        @Bean
+        JwtTokenService jwtTokenService() {
+            return mock(JwtTokenService.class);
+        }
+
+        @Bean
+        AuthSessionService authSessionService() {
+            return mock(AuthSessionService.class);
+        }
+    }
+}
