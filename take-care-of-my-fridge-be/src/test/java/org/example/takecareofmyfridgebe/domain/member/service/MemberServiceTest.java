@@ -120,8 +120,12 @@ class MemberServiceTest {
 
     @Test
     void getMyInfoReturnsMemberWithTastes() {
-        Member member = Member.create("cook@example.com", "{bcrypt}encoded", "요리왕",
-                Set.of(Member.Taste.SWEET));
+        Member member = Member.builder()
+                .email("cook@example.com")
+                .passwordHash("{bcrypt}encoded")
+                .nickname("요리왕")
+                .tastes(Set.of(Member.Taste.SWEET))
+                .build();
         ReflectionTestUtils.setField(member, "id", 7L);
         when(memberRepository.findById(7L)).thenReturn(Optional.of(member));
 
@@ -146,7 +150,11 @@ class MemberServiceTest {
 
     @Test
     void changeNicknameUpdatesOnlyCurrentMember() {
-        Member member = Member.create("cook@example.com", "hash", "기존닉네임", Set.of());
+        Member member = Member.builder()
+                .email("cook@example.com")
+                .passwordHash("hash")
+                .nickname("기존닉네임")
+                .build();
         when(memberRepository.findById(7L)).thenReturn(Optional.of(member));
 
         memberService.changeNickname(7L, new ChangeNicknameRequest(" 새닉네임 "));
@@ -158,7 +166,11 @@ class MemberServiceTest {
 
     @Test
     void changeNicknameRejectsAnotherMembersNickname() {
-        Member member = Member.create("cook@example.com", "hash", "기존닉네임", Set.of());
+        Member member = Member.builder()
+                .email("cook@example.com")
+                .passwordHash("hash")
+                .nickname("기존닉네임")
+                .build();
         when(memberRepository.findById(7L)).thenReturn(Optional.of(member));
         when(memberRepository.existsByNicknameAndIdNot("중복닉네임", 7L)).thenReturn(true);
 
@@ -172,7 +184,11 @@ class MemberServiceTest {
 
     @Test
     void changeNicknameMapsConcurrentUniqueConstraintConflict() {
-        Member member = Member.create("cook@example.com", "hash", "기존닉네임", Set.of());
+        Member member = Member.builder()
+                .email("cook@example.com")
+                .passwordHash("hash")
+                .nickname("기존닉네임")
+                .build();
         when(memberRepository.findById(7L)).thenReturn(Optional.of(member));
         doThrow(new DataIntegrityViolationException("Duplicate entry for key 'uk_members_nickname'"))
                 .when(memberRepository).flush();
@@ -185,7 +201,11 @@ class MemberServiceTest {
 
     @Test
     void changeNicknameToSameValueDoesNotWrite() {
-        Member member = Member.create("cook@example.com", "hash", "기존닉네임", Set.of());
+        Member member = Member.builder()
+                .email("cook@example.com")
+                .passwordHash("hash")
+                .nickname("기존닉네임")
+                .build();
         when(memberRepository.findById(7L)).thenReturn(Optional.of(member));
 
         memberService.changeNickname(7L, new ChangeNicknameRequest("기존닉네임"));
@@ -195,7 +215,11 @@ class MemberServiceTest {
 
     @Test
     void changePasswordReplacesHashAfterCheckingCurrentPassword() {
-        Member member = Member.create("cook@example.com", "old-hash", "요리왕", Set.of());
+        Member member = Member.builder()
+                .email("cook@example.com")
+                .passwordHash("old-hash")
+                .nickname("요리왕")
+                .build();
         when(memberRepository.findById(7L)).thenReturn(Optional.of(member));
         when(passwordEncoder.matches("Oldpassword1!", "old-hash")).thenReturn(true);
         when(passwordEncoder.encode("Newpassword1!")).thenReturn("new-hash");
@@ -214,7 +238,11 @@ class MemberServiceTest {
 
     @Test
     void changePasswordRejectsWrongCurrentPasswordWithoutEncoding() {
-        Member member = Member.create("cook@example.com", "old-hash", "요리왕", Set.of());
+        Member member = Member.builder()
+                .email("cook@example.com")
+                .passwordHash("old-hash")
+                .nickname("요리왕")
+                .build();
         when(memberRepository.findById(7L)).thenReturn(Optional.of(member));
 
         BusinessException exception = assertThrows(BusinessException.class,
@@ -228,7 +256,11 @@ class MemberServiceTest {
 
     @Test
     void changePasswordRejectsSamePasswordWithoutEncoding() {
-        Member member = Member.create("cook@example.com", "old-hash", "요리왕", Set.of());
+        Member member = Member.builder()
+                .email("cook@example.com")
+                .passwordHash("old-hash")
+                .nickname("요리왕")
+                .build();
         when(memberRepository.findById(7L)).thenReturn(Optional.of(member));
         when(passwordEncoder.matches("Oldpassword1!", "old-hash")).thenReturn(true);
 
@@ -254,8 +286,12 @@ class MemberServiceTest {
 
     @Test
     void changeTastesReplacesListAndKeepsExistingRows() {
-        Member member = Member.create("cook@example.com", "hash", "요리왕",
-                Set.of(Member.Taste.SWEET, Member.Taste.SALTY));
+        Member member = Member.builder()
+                .email("cook@example.com")
+                .passwordHash("hash")
+                .nickname("요리왕")
+                .tastes(Set.of(Member.Taste.SWEET, Member.Taste.SALTY))
+                .build();
         MemberTaste existingSweet = member.getTastes().stream()
                 .filter(item -> item.getTaste() == Member.Taste.SWEET).findFirst().orElseThrow();
         when(memberRepository.findById(7L)).thenReturn(Optional.of(member));
@@ -281,8 +317,12 @@ class MemberServiceTest {
 
     @Test
     void changeTastesWithEmptyListClearsAllPreferences() {
-        Member member = Member.create("cook@example.com", "hash", "요리왕",
-                Set.of(Member.Taste.SWEET));
+        Member member = Member.builder()
+                .email("cook@example.com")
+                .passwordHash("hash")
+                .nickname("요리왕")
+                .tastes(Set.of(Member.Taste.SWEET))
+                .build();
         when(memberRepository.findById(7L)).thenReturn(Optional.of(member));
 
         memberService.changeTastes(7L, List.of());

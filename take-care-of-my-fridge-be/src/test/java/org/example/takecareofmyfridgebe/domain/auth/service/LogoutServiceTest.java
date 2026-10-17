@@ -11,7 +11,6 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.Optional;
-import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -54,7 +53,11 @@ class LogoutServiceTest {
     }
 
     private RefreshSession session(String refresh) {
-        Member member = Member.create("cook@example.com", "hash", "요리왕", Set.of());
+        Member member = Member.builder()
+                .email("cook@example.com")
+                .passwordHash("hash")
+                .nickname("요리왕")
+                .build();
         ReflectionTestUtils.setField(member, "id", 4L);
         RefreshSession session = RefreshSession.create(member, jwt.hash(refresh),
                 LocalDateTime.now(ZoneOffset.UTC));

@@ -20,7 +20,6 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -39,7 +38,11 @@ class AdminAuditSearchServiceTest {
 
     @Test
     void returnsPageWithActorRoleAtActionTime() {
-        Member actor = Member.create("cook@example.com", "hash", "요리왕", Set.of());
+        Member actor = Member.builder()
+                .email("cook@example.com")
+                .passwordHash("hash")
+                .nickname("요리왕")
+                .build();
         AdminAuditLog log = AdminAuditLog.create(actor, AdminAuditLog.Action.ROLE_CHANGE,
                 "Member", 12L, AdminAuditLog.Result.DENIED);
         ReflectionTestUtils.setField(log, "id", 5L);

@@ -11,7 +11,12 @@ class AdminAuditLogTest {
 
     @Test
     void roleChangeStoresOnlyRoleValues() {
-        Member actor = Member.createInitialAdmin("admin@example.com", "hash", "관리자");
+        Member actor = Member.builder()
+                .email("admin@example.com")
+                .passwordHash("hash")
+                .nickname("관리자")
+                .role(Member.Role.ADMIN)
+                .build();
         AdminAuditLog log = AdminAuditLog.create(actor, AdminAuditLog.Action.ROLE_CHANGE,
                 "Member", 12L, AdminAuditLog.Result.SUCCESS,
                 Map.of("role", "USER"), Map.of("role", "ADMIN"));

@@ -10,8 +10,12 @@ class MemberTest {
 
     @Test
     void createInitializesAccountAndLinksSelectedTastes() {
-        Member member = Member.create("member@example.com", "encoded-password", "member", Set.of(
-                Member.Taste.SALTY, Member.Taste.SWEET));
+        Member member = Member.builder()
+                .email("member@example.com")
+                .passwordHash("encoded-password")
+                .nickname("member")
+                .tastes(Set.of(Member.Taste.SALTY, Member.Taste.SWEET))
+                .build();
 
         assertThat(member.getRole()).isEqualTo(Member.Role.USER);
         assertThat(member.getStatus()).isEqualTo(Member.Status.ACTIVE);

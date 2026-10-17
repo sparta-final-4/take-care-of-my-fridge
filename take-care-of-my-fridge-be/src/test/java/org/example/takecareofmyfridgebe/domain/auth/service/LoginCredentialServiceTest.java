@@ -13,7 +13,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.Optional;
-import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -73,7 +72,11 @@ class LoginCredentialServiceTest {
     }
 
     private Member member(Member.Status status) {
-        Member member = Member.create("cook@example.com", "{bcrypt}hash", "요리왕", Set.of());
+        Member member = Member.builder()
+                .email("cook@example.com")
+                .passwordHash("{bcrypt}hash")
+                .nickname("요리왕")
+                .build();
         ReflectionTestUtils.setField(member, "status", status);
         return member;
     }

@@ -4,7 +4,6 @@ import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
-import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -12,7 +11,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class RefreshSessionTest {
 
     private final LocalDateTime now = LocalDateTime.of(2026, 10, 16, 12, 0);
-    private final Member member = Member.create("cook@example.com", "hash", "요리왕", Set.of());
+    private final Member member = Member.builder()
+            .email("cook@example.com")
+            .passwordHash("hash")
+            .nickname("요리왕")
+            .build();
 
     @Test
     void expiresAfterThirtyMinutesWithoutUse() {
