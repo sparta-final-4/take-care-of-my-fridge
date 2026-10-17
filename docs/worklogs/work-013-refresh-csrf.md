@@ -14,6 +14,6 @@
 
 ## 검증
 
-- `./gradlew.bat clean compileJava compileTestJava` 실행 시 기본 Gradle 캐시 잠금 파일 접근이 거부됐다.
-- 작업 공간 캐시로도 Gradle 데몬 연결이 실패해 테스트는 미실행이다.
-- Spring Security 7.1.1의 `CsrfConfigurer.spa()` 메서드는 로컬 라이브러리에서 확인했다.
+- 기본 Gradle 캐시 잠금 파일 쓰기와 워커 연결이 제한돼 표준 Gradle 테스트 작업은 미실행이다.
+- Gradle이 계산한 의존성 경로로 `javac` 소스·테스트 컴파일 성공. JUnit Launcher로 `CsrfControllerTest` 1개 통과, 전체 DB 비의존 테스트 38개 통과.
+- Spring Security 7.1.1의 `CsrfConfigurer.spa()` 메서드는 로컬 라이브러리에서도 확인했다.
