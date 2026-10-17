@@ -4,6 +4,7 @@ import org.example.takecareofmyfridgebe.domain.member.dto.MyInfoResponse;
 import org.example.takecareofmyfridgebe.domain.member.dto.ChangeNicknameRequest;
 import org.example.takecareofmyfridgebe.domain.member.dto.SignUpRequest;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
+import org.example.takecareofmyfridgebe.domain.member.entity.MemberTaste;
 import org.example.takecareofmyfridgebe.domain.member.repository.MemberRepository;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
@@ -24,6 +25,7 @@ import java.util.Set;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -182,6 +184,45 @@ class MemberServiceTest {
         memberService.changeNickname(7L, new ChangeNicknameRequest("기존닉네임"));
 
         verify(memberRepository, never()).flush();
+    }
+
+    @Test
+    void changeTastesReplacesListAndAcceptsDuplicates() {
+        Member member = Member.create("cook@example.com", "hash", "요리왕",
+                Set.of(Member.Taste.SWEET, Member.Taste.SALTY));
+        MemberTaste existingSweet = member.getTastes().stream()
+                .filter(item -> item.getTaste() == Member.Taste.SWEET).findFirst().orElseThrow();
+        when(memberRepository.findById(7L)).thenReturn(Optional.of(member));
+
+        memberService.changeTastes(7L,
+                List.of(Member.Taste.SWEET, Member.Taste.SWEET, Member.Taste.SPICY));
+
+        assertEquals(2, member.getTastes().size());
+        assertEquals(Set.of(Member.Taste.SWEET, Member.Taste.SPICY),
+                Set.copyOf(member.getTastes().stream().map(MemberTaste::getTaste).toList()));
+        assertSame(existingSweet, member.getTastes().stream()
+                .filter(item -> item.getTaste() == Member.Taste.SWEET).findFirst().orElseThrow());
+    }
+
+    @Test
+    void changeTastesWithEmptyListClearsAllPreferences() {
+        Member member = Member.create("cook@example.com", "hash", "요리왕",
+                Set.of(Member.Taste.SWEET));
+        when(memberRepository.findById(7L)).thenReturn(Optional.of(member));
+
+        memberService.changeTastes(7L, List.of());
+
+        assertTrue(member.getTastes().isEmpty());
+    }
+
+    @Test
+    void changeTastesRejectsMissingMember() {
+        when(memberRepository.findById(7L)).thenReturn(Optional.empty());
+
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> memberService.changeTastes(7L, List.of()));
+
+        assertEquals(ErrorCode.MEMBER_NOT_FOUND, exception.getErrorCode());
     }
 
     @Test

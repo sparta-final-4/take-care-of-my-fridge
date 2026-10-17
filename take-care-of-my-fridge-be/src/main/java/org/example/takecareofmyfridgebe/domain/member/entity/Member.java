@@ -70,6 +70,15 @@ public class Member extends BaseTimeEntity {
         return new Member(email, passwordHash, nickname, tastes);
     }
 
+    public void replaceTastes(Set<Taste> newTastes) {
+        tastes.removeIf(existing -> !newTastes.contains(existing.getTaste()));
+        for (Taste taste : newTastes) {
+            if (tastes.stream().noneMatch(existing -> existing.getTaste() == taste)) {
+                tastes.add(MemberTaste.create(this, taste));
+            }
+        }
+    }
+
     public void changeNickname(String nickname) {
         this.nickname = nickname;
     }

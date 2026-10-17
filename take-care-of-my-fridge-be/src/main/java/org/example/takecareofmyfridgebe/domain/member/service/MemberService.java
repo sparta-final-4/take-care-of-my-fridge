@@ -1,8 +1,8 @@
 package org.example.takecareofmyfridgebe.domain.member.service;
 
 import lombok.RequiredArgsConstructor;
-import org.example.takecareofmyfridgebe.domain.member.dto.EmailAvailabilityResponse;
 import org.example.takecareofmyfridgebe.domain.member.dto.ChangeNicknameRequest;
+import org.example.takecareofmyfridgebe.domain.member.dto.EmailAvailabilityResponse;
 import org.example.takecareofmyfridgebe.domain.member.dto.MyInfoResponse;
 import org.example.takecareofmyfridgebe.domain.member.dto.NicknameAvailabilityResponse;
 import org.example.takecareofmyfridgebe.domain.member.dto.SignUpRequest;
@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.HashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 
@@ -65,6 +66,13 @@ public class MemberService {
             }
             throw e;
         }
+    }
+
+    @Transactional
+    public void changeTastes(Long memberId, List<Member.Taste> tastes) {
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
+        member.replaceTastes(new HashSet<>(tastes));
     }
 
     @Transactional
