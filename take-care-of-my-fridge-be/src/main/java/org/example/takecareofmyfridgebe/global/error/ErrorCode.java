@@ -73,7 +73,10 @@ public enum ErrorCode {
     CHAT_ACCESS_DENIED(HttpStatus.FORBIDDEN, "CHAT_004", "해당 채팅방에 접근할 권한이 없습니다."),
 
     // Review
-    REVIEW_NOT_FOUND(HttpStatus.NOT_FOUND, "REVIEW_001", "리뷰를 찾을 수 없습니다.")
+    REVIEW_NOT_FOUND(HttpStatus.NOT_FOUND, "REVIEW_001", "리뷰를 찾을 수 없습니다."),
+
+    // Notification
+    INVALID_NOTIFICATION(HttpStatus.INTERNAL_SERVER_ERROR, "NOTIFICATION_001", "알림 정보가 올바르지 않습니다.")
     ;
 
     private final HttpStatus status;
