@@ -140,7 +140,7 @@ class AuthControllerTest {
                 .andExpect(status().isForbidden());
         mvc.perform(post("/api/auth/refresh").with(csrf()))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.code").value("MEMBER_004"));
+                .andExpect(jsonPath("$.code").value("A005"));
 
         verifyNoInteractions(refreshService);
     }
@@ -154,7 +154,7 @@ class AuthControllerTest {
                         .with(csrf())
                         .cookie(new Cookie("refresh_token", "invalid")))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.code").value("MEMBER_004"));
+                .andExpect(jsonPath("$.code").value("A005"));
     }
 
     @Test

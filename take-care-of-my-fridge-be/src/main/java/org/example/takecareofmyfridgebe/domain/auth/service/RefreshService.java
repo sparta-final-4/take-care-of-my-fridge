@@ -34,9 +34,11 @@ public class RefreshService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_REFRESH_TOKEN));
         LocalDateTime now = LocalDateTime.ofInstant(Instant.now(), ZoneOffset.UTC);
         Member member = session.getMember();
-        if (!member.getId().equals(memberId) || !session.isUsable(now)
-                || member.getStatus() != Member.Status.ACTIVE) {
+        if (!member.getId().equals(memberId) || !session.isUsable(now)) {
             throw new BusinessException(ErrorCode.INVALID_REFRESH_TOKEN);
+        }
+        if (member.getStatus() != Member.Status.ACTIVE) {
+            throw new BusinessException(ErrorCode.SESSION_REVOKED_BY_SUSPENSION);
         }
 
         Instant issuedAt = now.toInstant(ZoneOffset.UTC);

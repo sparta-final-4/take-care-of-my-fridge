@@ -61,6 +61,18 @@ class RefreshServiceTest {
         assertEquals(ErrorCode.INVALID_REFRESH_TOKEN, invalid.getErrorCode());
     }
 
+    @Test
+    void suspendedMemberGetsSuspensionCode() {
+        String token = jwt.issueRefresh(4L, Instant.now());
+        RefreshSession session = session(token, LocalDateTime.now(ZoneOffset.UTC));
+        ReflectionTestUtils.setField(session.getMember(), "status", Member.Status.SUSPENDED);
+        when(repository.findByTokenHashForUpdate(jwt.hash(token))).thenReturn(Optional.of(session));
+
+        BusinessException suspended = assertThrows(BusinessException.class, () -> service.refresh(token));
+
+        assertEquals(ErrorCode.SESSION_REVOKED_BY_SUSPENSION, suspended.getErrorCode());
+    }
+
     private RefreshSession session(String token, LocalDateTime now) {
         Member member = Member.create("cook@example.com", "hash", "요리왕", Set.of());
         ReflectionTestUtils.setField(member, "id", 4L);
