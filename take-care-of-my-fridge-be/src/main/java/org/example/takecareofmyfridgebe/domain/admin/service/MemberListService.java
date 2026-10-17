@@ -46,7 +46,8 @@ public class MemberListService {
         Map<Long, AdminAuditLog> promotions = new HashMap<>();
         if (!adminIds.isEmpty()) {
             auditLogRepository.findByActionAndResultAndTargetTypeAndTargetIdInOrderByCreatedAtDescIdDesc(
-                    AdminAuditLog.Action.ROLE_CHANGE, AdminAuditLog.Result.SUCCESS, "Member", adminIds)
+                    AdminAuditLog.Action.ROLE_CHANGE, AdminAuditLog.Result.SUCCESS,
+                    AdminAuditLog.TARGET_MEMBER, adminIds)
                     .forEach(log -> promotions.putIfAbsent(log.getTargetId(), log));
         }
         return PageResponse.of(members.map(member ->

@@ -37,14 +37,14 @@ public class AdminMemberController {
             @AuthenticationPrincipal AuthSessionService.AuthPrincipal principal) {
         if (principal.role() != Member.Role.ADMIN) {
             auditLogService.record(principal.memberId(), AdminAuditLog.Action.ROLE_CHANGE,
-                    "Member", memberId, AdminAuditLog.Result.DENIED);
+                    AdminAuditLog.TARGET_MEMBER, memberId, AdminAuditLog.Result.DENIED);
             throw new BusinessException(ErrorCode.FORBIDDEN);
         }
         try {
             memberPromotionService.promote(principal.memberId(), memberId);
         } catch (BusinessException e) {
             auditLogService.record(principal.memberId(), AdminAuditLog.Action.ROLE_CHANGE,
-                    "Member", memberId, AdminAuditLog.Result.FAILED);
+                    AdminAuditLog.TARGET_MEMBER, memberId, AdminAuditLog.Result.FAILED);
             throw e;
         }
         return ResponseEntity.ok(ApiResponse.ok());

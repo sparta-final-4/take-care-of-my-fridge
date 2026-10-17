@@ -36,7 +36,7 @@ public class MemberPromotionService {
         }
         target.promoteToAdmin();
         auditLogRepository.save(AdminAuditLog.create(actor, AdminAuditLog.Action.ROLE_CHANGE,
-                "Member", targetId, AdminAuditLog.Result.SUCCESS,
+                AdminAuditLog.TARGET_MEMBER, targetId, AdminAuditLog.Result.SUCCESS,
                 Map.of("role", "USER"), Map.of("role", "ADMIN")));
     }
 }
