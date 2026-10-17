@@ -3,6 +3,7 @@ package org.example.takecareofmyfridgebe.domain.member.controller;
 import org.example.takecareofmyfridgebe.domain.auth.service.AuthSessionService;
 import org.example.takecareofmyfridgebe.domain.auth.service.JwtTokenService;
 import org.example.takecareofmyfridgebe.domain.member.dto.EmailAvailabilityResponse;
+import org.example.takecareofmyfridgebe.domain.member.dto.MyInfoResponse;
 import org.example.takecareofmyfridgebe.domain.member.dto.NicknameAvailabilityResponse;
 import org.example.takecareofmyfridgebe.domain.member.dto.SignUpResponse;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
@@ -23,6 +24,7 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -102,6 +104,26 @@ class MemberControllerTest {
         mvc.perform(get("/api/members/me"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("A003"));
+    }
+
+    @Test
+    void loggedInMemberCanReadMyInfo() throws Exception {
+        when(memberService.getMyInfo(7L)).thenReturn(new MyInfoResponse(7L, "cook@example.com", "요리왕",
+                Member.Role.USER, Member.Status.ACTIVE, List.of(Member.Taste.SWEET),
+                LocalDateTime.of(2026, 10, 13, 10, 12)));
+
+        mvc.perform(get("/api/members/me")
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                new AuthSessionService.AuthPrincipal(7L, Member.Role.USER), null,
+                                List.of(new SimpleGrantedAuthority("ROLE_USER"))))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.memberId").value(7))
+                .andExpect(jsonPath("$.data.email").value("cook@example.com"))
+                .andExpect(jsonPath("$.data.nickname").value("요리왕"))
+                .andExpect(jsonPath("$.data.role").value("USER"))
+                .andExpect(jsonPath("$.data.status").value("ACTIVE"))
+                .andExpect(jsonPath("$.data.tastes[0]").value("SWEET"))
+                .andExpect(jsonPath("$.data.createdAt").value("2026-10-13T10:12:00"));
     }
 
     @Test

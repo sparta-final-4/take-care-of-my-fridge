@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.auth.service.AuthSessionService;
 import org.example.takecareofmyfridgebe.domain.member.dto.EmailAvailabilityRequest;
 import org.example.takecareofmyfridgebe.domain.member.dto.EmailAvailabilityResponse;
+import org.example.takecareofmyfridgebe.domain.member.dto.MyInfoResponse;
 import org.example.takecareofmyfridgebe.domain.member.dto.NicknameAvailabilityRequest;
 import org.example.takecareofmyfridgebe.domain.member.dto.NicknameAvailabilityResponse;
 import org.example.takecareofmyfridgebe.domain.member.dto.SignUpRequest;
@@ -40,6 +41,12 @@ public class MemberController {
             @AuthenticationPrincipal AuthSessionService.AuthPrincipal principal) {
         Long memberId = principal == null ? null : principal.memberId();
         return ResponseEntity.ok(ApiResponse.ok(memberService.checkNicknameAvailability(request.nickname(), memberId)));
+    }
+
+    @GetMapping("/me")
+    public ResponseEntity<ApiResponse<MyInfoResponse>> getMyInfo(
+            @AuthenticationPrincipal AuthSessionService.AuthPrincipal principal) {
+        return ResponseEntity.ok(ApiResponse.ok(memberService.getMyInfo(principal.memberId())));
     }
 
     @PostMapping
