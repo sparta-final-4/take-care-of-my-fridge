@@ -104,7 +104,8 @@ class MemberControllerTest {
         mvc.perform(post("/api/members/me/nickname")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("AUTH_002"));
     }
 
     @Test

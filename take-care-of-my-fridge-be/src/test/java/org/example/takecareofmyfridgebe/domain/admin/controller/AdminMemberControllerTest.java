@@ -143,7 +143,8 @@ class AdminMemberControllerTest {
     void userPromotionAttemptIsDeniedAndRecorded() throws Exception {
         mvc.perform(post("/api/admin/members/12/promotion")
                         .with(csrf()).with(authenticationFor(Member.Role.USER)))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("A004"));
         verifyNoInteractions(memberPromotionService);
         verify(auditLogService).record(7L, AdminAuditLog.Action.ROLE_CHANGE,
                 "Member", 12L, AdminAuditLog.Result.DENIED);

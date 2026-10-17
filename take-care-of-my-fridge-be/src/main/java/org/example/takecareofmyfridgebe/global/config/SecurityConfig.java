@@ -15,6 +15,7 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.csrf.CsrfException;
 import tools.jackson.databind.ObjectMapper;
 
 @Configuration
@@ -52,7 +53,9 @@ public class SecurityConfig {
                         .accessDeniedHandler((request, response, exception) -> {
                             response.setStatus(403);
                             response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-                            objectMapper.writeValue(response.getWriter(), ApiResponse.error(ErrorCode.FORBIDDEN));
+                            ErrorCode code = exception instanceof CsrfException
+                                    ? ErrorCode.FORBIDDEN : ErrorCode.ADMIN_ACCESS_DENIED;
+                            objectMapper.writeValue(response.getWriter(), ApiResponse.error(code));
                         }))
                 .addFilterBefore(new JwtCookieFilter(jwtTokenService, sessionService),
                         UsernamePasswordAuthenticationFilter.class)

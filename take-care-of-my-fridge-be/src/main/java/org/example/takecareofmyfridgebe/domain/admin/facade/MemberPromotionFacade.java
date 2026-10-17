@@ -19,7 +19,7 @@ public class MemberPromotionFacade {
     public void promote(Long actorId, Member.Role actorRole, Long targetId) {
         if (actorRole != Member.Role.ADMIN) {
             record(actorId, targetId, AdminAuditLog.Result.DENIED);
-            throw new BusinessException(ErrorCode.FORBIDDEN);
+            throw new BusinessException(ErrorCode.ADMIN_ACCESS_DENIED);
         }
         try {
             memberPromotionService.promote(actorId, targetId);

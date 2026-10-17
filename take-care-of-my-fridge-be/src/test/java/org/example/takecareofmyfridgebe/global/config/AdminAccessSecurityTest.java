@@ -43,7 +43,7 @@ class AdminAccessSecurityTest {
     void userRequestIsForbidden() throws Exception {
         mvc.perform(get("/api/admin/probe").with(authentication(authenticationFor(Member.Role.USER))))
                 .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.code").value("AUTH_002"));
+                .andExpect(jsonPath("$.code").value("A004"));
     }
 
     @Test

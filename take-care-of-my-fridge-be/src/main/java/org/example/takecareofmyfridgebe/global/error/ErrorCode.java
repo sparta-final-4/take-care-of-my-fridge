@@ -15,6 +15,7 @@ public enum ErrorCode {
     // Auth
     UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "A003", "로그인이 필요합니다."),
     FORBIDDEN(HttpStatus.FORBIDDEN, "AUTH_002", "권한이 없습니다."),
+    ADMIN_ACCESS_DENIED(HttpStatus.FORBIDDEN, "A004", "관리자 계정만 볼 수 있는 페이지입니다."),
 
     // Member
     MEMBER_NOT_FOUND(HttpStatus.NOT_FOUND, "M005", "회원을 찾을 수 없습니다."),
@@ -25,8 +26,8 @@ public enum ErrorCode {
     DUPLICATE_NICKNAME(HttpStatus.CONFLICT, "M002", "이미 사용 중인 닉네임입니다."),
     INVALID_CURRENT_PASSWORD(HttpStatus.BAD_REQUEST, "M003", "현재 비밀번호가 일치하지 않습니다."),
     SAME_AS_CURRENT_PASSWORD(HttpStatus.BAD_REQUEST, "M004", "현재 비밀번호와 다른 비밀번호를 입력해 주세요."),
-    ALREADY_ADMIN(HttpStatus.CONFLICT, "M007", "이미 관리자입니다."),
-    PROMOTION_SUSPENDED(HttpStatus.CONFLICT, "M008", "정지된 회원은 승격할 수 없습니다."),
+    ALREADY_ADMIN(HttpStatus.CONFLICT, "M007", "이미 관리자인 회원입니다."),
+    PROMOTION_SUSPENDED(HttpStatus.CONFLICT, "M006", "정지된 회원은 관리자로 승격할 수 없습니다."),
 
     // Product
     PRODUCT_NOT_FOUND(HttpStatus.NOT_FOUND, "PRODUCT_001", "상품을 찾을 수 없습니다."),
