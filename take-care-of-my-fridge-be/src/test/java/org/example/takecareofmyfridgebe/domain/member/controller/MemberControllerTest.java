@@ -2,6 +2,7 @@ package org.example.takecareofmyfridgebe.domain.member.controller;
 
 import org.example.takecareofmyfridgebe.domain.auth.service.AuthSessionService;
 import org.example.takecareofmyfridgebe.domain.auth.service.JwtTokenService;
+import org.example.takecareofmyfridgebe.domain.member.dto.EmailAvailabilityResponse;
 import org.example.takecareofmyfridgebe.domain.member.dto.SignUpResponse;
 import org.example.takecareofmyfridgebe.domain.member.service.MemberService;
 import org.example.takecareofmyfridgebe.global.config.SecurityConfig;
@@ -94,6 +95,47 @@ class MemberControllerTest {
         mvc.perform(get("/api/members/me"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("AUTH_001"));
+    }
+
+    @Test
+    @WithMockUser
+    void checkEmailAvailabilityReturnsAvailability() throws Exception {
+        when(memberService.checkEmailAvailability("cook@example.com"))
+                .thenReturn(new EmailAvailabilityResponse(false));
+
+        mvc.perform(get("/api/members/email-availability").param("email", "cook@example.com"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.available").value(false));
+    }
+
+    @Test
+    @WithMockUser
+    void invalidEmailFormatIsRejectedBeforeCallingService() throws Exception {
+        mvc.perform(get("/api/members/email-availability").param("email", "not-an-email"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(ErrorCode.INVALID_INPUT_VALUE.getCode()));
+
+        verifyNoInteractions(memberService);
+    }
+
+    @Test
+    @WithMockUser
+    void missingEmailIsRejectedBeforeCallingService() throws Exception {
+        mvc.perform(get("/api/members/email-availability"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(memberService);
+    }
+
+    @Test
+    @WithMockUser
+    void emailLongerThan255IsRejectedBeforeCallingService() throws Exception {
+        String email = "a".repeat(64) + "@" + "b".repeat(63) + "." + "c".repeat(63) + "." + "d".repeat(63) + ".com";
+
+        mvc.perform(get("/api/members/email-availability").param("email", email))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(memberService);
     }
 
     @TestConfiguration
