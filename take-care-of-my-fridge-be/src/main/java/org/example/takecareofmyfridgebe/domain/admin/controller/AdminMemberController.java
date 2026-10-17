@@ -4,14 +4,9 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.admin.dto.MemberListRequest;
 import org.example.takecareofmyfridgebe.domain.admin.dto.MemberSummaryResponse;
-import org.example.takecareofmyfridgebe.domain.admin.entity.AdminAuditLog;
-import org.example.takecareofmyfridgebe.domain.admin.service.AdminAuditLogService;
-import org.example.takecareofmyfridgebe.domain.admin.service.MemberPromotionService;
-import org.example.takecareofmyfridgebe.domain.auth.service.AuthSessionService;
-import org.example.takecareofmyfridgebe.domain.member.entity.Member;
-import org.example.takecareofmyfridgebe.global.error.BusinessException;
-import org.example.takecareofmyfridgebe.global.error.ErrorCode;
+import org.example.takecareofmyfridgebe.domain.admin.facade.MemberPromotionFacade;
 import org.example.takecareofmyfridgebe.domain.admin.service.MemberListService;
+import org.example.takecareofmyfridgebe.domain.auth.service.AuthSessionService;
 import org.example.takecareofmyfridgebe.global.response.ApiResponse;
 import org.example.takecareofmyfridgebe.global.response.PageResponse;
 import org.springframework.http.ResponseEntity;
@@ -29,24 +24,12 @@ import org.springframework.web.bind.annotation.RestController;
 public class AdminMemberController {
 
     private final MemberListService memberListService;
-    private final MemberPromotionService memberPromotionService;
-    private final AdminAuditLogService auditLogService;
+    private final MemberPromotionFacade memberPromotionFacade;
 
     @PostMapping("/{memberId}/promotion")
     public ResponseEntity<ApiResponse<Void>> promote(@PathVariable Long memberId,
             @AuthenticationPrincipal AuthSessionService.AuthPrincipal principal) {
-        if (principal.role() != Member.Role.ADMIN) {
-            auditLogService.record(principal.memberId(), AdminAuditLog.Action.ROLE_CHANGE,
-                    AdminAuditLog.TARGET_MEMBER, memberId, AdminAuditLog.Result.DENIED);
-            throw new BusinessException(ErrorCode.FORBIDDEN);
-        }
-        try {
-            memberPromotionService.promote(principal.memberId(), memberId);
-        } catch (BusinessException e) {
-            auditLogService.record(principal.memberId(), AdminAuditLog.Action.ROLE_CHANGE,
-                    AdminAuditLog.TARGET_MEMBER, memberId, AdminAuditLog.Result.FAILED);
-            throw e;
-        }
+        memberPromotionFacade.promote(principal.memberId(), principal.role(), memberId);
         return ResponseEntity.ok(ApiResponse.ok());
     }
 

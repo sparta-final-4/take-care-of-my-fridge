@@ -23,9 +23,6 @@ public class MemberPromotionService {
     public void promote(Long actorId, Long targetId) {
         Member actor = memberRepository.findById(actorId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
-        if (actor.getRole() != Member.Role.ADMIN) {
-            throw new BusinessException(ErrorCode.FORBIDDEN);
-        }
         Member target = memberRepository.findByIdForUpdate(targetId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
         if (target.getStatus() == Member.Status.SUSPENDED) {
