@@ -227,6 +227,21 @@ class MemberServiceTest {
     }
 
     @Test
+    void changePasswordRejectsSamePasswordWithoutEncoding() {
+        Member member = Member.create("cook@example.com", "old-hash", "요리왕", Set.of());
+        when(memberRepository.findById(7L)).thenReturn(Optional.of(member));
+        when(passwordEncoder.matches("Oldpassword1!", "old-hash")).thenReturn(true);
+
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> memberService.changePassword(7L, 8L, "Oldpassword1!", "Oldpassword1!"));
+
+        assertEquals(ErrorCode.SAME_AS_CURRENT_PASSWORD, exception.getErrorCode());
+        assertEquals("old-hash", member.getPasswordHash());
+        verify(passwordEncoder, never()).encode(any());
+        verify(sessionRepository, never()).findAllByMember_IdAndIdNotAndRevokedAtIsNull(any(), any());
+    }
+
+    @Test
     void changePasswordRejectsMissingMember() {
         when(memberRepository.findById(7L)).thenReturn(Optional.empty());
 

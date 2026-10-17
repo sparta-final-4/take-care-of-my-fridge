@@ -72,6 +72,9 @@ public class MemberService {
         if (!passwordEncoder.matches(currentPassword, member.getPasswordHash())) {
             throw new BusinessException(ErrorCode.INVALID_CURRENT_PASSWORD);
         }
+        if (newPassword.equals(currentPassword)) {
+            throw new BusinessException(ErrorCode.SAME_AS_CURRENT_PASSWORD);
+        }
         member.changePassword(passwordEncoder.encode(newPassword));
         LocalDateTime now = LocalDateTime.ofInstant(Instant.now(), ZoneOffset.UTC);
         sessionRepository.findAllByMember_IdAndIdNotAndRevokedAtIsNull(memberId, currentSessionId)

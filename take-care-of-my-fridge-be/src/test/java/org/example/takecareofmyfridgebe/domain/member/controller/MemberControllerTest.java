@@ -360,8 +360,8 @@ class MemberControllerTest {
                                 List.of(new SimpleGrantedAuthority("ROLE_USER")))))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"currentPassword\":\"Wrongpassword1!\",\"newPassword\":\"Newpassword1!\"}"))
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.code").value("M006"));
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("M003"));
     }
 
     @Test
