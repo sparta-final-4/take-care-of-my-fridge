@@ -1,5 +1,6 @@
 package org.example.takecareofmyfridgebe.domain.member.service;
 
+import org.example.takecareofmyfridgebe.domain.member.dto.MyInfoResponse;
 import org.example.takecareofmyfridgebe.domain.member.dto.SignUpRequest;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 import org.example.takecareofmyfridgebe.domain.member.repository.MemberRepository;
@@ -16,6 +17,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -102,6 +105,32 @@ class MemberServiceTest {
         when(memberRepository.existsByNicknameAndIdNot("요리왕", 7L)).thenReturn(true);
 
         assertFalse(memberService.checkNicknameAvailability("요리왕", 7L).available());
+    }
+
+    @Test
+    void getMyInfoReturnsMemberWithTastes() {
+        Member member = Member.create("cook@example.com", "{bcrypt}encoded", "요리왕",
+                Set.of(Member.Taste.SWEET));
+        ReflectionTestUtils.setField(member, "id", 7L);
+        when(memberRepository.findById(7L)).thenReturn(Optional.of(member));
+
+        MyInfoResponse response = memberService.getMyInfo(7L);
+
+        assertEquals(7L, response.memberId());
+        assertEquals("cook@example.com", response.email());
+        assertEquals("요리왕", response.nickname());
+        assertEquals(Member.Role.USER, response.role());
+        assertEquals(Member.Status.ACTIVE, response.status());
+        assertEquals(List.of(Member.Taste.SWEET), response.tastes());
+    }
+
+    @Test
+    void getMyInfoRejectsMissingMember() {
+        when(memberRepository.findById(7L)).thenReturn(Optional.empty());
+
+        BusinessException exception = assertThrows(BusinessException.class, () -> memberService.getMyInfo(7L));
+
+        assertEquals(ErrorCode.MEMBER_NOT_FOUND, exception.getErrorCode());
     }
 
     @Test

@@ -2,6 +2,7 @@ package org.example.takecareofmyfridgebe.domain.member.service;
 
 import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.member.dto.EmailAvailabilityResponse;
+import org.example.takecareofmyfridgebe.domain.member.dto.MyInfoResponse;
 import org.example.takecareofmyfridgebe.domain.member.dto.NicknameAvailabilityResponse;
 import org.example.takecareofmyfridgebe.domain.member.dto.SignUpRequest;
 import org.example.takecareofmyfridgebe.domain.member.dto.SignUpResponse;
@@ -35,6 +36,12 @@ public class MemberService {
                 ? memberRepository.existsByNickname(nickname)
                 : memberRepository.existsByNicknameAndIdNot(nickname, memberId);
         return new NicknameAvailabilityResponse(!taken);
+    }
+
+    public MyInfoResponse getMyInfo(Long memberId) {
+        return memberRepository.findById(memberId)
+                .map(MyInfoResponse::from)
+                .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
     }
 
     @Transactional
