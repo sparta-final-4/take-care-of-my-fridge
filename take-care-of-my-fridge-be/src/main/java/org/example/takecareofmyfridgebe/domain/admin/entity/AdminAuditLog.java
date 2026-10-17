@@ -43,6 +43,10 @@ public class AdminAuditLog extends BaseTimeEntity {
     private Member member;
 
     @Enumerated(EnumType.STRING)
+    @Column(name = "actor_role", length = 20)
+    private Member.Role actorRole;
+
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 32)
     private Action action;
 
@@ -66,6 +70,7 @@ public class AdminAuditLog extends BaseTimeEntity {
 
     private AdminAuditLog(Member member, Action action, String targetType, Long targetId, Result result) {
         this.member = member;
+        this.actorRole = member.getRole();
         this.action = action;
         this.targetType = targetType;
         this.targetId = targetId;

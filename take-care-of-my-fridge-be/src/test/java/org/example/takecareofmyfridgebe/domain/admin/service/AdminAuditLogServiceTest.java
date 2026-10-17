@@ -47,6 +47,7 @@ class AdminAuditLogServiceTest {
         verify(auditLogRepository).save(captor.capture());
         AdminAuditLog log = captor.getValue();
         assertSame(actor, log.getMember());
+        assertEquals(Member.Role.ADMIN, log.getActorRole());
         assertEquals(AdminAuditLog.Action.ROLE_CHANGE, log.getAction());
         assertEquals("Member", log.getTargetType());
         assertEquals(12L, log.getTargetId());
@@ -64,6 +65,7 @@ class AdminAuditLogServiceTest {
         ArgumentCaptor<AdminAuditLog> captor = ArgumentCaptor.forClass(AdminAuditLog.class);
         verify(auditLogRepository).save(captor.capture());
         assertSame(actor, captor.getValue().getMember());
+        assertEquals(Member.Role.USER, captor.getValue().getActorRole());
         assertNull(captor.getValue().getTargetId());
         assertEquals(AdminAuditLog.Result.DENIED, captor.getValue().getResult());
     }

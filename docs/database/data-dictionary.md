@@ -125,6 +125,7 @@
 | 컬럼 | 타입 | NULL | 기본값 | 제약 | 의미 |
 |---|---|---|---|---|---|
 | member_id | BIGINT | 불가 | | FK fk_admin_audit_logs_member | 작업한 회원. 권한 없이 시도한 일반 회원 포함 |
+| actor_role | ENUM('USER','ADMIN') | 허용 | NULL | | 작업 당시 역할. 기존 기록은 NULL |
 | action | ENUM('PRODUCT_CREATE','PRODUCT_DELETE','PRICE_UPDATE','DEAL_REVIEW','EVENT_REQUEST','ROLE_CHANGE') | 불가 | | | 작업 종류 |
 | target_type | VARCHAR(50) | 불가 | | | 대상 종류(Product, DealCandidate, Member 등) |
 | target_id | BIGINT | 허용 | NULL | | 대상 ID. 등록 실패처럼 대상이 없으면 NULL. FK 아님 |

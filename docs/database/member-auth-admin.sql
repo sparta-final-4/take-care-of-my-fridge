@@ -129,6 +129,7 @@ CREATE TABLE deal_candidates (
 CREATE TABLE admin_audit_logs (
     id           BIGINT      NOT NULL AUTO_INCREMENT COMMENT '작업 이력 ID',
     member_id    BIGINT      NOT NULL COMMENT '작업한 회원 ID(권한 없이 시도한 일반 회원 포함)',
+    actor_role   ENUM('USER', 'ADMIN') NULL COMMENT '작업 당시 역할',
     action       ENUM('PRODUCT_CREATE', 'PRODUCT_DELETE', 'PRICE_UPDATE', 'DEAL_REVIEW', 'EVENT_REQUEST', 'ROLE_CHANGE') NOT NULL COMMENT '작업 종류',
     target_type  VARCHAR(50) NOT NULL COMMENT '작업 대상 종류(Product, DealCandidate, Member 등)',
     target_id    BIGINT      NULL COMMENT '작업 대상 ID(등록 실패처럼 대상이 없으면 NULL)',
