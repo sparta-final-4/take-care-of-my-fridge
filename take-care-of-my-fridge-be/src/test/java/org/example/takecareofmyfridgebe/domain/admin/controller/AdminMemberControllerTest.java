@@ -111,6 +111,14 @@ class AdminMemberControllerTest {
     }
 
     @Test
+    void unknownRoleGetsReadableMessage() throws Exception {
+        mvc.perform(get("/api/admin/members?role=OWNER")
+                        .with(authenticationFor(Member.Role.ADMIN)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("요청 값의 형식이 올바르지 않습니다."));
+    }
+
+    @Test
     void adminCanPromoteMember() throws Exception {
         mvc.perform(post("/api/admin/members/12/promotion")
                         .with(csrf()).with(authenticationFor(Member.Role.ADMIN)))
