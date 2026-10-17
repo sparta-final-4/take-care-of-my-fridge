@@ -41,6 +41,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -279,6 +280,61 @@ class MemberControllerTest {
         mvc.perform(get("/api/members/nickname-availability").param("nickname", " " + "가".repeat(31) + " "))
                 .andExpect(status().isBadRequest());
 
+        verifyNoInteractions(memberService);
+    }
+
+    @Test
+    void changeTastesAcceptsDuplicateValuesAndEmptyList() throws Exception {
+        var auth = authentication(new UsernamePasswordAuthenticationToken(
+                new AuthSessionService.AuthPrincipal(7L, Member.Role.USER), null,
+                List.of(new SimpleGrantedAuthority("ROLE_USER"))));
+        mvc.perform(put("/api/members/me/tastes")
+                        .with(csrf()).with(auth)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"tastes\":[\"SWEET\",\"SWEET\",\"SPICY\"]}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("SUCCESS"));
+        verify(memberService).changeTastes(eq(7L), argThat(request ->
+                request.equals(List.of(Member.Taste.SWEET, Member.Taste.SWEET, Member.Taste.SPICY))));
+
+        mvc.perform(put("/api/members/me/tastes")
+                        .with(csrf()).with(auth)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"tastes\":[]}"))
+                .andExpect(status().isOk());
+        verify(memberService).changeTastes(eq(7L), argThat(List::isEmpty));
+    }
+
+    @Test
+    void changeTastesRequiresLoginAndCsrf() throws Exception {
+        mvc.perform(put("/api/members/me/tastes")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"tastes\":[]}"))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(put("/api/members/me/tastes")
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                new AuthSessionService.AuthPrincipal(7L, Member.Role.USER), null,
+                                List.of(new SimpleGrantedAuthority("ROLE_USER")))))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"tastes\":[]}"))
+                .andExpect(status().isForbidden());
+        verifyNoInteractions(memberService);
+    }
+
+    @Test
+    void changeTastesRejectsMissingNullAndUnknownValues() throws Exception {
+        for (String body : List.of("{}", "{\"tastes\":null}",
+                "{\"tastes\":[null]}", "{\"tastes\":[\"UNKNOWN\"]}")) {
+            mvc.perform(put("/api/members/me/tastes")
+                            .with(csrf())
+                            .with(authentication(new UsernamePasswordAuthenticationToken(
+                                    new AuthSessionService.AuthPrincipal(7L, Member.Role.USER), null,
+                                    List.of(new SimpleGrantedAuthority("ROLE_USER")))))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body))
+                    .andExpect(status().isBadRequest());
+        }
         verifyNoInteractions(memberService);
     }
 

@@ -3,8 +3,9 @@ package org.example.takecareofmyfridgebe.domain.member.controller;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.auth.service.AuthSessionService;
-import org.example.takecareofmyfridgebe.domain.member.dto.EmailAvailabilityRequest;
 import org.example.takecareofmyfridgebe.domain.member.dto.ChangeNicknameRequest;
+import org.example.takecareofmyfridgebe.domain.member.dto.ChangeTastesRequest;
+import org.example.takecareofmyfridgebe.domain.member.dto.EmailAvailabilityRequest;
 import org.example.takecareofmyfridgebe.domain.member.dto.EmailAvailabilityResponse;
 import org.example.takecareofmyfridgebe.domain.member.dto.MyInfoResponse;
 import org.example.takecareofmyfridgebe.domain.member.dto.NicknameAvailabilityRequest;
@@ -20,6 +21,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -56,6 +58,14 @@ public class MemberController {
             @AuthenticationPrincipal AuthSessionService.AuthPrincipal principal,
             @Valid @RequestBody ChangeNicknameRequest request) {
         memberService.changeNickname(principal.memberId(), request);
+        return ResponseEntity.ok(ApiResponse.ok());
+    }
+
+    @PutMapping("/me/tastes")
+    public ResponseEntity<ApiResponse<Void>> changeTastes(
+            @AuthenticationPrincipal AuthSessionService.AuthPrincipal principal,
+            @Valid @RequestBody ChangeTastesRequest request) {
+        memberService.changeTastes(principal.memberId(), request.tastes());
         return ResponseEntity.ok(ApiResponse.ok());
     }
 
