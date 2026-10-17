@@ -1,6 +1,7 @@
 package org.example.takecareofmyfridgebe.domain.member.service;
 
 import lombok.RequiredArgsConstructor;
+import org.example.takecareofmyfridgebe.domain.member.dto.EmailAvailabilityResponse;
 import org.example.takecareofmyfridgebe.domain.member.dto.SignUpRequest;
 import org.example.takecareofmyfridgebe.domain.member.dto.SignUpResponse;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
@@ -23,6 +24,10 @@ public class MemberService {
 
     private final MemberRepository memberRepository;
     private final PasswordEncoder passwordEncoder;
+
+    public EmailAvailabilityResponse checkEmailAvailability(String email) {
+        return new EmailAvailabilityResponse(!memberRepository.existsByEmail(email));
+    }
 
     @Transactional
     public SignUpResponse signUp(SignUpRequest request) {

@@ -18,8 +18,10 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -57,6 +59,20 @@ class MemberServiceTest {
         assertEquals(Member.Status.ACTIVE, member.getStatus());
         assertNotEquals(request.password(), member.getPasswordHash());
         assertEquals(2, member.getTastes().size());
+    }
+
+    @Test
+    void emailIsAvailableWhenNoMemberUsesIt() {
+        when(memberRepository.existsByEmail("cook@example.com")).thenReturn(false);
+
+        assertTrue(memberService.checkEmailAvailability("cook@example.com").available());
+    }
+
+    @Test
+    void emailIsUnavailableWhenMemberAlreadyUsesIt() {
+        when(memberRepository.existsByEmail("cook@example.com")).thenReturn(true);
+
+        assertFalse(memberService.checkEmailAvailability("cook@example.com").available());
     }
 
     @Test
