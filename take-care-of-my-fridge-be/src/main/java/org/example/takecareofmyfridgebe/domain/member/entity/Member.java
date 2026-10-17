@@ -66,7 +66,7 @@ public class Member extends BaseTimeEntity {
         this.role = role == null ? Role.USER : role;
         this.status = Status.ACTIVE;
         if (tastes != null) {
-            tastes.forEach(taste -> this.tastes.add(MemberTaste.create(this, taste)));
+            tastes.forEach(taste -> this.tastes.add(MemberTaste.builder().member(this).taste(taste).build()));
         }
     }
 
@@ -74,7 +74,7 @@ public class Member extends BaseTimeEntity {
         tastes.removeIf(existing -> !newTastes.contains(existing.getTaste()));
         for (Taste taste : newTastes) {
             if (tastes.stream().noneMatch(existing -> existing.getTaste() == taste)) {
-                tastes.add(MemberTaste.create(this, taste));
+                tastes.add(MemberTaste.builder().member(this).taste(taste).build());
             }
         }
     }
