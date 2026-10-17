@@ -1,6 +1,8 @@
 package org.example.takecareofmyfridgebe.domain.admin.service;
 
 import org.example.takecareofmyfridgebe.domain.admin.dto.MemberSummaryResponse;
+import org.example.takecareofmyfridgebe.domain.admin.entity.AdminAuditLog;
+import org.example.takecareofmyfridgebe.domain.admin.repository.AdminAuditLogRepository;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 import org.example.takecareofmyfridgebe.domain.member.repository.MemberRepository;
 import org.example.takecareofmyfridgebe.global.response.PageResponse;
@@ -17,6 +19,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Set;
 
@@ -32,6 +35,8 @@ class MemberListServiceTest {
 
     @Mock
     private MemberRepository memberRepository;
+    @Mock
+    private AdminAuditLogRepository auditLogRepository;
     @InjectMocks
     private MemberListService service;
 
@@ -61,6 +66,25 @@ class MemberListServiceTest {
         assertNull(response.content().get(0).promotedBy());
     }
 
+    @Test
+    void adminSummaryUsesLatestSuccessfulPromotion() {
+        Member admin = Member.createInitialAdmin("new-admin@example.com", "hash", "새관리자");
+        ReflectionTestUtils.setField(admin, "id", 12L);
+        Member actor = Member.createInitialAdmin("actor@example.com", "hash", "작업자");
+        AdminAuditLog promotion = AdminAuditLog.create(actor, AdminAuditLog.Action.ROLE_CHANGE,
+                "Member", 12L, AdminAuditLog.Result.SUCCESS);
+        LocalDateTime promotedAt = LocalDateTime.of(2026, 10, 17, 10, 30);
+        ReflectionTestUtils.setField(promotion, "createdAt", promotedAt);
+        when(memberRepository.findAll(any(Pageable.class))).thenReturn(new PageImpl<>(List.of(admin)));
+        when(auditLogRepository.findByActionAndResultAndTargetTypeAndTargetIdInOrderByCreatedAtDescIdDesc(
+                eq(AdminAuditLog.Action.ROLE_CHANGE), eq(AdminAuditLog.Result.SUCCESS),
+                eq("Member"), eq(Set.of(12L)))).thenReturn(List.of(promotion));
+
+        var response = service.getMembers(null, null, 1, 20);
+
+        assertEquals(promotedAt, response.content().get(0).promotedAt());
+        assertEquals("actor@example.com", response.content().get(0).promotedBy());
+    }
     @Test
     void noFiltersLoadsAllMembers() {
         when(memberRepository.findAll(any(Pageable.class))).thenReturn(Page.empty());
