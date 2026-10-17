@@ -43,8 +43,13 @@ class AdminAuditSearchServiceTest {
                 .passwordHash("hash")
                 .nickname("요리왕")
                 .build();
-        AdminAuditLog log = AdminAuditLog.create(actor, AdminAuditLog.Action.ROLE_CHANGE,
-                "Member", 12L, AdminAuditLog.Result.DENIED);
+        AdminAuditLog log = AdminAuditLog.builder()
+                .member(actor)
+                .action(AdminAuditLog.Action.ROLE_CHANGE)
+                .targetType("Member")
+                .targetId(12L)
+                .result(AdminAuditLog.Result.DENIED)
+                .build();
         ReflectionTestUtils.setField(log, "id", 5L);
         ReflectionTestUtils.setField(log, "createdAt", LocalDateTime.of(2026, 10, 17, 10, 0));
         actor.promoteToAdmin();

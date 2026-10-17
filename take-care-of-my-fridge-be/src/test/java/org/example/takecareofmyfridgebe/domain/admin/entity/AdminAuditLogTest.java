@@ -17,9 +17,15 @@ class AdminAuditLogTest {
                 .nickname("관리자")
                 .role(Member.Role.ADMIN)
                 .build();
-        AdminAuditLog log = AdminAuditLog.create(actor, AdminAuditLog.Action.ROLE_CHANGE,
-                "Member", 12L, AdminAuditLog.Result.SUCCESS,
-                Map.of("role", "USER"), Map.of("role", "ADMIN"));
+        AdminAuditLog log = AdminAuditLog.builder()
+                .member(actor)
+                .action(AdminAuditLog.Action.ROLE_CHANGE)
+                .targetType("Member")
+                .targetId(12L)
+                .result(AdminAuditLog.Result.SUCCESS)
+                .beforeValue(Map.of("role", "USER"))
+                .afterValue(Map.of("role", "ADMIN"))
+                .build();
 
         assertEquals(Map.of("role", "USER"), log.getBeforeValue());
         assertEquals(Map.of("role", "ADMIN"), log.getAfterValue());

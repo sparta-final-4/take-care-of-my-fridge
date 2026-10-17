@@ -96,8 +96,13 @@ class MemberListServiceTest {
                 .nickname("작업자")
                 .role(Member.Role.ADMIN)
                 .build();
-        AdminAuditLog promotion = AdminAuditLog.create(actor, AdminAuditLog.Action.ROLE_CHANGE,
-                "Member", 12L, AdminAuditLog.Result.SUCCESS);
+        AdminAuditLog promotion = AdminAuditLog.builder()
+                .member(actor)
+                .action(AdminAuditLog.Action.ROLE_CHANGE)
+                .targetType("Member")
+                .targetId(12L)
+                .result(AdminAuditLog.Result.SUCCESS)
+                .build();
         LocalDateTime promotedAt = LocalDateTime.of(2026, 10, 17, 10, 30);
         ReflectionTestUtils.setField(promotion, "createdAt", promotedAt);
         when(memberRepository.findAll(anySpecification(), any(Pageable.class)))
