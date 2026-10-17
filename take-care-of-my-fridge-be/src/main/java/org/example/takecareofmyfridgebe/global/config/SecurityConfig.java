@@ -27,7 +27,7 @@ public class SecurityConfig {
 
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        http.csrf(csrf -> csrf.ignoringRequestMatchers(request ->
+        http.csrf(csrf -> csrf.spa().ignoringRequestMatchers(request ->
                         "POST".equals(request.getMethod())
                                 && ((request.getContextPath() + "/api/members").equals(request.getRequestURI())
                                 || (request.getContextPath() + "/api/auth/login").equals(request.getRequestURI()))))
@@ -36,6 +36,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/members/email-availability").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/members/nickname-availability").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/auth/csrf").permitAll()
                         .anyRequest().authenticated())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .exceptionHandling(errors -> errors
