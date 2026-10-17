@@ -70,6 +70,12 @@ public class Member extends BaseTimeEntity {
         return new Member(email, passwordHash, nickname, tastes);
     }
 
+    public static Member createInitialAdmin(String email, String passwordHash, String nickname) {
+        Member member = new Member(email, passwordHash, nickname, Set.of());
+        member.role = Role.ADMIN;
+        return member;
+    }
+
     public void replaceTastes(Set<Taste> newTastes) {
         tastes.removeIf(existing -> !newTastes.contains(existing.getTaste()));
         for (Taste taste : newTastes) {
