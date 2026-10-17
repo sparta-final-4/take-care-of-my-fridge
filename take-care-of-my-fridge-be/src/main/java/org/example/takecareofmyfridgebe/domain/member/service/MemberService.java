@@ -69,6 +69,16 @@ public class MemberService {
     }
 
     @Transactional
+    public void changePassword(Long memberId, String currentPassword, String newPassword) {
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
+        if (!passwordEncoder.matches(currentPassword, member.getPasswordHash())) {
+            throw new BusinessException(ErrorCode.INVALID_CURRENT_PASSWORD);
+        }
+        member.changePassword(passwordEncoder.encode(newPassword));
+    }
+
+    @Transactional
     public void changeTastes(Long memberId, List<Member.Taste> tastes) {
         Member member = memberRepository.findById(memberId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));

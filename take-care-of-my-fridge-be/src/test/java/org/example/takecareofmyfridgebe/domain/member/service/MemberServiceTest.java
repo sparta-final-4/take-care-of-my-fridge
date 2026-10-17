@@ -187,6 +187,43 @@ class MemberServiceTest {
     }
 
     @Test
+    void changePasswordReplacesHashAfterCheckingCurrentPassword() {
+        Member member = Member.create("cook@example.com", "old-hash", "요리왕", Set.of());
+        when(memberRepository.findById(7L)).thenReturn(Optional.of(member));
+        when(passwordEncoder.matches("Oldpassword1!", "old-hash")).thenReturn(true);
+        when(passwordEncoder.encode("Newpassword1!")).thenReturn("new-hash");
+
+        memberService.changePassword(7L, "Oldpassword1!", "Newpassword1!");
+
+        assertEquals("new-hash", member.getPasswordHash());
+        verify(passwordEncoder).matches("Oldpassword1!", "old-hash");
+    }
+
+    @Test
+    void changePasswordRejectsWrongCurrentPasswordWithoutEncoding() {
+        Member member = Member.create("cook@example.com", "old-hash", "요리왕", Set.of());
+        when(memberRepository.findById(7L)).thenReturn(Optional.of(member));
+
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> memberService.changePassword(7L, "Wrongpassword1!", "Newpassword1!"));
+
+        assertEquals(ErrorCode.INVALID_CURRENT_PASSWORD, exception.getErrorCode());
+        assertEquals("old-hash", member.getPasswordHash());
+        verify(passwordEncoder, never()).encode(any());
+    }
+
+    @Test
+    void changePasswordRejectsMissingMember() {
+        when(memberRepository.findById(7L)).thenReturn(Optional.empty());
+
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> memberService.changePassword(7L, "Oldpassword1!", "Newpassword1!"));
+
+        assertEquals(ErrorCode.MEMBER_NOT_FOUND, exception.getErrorCode());
+        verify(passwordEncoder, never()).encode(any());
+    }
+
+    @Test
     void changeTastesReplacesListAndAcceptsDuplicates() {
         Member member = Member.create("cook@example.com", "hash", "요리왕",
                 Set.of(Member.Taste.SWEET, Member.Taste.SALTY));
