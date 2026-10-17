@@ -3,7 +3,9 @@ package org.example.takecareofmyfridgebe.domain.member.controller;
 import org.example.takecareofmyfridgebe.domain.auth.service.AuthSessionService;
 import org.example.takecareofmyfridgebe.domain.auth.service.JwtTokenService;
 import org.example.takecareofmyfridgebe.domain.member.dto.EmailAvailabilityResponse;
+import org.example.takecareofmyfridgebe.domain.member.dto.NicknameAvailabilityResponse;
 import org.example.takecareofmyfridgebe.domain.member.dto.SignUpResponse;
+import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 import org.example.takecareofmyfridgebe.domain.member.service.MemberService;
 import org.example.takecareofmyfridgebe.global.config.SecurityConfig;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
@@ -16,14 +18,19 @@ import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
+
+import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -129,6 +136,58 @@ class MemberControllerTest {
         String email = "a".repeat(64) + "@" + "b".repeat(63) + "." + "c".repeat(63) + "." + "d".repeat(63) + ".com";
 
         mvc.perform(get("/api/members/email-availability").param("email", email))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(memberService);
+    }
+
+    @Test
+    @WithMockUser
+    void checkNicknameAvailabilityStripsNicknameBeforeCallingService() throws Exception {
+        when(memberService.checkNicknameAvailability("요리왕", null))
+                .thenReturn(new NicknameAvailabilityResponse(false));
+
+        mvc.perform(get("/api/members/nickname-availability").param("nickname", "  요리왕 "))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.available").value(false));
+    }
+
+    @Test
+    void loggedInMemberIdIsPassedToNicknameCheck() throws Exception {
+        when(memberService.checkNicknameAvailability("요리왕", 7L))
+                .thenReturn(new NicknameAvailabilityResponse(true));
+
+        mvc.perform(get("/api/members/nickname-availability").param("nickname", "요리왕")
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                new AuthSessionService.AuthPrincipal(7L, Member.Role.USER), null,
+                                List.of(new SimpleGrantedAuthority("ROLE_USER"))))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.available").value(true));
+    }
+
+    @Test
+    @WithMockUser
+    void blankNicknameIsRejectedBeforeCallingService() throws Exception {
+        mvc.perform(get("/api/members/nickname-availability").param("nickname", "   "))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(ErrorCode.INVALID_INPUT_VALUE.getCode()));
+
+        verifyNoInteractions(memberService);
+    }
+
+    @Test
+    @WithMockUser
+    void missingNicknameIsRejectedBeforeCallingService() throws Exception {
+        mvc.perform(get("/api/members/nickname-availability"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(memberService);
+    }
+
+    @Test
+    @WithMockUser
+    void nicknameLongerThan30AfterStripIsRejectedBeforeCallingService() throws Exception {
+        mvc.perform(get("/api/members/nickname-availability").param("nickname", " " + "가".repeat(31) + " "))
                 .andExpect(status().isBadRequest());
 
         verifyNoInteractions(memberService);
