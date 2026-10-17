@@ -68,6 +68,11 @@ public class RefreshSession extends BaseTimeEntity {
         lastUsedAt = now;
     }
 
+    public void rotateToken(String newTokenHash, LocalDateTime now) {
+        tokenHash = newTokenHash;
+        lastUsedAt = now;
+    }
+
     public void revoke(LocalDateTime now) {
         revokedAt = now;
     }

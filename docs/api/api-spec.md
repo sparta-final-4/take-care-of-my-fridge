@@ -85,6 +85,7 @@ HTTP 메서드·경로·DTO 이름은 구현 전 합의합니다.
 - 성공 시 `access_token`(Path `/api`, 15분)과 `refresh_token`(Path `/api/auth`, 7일) 쿠키를 발급합니다. 둘 다 HttpOnly, SameSite=Lax, 기본 Secure입니다. 로컬 HTTP 개발에서만 `AUTH_COOKIE_SECURE=false`로 설정할 수 있습니다.
 - 로그인 POST는 익명 요청과 CSRF 예외를 허용합니다. 다른 POST 경로의 CSRF 보호는 유지합니다.
 - 보호 API는 `access_token` 쿠키의 서명·만료·세션 ID를 확인한 뒤 회원 역할을 설정합니다. 세션이 폐기·만료됐거나 30분간 사용되지 않았다면 JSON 401 `AUTH_001`입니다. 유효한 요청은 세션의 마지막 사용 시각을 갱신합니다.
+- 갱신 토큰은 사용 때마다 교체합니다. 같은 토큰으로 동시에 갱신하면 세션 행 잠금으로 한 요청만 성공하며 이전 토큰 재사용은 401 `MEMBER_004`입니다. 교체해도 최초 로그인으로부터 7일 최대 만료는 연장되지 않습니다.
 - tastes 값: SALTY, SWEET, SPICY, UMAMI, MILD.
 - 가입 요청에 role이 들어와도 무시하고 USER로 만듭니다.
 - 가입 비밀번호는 8~30자이며 ASCII 영문·숫자·특수문자를 각각 하나 이상 포함합니다. 공백·한글은 허용하지 않습니다(2026-10-16 사용자 확정).

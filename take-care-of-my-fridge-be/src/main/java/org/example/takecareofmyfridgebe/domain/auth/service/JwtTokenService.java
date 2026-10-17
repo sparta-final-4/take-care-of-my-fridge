@@ -48,7 +48,11 @@ public class JwtTokenService {
     }
 
     public String issueRefresh(Long memberId, Instant now) {
-        return issue(memberId, "refresh", now, now.plus(7, ChronoUnit.DAYS),
+        return issueRefresh(memberId, now, now.plus(7, ChronoUnit.DAYS));
+    }
+
+    public String issueRefresh(Long memberId, Instant now, Instant expiresAt) {
+        return issue(memberId, "refresh", now, expiresAt,
                 builder -> builder.id(UUID.randomUUID().toString()));
     }
 
