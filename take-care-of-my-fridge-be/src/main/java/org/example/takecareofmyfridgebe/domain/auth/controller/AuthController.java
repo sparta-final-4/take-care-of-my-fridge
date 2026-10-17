@@ -2,9 +2,9 @@ package org.example.takecareofmyfridgebe.domain.auth.controller;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.example.takecareofmyfridgebe.domain.auth.dto.LoginMember;
 import org.example.takecareofmyfridgebe.domain.auth.dto.LoginRequest;
 import org.example.takecareofmyfridgebe.domain.auth.service.LoginService;
+import org.example.takecareofmyfridgebe.domain.member.dto.MyInfoResponse;
 import org.example.takecareofmyfridgebe.global.response.ApiResponse;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
@@ -22,7 +22,7 @@ public class AuthController {
     private final AuthCookies cookies;
 
     @PostMapping("/login")
-    public ResponseEntity<ApiResponse<LoginMember>> login(@Valid @RequestBody LoginRequest request) {
+    public ResponseEntity<ApiResponse<MyInfoResponse>> login(@Valid @RequestBody LoginRequest request) {
         LoginService.LoginResult result = loginService.login(request.email(), request.password());
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, cookies.access(result.accessToken()).toString())

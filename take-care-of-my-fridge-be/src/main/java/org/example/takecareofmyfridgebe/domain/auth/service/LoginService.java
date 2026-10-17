@@ -1,9 +1,9 @@
 package org.example.takecareofmyfridgebe.domain.auth.service;
 
 import lombok.RequiredArgsConstructor;
-import org.example.takecareofmyfridgebe.domain.auth.dto.LoginMember;
 import org.example.takecareofmyfridgebe.domain.auth.entity.RefreshSession;
 import org.example.takecareofmyfridgebe.domain.auth.repository.RefreshSessionRepository;
+import org.example.takecareofmyfridgebe.domain.member.dto.MyInfoResponse;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,9 +28,9 @@ public class LoginService {
         RefreshSession session = sessionRepository.saveAndFlush(RefreshSession.create(member,
                 jwtTokenService.hash(refreshToken), LocalDateTime.ofInstant(now, ZoneOffset.UTC)));
         String accessToken = jwtTokenService.issueAccess(member.getId(), session.getId(), now);
-        return new LoginResult(LoginMember.from(member), accessToken, refreshToken);
+        return new LoginResult(MyInfoResponse.from(member), accessToken, refreshToken);
     }
 
-    public record LoginResult(LoginMember member, String accessToken, String refreshToken) {
+    public record LoginResult(MyInfoResponse member, String accessToken, String refreshToken) {
     }
 }

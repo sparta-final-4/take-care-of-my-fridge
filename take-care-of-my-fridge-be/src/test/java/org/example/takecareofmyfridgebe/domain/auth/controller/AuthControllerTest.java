@@ -1,9 +1,9 @@
 package org.example.takecareofmyfridgebe.domain.auth.controller;
 
-import org.example.takecareofmyfridgebe.domain.auth.dto.LoginMember;
 import org.example.takecareofmyfridgebe.domain.auth.service.LoginService;
 import org.example.takecareofmyfridgebe.domain.auth.service.AuthSessionService;
 import org.example.takecareofmyfridgebe.domain.auth.service.JwtTokenService;
+import org.example.takecareofmyfridgebe.domain.member.dto.MyInfoResponse;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 import org.example.takecareofmyfridgebe.global.config.SecurityConfig;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
@@ -48,7 +48,7 @@ class AuthControllerTest {
 
     @Test
     void anonymousLoginSetsHttpOnlyCookiesAndReturnsMember() throws Exception {
-        LoginMember member = new LoginMember(4L, "cook@example.com", "요리왕",
+        MyInfoResponse member = new MyInfoResponse(4L, "cook@example.com", "요리왕",
                 Member.Role.USER, Member.Status.ACTIVE, List.of(), null);
         when(loginService.login("cook@example.com", "password"))
                 .thenReturn(new LoginService.LoginResult(member, "access", "refresh"));
