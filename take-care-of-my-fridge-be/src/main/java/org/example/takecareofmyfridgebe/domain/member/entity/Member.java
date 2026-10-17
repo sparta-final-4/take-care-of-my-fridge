@@ -85,6 +85,10 @@ public class Member extends BaseTimeEntity {
         }
     }
 
+    public void promoteToAdmin() {
+        role = Role.ADMIN;
+    }
+
     public void changeNickname(String nickname) {
         this.nickname = nickname;
     }

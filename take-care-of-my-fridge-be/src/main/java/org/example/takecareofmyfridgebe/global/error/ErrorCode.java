@@ -32,6 +32,8 @@ public enum ErrorCode {
     ACCOUNT_SUSPENDED(HttpStatus.FORBIDDEN, "A002", "정지된 계정입니다."),
     DUPLICATE_NICKNAME(HttpStatus.CONFLICT, "M002", "이미 사용 중인 닉네임입니다."),
     INVALID_CURRENT_PASSWORD(HttpStatus.UNAUTHORIZED, "M006", "현재 비밀번호가 올바르지 않습니다."),
+    ALREADY_ADMIN(HttpStatus.CONFLICT, "M007", "이미 관리자입니다."),
+    PROMOTION_SUSPENDED(HttpStatus.CONFLICT, "M008", "정지된 회원은 승격할 수 없습니다."),
 
     // Product
     PRODUCT_NOT_FOUND(HttpStatus.NOT_FOUND, "PRODUCT_001", "상품을 찾을 수 없습니다."),
