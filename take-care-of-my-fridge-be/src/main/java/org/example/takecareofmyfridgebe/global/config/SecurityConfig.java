@@ -14,9 +14,11 @@ public class SecurityConfig {
     SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http.csrf(csrf -> csrf.ignoringRequestMatchers(request ->
                         "POST".equals(request.getMethod())
-                                && (request.getContextPath() + "/api/members").equals(request.getRequestURI())))
+                                && ((request.getContextPath() + "/api/members").equals(request.getRequestURI())
+                                || (request.getContextPath() + "/api/auth/login").equals(request.getRequestURI()))))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.POST, "/api/members").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
                         .anyRequest().authenticated())
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .formLogin(AbstractHttpConfigurer::disable);
