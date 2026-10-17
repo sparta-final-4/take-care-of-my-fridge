@@ -40,6 +40,7 @@ class AuthSessionServiceTest {
 
         assertEquals(4L, principal.memberId());
         assertEquals(Member.Role.USER, principal.role());
+        assertEquals(8L, principal.sessionId());
         assertTrue(session.getLastUsedAt().isAfter(LocalDateTime.now(ZoneOffset.UTC).minusMinutes(1)));
     }
 

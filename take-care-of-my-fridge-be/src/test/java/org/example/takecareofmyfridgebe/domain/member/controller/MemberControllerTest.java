@@ -122,7 +122,7 @@ class MemberControllerTest {
 
         mvc.perform(get("/api/members/me")
                         .with(authentication(new UsernamePasswordAuthenticationToken(
-                                new AuthSessionService.AuthPrincipal(7L, Member.Role.USER), null,
+                                new AuthSessionService.AuthPrincipal(7L, 8L, Member.Role.USER), null,
                                 List.of(new SimpleGrantedAuthority("ROLE_USER"))))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.memberId").value(7))
@@ -139,7 +139,7 @@ class MemberControllerTest {
         mvc.perform(patch("/api/members/me/nickname")
                         .with(csrf())
                         .with(authentication(new UsernamePasswordAuthenticationToken(
-                                new AuthSessionService.AuthPrincipal(7L, Member.Role.USER), null,
+                                new AuthSessionService.AuthPrincipal(7L, 8L, Member.Role.USER), null,
                                 List.of(new SimpleGrantedAuthority("ROLE_USER")))))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"nickname\":\" 새닉네임 \"}"))
@@ -159,7 +159,7 @@ class MemberControllerTest {
                 .andExpect(status().isUnauthorized());
         mvc.perform(patch("/api/members/me/nickname")
                         .with(authentication(new UsernamePasswordAuthenticationToken(
-                                new AuthSessionService.AuthPrincipal(7L, Member.Role.USER), null,
+                                new AuthSessionService.AuthPrincipal(7L, 8L, Member.Role.USER), null,
                                 List.of(new SimpleGrantedAuthority("ROLE_USER")))))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"nickname\":\"새닉네임\"}"))
@@ -173,7 +173,7 @@ class MemberControllerTest {
             mvc.perform(patch("/api/members/me/nickname")
                             .with(csrf())
                             .with(authentication(new UsernamePasswordAuthenticationToken(
-                                    new AuthSessionService.AuthPrincipal(7L, Member.Role.USER), null,
+                                    new AuthSessionService.AuthPrincipal(7L, 8L, Member.Role.USER), null,
                                     List.of(new SimpleGrantedAuthority("ROLE_USER")))))
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("{\"nickname\":\"" + nickname + "\"}"))
@@ -190,7 +190,7 @@ class MemberControllerTest {
         mvc.perform(patch("/api/members/me/nickname")
                         .with(csrf())
                         .with(authentication(new UsernamePasswordAuthenticationToken(
-                                new AuthSessionService.AuthPrincipal(7L, Member.Role.USER), null,
+                                new AuthSessionService.AuthPrincipal(7L, 8L, Member.Role.USER), null,
                                 List.of(new SimpleGrantedAuthority("ROLE_USER")))))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"nickname\":\"중복닉네임\"}"))
@@ -252,7 +252,7 @@ class MemberControllerTest {
 
         mvc.perform(get("/api/members/nickname-availability").param("nickname", "요리왕")
                         .with(authentication(new UsernamePasswordAuthenticationToken(
-                                new AuthSessionService.AuthPrincipal(7L, Member.Role.USER), null,
+                                new AuthSessionService.AuthPrincipal(7L, 8L, Member.Role.USER), null,
                                 List.of(new SimpleGrantedAuthority("ROLE_USER"))))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.available").value(true));
@@ -286,7 +286,7 @@ class MemberControllerTest {
     @Test
     void changeTastesAcceptsDuplicateValuesAndEmptyList() throws Exception {
         var auth = authentication(new UsernamePasswordAuthenticationToken(
-                new AuthSessionService.AuthPrincipal(7L, Member.Role.USER), null,
+                new AuthSessionService.AuthPrincipal(7L, 8L, Member.Role.USER), null,
                 List.of(new SimpleGrantedAuthority("ROLE_USER"))));
         mvc.perform(put("/api/members/me/tastes")
                         .with(csrf()).with(auth)
@@ -314,7 +314,7 @@ class MemberControllerTest {
                 .andExpect(status().isUnauthorized());
         mvc.perform(put("/api/members/me/tastes")
                         .with(authentication(new UsernamePasswordAuthenticationToken(
-                                new AuthSessionService.AuthPrincipal(7L, Member.Role.USER), null,
+                                new AuthSessionService.AuthPrincipal(7L, 8L, Member.Role.USER), null,
                                 List.of(new SimpleGrantedAuthority("ROLE_USER")))))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"tastes\":[]}"))
@@ -329,7 +329,7 @@ class MemberControllerTest {
             mvc.perform(put("/api/members/me/tastes")
                             .with(csrf())
                             .with(authentication(new UsernamePasswordAuthenticationToken(
-                                    new AuthSessionService.AuthPrincipal(7L, Member.Role.USER), null,
+                                    new AuthSessionService.AuthPrincipal(7L, 8L, Member.Role.USER), null,
                                     List.of(new SimpleGrantedAuthority("ROLE_USER")))))
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(body))

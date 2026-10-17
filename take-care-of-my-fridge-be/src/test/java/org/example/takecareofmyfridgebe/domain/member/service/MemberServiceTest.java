@@ -1,5 +1,7 @@
 package org.example.takecareofmyfridgebe.domain.member.service;
 
+import org.example.takecareofmyfridgebe.domain.auth.entity.RefreshSession;
+import org.example.takecareofmyfridgebe.domain.auth.repository.RefreshSessionRepository;
 import org.example.takecareofmyfridgebe.domain.member.dto.MyInfoResponse;
 import org.example.takecareofmyfridgebe.domain.member.dto.ChangeNicknameRequest;
 import org.example.takecareofmyfridgebe.domain.member.dto.SignUpRequest;
@@ -18,6 +20,8 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -42,6 +46,9 @@ class MemberServiceTest {
 
     @Mock
     private PasswordEncoder passwordEncoder;
+
+    @Mock
+    private RefreshSessionRepository sessionRepository;
 
     @InjectMocks
     private MemberService memberService;
@@ -192,11 +199,17 @@ class MemberServiceTest {
         when(memberRepository.findById(7L)).thenReturn(Optional.of(member));
         when(passwordEncoder.matches("Oldpassword1!", "old-hash")).thenReturn(true);
         when(passwordEncoder.encode("Newpassword1!")).thenReturn("new-hash");
+        RefreshSession otherSession = RefreshSession.create(member, "token-hash",
+                LocalDateTime.now(ZoneOffset.UTC));
+        when(sessionRepository.findAllByMember_IdAndIdNotAndRevokedAtIsNull(7L, 8L))
+                .thenReturn(List.of(otherSession));
 
-        memberService.changePassword(7L, "Oldpassword1!", "Newpassword1!");
+        memberService.changePassword(7L, 8L, "Oldpassword1!", "Newpassword1!");
 
         assertEquals("new-hash", member.getPasswordHash());
+        assertTrue(otherSession.getRevokedAt() != null);
         verify(passwordEncoder).matches("Oldpassword1!", "old-hash");
+        verify(sessionRepository).findAllByMember_IdAndIdNotAndRevokedAtIsNull(7L, 8L);
     }
 
     @Test
@@ -205,11 +218,12 @@ class MemberServiceTest {
         when(memberRepository.findById(7L)).thenReturn(Optional.of(member));
 
         BusinessException exception = assertThrows(BusinessException.class,
-                () -> memberService.changePassword(7L, "Wrongpassword1!", "Newpassword1!"));
+                () -> memberService.changePassword(7L, 8L, "Wrongpassword1!", "Newpassword1!"));
 
         assertEquals(ErrorCode.INVALID_CURRENT_PASSWORD, exception.getErrorCode());
         assertEquals("old-hash", member.getPasswordHash());
         verify(passwordEncoder, never()).encode(any());
+        verify(sessionRepository, never()).findAllByMember_IdAndIdNotAndRevokedAtIsNull(any(), any());
     }
 
     @Test
@@ -217,7 +231,7 @@ class MemberServiceTest {
         when(memberRepository.findById(7L)).thenReturn(Optional.empty());
 
         BusinessException exception = assertThrows(BusinessException.class,
-                () -> memberService.changePassword(7L, "Oldpassword1!", "Newpassword1!"));
+                () -> memberService.changePassword(7L, 8L, "Oldpassword1!", "Newpassword1!"));
 
         assertEquals(ErrorCode.MEMBER_NOT_FOUND, exception.getErrorCode());
         verify(passwordEncoder, never()).encode(any());

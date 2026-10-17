@@ -1,6 +1,7 @@
 package org.example.takecareofmyfridgebe.domain.member.service;
 
 import lombok.RequiredArgsConstructor;
+import org.example.takecareofmyfridgebe.domain.auth.repository.RefreshSessionRepository;
 import org.example.takecareofmyfridgebe.domain.member.dto.ChangeNicknameRequest;
 import org.example.takecareofmyfridgebe.domain.member.dto.EmailAvailabilityResponse;
 import org.example.takecareofmyfridgebe.domain.member.dto.MyInfoResponse;
@@ -16,6 +17,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -27,6 +31,7 @@ import java.util.Set;
 public class MemberService {
 
     private final MemberRepository memberRepository;
+    private final RefreshSessionRepository sessionRepository;
     private final PasswordEncoder passwordEncoder;
 
     public EmailAvailabilityResponse checkEmailAvailability(String email) {
@@ -69,13 +74,16 @@ public class MemberService {
     }
 
     @Transactional
-    public void changePassword(Long memberId, String currentPassword, String newPassword) {
+    public void changePassword(Long memberId, Long currentSessionId, String currentPassword, String newPassword) {
         Member member = memberRepository.findById(memberId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
         if (!passwordEncoder.matches(currentPassword, member.getPasswordHash())) {
             throw new BusinessException(ErrorCode.INVALID_CURRENT_PASSWORD);
         }
         member.changePassword(passwordEncoder.encode(newPassword));
+        LocalDateTime now = LocalDateTime.ofInstant(Instant.now(), ZoneOffset.UTC);
+        sessionRepository.findAllByMember_IdAndIdNotAndRevokedAtIsNull(memberId, currentSessionId)
+                .forEach(session -> session.revoke(now));
     }
 
     @Transactional

@@ -30,9 +30,9 @@ public class AuthSessionService {
             throw new BusinessException(ErrorCode.UNAUTHORIZED);
         }
         session.markUsed(now);
-        return new AuthPrincipal(member.getId(), member.getRole());
+        return new AuthPrincipal(member.getId(), session.getId(), member.getRole());
     }
 
-    public record AuthPrincipal(Long memberId, Member.Role role) {
+    public record AuthPrincipal(Long memberId, Long sessionId, Member.Role role) {
     }
 }

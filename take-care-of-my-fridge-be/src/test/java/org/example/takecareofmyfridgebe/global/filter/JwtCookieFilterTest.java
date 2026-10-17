@@ -36,7 +36,7 @@ class JwtCookieFilterTest {
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setCookies(new Cookie("access_token", token));
         when(sessions.authenticate(new JwtTokenService.AccessClaims(4L, 8L)))
-                .thenReturn(new AuthSessionService.AuthPrincipal(4L, Member.Role.USER));
+                .thenReturn(new AuthSessionService.AuthPrincipal(4L, 8L, Member.Role.USER));
 
         filter.doFilter(request, new MockHttpServletResponse(), new MockFilterChain());
 
