@@ -39,7 +39,7 @@
 
 ## 페이지 응답
 
-공유 구조: content, pageNumber, pageSize, totalElements, totalPages, isLast. 응답 pageNumber는 1부터 시작하는 제안입니다. Spring Pageable 요청의 번호 변환은 아직 정의되지 않았으므로 요청·응답을 함께 확정합니다.
+공유 구조: content, pageNumber, pageSize, totalElements, totalPages, isLast. 요청 page와 응답 pageNumber는 1부터 시작하며, 서비스 내부의 Spring Page 번호는 0부터 시작합니다(2026-10-17 회원 목록 조회 구현).
 
 ## 필요한 API 기능 목록
 
