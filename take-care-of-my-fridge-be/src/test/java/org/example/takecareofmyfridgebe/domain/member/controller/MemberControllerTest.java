@@ -1,5 +1,7 @@
 package org.example.takecareofmyfridgebe.domain.member.controller;
 
+import org.example.takecareofmyfridgebe.domain.auth.service.AuthSessionService;
+import org.example.takecareofmyfridgebe.domain.auth.service.JwtTokenService;
 import org.example.takecareofmyfridgebe.domain.member.dto.SignUpResponse;
 import org.example.takecareofmyfridgebe.domain.member.service.MemberService;
 import org.example.takecareofmyfridgebe.global.config.SecurityConfig;
@@ -22,6 +24,7 @@ import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -86,12 +89,29 @@ class MemberControllerTest {
                 .andExpect(status().isForbidden());
     }
 
+    @Test
+    void protectedRequestWithoutAccessCookieReturnsJsonUnauthorized() throws Exception {
+        mvc.perform(get("/api/members/me"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("AUTH_001"));
+    }
+
     @TestConfiguration
     static class TestConfig {
 
         @Bean
         MemberService memberService() {
             return mock(MemberService.class);
+        }
+
+        @Bean
+        JwtTokenService jwtTokenService() {
+            return mock(JwtTokenService.class);
+        }
+
+        @Bean
+        AuthSessionService authSessionService() {
+            return mock(AuthSessionService.class);
         }
     }
 }

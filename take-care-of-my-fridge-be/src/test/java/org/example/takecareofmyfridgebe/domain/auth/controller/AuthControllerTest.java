@@ -2,6 +2,8 @@ package org.example.takecareofmyfridgebe.domain.auth.controller;
 
 import org.example.takecareofmyfridgebe.domain.auth.dto.LoginMember;
 import org.example.takecareofmyfridgebe.domain.auth.service.LoginService;
+import org.example.takecareofmyfridgebe.domain.auth.service.AuthSessionService;
+import org.example.takecareofmyfridgebe.domain.auth.service.JwtTokenService;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 import org.example.takecareofmyfridgebe.global.config.SecurityConfig;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
@@ -108,6 +110,16 @@ class AuthControllerTest {
         @Bean
         LoginService loginService() {
             return mock(LoginService.class);
+        }
+
+        @Bean
+        JwtTokenService jwtTokenService() {
+            return mock(JwtTokenService.class);
+        }
+
+        @Bean
+        AuthSessionService authSessionService() {
+            return mock(AuthSessionService.class);
         }
     }
 }
