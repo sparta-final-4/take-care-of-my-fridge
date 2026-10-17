@@ -2,6 +2,11 @@ package org.example.takecareofmyfridgebe.domain.admin.controller;
 
 import org.example.takecareofmyfridgebe.domain.admin.dto.MemberSummaryResponse;
 import org.example.takecareofmyfridgebe.domain.admin.service.MemberListService;
+import org.example.takecareofmyfridgebe.domain.admin.service.MemberPromotionService;
+import org.example.takecareofmyfridgebe.domain.admin.service.AdminAuditLogService;
+import org.example.takecareofmyfridgebe.domain.admin.entity.AdminAuditLog;
+import org.example.takecareofmyfridgebe.global.error.BusinessException;
+import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 import org.example.takecareofmyfridgebe.domain.auth.service.AuthSessionService;
 import org.example.takecareofmyfridgebe.domain.auth.service.JwtTokenService;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
@@ -22,12 +27,15 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -39,10 +47,14 @@ class AdminMemberControllerTest {
     private MockMvc mvc;
     @Autowired
     private MemberListService memberListService;
+    @Autowired
+    private MemberPromotionService memberPromotionService;
+    @Autowired
+    private AdminAuditLogService auditLogService;
 
     @BeforeEach
     void resetMock() {
-        reset(memberListService);
+        reset(memberListService, memberPromotionService, auditLogService);
     }
 
     @Test
@@ -97,6 +109,43 @@ class AdminMemberControllerTest {
         verifyNoInteractions(memberListService);
     }
 
+    @Test
+    void adminCanPromoteMember() throws Exception {
+        mvc.perform(post("/api/admin/members/12/promotion")
+                        .with(csrf()).with(authenticationFor(Member.Role.ADMIN)))
+                .andExpect(status().isOk());
+        verify(memberPromotionService).promote(7L, 12L);
+        verifyNoInteractions(auditLogService);
+    }
+
+    @Test
+    void failedPromotionIsRecordedAfterServiceError() throws Exception {
+        doThrow(new BusinessException(ErrorCode.ALREADY_ADMIN))
+                .when(memberPromotionService).promote(7L, 12L);
+        mvc.perform(post("/api/admin/members/12/promotion")
+                        .with(csrf()).with(authenticationFor(Member.Role.ADMIN)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("M007"));
+        verify(auditLogService).record(7L, AdminAuditLog.Action.ROLE_CHANGE,
+                "Member", 12L, AdminAuditLog.Result.FAILED);
+    }
+
+    @Test
+    void userPromotionAttemptIsDeniedAndRecorded() throws Exception {
+        mvc.perform(post("/api/admin/members/12/promotion")
+                        .with(csrf()).with(authenticationFor(Member.Role.USER)))
+                .andExpect(status().isForbidden());
+        verifyNoInteractions(memberPromotionService);
+        verify(auditLogService).record(7L, AdminAuditLog.Action.ROLE_CHANGE,
+                "Member", 12L, AdminAuditLog.Result.DENIED);
+    }
+
+    @Test
+    void anonymousPromotionIsUnauthorized() throws Exception {
+        mvc.perform(post("/api/admin/members/12/promotion").with(csrf()))
+                .andExpect(status().isUnauthorized());
+        verifyNoInteractions(memberPromotionService, auditLogService);
+    }
     private org.springframework.test.web.servlet.request.RequestPostProcessor authenticationFor(Member.Role role) {
         return authentication(new UsernamePasswordAuthenticationToken(
                 new AuthSessionService.AuthPrincipal(7L, 8L, role), null,
@@ -108,6 +157,16 @@ class AdminMemberControllerTest {
         @Bean
         MemberListService memberListService() {
             return mock(MemberListService.class);
+        }
+
+        @Bean
+        MemberPromotionService memberPromotionService() {
+            return mock(MemberPromotionService.class);
+        }
+
+        @Bean
+        AdminAuditLogService auditLogService() {
+            return mock(AdminAuditLogService.class);
         }
 
         @Bean
