@@ -142,8 +142,7 @@ class MemberControllerTest {
     }
 
     @Test
-    @WithMockUser
-    void checkNicknameAvailabilityStripsNicknameBeforeCallingService() throws Exception {
+    void anonymousUserCanCheckNicknameWithStrippedValue() throws Exception {
         when(memberService.checkNicknameAvailability("요리왕", null))
                 .thenReturn(new NicknameAvailabilityResponse(false));
 
@@ -166,7 +165,6 @@ class MemberControllerTest {
     }
 
     @Test
-    @WithMockUser
     void blankNicknameIsRejectedBeforeCallingService() throws Exception {
         mvc.perform(get("/api/members/nickname-availability").param("nickname", "   "))
                 .andExpect(status().isBadRequest())
@@ -176,7 +174,6 @@ class MemberControllerTest {
     }
 
     @Test
-    @WithMockUser
     void missingNicknameIsRejectedBeforeCallingService() throws Exception {
         mvc.perform(get("/api/members/nickname-availability"))
                 .andExpect(status().isBadRequest());
@@ -185,7 +182,6 @@ class MemberControllerTest {
     }
 
     @Test
-    @WithMockUser
     void nicknameLongerThan30AfterStripIsRejectedBeforeCallingService() throws Exception {
         mvc.perform(get("/api/members/nickname-availability").param("nickname", " " + "가".repeat(31) + " "))
                 .andExpect(status().isBadRequest());
