@@ -46,15 +46,12 @@ public class MemberService {
     }
 
     public MyInfoResponse getMyInfo(Long memberId) {
-        return memberRepository.findById(memberId)
-                .map(MyInfoResponse::from)
-                .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
+        return MyInfoResponse.from(getMember(memberId));
     }
 
     @Transactional
     public void changeNickname(Long memberId, ChangeNicknameRequest request) {
-        Member member = memberRepository.findById(memberId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
+        Member member = getMember(memberId);
         if (member.getNickname().equals(request.nickname())) {
             return;
         }
@@ -75,8 +72,7 @@ public class MemberService {
 
     @Transactional
     public void changePassword(Long memberId, Long currentSessionId, String currentPassword, String newPassword) {
-        Member member = memberRepository.findById(memberId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
+        Member member = getMember(memberId);
         if (!passwordEncoder.matches(currentPassword, member.getPasswordHash())) {
             throw new BusinessException(ErrorCode.INVALID_CURRENT_PASSWORD);
         }
@@ -88,9 +84,7 @@ public class MemberService {
 
     @Transactional
     public void changeTastes(Long memberId, List<Member.Taste> tastes) {
-        Member member = memberRepository.findById(memberId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
-        member.replaceTastes(new HashSet<>(tastes));
+        getMember(memberId).replaceTastes(new HashSet<>(tastes));
     }
 
     @Transactional
@@ -121,5 +115,10 @@ public class MemberService {
             }
             throw e;
         }
+    }
+
+    private Member getMember(Long memberId) {
+        return memberRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
     }
 }
