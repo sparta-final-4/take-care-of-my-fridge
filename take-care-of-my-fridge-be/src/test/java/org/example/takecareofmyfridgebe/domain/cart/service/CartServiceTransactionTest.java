@@ -10,6 +10,7 @@ import org.example.takecareofmyfridgebe.domain.cart.entity.CartItem;
 import org.example.takecareofmyfridgebe.domain.cart.repository.CartItemRepository;
 import org.example.takecareofmyfridgebe.domain.cart.repository.CartRepository;
 import org.example.takecareofmyfridgebe.global.config.JpaAuditingConfig;
+import org.example.takecareofmyfridgebe.global.config.QueryDslConfig;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 import org.junit.jupiter.api.AfterEach;
@@ -31,7 +32,7 @@ import org.testcontainers.mysql.MySQLContainer;
 @Testcontainers
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({JpaAuditingConfig.class, CartService.class})
+@Import({JpaAuditingConfig.class, QueryDslConfig.class, CartService.class})
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class CartServiceTransactionTest {
 
