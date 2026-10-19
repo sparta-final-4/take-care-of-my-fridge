@@ -1,0 +1,40 @@
+.row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--ant-margin-sm);
+  padding: var(--ant-padding-xs) var(--ant-padding-sm);
+  background: var(--ant-color-bg-container);
+  border: 1px solid var(--ant-color-border);
+  border-radius: var(--ant-border-radius);
+}
+
+.name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.consumedBadge,
+.discardedBadge {
+  margin-inline-end: 0;
+  border-radius: var(--ant-control-height);
+}
+
+.consumedBadge {
+  color: var(--ant-color-text);
+  background: var(--ant-color-bg-container);
+  border-color: var(--ant-color-border);
+}
+
+.discardedBadge {
+  font-weight: var(--ant-font-weight-strong);
+  color: var(--ant-color-text-light-solid);
+  background: var(--ant-color-text);
+  border-color: var(--ant-color-text);
+}
+
+.date {
+  font-size: var(--ant-font-size-sm);
+  white-space: nowrap;
+}

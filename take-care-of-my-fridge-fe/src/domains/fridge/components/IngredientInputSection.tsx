@@ -7,6 +7,7 @@ import { useAuthStore } from '@/common/auth/authStore';
 import { SectionCard } from '@/common/components/SectionCard';
 
 import type { FridgeItemCreateRequest, StorageType } from '../api';
+import { STORAGE_LABELS } from '../format';
 import { MOCK_QUICK_CHIPS } from '../mocks';
 import { useCreateFridgeItems } from '../queries';
 import styles from './IngredientInputSection.module.scss';
@@ -14,12 +15,6 @@ import styles from './IngredientInputSection.module.scss';
 // FridgeItemCreateRequest.java의 @Size 제한
 const MAX_ITEMS = 20;
 const MAX_NAME_LENGTH = 200;
-
-const STORAGE_LABELS: Record<StorageType, string> = {
-  REFRIGERATED: '냉장',
-  FROZEN: '냉동',
-  ROOM_TEMP: '상온',
-};
 
 const STORAGE_OPTIONS = (Object.keys(STORAGE_LABELS) as StorageType[]).map((value) => ({
   value,

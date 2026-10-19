@@ -2,7 +2,7 @@ import { MenuOutlined, SearchOutlined } from '@ant-design/icons';
 import { useMutation } from '@tanstack/react-query';
 import { Badge, Button, Drawer, Flex, Grid, Input, Layout, Typography } from 'antd';
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { Link, useLocation, useNavigate } from 'react-router';
 
 import { ROUTES } from '@/app/paths';
 import { useAuthStore } from '@/common/auth/authStore';
@@ -25,6 +25,7 @@ const NAV_ITEMS = [
 
 export function Header() {
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const status = useAuthStore((state) => state.status);
   const role = useAuthStore((state) => state.member?.role);
   const nickname = useAuthStore((state) => state.member?.nickname);
@@ -34,6 +35,12 @@ export function Header() {
 
   const handleOpenDrawer = () => setDrawerOpen(true);
   const handleCloseDrawer = () => setDrawerOpen(false);
+  const handleNavigate = (key: (typeof NAV_ITEMS)[number]['key']) => {
+    if (key === 'fridge') navigate(ROUTES.fridge);
+    if (key === 'mypage') navigate(status === 'authenticated' ? ROUTES.account : ROUTES.login);
+  };
+  const isCurrent = (key: (typeof NAV_ITEMS)[number]['key']) =>
+    key === 'fridge' && pathname === ROUTES.fridge;
   const handleLogout = () => {
     const id = sessionId();
     logoutMutation.mutate(undefined, {
@@ -71,12 +78,9 @@ export function Header() {
             <Button
               key={item.key}
               type="text"
-              className={styles.navButton}
-              onClick={
-                item.key === 'mypage'
-                  ? () => navigate(status === 'authenticated' ? ROUTES.account : ROUTES.login)
-                  : undefined
-              }
+              aria-current={isCurrent(item.key) ? 'page' : undefined}
+              className={isCurrent(item.key) ? styles.navButtonCurrent : styles.navButton}
+              onClick={() => handleNavigate(item.key)}
             >
               <Flex align="center" gap="small">
                 <span>{item.label}</span>
@@ -133,10 +137,10 @@ export function Header() {
                 key={item.key}
                 type="text"
                 block
+                aria-current={isCurrent(item.key) ? 'page' : undefined}
                 onClick={() => {
                   handleCloseDrawer();
-                  if (item.key === 'mypage')
-                    navigate(status === 'authenticated' ? ROUTES.account : ROUTES.login);
+                  handleNavigate(item.key);
                 }}
                 className={styles.drawerNavButton}
               >

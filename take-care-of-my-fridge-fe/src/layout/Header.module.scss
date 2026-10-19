@@ -95,6 +95,15 @@
   min-height: 44px;
 }
 
+// 현재 위치 메뉴: 굵게 + 밑줄
+.navButtonCurrent {
+  @extend .navButton;
+
+  font-weight: var(--ant-font-weight-strong);
+  border-bottom: 2px solid var(--ant-color-text);
+  border-radius: 0;
+}
+
 .actions {
   flex-shrink: 0;
   margin-left: auto;

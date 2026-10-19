@@ -8,3 +8,6 @@ $breakpoints: (
 
 $content-max-width: 1200px;
 $header-height: 64px;
+
+// YYYY-MM-DD(10자)가 잘리지 않는 너비
+$date-min-width: 10ch;

@@ -22,7 +22,10 @@ export const router = createBrowserRouter([
       { path: ROUTES.signupComplete, lazy: page(() => import('@/pages/SignUpCompletePage')) },
       {
         Component: RequireAuth,
-        children: [{ path: ROUTES.account, lazy: page(() => import('@/pages/AccountPage')) }],
+        children: [
+          { path: ROUTES.fridge, lazy: page(() => import('@/pages/FridgePage')) },
+          { path: ROUTES.account, lazy: page(() => import('@/pages/AccountPage')) },
+        ],
       },
       {
         element: <RequireAuth admin />,

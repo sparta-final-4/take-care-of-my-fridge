@@ -1,0 +1,11 @@
+.chip {
+  margin-inline-end: 0;
+  padding: var(--ant-padding-xxs) var(--ant-padding-sm);
+  background: var(--ant-color-bg-container);
+  border-color: var(--ant-color-border);
+  border-radius: var(--ant-control-height);
+}
+
+.hint {
+  font-size: var(--ant-font-size-sm);
+}
