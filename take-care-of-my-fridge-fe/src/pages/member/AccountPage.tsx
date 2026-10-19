@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { App, Button, Card, Checkbox, Form, Input, Result, Space, Spin, Typography } from 'antd';
 import { isAxiosError } from 'axios';
+import dayjs from 'dayjs';
 import { useState } from 'react';
 
 import { useAuthStore } from '@/common/auth/authStore';
@@ -12,17 +13,10 @@ import {
   type ChangePasswordRequest,
   type MyInfoResponse,
 } from '@/domains/member/api';
+import { ROLE_LABELS, TASTE_OPTIONS } from '@/domains/member/labels';
 import { memberQueries } from '@/domains/member/queries';
 
 import styles from './AccountPage.module.scss';
-
-const tasteOptions = [
-  { label: '짠맛', value: 'SALTY' },
-  { label: '단맛', value: 'SWEET' },
-  { label: '매운맛', value: 'SPICY' },
-  { label: '감칠맛', value: 'UMAMI' },
-  { label: '담백한 맛', value: 'MILD' },
-];
 
 function AccountForms({ member }: { member: MyInfoResponse }) {
   const queryClient = useQueryClient();
@@ -71,10 +65,10 @@ function AccountForms({ member }: { member: MyInfoResponse }) {
     <div className={styles.cards}>
       <Card title="내 정보">
         <Typography.Paragraph>이메일: {member.email}</Typography.Paragraph>
-        <Typography.Paragraph>가입일: {member.createdAt.slice(0, 10)}</Typography.Paragraph>
         <Typography.Paragraph>
-          역할: {member.role === 'ADMIN' ? '관리자' : '일반 회원'}
+          가입일: {dayjs(member.createdAt).format('YYYY-MM-DD')}
         </Typography.Paragraph>
+        <Typography.Paragraph>역할: {ROLE_LABELS[member.role]}</Typography.Paragraph>
       </Card>
       <Card title="닉네임 변경">
         <Form
@@ -121,7 +115,7 @@ function AccountForms({ member }: { member: MyInfoResponse }) {
       </Card>
       <Card title="좋아하는 맛">
         <Checkbox.Group
-          options={tasteOptions}
+          options={TASTE_OPTIONS}
           value={tastes}
           onChange={(values) => setTastes(values as MyInfoResponse['tastes'])}
         />
