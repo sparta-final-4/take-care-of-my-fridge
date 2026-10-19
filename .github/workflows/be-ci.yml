@@ -1,0 +1,95 @@
+name: BE CI
+
+# main 룰셋이 'backend'·'frontend' 체크를 필수로 요구한다. PR에 paths 필터를 걸면
+# 백엔드를 안 건드린 PR에서 체크가 보고되지 않아 머지가 영영 막히므로 PR은 항상 실행한다.
+on:
+  pull_request:
+    branches: [dev, main]
+  # dev·main push 시에는 be-deploy.yml이 배포 전에 이 워크플로를 호출한다.
+  workflow_call:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: be-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: take-care-of-my-fridge-be
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    # @SpringBootTest(컨텍스트 로딩 테스트)가 실제 DB에 연결한다. 값은 application.yml의 datasource와 같다.
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_DATABASE: fridge_db
+          MYSQL_USER: fridge_user
+          MYSQL_PASSWORD: '12345678'
+          MYSQL_ROOT_PASSWORD: '12345678'
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 --silent"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v6
+
+      - name: gradlew 실행 권한 부여
+        run: chmod +x gradlew
+
+      - name: 컴파일 확인
+        run: ./gradlew compileJava compileTestJava --console=plain
+
+      # application.yml의 app.auth.jwt-secret이 ${JWT_SECRET}을 읽는다(32바이트 이상).
+      - name: Build & Test
+        run: |
+          export JWT_SECRET="$(openssl rand -base64 48)"
+          ./gradlew test jacocoTestReport --console=plain
+
+      # Jacoco 보고서 생성
+      - name: JaCoCo Coverage Summary
+        if: always()
+        run: python3 scripts/jacoco-summary.py
+
+      # 포크에서 온 PR 은 permissions 블록과 무관하게 GITHUB_TOKEN 이 읽기 전용으로
+      # 발급되므로 코멘트를 달 수 없다. 이 경우 스텝을 건너뛰어 CI 가 실패하지 않게 한다.
+      # 커버리지 수치는 jacoco-summary.py 가 GITHUB_STEP_SUMMARY 에도 쓰므로
+      # Actions 실행 요약에서 그대로 확인할 수 있다.
+      - name: PR에 JaCoCo 보고서 코멘트
+        if: >
+          always()
+          && github.event_name == 'pull_request'
+          && github.event.pull_request.head.repo.full_name == github.repository
+          && hashFiles('take-care-of-my-fridge-be/jacoco-comment.md') != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr comment "${{ github.event.pull_request.number }}" \
+            --body-file jacoco-comment.md \
+            --edit-last \
+            --create-if-none
+
+      - name: 테스트 리포트 업로드
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: be-test-report
+          path: take-care-of-my-fridge-be/build/reports/tests/test
