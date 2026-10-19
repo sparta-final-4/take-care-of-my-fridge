@@ -40,16 +40,17 @@ public class SecurityConfig {
                                 && ((request.getContextPath() + "/api/members").equals(request.getRequestURI())
                                 || (request.getContextPath() + "/api/auth/login").equals(request.getRequestURI()))))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(HttpMethod.POST, "/api/members").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/members/email-availability").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/members/nickname-availability").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/auth/refresh").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/auth/logout").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/auth/csrf").permitAll()
+                        .requestMatchers(HttpMethod.POST,
+                                "/api/members"
+                        ).permitAll()
+                        .requestMatchers(
+                                "/api/auth/login", "/api/auth/refresh", "/api/auth/logout", "/api/auth/csrf",
+                                "/api/members/email-availability", "/api/members/nickname-availability",
+                                "/api/products", "/api/products/**"
+                        ).permitAll()
+                        .requestMatchers(API_DOCS_PATHS).permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/admin/members/*/promotion").authenticated()
                         .requestMatchers("/api/admin", "/api/admin/**").hasRole("ADMIN")
-                        .requestMatchers(API_DOCS_PATHS).permitAll()
                         .anyRequest().authenticated())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .exceptionHandling(errors -> errors
