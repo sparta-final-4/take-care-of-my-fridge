@@ -114,7 +114,7 @@ class FridgeRepositoryImplTest {
     /**
      * 보관방식(REFRIGERATED), 임박 필터(imminentOnly = true), 최근 등록 순(CREATED)일 때:
      * 1) where 절에 storage = REFRIGERATED 조건과 expirationDate BETWEEN today AND today+3 조건이 들어가는지
-     * 2) orderBy 절이 createdAt DESC, id ASC 순서로 들어가는지 검증한다.
+     * 2) orderBy 절이 createdAt DESC, id DESC 순서로 들어가는지 검증한다.
      */
     @Test
     void findItemsByConditionWithCreatedSortAndImminentOnly() {
@@ -135,11 +135,11 @@ class FridgeRepositoryImplTest {
                 predicates[2]
         );
 
-        // Then: 정렬 조건 확인 (등록일 내림차순 + id 오름차순)
+        // Then: 정렬 조건 확인 (등록일 내림차순 + id 내림차순)
         ArgumentCaptor<OrderSpecifier<?>[]> orderCaptor = ArgumentCaptor.forClass(OrderSpecifier[].class);
         verify(jpaQuery).orderBy(orderCaptor.capture());
         assertArrayEquals(
-                new OrderSpecifier<?>[]{fridge.createdAt.desc(), fridge.id.asc()},
+                new OrderSpecifier<?>[]{fridge.createdAt.desc(), fridge.id.desc()},
                 orderCaptor.getValue()
         );
     }
