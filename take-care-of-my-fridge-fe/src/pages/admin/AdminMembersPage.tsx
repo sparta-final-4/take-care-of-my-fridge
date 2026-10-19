@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { App, Button, Input, Result, Select, Space, Table, Tag, Typography } from 'antd';
-import { useState } from 'react';
+import { useSearchParams } from 'react-router';
 
 import {
   promoteMember,
@@ -16,10 +16,23 @@ const PAGE_SIZE = 20;
 export default function AdminMembersPage() {
   const { modal, message } = App.useApp();
   const queryClient = useQueryClient();
-  const [keywordInput, setKeywordInput] = useState('');
-  const [keyword, setKeyword] = useState('');
-  const [role, setRole] = useState<MemberListRequest['role']>();
-  const [page, setPage] = useState(1);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const keyword = searchParams.get('keyword') ?? '';
+  const roleParam = searchParams.get('role');
+  const role: MemberListRequest['role'] =
+    roleParam === 'USER' || roleParam === 'ADMIN' ? roleParam : undefined;
+  const page = Math.max(1, Number(searchParams.get('page')) || 1);
+
+  // 값이 없으면 쿼리에서 지운다. 검색 조건이 바뀌면 첫 페이지로 돌아간다.
+  const updateSearch = (changes: Record<string, string | undefined>) =>
+    setSearchParams((previous) => {
+      const next = new URLSearchParams(previous);
+      if (!('page' in changes)) next.delete('page');
+      Object.entries(changes).forEach(([key, value]) =>
+        value ? next.set(key, value) : next.delete(key),
+      );
+      return next;
+    });
   const { data, isPending, isError, refetch } = useQuery(
     adminQueries.members({ keyword: keyword || undefined, role, page, size: PAGE_SIZE }),
   );
@@ -54,12 +67,9 @@ export default function AdminMembersPage() {
         <Input.Search
           placeholder="이메일 또는 닉네임"
           aria-label="회원 검색"
-          value={keywordInput}
-          onChange={(event) => setKeywordInput(event.target.value)}
-          onSearch={(value) => {
-            setKeyword(value.trim());
-            setPage(1);
-          }}
+          key={keyword}
+          defaultValue={keyword}
+          onSearch={(value) => updateSearch({ keyword: value.trim() || undefined })}
           enterButton="검색"
           allowClear
         />
@@ -72,10 +82,7 @@ export default function AdminMembersPage() {
             { value: 'USER', label: '일반 회원' },
             { value: 'ADMIN', label: '관리자' },
           ]}
-          onChange={(value) => {
-            setRole(value);
-            setPage(1);
-          }}
+          onChange={(value) => updateSearch({ role: value })}
           className={styles.roleFilter}
         />
       </Space>
@@ -96,7 +103,7 @@ export default function AdminMembersPage() {
             pageSize: PAGE_SIZE,
             total: data?.totalElements,
             showSizeChanger: false,
-            onChange: setPage,
+            onChange: (next) => updateSearch({ page: next > 1 ? String(next) : undefined }),
           }}
           locale={{ emptyText: '조건에 맞는 회원이 없습니다.' }}
           columns={[
