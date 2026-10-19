@@ -7,12 +7,16 @@ import org.example.takecareofmyfridgebe.domain.cart.dto.AddCartItemRequest;
 import org.example.takecareofmyfridgebe.domain.cart.dto.AddCartItemResponse;
 import org.example.takecareofmyfridgebe.domain.cart.dto.AddCartItemResult;
 import org.example.takecareofmyfridgebe.domain.cart.dto.CartItemsResponse;
+import org.example.takecareofmyfridgebe.domain.cart.dto.ChangeCartItemQuantityRequest;
+import org.example.takecareofmyfridgebe.domain.cart.dto.ChangeCartItemQuantityResponse;
 import org.example.takecareofmyfridgebe.domain.cart.service.CartService;
 import org.example.takecareofmyfridgebe.global.response.ApiResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -38,5 +42,13 @@ public class CartController {
     public ResponseEntity<ApiResponse<CartItemsResponse>> getItems(
             @AuthenticationPrincipal AuthSessionService.AuthPrincipal principal) {
         return ResponseEntity.ok(ApiResponse.ok(cartService.getItems(principal.memberId())));
+    }
+
+    @PatchMapping("/{cartItemId}")
+    public ResponseEntity<ApiResponse<ChangeCartItemQuantityResponse>> changeQuantity(
+            @AuthenticationPrincipal AuthSessionService.AuthPrincipal principal,
+            @PathVariable Long cartItemId,
+            @Valid @RequestBody ChangeCartItemQuantityRequest request) {
+        return ResponseEntity.ok(ApiResponse.ok(cartService.changeQuantity(principal.memberId(), cartItemId, request)));
     }
 }
