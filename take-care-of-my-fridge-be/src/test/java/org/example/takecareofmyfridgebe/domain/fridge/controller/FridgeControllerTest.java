@@ -1,0 +1,207 @@
+package org.example.takecareofmyfridgebe.domain.fridge.controller;
+
+import org.example.takecareofmyfridgebe.domain.auth.service.AuthSessionService;
+import org.example.takecareofmyfridgebe.domain.auth.service.JwtTokenService;
+import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemResponse;
+import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeSortType;
+import org.example.takecareofmyfridgebe.domain.fridge.entity.FridgeSource;
+import org.example.takecareofmyfridgebe.domain.fridge.entity.StorageType;
+import org.example.takecareofmyfridgebe.domain.fridge.service.FridgeService;
+import org.example.takecareofmyfridgebe.domain.member.entity.Member;
+import org.example.takecareofmyfridgebe.global.config.SecurityConfig;
+import org.example.takecareofmyfridgebe.global.error.ErrorCode;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.test.web.servlet.MockMvc;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
+
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+/**
+ * FridgeController의 웹 계층(MockMvc + SecurityConfig) 슬라이스 테스트.
+ * 인증 여부, 쿼리 파라미터 바인딩 및 기본값 적용, 잘못된 요청 파라미터 검증을 확인한다.
+ */
+@WebMvcTest(FridgeController.class)
+@Import({SecurityConfig.class, FridgeControllerTest.TestConfig.class})
+class FridgeControllerTest {
+
+    @Autowired
+    private MockMvc mvc;
+
+    @Autowired
+    private FridgeService fridgeService;
+
+    @BeforeEach
+    void resetMock() {
+        reset(fridgeService);
+    }
+
+    /**
+     * 비로그인(미인증) 상태로 냉장고 재료 목록을 요청하면
+     * 서비스를 호출하지 않고 401 Unauthorized(A003) 에러를 반환하는지 검증한다.
+     */
+    @Test
+    void unauthenticatedRequestReturnsUnauthorized() throws Exception {
+        // When & Then: 인증 정보 없이 GET 요청 시 401 응답 및 서비스 미호출 확인
+        mvc.perform(get("/api/fridge/items"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value(ErrorCode.UNAUTHORIZED.getCode()));
+
+        verifyNoInteractions(fridgeService);
+    }
+
+    /**
+     * 쿼리 파라미터(storage, sort, imminentOnly)를 빈 문자열로 보내고 임의의 memberId 파라미터를 함께 보냈을 때:
+     * 1) 회원 ID는 요청 파라미터(999)가 아닌 인증 토큰(7L)에서만 꺼내는지
+     * 2) 빈 파라미터들이 기본값(storage=null, sort=EXPIRATION, imminentOnly=false)으로 보정되는지
+     * 3) 응답 JSON 필드가 규격대로 직렬화되는지 검증한다.
+     */
+    @Test
+    void getItemsWithEmptyQueryParamsUsesDefaultsAndTokenMemberId() throws Exception {
+        // Given: 7번 회원의 기본 조건 조회 시 반환할 응답 DTO 준비
+        FridgeItemResponse item = new FridgeItemResponse(
+                1L,
+                10L,
+                "두부",
+                "모",
+                "국산 두부",
+                new BigDecimal("1.00"),
+                StorageType.REFRIGERATED,
+                LocalDate.of(2026, 10, 20),
+                FridgeSource.MANUAL,
+                null,
+                true,
+                false,
+                LocalDateTime.of(2026, 10, 18, 12, 0),
+                LocalDateTime.of(2026, 10, 18, 12, 0)
+        );
+        when(fridgeService.getItems(7L, null, FridgeSortType.EXPIRATION, false))
+                .thenReturn(List.of(item));
+
+        // When & Then: 빈 쿼리 파라미터 및 위조된 memberId(999)를 담아 7번 회원으로 인증 요청
+        mvc.perform(get("/api/fridge/items")
+                        .param("storage", "")
+                        .param("sort", "")
+                        .param("imminentOnly", "")
+                        .param("memberId", "999")
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                new AuthSessionService.AuthPrincipal(7L, 8L, Member.Role.USER), null,
+                                List.of(new SimpleGrantedAuthority("ROLE_USER"))))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data[0].id").value(1))
+                .andExpect(jsonPath("$.data[0].ingredientId").value(10))
+                .andExpect(jsonPath("$.data[0].ingredientName").value("두부"))
+                .andExpect(jsonPath("$.data[0].baseUnit").value("모"))
+                .andExpect(jsonPath("$.data[0].rawName").value("국산 두부"))
+                .andExpect(jsonPath("$.data[0].quantity").value(1.00))
+                .andExpect(jsonPath("$.data[0].storage").value("REFRIGERATED"))
+                .andExpect(jsonPath("$.data[0].expirationDate").value("2026-10-20"))
+                .andExpect(jsonPath("$.data[0].source").value("MANUAL"))
+                .andExpect(jsonPath("$.data[0].imminent").value(true))
+                .andExpect(jsonPath("$.data[0].expired").value(false));
+
+        // 토큰에서 꺼낸 7L과 기본값들이 서비스에 전달되었는지 검증
+        verify(fridgeService).getItems(7L, null, FridgeSortType.EXPIRATION, false);
+    }
+
+    /**
+     * 보관방식(FROZEN), 정렬(NAME), 임박 필터(true) 조건을 모두 지정해 요청했을 때
+     * 해당 조건들이 그대로 FridgeService에 전달되는지 검증한다.
+     */
+    @Test
+    void getItemsWithFiltersPassesParametersToService() throws Exception {
+        // Given
+        when(fridgeService.getItems(7L, StorageType.FROZEN, FridgeSortType.NAME, true))
+                .thenReturn(List.of());
+
+        // When & Then
+        mvc.perform(get("/api/fridge/items")
+                        .param("storage", "FROZEN")
+                        .param("sort", "NAME")
+                        .param("imminentOnly", "true")
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                new AuthSessionService.AuthPrincipal(7L, 8L, Member.Role.USER), null,
+                                List.of(new SimpleGrantedAuthority("ROLE_USER"))))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data").isEmpty());
+
+        verify(fridgeService).getItems(7L, StorageType.FROZEN, FridgeSortType.NAME, true);
+    }
+
+    /**
+     * 정의되지 않은 보관방식(storage) 값을 전달하면
+     * 바인딩 단계에서 거절되어 400 Bad Request(C001)를 반환하는지 검증한다.
+     */
+    @Test
+    void getItemsWithInvalidStorageReturnsBadRequest() throws Exception {
+        mvc.perform(get("/api/fridge/items")
+                        .param("storage", "INVALID_STORAGE")
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                new AuthSessionService.AuthPrincipal(7L, 8L, Member.Role.USER), null,
+                                List.of(new SimpleGrantedAuthority("ROLE_USER"))))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value(ErrorCode.INVALID_INPUT_VALUE.getCode()));
+
+        verifyNoInteractions(fridgeService);
+    }
+
+    /**
+     * 정의되지 않은 정렬 기준(sort) 값을 전달하면
+     * 바인딩 단계에서 거절되어 400 Bad Request(C001)를 반환하는지 검증한다.
+     */
+    @Test
+    void getItemsWithInvalidSortReturnsBadRequest() throws Exception {
+        mvc.perform(get("/api/fridge/items")
+                        .param("sort", "INVALID_SORT")
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                new AuthSessionService.AuthPrincipal(7L, 8L, Member.Role.USER), null,
+                                List.of(new SimpleGrantedAuthority("ROLE_USER"))))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value(ErrorCode.INVALID_INPUT_VALUE.getCode()));
+
+        verifyNoInteractions(fridgeService);
+    }
+
+    @TestConfiguration
+    static class TestConfig {
+
+        @Bean
+        FridgeService fridgeService() {
+            return mock(FridgeService.class);
+        }
+
+        @Bean
+        JwtTokenService jwtTokenService() {
+            return mock(JwtTokenService.class);
+        }
+
+        @Bean
+        AuthSessionService authSessionService() {
+            return mock(AuthSessionService.class);
+        }
+    }
+}
