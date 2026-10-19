@@ -5,6 +5,7 @@ import org.example.takecareofmyfridgebe.domain.auth.service.JwtTokenService;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemCreateRequest;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemResponse;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemUpdateRequest;
+import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeRemoveReason;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeSortType;
 import org.example.takecareofmyfridgebe.domain.fridge.entity.FridgeSource;
 import org.example.takecareofmyfridgebe.domain.fridge.facade.FridgeFacade;
@@ -35,6 +36,7 @@ import java.util.stream.IntStream;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
@@ -42,6 +44,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -50,7 +53,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /**
  * FridgeController의 웹 계층(MockMvc + SecurityConfig) 슬라이스 테스트.
- * 인증 여부, 쿼리 파라미터 바인딩 및 기본값 적용, 재료 다건 등록 및 단건 수정 요청 검증을 확인한다.
+ * 인증 여부, 쿼리 파라미터 바인딩 및 기본값 적용, 재료 다건 등록·단건 수정·삭제 요청 검증을 확인한다.
  */
 @WebMvcTest(FridgeController.class)
 @Import({SecurityConfig.class, FridgeControllerTest.TestConfig.class})
@@ -423,6 +426,93 @@ class FridgeControllerTest {
         }
 
         verifyNoInteractions(fridgeFacade);
+    }
+
+    /**
+     * 냉장고 재료 빼기 요청(DELETE /api/fridge/items/{fridgeId}?reason=...) 시:
+     * 1) reason=CONSUMED(다 먹었어요) 전달 시 FridgeService.removeItem 호출
+     * 2) reason=DISCARDED(버렸어요) 전달 시 FridgeService.removeItem 호출
+     * 3) reason=WRONG_ENTRY(잘못 등록해서 삭제) 전달 시 FridgeService.removeItem 호출
+     * 모두 토큰의 회원 ID(7L)를 사용해 200 OK를 반환하는지 검증한다.
+     */
+    @Test
+    void removeItemPassesTokenMemberIdAndReasonToService() throws Exception {
+        for (FridgeRemoveReason reason : FridgeRemoveReason.values()) {
+            mvc.perform(delete("/api/fridge/items/100")
+                            .param("reason", reason.name())
+                            .with(csrf())
+                            .with(authentication(new UsernamePasswordAuthenticationToken(
+                                    new AuthSessionService.AuthPrincipal(7L, 8L, Member.Role.USER), null,
+                                    List.of(new SimpleGrantedAuthority("ROLE_USER"))))))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.success").value(true))
+                    .andExpect(jsonPath("$.data").isEmpty());
+
+            verify(fridgeService).removeItem(7L, 100L, reason);
+        }
+    }
+
+    /**
+     * 재료 빼기 시 reason 파라미터가 없거나, 빈 문자열이거나, 정의되지 않은 값(?reason=INVALID)이면
+     * 서비스를 호출하지 않고 400 Bad Request(C001)를 반환하는지 검증한다.
+     */
+    @Test
+    void removeItemWithMissingOrInvalidReasonReturnsBadRequest() throws Exception {
+        // 1) reason 파라미터 아예 누락
+        mvc.perform(delete("/api/fridge/items/100")
+                        .with(csrf())
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                new AuthSessionService.AuthPrincipal(7L, 8L, Member.Role.USER), null,
+                                List.of(new SimpleGrantedAuthority("ROLE_USER"))))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value(ErrorCode.INVALID_INPUT_VALUE.getCode()));
+
+        // 2) reason 파라미터가 빈 문자열
+        mvc.perform(delete("/api/fridge/items/100")
+                        .param("reason", "")
+                        .with(csrf())
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                new AuthSessionService.AuthPrincipal(7L, 8L, Member.Role.USER), null,
+                                List.of(new SimpleGrantedAuthority("ROLE_USER"))))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value(ErrorCode.INVALID_INPUT_VALUE.getCode()));
+
+        // 3) 정의되지 않은 reason 값
+        mvc.perform(delete("/api/fridge/items/100")
+                        .param("reason", "INVALID")
+                        .with(csrf())
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                new AuthSessionService.AuthPrincipal(7L, 8L, Member.Role.USER), null,
+                                List.of(new SimpleGrantedAuthority("ROLE_USER"))))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value(ErrorCode.INVALID_INPUT_VALUE.getCode()));
+
+        verifyNoInteractions(fridgeService);
+    }
+
+    /**
+     * 다른 회원의 재료(또는 존재하지 않는 fridgeId)를 빼려고 할 때
+     * FRIDGE_ITEM_NOT_FOUND(404) 응답이 반환되는지 검증한다.
+     */
+    @Test
+    void removeItemReturnsNotFoundWhenTargetBelongsToAnotherMember() throws Exception {
+        // Given
+        doThrow(new BusinessException(ErrorCode.FRIDGE_ITEM_NOT_FOUND))
+                .when(fridgeService).removeItem(7L, 999L, FridgeRemoveReason.CONSUMED);
+
+        // When & Then
+        mvc.perform(delete("/api/fridge/items/999")
+                        .param("reason", "CONSUMED")
+                        .with(csrf())
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                new AuthSessionService.AuthPrincipal(7L, 8L, Member.Role.USER), null,
+                                List.of(new SimpleGrantedAuthority("ROLE_USER"))))))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value(ErrorCode.FRIDGE_ITEM_NOT_FOUND.getCode()));
     }
 
     @TestConfiguration
