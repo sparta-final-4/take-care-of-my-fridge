@@ -21,6 +21,11 @@ function getServerMessage(data: unknown) {
   return typeof error.message === 'string' && error.message ? error.message : undefined;
 }
 
+// 401은 인터셉터가 세션 만료로 처리하므로 화면에서 따로 알리지 않는다.
+export function isUnauthorized(error: unknown) {
+  return isAxiosError(error) && error.response?.status === 401;
+}
+
 export function getErrorMessage(error: unknown) {
   if (!isAxiosError(error)) return DEFAULT_MESSAGE;
 

@@ -5,7 +5,7 @@ import dayjs from 'dayjs';
 import { useState } from 'react';
 
 import { useAuthStore } from '@/common/auth/authStore';
-import { getErrorCode, getErrorMessage } from '@/common/api/errors';
+import { getErrorCode, getErrorMessage, isUnauthorized } from '@/common/api/errors';
 import {
   changeNickname,
   changePassword,
@@ -55,7 +55,7 @@ function AccountForms({ member }: { member: MyInfoResponse }) {
       }
       setCheckedNickname(nickname);
     } catch (error) {
-      if (isAxiosError(error)) void message.error(getErrorMessage(error));
+      if (isAxiosError(error) && !isUnauthorized(error)) void message.error(getErrorMessage(error));
     } finally {
       setChecking(false);
     }
@@ -92,7 +92,7 @@ function AccountForms({ member }: { member: MyInfoResponse }) {
                 if (getErrorCode(error) === 'M002') {
                   setCheckedNickname(undefined);
                   nicknameForm.setFields([{ name: 'nickname', errors: ['이미 사용 중입니다.'] }]);
-                } else {
+                } else if (!isUnauthorized(error)) {
                   void message.error(getErrorMessage(error));
                 }
               },
@@ -154,7 +154,7 @@ function AccountForms({ member }: { member: MyInfoResponse }) {
                         errors: ['현재 비밀번호와 다른 비밀번호를 입력해 주세요.'],
                       },
                     ]);
-                  } else {
+                  } else if (!isUnauthorized(error)) {
                     void message.error(getErrorMessage(error));
                   }
                 },
