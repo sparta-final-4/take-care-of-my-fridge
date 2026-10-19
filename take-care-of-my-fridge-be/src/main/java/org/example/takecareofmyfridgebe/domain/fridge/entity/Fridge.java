@@ -28,7 +28,7 @@ public class Fridge extends BaseTimeEntity {
 
     // 잔여 수량 0 처리 기준값 (0.05 미만) 및 소비기한 임박 기준일(D-3)
     private static final BigDecimal ZERO_THRESHOLD = new BigDecimal("0.05");
-    private static final int IMMINENT_DAYS = 3;
+    public static final int IMMINENT_DAYS = 3;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
