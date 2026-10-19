@@ -7,9 +7,12 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
+import java.util.List;
 import java.util.Optional;
 import org.example.takecareofmyfridgebe.domain.cart.dto.AddCartItemRequest;
 import org.example.takecareofmyfridgebe.domain.cart.dto.AddCartItemResult;
+import org.example.takecareofmyfridgebe.domain.cart.dto.CartItemResponse;
+import org.example.takecareofmyfridgebe.domain.cart.dto.CartItemsResponse;
 import org.example.takecareofmyfridgebe.domain.cart.entity.Cart;
 import org.example.takecareofmyfridgebe.domain.cart.entity.CartItem;
 import org.example.takecareofmyfridgebe.domain.cart.repository.CartItemRepository;
@@ -69,5 +72,27 @@ class CartServiceTest {
 
         assertThat(item.getQuantity()).isEqualTo(5);
         verify(cartItemRepository, never()).save(any(CartItem.class));
+    }
+
+    @Test
+    @DisplayName("담은 줄을 담은 순서대로 돌려준다")
+    void getItems_returnsItemsInOrder() {
+        Cart cart = Cart.builder().memberId(1L).build();
+        CartItem first = CartItem.builder().cart(cart).productId(10L).quantity(2).build();
+        CartItem second = CartItem.builder().cart(cart).productId(20L).quantity(1).build();
+        given(cartItemRepository.findByCartMemberIdOrderByIdAsc(1L)).willReturn(List.of(first, second));
+
+        CartItemsResponse result = cartService.getItems(1L);
+
+        assertThat(result.items()).extracting(CartItemResponse::productId).containsExactly(10L, 20L);
+        assertThat(result.items()).extracting(CartItemResponse::quantity).containsExactly(2, 1);
+    }
+
+    @Test
+    @DisplayName("장바구니가 비어 있으면 빈 목록을 돌려준다")
+    void getItems_returnsEmptyListWhenNothingInCart() {
+        given(cartItemRepository.findByCartMemberIdOrderByIdAsc(1L)).willReturn(List.of());
+
+        assertThat(cartService.getItems(1L).items()).isEmpty();
     }
 }
