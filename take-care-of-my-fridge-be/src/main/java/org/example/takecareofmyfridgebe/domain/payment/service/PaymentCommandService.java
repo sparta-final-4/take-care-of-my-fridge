@@ -38,19 +38,19 @@ public class PaymentCommandService {
         return PaymentConfirmResponse.from(payment);
     }
 
+    // 실제로 실패 처리했으면 true, 다른 요청이 이미 처리해 그대로 뒀으면 false
     @Transactional
-    public void fail(String portonePaymentId, FailReason reason) {
+    public boolean fail(String portonePaymentId, FailReason reason) {
         Payment payment = getForUpdate(portonePaymentId);
 
-        // 다른 요청이 이미 처리했다면 그대로 둔다
         if (payment.getStatus() != PaymentStatus.READY) {
-            return;
+            return false;
         }
 
         payment.fail(reason);
         payment.getOrder().cancel();
         // TODO: 주문 로직에 재고 복구, 번개 드롭 1인 1개 기록 해제 메서드
-        
+        return true;
     }
 
     private Payment getForUpdate(String portonePaymentId) {

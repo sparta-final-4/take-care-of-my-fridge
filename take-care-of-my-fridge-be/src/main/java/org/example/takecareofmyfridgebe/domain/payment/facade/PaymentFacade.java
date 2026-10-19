@@ -57,11 +57,21 @@ public class PaymentFacade {
             throw new BusinessException(ErrorCode.PAYMENT_NOT_PAID);
         }
 
+        // 금액을 확인할 수 없으면 승인도 취소도 하지 않는다
+        if (pgPayment.amount() == null) {
+            log.error("PG 결제 금액 누락: portonePaymentId={}", payment.getPortonePaymentId());
+            throw new BusinessException(ErrorCode.PAYMENT_NOT_PAID);
+        }
+
         if (payment.getAmount() != pgPayment.amount().total()) {
             log.error("결제 금액 불일치: portonePaymentId={}, 주문 금액={}, PG 금액={}",
                     payment.getPortonePaymentId(), payment.getAmount(), pgPayment.amount().total());
-            cancelPgPayment(payment.getPortonePaymentId());
-            paymentCommandService.fail(payment.getPortonePaymentId(), FailReason.AMOUNT_MISMATCH);
+            // 락을 잡고 실패 처리가 반영된 경우에만 PG를 취소해 DB PAID + PG 취소 상태를 막는다
+            if (paymentCommandService.fail(payment.getPortonePaymentId(), FailReason.AMOUNT_MISMATCH)) {
+                cancelPgPayment(payment.getPortonePaymentId());
+            } else {
+                log.error("금액 불일치 결제가 이미 처리됨, PG 취소 생략: portonePaymentId={}", payment.getPortonePaymentId());
+            }
             throw new BusinessException(ErrorCode.PAYMENT_AMOUNT_MISMATCH);
         }
 
@@ -82,6 +92,7 @@ public class PaymentFacade {
             throw new BusinessException(ErrorCode.ALREADY_PROCESSED_PAYMENT);
         }
 
+        // TODO: PG 조회와 실패 처리 사이에 결제가 완료되면 주문은 취소되고 PG 결제만 남는다. 웹훅에서 보상 취소로 처리
         paymentCommandService.fail(portonePaymentId, FailReason.USER_CANCELLED);
     }
 
@@ -93,7 +104,7 @@ public class PaymentFacade {
         return payment;
     }
 
-    // PG 취소가 실패해도 결제 실패 기록은 남겨야 하므로 예외를 삼키고 로그로 남긴다
+    // 결제 실패는 이미 기록됐으므로 PG 취소가 실패하면 예외를 삼키고 수동 처리용 로그를 남긴다
     private void cancelPgPayment(String portonePaymentId) {
         try {
             portOneClient.cancelPayment(portonePaymentId, AMOUNT_MISMATCH_CANCEL_REASON, null);
