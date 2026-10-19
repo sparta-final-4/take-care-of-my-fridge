@@ -3,6 +3,7 @@ package org.example.takecareofmyfridgebe.domain.fridge.service;
 import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemResponse;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeSortType;
+import org.example.takecareofmyfridgebe.domain.fridge.entity.Fridge;
 import org.example.takecareofmyfridgebe.domain.fridge.repository.FridgeRepository;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.StorageType;
 import org.springframework.stereotype.Service;
@@ -35,6 +36,20 @@ public class FridgeService {
     ) {
         LocalDate today = LocalDate.now();
         return fridgeRepository.findItemsByCondition(memberId, storage, sort, imminentOnly, today)
+                .stream()
+                .map(FridgeItemResponse::from)
+                .toList();
+    }
+
+    /**
+     * 조립된 냉장고 재료 엔티티 목록을 단일 트랜잭션으로 일괄 저장한다.
+     *
+     * @param items 저장할 냉장고 재료 엔티티 목록
+     * @return 저장된 냉장고 재료 응답 목록
+     */
+    @Transactional
+    public List<FridgeItemResponse> saveItems(List<Fridge> items) {
+        return fridgeRepository.saveAll(items)
                 .stream()
                 .map(FridgeItemResponse::from)
                 .toList();

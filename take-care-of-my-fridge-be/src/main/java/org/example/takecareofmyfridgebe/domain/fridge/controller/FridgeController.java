@@ -3,14 +3,18 @@ package org.example.takecareofmyfridgebe.domain.fridge.controller;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.auth.service.AuthSessionService.AuthPrincipal;
+import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemCreateRequest;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemResponse;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemSearchRequest;
+import org.example.takecareofmyfridgebe.domain.fridge.facade.FridgeFacade;
 import org.example.takecareofmyfridgebe.domain.fridge.service.FridgeService;
 import org.example.takecareofmyfridgebe.global.response.ApiResponse;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -21,6 +25,7 @@ import java.util.List;
 @RequestMapping("/api/fridge")
 public class FridgeController {
 
+    private final FridgeFacade fridgeFacade;
     private final FridgeService fridgeService;
 
     /**
@@ -41,6 +46,22 @@ public class FridgeController {
                 request.sort(),
                 request.imminentOnly()
         );
+        return ResponseEntity.ok(ApiResponse.ok(response));
+    }
+
+    /**
+     * 로그인한 회원의 냉장고에 여러 재료를 한 번에 등록한다.
+     *
+     * @param principal 인증된 요청자의 회원 정보 — 토큰에서 추출한 회원 ID로 재료 소유자 설정
+     * @param request   등록할 재료 목록 요청
+     * @return 등록된 냉장고 재료 목록
+     */
+    @PostMapping("/items")
+    public ResponseEntity<ApiResponse<List<FridgeItemResponse>>> createItems(
+            @AuthenticationPrincipal AuthPrincipal principal,
+            @Valid @RequestBody FridgeItemCreateRequest request
+    ) {
+        List<FridgeItemResponse> response = fridgeFacade.createItems(principal.memberId(), request);
         return ResponseEntity.ok(ApiResponse.ok(response));
     }
 }
