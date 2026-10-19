@@ -68,7 +68,7 @@ public class FridgeService {
      *
      * @param memberId   요청한 회원 ID
      * @param fridgeId   수정할 냉장고 재료 ID
-     * @param ingredient 매핑된(또는 기존 유지된) 표준 재료 엔티티
+     * @param ingredient 새로 매핑된 표준 재료 엔티티 (null이면 기존 재료 유지)
      * @param request    수정할 재료 정보 (rawName, quantity, storage, expirationDate)
      * @return 수정된 냉장고 재료 응답
      */
@@ -81,7 +81,7 @@ public class FridgeService {
     ) {
         Fridge fridge = getFridgeEntity(memberId, fridgeId);
         fridge.update(
-                ingredient,
+                ingredient != null ? ingredient : fridge.getIngredient(),
                 request.rawName(),
                 request.quantity(),
                 request.storage(),
@@ -129,6 +129,19 @@ public class FridgeService {
      */
     public Fridge getFridgeEntity(Long memberId, Long fridgeId) {
         return fridgeRepository.findByIdAndMemberId(fridgeId, memberId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.FRIDGE_ITEM_NOT_FOUND));
+    }
+
+    /**
+     * 냉장고 재료 ID와 회원 ID로 본인 소유 재료의 rawName만 조회한다.
+     * 존재하지 않거나 다른 회원의 재료이면 404(FRIDGE_ITEM_NOT_FOUND)로 통일한다.
+     *
+     * @param memberId 요청한 회원 ID
+     * @param fridgeId 조회할 냉장고 재료 ID
+     * @return 저장된 재료 원문 이름(rawName)
+     */
+    public String getRawName(Long memberId, Long fridgeId) {
+        return fridgeRepository.findRawNameByIdAndMemberId(fridgeId, memberId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.FRIDGE_ITEM_NOT_FOUND));
     }
 

@@ -37,16 +37,12 @@ public class FridgeRepositoryImpl implements FridgeRepositoryCustom {
                 .selectFrom(fridge)
                 .join(fridge.ingredient, ingredient).fetchJoin()
                 .where(
-                        eqMemberId(memberId),
+                        fridge.memberId.eq(memberId),
                         eqStorage(storage),
                         imminentCondition(imminentOnly, today)
                 )
                 .orderBy(orderSpecifiers(sort))
                 .fetch();
-    }
-
-    private BooleanExpression eqMemberId(Long memberId) {
-        return memberId != null ? fridge.memberId.eq(memberId) : null;
     }
 
     // 보관방식(REFRIGERATED, FROZEN, ROOM_TEMP) 미지정 시 null을 반환해 전체 조회
@@ -62,13 +58,13 @@ public class FridgeRepositoryImpl implements FridgeRepositoryCustom {
         return fridge.expirationDate.between(today, today.plusDays(Fridge.IMMINENT_DAYS));
     }
 
-    // 정렬 조건: 1차 정렬 기준 값이 같을 때 조회 순서가 항상 일정하도록 2차 정렬(id 오름차순)을 함께 지정
+    // 정렬 조건: 1차 정렬 기준 값이 같을 때 조회 순서가 항상 일정하도록 id를 2차 정렬로 함께 지정
     private OrderSpecifier<?>[] orderSpecifiers(FridgeSortType sort) {
         FridgeSortType resolvedSort = sort != null ? sort : FridgeSortType.EXPIRATION;
         return switch (resolvedSort) {
             case EXPIRATION -> new OrderSpecifier<?>[]{fridge.expirationDate.asc(), fridge.id.asc()};
-            case CREATED -> new OrderSpecifier<?>[]{fridge.createdAt.desc(), fridge.id.asc()};
-            case NAME -> new OrderSpecifier<?>[]{fridge.rawName.asc(), fridge.id.asc()};
+            case CREATED -> new OrderSpecifier<?>[]{fridge.createdAt.desc(), fridge.id.desc()};
+            case NAME -> new OrderSpecifier<?>[]{ingredient.name.asc(), fridge.rawName.asc(), fridge.id.asc()};
         };
     }
 }
