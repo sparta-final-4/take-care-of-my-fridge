@@ -28,14 +28,19 @@ class CartItemRepositoryTest {
     @ServiceConnection
     static MySQLContainer mysql = new MySQLContainer("mysql:8.4");
 
-    @Autowired
-    private CartRepository cartRepository;
+    private final CartRepository cartRepository;
+    private final CartItemRepository cartItemRepository;
+    private final EntityManager entityManager;
 
     @Autowired
-    private CartItemRepository cartItemRepository;
-
-    @Autowired
-    private EntityManager entityManager;
+    CartItemRepositoryTest(
+            CartRepository cartRepository,
+            CartItemRepository cartItemRepository,
+            EntityManager entityManager) {
+        this.cartRepository = cartRepository;
+        this.cartItemRepository = cartItemRepository;
+        this.entityManager = entityManager;
+    }
 
     @Test
     @DisplayName("같은 상품이 다른 회원의 장바구니에 있어도 내 장바구니의 줄만 찾는다")
@@ -55,8 +60,8 @@ class CartItemRepositoryTest {
     }
 
     @Test
-    @DisplayName("다른 회원의 줄은 조회되지 않고, 줄이 없는 회원은 빈 목록이다")
-    void findByCartMemberId_isolatesMembers() {
+    @DisplayName("다른 회원의 줄은 조회되지 않는다")
+    void findByCartMemberId_excludesOtherMembersItems() {
         Cart cartA = cartRepository.save(Cart.builder().memberId(1L).build());
         cartRepository.save(Cart.builder().memberId(2L).build());
         cartItemRepository.save(CartItem.builder().cart(cartA).productId(10L).quantity(1).build());
@@ -64,12 +69,22 @@ class CartItemRepositoryTest {
         flushAndClear();
 
         List<CartItem> memberB = cartItemRepository.findByCartMemberIdOrderByIdAsc(2L);
-        List<CartItem> memberWithoutCart = cartItemRepository.findByCartMemberIdOrderByIdAsc(3L);
         List<CartItem> memberA = cartItemRepository.findByCartMemberIdOrderByIdAsc(1L);
 
         assertThat(memberB).isEmpty();
-        assertThat(memberWithoutCart).isEmpty();
         assertThat(memberA).extracting(CartItem::getProductId).containsExactly(10L, 20L);
+    }
+
+    @Test
+    @DisplayName("장바구니가 없는 회원은 빈 목록이다")
+    void findByCartMemberId_returnsEmptyWithoutCart() {
+        Cart cartA = cartRepository.save(Cart.builder().memberId(1L).build());
+        cartItemRepository.save(CartItem.builder().cart(cartA).productId(10L).quantity(1).build());
+        flushAndClear();
+
+        List<CartItem> memberWithoutCart = cartItemRepository.findByCartMemberIdOrderByIdAsc(3L);
+
+        assertThat(memberWithoutCart).isEmpty();
     }
 
     @Test
