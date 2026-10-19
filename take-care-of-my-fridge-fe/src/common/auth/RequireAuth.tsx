@@ -7,7 +7,9 @@ import { useAuthStore } from './authStore';
 import { initSession } from './initialize';
 
 export function RequireAuth({ admin = false }: { admin?: boolean }) {
-  const { status, member, reason } = useAuthStore();
+  const status = useAuthStore((state) => state.status);
+  const role = useAuthStore((state) => state.member?.role);
+  const reason = useAuthStore((state) => state.reason);
   const location = useLocation();
 
   if (status === 'initializing') return <Spin fullscreen tip="로그인 상태를 확인하고 있습니다" />;
@@ -26,7 +28,7 @@ export function RequireAuth({ admin = false }: { admin?: boolean }) {
     if (reason) params.set('reason', reason);
     return <Navigate to={`${ROUTES.login}?${params}`} replace />;
   }
-  if (admin && member?.role !== 'ADMIN') {
+  if (admin && role !== 'ADMIN') {
     return <Result status="403" title="관리자 권한이 필요합니다" />;
   }
   return <Outlet />;
