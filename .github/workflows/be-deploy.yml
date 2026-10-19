@@ -1,0 +1,163 @@
+name: BE Deploy
+
+# dev  → App 서버(Project=imhungry, Env=dev,  Role=app) → https://api-dev.imhungry.click
+# main → App 서버(Project=imhungry, Env=main, Role=app) → https://api.imhungry.click
+# 인프라: imhungry-infra (modules/environment: compose-app.yml, deploy.sh / global: github_oidc.tf)
+#
+# 흐름: BE CI 통과 → arm64 이미지 빌드·GHCR push → SSM으로 서버의 /opt/app/deploy.sh <이미지> 실행 → 헬스 체크
+# 서버의 deploy.sh가 SSM Parameter Store 시크릿으로 .env를 다시 만들고 docker compose로 app 컨테이너를 교체한다.
+#
+# Secrets
+#   AWS_DEPLOY_ROLE_ARN : terraform -chdir=global output -raw github_actions_role_arn
+# Variables
+#   API_URL_DEV  : https://api-dev.imhungry.click (FE Deploy와 공유)
+#   API_URL_MAIN : https://api.imhungry.click     (FE Deploy와 공유)
+on:
+  push:
+    branches: [dev, main]
+    paths:
+      - 'take-care-of-my-fridge-be/**'
+      - '.github/workflows/be-ci.yml'
+      - '.github/workflows/be-deploy.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    uses: ./.github/workflows/be-ci.yml
+    # be-ci.yml의 PR 코멘트 권한을 넘겨줘야 호출할 수 있다(push에서는 코멘트 단계가 건너뛰어진다).
+    permissions:
+      contents: read
+      pull-requests: write
+
+  deploy:
+    needs: ci
+    if: github.ref_name == 'dev' || github.ref_name == 'main'
+    # App 서버가 arm64(t4g)라 arm 러너에서 네이티브로 빌드한다(QEMU 에뮬레이션보다 빠름).
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
+    # 같은 환경 배포는 순서대로 하나씩. 진행 중인 배포를 취소하면 서버가 중간 상태로 남을 수 있다.
+    concurrency:
+      group: be-deploy-${{ github.ref_name }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    env:
+      AWS_REGION: ap-northeast-2
+      # Terraform project 값(EC2 Project 태그, Parameter Store 경로 /imhungry/...)
+      PROJECT_NAME: imhungry
+      ENV_NAME: ${{ github.ref_name }}
+      API_URL: ${{ github.ref_name == 'main' && vars.API_URL_MAIN || vars.API_URL_DEV }}
+    steps:
+      - uses: actions/checkout@v7
+
+      # 비어 있으면 서버 검색·헬스 체크가 엉뚱한 이유로 실패하므로 이미지 빌드 전에 막는다.
+      - name: 배포 설정 확인
+        env:
+          ROLE: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+        run: |
+          missing=""
+          [ -n "$API_URL" ] || missing="$missing API_URL_(DEV|MAIN)"
+          [ -n "$ROLE" ] || missing="$missing AWS_DEPLOY_ROLE_ARN"
+          if [ -n "$missing" ]; then
+            echo "::error::GitHub Secrets/Variables가 비어 있습니다:$missing"
+            exit 1
+          fi
+
+      # 도커 이미지 이름은 소문자만 허용된다.
+      # <브랜치>-<sha>: 배포·롤백용 고정 태그 / <브랜치>: 서버 최초 부팅 때 쓰는 태그(tfvars의 app_image)
+      - name: 이미지 이름 설정
+        id: meta
+        run: |
+          REPO="$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')"
+          echo "image=ghcr.io/${REPO}:${ENV_NAME}-${{ github.sha }}" >> "$GITHUB_OUTPUT"
+          echo "latest=ghcr.io/${REPO}:${ENV_NAME}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # 서버는 GHCR에 로그인하지 않으므로 패키지가 public이어야 pull할 수 있다(첫 push 후 패키지 설정 확인).
+      - name: 이미지 빌드·push (linux/arm64)
+        uses: docker/build-push-action@v6
+        with:
+          context: take-care-of-my-fridge-be
+          platforms: linux/arm64
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.image }}
+            ${{ steps.meta.outputs.latest }}
+          labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
+          cache-from: type=gha,scope=be-${{ github.ref_name }}
+          cache-to: type=gha,mode=max,scope=be-${{ github.ref_name }}
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: App 서버 찾기
+        id: ec2
+        run: |
+          INSTANCE_ID=$(aws ec2 describe-instances \
+            --filters "Name=tag:Project,Values=${PROJECT_NAME}" \
+                      "Name=tag:Env,Values=${ENV_NAME}" \
+                      "Name=tag:Role,Values=app" \
+                      "Name=instance-state-name,Values=running" \
+            --query 'Reservations[].Instances[].InstanceId' --output text)
+          if [ -z "$INSTANCE_ID" ] || [ "$(echo "$INSTANCE_ID" | wc -w)" -ne 1 ]; then
+            echo "::error::running 상태의 App 서버(Env=${ENV_NAME})를 정확히 1대 찾지 못했습니다: '${INSTANCE_ID}'. 스케줄러로 꺼진 시간(dev 03~07시, main 01~07시)이거나 환경이 아직 꺼져 있을 수 있습니다. 이미지는 push됐으니 서버가 켜진 뒤 Re-run 하세요."
+            exit 1
+          fi
+          echo "instance_id=$INSTANCE_ID" >> "$GITHUB_OUTPUT"
+
+      - name: SSM으로 배포 실행
+        env:
+          INSTANCE_ID: ${{ steps.ec2.outputs.instance_id }}
+          IMAGE: ${{ steps.meta.outputs.image }}
+        run: |
+          CMD_ID=$(aws ssm send-command \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name AWS-RunShellScript \
+            --comment "deploy ${ENV_NAME} ${{ github.sha }}" \
+            --parameters "commands=[\"sudo /opt/app/deploy.sh ${IMAGE}\"]" \
+            --timeout-seconds 600 \
+            --query 'Command.CommandId' --output text)
+          echo "SSM Command ID: $CMD_ID"
+
+          # aws ssm wait 는 최대 100초라 이미지 pull이 길면 먼저 끝난다 → 최대 10분 직접 대기
+          STATUS=Pending
+          for i in $(seq 1 60); do
+            sleep 10
+            STATUS=$(aws ssm get-command-invocation --command-id "$CMD_ID" --instance-id "$INSTANCE_ID" \
+              --query Status --output text 2>/dev/null || echo Pending)
+            echo "[$i/60] $STATUS"
+            case "$STATUS" in
+              Pending|InProgress|Delayed) continue ;;
+              *) break ;;
+            esac
+          done
+          aws ssm get-command-invocation --command-id "$CMD_ID" --instance-id "$INSTANCE_ID" \
+            --query '{Status:Status,Out:StandardOutputContent,Err:StandardErrorContent}' --output json
+          [ "$STATUS" = "Success" ]
+
+      # deploy.sh는 컨테이너를 띄우기만 하고 앱 기동 성공은 확인하지 않는다.
+      # 인증 없이 열린 GET /api/auth/csrf 로 Caddy → app 까지 실제로 응답하는지 확인한다(최대 5분).
+      - name: 헬스 체크
+        run: |
+          for i in $(seq 1 30); do
+            CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "${API_URL}/api/auth/csrf" || true)
+            echo "[$i/30] ${API_URL}/api/auth/csrf → ${CODE}"
+            [ "$CODE" = "200" ] && exit 0
+            sleep 10
+          done
+          echo "::error::배포 후 5분 안에 앱이 응답하지 않았습니다. 서버에서 'sudo docker logs app'으로 확인하세요. 롤백: 이전 커밋의 이미지로 'sudo /opt/app/deploy.sh ghcr.io/<repo>:${ENV_NAME}-<이전 sha>'"
+          exit 1

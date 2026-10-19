@@ -16,7 +16,14 @@ spring:
       hibernate:
         format_sql: true
 
+  # Parameter Store 연동(spring-cloud-aws)이 기동 시 SSM 클라이언트를 만들 때 리전이 필요하다.
+  # 리전이 없으면 AWS 설정이 없는 CI·로컬에서 컨텍스트 로딩이 실패한다. 실제 조회는 prod 프로파일에서만 한다.
+  cloud:
+    aws:
+      region:
+        static: ap-northeast-2
+
 app:
   auth:
-    jwt-secret: ${JWT_SECRET}
+    jwt-secret: WavSy2onX+rGXL9EhdkwDNgkscczEziOL09OsXSj7jEy0XurFwGtpB36WShSTM3t
     cookie-secure: ${AUTH_COOKIE_SECURE:true}
