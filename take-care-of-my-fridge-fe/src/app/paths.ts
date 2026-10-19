@@ -2,4 +2,9 @@
 export const ROUTES = {
   home: '/',
   login: '/login',
+  signup: '/signup',
+  signupComplete: '/signup/complete',
+  account: '/mypage/account',
+  adminMembers: '/admin/members',
+  adminAudit: '/admin/audit',
 } as const;

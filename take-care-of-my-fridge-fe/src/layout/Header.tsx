@@ -7,6 +7,7 @@ import { Link, useNavigate } from 'react-router';
 import { ROUTES } from '@/app/paths';
 import { useAuthStore } from '@/common/auth/authStore';
 import { setSession } from '@/common/auth/session';
+import { sessionId } from '@/common/auth/sessionId';
 import { logout } from '@/domains/auth/api';
 import { NotificationBell } from '@/domains/notification/components/NotificationBell';
 
@@ -32,8 +33,10 @@ export function Header() {
   const handleOpenDrawer = () => setDrawerOpen(true);
   const handleCloseDrawer = () => setDrawerOpen(false);
   const handleLogout = () => {
+    const id = sessionId();
     logoutMutation.mutate(undefined, {
       onSuccess: async () => {
+        if (id !== sessionId()) return;
         await setSession(null);
         navigate(ROUTES.login);
       },
@@ -67,7 +70,11 @@ export function Header() {
               key={item.key}
               type="text"
               className={styles.navButton}
-              onClick={item.key === 'mypage' ? () => navigate(ROUTES.login) : undefined}
+              onClick={
+                item.key === 'mypage'
+                  ? () => navigate(status === 'authenticated' ? ROUTES.account : ROUTES.login)
+                  : undefined
+              }
             >
               <Flex align="center" gap="small">
                 <span>{item.label}</span>
@@ -78,7 +85,17 @@ export function Header() {
         </nav>
 
         <Flex align="center" gap="small" className={styles.actions}>
-          {status === 'authenticated' && (
+          {screens.lg && member?.role === 'ADMIN' && (
+            <>
+              <Button type="text" onClick={() => navigate(ROUTES.adminMembers)}>
+                회원 관리
+              </Button>
+              <Button type="text" onClick={() => navigate(ROUTES.adminAudit)}>
+                작업 이력
+              </Button>
+            </>
+          )}
+          {screens.lg && status === 'authenticated' && (
             <Button type="text" onClick={handleLogout} loading={logoutMutation.isPending}>
               {member?.nickname} 로그아웃
             </Button>
@@ -116,7 +133,8 @@ export function Header() {
                 block
                 onClick={() => {
                   handleCloseDrawer();
-                  if (item.key === 'mypage') navigate(ROUTES.login);
+                  if (item.key === 'mypage')
+                    navigate(status === 'authenticated' ? ROUTES.account : ROUTES.login);
                 }}
                 className={styles.drawerNavButton}
               >
@@ -126,6 +144,43 @@ export function Header() {
                 </Flex>
               </Button>
             ))}
+            {member?.role === 'ADMIN' && (
+              <Button
+                type="text"
+                block
+                onClick={() => {
+                  handleCloseDrawer();
+                  navigate(ROUTES.adminMembers);
+                }}
+              >
+                회원 관리
+              </Button>
+            )}
+            {member?.role === 'ADMIN' && (
+              <Button
+                type="text"
+                block
+                onClick={() => {
+                  handleCloseDrawer();
+                  navigate(ROUTES.adminAudit);
+                }}
+              >
+                작업 이력
+              </Button>
+            )}
+            {status === 'authenticated' && (
+              <Button
+                type="text"
+                block
+                onClick={() => {
+                  handleCloseDrawer();
+                  handleLogout();
+                }}
+                loading={logoutMutation.isPending}
+              >
+                로그아웃
+              </Button>
+            )}
           </Flex>
         </Flex>
       </Drawer>

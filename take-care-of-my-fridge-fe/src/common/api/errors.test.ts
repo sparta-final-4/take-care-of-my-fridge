@@ -1,7 +1,7 @@
 import { AxiosError, AxiosHeaders } from 'axios';
 import { describe, expect, it } from 'vitest';
 
-import { getErrorMessage } from './errors';
+import { getErrorCode, getErrorMessage } from './errors';
 
 function responseError(status: number, data: unknown) {
   const config = { headers: new AxiosHeaders() };
@@ -22,6 +22,7 @@ describe('getErrorMessage', () => {
       error: { code: 'C001', message: '잘못된 입력값입니다.' },
     });
     expect(getErrorMessage(error)).toBe('잘못된 입력값입니다.');
+    expect(getErrorCode(error)).toBe('C001');
   });
 
   it('5xx는 서버 메시지 대신 서버 오류 안내를 쓴다', () => {

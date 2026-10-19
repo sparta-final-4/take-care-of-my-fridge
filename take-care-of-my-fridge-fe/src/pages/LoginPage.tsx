@@ -1,21 +1,22 @@
 import { useMutation } from '@tanstack/react-query';
 import { Alert, Button, Form, Input, Typography } from 'antd';
 import { isAxiosError } from 'axios';
-import { useNavigate, useSearchParams } from 'react-router';
+import { Link, useNavigate, useSearchParams } from 'react-router';
 
 import { ROUTES } from '@/app/paths';
-import { getErrorMessage } from '@/common/api/errors';
+import { getErrorCode, getErrorMessage } from '@/common/api/errors';
 import { setSession } from '@/common/auth/session';
 import { login, type LoginRequest } from '@/domains/auth/api';
 
 import styles from './LoginPage.module.scss';
 
-function safeRedirect(value: string | null) {
-  if (!value) return ROUTES.home;
+function safeRedirect(value: string | null, role: 'USER' | 'ADMIN') {
+  const fallback = role === 'ADMIN' ? ROUTES.adminMembers : ROUTES.home;
+  if (!value) return fallback;
   const url = new URL(value, window.location.origin);
-  return url.origin === window.location.origin
+  return url.origin === window.location.origin && url.pathname !== ROUTES.login
     ? `${url.pathname}${url.search}${url.hash}`
-    : ROUTES.home;
+    : fallback;
 }
 
 export default function LoginPage() {
@@ -27,13 +28,14 @@ export default function LoginPage() {
     loginMutation.mutate(values, {
       onSuccess: async (member) => {
         await setSession(member);
-        navigate(safeRedirect(searchParams.get('redirect')), { replace: true });
+        navigate(safeRedirect(searchParams.get('redirect'), member.role), { replace: true });
       },
     });
   };
 
   const error = loginMutation.error;
-  const isSuspended = isAxiosError(error) && error.response?.data?.error?.code === 'A002';
+  const sessionReason = searchParams.get('reason');
+  const isSuspended = getErrorCode(error) === 'A002';
   const errorMessage = isSuspended
     ? '정지된 계정입니다. 관리자에게 문의해 주세요.'
     : isAxiosError(error) && error.response?.status === 401
@@ -50,6 +52,18 @@ export default function LoginPage() {
       </Typography.Paragraph>
       {errorMessage && (
         <Alert type="error" message={errorMessage} showIcon className={styles.error} />
+      )}
+      {!errorMessage && sessionReason && (
+        <Alert
+          type="warning"
+          message={
+            sessionReason === 'suspended'
+              ? '계정 이용이 제한되어 로그인이 해제되었습니다.'
+              : '로그인이 만료되었습니다. 다시 로그인해 주세요.'
+          }
+          showIcon
+          className={styles.error}
+        />
       )}
       <Form<LoginRequest> layout="vertical" onFinish={handleSubmit} requiredMark={false}>
         <Form.Item
@@ -79,6 +93,9 @@ export default function LoginPage() {
           로그인
         </Button>
       </Form>
+      <Typography.Paragraph className={styles.signupLink}>
+        아직 계정이 없나요? <Link to={ROUTES.signup}>회원가입</Link>
+      </Typography.Paragraph>
     </section>
   );
 }
