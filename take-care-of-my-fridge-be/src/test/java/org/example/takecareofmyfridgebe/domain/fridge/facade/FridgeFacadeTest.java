@@ -19,6 +19,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -73,8 +74,8 @@ class FridgeFacadeTest {
                 .basicSeasoning(false)
                 .build();
 
-        when(ingredientMatcher.match("[특가] 국산 두부 300g")).thenReturn(tofu);
-        when(ingredientMatcher.match("엄마표 겉절이")).thenReturn(custom);
+        when(ingredientMatcher.matchAll(List.of("[특가] 국산 두부 300g", "엄마표 겉절이")))
+                .thenReturn(Map.of("[특가] 국산 두부 300g", tofu, "엄마표 겉절이", custom));
         when(fridgeService.saveItems(anyList())).thenReturn(List.of());
 
         LocalDate customExpiration = today.plusDays(14);
@@ -129,31 +130,12 @@ class FridgeFacadeTest {
 
     /**
      * 재료 수정 시 요청한 rawName이 기존 재료의 rawName과 같으면
-     * IngredientMatcher.match를 호출하지 않고 기존 ingredient를 그대로 유지하여
-     * FridgeService.updateItem으로 전달하는지 검증한다.
+     * IngredientMatcher.match를 호출하지 않고 ingredient를 null(기존 재료 유지)로
+     * FridgeService.updateItem에 전달하는지 검증한다.
      */
     @Test
     void updateItemDoesNotCallMatcherWhenRawNameIsSame() {
         // Given: 기존 rawName이 "국산 두부 300g"인 냉장고 재료
-        Ingredient existingIngredient = Ingredient.builder()
-                .ingredientCode("ING_TOFU")
-                .name("두부")
-                .baseUnit("모")
-                .defaultStorage(StorageType.REFRIGERATED)
-                .defaultShelfDays(5)
-                .basicSeasoning(false)
-                .build();
-
-        Fridge existingFridge = Fridge.builder()
-                .memberId(7L)
-                .ingredient(existingIngredient)
-                .rawName("국산 두부 300g")
-                .quantity(new BigDecimal("1"))
-                .storage(StorageType.REFRIGERATED)
-                .expirationDate(LocalDate.of(2026, 10, 20))
-                .source(FridgeSource.MANUAL)
-                .build();
-
         FridgeItemUpdateRequest request = new FridgeItemUpdateRequest(
                 "국산 두부 300g",
                 new BigDecimal("3"),
@@ -162,16 +144,16 @@ class FridgeFacadeTest {
         );
         FridgeItemResponse expectedResponse = mock(FridgeItemResponse.class);
 
-        when(fridgeService.getFridgeEntity(7L, 100L)).thenReturn(existingFridge);
-        when(fridgeService.updateItem(7L, 100L, existingIngredient, request)).thenReturn(expectedResponse);
+        when(fridgeService.getRawName(7L, 100L)).thenReturn("국산 두부 300g");
+        when(fridgeService.updateItem(7L, 100L, null, request)).thenReturn(expectedResponse);
 
         // When: 동일한 rawName으로 수정 요청
         FridgeItemResponse actual = fridgeFacade.updateItem(7L, 100L, request);
 
-        // Then: 매핑기(IngredientMatcher)를 호출하지 않고 기존 ingredient를 그대로 전달했는지 확인
+        // Then: 매핑기(IngredientMatcher)를 호출하지 않고 ingredient를 null(기존 재료 유지)로 전달했는지 확인
         assertSame(expectedResponse, actual);
         verifyNoInteractions(ingredientMatcher);
-        verify(fridgeService).updateItem(7L, 100L, existingIngredient, request);
+        verify(fridgeService).updateItem(7L, 100L, null, request);
     }
 
     /**
@@ -182,15 +164,6 @@ class FridgeFacadeTest {
     @Test
     void updateItemCallsMatcherWhenRawNameIsChanged() {
         // Given: 기존 rawName이 "두부"인 재료를 "[특가] 신라면 5개입"으로 이름을 바꿔 수정하는 상황
-        Ingredient oldIngredient = Ingredient.builder()
-                .ingredientCode("ING_TOFU")
-                .name("두부")
-                .baseUnit("모")
-                .defaultStorage(StorageType.REFRIGERATED)
-                .defaultShelfDays(5)
-                .basicSeasoning(false)
-                .build();
-
         Ingredient newIngredient = Ingredient.builder()
                 .ingredientCode("ING_RAMEN")
                 .name("신라면")
@@ -198,16 +171,6 @@ class FridgeFacadeTest {
                 .defaultStorage(StorageType.ROOM_TEMP)
                 .defaultShelfDays(180)
                 .basicSeasoning(false)
-                .build();
-
-        Fridge existingFridge = Fridge.builder()
-                .memberId(7L)
-                .ingredient(oldIngredient)
-                .rawName("두부")
-                .quantity(new BigDecimal("1"))
-                .storage(StorageType.REFRIGERATED)
-                .expirationDate(LocalDate.of(2026, 10, 20))
-                .source(FridgeSource.MANUAL)
                 .build();
 
         FridgeItemUpdateRequest request = new FridgeItemUpdateRequest(
@@ -218,7 +181,7 @@ class FridgeFacadeTest {
         );
         FridgeItemResponse expectedResponse = mock(FridgeItemResponse.class);
 
-        when(fridgeService.getFridgeEntity(7L, 100L)).thenReturn(existingFridge);
+        when(fridgeService.getRawName(7L, 100L)).thenReturn("두부");
         when(ingredientMatcher.match("[특가] 신라면 5개입")).thenReturn(newIngredient);
         when(fridgeService.updateItem(7L, 100L, newIngredient, request)).thenReturn(expectedResponse);
 
