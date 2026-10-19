@@ -47,4 +47,6 @@ jobs:
           # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
           # or https://code.claude.com/docs/en/cli-reference for available options
           # claude_args: '--allowed-tools Bash(gh pr *)'
+          claude_args: |
+            --append-system-prompt "모든 응답(리뷰, 코멘트, 진행 상황 체크리스트 포함)은 반드시 한국어로 작성하세요. 코드, 식별자, 파일 경로, 명령어는 원문 그대로 둡니다."
 
