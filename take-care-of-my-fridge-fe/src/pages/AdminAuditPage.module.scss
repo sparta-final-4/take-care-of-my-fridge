@@ -1,0 +1,29 @@
+.container {
+  width: 100%;
+  max-width: 1200px;
+  margin: var(--ant-margin-xl) auto;
+  padding: 0 var(--ant-padding-lg);
+}
+
+.filters {
+  margin-bottom: var(--ant-margin-lg);
+}
+
+.select {
+  width: 150px;
+}
+
+.details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ant-margin-lg);
+
+  > div {
+    min-width: 240px;
+  }
+
+  pre {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+}

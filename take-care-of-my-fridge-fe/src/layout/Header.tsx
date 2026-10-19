@@ -83,9 +83,14 @@ export function Header() {
 
         <Flex align="center" gap="small" className={styles.actions}>
           {screens.lg && member?.role === 'ADMIN' && (
-            <Button type="text" onClick={() => navigate(ROUTES.adminMembers)}>
-              관리자
-            </Button>
+            <>
+              <Button type="text" onClick={() => navigate(ROUTES.adminMembers)}>
+                회원 관리
+              </Button>
+              <Button type="text" onClick={() => navigate(ROUTES.adminAudit)}>
+                작업 이력
+              </Button>
+            </>
           )}
           {screens.lg && status === 'authenticated' && (
             <Button type="text" onClick={handleLogout} loading={logoutMutation.isPending}>
@@ -145,7 +150,19 @@ export function Header() {
                   navigate(ROUTES.adminMembers);
                 }}
               >
-                관리자
+                회원 관리
+              </Button>
+            )}
+            {member?.role === 'ADMIN' && (
+              <Button
+                type="text"
+                block
+                onClick={() => {
+                  handleCloseDrawer();
+                  navigate(ROUTES.adminAudit);
+                }}
+              >
+                작업 이력
               </Button>
             )}
             {status === 'authenticated' && (

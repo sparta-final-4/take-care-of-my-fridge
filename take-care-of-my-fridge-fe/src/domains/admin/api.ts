@@ -38,3 +38,41 @@ export async function promoteMember(memberId: number) {
     },
   );
 }
+
+export interface AuditLogSearchRequest {
+  from?: string;
+  to?: string;
+  action?: AuditLogResponse['action'];
+  result?: AuditLogResponse['result'];
+  targetType?: string;
+  targetId?: number;
+  page: number;
+  size: number;
+}
+
+export interface AuditLogResponse {
+  auditLogId: number;
+  createdAt: string;
+  actorEmail: string;
+  actorRole: MyInfoResponse['role'];
+  action:
+    | 'PRODUCT_CREATE'
+    | 'PRODUCT_DELETE'
+    | 'PRICE_UPDATE'
+    | 'DEAL_REVIEW'
+    | 'EVENT_REQUEST'
+    | 'ROLE_CHANGE';
+  targetType: string;
+  targetId: number | null;
+  result: 'SUCCESS' | 'FAILED' | 'DENIED';
+  beforeValue: Record<string, string> | null;
+  afterValue: Record<string, string> | null;
+}
+
+export async function getAuditLogs(request: AuditLogSearchRequest, signal?: AbortSignal) {
+  const { data } = await axiosInstance.get<ApiResponse<PageResponse<AuditLogResponse>>>(
+    '/api/admin/audit-logs',
+    { params: request, signal },
+  );
+  return data.data;
+}
