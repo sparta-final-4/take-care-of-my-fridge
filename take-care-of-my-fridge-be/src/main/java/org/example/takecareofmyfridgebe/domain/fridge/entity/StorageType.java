@@ -1,4 +1,4 @@
-package org.example.takecareofmyfridgebe.domain.ingredient.entity;
+package org.example.takecareofmyfridgebe.domain.fridge.entity;
 
 public enum StorageType {
     REFRIGERATED,
