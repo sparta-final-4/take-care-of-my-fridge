@@ -1,9 +1,13 @@
 import { MenuOutlined, SearchOutlined } from '@ant-design/icons';
+import { useMutation } from '@tanstack/react-query';
 import { Badge, Button, Drawer, Flex, Grid, Input, Layout, Typography } from 'antd';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 
 import { ROUTES } from '@/app/paths';
+import { useAuthStore } from '@/common/auth/authStore';
+import { setSession } from '@/common/auth/session';
+import { logout } from '@/domains/auth/api';
 import { NotificationBell } from '@/domains/notification/components/NotificationBell';
 
 import styles from './Header.module.scss';
@@ -20,11 +24,21 @@ const NAV_ITEMS = [
 
 export function Header() {
   const navigate = useNavigate();
+  const { status, member } = useAuthStore();
+  const logoutMutation = useMutation({ mutationFn: logout });
   const screens = Grid.useBreakpoint();
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   const handleOpenDrawer = () => setDrawerOpen(true);
   const handleCloseDrawer = () => setDrawerOpen(false);
+  const handleLogout = () => {
+    logoutMutation.mutate(undefined, {
+      onSuccess: async () => {
+        await setSession(null);
+        navigate(ROUTES.login);
+      },
+    });
+  };
 
   return (
     <Layout.Header className={styles.header}>
@@ -64,6 +78,11 @@ export function Header() {
         </nav>
 
         <Flex align="center" gap="small" className={styles.actions}>
+          {status === 'authenticated' && (
+            <Button type="text" onClick={handleLogout} loading={logoutMutation.isPending}>
+              {member?.nickname} 로그아웃
+            </Button>
+          )}
           <NotificationBell />
           {!screens.lg && (
             <Button

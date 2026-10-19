@@ -1,0 +1,31 @@
+import { Button, Result, Spin } from 'antd';
+import { Navigate, Outlet, useLocation } from 'react-router';
+
+import { ROUTES } from '@/app/paths';
+
+import { useAuthStore } from './authStore';
+import { initSession } from './initialize';
+
+export function RequireAuth({ admin = false }: { admin?: boolean }) {
+  const { status, member } = useAuthStore();
+  const location = useLocation();
+
+  if (status === 'initializing') return <Spin fullscreen tip="로그인 상태를 확인하고 있습니다" />;
+  if (status === 'error') {
+    return (
+      <Result
+        status="warning"
+        title="로그인 상태를 확인하지 못했습니다"
+        extra={<Button onClick={() => void initSession()}>다시 시도</Button>}
+      />
+    );
+  }
+  if (status === 'anonymous') {
+    const redirect = `${location.pathname}${location.search}${location.hash}`;
+    return <Navigate to={`${ROUTES.login}?redirect=${encodeURIComponent(redirect)}`} replace />;
+  }
+  if (admin && member?.role !== 'ADMIN') {
+    return <Result status="403" title="관리자 권한이 필요합니다" />;
+  }
+  return <Outlet />;
+}
