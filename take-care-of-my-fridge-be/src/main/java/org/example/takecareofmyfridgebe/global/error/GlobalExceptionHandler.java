@@ -8,6 +8,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
@@ -61,6 +62,17 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponse.error(ErrorCode.INVALID_INPUT_VALUE, "요청 본문의 형식이 올바르지 않습니다."));
+    }
+
+    /**
+     * 필수 URL 쿼리 파라미터 누락 예외 처리
+     */
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMissingServletRequestParameterException(MissingServletRequestParameterException e) {
+        log.warn("MissingServletRequestParameterException: {}", e.getMessage());
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.error(ErrorCode.INVALID_INPUT_VALUE, "필수 요청 파라미터가 누락되었습니다."));
     }
 
     /**

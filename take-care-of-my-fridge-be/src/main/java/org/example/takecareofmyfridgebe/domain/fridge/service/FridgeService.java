@@ -3,8 +3,11 @@ package org.example.takecareofmyfridgebe.domain.fridge.service;
 import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemResponse;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemUpdateRequest;
+import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeRemoveReason;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeSortType;
 import org.example.takecareofmyfridgebe.domain.fridge.entity.Fridge;
+import org.example.takecareofmyfridgebe.domain.fridge.entity.FridgeItemLog;
+import org.example.takecareofmyfridgebe.domain.fridge.repository.FridgeItemLogRepository;
 import org.example.takecareofmyfridgebe.domain.fridge.repository.FridgeRepository;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.Ingredient;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.StorageType;
@@ -22,6 +25,7 @@ import java.util.List;
 public class FridgeService {
 
     private final FridgeRepository fridgeRepository;
+    private final FridgeItemLogRepository fridgeItemLogRepository;
 
     /**
      * 로그인한 회원의 냉장고 재료 목록을 보관방식, 정렬 기준, 소비기한 임박 여부 조건으로 조회한다.
@@ -84,6 +88,35 @@ public class FridgeService {
                 request.expirationDate()
         );
         return FridgeItemResponse.from(fridge);
+    }
+
+    /**
+     * 본인 소유의 냉장고 재료를 빼서 삭제한다.
+     * CONSUMED(다 먹었어요)·DISCARDED(버렸어요)는 삭제 전에 fridge_item_logs에 이력을 먼저 저장하고,
+     * WRONG_ENTRY(잘못 등록해서 삭제)는 기록 없이 냉장고에서만 삭제한다.
+     * 기록 저장과 재료 삭제는 데이터 정합성을 위해 하나의 트랜잭션 안에서 수행한다.
+     *
+     * @param memberId 요청한 회원 ID
+     * @param fridgeId 삭제할 냉장고 재료 ID
+     * @param reason   재료 빼기 사유 (CONSUMED, DISCARDED, WRONG_ENTRY)
+     */
+    @Transactional
+    public void removeItem(Long memberId, Long fridgeId, FridgeRemoveReason reason) {
+        Fridge fridge = getFridgeEntity(memberId, fridgeId);
+
+        if (reason.requiresLog()) {
+            FridgeItemLog itemLog = FridgeItemLog.builder()
+                    .memberId(fridge.getMemberId())
+                    .ingredient(fridge.getIngredient())
+                    .fridgeId(fridge.getId())
+                    .rawName(fridge.getRawName())
+                    .quantity(fridge.getQuantity())
+                    .action(reason.toAction())
+                    .build();
+            fridgeItemLogRepository.save(itemLog);
+        }
+
+        fridgeRepository.delete(fridge);
     }
 
     /**
