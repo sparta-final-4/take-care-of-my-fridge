@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 
 import { ROUTES } from '@/app/paths';
-import { getErrorMessage } from '@/common/api/errors';
+import { getErrorCode, getErrorMessage } from '@/common/api/errors';
 import {
   checkEmailAvailability,
   checkNicknameAvailability,
@@ -70,7 +70,19 @@ export default function SignUpPage() {
     }
     signupMutation.mutate(
       { email: values.email, password: values.password, nickname, tastes: values.tastes ?? [] },
-      { onSuccess: () => navigate(ROUTES.signupComplete, { state: { email: values.email } }) },
+      {
+        onSuccess: () => navigate(ROUTES.signupComplete, { state: { email: values.email } }),
+        onError: (error) => {
+          if (getErrorCode(error) === 'M001') {
+            setCheckedEmail(undefined);
+            form.setFields([{ name: 'email', errors: ['이미 가입된 이메일입니다.'] }]);
+          }
+          if (getErrorCode(error) === 'M002') {
+            setCheckedNickname(undefined);
+            form.setFields([{ name: 'nickname', errors: ['이미 사용 중인 닉네임입니다.'] }]);
+          }
+        },
+      },
     );
   };
 
@@ -83,13 +95,14 @@ export default function SignUpPage() {
       {availabilityError && (
         <Alert type="error" message={availabilityError} className={styles.error} />
       )}
-      {signupMutation.error && (
-        <Alert
-          type="error"
-          message={getErrorMessage(signupMutation.error)}
-          className={styles.error}
-        />
-      )}
+      {signupMutation.error &&
+        !['M001', 'M002'].includes(getErrorCode(signupMutation.error) ?? '') && (
+          <Alert
+            type="error"
+            message={getErrorMessage(signupMutation.error)}
+            className={styles.error}
+          />
+        )}
       <Form<FormValues>
         form={form}
         layout="vertical"

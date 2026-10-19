@@ -7,6 +7,7 @@ import { Link, useNavigate } from 'react-router';
 import { ROUTES } from '@/app/paths';
 import { useAuthStore } from '@/common/auth/authStore';
 import { setSession } from '@/common/auth/session';
+import { sessionId } from '@/common/auth/sessionId';
 import { logout } from '@/domains/auth/api';
 import { NotificationBell } from '@/domains/notification/components/NotificationBell';
 
@@ -32,8 +33,10 @@ export function Header() {
   const handleOpenDrawer = () => setDrawerOpen(true);
   const handleCloseDrawer = () => setDrawerOpen(false);
   const handleLogout = () => {
+    const id = sessionId();
     logoutMutation.mutate(undefined, {
       onSuccess: async () => {
+        if (id !== sessionId()) return;
         await setSession(null);
         navigate(ROUTES.login);
       },

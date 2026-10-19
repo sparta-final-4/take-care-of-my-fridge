@@ -4,10 +4,13 @@ import type { MyInfoResponse } from '@/domains/member/api';
 import { useAuthStore } from './authStore';
 import { nextSessionId, sessionId } from './sessionId';
 
-export async function setSession(member: MyInfoResponse | null) {
+export async function setSession(
+  member: MyInfoResponse | null,
+  reason: 'expired' | 'suspended' | null = null,
+) {
   const id = nextSessionId();
   await queryClient.cancelQueries();
   if (id !== sessionId()) return;
   queryClient.clear();
-  useAuthStore.setState({ status: member ? 'authenticated' : 'anonymous', member });
+  useAuthStore.setState({ status: member ? 'authenticated' : 'anonymous', member, reason });
 }
