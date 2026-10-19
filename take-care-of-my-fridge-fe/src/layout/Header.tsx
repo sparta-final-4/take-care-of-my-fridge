@@ -82,12 +82,12 @@ export function Header() {
         </nav>
 
         <Flex align="center" gap="small" className={styles.actions}>
-          {member?.role === 'ADMIN' && (
+          {screens.lg && member?.role === 'ADMIN' && (
             <Button type="text" onClick={() => navigate(ROUTES.adminMembers)}>
               관리자
             </Button>
           )}
-          {status === 'authenticated' && (
+          {screens.lg && status === 'authenticated' && (
             <Button type="text" onClick={handleLogout} loading={logoutMutation.isPending}>
               {member?.nickname} 로그아웃
             </Button>
@@ -136,6 +136,31 @@ export function Header() {
                 </Flex>
               </Button>
             ))}
+            {member?.role === 'ADMIN' && (
+              <Button
+                type="text"
+                block
+                onClick={() => {
+                  handleCloseDrawer();
+                  navigate(ROUTES.adminMembers);
+                }}
+              >
+                관리자
+              </Button>
+            )}
+            {status === 'authenticated' && (
+              <Button
+                type="text"
+                block
+                onClick={() => {
+                  handleCloseDrawer();
+                  handleLogout();
+                }}
+                loading={logoutMutation.isPending}
+              >
+                로그아웃
+              </Button>
+            )}
           </Flex>
         </Flex>
       </Drawer>
