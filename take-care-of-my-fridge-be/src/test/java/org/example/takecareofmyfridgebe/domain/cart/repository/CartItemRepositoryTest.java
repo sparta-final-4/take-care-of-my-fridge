@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import jakarta.persistence.EntityManager;
 import java.util.List;
+import java.util.Optional;
 import org.example.takecareofmyfridgebe.domain.cart.entity.Cart;
 import org.example.takecareofmyfridgebe.domain.cart.entity.CartItem;
 import org.example.takecareofmyfridgebe.global.config.JpaAuditingConfig;
@@ -99,6 +100,32 @@ class CartItemRepositoryTest {
         List<CartItem> items = cartItemRepository.findByCartMemberIdOrderByIdAsc(1L);
 
         assertThat(items).extracting(CartItem::getProductId).containsExactly(30L, 10L, 20L);
+    }
+
+    @Test
+    @DisplayName("줄 번호와 회원 번호가 모두 맞으면 내 장바구니의 줄을 찾는다")
+    void findByIdAndCartMemberId_findsOwnItem() {
+        Cart cart = cartRepository.save(Cart.builder().memberId(1L).build());
+        CartItem saved = cartItemRepository.save(CartItem.builder().cart(cart).productId(10L).quantity(2).build());
+        flushAndClear();
+
+        Optional<CartItem> found = cartItemRepository.findByIdAndCartMemberId(saved.getId(), 1L);
+
+        assertThat(found).isPresent();
+        assertThat(found.get().getQuantity()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("다른 회원의 줄 번호로는 찾지 못한다")
+    void findByIdAndCartMemberId_doesNotFindOthersItem() {
+        Cart cartA = cartRepository.save(Cart.builder().memberId(1L).build());
+        cartRepository.save(Cart.builder().memberId(2L).build());
+        CartItem itemOfA = cartItemRepository.save(CartItem.builder().cart(cartA).productId(10L).quantity(2).build());
+        flushAndClear();
+
+        Optional<CartItem> foundByB = cartItemRepository.findByIdAndCartMemberId(itemOfA.getId(), 2L);
+
+        assertThat(foundByB).isEmpty();
     }
 
     // 영속성 컨텍스트 캐시가 아니라 DB에서 다시 읽게 한다.
