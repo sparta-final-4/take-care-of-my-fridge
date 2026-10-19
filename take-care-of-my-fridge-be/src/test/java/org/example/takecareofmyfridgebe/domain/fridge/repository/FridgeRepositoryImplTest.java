@@ -22,7 +22,10 @@ import static org.example.takecareofmyfridgebe.domain.ingredient.entity.QIngredi
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -49,9 +52,27 @@ class FridgeRepositoryImplTest {
         when(queryFactory.selectFrom(fridge)).thenReturn(jpaQuery);
         when(jpaQuery.join(fridge.ingredient, ingredient)).thenReturn(jpaQuery);
         when(jpaQuery.fetchJoin()).thenReturn(jpaQuery);
-        when(jpaQuery.where(any(Predicate[].class))).thenReturn(jpaQuery);
-        when(jpaQuery.orderBy(any(OrderSpecifier[].class))).thenReturn(jpaQuery);
-        when(jpaQuery.fetch()).thenReturn(List.of());
+        // memberId가 null이면 where 조건 생성 단계에서 예외가 나 이후 체인이 호출되지 않으므로 lenient로 스터빙
+        lenient().when(jpaQuery.where(any(Predicate[].class))).thenReturn(jpaQuery);
+        lenient().when(jpaQuery.orderBy(any(OrderSpecifier[].class))).thenReturn(jpaQuery);
+        lenient().when(jpaQuery.fetch()).thenReturn(List.of());
+    }
+
+    /**
+     * 회원 조건은 필수 조건이므로 memberId가 null이면
+     * 전체 회원의 재료를 조회하지 않고 예외가 발생하는지 검증한다.
+     */
+    @Test
+    void findItemsByConditionThrowsWhenMemberIdIsNull() {
+        // Given
+        LocalDate today = LocalDate.of(2026, 10, 19);
+
+        // When & Then: 예외 발생 및 쿼리 미실행 확인
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> repository.findItemsByCondition(null, null, FridgeSortType.EXPIRATION, false, today)
+        );
+        verify(jpaQuery, never()).fetch();
     }
 
     /**
@@ -93,7 +114,7 @@ class FridgeRepositoryImplTest {
     /**
      * 보관방식(REFRIGERATED), 임박 필터(imminentOnly = true), 최근 등록 순(CREATED)일 때:
      * 1) where 절에 storage = REFRIGERATED 조건과 expirationDate BETWEEN today AND today+3 조건이 들어가는지
-     * 2) orderBy 절이 createdAt DESC, id ASC 순서로 들어가는지 검증한다.
+     * 2) orderBy 절이 createdAt DESC, id DESC 순서로 들어가는지 검증한다.
      */
     @Test
     void findItemsByConditionWithCreatedSortAndImminentOnly() {
@@ -114,32 +135,32 @@ class FridgeRepositoryImplTest {
                 predicates[2]
         );
 
-        // Then: 정렬 조건 확인 (등록일 내림차순 + id 오름차순)
+        // Then: 정렬 조건 확인 (등록일 내림차순 + id 내림차순)
         ArgumentCaptor<OrderSpecifier<?>[]> orderCaptor = ArgumentCaptor.forClass(OrderSpecifier[].class);
         verify(jpaQuery).orderBy(orderCaptor.capture());
         assertArrayEquals(
-                new OrderSpecifier<?>[]{fridge.createdAt.desc(), fridge.id.asc()},
+                new OrderSpecifier<?>[]{fridge.createdAt.desc(), fridge.id.desc()},
                 orderCaptor.getValue()
         );
     }
 
     /**
      * 재료명 가나다순(NAME) 정렬 선택 시
-     * orderBy 절이 rawName ASC, id ASC 순서로 들어가는지 검증한다.
+     * orderBy 절이 ingredient.name ASC, rawName ASC, id ASC 순서로 들어가는지 검증한다.
      */
     @Test
-    void findItemsByConditionWithNameSortUsesRawNameAscAndIdAsc() {
+    void findItemsByConditionWithNameSortUsesIngredientNameThenRawNameThenId() {
         // Given
         LocalDate today = LocalDate.of(2026, 10, 19);
 
         // When
         repository.findItemsByCondition(7L, StorageType.FROZEN, FridgeSortType.NAME, false, today);
 
-        // Then: 정렬 조건 확인 (표시명 오름차순 + id 오름차순)
+        // Then: 정렬 조건 확인 (표준 재료명 오름차순 + 표시명 오름차순 + id 오름차순)
         ArgumentCaptor<OrderSpecifier<?>[]> orderCaptor = ArgumentCaptor.forClass(OrderSpecifier[].class);
         verify(jpaQuery).orderBy(orderCaptor.capture());
         assertArrayEquals(
-                new OrderSpecifier<?>[]{fridge.rawName.asc(), fridge.id.asc()},
+                new OrderSpecifier<?>[]{ingredient.name.asc(), fridge.rawName.asc(), fridge.id.asc()},
                 orderCaptor.getValue()
         );
     }

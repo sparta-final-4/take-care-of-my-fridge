@@ -274,6 +274,72 @@ class FridgeServiceTest {
     }
 
     /**
+     * 이름이 바뀌지 않아 Facade가 ingredient를 null로 넘기면
+     * 기존 표준 재료를 그대로 유지하고 나머지 값만 수정하는지 검증한다.
+     */
+    @Test
+    void updateItemKeepsExistingIngredientWhenIngredientIsNull() {
+        // Given: 두부(ingredientId=10L)로 매핑된 7번 회원의 냉장고 재료
+        LocalDate today = LocalDate.now();
+        Ingredient existingIngredient = Ingredient.builder()
+                .ingredientCode("ING_TOFU")
+                .name("두부")
+                .baseUnit("모")
+                .defaultStorage(StorageType.REFRIGERATED)
+                .defaultShelfDays(5)
+                .basicSeasoning(false)
+                .build();
+        ReflectionTestUtils.setField(existingIngredient, "id", 10L);
+
+        Fridge fridge = Fridge.builder()
+                .memberId(7L)
+                .ingredient(existingIngredient)
+                .rawName("찌개용 두부")
+                .quantity(new BigDecimal("1.00"))
+                .storage(StorageType.REFRIGERATED)
+                .expirationDate(today.plusDays(3))
+                .source(FridgeSource.MANUAL)
+                .build();
+        ReflectionTestUtils.setField(fridge, "id", 100L);
+
+        when(fridgeRepository.findByIdAndMemberId(100L, 7L)).thenReturn(Optional.of(fridge));
+
+        FridgeItemUpdateRequest request = new FridgeItemUpdateRequest(
+                "찌개용 두부",
+                new BigDecimal("2.00"),
+                StorageType.FROZEN,
+                today.plusDays(10)
+        );
+
+        // When: ingredient 없이(null) 수정 실행
+        FridgeItemResponse response = fridgeService.updateItem(7L, 100L, null, request);
+
+        // Then: 기존 재료는 유지되고 수량·보관방식·소비기한만 변경
+        assertSame(existingIngredient, fridge.getIngredient());
+        assertEquals(10L, response.ingredientId());
+        assertEquals(new BigDecimal("2.00"), response.quantity());
+        assertEquals(StorageType.FROZEN, response.storage());
+        assertEquals(today.plusDays(10), response.expirationDate());
+    }
+
+    /**
+     * rawName 비교용 조회에서 존재하지 않거나 다른 회원의 fridgeId이면
+     * BusinessException(ErrorCode.FRIDGE_ITEM_NOT_FOUND) 예외가 발생하는지 검증한다.
+     */
+    @Test
+    void getRawNameThrowsNotFoundWhenOwnedByAnotherMemberOrMissing() {
+        // Given
+        when(fridgeRepository.findRawNameByIdAndMemberId(999L, 7L)).thenReturn(Optional.empty());
+
+        // When & Then
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> fridgeService.getRawName(7L, 999L)
+        );
+        assertEquals(ErrorCode.FRIDGE_ITEM_NOT_FOUND, exception.getErrorCode());
+    }
+
+    /**
      * 존재하지 않거나 다른 회원의 fridgeId로 조회·수정·삭제를 시도하면
      * BusinessException(ErrorCode.FRIDGE_ITEM_NOT_FOUND) 예외가 발생하는지 검증한다.
      */

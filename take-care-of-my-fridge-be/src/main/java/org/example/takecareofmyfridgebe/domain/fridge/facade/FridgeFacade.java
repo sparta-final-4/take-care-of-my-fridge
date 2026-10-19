@@ -13,6 +13,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 @Component
 @RequiredArgsConstructor
@@ -34,9 +35,16 @@ public class FridgeFacade {
     public List<FridgeItemResponse> createItems(Long memberId, FridgeItemCreateRequest request) {
         LocalDate today = LocalDate.now();
 
+        // 등록 항목 수와 관계없이 재료 조회 쿼리를 일괄 처리하기 위해 한 번에 매핑
+        Map<String, Ingredient> ingredients = ingredientMatcher.matchAll(
+                request.items().stream()
+                        .map(FridgeItemCreateRequest.Item::rawName)
+                        .toList()
+        );
+
         List<Fridge> fridges = request.items().stream()
                 .map(item -> {
-                    Ingredient ingredient = ingredientMatcher.match(item.rawName());
+                    Ingredient ingredient = ingredients.get(item.rawName());
                     StorageType storage = item.storage() != null
                             ? item.storage()
                             : ingredient.getDefaultStorage();
@@ -62,10 +70,12 @@ public class FridgeFacade {
      * @return 수정된 냉장고 재료 응답
      */
     public FridgeItemResponse updateItem(Long memberId, Long fridgeId, FridgeItemUpdateRequest request) {
-        Fridge fridge = fridgeService.getFridgeEntity(memberId, fridgeId);
+        // 이름 변경 여부만 확인하는 비교용 조회 (재매핑을 트랜잭션 밖에서 하기 위해 분리)
+        String currentRawName = fridgeService.getRawName(memberId, fridgeId);
 
-        Ingredient ingredient = fridge.getRawName().equals(request.rawName())
-                ? fridge.getIngredient()
+        // 이름이 같으면 null을 넘겨 FridgeService.updateItem에서 기존 재료를 유지한다.
+        Ingredient ingredient = currentRawName.equals(request.rawName())
+                ? null
                 : ingredientMatcher.match(request.rawName());
 
         return fridgeService.updateItem(memberId, fridgeId, ingredient, request);
