@@ -3,6 +3,8 @@ package org.example.takecareofmyfridgebe.domain.fridge.controller;
 import org.example.takecareofmyfridgebe.domain.auth.service.AuthSessionService;
 import org.example.takecareofmyfridgebe.domain.auth.service.JwtTokenService;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemCreateRequest;
+import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemLogResponse;
+import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemLogSearchRequest;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemResponse;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemTakeOutRequest;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemTakeOutResponse;
@@ -19,6 +21,7 @@ import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 import org.example.takecareofmyfridgebe.global.config.SecurityConfig;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
+import org.example.takecareofmyfridgebe.global.response.PageResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -581,6 +584,93 @@ class FridgeControllerTest {
                                     List.of(new SimpleGrantedAuthority("ROLE_USER")))))
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(body))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.success").value(false))
+                    .andExpect(jsonPath("$.error.code").value(ErrorCode.INVALID_INPUT_VALUE.getCode()));
+        }
+
+        verifyNoInteractions(fridgeService);
+    }
+
+    /**
+     * 쿼리 파라미터 없이 기록을 조회하면:
+     * 1) 토큰의 회원 ID(7L)와 기본값(action·from·to = null, page = 1, size = 20)으로 서비스를 호출하는지
+     * 2) PageResponse와 FridgeItemLogResponse 필드가 규격대로 직렬화되는지 검증한다.
+     */
+    @Test
+    void getLogsWithoutParamsUsesDefaultsAndTokenMemberId() throws Exception {
+        // Given
+        FridgeItemLogResponse logResponse = new FridgeItemLogResponse(
+                1L, 10L, "두부", "모", "국산 두부", new BigDecimal("0.50"),
+                FridgeItemAction.DISCARDED, false, LocalDateTime.of(2026, 10, 18, 21, 30));
+        when(fridgeService.getLogs(eq(7L), any(FridgeItemLogSearchRequest.class)))
+                .thenReturn(new PageResponse<>(List.of(logResponse), 1, 20, 1, 1, true));
+
+        // When & Then
+        mvc.perform(get("/api/fridge/logs")
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                new AuthSessionService.AuthPrincipal(7L, 8L, Member.Role.USER), null,
+                                List.of(new SimpleGrantedAuthority("ROLE_USER"))))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.content[0].id").value(1))
+                .andExpect(jsonPath("$.data.content[0].ingredientId").value(10))
+                .andExpect(jsonPath("$.data.content[0].ingredientName").value("두부"))
+                .andExpect(jsonPath("$.data.content[0].baseUnit").value("모"))
+                .andExpect(jsonPath("$.data.content[0].rawName").value("국산 두부"))
+                .andExpect(jsonPath("$.data.content[0].quantity").value(0.5))
+                .andExpect(jsonPath("$.data.content[0].action").value("DISCARDED"))
+                .andExpect(jsonPath("$.data.content[0].cookedByRecipe").value(false))
+                .andExpect(jsonPath("$.data.content[0].createdAt").value("2026-10-18T21:30:00"))
+                .andExpect(jsonPath("$.data.pageNumber").value(1))
+                .andExpect(jsonPath("$.data.totalElements").value(1));
+
+        verify(fridgeService).getLogs(7L, new FridgeItemLogSearchRequest(null, null, null, 1, 20));
+    }
+
+    /**
+     * action·from·to·page·size 파라미터가 그대로 바인딩되어 서비스에 전달되는지 검증한다.
+     */
+    @Test
+    void getLogsBindsQueryParams() throws Exception {
+        when(fridgeService.getLogs(eq(7L), any(FridgeItemLogSearchRequest.class)))
+                .thenReturn(new PageResponse<>(List.of(), 2, 10, 0, 0, true));
+
+        mvc.perform(get("/api/fridge/logs")
+                        .param("action", "CONSUMED")
+                        .param("from", "2026-10-01")
+                        .param("to", "2026-10-10")
+                        .param("page", "2")
+                        .param("size", "10")
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                new AuthSessionService.AuthPrincipal(7L, 8L, Member.Role.USER), null,
+                                List.of(new SimpleGrantedAuthority("ROLE_USER"))))))
+                .andExpect(status().isOk());
+
+        verify(fridgeService).getLogs(7L, new FridgeItemLogSearchRequest(
+                FridgeItemAction.CONSUMED, LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 10), 2, 10));
+    }
+
+    /**
+     * 기록 조회 파라미터가 잘못되면(정의되지 않은 action, 날짜 형식 오류, page 0, size 0·101)
+     * 서비스를 호출하지 않고 400 Bad Request(C001)를 반환하는지 검증한다.
+     */
+    @Test
+    void getLogsWithInvalidParamsReturnsBadRequest() throws Exception {
+        List<String[]> invalidParams = List.of(
+                new String[]{"action", "WRONG_ENTRY"},
+                new String[]{"from", "2026/10/01"},
+                new String[]{"page", "0"},
+                new String[]{"size", "0"},
+                new String[]{"size", "101"}
+        );
+
+        for (String[] param : invalidParams) {
+            mvc.perform(get("/api/fridge/logs")
+                            .param(param[0], param[1])
+                            .with(authentication(new UsernamePasswordAuthenticationToken(
+                                    new AuthSessionService.AuthPrincipal(7L, 8L, Member.Role.USER), null,
+                                    List.of(new SimpleGrantedAuthority("ROLE_USER"))))))
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.success").value(false))
                     .andExpect(jsonPath("$.error.code").value(ErrorCode.INVALID_INPUT_VALUE.getCode()));

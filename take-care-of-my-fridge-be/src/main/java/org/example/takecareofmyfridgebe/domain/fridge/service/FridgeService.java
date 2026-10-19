@@ -1,6 +1,8 @@
 package org.example.takecareofmyfridgebe.domain.fridge.service;
 
 import lombok.RequiredArgsConstructor;
+import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemLogResponse;
+import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemLogSearchRequest;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemResponse;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemTakeOutRequest;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemTakeOutResponse;
@@ -15,6 +17,9 @@ import org.example.takecareofmyfridgebe.domain.ingredient.entity.Ingredient;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.StorageType;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
+import org.example.takecareofmyfridgebe.global.response.PageResponse;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -50,6 +55,27 @@ public class FridgeService {
                 .stream()
                 .map(fridge -> FridgeItemResponse.from(fridge, today))
                 .toList();
+    }
+
+    /**
+     * 로그인한 회원의 냉장고 재료 기록(먹었어요·버렸어요)을 처리 방식과 기간 조건으로 최신순 페이지 조회한다.
+     *
+     * @param memberId 조회 대상 회원 ID
+     * @param request  조회 조건 (action, from, to, page는 1부터, size)
+     * @return 조건에 맞는 기록 페이지
+     */
+    public PageResponse<FridgeItemLogResponse> getLogs(Long memberId, FridgeItemLogSearchRequest request) {
+        if (request.from() != null && request.to() != null && request.from().isAfter(request.to())) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+        Page<FridgeItemLog> logs = fridgeItemLogRepository.findLogsByCondition(
+                memberId,
+                request.action(),
+                request.from(),
+                request.to(),
+                PageRequest.of(request.page() - 1, request.size())
+        );
+        return PageResponse.of(logs.map(FridgeItemLogResponse::from));
     }
 
     /**

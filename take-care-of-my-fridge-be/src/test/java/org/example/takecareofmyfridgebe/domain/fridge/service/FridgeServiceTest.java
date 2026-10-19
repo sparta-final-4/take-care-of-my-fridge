@@ -1,5 +1,7 @@
 package org.example.takecareofmyfridgebe.domain.fridge.service;
 
+import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemLogResponse;
+import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemLogSearchRequest;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemResponse;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemTakeOutRequest;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemTakeOutResponse;
@@ -16,6 +18,7 @@ import org.example.takecareofmyfridgebe.domain.ingredient.entity.Ingredient;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.StorageType;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
+import org.example.takecareofmyfridgebe.global.response.PageResponse;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -23,6 +26,8 @@ import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
@@ -569,6 +574,72 @@ class FridgeServiceTest {
         assertEquals(ErrorCode.FRIDGE_ITEM_NOT_FOUND, exception.getErrorCode());
         verifyNoInteractions(fridgeItemLogRepository);
         verify(fridgeRepository, never()).delete(any(Fridge.class));
+    }
+
+    /**
+     * 기록 조회 시:
+     * 1) 조건(action, from, to)과 1부터 시작하는 page를 0부터 시작하는 PageRequest로 바꿔 Repository에 넘기는지
+     * 2) 기록이 FridgeItemLogResponse로 변환되고(cookingLogId가 있으면 cookedByRecipe = true) 페이지 번호가 다시 1부터인지 검증한다.
+     */
+    @Test
+    void getLogsPassesConditionWithZeroBasedPageAndMapsToResponses() {
+        // Given: 요리 완료로 소진한 기록 1건
+        Ingredient ingredient = Ingredient.builder()
+                .ingredientCode("ING_TOFU")
+                .name("두부")
+                .baseUnit("모")
+                .defaultStorage(StorageType.REFRIGERATED)
+                .defaultShelfDays(5)
+                .basicSeasoning(false)
+                .build();
+        ReflectionTestUtils.setField(ingredient, "id", 10L);
+        FridgeItemLog itemLog = FridgeItemLog.builder()
+                .memberId(7L)
+                .ingredient(ingredient)
+                .cookingLogId(3L)
+                .fridgeId(100L)
+                .rawName("국산 두부")
+                .quantity(new BigDecimal("0.50"))
+                .action(FridgeItemAction.CONSUMED)
+                .build();
+        ReflectionTestUtils.setField(itemLog, "id", 1L);
+
+        LocalDate from = LocalDate.of(2026, 10, 1);
+        LocalDate to = LocalDate.of(2026, 10, 10);
+        PageRequest pageRequest = PageRequest.of(1, 10);
+        when(fridgeItemLogRepository.findLogsByCondition(7L, FridgeItemAction.CONSUMED, from, to, pageRequest))
+                .thenReturn(new PageImpl<>(List.of(itemLog), pageRequest, 11));
+
+        // When: 2페이지(크기 10) 조회
+        PageResponse<FridgeItemLogResponse> response = fridgeService.getLogs(
+                7L, new FridgeItemLogSearchRequest(FridgeItemAction.CONSUMED, from, to, 2, 10));
+
+        // Then
+        assertEquals(2, response.pageNumber());
+        assertEquals(11, response.totalElements());
+        FridgeItemLogResponse first = response.content().get(0);
+        assertEquals(1L, first.id());
+        assertEquals(10L, first.ingredientId());
+        assertEquals("두부", first.ingredientName());
+        assertEquals("모", first.baseUnit());
+        assertEquals("국산 두부", first.rawName());
+        assertEquals(new BigDecimal("0.50"), first.quantity());
+        assertEquals(FridgeItemAction.CONSUMED, first.action());
+        assertTrue(first.cookedByRecipe());
+    }
+
+    /**
+     * 시작일(from)이 종료일(to)보다 늦으면 INVALID_INPUT_VALUE(400) 예외가 발생하고 조회하지 않는지 검증한다.
+     */
+    @Test
+    void getLogsThrowsWhenFromIsAfterTo() {
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> fridgeService.getLogs(7L, new FridgeItemLogSearchRequest(
+                        null, LocalDate.of(2026, 10, 10), LocalDate.of(2026, 10, 1), 1, 20))
+        );
+        assertEquals(ErrorCode.INVALID_INPUT_VALUE, exception.getErrorCode());
+        verifyNoInteractions(fridgeItemLogRepository);
     }
 
     // 7번 회원이 보유한 100번 재료(두부)

@@ -4,15 +4,18 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.auth.service.AuthSessionService.AuthPrincipal;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemCreateRequest;
+import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemLogResponse;
+import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemLogSearchRequest;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemResponse;
+import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemSearchRequest;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemTakeOutRequest;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemTakeOutResponse;
-import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemSearchRequest;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemUpdateRequest;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeRemoveReason;
 import org.example.takecareofmyfridgebe.domain.fridge.facade.FridgeFacade;
 import org.example.takecareofmyfridgebe.domain.fridge.service.FridgeService;
 import org.example.takecareofmyfridgebe.global.response.ApiResponse;
+import org.example.takecareofmyfridgebe.global.response.PageResponse;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -54,6 +57,22 @@ public class FridgeController {
                 request.sort(),
                 request.imminentOnly()
         );
+        return ResponseEntity.ok(ApiResponse.ok(response));
+    }
+
+    /**
+     * 로그인한 회원 본인의 냉장고 재료 기록(먹었어요·버렸어요)을 조건(처리 방식, 기간)으로 최신순 페이지 조회한다.
+     *
+     * @param principal 인증된 요청자의 회원 정보 — 토큰에서 추출한 회원 ID 소유의 기록만 조회 대상
+     * @param request   조회 조건 (action, from, to, page, size)
+     * @return 조건에 맞는 기록 페이지
+     */
+    @GetMapping("/logs")
+    public ResponseEntity<ApiResponse<PageResponse<FridgeItemLogResponse>>> getLogs(
+            @AuthenticationPrincipal AuthPrincipal principal,
+            @Valid @ModelAttribute FridgeItemLogSearchRequest request
+    ) {
+        PageResponse<FridgeItemLogResponse> response = fridgeService.getLogs(principal.memberId(), request);
         return ResponseEntity.ok(ApiResponse.ok(response));
     }
 
