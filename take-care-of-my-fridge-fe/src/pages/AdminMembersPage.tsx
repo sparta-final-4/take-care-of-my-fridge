@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { App, Button, Input, Result, Select, Space, Table, Tag, Typography } from 'antd';
+import dayjs from 'dayjs';
 import { useSearchParams } from 'react-router';
 
 import {
@@ -8,6 +9,7 @@ import {
   type MemberSummaryResponse,
 } from '@/domains/admin/api';
 import { adminQueries } from '@/domains/admin/queries';
+import { ROLE_LABELS, STATUS_LABELS } from '@/domains/member/labels';
 
 import styles from './AdminMembersPage.module.scss';
 
@@ -65,7 +67,7 @@ export default function AdminMembersPage() {
       <Typography.Title level={2}>회원 관리</Typography.Title>
       <Space wrap className={styles.filters}>
         <Input.Search
-          placeholder="이메일 또는 닉네임"
+          placeholder="이메일"
           aria-label="회원 검색"
           key={keyword}
           defaultValue={keyword}
@@ -79,8 +81,8 @@ export default function AdminMembersPage() {
           value={role}
           allowClear
           options={[
-            { value: 'USER', label: '일반 회원' },
-            { value: 'ADMIN', label: '관리자' },
+            { value: 'USER', label: ROLE_LABELS.USER },
+            { value: 'ADMIN', label: ROLE_LABELS.ADMIN },
           ]}
           onChange={(value) => updateSearch({ role: value })}
           className={styles.roleFilter}
@@ -97,7 +99,7 @@ export default function AdminMembersPage() {
           rowKey="memberId"
           loading={isPending}
           dataSource={data?.content}
-          scroll={{ x: 920 }}
+          scroll={{ x: 'max-content' }}
           pagination={{
             current: page,
             pageSize: PAGE_SIZE,
@@ -114,22 +116,27 @@ export default function AdminMembersPage() {
               dataIndex: 'role',
               key: 'role',
               render: (value: MemberSummaryResponse['role']) => (
-                <Tag color={value === 'ADMIN' ? 'purple' : 'default'}>{value}</Tag>
+                <Tag color={value === 'ADMIN' ? 'purple' : 'default'}>{ROLE_LABELS[value]}</Tag>
               ),
             },
-            { title: '상태', dataIndex: 'status', key: 'status' },
+            {
+              title: '상태',
+              dataIndex: 'status',
+              key: 'status',
+              render: (value: MemberSummaryResponse['status']) => STATUS_LABELS[value],
+            },
             {
               title: '가입일',
               dataIndex: 'createdAt',
               key: 'createdAt',
-              render: (value: string) => value.slice(0, 10),
+              render: (value: string) => dayjs(value).format('YYYY-MM-DD'),
             },
             {
               title: '승격 정보',
               key: 'promotion',
               render: (_, member) =>
                 member.promotedAt
-                  ? `${member.promotedAt.slice(0, 10)} · ${member.promotedBy ?? '-'}`
+                  ? `${dayjs(member.promotedAt).format('YYYY-MM-DD')} · ${member.promotedBy ?? '-'}`
                   : '-',
             },
             {

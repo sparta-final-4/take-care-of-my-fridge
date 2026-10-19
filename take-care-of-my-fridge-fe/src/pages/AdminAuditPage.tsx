@@ -16,7 +16,10 @@ import { useState } from 'react';
 import { useSearchParams } from 'react-router';
 
 import { type AuditLogResponse, type AuditLogSearchRequest } from '@/domains/admin/api';
+import { getErrorMessage } from '@/common/api/errors';
+import { ACTION_LABELS, RESULT_LABELS } from '@/domains/admin/labels';
 import { adminQueries } from '@/domains/admin/queries';
+import { ROLE_LABELS } from '@/domains/member/labels';
 
 import styles from './AdminAuditPage.module.scss';
 
@@ -64,7 +67,7 @@ export default function AdminAuditPage() {
     if (nextPage > 1) params.set('page', String(nextPage));
     setSearchParams(params);
   };
-  const { data, isPending, isError, refetch } = useQuery(
+  const { data, isPending, isError, error, refetch } = useQuery(
     adminQueries.auditLogs({ ...applied, page, size: PAGE_SIZE }),
   );
 
@@ -94,7 +97,7 @@ export default function AdminAuditPage() {
           allowClear
           className={styles.select}
           value={filters.action}
-          options={actions.map((action) => ({ value: action, label: action }))}
+          options={actions.map((action) => ({ value: action, label: ACTION_LABELS[action] }))}
           onChange={(action) => setFilters((previous) => ({ ...previous, action }))}
         />
         <Select
@@ -103,11 +106,7 @@ export default function AdminAuditPage() {
           allowClear
           className={styles.select}
           value={filters.result}
-          options={[
-            { value: 'SUCCESS', label: '성공' },
-            { value: 'FAILED', label: '실패' },
-            { value: 'DENIED', label: '권한 거부' },
-          ]}
+          options={results.map((result) => ({ value: result, label: RESULT_LABELS[result] }))}
           onChange={(result) => setFilters((previous) => ({ ...previous, result }))}
         />
         <Input
@@ -133,10 +132,14 @@ export default function AdminAuditPage() {
           조회
         </Button>
       </Space>
+      <Typography.Paragraph type="secondary">
+        기간을 비우면 최근 7일의 이력을 조회합니다.
+      </Typography.Paragraph>
       {isError ? (
         <Result
           status="error"
           title="작업 이력을 불러오지 못했습니다"
+          subTitle={getErrorMessage(error)}
           extra={<Button onClick={() => void refetch()}>다시 시도</Button>}
         />
       ) : (
@@ -144,7 +147,7 @@ export default function AdminAuditPage() {
           rowKey="auditLogId"
           loading={isPending}
           dataSource={data?.content}
-          scroll={{ x: 900 }}
+          scroll={{ x: 'max-content' }}
           locale={{ emptyText: '조건에 맞는 작업 이력이 없습니다.' }}
           pagination={{
             current: page,
@@ -173,11 +176,21 @@ export default function AdminAuditPage() {
               title: '시각',
               dataIndex: 'createdAt',
               key: 'createdAt',
-              render: (value: string) => value.replace('T', ' '),
+              render: (value: string) => dayjs(value).format('YYYY-MM-DD HH:mm'),
             },
             { title: '작업자', dataIndex: 'actorEmail', key: 'actorEmail' },
-            { title: '역할', dataIndex: 'actorRole', key: 'actorRole' },
-            { title: '작업', dataIndex: 'action', key: 'action' },
+            {
+              title: '역할',
+              dataIndex: 'actorRole',
+              key: 'actorRole',
+              render: (value: AuditLogResponse['actorRole']) => ROLE_LABELS[value],
+            },
+            {
+              title: '작업',
+              dataIndex: 'action',
+              key: 'action',
+              render: (value: AuditLogResponse['action']) => ACTION_LABELS[value],
+            },
             {
               title: '대상',
               key: 'target',
@@ -189,7 +202,7 @@ export default function AdminAuditPage() {
               key: 'result',
               render: (value: AuditLogResponse['result']) => (
                 <Tag color={value === 'SUCCESS' ? 'green' : value === 'FAILED' ? 'orange' : 'red'}>
-                  {value}
+                  {RESULT_LABELS[value]}
                 </Tag>
               ),
             },

@@ -15,9 +15,14 @@ export async function login(request: LoginRequest) {
   return data.data;
 }
 
+// CsrfController.CsrfResponse
+export interface CsrfResponse {
+  headerName: string;
+  token: string;
+}
+
 export async function csrfHeaders() {
-  const { data } =
-    await axiosInstance.get<ApiResponse<{ headerName: string; token: string }>>('/api/auth/csrf');
+  const { data } = await axiosInstance.get<ApiResponse<CsrfResponse>>('/api/auth/csrf');
   return { [data.data.headerName]: data.data.token };
 }
 
