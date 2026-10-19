@@ -8,16 +8,17 @@ import {
 
 import {
   createFridgeItems,
+  getFridgeItemLogs,
   getFridgeItems,
   removeFridgeItem,
   takeOutFridgeItem,
   updateFridgeItem,
+  type FridgeItemLogSearchRequest,
   type FridgeItemTakeOutRequest,
   type FridgeItemUpdateRequest,
   type FridgeRemoveReason,
   type FridgeSortType,
 } from './api';
-import { MOCK_FRIDGE_LOG_SUMMARY } from './mocks';
 
 export const fridgeQueries = {
   all: ['fridge'] as const,
@@ -27,11 +28,11 @@ export const fridgeQueries = {
       queryKey: [...fridgeQueries.itemLists(), sort],
       queryFn: ({ signal }) => getFridgeItems(sort, signal),
     }),
-  // TODO: GET /api/fridge/logs가 생기면 queryFn을 api.ts의 조회 함수로 바꾼다.
-  logs: () =>
+  logLists: () => [...fridgeQueries.all, 'logs'] as const,
+  logs: (params: FridgeItemLogSearchRequest) =>
     queryOptions({
-      queryKey: [...fridgeQueries.all, 'logs'],
-      queryFn: () => Promise.resolve(MOCK_FRIDGE_LOG_SUMMARY),
+      queryKey: [...fridgeQueries.logLists(), params],
+      queryFn: ({ signal }) => getFridgeItemLogs(params, signal),
     }),
 };
 
@@ -41,8 +42,8 @@ export function useFridgeItems(sort: FridgeSortType, enabled: boolean) {
   return useQuery({ ...fridgeQueries.items(sort), enabled, placeholderData: keepPreviousData });
 }
 
-export function useFridgeLogs() {
-  return useQuery(fridgeQueries.logs());
+export function useFridgeLogs(params: FridgeItemLogSearchRequest) {
+  return useQuery(fridgeQueries.logs(params));
 }
 
 export function useCreateFridgeItems() {
@@ -67,11 +68,11 @@ export function useTakeOutFridgeItem() {
   return useMutation({
     mutationFn: ({ fridgeId, request }: { fridgeId: number; request: FridgeItemTakeOutRequest }) =>
       takeOutFridgeItem(fridgeId, request),
-    // logs에는 최근 기록과 이번 달 버린 재료 수가 함께 들어 있다.
+    // 최근 기록과 이번 달 버린 재료 수는 모두 logLists 아래 쿼리다.
     onSuccess: () =>
       Promise.all([
         queryClient.invalidateQueries({ queryKey: fridgeQueries.itemLists() }),
-        queryClient.invalidateQueries({ queryKey: fridgeQueries.logs().queryKey }),
+        queryClient.invalidateQueries({ queryKey: fridgeQueries.logLists() }),
       ]),
   });
 }

@@ -1,6 +1,7 @@
 .row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  // 재료명 / 뺀 양 / 먹었어요·버렸어요 / 날짜. 좁아지면 재료명만 말줄임된다.
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
   align-items: center;
   gap: var(--ant-margin-sm);
   padding: var(--ant-padding-xs) var(--ant-padding-sm);
@@ -12,6 +13,10 @@
 .name {
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quantity {
   white-space: nowrap;
 }
 

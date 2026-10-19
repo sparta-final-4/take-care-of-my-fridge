@@ -1,5 +1,5 @@
 import { axiosInstance } from '@/common/api/axiosInstance';
-import type { ApiResponse } from '@/common/api/types';
+import type { ApiResponse, PageResponse } from '@/common/api/types';
 import { csrfHeaders } from '@/domains/auth/api';
 
 export type StorageType = 'REFRIGERATED' | 'FROZEN' | 'ROOM_TEMP';
@@ -65,6 +65,37 @@ export interface FridgeItemTakeOutResponse {
   fridgeId: number;
   removed: boolean;
   remainingQuantity: number;
+}
+
+// FridgeItemLogSearchRequest.java. 비운 조건은 빠진다. page는 1부터, size 기본 20·최대 100.
+export interface FridgeItemLogSearchRequest {
+  action?: FridgeItemAction;
+  from?: string;
+  to?: string;
+  page?: number;
+  size?: number;
+}
+
+// FridgeItemLogResponse.java
+export interface FridgeItemLogResponse {
+  id: number;
+  ingredientId: number | null;
+  ingredientName: string | null;
+  baseUnit: string | null;
+  rawName: string;
+  // 냉장고에서 실제로 뺀 양
+  quantity: number;
+  action: FridgeItemAction;
+  cookedByRecipe: boolean;
+  createdAt: string;
+}
+
+export async function getFridgeItemLogs(params: FridgeItemLogSearchRequest, signal?: AbortSignal) {
+  const { data } = await axiosInstance.get<ApiResponse<PageResponse<FridgeItemLogResponse>>>(
+    '/api/fridge/logs',
+    { params, signal },
+  );
+  return data.data;
 }
 
 export async function getFridgeItems(sort: FridgeSortType, signal?: AbortSignal) {

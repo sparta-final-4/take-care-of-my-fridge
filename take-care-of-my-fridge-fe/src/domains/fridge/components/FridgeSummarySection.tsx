@@ -1,4 +1,5 @@
 import { Typography } from 'antd';
+import dayjs from 'dayjs';
 
 import { SectionCard } from '@/common/components/SectionCard';
 
@@ -9,13 +10,17 @@ import styles from './FridgeSummarySection.module.scss';
 export function FridgeSummarySection() {
   const [sort] = useFridgeSort();
   const { data: items } = useFridgeItems(sort, true);
-  const { data: logs } = useFridgeLogs();
+  // 개수만 필요하므로 1건만 받아 totalElements를 쓴다.
+  const { data: discardedLogs } = useFridgeLogs({
+    action: 'DISCARDED',
+    from: dayjs().startOf('month').format('YYYY-MM-DD'),
+    size: 1,
+  });
 
   const stats = [
     { label: '전체 재료', value: items?.length },
     { label: '임박 재료', value: items?.filter((item) => item.status === 'IMMINENT').length },
-    // TODO: 기록 API가 생기면 실제 이번 달 폐기 수로 바뀐다(지금은 가짜 데이터).
-    { label: '이번 달 버린 재료', value: logs?.monthlyDiscardedCount },
+    { label: '이번 달 버린 재료', value: discardedLogs?.totalElements },
   ];
 
   return (
