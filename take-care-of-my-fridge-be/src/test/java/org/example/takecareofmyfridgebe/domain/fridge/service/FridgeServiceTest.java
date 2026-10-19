@@ -343,7 +343,7 @@ class FridgeServiceTest {
     /**
      * 재료를 빼면서 reason으로 WRONG_ENTRY(잘못 등록해서 삭제)를 전달했을 때:
      * fridge_item_logs에 기록을 남기지 않고 냉장고에서만 재료를 삭제하며,
-     * WRONG_ENTRY.toAction()을 직접 호출하면 IllegalStateException이 발생하는지 검증한다.
+     * WRONG_ENTRY.toAction()을 직접 호출하면 BusinessException(INVALID_FRIDGE_LOG)이 발생하는지 검증한다.
      */
     @Test
     void removeItemDeletesFridgeWithoutSavingLogWhenReasonIsWrongEntry() {
@@ -373,10 +373,14 @@ class FridgeServiceTest {
         // When: WRONG_ENTRY 사유로 삭제 실행
         fridgeService.removeItem(7L, 100L, FridgeRemoveReason.WRONG_ENTRY);
 
-        // Then: 이력 저장소는 전혀 호출되지 않고 재료 삭제만 수행되며, WRONG_ENTRY.toAction()은 예외를 던짐
+        // Then: 이력 저장소는 전혀 호출되지 않고 재료 삭제만 수행되며, WRONG_ENTRY.toAction()은 BusinessException(INVALID_FRIDGE_LOG)을 던짐
         verifyNoInteractions(fridgeItemLogRepository);
         verify(fridgeRepository).delete(fridge);
-        assertThrows(IllegalStateException.class, FridgeRemoveReason.WRONG_ENTRY::toAction);
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                FridgeRemoveReason.WRONG_ENTRY::toAction
+        );
+        assertEquals(ErrorCode.INVALID_FRIDGE_LOG, exception.getErrorCode());
     }
 
     /**

@@ -17,6 +17,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.Ingredient;
 import org.example.takecareofmyfridgebe.global.entity.BaseTimeEntity;
+import org.example.takecareofmyfridgebe.global.error.BusinessException;
+import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 
 import java.math.BigDecimal;
 
@@ -81,7 +83,7 @@ public class FridgeItemLog extends BaseTimeEntity {
     // 버린 재료에는 요리 기록을 연결할 수 없음
     private static void validateCookingLog(FridgeItemAction action, Long cookingLogId) {
         if (action == FridgeItemAction.DISCARDED && cookingLogId != null) {
-            throw new IllegalArgumentException("버린 재료에는 요리 기록을 연결할 수 없습니다.");
+            throw new BusinessException(ErrorCode.INVALID_FRIDGE_LOG);
         }
     }
 }

@@ -1,6 +1,8 @@
 package org.example.takecareofmyfridgebe.domain.fridge.dto;
 
 import org.example.takecareofmyfridgebe.domain.fridge.entity.FridgeItemAction;
+import org.example.takecareofmyfridgebe.global.error.BusinessException;
+import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 
 /**
  * 냉장고 재료 빼기 요청 사유.
@@ -46,7 +48,7 @@ public enum FridgeRemoveReason {
         // 이력을 남기지 않는 사유이므로 DB 액션으로 변환하려고 하면 예외를 던져 잘못된 호출을 막는다.
         @Override
         public FridgeItemAction toAction() {
-            throw new IllegalStateException("WRONG_ENTRY는 이력을 기록하지 않으므로 FridgeItemAction으로 변환할 수 없습니다.");
+            throw new BusinessException(ErrorCode.INVALID_FRIDGE_LOG);
         }
     };
 

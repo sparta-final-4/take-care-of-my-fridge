@@ -18,6 +18,8 @@ import lombok.NoArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.Ingredient;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.StorageType;
 import org.example.takecareofmyfridgebe.global.entity.BaseTimeEntity;
+import org.example.takecareofmyfridgebe.global.error.BusinessException;
+import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -108,9 +110,7 @@ public class Fridge extends BaseTimeEntity {
 
     // 재료 수량 차감 (잔여량이 0.05 미만이면 0으로 보정, 음수 방지)
     public void deduct(BigDecimal amount) {
-        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalArgumentException("차감 수량은 0보다 커야 합니다.");
-        }
+        validatePositiveQuantity(amount);
         BigDecimal remaining = this.quantity.subtract(amount);
         if (remaining.compareTo(ZERO_THRESHOLD) < 0) {
             this.quantity = BigDecimal.ZERO;
@@ -140,7 +140,7 @@ public class Fridge extends BaseTimeEntity {
     // 수량은 0보다 커야 함
     private static void validatePositiveQuantity(BigDecimal quantity) {
         if (quantity == null || quantity.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalArgumentException("수량은 0보다 커야 합니다.");
+            throw new BusinessException(ErrorCode.INVALID_FRIDGE_QUANTITY);
         }
     }
 
@@ -149,11 +149,8 @@ public class Fridge extends BaseTimeEntity {
         boolean isCommerce = source == FridgeSource.COMMERCE;
         boolean hasOrderItem = orderItemId != null;
 
-        if (isCommerce && !hasOrderItem) {
-            throw new IllegalArgumentException("커머스 입고는 주문 상품 ID가 필요합니다.");
-        }
-        if (!isCommerce && hasOrderItem) {
-            throw new IllegalArgumentException("직접 등록은 주문 상품 ID를 가질 수 없습니다.");
+        if (isCommerce != hasOrderItem) {
+            throw new BusinessException(ErrorCode.INVALID_FRIDGE_ORDER_ITEM);
         }
     }
 }
