@@ -11,7 +11,9 @@ import {
   Tag,
   Typography,
 } from 'antd';
+import dayjs from 'dayjs';
 import { useState } from 'react';
+import { useSearchParams } from 'react-router';
 
 import { type AuditLogResponse, type AuditLogSearchRequest } from '@/domains/admin/api';
 import { adminQueries } from '@/domains/admin/queries';
@@ -28,12 +30,40 @@ const actions: AuditLogResponse['action'][] = [
   'ROLE_CHANGE',
 ];
 
+const results: AuditLogResponse['result'][] = ['SUCCESS', 'FAILED', 'DENIED'];
+
 type Filters = Omit<AuditLogSearchRequest, 'page' | 'size'>;
 
+function pick<T extends string>(value: string | null, allowed: T[]) {
+  return allowed.find((item) => item === value);
+}
+
+function readFilters(params: URLSearchParams): Filters {
+  return {
+    from: params.get('from') ?? undefined,
+    to: params.get('to') ?? undefined,
+    action: pick(params.get('action'), actions),
+    result: pick(params.get('result'), results),
+    targetType: params.get('targetType') ?? undefined,
+    targetId: Number(params.get('targetId')) || undefined,
+  };
+}
+
 export default function AdminAuditPage() {
-  const [filters, setFilters] = useState<Filters>({});
-  const [applied, setApplied] = useState<Filters>({});
-  const [page, setPage] = useState(1);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const applied = readFilters(searchParams);
+  const page = Math.max(1, Number(searchParams.get('page')) || 1);
+  // 조회 버튼을 누르기 전까지 입력 중인 조건은 화면 상태로 둔다.
+  const [filters, setFilters] = useState<Filters>(applied);
+
+  const search = (next: Filters, nextPage = 1) => {
+    const params = new URLSearchParams();
+    Object.entries(next).forEach(([key, value]) => {
+      if (value !== undefined && value !== '') params.set(key, String(value));
+    });
+    if (nextPage > 1) params.set('page', String(nextPage));
+    setSearchParams(params);
+  };
   const { data, isPending, isError, refetch } = useQuery(
     adminQueries.auditLogs({ ...applied, page, size: PAGE_SIZE }),
   );
@@ -45,6 +75,7 @@ export default function AdminAuditPage() {
         <DatePicker
           aria-label="시작일"
           placeholder="시작일"
+          value={filters.from ? dayjs(filters.from) : null}
           onChange={(value) =>
             setFilters((previous) => ({ ...previous, from: value?.format('YYYY-MM-DD') }))
           }
@@ -52,6 +83,7 @@ export default function AdminAuditPage() {
         <DatePicker
           aria-label="종료일"
           placeholder="종료일"
+          value={filters.to ? dayjs(filters.to) : null}
           onChange={(value) =>
             setFilters((previous) => ({ ...previous, to: value?.format('YYYY-MM-DD') }))
           }
@@ -61,6 +93,7 @@ export default function AdminAuditPage() {
           placeholder="전체 작업"
           allowClear
           className={styles.select}
+          value={filters.action}
           options={actions.map((action) => ({ value: action, label: action }))}
           onChange={(action) => setFilters((previous) => ({ ...previous, action }))}
         />
@@ -69,6 +102,7 @@ export default function AdminAuditPage() {
           placeholder="전체 결과"
           allowClear
           className={styles.select}
+          value={filters.result}
           options={[
             { value: 'SUCCESS', label: '성공' },
             { value: 'FAILED', label: '실패' },
@@ -95,13 +129,7 @@ export default function AdminAuditPage() {
             setFilters((previous) => ({ ...previous, targetId: value ?? undefined }))
           }
         />
-        <Button
-          type="primary"
-          onClick={() => {
-            setApplied({ ...filters });
-            setPage(1);
-          }}
-        >
+        <Button type="primary" onClick={() => search(filters)}>
           조회
         </Button>
       </Space>
@@ -123,7 +151,7 @@ export default function AdminAuditPage() {
             pageSize: PAGE_SIZE,
             total: data?.totalElements,
             showSizeChanger: false,
-            onChange: setPage,
+            onChange: (next) => search(applied, next),
           }}
           expandable={{
             expandedRowRender: (record) => (
