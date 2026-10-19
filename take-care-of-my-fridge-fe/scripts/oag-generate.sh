@@ -82,3 +82,9 @@ openapi-generator-cli generate \
     -o "$OUTPUT_DIR" \
     --additional-properties=withInterfaces=true,supportsES6=true,useSingleRequestParameter=true,modelPropertyNaming=original,withSeparateModelsAndApi=true,apiPackage=apis,modelPackage=models \
     --global-property=modelDocs=false,apiDocs=false,apiTests=false,modelTests=false
+
+# 생성 코드는 tsconfig의 엄격한 규칙(noUnusedParameters 등)을 따르지 않으므로 타입 검사에서 제외한다.
+# 생성 코드를 import하는 쪽의 타입 검사는 그대로 동작한다.
+find "$OUTPUT_DIR" -name '*.ts' -type f | while read -r file; do
+    { printf '// @ts-nocheck\n'; cat "$file"; } > "$file.tmp" && mv "$file.tmp" "$file"
+done

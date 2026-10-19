@@ -1,0 +1,99 @@
+name: FE Deploy
+
+# dev → s3://<버킷>/dev  → https://dev.imhungry.click
+# main → s3://<버킷>/main → https://imhungry.click
+on:
+  push:
+    branches: [dev, main]
+    paths:
+      - "take-care-of-my-fridge-fe/**"
+      - ".github/workflows/fe-ci.yml"
+      - ".github/workflows/fe-deploy.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    uses: ./.github/workflows/fe-ci.yml
+
+  deploy:
+    needs: ci
+    if: github.ref_name == 'dev' || github.ref_name == 'main'
+    runs-on: ubuntu-latest
+    # 같은 환경 배포는 순서대로 한 번에 하나씩(진행 중인 배포는 취소하지 않음)
+    concurrency:
+      group: fe-deploy-${{ github.ref_name }}
+      cancel-in-progress: false
+    permissions:
+      id-token: write
+      contents: read
+    env:
+      AWS_REGION: ap-northeast-2
+      ENV_NAME: ${{ github.ref_name }}
+    defaults:
+      run:
+        working-directory: take-care-of-my-fridge-fe
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: take-care-of-my-fridge-fe/package.json
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: take-care-of-my-fridge-fe/.node-version
+          cache: pnpm
+          cache-dependency-path: take-care-of-my-fridge-fe/pnpm-lock.yaml
+
+      # 값이 비어 있어도 빌드는 성공하고(빈 값이 .env.production보다 우선) API 호출만 조용히 깨지므로 먼저 막는다.
+      - name: 배포 설정 확인
+        env:
+          API_URL: ${{ github.ref_name == 'main' && vars.API_URL_MAIN || vars.API_URL_DEV }}
+          BUCKET: ${{ secrets.FRONTEND_BUCKET }}
+          DIST_ID: ${{ github.ref_name == 'main' && secrets.CF_DIST_ID_MAIN || secrets.CF_DIST_ID_DEV }}
+          ROLE: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+        run: |
+          missing=""
+          [ -n "$API_URL" ] || missing="$missing API_URL_(DEV|MAIN)"
+          [ -n "$BUCKET" ] || missing="$missing FRONTEND_BUCKET"
+          [ -n "$DIST_ID" ] || missing="$missing CF_DIST_ID_(DEV|MAIN)"
+          [ -n "$ROLE" ] || missing="$missing AWS_DEPLOY_ROLE_ARN"
+          if [ -n "$missing" ]; then
+            echo "::error::GitHub Secrets/Variables가 비어 있습니다:$missing"
+            exit 1
+          fi
+
+      - run: pnpm install --frozen-lockfile
+
+      # 환경변수가 .env.production보다 우선한다.
+      - name: Build
+        env:
+          VITE_API_BASE_URL: ${{ github.ref_name == 'main' && vars.API_URL_MAIN || vars.API_URL_DEV }}
+        run: pnpm build
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # 1) 해시가 붙은 assets를 먼저 올린다. 이전 배포의 assets는 지우지 않아
+      #    예전 index.html을 연 사용자가 lazy 청크를 받다가 404가 나지 않게 한다.
+      # 2) 나머지(index.html 등)는 매번 재검증하도록 올리고, assets를 제외한 오래된 파일은 지운다.
+      - name: Upload to S3
+        env:
+          TARGET: s3://${{ secrets.FRONTEND_BUCKET }}/${{ env.ENV_NAME }}
+        run: |
+          aws s3 sync dist/assets "$TARGET/assets" \
+            --cache-control "public, max-age=31536000, immutable"
+          aws s3 sync dist "$TARGET" \
+            --exclude "assets/*" \
+            --cache-control "no-cache" \
+            --delete
+
+      - name: Invalidate CloudFront
+        env:
+          DIST_ID: ${{ github.ref_name == 'main' && secrets.CF_DIST_ID_MAIN || secrets.CF_DIST_ID_DEV }}
+        run: aws cloudfront create-invalidation --distribution-id "$DIST_ID" --paths "/*"

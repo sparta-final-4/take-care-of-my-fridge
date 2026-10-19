@@ -26,6 +26,13 @@ public class SecurityConfig {
     private final AuthSessionService sessionService;
     private final ObjectMapper objectMapper;
 
+    // OpenAPI 스펙(프론트 클라이언트 생성용)과 Swagger UI는 인증 없이 열어 둔다.
+    private static final String[] API_DOCS_PATHS = {
+            "/v3/api-docs/**",
+            "/swagger-ui/**",
+            "/swagger-ui.html"
+    };
+
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http.csrf(csrf -> csrf.spa().ignoringRequestMatchers(request ->
@@ -42,6 +49,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/auth/csrf").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/admin/members/*/promotion").authenticated()
                         .requestMatchers("/api/admin", "/api/admin/**").hasRole("ADMIN")
+                        .requestMatchers(API_DOCS_PATHS).permitAll()
                         .anyRequest().authenticated())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .exceptionHandling(errors -> errors

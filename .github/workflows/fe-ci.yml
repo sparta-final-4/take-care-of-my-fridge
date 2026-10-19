@@ -1,0 +1,47 @@
+name: FE CI
+
+# main 룰셋이 'backend'·'frontend' 체크를 필수로 요구한다. PR에 paths 필터를 걸면
+# 프론트를 안 건드린 PR에서 체크가 보고되지 않아 머지가 영영 막히므로 PR은 항상 실행한다.
+on:
+  pull_request:
+    branches: [dev, main]
+  # dev·main push 시에는 fe-deploy.yml이 배포 전에 이 워크플로를 호출한다.
+  workflow_call:
+
+concurrency:
+  group: fe-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: take-care-of-my-fridge-fe
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # pnpm 버전은 package.json의 packageManager를 따른다.
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: take-care-of-my-fridge-fe/package.json
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: take-care-of-my-fridge-fe/.node-version
+          cache: pnpm
+          cache-dependency-path: take-care-of-my-fridge-fe/pnpm-lock.yaml
+
+      - run: pnpm install --frozen-lockfile
+
+      # 생성 클라이언트(src/common/api/generated)는 커밋돼 있으므로 여기서 생성하지 않는다(Java 불필요).
+      # 스펙·생성 결과가 백엔드와 맞는지는 openapi-drift.yml이 검사한다.
+      - run: pnpm lint
+      - run: pnpm format:check
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
