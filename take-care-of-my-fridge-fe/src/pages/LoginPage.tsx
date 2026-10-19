@@ -1,7 +1,7 @@
 import { useMutation } from '@tanstack/react-query';
 import { Alert, Button, Form, Input, Typography } from 'antd';
 import { isAxiosError } from 'axios';
-import { useNavigate, useSearchParams } from 'react-router';
+import { Link, useNavigate, useSearchParams } from 'react-router';
 
 import { ROUTES } from '@/app/paths';
 import { getErrorMessage } from '@/common/api/errors';
@@ -79,6 +79,9 @@ export default function LoginPage() {
           로그인
         </Button>
       </Form>
+      <Typography.Paragraph className={styles.signupLink}>
+        아직 계정이 없나요? <Link to={ROUTES.signup}>회원가입</Link>
+      </Typography.Paragraph>
     </section>
   );
 }

@@ -18,3 +18,35 @@ export async function getMyInfo(signal?: AbortSignal) {
   });
   return data.data;
 }
+
+export interface SignUpRequest {
+  email: string;
+  password: string;
+  nickname: string;
+  tastes: MyInfoResponse['tastes'];
+}
+
+export interface SignUpResponse {
+  memberId: number;
+}
+
+export async function checkEmailAvailability(email: string, signal?: AbortSignal) {
+  const { data } = await axiosInstance.get<ApiResponse<{ available: boolean }>>(
+    '/api/members/email-availability',
+    { params: { email }, signal },
+  );
+  return data.data.available;
+}
+
+export async function checkNicknameAvailability(nickname: string, signal?: AbortSignal) {
+  const { data } = await axiosInstance.get<ApiResponse<{ available: boolean }>>(
+    '/api/members/nickname-availability',
+    { params: { nickname }, signal },
+  );
+  return data.data.available;
+}
+
+export async function signUp(request: SignUpRequest) {
+  const { data } = await axiosInstance.post<ApiResponse<SignUpResponse>>('/api/members', request);
+  return data.data;
+}
