@@ -25,7 +25,9 @@ const NAV_ITEMS = [
 
 export function Header() {
   const navigate = useNavigate();
-  const { status, member } = useAuthStore();
+  const status = useAuthStore((state) => state.status);
+  const role = useAuthStore((state) => state.member?.role);
+  const nickname = useAuthStore((state) => state.member?.nickname);
   const logoutMutation = useMutation({ mutationFn: logout });
   const screens = Grid.useBreakpoint();
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -85,7 +87,7 @@ export function Header() {
         </nav>
 
         <Flex align="center" gap="small" className={styles.actions}>
-          {screens.lg && member?.role === 'ADMIN' && (
+          {screens.lg && role === 'ADMIN' && (
             <>
               <Button type="text" onClick={() => navigate(ROUTES.adminMembers)}>
                 회원 관리
@@ -97,7 +99,7 @@ export function Header() {
           )}
           {screens.lg && status === 'authenticated' && (
             <Button type="text" onClick={handleLogout} loading={logoutMutation.isPending}>
-              {member?.nickname} 로그아웃
+              {nickname} 로그아웃
             </Button>
           )}
           <NotificationBell />
@@ -144,7 +146,7 @@ export function Header() {
                 </Flex>
               </Button>
             ))}
-            {member?.role === 'ADMIN' && (
+            {role === 'ADMIN' && (
               <Button
                 type="text"
                 block
@@ -156,7 +158,7 @@ export function Header() {
                 회원 관리
               </Button>
             )}
-            {member?.role === 'ADMIN' && (
+            {role === 'ADMIN' && (
               <Button
                 type="text"
                 block
