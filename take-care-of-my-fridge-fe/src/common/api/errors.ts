@@ -3,6 +3,16 @@ import { isAxiosError } from 'axios';
 // 에러 분류와 메시지 변환은 이 파일에서만 한다.
 const DEFAULT_MESSAGE = '요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.';
 
+export function getErrorCode(error: unknown): string | undefined {
+  if (!isAxiosError(error)) return undefined;
+  const data: unknown = error.response?.data;
+  if (typeof data !== 'object' || data === null || !('error' in data)) return undefined;
+  const responseError = data.error;
+  if (typeof responseError !== 'object' || responseError === null || !('code' in responseError))
+    return undefined;
+  return typeof responseError.code === 'string' ? responseError.code : undefined;
+}
+
 // 백엔드 공통 응답(ApiResponse.java): { success, data, error }.
 function getServerMessage(data: unknown) {
   if (typeof data !== 'object' || data === null || !('error' in data)) return undefined;

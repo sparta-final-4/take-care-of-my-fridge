@@ -1,5 +1,6 @@
 import { isAxiosError } from 'axios';
 
+import { getErrorCode } from '@/common/api/errors';
 import { refresh } from '@/domains/auth/api';
 import { getMyInfo } from '@/domains/member/api';
 
@@ -20,6 +21,7 @@ export function initSession() {
         member = await getMyInfo();
       } catch (error) {
         if (!isAxiosError(error) || error.response?.status !== 401) throw error;
+        if (getErrorCode(error) === 'A006') throw error;
         await refresh();
         member = await getMyInfo();
       }
@@ -27,7 +29,7 @@ export function initSession() {
     } catch (error) {
       if (id !== sessionId()) return;
       if (isAxiosError(error) && error.response?.status === 401) {
-        await setSession(null);
+        await setSession(null, getErrorCode(error) === 'A006' ? 'suspended' : null);
       } else {
         useAuthStore.setState({ status: 'error', member: null });
       }

@@ -4,7 +4,7 @@ import { isAxiosError } from 'axios';
 import { useEffect, useState } from 'react';
 
 import { useAuthStore } from '@/common/auth/authStore';
-import { getErrorMessage } from '@/common/api/errors';
+import { getErrorCode, getErrorMessage } from '@/common/api/errors';
 import {
   changeNickname,
   changePassword,
@@ -38,9 +38,16 @@ function AccountForms({ member }: { member: MyInfoResponse }) {
     await queryClient.invalidateQueries({ queryKey: ['member', 'me'] });
     void message.success('저장했습니다.');
   };
-  const nicknameMutation = useMutation({ mutationFn: changeNickname, onSuccess: saved });
+  const nicknameMutation = useMutation({
+    mutationFn: changeNickname,
+    onSuccess: saved,
+    meta: { skipGlobalError: true },
+  });
   const tastesMutation = useMutation({ mutationFn: changeTastes, onSuccess: saved });
-  const passwordMutation = useMutation({ mutationFn: changePassword });
+  const passwordMutation = useMutation({
+    mutationFn: changePassword,
+    meta: { skipGlobalError: true },
+  });
 
   const checkNickname = async () => {
     try {
@@ -82,7 +89,16 @@ function AccountForms({ member }: { member: MyInfoResponse }) {
               nicknameForm.setFields([{ name: 'nickname', errors: ['중복 확인을 해 주세요.'] }]);
               return;
             }
-            nicknameMutation.mutate(value);
+            nicknameMutation.mutate(value, {
+              onError: (error) => {
+                if (getErrorCode(error) === 'M002') {
+                  setCheckedNickname(undefined);
+                  nicknameForm.setFields([{ name: 'nickname', errors: ['이미 사용 중입니다.'] }]);
+                } else {
+                  void message.error(getErrorMessage(error));
+                }
+              },
+            });
           }}
         >
           <Form.Item label="닉네임" name="nickname" rules={[{ required: true, max: 30 }]}>
@@ -126,6 +142,23 @@ function AccountForms({ member }: { member: MyInfoResponse }) {
                 onSuccess: () => {
                   passwordForm.resetFields();
                   void message.success('비밀번호를 변경했습니다. 다른 기기의 세션은 해제됩니다.');
+                },
+                onError: (error) => {
+                  const code = getErrorCode(error);
+                  if (code === 'M003') {
+                    passwordForm.setFields([
+                      { name: 'currentPassword', errors: ['현재 비밀번호가 일치하지 않습니다.'] },
+                    ]);
+                  } else if (code === 'M004') {
+                    passwordForm.setFields([
+                      {
+                        name: 'newPassword',
+                        errors: ['현재 비밀번호와 다른 비밀번호를 입력해 주세요.'],
+                      },
+                    ]);
+                  } else {
+                    void message.error(getErrorMessage(error));
+                  }
                 },
               },
             )

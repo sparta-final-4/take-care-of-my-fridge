@@ -4,7 +4,7 @@ import { isAxiosError } from 'axios';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 
 import { ROUTES } from '@/app/paths';
-import { getErrorMessage } from '@/common/api/errors';
+import { getErrorCode, getErrorMessage } from '@/common/api/errors';
 import { setSession } from '@/common/auth/session';
 import { login, type LoginRequest } from '@/domains/auth/api';
 
@@ -14,7 +14,7 @@ function safeRedirect(value: string | null, role: 'USER' | 'ADMIN') {
   const fallback = role === 'ADMIN' ? ROUTES.adminMembers : ROUTES.home;
   if (!value) return fallback;
   const url = new URL(value, window.location.origin);
-  return url.origin === window.location.origin
+  return url.origin === window.location.origin && url.pathname !== ROUTES.login
     ? `${url.pathname}${url.search}${url.hash}`
     : fallback;
 }
@@ -34,7 +34,8 @@ export default function LoginPage() {
   };
 
   const error = loginMutation.error;
-  const isSuspended = isAxiosError(error) && error.response?.data?.error?.code === 'A002';
+  const sessionReason = searchParams.get('reason');
+  const isSuspended = getErrorCode(error) === 'A002';
   const errorMessage = isSuspended
     ? '정지된 계정입니다. 관리자에게 문의해 주세요.'
     : isAxiosError(error) && error.response?.status === 401
@@ -51,6 +52,18 @@ export default function LoginPage() {
       </Typography.Paragraph>
       {errorMessage && (
         <Alert type="error" message={errorMessage} showIcon className={styles.error} />
+      )}
+      {!errorMessage && sessionReason && (
+        <Alert
+          type="warning"
+          message={
+            sessionReason === 'suspended'
+              ? '계정 이용이 제한되어 로그인이 해제되었습니다.'
+              : '로그인이 만료되었습니다. 다시 로그인해 주세요.'
+          }
+          showIcon
+          className={styles.error}
+        />
       )}
       <Form<LoginRequest> layout="vertical" onFinish={handleSubmit} requiredMark={false}>
         <Form.Item
