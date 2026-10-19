@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.cart.dto.AddCartItemRequest;
 import org.example.takecareofmyfridgebe.domain.cart.dto.AddCartItemResponse;
 import org.example.takecareofmyfridgebe.domain.cart.dto.AddCartItemResult;
+import org.example.takecareofmyfridgebe.domain.cart.dto.CartItemsResponse;
 import org.example.takecareofmyfridgebe.domain.cart.entity.Cart;
 import org.example.takecareofmyfridgebe.domain.cart.entity.CartItem;
 import org.example.takecareofmyfridgebe.domain.cart.repository.CartItemRepository;
@@ -35,5 +36,10 @@ public class CartService {
         CartItem item = existing.get();
         item.changeQuantity(item.getQuantity() + request.quantity());
         return new AddCartItemResult(AddCartItemResponse.from(item), false);
+    }
+
+    public CartItemsResponse getItems(Long memberId) {
+        // TODO: 상품 도메인 연동 시 상품 이름·가격·할인·품절 여부를 함께 돌려준다
+        return CartItemsResponse.from(cartItemRepository.findByCartMemberIdOrderByIdAsc(memberId));
     }
 }
