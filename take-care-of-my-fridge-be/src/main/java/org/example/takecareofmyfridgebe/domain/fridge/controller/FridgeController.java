@@ -5,6 +5,8 @@ import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.auth.service.AuthSessionService.AuthPrincipal;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemCreateRequest;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemResponse;
+import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemTakeOutRequest;
+import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemTakeOutResponse;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemSearchRequest;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemUpdateRequest;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeRemoveReason;
@@ -86,6 +88,25 @@ public class FridgeController {
             @Valid @RequestBody FridgeItemUpdateRequest request
     ) {
         FridgeItemResponse response = fridgeFacade.updateItem(principal.memberId(), fridgeId, request);
+        return ResponseEntity.ok(ApiResponse.ok(response));
+    }
+
+    /**
+     * 로그인한 회원 본인의 냉장고 재료를 일부 또는 전부 먹었거나(CONSUMED) 버린(DISCARDED) 것으로 처리한다.
+     * quantity가 없거나 남은 양 이상이면 전부 빼서 냉장고에서 삭제하고, 뺀 양은 이력으로 기록한다.
+     *
+     * @param principal 인증된 요청자의 회원 정보 — 토큰에서 추출한 회원 ID로 본인 재료 여부 검증
+     * @param fridgeId  처리할 냉장고 재료 ID
+     * @param request   처리 방식(action)과 뺄 수량(quantity, null이면 전부)
+     * @return 삭제 여부와 남은 양
+     */
+    @PostMapping("/items/{fridgeId}/take-out")
+    public ResponseEntity<ApiResponse<FridgeItemTakeOutResponse>> takeOutItem(
+            @AuthenticationPrincipal AuthPrincipal principal,
+            @PathVariable Long fridgeId,
+            @Valid @RequestBody FridgeItemTakeOutRequest request
+    ) {
+        FridgeItemTakeOutResponse response = fridgeService.takeOutItem(principal.memberId(), fridgeId, request);
         return ResponseEntity.ok(ApiResponse.ok(response));
     }
 

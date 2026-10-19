@@ -4,9 +4,12 @@ import org.example.takecareofmyfridgebe.domain.auth.service.AuthSessionService;
 import org.example.takecareofmyfridgebe.domain.auth.service.JwtTokenService;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemCreateRequest;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemResponse;
+import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemTakeOutRequest;
+import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemTakeOutResponse;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemUpdateRequest;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeRemoveReason;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeSortType;
+import org.example.takecareofmyfridgebe.domain.fridge.entity.FridgeItemAction;
 import org.example.takecareofmyfridgebe.domain.fridge.entity.FridgeItemStatus;
 import org.example.takecareofmyfridgebe.domain.fridge.entity.FridgeSource;
 import org.example.takecareofmyfridgebe.domain.fridge.facade.FridgeFacade;
@@ -522,6 +525,68 @@ class FridgeControllerTest {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.error.code").value(ErrorCode.FRIDGE_ITEM_NOT_FOUND.getCode()));
+    }
+
+    /**
+     * 재료 먹음/버림 처리 요청 시 토큰의 회원 ID(7L)와 요청 본문(action, quantity)을 서비스에 넘기고,
+     * 응답의 fridgeId·removed·remainingQuantity가 규격대로 직렬화되는지 검증한다.
+     */
+    @Test
+    void takeOutItemPassesTokenMemberIdAndRequestToService() throws Exception {
+        // Given
+        when(fridgeService.takeOutItem(eq(7L), eq(100L), any(FridgeItemTakeOutRequest.class)))
+                .thenReturn(new FridgeItemTakeOutResponse(100L, false, new BigDecimal("2.50")));
+
+        // When & Then
+        mvc.perform(post("/api/fridge/items/100/take-out")
+                        .with(csrf())
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                new AuthSessionService.AuthPrincipal(7L, 8L, Member.Role.USER), null,
+                                List.of(new SimpleGrantedAuthority("ROLE_USER")))))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"action\":\"CONSUMED\",\"quantity\":0.5}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.fridgeId").value(100))
+                .andExpect(jsonPath("$.data.removed").value(false))
+                .andExpect(jsonPath("$.data.remainingQuantity").value(2.5));
+
+        verify(fridgeService).takeOutItem(
+                7L, 100L, new FridgeItemTakeOutRequest(FridgeItemAction.CONSUMED, new BigDecimal("0.5")));
+    }
+
+    /**
+     * 재료 먹음/버림 요청 검증 실패 케이스:
+     * action이 없거나 정의되지 않은 값이거나, quantity가 0 또는 음수이면
+     * 서비스를 호출하지 않고 400 Bad Request(C001)를 반환하는지 검증한다.
+     */
+    @Test
+    void takeOutItemRejectsInvalidRequestsWithBadRequest() throws Exception {
+        List<String> invalidBodies = List.of(
+                // action 누락
+                "{\"quantity\":1}",
+                // 정의되지 않은 action
+                "{\"action\":\"WRONG_ENTRY\",\"quantity\":1}",
+                // quantity 0
+                "{\"action\":\"CONSUMED\",\"quantity\":0}",
+                // quantity 음수
+                "{\"action\":\"CONSUMED\",\"quantity\":-1}"
+        );
+
+        for (String body : invalidBodies) {
+            mvc.perform(post("/api/fridge/items/100/take-out")
+                            .with(csrf())
+                            .with(authentication(new UsernamePasswordAuthenticationToken(
+                                    new AuthSessionService.AuthPrincipal(7L, 8L, Member.Role.USER), null,
+                                    List.of(new SimpleGrantedAuthority("ROLE_USER")))))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.success").value(false))
+                    .andExpect(jsonPath("$.error.code").value(ErrorCode.INVALID_INPUT_VALUE.getCode()));
+        }
+
+        verifyNoInteractions(fridgeService);
     }
 
     @TestConfiguration

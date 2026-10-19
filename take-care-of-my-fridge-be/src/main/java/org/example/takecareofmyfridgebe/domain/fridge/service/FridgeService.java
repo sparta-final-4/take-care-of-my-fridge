@@ -2,6 +2,8 @@ package org.example.takecareofmyfridgebe.domain.fridge.service;
 
 import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemResponse;
+import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemTakeOutRequest;
+import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemTakeOutResponse;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemUpdateRequest;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeRemoveReason;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeSortType;
@@ -16,6 +18,7 @@ import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -118,6 +121,43 @@ public class FridgeService {
         }
 
         fridgeRepository.delete(fridge);
+    }
+
+    /**
+     * 본인 소유의 냉장고 재료를 일부 또는 전부 먹었거나 버린 것으로 처리한다.
+     * 요청 수량이 없거나 남은 양 이상이면 전부 뺀 것으로 보고, 차감 후 남은 양이 0이 되면 냉장고에서 삭제한다.
+     * 실제로 뺀 양을 fridge_item_logs에 기록하며, 기록 저장과 차감·삭제는 하나의 트랜잭션 안에서 수행한다.
+     *
+     * @param memberId 요청한 회원 ID
+     * @param fridgeId 처리할 냉장고 재료 ID
+     * @param request  처리 방식(CONSUMED, DISCARDED)과 뺄 수량(null이면 전부)
+     * @return 삭제 여부와 남은 양
+     */
+    @Transactional
+    public FridgeItemTakeOutResponse takeOutItem(Long memberId, Long fridgeId, FridgeItemTakeOutRequest request) {
+        Fridge fridge = getFridgeEntity(memberId, fridgeId);
+        BigDecimal before = fridge.getQuantity();
+        BigDecimal requested = request.quantity();
+        boolean takeAll = requested == null || requested.compareTo(before) >= 0;
+
+        fridge.deduct(takeAll ? before : requested);
+        // 차감 후 0.05 미만으로 남아 0으로 보정된 경우도 전부 뺀 것으로 기록한다.
+        BigDecimal takenQuantity = fridge.isEmpty() ? before : requested;
+
+        FridgeItemLog itemLog = FridgeItemLog.builder()
+                .memberId(fridge.getMemberId())
+                .ingredient(fridge.getIngredient())
+                .fridgeId(fridge.getId())
+                .rawName(fridge.getRawName())
+                .quantity(takenQuantity)
+                .action(request.action())
+                .build();
+        fridgeItemLogRepository.save(itemLog);
+
+        if (fridge.isEmpty()) {
+            fridgeRepository.delete(fridge);
+        }
+        return FridgeItemTakeOutResponse.from(fridge);
     }
 
     /**
