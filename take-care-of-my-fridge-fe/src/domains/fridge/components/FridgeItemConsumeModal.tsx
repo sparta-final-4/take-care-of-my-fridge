@@ -5,6 +5,9 @@ import { formatQuantity, withObjectParticle } from '../format';
 import { useTakeOutFridgeItem } from '../queries';
 import styles from './FridgeItemConsumeModal.module.scss';
 
+// 입력칸 하나뿐이라 기본 너비(520px)보다 좁게 띄운다. 좁은 화면에서는 antd가 화면 안으로 줄인다.
+const MODAL_WIDTH = 400;
+
 interface ConsumeFormValues {
   quantity: number;
 }
@@ -44,6 +47,8 @@ export function FridgeItemConsumeModal({ item, onClose }: FridgeItemConsumeModal
   return (
     <Modal
       open
+      width={MODAL_WIDTH}
+      centered
       title={`${withObjectParticle(item.rawName)} 얼마나 먹었나요?`}
       okText="먹었어요"
       cancelText="취소"
