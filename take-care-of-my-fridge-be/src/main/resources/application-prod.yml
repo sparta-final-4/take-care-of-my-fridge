@@ -1,0 +1,19 @@
+# 배포 서버(dev·main) 공통. imhungry-infra compose가 SPRING_PROFILES_ACTIVE=prod, APP_ENV=<dev|main> 으로 띄운다.
+# - DB·Redis 접속 정보: compose(compose-app.yml)가 SPRING_* 환경변수로 넣는다.
+# - compose가 넘기지 않는 시크릿(JWT_SECRET 등): Parameter Store /imhungry/<APP_ENV>/ 에서 직접 읽는다.
+#   EC2 역할에 이 경로 읽기 권한이 있고, 컨테이너도 인스턴스 메타데이터로 역할 자격 증명을 쓴다.
+# APP_ENV는 기본값을 두지 않는다. 빠지면 다른 환경의 시크릿을 읽는 대신 기동에 실패한다.
+spring:
+  config:
+    import: "aws-parameterstore:/imhungry/${APP_ENV}/"
+  jpa:
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+
+app:
+  auth:
+    # application.yml 값과 무관하게 반드시 Parameter Store 값을 쓴다(없으면 기동 실패).
+    jwt-secret: ${JWT_SECRET}
+    cookie-secure: true

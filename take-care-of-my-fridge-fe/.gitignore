@@ -21,7 +21,3 @@ coverage
 .claude
 
 .env
-
-# openapi-generator: 커밋된 스펙(openapi/fridge-api.json)으로 생성한다
-src/common/api/generated/*
-!src/common/api/generated/.openapi-generator-ignore

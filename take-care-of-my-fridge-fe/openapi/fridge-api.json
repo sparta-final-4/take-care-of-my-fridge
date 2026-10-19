@@ -1,0 +1,1026 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "OpenAPI definition",
+    "version": "v0"
+  },
+  "paths": {
+    "/api/members/me/tastes": {
+      "put": {
+        "tags": [
+          "member-controller"
+        ],
+        "operationId": "changeTastes",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeTastesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/members": {
+      "post": {
+        "tags": [
+          "member-controller"
+        ],
+        "operationId": "signUp",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SignUpRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseSignUpResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/refresh": {
+      "post": {
+        "tags": [
+          "auth-controller"
+        ],
+        "operationId": "refresh",
+        "parameters": [
+          {
+            "name": "refresh_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "tags": [
+          "auth-controller"
+        ],
+        "operationId": "logout",
+        "parameters": [
+          {
+            "name": "access_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "refresh_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "tags": [
+          "auth-controller"
+        ],
+        "operationId": "login",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMyInfoResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/members/{memberId}/promotion": {
+      "post": {
+        "tags": [
+          "admin-member-controller"
+        ],
+        "operationId": "promote",
+        "parameters": [
+          {
+            "name": "memberId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/members/me/password": {
+      "patch": {
+        "tags": [
+          "member-controller"
+        ],
+        "operationId": "changePassword",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePasswordRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/members/me/nickname": {
+      "patch": {
+        "tags": [
+          "member-controller"
+        ],
+        "operationId": "changeNickname",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeNicknameRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/members/nickname-availability": {
+      "get": {
+        "tags": [
+          "member-controller"
+        ],
+        "operationId": "checkNicknameAvailability",
+        "parameters": [
+          {
+            "name": "request",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/NicknameAvailabilityRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseNicknameAvailabilityResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/members/me": {
+      "get": {
+        "tags": [
+          "member-controller"
+        ],
+        "operationId": "getMyInfo",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMyInfoResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/members/email-availability": {
+      "get": {
+        "tags": [
+          "member-controller"
+        ],
+        "operationId": "checkEmailAvailability",
+        "parameters": [
+          {
+            "name": "request",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/EmailAvailabilityRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseEmailAvailabilityResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/csrf": {
+      "get": {
+        "tags": [
+          "csrf-controller"
+        ],
+        "operationId": "csrf",
+        "parameters": [
+          {
+            "name": "token",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/CsrfToken"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseCsrfResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/members": {
+      "get": {
+        "tags": [
+          "admin-member-controller"
+        ],
+        "operationId": "getMembers",
+        "parameters": [
+          {
+            "name": "request",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/MemberListRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePageResponseMemberSummaryResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/audit-logs": {
+      "get": {
+        "tags": [
+          "admin-audit-controller"
+        ],
+        "operationId": "getAuditLogs",
+        "parameters": [
+          {
+            "name": "request",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/AuditLogSearchRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePageResponseAuditLogResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ChangeTastesRequest": {
+        "type": "object",
+        "properties": {
+          "tastes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "SALTY",
+                "SWEET",
+                "SPICY",
+                "UMAMI",
+                "MILD"
+              ]
+            }
+          }
+        },
+        "required": [
+          "tastes"
+        ]
+      },
+      "ApiResponseVoid": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {},
+          "error": {
+            "$ref": "#/components/schemas/ErrorResponse"
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "SignUpRequest": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "maxLength": 255,
+            "minLength": 0
+          },
+          "password": {
+            "type": "string",
+            "maxLength": 30,
+            "minLength": 8,
+            "pattern": "^(?=.*[A-Za-z])(?=.*\\d)(?=.*[^A-Za-z0-9])[\\x21-\\x7E]+$"
+          },
+          "nickname": {
+            "type": "string",
+            "maxLength": 30,
+            "minLength": 0
+          },
+          "tastes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "SALTY",
+                "SWEET",
+                "SPICY",
+                "UMAMI",
+                "MILD"
+              ]
+            }
+          }
+        },
+        "required": [
+          "email",
+          "nickname",
+          "password",
+          "tastes"
+        ]
+      },
+      "ApiResponseSignUpResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/SignUpResponse"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorResponse"
+          }
+        }
+      },
+      "SignUpResponse": {
+        "type": "object",
+        "properties": {
+          "memberId": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "LoginRequest": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "minLength": 1
+          },
+          "password": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "email",
+          "password"
+        ]
+      },
+      "ApiResponseMyInfoResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/MyInfoResponse"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorResponse"
+          }
+        }
+      },
+      "MyInfoResponse": {
+        "type": "object",
+        "properties": {
+          "memberId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "email": {
+            "type": "string"
+          },
+          "nickname": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "USER",
+              "ADMIN"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "SUSPENDED"
+            ]
+          },
+          "tastes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "SALTY",
+                "SWEET",
+                "SPICY",
+                "UMAMI",
+                "MILD"
+              ]
+            }
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ChangePasswordRequest": {
+        "type": "object",
+        "properties": {
+          "currentPassword": {
+            "type": "string",
+            "minLength": 1
+          },
+          "newPassword": {
+            "type": "string",
+            "maxLength": 30,
+            "minLength": 8,
+            "pattern": "^(?=.*[A-Za-z])(?=.*\\d)(?=.*[^A-Za-z0-9])[\\x21-\\x7E]+$"
+          }
+        },
+        "required": [
+          "currentPassword",
+          "newPassword"
+        ]
+      },
+      "ChangeNicknameRequest": {
+        "type": "object",
+        "properties": {
+          "nickname": {
+            "type": "string",
+            "maxLength": 30,
+            "minLength": 0
+          }
+        },
+        "required": [
+          "nickname"
+        ]
+      },
+      "NicknameAvailabilityRequest": {
+        "type": "object",
+        "properties": {
+          "nickname": {
+            "type": "string",
+            "maxLength": 30,
+            "minLength": 0
+          }
+        },
+        "required": [
+          "nickname"
+        ]
+      },
+      "ApiResponseNicknameAvailabilityResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/NicknameAvailabilityResponse"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorResponse"
+          }
+        }
+      },
+      "NicknameAvailabilityResponse": {
+        "type": "object",
+        "properties": {
+          "available": {
+            "type": "boolean"
+          }
+        }
+      },
+      "EmailAvailabilityRequest": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "maxLength": 255,
+            "minLength": 0
+          }
+        },
+        "required": [
+          "email"
+        ]
+      },
+      "ApiResponseEmailAvailabilityResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/EmailAvailabilityResponse"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorResponse"
+          }
+        }
+      },
+      "EmailAvailabilityResponse": {
+        "type": "object",
+        "properties": {
+          "available": {
+            "type": "boolean"
+          }
+        }
+      },
+      "CsrfToken": {
+        "type": "object",
+        "properties": {
+          "parameterName": {
+            "type": "string"
+          },
+          "token": {
+            "type": "string"
+          },
+          "headerName": {
+            "type": "string"
+          }
+        }
+      },
+      "ApiResponseCsrfResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/CsrfResponse"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorResponse"
+          }
+        }
+      },
+      "CsrfResponse": {
+        "type": "object",
+        "properties": {
+          "headerName": {
+            "type": "string"
+          },
+          "token": {
+            "type": "string"
+          }
+        }
+      },
+      "MemberListRequest": {
+        "type": "object",
+        "properties": {
+          "keyword": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "USER",
+              "ADMIN"
+            ]
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 1
+          },
+          "size": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 1
+          }
+        }
+      },
+      "ApiResponsePageResponseMemberSummaryResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/PageResponseMemberSummaryResponse"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorResponse"
+          }
+        }
+      },
+      "MemberSummaryResponse": {
+        "type": "object",
+        "properties": {
+          "memberId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "email": {
+            "type": "string"
+          },
+          "nickname": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "USER",
+              "ADMIN"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "SUSPENDED"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "promotedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "promotedBy": {
+            "type": "string"
+          }
+        }
+      },
+      "PageResponseMemberSummaryResponse": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MemberSummaryResponse"
+            }
+          },
+          "pageNumber": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalElements": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "totalPages": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "isLast": {
+            "type": "boolean"
+          }
+        }
+      },
+      "AuditLogSearchRequest": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "format": "date"
+          },
+          "to": {
+            "type": "string",
+            "format": "date"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "PRODUCT_CREATE",
+              "PRODUCT_DELETE",
+              "PRICE_UPDATE",
+              "DEAL_REVIEW",
+              "EVENT_REQUEST",
+              "ROLE_CHANGE"
+            ]
+          },
+          "result": {
+            "type": "string",
+            "enum": [
+              "SUCCESS",
+              "FAILED",
+              "DENIED"
+            ]
+          },
+          "targetType": {
+            "type": "string",
+            "maxLength": 50,
+            "minLength": 0
+          },
+          "targetId": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 1
+          },
+          "size": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 1
+          }
+        }
+      },
+      "ApiResponsePageResponseAuditLogResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/PageResponseAuditLogResponse"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorResponse"
+          }
+        }
+      },
+      "AuditLogResponse": {
+        "type": "object",
+        "properties": {
+          "auditLogId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "actorEmail": {
+            "type": "string"
+          },
+          "actorRole": {
+            "type": "string",
+            "enum": [
+              "USER",
+              "ADMIN"
+            ]
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "PRODUCT_CREATE",
+              "PRODUCT_DELETE",
+              "PRICE_UPDATE",
+              "DEAL_REVIEW",
+              "EVENT_REQUEST",
+              "ROLE_CHANGE"
+            ]
+          },
+          "targetType": {
+            "type": "string"
+          },
+          "targetId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "result": {
+            "type": "string",
+            "enum": [
+              "SUCCESS",
+              "FAILED",
+              "DENIED"
+            ]
+          },
+          "beforeValue": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "afterValue": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "PageResponseAuditLogResponse": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuditLogResponse"
+            }
+          },
+          "pageNumber": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalElements": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "totalPages": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "isLast": {
+            "type": "boolean"
+          }
+        }
+      }
+    }
+  }
+}
