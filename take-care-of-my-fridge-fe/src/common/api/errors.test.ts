@@ -16,12 +16,20 @@ function responseError(status: number, data: unknown) {
 
 describe('getErrorMessage', () => {
   it('공통 실패 응답의 서버 메시지를 쓴다', () => {
-    const error = responseError(400, { code: 'COMMON_001', message: '잘못된 입력값입니다.' });
+    const error = responseError(400, {
+      success: false,
+      data: null,
+      error: { code: 'C001', message: '잘못된 입력값입니다.' },
+    });
     expect(getErrorMessage(error)).toBe('잘못된 입력값입니다.');
   });
 
   it('5xx는 서버 메시지 대신 서버 오류 안내를 쓴다', () => {
-    const error = responseError(500, { code: 'COMMON_002', message: 'NullPointerException' });
+    const error = responseError(500, {
+      success: false,
+      data: null,
+      error: { code: 'C002', message: 'NullPointerException' },
+    });
     expect(getErrorMessage(error)).toBe('서버에 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.');
   });
 

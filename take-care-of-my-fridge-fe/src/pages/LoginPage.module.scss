@@ -1,0 +1,21 @@
+@use '@/styles/variables' as *;
+@use '@/styles/mixins' as *;
+
+.container {
+  width: 100%;
+  max-width: 440px;
+  margin: var(--ant-margin-xl) auto;
+  padding: var(--ant-padding-lg);
+  background: var(--ant-color-bg-container);
+  border: 1px solid var(--ant-color-border-secondary);
+  border-radius: var(--ant-border-radius);
+
+  @include from(md) {
+    margin-top: var(--ant-margin-xxl);
+    padding: var(--ant-padding-xl);
+  }
+}
+
+.error {
+  margin-bottom: var(--ant-margin);
+}

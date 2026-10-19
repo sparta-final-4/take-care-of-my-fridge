@@ -3,10 +3,12 @@ import { isAxiosError } from 'axios';
 // 에러 분류와 메시지 변환은 이 파일에서만 한다.
 const DEFAULT_MESSAGE = '요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.';
 
-// 백엔드 공통 응답(ApiResponse.java): { code, message, data }. 실패 시 data는 없다.
+// 백엔드 공통 응답(ApiResponse.java): { success, data, error }.
 function getServerMessage(data: unknown) {
-  if (typeof data !== 'object' || data === null || !('message' in data)) return undefined;
-  return typeof data.message === 'string' && data.message ? data.message : undefined;
+  if (typeof data !== 'object' || data === null || !('error' in data)) return undefined;
+  const { error } = data;
+  if (typeof error !== 'object' || error === null || !('message' in error)) return undefined;
+  return typeof error.message === 'string' && error.message ? error.message : undefined;
 }
 
 export function getErrorMessage(error: unknown) {

@@ -1,0 +1,2 @@
+# openapi-generator 생성 결과: 커밋하지만 PR diff에서는 기본으로 접는다. 직접 수정 금지(pnpm oag:generate로 재생성).
+src/common/api/generated/** linguist-generated=true

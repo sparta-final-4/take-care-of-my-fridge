@@ -52,7 +52,7 @@ dependencies {
     annotationProcessor "jakarta.annotation:jakarta.annotation-api"
     annotationProcessor "jakarta.persistence:jakarta.persistence-api"
 
-    // AWS Parameter Store: 배포 서버(prod 프로파일)에서 시크릿(JWT_SECRET 등)을 읽는다
+    // AWS Parameter Store
     implementation platform('io.awspring.cloud:spring-cloud-aws-dependencies:4.1.1')
     implementation 'io.awspring.cloud:spring-cloud-aws-starter-parameter-store'
 

@@ -14,7 +14,10 @@ export const router = createBrowserRouter([
   {
     Component: MainLayout,
     errorElement: <RouteErrorPage />,
-    children: [{ path: ROUTES.home, lazy: page(() => import('@/pages/MainPage')) }],
+    children: [
+      { path: ROUTES.home, lazy: page(() => import('@/pages/MainPage')) },
+      { path: ROUTES.login, lazy: page(() => import('@/pages/LoginPage')) },
+    ],
   },
   { path: '*', lazy: page(() => import('@/pages/NotFoundPage')) },
 ]);
