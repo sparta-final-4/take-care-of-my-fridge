@@ -6,10 +6,6 @@
 spring:
   config:
     import: "aws-parameterstore:/imhungry/${APP_ENV}/"
-  cloud:
-    aws:
-      region:
-        static: ap-northeast-2
   jpa:
     show-sql: false
     properties:
