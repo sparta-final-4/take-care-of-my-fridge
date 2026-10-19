@@ -13,7 +13,7 @@ import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import org.example.takecareofmyfridgebe.domain.fridge.entity.StorageType;
+import org.example.takecareofmyfridgebe.domain.ingredient.entity.StorageType;
 import org.example.takecareofmyfridgebe.global.entity.BaseTimeEntity;
 
 @Entity
