@@ -1,4 +1,4 @@
-package org.example.takecareofmyfridgebe.domain.fridge.entity;
+package org.example.takecareofmyfridgebe.domain.ingredient.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

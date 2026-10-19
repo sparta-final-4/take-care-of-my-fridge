@@ -6,7 +6,7 @@ import com.querydsl.jpa.impl.JPAQuery;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeSortType;
 import org.example.takecareofmyfridgebe.domain.fridge.entity.Fridge;
-import org.example.takecareofmyfridgebe.domain.fridge.entity.StorageType;
+import org.example.takecareofmyfridgebe.domain.ingredient.entity.StorageType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -18,7 +18,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 import static org.example.takecareofmyfridgebe.domain.fridge.entity.QFridge.fridge;
-import static org.example.takecareofmyfridgebe.domain.fridge.entity.QIngredient.ingredient;
+import static org.example.takecareofmyfridgebe.domain.ingredient.entity.QIngredient.ingredient;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;

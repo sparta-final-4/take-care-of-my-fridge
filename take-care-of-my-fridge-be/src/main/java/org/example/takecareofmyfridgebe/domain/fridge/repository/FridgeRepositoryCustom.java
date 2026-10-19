@@ -2,7 +2,7 @@ package org.example.takecareofmyfridgebe.domain.fridge.repository;
 
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeSortType;
 import org.example.takecareofmyfridgebe.domain.fridge.entity.Fridge;
-import org.example.takecareofmyfridgebe.domain.fridge.entity.StorageType;
+import org.example.takecareofmyfridgebe.domain.ingredient.entity.StorageType;
 
 import java.time.LocalDate;
 import java.util.List;

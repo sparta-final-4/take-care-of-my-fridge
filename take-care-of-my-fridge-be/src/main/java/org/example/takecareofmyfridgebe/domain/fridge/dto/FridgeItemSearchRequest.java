@@ -1,6 +1,6 @@
 package org.example.takecareofmyfridgebe.domain.fridge.dto;
 
-import org.example.takecareofmyfridgebe.domain.fridge.entity.StorageType;
+import org.example.takecareofmyfridgebe.domain.ingredient.entity.StorageType;
 
 public record FridgeItemSearchRequest(
         StorageType storage,

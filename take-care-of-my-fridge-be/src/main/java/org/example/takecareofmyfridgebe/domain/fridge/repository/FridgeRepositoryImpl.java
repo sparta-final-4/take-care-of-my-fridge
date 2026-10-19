@@ -6,14 +6,14 @@ import com.querydsl.jpa.impl.JPAQueryFactory;
 import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeSortType;
 import org.example.takecareofmyfridgebe.domain.fridge.entity.Fridge;
-import org.example.takecareofmyfridgebe.domain.fridge.entity.StorageType;
+import org.example.takecareofmyfridgebe.domain.ingredient.entity.StorageType;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
 import java.util.List;
 
 import static org.example.takecareofmyfridgebe.domain.fridge.entity.QFridge.fridge;
-import static org.example.takecareofmyfridgebe.domain.fridge.entity.QIngredient.ingredient;
+import static org.example.takecareofmyfridgebe.domain.ingredient.entity.QIngredient.ingredient;
 
 @Repository
 @RequiredArgsConstructor

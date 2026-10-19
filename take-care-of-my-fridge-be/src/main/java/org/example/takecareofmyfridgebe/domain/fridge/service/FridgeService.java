@@ -3,8 +3,8 @@ package org.example.takecareofmyfridgebe.domain.fridge.service;
 import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemResponse;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeSortType;
-import org.example.takecareofmyfridgebe.domain.fridge.entity.StorageType;
 import org.example.takecareofmyfridgebe.domain.fridge.repository.FridgeRepository;
+import org.example.takecareofmyfridgebe.domain.ingredient.entity.StorageType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 

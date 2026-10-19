@@ -2,8 +2,8 @@ package org.example.takecareofmyfridgebe.domain.fridge.dto;
 
 import org.example.takecareofmyfridgebe.domain.fridge.entity.Fridge;
 import org.example.takecareofmyfridgebe.domain.fridge.entity.FridgeSource;
-import org.example.takecareofmyfridgebe.domain.fridge.entity.Ingredient;
-import org.example.takecareofmyfridgebe.domain.fridge.entity.StorageType;
+import org.example.takecareofmyfridgebe.domain.ingredient.entity.Ingredient;
+import org.example.takecareofmyfridgebe.domain.ingredient.entity.StorageType;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
