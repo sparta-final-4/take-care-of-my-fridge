@@ -104,8 +104,9 @@ class PaymentCommandServiceTest {
         Payment payment = newPayment();
         givenLockedPayment(payment);
 
-        paymentCommandService.fail(PORTONE_PAYMENT_ID, FailReason.USER_CANCELLED);
+        boolean failed = paymentCommandService.fail(PORTONE_PAYMENT_ID, FailReason.USER_CANCELLED);
 
+        assertThat(failed).isTrue();
         assertThat(payment.getStatus()).isEqualTo(PaymentStatus.FAILED);
         assertThat(payment.getFailReason()).isEqualTo(FailReason.USER_CANCELLED);
         assertThat(payment.getOrder().getStatus()).isEqualTo(OrderStatus.CANCELLED);
@@ -120,8 +121,9 @@ class PaymentCommandServiceTest {
         payment.getOrder().markPaid(paidAt);
         givenLockedPayment(payment);
 
-        paymentCommandService.fail(PORTONE_PAYMENT_ID, FailReason.TIMEOUT);
+        boolean failed = paymentCommandService.fail(PORTONE_PAYMENT_ID, FailReason.TIMEOUT);
 
+        assertThat(failed).isFalse();
         assertThat(payment.getStatus()).isEqualTo(PaymentStatus.PAID);
         assertThat(payment.getFailReason()).isNull();
         assertThat(payment.getOrder().getStatus()).isEqualTo(OrderStatus.PAID);

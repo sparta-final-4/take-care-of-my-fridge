@@ -15,6 +15,7 @@ import org.example.takecareofmyfridgebe.infra.portone.dto.PortOnePaymentResponse
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -30,6 +31,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -176,17 +178,32 @@ class PaymentFacadeTest {
     }
 
     @Test
-    @DisplayName("금액이 다르면 PG 결제를 취소하고 AMOUNT_MISMATCH로 실패 처리한다")
-    void confirm_amountMismatch_cancelsAndFails() {
+    @DisplayName("금액이 다르면 AMOUNT_MISMATCH로 실패 처리한 뒤 PG 결제를 취소한다")
+    void confirm_amountMismatch_failsThenCancelsPg() {
         newPayment();
         givenPgPayment("PAID", 100L);
+        given(paymentCommandService.fail(PORTONE_PAYMENT_ID, FailReason.AMOUNT_MISMATCH)).willReturn(true);
 
         assertThatThrownBy(() -> confirm(MEMBER_ID))
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode").isEqualTo(ErrorCode.PAYMENT_AMOUNT_MISMATCH);
-        verify(portOneClient).cancelPayment(anyString(), anyString(), isNull());
-        verify(paymentCommandService).fail(PORTONE_PAYMENT_ID, FailReason.AMOUNT_MISMATCH);
+        InOrder inOrder = inOrder(paymentCommandService, portOneClient);
+        inOrder.verify(paymentCommandService).fail(PORTONE_PAYMENT_ID, FailReason.AMOUNT_MISMATCH);
+        inOrder.verify(portOneClient).cancelPayment(anyString(), anyString(), isNull());
         verify(paymentCommandService, never()).approve(anyString());
+    }
+
+    @Test
+    @DisplayName("금액 불일치인데 다른 요청이 이미 처리했으면 PG 결제를 취소하지 않는다")
+    void confirm_amountMismatch_alreadyProcessed_skipsPgCancel() {
+        newPayment();
+        givenPgPayment("PAID", 100L);
+        given(paymentCommandService.fail(PORTONE_PAYMENT_ID, FailReason.AMOUNT_MISMATCH)).willReturn(false);
+
+        assertThatThrownBy(() -> confirm(MEMBER_ID))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode").isEqualTo(ErrorCode.PAYMENT_AMOUNT_MISMATCH);
+        verify(portOneClient, never()).cancelPayment(anyString(), anyString(), any());
     }
 
     @Test
@@ -194,12 +211,27 @@ class PaymentFacadeTest {
     void confirm_amountMismatch_pgCancelFails_stillFails() {
         newPayment();
         givenPgPayment("PAID", 100L);
+        given(paymentCommandService.fail(PORTONE_PAYMENT_ID, FailReason.AMOUNT_MISMATCH)).willReturn(true);
         willThrow(new IllegalStateException("PG 오류")).given(portOneClient).cancelPayment(anyString(), anyString(), isNull());
 
         assertThatThrownBy(() -> confirm(MEMBER_ID))
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode").isEqualTo(ErrorCode.PAYMENT_AMOUNT_MISMATCH);
         verify(paymentCommandService).fail(PORTONE_PAYMENT_ID, FailReason.AMOUNT_MISMATCH);
+    }
+
+    @Test
+    @DisplayName("PG 응답에 금액이 없으면 상태를 바꾸지 않고 PAYMENT_NOT_PAID")
+    void confirm_pgAmountMissing_keepsReady() {
+        newPayment();
+        given(portOneClient.getPayment(PORTONE_PAYMENT_ID))
+                .willReturn(Optional.of(new PortOnePaymentResponse("PAID", null)));
+
+        assertThatThrownBy(() -> confirm(MEMBER_ID))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode").isEqualTo(ErrorCode.PAYMENT_NOT_PAID);
+        verifyNoInteractions(paymentCommandService);
+        verify(portOneClient, never()).cancelPayment(anyString(), anyString(), any());
     }
 
     // cancelByUser
