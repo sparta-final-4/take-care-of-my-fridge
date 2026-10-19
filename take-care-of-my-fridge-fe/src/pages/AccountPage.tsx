@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { App, Button, Card, Checkbox, Form, Input, Result, Space, Spin, Typography } from 'antd';
 import { isAxiosError } from 'axios';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 import { useAuthStore } from '@/common/auth/authStore';
 import { getErrorCode, getErrorMessage } from '@/common/api/errors';
@@ -9,11 +9,10 @@ import {
   changeNickname,
   changePassword,
   changeTastes,
-  checkNicknameAvailability,
-  getMyInfo,
   type ChangePasswordRequest,
   type MyInfoResponse,
 } from '@/domains/member/api';
+import { memberQueries } from '@/domains/member/queries';
 
 import styles from './AccountPage.module.scss';
 
@@ -35,7 +34,7 @@ function AccountForms({ member }: { member: MyInfoResponse }) {
   const [tastes, setTastes] = useState(member.tastes);
 
   const saved = async () => {
-    await queryClient.invalidateQueries({ queryKey: ['member', 'me'] });
+    await queryClient.invalidateQueries({ queryKey: memberQueries.me().queryKey });
     void message.success('저장했습니다.');
   };
   const nicknameMutation = useMutation({
@@ -54,7 +53,7 @@ function AccountForms({ member }: { member: MyInfoResponse }) {
       await nicknameForm.validateFields();
       const nickname = nicknameForm.getFieldValue('nickname')?.trim() as string;
       setChecking(true);
-      const available = await checkNicknameAvailability(nickname);
+      const available = await queryClient.fetchQuery(memberQueries.nicknameAvailability(nickname));
       if (nicknameForm.getFieldValue('nickname')?.trim() !== nickname) return;
       if (!available) {
         nicknameForm.setFields([{ name: 'nickname', errors: ['이미 사용 중입니다.'] }]);
@@ -90,6 +89,11 @@ function AccountForms({ member }: { member: MyInfoResponse }) {
               return;
             }
             nicknameMutation.mutate(value, {
+              // 헤더에 표시되는 닉네임을 바꾼다.
+              onSuccess: () =>
+                useAuthStore.setState((state) =>
+                  state.member ? { member: { ...state.member, nickname: value } } : state,
+                ),
               onError: (error) => {
                 if (getErrorCode(error) === 'M002') {
                   setCheckedNickname(undefined);
@@ -206,14 +210,7 @@ function AccountForms({ member }: { member: MyInfoResponse }) {
 }
 
 export default function AccountPage() {
-  const { data, isPending, isError, refetch } = useQuery({
-    queryKey: ['member', 'me'],
-    queryFn: ({ signal }) => getMyInfo(signal),
-  });
-
-  useEffect(() => {
-    if (data) useAuthStore.setState({ member: data });
-  }, [data]);
+  const { data, isPending, isError, refetch } = useQuery(memberQueries.me());
 
   if (isPending) return <Spin fullscreen tip="계정 정보를 불러오고 있습니다" />;
   if (isError) {

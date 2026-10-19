@@ -13,11 +13,8 @@ import {
 } from 'antd';
 import { useState } from 'react';
 
-import {
-  getAuditLogs,
-  type AuditLogResponse,
-  type AuditLogSearchRequest,
-} from '@/domains/admin/api';
+import { type AuditLogResponse, type AuditLogSearchRequest } from '@/domains/admin/api';
+import { adminQueries } from '@/domains/admin/queries';
 
 import styles from './AdminAuditPage.module.scss';
 
@@ -37,10 +34,9 @@ export default function AdminAuditPage() {
   const [filters, setFilters] = useState<Filters>({});
   const [applied, setApplied] = useState<Filters>({});
   const [page, setPage] = useState(1);
-  const { data, isPending, isError, refetch } = useQuery({
-    queryKey: ['admin', 'audit', applied, page],
-    queryFn: ({ signal }) => getAuditLogs({ ...applied, page, size: PAGE_SIZE }, signal),
-  });
+  const { data, isPending, isError, refetch } = useQuery(
+    adminQueries.auditLogs({ ...applied, page, size: PAGE_SIZE }),
+  );
 
   return (
     <section className={styles.container}>

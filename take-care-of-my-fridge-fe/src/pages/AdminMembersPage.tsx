@@ -3,11 +3,11 @@ import { App, Button, Input, Result, Select, Space, Table, Tag, Typography } fro
 import { useState } from 'react';
 
 import {
-  getMembers,
   promoteMember,
   type MemberListRequest,
   type MemberSummaryResponse,
 } from '@/domains/admin/api';
+import { adminQueries } from '@/domains/admin/queries';
 
 import styles from './AdminMembersPage.module.scss';
 
@@ -20,14 +20,12 @@ export default function AdminMembersPage() {
   const [keyword, setKeyword] = useState('');
   const [role, setRole] = useState<MemberListRequest['role']>();
   const [page, setPage] = useState(1);
-  const { data, isPending, isError, refetch } = useQuery({
-    queryKey: ['admin', 'members', keyword, role, page],
-    queryFn: ({ signal }) =>
-      getMembers({ keyword: keyword || undefined, role, page, size: PAGE_SIZE }, signal),
-  });
+  const { data, isPending, isError, refetch } = useQuery(
+    adminQueries.members({ keyword: keyword || undefined, role, page, size: PAGE_SIZE }),
+  );
   const promotion = useMutation({
     mutationFn: promoteMember,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin', 'members'] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: adminQueries.memberLists() }),
   });
 
   const confirmPromotion = (member: MemberSummaryResponse) => {

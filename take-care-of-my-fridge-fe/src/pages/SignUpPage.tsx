@@ -1,4 +1,4 @@
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Alert, Button, Checkbox, Form, Input, Space, Typography } from 'antd';
 import { isAxiosError } from 'axios';
 import { useState } from 'react';
@@ -6,12 +6,8 @@ import { Link, useNavigate } from 'react-router';
 
 import { ROUTES } from '@/app/paths';
 import { getErrorCode, getErrorMessage } from '@/common/api/errors';
-import {
-  checkEmailAvailability,
-  checkNicknameAvailability,
-  signUp,
-  type SignUpRequest,
-} from '@/domains/member/api';
+import { signUp, type SignUpRequest } from '@/domains/member/api';
+import { memberQueries } from '@/domains/member/queries';
 
 import styles from './SignUpPage.module.scss';
 
@@ -28,6 +24,7 @@ const tasteOptions = [
 export default function SignUpPage() {
   const [form] = Form.useForm<FormValues>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [checkedEmail, setCheckedEmail] = useState<string>();
   const [checkedNickname, setCheckedNickname] = useState<string>();
   const [availabilityError, setAvailabilityError] = useState<string>();
@@ -40,10 +37,11 @@ export default function SignUpPage() {
       await form.validateFields([field]);
       const value = form.getFieldValue(field)?.trim() as string;
       setChecking(field);
-      const available =
+      const available = await queryClient.fetchQuery(
         field === 'email'
-          ? await checkEmailAvailability(value)
-          : await checkNicknameAvailability(value);
+          ? memberQueries.emailAvailability(value)
+          : memberQueries.nicknameAvailability(value),
+      );
       if (form.getFieldValue(field)?.trim() !== value) return;
       if (!available) {
         form.setFields([{ name: field, errors: ['이미 사용 중입니다.'] }]);
