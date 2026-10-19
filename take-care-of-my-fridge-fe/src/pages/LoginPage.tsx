@@ -5,6 +5,7 @@ import { useNavigate, useSearchParams } from 'react-router';
 
 import { ROUTES } from '@/app/paths';
 import { getErrorMessage } from '@/common/api/errors';
+import { setSession } from '@/common/auth/session';
 import { login, type LoginRequest } from '@/domains/auth/api';
 
 import styles from './LoginPage.module.scss';
@@ -24,7 +25,10 @@ export default function LoginPage() {
 
   const handleSubmit = (values: LoginRequest) => {
     loginMutation.mutate(values, {
-      onSuccess: () => navigate(safeRedirect(searchParams.get('redirect')), { replace: true }),
+      onSuccess: async (member) => {
+        await setSession(member);
+        navigate(safeRedirect(searchParams.get('redirect')), { replace: true });
+      },
     });
   };
 
