@@ -1,0 +1,10 @@
+.gradle
+build
+out
+bin
+.idea
+*.iml
+scripts
+jacoco-comment.md
+Dockerfile
+.dockerignore
