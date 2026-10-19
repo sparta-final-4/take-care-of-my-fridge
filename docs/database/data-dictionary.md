@@ -59,6 +59,7 @@
 | model_version | VARCHAR(50) | 불가 | | | 예측 모델 버전(예: fc-v0.3) |
 | data_cutoff_at | DATETIME(6) | 불가 | | | 입력 데이터 기준 시각 |
 | confirmed_at | DATETIME(6) | 허용 | NULL | | 실제 판매량 확정일시(다음 주 월요일 06:00) |
+| synthetic_data | BOOLEAN | 불가 | false | | 가상 데이터 사용 여부 |
 | created_at | DATETIME(6) | 불가 | 현재 시각 | | 예측 생성일시(일요일 22:00) |
 
 - 주 1건만 저장하며, 주가 시작되면 예측을 바꾸지 않습니다.
