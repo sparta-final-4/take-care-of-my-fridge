@@ -7,6 +7,7 @@ import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemResponse;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemUpdateRequest;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeRemoveReason;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeSortType;
+import org.example.takecareofmyfridgebe.domain.fridge.entity.FridgeItemStatus;
 import org.example.takecareofmyfridgebe.domain.fridge.entity.FridgeSource;
 import org.example.takecareofmyfridgebe.domain.fridge.facade.FridgeFacade;
 import org.example.takecareofmyfridgebe.domain.fridge.service.FridgeService;
@@ -110,6 +111,8 @@ class FridgeControllerTest {
                 null,
                 true,
                 false,
+                2L,
+                FridgeItemStatus.IMMINENT,
                 LocalDateTime.of(2026, 10, 18, 12, 0),
                 LocalDateTime.of(2026, 10, 18, 12, 0)
         );
@@ -137,6 +140,8 @@ class FridgeControllerTest {
                 .andExpect(jsonPath("$.data[0].expirationDate").value("2026-10-20"))
                 .andExpect(jsonPath("$.data[0].source").value("MANUAL"))
                 .andExpect(jsonPath("$.data[0].imminent").value(true))
+                .andExpect(jsonPath("$.data[0].dDay").value(2))
+                .andExpect(jsonPath("$.data[0].status").value("IMMINENT"))
                 .andExpect(jsonPath("$.data[0].expired").value(false));
 
         // 토큰에서 꺼낸 7L과 기본값들이 서비스에 전달되었는지 검증
@@ -225,6 +230,8 @@ class FridgeControllerTest {
                 null,
                 false,
                 false,
+                5L,
+                FridgeItemStatus.NORMAL,
                 LocalDateTime.of(2026, 10, 19, 11, 0),
                 LocalDateTime.of(2026, 10, 19, 11, 0)
         );
@@ -324,6 +331,8 @@ class FridgeControllerTest {
                 null,
                 true,
                 false,
+                1L,
+                FridgeItemStatus.IMMINENT,
                 LocalDateTime.of(2026, 10, 18, 10, 0),
                 LocalDateTime.of(2026, 10, 19, 14, 0)
         );

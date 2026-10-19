@@ -30,9 +30,8 @@ import java.time.LocalDate;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Fridge extends BaseTimeEntity {
 
-    // 잔여 수량 0 처리 기준값 (0.05 미만) 및 소비기한 임박 기준일(D-3)
+    // 잔여 수량 0 처리 기준값 (0.05 미만)
     private static final BigDecimal ZERO_THRESHOLD = new BigDecimal("0.05");
-    public static final int IMMINENT_DAYS = 3;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -122,19 +121,6 @@ public class Fridge extends BaseTimeEntity {
     // 잔여 수량 모두 소진(0) 여부 확인
     public boolean isEmpty() {
         return this.quantity.compareTo(BigDecimal.ZERO) == 0;
-    }
-
-    // 소비기한 만료 여부 확인 (오늘 이전이면 만료)
-    public boolean isExpired(LocalDate today) {
-        return this.expirationDate.isBefore(today);
-    }
-
-    // 소비기한 임박 여부 확인 (만료 제외, D-3 이내)
-    public boolean isImminent(LocalDate today) {
-        if (isExpired(today)) {
-            return false;
-        }
-        return !this.expirationDate.isAfter(today.plusDays(IMMINENT_DAYS));
     }
 
     // 수량은 0보다 커야 함

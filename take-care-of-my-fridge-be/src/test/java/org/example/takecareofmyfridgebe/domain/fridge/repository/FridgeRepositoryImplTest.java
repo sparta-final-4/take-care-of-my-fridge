@@ -6,6 +6,7 @@ import com.querydsl.jpa.impl.JPAQuery;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeSortType;
 import org.example.takecareofmyfridgebe.domain.fridge.entity.Fridge;
+import org.example.takecareofmyfridgebe.domain.fridge.entity.FridgeItemStatus;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.StorageType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -131,7 +132,7 @@ class FridgeRepositoryImplTest {
         assertEquals(fridge.memberId.eq(7L), predicates[0]);
         assertEquals(fridge.storage.eq(StorageType.REFRIGERATED), predicates[1]);
         assertEquals(
-                fridge.expirationDate.between(today, today.plusDays(Fridge.IMMINENT_DAYS)),
+                fridge.expirationDate.between(today, today.plusDays(FridgeItemStatus.IMMINENT_DAYS)),
                 predicates[2]
         );
 

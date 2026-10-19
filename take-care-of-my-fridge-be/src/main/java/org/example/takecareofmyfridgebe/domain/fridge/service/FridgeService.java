@@ -45,7 +45,7 @@ public class FridgeService {
         LocalDate today = LocalDate.now();
         return fridgeRepository.findItemsByCondition(memberId, storage, sort, imminentOnly, today)
                 .stream()
-                .map(FridgeItemResponse::from)
+                .map(fridge -> FridgeItemResponse.from(fridge, today))
                 .toList();
     }
 
@@ -57,9 +57,10 @@ public class FridgeService {
      */
     @Transactional
     public List<FridgeItemResponse> saveItems(List<Fridge> items) {
+        LocalDate today = LocalDate.now();
         return fridgeRepository.saveAll(items)
                 .stream()
-                .map(FridgeItemResponse::from)
+                .map(fridge -> FridgeItemResponse.from(fridge, today))
                 .toList();
     }
 
@@ -87,7 +88,7 @@ public class FridgeService {
                 request.storage(),
                 request.expirationDate()
         );
-        return FridgeItemResponse.from(fridge);
+        return FridgeItemResponse.from(fridge, LocalDate.now());
     }
 
     /**

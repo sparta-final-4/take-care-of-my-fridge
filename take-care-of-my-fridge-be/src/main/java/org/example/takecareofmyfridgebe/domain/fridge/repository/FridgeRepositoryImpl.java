@@ -6,6 +6,7 @@ import com.querydsl.jpa.impl.JPAQueryFactory;
 import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeSortType;
 import org.example.takecareofmyfridgebe.domain.fridge.entity.Fridge;
+import org.example.takecareofmyfridgebe.domain.fridge.entity.FridgeItemStatus;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.StorageType;
 import org.springframework.stereotype.Repository;
 
@@ -55,7 +56,7 @@ public class FridgeRepositoryImpl implements FridgeRepositoryCustom {
         if (!imminentOnly) {
             return null;
         }
-        return fridge.expirationDate.between(today, today.plusDays(Fridge.IMMINENT_DAYS));
+        return fridge.expirationDate.between(today, today.plusDays(FridgeItemStatus.IMMINENT_DAYS));
     }
 
     // 정렬 조건: 1차 정렬 기준 값이 같을 때 조회 순서가 항상 일정하도록 id를 2차 정렬로 함께 지정
