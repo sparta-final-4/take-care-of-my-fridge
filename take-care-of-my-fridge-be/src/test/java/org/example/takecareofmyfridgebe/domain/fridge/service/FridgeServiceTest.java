@@ -1,12 +1,15 @@
 package org.example.takecareofmyfridgebe.domain.fridge.service;
 
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemResponse;
+import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemUpdateRequest;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeSortType;
 import org.example.takecareofmyfridgebe.domain.fridge.entity.Fridge;
 import org.example.takecareofmyfridgebe.domain.fridge.entity.FridgeSource;
 import org.example.takecareofmyfridgebe.domain.fridge.repository.FridgeRepository;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.Ingredient;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.StorageType;
+import org.example.takecareofmyfridgebe.global.error.BusinessException;
+import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -18,20 +21,25 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
  * FridgeService 단위 테스트.
- * Repository 조회 결과가 FridgeItemResponse DTO로 변환될 때
- * 연관된 Ingredient 정보와 임박(imminent)·만료(expired) 상태가 정확히 매핑되는지 검증한다.
+ * Repository 조회·저장·수정 결과가 FridgeItemResponse DTO로 변환될 때
+ * 연관된 Ingredient 정보와 임박(imminent)·만료(expired) 상태가 정확히 매핑되는지,
+ * 본인 재료 확인 및 더티 체킹 수정 규칙이 지켜지는지 검증한다.
  */
 @ExtendWith(MockitoExtension.class)
 class FridgeServiceTest {
@@ -183,5 +191,91 @@ class FridgeServiceTest {
         assertFalse(responses.get(0).imminent());
         assertFalse(responses.get(0).expired());
         verify(fridgeRepository).saveAll(itemsToSave);
+    }
+
+    /**
+     * 본인 소유의 냉장고 재료를 수정할 때:
+     * 1) 엔티티의 ingredient, rawName(원문 그대로), quantity, storage, expirationDate가 변경되는지
+     * 2) 커머스 입고(COMMERCE) 재료라도 source와 orderItemId는 바뀌지 않고 유지되는지
+     * 3) JPA 더티 체킹으로 반영하므로 fridgeRepository.save를 호출하지 않는지 검증한다.
+     */
+    @Test
+    void updateItemUpdatesEntityViaDirtyCheckingAndPreservesSourceAndOrderItemId() {
+        // Given: 커머스 입고(COMMERCE, orderItemId=55L)로 등록된 7번 회원의 냉장고 재료
+        LocalDate today = LocalDate.now();
+        Ingredient oldIngredient = Ingredient.builder()
+                .ingredientCode("ING_TOFU")
+                .name("두부")
+                .baseUnit("모")
+                .defaultStorage(StorageType.REFRIGERATED)
+                .defaultShelfDays(5)
+                .basicSeasoning(false)
+                .build();
+        ReflectionTestUtils.setField(oldIngredient, "id", 10L);
+
+        Ingredient newIngredient = Ingredient.builder()
+                .ingredientCode("ING_KIMCHI")
+                .name("배추김치")
+                .baseUnit("포기")
+                .defaultStorage(StorageType.REFRIGERATED)
+                .defaultShelfDays(30)
+                .basicSeasoning(false)
+                .build();
+        ReflectionTestUtils.setField(newIngredient, "id", 20L);
+
+        Fridge fridge = Fridge.builder()
+                .memberId(7L)
+                .ingredient(oldIngredient)
+                .orderItemId(55L)
+                .rawName("찌개용 두부")
+                .quantity(new BigDecimal("1.00"))
+                .storage(StorageType.REFRIGERATED)
+                .expirationDate(today.plusDays(3))
+                .source(FridgeSource.COMMERCE)
+                .build();
+        ReflectionTestUtils.setField(fridge, "id", 100L);
+
+        when(fridgeRepository.findByIdAndMemberId(100L, 7L)).thenReturn(Optional.of(fridge));
+
+        FridgeItemUpdateRequest request = new FridgeItemUpdateRequest(
+                "비비고 썰은배추김치(500g)",
+                new BigDecimal("2.50"),
+                StorageType.FROZEN,
+                today.plusDays(10)
+        );
+
+        // When: 수정 실행
+        FridgeItemResponse response = fridgeService.updateItem(7L, 100L, newIngredient, request);
+
+        // Then: 엔티티와 응답 DTO에 변경된 값이 반영되고 source·orderItemId는 그대로 유지되며 save는 미호출
+        assertSame(newIngredient, fridge.getIngredient());
+        assertEquals(20L, response.ingredientId());
+        assertEquals("배추김치", response.ingredientName());
+        assertEquals("포기", response.baseUnit());
+        assertEquals("비비고 썰은배추김치(500g)", response.rawName());
+        assertEquals(new BigDecimal("2.50"), response.quantity());
+        assertEquals(StorageType.FROZEN, response.storage());
+        assertEquals(today.plusDays(10), response.expirationDate());
+        assertEquals(FridgeSource.COMMERCE, response.source());
+        assertEquals(55L, response.orderItemId());
+
+        verify(fridgeRepository, never()).save(any(Fridge.class));
+    }
+
+    /**
+     * 존재하지 않거나 다른 회원의 fridgeId로 조회·수정을 시도하면
+     * BusinessException(ErrorCode.FRIDGE_ITEM_NOT_FOUND) 예외가 발생하는지 검증한다.
+     */
+    @Test
+    void getFridgeEntityThrowsNotFoundWhenOwnedByAnotherMemberOrMissing() {
+        // Given: 7번 회원이 다른 회원의 재료(또는 존재하지 않는 재료) 999L을 조회
+        when(fridgeRepository.findByIdAndMemberId(999L, 7L)).thenReturn(Optional.empty());
+
+        // When & Then: FRIDGE_ITEM_NOT_FOUND 예외 발생 확인
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> fridgeService.getFridgeEntity(7L, 999L)
+        );
+        assertEquals(ErrorCode.FRIDGE_ITEM_NOT_FOUND, exception.getErrorCode());
     }
 }

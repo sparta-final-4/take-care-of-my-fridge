@@ -2,6 +2,7 @@ package org.example.takecareofmyfridgebe.domain.fridge.facade;
 
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemCreateRequest;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemResponse;
+import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemUpdateRequest;
 import org.example.takecareofmyfridgebe.domain.fridge.entity.Fridge;
 import org.example.takecareofmyfridgebe.domain.fridge.entity.FridgeSource;
 import org.example.takecareofmyfridgebe.domain.fridge.service.FridgeService;
@@ -22,12 +23,14 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
  * FridgeFacade 단위 테스트.
- * 재료 등록 시 IngredientMatcher 매핑, 보관방식·소비기한 권장값 계산,
+ * 재료 등록 및 수정 시 IngredientMatcher 매핑 호출 여부, 보관방식·소비기한 권장값 계산,
  * 그리고 사용자 입력 원문(rawName) 보존 여부를 검증한다.
  */
 @ExtendWith(MockitoExtension.class)
@@ -122,5 +125,109 @@ class FridgeFacadeTest {
         assertEquals(StorageType.FROZEN, second.getStorage());
         assertEquals(customExpiration, second.getExpirationDate());
         assertEquals(FridgeSource.MANUAL, second.getSource());
+    }
+
+    /**
+     * 재료 수정 시 요청한 rawName이 기존 재료의 rawName과 같으면
+     * IngredientMatcher.match를 호출하지 않고 기존 ingredient를 그대로 유지하여
+     * FridgeService.updateItem으로 전달하는지 검증한다.
+     */
+    @Test
+    void updateItemDoesNotCallMatcherWhenRawNameIsSame() {
+        // Given: 기존 rawName이 "국산 두부 300g"인 냉장고 재료
+        Ingredient existingIngredient = Ingredient.builder()
+                .ingredientCode("ING_TOFU")
+                .name("두부")
+                .baseUnit("모")
+                .defaultStorage(StorageType.REFRIGERATED)
+                .defaultShelfDays(5)
+                .basicSeasoning(false)
+                .build();
+
+        Fridge existingFridge = Fridge.builder()
+                .memberId(7L)
+                .ingredient(existingIngredient)
+                .rawName("국산 두부 300g")
+                .quantity(new BigDecimal("1"))
+                .storage(StorageType.REFRIGERATED)
+                .expirationDate(LocalDate.of(2026, 10, 20))
+                .source(FridgeSource.MANUAL)
+                .build();
+
+        FridgeItemUpdateRequest request = new FridgeItemUpdateRequest(
+                "국산 두부 300g",
+                new BigDecimal("3"),
+                StorageType.FROZEN,
+                LocalDate.of(2026, 10, 25)
+        );
+        FridgeItemResponse expectedResponse = mock(FridgeItemResponse.class);
+
+        when(fridgeService.getFridgeEntity(7L, 100L)).thenReturn(existingFridge);
+        when(fridgeService.updateItem(7L, 100L, existingIngredient, request)).thenReturn(expectedResponse);
+
+        // When: 동일한 rawName으로 수정 요청
+        FridgeItemResponse actual = fridgeFacade.updateItem(7L, 100L, request);
+
+        // Then: 매핑기(IngredientMatcher)를 호출하지 않고 기존 ingredient를 그대로 전달했는지 확인
+        assertSame(expectedResponse, actual);
+        verifyNoInteractions(ingredientMatcher);
+        verify(fridgeService).updateItem(7L, 100L, existingIngredient, request);
+    }
+
+    /**
+     * 재료 수정 시 요청한 rawName이 기존 재료의 rawName과 다르면
+     * IngredientMatcher.match를 호출해 새로 매핑된 표준 재료(ingredient)를
+     * FridgeService.updateItem으로 전달하는지 검증한다.
+     */
+    @Test
+    void updateItemCallsMatcherWhenRawNameIsChanged() {
+        // Given: 기존 rawName이 "두부"인 재료를 "[특가] 신라면 5개입"으로 이름을 바꿔 수정하는 상황
+        Ingredient oldIngredient = Ingredient.builder()
+                .ingredientCode("ING_TOFU")
+                .name("두부")
+                .baseUnit("모")
+                .defaultStorage(StorageType.REFRIGERATED)
+                .defaultShelfDays(5)
+                .basicSeasoning(false)
+                .build();
+
+        Ingredient newIngredient = Ingredient.builder()
+                .ingredientCode("ING_RAMEN")
+                .name("신라면")
+                .baseUnit("봉")
+                .defaultStorage(StorageType.ROOM_TEMP)
+                .defaultShelfDays(180)
+                .basicSeasoning(false)
+                .build();
+
+        Fridge existingFridge = Fridge.builder()
+                .memberId(7L)
+                .ingredient(oldIngredient)
+                .rawName("두부")
+                .quantity(new BigDecimal("1"))
+                .storage(StorageType.REFRIGERATED)
+                .expirationDate(LocalDate.of(2026, 10, 20))
+                .source(FridgeSource.MANUAL)
+                .build();
+
+        FridgeItemUpdateRequest request = new FridgeItemUpdateRequest(
+                "[특가] 신라면 5개입",
+                new BigDecimal("5"),
+                StorageType.ROOM_TEMP,
+                LocalDate.of(2027, 4, 20)
+        );
+        FridgeItemResponse expectedResponse = mock(FridgeItemResponse.class);
+
+        when(fridgeService.getFridgeEntity(7L, 100L)).thenReturn(existingFridge);
+        when(ingredientMatcher.match("[특가] 신라면 5개입")).thenReturn(newIngredient);
+        when(fridgeService.updateItem(7L, 100L, newIngredient, request)).thenReturn(expectedResponse);
+
+        // When: 변경된 rawName으로 수정 요청
+        FridgeItemResponse actual = fridgeFacade.updateItem(7L, 100L, request);
+
+        // Then: IngredientMatcher.match가 호출되고 새로 매핑된 newIngredient가 전달되었는지 확인
+        assertSame(expectedResponse, actual);
+        verify(ingredientMatcher).match("[특가] 신라면 5개입");
+        verify(fridgeService).updateItem(7L, 100L, newIngredient, request);
     }
 }
