@@ -30,6 +30,9 @@ public enum ErrorCode {
     ALREADY_ADMIN(HttpStatus.CONFLICT, "M007", "이미 관리자인 회원입니다."),
     PROMOTION_SUSPENDED(HttpStatus.CONFLICT, "M006", "정지된 회원은 관리자로 승격할 수 없습니다."),
 
+    // Forecast
+    FORECAST_NOT_FOUND(HttpStatus.NOT_FOUND, "F001", "해당 주의 예측이 없습니다."),
+
     // Product
     PRODUCT_NOT_FOUND(HttpStatus.NOT_FOUND, "PRODUCT_001", "상품을 찾을 수 없습니다."),
     INSUFFICIENT_STOCK(HttpStatus.CONFLICT, "PRODUCT_002", "재고가 부족합니다."),
