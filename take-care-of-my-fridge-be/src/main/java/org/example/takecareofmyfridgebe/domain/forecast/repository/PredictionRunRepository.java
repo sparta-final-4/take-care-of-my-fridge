@@ -9,6 +9,8 @@ public interface PredictionRunRepository extends JpaRepository<PredictionRun, Lo
 
     Optional<PredictionRun> findByTargetWeekStart(LocalDate targetWeekStart);
 
+    Optional<PredictionRun> findTopByOrderByTargetWeekStartDesc();
+
     Optional<PredictionRun> findTopByTargetWeekStartLessThanOrderByTargetWeekStartDesc(LocalDate targetWeekStart);
 
     Optional<PredictionRun> findTopByTargetWeekStartGreaterThanOrderByTargetWeekStartAsc(LocalDate targetWeekStart);

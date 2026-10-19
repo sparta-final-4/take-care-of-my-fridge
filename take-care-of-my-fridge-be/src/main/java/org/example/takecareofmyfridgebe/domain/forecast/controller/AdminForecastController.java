@@ -19,6 +19,11 @@ public class AdminForecastController {
 
     private final ForecastReadService forecastReadService;
 
+    @GetMapping("/latest")
+    public ResponseEntity<ApiResponse<ForecastResponse>> getLatest() {
+        return ResponseEntity.ok(ApiResponse.ok(forecastReadService.getLatest()));
+    }
+
     @GetMapping("/{weekStart}")
     public ResponseEntity<ApiResponse<ForecastResponse>> getByWeek(
             @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate weekStart) {

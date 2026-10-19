@@ -43,6 +43,8 @@ class ForecastReadRepositoryTest {
         entityManager.flush();
         entityManager.clear();
 
+        assertThat(runRepository.findTopByOrderByTargetWeekStartDesc()).get()
+                .extracting(PredictionRun::getTargetWeekStart).isEqualTo(LocalDate.of(2026, 11, 2));
         assertThat(runRepository.findByTargetWeekStart(LocalDate.of(2026, 10, 19)))
                 .get().extracting(PredictionRun::getId).isEqualTo(middle.getId());
         assertThat(runRepository.findTopByTargetWeekStartLessThanOrderByTargetWeekStartDesc(

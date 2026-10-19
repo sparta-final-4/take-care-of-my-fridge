@@ -62,6 +62,29 @@ class ForecastReadServiceTest {
         verifyNoInteractions(forecasts);
     }
 
+    @Test
+    void latestUsesMostRecentTargetWeek() {
+        LocalDate latest = LocalDate.of(2026, 11, 2);
+        PredictionRun run = run(8L, latest);
+        when(runs.findTopByOrderByTargetWeekStartDesc()).thenReturn(Optional.of(run));
+        when(runs.findByTargetWeekStart(latest)).thenReturn(Optional.of(run));
+        when(forecasts.findByPredictionRunIdOrderByProductIdAsc(8L)).thenReturn(List.of());
+
+        var response = service.getLatest();
+
+        assertThat(response.weekStart()).isEqualTo(latest);
+    }
+
+    @Test
+    void latestReturnsF001WhenNoForecastExists() {
+        when(runs.findTopByOrderByTargetWeekStartDesc()).thenReturn(Optional.empty());
+
+        assertThatThrownBy(service::getLatest)
+                .isInstanceOfSatisfying(BusinessException.class,
+                        error -> assertThat(error.getErrorCode())
+                                .isEqualTo(ErrorCode.FORECAST_NOT_FOUND));
+        verifyNoInteractions(forecasts);
+    }
     private PredictionRun run(Long id, LocalDate week) {
         PredictionRun run = PredictionRun.builder().targetWeekStart(week)
                 .modelVersion("weekly-mlp-v1")

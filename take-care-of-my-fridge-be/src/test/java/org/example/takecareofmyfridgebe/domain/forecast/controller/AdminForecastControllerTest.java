@@ -94,6 +94,38 @@ class AdminForecastControllerTest {
         verifyNoInteractions(service);
     }
 
+    @Test
+    void adminReadsLatestForecastThroughStaticRoute() throws Exception {
+        LocalDate latest = LocalDate.of(2026, 11, 2);
+        when(service.getLatest()).thenReturn(new ForecastResponse(
+                latest, latest.plusDays(6), "weekly-mlp-v1",
+                LocalDateTime.of(2026, 11, 1, 18, 0),
+                LocalDateTime.of(2026, 11, 1, 22, 0),
+                false, null, false, null, null, null, List.of()));
+
+        mvc.perform(get("/api/admin/forecasts/latest")
+                        .with(authenticationFor(Member.Role.ADMIN)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.weekStart").value("2026-11-02"));
+    }
+
+    @Test
+    void latestReturnsF001WhenNoForecastExists() throws Exception {
+        when(service.getLatest()).thenThrow(new BusinessException(ErrorCode.FORECAST_NOT_FOUND));
+
+        mvc.perform(get("/api/admin/forecasts/latest")
+                        .with(authenticationFor(Member.Role.ADMIN)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error.code").value("F001"));
+    }
+
+    @Test
+    void userCannotReadLatestForecast() throws Exception {
+        mvc.perform(get("/api/admin/forecasts/latest")
+                        .with(authenticationFor(Member.Role.USER)))
+                .andExpect(status().isForbidden());
+        verifyNoInteractions(service);
+    }
     private org.springframework.test.web.servlet.request.RequestPostProcessor authenticationFor(Member.Role role) {
         return authentication(new UsernamePasswordAuthenticationToken(
                 new AuthSessionService.AuthPrincipal(7L, 8L, role), null,
