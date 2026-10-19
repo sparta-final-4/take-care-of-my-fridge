@@ -82,6 +82,11 @@ export function Header() {
         </nav>
 
         <Flex align="center" gap="small" className={styles.actions}>
+          {member?.role === 'ADMIN' && (
+            <Button type="text" onClick={() => navigate(ROUTES.adminMembers)}>
+              관리자
+            </Button>
+          )}
           {status === 'authenticated' && (
             <Button type="text" onClick={handleLogout} loading={logoutMutation.isPending}>
               {member?.nickname} 로그아웃

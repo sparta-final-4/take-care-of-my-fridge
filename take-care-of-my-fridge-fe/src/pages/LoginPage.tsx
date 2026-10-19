@@ -10,12 +10,13 @@ import { login, type LoginRequest } from '@/domains/auth/api';
 
 import styles from './LoginPage.module.scss';
 
-function safeRedirect(value: string | null) {
-  if (!value) return ROUTES.home;
+function safeRedirect(value: string | null, role: 'USER' | 'ADMIN') {
+  const fallback = role === 'ADMIN' ? ROUTES.adminMembers : ROUTES.home;
+  if (!value) return fallback;
   const url = new URL(value, window.location.origin);
   return url.origin === window.location.origin
     ? `${url.pathname}${url.search}${url.hash}`
-    : ROUTES.home;
+    : fallback;
 }
 
 export default function LoginPage() {
@@ -27,7 +28,7 @@ export default function LoginPage() {
     loginMutation.mutate(values, {
       onSuccess: async (member) => {
         await setSession(member);
-        navigate(safeRedirect(searchParams.get('redirect')), { replace: true });
+        navigate(safeRedirect(searchParams.get('redirect'), member.role), { replace: true });
       },
     });
   };

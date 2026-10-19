@@ -24,6 +24,12 @@ export const router = createBrowserRouter([
         Component: RequireAuth,
         children: [{ path: ROUTES.account, lazy: page(() => import('@/pages/AccountPage')) }],
       },
+      {
+        element: <RequireAuth admin />,
+        children: [
+          { path: ROUTES.adminMembers, lazy: page(() => import('@/pages/AdminMembersPage')) },
+        ],
+      },
     ],
   },
   { path: '*', lazy: page(() => import('@/pages/NotFoundPage')) },
