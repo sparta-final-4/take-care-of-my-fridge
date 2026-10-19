@@ -1,0 +1,21 @@
+@use '@/styles/mixins' as *;
+
+.container {
+  width: 100%;
+  max-width: 960px;
+  margin: var(--ant-margin-xl) auto;
+  padding: 0 var(--ant-padding-lg);
+}
+
+.cards {
+  display: grid;
+  gap: var(--ant-margin-lg);
+
+  @include from(md) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.cardAction {
+  margin-top: var(--ant-margin-lg);
+}

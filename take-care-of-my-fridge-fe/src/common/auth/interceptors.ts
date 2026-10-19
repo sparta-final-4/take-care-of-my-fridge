@@ -21,7 +21,7 @@ axiosInstance.interceptors.response.use(undefined, async (error: unknown) => {
   const request = error.config as SessionRequest | undefined;
   if (!request || request.sessionId !== sessionId()) return Promise.reject(error);
   if (useAuthStore.getState().status !== 'authenticated') return Promise.reject(error);
-  if (/\/api\/(auth|members\/me)/.test(request.url ?? '')) return Promise.reject(error);
+  if ((request.url ?? '').startsWith('/api/auth/')) return Promise.reject(error);
 
   if (!request.retried) {
     request.retried = true;

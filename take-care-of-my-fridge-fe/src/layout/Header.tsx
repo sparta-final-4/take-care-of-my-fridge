@@ -67,7 +67,11 @@ export function Header() {
               key={item.key}
               type="text"
               className={styles.navButton}
-              onClick={item.key === 'mypage' ? () => navigate(ROUTES.login) : undefined}
+              onClick={
+                item.key === 'mypage'
+                  ? () => navigate(status === 'authenticated' ? ROUTES.account : ROUTES.login)
+                  : undefined
+              }
             >
               <Flex align="center" gap="small">
                 <span>{item.label}</span>
@@ -116,7 +120,8 @@ export function Header() {
                 block
                 onClick={() => {
                   handleCloseDrawer();
-                  if (item.key === 'mypage') navigate(ROUTES.login);
+                  if (item.key === 'mypage')
+                    navigate(status === 'authenticated' ? ROUTES.account : ROUTES.login);
                 }}
                 className={styles.drawerNavButton}
               >
