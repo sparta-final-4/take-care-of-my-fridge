@@ -8,7 +8,7 @@
 - [공통 지침](../AGENTS.md)의 절차를 함께 적용한다.
 - 백엔드는 [../take-care-of-my-fridge-be](../take-care-of-my-fridge-be). 명세보다 실제 컨트롤러·DTO·직렬화가 우선이며, 다르면 프론트를 백엔드에 맞추고 보고한다.
 - `(예정)`이 붙은 파일·폴더는 아직 없다. 처음 필요할 때 이 문서의 위치와 이름으로 만든다.
-- 30분 미사용 시 자동 로그아웃은 결정됐다. 401 재발급, 만료 화면, 로그인·로그아웃 후 이동, 필드별 오류 응답 구조, 가입 정책(비밀번호 규칙, 이메일 인증 여부)은 미정이다.
+- 30분 미사용 시 자동 로그아웃한다. 현재 프론트는 보호 API 401에서 재발급 후 한 번 재시도하고, 만료·정지 시 로그인으로 이동한다. 가입 비밀번호 규칙은 백엔드 DTO를 따른다. 이메일 인증은 현재 API에 없다.
 - OpenAPI 클라이언트 생성(`openapi-generator-cli`)은 도입 검토 중이다. 도입 여부와 관계없이 8.1을 따른다.
 
 ## 0. 작업 절차
@@ -55,13 +55,13 @@ src/
 │   ├─ api/
 │   │   ├─ axiosInstance.ts  # 유일한 axios 인스턴스, 인터셉터
 │   │   ├─ errors.ts         # 에러 분류·메시지 변환
-│   │   ├─ types.ts          # (예정) ApiResponse<T> 등 공통 응답 타입
+│   │   ├─ types.ts          # ApiResponse<T>, PageResponse<T> 등 공통 응답 타입
 │   │   └─ generated/        # (도입 검토 중) openapi-generator-cli 생성 결과, 직접 수정 금지
-│   └─ auth/                 # (예정) 8.4 인증: authStore, session, sessionId, RequireAuth, safeRedirect
+│   └─ auth/                 # 8.4 인증: authStore, initialize, session, sessionId, RequireAuth 등
 ├─ layout/                   # MainLayout, Header
 ├─ pages/                    # XxxPage.tsx: 섹션을 배치만 함 (MainPage, NotFoundPage)
 ├─ styles/                   # global.scss, _variables.scss, _mixins.scss
-└─ domains/                  # (예정) 백엔드 도메인과 같은 이름
+└─ domains/                  # 백엔드 도메인과 같은 이름
     └─ <domain>/             # fridge(재료 입력·내 냉장고), review(후기), notification(헤더 알림),
         │                    # chat(AI 상담), recipe(레시피 추천), product(밀키트 큐레이션)
         ├─ api.ts            # API 함수와 요청·응답 타입 (8.1)
@@ -112,7 +112,7 @@ src/
 - `createBrowserRouter`·`generatePath`는 `react-router`, `RouterProvider`는 `react-router/dom`.
 - 경로 문자열은 `src/app/paths.ts`의 `ROUTES`에만 두고, 파라미터 경로는 `generatePath`로 만든다.
 - 페이지는 `src/pages/XxxPage.tsx`(폴더 없이)로 만들고 `src/app/router.tsx`에 등록한다. 추가 절차는 [README](README.md#새-페이지-추가).
-- 레이아웃은 정적 import 후 `Component`로, **lazy는 페이지에만**. 로그인이 필요한 화면은 `RequireAuth`(예정) 라우트 아래에 둔다.
+- 레이아웃은 정적 import 후 `Component`로, **lazy는 페이지에만**. 로그인이 필요한 화면은 `RequireAuth` 라우트 아래에 둔다.
 - 에러는 `errorElement`, 404·권한 없음은 antd `Result`.
 - 배포 시 SPA 화면 경로에만 `index.html`을 응답한다. 정적 파일 404·API 오류까지 바꾸지 않는다.
 
@@ -173,8 +173,8 @@ src/
 
 **타입**
 
-- 요청·응답 타입은 `src/domains/<domain>/api.ts`에 백엔드 DTO 이름 그대로 정의하고 다른 곳에 중복 정의하지 않는다. 생성 클라이언트를 도입하면 `generated/models`의 타입을 쓰고 직접 정의하지 않는다. 공통 타입은 `src/common/api/types.ts`(예정).
-- 백엔드 공통 응답은 `ApiResponse.java` 기준 `{ code, message, data }`이고 null 필드는 직렬화되지 않는다(성공 시 `message` 없음, 실패 시 `data` 없음).
+- 요청·응답 타입은 `src/domains/<domain>/api.ts`에 백엔드 DTO 이름 그대로 정의하고 다른 곳에 중복 정의하지 않는다. 생성 클라이언트를 도입하면 `generated/models`의 타입을 쓰고 직접 정의하지 않는다. 공통 타입은 `src/common/api/types.ts`에 둔다.
+- 백엔드 공통 응답은 `ApiResponse.java` 기준 `{ success, data, error }`이다. 오류는 `error: { code, message }`로 전달된다. 필드별 오류 구조는 없다.
 - 백엔드 컨트롤러·DTO·직렬화 설정을 확인해 맞춘다. **추측으로 필드를 만들지 않고**, 확인할 수 없으면 묻는다.
 - 날짜는 `string`, enum은 문자열 리터럴 유니온, `?`와 `| null`은 백엔드 기준으로 구분.
 - 타입은 런타임 검증이 아니다. 새 API는 실제 응답을 한 번 확인하고, 못 했으면 보고한다.
@@ -232,18 +232,18 @@ const handleSave = (values: UpdatePageRequest) =>
 
 에러 분류와 메시지 변환은 `src/common/api/errors.ts`에서만 한다.
 
-| 상황                      | 처리                                                                    |
-| ------------------------- | ----------------------------------------------------------------------- |
-| 로그인 API 401            | 로그인 실패로 폼에 표시                                                 |
-| 사용자 정보 조회 401      | 비로그인(`anonymous`)                                                   |
-| 그 외 401                 | 로그인 상태이고 현재 세션의 요청일 때만 세션 만료(알림 없이 로그인으로) |
-| 403                       | 권한 없음 안내(로그아웃하지 않음)                                       |
-| 400 / 422                 | `form.setFields`로 필드에 표시                                          |
-| 5xx · 네트워크 · 타임아웃 | 구분된 안내                                                             |
+| 상황                      | 처리                                                                   |
+| ------------------------- | ---------------------------------------------------------------------- |
+| 로그인 API 401            | 로그인 실패로 폼에 표시                                                |
+| 사용자 정보 조회 401      | A006은 정지 안내. 그 외에는 재발급 후 재조회하고 실패 시 비로그인 처리 |
+| 그 외 401                 | 현재 세션의 보호 API면 재발급 후 한 번 재시도. 실패 시 로그인으로 이동 |
+| 403                       | 권한 없음 안내. 로그인 A002는 정지 안내                                |
+| 400 / 422                 | 확인된 오류 코드는 해당 필드에 표시하고 나머지는 공통 메시지로 안내    |
+| 5xx · 네트워크 · 타임아웃 | 구분된 안내                                                            |
 
-### 8.4 인증 (예정)
+### 8.4 인증
 
-아래 파일은 인증 정책(재발급·만료 처리)이 정해진 뒤 `src/common/auth/`에 만든다: `authStore.ts`(Zustand), `session.ts`, `sessionId.ts`, `RequireAuth.tsx`, `safeRedirect.ts`.
+인증 구현은 `src/common/auth/`의 `authStore.ts`, `initialize.ts`, `interceptors.ts`, `session.ts`, `sessionId.ts`, `RequireAuth.tsx`, `IdleLogout.tsx`에 있다. 로그인 복귀 경로 검증은 `LoginPage.tsx`에서 한다.
 
 - HttpOnly 쿠키 기반(`withCredentials: true`). 토큰을 브라우저 저장소에 두지 않는다. CSRF·CORS는 백엔드와 함께 정한다.
 - 상태(`useAuthStore`의 `status`): `initializing` / `authenticated` / `anonymous` / `error`.

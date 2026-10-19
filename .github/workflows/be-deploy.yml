@@ -4,7 +4,7 @@ name: BE Deploy
 # main → App 서버(Project=imhungry, Env=main, Role=app) → https://api.imhungry.click
 # 인프라: imhungry-infra (modules/environment: compose-app.yml, deploy.sh / global: github_oidc.tf)
 #
-# 흐름: BE CI 통과 → arm64 이미지 빌드·GHCR push → SSM으로 서버의 /opt/app/deploy.sh <이미지> 실행 → 헬스 체크
+# 흐름: BE CI 통과 → arm64 이미지 빌드·ECR push → SSM으로 서버의 /opt/app/deploy.sh <이미지> 실행 → 헬스 체크
 # 서버의 deploy.sh가 SSM Parameter Store 시크릿으로 .env를 다시 만들고 docker compose로 app 컨테이너를 교체한다.
 #
 # Secrets
@@ -44,12 +44,13 @@ jobs:
       cancel-in-progress: false
     permissions:
       contents: read
-      packages: write
       id-token: write
     env:
       AWS_REGION: ap-northeast-2
       # Terraform project 값(EC2 Project 태그, Parameter Store 경로 /imhungry/...)
       PROJECT_NAME: imhungry
+      # imhungry-infra/global/ecr.tf 의 저장소 이름(<project>-backend)
+      ECR_REPOSITORY: imhungry-backend
       ENV_NAME: ${{ github.ref_name }}
       API_URL: ${{ github.ref_name == 'main' && vars.API_URL_MAIN || vars.API_URL_DEV }}
     steps:
@@ -68,24 +69,27 @@ jobs:
             exit 1
           fi
 
-      # 도커 이미지 이름은 소문자만 허용된다.
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: ECR 로그인
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
       # <브랜치>-<sha>: 배포·롤백용 고정 태그 / <브랜치>: 서버 최초 부팅 때 쓰는 태그(tfvars의 app_image)
       - name: 이미지 이름 설정
         id: meta
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
         run: |
-          REPO="$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')"
-          echo "image=ghcr.io/${REPO}:${ENV_NAME}-${{ github.sha }}" >> "$GITHUB_OUTPUT"
-          echo "latest=ghcr.io/${REPO}:${ENV_NAME}" >> "$GITHUB_OUTPUT"
+          echo "image=${REGISTRY}/${ECR_REPOSITORY}:${ENV_NAME}-${{ github.sha }}" >> "$GITHUB_OUTPUT"
+          echo "latest=${REGISTRY}/${ECR_REPOSITORY}:${ENV_NAME}" >> "$GITHUB_OUTPUT"
 
       - uses: docker/setup-buildx-action@v3
 
-      - uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      # 서버는 GHCR에 로그인하지 않으므로 패키지가 public이어야 pull할 수 있다(첫 push 후 패키지 설정 확인).
+      # 서버의 deploy.sh가 ECR 이미지면 EC2 역할로 자동 로그인 후 pull한다.
       - name: 이미지 빌드·push (linux/arm64)
         uses: docker/build-push-action@v6
         with:
@@ -98,11 +102,6 @@ jobs:
           labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
           cache-from: type=gha,scope=be-${{ github.ref_name }}
           cache-to: type=gha,mode=max,scope=be-${{ github.ref_name }}
-
-      - uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
 
       - name: App 서버 찾기
         id: ec2
@@ -159,5 +158,5 @@ jobs:
             [ "$CODE" = "200" ] && exit 0
             sleep 10
           done
-          echo "::error::배포 후 5분 안에 앱이 응답하지 않았습니다. 서버에서 'sudo docker logs app'으로 확인하세요. 롤백: 이전 커밋의 이미지로 'sudo /opt/app/deploy.sh ghcr.io/<repo>:${ENV_NAME}-<이전 sha>'"
+          echo "::error::배포 후 5분 안에 앱이 응답하지 않았습니다. 서버에서 'sudo docker logs app'으로 확인하세요. 롤백: 이전 커밋의 이미지로 'sudo /opt/app/deploy.sh <ECR 레지스트리>/${ECR_REPOSITORY}:${ENV_NAME}-<이전 sha>'"
           exit 1

@@ -1,6 +1,7 @@
 import { isAxiosError, type InternalAxiosRequestConfig } from 'axios';
 
 import { axiosInstance } from '@/common/api/axiosInstance';
+import { getErrorCode } from '@/common/api/errors';
 import { refresh } from '@/domains/auth/api';
 
 import { useAuthStore } from './authStore';
@@ -21,8 +22,14 @@ axiosInstance.interceptors.response.use(undefined, async (error: unknown) => {
   const request = error.config as SessionRequest | undefined;
   if (!request || request.sessionId !== sessionId()) return Promise.reject(error);
   if (useAuthStore.getState().status !== 'authenticated') return Promise.reject(error);
-  if (/\/api\/(auth|members\/me)/.test(request.url ?? '')) return Promise.reject(error);
+  if ((request.url ?? '').startsWith('/api/auth/')) return Promise.reject(error);
 
+  if (getErrorCode(error) === 'A006') {
+    await setSession(null, 'suspended');
+    return Promise.reject(error);
+  }
+
+  let reason: 'expired' | 'suspended' = 'expired';
   if (!request.retried) {
     request.retried = true;
     try {
@@ -31,10 +38,12 @@ axiosInstance.interceptors.response.use(undefined, async (error: unknown) => {
       });
       await refreshing;
       if (request.sessionId === sessionId()) return axiosInstance(request);
-    } catch {
-      // 재발급 실패는 아래에서 현재 세션을 종료한다.
+    } catch (refreshError) {
+      if (getErrorCode(refreshError) === 'A006') {
+        reason = 'suspended';
+      }
     }
   }
-  if (request.sessionId === sessionId()) await setSession(null);
+  if (request.sessionId === sessionId()) await setSession(null, reason);
   return Promise.reject(error);
 });

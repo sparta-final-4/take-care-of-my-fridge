@@ -1,0 +1,29 @@
+@use '@/styles/mixins' as *;
+
+.container {
+  width: 100%;
+  max-width: 520px;
+  margin: var(--ant-margin-xl) auto;
+  padding: var(--ant-padding-lg);
+  background: var(--ant-color-bg-container);
+  border: 1px solid var(--ant-color-border-secondary);
+  border-radius: var(--ant-border-radius);
+
+  @include from(md) {
+    margin-top: var(--ant-margin-xxl);
+    padding: var(--ant-padding-xl);
+  }
+}
+
+.checkRow {
+  margin: calc(-1 * var(--ant-margin-sm)) 0 var(--ant-margin-lg);
+}
+
+.error {
+  margin-bottom: var(--ant-margin);
+}
+
+.loginLink {
+  margin: var(--ant-margin-lg) 0 0;
+  text-align: center;
+}
