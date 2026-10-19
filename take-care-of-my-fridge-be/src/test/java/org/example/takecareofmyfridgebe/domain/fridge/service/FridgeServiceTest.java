@@ -138,4 +138,50 @@ class FridgeServiceTest {
                 any(LocalDate.class)
         );
     }
+
+    /**
+     * saveItems 호출 시 전달받은 Fridge 엔티티 목록을 saveAll로 일괄 저장하고
+     * 저장된 엔티티들을 FridgeItemResponse 목록으로 변환해 반환하는지 검증한다.
+     */
+    @Test
+    void saveItemsSavesAllEntitiesAndMapsToResponses() {
+        // Given
+        LocalDate today = LocalDate.now();
+        Ingredient ingredient = Ingredient.builder()
+                .ingredientCode("ING_TOFU")
+                .name("두부")
+                .baseUnit("모")
+                .defaultStorage(StorageType.REFRIGERATED)
+                .defaultShelfDays(5)
+                .basicSeasoning(false)
+                .build();
+        ReflectionTestUtils.setField(ingredient, "id", 10L);
+
+        Fridge fridge = Fridge.builder()
+                .memberId(7L)
+                .ingredient(ingredient)
+                .rawName("국산 두부 300g")
+                .quantity(new BigDecimal("1.00"))
+                .storage(StorageType.REFRIGERATED)
+                .expirationDate(today.plusDays(5))
+                .source(FridgeSource.MANUAL)
+                .build();
+        ReflectionTestUtils.setField(fridge, "id", 100L);
+
+        List<Fridge> itemsToSave = List.of(fridge);
+        when(fridgeRepository.saveAll(itemsToSave)).thenReturn(itemsToSave);
+
+        // When
+        List<FridgeItemResponse> responses = fridgeService.saveItems(itemsToSave);
+
+        // Then
+        assertEquals(1, responses.size());
+        assertEquals(100L, responses.get(0).id());
+        assertEquals(10L, responses.get(0).ingredientId());
+        assertEquals("두부", responses.get(0).ingredientName());
+        assertEquals("국산 두부 300g", responses.get(0).rawName());
+        assertFalse(responses.get(0).imminent());
+        assertFalse(responses.get(0).expired());
+        verify(fridgeRepository).saveAll(itemsToSave);
+    }
 }

@@ -2,9 +2,11 @@ package org.example.takecareofmyfridgebe.domain.fridge.controller;
 
 import org.example.takecareofmyfridgebe.domain.auth.service.AuthSessionService;
 import org.example.takecareofmyfridgebe.domain.auth.service.JwtTokenService;
+import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemCreateRequest;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemResponse;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeSortType;
 import org.example.takecareofmyfridgebe.domain.fridge.entity.FridgeSource;
+import org.example.takecareofmyfridgebe.domain.fridge.facade.FridgeFacade;
 import org.example.takecareofmyfridgebe.domain.fridge.service.FridgeService;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.StorageType;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
@@ -17,6 +19,7 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.web.servlet.MockMvc;
@@ -25,20 +28,26 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
  * FridgeController의 웹 계층(MockMvc + SecurityConfig) 슬라이스 테스트.
- * 인증 여부, 쿼리 파라미터 바인딩 및 기본값 적용, 잘못된 요청 파라미터 검증을 확인한다.
+ * 인증 여부, 쿼리 파라미터 바인딩 및 기본값 적용, 재료 다건 등록 요청 검증을 확인한다.
  */
 @WebMvcTest(FridgeController.class)
 @Import({SecurityConfig.class, FridgeControllerTest.TestConfig.class})
@@ -48,11 +57,14 @@ class FridgeControllerTest {
     private MockMvc mvc;
 
     @Autowired
+    private FridgeFacade fridgeFacade;
+
+    @Autowired
     private FridgeService fridgeService;
 
     @BeforeEach
     void resetMock() {
-        reset(fridgeService);
+        reset(fridgeFacade, fridgeService);
     }
 
     /**
@@ -186,8 +198,112 @@ class FridgeControllerTest {
         verifyNoInteractions(fridgeService);
     }
 
+    /**
+     * 유효한 냉장고 재료 다건 등록 요청(POST /api/fridge/items) 시
+     * 토큰의 회원 ID(7L)와 요청 본문이 FridgeFacade.createItems로 전달되고
+     * 등록된 재료 목록이 반환되는지 검증한다.
+     */
+    @Test
+    void createItemsUsesTokenMemberIdAndReturnsSavedItems() throws Exception {
+        // Given
+        FridgeItemResponse saved = new FridgeItemResponse(
+                10L,
+                1L,
+                "두부",
+                "모",
+                "국산 두부 300g",
+                new BigDecimal("1"),
+                StorageType.REFRIGERATED,
+                LocalDate.of(2026, 10, 24),
+                FridgeSource.MANUAL,
+                null,
+                false,
+                false,
+                LocalDateTime.of(2026, 10, 19, 11, 0),
+                LocalDateTime.of(2026, 10, 19, 11, 0)
+        );
+        when(fridgeFacade.createItems(eq(7L), any(FridgeItemCreateRequest.class)))
+                .thenReturn(List.of(saved));
+
+        // When & Then
+        mvc.perform(post("/api/fridge/items")
+                        .with(csrf())
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                new AuthSessionService.AuthPrincipal(7L, 8L, Member.Role.USER), null,
+                                List.of(new SimpleGrantedAuthority("ROLE_USER")))))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "items": [
+                                    {
+                                      "rawName": "국산 두부 300g",
+                                      "quantity": 1,
+                                      "storage": null,
+                                      "expirationDate": null
+                                    }
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data[0].id").value(10))
+                .andExpect(jsonPath("$.data[0].rawName").value("국산 두부 300g"))
+                .andExpect(jsonPath("$.data[0].storage").value("REFRIGERATED"));
+
+        verify(fridgeFacade).createItems(eq(7L), any(FridgeItemCreateRequest.class));
+    }
+
+    /**
+     * 재료 등록 요청 검증 실패 케이스:
+     * 1) items가 빈 배열(0개)일 때
+     * 2) items가 21개(최대 20개 초과)일 때
+     * 3) rawName이 빈 문자열 또는 공백일 때
+     * 4) quantity가 0 또는 음수일 때
+     * 모두 FridgeFacade를 호출하지 않고 400 Bad Request(C001)를 반환하는지 검증한다.
+     */
+    @Test
+    void createItemsRejectsInvalidRequestsWithBadRequest() throws Exception {
+        // 21개 항목 JSON 생성
+        String twentyOneItems = IntStream.range(0, 21)
+                .mapToObj(i -> "{\"rawName\":\"두부\",\"quantity\":1}")
+                .collect(Collectors.joining(",", "{\"items\":[", "]}"));
+
+        List<String> invalidBodies = List.of(
+                // items 0개
+                "{\"items\":[]}",
+                // items 21개
+                twentyOneItems,
+                // rawName 빈 값
+                "{\"items\":[{\"rawName\":\"   \",\"quantity\":1}]}",
+                // quantity 0
+                "{\"items\":[{\"rawName\":\"두부\",\"quantity\":0}]}",
+                // quantity 음수
+                "{\"items\":[{\"rawName\":\"두부\",\"quantity\":-1}]}"
+        );
+
+        for (String body : invalidBodies) {
+            mvc.perform(post("/api/fridge/items")
+                            .with(csrf())
+                            .with(authentication(new UsernamePasswordAuthenticationToken(
+                                    new AuthSessionService.AuthPrincipal(7L, 8L, Member.Role.USER), null,
+                                    List.of(new SimpleGrantedAuthority("ROLE_USER")))))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.success").value(false))
+                    .andExpect(jsonPath("$.error.code").value(ErrorCode.INVALID_INPUT_VALUE.getCode()));
+        }
+
+        verifyNoInteractions(fridgeFacade);
+    }
+
     @TestConfiguration
     static class TestConfig {
+
+        @Bean
+        FridgeFacade fridgeFacade() {
+            return mock(FridgeFacade.class);
+        }
 
         @Bean
         FridgeService fridgeService() {
