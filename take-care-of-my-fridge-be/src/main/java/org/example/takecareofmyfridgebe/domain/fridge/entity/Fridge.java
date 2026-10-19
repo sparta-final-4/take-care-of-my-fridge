@@ -90,14 +90,16 @@ public class Fridge extends BaseTimeEntity {
         this.source = resolvedSource;
     }
 
-    // 재료 정보(표시명, 수량, 보관방식, 소비기한) 수정
+    // 재료 정보(표준 재료, 표시명, 수량, 보관방식, 소비기한) 수정
     public void update(
+        Ingredient ingredient,
         String rawName,
         BigDecimal quantity,
         StorageType storage,
         LocalDate expirationDate
     ) {
         validatePositiveQuantity(quantity);
+        this.ingredient = ingredient;
         this.rawName = rawName;
         this.quantity = quantity;
         this.storage = storage;

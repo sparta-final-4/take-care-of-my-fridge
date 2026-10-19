@@ -6,6 +6,7 @@ import org.example.takecareofmyfridgebe.domain.auth.service.AuthSessionService.A
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemCreateRequest;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemResponse;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemSearchRequest;
+import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemUpdateRequest;
 import org.example.takecareofmyfridgebe.domain.fridge.facade.FridgeFacade;
 import org.example.takecareofmyfridgebe.domain.fridge.service.FridgeService;
 import org.example.takecareofmyfridgebe.global.response.ApiResponse;
@@ -13,6 +14,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -62,6 +65,24 @@ public class FridgeController {
             @Valid @RequestBody FridgeItemCreateRequest request
     ) {
         List<FridgeItemResponse> response = fridgeFacade.createItems(principal.memberId(), request);
+        return ResponseEntity.ok(ApiResponse.ok(response));
+    }
+
+    /**
+     * 로그인한 회원 본인의 냉장고 재료 정보(이름, 수량, 보관방식, 소비기한)를 수정한다.
+     *
+     * @param principal 인증된 요청자의 회원 정보 — 토큰에서 추출한 회원 ID로 본인 재료 여부 검증
+     * @param fridgeId  수정할 냉장고 재료 ID
+     * @param request   수정할 재료 정보 (rawName, quantity, storage, expirationDate)
+     * @return 수정된 냉장고 재료 정보
+     */
+    @PatchMapping("/items/{fridgeId}")
+    public ResponseEntity<ApiResponse<FridgeItemResponse>> updateItem(
+            @AuthenticationPrincipal AuthPrincipal principal,
+            @PathVariable Long fridgeId,
+            @Valid @RequestBody FridgeItemUpdateRequest request
+    ) {
+        FridgeItemResponse response = fridgeFacade.updateItem(principal.memberId(), fridgeId, request);
         return ResponseEntity.ok(ApiResponse.ok(response));
     }
 }

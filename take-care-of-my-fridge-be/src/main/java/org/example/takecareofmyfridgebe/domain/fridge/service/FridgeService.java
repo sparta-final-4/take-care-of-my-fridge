@@ -2,10 +2,14 @@ package org.example.takecareofmyfridgebe.domain.fridge.service;
 
 import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemResponse;
+import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemUpdateRequest;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeSortType;
 import org.example.takecareofmyfridgebe.domain.fridge.entity.Fridge;
 import org.example.takecareofmyfridgebe.domain.fridge.repository.FridgeRepository;
+import org.example.takecareofmyfridgebe.domain.ingredient.entity.Ingredient;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.StorageType;
+import org.example.takecareofmyfridgebe.global.error.BusinessException;
+import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -54,4 +58,45 @@ public class FridgeService {
                 .map(FridgeItemResponse::from)
                 .toList();
     }
+
+    /**
+     * 본인 소유의 냉장고 재료 정보를 더티 체킹으로 수정한다.
+     *
+     * @param memberId   요청한 회원 ID
+     * @param fridgeId   수정할 냉장고 재료 ID
+     * @param ingredient 매핑된(또는 기존 유지된) 표준 재료 엔티티
+     * @param request    수정할 재료 정보 (rawName, quantity, storage, expirationDate)
+     * @return 수정된 냉장고 재료 응답
+     */
+    @Transactional
+    public FridgeItemResponse updateItem(
+            Long memberId,
+            Long fridgeId,
+            Ingredient ingredient,
+            FridgeItemUpdateRequest request
+    ) {
+        Fridge fridge = getFridgeEntity(memberId, fridgeId);
+        fridge.update(
+                ingredient,
+                request.rawName(),
+                request.quantity(),
+                request.storage(),
+                request.expirationDate()
+        );
+        return FridgeItemResponse.from(fridge);
+    }
+
+    /**
+     * 냉장고 재료 ID와 회원 ID로 본인 소유의 재료 엔티티를 조회한다.
+     * 존재하지 않거나 다른 회원의 재료이면 타인의 재료 존재 여부를 노출하지 않기 위해 404(FRIDGE_ITEM_NOT_FOUND)로 통일한다.
+     *
+     * @param memberId 요청한 회원 ID
+     * @param fridgeId 조회할 냉장고 재료 ID
+     * @return 조회된 냉장고 재료 엔티티 (ingredient 함께 로딩)
+     */
+    public Fridge getFridgeEntity(Long memberId, Long fridgeId) {
+        return fridgeRepository.findByIdAndMemberId(fridgeId, memberId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.FRIDGE_ITEM_NOT_FOUND));
+    }
+
 }

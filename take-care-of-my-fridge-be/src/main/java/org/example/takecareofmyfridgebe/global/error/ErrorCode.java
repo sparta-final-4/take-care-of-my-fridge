@@ -80,7 +80,10 @@ public enum ErrorCode {
     INVALID_NOTIFICATION(HttpStatus.INTERNAL_SERVER_ERROR, "NOTIFICATION_001", "알림 정보가 올바르지 않습니다."),
 
     // Ingredient
-    CUSTOM_INGREDIENT_NOT_CONFIGURED(HttpStatus.INTERNAL_SERVER_ERROR, "INGREDIENT_001", "직접 입력용 기본 재료가 설정되어 있지 않습니다.")
+    CUSTOM_INGREDIENT_NOT_CONFIGURED(HttpStatus.INTERNAL_SERVER_ERROR, "INGREDIENT_001", "직접 입력용 기본 재료가 설정되어 있지 않습니다."),
+
+    // Fridge
+    FRIDGE_ITEM_NOT_FOUND(HttpStatus.NOT_FOUND, "FRIDGE_001", "냉장고 재료를 찾을 수 없습니다.")
     ;
 
     private final HttpStatus status;

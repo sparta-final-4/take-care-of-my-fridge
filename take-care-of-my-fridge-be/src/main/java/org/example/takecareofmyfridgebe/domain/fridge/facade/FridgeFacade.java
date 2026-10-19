@@ -3,6 +3,7 @@ package org.example.takecareofmyfridgebe.domain.fridge.facade;
 import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemCreateRequest;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemResponse;
+import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemUpdateRequest;
 import org.example.takecareofmyfridgebe.domain.fridge.entity.Fridge;
 import org.example.takecareofmyfridgebe.domain.fridge.service.FridgeService;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.Ingredient;
@@ -47,5 +48,26 @@ public class FridgeFacade {
                 .toList();
 
         return fridgeService.saveItems(fridges);
+    }
+
+    /**
+     * [냉장고 재료 수정 및 선택적 재매핑]
+     * 본인 재료 여부를 먼저 확인한 뒤, 입력된 rawName이 기존과 다를 때만 표준 재료를 다시 매핑한다.
+     * 추후 Elasticsearch 외부 I/O가 추가되는 매핑 단계를 DB 쓰기 트랜잭션 밖에 두기 위해
+     * Facade에는 트랜잭션을 걸지 않고, 매핑 확정 후 FridgeService.updateItem에서 수정한다.
+     *
+     * @param memberId 로그인한 회원 ID
+     * @param fridgeId 수정할 냉장고 재료 ID
+     * @param request  수정할 냉장고 재료 요청 정보
+     * @return 수정된 냉장고 재료 응답
+     */
+    public FridgeItemResponse updateItem(Long memberId, Long fridgeId, FridgeItemUpdateRequest request) {
+        Fridge fridge = fridgeService.getFridgeEntity(memberId, fridgeId);
+
+        Ingredient ingredient = fridge.getRawName().equals(request.rawName())
+                ? fridge.getIngredient()
+                : ingredientMatcher.match(request.rawName());
+
+        return fridgeService.updateItem(memberId, fridgeId, ingredient, request);
     }
 }
