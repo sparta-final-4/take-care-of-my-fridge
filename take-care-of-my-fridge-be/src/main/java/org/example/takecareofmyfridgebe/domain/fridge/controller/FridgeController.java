@@ -4,13 +4,18 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.auth.service.AuthSessionService.AuthPrincipal;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemCreateRequest;
+import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemLogResponse;
+import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemLogSearchRequest;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemResponse;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemSearchRequest;
+import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemTakeOutRequest;
+import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemTakeOutResponse;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemUpdateRequest;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeRemoveReason;
 import org.example.takecareofmyfridgebe.domain.fridge.facade.FridgeFacade;
 import org.example.takecareofmyfridgebe.domain.fridge.service.FridgeService;
 import org.example.takecareofmyfridgebe.global.response.ApiResponse;
+import org.example.takecareofmyfridgebe.global.response.PageResponse;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -56,6 +61,22 @@ public class FridgeController {
     }
 
     /**
+     * 로그인한 회원 본인의 냉장고 재료 기록(먹었어요·버렸어요)을 조건(처리 방식, 기간)으로 최신순 페이지 조회한다.
+     *
+     * @param principal 인증된 요청자의 회원 정보 — 토큰에서 추출한 회원 ID 소유의 기록만 조회 대상
+     * @param request   조회 조건 (action, from, to, page, size)
+     * @return 조건에 맞는 기록 페이지
+     */
+    @GetMapping("/logs")
+    public ResponseEntity<ApiResponse<PageResponse<FridgeItemLogResponse>>> getLogs(
+            @AuthenticationPrincipal AuthPrincipal principal,
+            @Valid @ModelAttribute FridgeItemLogSearchRequest request
+    ) {
+        PageResponse<FridgeItemLogResponse> response = fridgeService.getLogs(principal.memberId(), request);
+        return ResponseEntity.ok(ApiResponse.ok(response));
+    }
+
+    /**
      * 로그인한 회원의 냉장고에 여러 재료를 한 번에 등록한다.
      *
      * @param principal 인증된 요청자의 회원 정보 — 토큰에서 추출한 회원 ID로 재료 소유자 설정
@@ -86,6 +107,25 @@ public class FridgeController {
             @Valid @RequestBody FridgeItemUpdateRequest request
     ) {
         FridgeItemResponse response = fridgeFacade.updateItem(principal.memberId(), fridgeId, request);
+        return ResponseEntity.ok(ApiResponse.ok(response));
+    }
+
+    /**
+     * 로그인한 회원 본인의 냉장고 재료를 일부 또는 전부 먹었거나(CONSUMED) 버린(DISCARDED) 것으로 처리한다.
+     * quantity가 없거나 남은 양 이상이면 전부 빼서 냉장고에서 삭제하고, 뺀 양은 이력으로 기록한다.
+     *
+     * @param principal 인증된 요청자의 회원 정보 — 토큰에서 추출한 회원 ID로 본인 재료 여부 검증
+     * @param fridgeId  처리할 냉장고 재료 ID
+     * @param request   처리 방식(action)과 뺄 수량(quantity, null이면 전부)
+     * @return 삭제 여부와 남은 양
+     */
+    @PostMapping("/items/{fridgeId}/take-out")
+    public ResponseEntity<ApiResponse<FridgeItemTakeOutResponse>> takeOutItem(
+            @AuthenticationPrincipal AuthPrincipal principal,
+            @PathVariable Long fridgeId,
+            @Valid @RequestBody FridgeItemTakeOutRequest request
+    ) {
+        FridgeItemTakeOutResponse response = fridgeService.takeOutItem(principal.memberId(), fridgeId, request);
         return ResponseEntity.ok(ApiResponse.ok(response));
     }
 

@@ -1,7 +1,11 @@
 package org.example.takecareofmyfridgebe.domain.fridge.service;
 
 import lombok.RequiredArgsConstructor;
+import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemLogResponse;
+import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemLogSearchRequest;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemResponse;
+import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemTakeOutRequest;
+import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemTakeOutResponse;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemUpdateRequest;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeRemoveReason;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeSortType;
@@ -13,9 +17,13 @@ import org.example.takecareofmyfridgebe.domain.ingredient.entity.Ingredient;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.StorageType;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
+import org.example.takecareofmyfridgebe.global.response.PageResponse;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -45,8 +53,29 @@ public class FridgeService {
         LocalDate today = LocalDate.now();
         return fridgeRepository.findItemsByCondition(memberId, storage, sort, imminentOnly, today)
                 .stream()
-                .map(FridgeItemResponse::from)
+                .map(fridge -> FridgeItemResponse.from(fridge, today))
                 .toList();
+    }
+
+    /**
+     * 로그인한 회원의 냉장고 재료 기록(먹었어요·버렸어요)을 처리 방식과 기간 조건으로 최신순 페이지 조회한다.
+     *
+     * @param memberId 조회 대상 회원 ID
+     * @param request  조회 조건 (action, from, to, page는 1부터, size)
+     * @return 조건에 맞는 기록 페이지
+     */
+    public PageResponse<FridgeItemLogResponse> getLogs(Long memberId, FridgeItemLogSearchRequest request) {
+        if (request.from() != null && request.to() != null && request.from().isAfter(request.to())) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+        Page<FridgeItemLog> logs = fridgeItemLogRepository.findLogsByCondition(
+                memberId,
+                request.action(),
+                request.from(),
+                request.to(),
+                PageRequest.of(request.page() - 1, request.size())
+        );
+        return PageResponse.of(logs.map(FridgeItemLogResponse::from));
     }
 
     /**
@@ -57,9 +86,10 @@ public class FridgeService {
      */
     @Transactional
     public List<FridgeItemResponse> saveItems(List<Fridge> items) {
+        LocalDate today = LocalDate.now();
         return fridgeRepository.saveAll(items)
                 .stream()
-                .map(FridgeItemResponse::from)
+                .map(fridge -> FridgeItemResponse.from(fridge, today))
                 .toList();
     }
 
@@ -87,7 +117,7 @@ public class FridgeService {
                 request.storage(),
                 request.expirationDate()
         );
-        return FridgeItemResponse.from(fridge);
+        return FridgeItemResponse.from(fridge, LocalDate.now());
     }
 
     /**
@@ -102,7 +132,8 @@ public class FridgeService {
      */
     @Transactional
     public void removeItem(Long memberId, Long fridgeId, FridgeRemoveReason reason) {
-        Fridge fridge = getFridgeEntity(memberId, fridgeId);
+        // 같은 재료를 동시에 사용·삭제할 때 수량을 덮어쓰거나 이미 지워진 재료를 다시 지우지 않도록 잠금
+        Fridge fridge = getFridgeEntityForUpdate(memberId, fridgeId);
 
         if (reason.requiresLog()) {
             FridgeItemLog itemLog = FridgeItemLog.builder()
@@ -120,6 +151,45 @@ public class FridgeService {
     }
 
     /**
+     * 본인 소유의 냉장고 재료를 일부 또는 전부 먹었거나 버린 것으로 처리한다.
+     * 요청 수량이 없거나 남은 양 이상이면 전부 뺀 것으로 보고, 차감 후 남은 양이 0이 되면 냉장고에서 삭제한다.
+     * 실제로 뺀 양을 fridge_item_logs에 기록하며, 기록 저장과 차감·삭제는 하나의 트랜잭션 안에서 수행한다.
+     *
+     * @param memberId 요청한 회원 ID
+     * @param fridgeId 처리할 냉장고 재료 ID
+     * @param request  처리 방식(CONSUMED, DISCARDED)과 뺄 수량(null이면 전부)
+     * @return 삭제 여부와 남은 양
+     */
+    @Transactional
+    public FridgeItemTakeOutResponse takeOutItem(Long memberId, Long fridgeId, FridgeItemTakeOutRequest request) {
+        // 같은 재료를 동시에 사용할 때 수량을 덮어쓰지 않도록 잠금.
+        // 뒤 요청은 앞 요청이 커밋될 때까지 기다린 뒤 남은 양 기준으로 처리되고, 앞 요청이 지웠으면 404가 된다.
+        Fridge fridge = getFridgeEntityForUpdate(memberId, fridgeId);
+        BigDecimal before = fridge.getQuantity();
+        BigDecimal requested = request.quantity();
+        boolean takeAll = requested == null || requested.compareTo(before) >= 0;
+
+        fridge.deduct(takeAll ? before : requested);
+        // 차감 후 0.05 미만으로 남아 0으로 보정된 경우도 전부 뺀 것으로 기록한다.
+        BigDecimal takenQuantity = fridge.isEmpty() ? before : requested;
+
+        FridgeItemLog itemLog = FridgeItemLog.builder()
+                .memberId(fridge.getMemberId())
+                .ingredient(fridge.getIngredient())
+                .fridgeId(fridge.getId())
+                .rawName(fridge.getRawName())
+                .quantity(takenQuantity)
+                .action(request.action())
+                .build();
+        fridgeItemLogRepository.save(itemLog);
+
+        if (fridge.isEmpty()) {
+            fridgeRepository.delete(fridge);
+        }
+        return FridgeItemTakeOutResponse.from(fridge);
+    }
+
+    /**
      * 냉장고 재료 ID와 회원 ID로 본인 소유의 재료 엔티티를 조회한다.
      * 존재하지 않거나 다른 회원의 재료이면 타인의 재료 존재 여부를 노출하지 않기 위해 404(FRIDGE_ITEM_NOT_FOUND)로 통일한다.
      *
@@ -129,6 +199,19 @@ public class FridgeService {
      */
     public Fridge getFridgeEntity(Long memberId, Long fridgeId) {
         return fridgeRepository.findByIdAndMemberId(fridgeId, memberId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.FRIDGE_ITEM_NOT_FOUND));
+    }
+
+    /**
+     * 냉장고 재료 ID와 회원 ID로 본인 소유의 재료 엔티티를 쓰기 잠금(SELECT ... FOR UPDATE)으로 조회한다.
+     * 잠금은 호출한 트랜잭션이 끝날 때까지 유지되며, 기다리는 사이 재료가 지워졌으면 404(FRIDGE_ITEM_NOT_FOUND)로 통일한다.
+     *
+     * @param memberId 요청한 회원 ID
+     * @param fridgeId 조회할 냉장고 재료 ID
+     * @return 잠금이 걸린 냉장고 재료 엔티티 (ingredient는 지연 로딩)
+     */
+    private Fridge getFridgeEntityForUpdate(Long memberId, Long fridgeId) {
+        return fridgeRepository.findForUpdateByIdAndMemberId(fridgeId, memberId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.FRIDGE_ITEM_NOT_FOUND));
     }
 

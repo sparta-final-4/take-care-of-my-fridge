@@ -1,0 +1,32 @@
+@use '@/styles/variables' as *;
+@use '@/styles/mixins' as *;
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ant-margin-lg);
+}
+
+// MainPage와 같은 좌우 비율
+.row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--ant-margin-lg);
+  align-items: start;
+
+  @include from(lg) {
+    grid-template-columns: minmax(0, 780fr) minmax(0, 416fr);
+  }
+}
+
+.leftCol {
+  display: flex;
+  min-width: 0;
+}
+
+.rightStack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ant-margin-lg);
+  min-width: 0;
+}

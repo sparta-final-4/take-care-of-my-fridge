@@ -1,0 +1,37 @@
+.container {
+  height: 100%;
+}
+
+.sortSelect {
+  min-width: 120px;
+}
+
+// 탭이 많아 좁은 화면에서는 가로로 스크롤한다(페이지 전체 가로 스크롤 방지).
+.storageTabs {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.groupTitle {
+  display: block;
+  margin-bottom: var(--ant-margin-xs);
+}
+
+.selectionBar {
+  margin-top: auto;
+  padding: var(--ant-padding-sm) var(--ant-padding);
+  background: var(--ant-color-text);
+  border-radius: var(--ant-border-radius);
+}
+
+.selectionText {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ant-color-text-light-solid);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.selectionButton {
+  flex-shrink: 0;
+}

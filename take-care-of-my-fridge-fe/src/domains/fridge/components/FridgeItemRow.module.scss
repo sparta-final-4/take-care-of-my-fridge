@@ -1,0 +1,86 @@
+@use '@/styles/variables' as *;
+@use '@/styles/mixins' as *;
+
+// 모바일: 이름·배지 / 수량·소비기한·보관 / 버튼 3줄, xl부터 한 줄
+// 이름 칸만 줄어들며 말줄임되고, 수량·소비기한·보관은 잘리지 않는다.
+.row {
+  display: grid;
+  grid-template-areas:
+    'check name badge'
+    'check meta meta'
+    'actions actions actions';
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--ant-margin-xs) var(--ant-margin-sm);
+  padding: var(--ant-padding-sm);
+  background: var(--ant-color-bg-container);
+  border: 1px solid var(--ant-color-border);
+  border-radius: var(--ant-border-radius);
+
+  @include from(xl) {
+    grid-template-areas: 'check name meta badge actions';
+    grid-template-columns: auto minmax(0, 1fr) auto auto auto;
+  }
+}
+
+.check {
+  grid-area: check;
+}
+
+.name {
+  grid-area: name;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  grid-area: meta;
+  align-items: center;
+  gap: var(--ant-margin-xs) var(--ant-margin);
+
+  @include from(xl) {
+    flex-wrap: nowrap;
+  }
+}
+
+.metaText {
+  white-space: nowrap;
+}
+
+.date {
+  flex-shrink: 0;
+  min-width: $date-min-width;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.actions {
+  grid-area: actions;
+  justify-content: flex-end;
+  gap: var(--ant-margin-xs);
+}
+
+.imminentBadge,
+.normalBadge {
+  grid-area: badge;
+  min-width: 54px;
+  margin-inline-end: 0;
+  text-align: center;
+  border-radius: var(--ant-control-height);
+}
+
+.imminentBadge {
+  font-weight: var(--ant-font-weight-strong);
+  color: var(--ant-color-text-light-solid);
+  background: var(--ant-color-text);
+  border-color: var(--ant-color-text);
+}
+
+.normalBadge {
+  color: var(--ant-color-text);
+  background: var(--ant-color-bg-container);
+  border-color: var(--ant-color-border);
+}

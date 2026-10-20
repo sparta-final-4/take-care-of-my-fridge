@@ -1,0 +1,232 @@
+import { CheckOutlined } from '@ant-design/icons';
+import { App, Button, Empty, Flex, Result, Segmented, Select, Skeleton, Typography } from 'antd';
+import { useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router';
+
+import { ROUTES } from '@/app/paths';
+import { SectionCard } from '@/common/components/SectionCard';
+
+import type { FridgeItemResponse, FridgeSortType, StorageType } from '../api';
+import { STORAGE_LABELS } from '../format';
+import { useFridgeSort } from '../hooks/useFridgeSort';
+import { useFridgeItems, useRemoveFridgeItem, useTakeOutFridgeItem } from '../queries';
+import { FridgeItemConsumeModal } from './FridgeItemConsumeModal';
+import { FridgeItemEditModal } from './FridgeItemEditModal';
+import { FridgeItemRow } from './FridgeItemRow';
+import styles from './FridgeItemListSection.module.scss';
+
+type StorageTab = StorageType | 'ALL';
+
+const STORAGE_TABS: StorageTab[] = ['ALL', 'REFRIGERATED', 'FROZEN', 'ROOM_TEMP'];
+
+const SORT_OPTIONS: Array<{ value: FridgeSortType; label: string }> = [
+  { value: 'EXPIRATION', label: '임박순' },
+  { value: 'CREATED', label: '등록순' },
+  { value: 'NAME', label: '이름순' },
+];
+
+// 임박순 그룹. 서버가 준 status·dDay만으로 나눈다.
+const EXPIRATION_GROUPS: Array<{ label: string; match: (item: FridgeItemResponse) => boolean }> = [
+  { label: '기한 지남', match: (item) => item.status === 'EXPIRED' },
+  { label: '오늘까지', match: (item) => item.status === 'IMMINENT' && item.dDay === 0 },
+  { label: '3일 이내', match: (item) => item.status === 'IMMINENT' && item.dDay > 0 },
+  { label: '여유 있음', match: (item) => item.status === 'NORMAL' },
+];
+
+function isStorageTab(value: string | null): value is StorageTab {
+  return STORAGE_TABS.some((tab) => tab === value);
+}
+
+export function FridgeItemListSection() {
+  const { message } = App.useApp();
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [sort, setSort] = useFridgeSort();
+  const { data, isPending, isError, refetch } = useFridgeItems(sort, true);
+  const takeOutMutation = useTakeOutFridgeItem();
+  const removeMutation = useRemoveFridgeItem();
+  const [checkedIds, setCheckedIds] = useState<number[]>([]);
+  const [removingIds, setRemovingIds] = useState<number[]>([]);
+  const [editingItem, setEditingItem] = useState<FridgeItemResponse>();
+  const [consumingItem, setConsumingItem] = useState<FridgeItemResponse>();
+
+  const storageParam = searchParams.get('storage');
+  const storage: StorageTab = isStorageTab(storageParam) ? storageParam : 'ALL';
+
+  const handleStorageChange = (next: StorageTab) => {
+    setSearchParams(
+      (params) => {
+        if (next === 'ALL') params.delete('storage');
+        else params.set('storage', next);
+        return params;
+      },
+      { replace: true },
+    );
+  };
+
+  const handleCheck = (fridgeId: number, checked: boolean) => {
+    setCheckedIds((ids) => (checked ? [...ids, fridgeId] : ids.filter((id) => id !== fridgeId)));
+  };
+
+  // 여러 재료를 연달아 처리할 수 있어 진행 중인 id를 모두 기록한다.
+  // mutate의 콜백은 마지막 호출에만 실행되므로 호출마다 결과를 받는 mutateAsync를 쓴다.
+  const removeRow = async (
+    fridgeId: number,
+    request: Promise<unknown>,
+    successMessage: string,
+  ): Promise<void> => {
+    setRemovingIds((ids) => [...ids, fridgeId]);
+    try {
+      await request;
+      setCheckedIds((ids) => ids.filter((id) => id !== fridgeId));
+      void message.success(successMessage);
+    } catch {
+      // 실패 알림은 MutationCache.onError가 띄운다.
+    } finally {
+      setRemovingIds((ids) => ids.filter((id) => id !== fridgeId));
+    }
+  };
+
+  const handleDiscard = (fridgeId: number) =>
+    removeRow(
+      fridgeId,
+      takeOutMutation.mutateAsync({ fridgeId, request: { action: 'DISCARDED', quantity: null } }),
+      '버렸어요',
+    );
+
+  const handleDelete = (fridgeId: number) =>
+    removeRow(
+      fridgeId,
+      removeMutation.mutateAsync({ fridgeId, reason: 'WRONG_ENTRY' }),
+      '재료를 삭제했습니다.',
+    );
+
+  const renderRows = (items: FridgeItemResponse[]) => (
+    <Flex vertical gap="xs">
+      {items.map((item) => (
+        <FridgeItemRow
+          key={item.id}
+          item={item}
+          checked={checkedIds.includes(item.id)}
+          removing={removingIds.includes(item.id)}
+          onCheck={(checked) => handleCheck(item.id, checked)}
+          onEdit={() => setEditingItem(item)}
+          onConsume={() => setConsumingItem(item)}
+          onDiscard={() => handleDiscard(item.id)}
+          onDelete={() => handleDelete(item.id)}
+        />
+      ))}
+    </Flex>
+  );
+
+  const renderBody = () => {
+    if (isPending) return <Skeleton active paragraph={{ rows: 6 }} />;
+    if (isError) {
+      return (
+        <Result
+          status="error"
+          title="냉장고 재료를 불러오지 못했어요."
+          extra={<Button onClick={() => void refetch()}>다시 시도</Button>}
+        />
+      );
+    }
+    if (data.length === 0) {
+      return (
+        <Empty description="냉장고가 비어 있어요">
+          <Typography.Paragraph type="secondary">
+            메인 화면의 [냉장고에 뭐가 남았나요?]에서 재료를 추가해 보세요.
+          </Typography.Paragraph>
+          <Button onClick={() => navigate(ROUTES.home)}>재료 추가하러 가기</Button>
+        </Empty>
+      );
+    }
+
+    const visibleItems = storage === 'ALL' ? data : data.filter((item) => item.storage === storage);
+    if (visibleItems.length === 0) {
+      return (
+        <Empty
+          image={Empty.PRESENTED_IMAGE_SIMPLE}
+          description={`${STORAGE_LABELS[storage as StorageType]} 보관 재료가 없어요`}
+        />
+      );
+    }
+    if (sort !== 'EXPIRATION') return renderRows(visibleItems);
+
+    return (
+      <Flex vertical gap="middle">
+        {EXPIRATION_GROUPS.map((group) => {
+          const groupItems = visibleItems.filter(group.match);
+          if (groupItems.length === 0) return null;
+          return (
+            <section key={group.label} aria-label={group.label}>
+              <Typography.Text strong className={styles.groupTitle}>
+                {group.label}{' '}
+                <Typography.Text type="secondary">{groupItems.length}</Typography.Text>
+              </Typography.Text>
+              {renderRows(groupItems)}
+            </section>
+          );
+        })}
+      </Flex>
+    );
+  };
+
+  const countOf = (tab: StorageTab) =>
+    tab === 'ALL'
+      ? (data?.length ?? 0)
+      : (data?.filter((item) => item.storage === tab).length ?? 0);
+  const checkedItems = data?.filter((item) => checkedIds.includes(item.id)) ?? [];
+
+  return (
+    <SectionCard
+      title="재료 목록"
+      extra={
+        <Select
+          value={sort}
+          onChange={setSort}
+          options={SORT_OPTIONS}
+          aria-label="정렬"
+          className={styles.sortSelect}
+        />
+      }
+    >
+      <Flex vertical gap="middle" className={styles.container}>
+        <Segmented<StorageTab>
+          value={storage}
+          onChange={handleStorageChange}
+          options={STORAGE_TABS.map((tab) => ({
+            value: tab,
+            label: `${tab === 'ALL' ? '전체' : STORAGE_LABELS[tab]} ${countOf(tab)}`,
+          }))}
+          className={styles.storageTabs}
+        />
+
+        {renderBody()}
+
+        {checkedItems.length > 0 && (
+          <Flex
+            align="center"
+            justify="space-between"
+            wrap
+            gap="small"
+            className={styles.selectionBar}
+          >
+            <Typography.Text className={styles.selectionText}>
+              <CheckOutlined /> {checkedItems.length}개 선택됨 ·{' '}
+              {checkedItems.map((item) => item.rawName).join(', ')}
+            </Typography.Text>
+            {/* TODO: AI 상담 기능이 생기면 선택한 재료로 추천을 요청한다. */}
+            <Button className={styles.selectionButton}>이 재료 위주로 AI 추천</Button>
+          </Flex>
+        )}
+      </Flex>
+
+      {editingItem && (
+        <FridgeItemEditModal item={editingItem} onClose={() => setEditingItem(undefined)} />
+      )}
+      {consumingItem && (
+        <FridgeItemConsumeModal item={consumingItem} onClose={() => setConsumingItem(undefined)} />
+      )}
+    </SectionCard>
+  );
+}
