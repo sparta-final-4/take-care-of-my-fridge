@@ -134,6 +134,45 @@ class RecipeReviewControllerTest {
     }
 
     /**
+     * 정의되지 않은 정렬 기준(sort=ABC)을 전달하면
+     * 바인딩 단계에서 거절되어 400 Bad Request(C001)를 반환하는지 검증한다.
+     */
+    @Test
+    void getReviewsWithInvalidSortReturnsBadRequest() throws Exception {
+        mvc.perform(get("/api/reviews")
+                        .param("sort", "ABC"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value(ErrorCode.INVALID_INPUT_VALUE.getCode()));
+    }
+
+    /**
+     * 잘못된 페이지 번호 형식(page=abc)을 전달하면
+     * 바인딩 단계에서 거절되어 400 Bad Request(C001)를 반환하는지 검증한다.
+     */
+    @Test
+    void getReviewsWithInvalidPageReturnsBadRequest() throws Exception {
+        mvc.perform(get("/api/reviews")
+                        .param("page", "abc"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value(ErrorCode.INVALID_INPUT_VALUE.getCode()));
+    }
+
+    /**
+     * 허용 최대치를 초과한 페이지 크기(size=51)를 전달하면
+     * 유효성 검증(@Max(50))에서 거절되어 400 Bad Request(C001)를 반환하는지 검증한다.
+     */
+    @Test
+    void getReviewsWithExcessiveSizeReturnsBadRequest() throws Exception {
+        mvc.perform(get("/api/reviews")
+                        .param("size", "51"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value(ErrorCode.INVALID_INPUT_VALUE.getCode()));
+    }
+
+    /**
      * 후기 작성 시 필수 값(recipeId, rating, content)이 유효하면
      * 200 OK와 함께 작성된 ReviewResponse를 반환하는지 검증한다.
      */

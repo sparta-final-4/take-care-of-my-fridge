@@ -125,20 +125,20 @@ class RecipeReviewServiceTest {
     }
 
     /**
-     * 정상적인 후기 작성 요청 시 memberRepository.getReferenceById로 프록시를 연결하고
+     * 정상적인 후기 작성 요청 시 memberRepository.findById로 회원을 조회하고
      * 저장된 엔티티를 ReviewResponse로 변환하여 반환하는지 검증한다.
      */
     @Test
     void createReviewSavesReviewAndReturnsResponse() {
         // Given: 1번 회원의 10번 레시피 후기 작성 요청
         Long memberId = 1L;
-        Member memberProxy = createMember(memberId, "사용자1");
+        Member member = createMember(memberId, "사용자1");
         ReviewCreateRequest request = new ReviewCreateRequest(10L, 5, "정말 맛있어요!");
 
         when(recipeReviewRepository.existsByMemberIdAndRecipeId(memberId, 10L)).thenReturn(false);
-        when(memberRepository.getReferenceById(memberId)).thenReturn(memberProxy);
+        when(memberRepository.findById(memberId)).thenReturn(Optional.of(member));
 
-        RecipeReview savedReview = createReview(100L, memberProxy, 10L, 5, "정말 맛있어요!");
+        RecipeReview savedReview = createReview(100L, member, 10L, 5, "정말 맛있어요!");
         when(recipeReviewRepository.save(any(RecipeReview.class))).thenReturn(savedReview);
 
         // When
@@ -150,6 +150,27 @@ class RecipeReviewServiceTest {
         assertEquals("정말 맛있어요!", response.content());
         assertTrue(response.mine());
         verify(recipeReviewRepository).save(any(RecipeReview.class));
+    }
+
+    /**
+     * 후기 작성 시 회원이 존재하지 않으면 404 MEMBER_NOT_FOUND 예외가 발생하는지 검증한다.
+     */
+    @Test
+    void createReviewThrowsMemberNotFoundWhenMemberDoesNotExist() {
+        // Given
+        Long memberId = 999L;
+        ReviewCreateRequest request = new ReviewCreateRequest(10L, 5, "후기 내용");
+
+        when(recipeReviewRepository.existsByMemberIdAndRecipeId(memberId, 10L)).thenReturn(false);
+        when(memberRepository.findById(memberId)).thenReturn(Optional.empty());
+
+        // When & Then
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> recipeReviewService.createReview(memberId, request)
+        );
+        assertEquals(ErrorCode.MEMBER_NOT_FOUND, exception.getErrorCode());
+        verify(recipeReviewRepository, never()).save(any(RecipeReview.class));
     }
 
     /**
@@ -181,11 +202,11 @@ class RecipeReviewServiceTest {
     void createReviewConvertsDataIntegrityViolationExceptionToConflict() {
         // Given: 사전 조회는 통과했으나 save 시점에 DB 유니크 제약 위반 발생
         Long memberId = 1L;
-        Member memberProxy = createMember(memberId, "사용자1");
+        Member member = createMember(memberId, "사용자1");
         ReviewCreateRequest request = new ReviewCreateRequest(10L, 5, "동시 후기");
 
         when(recipeReviewRepository.existsByMemberIdAndRecipeId(memberId, 10L)).thenReturn(false);
-        when(memberRepository.getReferenceById(memberId)).thenReturn(memberProxy);
+        when(memberRepository.findById(memberId)).thenReturn(Optional.of(member));
         when(recipeReviewRepository.save(any(RecipeReview.class)))
                 .thenThrow(new DataIntegrityViolationException("Unique constraint violated"));
 

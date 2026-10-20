@@ -59,14 +59,9 @@ public class RecipeReviewService {
             throw new BusinessException(ErrorCode.REVIEW_ALREADY_EXISTS);
         }
 
-        Member memberProxy = memberRepository.getReferenceById(memberId);
-
-        RecipeReview review = RecipeReview.builder()
-                .member(memberProxy)
-                .recipeId(request.recipeId())
-                .rating(request.rating())
-                .content(request.content())
-                .build();
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
+        RecipeReview review = request.toEntity(member);
 
         try {
             RecipeReview savedReview = recipeReviewRepository.save(review);
