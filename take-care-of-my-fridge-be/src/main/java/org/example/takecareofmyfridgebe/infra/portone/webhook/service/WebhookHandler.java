@@ -6,6 +6,7 @@ import org.example.takecareofmyfridgebe.domain.payment.entity.Payment;
 import org.example.takecareofmyfridgebe.domain.payment.facade.PaymentFacade;
 import org.example.takecareofmyfridgebe.domain.payment.service.PaymentService;
 import org.example.takecareofmyfridgebe.infra.portone.dto.PortOneWebhook;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
 
 import java.util.Optional;
@@ -26,7 +27,14 @@ public class WebhookHandler {
     private final WebhookEventService webhookEventService;
 
     public void handle(String webhookId, PortOneWebhook webhook, String rawPayload) {
-        Optional<Long> eventId = webhookEventService.receive(webhookId, webhook.type(), rawPayload);
+        Optional<Long> eventId;
+        try {
+            eventId = webhookEventService.receive(webhookId, webhook.type(), rawPayload);
+        } catch (DataIntegrityViolationException e) {
+            // 같은 웹훅이 동시에 들어와 다른 요청이 먼저 저장했다. 그쪽이 실패하면 PortOne이 다시 보낸다
+            log.info("[Webhook] 동시 수신된 웹훅 건너뜀: webhookId={}", webhookId);
+            return;
+        }
         if (eventId.isEmpty()) {
             log.info("[Webhook] 이미 처리된 웹훅 재수신: webhookId={}", webhookId);
             return;
@@ -55,8 +63,17 @@ public class WebhookHandler {
         } catch (RuntimeException e) {
             // 실패를 기록하고 오류로 응답해 PortOne이 재전송하게 한다
             log.error("[Webhook] 처리 실패: webhookId={}", webhookId, e);
-            webhookEventService.markFailed(eventId.get(), paymentId, e.getMessage());
+            recordFailure(eventId.get(), paymentId, e);
             throw e;
+        }
+    }
+
+    // 실패 기록 자체가 실패해도 원래 예외가 묻히지 않도록 suppressed로 붙인다
+    private void recordFailure(Long eventId, Long paymentId, RuntimeException cause) {
+        try {
+            webhookEventService.markFailed(eventId, paymentId, cause.getMessage());
+        } catch (RuntimeException recordError) {
+            cause.addSuppressed(recordError);
         }
     }
 }

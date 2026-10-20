@@ -4,7 +4,7 @@ public record PaymentGatewayResponse(
         String id,
         String status,
         Long totalAmount,   // PG 응답에 금액이 없으면 null
-        long cancelledAmount // 총 취소 금액
+        long cancelledAmount // 총 취소 금액. TODO: 환불 도메인에서 사용
 ) {
     private static final String STATUS_PAID = "PAID";
     private static final String STATUS_FAILED = "FAILED";

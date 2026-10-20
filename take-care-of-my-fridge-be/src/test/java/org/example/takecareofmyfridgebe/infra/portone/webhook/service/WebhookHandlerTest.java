@@ -11,13 +11,16 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.Optional;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -126,5 +129,31 @@ class WebhookHandlerTest {
 
         verify(webhookEventService).markFailed(EVENT_ID, PAYMENT_ID, "PG 오류");
         verify(webhookEventService, never()).markProcessed(any(), any());
+    }
+
+    @Test
+    @DisplayName("같은 웹훅이 동시에 들어와 저장이 중복되면 처리를 건너뛴다")
+    void handle_concurrentDuplicate_skipped() {
+        given(webhookEventService.receive(WEBHOOK_ID, "Transaction.Paid", BODY))
+                .willThrow(new DataIntegrityViolationException("uk_webhook_events_webhook_id"));
+
+        webhookHandler.handle(WEBHOOK_ID, new PortOneWebhook("Transaction.Paid", PORTONE_PAYMENT_ID), BODY);
+
+        verifyNoInteractions(paymentService, paymentFacade);
+    }
+
+    @Test
+    @DisplayName("실패 기록이 실패해도 원래 예외를 던지고 기록 오류는 suppressed로 남긴다")
+    void handle_markFailedFails_keepsOriginalException() {
+        PortOneWebhook webhook = givenReceived("Transaction.Paid");
+        Payment payment = givenPayment();
+        IllegalStateException original = new IllegalStateException("PG 오류");
+        IllegalStateException recordError = new IllegalStateException("DB 오류");
+        given(paymentFacade.syncWithPg(payment)).willThrow(original);
+        willThrow(recordError).given(webhookEventService).markFailed(EVENT_ID, PAYMENT_ID, "PG 오류");
+
+        assertThatThrownBy(() -> webhookHandler.handle(WEBHOOK_ID, webhook, BODY))
+                .isSameAs(original)
+                .satisfies(e -> assertThat(e.getSuppressed()).containsExactly(recordError));
     }
 }
