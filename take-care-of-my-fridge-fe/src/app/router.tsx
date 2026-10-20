@@ -1,9 +1,10 @@
 import type { ComponentType } from 'react';
-import { createBrowserRouter } from 'react-router';
+import { createBrowserRouter, Navigate } from 'react-router';
 
 import { RouteErrorPage } from '@/common/components/RouteErrorPage';
 import { RequireAuth } from '@/common/auth/RequireAuth';
 import { MainLayout } from '@/layout/MainLayout';
+import { MyPageLayout } from '@/layout/MyPageLayout';
 
 import { ROUTES } from './paths';
 
@@ -25,6 +26,28 @@ export const router = createBrowserRouter([
         children: [
           { path: ROUTES.fridge, lazy: page(() => import('@/pages/fridge/FridgePage')) },
           { path: ROUTES.account, lazy: page(() => import('@/pages/member/AccountPage')) },
+          {
+            Component: MyPageLayout,
+            children: [
+              { path: ROUTES.mypage, element: <Navigate to={ROUTES.mypageRecipes} replace /> },
+              {
+                path: ROUTES.mypageRecipes,
+                lazy: page(() => import('@/pages/mypage/MyPageRecipesPage')),
+              },
+              {
+                path: ROUTES.mypageChats,
+                lazy: page(() => import('@/pages/mypage/MyPageChatsPage')),
+              },
+              {
+                path: ROUTES.mypageProfile,
+                lazy: page(() => import('@/pages/mypage/MyPageProfilePage')),
+              },
+              {
+                path: ROUTES.mypageOrders,
+                lazy: page(() => import('@/pages/mypage/MyPageOrdersPage')),
+              },
+            ],
+          },
         ],
       },
       {

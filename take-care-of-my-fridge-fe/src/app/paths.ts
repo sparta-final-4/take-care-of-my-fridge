@@ -6,6 +6,11 @@ export const ROUTES = {
   signup: '/signup',
   signupComplete: '/signup/complete',
   account: '/mypage/account',
+  mypage: '/mypage',
+  mypageRecipes: '/mypage/recipes',
+  mypageChats: '/mypage/chats',
+  mypageProfile: '/mypage/profile',
+  mypageOrders: '/mypage/orders',
   adminMembers: '/admin/members',
   adminAudit: '/admin/audit',
 } as const;

@@ -37,10 +37,11 @@ export function Header() {
   const handleCloseDrawer = () => setDrawerOpen(false);
   const handleNavigate = (key: (typeof NAV_ITEMS)[number]['key']) => {
     if (key === 'fridge') navigate(ROUTES.fridge);
-    if (key === 'mypage') navigate(status === 'authenticated' ? ROUTES.account : ROUTES.login);
+    if (key === 'mypage') navigate(status === 'authenticated' ? ROUTES.mypage : ROUTES.login);
   };
   const isCurrent = (key: (typeof NAV_ITEMS)[number]['key']) =>
-    key === 'fridge' && pathname === ROUTES.fridge;
+    (key === 'fridge' && pathname === ROUTES.fridge) ||
+    (key === 'mypage' && pathname.startsWith(ROUTES.mypage));
   const handleLogout = () => {
     const id = sessionId();
     logoutMutation.mutate(undefined, {
