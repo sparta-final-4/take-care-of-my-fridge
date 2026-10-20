@@ -11,7 +11,7 @@ import org.example.takecareofmyfridgebe.domain.forecast.entity.SalesForecast;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
-class ForecastResponseMapperTest {
+class ForecastResponseTest {
 
     private static final LocalDate WEEK = LocalDate.of(2026, 10, 19);
 
@@ -21,7 +21,7 @@ class ForecastResponseMapperTest {
         SalesForecast predicted = item(run, 1L, 1, 10, 7, 1, 8);
         SalesForecast entrant = item(run, 2L, null, null, 12, 2, 15);
 
-        ForecastResponse response = ForecastResponseMapper.from(run, List.of(entrant, predicted),
+        ForecastResponse response = ForecastResponse.from(run, List.of(entrant, predicted),
                 null, WEEK.plusWeeks(2));
 
         assertThat(response.weekStart()).isEqualTo(WEEK);
@@ -43,7 +43,7 @@ class ForecastResponseMapperTest {
         SalesForecast dropped = item(run, 2L, 2, 20, 18, null, 0);
         SalesForecast entered = item(run, 3L, null, null, 25, 2, 15);
 
-        ForecastResponse response = ForecastResponseMapper.from(run,
+        ForecastResponse response = ForecastResponse.from(run,
                 List.of(entered, dropped, matched), WEEK.minusWeeks(1), null);
 
         assertThat(response.summary()).isEqualTo(new ForecastResponse.Summary(1, 2,
@@ -68,7 +68,7 @@ class ForecastResponseMapperTest {
         }
         forecasts.add(item(run, 11L, 1, 5, 1, 1, 5));
 
-        ForecastResponse response = ForecastResponseMapper.from(run, forecasts, null, null);
+        ForecastResponse response = ForecastResponse.from(run, forecasts, null, null);
 
         assertThat(response.summary().top10MatchCount()).isEqualTo(1);
         assertThat(response.summary().baselineTop10MatchCount()).isZero();
@@ -80,7 +80,7 @@ class ForecastResponseMapperTest {
         SalesForecast dropped = item(run, 1L, 10, 4, 3, 11, 6);
         SalesForecast entered = item(run, 2L, null, null, 2, 10, 9);
 
-        ForecastResponse response = ForecastResponseMapper.from(
+        ForecastResponse response = ForecastResponse.from(
                 run, List.of(entered, dropped), null, null);
 
         assertThat(response.summary().top10MatchCount()).isZero();

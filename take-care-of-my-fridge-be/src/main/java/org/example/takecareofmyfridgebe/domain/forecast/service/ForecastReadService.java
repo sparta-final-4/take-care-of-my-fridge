@@ -4,7 +4,6 @@ import java.time.DayOfWeek;
 import java.time.LocalDate;
 import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.forecast.dto.ForecastResponse;
-import org.example.takecareofmyfridgebe.domain.forecast.dto.ForecastResponseMapper;
 import org.example.takecareofmyfridgebe.domain.forecast.entity.PredictionRun;
 import org.example.takecareofmyfridgebe.domain.forecast.repository.PredictionRunRepository;
 import org.example.takecareofmyfridgebe.domain.forecast.repository.SalesForecastRepository;
@@ -40,7 +39,7 @@ public class ForecastReadService {
         LocalDate next = runRepository
                 .findTopByTargetWeekStartGreaterThanOrderByTargetWeekStartAsc(weekStart)
                 .map(PredictionRun::getTargetWeekStart).orElse(null);
-        return ForecastResponseMapper.from(run,
+        return ForecastResponse.from(run,
                 forecastRepository.findByPredictionRunIdOrderByProductIdAsc(run.getId()),
                 previous, next);
     }
