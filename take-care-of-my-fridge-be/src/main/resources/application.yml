@@ -27,3 +27,11 @@ app:
   auth:
     jwt-secret: WavSy2onX+rGXL9EhdkwDNgkscczEziOL09OsXSj7jEy0XurFwGtpB36WShSTM3t
     cookie-secure: ${AUTH_COOKIE_SECURE:true}
+    
+portone:
+  base-url: "https://api.portone.io"
+  api-secret: "kwjfvYDdq35AIOKiqtX81g36AHgGowto4Af3YGwruD8BPpBvAmB3qoHePuGZlPohtJw1IjJJdIjKjzHW"
+  store-id: "store-6d7d9fe2-1e1d-47d3-96a9-6ceb3873df88"
+  channel-key: "channel-key-d45e37ea-9034-495a-b691-c223dbf16f12"
+  webhook-secret: "whsec_IJTPyu6yKJ/p6noqNdbveluR7P8AeVSJCoYRVpSGgXg="
+
