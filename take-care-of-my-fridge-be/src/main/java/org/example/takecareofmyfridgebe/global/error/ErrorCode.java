@@ -49,6 +49,8 @@ public enum ErrorCode {
     INVALID_ORDER_STATUS(HttpStatus.BAD_REQUEST, "ORDER_002", "유효하지 않은 주문 상태 변경입니다."),
     ORDER_ACCESS_DENIED(HttpStatus.FORBIDDEN, "ORDER_003", "해당 주문에 접근할 권한이 없습니다."),
     ORDER_NOT_CANCELABLE(HttpStatus.CONFLICT, "ORDER_004", "결제대기 상태의 주문만 취소할 수 있습니다."),
+    ORDER_NUMBER_CONFLICT(HttpStatus.CONFLICT, "ORDER_005", "잠시 후 다시 주문해 주세요."),
+    ORDER_IDEMPOTENCY_KEY_REUSED(HttpStatus.CONFLICT, "ORDER_006", "다른 주문 요청에 이미 쓴 Idempotency-Key입니다."),
 
     // Payment
     PAYMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "PAYMENT_001", "결제 정보를 찾을 수 없습니다."),

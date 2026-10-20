@@ -48,6 +48,10 @@ public class OrderItem extends BaseTimeEntity {
     @Column(name = "product_name", nullable = false, length = 200)
     private String productName;
 
+    // 주문 당시 상품 이미지 (상품에 이미지가 없으면 null)
+    @Column(name = "product_image_url", length = 500)
+    private String productImageUrl;
+
     @Column(name = "quantity", nullable = false)
     private int quantity;
 
@@ -76,6 +80,7 @@ public class OrderItem extends BaseTimeEntity {
         Order order,
         Long productId,
         String productName,
+        String productImageUrl,
         int quantity,
         int listPrice,
         int unitPrice,
@@ -86,6 +91,7 @@ public class OrderItem extends BaseTimeEntity {
         this.order = order;
         this.productId = productId;
         this.productName = productName;
+        this.productImageUrl = productImageUrl;
         this.quantity = quantity;
         this.listPrice = listPrice;
         this.unitPrice = unitPrice;

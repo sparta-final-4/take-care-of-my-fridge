@@ -1,5 +1,6 @@
 package org.example.takecareofmyfridgebe.domain.cart.repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.example.takecareofmyfridgebe.domain.cart.entity.Cart;
@@ -24,4 +25,7 @@ public interface CartItemRepository extends JpaRepository<CartItem, Long> {
     @Query("delete from CartItem ci where ci.id in :ids "
             + "and ci.cart.id in (select c.id from Cart c where c.memberId = :memberId)")
     void deleteAllByIdsAndMemberId(@Param("ids") List<Long> ids, @Param("memberId") Long memberId);
+
+    // 내 장바구니의 줄만 읽는다. 남의 줄이거나 없는 번호는 결과에서 빠진다.
+    List<CartItem> findByIdInAndCartMemberId(Collection<Long> ids, Long memberId);
 }

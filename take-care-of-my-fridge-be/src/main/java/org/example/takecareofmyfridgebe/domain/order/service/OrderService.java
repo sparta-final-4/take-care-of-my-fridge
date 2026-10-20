@@ -1,0 +1,148 @@
+package org.example.takecareofmyfridgebe.domain.order.service;
+
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import lombok.RequiredArgsConstructor;
+import org.example.takecareofmyfridgebe.domain.cart.entity.CartItem;
+import org.example.takecareofmyfridgebe.domain.cart.repository.CartItemRepository;
+import org.example.takecareofmyfridgebe.domain.cart.repository.CartRepository;
+import org.example.takecareofmyfridgebe.domain.order.dto.OrderCreateRequest;
+import org.example.takecareofmyfridgebe.domain.order.dto.OrderCreateResult;
+import org.example.takecareofmyfridgebe.domain.order.dto.OrderDetailResponse;
+import org.example.takecareofmyfridgebe.domain.order.entity.Order;
+import org.example.takecareofmyfridgebe.domain.order.entity.OrderItem;
+import org.example.takecareofmyfridgebe.domain.order.entity.SaleType;
+import org.example.takecareofmyfridgebe.domain.order.repository.OrderItemRepository;
+import org.example.takecareofmyfridgebe.domain.order.repository.OrderRepository;
+import org.example.takecareofmyfridgebe.domain.product.entity.Product;
+import org.example.takecareofmyfridgebe.domain.product.entity.ProductStatus;
+import org.example.takecareofmyfridgebe.domain.product.repository.ProductRepository;
+import org.example.takecareofmyfridgebe.global.error.BusinessException;
+import org.example.takecareofmyfridgebe.global.error.ErrorCode;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+@RequiredArgsConstructor
+@Transactional(readOnly = true)
+public class OrderService {
+
+    private static final int IDEMPOTENCY_KEY_MAX_LENGTH = 64;
+
+    private final OrderRepository orderRepository;
+    private final OrderItemRepository orderItemRepository;
+    private final CartRepository cartRepository;
+    private final CartItemRepository cartItemRepository;
+    private final ProductRepository productRepository;
+    private final OrderNumberGenerator orderNumberGenerator;
+
+    // 재고 차감과 주문 저장을 한 트랜잭션으로 묶는다. 하나라도 실패하면 앞서 뺀 재고까지 롤백된다.
+    // 장바구니 줄은 결제 완료 때 지우므로 여기서는 건드리지 않는다.
+    @Transactional
+    public OrderCreateResult createOrder(Long memberId, String idempotencyKey, OrderCreateRequest request) {
+        if (idempotencyKey == null || idempotencyKey.isBlank() || idempotencyKey.length() > IDEMPOTENCY_KEY_MAX_LENGTH) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "Idempotency-Key 헤더가 필요합니다. (64자 이하)");
+        }
+
+        // 같은 회원의 주문하기를 한 줄로 세워, 같은 멱등 키로 동시에 온 요청이 주문을 둘 만들지 않게 한다. 다른 회원끼리는 기다리지 않는다.
+        // 이 잠금은 트랜잭션의 첫 조회여야 한다. 앞에 일반 조회가 있으면 그 시점 스냅샷으로 아래 확인을 해서 잠금을 기다리는 동안 커밋된 주문을 못 본다.
+        cartRepository.findByMemberIdForUpdate(memberId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.CART_ITEM_NOT_FOUND));
+
+        List<Long> cartItemIds = request.cartItemIds().stream().distinct().toList();
+        List<CartItem> cartItems = cartItemRepository.findByIdInAndCartMemberId(cartItemIds, memberId);
+        if (cartItems.size() != cartItemIds.size()) {
+            throw new BusinessException(ErrorCode.CART_ITEM_NOT_FOUND);
+        }
+
+        Optional<Order> existing = orderRepository.findByMemberIdAndIdempotencyKey(memberId, idempotencyKey);
+        if (existing.isPresent()) {
+            return toExistingResult(existing.get(), cartItems);
+        }
+
+        // 상품 행을 잠근 뒤 읽으므로 아래 재고 확인과 차감 사이에 다른 주문이 끼어들지 못한다
+        List<Long> productIds = cartItems.stream().map(CartItem::getProductId).toList();
+        Map<Long, Product> productsById = productRepository.findAllByIdInForUpdate(productIds).stream()
+            .collect(Collectors.toMap(Product::getId, Function.identity()));
+        cartItems.forEach(item -> validateSellable(productsById.get(item.getProductId())));
+        cartItems.forEach(item -> decreaseStock(productsById.get(item.getProductId()), item.getQuantity()));
+
+        // TODO: 할인 연동 시 진행 중 할인으로 단가·할인 구분을 정하고 번개 드롭 한도를 확인한다
+        long totalAmount = cartItems.stream()
+            .mapToLong(item -> (long) productsById.get(item.getProductId()).getPrice() * item.getQuantity())
+            .sum();
+        Order order = saveOrder(memberId, idempotencyKey, totalAmount);
+
+        List<OrderItem> orderItems = cartItems.stream()
+            .map(item -> toOrderItem(order, productsById.get(item.getProductId()), item.getQuantity()))
+            .toList();
+        orderItemRepository.saveAll(orderItems);
+        return new OrderCreateResult(OrderDetailResponse.from(order, orderItems), true);
+    }
+
+    // 같은 키로 이미 만든 주문을 돌려준다. 고른 상품·수량이 처음 요청과 다르면 키를 잘못 재사용한 것으로 보고 거절한다.
+    // 장바구니에는 같은 상품이 한 줄뿐이라 상품·수량이 같으면 같은 요청이다.
+    private OrderCreateResult toExistingResult(Order order, List<CartItem> cartItems) {
+        List<OrderItem> orderItems = orderItemRepository.findByOrderIdOrderByIdAsc(order.getId());
+        Map<Long, Integer> ordered = orderItems.stream()
+            .collect(Collectors.toMap(OrderItem::getProductId, OrderItem::getQuantity));
+        Map<Long, Integer> requested = cartItems.stream()
+            .collect(Collectors.toMap(CartItem::getProductId, CartItem::getQuantity));
+        if (!ordered.equals(requested)) {
+            throw new BusinessException(ErrorCode.ORDER_IDEMPOTENCY_KEY_REUSED);
+        }
+        return new OrderCreateResult(OrderDetailResponse.from(order, orderItems), false);
+    }
+
+    // 판매 중지만 막는다. 상태가 품절이어도 재고 숫자가 남아 있으면 판다.
+    private void validateSellable(Product product) {
+        if (product == null) {
+            throw new BusinessException(ErrorCode.PRODUCT_NOT_FOUND);
+        }
+        if (product.getStatus() == ProductStatus.STOPPED) {
+            throw new BusinessException(ErrorCode.PRODUCT_NOT_ON_SALE);
+        }
+    }
+
+    // 화면에 띄울 문구(품절·재고 부족 + 상품명)를 만들려고 엔티티보다 먼저 확인한다. 저장은 더티 체킹이 한다.
+    private void decreaseStock(Product product, int quantity) {
+        if (product.getStock() < quantity) {
+            String reason = product.getStock() == 0 ? "품절" : "재고 부족";
+            throw new BusinessException(ErrorCode.INSUFFICIENT_STOCK, reason + " · " + product.getName());
+        }
+        product.decreaseStock(quantity);
+    }
+
+    // 유니크 제약 위반은 둘이다. 서버 재시작·시계 되돌림으로 주문번호가 겹치는 경우(드묾)와,
+    // 장바구니 잠금 없이 같은 멱등 키 요청이 동시에 저장되는 경우다(잠금이 있으면 생기지 않음). 이 주문은 롤백하고 다시 주문하게 한다.
+    private Order saveOrder(Long memberId, String idempotencyKey, long totalAmount) {
+        Order order = Order.builder()
+            .orderNumber(orderNumberGenerator.next())
+            .memberId(memberId)
+            .idempotencyKey(idempotencyKey)
+            .totalAmount(totalAmount)
+            .build();
+        try {
+            return orderRepository.save(order);
+        } catch (DataIntegrityViolationException e) {
+            throw new BusinessException(ErrorCode.ORDER_NUMBER_CONFLICT);
+        }
+    }
+
+    private OrderItem toOrderItem(Order order, Product product, int quantity) {
+        return OrderItem.builder()
+            .order(order)
+            .productId(product.getId())
+            .productName(product.getName())
+            .productImageUrl(product.getImageUrl())
+            .quantity(quantity)
+            .listPrice(product.getPrice())
+            .unitPrice(product.getPrice())
+            .saleType(SaleType.NONE)
+            .build();
+    }
+}

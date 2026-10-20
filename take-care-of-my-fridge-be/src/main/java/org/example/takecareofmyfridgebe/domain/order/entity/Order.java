@@ -27,6 +27,10 @@ import java.time.LocalDateTime;
         @UniqueConstraint(
             name = "uk_orders_order_number",
             columnNames = "order_number"
+        ),
+        @UniqueConstraint(
+            name = "uk_orders_member_id_idempotency_key",
+            columnNames = {"member_id", "idempotency_key"}
         )
     },
     indexes = {
@@ -52,6 +56,10 @@ public class Order extends BaseTimeEntity {
     @Column(name = "member_id", nullable = false)
     private Long memberId;
 
+    // 주문하기 클릭마다 프론트가 만든 값. 같은 값으로 다시 오면 새 주문을 만들지 않는다 (기존 주문은 null)
+    @Column(name = "idempotency_key", length = 64)
+    private String idempotencyKey;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
     private OrderStatus status;
@@ -68,9 +76,10 @@ public class Order extends BaseTimeEntity {
     private LocalDateTime confirmedAt;
 
     @Builder
-    private Order(String orderNumber, Long memberId, long totalAmount) {
+    private Order(String orderNumber, Long memberId, String idempotencyKey, long totalAmount) {
         this.orderNumber = orderNumber;
         this.memberId = memberId;
+        this.idempotencyKey = idempotencyKey;
         this.totalAmount = totalAmount;
         this.status = OrderStatus.PENDING;
     }
