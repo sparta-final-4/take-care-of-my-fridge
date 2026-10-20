@@ -5,7 +5,6 @@ import org.example.takecareofmyfridgebe.domain.auth.service.JwtTokenService;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.CookingCompleteRequest;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.CookingCompleteResponse;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.CookingLogResponse;
-import org.example.takecareofmyfridgebe.domain.cooking.dto.CookingLogSearchRequest;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.IngredientDeductionResponse;
 import org.example.takecareofmyfridgebe.domain.cooking.entity.CookingResult;
 import org.example.takecareofmyfridgebe.domain.cooking.facade.CookingFacade;
