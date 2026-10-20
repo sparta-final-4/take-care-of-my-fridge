@@ -1,0 +1,309 @@
+@use '@/styles/variables' as *;
+@use '@/styles/mixins' as *;
+
+.section {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  padding: var(--ant-padding-lg);
+  background: var(--ant-color-bg-container);
+  border: 1px solid var(--ant-color-border);
+  border-radius: var(--ant-border-radius-lg);
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: var(--ant-margin-lg);
+
+  :global(.ant-typography).title {
+    margin: 0 0 var(--ant-margin-xxs);
+    font-size: var(--ant-font-size-xl);
+    font-weight: var(--ant-font-weight-strong);
+  }
+}
+
+.subtitle {
+  font-size: var(--ant-font-size-sm);
+}
+
+.sortSelect {
+  width: $recipe-sort-select-width;
+}
+
+/* 탭 */
+.tabs {
+  margin-bottom: var(--ant-margin-md);
+}
+
+.tabCount {
+  margin-left: var(--ant-margin-xxs);
+  font-size: var(--ant-font-size-sm);
+  opacity: 0.85;
+}
+
+/* 표 컨테이너 */
+.emptyWrapper {
+  padding: var(--ant-padding-xl) 0;
+}
+
+.tableWrapper {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  min-width: 680px;
+  border-collapse: collapse;
+
+  thead tr {
+    border-bottom: 1px solid var(--ant-color-border-secondary);
+  }
+
+  th {
+    padding: var(--ant-padding-xs) var(--ant-padding-sm);
+    font-size: var(--ant-font-size-sm);
+    font-weight: var(--ant-font-weight-strong);
+    color: var(--ant-color-text-secondary);
+    text-align: left;
+  }
+
+  td {
+    padding: var(--ant-padding-sm);
+    vertical-align: middle;
+  }
+
+  td.expandedCell {
+    padding: 0 var(--ant-padding-sm) var(--ant-padding-sm);
+  }
+}
+
+.thRecipe,
+.tdRecipe {
+  width: 32%;
+}
+
+.thCookCount,
+.tdCookCount {
+  width: 14%;
+}
+
+.thLastCooked,
+.tdLastCooked {
+  width: 14%;
+  font-size: var(--ant-font-size);
+}
+
+.thReview,
+.tdReview {
+  width: 14%;
+}
+
+.thActions,
+.tdActions {
+  width: 26%;
+  text-align: right;
+}
+
+.tdActions {
+  :global(.ant-space) {
+    justify-content: flex-end;
+  }
+}
+
+.dataRow {
+  border-bottom: 1px solid var(--ant-color-border-secondary);
+}
+
+.expandedRow {
+  border-bottom: 1px solid var(--ant-color-border-secondary);
+}
+
+.recipeCell {
+  display: flex;
+  align-items: center;
+  gap: var(--ant-margin-sm);
+}
+
+.thumbnail {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: $recipe-thumb-size;
+  height: $recipe-thumb-size;
+  border-radius: var(--ant-border-radius);
+  background: var(--ant-color-fill-secondary);
+  color: var(--ant-color-text-tertiary);
+  font-size: $font-size-xs;
+  flex-shrink: 0;
+  overflow: hidden;
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+}
+
+.placeholderImg {
+  color: var(--ant-color-text-quaternary);
+}
+
+.recipeInfo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ant-margin-xxs);
+  min-width: 0;
+}
+
+.aiTag {
+  width: fit-content;
+  margin: 0;
+  font-size: $font-size-xs;
+  line-height: var(--ant-line-height);
+  padding: 0 var(--ant-padding-xxs);
+  border-radius: var(--ant-border-radius-sm);
+  background: var(--ant-color-fill-secondary);
+  border: 1px solid var(--ant-color-border-secondary);
+  color: var(--ant-color-text-secondary);
+}
+
+.recipeName {
+  font-size: var(--ant-font-size);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.expandTrigger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ant-margin-xxs);
+  background: transparent;
+  border: none;
+  padding: var(--ant-padding-xxs) var(--ant-padding-xs);
+  border-radius: var(--ant-border-radius-sm);
+  font-size: var(--ant-font-size);
+  color: var(--ant-color-text);
+  cursor: pointer;
+
+  &:hover {
+    background: var(--ant-color-fill-tertiary);
+  }
+}
+
+.expandIcon {
+  font-size: $font-size-2xs;
+  color: var(--ant-color-text-secondary);
+}
+
+.ratingText {
+  font-size: var(--ant-font-size);
+  font-weight: var(--ant-font-weight-strong);
+  color: var(--ant-color-text);
+}
+
+.unreviewedTag {
+  margin: 0;
+  padding: 2px var(--ant-padding-xs);
+  border-radius: var(--ant-control-height);
+  font-size: var(--ant-font-size-sm);
+  background: var(--ant-color-fill-secondary);
+  border: 1px solid var(--ant-color-border);
+  color: var(--ant-color-text-secondary);
+}
+
+/* 펼쳐진 서브 패널 */
+.expandedPanel {
+  margin: 0;
+  padding: var(--ant-padding);
+  background: var(--ant-color-fill-quaternary);
+  border-radius: var(--ant-border-radius);
+  display: flex;
+  flex-direction: column;
+  gap: var(--ant-margin);
+}
+
+.detailReviewSection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ant-margin-xxs);
+}
+
+.detailLabel {
+  font-size: var(--ant-font-size-sm);
+  font-weight: var(--ant-font-weight-strong);
+}
+
+.detailReviewContent {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--ant-margin-xs);
+}
+
+.reviewHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--ant-margin-xs);
+}
+
+.reviewText {
+  font-size: var(--ant-font-size);
+  color: var(--ant-color-text);
+}
+
+.reviewDate {
+  font-size: var(--ant-font-size-sm);
+}
+
+.detailHistorySection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ant-margin-xs);
+}
+
+.historyList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ant-margin-xxs);
+}
+
+.historyItem {
+  display: flex;
+  align-items: center;
+  gap: var(--ant-margin-sm);
+  font-size: var(--ant-font-size-sm);
+}
+
+.historyDate {
+  color: var(--ant-color-text-secondary);
+  width: $history-date-width;
+}
+
+.successTag {
+  margin: 0;
+  border-radius: var(--ant-control-height);
+  padding: 0 var(--ant-padding-xs);
+  background: var(--ant-color-text);
+  color: var(--ant-color-text-light-solid);
+  border: none;
+  font-size: $font-size-xs;
+}
+
+.failedTag {
+  margin: 0;
+  border-radius: var(--ant-control-height);
+  padding: 0 var(--ant-padding-xs);
+  background: var(--ant-color-bg-container);
+  border: 1px solid var(--ant-color-border);
+  color: var(--ant-color-text-secondary);
+  font-size: $font-size-xs;
+}
+
+.historyMemo {
+  color: var(--ant-color-text);
+}

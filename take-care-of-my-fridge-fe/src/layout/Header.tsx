@@ -37,10 +37,11 @@ export function Header() {
   const handleCloseDrawer = () => setDrawerOpen(false);
   const handleNavigate = (key: (typeof NAV_ITEMS)[number]['key']) => {
     if (key === 'fridge') navigate(ROUTES.fridge);
-    if (key === 'mypage') navigate(status === 'authenticated' ? ROUTES.account : ROUTES.login);
+    if (key === 'mypage') navigate(status === 'authenticated' ? ROUTES.mypage : ROUTES.login);
   };
   const isCurrent = (key: (typeof NAV_ITEMS)[number]['key']) =>
-    key === 'fridge' && pathname === ROUTES.fridge;
+    (key === 'fridge' && pathname === ROUTES.fridge) ||
+    (key === 'mypage' && pathname.startsWith(ROUTES.mypage));
   const handleLogout = () => {
     const id = sessionId();
     logoutMutation.mutate(undefined, {
@@ -104,6 +105,11 @@ export function Header() {
           {screens.lg && status === 'authenticated' && (
             <Button type="text" onClick={handleLogout} loading={logoutMutation.isPending}>
               {nickname} 로그아웃
+            </Button>
+          )}
+          {screens.lg && status === 'anonymous' && (
+            <Button type="text" onClick={() => navigate(ROUTES.login)}>
+              로그인
             </Button>
           )}
           <NotificationBell />
@@ -185,6 +191,18 @@ export function Header() {
                 loading={logoutMutation.isPending}
               >
                 로그아웃
+              </Button>
+            )}
+            {status === 'anonymous' && (
+              <Button
+                type="text"
+                block
+                onClick={() => {
+                  handleCloseDrawer();
+                  navigate(ROUTES.login);
+                }}
+              >
+                로그인
               </Button>
             )}
           </Flex>

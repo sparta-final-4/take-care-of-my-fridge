@@ -11,3 +11,12 @@ $header-height: 64px;
 
 // YYYY-MM-DD(10자)가 잘리지 않는 너비
 $date-min-width: 10ch;
+
+// 레시피 관리 고정 치수
+$recipe-thumb-size: 54px;
+$recipe-sort-select-width: 130px;
+$history-date-width: 44px;
+
+// 12px(var(--ant-font-size-sm)) 미만의 소형 텍스트/아이콘 치수
+$font-size-2xs: 10px;
+$font-size-xs: 11px;

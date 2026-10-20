@@ -1,0 +1,24 @@
+.recipeName {
+  margin-bottom: var(--ant-margin-sm);
+  font-size: var(--ant-font-size);
+}
+
+.form {
+  margin-top: var(--ant-margin);
+}
+
+.rate {
+  font-size: 24px;
+}
+
+.labelWrapper {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.counter {
+  font-size: var(--ant-font-size-sm);
+  color: var(--ant-color-text-secondary);
+}
