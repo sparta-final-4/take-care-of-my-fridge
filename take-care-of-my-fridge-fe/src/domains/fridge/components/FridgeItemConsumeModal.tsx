@@ -53,6 +53,8 @@ export function FridgeItemConsumeModal({ item, onClose }: FridgeItemConsumeModal
       okText="먹었어요"
       cancelText="취소"
       confirmLoading={takeOutMutation.isPending}
+      okButtonProps={{ loading: takeOutMutation.isPending, disabled: takeOutMutation.isPending }}
+      cancelButtonProps={{ disabled: takeOutMutation.isPending }}
       onOk={form.submit}
       onCancel={onClose}
     >

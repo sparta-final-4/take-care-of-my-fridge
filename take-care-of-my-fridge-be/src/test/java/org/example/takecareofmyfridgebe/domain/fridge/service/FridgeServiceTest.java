@@ -393,7 +393,7 @@ class FridgeServiceTest {
                 .build();
         ReflectionTestUtils.setField(fridge, "id", 100L);
 
-        when(fridgeRepository.findByIdAndMemberId(100L, 7L)).thenReturn(Optional.of(fridge));
+        when(fridgeRepository.findForUpdateByIdAndMemberId(100L, 7L)).thenReturn(Optional.of(fridge));
 
         // When: 다 먹음(CONSUMED) 사유로 재료 빼기 실행
         fridgeService.removeItem(7L, 100L, FridgeRemoveReason.CONSUMED);
@@ -442,7 +442,7 @@ class FridgeServiceTest {
                 .build();
         ReflectionTestUtils.setField(fridge, "id", 100L);
 
-        when(fridgeRepository.findByIdAndMemberId(100L, 7L)).thenReturn(Optional.of(fridge));
+        when(fridgeRepository.findForUpdateByIdAndMemberId(100L, 7L)).thenReturn(Optional.of(fridge));
 
         // When: WRONG_ENTRY 사유로 삭제 실행
         fridgeService.removeItem(7L, 100L, FridgeRemoveReason.WRONG_ENTRY);
@@ -464,7 +464,7 @@ class FridgeServiceTest {
     @Test
     void removeItemThrowsNotFoundWhenTargetBelongsToAnotherMember() {
         // Given
-        when(fridgeRepository.findByIdAndMemberId(999L, 7L)).thenReturn(Optional.empty());
+        when(fridgeRepository.findForUpdateByIdAndMemberId(999L, 7L)).thenReturn(Optional.empty());
 
         // When & Then
         BusinessException exception = assertThrows(
@@ -486,7 +486,7 @@ class FridgeServiceTest {
     void takeOutItemDeductsPartialQuantityAndKeepsFridge() {
         // Given: 7번 회원의 100번 재료(남은 양 3.00)
         Fridge fridge = fridgeWithQuantity("3.00");
-        when(fridgeRepository.findByIdAndMemberId(100L, 7L)).thenReturn(Optional.of(fridge));
+        when(fridgeRepository.findForUpdateByIdAndMemberId(100L, 7L)).thenReturn(Optional.of(fridge));
 
         // When: 1만큼 먹음
         FridgeItemTakeOutResponse response = fridgeService.takeOutItem(
@@ -513,7 +513,7 @@ class FridgeServiceTest {
         for (BigDecimal requested : new BigDecimal[]{null, new BigDecimal("5")}) {
             // Given
             Fridge fridge = fridgeWithQuantity("3.00");
-            when(fridgeRepository.findByIdAndMemberId(100L, 7L)).thenReturn(Optional.of(fridge));
+            when(fridgeRepository.findForUpdateByIdAndMemberId(100L, 7L)).thenReturn(Optional.of(fridge));
 
             // When
             FridgeItemTakeOutResponse response = fridgeService.takeOutItem(
@@ -542,7 +542,7 @@ class FridgeServiceTest {
     void takeOutItemRemovesFridgeWhenRemainderIsBelowThreshold() {
         // Given
         Fridge fridge = fridgeWithQuantity("1.00");
-        when(fridgeRepository.findByIdAndMemberId(100L, 7L)).thenReturn(Optional.of(fridge));
+        when(fridgeRepository.findForUpdateByIdAndMemberId(100L, 7L)).thenReturn(Optional.of(fridge));
 
         // When
         FridgeItemTakeOutResponse response = fridgeService.takeOutItem(
@@ -563,7 +563,7 @@ class FridgeServiceTest {
     @Test
     void takeOutItemThrowsNotFoundWhenTargetBelongsToAnotherMember() {
         // Given
-        when(fridgeRepository.findByIdAndMemberId(999L, 7L)).thenReturn(Optional.empty());
+        when(fridgeRepository.findForUpdateByIdAndMemberId(999L, 7L)).thenReturn(Optional.empty());
 
         // When & Then
         BusinessException exception = assertThrows(

@@ -12,8 +12,8 @@ interface FridgeItemRowProps {
   onCheck: (checked: boolean) => void;
   onEdit: () => void;
   onConsume: () => void;
-  onDiscard: () => void;
-  onDelete: () => void;
+  onDiscard: () => Promise<void>;
+  onDelete: () => Promise<void>;
 }
 
 export function FridgeItemRow({
@@ -63,9 +63,11 @@ export function FridgeItemRow({
           description="냉장고에서 빠지고 기록에 남아요."
           okText="버렸어요"
           cancelText="취소"
+          okButtonProps={{ loading: removing, disabled: removing }}
+          cancelButtonProps={{ disabled: removing }}
           onConfirm={onDiscard}
         >
-          <Button size="small" disabled={removing}>
+          <Button size="small" loading={removing} disabled={removing}>
             버렸어요
           </Button>
         </Popconfirm>
@@ -73,11 +75,11 @@ export function FridgeItemRow({
           title={`${withObjectParticle(item.rawName)} 삭제할까요?`}
           description="잘못 등록한 재료일 때 사용해요. 기록에 남지 않아요."
           okText="삭제"
-          okButtonProps={{ danger: true }}
-          cancelText="취소"
+          okButtonProps={{ danger: true, loading: removing, disabled: removing }}
+          cancelButtonProps={{ disabled: removing }}
           onConfirm={onDelete}
         >
-          <Button size="small" danger disabled={removing}>
+          <Button size="small" danger loading={removing} disabled={removing}>
             삭제
           </Button>
         </Popconfirm>

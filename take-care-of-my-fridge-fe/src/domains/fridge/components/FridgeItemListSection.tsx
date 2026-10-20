@@ -70,16 +70,21 @@ export function FridgeItemListSection() {
 
   // 여러 재료를 연달아 처리할 수 있어 진행 중인 id를 모두 기록한다.
   // mutate의 콜백은 마지막 호출에만 실행되므로 호출마다 결과를 받는 mutateAsync를 쓴다.
-  const removeRow = (fridgeId: number, request: Promise<unknown>, successMessage: string) => {
+  const removeRow = async (
+    fridgeId: number,
+    request: Promise<unknown>,
+    successMessage: string,
+  ): Promise<void> => {
     setRemovingIds((ids) => [...ids, fridgeId]);
-    request
-      .then(() => {
-        setCheckedIds((ids) => ids.filter((id) => id !== fridgeId));
-        void message.success(successMessage);
-      })
+    try {
+      await request;
+      setCheckedIds((ids) => ids.filter((id) => id !== fridgeId));
+      void message.success(successMessage);
+    } catch {
       // 실패 알림은 MutationCache.onError가 띄운다.
-      .catch(() => undefined)
-      .finally(() => setRemovingIds((ids) => ids.filter((id) => id !== fridgeId)));
+    } finally {
+      setRemovingIds((ids) => ids.filter((id) => id !== fridgeId));
+    }
   };
 
   const handleDiscard = (fridgeId: number) =>

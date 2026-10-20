@@ -132,7 +132,8 @@ public class FridgeService {
      */
     @Transactional
     public void removeItem(Long memberId, Long fridgeId, FridgeRemoveReason reason) {
-        Fridge fridge = getFridgeEntity(memberId, fridgeId);
+        // 같은 재료를 동시에 사용·삭제할 때 수량을 덮어쓰거나 이미 지워진 재료를 다시 지우지 않도록 잠금
+        Fridge fridge = getFridgeEntityForUpdate(memberId, fridgeId);
 
         if (reason.requiresLog()) {
             FridgeItemLog itemLog = FridgeItemLog.builder()
@@ -161,7 +162,9 @@ public class FridgeService {
      */
     @Transactional
     public FridgeItemTakeOutResponse takeOutItem(Long memberId, Long fridgeId, FridgeItemTakeOutRequest request) {
-        Fridge fridge = getFridgeEntity(memberId, fridgeId);
+        // 같은 재료를 동시에 사용할 때 수량을 덮어쓰지 않도록 잠금.
+        // 뒤 요청은 앞 요청이 커밋될 때까지 기다린 뒤 남은 양 기준으로 처리되고, 앞 요청이 지웠으면 404가 된다.
+        Fridge fridge = getFridgeEntityForUpdate(memberId, fridgeId);
         BigDecimal before = fridge.getQuantity();
         BigDecimal requested = request.quantity();
         boolean takeAll = requested == null || requested.compareTo(before) >= 0;
@@ -196,6 +199,19 @@ public class FridgeService {
      */
     public Fridge getFridgeEntity(Long memberId, Long fridgeId) {
         return fridgeRepository.findByIdAndMemberId(fridgeId, memberId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.FRIDGE_ITEM_NOT_FOUND));
+    }
+
+    /**
+     * 냉장고 재료 ID와 회원 ID로 본인 소유의 재료 엔티티를 쓰기 잠금(SELECT ... FOR UPDATE)으로 조회한다.
+     * 잠금은 호출한 트랜잭션이 끝날 때까지 유지되며, 기다리는 사이 재료가 지워졌으면 404(FRIDGE_ITEM_NOT_FOUND)로 통일한다.
+     *
+     * @param memberId 요청한 회원 ID
+     * @param fridgeId 조회할 냉장고 재료 ID
+     * @return 잠금이 걸린 냉장고 재료 엔티티 (ingredient는 지연 로딩)
+     */
+    private Fridge getFridgeEntityForUpdate(Long memberId, Long fridgeId) {
+        return fridgeRepository.findForUpdateByIdAndMemberId(fridgeId, memberId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.FRIDGE_ITEM_NOT_FOUND));
     }
 
