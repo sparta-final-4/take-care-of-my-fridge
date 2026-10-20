@@ -234,49 +234,49 @@ class PaymentFacadeTest {
         verify(portOneClient, never()).cancelPayment(anyString(), anyString(), any());
     }
 
-    // cancelByUser
+    // failByUser
 
     @Test
     @DisplayName("결제창을 닫았고 PG에 결제가 없으면 USER_CANCELLED로 실패 처리한다")
-    void cancelByUser_noPgPayment_fails() {
+    void failByUser_noPgPayment_fails() {
         newPayment();
         given(portOneClient.getPayment(PORTONE_PAYMENT_ID)).willReturn(Optional.empty());
 
-        paymentFacade.cancelByUser(MEMBER_ID, PORTONE_PAYMENT_ID);
+        paymentFacade.failByUser(MEMBER_ID, PORTONE_PAYMENT_ID);
 
         verify(paymentCommandService).fail(PORTONE_PAYMENT_ID, FailReason.USER_CANCELLED);
     }
 
     @Test
-    @DisplayName("PG에서 이미 결제가 끝났으면 취소하지 않는다")
-    void cancelByUser_pgPaid_throws() {
+    @DisplayName("PG에서 이미 결제가 끝났으면 실패 처리하지 않는다")
+    void failByUser_pgPaid_throws() {
         newPayment();
         givenPgPayment("PAID", AMOUNT);
 
-        assertThatThrownBy(() -> paymentFacade.cancelByUser(MEMBER_ID, PORTONE_PAYMENT_ID))
+        assertThatThrownBy(() -> paymentFacade.failByUser(MEMBER_ID, PORTONE_PAYMENT_ID))
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode").isEqualTo(ErrorCode.ALREADY_PROCESSED_PAYMENT);
         verifyNoInteractions(paymentCommandService);
     }
 
     @Test
-    @DisplayName("READY가 아닌 결제는 취소하지 않는다")
-    void cancelByUser_notReady_throws() {
+    @DisplayName("READY가 아닌 결제는 실패 처리하지 않는다")
+    void failByUser_notReady_throws() {
         Payment payment = newPayment();
         payment.complete(LocalDateTime.of(2026, 10, 19, 10, 0));
 
-        assertThatThrownBy(() -> paymentFacade.cancelByUser(MEMBER_ID, PORTONE_PAYMENT_ID))
+        assertThatThrownBy(() -> paymentFacade.failByUser(MEMBER_ID, PORTONE_PAYMENT_ID))
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode").isEqualTo(ErrorCode.ALREADY_PROCESSED_PAYMENT);
         verifyNoInteractions(portOneClient, paymentCommandService);
     }
 
     @Test
-    @DisplayName("다른 회원의 결제는 취소할 수 없다")
-    void cancelByUser_otherMember_denied() {
+    @DisplayName("다른 회원의 결제는 실패 처리할 수 없다")
+    void failByUser_otherMember_denied() {
         newPayment();
 
-        assertThatThrownBy(() -> paymentFacade.cancelByUser(OTHER_MEMBER_ID, PORTONE_PAYMENT_ID))
+        assertThatThrownBy(() -> paymentFacade.failByUser(OTHER_MEMBER_ID, PORTONE_PAYMENT_ID))
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode").isEqualTo(ErrorCode.ORDER_ACCESS_DENIED);
         verifyNoInteractions(portOneClient, paymentCommandService);
