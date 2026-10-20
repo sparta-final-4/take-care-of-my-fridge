@@ -6,6 +6,7 @@ import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.example.takecareofmyfridgebe.domain.cart.entity.CartItem;
 import org.example.takecareofmyfridgebe.domain.cart.repository.CartItemRepository;
 import org.example.takecareofmyfridgebe.domain.cart.repository.CartRepository;
@@ -22,16 +23,20 @@ import org.example.takecareofmyfridgebe.domain.product.entity.ProductStatus;
 import org.example.takecareofmyfridgebe.domain.product.repository.ProductRepository;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
+import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class OrderCreateService {
 
     private static final int IDEMPOTENCY_KEY_MAX_LENGTH = 64;
+    private static final String ORDER_NUMBER_UNIQUE = "uk_orders_order_number";
+    private static final String IDEMPOTENCY_KEY_UNIQUE = "uk_orders_member_id_idempotency_key";
 
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
@@ -55,13 +60,14 @@ public class OrderCreateService {
 
         List<Long> cartItemIds = request.cartItemIds().stream().distinct().toList();
         List<CartItem> cartItems = cartItemRepository.findByIdInAndCartMemberId(cartItemIds, memberId);
-        if (cartItems.size() != cartItemIds.size()) {
-            throw new BusinessException(ErrorCode.CART_ITEM_NOT_FOUND);
-        }
 
+        // 같은 키 확인을 줄 검증보다 먼저 한다. 처음 주문 뒤 장바구니 줄이 지워져도 재전송에는 처음 주문을 돌려준다.
         Optional<Order> existing = orderRepository.findByMemberIdAndIdempotencyKey(memberId, idempotencyKey);
         if (existing.isPresent()) {
-            return toExistingResult(existing.get(), cartItems);
+            return toExistingResult(existing.get(), cartItemIds, cartItems);
+        }
+        if (cartItems.size() != cartItemIds.size()) {
+            throw new BusinessException(ErrorCode.CART_ITEM_NOT_FOUND);
         }
 
         // 상품 행을 잠근 뒤 읽으므로 아래 재고 확인과 차감 사이에 다른 주문이 끼어들지 못한다
@@ -69,7 +75,7 @@ public class OrderCreateService {
         Map<Long, Product> productsById = productRepository.findAllByIdInForUpdate(productIds).stream()
             .collect(Collectors.toMap(Product::getId, Function.identity()));
         cartItems.forEach(item -> validateSellable(productsById.get(item.getProductId())));
-        cartItems.forEach(item -> decreaseStock(productsById.get(item.getProductId()), item.getQuantity()));
+        cartItems.forEach(item -> productsById.get(item.getProductId()).decreaseStock(item.getQuantity()));
 
         // TODO: 할인 연동 시 진행 중 할인으로 단가·할인 구분을 정하고 번개 드롭 한도를 확인한다
         long totalAmount = cartItems.stream()
@@ -86,8 +92,14 @@ public class OrderCreateService {
 
     // 같은 키로 이미 만든 주문을 돌려준다. 고른 상품·수량이 처음 요청과 다르면 키를 잘못 재사용한 것으로 보고 거절한다.
     // 장바구니에는 같은 상품이 한 줄뿐이라 상품·수량이 같으면 같은 요청이다.
-    private OrderCreateResult toExistingResult(Order order, List<CartItem> cartItems) {
+    private OrderCreateResult toExistingResult(Order order, List<Long> cartItemIds, List<CartItem> cartItems) {
         List<OrderItem> orderItems = orderItemRepository.findByOrderIdOrderByIdAsc(order.getId());
+        OrderCreateResult result = new OrderCreateResult(OrderDetailResponse.from(order, orderItems), false);
+        // 결제 완료나 사용자 삭제로 줄이 일부 사라졌으면 비교할 수 없으므로 처음 주문을 그대로 돌려준다
+        if (cartItems.size() != cartItemIds.size()) {
+            return result;
+        }
+
         Map<Long, Integer> ordered = orderItems.stream()
             .collect(Collectors.toMap(OrderItem::getProductId, OrderItem::getQuantity));
         Map<Long, Integer> requested = cartItems.stream()
@@ -95,7 +107,7 @@ public class OrderCreateService {
         if (!ordered.equals(requested)) {
             throw new BusinessException(ErrorCode.ORDER_IDEMPOTENCY_KEY_REUSED);
         }
-        return new OrderCreateResult(OrderDetailResponse.from(order, orderItems), false);
+        return result;
     }
 
     // 판매 중지만 막는다. 상태가 품절이어도 재고 숫자가 남아 있으면 판다.
@@ -108,17 +120,8 @@ public class OrderCreateService {
         }
     }
 
-    // 화면에 띄울 문구(품절·재고 부족 + 상품명)를 만들려고 엔티티보다 먼저 확인한다. 저장은 더티 체킹이 한다.
-    private void decreaseStock(Product product, int quantity) {
-        if (product.getStock() < quantity) {
-            String reason = product.getStock() == 0 ? "품절" : "재고 부족";
-            throw new BusinessException(ErrorCode.INSUFFICIENT_STOCK, reason + " · " + product.getName());
-        }
-        product.decreaseStock(quantity);
-    }
-
-    // 유니크 제약 위반은 둘이다. 서버 재시작·시계 되돌림으로 주문번호가 겹치는 경우(드묾)와,
-    // 장바구니 잠금 없이 같은 멱등 키 요청이 동시에 저장되는 경우다(잠금이 있으면 생기지 않음). 이 주문은 롤백하고 다시 주문하게 한다.
+    // 주문번호가 겹치거나(시계가 뒤로 간 채 재시작한 경우 등, 드묾) 같은 멱등 키가 동시에 저장되면(장바구니 잠금이 있으면 생기지 않음)
+    // 이 주문은 롤백하고 다시 주문하게 한다. 그 밖의 제약 위반은 원인을 가리지 않도록 그대로 던진다.
     private Order saveOrder(Long memberId, String idempotencyKey, long totalAmount) {
         Order order = Order.builder()
             .orderNumber(orderNumberGenerator.next())
@@ -129,8 +132,20 @@ public class OrderCreateService {
         try {
             return orderRepository.save(order);
         } catch (DataIntegrityViolationException e) {
-            throw new BusinessException(ErrorCode.ORDER_NUMBER_CONFLICT);
+            String constraint = constraintName(e);
+            log.warn("주문 저장 중 제약 위반: constraint={}", constraint, e);
+            if (constraint.contains(ORDER_NUMBER_UNIQUE) || constraint.contains(IDEMPOTENCY_KEY_UNIQUE)) {
+                throw new BusinessException(ErrorCode.ORDER_NUMBER_CONFLICT);
+            }
+            throw e;
         }
+    }
+
+    private String constraintName(DataIntegrityViolationException e) {
+        if (e.getCause() instanceof ConstraintViolationException cause && cause.getConstraintName() != null) {
+            return cause.getConstraintName();
+        }
+        return "";
     }
 
     private OrderItem toOrderItem(Order order, Product product, int quantity) {

@@ -27,6 +27,7 @@ public record OrderDetailResponse(
                 order.getStatus(),
                 order.getCreatedAt(),
                 listPriceAmount,
+                // totalAmount는 할인 후 실제 결제 금액이다. 할인 연동 뒤에도 이 의미를 유지해야 할인 금액이 맞다.
                 listPriceAmount - order.getTotalAmount(),
                 order.getTotalAmount(),
                 items.stream().map(OrderItemResponse::from).toList()

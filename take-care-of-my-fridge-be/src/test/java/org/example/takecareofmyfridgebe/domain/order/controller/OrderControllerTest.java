@@ -15,6 +15,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import org.example.takecareofmyfridgebe.domain.auth.service.AuthSessionService;
 import org.example.takecareofmyfridgebe.domain.auth.service.JwtTokenService;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
@@ -111,6 +113,23 @@ class OrderControllerTest {
                         .header("Idempotency-Key", "key-1")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"cartItemIds\": []}")
+                        .with(csrf())
+                        .with(loginAsMember7()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("C001"));
+
+        verifyNoInteractions(orderCreateService);
+    }
+
+    @Test
+    @DisplayName("장바구니 줄 번호가 50개를 넘으면 400이고 서비스를 부르지 않는다")
+    void createOrder_tooManyCartItemIds_returns400() throws Exception {
+        String ids = IntStream.rangeClosed(1, 51).mapToObj(String::valueOf).collect(Collectors.joining(","));
+
+        mvc.perform(post("/api/orders")
+                        .header("Idempotency-Key", "key-1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"cartItemIds\": [" + ids + "]}")
                         .with(csrf())
                         .with(loginAsMember7()))
                 .andExpect(status().isBadRequest())

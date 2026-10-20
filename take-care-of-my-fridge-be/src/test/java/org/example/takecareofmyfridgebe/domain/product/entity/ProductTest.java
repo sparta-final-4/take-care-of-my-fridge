@@ -56,4 +56,15 @@ class ProductTest {
             .extracting("errorCode").isEqualTo(ErrorCode.INVALID_INPUT_VALUE);
         assertThat(product.getStock()).isEqualTo(5);
     }
+
+    @Test
+    @DisplayName("재고가 0이면 품절, 모자라면 재고 부족 문구에 상품명을 담는다")
+    void decreaseStock_messageIncludesName() {
+        assertThatThrownBy(() -> productWithStock(0).decreaseStock(1))
+            .isInstanceOf(BusinessException.class)
+            .hasMessage("품절 · 대파");
+        assertThatThrownBy(() -> productWithStock(2).decreaseStock(3))
+            .isInstanceOf(BusinessException.class)
+            .hasMessage("재고 부족 · 대파");
+    }
 }

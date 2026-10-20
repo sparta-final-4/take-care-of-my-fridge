@@ -170,6 +170,34 @@ class OrderCreateServiceTransactionTest {
     }
 
     @Test
+    @DisplayName("주문 뒤 장바구니 줄이 지워져도 같은 멱등 키 재전송에는 처음 주문을 돌려준다")
+    void createOrder_sameKeyAfterCartItemRemoved_returnsFirstOrder() {
+        Product greenOnion = saveProduct("대파", 3000, 10);
+        CartItem item = saveCartItem(saveCart(1L), greenOnion, 2);
+        OrderCreateResult first = orderCreateService.createOrder(1L, "key-1", request(item));
+        cartItemRepository.deleteById(item.getId());
+
+        OrderCreateResult retry = orderCreateService.createOrder(1L, "key-1", request(item));
+
+        assertThat(retry.created()).isFalse();
+        assertThat(retry.response().orderId()).isEqualTo(first.response().orderId());
+        assertThat(orderRepository.count()).isEqualTo(1);
+        assertThat(stockOf(greenOnion)).isEqualTo(8);
+    }
+
+    @Test
+    @DisplayName("장바구니 줄의 상품이 없어졌으면 404로 거절하고 주문은 없다")
+    void createOrder_rejectsMissingProduct() {
+        Cart cart = saveCart(1L);
+        CartItem orphan = cartItemRepository.save(CartItem.builder().cart(cart).productId(999_999L).quantity(1).build());
+
+        assertThatThrownBy(() -> order(1L, request(orphan)))
+            .isInstanceOf(BusinessException.class)
+            .extracting("errorCode").isEqualTo(ErrorCode.PRODUCT_NOT_FOUND);
+        assertThat(orderRepository.count()).isZero();
+    }
+
+    @Test
     @DisplayName("판매 중지 상품은 거절하고 재고는 그대로다")
     void createOrder_rejectsStoppedProduct() {
         Product stopped = productRepository.save(product("대파", 3000, 10, ProductStatus.STOPPED));

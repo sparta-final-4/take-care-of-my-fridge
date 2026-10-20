@@ -90,14 +90,17 @@ public class Product extends BaseTimeEntity {
         this.status = status != null ? status : ProductStatus.ON_SALE;
     }
 
-    // 재고는 음수가 될 수 없다. 모자라면 빼지 않고 거절한다.
+    // 재고는 음수가 될 수 없다. 모자라면 빼지 않고 거절하며, 화면에 띄울 문구(품절·재고 부족 + 상품명)를 함께 담는다.
     // 수량이 0 이하면 재고가 늘어나므로 먼저 거절한다.
     public void decreaseStock(int quantity) {
         if (quantity <= 0) {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "수량은 1 이상이어야 합니다.");
         }
+        if (stock == 0) {
+            throw new BusinessException(ErrorCode.INSUFFICIENT_STOCK, "품절 · " + name);
+        }
         if (stock < quantity) {
-            throw new BusinessException(ErrorCode.INSUFFICIENT_STOCK);
+            throw new BusinessException(ErrorCode.INSUFFICIENT_STOCK, "재고 부족 · " + name);
         }
         this.stock -= quantity;
     }
