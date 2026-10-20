@@ -66,6 +66,9 @@ class FridgeServiceTest {
     @Mock
     private FridgeItemLogRepository fridgeItemLogRepository;
 
+    @Mock
+    private org.example.takecareofmyfridgebe.domain.ingredient.service.IngredientService ingredientService;
+
     @InjectMocks
     private FridgeService fridgeService;
 
@@ -640,6 +643,57 @@ class FridgeServiceTest {
         );
         assertEquals(ErrorCode.INVALID_INPUT_VALUE, exception.getErrorCode());
         verifyNoInteractions(fridgeItemLogRepository);
+    }
+
+    /**
+     * 요리 완료 차감 시:
+     * 1) 기본 양념(isBasicSeasoning) 또는 ING_CUSTOM/ING_MEALKIT은 제외되고
+     * 2) 여러 줄이 있을 때 소비기한 빠른 순으로 순차 차감되며
+     * 3) 차감된 줄마다 FridgeItemLog(cookingLogId 포함)가 기록되고 완전히 소진된 줄은 삭제되는지 검증한다.
+     */
+    @Test
+    void consumeForCookingDeductsInExpirationOrderAndRecordsLogsWithCookingLogId() {
+        // Given: 7번 회원이 3번 재료(두부)를 소비기한 빠른 순으로 2줄 보유 (1.00모, 2.00모)
+        Fridge item1 = fridgeWithQuantity("1.00");
+        ReflectionTestUtils.setField(item1, "id", 101L);
+        Fridge item2 = fridgeWithQuantity("2.00");
+        ReflectionTestUtils.setField(item2, "id", 102L);
+
+        when(ingredientService.getExcludedIngredientIds(any())).thenReturn(java.util.Set.of(99L));
+        when(fridgeRepository.findForUpdateByMemberIdAndIngredientId(7L, 3L))
+                .thenReturn(List.of(item1, item2));
+
+        // When: 99번(기본양념 등 제외대상)과 3번 재료(1.50모 차감 요청)
+        org.example.takecareofmyfridgebe.domain.cooking.dto.UsedIngredientRequest reqSeasoning =
+                new org.example.takecareofmyfridgebe.domain.cooking.dto.UsedIngredientRequest(99L, new BigDecimal("1.00"));
+        org.example.takecareofmyfridgebe.domain.cooking.dto.UsedIngredientRequest reqTofu =
+                new org.example.takecareofmyfridgebe.domain.cooking.dto.UsedIngredientRequest(3L, new BigDecimal("1.50"));
+
+        List<org.example.takecareofmyfridgebe.domain.cooking.dto.IngredientDeductionResponse> deductions =
+                fridgeService.consumeForCooking(7L, 500L, List.of(reqSeasoning, reqTofu));
+
+        // Then
+        // 99번은 제외되어 3번만 차감 결과에 포함됨
+        assertEquals(1, deductions.size());
+        assertEquals(3L, deductions.get(0).ingredientId());
+        assertEquals(0, new BigDecimal("1.50").compareTo(deductions.get(0).deductedQuantity()));
+        assertEquals(0, new BigDecimal("1.50").compareTo(deductions.get(0).remainingQuantity()));
+
+        // 첫 번째 줄(1.00)은 모두 소진되어 삭제 호출
+        assertTrue(item1.isEmpty());
+        verify(fridgeRepository).delete(item1);
+
+        // 두 번째 줄(2.00)은 0.50 차감되어 1.50 남음
+        assertFalse(item2.isEmpty());
+        assertEquals(0, new BigDecimal("1.50").compareTo(item2.getQuantity()));
+        verify(fridgeRepository, never()).delete(item2);
+
+        // 2건의 이력이 cookingLogId=500L로 저장됨
+        ArgumentCaptor<FridgeItemLog> logCaptor = ArgumentCaptor.forClass(FridgeItemLog.class);
+        verify(fridgeItemLogRepository, org.mockito.Mockito.times(2)).save(logCaptor.capture());
+        List<FridgeItemLog> logs = logCaptor.getAllValues();
+        assertEquals(500L, logs.get(0).getCookingLogId());
+        assertEquals(500L, logs.get(1).getCookingLogId());
     }
 
     // 7번 회원이 보유한 100번 재료(두부)
