@@ -1,5 +1,4 @@
 import { App, Form, Input, Modal, Rate, Typography } from 'antd';
-import { useEffect } from 'react';
 import { isAxiosError } from 'axios';
 
 import { getErrorCode, getErrorMessage } from '@/common/api/errors';
@@ -48,18 +47,10 @@ export function ReviewModal({
 
   const isPending = createMutation.isPending || updateMutation.isPending;
 
-  useEffect(() => {
-    if (open) {
-      if (initialReview) {
-        form.setFieldsValue({
-          rating: initialReview.rating,
-          content: initialReview.content,
-        });
-      } else {
-        form.resetFields();
-      }
-    }
-  }, [open, initialReview, form]);
+  const initialValues: Partial<FormValues> = {
+    rating: initialReview?.rating,
+    content: initialReview?.content ?? '',
+  };
 
   const handleSubmit = async () => {
     try {
@@ -128,7 +119,7 @@ export function ReviewModal({
       okButtonProps={{ disabled: isPending }}
       onOk={handleSubmit}
       onCancel={onClose}
-      destroyOnClose
+      destroyOnHidden
     >
       {recipeName && (
         <Typography.Paragraph type="secondary" className={styles.recipeName}>
@@ -136,7 +127,15 @@ export function ReviewModal({
         </Typography.Paragraph>
       )}
 
-      <Form form={form} layout="vertical" requiredMark={false} className={styles.form}>
+      <Form
+        key={`${recipeId}-${initialReview?.id ?? 'new'}`}
+        form={form}
+        layout="vertical"
+        requiredMark={false}
+        className={styles.form}
+        initialValues={initialValues}
+        preserve={false}
+      >
         <Form.Item
           name="rating"
           label="별점"

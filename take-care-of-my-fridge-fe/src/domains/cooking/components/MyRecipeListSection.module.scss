@@ -32,45 +32,13 @@
   width: 130px;
 }
 
-/* 탭 버튼들 */
+/* 탭 */
 .tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--ant-margin-xs);
-  margin-bottom: var(--ant-margin-lg);
-}
-
-.tabButton {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 14px;
-  border-radius: 20px;
-  border: 1px solid var(--ant-color-border);
-  background: var(--ant-color-bg-container);
-  color: var(--ant-color-text);
-  font-size: var(--ant-font-size);
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-
-  &:hover {
-    border-color: var(--ant-color-text-secondary);
-  }
-}
-
-.tabButtonActive {
-  background: #1f1f1f;
-  color: #ffffff;
-  border-color: #1f1f1f;
-
-  &:hover {
-    color: #ffffff;
-    border-color: #1f1f1f;
-  }
+  margin-bottom: var(--ant-margin-md);
 }
 
 .tabCount {
+  margin-left: 4px;
   font-size: var(--ant-font-size-sm);
   opacity: 0.85;
 }
@@ -101,53 +69,62 @@
     color: var(--ant-color-text-secondary);
     text-align: left;
   }
+
+  td {
+    padding: 14px 12px;
+    vertical-align: middle;
+  }
 }
 
-.thRecipe {
+.thRecipe,
+.tdRecipe {
   width: 32%;
 }
 
-.thCookCount {
+.thCookCount,
+.tdCookCount {
   width: 14%;
 }
 
-.thLastCooked {
+.thLastCooked,
+.tdLastCooked {
+  width: 14%;
+  font-size: var(--ant-font-size);
+}
+
+.thReview,
+.tdReview {
   width: 14%;
 }
 
-.thReview {
-  width: 14%;
-}
-
-.thActions {
+.thActions,
+.tdActions {
   width: 26%;
   text-align: right;
 }
 
-.rowGroup {
-  border-bottom: 1px solid var(--ant-color-border-secondary);
-
-  &:last-child {
-    border-bottom: none;
+.tdActions {
+  :global(.ant-space) {
+    justify-content: flex-end;
   }
 }
 
-.rowCell {
-  padding: 14px 0;
+.dataRow {
+  border-bottom: 1px solid var(--ant-color-border-secondary);
 }
 
-.mainRow {
-  display: flex;
-  align-items: center;
-  width: 100%;
-  padding: 0 12px;
+.expandedRow {
+  border-bottom: 1px solid var(--ant-color-border-secondary);
 }
 
-.colRecipe {
+.expandedCell {
+  padding: 0 12px 14px !important;
+}
+
+.recipeCell {
   display: flex;
   align-items: center;
   gap: var(--ant-margin-sm);
-  width: 32%;
 }
 
 .thumbnail {
@@ -200,10 +177,6 @@
   text-overflow: ellipsis;
 }
 
-.colCookCount {
-  width: 14%;
-}
-
 .expandTrigger {
   display: inline-flex;
   align-items: center;
@@ -226,15 +199,6 @@
   color: var(--ant-color-text-secondary);
 }
 
-.colLastCooked {
-  width: 14%;
-  font-size: var(--ant-font-size);
-}
-
-.colReview {
-  width: 14%;
-}
-
 .ratingText {
   font-size: var(--ant-font-size);
   font-weight: 600;
@@ -251,12 +215,6 @@
   color: var(--ant-color-text-secondary);
 }
 
-.colActions {
-  width: 26%;
-  display: flex;
-  justify-content: flex-end;
-}
-
 .primaryActionButton {
   background: #1f1f1f !important;
   border-color: #1f1f1f !important;
@@ -270,7 +228,7 @@
 
 /* 펼쳐진 서브 패널 */
 .expandedPanel {
-  margin: 12px 12px 6px;
+  margin: 0;
   padding: var(--ant-padding);
   background: var(--ant-color-fill-quaternary);
   border-radius: var(--ant-border-radius);
