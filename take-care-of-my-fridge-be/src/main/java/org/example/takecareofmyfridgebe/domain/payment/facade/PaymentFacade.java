@@ -79,7 +79,7 @@ public class PaymentFacade {
     }
 
     // 사용자가 결제창을 닫았을 때 프론트가 호출한다
-    public void cancelByUser(Long memberId, String portonePaymentId) {
+    public void failByUser(Long memberId, String portonePaymentId) {
         Payment payment = getOwnedPayment(memberId, portonePaymentId);
 
         if (payment.getStatus() != PaymentStatus.READY) {
