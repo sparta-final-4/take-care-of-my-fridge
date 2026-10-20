@@ -78,6 +78,10 @@ public class ChatSession extends BaseTimeEntity {
         return this.status == ChatSessionStatus.ACTIVE;
     }
 
+    public boolean isCompleted() {
+        return this.status == ChatSessionStatus.COMPLETED;
+    }
+
     private void validateActive() {
         if (!isActive()) {
             throw new BusinessException(ErrorCode.INVALID_CHAT_ROOM_STATUS);

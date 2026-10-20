@@ -17,6 +17,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.http.HttpStatus;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDate;
@@ -85,6 +86,7 @@ class CookingServiceTest {
                 () -> cookingService.getCookingLogs(7L, request)
         );
         assertEquals(ErrorCode.INVALID_INPUT_VALUE, exception.getErrorCode());
+        assertEquals(HttpStatus.BAD_REQUEST, exception.getErrorCode().getStatus());
         verifyNoInteractions(cookingLogRepository);
     }
 

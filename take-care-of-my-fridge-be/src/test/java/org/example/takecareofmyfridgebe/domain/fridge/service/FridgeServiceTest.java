@@ -1,5 +1,7 @@
 package org.example.takecareofmyfridgebe.domain.fridge.service;
 
+import org.example.takecareofmyfridgebe.domain.cooking.dto.IngredientDeductionResponse;
+import org.example.takecareofmyfridgebe.domain.cooking.dto.UsedIngredientRequest;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemLogResponse;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemLogSearchRequest;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemResponse;
@@ -16,6 +18,7 @@ import org.example.takecareofmyfridgebe.domain.fridge.repository.FridgeItemLogRe
 import org.example.takecareofmyfridgebe.domain.fridge.repository.FridgeRepository;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.Ingredient;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.StorageType;
+import org.example.takecareofmyfridgebe.domain.ingredient.service.IngredientService;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 import org.example.takecareofmyfridgebe.global.response.PageResponse;
@@ -35,6 +38,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -47,6 +51,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -67,7 +72,7 @@ class FridgeServiceTest {
     private FridgeItemLogRepository fridgeItemLogRepository;
 
     @Mock
-    private org.example.takecareofmyfridgebe.domain.ingredient.service.IngredientService ingredientService;
+    private IngredientService ingredientService;
 
     @InjectMocks
     private FridgeService fridgeService;
@@ -659,17 +664,15 @@ class FridgeServiceTest {
         Fridge item2 = fridgeWithQuantity("2.00");
         ReflectionTestUtils.setField(item2, "id", 102L);
 
-        when(ingredientService.getExcludedIngredientIds(any())).thenReturn(java.util.Set.of(99L));
+        when(ingredientService.getExcludedIngredientIds(any())).thenReturn(Set.of(99L));
         when(fridgeRepository.findForUpdateByMemberIdAndIngredientId(7L, 3L))
                 .thenReturn(List.of(item1, item2));
 
         // When: 99번(기본양념 등 제외대상)과 3번 재료(1.50모 차감 요청)
-        org.example.takecareofmyfridgebe.domain.cooking.dto.UsedIngredientRequest reqSeasoning =
-                new org.example.takecareofmyfridgebe.domain.cooking.dto.UsedIngredientRequest(99L, new BigDecimal("1.00"));
-        org.example.takecareofmyfridgebe.domain.cooking.dto.UsedIngredientRequest reqTofu =
-                new org.example.takecareofmyfridgebe.domain.cooking.dto.UsedIngredientRequest(3L, new BigDecimal("1.50"));
+        UsedIngredientRequest reqSeasoning = new UsedIngredientRequest(99L, new BigDecimal("1.00"));
+        UsedIngredientRequest reqTofu = new UsedIngredientRequest(3L, new BigDecimal("1.50"));
 
-        List<org.example.takecareofmyfridgebe.domain.cooking.dto.IngredientDeductionResponse> deductions =
+        List<IngredientDeductionResponse> deductions =
                 fridgeService.consumeForCooking(7L, 500L, List.of(reqSeasoning, reqTofu));
 
         // Then
@@ -690,7 +693,7 @@ class FridgeServiceTest {
 
         // 2건의 이력이 cookingLogId=500L로 저장됨
         ArgumentCaptor<FridgeItemLog> logCaptor = ArgumentCaptor.forClass(FridgeItemLog.class);
-        verify(fridgeItemLogRepository, org.mockito.Mockito.times(2)).save(logCaptor.capture());
+        verify(fridgeItemLogRepository, times(2)).save(logCaptor.capture());
         List<FridgeItemLog> logs = logCaptor.getAllValues();
         assertEquals(500L, logs.get(0).getCookingLogId());
         assertEquals(500L, logs.get(1).getCookingLogId());

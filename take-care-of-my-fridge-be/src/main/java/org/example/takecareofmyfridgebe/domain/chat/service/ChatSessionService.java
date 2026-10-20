@@ -24,8 +24,14 @@ public class ChatSessionService {
      * @return 검증된 채팅 세션 엔티티
      */
     public ChatSession validateAndGetSession(Long memberId, Long sessionId) {
-        return chatSessionRepository.findByIdAndMemberId(sessionId, memberId)
+        ChatSession session = chatSessionRepository.findByIdAndMemberId(sessionId, memberId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND));
+
+        if (session.isCompleted()) {
+            throw new BusinessException(ErrorCode.CHAT_ROOM_ALREADY_COMPLETED);
+        }
+
+        return session;
     }
 
     /**

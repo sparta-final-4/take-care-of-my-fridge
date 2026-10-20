@@ -17,6 +17,7 @@ import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
@@ -73,6 +74,34 @@ class CookingFacadeTest {
                 () -> cookingFacade.completeCooking(memberId, request)
         );
         assertEquals(ErrorCode.CHAT_ROOM_NOT_FOUND, exception.getErrorCode());
+
+        verify(cookingService, never()).saveCookingLog(any(), any());
+        verify(fridgeService, never()).consumeForCooking(any(), any(), any());
+        verify(chatSessionService, never()).completeSessionFromCooking(any(), any());
+    }
+
+    /**
+     * chatSessionId가 이미 종료(COMPLETED)된 상담 세션이면
+     * 요리 기록 저장 및 냉장고 차감 로직을 전혀 실행하지 않고 409 CHAT_ROOM_ALREADY_COMPLETED로 즉시 실패하는지 검증한다.
+     */
+    @Test
+    void completeCookingFastFailsWithConflictWhenChatSessionIsAlreadyCompleted() {
+        // Given
+        Long memberId = 7L;
+        Long completedSessionId = 20L;
+        CookingCompleteRequest request = new CookingCompleteRequest(
+                12L, CookingResult.SUCCESS, "완료", completedSessionId, List.of());
+
+        doThrow(new BusinessException(ErrorCode.CHAT_ROOM_ALREADY_COMPLETED))
+                .when(chatSessionService).validateAndGetSession(memberId, completedSessionId);
+
+        // When & Then
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> cookingFacade.completeCooking(memberId, request)
+        );
+        assertEquals(ErrorCode.CHAT_ROOM_ALREADY_COMPLETED, exception.getErrorCode());
+        assertEquals(HttpStatus.CONFLICT, exception.getErrorCode().getStatus());
 
         verify(cookingService, never()).saveCookingLog(any(), any());
         verify(fridgeService, never()).consumeForCooking(any(), any(), any());
