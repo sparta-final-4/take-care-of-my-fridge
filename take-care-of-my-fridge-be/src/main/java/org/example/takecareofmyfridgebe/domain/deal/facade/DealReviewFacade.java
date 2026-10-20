@@ -35,6 +35,6 @@ public class DealReviewFacade {
 
     private void record(Long actorId, Long analysisId, AdminAuditLog.Result result) {
         auditLogService.record(actorId, AdminAuditLog.Action.DEAL_REVIEW,
-                "DealAnalysis", analysisId, result);
+                AdminAuditLog.TARGET_DEAL_ANALYSIS, analysisId, result);
     }
 }

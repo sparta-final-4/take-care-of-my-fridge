@@ -54,7 +54,7 @@ public class DealReviewService {
         LocalDateTime savedAt = LocalDateTime.now();
         analysis.markReviewsSaved(savedAt);
         auditLogService.record(actorId, AdminAuditLog.Action.DEAL_REVIEW,
-                "DealAnalysis", analysisId, AdminAuditLog.Result.SUCCESS);
+                AdminAuditLog.TARGET_DEAL_ANALYSIS, analysisId, AdminAuditLog.Result.SUCCESS);
         return DealReviewResponse.from(savedAt, candidates);
     }
 }
