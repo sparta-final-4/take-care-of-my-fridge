@@ -17,21 +17,21 @@ export const router = createBrowserRouter([
     errorElement: <RouteErrorPage />,
     children: [
       { path: ROUTES.home, lazy: page(() => import('@/pages/MainPage')) },
-      { path: ROUTES.login, lazy: page(() => import('@/pages/LoginPage')) },
-      { path: ROUTES.signup, lazy: page(() => import('@/pages/SignUpPage')) },
-      { path: ROUTES.signupComplete, lazy: page(() => import('@/pages/SignUpCompletePage')) },
+      { path: ROUTES.login, lazy: page(() => import('@/pages/auth/LoginPage')) },
+      { path: ROUTES.signup, lazy: page(() => import('@/pages/auth/SignUpPage')) },
+      { path: ROUTES.signupComplete, lazy: page(() => import('@/pages/auth/SignUpCompletePage')) },
       {
         Component: RequireAuth,
         children: [
-          { path: ROUTES.fridge, lazy: page(() => import('@/pages/FridgePage')) },
-          { path: ROUTES.account, lazy: page(() => import('@/pages/AccountPage')) },
+          { path: ROUTES.fridge, lazy: page(() => import('@/pages/fridge/FridgePage')) },
+          { path: ROUTES.account, lazy: page(() => import('@/pages/member/AccountPage')) },
         ],
       },
       {
         element: <RequireAuth admin />,
         children: [
-          { path: ROUTES.adminMembers, lazy: page(() => import('@/pages/AdminMembersPage')) },
-          { path: ROUTES.adminAudit, lazy: page(() => import('@/pages/AdminAuditPage')) },
+          { path: ROUTES.adminMembers, lazy: page(() => import('@/pages/admin/AdminMembersPage')) },
+          { path: ROUTES.adminAudit, lazy: page(() => import('@/pages/admin/AdminAuditPage')) },
         ],
       },
     ],
