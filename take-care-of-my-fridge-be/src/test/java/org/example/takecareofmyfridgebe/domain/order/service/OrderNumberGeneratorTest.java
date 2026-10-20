@@ -2,12 +2,17 @@ package org.example.takecareofmyfridgebe.domain.order.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -45,5 +50,56 @@ class OrderNumberGeneratorTest {
         assertThat(executor.awaitTermination(10, TimeUnit.SECONDS)).isTrue();
 
         assertThat(numbers).hasSize(threads * perThread);
+    }
+
+    @Test
+    @DisplayName("같은 밀리초에 1000개를 넘으면 다음 밀리초 번호로 넘어가 20자리를 지킨다")
+    void next_sequenceOverflow_movesToNextMillis() {
+        Instant now = Instant.parse("2026-10-21T05:30:00.123Z");
+        OrderNumberGenerator fixed = new OrderNumberGenerator(Clock.fixed(now, ZoneOffset.UTC));
+
+        List<String> numbers = IntStream.range(0, 1_001).mapToObj(i -> fixed.next()).toList();
+
+        assertThat(numbers).allMatch(n -> n.length() == 20).isSorted().doesNotHaveDuplicates();
+        assertThat(numbers.get(999)).isEqualTo("20261021143000123999");
+        assertThat(numbers.get(1_000)).isEqualTo("20261021143000124000");
+    }
+
+    @Test
+    @DisplayName("시계가 뒤로 가도 번호는 계속 커진다")
+    void next_clockGoesBack_keepsIncreasing() {
+        AtomicLong millis = new AtomicLong(Instant.parse("2026-10-21T05:30:00Z").toEpochMilli());
+        OrderNumberGenerator generator = new OrderNumberGenerator(new Clock() {
+            @Override
+            public ZoneId getZone() {
+                return ZoneOffset.UTC;
+            }
+
+            @Override
+            public Clock withZone(ZoneId zone) {
+                return this;
+            }
+
+            @Override
+            public Instant instant() {
+                return Instant.ofEpochMilli(millis.get());
+            }
+        });
+
+        String before = generator.next();
+        millis.addAndGet(-5_000);
+        String after = generator.next();
+
+        assertThat(after).isGreaterThan(before);
+    }
+
+    @Test
+    @DisplayName("번호의 시각은 서버 시간대와 관계없이 한국 시각이다")
+    void next_usesSeoulTime() {
+        Instant utcMidnight = Instant.parse("2026-10-21T00:00:00Z");
+
+        String number = new OrderNumberGenerator(Clock.fixed(utcMidnight, ZoneOffset.UTC)).next();
+
+        assertThat(number).startsWith("20261021090000000");
     }
 }
