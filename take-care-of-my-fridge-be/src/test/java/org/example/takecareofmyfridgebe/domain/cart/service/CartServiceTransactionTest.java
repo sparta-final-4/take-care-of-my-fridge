@@ -3,8 +3,10 @@ package org.example.takecareofmyfridgebe.domain.cart.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.util.List;
 import org.example.takecareofmyfridgebe.domain.cart.dto.ChangeCartItemQuantityRequest;
 import org.example.takecareofmyfridgebe.domain.cart.dto.ChangeCartItemQuantityResponse;
+import org.example.takecareofmyfridgebe.domain.cart.dto.RemoveCartItemsRequest;
 import org.example.takecareofmyfridgebe.domain.cart.entity.Cart;
 import org.example.takecareofmyfridgebe.domain.cart.entity.CartItem;
 import org.example.takecareofmyfridgebe.domain.cart.repository.CartItemRepository;
@@ -93,5 +95,43 @@ class CartServiceTransactionTest {
                 .isInstanceOf(BusinessException.class)
                 .extracting(e -> ((BusinessException) e).getErrorCode())
                 .isEqualTo(ErrorCode.CART_ITEM_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("목록에 든 내 줄은 DB에서 지워지고 나머지는 남는다")
+    void removeItems_deletesListedOwnItems() {
+        Cart cart = cartRepository.save(Cart.builder().memberId(1L).build());
+        CartItem first = cartItemRepository.save(CartItem.builder().cart(cart).productId(10L).quantity(1).build());
+        CartItem second = cartItemRepository.save(CartItem.builder().cart(cart).productId(20L).quantity(1).build());
+
+        cartService.removeItems(1L, new RemoveCartItemsRequest(List.of(first.getId())));
+
+        assertThat(cartItemRepository.findAll()).extracting(CartItem::getId).containsExactly(second.getId());
+    }
+
+    @Test
+    @DisplayName("다른 회원의 줄과 없는 번호가 섞여도 내 줄만 지우고 오류는 없다")
+    void removeItems_ignoresOthersAndMissingIds() {
+        Cart cartA = cartRepository.save(Cart.builder().memberId(1L).build());
+        Cart cartB = cartRepository.save(Cart.builder().memberId(2L).build());
+        CartItem itemOfA = cartItemRepository.save(CartItem.builder().cart(cartA).productId(10L).quantity(1).build());
+        CartItem itemOfB = cartItemRepository.save(CartItem.builder().cart(cartB).productId(10L).quantity(1).build());
+
+        cartService.removeItems(1L, new RemoveCartItemsRequest(List.of(itemOfA.getId(), itemOfB.getId(), 999L)));
+
+        assertThat(cartItemRepository.findAll()).extracting(CartItem::getId).containsExactly(itemOfB.getId());
+    }
+
+    @Test
+    @DisplayName("같은 요청을 두 번 보내도 같은 결과다")
+    void removeItems_isIdempotent() {
+        Cart cart = cartRepository.save(Cart.builder().memberId(1L).build());
+        CartItem item = cartItemRepository.save(CartItem.builder().cart(cart).productId(10L).quantity(1).build());
+        RemoveCartItemsRequest request = new RemoveCartItemsRequest(List.of(item.getId()));
+
+        cartService.removeItems(1L, request);
+        cartService.removeItems(1L, request);
+
+        assertThat(cartItemRepository.findAll()).isEmpty();
     }
 }

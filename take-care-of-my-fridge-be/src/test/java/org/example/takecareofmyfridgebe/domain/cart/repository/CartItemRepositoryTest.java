@@ -129,6 +129,36 @@ class CartItemRepositoryTest {
         assertThat(foundByB).isEmpty();
     }
 
+    @Test
+    @DisplayName("내 장바구니의 줄만 지우고 다른 회원의 줄은 그대로 둔다")
+    void deleteAllByIdsAndMemberId_deletesOnlyOwnItems() {
+        Cart cartA = cartRepository.save(Cart.builder().memberId(1L).build());
+        Cart cartB = cartRepository.save(Cart.builder().memberId(2L).build());
+        CartItem itemOfA = cartItemRepository.save(CartItem.builder().cart(cartA).productId(10L).quantity(1).build());
+        CartItem itemOfB = cartItemRepository.save(CartItem.builder().cart(cartB).productId(10L).quantity(1).build());
+        flushAndClear();
+
+        cartItemRepository.deleteAllByIdsAndMemberId(List.of(itemOfA.getId(), itemOfB.getId()), 1L);
+
+        assertThat(cartItemRepository.findByCartMemberIdOrderByIdAsc(1L)).isEmpty();
+        assertThat(cartItemRepository.findByCartMemberIdOrderByIdAsc(2L))
+                .extracting(CartItem::getId).containsExactly(itemOfB.getId());
+    }
+
+    @Test
+    @DisplayName("목록에 없는 줄은 지우지 않는다")
+    void deleteAllByIdsAndMemberId_keepsUnlistedItems() {
+        Cart cart = cartRepository.save(Cart.builder().memberId(1L).build());
+        CartItem first = cartItemRepository.save(CartItem.builder().cart(cart).productId(10L).quantity(1).build());
+        CartItem second = cartItemRepository.save(CartItem.builder().cart(cart).productId(20L).quantity(1).build());
+        flushAndClear();
+
+        cartItemRepository.deleteAllByIdsAndMemberId(List.of(first.getId()), 1L);
+
+        assertThat(cartItemRepository.findByCartMemberIdOrderByIdAsc(1L))
+                .extracting(CartItem::getId).containsExactly(second.getId());
+    }
+
     // 영속성 컨텍스트 캐시가 아니라 DB에서 다시 읽게 한다.
     private void flushAndClear() {
         entityManager.flush();
