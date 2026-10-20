@@ -46,7 +46,8 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/api/auth/login", "/api/auth/refresh", "/api/auth/logout", "/api/auth/csrf",
                                 "/api/members/email-availability", "/api/members/nickname-availability",
-                                "/api/products", "/api/products/**"
+                                "/api/products", "/api/products/**",
+                                "/api/recipes", "/api/recipes/**"
                         ).permitAll()
                         .requestMatchers(API_DOCS_PATHS).permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/admin/members/*/promotion").authenticated()
