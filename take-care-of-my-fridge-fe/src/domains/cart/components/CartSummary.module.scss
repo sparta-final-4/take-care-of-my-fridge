@@ -1,0 +1,33 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  padding: var(--ant-padding-lg);
+  background: var(--ant-color-bg-container);
+  border: 1px solid var(--ant-color-border);
+  border-radius: var(--ant-border-radius-lg);
+}
+
+.title {
+  font-size: var(--ant-font-size-lg);
+}
+
+.rows {
+  margin-top: var(--ant-margin);
+}
+
+.amount {
+  font-variant-numeric: tabular-nums;
+}
+
+.divider {
+  margin: var(--ant-margin) 0;
+}
+
+.total {
+  font-size: var(--ant-font-size-lg);
+  font-variant-numeric: tabular-nums;
+}
+
+.order {
+  margin-top: var(--ant-margin-lg);
+}

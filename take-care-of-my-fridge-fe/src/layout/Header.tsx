@@ -1,5 +1,5 @@
 import { MenuOutlined, SearchOutlined } from '@ant-design/icons';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { Badge, Button, Drawer, Flex, Grid, Input, Layout, Typography } from 'antd';
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
@@ -9,17 +9,16 @@ import { useAuthStore } from '@/common/auth/authStore';
 import { setSession } from '@/common/auth/session';
 import { sessionId } from '@/common/auth/sessionId';
 import { logout } from '@/domains/auth/api';
+import { cartQueries } from '@/domains/cart/queries';
 import { NotificationBell } from '@/domains/notification/components/NotificationBell';
 
 import styles from './Header.module.scss';
-
-const CART_COUNT = 2;
 
 const NAV_ITEMS = [
   { key: 'fridge', label: '내 냉장고' },
   { key: 'recipes', label: '레시피' },
   { key: 'products', label: '재료/밀키트' },
-  { key: 'cart', label: '장바구니', badgeCount: CART_COUNT },
+  { key: 'cart', label: '장바구니' },
   { key: 'mypage', label: '마이페이지' },
 ] as const;
 
@@ -32,15 +31,23 @@ export function Header() {
   const logoutMutation = useMutation({ mutationFn: logout });
   const screens = Grid.useBreakpoint();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  // 배지는 장바구니 줄 수. 로그인하지 않았으면 조회하지 않는다.
+  const { data: cartItems } = useQuery({
+    ...cartQueries.items(),
+    enabled: status === 'authenticated',
+  });
+  const cartCount = status === 'authenticated' ? (cartItems?.length ?? 0) : 0;
 
   const handleOpenDrawer = () => setDrawerOpen(true);
   const handleCloseDrawer = () => setDrawerOpen(false);
   const handleNavigate = (key: (typeof NAV_ITEMS)[number]['key']) => {
     if (key === 'fridge') navigate(ROUTES.fridge);
+    if (key === 'cart') navigate(ROUTES.cart);
     if (key === 'mypage') navigate(status === 'authenticated' ? ROUTES.mypage : ROUTES.login);
   };
   const isCurrent = (key: (typeof NAV_ITEMS)[number]['key']) =>
     (key === 'fridge' && pathname === ROUTES.fridge) ||
+    (key === 'cart' && pathname === ROUTES.cart) ||
     (key === 'mypage' && pathname.startsWith(ROUTES.mypage));
   const handleLogout = () => {
     const id = sessionId();
@@ -85,7 +92,7 @@ export function Header() {
             >
               <Flex align="center" gap="small">
                 <span>{item.label}</span>
-                {'badgeCount' in item && <Badge count={item.badgeCount} size="small" />}
+                {item.key === 'cart' && <Badge count={cartCount} size="small" />}
               </Flex>
             </Button>
           ))}
@@ -152,7 +159,7 @@ export function Header() {
               >
                 <Flex align="center" justify="space-between" className={styles.drawerNavInner}>
                   <span>{item.label}</span>
-                  {'badgeCount' in item && <Badge count={item.badgeCount} size="small" />}
+                  {item.key === 'cart' && <Badge count={cartCount} size="small" />}
                 </Flex>
               </Button>
             ))}

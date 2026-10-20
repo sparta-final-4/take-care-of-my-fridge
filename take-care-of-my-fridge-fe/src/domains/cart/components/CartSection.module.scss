@@ -1,0 +1,44 @@
+@use '@/styles/variables' as *;
+@use '@/styles/mixins' as *;
+
+// FridgePage와 같은 좌우 비율. lg 미만에서는 결제 예정 금액이 목록 아래로 간다.
+.layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--ant-margin-lg);
+  align-items: start;
+
+  @include from(lg) {
+    grid-template-columns: minmax(0, 780fr) minmax(0, 416fr);
+  }
+}
+
+.list {
+  min-width: 0;
+  padding: 0 var(--ant-padding);
+  background: var(--ant-color-bg-container);
+  border: 1px solid var(--ant-color-border);
+  border-radius: var(--ant-border-radius-lg);
+
+  @include from(md) {
+    padding: 0 var(--ant-padding-lg);
+  }
+}
+
+.toolbar {
+  padding: var(--ant-padding) 0;
+  border-bottom: 1px solid var(--ant-color-border);
+}
+
+.summary {
+  min-width: 0;
+
+  @include from(lg) {
+    position: sticky;
+    top: calc(#{$header-height} + var(--ant-margin-lg));
+  }
+}
+
+.empty {
+  padding: var(--ant-padding-xl) 0;
+}

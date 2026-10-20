@@ -1,0 +1,115 @@
+@use '@/styles/variables' as *;
+@use '@/styles/mixins' as *;
+
+// 모바일: 체크·이미지·상품 정보 / 수량·금액·삭제 2줄, md부터 한 줄
+.row {
+  display: grid;
+  grid-template-areas:
+    'check thumb info info'
+    'quantity quantity total remove';
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--ant-margin-sm) var(--ant-margin);
+  padding: var(--ant-padding) 0;
+  border-bottom: 1px solid var(--ant-color-border-secondary);
+
+  @include from(md) {
+    grid-template-areas: 'check thumb info quantity total remove';
+    grid-template-columns: auto auto minmax(0, 1fr) auto $cart-total-min-width auto;
+  }
+}
+
+.rowSoldOut {
+  @extend .row;
+
+  color: var(--ant-color-text-tertiary);
+}
+
+.check {
+  grid-area: check;
+}
+
+.thumb {
+  position: relative;
+  grid-area: thumb;
+  width: $cart-thumb-size;
+  height: $cart-thumb-size;
+  overflow: hidden;
+  background: var(--ant-color-fill-tertiary);
+  border-radius: var(--ant-border-radius);
+}
+
+.image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.imagePlaceholder {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.soldOutMark {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ant-color-white);
+  font-weight: var(--ant-font-weight-strong);
+  background: var(--ant-color-bg-mask);
+}
+
+.info {
+  grid-area: info;
+  min-width: 0;
+}
+
+.saleTag {
+  align-self: flex-start;
+  margin: 0;
+}
+
+.name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.listPrice {
+  font-size: var(--ant-font-size-sm);
+}
+
+.quantity {
+  grid-area: quantity;
+}
+
+.quantityValue {
+  min-width: $cart-quantity-min-width;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.total {
+  grid-area: total;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.remove {
+  grid-area: remove;
+}
+
+// 모바일에서는 터치 영역을 넓히고, md부터 antd 기본 크기로 둔다.
+.touchButton {
+  min-width: $touch-target-size;
+  min-height: $touch-target-size;
+
+  @include from(md) {
+    min-width: 0;
+    min-height: 0;
+  }
+}
