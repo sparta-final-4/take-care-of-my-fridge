@@ -73,6 +73,26 @@ class ForecastResponseMapperTest {
         assertThat(response.summary().top10MatchCount()).isEqualTo(1);
         assertThat(response.summary().baselineTop10MatchCount()).isZero();
     }
+
+    @Test
+    void actualRankElevenIsDroppedAndRankTenIsEntered() {
+        PredictionRun run = run(LocalDateTime.of(2026, 10, 26, 6, 0));
+        SalesForecast dropped = item(run, 1L, 10, 4, 3, 11, 6);
+        SalesForecast entered = item(run, 2L, null, null, 2, 10, 9);
+
+        ForecastResponse response = ForecastResponseMapper.from(
+                run, List.of(entered, dropped), null, null);
+
+        assertThat(response.summary().top10MatchCount()).isZero();
+        assertThat(response.summary().enteredCount()).isEqualTo(1);
+        assertThat(response.summary().droppedCount()).isEqualTo(1);
+        assertThat(response.summary().meanAbsoluteError()).isEqualTo(2.0);
+        assertThat(response.items()).extracting(ForecastResponse.Item::status)
+                .containsExactly(ForecastResponse.Status.DROPPED, ForecastResponse.Status.ENTERED);
+        assertThat(response.items().get(0).rankChange()).isEqualTo(-1);
+        assertThat(response.items().get(0).qtyError()).isEqualTo(-2);
+    }
+
     private PredictionRun run(LocalDateTime confirmedAt) {
         PredictionRun run = PredictionRun.builder().targetWeekStart(WEEK)
                 .modelVersion("weekly-mlp-v1")
