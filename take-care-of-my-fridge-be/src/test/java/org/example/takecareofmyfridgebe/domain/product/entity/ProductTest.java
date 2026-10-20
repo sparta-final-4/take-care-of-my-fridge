@@ -42,4 +42,18 @@ class ProductTest {
             .extracting("errorCode").isEqualTo(ErrorCode.INSUFFICIENT_STOCK);
         assertThat(product.getStock()).isEqualTo(2);
     }
+
+    @Test
+    @DisplayName("0 이하의 수량은 거절하고 재고는 그대로다")
+    void decreaseStock_rejectsNonPositiveQuantity() {
+        Product product = productWithStock(5);
+
+        assertThatThrownBy(() -> product.decreaseStock(0))
+            .isInstanceOf(BusinessException.class)
+            .extracting("errorCode").isEqualTo(ErrorCode.INVALID_INPUT_VALUE);
+        assertThatThrownBy(() -> product.decreaseStock(-3))
+            .isInstanceOf(BusinessException.class)
+            .extracting("errorCode").isEqualTo(ErrorCode.INVALID_INPUT_VALUE);
+        assertThat(product.getStock()).isEqualTo(5);
+    }
 }

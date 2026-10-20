@@ -157,6 +157,19 @@ class OrderServiceTransactionTest {
     }
 
     @Test
+    @DisplayName("장바구니 수량이 음수인 줄은 주문을 거절하고 재고와 주문은 그대로다")
+    void createOrder_rejectsNegativeCartQuantity() {
+        Product greenOnion = saveProduct("대파", 3000, 10);
+        CartItem item = saveCartItem(saveCart(1L), greenOnion, -3);
+
+        assertThatThrownBy(() -> order(1L, request(item)))
+            .isInstanceOf(BusinessException.class)
+            .extracting("errorCode").isEqualTo(ErrorCode.INVALID_INPUT_VALUE);
+        assertThat(stockOf(greenOnion)).isEqualTo(10);
+        assertThat(orderRepository.count()).isZero();
+    }
+
+    @Test
     @DisplayName("판매 중지 상품은 거절하고 재고는 그대로다")
     void createOrder_rejectsStoppedProduct() {
         Product stopped = productRepository.save(product("대파", 3000, 10, ProductStatus.STOPPED));
