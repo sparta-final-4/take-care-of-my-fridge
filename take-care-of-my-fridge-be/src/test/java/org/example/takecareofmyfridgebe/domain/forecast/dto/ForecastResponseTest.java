@@ -93,6 +93,20 @@ class ForecastResponseTest {
         assertThat(response.items().get(0).qtyError()).isEqualTo(-2);
     }
 
+    @Test
+    void confirmedWeekTreatsMissingActualQtyAsZero() {
+        PredictionRun run = run(LocalDateTime.of(2026, 10, 26, 6, 0));
+        SalesForecast noSales = item(run, 1L, 1, 5, 3, null, null);
+
+        ForecastResponse response = ForecastResponse.from(run, List.of(noSales), null, null);
+
+        assertThat(response.summary().meanAbsoluteError()).isEqualTo(5.0);
+        assertThat(response.summary().baselineMeanAbsoluteError()).isEqualTo(3.0);
+        assertThat(response.items().get(0).actualQty()).isZero();
+        assertThat(response.items().get(0).qtyError()).isEqualTo(5);
+        assertThat(response.items().get(0).status()).isEqualTo(ForecastResponse.Status.DROPPED);
+    }
+
     private PredictionRun run(LocalDateTime confirmedAt) {
         PredictionRun run = PredictionRun.builder().targetWeekStart(WEEK)
                 .modelVersion("weekly-mlp-v1")

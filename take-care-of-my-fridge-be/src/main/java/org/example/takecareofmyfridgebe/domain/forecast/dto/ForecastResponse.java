@@ -56,10 +56,10 @@ public record ForecastResponse(
                 .filter(ForecastResponse::isActualTop)
                 .count();
         double predictionError = predictedTop.stream()
-                .mapToInt(item -> Math.abs(item.getPredictedQty() - item.getActualQty()))
+                .mapToInt(item -> Math.abs(item.getPredictedQty() - actualQtyOrZero(item)))
                 .average().orElse(0);
         double baselineError = predictedTop.stream()
-                .mapToInt(item -> Math.abs(item.getBaselineQty() - item.getActualQty()))
+                .mapToInt(item -> Math.abs(item.getBaselineQty() - actualQtyOrZero(item)))
                 .average().orElse(0);
         return new Summary(matches, baselineMatches,
                 roundOneDecimal(predictionError), roundOneDecimal(baselineError),
@@ -71,7 +71,7 @@ public record ForecastResponse(
         Integer predictedRank = predictedTop ? item.getPredictedRank() : null;
         Integer predictedQty = predictedTop ? item.getPredictedQty() : null;
         Integer actualRank = confirmed ? item.getActualRank() : null;
-        Integer actualQty = confirmed ? item.getActualQty() : null;
+        Integer actualQty = confirmed ? actualQtyOrZero(item) : null;
         Integer rankChange = confirmed && predictedRank != null && actualRank != null
                 ? predictedRank - actualRank : null;
         Integer qtyError = confirmed && predictedQty != null && actualQty != null
@@ -91,6 +91,11 @@ public record ForecastResponse(
 
     private static boolean isActualTop(SalesForecast item) {
         return item.getActualRank() != null && item.getActualRank() <= 10;
+    }
+
+    // 확정된 주에 실적 행이 없으면 판매 0으로 본다(data-dictionary: 판매가 없어도 0으로 저장).
+    private static int actualQtyOrZero(SalesForecast item) {
+        return item.getActualQty() == null ? 0 : item.getActualQty();
     }
 
     private static double roundOneDecimal(double value) {
