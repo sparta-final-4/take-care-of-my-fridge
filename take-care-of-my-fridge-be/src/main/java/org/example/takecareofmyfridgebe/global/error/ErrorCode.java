@@ -75,6 +75,7 @@ public enum ErrorCode {
 
     // Review
     REVIEW_NOT_FOUND(HttpStatus.NOT_FOUND, "REVIEW_001", "리뷰를 찾을 수 없습니다."),
+    REVIEW_ALREADY_EXISTS(HttpStatus.CONFLICT, "REVIEW_002", "이미 후기를 작성한 레시피입니다."),
 
     // Notification
     INVALID_NOTIFICATION(HttpStatus.INTERNAL_SERVER_ERROR, "NOTIFICATION_001", "알림 정보가 올바르지 않습니다."),

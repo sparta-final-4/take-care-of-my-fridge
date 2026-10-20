@@ -48,6 +48,7 @@ public class SecurityConfig {
                                 "/api/members/email-availability", "/api/members/nickname-availability",
                                 "/api/products", "/api/products/**"
                         ).permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/reviews").permitAll()
                         .requestMatchers(API_DOCS_PATHS).permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/admin/members/*/promotion").authenticated()
                         .requestMatchers("/api/admin", "/api/admin/**").hasRole("ADMIN")
