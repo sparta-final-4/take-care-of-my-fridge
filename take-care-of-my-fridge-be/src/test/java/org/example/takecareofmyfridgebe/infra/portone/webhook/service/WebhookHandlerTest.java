@@ -132,13 +132,26 @@ class WebhookHandlerTest {
     }
 
     @Test
-    @DisplayName("같은 웹훅이 동시에 들어와 저장이 중복되면 처리를 건너뛴다")
+    @DisplayName("같은 웹훅이 동시에 들어와 다른 요청이 먼저 저장했으면 처리를 건너뛴다")
     void handle_concurrentDuplicate_skipped() {
         given(webhookEventService.receive(WEBHOOK_ID, "Transaction.Paid", BODY))
                 .willThrow(new DataIntegrityViolationException("uk_webhook_events_webhook_id"));
+        given(webhookEventService.isReceived(WEBHOOK_ID)).willReturn(true);
 
         webhookHandler.handle(WEBHOOK_ID, new PortOneWebhook("Transaction.Paid", PORTONE_PAYMENT_ID), BODY);
 
+        verifyNoInteractions(paymentService, paymentFacade);
+    }
+
+    @Test
+    @DisplayName("중복이 아닌 제약 위반으로 저장에 실패하면 예외를 다시 던져 재전송을 받는다")
+    void handle_otherConstraintViolation_rethrown() {
+        DataIntegrityViolationException violation = new DataIntegrityViolationException("Data too long for column");
+        given(webhookEventService.receive(WEBHOOK_ID, "Transaction.Paid", BODY)).willThrow(violation);
+        given(webhookEventService.isReceived(WEBHOOK_ID)).willReturn(false);
+
+        assertThatThrownBy(() -> webhookHandler.handle(WEBHOOK_ID, new PortOneWebhook("Transaction.Paid", PORTONE_PAYMENT_ID), BODY))
+                .isSameAs(violation);
         verifyNoInteractions(paymentService, paymentFacade);
     }
 

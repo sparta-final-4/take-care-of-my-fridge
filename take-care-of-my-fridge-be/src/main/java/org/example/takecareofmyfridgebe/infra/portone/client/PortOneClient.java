@@ -6,6 +6,7 @@ import org.example.takecareofmyfridgebe.domain.payment.port.PaymentGateway;
 import org.example.takecareofmyfridgebe.domain.payment.port.PaymentGatewayResponse;
 import org.example.takecareofmyfridgebe.infra.portone.config.PortOneProperties;
 import org.example.takecareofmyfridgebe.infra.portone.dto.PortOneCancelRequest;
+import org.example.takecareofmyfridgebe.infra.portone.dto.PortOneErrorResponse;
 import org.example.takecareofmyfridgebe.infra.portone.dto.PortOnePaymentResponse;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
@@ -21,6 +22,7 @@ import java.util.UUID;
 public class PortOneClient implements PaymentGateway {
 
     private static final int MAX_CANCEL_ATTEMPTS = 3;
+    private static final String ALREADY_CANCELLED_ERROR_TYPE = "PAYMENT_ALREADY_CANCELLED";
 
     private final RestClient portOneRestClient;
     private final PortOneProperties portOneProperties;
@@ -59,6 +61,13 @@ public class PortOneClient implements PaymentGateway {
                         .retrieve()
                         .toBodilessEntity();
                 return;
+            } catch (HttpClientErrorException e) {
+                // 다른 요청이 먼저 취소했으면 원하는 결과(취소됨)는 이미 이뤄졌으므로 성공으로 본다
+                if (isAlreadyCancelled(e)) {
+                    log.info("PortOne 결제가 이미 취소됨: paymentId={}", paymentId);
+                    return;
+                }
+                throw e;
             } catch (ResourceAccessException e) {
                 // 네트워크 타임아웃만 재시도한다
                 log.warn("PortOne 취소 요청 타임아웃 (시도 {}/{}): paymentId={}", attempt, MAX_CANCEL_ATTEMPTS, paymentId);
@@ -66,6 +75,16 @@ public class PortOneClient implements PaymentGateway {
                     throw e;
                 }
             }
+        }
+    }
+
+    private boolean isAlreadyCancelled(HttpClientErrorException e) {
+        try {
+            PortOneErrorResponse error = e.getResponseBodyAs(PortOneErrorResponse.class);
+            return error != null && ALREADY_CANCELLED_ERROR_TYPE.equals(error.type());
+        } catch (RuntimeException parseError) {
+            // 오류 본문을 해석할 수 없으면 이미 취소된 것으로 단정하지 않는다
+            return false;
         }
     }
 }

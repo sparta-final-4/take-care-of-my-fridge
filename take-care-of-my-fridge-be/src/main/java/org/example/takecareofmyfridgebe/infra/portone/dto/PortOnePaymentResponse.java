@@ -15,14 +15,15 @@ public record PortOnePaymentResponse(
                 id,
                 status,
                 amount == null ? null : amount.total(),
-                amount == null ? 0L : amount.cancelled()
+                amount == null || amount.cancelled() == null ? 0L : amount.cancelled()
         );
     }
 
+    // Jackson 3는 원시 타입 필드가 응답에 없으면 파싱을 실패시키므로, 없을 수 있는 값은 래퍼 타입으로 받는다
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record Amount(
             long total,
-            long cancelled
+            Long cancelled
     ) {
     }
 }

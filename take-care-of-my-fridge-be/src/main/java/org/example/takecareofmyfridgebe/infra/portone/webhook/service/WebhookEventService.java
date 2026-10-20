@@ -38,6 +38,11 @@ public class WebhookEventService {
         return Optional.of(webhookEventRepository.save(event).getId());
     }
 
+    // 동시 수신으로 저장이 충돌했을 때, 다른 요청이 같은 웹훅을 이미 저장했는지 확인한다
+    public boolean isReceived(String webhookId) {
+        return webhookEventRepository.existsByWebhookId(webhookId);
+    }
+
     @Transactional
     public void markProcessed(Long eventId, Long paymentId) {
         getEvent(eventId).process(getPaymentReference(paymentId));

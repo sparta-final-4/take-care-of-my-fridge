@@ -324,6 +324,26 @@ class PaymentFacadeTest {
     }
 
     @Test
+    @DisplayName("PG PAID + 우리 READY + 금액 불일치인데 다른 요청이 먼저 실패 처리했어도 PG를 취소한다")
+    void sync_pgPaid_ready_amountMismatch_alreadyFailed_stillCancels() {
+        givenPgPayment("PAID", AMOUNT + 1);
+        given(paymentCommandService.fail(PORTONE_PAYMENT_ID, FailReason.AMOUNT_MISMATCH)).willReturn(false);
+
+        assertThat(paymentFacade.syncWithPg(syncPayment())).isTrue();
+        verify(paymentGateway).cancelPayment(eq(PORTONE_PAYMENT_ID), anyString(), isNull());
+    }
+
+    @Test
+    @DisplayName("웹훅에서 금액 불일치 PG 취소가 실패하면 예외를 던져 재전송으로 다시 시도한다")
+    void sync_amountMismatch_pgCancelFails_throws() {
+        givenPgPayment("PAID", AMOUNT + 1);
+        given(paymentCommandService.fail(PORTONE_PAYMENT_ID, FailReason.AMOUNT_MISMATCH)).willReturn(true);
+        willThrow(new IllegalStateException("PG 오류")).given(paymentGateway).cancelPayment(anyString(), anyString(), isNull());
+
+        assertThatThrownBy(() -> paymentFacade.syncWithPg(syncPayment())).isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
     @DisplayName("PG PAID + 우리 FAILED면 PG 결제를 보상 취소한다")
     void sync_pgPaid_failed_compensates() {
         Payment payment = syncPayment();

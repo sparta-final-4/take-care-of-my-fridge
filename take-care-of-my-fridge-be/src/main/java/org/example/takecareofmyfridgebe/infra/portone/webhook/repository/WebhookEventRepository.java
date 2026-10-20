@@ -9,4 +9,6 @@ public interface WebhookEventRepository extends JpaRepository<WebhookEvent, Long
 
     // PortOne이 같은 웹훅을 재전송하면 이전 기록의 처리 상태로 다시 처리할지 정한다
     Optional<WebhookEvent> findByWebhookId(String webhookId);
+
+    boolean existsByWebhookId(String webhookId);
 }

@@ -1,5 +1,6 @@
 package org.example.takecareofmyfridgebe.domain.payment.service;
 
+import jakarta.persistence.EntityManager;
 import org.example.takecareofmyfridgebe.domain.order.entity.Order;
 import org.example.takecareofmyfridgebe.domain.order.entity.OrderStatus;
 import org.example.takecareofmyfridgebe.domain.payment.dto.PaymentConfirmResponse;
@@ -12,6 +13,7 @@ import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -22,6 +24,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.inOrder;
 
 @ExtendWith(MockitoExtension.class)
 class PaymentCommandServiceTest {
@@ -30,6 +33,9 @@ class PaymentCommandServiceTest {
 
     @Mock
     private PaymentRepository paymentRepository;
+
+    @Mock
+    private EntityManager entityManager;
 
     @InjectMocks
     private PaymentCommandService paymentCommandService;
@@ -127,5 +133,20 @@ class PaymentCommandServiceTest {
         assertThat(payment.getStatus()).isEqualTo(PaymentStatus.PAID);
         assertThat(payment.getFailReason()).isNull();
         assertThat(payment.getOrder().getStatus()).isEqualTo(OrderStatus.PAID);
+    }
+
+    @Test
+    @DisplayName("잠금 조회 뒤 미반영 변경을 flush하고 결제와 주문을 DB 값으로 다시 읽는다")
+    void lockedPayment_isRefreshedAfterFlush() {
+        Payment payment = newPayment();
+        givenLockedPayment(payment);
+
+        paymentCommandService.fail(PORTONE_PAYMENT_ID, FailReason.USER_CANCELLED);
+
+        InOrder inOrder = inOrder(paymentRepository, entityManager);
+        inOrder.verify(paymentRepository).findWithOrderByPortonePaymentIdForUpdate(PORTONE_PAYMENT_ID);
+        inOrder.verify(entityManager).flush();
+        inOrder.verify(entityManager).refresh(payment);
+        inOrder.verify(entityManager).refresh(payment.getOrder());
     }
 }

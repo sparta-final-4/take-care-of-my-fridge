@@ -31,7 +31,11 @@ public class WebhookHandler {
         try {
             eventId = webhookEventService.receive(webhookId, webhook.type(), rawPayload);
         } catch (DataIntegrityViolationException e) {
-            // 같은 웹훅이 동시에 들어와 다른 요청이 먼저 저장했다. 그쪽이 실패하면 PortOne이 다시 보낸다
+            // 다른 요청이 같은 웹훅을 먼저 저장한 경우만 건너뛴다. 그쪽이 실패하면 PortOne이 다시 보낸다
+            // 그 외 제약 위반은 다시 던져 오류로 응답하고 재전송을 받는다
+            if (!webhookEventService.isReceived(webhookId)) {
+                throw e;
+            }
             log.info("[Webhook] 동시 수신된 웹훅 건너뜀: webhookId={}", webhookId);
             return;
         }
