@@ -15,6 +15,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.StorageType;
 import org.example.takecareofmyfridgebe.global.entity.BaseTimeEntity;
+import org.example.takecareofmyfridgebe.global.error.BusinessException;
+import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 
 @Entity
 @Table(
@@ -86,5 +88,13 @@ public class Product extends BaseTimeEntity {
         this.storage = storage;
         this.shelfDays = shelfDays;
         this.status = status != null ? status : ProductStatus.ON_SALE;
+    }
+
+    // 재고는 음수가 될 수 없다. 모자라면 빼지 않고 거절한다.
+    public void decreaseStock(int quantity) {
+        if (stock < quantity) {
+            throw new BusinessException(ErrorCode.INSUFFICIENT_STOCK);
+        }
+        this.stock -= quantity;
     }
 }

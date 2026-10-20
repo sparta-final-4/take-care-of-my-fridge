@@ -1,0 +1,45 @@
+package org.example.takecareofmyfridgebe.domain.product.entity;
+
+import org.example.takecareofmyfridgebe.domain.ingredient.entity.StorageType;
+import org.example.takecareofmyfridgebe.global.error.BusinessException;
+import org.example.takecareofmyfridgebe.global.error.ErrorCode;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+class ProductTest {
+
+    private Product productWithStock(int stock) {
+        return Product.builder()
+            .productType(ProductType.INGREDIENT)
+            .name("대파")
+            .price(3000)
+            .stock(stock)
+            .storage(StorageType.REFRIGERATED)
+            .shelfDays(7)
+            .build();
+    }
+
+    @Test
+    @DisplayName("재고를 수량만큼 뺀다. 재고와 같은 수량이면 0이 된다")
+    void decreaseStock_subtractsQuantity() {
+        Product product = productWithStock(3);
+
+        product.decreaseStock(3);
+
+        assertThat(product.getStock()).isZero();
+    }
+
+    @Test
+    @DisplayName("재고보다 많이 빼려 하면 거절하고 재고는 그대로다")
+    void decreaseStock_rejectsWhenShort() {
+        Product product = productWithStock(2);
+
+        assertThatThrownBy(() -> product.decreaseStock(3))
+            .isInstanceOf(BusinessException.class)
+            .extracting("errorCode").isEqualTo(ErrorCode.INSUFFICIENT_STOCK);
+        assertThat(product.getStock()).isEqualTo(2);
+    }
+}
