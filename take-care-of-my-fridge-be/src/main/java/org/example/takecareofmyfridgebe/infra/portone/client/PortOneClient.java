@@ -2,6 +2,8 @@ package org.example.takecareofmyfridgebe.infra.portone.client;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.example.takecareofmyfridgebe.domain.payment.port.PaymentGateway;
+import org.example.takecareofmyfridgebe.domain.payment.port.PaymentGatewayResponse;
 import org.example.takecareofmyfridgebe.infra.portone.config.PortOneProperties;
 import org.example.takecareofmyfridgebe.infra.portone.dto.PortOneCancelRequest;
 import org.example.takecareofmyfridgebe.infra.portone.dto.PortOnePaymentResponse;
@@ -16,7 +18,7 @@ import java.util.UUID;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class PortOneClient {
+public class PortOneClient implements PaymentGateway {
 
     private static final int MAX_CANCEL_ATTEMPTS = 3;
 
@@ -24,7 +26,8 @@ public class PortOneClient {
     private final PortOneProperties portOneProperties;
 
     // 결제창에서 결제를 시작하지 않았으면 PortOne에 결제 건이 없어 404가 온다
-    public Optional<PortOnePaymentResponse> getPayment(String paymentId) {
+    @Override
+    public Optional<PaymentGatewayResponse> getPayment(String paymentId) {
         log.info("PortOne 결제 조회: paymentId={}", paymentId);
         try {
             return Optional.ofNullable(portOneRestClient.get()
@@ -33,13 +36,15 @@ public class PortOneClient {
                             .queryParam("storeId", portOneProperties.storeId())
                             .build(paymentId))
                     .retrieve()
-                    .body(PortOnePaymentResponse.class));
+                    .body(PortOnePaymentResponse.class))
+                    .map(PortOnePaymentResponse::toGatewayResponse);
         } catch (HttpClientErrorException.NotFound e) {
             return Optional.empty();
         }
     }
 
     // amount가 null이면 전액 취소한다
+    @Override
     public void cancelPayment(String paymentId, String reason, Long amount) {
         // 재시도해도 한 번만 취소되도록 모든 시도에 같은 키를 쓴다
         String idempotencyKey = UUID.randomUUID().toString();

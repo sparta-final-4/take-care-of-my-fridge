@@ -9,6 +9,7 @@ import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -34,5 +35,10 @@ public class PaymentService {
     public Payment getWithOrder(String portonePaymentId) {
         return paymentRepository.findWithOrderByPortonePaymentId(portonePaymentId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.PAYMENT_NOT_FOUND));
+    }
+
+    // 웹훅처럼 결제가 없을 수도 있는 요청에서 쓴다
+    public Optional<Payment> findWithOrder(String portonePaymentId) {
+        return paymentRepository.findWithOrderByPortonePaymentId(portonePaymentId);
     }
 }
