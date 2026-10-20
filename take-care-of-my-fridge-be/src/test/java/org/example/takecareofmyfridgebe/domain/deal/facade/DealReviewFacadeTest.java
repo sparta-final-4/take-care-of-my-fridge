@@ -51,6 +51,16 @@ class DealReviewFacadeTest {
     }
 
     @Test
+    void recordsUnexpectedFailure() {
+        when(service.save(7L, 3L, reviews)).thenThrow(new IllegalStateException("lock timeout"));
+
+        assertThatThrownBy(() -> facade.save(7L, Member.Role.ADMIN, 3L, reviews))
+                .isInstanceOf(IllegalStateException.class);
+        verify(audit).record(7L, AdminAuditLog.Action.DEAL_REVIEW,
+                AdminAuditLog.TARGET_DEAL_ANALYSIS, 3L, AdminAuditLog.Result.FAILED);
+    }
+
+    @Test
     void recordsDeniedRoleBeforeSaving() {
         assertThatThrownBy(() -> facade.save(7L, Member.Role.USER, 3L, reviews))
                 .isInstanceOfSatisfying(BusinessException.class,

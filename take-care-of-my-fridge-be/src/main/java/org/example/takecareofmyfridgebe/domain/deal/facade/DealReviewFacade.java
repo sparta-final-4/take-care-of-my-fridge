@@ -27,7 +27,8 @@ public class DealReviewFacade {
         }
         try {
             return reviewService.save(actorId, analysisId, reviews);
-        } catch (BusinessException e) {
+        } catch (RuntimeException e) {
+            // 비즈니스 오류뿐 아니라 락 대기 초과 같은 예상 밖 오류도 실패 이력을 남긴다.
             record(actorId, analysisId, AdminAuditLog.Result.FAILED);
             throw e;
         }
