@@ -2,6 +2,7 @@ package org.example.takecareofmyfridgebe.domain.product.dto;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.AssertTrue;
+import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -56,6 +57,7 @@ public record ProductCreateRequest(
 
             @NotNull(message = "용량을 입력해 주세요.")
             @Positive(message = "용량은 0보다 커야 합니다.")
+            @Digits(integer = 6, fraction = 2, message = "용량은 정수 6자리, 소수 2자리까지 입력할 수 있습니다.")
             BigDecimal unitAmount,
 
             @NotBlank(message = "용량 단위를 입력해 주세요.")
@@ -64,6 +66,7 @@ public record ProductCreateRequest(
 
             @NotNull(message = "재료 기본 단위 수량을 입력해 주세요.")
             @Positive(message = "재료 기본 단위 수량은 0보다 커야 합니다.")
+            @Digits(integer = 8, fraction = 2, message = "재료 기본 단위 수량은 정수 8자리, 소수 2자리까지 입력할 수 있습니다.")
             BigDecimal baseQuantity
     ) {
     }
