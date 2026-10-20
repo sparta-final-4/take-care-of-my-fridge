@@ -55,6 +55,7 @@ CREATE TABLE prediction_runs (
     model_version     VARCHAR(50) NOT NULL COMMENT '예측 모델 버전(예: fc-v0.3)',
     data_cutoff_at    DATETIME(6) NOT NULL COMMENT '입력 데이터 기준 시각',
     confirmed_at      DATETIME(6) NULL COMMENT '실제 판매량 확정일시(다음 주 월요일 06:00)',
+    synthetic_data    BOOLEAN     NOT NULL DEFAULT FALSE COMMENT '가상 데이터 사용 여부',
     created_at        DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '예측 생성일시(일요일 22:00)',
     updated_at        DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '수정일시',
     PRIMARY KEY (id),
