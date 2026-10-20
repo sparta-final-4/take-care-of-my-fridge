@@ -3,9 +3,11 @@ package org.example.takecareofmyfridgebe.domain.product.dto;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Digits;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.StorageType;
@@ -28,14 +30,17 @@ public record ProductCreateRequest(
         String description,
 
         @Size(max = 500, message = "이미지 URL은 500자 이하여야 합니다.")
+        @Pattern(regexp = "^https?://\\S+$", message = "이미지 URL은 http:// 또는 https://로 시작해야 합니다.")
         String imageUrl,
 
         @NotNull(message = "가격을 입력해 주세요.")
         @Min(value = 0, message = "가격은 0 이상이어야 합니다.")
+        @Max(value = MAX_PRICE, message = "가격은 1,000만 원 이하여야 합니다.")
         Integer price,
 
         @NotNull(message = "재고를 입력해 주세요.")
         @Min(value = 0, message = "재고는 0 이상이어야 합니다.")
+        @Max(value = MAX_STOCK, message = "재고는 10만 개 이하여야 합니다.")
         Integer stock,
 
         @NotNull(message = "보관 방법을 선택해 주세요.")
@@ -51,6 +56,16 @@ public record ProductCreateRequest(
         @Valid
         MealkitDetail mealkit
 ) {
+    // 주문 금액(가격 x 수량) 계산 시 int 오버플로가 나지 않도록 상한을 둔다
+    public static final int MAX_PRICE = 10_000_000;
+    public static final int MAX_STOCK = 100_000;
+
+    // 검증 전에 앞뒤 공백을 제거하고, 빈 이미지 URL은 null로 저장한다
+    public ProductCreateRequest {
+        name = strip(name);
+        imageUrl = blankToNull(strip(imageUrl));
+    }
+
     public record IngredientDetail(
             @NotNull(message = "연결할 재료를 선택해 주세요.")
             Long ingredientId,
@@ -69,6 +84,9 @@ public record ProductCreateRequest(
             @Digits(integer = 8, fraction = 2, message = "재료 기본 단위 수량은 정수 8자리, 소수 2자리까지 입력할 수 있습니다.")
             BigDecimal baseQuantity
     ) {
+        public IngredientDetail {
+            unit = strip(unit);
+        }
     }
 
     public record MealkitDetail(
@@ -94,7 +112,7 @@ public record ProductCreateRequest(
     public Product toProduct() {
         return Product.builder()
                 .productType(productType)
-                .name(name.strip())
+                .name(name)
                 .description(description)
                 .imageUrl(imageUrl)
                 .price(price)
@@ -109,7 +127,7 @@ public record ProductCreateRequest(
                 .product(product)
                 .ingredientId(ingredient.ingredientId())
                 .unitAmount(ingredient.unitAmount())
-                .unit(ingredient.unit().strip())
+                .unit(ingredient.unit())
                 .baseQuantity(ingredient.baseQuantity())
                 .build();
     }
@@ -119,5 +137,13 @@ public record ProductCreateRequest(
                 .product(product)
                 .servings(mealkit.servings())
                 .build();
+    }
+
+    private static String strip(String value) {
+        return value == null ? null : value.strip();
+    }
+
+    private static String blankToNull(String value) {
+        return value == null || value.isEmpty() ? null : value;
     }
 }

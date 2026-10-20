@@ -1,6 +1,7 @@
 package org.example.takecareofmyfridgebe.domain.product.service;
 
 import lombok.RequiredArgsConstructor;
+import org.example.takecareofmyfridgebe.domain.ingredient.entity.Ingredient;
 import org.example.takecareofmyfridgebe.domain.ingredient.repository.IngredientRepository;
 import org.example.takecareofmyfridgebe.domain.product.dto.ProductCreateRequest;
 import org.example.takecareofmyfridgebe.domain.product.dto.ProductDetailResponse;
@@ -64,9 +65,8 @@ public class ProductService {
     // TODO: ElasticSearch 에 인덱싱 과정 추가 필수...
     @Transactional
     public ProductDetailResponse createProduct(ProductCreateRequest request) {
-        if (request.productType() == ProductType.INGREDIENT
-                && !ingredientRepository.existsById(request.ingredient().ingredientId())) {
-            throw new BusinessException(ErrorCode.INGREDIENT_NOT_FOUND);
+        if (request.productType() == ProductType.INGREDIENT) {
+            validateLinkableIngredient(request.ingredient().ingredientId());
         }
 
         Product product = productRepository.save(request.toProduct());
@@ -81,5 +81,15 @@ public class ProductService {
                     mealkitProductRepository.save(request.toMealkitProduct(product))
             );
         };
+    }
+
+    // ingredient_products.ingredient_id는 FK 없이 ID로만 참조하므로 저장 전에 직접 확인한다.
+    // 직접 입력용(ING_CUSTOM)·밀키트용(ING_MEALKIT) 기본 재료는 상품에 연결하지 않는다.
+    private void validateLinkableIngredient(Long ingredientId) {
+        Ingredient ingredient = ingredientRepository.findById(ingredientId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.INGREDIENT_NOT_FOUND));
+        if (ingredient.isCustom() || ingredient.isMealkit()) {
+            throw new BusinessException(ErrorCode.INVALID_PRODUCT_INGREDIENT);
+        }
     }
 }
