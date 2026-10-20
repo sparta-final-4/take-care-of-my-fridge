@@ -1,11 +1,14 @@
 package org.example.takecareofmyfridgebe.domain.product.service;
 
 import lombok.RequiredArgsConstructor;
+import org.example.takecareofmyfridgebe.domain.ingredient.repository.IngredientRepository;
+import org.example.takecareofmyfridgebe.domain.product.dto.ProductCreateRequest;
 import org.example.takecareofmyfridgebe.domain.product.dto.ProductDetailResponse;
 import org.example.takecareofmyfridgebe.domain.product.dto.ProductListItemResponse;
 import org.example.takecareofmyfridgebe.domain.product.dto.ProductSort;
 import org.example.takecareofmyfridgebe.domain.product.entity.Product;
 import org.example.takecareofmyfridgebe.domain.product.entity.ProductStatus;
+import org.example.takecareofmyfridgebe.domain.product.entity.ProductType;
 import org.example.takecareofmyfridgebe.domain.product.repository.IngredientProductRepository;
 import org.example.takecareofmyfridgebe.domain.product.repository.MealkitProductRepository;
 import org.example.takecareofmyfridgebe.domain.product.repository.ProductRepository;
@@ -30,6 +33,7 @@ public class ProductService {
     private final ProductRepository productRepository;
     private final IngredientProductRepository ingredientProductRepository;
     private final MealkitProductRepository mealkitProductRepository;
+    private final IngredientRepository ingredientRepository;
 
     public PageResponse<ProductListItemResponse> getProducts(ProductSort sort, int page, int size) {
         PageRequest pageable = PageRequest.of(page - 1, size, sort.toSort());
@@ -53,6 +57,28 @@ public class ProductService {
             case MEALKIT -> ProductDetailResponse.ofMealkit(
                     product,
                     mealkitProductRepository.findByProductId(productId).orElse(null)
+            );
+        };
+    }
+
+    // TODO: ElasticSearch 에 인덱싱 과정 추가 필수...
+    @Transactional
+    public ProductDetailResponse createProduct(ProductCreateRequest request) {
+        if (request.productType() == ProductType.INGREDIENT
+                && !ingredientRepository.existsById(request.ingredient().ingredientId())) {
+            throw new BusinessException(ErrorCode.INGREDIENT_NOT_FOUND);
+        }
+
+        Product product = productRepository.save(request.toProduct());
+
+        return switch (product.getProductType()) {
+            case INGREDIENT -> ProductDetailResponse.ofIngredient(
+                    product,
+                    ingredientProductRepository.save(request.toIngredientProduct(product))
+            );
+            case MEALKIT -> ProductDetailResponse.ofMealkit(
+                    product,
+                    mealkitProductRepository.save(request.toMealkitProduct(product))
             );
         };
     }
