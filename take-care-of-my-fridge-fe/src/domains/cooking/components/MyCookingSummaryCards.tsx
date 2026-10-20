@@ -51,7 +51,8 @@ export function MyCookingSummaryCards({
                 후기는 다른 사람의 요리 실패를 줄여줘요.
               </Typography.Text>
               <Button
-                type="primary"
+                color="default"
+                variant="solid"
                 block
                 size="large"
                 className={styles.promptButton}

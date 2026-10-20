@@ -148,9 +148,9 @@ export function MyRecipeListSection({
                           </Button>
                         ) : (
                           <Button
-                            type="primary"
+                            color="default"
+                            variant="solid"
                             size="middle"
-                            className={styles.primaryActionButton}
                             onClick={() => onOpenReviewModal(item)}
                           >
                             후기 쓰기

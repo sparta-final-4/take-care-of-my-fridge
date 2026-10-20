@@ -16,12 +16,12 @@
   justify-content: space-between;
   align-items: flex-start;
   margin-bottom: var(--ant-margin-lg);
-}
 
-.title {
-  margin: 0 0 4px !important;
-  font-size: var(--ant-font-size-xl) !important;
-  font-weight: 700 !important;
+  :global(.ant-typography).title {
+    margin: 0 0 var(--ant-margin-xxs);
+    font-size: var(--ant-font-size-xl);
+    font-weight: var(--ant-font-weight-strong);
+  }
 }
 
 .subtitle {
@@ -29,7 +29,7 @@
 }
 
 .sortSelect {
-  width: 130px;
+  width: $recipe-sort-select-width;
 }
 
 /* 탭 */
@@ -38,7 +38,7 @@
 }
 
 .tabCount {
-  margin-left: 4px;
+  margin-left: var(--ant-margin-xxs);
   font-size: var(--ant-font-size-sm);
   opacity: 0.85;
 }
@@ -63,16 +63,20 @@
   }
 
   th {
-    padding: 10px 12px;
+    padding: var(--ant-padding-xs) var(--ant-padding-sm);
     font-size: var(--ant-font-size-sm);
-    font-weight: 500;
+    font-weight: var(--ant-font-weight-strong);
     color: var(--ant-color-text-secondary);
     text-align: left;
   }
 
   td {
-    padding: 14px 12px;
+    padding: var(--ant-padding-sm);
     vertical-align: middle;
+  }
+
+  td.expandedCell {
+    padding: 0 var(--ant-padding-sm) var(--ant-padding-sm);
   }
 }
 
@@ -117,10 +121,6 @@
   border-bottom: 1px solid var(--ant-color-border-secondary);
 }
 
-.expandedCell {
-  padding: 0 12px 14px !important;
-}
-
 .recipeCell {
   display: flex;
   align-items: center;
@@ -131,12 +131,12 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 54px;
-  height: 54px;
+  width: $recipe-thumb-size;
+  height: $recipe-thumb-size;
   border-radius: var(--ant-border-radius);
   background: var(--ant-color-fill-secondary);
   color: var(--ant-color-text-tertiary);
-  font-size: 11px;
+  font-size: $font-size-xs;
   flex-shrink: 0;
   overflow: hidden;
 
@@ -154,17 +154,17 @@
 .recipeInfo {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--ant-margin-xxs);
   min-width: 0;
 }
 
 .aiTag {
   width: fit-content;
   margin: 0;
-  font-size: 11px;
-  line-height: 18px;
-  padding: 0 6px;
-  border-radius: 4px;
+  font-size: $font-size-xs;
+  line-height: var(--ant-line-height);
+  padding: 0 var(--ant-padding-xxs);
+  border-radius: var(--ant-border-radius-sm);
   background: var(--ant-color-fill-secondary);
   border: 1px solid var(--ant-color-border-secondary);
   color: var(--ant-color-text-secondary);
@@ -180,11 +180,11 @@
 .expandTrigger {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--ant-margin-xxs);
   background: transparent;
   border: none;
-  padding: 4px 6px;
-  border-radius: 4px;
+  padding: var(--ant-padding-xxs) var(--ant-padding-xs);
+  border-radius: var(--ant-border-radius-sm);
   font-size: var(--ant-font-size);
   color: var(--ant-color-text);
   cursor: pointer;
@@ -195,35 +195,24 @@
 }
 
 .expandIcon {
-  font-size: 10px;
+  font-size: $font-size-2xs;
   color: var(--ant-color-text-secondary);
 }
 
 .ratingText {
   font-size: var(--ant-font-size);
-  font-weight: 600;
+  font-weight: var(--ant-font-weight-strong);
   color: var(--ant-color-text);
 }
 
 .unreviewedTag {
   margin: 0;
-  padding: 2px 8px;
-  border-radius: 12px;
-  font-size: 12px;
+  padding: 2px var(--ant-padding-xs);
+  border-radius: var(--ant-control-height);
+  font-size: var(--ant-font-size-sm);
   background: var(--ant-color-fill-secondary);
   border: 1px solid var(--ant-color-border);
   color: var(--ant-color-text-secondary);
-}
-
-.primaryActionButton {
-  background: #1f1f1f !important;
-  border-color: #1f1f1f !important;
-  color: #ffffff !important;
-
-  &:hover {
-    background: #333333 !important;
-    border-color: #333333 !important;
-  }
 }
 
 /* 펼쳐진 서브 패널 */
@@ -240,12 +229,12 @@
 .detailReviewSection {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--ant-margin-xxs);
 }
 
 .detailLabel {
-  font-size: 12px;
-  font-weight: 500;
+  font-size: var(--ant-font-size-sm);
+  font-weight: var(--ant-font-weight-strong);
 }
 
 .detailReviewContent {
@@ -259,7 +248,7 @@
 .reviewHeader {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--ant-margin-xs);
 }
 
 .reviewText {
@@ -268,51 +257,51 @@
 }
 
 .reviewDate {
-  font-size: 12px;
+  font-size: var(--ant-font-size-sm);
 }
 
 .detailHistorySection {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--ant-margin-xs);
 }
 
 .historyList {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--ant-margin-xxs);
 }
 
 .historyItem {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--ant-margin-sm);
   font-size: var(--ant-font-size-sm);
 }
 
 .historyDate {
   color: var(--ant-color-text-secondary);
-  width: 44px;
+  width: $history-date-width;
 }
 
 .successTag {
   margin: 0;
-  border-radius: 10px;
-  padding: 0 8px;
-  background: #1f1f1f;
-  color: #ffffff;
+  border-radius: var(--ant-control-height);
+  padding: 0 var(--ant-padding-xs);
+  background: var(--ant-color-text);
+  color: var(--ant-color-text-light-solid);
   border: none;
-  font-size: 11px;
+  font-size: $font-size-xs;
 }
 
 .failedTag {
   margin: 0;
-  border-radius: 10px;
-  padding: 0 8px;
+  border-radius: var(--ant-control-height);
+  padding: 0 var(--ant-padding-xs);
   background: var(--ant-color-bg-container);
   border: 1px solid var(--ant-color-border);
   color: var(--ant-color-text-secondary);
-  font-size: 11px;
+  font-size: $font-size-xs;
 }
 
 .historyMemo {

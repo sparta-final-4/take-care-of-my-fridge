@@ -38,7 +38,7 @@
 }
 
 .summaryValue {
-  font-weight: 600;
+  font-weight: var(--ant-font-weight-strong);
   color: var(--ant-color-text);
 }
 
@@ -56,13 +56,5 @@
 
 .promptButton {
   margin-top: auto;
-  background: #1f1f1f !important;
-  border-color: #1f1f1f !important;
-  color: #ffffff !important;
-  font-weight: 600;
-
-  &:hover {
-    background: #333333 !important;
-    border-color: #333333 !important;
-  }
+  font-weight: var(--ant-font-weight-strong);
 }
