@@ -6,7 +6,7 @@ import org.example.takecareofmyfridgebe.domain.auth.service.AuthSessionService;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderCreateRequest;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderCreateResult;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderDetailResponse;
-import org.example.takecareofmyfridgebe.domain.order.service.OrderService;
+import org.example.takecareofmyfridgebe.domain.order.service.OrderCreateService;
 import org.example.takecareofmyfridgebe.global.response.ApiResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -22,14 +22,14 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class OrderController {
 
-    private final OrderService orderService;
+    private final OrderCreateService orderCreateService;
 
     @PostMapping
     public ResponseEntity<ApiResponse<OrderDetailResponse>> createOrder(
             @AuthenticationPrincipal AuthSessionService.AuthPrincipal principal,
             @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
             @Valid @RequestBody OrderCreateRequest request) {
-        OrderCreateResult result = orderService.createOrder(principal.memberId(), idempotencyKey, request);
+        OrderCreateResult result = orderCreateService.createOrder(principal.memberId(), idempotencyKey, request);
         HttpStatus status = result.created() ? HttpStatus.CREATED : HttpStatus.OK;
         return ResponseEntity.status(status).body(ApiResponse.ok(result.response()));
     }

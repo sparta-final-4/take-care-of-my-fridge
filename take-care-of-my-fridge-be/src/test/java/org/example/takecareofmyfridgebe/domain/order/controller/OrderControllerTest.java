@@ -21,7 +21,7 @@ import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderCreateResult;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderDetailResponse;
 import org.example.takecareofmyfridgebe.domain.order.entity.OrderStatus;
-import org.example.takecareofmyfridgebe.domain.order.service.OrderService;
+import org.example.takecareofmyfridgebe.domain.order.service.OrderCreateService;
 import org.example.takecareofmyfridgebe.global.config.SecurityConfig;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
@@ -46,23 +46,23 @@ class OrderControllerTest {
     private static final String BODY = "{\"cartItemIds\": [11]}";
 
     private final MockMvc mvc;
-    private final OrderService orderService;
+    private final OrderCreateService orderCreateService;
 
     @Autowired
-    OrderControllerTest(MockMvc mvc, OrderService orderService) {
+    OrderControllerTest(MockMvc mvc, OrderCreateService orderCreateService) {
         this.mvc = mvc;
-        this.orderService = orderService;
+        this.orderCreateService = orderCreateService;
     }
 
     @BeforeEach
     void resetMock() {
-        reset(orderService);
+        reset(orderCreateService);
     }
 
     @Test
     @DisplayName("새 주문이 만들어지면 201이다")
     void createOrder_created_returns201() throws Exception {
-        when(orderService.createOrder(eq(7L), eq("key-1"), any())).thenReturn(new OrderCreateResult(response(), true));
+        when(orderCreateService.createOrder(eq(7L), eq("key-1"), any())).thenReturn(new OrderCreateResult(response(), true));
 
         mvc.perform(post("/api/orders")
                         .header("Idempotency-Key", "key-1")
@@ -77,7 +77,7 @@ class OrderControllerTest {
     @Test
     @DisplayName("같은 멱등 키로 이미 만든 주문을 돌려주면 200이다")
     void createOrder_existing_returns200() throws Exception {
-        when(orderService.createOrder(eq(7L), eq("key-1"), any())).thenReturn(new OrderCreateResult(response(), false));
+        when(orderCreateService.createOrder(eq(7L), eq("key-1"), any())).thenReturn(new OrderCreateResult(response(), false));
 
         mvc.perform(post("/api/orders")
                         .header("Idempotency-Key", "key-1")
@@ -92,7 +92,7 @@ class OrderControllerTest {
     @Test
     @DisplayName("멱등 키 헤더가 없으면 서비스의 거절이 400으로 나간다")
     void createOrder_missingKey_returns400() throws Exception {
-        when(orderService.createOrder(eq(7L), isNull(), any()))
+        when(orderCreateService.createOrder(eq(7L), isNull(), any()))
                 .thenThrow(new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "Idempotency-Key 헤더가 필요합니다. (64자 이하)"));
 
         mvc.perform(post("/api/orders")
@@ -116,7 +116,7 @@ class OrderControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error.code").value("C001"));
 
-        verifyNoInteractions(orderService);
+        verifyNoInteractions(orderCreateService);
     }
 
     private OrderDetailResponse response() {
@@ -134,8 +134,8 @@ class OrderControllerTest {
     static class TestConfig {
 
         @Bean
-        OrderService orderService() {
-            return mock(OrderService.class);
+        OrderCreateService orderCreateService() {
+            return mock(OrderCreateService.class);
         }
 
         @Bean

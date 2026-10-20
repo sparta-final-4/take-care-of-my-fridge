@@ -57,15 +57,15 @@ import org.testcontainers.mysql.MySQLContainer;
 @Testcontainers
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({JpaAuditingConfig.class, QueryDslConfig.class, OrderService.class, OrderNumberGenerator.class})
+@Import({JpaAuditingConfig.class, QueryDslConfig.class, OrderCreateService.class, OrderNumberGenerator.class})
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
-class OrderServiceTransactionTest {
+class OrderCreateServiceTransactionTest {
 
     @Container
     @ServiceConnection
     static MySQLContainer mysql = new MySQLContainer("mysql:8.4");
 
-    private final OrderService orderService;
+    private final OrderCreateService orderCreateService;
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final CartRepository cartRepository;
@@ -73,14 +73,14 @@ class OrderServiceTransactionTest {
     private final ProductRepository productRepository;
 
     @Autowired
-    OrderServiceTransactionTest(
-            OrderService orderService,
+    OrderCreateServiceTransactionTest(
+            OrderCreateService orderCreateService,
             OrderRepository orderRepository,
             OrderItemRepository orderItemRepository,
             CartRepository cartRepository,
             CartItemRepository cartItemRepository,
             ProductRepository productRepository) {
-        this.orderService = orderService;
+        this.orderCreateService = orderCreateService;
         this.orderRepository = orderRepository;
         this.orderItemRepository = orderItemRepository;
         this.cartRepository = cartRepository;
@@ -202,8 +202,8 @@ class OrderServiceTransactionTest {
         Product greenOnion = saveProduct("대파", 3000, 10);
         CartItem item = saveCartItem(saveCart(1L), greenOnion, 2);
 
-        OrderCreateResult first = orderService.createOrder(1L, "key-1", request(item));
-        OrderCreateResult second = orderService.createOrder(1L, "key-1", request(item));
+        OrderCreateResult first = orderCreateService.createOrder(1L, "key-1", request(item));
+        OrderCreateResult second = orderCreateService.createOrder(1L, "key-1", request(item));
 
         assertThat(first.created()).isTrue();
         assertThat(second.created()).isFalse();
@@ -221,9 +221,9 @@ class OrderServiceTransactionTest {
         Cart cart = saveCart(1L);
         CartItem item1 = saveCartItem(cart, greenOnion, 1);
         CartItem item2 = saveCartItem(cart, tofu, 1);
-        orderService.createOrder(1L, "key-1", request(item1));
+        orderCreateService.createOrder(1L, "key-1", request(item1));
 
-        assertThatThrownBy(() -> orderService.createOrder(1L, "key-1", request(item2)))
+        assertThatThrownBy(() -> orderCreateService.createOrder(1L, "key-1", request(item2)))
             .isInstanceOf(BusinessException.class)
             .extracting("errorCode").isEqualTo(ErrorCode.ORDER_IDEMPOTENCY_KEY_REUSED);
         assertThat(orderRepository.count()).isEqualTo(1);
@@ -237,8 +237,8 @@ class OrderServiceTransactionTest {
         Product greenOnion = saveProduct("대파", 3000, 10);
         CartItem item = saveCartItem(saveCart(1L), greenOnion, 1);
 
-        orderService.createOrder(1L, "key-1", request(item));
-        orderService.createOrder(1L, "key-2", request(item));
+        orderCreateService.createOrder(1L, "key-1", request(item));
+        orderCreateService.createOrder(1L, "key-2", request(item));
 
         assertThat(orderRepository.count()).isEqualTo(2);
         assertThat(stockOf(greenOnion)).isEqualTo(8);
@@ -251,8 +251,8 @@ class OrderServiceTransactionTest {
         CartItem itemOfMember1 = saveCartItem(saveCart(1L), greenOnion, 1);
         CartItem itemOfMember2 = saveCartItem(saveCart(2L), greenOnion, 1);
 
-        orderService.createOrder(1L, "key-1", request(itemOfMember1));
-        orderService.createOrder(2L, "key-1", request(itemOfMember2));
+        orderCreateService.createOrder(1L, "key-1", request(itemOfMember1));
+        orderCreateService.createOrder(2L, "key-1", request(itemOfMember2));
 
         assertThat(orderRepository.count()).isEqualTo(2);
         assertThat(stockOf(greenOnion)).isEqualTo(8);
@@ -264,13 +264,13 @@ class OrderServiceTransactionTest {
         Product greenOnion = saveProduct("대파", 3000, 10);
         CartItem item = saveCartItem(saveCart(1L), greenOnion, 1);
 
-        assertThatThrownBy(() -> orderService.createOrder(1L, null, request(item)))
+        assertThatThrownBy(() -> orderCreateService.createOrder(1L, null, request(item)))
             .isInstanceOf(BusinessException.class)
             .extracting("errorCode").isEqualTo(ErrorCode.INVALID_INPUT_VALUE);
-        assertThatThrownBy(() -> orderService.createOrder(1L, " ", request(item)))
+        assertThatThrownBy(() -> orderCreateService.createOrder(1L, " ", request(item)))
             .isInstanceOf(BusinessException.class)
             .extracting("errorCode").isEqualTo(ErrorCode.INVALID_INPUT_VALUE);
-        assertThatThrownBy(() -> orderService.createOrder(1L, "k".repeat(65), request(item)))
+        assertThatThrownBy(() -> orderCreateService.createOrder(1L, "k".repeat(65), request(item)))
             .isInstanceOf(BusinessException.class)
             .extracting("errorCode").isEqualTo(ErrorCode.INVALID_INPUT_VALUE);
         assertThat(orderRepository.count()).isZero();
@@ -311,7 +311,7 @@ class OrderServiceTransactionTest {
         List<Long> orderIds = Collections.synchronizedList(new ArrayList<>());
 
         List<Throwable> failures = runConcurrently(Collections.nCopies(5, () -> {
-            orderIds.add(orderService.createOrder(1L, "same-click", request(item)).response().orderId());
+            orderIds.add(orderCreateService.createOrder(1L, "same-click", request(item)).response().orderId());
             return null;
         }));
 
@@ -353,7 +353,7 @@ class OrderServiceTransactionTest {
 
     // 클릭마다 새 멱등 키를 만드는 프론트처럼 매번 다른 키로 주문한다
     private OrderDetailResponse order(Long memberId, OrderCreateRequest request) {
-        return orderService.createOrder(memberId, UUID.randomUUID().toString(), request).response();
+        return orderCreateService.createOrder(memberId, UUID.randomUUID().toString(), request).response();
     }
 
     private List<Throwable> runConcurrently(List<Callable<Void>> tasks) throws Exception {

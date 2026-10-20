@@ -29,7 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-public class OrderService {
+public class OrderCreateService {
 
     private static final int IDEMPOTENCY_KEY_MAX_LENGTH = 64;
 

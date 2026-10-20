@@ -20,7 +20,7 @@
 
 ## 구현 결과
 
-- `POST /api/orders` (`OrderController`, `OrderService.createOrder`)
+- `POST /api/orders` (`OrderController`, `OrderCreateService.createOrder`)
   - 헤더: `Idempotency-Key`(필수, 64자 이하). 없거나 길면 400 `INVALID_INPUT_VALUE`.
   - 요청: `cartItemIds`(1개 이상).
   - 처리 순서: 회원의 장바구니 행 잠금 → 고른 줄이 내 것인지 확인 → 같은 멱등 키 주문이 있으면 상품·수량이 같을 때 그 주문을 돌려주고 다르면 거절 → 상품 행을 ID 순으로 잠그고 읽기 → 판매 중지 확인 → 재고 확인·차감 → 주문·주문 상품 저장.
@@ -34,7 +34,7 @@
   - `ORDER_IDEMPOTENCY_KEY_REUSED`(409, `ORDER_006`, "다른 주문 요청에 이미 쓴 Idempotency-Key입니다.").
 - 그 밖의 오류: 내 줄이 아니면 404 `CART_ITEM_NOT_FOUND`, 없는 상품 404 `PRODUCT_NOT_FOUND`, 판매 중지 409 `PRODUCT_NOT_ON_SALE`, 재고 부족 409 `INSUFFICIENT_STOCK`(메시지 "재고 부족 · 상품명", 재고 0이면 "품절 · 상품명").
 - 테스트
-  - `OrderServiceTransactionTest`(Testcontainers MySQL, 커밋된 DB 상태로 확인): 주문 성공 시 재고 감소·주문 저장·장바구니 유지, 두 번째 상품 재고 부족 시 첫 상품 재고까지 롤백, 재고 0 품절, 판매 중지, 남의 장바구니 줄, 같은 멱등 키 재요청 시 처음 주문 반환·재고 한 번만 차감, 같은 키·다른 상품 거절·처음 주문과 재고 유지, 키가 다르면 같은 상품도 새 주문, 다른 회원은 같은 키로도 각자 주문, 키 없음·64자 초과 거절, 장바구니 수량이 음수인 줄 거절·재고와 주문 그대로, 재고 5개에 20명 동시 주문 시 정확히 5건만 성공·재고 0, 같은 키 동시 5회 주문 시 주문 1건·모두 같은 주문 반환, 담은 순서가 엇갈린 주문 20건 동시 실행 시 모두 성공·재고 정확.
+  - `OrderCreateServiceTransactionTest`(Testcontainers MySQL, 커밋된 DB 상태로 확인): 주문 성공 시 재고 감소·주문 저장·장바구니 유지, 두 번째 상품 재고 부족 시 첫 상품 재고까지 롤백, 재고 0 품절, 판매 중지, 남의 장바구니 줄, 같은 멱등 키 재요청 시 처음 주문 반환·재고 한 번만 차감, 같은 키·다른 상품 거절·처음 주문과 재고 유지, 키가 다르면 같은 상품도 새 주문, 다른 회원은 같은 키로도 각자 주문, 키 없음·64자 초과 거절, 장바구니 수량이 음수인 줄 거절·재고와 주문 그대로, 재고 5개에 20명 동시 주문 시 정확히 5건만 성공·재고 0, 같은 키 동시 5회 주문 시 주문 1건·모두 같은 주문 반환, 담은 순서가 엇갈린 주문 20건 동시 실행 시 모두 성공·재고 정확.
   - `OrderControllerTest`: 새 주문 201, 같은 키 200, 키 없음 400, 빈 `cartItemIds` 400.
   - `OrderNumberGeneratorTest`: 20자리 형식, 연속 생성 시 증가, 여러 스레드 동시 생성 시 중복 없음.
   - `ProductTest`: 재고 차감, 재고보다 많이 빼면 거절하고 재고 유지, 0 이하 수량 거절하고 재고 유지.
