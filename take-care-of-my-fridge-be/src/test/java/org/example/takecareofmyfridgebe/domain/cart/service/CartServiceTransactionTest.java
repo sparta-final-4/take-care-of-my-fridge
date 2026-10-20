@@ -15,7 +15,6 @@ import org.example.takecareofmyfridgebe.domain.cart.entity.CartItem;
 import org.example.takecareofmyfridgebe.domain.cart.repository.CartItemRepository;
 import org.example.takecareofmyfridgebe.domain.cart.repository.CartRepository;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.StorageType;
-import org.example.takecareofmyfridgebe.domain.order.entity.SaleType;
 import org.example.takecareofmyfridgebe.domain.product.entity.Product;
 import org.example.takecareofmyfridgebe.domain.product.entity.ProductStatus;
 import org.example.takecareofmyfridgebe.domain.product.entity.ProductType;
@@ -245,7 +244,7 @@ class CartServiceTransactionTest {
             assertThat(item.productName()).isEqualTo("대파");
             assertThat(item.listPrice()).isEqualTo(1000);
             assertThat(item.unitPrice()).isEqualTo(1000);
-            assertThat(item.saleType()).isEqualTo(SaleType.NONE);
+            assertThat(item.saleType()).isNull();
             assertThat(item.discountRate()).isNull();
             assertThat(item.flashDropRemaining()).isNull();
         });

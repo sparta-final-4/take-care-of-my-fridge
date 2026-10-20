@@ -2,9 +2,9 @@ package org.example.takecareofmyfridgebe.domain.cart.dto;
 
 import lombok.Builder;
 import org.example.takecareofmyfridgebe.domain.cart.entity.CartItem;
-import org.example.takecareofmyfridgebe.domain.order.entity.SaleType;
 import org.example.takecareofmyfridgebe.domain.product.entity.Product;
 import org.example.takecareofmyfridgebe.domain.product.entity.ProductStatus;
+import org.example.takecareofmyfridgebe.domain.sale.entity.SaleEventType;
 
 @Builder
 public record CartItemResponse(
@@ -14,7 +14,7 @@ public record CartItemResponse(
         int quantity,
         int listPrice,
         int unitPrice,
-        SaleType saleType,
+        SaleEventType saleType,
         Integer discountRate,
         Integer flashDropRemaining,
         boolean soldOut
@@ -29,7 +29,6 @@ public record CartItemResponse(
                 .quantity(item.getQuantity())
                 .listPrice(product.getPrice())
                 .unitPrice(product.getPrice())
-                .saleType(SaleType.NONE)
                 .soldOut(isUnavailable(product))
                 .build();
     }

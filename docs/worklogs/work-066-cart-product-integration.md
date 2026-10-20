@@ -21,7 +21,7 @@
   - 담기: 상품이 없으면 404 `PRODUCT_NOT_FOUND`, 판매 중지면 409 `PRODUCT_NOT_ON_SALE`. 이미 담긴 수량과 합쳐 재고를 넘으면 409 `CART_QUANTITY_EXCEEDS_STOCK`. `요청 수량 > 재고 - 기존 수량`으로 비교해 큰 수량에서 int가 넘치지 않게 했다.
   - 수량 변경: 판매 중지면 409 `PRODUCT_NOT_ON_SALE`. 재고를 넘고 지금 수량보다 올릴 때만 409 `CART_QUANTITY_EXCEEDS_STOCK`. 담아 둔 뒤 재고가 줄었어도 수량을 내리는 것은 허용한다.
   - 조회: 상품을 `findAllById`로 한 번에 읽어 줄과 합친다.
-- CartItemResponse에 `productName`, `listPrice`, `unitPrice`, `saleType`, `discountRate`, `flashDropRemaining`, `soldOut`을 추가했다. `soldOut`은 재고가 0이거나 판매 중지면 true다. 할인 행사 연동 전이라 `unitPrice`는 정가, `saleType`은 `NONE`, 나머지 할인 필드는 null이다. `saleType`은 주문 상품과 같은 `SaleType`을 쓴다.
+- CartItemResponse에 `productName`, `listPrice`, `unitPrice`, `saleType`, `discountRate`, `flashDropRemaining`, `soldOut`을 추가했다. `soldOut`은 재고가 0이거나 판매 중지면 true다. 할인 행사 연동 전이라 `unitPrice`는 정가, 할인 필드는 모두 null이다. `saleType`은 할인 행사의 `SaleEventType`을 쓰고 할인이 없으면 null이다.
 - 신규 오류 코드 `CART_QUANTITY_EXCEEDS_STOCK`(409, `CART_002`, "재고보다 많이 담을 수 없습니다."). 상품의 `INSUFFICIENT_STOCK`은 주문에서 재고를 뺄 때 쓴다.
 - 테스트(`CartServiceTransactionTest`, Testcontainers MySQL, DB 상태로 확인):
   - 담기: 재고와 같은 수량은 담긴다. 기존 수량과 합쳐 재고 초과, int 범위를 넘는 수량, 재고 0, 판매 중지, 없는 상품은 거절되고 수량은 그대로다. 처음 담다 거절되면 장바구니도 남지 않는다.
