@@ -3,6 +3,8 @@ package org.example.takecareofmyfridgebe.domain.forecast.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -67,12 +69,12 @@ class ForecastReadServiceTest {
         LocalDate latest = LocalDate.of(2026, 11, 2);
         PredictionRun run = run(8L, latest);
         when(runs.findTopByOrderByTargetWeekStartDesc()).thenReturn(Optional.of(run));
-        when(runs.findByTargetWeekStart(latest)).thenReturn(Optional.of(run));
         when(forecasts.findByPredictionRunIdOrderByProductIdAsc(8L)).thenReturn(List.of());
 
         var response = service.getLatest();
 
         assertThat(response.weekStart()).isEqualTo(latest);
+        verify(runs, never()).findByTargetWeekStart(latest);
     }
 
     @Test

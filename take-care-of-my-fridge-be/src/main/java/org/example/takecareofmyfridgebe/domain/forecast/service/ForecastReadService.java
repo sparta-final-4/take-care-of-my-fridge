@@ -21,10 +21,9 @@ public class ForecastReadService {
     private final SalesForecastRepository forecastRepository;
 
     public ForecastResponse getLatest() {
-        LocalDate weekStart = runRepository.findTopByOrderByTargetWeekStartDesc()
-                .orElseThrow(() -> new BusinessException(ErrorCode.FORECAST_NOT_FOUND))
-                .getTargetWeekStart();
-        return getByWeek(weekStart);
+        PredictionRun run = runRepository.findTopByOrderByTargetWeekStartDesc()
+                .orElseThrow(() -> new BusinessException(ErrorCode.FORECAST_NOT_FOUND));
+        return toResponse(run);
     }
 
     public ForecastResponse getByWeek(LocalDate weekStart) {
@@ -33,6 +32,11 @@ public class ForecastReadService {
         }
         PredictionRun run = runRepository.findByTargetWeekStart(weekStart)
                 .orElseThrow(() -> new BusinessException(ErrorCode.FORECAST_NOT_FOUND));
+        return toResponse(run);
+    }
+
+    private ForecastResponse toResponse(PredictionRun run) {
+        LocalDate weekStart = run.getTargetWeekStart();
         LocalDate previous = runRepository
                 .findTopByTargetWeekStartLessThanOrderByTargetWeekStartDesc(weekStart)
                 .map(PredictionRun::getTargetWeekStart).orElse(null);
