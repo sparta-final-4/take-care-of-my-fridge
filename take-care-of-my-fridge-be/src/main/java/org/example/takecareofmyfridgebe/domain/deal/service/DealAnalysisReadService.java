@@ -21,7 +21,17 @@ public class DealAnalysisReadService {
     public DealAnalysisResponse getById(Long analysisId) {
         DealAnalysis analysis = analysisRepository.findById(analysisId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.DEAL_ANALYSIS_NOT_FOUND));
+        return toResponse(analysis);
+    }
+
+    public DealAnalysisResponse getLatestForMember(Long memberId) {
+        DealAnalysis analysis = analysisRepository.findTopByMemberIdOrderByCreatedAtDescIdDesc(memberId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.DEAL_ANALYSIS_NOT_FOUND));
+        return toResponse(analysis);
+    }
+
+    private DealAnalysisResponse toResponse(DealAnalysis analysis) {
         return DealAnalysisResponse.from(analysis,
-                candidateRepository.findByDealAnalysisIdOrderByIdAsc(analysisId));
+                candidateRepository.findByDealAnalysisIdOrderByIdAsc(analysis.getId()));
     }
 }

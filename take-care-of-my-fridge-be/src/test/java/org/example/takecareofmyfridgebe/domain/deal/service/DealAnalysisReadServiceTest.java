@@ -42,4 +42,27 @@ class DealAnalysisReadServiceTest {
                                 .isEqualTo(ErrorCode.DEAL_ANALYSIS_NOT_FOUND));
         verifyNoInteractions(candidates);
     }
+
+    @Test
+    void latestReadsOnlyRequestedMembersAnalysis() {
+        DealAnalysis analysis = DealAnalysis.builder().build();
+        ReflectionTestUtils.setField(analysis, "id", 12L);
+        when(analyses.findTopByMemberIdOrderByCreatedAtDescIdDesc(7L))
+                .thenReturn(Optional.of(analysis));
+        when(candidates.findByDealAnalysisIdOrderByIdAsc(12L)).thenReturn(List.of());
+
+        assertThat(service.getLatestForMember(7L).analysisId()).isEqualTo(12L);
+    }
+
+    @Test
+    void memberWithoutAnalysisReturnsD002() {
+        when(analyses.findTopByMemberIdOrderByCreatedAtDescIdDesc(7L))
+                .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.getLatestForMember(7L))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        error -> assertThat(error.getErrorCode())
+                                .isEqualTo(ErrorCode.DEAL_ANALYSIS_NOT_FOUND));
+        verifyNoInteractions(candidates);
+    }
 }

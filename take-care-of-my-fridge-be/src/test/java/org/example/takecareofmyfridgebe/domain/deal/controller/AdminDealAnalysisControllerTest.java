@@ -75,6 +75,27 @@ class AdminDealAnalysisControllerTest {
         verifyNoInteractions(service);
     }
 
+    @Test
+    void adminReadsOwnLatestAnalysis() throws Exception {
+        when(service.getLatestForMember(7L)).thenReturn(new DealAnalysisResponse(
+                12L, LocalDate.of(2026, 10, 26), DealAnalysis.Day.WED, 30, 50,
+                "model-v1", null, null, null, false,
+                new DealAnalysisResponse.ReviewCounts(0, 0, 0), List.of(), List.of()));
+
+        mvc.perform(get("/api/admin/deal-analyses/latest")
+                        .with(authenticationFor(Member.Role.ADMIN)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.analysisId").value(12));
+    }
+
+    @Test
+    void userCannotReadLatestAnalysis() throws Exception {
+        mvc.perform(get("/api/admin/deal-analyses/latest")
+                        .with(authenticationFor(Member.Role.USER)))
+                .andExpect(status().isForbidden());
+        verifyNoInteractions(service);
+    }
+
     private org.springframework.test.web.servlet.request.RequestPostProcessor authenticationFor(Member.Role role) {
         return authentication(new UsernamePasswordAuthenticationToken(
                 new AuthSessionService.AuthPrincipal(7L, 8L, role), null,
