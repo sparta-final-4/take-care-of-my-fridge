@@ -10,6 +10,7 @@ import org.example.takecareofmyfridgebe.domain.fridge.repository.FridgeRepositor
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.Ingredient;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.StorageType;
 import org.example.takecareofmyfridgebe.domain.ingredient.repository.IngredientRepository;
+import org.example.takecareofmyfridgebe.domain.ingredient.service.IngredientService;
 import org.example.takecareofmyfridgebe.global.config.JpaAuditingConfig;
 import org.example.takecareofmyfridgebe.global.config.QueryDslConfig;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
@@ -50,7 +51,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Testcontainers
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({JpaAuditingConfig.class, QueryDslConfig.class, FridgeService.class})
+@Import({JpaAuditingConfig.class, QueryDslConfig.class, FridgeService.class, IngredientService.class})
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class FridgeServiceConcurrencyTest {
 
