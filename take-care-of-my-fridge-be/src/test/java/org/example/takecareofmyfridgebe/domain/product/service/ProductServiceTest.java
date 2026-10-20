@@ -1,8 +1,13 @@
 package org.example.takecareofmyfridgebe.domain.product.service;
 
+import org.example.takecareofmyfridgebe.domain.ingredient.entity.Ingredient;
+import org.example.takecareofmyfridgebe.domain.ingredient.entity.StorageType;
+import org.example.takecareofmyfridgebe.domain.ingredient.repository.IngredientRepository;
 import org.example.takecareofmyfridgebe.domain.product.dto.ProductDetailResponse;
 import org.example.takecareofmyfridgebe.domain.product.dto.ProductListItemResponse;
 import org.example.takecareofmyfridgebe.domain.product.dto.ProductSort;
+import org.example.takecareofmyfridgebe.domain.product.entity.IngredientProduct;
+import org.example.takecareofmyfridgebe.domain.product.entity.MealkitProduct;
 import org.example.takecareofmyfridgebe.domain.product.entity.Product;
 import org.example.takecareofmyfridgebe.domain.product.entity.ProductStatus;
 import org.example.takecareofmyfridgebe.domain.product.entity.ProductType;
@@ -35,6 +40,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -47,6 +53,8 @@ class ProductServiceTest {
     private IngredientProductRepository ingredientProductRepository;
     @Mock
     private MealkitProductRepository mealkitProductRepository;
+    @Mock
+    private IngredientRepository ingredientRepository;
     @InjectMocks
     private ProductService service;
     @Captor
@@ -153,6 +161,83 @@ class ProductServiceTest {
         verify(productRepository).findByIdAndStatusIn(eq(99L), statusCaptor.capture());
         assertThat(statusCaptor.getValue())
                 .containsExactlyInAnyOrder(ProductStatus.ON_SALE, ProductStatus.SOLD_OUT);
+    }
+
+    @Test
+    @DisplayName("재료 상품 등록 시 상품과 재료 상세를 함께 저장한다")
+    void createProduct_ingredient() {
+        // given
+        when(ingredientRepository.findById(1L)).thenReturn(Optional.of(ingredient("ONION")));
+        when(productRepository.save(any(Product.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(ingredientProductRepository.save(any(IngredientProduct.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        // when
+        ProductDetailResponse result = service.createProduct(ProductFixture.createIngredientRequest(1L));
+
+        // then
+        assertThat(result.productType()).isEqualTo(ProductType.INGREDIENT);
+        assertThat(result.name()).isEqualTo("양파 1kg");
+        assertThat(result.status()).isEqualTo(ProductStatus.ON_SALE);
+        assertThat(result.ingredient()).isEqualTo(new ProductDetailResponse.IngredientInfo(new BigDecimal("1000"), "g"));
+        verify(mealkitProductRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("밀키트 상품 등록 시 상품과 밀키트 상세를 함께 저장한다")
+    void createProduct_mealkit() {
+        // given
+        when(productRepository.save(any(Product.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(mealkitProductRepository.save(any(MealkitProduct.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        // when
+        ProductDetailResponse result = service.createProduct(ProductFixture.createMealkitRequest());
+
+        // then
+        assertThat(result.productType()).isEqualTo(ProductType.MEALKIT);
+        assertThat(result.mealkit()).isEqualTo(new ProductDetailResponse.MealkitInfo(2));
+        verify(ingredientProductRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("연결할 재료가 없으면 INGREDIENT_NOT_FOUND 예외가 발생하고 아무것도 저장하지 않는다")
+    void createProduct_ingredientNotFound() {
+        // given
+        when(ingredientRepository.findById(99L)).thenReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> service.createProduct(ProductFixture.createIngredientRequest(99L)))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.INGREDIENT_NOT_FOUND);
+        verify(productRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("직접 입력용·밀키트용 기본 재료에는 상품을 연결할 수 없다")
+    void createProduct_specialIngredient() {
+        for (String code : List.of(Ingredient.ING_CUSTOM, Ingredient.ING_MEALKIT)) {
+            // given
+            when(ingredientRepository.findById(1L)).thenReturn(Optional.of(ingredient(code)));
+
+            // when & then
+            assertThatThrownBy(() -> service.createProduct(ProductFixture.createIngredientRequest(1L)))
+                    .isInstanceOf(BusinessException.class)
+                    .extracting("errorCode")
+                    .isEqualTo(ErrorCode.INVALID_PRODUCT_INGREDIENT);
+        }
+        verify(productRepository, never()).save(any());
+    }
+
+    private static Ingredient ingredient(String code) {
+        return Ingredient.builder()
+                .ingredientCode(code)
+                .name(code)
+                .baseUnit("개")
+                .defaultStorage(StorageType.ROOM_TEMP)
+                .defaultShelfDays(7)
+                .build();
     }
 
 }
