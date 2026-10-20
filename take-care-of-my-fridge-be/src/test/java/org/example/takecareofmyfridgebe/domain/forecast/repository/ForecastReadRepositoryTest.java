@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 import org.example.takecareofmyfridgebe.domain.forecast.entity.PredictionRun;
 import org.example.takecareofmyfridgebe.domain.forecast.entity.SalesForecast;
 import org.example.takecareofmyfridgebe.global.config.JpaAuditingConfig;
+import org.example.takecareofmyfridgebe.global.config.QueryDslConfig;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
@@ -21,7 +22,7 @@ import org.testcontainers.mysql.MySQLContainer;
 @Testcontainers
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import(JpaAuditingConfig.class)
+@Import({JpaAuditingConfig.class, QueryDslConfig.class})
 class ForecastReadRepositoryTest {
 
     @Container
