@@ -50,6 +50,7 @@ public class SecurityConfig {
                         ).permitAll()
                         .requestMatchers(API_DOCS_PATHS).permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/admin/members/*/promotion").authenticated()
+                        .requestMatchers(HttpMethod.PUT, "/api/admin/deal-analyses/*/reviews").authenticated()
                         .requestMatchers("/api/admin", "/api/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))

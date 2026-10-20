@@ -2,10 +2,13 @@ package org.example.takecareofmyfridgebe.domain.deal.controller;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -14,7 +17,11 @@ import java.util.List;
 import org.example.takecareofmyfridgebe.domain.auth.service.AuthSessionService;
 import org.example.takecareofmyfridgebe.domain.auth.service.JwtTokenService;
 import org.example.takecareofmyfridgebe.domain.deal.dto.DealAnalysisResponse;
+import org.example.takecareofmyfridgebe.domain.deal.dto.DealReviewRequest;
+import org.example.takecareofmyfridgebe.domain.deal.dto.DealReviewResponse;
 import org.example.takecareofmyfridgebe.domain.deal.entity.DealAnalysis;
+import org.example.takecareofmyfridgebe.domain.deal.entity.DealCandidate;
+import org.example.takecareofmyfridgebe.domain.deal.facade.DealReviewFacade;
 import org.example.takecareofmyfridgebe.domain.deal.service.DealAnalysisReadService;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 import org.example.takecareofmyfridgebe.global.config.SecurityConfig;
@@ -27,6 +34,7 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.web.servlet.MockMvc;
@@ -39,10 +47,12 @@ class AdminDealAnalysisControllerTest {
     private MockMvc mvc;
     @Autowired
     private DealAnalysisReadService service;
+    @Autowired
+    private DealReviewFacade reviewFacade;
 
     @BeforeEach
     void resetMock() {
-        reset(service);
+        reset(service, reviewFacade);
     }
 
     @Test
@@ -96,6 +106,44 @@ class AdminDealAnalysisControllerTest {
         verifyNoInteractions(service);
     }
 
+    @Test
+    void adminSavesSelectedCandidate() throws Exception {
+        var reviews = List.of(new DealReviewRequest.Review(11L, DealCandidate.ReviewStatus.SELECTED));
+        when(reviewFacade.save(7L, Member.Role.ADMIN, 3L, reviews))
+                .thenReturn(new DealReviewResponse(null,
+                        new DealAnalysisResponse.ReviewCounts(1, 0, 0)));
+
+        mvc.perform(put("/api/admin/deal-analyses/3/reviews")
+                        .with(csrf()).with(authenticationFor(Member.Role.ADMIN))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reviews\":[{\"candidateId\":11,\"reviewStatus\":\"SELECTED\"}]}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.reviewCounts.selected").value(1));
+    }
+
+    @Test
+    void rejectsEmptyReviewList() throws Exception {
+        mvc.perform(put("/api/admin/deal-analyses/3/reviews")
+                        .with(csrf()).with(authenticationFor(Member.Role.ADMIN))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"reviews\":[]}"))
+                .andExpect(status().isBadRequest());
+        verifyNoInteractions(reviewFacade);
+    }
+
+    @Test
+    void userCannotSaveReviews() throws Exception {
+        var reviews = List.of(new DealReviewRequest.Review(11L, DealCandidate.ReviewStatus.SELECTED));
+        when(reviewFacade.save(7L, Member.Role.USER, 3L, reviews))
+                .thenThrow(new BusinessException(ErrorCode.ADMIN_ACCESS_DENIED));
+        mvc.perform(put("/api/admin/deal-analyses/3/reviews")
+                        .with(csrf()).with(authenticationFor(Member.Role.USER))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reviews\":[{\"candidateId\":11,\"reviewStatus\":\"SELECTED\"}]}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code").value("A004"));
+        verify(reviewFacade).save(7L, Member.Role.USER, 3L, reviews);
+    }
+
     private org.springframework.test.web.servlet.request.RequestPostProcessor authenticationFor(Member.Role role) {
         return authentication(new UsernamePasswordAuthenticationToken(
                 new AuthSessionService.AuthPrincipal(7L, 8L, role), null,
@@ -107,6 +155,11 @@ class AdminDealAnalysisControllerTest {
         @Bean
         DealAnalysisReadService dealAnalysisReadService() {
             return mock(DealAnalysisReadService.class);
+        }
+
+        @Bean
+        DealReviewFacade dealReviewFacade() {
+            return mock(DealReviewFacade.class);
         }
 
         @Bean

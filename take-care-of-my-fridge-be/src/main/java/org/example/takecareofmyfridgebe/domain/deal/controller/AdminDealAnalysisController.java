@@ -1,14 +1,20 @@
 package org.example.takecareofmyfridgebe.domain.deal.controller;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.auth.service.AuthSessionService;
 import org.example.takecareofmyfridgebe.domain.deal.dto.DealAnalysisResponse;
+import org.example.takecareofmyfridgebe.domain.deal.dto.DealReviewRequest;
+import org.example.takecareofmyfridgebe.domain.deal.dto.DealReviewResponse;
+import org.example.takecareofmyfridgebe.domain.deal.facade.DealReviewFacade;
 import org.example.takecareofmyfridgebe.domain.deal.service.DealAnalysisReadService;
 import org.example.takecareofmyfridgebe.global.response.ApiResponse;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -18,6 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class AdminDealAnalysisController {
 
     private final DealAnalysisReadService readService;
+    private final DealReviewFacade reviewFacade;
 
     @GetMapping("/latest")
     public ResponseEntity<ApiResponse<DealAnalysisResponse>> getLatest(
@@ -28,5 +35,14 @@ public class AdminDealAnalysisController {
     @GetMapping("/{analysisId}")
     public ResponseEntity<ApiResponse<DealAnalysisResponse>> getById(@PathVariable Long analysisId) {
         return ResponseEntity.ok(ApiResponse.ok(readService.getById(analysisId)));
+    }
+
+    @PutMapping("/{analysisId}/reviews")
+    public ResponseEntity<ApiResponse<DealReviewResponse>> saveReviews(
+            @PathVariable Long analysisId,
+            @Valid @RequestBody DealReviewRequest request,
+            @AuthenticationPrincipal AuthSessionService.AuthPrincipal principal) {
+        return ResponseEntity.ok(ApiResponse.ok(reviewFacade.save(
+                principal.memberId(), principal.role(), analysisId, request.reviews())));
     }
 }
