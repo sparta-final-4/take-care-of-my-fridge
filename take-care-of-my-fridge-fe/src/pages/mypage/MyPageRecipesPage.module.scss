@@ -1,0 +1,14 @@
+@use '@/styles/variables' as *;
+@use '@/styles/mixins' as *;
+
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ant-margin-xl);
+  width: 100%;
+}
+
+.loadingWrapper {
+  width: 100%;
+  padding: var(--ant-padding-xl) 0;
+}

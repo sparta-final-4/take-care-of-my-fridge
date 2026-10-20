@@ -107,6 +107,11 @@ export function Header() {
               {nickname} 로그아웃
             </Button>
           )}
+          {screens.lg && status === 'anonymous' && (
+            <Button type="text" onClick={() => navigate(ROUTES.login)}>
+              로그인
+            </Button>
+          )}
           <NotificationBell />
           {!screens.lg && (
             <Button
@@ -186,6 +191,18 @@ export function Header() {
                 loading={logoutMutation.isPending}
               >
                 로그아웃
+              </Button>
+            )}
+            {status === 'anonymous' && (
+              <Button
+                type="text"
+                block
+                onClick={() => {
+                  handleCloseDrawer();
+                  navigate(ROUTES.login);
+                }}
+              >
+                로그인
               </Button>
             )}
           </Flex>

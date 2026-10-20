@@ -1,0 +1,362 @@
+@use '@/styles/variables' as *;
+@use '@/styles/mixins' as *;
+
+.section {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  padding: var(--ant-padding-lg);
+  background: var(--ant-color-bg-container);
+  border: 1px solid var(--ant-color-border);
+  border-radius: var(--ant-border-radius-lg);
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: var(--ant-margin-lg);
+}
+
+.title {
+  margin: 0 0 4px !important;
+  font-size: var(--ant-font-size-xl) !important;
+  font-weight: 700 !important;
+}
+
+.subtitle {
+  font-size: var(--ant-font-size-sm);
+}
+
+.sortSelect {
+  width: 130px;
+}
+
+/* 탭 버튼들 */
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ant-margin-xs);
+  margin-bottom: var(--ant-margin-lg);
+}
+
+.tabButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 20px;
+  border: 1px solid var(--ant-color-border);
+  background: var(--ant-color-bg-container);
+  color: var(--ant-color-text);
+  font-size: var(--ant-font-size);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover {
+    border-color: var(--ant-color-text-secondary);
+  }
+}
+
+.tabButtonActive {
+  background: #1f1f1f;
+  color: #ffffff;
+  border-color: #1f1f1f;
+
+  &:hover {
+    color: #ffffff;
+    border-color: #1f1f1f;
+  }
+}
+
+.tabCount {
+  font-size: var(--ant-font-size-sm);
+  opacity: 0.85;
+}
+
+/* 표 컨테이너 */
+.emptyWrapper {
+  padding: var(--ant-padding-xl) 0;
+}
+
+.tableWrapper {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  min-width: 680px;
+  border-collapse: collapse;
+
+  thead tr {
+    border-bottom: 1px solid var(--ant-color-border-secondary);
+  }
+
+  th {
+    padding: 10px 12px;
+    font-size: var(--ant-font-size-sm);
+    font-weight: 500;
+    color: var(--ant-color-text-secondary);
+    text-align: left;
+  }
+}
+
+.thRecipe {
+  width: 32%;
+}
+
+.thCookCount {
+  width: 14%;
+}
+
+.thLastCooked {
+  width: 14%;
+}
+
+.thReview {
+  width: 14%;
+}
+
+.thActions {
+  width: 26%;
+  text-align: right;
+}
+
+.rowGroup {
+  border-bottom: 1px solid var(--ant-color-border-secondary);
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.rowCell {
+  padding: 14px 0;
+}
+
+.mainRow {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 0 12px;
+}
+
+.colRecipe {
+  display: flex;
+  align-items: center;
+  gap: var(--ant-margin-sm);
+  width: 32%;
+}
+
+.thumbnail {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 54px;
+  height: 54px;
+  border-radius: var(--ant-border-radius);
+  background: var(--ant-color-fill-secondary);
+  color: var(--ant-color-text-tertiary);
+  font-size: 11px;
+  flex-shrink: 0;
+  overflow: hidden;
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+}
+
+.placeholderImg {
+  color: var(--ant-color-text-quaternary);
+}
+
+.recipeInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.aiTag {
+  width: fit-content;
+  margin: 0;
+  font-size: 11px;
+  line-height: 18px;
+  padding: 0 6px;
+  border-radius: 4px;
+  background: var(--ant-color-fill-secondary);
+  border: 1px solid var(--ant-color-border-secondary);
+  color: var(--ant-color-text-secondary);
+}
+
+.recipeName {
+  font-size: var(--ant-font-size);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.colCookCount {
+  width: 14%;
+}
+
+.expandTrigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  border: none;
+  padding: 4px 6px;
+  border-radius: 4px;
+  font-size: var(--ant-font-size);
+  color: var(--ant-color-text);
+  cursor: pointer;
+
+  &:hover {
+    background: var(--ant-color-fill-tertiary);
+  }
+}
+
+.expandIcon {
+  font-size: 10px;
+  color: var(--ant-color-text-secondary);
+}
+
+.colLastCooked {
+  width: 14%;
+  font-size: var(--ant-font-size);
+}
+
+.colReview {
+  width: 14%;
+}
+
+.ratingText {
+  font-size: var(--ant-font-size);
+  font-weight: 600;
+  color: var(--ant-color-text);
+}
+
+.unreviewedTag {
+  margin: 0;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  background: var(--ant-color-fill-secondary);
+  border: 1px solid var(--ant-color-border);
+  color: var(--ant-color-text-secondary);
+}
+
+.colActions {
+  width: 26%;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.primaryActionButton {
+  background: #1f1f1f !important;
+  border-color: #1f1f1f !important;
+  color: #ffffff !important;
+
+  &:hover {
+    background: #333333 !important;
+    border-color: #333333 !important;
+  }
+}
+
+/* 펼쳐진 서브 패널 */
+.expandedPanel {
+  margin: 12px 12px 6px;
+  padding: var(--ant-padding);
+  background: var(--ant-color-fill-quaternary);
+  border-radius: var(--ant-border-radius);
+  display: flex;
+  flex-direction: column;
+  gap: var(--ant-margin);
+}
+
+.detailReviewSection {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.detailLabel {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.detailReviewContent {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--ant-margin-xs);
+}
+
+.reviewHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.reviewText {
+  font-size: var(--ant-font-size);
+  color: var(--ant-color-text);
+}
+
+.reviewDate {
+  font-size: 12px;
+}
+
+.detailHistorySection {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.historyList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.historyItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: var(--ant-font-size-sm);
+}
+
+.historyDate {
+  color: var(--ant-color-text-secondary);
+  width: 44px;
+}
+
+.successTag {
+  margin: 0;
+  border-radius: 10px;
+  padding: 0 8px;
+  background: #1f1f1f;
+  color: #ffffff;
+  border: none;
+  font-size: 11px;
+}
+
+.failedTag {
+  margin: 0;
+  border-radius: 10px;
+  padding: 0 8px;
+  background: var(--ant-color-bg-container);
+  border: 1px solid var(--ant-color-border);
+  color: var(--ant-color-text-secondary);
+  font-size: 11px;
+}
+
+.historyMemo {
+  color: var(--ant-color-text);
+}
