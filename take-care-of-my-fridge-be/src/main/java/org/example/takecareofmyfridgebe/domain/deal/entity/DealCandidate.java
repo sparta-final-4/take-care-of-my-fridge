@@ -18,6 +18,8 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.example.takecareofmyfridgebe.global.entity.BaseTimeEntity;
+import org.example.takecareofmyfridgebe.global.error.BusinessException;
+import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 
 @Entity
 @Table(name = "deal_candidates", uniqueConstraints =
@@ -120,5 +122,18 @@ public class DealCandidate extends BaseTimeEntity {
         this.expectedIncrease = expectedIncrease;
         this.reviewStatus = excluded ? null : ReviewStatus.UNREVIEWED;
         this.eventRequestStatus = EventRequestStatus.NONE;
+    }
+
+    public void review(ReviewStatus status) {
+        if (excluded) {
+            throw new BusinessException(ErrorCode.DEAL_CANDIDATE_NOT_IN_ANALYSIS);
+        }
+        if (eventRequestStatus != EventRequestStatus.NONE) {
+            throw new BusinessException(ErrorCode.DEAL_REVIEW_LOCKED);
+        }
+        if (status == null || status == ReviewStatus.UNREVIEWED) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+        this.reviewStatus = status;
     }
 }
