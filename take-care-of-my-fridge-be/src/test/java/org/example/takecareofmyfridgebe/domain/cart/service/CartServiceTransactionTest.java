@@ -225,7 +225,7 @@ class CartServiceTransactionTest {
     }
 
     @Test
-    @DisplayName("조회는 상품 이름·정가를 붙이고, 재고 0이나 판매 중지 상품은 품절로 표시한다")
+    @DisplayName("조회는 상품 이름·이미지·정가를 붙이고, 재고 0이나 판매 중지 상품은 품절로 표시한다")
     void getItems_includesProductInfoAndSoldOut() {
         Product onSale = saveProduct(5, ProductStatus.ON_SALE);
         Product noStock = saveProduct(0, ProductStatus.ON_SALE);
@@ -242,6 +242,7 @@ class CartServiceTransactionTest {
         assertThat(items).extracting(CartItemResponse::soldOut).containsExactly(false, true, true);
         assertThat(items).allSatisfy(item -> {
             assertThat(item.productName()).isEqualTo("대파");
+            assertThat(item.imageUrl()).isEqualTo("https://example.com/green-onion.png");
             assertThat(item.listPrice()).isEqualTo(1000);
             assertThat(item.unitPrice()).isEqualTo(1000);
             assertThat(item.saleType()).isNull();
@@ -292,6 +293,7 @@ class CartServiceTransactionTest {
         return productRepository.save(Product.builder()
                 .productType(ProductType.INGREDIENT)
                 .name("대파")
+                .imageUrl("https://example.com/green-onion.png")
                 .price(1000)
                 .stock(stock)
                 .storage(StorageType.REFRIGERATED)

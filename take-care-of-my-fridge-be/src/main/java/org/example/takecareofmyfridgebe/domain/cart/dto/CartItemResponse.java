@@ -11,6 +11,7 @@ public record CartItemResponse(
         Long cartItemId,
         Long productId,
         String productName,
+        String imageUrl,
         int quantity,
         int listPrice,
         int unitPrice,
@@ -26,6 +27,7 @@ public record CartItemResponse(
                 .cartItemId(item.getId())
                 .productId(item.getProductId())
                 .productName(product.getName())
+                .imageUrl(product.getImageUrl())
                 .quantity(item.getQuantity())
                 .listPrice(product.getPrice())
                 .unitPrice(product.getPrice())
