@@ -33,19 +33,36 @@ public record DealAnalysisResponse(
                 .filter(DealCandidate::isExcluded)
                 .sorted(Comparator.comparing(DealCandidate::getId))
                 .map(Excluded::from).toList();
-        long selected = candidates.stream()
-                .filter(item -> item.reviewStatus() == DealCandidate.ReviewStatus.SELECTED).count();
-        long held = candidates.stream()
-                .filter(item -> item.reviewStatus() == DealCandidate.ReviewStatus.HELD).count();
         return new DealAnalysisResponse(analysis.getId(), analysis.getTargetWeekStart(),
                 analysis.getDayOfWeek(), analysis.getDiscountRate(), analysis.getMinStock(),
                 analysis.getModelVersion(), analysis.getDataCutoffAt(), analysis.getCreatedAt(),
                 analysis.getLastSavedAt(), analysis.isSyntheticData(),
-                new ReviewCounts((int) selected, (int) held, candidates.size() - (int) selected - (int) held),
+                ReviewCounts.from(items),
                 candidates, excluded);
     }
 
-    public record ReviewCounts(int selected, int held, int unreviewed) {}
+    public record ReviewCounts(int selected, int held, int unreviewed) {
+
+        // 제외 상품은 세지 않는다. 검토 상태가 비어 있으면 미검토로 센다.
+        public static ReviewCounts from(List<DealCandidate> items) {
+            int selected = 0;
+            int held = 0;
+            int unreviewed = 0;
+            for (DealCandidate item : items) {
+                if (item.isExcluded()) {
+                    continue;
+                }
+                if (item.getReviewStatus() == DealCandidate.ReviewStatus.SELECTED) {
+                    selected++;
+                } else if (item.getReviewStatus() == DealCandidate.ReviewStatus.HELD) {
+                    held++;
+                } else {
+                    unreviewed++;
+                }
+            }
+            return new ReviewCounts(selected, held, unreviewed);
+        }
+    }
 
     public record Candidate(
             Long candidateId,

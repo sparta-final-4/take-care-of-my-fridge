@@ -38,6 +38,21 @@ class DealAnalysisResponseTest {
                 .containsExactly(13L);
     }
 
+    @Test
+    void reviewCountsSkipExcludedAndTreatMissingStatusAsUnreviewed() {
+        DealAnalysis analysis = DealAnalysis.builder().build();
+        DealCandidate selected = candidate(analysis, 21L, 7L, false, 5);
+        selected.review(DealCandidate.ReviewStatus.SELECTED);
+        DealCandidate held = candidate(analysis, 22L, 8L, false, 4);
+        held.review(DealCandidate.ReviewStatus.HELD);
+        DealCandidate missing = candidate(analysis, 23L, 9L, false, 3);
+        ReflectionTestUtils.setField(missing, "reviewStatus", null);
+        DealCandidate excluded = candidate(analysis, 24L, 10L, true, null);
+
+        assertThat(DealAnalysisResponse.ReviewCounts.from(List.of(selected, held, missing, excluded)))
+                .isEqualTo(new DealAnalysisResponse.ReviewCounts(1, 1, 1));
+    }
+
     private DealCandidate candidate(DealAnalysis analysis, Long id, Long productId,
                                     boolean excluded, Integer increase) {
         DealCandidate item = DealCandidate.builder().dealAnalysis(analysis).productId(productId)

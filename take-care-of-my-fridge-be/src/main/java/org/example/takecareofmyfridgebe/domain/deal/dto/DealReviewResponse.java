@@ -9,20 +9,6 @@ public record DealReviewResponse(
         DealAnalysisResponse.ReviewCounts reviewCounts
 ) {
     public static DealReviewResponse from(LocalDateTime savedAt, List<DealCandidate> candidates) {
-        int selected = 0;
-        int held = 0;
-        int unreviewed = 0;
-        for (DealCandidate candidate : candidates) {
-            if (candidate.isExcluded()) {
-                continue;
-            }
-            switch (candidate.getReviewStatus()) {
-                case SELECTED -> selected++;
-                case HELD -> held++;
-                case UNREVIEWED -> unreviewed++;
-            }
-        }
-        return new DealReviewResponse(savedAt,
-                new DealAnalysisResponse.ReviewCounts(selected, held, unreviewed));
+        return new DealReviewResponse(savedAt, DealAnalysisResponse.ReviewCounts.from(candidates));
     }
 }
