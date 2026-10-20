@@ -1,11 +1,15 @@
 package org.example.takecareofmyfridgebe.domain.product.service;
 
 import lombok.RequiredArgsConstructor;
+import org.example.takecareofmyfridgebe.domain.ingredient.entity.Ingredient;
+import org.example.takecareofmyfridgebe.domain.ingredient.repository.IngredientRepository;
+import org.example.takecareofmyfridgebe.domain.product.dto.ProductCreateRequest;
 import org.example.takecareofmyfridgebe.domain.product.dto.ProductDetailResponse;
 import org.example.takecareofmyfridgebe.domain.product.dto.ProductListItemResponse;
 import org.example.takecareofmyfridgebe.domain.product.dto.ProductSort;
 import org.example.takecareofmyfridgebe.domain.product.entity.Product;
 import org.example.takecareofmyfridgebe.domain.product.entity.ProductStatus;
+import org.example.takecareofmyfridgebe.domain.product.entity.ProductType;
 import org.example.takecareofmyfridgebe.domain.product.repository.IngredientProductRepository;
 import org.example.takecareofmyfridgebe.domain.product.repository.MealkitProductRepository;
 import org.example.takecareofmyfridgebe.domain.product.repository.ProductRepository;
@@ -30,6 +34,7 @@ public class ProductService {
     private final ProductRepository productRepository;
     private final IngredientProductRepository ingredientProductRepository;
     private final MealkitProductRepository mealkitProductRepository;
+    private final IngredientRepository ingredientRepository;
 
     public PageResponse<ProductListItemResponse> getProducts(ProductSort sort, int page, int size) {
         PageRequest pageable = PageRequest.of(page - 1, size, sort.toSort());
@@ -55,5 +60,36 @@ public class ProductService {
                     mealkitProductRepository.findByProductId(productId).orElse(null)
             );
         };
+    }
+
+    // TODO: ElasticSearch 에 인덱싱 과정 추가 필수...
+    @Transactional
+    public ProductDetailResponse createProduct(ProductCreateRequest request) {
+        if (request.productType() == ProductType.INGREDIENT) {
+            validateLinkableIngredient(request.ingredient().ingredientId());
+        }
+
+        Product product = productRepository.save(request.toProduct());
+
+        return switch (product.getProductType()) {
+            case INGREDIENT -> ProductDetailResponse.ofIngredient(
+                    product,
+                    ingredientProductRepository.save(request.toIngredientProduct(product))
+            );
+            case MEALKIT -> ProductDetailResponse.ofMealkit(
+                    product,
+                    mealkitProductRepository.save(request.toMealkitProduct(product))
+            );
+        };
+    }
+
+    // ingredient_products.ingredient_id는 FK 없이 ID로만 참조하므로 저장 전에 직접 확인한다.
+    // 직접 입력용(ING_CUSTOM)·밀키트용(ING_MEALKIT) 기본 재료는 상품에 연결하지 않는다.
+    private void validateLinkableIngredient(Long ingredientId) {
+        Ingredient ingredient = ingredientRepository.findById(ingredientId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.INGREDIENT_NOT_FOUND));
+        if (ingredient.isCustom() || ingredient.isMealkit()) {
+            throw new BusinessException(ErrorCode.INVALID_PRODUCT_INGREDIENT);
+        }
     }
 }

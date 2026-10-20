@@ -12,6 +12,7 @@ import org.example.takecareofmyfridgebe.domain.cart.dto.AddCartItemResult;
 import org.example.takecareofmyfridgebe.domain.cart.dto.CartItemsResponse;
 import org.example.takecareofmyfridgebe.domain.cart.dto.ChangeCartItemQuantityRequest;
 import org.example.takecareofmyfridgebe.domain.cart.dto.ChangeCartItemQuantityResponse;
+import org.example.takecareofmyfridgebe.domain.cart.dto.RemoveCartItemsRequest;
 import org.example.takecareofmyfridgebe.domain.cart.entity.Cart;
 import org.example.takecareofmyfridgebe.domain.cart.entity.CartItem;
 import org.example.takecareofmyfridgebe.domain.cart.repository.CartItemRepository;
@@ -82,6 +83,11 @@ public class CartService {
 
         item.changeQuantity(quantity);
         return ChangeCartItemQuantityResponse.from(item);
+    }
+
+    @Transactional
+    public void removeItems(Long memberId, RemoveCartItemsRequest request) {
+        cartItemRepository.deleteAllByIdsAndMemberId(request.cartItemIds(), memberId);
     }
 
     // 품절은 상태값이 아니라 재고 숫자로 판단하므로 판매 중지만 거른다
