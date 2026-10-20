@@ -8,6 +8,7 @@ import org.example.takecareofmyfridgebe.domain.cart.dto.AddCartItemResult;
 import org.example.takecareofmyfridgebe.domain.cart.dto.CartItemsResponse;
 import org.example.takecareofmyfridgebe.domain.cart.dto.ChangeCartItemQuantityRequest;
 import org.example.takecareofmyfridgebe.domain.cart.dto.ChangeCartItemQuantityResponse;
+import org.example.takecareofmyfridgebe.domain.cart.dto.RemoveCartItemsRequest;
 import org.example.takecareofmyfridgebe.domain.cart.entity.Cart;
 import org.example.takecareofmyfridgebe.domain.cart.entity.CartItem;
 import org.example.takecareofmyfridgebe.domain.cart.repository.CartItemRepository;
@@ -55,5 +56,10 @@ public class CartService {
 
         item.changeQuantity(request.quantity());
         return ChangeCartItemQuantityResponse.from(item);
+    }
+
+    @Transactional
+    public void removeItems(Long memberId, RemoveCartItemsRequest request) {
+        cartItemRepository.deleteAllByIdsAndMemberId(request.cartItemIds(), memberId);
     }
 }

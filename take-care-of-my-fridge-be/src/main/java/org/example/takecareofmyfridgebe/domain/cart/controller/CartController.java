@@ -9,12 +9,15 @@ import org.example.takecareofmyfridgebe.domain.cart.dto.AddCartItemResult;
 import org.example.takecareofmyfridgebe.domain.cart.dto.CartItemsResponse;
 import org.example.takecareofmyfridgebe.domain.cart.dto.ChangeCartItemQuantityRequest;
 import org.example.takecareofmyfridgebe.domain.cart.dto.ChangeCartItemQuantityResponse;
+import org.example.takecareofmyfridgebe.domain.cart.dto.RemoveCartItemsRequest;
 import org.example.takecareofmyfridgebe.domain.cart.service.CartService;
 import org.example.takecareofmyfridgebe.global.response.ApiResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -50,5 +53,13 @@ public class CartController {
             @PathVariable Long cartItemId,
             @Valid @RequestBody ChangeCartItemQuantityRequest request) {
         return ResponseEntity.ok(ApiResponse.ok(cartService.changeQuantity(principal.memberId(), cartItemId, request)));
+    }
+
+    @DeleteMapping
+    public ResponseEntity<ApiResponse<Void>> removeItems(
+            @AuthenticationPrincipal AuthSessionService.AuthPrincipal principal,
+            @Valid @ModelAttribute RemoveCartItemsRequest request) {
+        cartService.removeItems(principal.memberId(), request);
+        return ResponseEntity.ok(ApiResponse.ok());
     }
 }
