@@ -56,6 +56,9 @@ dependencies {
     implementation platform('io.awspring.cloud:spring-cloud-aws-dependencies:4.1.1')
     implementation 'io.awspring.cloud:spring-cloud-aws-starter-parameter-store'
 
+    // PortOne (웹훅 서명 검증)
+    implementation 'io.portone:server-sdk:0.24.0'
+
     // OpenAPI (Swagger)
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.3'
 

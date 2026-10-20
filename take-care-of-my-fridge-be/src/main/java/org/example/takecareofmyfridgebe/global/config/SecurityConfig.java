@@ -38,10 +38,11 @@ public class SecurityConfig {
         http.csrf(csrf -> csrf.spa().ignoringRequestMatchers(request ->
                         "POST".equals(request.getMethod())
                                 && ((request.getContextPath() + "/api/members").equals(request.getRequestURI())
-                                || (request.getContextPath() + "/api/auth/login").equals(request.getRequestURI()))))
+                                || (request.getContextPath() + "/api/auth/login").equals(request.getRequestURI())
+                                || (request.getContextPath() + "/api/webhooks/portone").equals(request.getRequestURI()))))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.POST,
-                                "/api/members"
+                                "/api/members", "/api/webhooks/portone"
                         ).permitAll()
                         .requestMatchers(
                                 "/api/auth/login", "/api/auth/refresh", "/api/auth/logout", "/api/auth/csrf",

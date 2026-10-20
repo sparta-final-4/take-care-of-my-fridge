@@ -43,6 +43,7 @@ public enum ErrorCode {
 
     // Cart
     CART_ITEM_NOT_FOUND(HttpStatus.NOT_FOUND, "CART_001", "장바구니 상품을 찾을 수 없습니다."),
+    CART_QUANTITY_EXCEEDS_STOCK(HttpStatus.CONFLICT, "CART_002", "재고보다 많이 담을 수 없습니다."),
 
     // Order
     ORDER_NOT_FOUND(HttpStatus.NOT_FOUND, "ORDER_001", "주문을 찾을 수 없습니다."),
@@ -78,6 +79,7 @@ public enum ErrorCode {
     INVALID_CHAT_ROOM_STATUS(HttpStatus.BAD_REQUEST, "CHAT_002", "유효하지 않은 채팅방 상태 변경입니다."),
     ALREADY_ACTIVE_ROOM_EXISTS(HttpStatus.BAD_REQUEST, "CHAT_003", "이미 진행 중인 상담이 존재합니다."),
     CHAT_ACCESS_DENIED(HttpStatus.FORBIDDEN, "CHAT_004", "해당 채팅방에 접근할 권한이 없습니다."),
+    CHAT_ROOM_ALREADY_COMPLETED(HttpStatus.CONFLICT, "CHAT_005", "이미 종료된 상담입니다."),
 
     // Review
     REVIEW_NOT_FOUND(HttpStatus.NOT_FOUND, "REVIEW_001", "리뷰를 찾을 수 없습니다."),

@@ -1,6 +1,8 @@
 package org.example.takecareofmyfridgebe.domain.fridge.service;
 
 import lombok.RequiredArgsConstructor;
+import org.example.takecareofmyfridgebe.domain.cooking.dto.IngredientDeductionResponse;
+import org.example.takecareofmyfridgebe.domain.cooking.dto.UsedIngredientRequest;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemLogResponse;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemLogSearchRequest;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemResponse;
@@ -10,11 +12,13 @@ import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemUpdateReques
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeRemoveReason;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeSortType;
 import org.example.takecareofmyfridgebe.domain.fridge.entity.Fridge;
+import org.example.takecareofmyfridgebe.domain.fridge.entity.FridgeItemAction;
 import org.example.takecareofmyfridgebe.domain.fridge.entity.FridgeItemLog;
 import org.example.takecareofmyfridgebe.domain.fridge.repository.FridgeItemLogRepository;
 import org.example.takecareofmyfridgebe.domain.fridge.repository.FridgeRepository;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.Ingredient;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.StorageType;
+import org.example.takecareofmyfridgebe.domain.ingredient.service.IngredientService;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 import org.example.takecareofmyfridgebe.global.response.PageResponse;
@@ -25,7 +29,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -34,6 +41,7 @@ public class FridgeService {
 
     private final FridgeRepository fridgeRepository;
     private final FridgeItemLogRepository fridgeItemLogRepository;
+    private final IngredientService ingredientService;
 
     /**
      * 로그인한 회원의 냉장고 재료 목록을 보관방식, 정렬 기준, 소비기한 임박 여부 조건으로 조회한다.
@@ -165,28 +173,118 @@ public class FridgeService {
         // 같은 재료를 동시에 사용할 때 수량을 덮어쓰지 않도록 잠금.
         // 뒤 요청은 앞 요청이 커밋될 때까지 기다린 뒤 남은 양 기준으로 처리되고, 앞 요청이 지웠으면 404가 된다.
         Fridge fridge = getFridgeEntityForUpdate(memberId, fridgeId);
-        BigDecimal before = fridge.getQuantity();
-        BigDecimal requested = request.quantity();
-        boolean takeAll = requested == null || requested.compareTo(before) >= 0;
+        deductAndLog(fridge, request.quantity(), request.action(), null);
+        return FridgeItemTakeOutResponse.from(fridge);
+    }
 
-        fridge.deduct(takeAll ? before : requested);
-        // 차감 후 0.05 미만으로 남아 0으로 보정된 경우도 전부 뺀 것으로 기록한다.
-        BigDecimal takenQuantity = fridge.isEmpty() ? before : requested;
+    /**
+     * 요리 완료 시 필요한 냉장고 재료들을 소비기한 빠른 순으로 차감한다.
+     * 여러 재료를 잠글 때의 교착(Deadlock) 방지를 위해 ingredientId 오름차순으로 처리한다.
+     * 기본 양념, 직접 입력 재료(ING_CUSTOM), 밀키트(ING_MEALKIT)는 차감 대상에서 제외한다.
+     * 냉장고에 보유하지 않은 재료는 에러 없이 건너뛰며, 차감된 재료만 결과 목록에 포함된다.
+     *
+     * @param memberId        회원 ID
+     * @param cookingLogId    생성된 요리 기록 ID
+     * @param usedIngredients 차감 요청 재료 목록
+     * @return 차감된 재료별 차감량 및 잔여량 응답 목록
+     */
+    @Transactional
+    public List<IngredientDeductionResponse> consumeForCooking(
+            Long memberId,
+            Long cookingLogId,
+            List<UsedIngredientRequest> usedIngredients
+    ) {
+        if (usedIngredients == null || usedIngredients.isEmpty()) {
+            return List.of();
+        }
+
+        List<Long> requestedIds = usedIngredients.stream()
+                .map(UsedIngredientRequest::ingredientId)
+                .toList();
+        Set<Long> excludedIds = ingredientService.getExcludedIngredientIds(requestedIds);
+
+        // 교착 방지를 위해 ingredientId 오름차순으로 정렬하여 잠금 획득
+        List<UsedIngredientRequest> sortedRequests = usedIngredients.stream()
+                .filter(item -> !excludedIds.contains(item.ingredientId()))
+                .sorted(Comparator.comparing(UsedIngredientRequest::ingredientId))
+                .toList();
+
+        List<IngredientDeductionResponse> deductions = new ArrayList<>();
+
+        for (UsedIngredientRequest request : sortedRequests) {
+            Long ingredientId = request.ingredientId();
+            List<Fridge> items = fridgeRepository.findForUpdateByMemberIdAndIngredientId(memberId, ingredientId);
+            if (items.isEmpty()) {
+                continue;
+            }
+
+            BigDecimal totalAvailable = items.stream()
+                    .map(Fridge::getQuantity)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            BigDecimal needed = request.quantity();
+            boolean takeAll = needed == null || needed.compareTo(totalAvailable) >= 0;
+            BigDecimal remainingToDeduct = takeAll ? totalAvailable : needed;
+
+            BigDecimal actuallyDeducted = BigDecimal.ZERO;
+
+            for (Fridge item : items) {
+                if (remainingToDeduct.compareTo(BigDecimal.ZERO) <= 0) {
+                    break;
+                }
+                BigDecimal before = item.getQuantity();
+                BigDecimal deductForThisItem = remainingToDeduct.compareTo(before) >= 0 ? before : remainingToDeduct;
+
+                BigDecimal deductedFromItem = deductAndLog(item, deductForThisItem, FridgeItemAction.CONSUMED, cookingLogId);
+                actuallyDeducted = actuallyDeducted.add(deductedFromItem);
+                remainingToDeduct = remainingToDeduct.subtract(deductForThisItem);
+            }
+
+            if (actuallyDeducted.compareTo(BigDecimal.ZERO) > 0) {
+                BigDecimal remainingTotal = items.stream()
+                        .filter(item -> !item.isEmpty())
+                        .map(Fridge::getQuantity)
+                        .reduce(BigDecimal.ZERO, BigDecimal::add);
+                deductions.add(new IngredientDeductionResponse(ingredientId, actuallyDeducted, remainingTotal));
+            }
+        }
+
+        return deductions;
+    }
+
+    /**
+     * 재료 수량을 차감하고, 이력(FridgeItemLog)을 저장하며, 잔여량이 0이 되면 냉장고에서 삭제한다.
+     * 차감 후 0.05 미만으로 남아 0으로 보정된 경우도 처리 전 수량 전체를 뺀 것으로 계산한다.
+     *
+     * @param fridge        차감할 냉장고 재료 엔티티
+     * @param quantity      차감 요청 수량 (null이면 전체)
+     * @param action        이력 처리 액션 (CONSUMED, DISCARDED)
+     * @param cookingLogId  요리 완료 연결 ID (요리 소진이 아닌 경우 null)
+     * @return 실제로 차감된 수량
+     */
+    private BigDecimal deductAndLog(Fridge fridge, BigDecimal quantity, FridgeItemAction action, Long cookingLogId) {
+        BigDecimal before = fridge.getQuantity();
+        boolean takeAll = quantity == null || quantity.compareTo(before) >= 0;
+
+        fridge.deduct(takeAll ? before : quantity);
+        BigDecimal takenQuantity = fridge.isEmpty() ? before : quantity;
 
         FridgeItemLog itemLog = FridgeItemLog.builder()
                 .memberId(fridge.getMemberId())
                 .ingredient(fridge.getIngredient())
+                .cookingLogId(cookingLogId)
                 .fridgeId(fridge.getId())
                 .rawName(fridge.getRawName())
                 .quantity(takenQuantity)
-                .action(request.action())
+                .action(action)
                 .build();
         fridgeItemLogRepository.save(itemLog);
 
         if (fridge.isEmpty()) {
             fridgeRepository.delete(fridge);
         }
-        return FridgeItemTakeOutResponse.from(fridge);
+
+        return takenQuantity;
     }
 
     /**

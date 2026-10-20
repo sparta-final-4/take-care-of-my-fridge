@@ -1,5 +1,6 @@
 package org.example.takecareofmyfridgebe.infra.portone.config;
 
+import io.portone.sdk.server.webhook.WebhookVerifier;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -31,5 +32,10 @@ public class PortOneConfig {
                 .baseUrl(properties.baseUrl())
                 .defaultHeader(HttpHeaders.AUTHORIZATION, "PortOne " + properties.apiSecret())
                 .build();
+    }
+
+    @Bean
+    public WebhookVerifier webhookVerifier() {
+        return new WebhookVerifier(properties.webhookSecret());
     }
 }

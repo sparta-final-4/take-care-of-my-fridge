@@ -1,5 +1,7 @@
 package org.example.takecareofmyfridgebe.domain.fridge.service;
 
+import org.example.takecareofmyfridgebe.domain.cooking.dto.IngredientDeductionResponse;
+import org.example.takecareofmyfridgebe.domain.cooking.dto.UsedIngredientRequest;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemLogResponse;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemLogSearchRequest;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemResponse;
@@ -16,6 +18,7 @@ import org.example.takecareofmyfridgebe.domain.fridge.repository.FridgeItemLogRe
 import org.example.takecareofmyfridgebe.domain.fridge.repository.FridgeRepository;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.Ingredient;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.StorageType;
+import org.example.takecareofmyfridgebe.domain.ingredient.service.IngredientService;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 import org.example.takecareofmyfridgebe.global.response.PageResponse;
@@ -35,6 +38,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -47,6 +51,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -65,6 +70,9 @@ class FridgeServiceTest {
 
     @Mock
     private FridgeItemLogRepository fridgeItemLogRepository;
+
+    @Mock
+    private IngredientService ingredientService;
 
     @InjectMocks
     private FridgeService fridgeService;
@@ -640,6 +648,55 @@ class FridgeServiceTest {
         );
         assertEquals(ErrorCode.INVALID_INPUT_VALUE, exception.getErrorCode());
         verifyNoInteractions(fridgeItemLogRepository);
+    }
+
+    /**
+     * 요리 완료 차감 시:
+     * 1) 기본 양념(isBasicSeasoning) 또는 ING_CUSTOM/ING_MEALKIT은 제외되고
+     * 2) 여러 줄이 있을 때 소비기한 빠른 순으로 순차 차감되며
+     * 3) 차감된 줄마다 FridgeItemLog(cookingLogId 포함)가 기록되고 완전히 소진된 줄은 삭제되는지 검증한다.
+     */
+    @Test
+    void consumeForCookingDeductsInExpirationOrderAndRecordsLogsWithCookingLogId() {
+        // Given: 7번 회원이 3번 재료(두부)를 소비기한 빠른 순으로 2줄 보유 (1.00모, 2.00모)
+        Fridge item1 = fridgeWithQuantity("1.00");
+        ReflectionTestUtils.setField(item1, "id", 101L);
+        Fridge item2 = fridgeWithQuantity("2.00");
+        ReflectionTestUtils.setField(item2, "id", 102L);
+
+        when(ingredientService.getExcludedIngredientIds(any())).thenReturn(Set.of(99L));
+        when(fridgeRepository.findForUpdateByMemberIdAndIngredientId(7L, 3L))
+                .thenReturn(List.of(item1, item2));
+
+        // When: 99번(기본양념 등 제외대상)과 3번 재료(1.50모 차감 요청)
+        UsedIngredientRequest reqSeasoning = new UsedIngredientRequest(99L, new BigDecimal("1.00"));
+        UsedIngredientRequest reqTofu = new UsedIngredientRequest(3L, new BigDecimal("1.50"));
+
+        List<IngredientDeductionResponse> deductions =
+                fridgeService.consumeForCooking(7L, 500L, List.of(reqSeasoning, reqTofu));
+
+        // Then
+        // 99번은 제외되어 3번만 차감 결과에 포함됨
+        assertEquals(1, deductions.size());
+        assertEquals(3L, deductions.get(0).ingredientId());
+        assertEquals(0, new BigDecimal("1.50").compareTo(deductions.get(0).deductedQuantity()));
+        assertEquals(0, new BigDecimal("1.50").compareTo(deductions.get(0).remainingQuantity()));
+
+        // 첫 번째 줄(1.00)은 모두 소진되어 삭제 호출
+        assertTrue(item1.isEmpty());
+        verify(fridgeRepository).delete(item1);
+
+        // 두 번째 줄(2.00)은 0.50 차감되어 1.50 남음
+        assertFalse(item2.isEmpty());
+        assertEquals(0, new BigDecimal("1.50").compareTo(item2.getQuantity()));
+        verify(fridgeRepository, never()).delete(item2);
+
+        // 2건의 이력이 cookingLogId=500L로 저장됨
+        ArgumentCaptor<FridgeItemLog> logCaptor = ArgumentCaptor.forClass(FridgeItemLog.class);
+        verify(fridgeItemLogRepository, times(2)).save(logCaptor.capture());
+        List<FridgeItemLog> logs = logCaptor.getAllValues();
+        assertEquals(500L, logs.get(0).getCookingLogId());
+        assertEquals(500L, logs.get(1).getCookingLogId());
     }
 
     // 7번 회원이 보유한 100번 재료(두부)

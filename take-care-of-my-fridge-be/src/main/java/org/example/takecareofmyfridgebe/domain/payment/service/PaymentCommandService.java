@@ -1,5 +1,6 @@
 package org.example.takecareofmyfridgebe.domain.payment.service;
 
+import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.payment.dto.PaymentConfirmResponse;
 import org.example.takecareofmyfridgebe.domain.payment.entity.FailReason;
@@ -19,6 +20,7 @@ import java.time.LocalDateTime;
 public class PaymentCommandService {
 
     private final PaymentRepository paymentRepository;
+    private final EntityManager entityManager;
 
     @Transactional
     public PaymentConfirmResponse approve(String portonePaymentId) {
@@ -54,7 +56,13 @@ public class PaymentCommandService {
     }
 
     private Payment getForUpdate(String portonePaymentId) {
-        return paymentRepository.findWithOrderByPortonePaymentIdForUpdate(portonePaymentId)
+        Payment payment = paymentRepository.findWithOrderByPortonePaymentIdForUpdate(portonePaymentId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.PAYMENT_NOT_FOUND));
+        // OSIV로 같은 요청에서 먼저 읽은 엔티티가 재사용되면 잠금 후에도 예전 상태가 남으므로 DB 값으로 다시 읽는다.
+        // 아직 반영하지 않은 변경이 덮어써지지 않도록 먼저 flush한다
+        entityManager.flush();
+        entityManager.refresh(payment);
+        entityManager.refresh(payment.getOrder());
+        return payment;
     }
 }

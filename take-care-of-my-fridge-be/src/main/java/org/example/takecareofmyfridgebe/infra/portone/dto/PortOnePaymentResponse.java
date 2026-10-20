@@ -1,29 +1,29 @@
 package org.example.takecareofmyfridgebe.infra.portone.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import org.example.takecareofmyfridgebe.domain.payment.port.PaymentGatewayResponse;
 
 // PortOne V2 결제 단건 조회 응답 중 검증에 쓰는 필드만 받는다
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record PortOnePaymentResponse(
+        String id,
         String status,
         Amount amount
 ) {
-    private static final String STATUS_PAID = "PAID";
-    private static final String STATUS_FAILED = "FAILED";
-    private static final String STATUS_CANCELLED = "CANCELLED";
-
-    public boolean isPaid() {
-        return STATUS_PAID.equals(status);
+    public PaymentGatewayResponse toGatewayResponse() {
+        return new PaymentGatewayResponse(
+                id,
+                status,
+                amount == null ? null : amount.total(),
+                amount == null || amount.cancelled() == null ? 0L : amount.cancelled()
+        );
     }
 
-    // 결제가 더 진행될 수 없는 상태
-    public boolean isFailed() {
-        return STATUS_FAILED.equals(status) || STATUS_CANCELLED.equals(status);
-    }
-
+    // Jackson 3는 원시 타입 필드가 응답에 없으면 파싱을 실패시키므로, 없을 수 있는 값은 래퍼 타입으로 받는다
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record Amount(
-            long total
+            long total,
+            Long cancelled
     ) {
     }
 }
