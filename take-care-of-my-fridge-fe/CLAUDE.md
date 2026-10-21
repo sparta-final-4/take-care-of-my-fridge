@@ -165,13 +165,17 @@ src/
 
 ### 8.1 API 호출
 
-- axios 인스턴스는 `src/common/api/axiosInstance.ts`의 `axiosInstance` 하나. HTTP 호출은 `src/domains/<domain>/api.ts`에서만 한다.
+- axios 인스턴스는 `src/common/api/axiosInstance.ts`의 `axiosInstance` 하나. HTTP 호출은 `src/domains/<domain>/api.ts`에서만 한다(예외: `axiosInstance.ts`의 CSRF 쿠키 발급).
 - API 함수는 일반 함수로 export한다(`getPages`, `updatePage`). 서비스 클래스 등 추가 레이어 금지.
 - 응답 래퍼(`ApiResponse<T>`)는 API 함수 안에서 벗겨 실제 데이터를 반환한다.
-- 조회 함수는 `signal?: AbortSignal`을 받아 axios에 넘긴다.
+- 조회 함수는 `signal?: AbortSignal`을 받아 요청 옵션으로 넘긴다.
 - 경로 변수는 `encodeURIComponent`, 쿼리스트링은 `params`로.
 - **URL 규칙**: `VITE_API_BASE_URL`은 로컬·운영 모두 빈 값이다. 로컬은 Vite `server.proxy`, 운영은 CloudFront `/api/*` behavior가 `/api` 요청을 백엔드로 넘긴다. `/api` prefix는 백엔드 컨트롤러 경로에 포함돼 있으므로 경로에 그대로 쓴다(`'/api/pages'`).
-- **OpenAPI 생성 클라이언트**: 생성 클래스 인스턴스는 `src/common/api/clients.ts`에서만 `new XxxApi(undefined, import.meta.env.VITE_API_BASE_URL, axiosInstance)`로 만든다(basePath를 빼면 `http://localhost`로 요청된다). `api.ts`의 일반 함수가 생성 메서드를 호출하고 `unwrap`으로 래퍼를 벗겨 반환한다. 화면·쿼리에서는 생성 클래스를 직접 쓰지 않는다.
+- **OpenAPI 생성 클라이언트** — API를 연결할 때 이 순서를 따른다.
+  1. 쓸 API가 `src/common/api/generated/apis/`에 있는지 확인한다. 없거나 백엔드와 다르면 직접 만들지 않고 사용자에게 알린다(백엔드 실행 → `pnpm oag:generate`, 결과는 `openapi/`와 함께 커밋). `generated/`와 `openapi/`는 손으로 고치지 않는다.
+  2. 인스턴스가 `src/common/api/clients.ts`에 없으면 사용자·관리자 그룹 안에 이름순으로 추가한다(`new XxxControllerApi(undefined, basePath, axiosInstance)`, basePath를 빼면 `http://localhost`로 요청된다).
+  3. `api.ts`의 일반 함수가 생성 메서드를 호출하고 `unwrap()`으로 래퍼를 벗겨 반환한다. 파라미터가 있으면 첫 인자는 요청 객체, 옵션(`{ signal }`)은 그다음이다. 경로·쿼리 인코딩은 생성 코드가 한다.
+  4. CSRF 헤더는 넘기지 않는다(`axiosInstance`가 처리). 화면·쿼리에서는 생성 클래스를 직접 쓰지 않는다.
 
 **타입**
 
