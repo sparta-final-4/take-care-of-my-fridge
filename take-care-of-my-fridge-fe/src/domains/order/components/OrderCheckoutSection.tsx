@@ -1,10 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
-import { Button, Divider, Flex, Result, Skeleton, Tag, Tooltip, Typography } from 'antd';
+import { Button, Divider, Flex, Modal, Result, Skeleton, Tag, Tooltip, Typography } from 'antd';
 import { useNavigate } from 'react-router';
 
 import { ROUTES } from '@/app/paths';
 import { getErrorCode } from '@/common/api/errors';
 import { formatPrice } from '@/domains/cart/format';
+import { useCancelOnLeave } from '@/domains/order/hooks/useCancelOnLeave';
 import { orderQueries } from '@/domains/order/queries';
 
 import { OrderItemRow } from './OrderItemRow';
@@ -22,9 +23,16 @@ export function OrderCheckoutSection({ orderId }: OrderCheckoutSectionProps) {
     data: order,
     isPending,
     isError,
+    isSuccess,
     error,
     refetch,
   } = useQuery({ ...orderQueries.checkout(orderId), enabled: validOrderId });
+  // 결제 대기 주문을 보여 주는 동안만 이동을 붙잡는다.
+  // 다시 조회하다 실패하면 data는 이전 값이 남으므로 data가 아니라 성공 상태로 판단한다(취소된 주문 안내의 버튼이 막히지 않게).
+  const { isLeaving, isConfirmOpen, isCancelling, askCancel, confirm, close } = useCancelOnLeave(
+    orderId,
+    isSuccess,
+  );
 
   const goToCart = () => navigate(ROUTES.cart);
   const cartButton = (
@@ -122,14 +130,23 @@ export function OrderCheckoutSection({ orderId }: OrderCheckoutSectionProps) {
               결제하기
             </Button>
           </Tooltip>
-          {/* 주문 취소 API가 붙으면 활성화한다. */}
-          <Tooltip title="주문 취소 기능은 준비 중입니다.">
-            <Button size="large" block disabled className={styles.cancel}>
-              취소하기
-            </Button>
-          </Tooltip>
+          <Button size="large" block onClick={askCancel} className={styles.cancel}>
+            취소하기
+          </Button>
         </section>
       </div>
+      <Modal
+        open={isConfirmOpen}
+        title={isLeaving ? '나가면 주문이 취소됩니다.' : '주문을 취소할까요?'}
+        okText={isLeaving ? '나가기' : '주문 취소'}
+        cancelText="머무르기"
+        okButtonProps={{ danger: true }}
+        confirmLoading={isCancelling}
+        onOk={confirm}
+        onCancel={close}
+      >
+        장바구니는 그대로 남아 있어 다시 주문할 수 있습니다.
+      </Modal>
     </div>
   );
 }
