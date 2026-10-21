@@ -104,4 +104,12 @@ public class Product extends BaseTimeEntity {
         }
         this.stock -= quantity;
     }
+
+    // 주문 취소로 잡아 두었던 재고를 되돌린다. 수량이 0 이하면 재고가 줄어들므로 거절한다.
+    public void increaseStock(int quantity) {
+        if (quantity <= 0) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "수량은 1 이상이어야 합니다.");
+        }
+        this.stock += quantity;
+    }
 }

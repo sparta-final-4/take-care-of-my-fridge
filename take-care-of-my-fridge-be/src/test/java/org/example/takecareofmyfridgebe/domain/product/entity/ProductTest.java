@@ -70,4 +70,28 @@ class ProductTest {
             .isInstanceOf(BusinessException.class)
             .hasMessage("재고 부족 · 대파");
     }
+
+    @Test
+    @DisplayName("재고를 수량만큼 되돌린다")
+    void increaseStock_addsQuantity() {
+        Product product = productWithStock(2);
+
+        product.increaseStock(3);
+
+        assertThat(product.getStock()).isEqualTo(5);
+    }
+
+    @Test
+    @DisplayName("되돌릴 수량이 0 이하면 거절하고 재고는 그대로다")
+    void increaseStock_rejectsNonPositiveQuantity() {
+        Product product = productWithStock(5);
+
+        assertThatThrownBy(() -> product.increaseStock(0))
+            .isInstanceOf(BusinessException.class)
+            .extracting("errorCode").isEqualTo(ErrorCode.INVALID_INPUT_VALUE);
+        assertThatThrownBy(() -> product.increaseStock(-3))
+            .isInstanceOf(BusinessException.class)
+            .extracting("errorCode").isEqualTo(ErrorCode.INVALID_INPUT_VALUE);
+        assertThat(product.getStock()).isEqualTo(5);
+    }
 }
