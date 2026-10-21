@@ -9,6 +9,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -62,6 +63,29 @@ class OrderControllerTest {
     @BeforeEach
     void resetMock() {
         reset(orderCreateService, orderQueryService);
+    }
+
+    @Test
+    @DisplayName("주문 확인 조회는 로그인한 회원 번호와 주문 번호로 서비스를 부르고 200이다")
+    void getCheckout_returns200() throws Exception {
+        when(orderQueryService.getCheckout(7L, 5001L)).thenReturn(response());
+
+        mvc.perform(get("/api/orders/5001/checkout")
+                        .with(loginAsMember7()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.orderId").value(5001))
+                .andExpect(jsonPath("$.data.status").value("PENDING"));
+    }
+
+    @Test
+    @DisplayName("남의 주문이거나 없는 주문이면 404다")
+    void getCheckout_notOwned_returns404() throws Exception {
+        when(orderQueryService.getCheckout(7L, 5001L)).thenThrow(new BusinessException(ErrorCode.ORDER_NOT_FOUND));
+
+        mvc.perform(get("/api/orders/5001/checkout")
+                        .with(loginAsMember7()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error.code").value("ORDER_001"));
     }
 
     @Test

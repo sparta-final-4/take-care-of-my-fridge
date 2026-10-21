@@ -1,6 +1,7 @@
 package org.example.takecareofmyfridgebe.domain.order.entity;
 
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
+import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
@@ -54,5 +55,36 @@ class OrderTest {
 
         assertThat(order.getStatus()).isEqualTo(OrderStatus.CONFIRMED);
         assertThat(order.getConfirmedAt()).isEqualTo(now);
+    }
+
+    @Test
+    void validatePendingPassesForPendingOrder() {
+        newOrder().validatePending();
+    }
+
+    @Test
+    void validatePendingRejectsPaidAndConfirmedOrder() {
+        Order paid = newOrder();
+        paid.markPaid(LocalDateTime.of(2026, 10, 21, 12, 0));
+        Order confirmed = newOrder();
+        confirmed.markPaid(LocalDateTime.of(2026, 10, 21, 12, 0));
+        confirmed.confirm(LocalDateTime.of(2026, 10, 28, 12, 0));
+
+        assertThatThrownBy(paid::validatePending)
+            .isInstanceOf(BusinessException.class)
+            .extracting("errorCode").isEqualTo(ErrorCode.ORDER_ALREADY_PAID);
+        assertThatThrownBy(confirmed::validatePending)
+            .isInstanceOf(BusinessException.class)
+            .extracting("errorCode").isEqualTo(ErrorCode.ORDER_ALREADY_PAID);
+    }
+
+    @Test
+    void validatePendingRejectsCancelledOrder() {
+        Order cancelled = newOrder();
+        cancelled.cancel();
+
+        assertThatThrownBy(cancelled::validatePending)
+            .isInstanceOf(BusinessException.class)
+            .extracting("errorCode").isEqualTo(ErrorCode.ORDER_CANCELLED);
     }
 }
