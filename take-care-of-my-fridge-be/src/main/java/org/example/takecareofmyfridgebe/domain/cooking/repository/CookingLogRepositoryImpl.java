@@ -4,15 +4,19 @@ import com.querydsl.core.types.OrderSpecifier;
 import com.querydsl.core.types.Projections;
 import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.core.types.dsl.CaseBuilder;
+import com.querydsl.core.types.dsl.NumberExpression;
 import com.querydsl.jpa.impl.JPAQuery;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import lombok.RequiredArgsConstructor;
+import org.example.takecareofmyfridgebe.domain.cooking.dto.CookingStatsCount;
+import org.example.takecareofmyfridgebe.domain.cooking.dto.CookingStatsResponse;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeResponse;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeReviewResponse;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeReviewStatus;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeSortType;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeSummaryResponse;
 import org.example.takecareofmyfridgebe.domain.cooking.entity.CookingLog;
+import org.example.takecareofmyfridgebe.domain.cooking.entity.CookingResult;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.support.PageableExecutionUtils;
@@ -51,7 +55,7 @@ public class CookingLogRepositoryImpl implements CookingLogRepositoryCustom {
                         createdFrom(from),
                         createdUntil(to)
                 )
-                .orderBy(cookingLog.createdAt.desc(), cookingLog.id.desc())
+                .orderBy(cookingLog.createdAt.desc())
                 .offset(pageable.getOffset())
                 .limit(pageable.getPageSize())
                 .fetch();
@@ -80,6 +84,8 @@ public class CookingLogRepositoryImpl implements CookingLogRepositoryCustom {
             throw new IllegalArgumentException("회원 ID는 필수입니다.");
         }
 
+        BooleanExpression reviewFilter = reviewStatusCondition(reviewStatus);
+
         List<MyRecipeResponse> content = queryFactory
                 .select(Projections.constructor(
                         MyRecipeResponse.class,
@@ -89,13 +95,16 @@ public class CookingLogRepositoryImpl implements CookingLogRepositoryCustom {
                         cookingLog.count(),
                         cookingLog.createdAt.max(),
                         new CaseBuilder()
-                                .when(cookingLog.chatSessionId.count().gt(0L))
-                                .then(true)
-                                .otherwise(false),
-                        recipeReview.id,
-                        recipeReview.rating,
-                        recipeReview.content,
-                        recipeReview.updatedAt
+                                .when(cookingLog.chatSessionId.isNotNull()).then(1L)
+                                .otherwise(0L)
+                                .sum().gt(0L),
+                        Projections.constructor(
+                                MyRecipeReviewResponse.class,
+                                recipeReview.id,
+                                recipeReview.rating,
+                                recipeReview.content,
+                                recipeReview.updatedAt
+                        )
                 ))
                 .from(cookingLog)
                 .leftJoin(recipe).on(recipe.id.eq(cookingLog.recipeId))
@@ -105,7 +114,7 @@ public class CookingLogRepositoryImpl implements CookingLogRepositoryCustom {
                 )
                 .where(
                         cookingLog.memberId.eq(memberId),
-                        reviewStatusCondition(reviewStatus)
+                        reviewFilter
                 )
                 .groupBy(
                         cookingLog.recipeId,
@@ -130,7 +139,7 @@ public class CookingLogRepositoryImpl implements CookingLogRepositoryCustom {
                 )
                 .where(
                         cookingLog.memberId.eq(memberId),
-                        reviewStatusCondition(reviewStatus)
+                        reviewFilter
                 );
 
         return PageableExecutionUtils.getPage(content, pageable, countQuery::fetchOne);
@@ -158,6 +167,34 @@ public class CookingLogRepositoryImpl implements CookingLogRepositoryCustom {
                 .fetchOne();
 
         return summary != null ? summary : MyRecipeSummaryResponse.empty();
+    }
+
+    @Override
+    public CookingStatsResponse getCookingStats(Long recipeId) {
+        if (recipeId == null) {
+            throw new IllegalArgumentException("레시피 ID는 필수입니다.");
+        }
+
+        NumberExpression<Long> successCase = new CaseBuilder()
+                .when(cookingLog.result.eq(CookingResult.SUCCESS)).then(1L)
+                .otherwise(0L);
+
+        NumberExpression<Long> failedCase = new CaseBuilder()
+                .when(cookingLog.result.eq(CookingResult.FAILED)).then(1L)
+                .otherwise(0L);
+
+        CookingStatsCount count = queryFactory
+                .select(Projections.constructor(
+                        CookingStatsCount.class,
+                        cookingLog.count(),
+                        successCase.sum(),
+                        failedCase.sum()
+                ))
+                .from(cookingLog)
+                .where(cookingLog.recipeId.eq(recipeId))
+                .fetchOne();
+
+        return CookingStatsResponse.of(recipeId, count);
     }
 
     private BooleanExpression eqRecipeId(Long recipeId) {

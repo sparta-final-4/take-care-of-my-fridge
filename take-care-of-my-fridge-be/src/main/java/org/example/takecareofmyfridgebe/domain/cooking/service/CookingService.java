@@ -5,6 +5,7 @@ import org.example.takecareofmyfridgebe.domain.cooking.dto.CookingCompleteReques
 import org.example.takecareofmyfridgebe.domain.cooking.dto.CookingLogResponse;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.CookingLogSearchRequest;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.CookingLogUpdateRequest;
+import org.example.takecareofmyfridgebe.domain.cooking.dto.CookingStatsResponse;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeListResponse;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeResponse;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeSearchRequest;
@@ -98,5 +99,17 @@ public class CookingService {
 
         cookingLog.update(request.result(), request.memo());
         return CookingLogResponse.from(cookingLog);
+    }
+
+    /**
+     * 특정 레시피의 요리 통계(총 요리 횟수, 성공 횟수, 실패 횟수)를 계산하여 반환한다.
+     * 요리 기록이 없는 경우 404가 아닌 모두 0인 통계를 반환한다.
+     *
+     * @param recipeId 레시피 ID
+     * @return 레시피 요리 통계 응답
+     */
+    public CookingStatsResponse getCookingStats(Long recipeId) {
+        // TODO: 레시피 도메인에 RecipeService/Repository 조회 메서드가 생기면 레시피 존재 여부 확인 추가
+        return cookingLogRepository.getCookingStats(recipeId);
     }
 }

@@ -1,6 +1,7 @@
 package org.example.takecareofmyfridgebe.domain.cooking.repository;
 
 import jakarta.persistence.EntityManager;
+import org.example.takecareofmyfridgebe.domain.cooking.dto.CookingStatsResponse;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeResponse;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeReviewStatus;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeSortType;
@@ -43,7 +44,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * CookingLogRepositoryImpl의 실제 쿼리(MySQL Testcontainers) 테스트.
  * 회원 기준 격리, Recipe left join(이름·이미지), RecipeReview left join 및 내 후기 매핑,
  * AI 상담 여부(fromChat), reviewStatus 필터, sort(RECENT/MOST) 정렬,
- * 전체 묶인 레시피 수 기준 페이징 및 단일 쿼리 전체 summary 통계를 검증한다.
+ * 전체 묶인 레시피 수 기준 페이징 및 단일 쿼리 전체 summary 통계,
+ * 레시피별 성공/실패 집계 통계를 검증한다.
  * created_at/updated_at은 JPA Auditing이 채우므로 저장 후 네이티브 쿼리로 원하는 시각으로 바꾼다.
  */
 @Testcontainers(disabledWithoutDocker = true)
@@ -390,5 +392,36 @@ class CookingLogRepositoryTest {
         assertEquals(new BigDecimal("100.00"), foundFridgeItemLog.getQuantity());
         assertEquals(FridgeItemAction.CONSUMED, foundFridgeItemLog.getAction());
         assertEquals("깐양파", foundFridgeItemLog.getRawName());
+    }
+
+    /**
+     * getCookingStats 단일 쿼리로 특정 레시피의 총 요리 횟수, 성공 횟수, 실패 횟수가 정확히 집계되는지 검증한다.
+     * 다른 레시피의 요리 기록은 집계에 포함되지 않아야 한다.
+     */
+    @Test
+    void getCookingStatsCalculatesAccurately() {
+        // Given: recipeA 성공 2회, 실패 1회 (총 3회) / recipeB 성공 1회
+        saveCookingLog(testMember.getId(), recipeA.getId(), null, CookingResult.SUCCESS, "A1", LocalDateTime.of(2026, 10, 1, 10, 0));
+        saveCookingLog(testMember.getId(), recipeA.getId(), null, CookingResult.SUCCESS, "A2", LocalDateTime.of(2026, 10, 2, 10, 0));
+        saveCookingLog(OTHER_MEMBER_ID, recipeA.getId(), null, CookingResult.FAILED, "A3", LocalDateTime.of(2026, 10, 3, 10, 0));
+
+        saveCookingLog(testMember.getId(), recipeB.getId(), null, CookingResult.SUCCESS, "B1", LocalDateTime.of(2026, 10, 4, 10, 0));
+        flushAndClear();
+
+        // When
+        CookingStatsResponse statsA = cookingLogRepository.getCookingStats(recipeA.getId());
+
+        // Then: recipeA 기준 총 3회, 성공 2회, 실패 1회
+        assertEquals(recipeA.getId(), statsA.recipeId());
+        assertEquals(3L, statsA.totalCount());
+        assertEquals(2L, statsA.successCount());
+        assertEquals(1L, statsA.failedCount());
+
+        // When: 요리 기록이 없는 recipeC 조회 시 404가 아닌 0으로 반환
+        CookingStatsResponse statsC = cookingLogRepository.getCookingStats(recipeC.getId());
+        assertEquals(recipeC.getId(), statsC.recipeId());
+        assertEquals(0L, statsC.totalCount());
+        assertEquals(0L, statsC.successCount());
+        assertEquals(0L, statsC.failedCount());
     }
 }
