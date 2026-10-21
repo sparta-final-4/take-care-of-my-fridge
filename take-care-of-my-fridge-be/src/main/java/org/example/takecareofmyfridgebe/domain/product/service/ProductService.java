@@ -6,7 +6,7 @@ import org.example.takecareofmyfridgebe.domain.ingredient.repository.IngredientR
 import org.example.takecareofmyfridgebe.domain.product.dto.ProductCreateRequest;
 import org.example.takecareofmyfridgebe.domain.product.dto.ProductDetailResponse;
 import org.example.takecareofmyfridgebe.domain.product.dto.ProductListItemResponse;
-import org.example.takecareofmyfridgebe.domain.product.dto.ProductSort;
+import org.example.takecareofmyfridgebe.domain.product.dto.ProductListRequest;
 import org.example.takecareofmyfridgebe.domain.product.entity.Product;
 import org.example.takecareofmyfridgebe.domain.product.entity.ProductStatus;
 import org.example.takecareofmyfridgebe.domain.product.entity.ProductType;
@@ -36,10 +36,11 @@ public class ProductService {
     private final MealkitProductRepository mealkitProductRepository;
     private final IngredientRepository ingredientRepository;
 
-    public PageResponse<ProductListItemResponse> getProducts(ProductSort sort, int page, int size) {
-        PageRequest pageable = PageRequest.of(page - 1, size, sort.toSort());
+    // 정렬은 request.sort()로 저장소가 적용하므로 PageRequest에는 넣지 않는다.
+    public PageResponse<ProductListItemResponse> getProducts(ProductListRequest request) {
+        PageRequest pageable = PageRequest.of(request.page() - 1, request.size());
 
-        Page<ProductListItemResponse> response = productRepository.findByStatusIn(PUBLIC_STATUSES, pageable)
+        Page<ProductListItemResponse> response = productRepository.findProductsByCondition(request, PUBLIC_STATUSES, pageable)
                 .map(ProductListItemResponse::from);
 
         return PageResponse.of(response);

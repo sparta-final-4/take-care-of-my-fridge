@@ -26,7 +26,7 @@ public class ProductController {
     public ResponseEntity<ApiResponse<PageResponse<ProductListItemResponse>>> getProducts(
             @Valid @ModelAttribute ProductListRequest request
     ) {
-        PageResponse<ProductListItemResponse> products = productService.getProducts(request.sort(), request.page(), request.size());
+        PageResponse<ProductListItemResponse> products = productService.getProducts(request);
         return ResponseEntity.ok(ApiResponse.ok(products));
     }
 

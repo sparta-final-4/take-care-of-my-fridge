@@ -3,8 +3,6 @@ package org.example.takecareofmyfridgebe.domain.product.repository;
 import jakarta.persistence.LockModeType;
 import org.example.takecareofmyfridgebe.domain.product.entity.Product;
 import org.example.takecareofmyfridgebe.domain.product.entity.ProductStatus;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -14,9 +12,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
-public interface ProductRepository extends JpaRepository<Product, Long> {
-
-    Page<Product> findByStatusIn(Collection<ProductStatus> statuses, Pageable pageable);
+public interface ProductRepository extends JpaRepository<Product, Long>, ProductRepositoryCustom {
 
     Optional<Product> findByIdAndStatusIn(Long id, Collection<ProductStatus> statuses);
 

@@ -3,8 +3,10 @@ package org.example.takecareofmyfridgebe.domain.product.service;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.Ingredient;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.StorageType;
 import org.example.takecareofmyfridgebe.domain.ingredient.repository.IngredientRepository;
+import org.example.takecareofmyfridgebe.domain.product.dto.ProductCreateRequest;
 import org.example.takecareofmyfridgebe.domain.product.dto.ProductDetailResponse;
 import org.example.takecareofmyfridgebe.domain.product.dto.ProductListItemResponse;
+import org.example.takecareofmyfridgebe.domain.product.dto.ProductListRequest;
 import org.example.takecareofmyfridgebe.domain.product.dto.ProductSort;
 import org.example.takecareofmyfridgebe.domain.product.entity.IngredientProduct;
 import org.example.takecareofmyfridgebe.domain.product.entity.MealkitProduct;
@@ -64,31 +66,32 @@ class ProductServiceTest {
     @DisplayName("판매 중지(STOPPED) 상품은 조회 대상에서 제외한다")
     void getProducts_excludesStopped() {
         // given
-        when(productRepository.findByStatusIn(anyCollection(), any(Pageable.class)))
+        when(productRepository.findProductsByCondition(any(ProductListRequest.class), anyCollection(), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of()));
 
         // when
-        service.getProducts(ProductSort.LATEST, 1, 20);
+        service.getProducts(listRequest(ProductSort.LATEST, 1));
 
         // then
-        verify(productRepository).findByStatusIn(statusCaptor.capture(), any(Pageable.class));
+        verify(productRepository).findProductsByCondition(any(ProductListRequest.class), statusCaptor.capture(), any(Pageable.class));
         assertThat(statusCaptor.getValue())
                 .containsExactlyInAnyOrder(ProductStatus.ON_SALE, ProductStatus.SOLD_OUT);
     }
 
     @Test
-    @DisplayName("1부터 시작하는 요청 페이지를 0부터 시작하는 PageRequest로 바꾸고 정렬을 적용한다")
-    void getProducts_convertsPageAndSort() {
+    @DisplayName("1부터 시작하는 요청 페이지를 0부터 시작하는 PageRequest로 바꾸고 검색 조건을 그대로 넘긴다")
+    void getProducts_convertsPageAndPassesCondition() {
         // given
-        when(productRepository.findByStatusIn(anyCollection(), any(Pageable.class)))
+        ProductListRequest request = new ProductListRequest(
+                ProductSort.PRICE_ASC, "두부", ProductType.MEALKIT, 3000, 10000, 2, 20);
+        when(productRepository.findProductsByCondition(any(ProductListRequest.class), anyCollection(), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of()));
 
         // when
-        service.getProducts(ProductSort.PRICE_ASC, 2, 20);
+        service.getProducts(request);
 
         // then
-        PageRequest expected = PageRequest.of(1, 20, ProductSort.PRICE_ASC.toSort());
-        verify(productRepository).findByStatusIn(anyCollection(), eq(expected));
+        verify(productRepository).findProductsByCondition(eq(request), anyCollection(), eq(PageRequest.of(1, 20)));
     }
 
     @Test
@@ -96,17 +99,21 @@ class ProductServiceTest {
     void getProducts_mapsToResponse() {
         // given
         Product onion = ProductFixture.createProduct(5L, "양파 1kg", 3900);
-        when(productRepository.findByStatusIn(anyCollection(), any(Pageable.class)))
+        when(productRepository.findProductsByCondition(any(ProductListRequest.class), anyCollection(), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(onion), PageRequest.of(1, 20), 21));
 
         // when
-        PageResponse<ProductListItemResponse> result = service.getProducts(ProductSort.LATEST, 2, 20);
+        PageResponse<ProductListItemResponse> result = service.getProducts(listRequest(ProductSort.LATEST, 2));
 
         // then
         assertThat(result.pageNumber()).isEqualTo(2);
         assertThat(result.totalElements()).isEqualTo(21);
         assertThat(result.content()).containsExactly(new ProductListItemResponse(
                 5L, ProductType.INGREDIENT, "양파 1kg", null, 3900, ProductStatus.ON_SALE));
+    }
+
+    private static ProductListRequest listRequest(ProductSort sort, int page) {
+        return new ProductListRequest(sort, null, null, null, null, page, 20);
     }
 
     @Test
@@ -205,9 +212,10 @@ class ProductServiceTest {
     void createProduct_ingredientNotFound() {
         // given
         when(ingredientRepository.findById(99L)).thenReturn(Optional.empty());
+        ProductCreateRequest request = ProductFixture.createIngredientRequest(99L);
 
         // when & then
-        assertThatThrownBy(() -> service.createProduct(ProductFixture.createIngredientRequest(99L)))
+        assertThatThrownBy(() -> service.createProduct(request))
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode")
                 .isEqualTo(ErrorCode.INGREDIENT_NOT_FOUND);
@@ -220,9 +228,10 @@ class ProductServiceTest {
         for (String code : List.of(Ingredient.ING_CUSTOM, Ingredient.ING_MEALKIT)) {
             // given
             when(ingredientRepository.findById(1L)).thenReturn(Optional.of(ingredient(code)));
+            ProductCreateRequest request = ProductFixture.createIngredientRequest(1L);
 
             // when & then
-            assertThatThrownBy(() -> service.createProduct(ProductFixture.createIngredientRequest(1L)))
+            assertThatThrownBy(() -> service.createProduct(request))
                     .isInstanceOf(BusinessException.class)
                     .extracting("errorCode")
                     .isEqualTo(ErrorCode.INVALID_PRODUCT_INGREDIENT);
