@@ -3,6 +3,7 @@ package org.example.takecareofmyfridgebe.domain.cooking.service;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.CookingCompleteRequest;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.CookingLogResponse;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.CookingLogSearchRequest;
+import org.example.takecareofmyfridgebe.domain.cooking.dto.CookingLogUpdateRequest;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeListResponse;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeResponse;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeReviewResponse;
@@ -31,6 +32,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -40,6 +42,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -47,7 +50,8 @@ import static org.mockito.Mockito.when;
 /**
  * CookingService 단위 테스트.
  * 요리 기록 저장 및 조회 조건(recipeId, from, to)과 DTO 변환(fromChat 여부),
- * from > to 유효성 검증, 내 레시피 페이징 및 요약 통계 조립을 확인한다.
+ * from > to 유효성 검증, 내 레시피 페이징 및 요약 통계 조립,
+ * 요리 기록 수정(결과·메모) 및 더티 체킹, 타인/미존재 시 404 예외 처리를 확인한다.
  */
 @ExtendWith(MockitoExtension.class)
 class CookingServiceTest {
@@ -245,5 +249,108 @@ class CookingServiceTest {
         assertEquals(0L, response.summary().notWrittenCount());
         assertTrue(response.recipes().content().isEmpty());
         assertEquals(0L, response.recipes().totalElements());
+    }
+
+    /**
+     * 요리 기록 수정 시 엔티티의 결과와 메모만 변경되고,
+     * repository.save()를 호출하지 않고 JPA 더티 체킹에 위임하는지 검증한다.
+     */
+    @Test
+    void updateCookingLogModifiesResultAndMemoWithDirtyChecking() {
+        // Given
+        Long memberId = 7L;
+        Long cookingLogId = 100L;
+        CookingLog cookingLog = CookingLog.builder()
+                .memberId(memberId)
+                .recipeId(12L)
+                .chatSessionId(5L)
+                .result(CookingResult.SUCCESS)
+                .memo("처음 작성한 메모")
+                .build();
+        ReflectionTestUtils.setField(cookingLog, "id", cookingLogId);
+
+        when(cookingLogRepository.findByIdAndMemberId(cookingLogId, memberId))
+                .thenReturn(Optional.of(cookingLog));
+
+        CookingLogUpdateRequest request = new CookingLogUpdateRequest(CookingResult.FAILED, "수정된 메모");
+
+        // When
+        CookingLogResponse response = cookingService.updateCookingLog(memberId, cookingLogId, request);
+
+        // Then
+        assertEquals(cookingLogId, response.id());
+        assertEquals(CookingResult.FAILED, response.result());
+        assertEquals("수정된 메모", response.memo());
+        assertEquals(CookingResult.FAILED, cookingLog.getResult());
+        assertEquals("수정된 메모", cookingLog.getMemo());
+
+        // 더티 체킹 검증: save()를 호출하지 않음
+        verify(cookingLogRepository, never()).save(any(CookingLog.class));
+    }
+
+    /**
+     * 존재하지 않거나 다른 회원의 요리 기록인 경우
+     * 404 COOKING_LOG_NOT_FOUND 예외를 던지는지 검증한다.
+     */
+    @Test
+    void updateCookingLogThrowsWhenNotFoundOrDifferentMember() {
+        // Given
+        Long memberId = 7L;
+        Long cookingLogId = 999L;
+        when(cookingLogRepository.findByIdAndMemberId(cookingLogId, memberId))
+                .thenReturn(Optional.empty());
+
+        CookingLogUpdateRequest request = new CookingLogUpdateRequest(CookingResult.SUCCESS, "메모");
+
+        // When & Then
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> cookingService.updateCookingLog(memberId, cookingLogId, request)
+        );
+        assertEquals(ErrorCode.COOKING_LOG_NOT_FOUND, exception.getErrorCode());
+        assertEquals(HttpStatus.NOT_FOUND, exception.getErrorCode().getStatus());
+        verify(cookingLogRepository, never()).save(any(CookingLog.class));
+    }
+
+    /**
+     * 요리 기록을 수정해도 재료 차감 이력 등 다른 연관 데이터(recipeId, chatSessionId, memberId)는
+     * 일체 변경되지 않고 결과와 메모만 수정되는지 검증한다.
+     * (재료 차감과 묶인 값은 되돌리기 어려워 결과와 메모만 수정)
+     */
+    @Test
+    void updateCookingLogPreservesRecipeChatSessionAndIngredientsDeductionState() {
+        // Given
+        Long memberId = 7L;
+        Long cookingLogId = 100L;
+        Long recipeId = 12L;
+        Long chatSessionId = 5L;
+
+        CookingLog cookingLog = CookingLog.builder()
+                .memberId(memberId)
+                .recipeId(recipeId)
+                .chatSessionId(chatSessionId)
+                .result(CookingResult.SUCCESS)
+                .memo("소금 조금 더 넣을 걸")
+                .build();
+        ReflectionTestUtils.setField(cookingLog, "id", cookingLogId);
+
+        when(cookingLogRepository.findByIdAndMemberId(cookingLogId, memberId))
+                .thenReturn(Optional.of(cookingLog));
+
+        CookingLogUpdateRequest request = new CookingLogUpdateRequest(CookingResult.FAILED, null);
+
+        // When
+        CookingLogResponse response = cookingService.updateCookingLog(memberId, cookingLogId, request);
+
+        // Then: 결과와 메모만 변경되고 차감/상담 식별자는 그대로 유지됨
+        assertEquals(CookingResult.FAILED, response.result());
+        assertNull(response.memo());
+        assertEquals(recipeId, response.recipeId());
+        assertTrue(response.fromChat());
+
+        // 엔티티 내부 필드 보존 검증
+        assertEquals(memberId, cookingLog.getMemberId());
+        assertEquals(recipeId, cookingLog.getRecipeId());
+        assertEquals(chatSessionId, cookingLog.getChatSessionId());
     }
 }

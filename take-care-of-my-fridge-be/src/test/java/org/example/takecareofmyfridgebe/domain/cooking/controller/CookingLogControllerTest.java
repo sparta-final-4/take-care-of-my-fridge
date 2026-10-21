@@ -5,12 +5,14 @@ import org.example.takecareofmyfridgebe.domain.auth.service.JwtTokenService;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.CookingCompleteRequest;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.CookingCompleteResponse;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.CookingLogResponse;
+import org.example.takecareofmyfridgebe.domain.cooking.dto.CookingLogUpdateRequest;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.IngredientDeductionResponse;
 import org.example.takecareofmyfridgebe.domain.cooking.entity.CookingResult;
 import org.example.takecareofmyfridgebe.domain.cooking.facade.CookingFacade;
 import org.example.takecareofmyfridgebe.domain.cooking.service.CookingService;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 import org.example.takecareofmyfridgebe.global.config.SecurityConfig;
+import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 import org.example.takecareofmyfridgebe.global.response.PageResponse;
 import org.junit.jupiter.api.BeforeEach;
@@ -41,6 +43,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -48,6 +51,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * CookingLogController의 웹 계층(MockMvc + SecurityConfig) 슬라이스 테스트.
  * 요리 완료 요청 유효성 검증(recipeId·result 필수, memo 50자 이하, 중복 ingredientId 400 등),
+ * 요리 기록 수정(PATCH) 유효성 검증, 401/404 예외 처리,
  * 정상 처리 시 200 OK와 응답 포맷을 확인한다.
  */
 @WebMvcTest(CookingLogController.class)
@@ -223,6 +227,150 @@ class CookingLogControllerTest {
                                 """.formatted(longMemo)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false));
+    }
+
+    /**
+     * 요리 기록 수정 정상 요청 시 200 OK와 수정된 정보를 반환하는지 검증한다.
+     */
+    @Test
+    void updateCookingLogSuccessReturnsOk() throws Exception {
+        Long memberId = 7L;
+        Long cookingLogId = 10L;
+        CookingLogResponse response = new CookingLogResponse(
+                cookingLogId, 12L, CookingResult.SUCCESS, "수정된 메모", false, LocalDateTime.now());
+
+        when(cookingService.updateCookingLog(eq(memberId), eq(cookingLogId), any(CookingLogUpdateRequest.class)))
+                .thenReturn(response);
+
+        mvc.perform(patch("/api/cooking-logs/{cookingLogId}", cookingLogId)
+                        .with(authentication(auth(memberId)))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "result": "SUCCESS",
+                                  "memo": "수정된 메모"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.id").value(cookingLogId))
+                .andExpect(jsonPath("$.data.result").value("SUCCESS"))
+                .andExpect(jsonPath("$.data.memo").value("수정된 메모"));
+    }
+
+    /**
+     * 메모를 null로 보내어 메모를 지우는 경우에도 200 OK를 반환하는지 검증한다.
+     */
+    @Test
+    void updateCookingLogWithNullMemoReturnsOk() throws Exception {
+        Long memberId = 7L;
+        Long cookingLogId = 10L;
+        CookingLogResponse response = new CookingLogResponse(
+                cookingLogId, 12L, CookingResult.FAILED, null, false, LocalDateTime.now());
+
+        when(cookingService.updateCookingLog(eq(memberId), eq(cookingLogId), any(CookingLogUpdateRequest.class)))
+                .thenReturn(response);
+
+        mvc.perform(patch("/api/cooking-logs/{cookingLogId}", cookingLogId)
+                        .with(authentication(auth(memberId)))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "result": "FAILED",
+                                  "memo": null
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.result").value("FAILED"))
+                .andExpect(jsonPath("$.data.memo").isEmpty());
+    }
+
+    /**
+     * 요리 결과(result)가 null이면 400 Bad Request를 반환하는지 검증한다.
+     */
+    @Test
+    void updateCookingLogWithNullResultReturnsBadRequest() throws Exception {
+        mvc.perform(patch("/api/cooking-logs/10")
+                        .with(authentication(auth(7L)))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "result": null,
+                                  "memo": "메모"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false));
+    }
+
+    /**
+     * 메모가 50자를 초과하면 400 Bad Request를 반환하는지 검증한다.
+     */
+    @Test
+    void updateCookingLogWithExcessiveMemoReturnsBadRequest() throws Exception {
+        String longMemo = "a".repeat(51);
+
+        mvc.perform(patch("/api/cooking-logs/10")
+                        .with(authentication(auth(7L)))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "result": "SUCCESS",
+                                  "memo": "%s"
+                                }
+                                """.formatted(longMemo)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false));
+    }
+
+    /**
+     * 미인증 상태로 요리 기록 수정을 요청하면 401 Unauthorized를 반환하는지 검증한다.
+     */
+    @Test
+    void updateCookingLogUnauthenticatedReturnsUnauthorized() throws Exception {
+        mvc.perform(patch("/api/cooking-logs/10")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "result": "SUCCESS",
+                                  "memo": "메모"
+                                }
+                                """))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value(ErrorCode.UNAUTHORIZED.getCode()));
+    }
+
+    /**
+     * 본인 기록이 아니거나 존재하지 않는 요리 기록이면 404 Not Found(COOKING_001)를 반환하는지 검증한다.
+     */
+    @Test
+    void updateCookingLogNotFoundReturnsNotFound() throws Exception {
+        Long memberId = 7L;
+        Long cookingLogId = 999L;
+
+        when(cookingService.updateCookingLog(eq(memberId), eq(cookingLogId), any(CookingLogUpdateRequest.class)))
+                .thenThrow(new BusinessException(ErrorCode.COOKING_LOG_NOT_FOUND));
+
+        mvc.perform(patch("/api/cooking-logs/{cookingLogId}", cookingLogId)
+                        .with(authentication(auth(memberId)))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "result": "SUCCESS",
+                                  "memo": "메모"
+                                }
+                                """))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value(ErrorCode.COOKING_LOG_NOT_FOUND.getCode()));
     }
 
     @TestConfiguration

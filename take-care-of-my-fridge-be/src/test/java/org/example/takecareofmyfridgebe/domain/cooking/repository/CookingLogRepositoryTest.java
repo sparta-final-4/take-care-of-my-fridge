@@ -7,6 +7,10 @@ import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeSortType;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeSummaryResponse;
 import org.example.takecareofmyfridgebe.domain.cooking.entity.CookingLog;
 import org.example.takecareofmyfridgebe.domain.cooking.entity.CookingResult;
+import org.example.takecareofmyfridgebe.domain.fridge.entity.FridgeItemAction;
+import org.example.takecareofmyfridgebe.domain.fridge.entity.FridgeItemLog;
+import org.example.takecareofmyfridgebe.domain.ingredient.entity.Ingredient;
+import org.example.takecareofmyfridgebe.domain.ingredient.entity.StorageType;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 import org.example.takecareofmyfridgebe.domain.recipe.entity.Recipe;
 import org.example.takecareofmyfridgebe.domain.review.entity.RecipeReview;
@@ -25,9 +29,9 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.mysql.MySQLContainer;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -67,7 +71,11 @@ class CookingLogRepositoryTest {
 
     @BeforeEach
     void setUp() {
-        testMember = Member.create("test@example.com", "hashed_password", "테스터", Set.of());
+        testMember = Member.builder()
+                .email("test@example.com")
+                .passwordHash("hashed_password")
+                .nickname("테스터")
+                .build();
         em.persist(testMember);
 
         recipeA = Recipe.builder()
@@ -100,7 +108,12 @@ class CookingLogRepositoryTest {
         flushAndClear();
     }
 
-    private Long saveCookingLog(Long memberId, Long recipeId, Long chatSessionId, CookingResult result, String memo, LocalDateTime createdAt) {
+    private void flushAndClear() {
+        em.flush();
+        em.clear();
+    }
+
+    private CookingLog saveCookingLog(Long memberId, Long recipeId, Long chatSessionId, CookingResult result, String memo, LocalDateTime createdAt) {
         CookingLog log = CookingLog.builder()
                 .memberId(memberId)
                 .recipeId(recipeId)
@@ -114,84 +127,132 @@ class CookingLogRepositoryTest {
                 .setParameter("createdAt", createdAt)
                 .setParameter("id", log.getId())
                 .executeUpdate();
-        return log.getId();
+        return log;
     }
 
-    private void saveReview(Member member, Long recipeId, int rating, String content, LocalDateTime updatedAt) {
-        Member refMember = em.getReference(Member.class, member.getId());
+    private RecipeReview saveReview(Member member, Long recipeId, int rating, String content, LocalDateTime createdAt) {
         RecipeReview review = RecipeReview.builder()
-                .member(refMember)
+                .member(member)
                 .recipeId(recipeId)
                 .rating(rating)
                 .content(content)
                 .build();
         em.persist(review);
         em.flush();
-        em.createNativeQuery("UPDATE recipe_reviews SET updated_at = :updatedAt WHERE id = :id")
-                .setParameter("updatedAt", updatedAt)
+        em.createNativeQuery("UPDATE recipe_reviews SET created_at = :createdAt, updated_at = :createdAt WHERE id = :id")
+                .setParameter("createdAt", createdAt)
                 .setParameter("id", review.getId())
                 .executeUpdate();
-    }
-
-    private void flushAndClear() {
-        em.flush();
-        em.clear();
+        return review;
     }
 
     /**
-     * 로그인한 회원의 요리 완료 레시피만 조회되며 Recipe 이름·이미지,
-     * AI 추천 배지(fromChat), 내 후기가 올바르게 left join되는지 검증한다.
+     * 회원 기준 격리: 로그인 회원의 요리 기록만 집계되고 타 회원의 기록은 포함되지 않는지 검증한다.
      */
     @Test
-    void findMyRecipesReturnsOnlyMemberRecipesWithRecipeInfoAndReview() {
-        // Given: recipeA(2회 요리, 1회 상담 포함, 후기 작성), recipeB(1회 요리, 상담 없음, 후기 미작성), 타인 기록(recipeC)
-        saveCookingLog(testMember.getId(), recipeA.getId(), 10L, CookingResult.SUCCESS, "맛있음", LocalDateTime.of(2026, 10, 10, 12, 0));
-        saveCookingLog(testMember.getId(), recipeA.getId(), null, CookingResult.SUCCESS, "또 만듦", LocalDateTime.of(2026, 10, 12, 18, 0));
-        saveReview(testMember, recipeA.getId(), 5, "정말 최고예요", LocalDateTime.of(2026, 10, 12, 19, 0));
-
-        saveCookingLog(testMember.getId(), recipeB.getId(), null, CookingResult.SUCCESS, "간단함", LocalDateTime.of(2026, 10, 8, 12, 0));
-
-        saveCookingLog(OTHER_MEMBER_ID, recipeC.getId(), 20L, CookingResult.SUCCESS, "타인 기록", LocalDateTime.of(2026, 10, 15, 12, 0));
+    void findMyRecipesIsolateByMember() {
+        // Given: testMember의 기록 2건(recipeA, recipeB), OTHER_MEMBER의 기록 1건(recipeC)
+        saveCookingLog(testMember.getId(), recipeA.getId(), null, CookingResult.SUCCESS, "A", LocalDateTime.of(2026, 10, 10, 10, 0));
+        saveCookingLog(testMember.getId(), recipeB.getId(), null, CookingResult.SUCCESS, "B", LocalDateTime.of(2026, 10, 11, 10, 0));
+        saveCookingLog(OTHER_MEMBER_ID, recipeC.getId(), null, CookingResult.SUCCESS, "C", LocalDateTime.of(2026, 10, 12, 10, 0));
         flushAndClear();
 
-        // When: 본인 레시피 기본(RECENT) 조회
+        // When: testMember 기준 내 레시피 조회
         Page<MyRecipeResponse> result = cookingLogRepository.findMyRecipes(
                 testMember.getId(), MyRecipeReviewStatus.ALL, MyRecipeSortType.RECENT, PageRequest.of(0, 10));
 
-        // Then: 본인의 2개 레시피만 반환되고 타인의 기록은 섞이지 않는지 확인
+        // Then: testMember의 recipeA, recipeB만 조회됨
         assertEquals(2, result.getTotalElements());
-        assertEquals(2, result.getContent().size());
-
-        // 1번째: 최신 요리인 recipeA (10.12 요리)
-        MyRecipeResponse first = result.getContent().get(0);
-        assertEquals(recipeA.getId(), first.recipeId());
-        assertEquals("불닭 참치 두부조림", first.recipeName());
-        assertEquals("https://image.example.com/tofu.jpg", first.recipeImageUrl());
-        assertEquals(2L, first.cookCount());
-        assertTrue(first.fromChat());
-        assertNotNull(first.review());
-        assertEquals(5, first.review().rating());
-        assertEquals("정말 최고예요", first.review().content());
-
-        // 2번째: recipeB (10.08 요리)
-        MyRecipeResponse second = result.getContent().get(1);
-        assertEquals(recipeB.getId(), second.recipeId());
-        assertEquals("계란말이", second.recipeName());
-        assertEquals(1L, second.cookCount());
-        assertFalse(second.fromChat());
-        assertNull(second.review());
+        List<Long> recipeIds = result.getContent().stream().map(MyRecipeResponse::recipeId).toList();
+        assertTrue(recipeIds.contains(recipeA.getId()));
+        assertTrue(recipeIds.contains(recipeB.getId()));
+        assertFalse(recipeIds.contains(recipeC.getId()));
     }
 
     /**
-     * reviewStatus 필터에 따라 후기 작성 완료(WRITTEN)와 미작성(NOT_WRITTEN) 레시피만 정확히 필터링되는지 검증한다.
+     * Recipe join으로 이름과 대표 이미지가 매핑되고, 이미지가 없는 레시피는 null로 매핑되는지 검증한다.
+     */
+    @Test
+    void findMyRecipesMapsRecipeNameAndImage() {
+        // Given: 이미지 있는 recipeA, 이미지 없는 recipeC
+        saveCookingLog(testMember.getId(), recipeA.getId(), null, CookingResult.SUCCESS, "A", LocalDateTime.of(2026, 10, 10, 10, 0));
+        saveCookingLog(testMember.getId(), recipeC.getId(), null, CookingResult.SUCCESS, "C", LocalDateTime.of(2026, 10, 11, 10, 0));
+        flushAndClear();
+
+        // When
+        Page<MyRecipeResponse> result = cookingLogRepository.findMyRecipes(
+                testMember.getId(), MyRecipeReviewStatus.ALL, MyRecipeSortType.RECENT, PageRequest.of(0, 10));
+
+        // Then: recipeC(최신), recipeA 순서
+        MyRecipeResponse first = result.getContent().get(0);
+        assertEquals(recipeC.getId(), first.recipeId());
+        assertEquals("된장찌개", first.recipeName());
+        assertNull(first.recipeImageUrl());
+
+        MyRecipeResponse second = result.getContent().get(1);
+        assertEquals(recipeA.getId(), second.recipeId());
+        assertEquals("불닭 참치 두부조림", second.recipeName());
+        assertEquals("https://image.example.com/tofu.jpg", second.recipeImageUrl());
+    }
+
+    /**
+     * RecipeReview left join: 회원의 후기가 있으면 review가 매핑되고, 없으면 null이 되는지 검증한다.
+     */
+    @Test
+    void findMyRecipesMapsReviewOrNull() {
+        // Given: recipeA는 후기 작성, recipeB는 후기 미작성
+        saveCookingLog(testMember.getId(), recipeA.getId(), null, CookingResult.SUCCESS, "A", LocalDateTime.of(2026, 10, 10, 10, 0));
+        saveCookingLog(testMember.getId(), recipeB.getId(), null, CookingResult.SUCCESS, "B", LocalDateTime.of(2026, 10, 11, 10, 0));
+        RecipeReview reviewA = saveReview(testMember, recipeA.getId(), 5, "진짜 맛있어요!", LocalDateTime.of(2026, 10, 10, 12, 0));
+        flushAndClear();
+
+        // When
+        Page<MyRecipeResponse> result = cookingLogRepository.findMyRecipes(
+                testMember.getId(), MyRecipeReviewStatus.ALL, MyRecipeSortType.RECENT, PageRequest.of(0, 10));
+
+        // Then: recipeB는 review가 null, recipeA는 review가 존재
+        MyRecipeResponse itemB = result.getContent().stream()
+                .filter(r -> r.recipeId().equals(recipeB.getId())).findFirst().orElseThrow();
+        assertNull(itemB.review());
+
+        MyRecipeResponse itemA = result.getContent().stream()
+                .filter(r -> r.recipeId().equals(recipeA.getId())).findFirst().orElseThrow();
+        assertNotNull(itemA.review());
+        assertEquals(reviewA.getId(), itemA.review().id());
+        assertEquals(5, itemA.review().rating());
+        assertEquals("진짜 맛있어요!", itemA.review().content());
+    }
+
+    /**
+     * AI 상담 여부: 여러 요리 기록 중 하나라도 chat_session_id가 있으면 fromChat이 true인지 검증한다.
+     */
+    @Test
+    void findMyRecipesFromChatIsTrueIfAnyLogHasChatSessionId() {
+        // Given: recipeA 1회차(chatSessionId=null), 2회차(chatSessionId=10L)
+        saveCookingLog(testMember.getId(), recipeA.getId(), null, CookingResult.SUCCESS, "1회차", LocalDateTime.of(2026, 10, 10, 10, 0));
+        saveCookingLog(testMember.getId(), recipeA.getId(), 10L, CookingResult.SUCCESS, "2회차", LocalDateTime.of(2026, 10, 12, 10, 0));
+        flushAndClear();
+
+        // When
+        Page<MyRecipeResponse> result = cookingLogRepository.findMyRecipes(
+                testMember.getId(), MyRecipeReviewStatus.ALL, MyRecipeSortType.RECENT, PageRequest.of(0, 10));
+
+        // Then: cookCount 2, fromChat true
+        assertEquals(1, result.getContent().size());
+        MyRecipeResponse item = result.getContent().get(0);
+        assertEquals(2L, item.cookCount());
+        assertTrue(item.fromChat());
+    }
+
+    /**
+     * reviewStatus 필터: WRITTEN은 후기 있는 레시피만, NOT_WRITTEN은 후기 없는 레시피만 조회되는지 검증한다.
      */
     @Test
     void findMyRecipesFiltersByReviewStatus() {
         // Given: recipeA(후기 작성), recipeB(후기 미작성)
-        saveCookingLog(testMember.getId(), recipeA.getId(), null, CookingResult.SUCCESS, "A", LocalDateTime.of(2026, 10, 1, 10, 0));
-        saveReview(testMember, recipeA.getId(), 4, "후기 A", LocalDateTime.of(2026, 10, 1, 12, 0));
-
-        saveCookingLog(testMember.getId(), recipeB.getId(), null, CookingResult.SUCCESS, "B", LocalDateTime.of(2026, 10, 2, 10, 0));
+        saveCookingLog(testMember.getId(), recipeA.getId(), null, CookingResult.SUCCESS, "A", LocalDateTime.of(2026, 10, 10, 10, 0));
+        saveCookingLog(testMember.getId(), recipeB.getId(), null, CookingResult.SUCCESS, "B", LocalDateTime.of(2026, 10, 11, 10, 0));
+        saveReview(testMember, recipeA.getId(), 4, "좋아요", LocalDateTime.of(2026, 10, 10, 11, 0));
         flushAndClear();
 
         // When: WRITTEN 조회
@@ -261,5 +322,73 @@ class CookingLogRepositoryTest {
         assertEquals(3L, summary.totalCookCount());
         assertEquals(1L, summary.writtenCount());
         assertEquals(1L, summary.notWrittenCount());
+    }
+
+    /**
+     * findByIdAndMemberId로 본인의 요리 기록만 정상 조회되고, 다른 회원의 기록이거나 없으면 Optional.empty()가 반환되는지 검증한다.
+     */
+    @Test
+    void findByIdAndMemberIdReturnsOnlyOwnRecord() {
+        CookingLog myLog = saveCookingLog(testMember.getId(), recipeA.getId(), null, CookingResult.SUCCESS, "내 기록", LocalDateTime.now());
+        CookingLog otherLog = saveCookingLog(OTHER_MEMBER_ID, recipeA.getId(), null, CookingResult.SUCCESS, "타인 기록", LocalDateTime.now());
+        flushAndClear();
+
+        // When & Then
+        assertTrue(cookingLogRepository.findByIdAndMemberId(myLog.getId(), testMember.getId()).isPresent());
+        assertTrue(cookingLogRepository.findByIdAndMemberId(otherLog.getId(), testMember.getId()).isEmpty());
+        assertTrue(cookingLogRepository.findByIdAndMemberId(99999L, testMember.getId()).isEmpty());
+    }
+
+    /**
+     * 요리 기록을 수정해도 데이터베이스의 다른 필드(recipeId, chatSessionId 등)와
+     * 연결된 fridge_item_logs(재료 차감 이력)가 변경되지 않는지 검증한다.
+     */
+    @Test
+    void updateCookingLogDoesNotAffectFridgeItemLogs() {
+        // Given: 요리 기록 생성
+        CookingLog log = saveCookingLog(testMember.getId(), recipeA.getId(), 10L, CookingResult.SUCCESS, "초기 메모", LocalDateTime.now());
+
+        // 재료 및 차감 이력(fridge_item_logs) 저장
+        Ingredient ingredient = Ingredient.builder()
+                .ingredientCode("ING_ONION")
+                .name("양파")
+                .baseUnit("g")
+                .defaultStorage(StorageType.ROOM_TEMP)
+                .defaultShelfDays(7)
+                .basicSeasoning(false)
+                .build();
+        em.persist(ingredient);
+
+        FridgeItemLog itemLog = FridgeItemLog.builder()
+                .memberId(testMember.getId())
+                .ingredient(ingredient)
+                .cookingLogId(log.getId())
+                .fridgeId(50L)
+                .rawName("깐양파")
+                .quantity(new BigDecimal("100.00"))
+                .action(FridgeItemAction.CONSUMED)
+                .build();
+        em.persist(itemLog);
+        flushAndClear();
+
+        // When: 요리 기록 수정 (결과, 메모 변경)
+        CookingLog foundLog = cookingLogRepository.findByIdAndMemberId(log.getId(), testMember.getId()).orElseThrow();
+        foundLog.update(CookingResult.FAILED, "수정된 메모");
+        flushAndClear();
+
+        // Then: 요리 기록의 결과와 메모만 변경되고 다른 필드는 보존됨
+        CookingLog updatedCookingLog = cookingLogRepository.findById(log.getId()).orElseThrow();
+        assertEquals(CookingResult.FAILED, updatedCookingLog.getResult());
+        assertEquals("수정된 메모", updatedCookingLog.getMemo());
+        assertEquals(recipeA.getId(), updatedCookingLog.getRecipeId());
+        assertEquals(10L, updatedCookingLog.getChatSessionId());
+
+        // 연결된 fridge_item_logs는 아무런 변경 없이 유지됨
+        FridgeItemLog foundFridgeItemLog = em.find(FridgeItemLog.class, itemLog.getId());
+        assertNotNull(foundFridgeItemLog);
+        assertEquals(log.getId(), foundFridgeItemLog.getCookingLogId());
+        assertEquals(new BigDecimal("100.00"), foundFridgeItemLog.getQuantity());
+        assertEquals(FridgeItemAction.CONSUMED, foundFridgeItemLog.getAction());
+        assertEquals("깐양파", foundFridgeItemLog.getRawName());
     }
 }

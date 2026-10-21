@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.CookingCompleteRequest;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.CookingLogResponse;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.CookingLogSearchRequest;
+import org.example.takecareofmyfridgebe.domain.cooking.dto.CookingLogUpdateRequest;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeListResponse;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeResponse;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeSearchRequest;
@@ -78,5 +79,24 @@ public class CookingService {
         MyRecipeSummaryResponse summary = cookingLogRepository.getMyRecipesSummary(memberId);
 
         return new MyRecipeListResponse(summary, PageResponse.of(recipePage));
+    }
+
+    /**
+     * 로그인한 회원의 요리 기록 결과와 메모를 수정한다.
+     * 본인의 기록만 수정할 수 있으며, 다른 회원의 기록이거나 존재하지 않으면 404 예외를 던진다.
+     * 재료 차감과 묶인 값은 되돌리기 어려워 결과와 메모만 수정하며 JPA 더티 체킹으로 반영한다.
+     *
+     * @param memberId     회원 ID
+     * @param cookingLogId 요리 기록 ID
+     * @param request      수정 정보 (result, memo)
+     * @return 수정된 요리 기록 응답
+     */
+    @Transactional
+    public CookingLogResponse updateCookingLog(Long memberId, Long cookingLogId, CookingLogUpdateRequest request) {
+        CookingLog cookingLog = cookingLogRepository.findByIdAndMemberId(cookingLogId, memberId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.COOKING_LOG_NOT_FOUND));
+
+        cookingLog.update(request.result(), request.memo());
+        return CookingLogResponse.from(cookingLog);
     }
 }
