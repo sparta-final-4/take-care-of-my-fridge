@@ -33,6 +33,11 @@ public enum ErrorCode {
     // Forecast
     FORECAST_NOT_FOUND(HttpStatus.NOT_FOUND, "F001", "해당 주의 예측이 없습니다."),
 
+    // Deal analysis
+    DEAL_ANALYSIS_NOT_FOUND(HttpStatus.NOT_FOUND, "D002", "할인 후보 분석 결과가 없습니다."),
+    DEAL_CANDIDATE_NOT_IN_ANALYSIS(HttpStatus.BAD_REQUEST, "D003", "이 분석의 할인 후보가 아닙니다."),
+    DEAL_REVIEW_LOCKED(HttpStatus.CONFLICT, "D004", "이미 행사 요청한 후보는 검토 상태를 바꿀 수 없습니다."),
+
     // Product
     PRODUCT_NOT_FOUND(HttpStatus.NOT_FOUND, "PRODUCT_001", "상품을 찾을 수 없습니다."),
     INSUFFICIENT_STOCK(HttpStatus.CONFLICT, "PRODUCT_002", "재고가 부족합니다."),
