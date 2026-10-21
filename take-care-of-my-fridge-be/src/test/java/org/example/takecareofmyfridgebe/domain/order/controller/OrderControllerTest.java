@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -21,9 +22,11 @@ import java.util.stream.IntStream;
 import org.example.takecareofmyfridgebe.domain.auth.service.AuthSessionService;
 import org.example.takecareofmyfridgebe.domain.auth.service.JwtTokenService;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
+import org.example.takecareofmyfridgebe.domain.order.dto.OrderCancelResponse;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderCheckoutResponse;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderCreateResult;
 import org.example.takecareofmyfridgebe.domain.order.entity.OrderStatus;
+import org.example.takecareofmyfridgebe.domain.order.service.OrderCancelService;
 import org.example.takecareofmyfridgebe.domain.order.service.OrderCreateService;
 import org.example.takecareofmyfridgebe.domain.order.service.OrderQueryService;
 import org.example.takecareofmyfridgebe.global.config.SecurityConfig;
@@ -52,17 +55,45 @@ class OrderControllerTest {
     private final MockMvc mvc;
     private final OrderCreateService orderCreateService;
     private final OrderQueryService orderQueryService;
+    private final OrderCancelService orderCancelService;
 
     @Autowired
-    OrderControllerTest(MockMvc mvc, OrderCreateService orderCreateService, OrderQueryService orderQueryService) {
+    OrderControllerTest(MockMvc mvc, OrderCreateService orderCreateService, OrderQueryService orderQueryService,
+                        OrderCancelService orderCancelService) {
         this.mvc = mvc;
         this.orderCreateService = orderCreateService;
         this.orderQueryService = orderQueryService;
+        this.orderCancelService = orderCancelService;
     }
 
     @BeforeEach
     void resetMock() {
-        reset(orderCreateService, orderQueryService);
+        reset(orderCreateService, orderQueryService, orderCancelService);
+    }
+
+    @Test
+    @DisplayName("주문 취소는 로그인한 회원 번호와 주문 번호로 서비스를 부르고 200이다")
+    void cancelOrder_returns200() throws Exception {
+        when(orderCancelService.cancel(7L, 5001L)).thenReturn(new OrderCancelResponse(5001L, OrderStatus.CANCELLED));
+
+        mvc.perform(patch("/api/orders/5001/cancel")
+                        .with(csrf())
+                        .with(loginAsMember7()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.orderId").value(5001))
+                .andExpect(jsonPath("$.data.status").value("CANCELLED"));
+    }
+
+    @Test
+    @DisplayName("결제가 끝난 주문을 취소하면 409다")
+    void cancelOrder_paidOrder_returns409() throws Exception {
+        when(orderCancelService.cancel(7L, 5001L)).thenThrow(new BusinessException(ErrorCode.ORDER_ALREADY_PAID));
+
+        mvc.perform(patch("/api/orders/5001/cancel")
+                        .with(csrf())
+                        .with(loginAsMember7()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("ORDER_007"));
     }
 
     @Test
@@ -187,6 +218,11 @@ class OrderControllerTest {
         @Bean
         OrderQueryService orderQueryService() {
             return mock(OrderQueryService.class);
+        }
+
+        @Bean
+        OrderCancelService orderCancelService() {
+            return mock(OrderCancelService.class);
         }
 
         @Bean
