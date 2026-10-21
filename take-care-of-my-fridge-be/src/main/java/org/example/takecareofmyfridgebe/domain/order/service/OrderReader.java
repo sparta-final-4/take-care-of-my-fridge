@@ -27,6 +27,12 @@ public class OrderReader {
             .orElseThrow(() -> new BusinessException(ErrorCode.ORDER_NOT_FOUND));
     }
 
+    // 상태를 바꾸기 전에 주문 행을 잠그고 찾는다. 잠금은 부르는 서비스의 트랜잭션이 끝날 때 풀린다.
+    public Order getOwnedOrderForUpdate(Long memberId, Long orderId) {
+        return orderRepository.findByIdAndMemberIdForUpdate(orderId, memberId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.ORDER_NOT_FOUND));
+    }
+
     public List<OrderItem> getOrderItems(Order order) {
         return orderItemRepository.findByOrderIdOrderByIdAsc(order.getId());
     }
