@@ -31,8 +31,17 @@ export interface SignUpResponse {
   memberId: number;
 }
 
+// EmailAvailabilityResponse.java, NicknameAvailabilityResponse.java
+export interface EmailAvailabilityResponse {
+  available: boolean;
+}
+
+export interface NicknameAvailabilityResponse {
+  available: boolean;
+}
+
 export async function checkEmailAvailability(email: string, signal?: AbortSignal) {
-  const { data } = await axiosInstance.get<ApiResponse<{ available: boolean }>>(
+  const { data } = await axiosInstance.get<ApiResponse<EmailAvailabilityResponse>>(
     '/api/members/email-availability',
     { params: { email }, signal },
   );
@@ -40,7 +49,7 @@ export async function checkEmailAvailability(email: string, signal?: AbortSignal
 }
 
 export async function checkNicknameAvailability(nickname: string, signal?: AbortSignal) {
-  const { data } = await axiosInstance.get<ApiResponse<{ available: boolean }>>(
+  const { data } = await axiosInstance.get<ApiResponse<NicknameAvailabilityResponse>>(
     '/api/members/nickname-availability',
     { params: { nickname }, signal },
   );

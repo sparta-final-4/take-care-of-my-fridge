@@ -14,7 +14,6 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.Optional;
-import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -71,9 +70,17 @@ class AuthSessionServiceTest {
     }
 
     private RefreshSession session(LocalDateTime now) {
-        Member member = Member.create("cook@example.com", "hash", "요리왕", Set.of());
+        Member member = Member.builder()
+                .email("cook@example.com")
+                .passwordHash("hash")
+                .nickname("요리왕")
+                .build();
         ReflectionTestUtils.setField(member, "id", 4L);
-        RefreshSession session = RefreshSession.create(member, "hash", now);
+        RefreshSession session = RefreshSession.builder()
+                .member(member)
+                .tokenHash("hash")
+                .issuedAt(now)
+                .build();
         ReflectionTestUtils.setField(session, "id", 8L);
         return session;
     }

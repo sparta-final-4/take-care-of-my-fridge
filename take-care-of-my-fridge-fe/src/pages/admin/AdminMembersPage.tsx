@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { App, Button, Input, Result, Select, Space, Table, Tag, Typography } from 'antd';
-import { useState } from 'react';
+import dayjs from 'dayjs';
+import { useSearchParams } from 'react-router';
 
 import {
   promoteMember,
@@ -8,6 +9,7 @@ import {
   type MemberSummaryResponse,
 } from '@/domains/admin/api';
 import { adminQueries } from '@/domains/admin/queries';
+import { ROLE_LABELS, STATUS_LABELS } from '@/domains/member/labels';
 
 import styles from './AdminMembersPage.module.scss';
 
@@ -16,10 +18,23 @@ const PAGE_SIZE = 20;
 export default function AdminMembersPage() {
   const { modal, message } = App.useApp();
   const queryClient = useQueryClient();
-  const [keywordInput, setKeywordInput] = useState('');
-  const [keyword, setKeyword] = useState('');
-  const [role, setRole] = useState<MemberListRequest['role']>();
-  const [page, setPage] = useState(1);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const keyword = searchParams.get('keyword') ?? '';
+  const roleParam = searchParams.get('role');
+  const role: MemberListRequest['role'] =
+    roleParam === 'USER' || roleParam === 'ADMIN' ? roleParam : undefined;
+  const page = Math.max(1, Number(searchParams.get('page')) || 1);
+
+  // 값이 없으면 쿼리에서 지운다. 검색 조건이 바뀌면 첫 페이지로 돌아간다.
+  const updateSearch = (changes: Record<string, string | undefined>) =>
+    setSearchParams((previous) => {
+      const next = new URLSearchParams(previous);
+      if (!('page' in changes)) next.delete('page');
+      Object.entries(changes).forEach(([key, value]) =>
+        value ? next.set(key, value) : next.delete(key),
+      );
+      return next;
+    });
   const { data, isPending, isError, refetch } = useQuery(
     adminQueries.members({ keyword: keyword || undefined, role, page, size: PAGE_SIZE }),
   );
@@ -52,14 +67,11 @@ export default function AdminMembersPage() {
       <Typography.Title level={2}>회원 관리</Typography.Title>
       <Space wrap className={styles.filters}>
         <Input.Search
-          placeholder="이메일 또는 닉네임"
+          placeholder="이메일"
           aria-label="회원 검색"
-          value={keywordInput}
-          onChange={(event) => setKeywordInput(event.target.value)}
-          onSearch={(value) => {
-            setKeyword(value.trim());
-            setPage(1);
-          }}
+          key={keyword}
+          defaultValue={keyword}
+          onSearch={(value) => updateSearch({ keyword: value.trim() || undefined })}
           enterButton="검색"
           allowClear
         />
@@ -69,13 +81,10 @@ export default function AdminMembersPage() {
           value={role}
           allowClear
           options={[
-            { value: 'USER', label: '일반 회원' },
-            { value: 'ADMIN', label: '관리자' },
+            { value: 'USER', label: ROLE_LABELS.USER },
+            { value: 'ADMIN', label: ROLE_LABELS.ADMIN },
           ]}
-          onChange={(value) => {
-            setRole(value);
-            setPage(1);
-          }}
+          onChange={(value) => updateSearch({ role: value })}
           className={styles.roleFilter}
         />
       </Space>
@@ -90,13 +99,13 @@ export default function AdminMembersPage() {
           rowKey="memberId"
           loading={isPending}
           dataSource={data?.content}
-          scroll={{ x: 920 }}
+          scroll={{ x: 'max-content' }}
           pagination={{
             current: page,
             pageSize: PAGE_SIZE,
             total: data?.totalElements,
             showSizeChanger: false,
-            onChange: setPage,
+            onChange: (next) => updateSearch({ page: next > 1 ? String(next) : undefined }),
           }}
           locale={{ emptyText: '조건에 맞는 회원이 없습니다.' }}
           columns={[
@@ -107,22 +116,27 @@ export default function AdminMembersPage() {
               dataIndex: 'role',
               key: 'role',
               render: (value: MemberSummaryResponse['role']) => (
-                <Tag color={value === 'ADMIN' ? 'purple' : 'default'}>{value}</Tag>
+                <Tag color={value === 'ADMIN' ? 'purple' : 'default'}>{ROLE_LABELS[value]}</Tag>
               ),
             },
-            { title: '상태', dataIndex: 'status', key: 'status' },
+            {
+              title: '상태',
+              dataIndex: 'status',
+              key: 'status',
+              render: (value: MemberSummaryResponse['status']) => STATUS_LABELS[value],
+            },
             {
               title: '가입일',
               dataIndex: 'createdAt',
               key: 'createdAt',
-              render: (value: string) => value.slice(0, 10),
+              render: (value: string) => dayjs(value).format('YYYY-MM-DD'),
             },
             {
               title: '승격 정보',
               key: 'promotion',
               render: (_, member) =>
                 member.promotedAt
-                  ? `${member.promotedAt.slice(0, 10)} · ${member.promotedBy ?? '-'}`
+                  ? `${dayjs(member.promotedAt).format('YYYY-MM-DD')} · ${member.promotedBy ?? '-'}`
                   : '-',
             },
             {

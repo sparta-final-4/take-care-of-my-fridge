@@ -13,7 +13,6 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.Optional;
-import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -74,9 +73,17 @@ class RefreshServiceTest {
     }
 
     private RefreshSession session(String token, LocalDateTime now) {
-        Member member = Member.create("cook@example.com", "hash", "요리왕", Set.of());
+        Member member = Member.builder()
+                .email("cook@example.com")
+                .passwordHash("hash")
+                .nickname("요리왕")
+                .build();
         ReflectionTestUtils.setField(member, "id", 4L);
-        RefreshSession session = RefreshSession.create(member, jwt.hash(token), now);
+        RefreshSession session = RefreshSession.builder()
+                .member(member)
+                .tokenHash(jwt.hash(token))
+                .issuedAt(now)
+                .build();
         ReflectionTestUtils.setField(session, "id", 8L);
         return session;
     }

@@ -692,6 +692,36 @@
         ]
       }
     },
+    "/api/me/recipes": {
+      "get": {
+        "operationId": "getMyRecipes",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "request",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/MyRecipeSearchRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMyRecipeListResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "my-recipe-controller"
+        ]
+      }
+    },
     "/api/members": {
       "post": {
         "operationId": "signUp",
@@ -1479,6 +1509,20 @@
         "properties": {
           "data": {
             "$ref": "#/components/schemas/MyInfoResponse"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorResponse"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ApiResponseMyRecipeListResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/MyRecipeListResponse"
           },
           "error": {
             "$ref": "#/components/schemas/ErrorResponse"
@@ -2636,6 +2680,118 @@
           }
         }
       },
+      "MyRecipeListResponse": {
+        "type": "object",
+        "properties": {
+          "recipes": {
+            "$ref": "#/components/schemas/PageResponseMyRecipeResponse"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/MyRecipeSummaryResponse"
+          }
+        }
+      },
+      "MyRecipeResponse": {
+        "type": "object",
+        "properties": {
+          "cookCount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "fromChat": {
+            "type": "boolean"
+          },
+          "lastCookedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "recipeId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "recipeImageUrl": {
+            "type": "string"
+          },
+          "recipeName": {
+            "type": "string"
+          },
+          "review": {
+            "$ref": "#/components/schemas/MyRecipeReviewResponse"
+          }
+        }
+      },
+      "MyRecipeReviewResponse": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "rating": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "MyRecipeSearchRequest": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 1
+          },
+          "reviewStatus": {
+            "type": "string",
+            "enum": [
+              "ALL",
+              "WRITTEN",
+              "NOT_WRITTEN"
+            ]
+          },
+          "size": {
+            "type": "integer",
+            "format": "int32",
+            "maximum": 50,
+            "minimum": 1
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "RECENT",
+              "MOST"
+            ]
+          }
+        }
+      },
+      "MyRecipeSummaryResponse": {
+        "type": "object",
+        "properties": {
+          "notWrittenCount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "recipeCount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "totalCookCount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "writtenCount": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
       "NicknameAvailabilityRequest": {
         "type": "object",
         "properties": {
@@ -2853,6 +3009,36 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/MemberSummaryResponse"
+            }
+          },
+          "isLast": {
+            "type": "boolean"
+          },
+          "pageNumber": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalElements": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "totalPages": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "PageResponseMyRecipeResponse": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MyRecipeResponse"
             }
           },
           "isLast": {

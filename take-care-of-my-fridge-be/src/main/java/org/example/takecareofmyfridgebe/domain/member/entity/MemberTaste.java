@@ -13,6 +13,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.example.takecareofmyfridgebe.global.entity.BaseTimeEntity;
@@ -36,12 +37,9 @@ public class MemberTaste extends BaseTimeEntity {
     @Column(nullable = false, length = 20)
     private Member.Taste taste;
 
+    @Builder(access = AccessLevel.PACKAGE)
     private MemberTaste(Member member, Member.Taste taste) {
         this.member = member;
         this.taste = taste;
-    }
-
-    static MemberTaste create(Member member, Member.Taste taste) {
-        return new MemberTaste(member, taste);
     }
 }

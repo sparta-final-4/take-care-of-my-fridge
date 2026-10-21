@@ -1,5 +1,9 @@
 package org.example.takecareofmyfridgebe.domain.cooking.repository;
 
+import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeResponse;
+import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeReviewStatus;
+import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeSortType;
+import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeSummaryResponse;
 import org.example.takecareofmyfridgebe.domain.cooking.entity.CookingLog;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -25,4 +29,28 @@ public interface CookingLogRepositoryCustom {
             LocalDate to,
             Pageable pageable
     );
+
+    /**
+     * 회원이 요리 완료한 레시피 목록을 레시피별로 묶어 페이징 조회한다.
+     *
+     * @param memberId     회원 ID (필수)
+     * @param reviewStatus 후기 작성 여부 필터 (ALL, WRITTEN, NOT_WRITTEN)
+     * @param sort         정렬 기준 (RECENT, MOST)
+     * @param pageable     페이징 정보
+     * @return 묶인 레시피 목록 페이지
+     */
+    Page<MyRecipeResponse> findMyRecipes(
+            Long memberId,
+            MyRecipeReviewStatus reviewStatus,
+            MyRecipeSortType sort,
+            Pageable pageable
+    );
+
+    /**
+     * 회원의 요리 완료 레시피 전체 요약 통계를 단일 쿼리로 조회한다.
+     *
+     * @param memberId 회원 ID (필수)
+     * @return 레시피 수, 총 요리 횟수, 작성/미작성 후기 수 요약
+     */
+    MyRecipeSummaryResponse getMyRecipesSummary(Long memberId);
 }

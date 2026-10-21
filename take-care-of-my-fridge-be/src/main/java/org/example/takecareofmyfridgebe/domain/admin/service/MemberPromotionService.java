@@ -32,8 +32,14 @@ public class MemberPromotionService {
             throw new BusinessException(ErrorCode.ALREADY_ADMIN);
         }
         target.promoteToAdmin();
-        auditLogRepository.save(AdminAuditLog.create(actor, AdminAuditLog.Action.ROLE_CHANGE,
-                AdminAuditLog.TARGET_MEMBER, targetId, AdminAuditLog.Result.SUCCESS,
-                Map.of("role", "USER"), Map.of("role", "ADMIN")));
+        auditLogRepository.save(AdminAuditLog.builder()
+                .member(actor)
+                .action(AdminAuditLog.Action.ROLE_CHANGE)
+                .targetType(AdminAuditLog.TARGET_MEMBER)
+                .targetId(targetId)
+                .result(AdminAuditLog.Result.SUCCESS)
+                .beforeValue(Map.of("role", "USER"))
+                .afterValue(Map.of("role", "ADMIN"))
+                .build());
     }
 }

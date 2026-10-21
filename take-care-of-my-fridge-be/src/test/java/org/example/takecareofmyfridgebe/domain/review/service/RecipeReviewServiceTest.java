@@ -55,7 +55,7 @@ class RecipeReviewServiceTest {
     private RecipeReviewService recipeReviewService;
 
     private Member createMember(Long id, String nickname) {
-        Member member = Member.create("user" + id + "@example.com", "encoded_password", nickname, Collections.emptySet());
+        Member member = Member.builder().email("user" + id + "@example.com").passwordHash("encoded_password").nickname(nickname).tastes(Collections.emptySet()).build();
         ReflectionTestUtils.setField(member, "id", id);
         return member;
     }

@@ -16,7 +16,6 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -37,8 +36,17 @@ class MemberPromotionServiceTest {
 
     @Test
     void promotesUserAndWritesRoleChangeInSameOperation() {
-        Member actor = Member.createInitialAdmin("admin@example.com", "hash", "관리자");
-        Member target = Member.create("cook@example.com", "hash", "요리왕", Set.of());
+        Member actor = Member.builder()
+                .email("admin@example.com")
+                .passwordHash("hash")
+                .nickname("관리자")
+                .role(Member.Role.ADMIN)
+                .build();
+        Member target = Member.builder()
+                .email("cook@example.com")
+                .passwordHash("hash")
+                .nickname("요리왕")
+                .build();
         when(memberRepository.findById(1L)).thenReturn(Optional.of(actor));
         when(memberRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(target));
 
@@ -55,17 +63,31 @@ class MemberPromotionServiceTest {
 
     @Test
     void rejectsMissingSuspendedAndAlreadyAdminWithoutSuccessLog() {
-        Member actor = Member.createInitialAdmin("admin@example.com", "hash", "관리자");
+        Member actor = Member.builder()
+                .email("admin@example.com")
+                .passwordHash("hash")
+                .nickname("관리자")
+                .role(Member.Role.ADMIN)
+                .build();
         when(memberRepository.findById(1L)).thenReturn(Optional.of(actor));
         when(memberRepository.findByIdForUpdate(2L)).thenReturn(Optional.empty());
         assertError(ErrorCode.MEMBER_NOT_FOUND);
 
-        Member suspended = Member.create("suspended@example.com", "hash", "정지회원", Set.of());
+        Member suspended = Member.builder()
+                .email("suspended@example.com")
+                .passwordHash("hash")
+                .nickname("정지회원")
+                .build();
         ReflectionTestUtils.setField(suspended, "status", Member.Status.SUSPENDED);
         when(memberRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(suspended));
         assertError(ErrorCode.PROMOTION_SUSPENDED);
 
-        Member admin = Member.createInitialAdmin("other@example.com", "hash", "다른관리자");
+        Member admin = Member.builder()
+                .email("other@example.com")
+                .passwordHash("hash")
+                .nickname("다른관리자")
+                .role(Member.Role.ADMIN)
+                .build();
         when(memberRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(admin));
         assertError(ErrorCode.ALREADY_ADMIN);
         verify(auditLogRepository, never()).save(any(AdminAuditLog.class));

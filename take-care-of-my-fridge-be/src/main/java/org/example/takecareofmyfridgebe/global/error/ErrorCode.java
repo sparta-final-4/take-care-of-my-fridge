@@ -33,6 +33,11 @@ public enum ErrorCode {
     // Forecast
     FORECAST_NOT_FOUND(HttpStatus.NOT_FOUND, "F001", "해당 주의 예측이 없습니다."),
 
+    // Deal analysis
+    DEAL_ANALYSIS_NOT_FOUND(HttpStatus.NOT_FOUND, "D002", "할인 후보 분석 결과가 없습니다."),
+    DEAL_CANDIDATE_NOT_IN_ANALYSIS(HttpStatus.BAD_REQUEST, "D003", "이 분석의 할인 후보가 아닙니다."),
+    DEAL_REVIEW_LOCKED(HttpStatus.CONFLICT, "D004", "이미 행사 요청한 후보는 검토 상태를 바꿀 수 없습니다."),
+
     // Product
     PRODUCT_NOT_FOUND(HttpStatus.NOT_FOUND, "PRODUCT_001", "상품을 찾을 수 없습니다."),
     INSUFFICIENT_STOCK(HttpStatus.CONFLICT, "PRODUCT_002", "재고가 부족합니다."),
@@ -84,6 +89,9 @@ public enum ErrorCode {
     CHAT_ACCESS_DENIED(HttpStatus.FORBIDDEN, "CHAT_004", "해당 채팅방에 접근할 권한이 없습니다."),
     CHAT_ROOM_ALREADY_COMPLETED(HttpStatus.CONFLICT, "CHAT_005", "이미 종료된 상담입니다."),
 
+    // Recipe
+    RECIPE_NOT_FOUND(HttpStatus.NOT_FOUND, "RECIPE_001", "레시피를 찾을 수 없습니다."),
+
     // Review
     REVIEW_NOT_FOUND(HttpStatus.NOT_FOUND, "REVIEW_001", "리뷰를 찾을 수 없습니다."),
     REVIEW_ALREADY_EXISTS(HttpStatus.CONFLICT, "REVIEW_002", "이미 후기를 작성한 레시피입니다."),
@@ -99,7 +107,10 @@ public enum ErrorCode {
     FRIDGE_ITEM_NOT_FOUND(HttpStatus.NOT_FOUND, "FRIDGE_001", "냉장고 재료를 찾을 수 없습니다."),
     INVALID_FRIDGE_QUANTITY(HttpStatus.BAD_REQUEST, "FRIDGE_002", "수량은 0보다 커야 합니다."),
     INVALID_FRIDGE_ORDER_ITEM(HttpStatus.INTERNAL_SERVER_ERROR, "FRIDGE_003", "입고 출처와 주문 상품 정보가 일치하지 않습니다."),
-    INVALID_FRIDGE_LOG(HttpStatus.INTERNAL_SERVER_ERROR, "FRIDGE_004", "유효하지 않은 냉장고 재료 이력입니다.")
+    INVALID_FRIDGE_LOG(HttpStatus.INTERNAL_SERVER_ERROR, "FRIDGE_004", "유효하지 않은 냉장고 재료 이력입니다."),
+
+    // Cooking
+    COOKING_LOG_NOT_FOUND(HttpStatus.NOT_FOUND, "COOKING_001", "요리 기록을 찾을 수 없습니다.")
     ;
 
     private final HttpStatus status;

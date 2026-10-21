@@ -97,8 +97,7 @@ public class MemberService {
             throw new BusinessException(ErrorCode.DUPLICATE_NICKNAME);
         }
 
-        Member member = Member.create(request.email(), passwordEncoder.encode(request.password()),
-                request.nickname(), tastes);
+        Member member = request.toEntity(passwordEncoder.encode(request.password()), tastes);
         try {
             return SignUpResponse.from(memberRepository.saveAndFlush(member));
         } catch (DataIntegrityViolationException e) {

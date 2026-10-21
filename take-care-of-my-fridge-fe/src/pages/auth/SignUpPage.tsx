@@ -7,19 +7,12 @@ import { Link, useNavigate } from 'react-router';
 import { ROUTES } from '@/app/paths';
 import { getErrorCode, getErrorMessage } from '@/common/api/errors';
 import { signUp, type SignUpRequest } from '@/domains/member/api';
+import { TASTE_OPTIONS } from '@/domains/member/labels';
 import { memberQueries } from '@/domains/member/queries';
 
 import styles from './SignUpPage.module.scss';
 
 type FormValues = SignUpRequest & { passwordConfirm: string };
-
-const tasteOptions = [
-  { label: '짠맛', value: 'SALTY' },
-  { label: '단맛', value: 'SWEET' },
-  { label: '매운맛', value: 'SPICY' },
-  { label: '감칠맛', value: 'UMAMI' },
-  { label: '담백한 맛', value: 'MILD' },
-];
 
 export default function SignUpPage() {
   const [form] = Form.useForm<FormValues>();
@@ -179,7 +172,7 @@ export default function SignUpPage() {
           <Input.Password autoComplete="new-password" />
         </Form.Item>
         <Form.Item label="좋아하는 맛" name="tastes">
-          <Checkbox.Group options={tasteOptions} />
+          <Checkbox.Group options={TASTE_OPTIONS} />
         </Form.Item>
         <Typography.Paragraph type="secondary">
           선택하지 않아도 가입할 수 있습니다.

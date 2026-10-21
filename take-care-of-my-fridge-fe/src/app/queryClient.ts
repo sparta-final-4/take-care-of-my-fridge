@@ -1,6 +1,7 @@
 import { MutationCache, QueryClient } from '@tanstack/react-query';
 
-import { getErrorMessage } from '@/common/api/errors';
+import { getErrorMessage, isUnauthorized } from '@/common/api/errors';
+import { sessionId } from '@/common/auth/sessionId';
 
 import { getFeedback } from './feedback';
 
@@ -13,10 +14,17 @@ declare module '@tanstack/react-query' {
   }
 }
 
+// mutation이 시작된 세션. 이전 세션 mutation의 실패는 알리지 않는다.
+const mutationSessions = new WeakMap<object, number>();
+
 export const queryClient = new QueryClient({
   mutationCache: new MutationCache({
+    onMutate: (_variables, mutation) => {
+      mutationSessions.set(mutation, sessionId());
+    },
     onError: (error, _variables, _onMutateResult, mutation) => {
       if (mutation.meta?.skipGlobalError) return;
+      if (isUnauthorized(error) || mutationSessions.get(mutation) !== sessionId()) return;
       getFeedback()?.message.error(getErrorMessage(error));
     },
   }),
