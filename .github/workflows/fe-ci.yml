@@ -39,7 +39,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       # 생성 클라이언트(src/common/api/generated)는 커밋돼 있으므로 여기서 생성하지 않는다(Java 불필요).
-      # 스펙·생성 결과가 백엔드와 맞는지는 openapi-drift.yml이 검사한다.
+      # 스펙·생성 결과가 백엔드와 맞는지는 openapi-drift.yml이 경고로 알린다(필수 체크 아님).
       - run: pnpm lint
       - run: pnpm format:check
       - run: pnpm typecheck

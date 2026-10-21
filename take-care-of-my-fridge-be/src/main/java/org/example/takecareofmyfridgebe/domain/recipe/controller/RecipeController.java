@@ -2,6 +2,7 @@ package org.example.takecareofmyfridgebe.domain.recipe.controller;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeDetailResponse;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeListItemResponse;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeListRequest;
 import org.example.takecareofmyfridgebe.domain.recipe.service.RecipeService;
@@ -10,6 +11,7 @@ import org.example.takecareofmyfridgebe.global.response.PageResponse;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -26,5 +28,11 @@ public class RecipeController {
     ) {
         PageResponse<RecipeListItemResponse> recipes = recipeService.getRecipes(request.sort(), request.page(), request.size());
         return ResponseEntity.ok(ApiResponse.ok(recipes));
+    }
+
+    @GetMapping("/{recipeId}")
+    public ResponseEntity<ApiResponse<RecipeDetailResponse>> getRecipe(@PathVariable Long recipeId) {
+        RecipeDetailResponse recipe = recipeService.getRecipe(recipeId);
+        return ResponseEntity.ok(ApiResponse.ok(recipe));
     }
 }

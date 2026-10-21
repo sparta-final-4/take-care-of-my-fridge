@@ -35,3 +35,5 @@ portone:
   channel-key: "channel-key-d45e37ea-9034-495a-b691-c223dbf16f12"
   webhook-secret: "whsec_IJTPyu6yKJ/p6noqNdbveluR7P8AeVSJCoYRVpSGgXg="
 
+springdoc:
+  writer-with-order-by-keys: true

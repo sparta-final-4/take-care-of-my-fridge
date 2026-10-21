@@ -46,15 +46,27 @@ public class CookingLog extends BaseTimeEntity {
 
     @Builder
     private CookingLog(
-        Long memberId,
-        Long recipeId,
-        Long chatSessionId,
-        CookingResult result,
-        String memo
+            Long memberId,
+            Long recipeId,
+            Long chatSessionId,
+            CookingResult result,
+            String memo
     ) {
         this.memberId = memberId;
         this.recipeId = recipeId;
         this.chatSessionId = chatSessionId;
+        this.result = result;
+        this.memo = memo;
+    }
+
+    /**
+     * 요리 결과와 메모를 수정한다.
+     * 재료 차감과 묶인 값은 되돌리기 어려워 결과와 메모만 수정한다.
+     *
+     * @param result 수정할 요리 결과
+     * @param memo   수정할 메모 (50자 이하, null 허용)
+     */
+    public void update(CookingResult result, String memo) {
         this.result = result;
         this.memo = memo;
     }

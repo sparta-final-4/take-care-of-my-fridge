@@ -1,10 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { App, Button, Card, Checkbox, Form, Input, Result, Space, Spin, Typography } from 'antd';
 import { isAxiosError } from 'axios';
+import dayjs from 'dayjs';
 import { useState } from 'react';
 
 import { useAuthStore } from '@/common/auth/authStore';
-import { getErrorCode, getErrorMessage } from '@/common/api/errors';
+import { getErrorCode, getErrorMessage, isUnauthorized } from '@/common/api/errors';
 import {
   changeNickname,
   changePassword,
@@ -12,17 +13,10 @@ import {
   type ChangePasswordRequest,
   type MyInfoResponse,
 } from '@/domains/member/api';
+import { ROLE_LABELS, TASTE_OPTIONS } from '@/domains/member/labels';
 import { memberQueries } from '@/domains/member/queries';
 
 import styles from './AccountPage.module.scss';
-
-const tasteOptions = [
-  { label: '짠맛', value: 'SALTY' },
-  { label: '단맛', value: 'SWEET' },
-  { label: '매운맛', value: 'SPICY' },
-  { label: '감칠맛', value: 'UMAMI' },
-  { label: '담백한 맛', value: 'MILD' },
-];
 
 function AccountForms({ member }: { member: MyInfoResponse }) {
   const queryClient = useQueryClient();
@@ -61,7 +55,7 @@ function AccountForms({ member }: { member: MyInfoResponse }) {
       }
       setCheckedNickname(nickname);
     } catch (error) {
-      if (isAxiosError(error)) void message.error(getErrorMessage(error));
+      if (isAxiosError(error) && !isUnauthorized(error)) void message.error(getErrorMessage(error));
     } finally {
       setChecking(false);
     }
@@ -71,10 +65,10 @@ function AccountForms({ member }: { member: MyInfoResponse }) {
     <div className={styles.cards}>
       <Card title="내 정보">
         <Typography.Paragraph>이메일: {member.email}</Typography.Paragraph>
-        <Typography.Paragraph>가입일: {member.createdAt.slice(0, 10)}</Typography.Paragraph>
         <Typography.Paragraph>
-          역할: {member.role === 'ADMIN' ? '관리자' : '일반 회원'}
+          가입일: {dayjs(member.createdAt).format('YYYY-MM-DD')}
         </Typography.Paragraph>
+        <Typography.Paragraph>역할: {ROLE_LABELS[member.role]}</Typography.Paragraph>
       </Card>
       <Card title="닉네임 변경">
         <Form
@@ -98,7 +92,7 @@ function AccountForms({ member }: { member: MyInfoResponse }) {
                 if (getErrorCode(error) === 'M002') {
                   setCheckedNickname(undefined);
                   nicknameForm.setFields([{ name: 'nickname', errors: ['이미 사용 중입니다.'] }]);
-                } else {
+                } else if (!isUnauthorized(error)) {
                   void message.error(getErrorMessage(error));
                 }
               },
@@ -121,7 +115,7 @@ function AccountForms({ member }: { member: MyInfoResponse }) {
       </Card>
       <Card title="좋아하는 맛">
         <Checkbox.Group
-          options={tasteOptions}
+          options={TASTE_OPTIONS}
           value={tastes}
           onChange={(values) => setTastes(values as MyInfoResponse['tastes'])}
         />
@@ -160,7 +154,7 @@ function AccountForms({ member }: { member: MyInfoResponse }) {
                         errors: ['현재 비밀번호와 다른 비밀번호를 입력해 주세요.'],
                       },
                     ]);
-                  } else {
+                  } else if (!isUnauthorized(error)) {
                     void message.error(getErrorMessage(error));
                   }
                 },

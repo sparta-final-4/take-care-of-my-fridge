@@ -14,7 +14,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Optional;
-import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -37,7 +36,12 @@ class AdminAuditLogServiceTest {
 
     @Test
     void recordsSuccessfulActionWithActorAndTarget() {
-        Member actor = Member.createInitialAdmin("admin@example.com", "hash", "관리자");
+        Member actor = Member.builder()
+                .email("admin@example.com")
+                .passwordHash("hash")
+                .nickname("관리자")
+                .role(Member.Role.ADMIN)
+                .build();
         when(memberRepository.findById(7L)).thenReturn(Optional.of(actor));
 
         service.record(7L, AdminAuditLog.Action.ROLE_CHANGE, "Member", 12L,
@@ -56,7 +60,11 @@ class AdminAuditLogServiceTest {
 
     @Test
     void recordsDeniedActionByUserWithoutTargetId() {
-        Member actor = Member.create("user@example.com", "hash", "회원", Set.of());
+        Member actor = Member.builder()
+                .email("user@example.com")
+                .passwordHash("hash")
+                .nickname("회원")
+                .build();
         when(memberRepository.findById(9L)).thenReturn(Optional.of(actor));
 
         service.record(9L, AdminAuditLog.Action.PRODUCT_DELETE, "Product", null,

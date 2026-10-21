@@ -29,7 +29,12 @@ class LoginServiceTest {
 
     @Test
     void storesOnlyRefreshHashAndIssuesTokensForSavedSession() {
-        Member member = Member.create("cook@example.com", "hash", "요리왕", Set.of(Member.Taste.SPICY));
+        Member member = Member.builder()
+                .email("cook@example.com")
+                .passwordHash("hash")
+                .nickname("요리왕")
+                .tastes(Set.of(Member.Taste.SPICY))
+                .build();
         ReflectionTestUtils.setField(member, "id", 4L);
         when(credentialService.authenticate("cook@example.com", "password")).thenReturn(member);
         when(sessionRepository.saveAndFlush(any(RefreshSession.class))).thenAnswer(invocation -> {

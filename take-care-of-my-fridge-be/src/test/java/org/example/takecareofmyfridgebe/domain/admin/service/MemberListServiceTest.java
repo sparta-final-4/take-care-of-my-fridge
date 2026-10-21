@@ -53,7 +53,11 @@ class MemberListServiceTest {
 
     @Test
     void emailAndRoleFiltersUseOneBasedPageAndStableSort() {
-        Member member = Member.create("cook@example.com", "hash", "요리왕", Set.of());
+        Member member = Member.builder()
+                .email("cook@example.com")
+                .passwordHash("hash")
+                .nickname("요리왕")
+                .build();
         ReflectionTestUtils.setField(member, "id", 7L);
         Page<Member> result = new PageImpl<>(List.of(member), PageRequest.of(1, 20), 21);
         when(memberRepository.findAll(anySpecification(), any(Pageable.class))).thenReturn(result);
@@ -79,11 +83,26 @@ class MemberListServiceTest {
 
     @Test
     void adminSummaryUsesLatestSuccessfulPromotion() {
-        Member admin = Member.createInitialAdmin("new-admin@example.com", "hash", "새관리자");
+        Member admin = Member.builder()
+                .email("new-admin@example.com")
+                .passwordHash("hash")
+                .nickname("새관리자")
+                .role(Member.Role.ADMIN)
+                .build();
         ReflectionTestUtils.setField(admin, "id", 12L);
-        Member actor = Member.createInitialAdmin("actor@example.com", "hash", "작업자");
-        AdminAuditLog promotion = AdminAuditLog.create(actor, AdminAuditLog.Action.ROLE_CHANGE,
-                "Member", 12L, AdminAuditLog.Result.SUCCESS);
+        Member actor = Member.builder()
+                .email("actor@example.com")
+                .passwordHash("hash")
+                .nickname("작업자")
+                .role(Member.Role.ADMIN)
+                .build();
+        AdminAuditLog promotion = AdminAuditLog.builder()
+                .member(actor)
+                .action(AdminAuditLog.Action.ROLE_CHANGE)
+                .targetType("Member")
+                .targetId(12L)
+                .result(AdminAuditLog.Result.SUCCESS)
+                .build();
         LocalDateTime promotedAt = LocalDateTime.of(2026, 10, 17, 10, 30);
         ReflectionTestUtils.setField(promotion, "createdAt", promotedAt);
         when(memberRepository.findAll(anySpecification(), any(Pageable.class)))

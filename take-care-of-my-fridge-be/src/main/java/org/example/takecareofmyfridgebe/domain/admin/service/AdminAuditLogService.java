@@ -23,6 +23,12 @@ public class AdminAuditLogService {
                        Long targetId, AdminAuditLog.Result result) {
         Member actor = memberRepository.findById(actorId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
-        auditLogRepository.save(AdminAuditLog.create(actor, action, targetType, targetId, result));
+        auditLogRepository.save(AdminAuditLog.builder()
+                .member(actor)
+                .action(action)
+                .targetType(targetType)
+                .targetId(targetId)
+                .result(result)
+                .build());
     }
 }

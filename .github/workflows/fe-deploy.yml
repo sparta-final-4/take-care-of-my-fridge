@@ -48,16 +48,14 @@ jobs:
           cache: pnpm
           cache-dependency-path: take-care-of-my-fridge-fe/pnpm-lock.yaml
 
-      # 값이 비어 있어도 빌드는 성공하고(빈 값이 .env.production보다 우선) API 호출만 조용히 깨지므로 먼저 막는다.
+      # 값이 비어 있으면 업로드·무효화가 조용히 깨지므로 먼저 막는다.
       - name: 배포 설정 확인
         env:
-          API_URL: ${{ github.ref_name == 'main' && vars.API_URL_MAIN || vars.API_URL_DEV }}
           BUCKET: ${{ secrets.FRONTEND_BUCKET }}
           DIST_ID: ${{ github.ref_name == 'main' && secrets.CF_DIST_ID_MAIN || secrets.CF_DIST_ID_DEV }}
           ROLE: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
         run: |
           missing=""
-          [ -n "$API_URL" ] || missing="$missing API_URL_(DEV|MAIN)"
           [ -n "$BUCKET" ] || missing="$missing FRONTEND_BUCKET"
           [ -n "$DIST_ID" ] || missing="$missing CF_DIST_ID_(DEV|MAIN)"
           [ -n "$ROLE" ] || missing="$missing AWS_DEPLOY_ROLE_ARN"
@@ -68,10 +66,8 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      # 환경변수가 .env.production보다 우선한다.
+      # API는 같은 출처(/api/*)로 호출한다(.env.production). CloudFront가 환경별 백엔드로 넘긴다.
       - name: Build
-        env:
-          VITE_API_BASE_URL: ${{ github.ref_name == 'main' && vars.API_URL_MAIN || vars.API_URL_DEV }}
         run: pnpm build
 
       - uses: aws-actions/configure-aws-credentials@v4
