@@ -11,6 +11,8 @@ import org.example.takecareofmyfridgebe.domain.payment.entity.PaymentStatus;
 import org.example.takecareofmyfridgebe.domain.payment.repository.PaymentRepository;
 import org.example.takecareofmyfridgebe.global.config.JpaAuditingConfig;
 import org.example.takecareofmyfridgebe.global.config.QueryDslConfig;
+import org.example.takecareofmyfridgebe.global.error.BusinessException;
+import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -100,15 +102,24 @@ class PaymentCommandServiceConcurrencyTest {
     }
 
     @Test
-    @DisplayName("결제 생성을 동시에 여러 번 요청해도 결제 대기 건은 하나만 생기고 모두 같은 결제를 받는다")
+    @DisplayName("결제 생성을 동시에 여러 번 요청하면 한 건만 만들어지고 나머지는 PAYMENT_IN_PROGRESS로 거절된다")
     void createConcurrently_onlyOneReadyPayment() throws Exception {
         Order order = saveOrder();
 
-        List<Payment> created = runConcurrently(IntStream.range(0, 5)
-                .<Callable<Payment>>mapToObj(i -> () -> paymentCommandService.create(order.getId()))
+        List<Object> results = runConcurrently(IntStream.range(0, 5)
+                .<Callable<Object>>mapToObj(i -> () -> {
+                    try {
+                        return paymentCommandService.create(order.getId());
+                    } catch (BusinessException e) {
+                        return e.getErrorCode();
+                    }
+                })
                 .toList());
 
-        assertThat(created).extracting(Payment::getPortonePaymentId).containsOnly(created.get(0).getPortonePaymentId());
+        assertThat(results).filteredOn(Payment.class::isInstance).hasSize(1);
+        assertThat(results).filteredOn(ErrorCode.class::isInstance)
+                .containsOnly(ErrorCode.PAYMENT_IN_PROGRESS)
+                .hasSize(4);
         assertThat(paymentRepository.findByOrderIdAndStatus(order.getId(), PaymentStatus.READY)).hasSize(1);
         assertThat(paymentRepository.count()).isEqualTo(1);
     }

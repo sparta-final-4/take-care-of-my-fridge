@@ -238,16 +238,16 @@ class PaymentCommandServiceTest {
     }
 
     @Test
-    @DisplayName("동시에 들어온 요청이 먼저 만든 결제 대기 건이 있으면 새로 만들지 않고 그 결제를 돌려준다")
-    void create_readyExists_returnsExisting() {
+    @DisplayName("동시에 들어온 요청이 먼저 만든 결제 대기 건이 있으면 재사용하지 않고 PAYMENT_IN_PROGRESS로 거절한다")
+    void create_readyExists_rejected() {
         Order order = newOrder();
-        Payment existing = newPayment(order);
         given(orderRepository.findByIdForUpdate(ORDER_ID)).willReturn(Optional.of(order));
-        given(paymentRepository.findByOrderIdAndStatus(ORDER_ID, PaymentStatus.READY)).willReturn(List.of(existing));
+        given(paymentRepository.findByOrderIdAndStatus(ORDER_ID, PaymentStatus.READY))
+                .willReturn(List.of(newPayment(order)));
 
-        Payment payment = paymentCommandService.create(ORDER_ID);
-
-        assertThat(payment).isSameAs(existing);
+        assertThatThrownBy(() -> paymentCommandService.create(ORDER_ID))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode").isEqualTo(ErrorCode.PAYMENT_IN_PROGRESS);
         verify(paymentRepository, never()).save(any());
     }
 

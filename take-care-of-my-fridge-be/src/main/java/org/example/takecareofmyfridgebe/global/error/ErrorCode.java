@@ -61,6 +61,7 @@ public enum ErrorCode {
     ALREADY_PROCESSED_PAYMENT(HttpStatus.CONFLICT, "PAYMENT_005", "이미 처리된 결제입니다."),
     PAYMENT_EXPIRED(HttpStatus.CONFLICT, "PAYMENT_006", "결제 가능 시간이 지나 결제가 취소되었습니다."),
     PAYMENT_ORDER_NOT_PAYABLE(HttpStatus.CONFLICT, "PAYMENT_007", "이미 결제됐거나 취소된 주문입니다."),
+    PAYMENT_IN_PROGRESS(HttpStatus.CONFLICT, "PAYMENT_008", "이미 진행 중인 결제가 있습니다. 잠시 후 다시 시도해 주세요."),
 
     // Webhook
     INVALID_WEBHOOK_SIGNATURE(HttpStatus.UNAUTHORIZED, "WEBHOOK_001", "웹훅 서명이 유효하지 않습니다."),

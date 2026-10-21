@@ -34,7 +34,10 @@ public class PaymentFacade {
     private final PaymentGateway paymentGateway;
 
     // 결제하기를 누를 때 프론트가 호출한다. 응답의 portonePaymentId로 결제창을 띄운다.
-    // 창 닫기 요청이 오지 않아 결제 대기로 남은 이전 결제가 있으면 정리한 뒤 새 결제를 만든다
+    // 창 닫기 요청이 오지 않아 결제 대기로 남은 이전 결제가 있으면 정리한 뒤 새 결제를 만든다.
+    // 규칙: 이전 결제가 PG에서 이미 끝났으면 그 결제를 승인하고 새 결제는 만들지 않는다.
+    //  아직 진행 중이면 가장 최근에 연 결제창만 인정한다. 이전 창(다른 탭·기기)에서 나중에 결제되면 FAILED 결제라 환불된다.
+    //  서버는 "다른 탭에서 결제 중"과 "브라우저 종료로 버려진 창"을 구분할 수 없어, 버려진 창 때문에 재결제가 막히지 않도록 이렇게 정했다
     public PaymentPrepareResponse preparePayment(Long memberId, Long orderId) {
         paymentService.validatePayableOrder(memberId, orderId);
 

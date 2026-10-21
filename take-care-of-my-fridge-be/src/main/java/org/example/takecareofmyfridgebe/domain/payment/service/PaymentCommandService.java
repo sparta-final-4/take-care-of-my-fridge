@@ -19,7 +19,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.List;
 import java.util.UUID;
 
 // 결제 상태를 바꾸고, 승인 시 주문을 결제 완료로 바꾼다. 외부 PG 호출은 하지 않는다.
@@ -37,17 +36,16 @@ public class PaymentCommandService {
     private final EntityManager entityManager;
 
     // 주문에 새 결제를 만든다. 금액은 클라이언트 값이 아닌 주문 금액을 사용한다.
-    // 동시에 들어온 결제 요청(따닥 클릭)이 먼저 만든 결제 대기 건이 있으면 새로 만들지 않고 그 결제를 돌려준다
+    // 한 주문의 결제 대기 건은 최대 한 건이다. 호출 전에 이전 결제 대기 건을 정리하므로, 여기서 남아 있으면
+    // 동시에 들어온 다른 요청이 방금 만든 것이다. 만료됐을 수도 있는 결제를 재사용하지 않고 거절한다
     @Transactional
     public Payment create(Long orderId) {
         Order order = lockOrder(orderId);
         if (order.getStatus() != OrderStatus.PENDING) {
             throw new BusinessException(ErrorCode.PAYMENT_ORDER_NOT_PAYABLE);
         }
-
-        List<Payment> ready = paymentRepository.findByOrderIdAndStatus(orderId, PaymentStatus.READY);
-        if (!ready.isEmpty()) {
-            return ready.get(0);
+        if (!paymentRepository.findByOrderIdAndStatus(orderId, PaymentStatus.READY).isEmpty()) {
+            throw new BusinessException(ErrorCode.PAYMENT_IN_PROGRESS);
         }
 
         Payment payment = Payment.builder()

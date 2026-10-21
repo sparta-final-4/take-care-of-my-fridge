@@ -12,7 +12,6 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 
     Optional<Order> findByMemberIdAndIdempotencyKey(Long memberId, String idempotencyKey);
 
-    // 주문을 SELECT ... FOR UPDATE로 잠근다. 한 주문에 결제가 여러 건이므로 결제 승인·주문 취소·만료가 이 잠금으로 순서대로 처리된다.
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select o from Order o where o.id = :id")
     Optional<Order> findByIdForUpdate(@Param("id") Long id);
