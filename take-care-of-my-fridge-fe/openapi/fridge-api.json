@@ -1054,6 +1054,37 @@
         ]
       }
     },
+    "/api/orders/{orderId}/cancel": {
+      "patch": {
+        "operationId": "cancelOrder",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "orderId",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseOrderCancelResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "order-controller"
+        ]
+      }
+    },
     "/api/orders/{orderId}/checkout": {
       "get": {
         "operationId": "getCheckout",
@@ -1688,6 +1719,20 @@
         "properties": {
           "data": {
             "$ref": "#/components/schemas/NicknameAvailabilityResponse"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorResponse"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ApiResponseOrderCancelResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/OrderCancelResponse"
           },
           "error": {
             "$ref": "#/components/schemas/ErrorResponse"
@@ -3215,6 +3260,24 @@
           },
           "weightG": {
             "type": "number"
+          }
+        }
+      },
+      "OrderCancelResponse": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "PAID",
+              "CANCELLED",
+              "CONFIRMED"
+            ]
           }
         }
       },
