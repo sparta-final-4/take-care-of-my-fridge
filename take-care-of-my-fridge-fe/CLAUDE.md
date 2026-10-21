@@ -9,14 +9,14 @@
 - 백엔드는 [../take-care-of-my-fridge-be](../take-care-of-my-fridge-be). 명세보다 실제 컨트롤러·DTO·직렬화가 우선이며, 다르면 프론트를 백엔드에 맞추고 보고한다.
 - `(예정)`이 붙은 파일·폴더는 아직 없다. 처음 필요할 때 이 문서의 위치와 이름으로 만든다.
 - 30분 미사용 시 자동 로그아웃한다. 현재 프론트는 보호 API 401에서 재발급 후 한 번 재시도하고, 만료·정지 시 로그인으로 이동한다. 가입 비밀번호 규칙은 백엔드 DTO를 따른다. 이메일 인증은 현재 API에 없다.
-- OpenAPI 클라이언트 생성(`openapi-generator-cli`)은 도입 검토 중이다. 도입 여부와 관계없이 8.1을 따른다.
+- API 클라이언트는 `openapi-generator-cli`로 생성한다(8.1). 생성 결과는 스펙과 함께 커밋하며, 생성·협업 절차는 [README](README.md#api-클라이언트-생성)를 따른다.
 
 ## 0. 작업 절차
 
 **시작 전**
 
 1. `node_modules`가 없거나 `pnpm-lock.yaml`이 바뀌었을 때만 `pnpm install --frozen-lockfile`.
-2. API를 다루는 작업이면 먼저 `../take-care-of-my-fridge-be`의 컨트롤러·DTO·`global/response/ApiResponse.java`를 읽고 `src/domains/<domain>/api.ts`의 타입과 맞는지 확인한다. 다르면 백엔드 기준으로 먼저 맞춘다.
+2. API를 다루는 작업이면 먼저 `../take-care-of-my-fridge-be`의 컨트롤러·DTO·`global/response/ApiResponse.java`를 읽고 `openapi/fridge-api.json`과 맞는지 확인한다. 다르면 스펙을 손으로 고치지 않고 사용자에게 알린다(백엔드를 띄워 `pnpm oag:generate`로 갱신해야 한다).
 
 **완료 전** (모두 통과해야 완료)
 
@@ -54,9 +54,11 @@ src/
 │   ├─ components/           # 공통 UI (RouteErrorPage 등)
 │   ├─ api/
 │   │   ├─ axiosInstance.ts  # 유일한 axios 인스턴스, 인터셉터
+│   │   ├─ clients.ts        # 생성 API 클래스 인스턴스, 생성 모델 타입 재export
+│   │   ├─ unwrap.ts         # 생성 응답에서 data만 꺼냄
 │   │   ├─ errors.ts         # 에러 분류·메시지 변환
 │   │   ├─ types.ts          # ApiResponse<T>, PageResponse<T> 등 공통 응답 타입
-│   │   └─ generated/        # (도입 검토 중) openapi-generator-cli 생성 결과, 직접 수정 금지
+│   │   └─ generated/        # openapi-generator-cli 생성 결과(커밋함), 직접 수정 금지
 │   └─ auth/                 # 8.4 인증: authStore, initialize, session, sessionId, RequireAuth 등
 ├─ layout/                   # MainLayout, Header
 ├─ pages/                    # XxxPage.tsx: 섹션을 배치만 함 (MainPage, NotFoundPage)
@@ -70,7 +72,7 @@ src/
         └─ hooks/            # 도메인 UI 로직 훅 (쿼리를 감싸기만 하는 훅은 두지 않음)
 ```
 
-- import는 `@/` alias(`src/`), 같은 폴더는 `./`. alias는 Vite `resolve.alias`와 `tsconfig` `paths`에 똑같이 설정한다. 배럴 파일(`index.ts` 재export) 금지.
+- import는 `@/` alias(`src/`), 같은 폴더는 `./`. alias는 Vite `resolve.alias`와 `tsconfig` `paths`에 똑같이 설정한다. 배럴 파일(`index.ts` 재export) 금지. 예외: `src/common/api/clients.ts`는 생성 모델 타입을 재export한다(도메인이 `generated` 경로를 직접 import하지 않게 하기 위해).
 - 컴포넌트와 `.module.scss`는 같은 폴더, 같은 이름.
 - `App.tsx` Provider 순서: `ConfigProvider`(theme, koKR) → `AntdApp` → [`FeedbackBridge`, `QueryClientProvider` → `RouterProvider`]. `FeedbackBridge`는 반드시 `AntdApp` 안에 둔다.
 
@@ -168,35 +170,24 @@ src/
 - 응답 래퍼(`ApiResponse<T>`)는 API 함수 안에서 벗겨 실제 데이터를 반환한다.
 - 조회 함수는 `signal?: AbortSignal`을 받아 axios에 넘긴다.
 - 경로 변수는 `encodeURIComponent`, 쿼리스트링은 `params`로.
-- **URL 규칙**: `VITE_API_BASE_URL`에는 API 서버 주소(origin)만 넣는다(로컬 빈 값, 운영 `https://api.imhungry.click`). `/api` prefix는 백엔드 컨트롤러 경로에 포함돼 있으므로 경로에 그대로 쓴다(`'/api/pages'`). 로컬은 Vite `server.proxy`로 `/api`를 백엔드에 넘긴다.
-- **OpenAPI 생성 클라이언트를 도입하면**: 생성 클래스는 `api.ts` 안에서만 쓰고, `api.ts`의 일반 함수가 생성 메서드를 호출해 래퍼를 벗겨 반환한다. 생성 클래스는 `new XxxApi(undefined, import.meta.env.VITE_API_BASE_URL, axiosInstance)`로 만든다(로컬에서 basePath를 빼면 `http://localhost`로 요청된다). 화면·쿼리에서는 생성 클래스를 직접 쓰지 않는다.
+- **URL 규칙**: `VITE_API_BASE_URL`은 로컬·운영 모두 빈 값이다. 로컬은 Vite `server.proxy`, 운영은 CloudFront `/api/*` behavior가 `/api` 요청을 백엔드로 넘긴다. `/api` prefix는 백엔드 컨트롤러 경로에 포함돼 있으므로 경로에 그대로 쓴다(`'/api/pages'`).
+- **OpenAPI 생성 클라이언트**: 생성 클래스 인스턴스는 `src/common/api/clients.ts`에서만 `new XxxApi(undefined, import.meta.env.VITE_API_BASE_URL, axiosInstance)`로 만든다(basePath를 빼면 `http://localhost`로 요청된다). `api.ts`의 일반 함수가 생성 메서드를 호출하고 `unwrap`으로 래퍼를 벗겨 반환한다. 화면·쿼리에서는 생성 클래스를 직접 쓰지 않는다.
 
 **타입**
 
-- 요청·응답 타입은 `src/domains/<domain>/api.ts`에 백엔드 DTO 이름 그대로 정의하고 다른 곳에 중복 정의하지 않는다. 생성 클라이언트를 도입하면 `generated/models`의 타입을 쓰고 직접 정의하지 않는다. 공통 타입은 `src/common/api/types.ts`에 둔다.
+- 요청·응답 타입은 `@/common/api/clients`에서 가져오는 생성 모델 타입을 쓰고 직접 정의하지 않는다. 아직 generated로 전환하지 않은 도메인의 직접 정의 타입은 전환할 때 지운다. 공통 타입은 `src/common/api/types.ts`에 둔다.
 - 백엔드 공통 응답은 `ApiResponse.java` 기준 `{ success, data, error }`이다. 오류는 `error: { code, message }`로 전달된다. 필드별 오류 구조는 없다.
 - 백엔드 컨트롤러·DTO·직렬화 설정을 확인해 맞춘다. **추측으로 필드를 만들지 않고**, 확인할 수 없으면 묻는다.
-- 날짜는 `string`, enum은 문자열 리터럴 유니온, `?`와 `| null`은 백엔드 기준으로 구분.
+- 날짜는 `string`, enum은 문자열 리터럴 유니온. 현재 생성 타입은 응답 필드도 `?`로 나오므로(백엔드에 required·nullable 정보 없음) `!`·`as`로 우회하지 않고 `??`·조건문으로 처리한다.
 - 타입은 런타임 검증이 아니다. 새 API는 실제 응답을 한 번 확인하고, 못 했으면 보고한다.
 
 ```ts
-// src/domains/page/api.ts
-import { axiosInstance } from '@/common/api/axiosInstance';
-import type { ApiResponse } from '@/common/api/types';
+// src/domains/member/api.ts
+import { memberApi, type MyInfoResponse } from '@/common/api/clients';
+import { unwrap } from '@/common/api/unwrap';
 
-export interface PageDto {
-  id: number;
-  slug: string;
-  title: string;
-  status: 'DRAFT' | 'PUBLISHED';
-}
-
-export async function getPage(slug: string, signal?: AbortSignal) {
-  const { data } = await axiosInstance.get<ApiResponse<PageDto>>(
-    `/api/pages/${encodeURIComponent(slug)}`,
-    { signal },
-  );
-  return data.data;
+export async function getMyInfo(signal?: AbortSignal): Promise<MyInfoResponse> {
+  return unwrap(memberApi.getMyInfo({ signal }));
 }
 ```
 

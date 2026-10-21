@@ -5,17 +5,156 @@
     "version": "v0"
   },
   "paths": {
-    "/api/members/me/tastes": {
-      "put": {
-        "tags": [
-          "member-controller"
+    "/api/admin/audit-logs": {
+      "get": {
+        "operationId": "getAuditLogs",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "request",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/AuditLogSearchRequest"
+            }
+          }
         ],
-        "operationId": "changeTastes",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePageResponseAuditLogResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "admin-audit-controller"
+        ]
+      }
+    },
+    "/api/admin/forecasts/latest": {
+      "get": {
+        "operationId": "getLatest",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseForecastResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "admin-forecast-controller"
+        ]
+      }
+    },
+    "/api/admin/forecasts/{weekStart}": {
+      "get": {
+        "operationId": "getByWeek",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "weekStart",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseForecastResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "admin-forecast-controller"
+        ]
+      }
+    },
+    "/api/admin/members": {
+      "get": {
+        "operationId": "getMembers",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "request",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/MemberListRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePageResponseMemberSummaryResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "admin-member-controller"
+        ]
+      }
+    },
+    "/api/admin/members/{memberId}/promotion": {
+      "post": {
+        "operationId": "promote",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "memberId",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "admin-member-controller"
+        ]
+      }
+    },
+    "/api/admin/products": {
+      "post": {
+        "operationId": "createProduct",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ChangeTastesRequest"
+                "$ref": "#/components/schemas/ProductCreateRequest"
               }
             }
           },
@@ -23,121 +162,53 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
             "content": {
               "*/*": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiResponseVoid"
+                  "$ref": "#/components/schemas/ApiResponseProductDetailResponse"
                 }
               }
-            }
+            },
+            "description": "OK"
           }
-        }
-      }
-    },
-    "/api/members": {
-      "post": {
-        "tags": [
-          "member-controller"
-        ],
-        "operationId": "signUp",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SignUpRequest"
-              }
-            }
-          },
-          "required": true
         },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseSignUpResponse"
-                }
-              }
-            }
-          }
-        }
+        "tags": [
+          "admin-product-controller"
+        ]
       }
     },
-    "/api/auth/refresh": {
-      "post": {
-        "tags": [
-          "auth-controller"
-        ],
-        "operationId": "refresh",
+    "/api/auth/csrf": {
+      "get": {
+        "operationId": "csrf",
         "parameters": [
           {
-            "name": "refresh_token",
-            "in": "cookie",
-            "required": false,
+            "in": "query",
+            "name": "token",
+            "required": true,
             "schema": {
-              "type": "string"
+              "$ref": "#/components/schemas/CsrfToken"
             }
           }
         ],
         "responses": {
           "200": {
-            "description": "OK",
             "content": {
               "*/*": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiResponseVoid"
+                  "$ref": "#/components/schemas/ApiResponseCsrfResponse"
                 }
               }
-            }
+            },
+            "description": "OK"
           }
-        }
-      }
-    },
-    "/api/auth/logout": {
-      "post": {
+        },
         "tags": [
-          "auth-controller"
-        ],
-        "operationId": "logout",
-        "parameters": [
-          {
-            "name": "access_token",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "refresh_token",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseVoid"
-                }
-              }
-            }
-          }
-        }
+          "csrf-controller"
+        ]
       }
     },
     "/api/auth/login": {
       "post": {
-        "tags": [
-          "auth-controller"
-        ],
         "operationId": "login",
         "requestBody": {
           "content": {
@@ -151,60 +222,143 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
             "content": {
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponseMyInfoResponse"
                 }
               }
-            }
+            },
+            "description": "OK"
           }
-        }
+        },
+        "tags": [
+          "auth-controller"
+        ]
       }
     },
-    "/api/admin/members/{memberId}/promotion": {
+    "/api/auth/logout": {
       "post": {
-        "tags": [
-          "admin-member-controller"
-        ],
-        "operationId": "promote",
+        "operationId": "logout",
         "parameters": [
           {
-            "name": "memberId",
-            "in": "path",
-            "required": true,
+            "in": "cookie",
+            "name": "access_token",
+            "required": false,
             "schema": {
-              "type": "integer",
-              "format": "int64"
+              "type": "string"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "refresh_token",
+            "required": false,
+            "schema": {
+              "type": "string"
             }
           }
         ],
         "responses": {
           "200": {
-            "description": "OK",
             "content": {
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponseVoid"
                 }
               }
-            }
+            },
+            "description": "OK"
           }
-        }
+        },
+        "tags": [
+          "auth-controller"
+        ]
       }
     },
-    "/api/members/me/password": {
-      "patch": {
-        "tags": [
-          "member-controller"
+    "/api/auth/refresh": {
+      "post": {
+        "operationId": "refresh",
+        "parameters": [
+          {
+            "in": "cookie",
+            "name": "refresh_token",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
         ],
-        "operationId": "changePassword",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "auth-controller"
+        ]
+      }
+    },
+    "/api/cart-items": {
+      "delete": {
+        "operationId": "removeItems",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "request",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/RemoveCartItemsRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "cart-controller"
+        ]
+      },
+      "get": {
+        "operationId": "getItems_1",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseCartItemsResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "cart-controller"
+        ]
+      },
+      "post": {
+        "operationId": "addItem",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ChangePasswordRequest"
+                "$ref": "#/components/schemas/AddCartItemRequest"
               }
             }
           },
@@ -212,23 +366,414 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseAddCartItemResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "cart-controller"
+        ]
+      }
+    },
+    "/api/cart-items/{cartItemId}": {
+      "patch": {
+        "operationId": "changeQuantity",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "cartItemId",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeCartItemQuantityRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseChangeCartItemQuantityResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "cart-controller"
+        ]
+      }
+    },
+    "/api/cooking-logs": {
+      "get": {
+        "operationId": "getCookingLogs",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "request",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/CookingLogSearchRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePageResponseCookingLogResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "cooking-log-controller"
+        ]
+      },
+      "post": {
+        "operationId": "completeCooking",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CookingCompleteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseCookingCompleteResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "cooking-log-controller"
+        ]
+      }
+    },
+    "/api/fridge/items": {
+      "get": {
+        "operationId": "getItems",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "request",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/FridgeItemSearchRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListFridgeItemResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "fridge-controller"
+        ]
+      },
+      "post": {
+        "operationId": "createItems",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FridgeItemCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListFridgeItemResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "fridge-controller"
+        ]
+      }
+    },
+    "/api/fridge/items/{fridgeId}": {
+      "delete": {
+        "operationId": "removeItem",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fridgeId",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "in": "query",
+            "name": "reason",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "CONSUMED",
+                "DISCARDED",
+                "WRONG_ENTRY"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
             "content": {
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponseVoid"
                 }
               }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "fridge-controller"
+        ]
+      },
+      "patch": {
+        "operationId": "updateItem",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fridgeId",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
             }
           }
-        }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FridgeItemUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseFridgeItemResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "fridge-controller"
+        ]
+      }
+    },
+    "/api/fridge/items/{fridgeId}/take-out": {
+      "post": {
+        "operationId": "takeOutItem",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fridgeId",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FridgeItemTakeOutRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseFridgeItemTakeOutResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "fridge-controller"
+        ]
+      }
+    },
+    "/api/fridge/logs": {
+      "get": {
+        "operationId": "getLogs",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "request",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/FridgeItemLogSearchRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePageResponseFridgeItemLogResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "fridge-controller"
+        ]
+      }
+    },
+    "/api/members": {
+      "post": {
+        "operationId": "signUp",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SignUpRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseSignUpResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "member-controller"
+        ]
+      }
+    },
+    "/api/members/email-availability": {
+      "get": {
+        "operationId": "checkEmailAvailability",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "request",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/EmailAvailabilityRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseEmailAvailabilityResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "member-controller"
+        ]
+      }
+    },
+    "/api/members/me": {
+      "get": {
+        "operationId": "getMyInfo",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMyInfoResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "member-controller"
+        ]
       }
     },
     "/api/members/me/nickname": {
       "patch": {
-        "tags": [
-          "member-controller"
-        ],
         "operationId": "changeNickname",
         "requestBody": {
           "content": {
@@ -242,28 +787,88 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
             "content": {
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponseVoid"
                 }
               }
-            }
+            },
+            "description": "OK"
           }
-        }
+        },
+        "tags": [
+          "member-controller"
+        ]
+      }
+    },
+    "/api/members/me/password": {
+      "patch": {
+        "operationId": "changePassword",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePasswordRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "member-controller"
+        ]
+      }
+    },
+    "/api/members/me/tastes": {
+      "put": {
+        "operationId": "changeTastes",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeTastesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "member-controller"
+        ]
       }
     },
     "/api/members/nickname-availability": {
       "get": {
-        "tags": [
-          "member-controller"
-        ],
         "operationId": "checkNicknameAvailability",
         "parameters": [
           {
-            "name": "request",
             "in": "query",
+            "name": "request",
             "required": true,
             "schema": {
               "$ref": "#/components/schemas/NicknameAvailabilityRequest"
@@ -272,161 +877,954 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
             "content": {
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponseNicknameAvailabilityResponse"
                 }
               }
-            }
+            },
+            "description": "OK"
           }
-        }
-      }
-    },
-    "/api/members/me": {
-      "get": {
+        },
         "tags": [
           "member-controller"
-        ],
-        "operationId": "getMyInfo",
+        ]
+      }
+    },
+    "/api/payments/confirm": {
+      "post": {
+        "operationId": "confirm",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PaymentConfirmRequest"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
-            "description": "OK",
             "content": {
               "*/*": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiResponseMyInfoResponse"
+                  "$ref": "#/components/schemas/ApiResponsePaymentConfirmResponse"
                 }
               }
-            }
+            },
+            "description": "OK"
           }
-        }
+        },
+        "tags": [
+          "payment-controller"
+        ]
       }
     },
-    "/api/members/email-availability": {
-      "get": {
-        "tags": [
-          "member-controller"
-        ],
-        "operationId": "checkEmailAvailability",
+    "/api/payments/{portonePaymentId}/fail": {
+      "post": {
+        "operationId": "fail",
         "parameters": [
           {
+            "in": "path",
+            "name": "portonePaymentId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "payment-controller"
+        ]
+      }
+    },
+    "/api/products": {
+      "get": {
+        "operationId": "getProducts",
+        "parameters": [
+          {
+            "in": "query",
             "name": "request",
-            "in": "query",
             "required": true,
             "schema": {
-              "$ref": "#/components/schemas/EmailAvailabilityRequest"
+              "$ref": "#/components/schemas/ProductListRequest"
             }
           }
         ],
         "responses": {
           "200": {
-            "description": "OK",
             "content": {
               "*/*": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiResponseEmailAvailabilityResponse"
+                  "$ref": "#/components/schemas/ApiResponsePageResponseProductListItemResponse"
                 }
               }
-            }
+            },
+            "description": "OK"
           }
-        }
+        },
+        "tags": [
+          "product-controller"
+        ]
       }
     },
-    "/api/auth/csrf": {
+    "/api/products/{productId}": {
       "get": {
-        "tags": [
-          "csrf-controller"
-        ],
-        "operationId": "csrf",
+        "operationId": "getProduct",
         "parameters": [
           {
-            "name": "token",
-            "in": "query",
+            "in": "path",
+            "name": "productId",
             "required": true,
             "schema": {
-              "$ref": "#/components/schemas/CsrfToken"
+              "type": "integer",
+              "format": "int64"
             }
           }
         ],
         "responses": {
           "200": {
-            "description": "OK",
             "content": {
               "*/*": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiResponseCsrfResponse"
+                  "$ref": "#/components/schemas/ApiResponseProductDetailResponse"
                 }
               }
-            }
+            },
+            "description": "OK"
           }
-        }
+        },
+        "tags": [
+          "product-controller"
+        ]
       }
     },
-    "/api/admin/members": {
+    "/api/recipes": {
       "get": {
-        "tags": [
-          "admin-member-controller"
-        ],
-        "operationId": "getMembers",
+        "operationId": "getRecipes",
         "parameters": [
           {
+            "in": "query",
             "name": "request",
-            "in": "query",
             "required": true,
             "schema": {
-              "$ref": "#/components/schemas/MemberListRequest"
+              "$ref": "#/components/schemas/RecipeListRequest"
             }
           }
         ],
         "responses": {
           "200": {
-            "description": "OK",
             "content": {
               "*/*": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiResponsePageResponseMemberSummaryResponse"
+                  "$ref": "#/components/schemas/ApiResponsePageResponseRecipeListItemResponse"
                 }
               }
-            }
+            },
+            "description": "OK"
           }
-        }
+        },
+        "tags": [
+          "recipe-controller"
+        ]
       }
     },
-    "/api/admin/audit-logs": {
+    "/api/reviews": {
       "get": {
-        "tags": [
-          "admin-audit-controller"
-        ],
-        "operationId": "getAuditLogs",
+        "operationId": "getReviews",
         "parameters": [
           {
-            "name": "request",
             "in": "query",
+            "name": "request",
             "required": true,
             "schema": {
-              "$ref": "#/components/schemas/AuditLogSearchRequest"
+              "$ref": "#/components/schemas/ReviewSearchRequest"
             }
           }
         ],
         "responses": {
           "200": {
-            "description": "OK",
             "content": {
               "*/*": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiResponsePageResponseAuditLogResponse"
+                  "$ref": "#/components/schemas/ApiResponsePageResponseReviewResponse"
                 }
               }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "recipe-review-controller"
+        ]
+      },
+      "post": {
+        "operationId": "createReview",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseReviewResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "recipe-review-controller"
+        ]
+      }
+    },
+    "/api/reviews/{reviewId}": {
+      "delete": {
+        "operationId": "deleteReview",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "reviewId",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
             }
           }
-        }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "recipe-review-controller"
+        ]
+      },
+      "patch": {
+        "operationId": "updateReview",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "reviewId",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseReviewResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "recipe-review-controller"
+        ]
+      }
+    },
+    "/api/webhooks/portone": {
+      "post": {
+        "operationId": "handlePortOneWebhook",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "webhook-id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "webhook-timestamp",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "webhook-signature",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "string"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "webhook-controller"
+        ]
       }
     }
   },
   "components": {
     "schemas": {
+      "AddCartItemRequest": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "quantity": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "productId"
+        ]
+      },
+      "AddCartItemResponse": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "quantity": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "ApiResponseAddCartItemResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/AddCartItemResponse"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorResponse"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ApiResponseCartItemsResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/CartItemsResponse"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorResponse"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ApiResponseChangeCartItemQuantityResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ChangeCartItemQuantityResponse"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorResponse"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ApiResponseCookingCompleteResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/CookingCompleteResponse"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorResponse"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ApiResponseCsrfResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/CsrfResponse"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorResponse"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ApiResponseEmailAvailabilityResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/EmailAvailabilityResponse"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorResponse"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ApiResponseForecastResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ForecastResponse"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorResponse"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ApiResponseFridgeItemResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/FridgeItemResponse"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorResponse"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ApiResponseFridgeItemTakeOutResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/FridgeItemTakeOutResponse"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorResponse"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ApiResponseListFridgeItemResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FridgeItemResponse"
+            }
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorResponse"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ApiResponseMyInfoResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/MyInfoResponse"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorResponse"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ApiResponseNicknameAvailabilityResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/NicknameAvailabilityResponse"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorResponse"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ApiResponsePageResponseAuditLogResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/PageResponseAuditLogResponse"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorResponse"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ApiResponsePageResponseCookingLogResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/PageResponseCookingLogResponse"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorResponse"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ApiResponsePageResponseFridgeItemLogResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/PageResponseFridgeItemLogResponse"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorResponse"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ApiResponsePageResponseMemberSummaryResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/PageResponseMemberSummaryResponse"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorResponse"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ApiResponsePageResponseProductListItemResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/PageResponseProductListItemResponse"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorResponse"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ApiResponsePageResponseRecipeListItemResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/PageResponseRecipeListItemResponse"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorResponse"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ApiResponsePageResponseReviewResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/PageResponseReviewResponse"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorResponse"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ApiResponsePaymentConfirmResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/PaymentConfirmResponse"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorResponse"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ApiResponseProductDetailResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ProductDetailResponse"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorResponse"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ApiResponseReviewResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ReviewResponse"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorResponse"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ApiResponseSignUpResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/SignUpResponse"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorResponse"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ApiResponseVoid": {
+        "type": "object",
+        "properties": {
+          "data": {},
+          "error": {
+            "$ref": "#/components/schemas/ErrorResponse"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
+      "AuditLogResponse": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "PRODUCT_CREATE",
+              "PRODUCT_DELETE",
+              "PRICE_UPDATE",
+              "DEAL_REVIEW",
+              "EVENT_REQUEST",
+              "ROLE_CHANGE"
+            ]
+          },
+          "actorEmail": {
+            "type": "string"
+          },
+          "actorRole": {
+            "type": "string",
+            "enum": [
+              "USER",
+              "ADMIN"
+            ]
+          },
+          "afterValue": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "auditLogId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "beforeValue": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "result": {
+            "type": "string",
+            "enum": [
+              "SUCCESS",
+              "FAILED",
+              "DENIED"
+            ]
+          },
+          "targetId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "targetType": {
+            "type": "string"
+          }
+        }
+      },
+      "AuditLogSearchRequest": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "PRODUCT_CREATE",
+              "PRODUCT_DELETE",
+              "PRICE_UPDATE",
+              "DEAL_REVIEW",
+              "EVENT_REQUEST",
+              "ROLE_CHANGE"
+            ]
+          },
+          "from": {
+            "type": "string",
+            "format": "date"
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 1
+          },
+          "result": {
+            "type": "string",
+            "enum": [
+              "SUCCESS",
+              "FAILED",
+              "DENIED"
+            ]
+          },
+          "size": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 1
+          },
+          "targetId": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "targetType": {
+            "type": "string",
+            "maxLength": 50,
+            "minLength": 0
+          },
+          "to": {
+            "type": "string",
+            "format": "date"
+          }
+        }
+      },
+      "CartItemResponse": {
+        "type": "object",
+        "properties": {
+          "cartItemId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "discountRate": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "flashDropRemaining": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "listPrice": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "productId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "productName": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "saleType": {
+            "type": "string",
+            "enum": [
+              "SPECIAL",
+              "FLASH_DROP"
+            ]
+          },
+          "soldOut": {
+            "type": "boolean"
+          },
+          "unitPrice": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "CartItemsResponse": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CartItemResponse"
+            }
+          }
+        }
+      },
+      "ChangeCartItemQuantityRequest": {
+        "type": "object",
+        "properties": {
+          "quantity": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "quantity"
+        ]
+      },
+      "ChangeCartItemQuantityResponse": {
+        "type": "object",
+        "properties": {
+          "cartItemId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "quantity": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "ChangeNicknameRequest": {
+        "type": "object",
+        "properties": {
+          "nickname": {
+            "type": "string",
+            "maxLength": 30,
+            "minLength": 0
+          }
+        },
+        "required": [
+          "nickname"
+        ]
+      },
+      "ChangePasswordRequest": {
+        "type": "object",
+        "properties": {
+          "currentPassword": {
+            "type": "string",
+            "minLength": 1
+          },
+          "newPassword": {
+            "type": "string",
+            "maxLength": 30,
+            "minLength": 8,
+            "pattern": "^(?=.*[A-Za-z])(?=.*\\d)(?=.*[^A-Za-z0-9])[\\x21-\\x7E]+$"
+          }
+        },
+        "required": [
+          "currentPassword",
+          "newPassword"
+        ]
+      },
       "ChangeTastesRequest": {
         "type": "object",
         "properties": {
@@ -448,15 +1846,163 @@
           "tastes"
         ]
       },
-      "ApiResponseVoid": {
+      "CookingCompleteRequest": {
         "type": "object",
         "properties": {
-          "success": {
+          "chatSessionId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "ingredientIdsUnique": {
             "type": "boolean"
           },
-          "data": {},
-          "error": {
-            "$ref": "#/components/schemas/ErrorResponse"
+          "memo": {
+            "type": "string",
+            "maxLength": 50,
+            "minLength": 0
+          },
+          "recipeId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "result": {
+            "type": "string",
+            "enum": [
+              "SUCCESS",
+              "FAILED"
+            ]
+          },
+          "usedIngredients": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UsedIngredientRequest"
+            },
+            "maxItems": 30,
+            "minItems": 0
+          }
+        },
+        "required": [
+          "recipeId",
+          "result"
+        ]
+      },
+      "CookingCompleteResponse": {
+        "type": "object",
+        "properties": {
+          "cookingLogId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "deductions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IngredientDeductionResponse"
+            }
+          }
+        }
+      },
+      "CookingLogResponse": {
+        "type": "object",
+        "properties": {
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "fromChat": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "memo": {
+            "type": "string"
+          },
+          "recipeId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "result": {
+            "type": "string",
+            "enum": [
+              "SUCCESS",
+              "FAILED"
+            ]
+          }
+        }
+      },
+      "CookingLogSearchRequest": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "format": "date"
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 1
+          },
+          "recipeId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "size": {
+            "type": "integer",
+            "format": "int32",
+            "maximum": 100,
+            "minimum": 1
+          },
+          "to": {
+            "type": "string",
+            "format": "date"
+          }
+        }
+      },
+      "CsrfResponse": {
+        "type": "object",
+        "properties": {
+          "headerName": {
+            "type": "string"
+          },
+          "token": {
+            "type": "string"
+          }
+        }
+      },
+      "CsrfToken": {
+        "type": "object",
+        "properties": {
+          "headerName": {
+            "type": "string"
+          },
+          "parameterName": {
+            "type": "string"
+          },
+          "token": {
+            "type": "string"
+          }
+        }
+      },
+      "EmailAvailabilityRequest": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "maxLength": 255,
+            "minLength": 0
+          }
+        },
+        "required": [
+          "email"
+        ]
+      },
+      "EmailAvailabilityResponse": {
+        "type": "object",
+        "properties": {
+          "available": {
+            "type": "boolean"
           }
         }
       },
@@ -471,6 +2017,1190 @@
           }
         }
       },
+      "ForecastResponse": {
+        "type": "object",
+        "properties": {
+          "confirmed": {
+            "type": "boolean"
+          },
+          "confirmedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "dataCutoffAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Item"
+            }
+          },
+          "modelVersion": {
+            "type": "string"
+          },
+          "nextWeekStart": {
+            "type": "string",
+            "format": "date"
+          },
+          "previousWeekStart": {
+            "type": "string",
+            "format": "date"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/Summary"
+          },
+          "syntheticData": {
+            "type": "boolean"
+          },
+          "weekEnd": {
+            "type": "string",
+            "format": "date"
+          },
+          "weekStart": {
+            "type": "string",
+            "format": "date"
+          }
+        }
+      },
+      "FridgeItemCreateRequest": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Item"
+            },
+            "maxItems": 20,
+            "minItems": 0
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "FridgeItemLogResponse": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "CONSUMED",
+              "DISCARDED"
+            ]
+          },
+          "baseUnit": {
+            "type": "string"
+          },
+          "cookedByRecipe": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "ingredientId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "ingredientName": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "number"
+          },
+          "rawName": {
+            "type": "string"
+          }
+        }
+      },
+      "FridgeItemLogSearchRequest": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "CONSUMED",
+              "DISCARDED"
+            ]
+          },
+          "from": {
+            "type": "string",
+            "format": "date"
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 1
+          },
+          "size": {
+            "type": "integer",
+            "format": "int32",
+            "maximum": 100,
+            "minimum": 1
+          },
+          "to": {
+            "type": "string",
+            "format": "date"
+          }
+        }
+      },
+      "FridgeItemResponse": {
+        "type": "object",
+        "properties": {
+          "baseUnit": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "dDay": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "expirationDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "expired": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "imminent": {
+            "type": "boolean"
+          },
+          "ingredientId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "ingredientName": {
+            "type": "string"
+          },
+          "orderItemId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "quantity": {
+            "type": "number"
+          },
+          "rawName": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "MANUAL",
+              "COMMERCE"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "EXPIRED",
+              "IMMINENT",
+              "NORMAL"
+            ]
+          },
+          "storage": {
+            "type": "string",
+            "enum": [
+              "REFRIGERATED",
+              "FROZEN",
+              "ROOM_TEMP"
+            ]
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "FridgeItemSearchRequest": {
+        "type": "object",
+        "properties": {
+          "imminentOnly": {
+            "type": "boolean"
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "EXPIRATION",
+              "CREATED",
+              "NAME"
+            ]
+          },
+          "storage": {
+            "type": "string",
+            "enum": [
+              "REFRIGERATED",
+              "FROZEN",
+              "ROOM_TEMP"
+            ]
+          }
+        }
+      },
+      "FridgeItemTakeOutRequest": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "CONSUMED",
+              "DISCARDED"
+            ]
+          },
+          "quantity": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "action"
+        ]
+      },
+      "FridgeItemTakeOutResponse": {
+        "type": "object",
+        "properties": {
+          "fridgeId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "remainingQuantity": {
+            "type": "number"
+          },
+          "removed": {
+            "type": "boolean"
+          }
+        }
+      },
+      "FridgeItemUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "expirationDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "quantity": {
+            "type": "number"
+          },
+          "rawName": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 0
+          },
+          "storage": {
+            "type": "string",
+            "enum": [
+              "REFRIGERATED",
+              "FROZEN",
+              "ROOM_TEMP"
+            ]
+          }
+        },
+        "required": [
+          "expirationDate",
+          "quantity",
+          "rawName",
+          "storage"
+        ]
+      },
+      "IngredientDeductionResponse": {
+        "type": "object",
+        "properties": {
+          "deductedQuantity": {
+            "type": "number"
+          },
+          "ingredientId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "remainingQuantity": {
+            "type": "number"
+          }
+        }
+      },
+      "IngredientDetail": {
+        "type": "object",
+        "properties": {
+          "baseQuantity": {
+            "type": "number"
+          },
+          "ingredientId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "unit": {
+            "type": "string",
+            "maxLength": 20,
+            "minLength": 0
+          },
+          "unitAmount": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "baseQuantity",
+          "ingredientId",
+          "unit",
+          "unitAmount"
+        ]
+      },
+      "IngredientInfo": {
+        "type": "object",
+        "properties": {
+          "unit": {
+            "type": "string"
+          },
+          "unitAmount": {
+            "type": "number"
+          }
+        }
+      },
+      "Item": {
+        "type": "object",
+        "properties": {
+          "expirationDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "quantity": {
+            "type": "number"
+          },
+          "rawName": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 0
+          },
+          "storage": {
+            "type": "string",
+            "enum": [
+              "REFRIGERATED",
+              "FROZEN",
+              "ROOM_TEMP"
+            ]
+          }
+        },
+        "required": [
+          "quantity",
+          "rawName"
+        ]
+      },
+      "LoginRequest": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "minLength": 1
+          },
+          "password": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "email",
+          "password"
+        ]
+      },
+      "MealkitDetail": {
+        "type": "object",
+        "properties": {
+          "servings": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "servings"
+        ]
+      },
+      "MealkitInfo": {
+        "type": "object",
+        "properties": {
+          "servings": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "MemberListRequest": {
+        "type": "object",
+        "properties": {
+          "keyword": {
+            "type": "string"
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 1
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "USER",
+              "ADMIN"
+            ]
+          },
+          "size": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 1
+          }
+        }
+      },
+      "MemberSummaryResponse": {
+        "type": "object",
+        "properties": {
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "email": {
+            "type": "string"
+          },
+          "memberId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "nickname": {
+            "type": "string"
+          },
+          "promotedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "promotedBy": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "USER",
+              "ADMIN"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "SUSPENDED"
+            ]
+          }
+        }
+      },
+      "MyInfoResponse": {
+        "type": "object",
+        "properties": {
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "email": {
+            "type": "string"
+          },
+          "memberId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "nickname": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "USER",
+              "ADMIN"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "SUSPENDED"
+            ]
+          },
+          "tastes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "SALTY",
+                "SWEET",
+                "SPICY",
+                "UMAMI",
+                "MILD"
+              ]
+            }
+          }
+        }
+      },
+      "NicknameAvailabilityRequest": {
+        "type": "object",
+        "properties": {
+          "nickname": {
+            "type": "string",
+            "maxLength": 30,
+            "minLength": 0
+          }
+        },
+        "required": [
+          "nickname"
+        ]
+      },
+      "NicknameAvailabilityResponse": {
+        "type": "object",
+        "properties": {
+          "available": {
+            "type": "boolean"
+          }
+        }
+      },
+      "PageResponseAuditLogResponse": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuditLogResponse"
+            }
+          },
+          "isLast": {
+            "type": "boolean"
+          },
+          "pageNumber": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalElements": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "totalPages": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "PageResponseCookingLogResponse": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CookingLogResponse"
+            }
+          },
+          "isLast": {
+            "type": "boolean"
+          },
+          "pageNumber": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalElements": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "totalPages": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "PageResponseFridgeItemLogResponse": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FridgeItemLogResponse"
+            }
+          },
+          "isLast": {
+            "type": "boolean"
+          },
+          "pageNumber": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalElements": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "totalPages": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "PageResponseMemberSummaryResponse": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MemberSummaryResponse"
+            }
+          },
+          "isLast": {
+            "type": "boolean"
+          },
+          "pageNumber": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalElements": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "totalPages": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "PageResponseProductListItemResponse": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductListItemResponse"
+            }
+          },
+          "isLast": {
+            "type": "boolean"
+          },
+          "pageNumber": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalElements": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "totalPages": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "PageResponseRecipeListItemResponse": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RecipeListItemResponse"
+            }
+          },
+          "isLast": {
+            "type": "boolean"
+          },
+          "pageNumber": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalElements": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "totalPages": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "PageResponseReviewResponse": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewResponse"
+            }
+          },
+          "isLast": {
+            "type": "boolean"
+          },
+          "pageNumber": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalElements": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "totalPages": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "PaymentConfirmRequest": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "portonePaymentId": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "orderId",
+          "portonePaymentId"
+        ]
+      },
+      "PaymentConfirmResponse": {
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "orderId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "paidAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "portonePaymentId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "READY",
+              "PAID",
+              "FAILED"
+            ]
+          }
+        }
+      },
+      "ProductCreateRequest": {
+        "type": "object",
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "detailMatchingType": {
+            "type": "boolean"
+          },
+          "imageUrl": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 0,
+            "pattern": "^https?://\\S+$"
+          },
+          "ingredient": {
+            "$ref": "#/components/schemas/IngredientDetail"
+          },
+          "mealkit": {
+            "$ref": "#/components/schemas/MealkitDetail"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 0
+          },
+          "price": {
+            "type": "integer",
+            "format": "int32",
+            "maximum": 10000000,
+            "minimum": 0
+          },
+          "productType": {
+            "type": "string",
+            "enum": [
+              "INGREDIENT",
+              "MEALKIT"
+            ]
+          },
+          "shelfDays": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 1
+          },
+          "stock": {
+            "type": "integer",
+            "format": "int32",
+            "maximum": 100000,
+            "minimum": 0
+          },
+          "storage": {
+            "type": "string",
+            "enum": [
+              "REFRIGERATED",
+              "FROZEN",
+              "ROOM_TEMP"
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "price",
+          "productType",
+          "shelfDays",
+          "stock",
+          "storage"
+        ]
+      },
+      "ProductDetailResponse": {
+        "type": "object",
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "imageUrl": {
+            "type": "string"
+          },
+          "ingredient": {
+            "$ref": "#/components/schemas/IngredientInfo"
+          },
+          "mealkit": {
+            "$ref": "#/components/schemas/MealkitInfo"
+          },
+          "name": {
+            "type": "string"
+          },
+          "price": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "productId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "productType": {
+            "type": "string",
+            "enum": [
+              "INGREDIENT",
+              "MEALKIT"
+            ]
+          },
+          "shelfDays": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ON_SALE",
+              "SOLD_OUT",
+              "STOPPED"
+            ]
+          },
+          "stock": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "storage": {
+            "type": "string",
+            "enum": [
+              "REFRIGERATED",
+              "FROZEN",
+              "ROOM_TEMP"
+            ]
+          }
+        }
+      },
+      "ProductListItemResponse": {
+        "type": "object",
+        "properties": {
+          "imageUrl": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "price": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "productId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "productType": {
+            "type": "string",
+            "enum": [
+              "INGREDIENT",
+              "MEALKIT"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ON_SALE",
+              "SOLD_OUT",
+              "STOPPED"
+            ]
+          }
+        }
+      },
+      "ProductListRequest": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 1
+          },
+          "size": {
+            "type": "integer",
+            "format": "int32",
+            "maximum": 100,
+            "minimum": 1
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "LATEST",
+              "PRICE_ASC",
+              "PRICE_DESC"
+            ]
+          }
+        }
+      },
+      "RecipeListItemResponse": {
+        "type": "object",
+        "properties": {
+          "calories": {
+            "type": "number"
+          },
+          "category": {
+            "type": "string"
+          },
+          "cookTimeMin": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "cuisineType": {
+            "type": "string"
+          },
+          "difficulty": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "imageUrl": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "recipeId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "servings": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "summary": {
+            "type": "string"
+          }
+        }
+      },
+      "RecipeListRequest": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 1
+          },
+          "size": {
+            "type": "integer",
+            "format": "int32",
+            "maximum": 100,
+            "minimum": 1
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "LATEST",
+              "NAME_ASC",
+              "DIFFICULTY_ASC"
+            ]
+          }
+        }
+      },
+      "RemoveCartItemsRequest": {
+        "type": "object",
+        "properties": {
+          "cartItemIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "minItems": 1
+          }
+        },
+        "required": [
+          "cartItemIds"
+        ]
+      },
+      "ReviewCreateRequest": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 0
+          },
+          "rating": {
+            "type": "integer",
+            "format": "int32",
+            "maximum": 5,
+            "minimum": 1
+          },
+          "recipeId": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "required": [
+          "content",
+          "rating",
+          "recipeId"
+        ]
+      },
+      "ReviewResponse": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "mine": {
+            "type": "boolean"
+          },
+          "nickname": {
+            "type": "string"
+          },
+          "rating": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "recipeId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ReviewSearchRequest": {
+        "type": "object",
+        "properties": {
+          "mine": {
+            "type": "boolean"
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 1
+          },
+          "recipeId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "size": {
+            "type": "integer",
+            "format": "int32",
+            "maximum": 50,
+            "minimum": 1
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "LATEST",
+              "RATING"
+            ]
+          }
+        }
+      },
+      "ReviewUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 0
+          },
+          "rating": {
+            "type": "integer",
+            "format": "int32",
+            "maximum": 5,
+            "minimum": 1
+          }
+        },
+        "required": [
+          "content",
+          "rating"
+        ]
+      },
       "SignUpRequest": {
         "type": "object",
         "properties": {
@@ -480,16 +3210,16 @@
             "maxLength": 255,
             "minLength": 0
           },
+          "nickname": {
+            "type": "string",
+            "maxLength": 30,
+            "minLength": 0
+          },
           "password": {
             "type": "string",
             "maxLength": 30,
             "minLength": 8,
             "pattern": "^(?=.*[A-Za-z])(?=.*\\d)(?=.*[^A-Za-z0-9])[\\x21-\\x7E]+$"
-          },
-          "nickname": {
-            "type": "string",
-            "maxLength": 30,
-            "minLength": 0
           },
           "tastes": {
             "type": "array",
@@ -512,20 +3242,6 @@
           "tastes"
         ]
       },
-      "ApiResponseSignUpResponse": {
-        "type": "object",
-        "properties": {
-          "success": {
-            "type": "boolean"
-          },
-          "data": {
-            "$ref": "#/components/schemas/SignUpResponse"
-          },
-          "error": {
-            "$ref": "#/components/schemas/ErrorResponse"
-          }
-        }
-      },
       "SignUpResponse": {
         "type": "object",
         "properties": {
@@ -535,491 +3251,49 @@
           }
         }
       },
-      "LoginRequest": {
+      "Summary": {
         "type": "object",
         "properties": {
-          "email": {
-            "type": "string",
-            "format": "email",
-            "minLength": 1
+          "baselineMeanAbsoluteError": {
+            "type": "number",
+            "format": "double"
           },
-          "password": {
-            "type": "string",
-            "minLength": 1
+          "baselineTop10MatchCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "droppedCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "enteredCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "meanAbsoluteError": {
+            "type": "number",
+            "format": "double"
+          },
+          "top10MatchCount": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "UsedIngredientRequest": {
+        "type": "object",
+        "properties": {
+          "ingredientId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "quantity": {
+            "type": "number"
           }
         },
         "required": [
-          "email",
-          "password"
+          "ingredientId"
         ]
-      },
-      "ApiResponseMyInfoResponse": {
-        "type": "object",
-        "properties": {
-          "success": {
-            "type": "boolean"
-          },
-          "data": {
-            "$ref": "#/components/schemas/MyInfoResponse"
-          },
-          "error": {
-            "$ref": "#/components/schemas/ErrorResponse"
-          }
-        }
-      },
-      "MyInfoResponse": {
-        "type": "object",
-        "properties": {
-          "memberId": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "email": {
-            "type": "string"
-          },
-          "nickname": {
-            "type": "string"
-          },
-          "role": {
-            "type": "string",
-            "enum": [
-              "USER",
-              "ADMIN"
-            ]
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "ACTIVE",
-              "SUSPENDED"
-            ]
-          },
-          "tastes": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "enum": [
-                "SALTY",
-                "SWEET",
-                "SPICY",
-                "UMAMI",
-                "MILD"
-              ]
-            }
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          }
-        }
-      },
-      "ChangePasswordRequest": {
-        "type": "object",
-        "properties": {
-          "currentPassword": {
-            "type": "string",
-            "minLength": 1
-          },
-          "newPassword": {
-            "type": "string",
-            "maxLength": 30,
-            "minLength": 8,
-            "pattern": "^(?=.*[A-Za-z])(?=.*\\d)(?=.*[^A-Za-z0-9])[\\x21-\\x7E]+$"
-          }
-        },
-        "required": [
-          "currentPassword",
-          "newPassword"
-        ]
-      },
-      "ChangeNicknameRequest": {
-        "type": "object",
-        "properties": {
-          "nickname": {
-            "type": "string",
-            "maxLength": 30,
-            "minLength": 0
-          }
-        },
-        "required": [
-          "nickname"
-        ]
-      },
-      "NicknameAvailabilityRequest": {
-        "type": "object",
-        "properties": {
-          "nickname": {
-            "type": "string",
-            "maxLength": 30,
-            "minLength": 0
-          }
-        },
-        "required": [
-          "nickname"
-        ]
-      },
-      "ApiResponseNicknameAvailabilityResponse": {
-        "type": "object",
-        "properties": {
-          "success": {
-            "type": "boolean"
-          },
-          "data": {
-            "$ref": "#/components/schemas/NicknameAvailabilityResponse"
-          },
-          "error": {
-            "$ref": "#/components/schemas/ErrorResponse"
-          }
-        }
-      },
-      "NicknameAvailabilityResponse": {
-        "type": "object",
-        "properties": {
-          "available": {
-            "type": "boolean"
-          }
-        }
-      },
-      "EmailAvailabilityRequest": {
-        "type": "object",
-        "properties": {
-          "email": {
-            "type": "string",
-            "format": "email",
-            "maxLength": 255,
-            "minLength": 0
-          }
-        },
-        "required": [
-          "email"
-        ]
-      },
-      "ApiResponseEmailAvailabilityResponse": {
-        "type": "object",
-        "properties": {
-          "success": {
-            "type": "boolean"
-          },
-          "data": {
-            "$ref": "#/components/schemas/EmailAvailabilityResponse"
-          },
-          "error": {
-            "$ref": "#/components/schemas/ErrorResponse"
-          }
-        }
-      },
-      "EmailAvailabilityResponse": {
-        "type": "object",
-        "properties": {
-          "available": {
-            "type": "boolean"
-          }
-        }
-      },
-      "CsrfToken": {
-        "type": "object",
-        "properties": {
-          "parameterName": {
-            "type": "string"
-          },
-          "token": {
-            "type": "string"
-          },
-          "headerName": {
-            "type": "string"
-          }
-        }
-      },
-      "ApiResponseCsrfResponse": {
-        "type": "object",
-        "properties": {
-          "success": {
-            "type": "boolean"
-          },
-          "data": {
-            "$ref": "#/components/schemas/CsrfResponse"
-          },
-          "error": {
-            "$ref": "#/components/schemas/ErrorResponse"
-          }
-        }
-      },
-      "CsrfResponse": {
-        "type": "object",
-        "properties": {
-          "headerName": {
-            "type": "string"
-          },
-          "token": {
-            "type": "string"
-          }
-        }
-      },
-      "MemberListRequest": {
-        "type": "object",
-        "properties": {
-          "keyword": {
-            "type": "string"
-          },
-          "role": {
-            "type": "string",
-            "enum": [
-              "USER",
-              "ADMIN"
-            ]
-          },
-          "page": {
-            "type": "integer",
-            "format": "int32",
-            "minimum": 1
-          },
-          "size": {
-            "type": "integer",
-            "format": "int32",
-            "minimum": 1
-          }
-        }
-      },
-      "ApiResponsePageResponseMemberSummaryResponse": {
-        "type": "object",
-        "properties": {
-          "success": {
-            "type": "boolean"
-          },
-          "data": {
-            "$ref": "#/components/schemas/PageResponseMemberSummaryResponse"
-          },
-          "error": {
-            "$ref": "#/components/schemas/ErrorResponse"
-          }
-        }
-      },
-      "MemberSummaryResponse": {
-        "type": "object",
-        "properties": {
-          "memberId": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "email": {
-            "type": "string"
-          },
-          "nickname": {
-            "type": "string"
-          },
-          "role": {
-            "type": "string",
-            "enum": [
-              "USER",
-              "ADMIN"
-            ]
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "ACTIVE",
-              "SUSPENDED"
-            ]
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "promotedAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "promotedBy": {
-            "type": "string"
-          }
-        }
-      },
-      "PageResponseMemberSummaryResponse": {
-        "type": "object",
-        "properties": {
-          "content": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/MemberSummaryResponse"
-            }
-          },
-          "pageNumber": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "pageSize": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "totalElements": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "totalPages": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "isLast": {
-            "type": "boolean"
-          }
-        }
-      },
-      "AuditLogSearchRequest": {
-        "type": "object",
-        "properties": {
-          "from": {
-            "type": "string",
-            "format": "date"
-          },
-          "to": {
-            "type": "string",
-            "format": "date"
-          },
-          "action": {
-            "type": "string",
-            "enum": [
-              "PRODUCT_CREATE",
-              "PRODUCT_DELETE",
-              "PRICE_UPDATE",
-              "DEAL_REVIEW",
-              "EVENT_REQUEST",
-              "ROLE_CHANGE"
-            ]
-          },
-          "result": {
-            "type": "string",
-            "enum": [
-              "SUCCESS",
-              "FAILED",
-              "DENIED"
-            ]
-          },
-          "targetType": {
-            "type": "string",
-            "maxLength": 50,
-            "minLength": 0
-          },
-          "targetId": {
-            "type": "integer",
-            "format": "int64",
-            "minimum": 1
-          },
-          "page": {
-            "type": "integer",
-            "format": "int32",
-            "minimum": 1
-          },
-          "size": {
-            "type": "integer",
-            "format": "int32",
-            "minimum": 1
-          }
-        }
-      },
-      "ApiResponsePageResponseAuditLogResponse": {
-        "type": "object",
-        "properties": {
-          "success": {
-            "type": "boolean"
-          },
-          "data": {
-            "$ref": "#/components/schemas/PageResponseAuditLogResponse"
-          },
-          "error": {
-            "$ref": "#/components/schemas/ErrorResponse"
-          }
-        }
-      },
-      "AuditLogResponse": {
-        "type": "object",
-        "properties": {
-          "auditLogId": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "actorEmail": {
-            "type": "string"
-          },
-          "actorRole": {
-            "type": "string",
-            "enum": [
-              "USER",
-              "ADMIN"
-            ]
-          },
-          "action": {
-            "type": "string",
-            "enum": [
-              "PRODUCT_CREATE",
-              "PRODUCT_DELETE",
-              "PRICE_UPDATE",
-              "DEAL_REVIEW",
-              "EVENT_REQUEST",
-              "ROLE_CHANGE"
-            ]
-          },
-          "targetType": {
-            "type": "string"
-          },
-          "targetId": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "result": {
-            "type": "string",
-            "enum": [
-              "SUCCESS",
-              "FAILED",
-              "DENIED"
-            ]
-          },
-          "beforeValue": {
-            "type": "object",
-            "additionalProperties": {
-              "type": "string"
-            }
-          },
-          "afterValue": {
-            "type": "object",
-            "additionalProperties": {
-              "type": "string"
-            }
-          }
-        }
-      },
-      "PageResponseAuditLogResponse": {
-        "type": "object",
-        "properties": {
-          "content": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/AuditLogResponse"
-            }
-          },
-          "pageNumber": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "pageSize": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "totalElements": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "totalPages": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "isLast": {
-            "type": "boolean"
-          }
-        }
       }
     }
   }
