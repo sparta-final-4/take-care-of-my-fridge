@@ -58,7 +58,7 @@ children: [
   { path: ROUTES.home, lazy: page(() => import('@/pages/MainPage')) },
   { path: ROUTES.fridge, lazy: page(() => import('@/pages/FridgePage')) },
   { path: ROUTES.recipeDetail, lazy: page(() => import('@/pages/RecipeDetailPage')) },
-]
+],
 ```
 
 - 레이아웃 없는 화면(예: 로그인)은 `MainLayout` 블록 밖, `'*'` 항목 위에 둡니다.
