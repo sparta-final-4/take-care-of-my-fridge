@@ -310,7 +310,7 @@ class MemberServiceTest {
 
     @Test
     void changeTastesAcceptsDuplicatesAndStoresEachTasteOnce() {
-        Member member = Member.create("cook@example.com", "hash", "요리왕", Set.of());
+        Member member = Member.builder().email("cook@example.com").passwordHash("hash").nickname("요리왕").tastes(Set.of()).build();
         when(memberRepository.findById(7L)).thenReturn(Optional.of(member));
 
         memberService.changeTastes(7L,
