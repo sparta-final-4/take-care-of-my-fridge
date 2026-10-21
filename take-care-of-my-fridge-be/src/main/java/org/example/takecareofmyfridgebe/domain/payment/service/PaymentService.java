@@ -2,6 +2,10 @@ package org.example.takecareofmyfridgebe.domain.payment.service;
 
 import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.order.entity.Order;
+import org.example.takecareofmyfridgebe.domain.order.entity.OrderItem;
+import org.example.takecareofmyfridgebe.domain.order.entity.OrderStatus;
+import org.example.takecareofmyfridgebe.domain.order.repository.OrderItemRepository;
+import org.example.takecareofmyfridgebe.domain.order.repository.OrderRepository;
 import org.example.takecareofmyfridgebe.domain.payment.entity.Payment;
 import org.example.takecareofmyfridgebe.domain.payment.entity.PaymentStatus;
 import org.example.takecareofmyfridgebe.domain.payment.repository.PaymentRepository;
@@ -14,28 +18,41 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class PaymentService {
 
-    private static final String PORTONE_PAYMENT_ID_PREFIX = "payment-";
-    private static final long PAYMENT_EXPIRE_MINUTES = 10;
-
     private final PaymentRepository paymentRepository;
+    private final OrderRepository orderRepository;
+    private final OrderItemRepository orderItemRepository;
 
-    // 주문 생성 흐름에서 호출한다. 금액은 클라이언트 값이 아닌 주문 금액을 사용한다.
-    @Transactional
-    public Payment createPayment(Order order) {
-        Payment payment = Payment.builder()
-                .order(order)
-                .portonePaymentId(PORTONE_PAYMENT_ID_PREFIX + UUID.randomUUID())
-                .amount(order.getTotalAmount())
-                .expiresAt(LocalDateTime.now().plusMinutes(PAYMENT_EXPIRE_MINUTES))
-                .build();
-        return paymentRepository.save(payment);
+    // 결제를 시작할 수 있는 주문인지 먼저 확인한다. 상태는 결제를 만들 때 주문을 잠그고 다시 확인한다
+    public void validatePayableOrder(Long memberId, Long orderId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.ORDER_NOT_FOUND));
+        if (!order.getMemberId().equals(memberId)) {
+            throw new BusinessException(ErrorCode.ORDER_ACCESS_DENIED);
+        }
+        if (order.getStatus() != OrderStatus.PENDING) {
+            throw new BusinessException(ErrorCode.PAYMENT_ORDER_NOT_PAYABLE);
+        }
+    }
+
+    // 주문에 남아 있는 결제 대기 건. 정상이면 최대 한 건이다
+    public List<Payment> findReady(Long orderId) {
+        return paymentRepository.findByOrderIdAndStatus(orderId, PaymentStatus.READY);
+    }
+
+    // PG 결제창에 보일 주문명 (예: "대파 외 2건")
+    public String getOrderName(Long orderId) {
+        List<OrderItem> items = orderItemRepository.findByOrderIdOrderByIdAsc(orderId);
+        if (items.isEmpty()) {
+            throw new BusinessException(ErrorCode.ORDER_NOT_FOUND);
+        }
+        String first = items.get(0).getProductName();
+        return items.size() == 1 ? first : first + " 외 " + (items.size() - 1) + "건";
     }
 
     public Payment getWithOrder(String portonePaymentId) {

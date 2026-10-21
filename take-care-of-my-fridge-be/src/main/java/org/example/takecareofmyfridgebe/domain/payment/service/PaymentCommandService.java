@@ -2,6 +2,12 @@ package org.example.takecareofmyfridgebe.domain.payment.service;
 
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.example.takecareofmyfridgebe.domain.order.entity.Order;
+import org.example.takecareofmyfridgebe.domain.order.entity.OrderStatus;
+import org.example.takecareofmyfridgebe.domain.order.repository.OrderRepository;
+import org.example.takecareofmyfridgebe.domain.payment.dto.PaymentApproveResult;
+import org.example.takecareofmyfridgebe.domain.payment.dto.PaymentApproveResult.Rejection;
 import org.example.takecareofmyfridgebe.domain.payment.dto.PaymentConfirmResponse;
 import org.example.takecareofmyfridgebe.domain.payment.entity.FailReason;
 import org.example.takecareofmyfridgebe.domain.payment.entity.Payment;
@@ -13,57 +19,103 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.UUID;
 
-// 결제와 주문 상태를 한 트랜잭션에서 함께 바꾼다. 외부 PG 호출은 하지 않는다.
+// 결제 상태를 바꾸고, 승인 시 주문을 결제 완료로 바꾼다. 외부 PG 호출은 하지 않는다.
+// 한 주문에 결제가 여러 건이므로 주문 → 결제 순서로 잠가 같은 주문의 요청을 하나씩 처리한다.
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class PaymentCommandService {
 
+    private static final String PORTONE_PAYMENT_ID_PREFIX = "payment-";
+    private static final long PAYMENT_EXPIRE_MINUTES = 10;
+
     private final PaymentRepository paymentRepository;
+    private final OrderRepository orderRepository;
     private final EntityManager entityManager;
 
+    // 주문에 새 결제를 만든다. 금액은 클라이언트 값이 아닌 주문 금액을 사용한다.
+    // 동시에 들어온 결제 요청(따닥 클릭)이 먼저 만든 결제 대기 건이 있으면 새로 만들지 않고 그 결제를 돌려준다
     @Transactional
-    public PaymentConfirmResponse approve(String portonePaymentId) {
-        Payment payment = getForUpdate(portonePaymentId);
+    public Payment create(Long orderId) {
+        Order order = lockOrder(orderId);
+        if (order.getStatus() != OrderStatus.PENDING) {
+            throw new BusinessException(ErrorCode.PAYMENT_ORDER_NOT_PAYABLE);
+        }
+
+        List<Payment> ready = paymentRepository.findByOrderIdAndStatus(orderId, PaymentStatus.READY);
+        if (!ready.isEmpty()) {
+            return ready.get(0);
+        }
+
+        Payment payment = Payment.builder()
+                .order(order)
+                .portonePaymentId(PORTONE_PAYMENT_ID_PREFIX + UUID.randomUUID())
+                .amount(order.getTotalAmount())
+                .expiresAt(LocalDateTime.now().plusMinutes(PAYMENT_EXPIRE_MINUTES))
+                .build();
+        return paymentRepository.save(payment);
+    }
+
+    // 승인하지 못한 결제는 PG에서 돈이 빠진 상태이므로, 호출한 쪽이 거절 결과를 보고 PG 결제를 취소한다
+    @Transactional
+    public PaymentApproveResult approve(Payment target) {
+        Payment payment = getForUpdate(target);
 
         // 확정 요청과 웹훅 중 먼저 처리한 쪽이 있으면 같은 결과를 돌려준다
         if (payment.getStatus() == PaymentStatus.PAID) {
-            return PaymentConfirmResponse.from(payment);
+            return PaymentApproveResult.approved(PaymentConfirmResponse.from(payment));
         }
         if (payment.getStatus() == PaymentStatus.FAILED) {
-            throw new BusinessException(ErrorCode.ALREADY_PROCESSED_PAYMENT);
+            return PaymentApproveResult.rejected(Rejection.PAYMENT_ALREADY_FAILED);
+        }
+        // 같은 주문의 다른 결제가 먼저 결제 완료됐거나 주문이 취소·만료됐다
+        if (payment.getOrder().getStatus() != OrderStatus.PENDING) {
+            log.warn("결제할 수 없는 주문의 결제 완료: portonePaymentId={}, 주문 상태={}",
+                    payment.getPortonePaymentId(), payment.getOrder().getStatus());
+            payment.fail(FailReason.ORDER_NOT_PAYABLE);
+            return PaymentApproveResult.rejected(Rejection.ORDER_NOT_PAYABLE);
         }
 
         LocalDateTime paidAt = LocalDateTime.now();
         payment.complete(paidAt);
         payment.getOrder().markPaid(paidAt);
-        return PaymentConfirmResponse.from(payment);
+        return PaymentApproveResult.approved(PaymentConfirmResponse.from(payment));
     }
 
+    // 결제 시도 하나만 실패 처리한다. 주문은 PENDING으로 남아 다시 결제할 수 있고, 주문 취소·재고 복구는 주문 쪽이 맡는다.
     // 실제로 실패 처리했으면 true, 다른 요청이 이미 처리해 그대로 뒀으면 false
     @Transactional
-    public boolean fail(String portonePaymentId, FailReason reason) {
-        Payment payment = getForUpdate(portonePaymentId);
+    public boolean fail(Payment target, FailReason reason) {
+        Payment payment = getForUpdate(target);
 
         if (payment.getStatus() != PaymentStatus.READY) {
             return false;
         }
 
         payment.fail(reason);
-        payment.getOrder().cancel();
-        // TODO: 주문 생성에서 재고 차감을 구현하면 여기서 재고를 복구하고 번개 드롭 1인 1개 기록(OrderItem.releaseFlashDropMember)을 해제한다.
-        //  confirm·결제창 닫기·웹훅·만료 스케줄러의 실패 처리가 모두 이 메서드를 거치므로 이곳 한 군데에서 처리한다
         return true;
     }
 
-    private Payment getForUpdate(String portonePaymentId) {
-        Payment payment = paymentRepository.findWithOrderByPortonePaymentIdForUpdate(portonePaymentId)
+    // 결제가 속한 주문은 바뀌지 않으므로 호출한 쪽이 읽어 둔 주문 ID로 주문부터 잠근다.
+    // 주문 ID를 얻으려고 잠금 전에 일반 조회를 하면 그 시점 스냅샷으로 refresh하게 되므로, 잠금이 트랜잭션의 첫 조회여야 한다
+    private Payment getForUpdate(Payment target) {
+        lockOrder(target.getOrder().getId());
+        Payment payment = paymentRepository.findWithOrderByPortonePaymentIdForUpdate(target.getPortonePaymentId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.PAYMENT_NOT_FOUND));
-        // OSIV로 같은 요청에서 먼저 읽은 엔티티가 재사용되면 잠금 후에도 예전 상태가 남으므로 DB 값으로 다시 읽는다.
-        // 아직 반영하지 않은 변경이 덮어써지지 않도록 먼저 flush한다
-        entityManager.flush();
         entityManager.refresh(payment);
-        entityManager.refresh(payment.getOrder());
         return payment;
+    }
+
+    // OSIV로 같은 요청에서 먼저 읽은 엔티티가 재사용되면 잠금 후에도 예전 상태가 남으므로 DB 값으로 다시 읽는다.
+    // 아직 반영하지 않은 변경이 덮어써지지 않도록 먼저 flush한다
+    private Order lockOrder(Long orderId) {
+        Order order = orderRepository.findByIdForUpdate(orderId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.ORDER_NOT_FOUND));
+        entityManager.flush();
+        entityManager.refresh(order);
+        return order;
     }
 }

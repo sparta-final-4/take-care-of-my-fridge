@@ -34,8 +34,9 @@ public class Payment extends BaseTimeEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    // 한 주문에 결제 시도가 여러 건 생길 수 있다(재결제). 한 주문의 결제 완료는 주문 잠금으로 한 건만 남긴다
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "order_id", nullable = false, unique = true)
+    @JoinColumn(name = "order_id", nullable = false)
     private Order order;
 
     @Column(name = "portone_payment_id", nullable = false, unique = true, length = 100)

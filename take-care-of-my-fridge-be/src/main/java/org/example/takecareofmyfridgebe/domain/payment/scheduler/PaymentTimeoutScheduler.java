@@ -11,7 +11,7 @@ import org.springframework.stereotype.Component;
 import java.time.LocalDateTime;
 import java.util.List;
 
-// 결제창을 띄운 뒤 만료 시각까지 결제하지 않은 건을 정리해 주문을 취소한다
+// 결제창을 띄운 뒤 만료 시각까지 결제하지 않은 결제 시도를 실패 처리한다. 주문 취소·재고 복구는 주문 쪽이 맡는다
 @Slf4j
 @Component
 @RequiredArgsConstructor

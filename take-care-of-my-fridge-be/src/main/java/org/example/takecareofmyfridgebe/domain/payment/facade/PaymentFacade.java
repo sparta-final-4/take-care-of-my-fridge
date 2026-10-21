@@ -2,8 +2,11 @@ package org.example.takecareofmyfridgebe.domain.payment.facade;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.example.takecareofmyfridgebe.domain.payment.dto.PaymentApproveResult;
+import org.example.takecareofmyfridgebe.domain.payment.dto.PaymentApproveResult.Rejection;
 import org.example.takecareofmyfridgebe.domain.payment.dto.PaymentConfirmRequest;
 import org.example.takecareofmyfridgebe.domain.payment.dto.PaymentConfirmResponse;
+import org.example.takecareofmyfridgebe.domain.payment.dto.PaymentPrepareResponse;
 import org.example.takecareofmyfridgebe.domain.payment.entity.FailReason;
 import org.example.takecareofmyfridgebe.domain.payment.entity.Payment;
 import org.example.takecareofmyfridgebe.domain.payment.entity.PaymentStatus;
@@ -24,10 +27,28 @@ import java.util.Optional;
 public class PaymentFacade {
 
     private static final String COMPENSATION_CANCEL_REASON = "실패 처리된 결제의 승인 건 보상 취소";
+    private static final String ORDER_NOT_PAYABLE_CANCEL_REASON = "결제할 수 없는 주문의 결제 자동 취소";
 
     private final PaymentService paymentService;
     private final PaymentCommandService paymentCommandService;
     private final PaymentGateway paymentGateway;
+
+    // 결제하기를 누를 때 프론트가 호출한다. 응답의 portonePaymentId로 결제창을 띄운다.
+    // 창 닫기 요청이 오지 않아 결제 대기로 남은 이전 결제가 있으면 정리한 뒤 새 결제를 만든다
+    public PaymentPrepareResponse preparePayment(Long memberId, Long orderId) {
+        paymentService.validatePayableOrder(memberId, orderId);
+
+        // 이전 결제가 PG에서 끝났으면 웹훅과 같은 규칙으로 처리한다. 승인됐으면 주문이 PAID라 아래 생성이 거절된다.
+        // PG 조회가 실패하면 예외를 그대로 던져 새 결제를 만들지 않는다
+        for (Payment previous : paymentService.findReady(orderId)) {
+            if (closeReady(previous, FailReason.SUPERSEDED)) {
+                log.info("이전 결제 대기 정리: portonePaymentId={}", previous.getPortonePaymentId());
+            }
+        }
+
+        Payment payment = paymentCommandService.create(orderId);
+        return PaymentPrepareResponse.of(payment, paymentService.getOrderName(orderId));
+    }
 
     // 결제창에서 결제를 마친 뒤 프론트가 호출한다
     public PaymentConfirmResponse confirmPayment(Long memberId, PaymentConfirmRequest request) {
@@ -51,7 +72,7 @@ public class PaymentFacade {
         if (!pgPayment.isPaid()) {
             // PG가 실패로 확정한 결제는 바로 실패 처리로 상태 변경
             if (pgPayment.isFailed()) {
-                paymentCommandService.fail(payment.getPortonePaymentId(), FailReason.PG_FAILED);
+                paymentCommandService.fail(payment, FailReason.PG_FAILED);
             }
             // 아직 진행 중인 결제는 상태를 바꾸지 않는다. 만료 시각이 지나면 PaymentTimeoutScheduler가 정리한다
             throw new BusinessException(ErrorCode.PAYMENT_NOT_PAID);
@@ -59,10 +80,16 @@ public class PaymentFacade {
 
         PaidDecision decision = decidePaid(payment, pgPayment);
         if (decision == PaidDecision.APPROVE) {
-            return paymentCommandService.approve(payment.getPortonePaymentId());
+            PaymentApproveResult result = paymentCommandService.approve(payment);
+            if (result.isApproved()) {
+                return result.response();
+            }
+            // 승인하지 못한 결제는 실패로 기록됐으므로 PG 결제를 되돌린다
+            cancelPgPaymentQuietly(payment.getPortonePaymentId(), cancelReasonOf(result.rejection()));
+            throw new BusinessException(errorCodeOf(result.rejection()));
         }
         // 락을 잡고 실패 처리가 반영된 경우에만 PG를 취소해 DB PAID + PG 취소 상태를 막는다
-        if (paymentCommandService.fail(payment.getPortonePaymentId(), decision.failReason)) {
+        if (paymentCommandService.fail(payment, decision.failReason)) {
             cancelPgPaymentQuietly(payment.getPortonePaymentId(), decision.cancelReason);
         } else {
             log.error("받지 않을 결제가 이미 처리됨, PG 취소 생략: portonePaymentId={}", payment.getPortonePaymentId());
@@ -70,7 +97,7 @@ public class PaymentFacade {
         throw new BusinessException(decision.errorCode);
     }
 
-    // 사용자가 결제창을 닫았을 때 프론트가 호출한다
+    // 사용자가 결제창을 닫았을 때 프론트가 호출한다. 이 결제 시도만 실패 처리하고 주문은 다시 결제할 수 있게 둔다
     public void failByUser(Long memberId, String portonePaymentId) {
         Payment payment = getOwnedPayment(memberId, portonePaymentId);
 
@@ -78,14 +105,14 @@ public class PaymentFacade {
             throw new BusinessException(ErrorCode.ALREADY_PROCESSED_PAYMENT);
         }
 
-        // 결제가 실제로 끝났는데 취소 요청이 온 경우 주문을 취소하지 않는다
+        // 결제가 실제로 끝났는데 취소 요청이 온 경우 실패 처리하지 않는다
         Optional<PaymentGatewayResponse> pgPayment = paymentGateway.getPayment(portonePaymentId);
         if (pgPayment.isPresent() && pgPayment.get().isPaid()) {
             throw new BusinessException(ErrorCode.ALREADY_PROCESSED_PAYMENT);
         }
 
         // PG 조회와 실패 처리 사이에 결제가 완료되면 Transaction.Paid 웹훅에서 보상 취소한다
-        paymentCommandService.fail(portonePaymentId, FailReason.USER_CANCELLED);
+        paymentCommandService.fail(payment, FailReason.USER_CANCELLED);
     }
 
     // 웹훅 수신 시 PG 상태에 맞춰 결제 상태를 바꾸고, 바꾼 것이 있으면 true
@@ -101,12 +128,17 @@ public class PaymentFacade {
                 case READY -> {
                     PaidDecision decision = decidePaid(payment, pgPayment);
                     if (decision == PaidDecision.APPROVE) {
-                        paymentCommandService.approve(payment.getPortonePaymentId());
+                        PaymentApproveResult result = paymentCommandService.approve(payment);
+                        // 읽은 뒤 다른 요청이 실패 처리했거나, 같은 주문의 다른 결제가 먼저 승인됐거나, 주문이 취소된 경우다.
+                        // 취소가 실패하면 예외를 던져 웹훅 재전송으로 다시 시도한다
+                        if (!result.isApproved()) {
+                            cancelPgPayment(payment.getPortonePaymentId(), cancelReasonOf(result.rejection()));
+                        }
                     } else {
                         // 다른 요청이 먼저 실패 처리했어도 PG 결제는 남아 있으므로 취소한다.
                         // 금액 불일치·만료 결제는 어느 요청도 승인할 수 없어 DB PAID + PG 취소 상태는 생기지 않는다.
                         // 취소가 실패하면 예외를 던져 웹훅 재전송으로 다시 시도한다
-                        paymentCommandService.fail(payment.getPortonePaymentId(), decision.failReason);
+                        paymentCommandService.fail(payment, decision.failReason);
                         cancelPgPayment(payment.getPortonePaymentId(), decision.cancelReason);
                     }
                     yield true;
@@ -122,20 +154,25 @@ public class PaymentFacade {
 
         // TODO: 환불 도메인 구현 후 PAID 결제의 PG 취소·부분 취소를 환불 쪽과 동기화
         if (pgPayment.isFailed() && payment.getStatus() == PaymentStatus.READY) {
-            return paymentCommandService.fail(payment.getPortonePaymentId(), FailReason.PG_FAILED);
+            return paymentCommandService.fail(payment, FailReason.PG_FAILED);
         }
         return false;
     }
 
-    // 스케줄러가 만료 시각이 지난 결제 대기 건에 호출한다.
-    // PG에서 결제가 끝났으면 웹훅과 같은 규칙으로 처리하고, 아니면 TIMEOUT으로 실패 처리한다
+    // 스케줄러가 만료 시각이 지난 결제 대기 건에 호출한다
     public void expire(Payment payment) {
-        if (syncWithPg(payment)) {
-            return;
-        }
-        if (paymentCommandService.fail(payment.getPortonePaymentId(), FailReason.TIMEOUT)) {
+        if (closeReady(payment, FailReason.TIMEOUT)) {
             log.info("결제 대기 만료 처리: portonePaymentId={}", payment.getPortonePaymentId());
         }
+    }
+
+    // 결제 대기 건을 정리한다. PG에서 결제가 끝났으면 웹훅과 같은 규칙으로 처리하고, 아니면 reason으로 실패 처리한다.
+    // reason으로 실패 처리했으면 true
+    private boolean closeReady(Payment payment, FailReason reason) {
+        if (syncWithPg(payment)) {
+            return false;
+        }
+        return paymentCommandService.fail(payment, reason);
     }
 
     // PG에서 결제가 완료된 READY 결제를 받을지 정한다. 금액이나 결제 시각을 확인할 수 없으면 판단하지 않는다
@@ -158,7 +195,22 @@ public class PaymentFacade {
         return PaidDecision.APPROVE;
     }
 
-    // 웹훅·스케줄러에서 PG 결제를 되돌린다. 실패하면 예외가 그대로 전달돼 다음 시도에서 다시 취소한다
+    private String cancelReasonOf(Rejection rejection) {
+        return switch (rejection) {
+            case PAYMENT_ALREADY_FAILED -> COMPENSATION_CANCEL_REASON;
+            case ORDER_NOT_PAYABLE -> ORDER_NOT_PAYABLE_CANCEL_REASON;
+        };
+    }
+
+    private ErrorCode errorCodeOf(Rejection rejection) {
+        return switch (rejection) {
+            case PAYMENT_ALREADY_FAILED -> ErrorCode.ALREADY_PROCESSED_PAYMENT;
+            case ORDER_NOT_PAYABLE -> ErrorCode.PAYMENT_ORDER_NOT_PAYABLE;
+        };
+    }
+
+    // 웹훅·스케줄러·결제 준비에서 PG 결제를 되돌린다. 실패하면 예외를 그대로 던진다.
+    // 결제는 이미 FAILED로 남으므로 Transaction.Paid 웹훅(재전송 포함)이 보상 취소로 다시 시도한다
     private void cancelPgPayment(String portonePaymentId, String reason) {
         paymentGateway.cancelPayment(portonePaymentId, reason, null);
     }
@@ -171,7 +223,7 @@ public class PaymentFacade {
         return payment;
     }
 
-    // confirm 응답은 받지 않은 이유(금액 불일치·만료)로 끝나야 하므로 PG 취소 실패를 삼킨다.
+    // confirm 응답은 받지 않은 이유(금액 불일치·만료·결제할 수 없는 주문)로 끝나야 하므로 PG 취소 실패를 삼킨다.
     // 결제 실패는 이미 기록됐고, Transaction.Paid 웹훅이 FAILED + PG PAID 상태를 보고 다시 취소한다
     private void cancelPgPaymentQuietly(String portonePaymentId, String reason) {
         try {

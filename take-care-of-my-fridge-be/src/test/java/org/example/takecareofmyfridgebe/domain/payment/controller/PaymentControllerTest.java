@@ -6,6 +6,7 @@ import org.example.takecareofmyfridgebe.domain.auth.service.JwtTokenService;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 import org.example.takecareofmyfridgebe.domain.payment.dto.PaymentConfirmRequest;
 import org.example.takecareofmyfridgebe.domain.payment.dto.PaymentConfirmResponse;
+import org.example.takecareofmyfridgebe.domain.payment.dto.PaymentPrepareResponse;
 import org.example.takecareofmyfridgebe.domain.payment.entity.PaymentStatus;
 import org.example.takecareofmyfridgebe.domain.payment.facade.PaymentFacade;
 import org.example.takecareofmyfridgebe.global.config.SecurityConfig;
@@ -191,6 +192,56 @@ class PaymentControllerTest {
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.error.code").value(ErrorCode.ALREADY_PROCESSED_PAYMENT.getCode()));
+    }
+
+    /**
+     * 비로그인 상태로 결제 준비를 요청하면 Facade를 호출하지 않고 401(A003)을 반환하는지 검증한다.
+     */
+    @Test
+    void prepareWithoutLoginReturnsUnauthorized() throws Exception {
+        mvc.perform(post("/api/orders/{orderId}/payments", 1L)
+                        .with(csrf()))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error.code").value(ErrorCode.UNAUTHORIZED.getCode()));
+
+        verifyNoInteractions(paymentFacade);
+    }
+
+    /**
+     * 결제 준비 요청 시 토큰의 회원 ID와 경로의 주문 ID로 Facade를 호출하고,
+     * 결제창을 띄울 정보가 규격대로 직렬화되는지 검증한다.
+     */
+    @Test
+    void preparePassesTokenMemberIdAndReturnsResponse() throws Exception {
+        PaymentPrepareResponse response = new PaymentPrepareResponse(
+                1L, PORTONE_PAYMENT_ID, "대파 외 1건", 15000L, LocalDateTime.of(2026, 10, 20, 10, 10));
+        when(paymentFacade.preparePayment(MEMBER_ID, 1L)).thenReturn(response);
+
+        mvc.perform(post("/api/orders/{orderId}/payments", 1L)
+                        .with(csrf())
+                        .with(loginUser()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.orderId").value(1))
+                .andExpect(jsonPath("$.data.portonePaymentId").value(PORTONE_PAYMENT_ID))
+                .andExpect(jsonPath("$.data.orderName").value("대파 외 1건"))
+                .andExpect(jsonPath("$.data.amount").value(15000))
+                .andExpect(jsonPath("$.data.expiresAt").value("2026-10-20T10:10:00"));
+    }
+
+    /**
+     * 이미 결제됐거나 취소된 주문이면 409(PAYMENT_007)로 응답하는지 검증한다.
+     */
+    @Test
+    void prepareOrderNotPayableReturnsConflict() throws Exception {
+        when(paymentFacade.preparePayment(MEMBER_ID, 1L))
+                .thenThrow(new BusinessException(ErrorCode.PAYMENT_ORDER_NOT_PAYABLE));
+
+        mvc.perform(post("/api/orders/{orderId}/payments", 1L)
+                        .with(csrf())
+                        .with(loginUser()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value(ErrorCode.PAYMENT_ORDER_NOT_PAYABLE.getCode()));
     }
 
     private static RequestPostProcessor loginUser() {
