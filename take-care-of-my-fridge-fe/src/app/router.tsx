@@ -49,6 +49,10 @@ export const router = createBrowserRouter([
             ],
           },
           { path: ROUTES.cart, lazy: page(() => import('@/pages/order/CartPage')) },
+          {
+            path: ROUTES.orderCheckout,
+            lazy: page(() => import('@/pages/order/OrderCheckoutPage')),
+          },
         ],
       },
       {

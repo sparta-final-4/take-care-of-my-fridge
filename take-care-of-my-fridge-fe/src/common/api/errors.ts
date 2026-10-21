@@ -13,6 +13,12 @@ export function getErrorCode(error: unknown): string | undefined {
   return typeof responseError.code === 'string' ? responseError.code : undefined;
 }
 
+// 응답이 없거나 5xx면 서버가 요청을 처리했는지 알 수 없다. 같은 요청을 다시 보낼 때 판단에 쓴다.
+export function isOutcomeUnknown(error: unknown) {
+  if (!isAxiosError(error)) return false;
+  return !error.response || error.response.status >= 500;
+}
+
 // 백엔드 공통 응답(ApiResponse.java): { success, data, error }.
 function getServerMessage(data: unknown) {
   if (typeof data !== 'object' || data === null || !('error' in data)) return undefined;

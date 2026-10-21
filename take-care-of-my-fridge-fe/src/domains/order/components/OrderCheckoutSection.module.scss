@@ -1,0 +1,87 @@
+@use '@/styles/variables' as *;
+@use '@/styles/mixins' as *;
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ant-margin-lg);
+}
+
+.header {
+  padding: var(--ant-padding) var(--ant-padding-lg);
+  background: var(--ant-color-bg-container);
+  border: 1px solid var(--ant-color-border);
+  border-radius: var(--ant-border-radius-lg);
+}
+
+.title {
+  margin: 0;
+}
+
+// 장바구니 화면과 같은 좌우 비율. lg 미만에서는 결제할 금액이 목록 아래로 간다.
+.layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--ant-margin-lg);
+  align-items: start;
+
+  @include from(lg) {
+    grid-template-columns: minmax(0, 780fr) minmax(0, 416fr);
+  }
+}
+
+.list {
+  min-width: 0;
+  padding: 0 var(--ant-padding);
+  background: var(--ant-color-bg-container);
+  border: 1px solid var(--ant-color-border);
+  border-radius: var(--ant-border-radius-lg);
+
+  @include from(md) {
+    padding: 0 var(--ant-padding-lg);
+  }
+}
+
+.summary {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: var(--ant-padding-lg);
+  background: var(--ant-color-bg-container);
+  border: 1px solid var(--ant-color-border);
+  border-radius: var(--ant-border-radius-lg);
+
+  @include from(lg) {
+    position: sticky;
+    top: calc(#{$header-height} + var(--ant-margin-lg));
+  }
+}
+
+.summaryTitle {
+  font-size: var(--ant-font-size-lg);
+}
+
+.rows {
+  margin-top: var(--ant-margin);
+}
+
+.amount {
+  font-variant-numeric: tabular-nums;
+}
+
+.divider {
+  margin: var(--ant-margin) 0;
+}
+
+.total {
+  font-size: var(--ant-font-size-lg);
+  font-variant-numeric: tabular-nums;
+}
+
+.pay {
+  margin-top: var(--ant-margin-lg);
+}
+
+.cancel {
+  margin-top: var(--ant-margin-sm);
+}

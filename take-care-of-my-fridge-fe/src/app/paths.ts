@@ -12,6 +12,7 @@ export const ROUTES = {
   mypageProfile: '/mypage/profile',
   mypageOrders: '/mypage/orders',
   cart: '/cart',
+  orderCheckout: '/orders/:orderId/checkout',
   adminMembers: '/admin/members',
   adminAudit: '/admin/audit',
   adminForecast: '/admin/forecast',

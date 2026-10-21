@@ -59,7 +59,6 @@ export function CartItemRow({
           )}
           <Typography.Text strong={!soldOut}>{formatPrice(item.unitPrice)}</Typography.Text>
         </Flex>
-        {soldOut && <Typography.Text type="secondary">주문에서 빠집니다</Typography.Text>}
       </Flex>
       <Flex align="center" className={styles.quantity}>
         <Button

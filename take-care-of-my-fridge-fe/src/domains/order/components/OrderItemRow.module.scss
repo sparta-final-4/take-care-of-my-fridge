@@ -1,0 +1,86 @@
+@use '@/styles/variables' as *;
+@use '@/styles/mixins' as *;
+
+// 모바일은 이미지·상품 정보 아래에 수량·단가·금액을 두고, md부터 한 행에 둔다
+.row {
+  display: grid;
+  grid-template-areas:
+    'thumb info info'
+    'quantity price total';
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--ant-margin-sm) var(--ant-margin);
+  padding: var(--ant-padding) 0;
+  border-bottom: 1px solid var(--ant-color-border-secondary);
+
+  @include from(md) {
+    grid-template-areas: 'thumb info quantity price total';
+    grid-template-columns:
+      auto minmax(0, 1fr)
+      $order-quantity-width $cart-total-min-width $cart-total-min-width;
+  }
+}
+
+.thumb {
+  grid-area: thumb;
+  width: $cart-thumb-size;
+  height: $cart-thumb-size;
+  overflow: hidden;
+  background: var(--ant-color-fill-tertiary);
+  border-radius: var(--ant-border-radius);
+}
+
+.image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.imagePlaceholder {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.info {
+  grid-area: info;
+  min-width: 0;
+}
+
+.saleTag {
+  align-self: flex-start;
+  margin: 0;
+}
+
+.name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quantity {
+  grid-area: quantity;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+
+  @include from(md) {
+    text-align: center;
+  }
+}
+
+.price {
+  grid-area: price;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.listPrice {
+  font-size: var(--ant-font-size-sm);
+}
+
+.total {
+  grid-area: total;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
