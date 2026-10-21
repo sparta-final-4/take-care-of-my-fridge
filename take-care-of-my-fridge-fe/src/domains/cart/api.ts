@@ -1,5 +1,7 @@
 import { axiosInstance } from '@/common/api/axiosInstance';
+import { cartApi, type AddCartItemRequest, type AddCartItemResponse } from '@/common/api/clients';
 import type { ApiResponse } from '@/common/api/types';
+import { unwrap } from '@/common/api/unwrap';
 import { csrfHeaders } from '@/domains/auth/api';
 
 // CartItemResponse.java와 필드·enum을 맞춘다. 할인 중이 아니면 saleType·discountRate는 null이다.
@@ -35,6 +37,11 @@ export async function getCartItems(signal?: AbortSignal) {
     signal,
   });
   return data.data.items;
+}
+
+// 이미 담긴 상품이면 백엔드가 수량을 더한다.
+export async function addCartItem(request: AddCartItemRequest): Promise<AddCartItemResponse> {
+  return unwrap(cartApi.addItem({ addCartItemRequest: request }));
 }
 
 export async function changeCartItemQuantity(

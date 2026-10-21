@@ -32,6 +32,10 @@ export function isUnauthorized(error: unknown) {
   return isAxiosError(error) && error.response?.status === 401;
 }
 
+export function isNotFound(error: unknown) {
+  return isAxiosError(error) && error.response?.status === 404;
+}
+
 export function getErrorMessage(error: unknown) {
   if (!isAxiosError(error)) return DEFAULT_MESSAGE;
 
