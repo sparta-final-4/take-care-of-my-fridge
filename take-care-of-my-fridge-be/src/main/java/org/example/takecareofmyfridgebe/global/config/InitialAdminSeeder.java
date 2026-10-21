@@ -49,7 +49,11 @@ public class InitialAdminSeeder implements ApplicationRunner {
             throw new IllegalStateException("첫 관리자 이메일 또는 닉네임이 이미 사용 중입니다.");
         }
 
-        memberRepository.saveAndFlush(Member.createInitialAdmin(request.email(),
-                passwordEncoder.encode(request.password()), request.nickname()));
+        memberRepository.saveAndFlush(Member.builder()
+                .email(request.email())
+                .passwordHash(passwordEncoder.encode(request.password()))
+                .nickname(request.nickname())
+                .role(Member.Role.ADMIN)
+                .build());
     }
 }

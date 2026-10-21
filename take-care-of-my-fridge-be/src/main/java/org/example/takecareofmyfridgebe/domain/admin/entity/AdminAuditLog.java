@@ -14,6 +14,7 @@ import jakarta.persistence.Table;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 import lombok.AccessLevel;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import java.util.Map;
@@ -70,25 +71,16 @@ public class AdminAuditLog extends BaseTimeEntity {
     @Column(name = "after_value", columnDefinition = "json")
     private Map<String, String> afterValue;
 
-    private AdminAuditLog(Member member, Action action, String targetType, Long targetId, Result result) {
+    @Builder
+    private AdminAuditLog(Member member, Action action, String targetType, Long targetId, Result result,
+                          Map<String, String> beforeValue, Map<String, String> afterValue) {
         this.member = member;
         this.actorRole = member.getRole();
         this.action = action;
         this.targetType = targetType;
         this.targetId = targetId;
         this.result = result;
-    }
-
-    public static AdminAuditLog create(Member member, Action action, String targetType, Long targetId, Result result) {
-        return new AdminAuditLog(member, action, targetType, targetId, result);
-    }
-
-    public static AdminAuditLog create(Member member, Action action, String targetType, Long targetId,
-                                       Result result, Map<String, String> beforeValue,
-                                       Map<String, String> afterValue) {
-        AdminAuditLog log = new AdminAuditLog(member, action, targetType, targetId, result);
-        log.beforeValue = beforeValue;
-        log.afterValue = afterValue;
-        return log;
+        this.beforeValue = beforeValue;
+        this.afterValue = afterValue;
     }
 }

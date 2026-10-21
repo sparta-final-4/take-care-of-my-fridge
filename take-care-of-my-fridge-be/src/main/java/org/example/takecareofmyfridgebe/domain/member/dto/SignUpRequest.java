@@ -8,6 +8,7 @@ import jakarta.validation.constraints.Size;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 
 import java.util.List;
+import java.util.Set;
 
 public record SignUpRequest(
         @NotBlank(message = "이메일을 입력해 주세요.")
@@ -31,5 +32,14 @@ public record SignUpRequest(
 
     public SignUpRequest {
         nickname = nickname == null ? null : nickname.strip();
+    }
+
+    public Member toEntity(String passwordHash, Set<Member.Taste> uniqueTastes) {
+        return Member.builder()
+                .email(email)
+                .passwordHash(passwordHash)
+                .nickname(nickname)
+                .tastes(uniqueTastes)
+                .build();
     }
 }
