@@ -4,6 +4,10 @@ import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.CookingCompleteRequest;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.CookingLogResponse;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.CookingLogSearchRequest;
+import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeListResponse;
+import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeResponse;
+import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeSearchRequest;
+import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeSummaryResponse;
 import org.example.takecareofmyfridgebe.domain.cooking.entity.CookingLog;
 import org.example.takecareofmyfridgebe.domain.cooking.repository.CookingLogRepository;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
@@ -55,5 +59,24 @@ public class CookingService {
                 PageRequest.of(request.page() - 1, request.size())
         );
         return PageResponse.of(logs.map(CookingLogResponse::from));
+    }
+
+    /**
+     * 로그인한 회원이 요리 완료한 레시피를 레시피별로 묶어 페이징 목록 및 전체 요약 통계를 반환한다.
+     *
+     * @param memberId 조회 대상 회원 ID
+     * @param request  조회 조건 (reviewStatus, sort, page는 1부터, size)
+     * @return 요약 통계와 레시피 목록 페이징 응답
+     */
+    public MyRecipeListResponse getMyRecipes(Long memberId, MyRecipeSearchRequest request) {
+        Page<MyRecipeResponse> recipePage = cookingLogRepository.findMyRecipes(
+                memberId,
+                request.reviewStatus(),
+                request.sort(),
+                PageRequest.of(request.page() - 1, request.size())
+        );
+        MyRecipeSummaryResponse summary = cookingLogRepository.getMyRecipesSummary(memberId);
+
+        return new MyRecipeListResponse(summary, PageResponse.of(recipePage));
     }
 }
