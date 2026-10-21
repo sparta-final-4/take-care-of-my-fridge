@@ -12,8 +12,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
-
 @Component
 @RequiredArgsConstructor
 public class InitialAdminSeeder implements ApplicationRunner {
@@ -40,19 +38,21 @@ public class InitialAdminSeeder implements ApplicationRunner {
             return;
         }
 
-        SignUpRequest request = new SignUpRequest(email, password, nickname, List.of());
-        if (!validator.validate(request).isEmpty()) {
+        String normalizedNickname = nickname.strip();
+        if (!validator.validateValue(SignUpRequest.class, "email", email).isEmpty()
+                || !validator.validateValue(SignUpRequest.class, "password", password).isEmpty()
+                || !validator.validateValue(SignUpRequest.class, "nickname", normalizedNickname).isEmpty()) {
             throw new IllegalStateException("첫 관리자 환경변수가 회원가입 입력 규칙에 맞지 않습니다.");
         }
-        if (memberRepository.existsByEmail(request.email())
-                || memberRepository.existsByNickname(request.nickname())) {
+        if (memberRepository.existsByEmail(email)
+                || memberRepository.existsByNickname(normalizedNickname)) {
             throw new IllegalStateException("첫 관리자 이메일 또는 닉네임이 이미 사용 중입니다.");
         }
 
         memberRepository.saveAndFlush(Member.builder()
-                .email(request.email())
-                .passwordHash(passwordEncoder.encode(request.password()))
-                .nickname(request.nickname())
+                .email(email)
+                .passwordHash(passwordEncoder.encode(password))
+                .nickname(normalizedNickname)
                 .role(Member.Role.ADMIN)
                 .build());
     }

@@ -96,6 +96,9 @@ public class MemberService {
         if (memberRepository.existsByNickname(request.nickname())) {
             throw new BusinessException(ErrorCode.DUPLICATE_NICKNAME);
         }
+        if (memberRepository.existsByPhone(request.normalizedPhone())) {
+            throw new BusinessException(ErrorCode.DUPLICATE_PHONE);
+        }
 
         Member member = request.toEntity(passwordEncoder.encode(request.password()), tastes);
         try {
@@ -112,6 +115,9 @@ public class MemberService {
         }
         if (detail.contains("uk_members_nickname")) {
             return new BusinessException(ErrorCode.DUPLICATE_NICKNAME);
+        }
+        if (detail.contains("uk_members_phone")) {
+            return new BusinessException(ErrorCode.DUPLICATE_PHONE);
         }
         return e;
     }
