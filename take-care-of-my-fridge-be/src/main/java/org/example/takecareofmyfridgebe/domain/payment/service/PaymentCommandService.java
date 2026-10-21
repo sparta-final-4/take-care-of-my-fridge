@@ -51,7 +51,8 @@ public class PaymentCommandService {
 
         payment.fail(reason);
         payment.getOrder().cancel();
-        // TODO: 주문 로직에 재고 복구, 번개 드롭 1인 1개 기록 해제 메서드
+        // TODO: 주문 생성에서 재고 차감을 구현하면 여기서 재고를 복구하고 번개 드롭 1인 1개 기록(OrderItem.releaseFlashDropMember)을 해제한다.
+        //  confirm·결제창 닫기·웹훅·만료 스케줄러의 실패 처리가 모두 이 메서드를 거치므로 이곳 한 군데에서 처리한다
         return true;
     }
 

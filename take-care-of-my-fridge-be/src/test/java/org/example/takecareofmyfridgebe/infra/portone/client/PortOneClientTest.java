@@ -12,6 +12,9 @@ import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -53,6 +56,30 @@ class PortOneClientTest {
             assertThat(pg.totalAmount()).isEqualTo(10000L);
             assertThat(pg.cancelledAmount()).isZero();
         });
+    }
+
+    @Test
+    @DisplayName("결제 완료 시각(RFC 3339)을 서버 시간대의 시각으로 바꿔 돌려준다")
+    void getPayment_convertsPaidAtToServerZone() {
+        server.expect(requestTo(BASE_URL + "/payments/" + PAYMENT_ID + "?storeId=store-1"))
+                .andRespond(withSuccess("""
+                        {"id":"payment-1","status":"PAID","amount":{"total":10000,"cancelled":0},
+                         "paidAt":"2026-10-20T01:09:59Z"}""", MediaType.APPLICATION_JSON));
+
+        Optional<PaymentGatewayResponse> response = client.getPayment(PAYMENT_ID);
+
+        LocalDateTime expected = LocalDateTime.ofInstant(Instant.parse("2026-10-20T01:09:59Z"), ZoneId.systemDefault());
+        assertThat(response).hasValueSatisfying(pg -> assertThat(pg.paidAt()).isEqualTo(expected));
+    }
+
+    @Test
+    @DisplayName("결제가 끝나지 않아 결제 완료 시각이 없으면 null로 둔다")
+    void getPayment_withoutPaidAt() {
+        server.expect(requestTo(BASE_URL + "/payments/" + PAYMENT_ID + "?storeId=store-1"))
+                .andRespond(withSuccess("""
+                        {"id":"payment-1","status":"READY","amount":{"total":10000,"cancelled":0}}""", MediaType.APPLICATION_JSON));
+
+        assertThat(client.getPayment(PAYMENT_ID)).hasValueSatisfying(pg -> assertThat(pg.paidAt()).isNull());
     }
 
     @Test

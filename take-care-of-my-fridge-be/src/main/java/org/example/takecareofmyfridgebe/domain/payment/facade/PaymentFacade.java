@@ -23,7 +23,6 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class PaymentFacade {
 
-    private static final String AMOUNT_MISMATCH_CANCEL_REASON = "결제 금액 불일치 자동 취소";
     private static final String COMPENSATION_CANCEL_REASON = "실패 처리된 결제의 승인 건 보상 취소";
 
     private final PaymentService paymentService;
@@ -54,20 +53,21 @@ public class PaymentFacade {
             if (pgPayment.isFailed()) {
                 paymentCommandService.fail(payment.getPortonePaymentId(), FailReason.PG_FAILED);
             }
-            //TODO: 아직 진행 중인 결제는 상태를 바꾸지 않고, 타임아웃 스케쥴러 로직 구현 후 처리
+            // 아직 진행 중인 결제는 상태를 바꾸지 않는다. 만료 시각이 지나면 PaymentTimeoutScheduler가 정리한다
             throw new BusinessException(ErrorCode.PAYMENT_NOT_PAID);
         }
 
-        if (!amountMatches(payment, pgPayment)) {
-            // 락을 잡고 실패 처리가 반영된 경우에만 PG를 취소해 DB PAID + PG 취소 상태를 막는다
-            if (paymentCommandService.fail(payment.getPortonePaymentId(), FailReason.AMOUNT_MISMATCH)) {
-                cancelPgPaymentQuietly(payment.getPortonePaymentId());
-            } else {
-                log.error("금액 불일치 결제가 이미 처리됨, PG 취소 생략: portonePaymentId={}", payment.getPortonePaymentId());
-            }
-            throw new BusinessException(ErrorCode.PAYMENT_AMOUNT_MISMATCH);
+        PaidDecision decision = decidePaid(payment, pgPayment);
+        if (decision == PaidDecision.APPROVE) {
+            return paymentCommandService.approve(payment.getPortonePaymentId());
         }
-        return paymentCommandService.approve(payment.getPortonePaymentId());
+        // 락을 잡고 실패 처리가 반영된 경우에만 PG를 취소해 DB PAID + PG 취소 상태를 막는다
+        if (paymentCommandService.fail(payment.getPortonePaymentId(), decision.failReason)) {
+            cancelPgPaymentQuietly(payment.getPortonePaymentId(), decision.cancelReason);
+        } else {
+            log.error("받지 않을 결제가 이미 처리됨, PG 취소 생략: portonePaymentId={}", payment.getPortonePaymentId());
+        }
+        throw new BusinessException(decision.errorCode);
     }
 
     // 사용자가 결제창을 닫았을 때 프론트가 호출한다
@@ -99,13 +99,15 @@ public class PaymentFacade {
         if (pgPayment.isPaid()) {
             return switch (payment.getStatus()) {
                 case READY -> {
-                    if (amountMatches(payment, pgPayment)) {
+                    PaidDecision decision = decidePaid(payment, pgPayment);
+                    if (decision == PaidDecision.APPROVE) {
                         paymentCommandService.approve(payment.getPortonePaymentId());
                     } else {
                         // 다른 요청이 먼저 실패 처리했어도 PG 결제는 남아 있으므로 취소한다.
+                        // 금액 불일치·만료 결제는 어느 요청도 승인할 수 없어 DB PAID + PG 취소 상태는 생기지 않는다.
                         // 취소가 실패하면 예외를 던져 웹훅 재전송으로 다시 시도한다
-                        paymentCommandService.fail(payment.getPortonePaymentId(), FailReason.AMOUNT_MISMATCH);
-                        cancelPgPayment(payment.getPortonePaymentId(), AMOUNT_MISMATCH_CANCEL_REASON);
+                        paymentCommandService.fail(payment.getPortonePaymentId(), decision.failReason);
+                        cancelPgPayment(payment.getPortonePaymentId(), decision.cancelReason);
                     }
                     yield true;
                 }
@@ -125,21 +127,38 @@ public class PaymentFacade {
         return false;
     }
 
-    // PG 금액이 주문 금액과 같은지 확인한다. 금액을 확인할 수 없으면 승인도 취소도 하지 않는다
-    private boolean amountMatches(Payment payment, PaymentGatewayResponse pgPayment) {
-        if (pgPayment.totalAmount() == null) {
-            log.error("PG 결제 금액 누락: portonePaymentId={}", payment.getPortonePaymentId());
-            throw new BusinessException(ErrorCode.PAYMENT_NOT_PAID);
+    // 스케줄러가 만료 시각이 지난 결제 대기 건에 호출한다.
+    // PG에서 결제가 끝났으면 웹훅과 같은 규칙으로 처리하고, 아니면 TIMEOUT으로 실패 처리한다
+    public void expire(Payment payment) {
+        if (syncWithPg(payment)) {
+            return;
         }
-        if (payment.getAmount().equals(pgPayment.totalAmount())) {
-            return true;
+        if (paymentCommandService.fail(payment.getPortonePaymentId(), FailReason.TIMEOUT)) {
+            log.info("결제 대기 만료 처리: portonePaymentId={}", payment.getPortonePaymentId());
         }
-        log.error("결제 금액 불일치: portonePaymentId={}, 주문 금액={}, PG 금액={}",
-                payment.getPortonePaymentId(), payment.getAmount(), pgPayment.totalAmount());
-        return false;
     }
 
-    // 웹훅에서 PG 결제를 되돌린다. 실패하면 예외가 그대로 전달돼 웹훅 재전송으로 다시 시도한다
+    // PG에서 결제가 완료된 READY 결제를 받을지 정한다. 금액이나 결제 시각을 확인할 수 없으면 판단하지 않는다
+    private PaidDecision decidePaid(Payment payment, PaymentGatewayResponse pgPayment) {
+        if (pgPayment.totalAmount() == null || pgPayment.paidAt() == null) {
+            log.error("PG 결제 정보 누락: portonePaymentId={}, 금액={}, 결제 시각={}",
+                    payment.getPortonePaymentId(), pgPayment.totalAmount(), pgPayment.paidAt());
+            throw new BusinessException(ErrorCode.PAYMENT_NOT_PAID);
+        }
+        if (!payment.getAmount().equals(pgPayment.totalAmount())) {
+            log.error("결제 금액 불일치: portonePaymentId={}, 주문 금액={}, PG 금액={}",
+                    payment.getPortonePaymentId(), payment.getAmount(), pgPayment.totalAmount());
+            return PaidDecision.AMOUNT_MISMATCH;
+        }
+        if (payment.isPaidAfterExpiry(pgPayment.paidAt())) {
+            log.warn("만료 시각 이후 결제 완료: portonePaymentId={}, 만료 시각={}, 결제 시각={}",
+                    payment.getPortonePaymentId(), payment.getExpiresAt(), pgPayment.paidAt());
+            return PaidDecision.EXPIRED;
+        }
+        return PaidDecision.APPROVE;
+    }
+
+    // 웹훅·스케줄러에서 PG 결제를 되돌린다. 실패하면 예외가 그대로 전달돼 다음 시도에서 다시 취소한다
     private void cancelPgPayment(String portonePaymentId, String reason) {
         paymentGateway.cancelPayment(portonePaymentId, reason, null);
     }
@@ -152,14 +171,31 @@ public class PaymentFacade {
         return payment;
     }
 
-    // confirm 응답은 금액 불일치로 끝나야 하므로 PG 취소 실패를 삼킨다.
+    // confirm 응답은 받지 않은 이유(금액 불일치·만료)로 끝나야 하므로 PG 취소 실패를 삼킨다.
     // 결제 실패는 이미 기록됐고, Transaction.Paid 웹훅이 FAILED + PG PAID 상태를 보고 다시 취소한다
-    private void cancelPgPaymentQuietly(String portonePaymentId) {
+    private void cancelPgPaymentQuietly(String portonePaymentId, String reason) {
         try {
-            paymentGateway.cancelPayment(portonePaymentId, AMOUNT_MISMATCH_CANCEL_REASON, null);
+            paymentGateway.cancelPayment(portonePaymentId, reason, null);
         } catch (Exception e) {
             log.error("PG 자동 취소 실패, Paid 웹훅 보상 취소로 재시도 예정(웹훅 미수신 시 수동 처리 필요): portonePaymentId={}",
                     portonePaymentId, e);
+        }
+    }
+
+    // PG에서 결제가 완료된 READY 결제의 처리 방향
+    private enum PaidDecision {
+        APPROVE(null, null, null),
+        AMOUNT_MISMATCH(FailReason.AMOUNT_MISMATCH, "결제 금액 불일치 자동 취소", ErrorCode.PAYMENT_AMOUNT_MISMATCH),
+        EXPIRED(FailReason.TIMEOUT, "결제 가능 시간 초과 자동 취소", ErrorCode.PAYMENT_EXPIRED);
+
+        private final FailReason failReason;
+        private final String cancelReason;
+        private final ErrorCode errorCode;
+
+        PaidDecision(FailReason failReason, String cancelReason, ErrorCode errorCode) {
+            this.failReason = failReason;
+            this.cancelReason = cancelReason;
+            this.errorCode = errorCode;
         }
     }
 }

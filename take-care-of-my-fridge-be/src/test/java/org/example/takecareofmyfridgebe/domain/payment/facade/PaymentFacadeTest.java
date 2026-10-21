@@ -47,6 +47,7 @@ class PaymentFacadeTest {
     private static final Long OTHER_ORDER_ID = 200L;
     private static final String PORTONE_PAYMENT_ID = "payment-1";
     private static final long AMOUNT = 10000L;
+    private static final LocalDateTime EXPIRES_AT = LocalDateTime.of(2026, 10, 20, 10, 10);
 
     @Mock
     private PaymentService paymentService;
@@ -63,14 +64,22 @@ class PaymentFacadeTest {
     private Payment newPayment() {
         Order order = Order.builder().orderNumber("20261019-000001").memberId(MEMBER_ID).totalAmount(AMOUNT).build();
         ReflectionTestUtils.setField(order, "id", ORDER_ID);
-        Payment payment = Payment.builder().order(order).portonePaymentId(PORTONE_PAYMENT_ID).amount(AMOUNT).build();
+        Payment payment = Payment.builder().order(order).portonePaymentId(PORTONE_PAYMENT_ID).amount(AMOUNT)
+                .expiresAt(EXPIRES_AT).build();
         given(paymentService.getWithOrder(PORTONE_PAYMENT_ID)).willReturn(payment);
         return payment;
     }
 
+    // PAID면 만료 1분 전에 결제가 끝난 것으로 둔다
     private void givenPgPayment(String status, long amount) {
+        LocalDateTime paidAt = "PAID".equals(status) ? EXPIRES_AT.minusMinutes(1) : null;
         given(paymentGateway.getPayment(PORTONE_PAYMENT_ID))
-                .willReturn(Optional.of(new PaymentGatewayResponse(PORTONE_PAYMENT_ID, status, amount, 0L)));
+                .willReturn(Optional.of(new PaymentGatewayResponse(PORTONE_PAYMENT_ID, status, amount, 0L, paidAt)));
+    }
+
+    private void givenPgPaidAt(LocalDateTime paidAt) {
+        given(paymentGateway.getPayment(PORTONE_PAYMENT_ID))
+                .willReturn(Optional.of(new PaymentGatewayResponse(PORTONE_PAYMENT_ID, "PAID", AMOUNT, 0L, paidAt)));
     }
 
     private PaymentConfirmResponse confirm(Long memberId) {
@@ -226,7 +235,7 @@ class PaymentFacadeTest {
     void confirm_pgAmountMissing_keepsReady() {
         newPayment();
         given(paymentGateway.getPayment(PORTONE_PAYMENT_ID))
-                .willReturn(Optional.of(new PaymentGatewayResponse(PORTONE_PAYMENT_ID, "PAID", null, 0L)));
+                .willReturn(Optional.of(new PaymentGatewayResponse(PORTONE_PAYMENT_ID, "PAID", null, 0L, EXPIRES_AT.minusMinutes(1))));
 
         assertThatThrownBy(() -> confirm(MEMBER_ID))
                 .isInstanceOf(BusinessException.class)
@@ -287,7 +296,8 @@ class PaymentFacadeTest {
 
     private Payment syncPayment() {
         Order order = Order.builder().orderNumber("20261019-000001").memberId(MEMBER_ID).totalAmount(AMOUNT).build();
-        return Payment.builder().order(order).portonePaymentId(PORTONE_PAYMENT_ID).amount(AMOUNT).build();
+        return Payment.builder().order(order).portonePaymentId(PORTONE_PAYMENT_ID).amount(AMOUNT)
+                .expiresAt(EXPIRES_AT).build();
     }
 
     @Test
@@ -397,5 +407,142 @@ class PaymentFacadeTest {
 
         assertThat(paymentFacade.syncWithPg(payment)).isFalse();
         verifyNoInteractions(paymentCommandService);
+    }
+
+    // 만료 시각 판단
+
+    @Test
+    @DisplayName("confirm: 만료 시각 이후 결제 완료면 TIMEOUT 실패 처리 후 PG를 취소하고 PAYMENT_EXPIRED")
+    void confirm_paidAfterExpiry_failsAndCancels() {
+        newPayment();
+        givenPgPaidAt(EXPIRES_AT.plusSeconds(1));
+        given(paymentCommandService.fail(PORTONE_PAYMENT_ID, FailReason.TIMEOUT)).willReturn(true);
+
+        assertThatThrownBy(() -> confirm(MEMBER_ID))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode").isEqualTo(ErrorCode.PAYMENT_EXPIRED);
+        InOrder inOrder = inOrder(paymentCommandService, paymentGateway);
+        inOrder.verify(paymentCommandService).fail(PORTONE_PAYMENT_ID, FailReason.TIMEOUT);
+        inOrder.verify(paymentGateway).cancelPayment(eq(PORTONE_PAYMENT_ID), anyString(), isNull());
+        verify(paymentCommandService, never()).approve(anyString());
+    }
+
+    @Test
+    @DisplayName("confirm: 만료 시각과 같은 시각에 결제 완료면 기한 내로 보고 승인한다")
+    void confirm_paidAtExpiry_approves() {
+        newPayment();
+        givenPgPaidAt(EXPIRES_AT);
+        given(paymentCommandService.approve(PORTONE_PAYMENT_ID)).willReturn(mock(PaymentConfirmResponse.class));
+
+        confirm(MEMBER_ID);
+
+        verify(paymentCommandService).approve(PORTONE_PAYMENT_ID);
+        verify(paymentCommandService, never()).fail(anyString(), any());
+    }
+
+    @Test
+    @DisplayName("confirm: 만료 후 결제인데 PG 취소가 실패해도 PAYMENT_EXPIRED로 응답한다")
+    void confirm_paidAfterExpiry_pgCancelFails_stillExpired() {
+        newPayment();
+        givenPgPaidAt(EXPIRES_AT.plusMinutes(1));
+        given(paymentCommandService.fail(PORTONE_PAYMENT_ID, FailReason.TIMEOUT)).willReturn(true);
+        willThrow(new IllegalStateException("PG 오류")).given(paymentGateway).cancelPayment(anyString(), anyString(), isNull());
+
+        assertThatThrownBy(() -> confirm(MEMBER_ID))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode").isEqualTo(ErrorCode.PAYMENT_EXPIRED);
+    }
+
+    @Test
+    @DisplayName("confirm: PG 결제 완료 시각이 없으면 상태를 바꾸지 않고 PAYMENT_NOT_PAID")
+    void confirm_pgPaidAtMissing_keepsReady() {
+        newPayment();
+        given(paymentGateway.getPayment(PORTONE_PAYMENT_ID))
+                .willReturn(Optional.of(new PaymentGatewayResponse(PORTONE_PAYMENT_ID, "PAID", AMOUNT, 0L, null)));
+
+        assertThatThrownBy(() -> confirm(MEMBER_ID))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode").isEqualTo(ErrorCode.PAYMENT_NOT_PAID);
+        verifyNoInteractions(paymentCommandService);
+    }
+
+    @Test
+    @DisplayName("웹훅: READY + 만료 시각 이후 결제 완료면 TIMEOUT 실패 처리 후 PG를 취소한다")
+    void sync_paidAfterExpiry_failsAndCancels() {
+        givenPgPaidAt(EXPIRES_AT.plusSeconds(1));
+
+        assertThat(paymentFacade.syncWithPg(syncPayment())).isTrue();
+        InOrder inOrder = inOrder(paymentCommandService, paymentGateway);
+        inOrder.verify(paymentCommandService).fail(PORTONE_PAYMENT_ID, FailReason.TIMEOUT);
+        inOrder.verify(paymentGateway).cancelPayment(eq(PORTONE_PAYMENT_ID), anyString(), isNull());
+        verify(paymentCommandService, never()).approve(anyString());
+    }
+
+    @Test
+    @DisplayName("웹훅: 만료 후 결제의 PG 취소가 실패하면 예외를 던져 재전송으로 다시 시도한다")
+    void sync_paidAfterExpiry_pgCancelFails_throws() {
+        givenPgPaidAt(EXPIRES_AT.plusSeconds(1));
+        willThrow(new IllegalStateException("PG 오류")).given(paymentGateway).cancelPayment(anyString(), anyString(), isNull());
+
+        assertThatThrownBy(() -> paymentFacade.syncWithPg(syncPayment())).isInstanceOf(IllegalStateException.class);
+    }
+
+    // expire (스케줄러)
+
+    @Test
+    @DisplayName("만료: PG에 결제가 없으면 TIMEOUT으로 실패 처리한다")
+    void expire_noPgPayment_timesOut() {
+        given(paymentGateway.getPayment(PORTONE_PAYMENT_ID)).willReturn(Optional.empty());
+
+        paymentFacade.expire(syncPayment());
+
+        verify(paymentCommandService).fail(PORTONE_PAYMENT_ID, FailReason.TIMEOUT);
+        verify(paymentGateway, never()).cancelPayment(anyString(), anyString(), any());
+    }
+
+    @Test
+    @DisplayName("만료: PG 결제가 아직 진행 중이면 TIMEOUT으로 실패 처리한다")
+    void expire_pgInProgress_timesOut() {
+        givenPgPayment("READY", AMOUNT);
+
+        paymentFacade.expire(syncPayment());
+
+        verify(paymentCommandService).fail(PORTONE_PAYMENT_ID, FailReason.TIMEOUT);
+    }
+
+    @Test
+    @DisplayName("만료: PG가 실패로 확정했으면 PG_FAILED로만 실패 처리한다")
+    void expire_pgFailed_failsWithPgFailed() {
+        givenPgPayment("FAILED", AMOUNT);
+        given(paymentCommandService.fail(PORTONE_PAYMENT_ID, FailReason.PG_FAILED)).willReturn(true);
+
+        paymentFacade.expire(syncPayment());
+
+        verify(paymentCommandService).fail(PORTONE_PAYMENT_ID, FailReason.PG_FAILED);
+        verify(paymentCommandService, never()).fail(PORTONE_PAYMENT_ID, FailReason.TIMEOUT);
+    }
+
+    @Test
+    @DisplayName("만료: 만료 시각 전에 PG 결제가 끝났으면 승인한다")
+    void expire_paidBeforeExpiry_approves() {
+        givenPgPaidAt(EXPIRES_AT.minusSeconds(1));
+        given(paymentCommandService.approve(PORTONE_PAYMENT_ID)).willReturn(mock(PaymentConfirmResponse.class));
+
+        paymentFacade.expire(syncPayment());
+
+        verify(paymentCommandService).approve(PORTONE_PAYMENT_ID);
+        verify(paymentCommandService, never()).fail(anyString(), any());
+    }
+
+    @Test
+    @DisplayName("만료: 만료 시각 이후 PG 결제가 끝났으면 TIMEOUT 실패 처리 후 PG를 취소한다")
+    void expire_paidAfterExpiry_failsAndCancels() {
+        givenPgPaidAt(EXPIRES_AT.plusSeconds(1));
+
+        paymentFacade.expire(syncPayment());
+
+        verify(paymentCommandService).fail(PORTONE_PAYMENT_ID, FailReason.TIMEOUT);
+        verify(paymentGateway).cancelPayment(eq(PORTONE_PAYMENT_ID), anyString(), isNull());
+        verify(paymentCommandService, never()).approve(anyString());
     }
 }

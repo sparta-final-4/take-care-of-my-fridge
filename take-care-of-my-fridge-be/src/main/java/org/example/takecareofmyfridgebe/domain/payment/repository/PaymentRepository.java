@@ -2,11 +2,15 @@ package org.example.takecareofmyfridgebe.domain.payment.repository;
 
 import jakarta.persistence.LockModeType;
 import org.example.takecareofmyfridgebe.domain.payment.entity.Payment;
+import org.example.takecareofmyfridgebe.domain.payment.entity.PaymentStatus;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 public interface PaymentRepository extends JpaRepository<Payment, Long> {
@@ -18,4 +22,9 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select p from Payment p join fetch p.order where p.portonePaymentId = :portonePaymentId")
     Optional<Payment> findWithOrderByPortonePaymentIdForUpdate(@Param("portonePaymentId") String portonePaymentId);
+
+    // 만료 시각이 지난 결제를 id 순으로 나눠 읽는다. 처리에 실패해 남은 건이 뒤의 건을 막지 않도록 id 커서를 쓴다
+    @Query("select p from Payment p where p.status = :status and p.expiresAt < :now and p.id > :afterId order by p.id")
+    List<Payment> findExpired(@Param("status") PaymentStatus status, @Param("now") LocalDateTime now,
+                              @Param("afterId") long afterId, Pageable pageable);
 }

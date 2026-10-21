@@ -13,6 +13,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -36,8 +37,11 @@ class PaymentServiceTest {
         Order order = Order.builder().orderNumber("20261019-000001").memberId(1L).totalAmount(15000L).build();
         given(paymentRepository.save(any(Payment.class))).willAnswer(returnsFirstArg());
 
+        LocalDateTime before = LocalDateTime.now();
         Payment payment = paymentService.createPayment(order);
+        LocalDateTime after = LocalDateTime.now();
 
+        assertThat(payment.getExpiresAt()).isBetween(before.plusMinutes(10), after.plusMinutes(10));
         assertThat(payment.getOrder()).isSameAs(order);
         assertThat(payment.getAmount()).isEqualTo(15000L);
         assertThat(payment.getStatus()).isEqualTo(PaymentStatus.READY);

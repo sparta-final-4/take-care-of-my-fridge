@@ -1,10 +1,13 @@
 package org.example.takecareofmyfridgebe.domain.payment.port;
 
+import java.time.LocalDateTime;
+
 public record PaymentGatewayResponse(
         String id,
         String status,
         Long totalAmount,   // PG 응답에 금액이 없으면 null
-        long cancelledAmount // 총 취소 금액. TODO: 환불 도메인에서 사용
+        long cancelledAmount, // 총 취소 금액. TODO: 환불 도메인에서 사용
+        LocalDateTime paidAt // PG가 기록한 결제 완료 시각(서버 시간대). 결제 완료 전이면 null
 ) {
     private static final String STATUS_PAID = "PAID";
     private static final String STATUS_FAILED = "FAILED";
