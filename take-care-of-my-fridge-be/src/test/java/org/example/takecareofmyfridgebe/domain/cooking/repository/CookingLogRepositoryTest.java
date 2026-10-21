@@ -125,9 +125,9 @@ class CookingLogRepositoryTest {
                 .build();
         em.persist(log);
         em.flush();
-        em.createNativeQuery("UPDATE cooking_logs SET created_at = :createdAt WHERE id = :id")
-                .setParameter("createdAt", createdAt)
-                .setParameter("id", log.getId())
+        em.createNativeQuery("UPDATE cooking_logs SET created_at = ?1 WHERE id = ?2")
+                .setParameter(1, createdAt)
+                .setParameter(2, log.getId())
                 .executeUpdate();
         return log;
     }
@@ -141,9 +141,10 @@ class CookingLogRepositoryTest {
                 .build();
         em.persist(review);
         em.flush();
-        em.createNativeQuery("UPDATE recipe_reviews SET created_at = :createdAt, updated_at = :createdAt WHERE id = :id")
-                .setParameter("createdAt", createdAt)
-                .setParameter("id", review.getId())
+        em.createNativeQuery("UPDATE recipe_reviews SET created_at = ?1, updated_at = ?2 WHERE id = ?3")
+                .setParameter(1, createdAt)
+                .setParameter(2, createdAt)
+                .setParameter(3, review.getId())
                 .executeUpdate();
         return review;
     }
