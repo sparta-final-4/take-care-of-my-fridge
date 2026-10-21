@@ -55,7 +55,7 @@ public class CookingLogRepositoryImpl implements CookingLogRepositoryCustom {
                         createdFrom(from),
                         createdUntil(to)
                 )
-                .orderBy(cookingLog.createdAt.desc())
+                .orderBy(cookingLog.createdAt.desc(), cookingLog.id.desc())
                 .offset(pageable.getOffset())
                 .limit(pageable.getPageSize())
                 .fetch();
@@ -84,8 +84,6 @@ public class CookingLogRepositoryImpl implements CookingLogRepositoryCustom {
             throw new IllegalArgumentException("회원 ID는 필수입니다.");
         }
 
-        BooleanExpression reviewFilter = reviewStatusCondition(reviewStatus);
-
         List<MyRecipeResponse> content = queryFactory
                 .select(Projections.constructor(
                         MyRecipeResponse.class,
@@ -95,16 +93,13 @@ public class CookingLogRepositoryImpl implements CookingLogRepositoryCustom {
                         cookingLog.count(),
                         cookingLog.createdAt.max(),
                         new CaseBuilder()
-                                .when(cookingLog.chatSessionId.isNotNull()).then(1L)
-                                .otherwise(0L)
-                                .sum().gt(0L),
-                        Projections.constructor(
-                                MyRecipeReviewResponse.class,
-                                recipeReview.id,
-                                recipeReview.rating,
-                                recipeReview.content,
-                                recipeReview.updatedAt
-                        )
+                                .when(cookingLog.chatSessionId.count().gt(0L))
+                                .then(true)
+                                .otherwise(false),
+                        recipeReview.id,
+                        recipeReview.rating,
+                        recipeReview.content,
+                        recipeReview.updatedAt
                 ))
                 .from(cookingLog)
                 .leftJoin(recipe).on(recipe.id.eq(cookingLog.recipeId))
@@ -114,7 +109,7 @@ public class CookingLogRepositoryImpl implements CookingLogRepositoryCustom {
                 )
                 .where(
                         cookingLog.memberId.eq(memberId),
-                        reviewFilter
+                        reviewStatusCondition(reviewStatus)
                 )
                 .groupBy(
                         cookingLog.recipeId,
@@ -139,7 +134,7 @@ public class CookingLogRepositoryImpl implements CookingLogRepositoryCustom {
                 )
                 .where(
                         cookingLog.memberId.eq(memberId),
-                        reviewFilter
+                        reviewStatusCondition(reviewStatus)
                 );
 
         return PageableExecutionUtils.getPage(content, pageable, countQuery::fetchOne);
