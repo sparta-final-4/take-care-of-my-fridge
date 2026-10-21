@@ -24,7 +24,8 @@ import java.util.Set;
 @Entity
 @Table(name = "members", uniqueConstraints = {
         @UniqueConstraint(name = "uk_members_email", columnNames = "email"),
-        @UniqueConstraint(name = "uk_members_nickname", columnNames = "nickname")
+        @UniqueConstraint(name = "uk_members_nickname", columnNames = "nickname"),
+        @UniqueConstraint(name = "uk_members_phone", columnNames = "phone")
 })
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -47,6 +48,9 @@ public class Member extends BaseTimeEntity {
     @Column(nullable = false, length = 30)
     private String nickname;
 
+    @Column(length = 11)
+    private String phone;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private Role role;
@@ -59,10 +63,11 @@ public class Member extends BaseTimeEntity {
     private List<MemberTaste> tastes = new ArrayList<>();
 
     @Builder
-    private Member(String email, String passwordHash, String nickname, Role role, Set<Taste> tastes) {
+    private Member(String email, String passwordHash, String nickname, String phone, Role role, Set<Taste> tastes) {
         this.email = email;
         this.passwordHash = passwordHash;
         this.nickname = nickname;
+        this.phone = phone;
         this.role = role == null ? Role.USER : role;
         this.status = Status.ACTIVE;
         if (tastes != null) {
