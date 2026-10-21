@@ -35,6 +35,98 @@
         ]
       }
     },
+    "/api/admin/deal-analyses/latest": {
+      "get": {
+        "operationId": "getLatest_1",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseDealAnalysisResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "admin-deal-analysis-controller"
+        ]
+      }
+    },
+    "/api/admin/deal-analyses/{analysisId}": {
+      "get": {
+        "operationId": "getById",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "analysisId",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseDealAnalysisResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "admin-deal-analysis-controller"
+        ]
+      }
+    },
+    "/api/admin/deal-analyses/{analysisId}/reviews": {
+      "put": {
+        "operationId": "saveReviews",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "analysisId",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DealReviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseDealReviewResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "admin-deal-analysis-controller"
+        ]
+      }
+    },
     "/api/admin/forecasts/latest": {
       "get": {
         "operationId": "getLatest",
@@ -1144,6 +1236,37 @@
         ]
       }
     },
+    "/api/recipes/{recipeId}": {
+      "get": {
+        "operationId": "getRecipe",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "recipeId",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseRecipeDetailResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "recipe-controller"
+        ]
+      }
+    },
     "/api/reviews": {
       "get": {
         "operationId": "getReviews",
@@ -1431,6 +1554,34 @@
           }
         }
       },
+      "ApiResponseDealAnalysisResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/DealAnalysisResponse"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorResponse"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ApiResponseDealReviewResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/DealReviewResponse"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorResponse"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
       "ApiResponseEmailAvailabilityResponse": {
         "type": "object",
         "properties": {
@@ -1686,6 +1837,20 @@
           }
         }
       },
+      "ApiResponseRecipeDetailResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/RecipeDetailResponse"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorResponse"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
       "ApiResponseReviewResponse": {
         "type": "object",
         "properties": {
@@ -1836,6 +2001,74 @@
           "to": {
             "type": "string",
             "format": "date"
+          }
+        }
+      },
+      "Candidate": {
+        "type": "object",
+        "properties": {
+          "candidateId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "candidateReason": {
+            "type": "string"
+          },
+          "currentStock": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "discountPrice": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "eventRequestStatus": {
+            "type": "string",
+            "enum": [
+              "NONE",
+              "REQUESTED",
+              "APPROVED",
+              "REJECTED"
+            ]
+          },
+          "expectedIncrease": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "expectedQtyDiscount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "expectedQtyRegular": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "productId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "productName": {
+            "type": "string"
+          },
+          "purchases": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "regularPrice": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "reviewStatus": {
+            "type": "string",
+            "enum": [
+              "UNREVIEWED",
+              "SELECTED",
+              "HELD"
+            ]
+          },
+          "searchClicks": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },
@@ -2116,6 +2349,99 @@
           }
         }
       },
+      "DealAnalysisResponse": {
+        "type": "object",
+        "properties": {
+          "analysisId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "candidates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Candidate"
+            }
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "dataCutoffAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "dayOfWeek": {
+            "type": "string",
+            "enum": [
+              "MON",
+              "TUE",
+              "WED",
+              "THU",
+              "FRI",
+              "SAT",
+              "SUN"
+            ]
+          },
+          "discountRate": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "excluded": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Excluded"
+            }
+          },
+          "lastSavedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "minStock": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "modelVersion": {
+            "type": "string"
+          },
+          "reviewCounts": {
+            "$ref": "#/components/schemas/ReviewCounts"
+          },
+          "syntheticData": {
+            "type": "boolean"
+          },
+          "targetWeekStart": {
+            "type": "string",
+            "format": "date"
+          }
+        }
+      },
+      "DealReviewRequest": {
+        "type": "object",
+        "properties": {
+          "reviews": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Review"
+            },
+            "minItems": 1
+          }
+        },
+        "required": [
+          "reviews"
+        ]
+      },
+      "DealReviewResponse": {
+        "type": "object",
+        "properties": {
+          "lastSavedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "reviewCounts": {
+            "$ref": "#/components/schemas/ReviewCounts"
+          }
+        }
+      },
       "EmailAvailabilityRequest": {
         "type": "object",
         "properties": {
@@ -2145,6 +2471,37 @@
             "type": "string"
           },
           "message": {
+            "type": "string"
+          }
+        }
+      },
+      "Excluded": {
+        "type": "object",
+        "properties": {
+          "avgSalesOnDay": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "candidateId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "currentStock": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "excludeReason": {
+            "type": "string",
+            "enum": [
+              "TOP_SELLER_ON_DAY",
+              "LOW_STOCK"
+            ]
+          },
+          "productId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "productName": {
             "type": "string"
           }
         }
@@ -2500,6 +2857,31 @@
           }
         }
       },
+      "IngredientItem": {
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "groupName": {
+            "type": "string"
+          },
+          "ingredientId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "role": {
+            "type": "string"
+          },
+          "seq": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
       "Item": {
         "type": "object",
         "properties": {
@@ -2810,6 +3192,29 @@
         "properties": {
           "available": {
             "type": "boolean"
+          }
+        }
+      },
+      "Nutrition": {
+        "type": "object",
+        "properties": {
+          "calories": {
+            "type": "number"
+          },
+          "carbsG": {
+            "type": "number"
+          },
+          "fatG": {
+            "type": "number"
+          },
+          "proteinG": {
+            "type": "number"
+          },
+          "sodiumMg": {
+            "type": "number"
+          },
+          "weightG": {
+            "type": "number"
           }
         }
       },
@@ -3365,6 +3770,21 @@
       "ProductListRequest": {
         "type": "object",
         "properties": {
+          "keyword": {
+            "type": "string",
+            "maxLength": 50,
+            "minLength": 0
+          },
+          "maxPrice": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "minPrice": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
           "page": {
             "type": "integer",
             "format": "int32",
@@ -3383,6 +3803,76 @@
               "PRICE_ASC",
               "PRICE_DESC"
             ]
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "INGREDIENT",
+              "MEALKIT"
+            ]
+          }
+        }
+      },
+      "RecipeDetailResponse": {
+        "type": "object",
+        "properties": {
+          "category": {
+            "type": "string"
+          },
+          "cookMethod": {
+            "type": "string"
+          },
+          "cookTimeMin": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "cuisineType": {
+            "type": "string"
+          },
+          "difficulty": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "imageUrl": {
+            "type": "string"
+          },
+          "ingredients": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IngredientItem"
+            }
+          },
+          "name": {
+            "type": "string"
+          },
+          "nutrition": {
+            "$ref": "#/components/schemas/Nutrition"
+          },
+          "recipeId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "servings": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StepItem"
+            }
+          },
+          "summary": {
+            "type": "string"
+          },
+          "tags": {
+            "type": "string"
+          },
+          "tip": {
+            "type": "string"
+          },
+          "tipSummary": {
+            "type": "string"
           }
         }
       },
@@ -3464,6 +3954,44 @@
         "required": [
           "cartItemIds"
         ]
+      },
+      "Review": {
+        "type": "object",
+        "properties": {
+          "candidateId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "reviewStatus": {
+            "type": "string",
+            "enum": [
+              "UNREVIEWED",
+              "SELECTED",
+              "HELD"
+            ]
+          }
+        },
+        "required": [
+          "candidateId",
+          "reviewStatus"
+        ]
+      },
+      "ReviewCounts": {
+        "type": "object",
+        "properties": {
+          "held": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "selected": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "unreviewed": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
       },
       "ReviewCreateRequest": {
         "type": "object",
@@ -3621,6 +4149,24 @@
           "memberId": {
             "type": "integer",
             "format": "int64"
+          }
+        }
+      },
+      "StepItem": {
+        "type": "object",
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "imageUrl": {
+            "type": "string"
+          },
+          "stepNo": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "tip": {
+            "type": "string"
           }
         }
       },

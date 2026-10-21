@@ -16,9 +16,13 @@
 
 
 export interface ProductListRequest {
+    'keyword'?: string;
+    'maxPrice'?: number;
+    'minPrice'?: number;
     'page'?: number;
     'size'?: number;
     'sort'?: ProductListRequestSortEnum;
+    'type'?: ProductListRequestTypeEnum;
 }
 
 export const ProductListRequestSortEnum = {
@@ -28,5 +32,11 @@ export const ProductListRequestSortEnum = {
 } as const;
 
 export type ProductListRequestSortEnum = typeof ProductListRequestSortEnum[keyof typeof ProductListRequestSortEnum];
+export const ProductListRequestTypeEnum = {
+    Ingredient: 'INGREDIENT',
+    Mealkit: 'MEALKIT',
+} as const;
+
+export type ProductListRequestTypeEnum = typeof ProductListRequestTypeEnum[keyof typeof ProductListRequestTypeEnum];
 
 
