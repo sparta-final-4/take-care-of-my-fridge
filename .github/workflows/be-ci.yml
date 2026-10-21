@@ -25,23 +25,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
-    # @SpringBootTest(컨텍스트 로딩 테스트)가 실제 DB에 연결한다. 값은 application.yml의 datasource와 같다.
-    services:
-      mysql:
-        image: mysql:8.4
-        env:
-          MYSQL_DATABASE: fridge_db
-          MYSQL_USER: fridge_user
-          MYSQL_PASSWORD: '12345678'
-          MYSQL_ROOT_PASSWORD: '12345678'
-        ports:
-          - 3306:3306
-        options: >-
-          --health-cmd="mysqladmin ping -h 127.0.0.1 --silent"
-          --health-interval=5s
-          --health-timeout=5s
-          --health-retries=20
-
+    # DB가 필요한 테스트는 MySqlContainerSupport가 띄우는 MySQL 컨테이너 하나를 함께 쓴다(별도 services 불필요).
     steps:
       - uses: actions/checkout@v7
 

@@ -15,6 +15,7 @@ import org.example.takecareofmyfridgebe.global.config.JpaAuditingConfig;
 import org.example.takecareofmyfridgebe.global.config.QueryDslConfig;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
+import org.example.takecareofmyfridgebe.support.MySqlContainerSupport;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -22,13 +23,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.context.annotation.Import;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.mysql.MySQLContainer;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -48,16 +45,11 @@ import static org.assertj.core.api.Assertions.assertThat;
  * 같은 냉장고 재료에 사용·삭제 요청이 동시에 들어올 때 행 잠금으로 순서대로 처리되는지 실제 MySQL로 검증한다.
  * 테스트 자체 트랜잭션을 끄고(NOT_SUPPORTED) 각 스레드가 서비스의 트랜잭션 경계로 따로 커밋하게 한다.
  */
-@Testcontainers
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({JpaAuditingConfig.class, QueryDslConfig.class, FridgeService.class, IngredientService.class})
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
-class FridgeServiceConcurrencyTest {
-
-    @Container
-    @ServiceConnection
-    static MySQLContainer mysql = new MySQLContainer("mysql:8.4");
+class FridgeServiceConcurrencyTest extends MySqlContainerSupport {
 
     private static final Long MEMBER_ID = 7L;
 
