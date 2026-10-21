@@ -56,6 +56,10 @@ export const router = createBrowserRouter([
         children: [
           { path: ROUTES.adminMembers, lazy: page(() => import('@/pages/admin/AdminMembersPage')) },
           { path: ROUTES.adminAudit, lazy: page(() => import('@/pages/admin/AdminAuditPage')) },
+          {
+            path: ROUTES.adminForecast,
+            lazy: page(() => import('@/pages/admin/AdminForecastPage')),
+          },
         ],
       },
     ],

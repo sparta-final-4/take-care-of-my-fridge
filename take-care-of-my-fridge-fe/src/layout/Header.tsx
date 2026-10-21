@@ -107,6 +107,9 @@ export function Header() {
               <Button type="text" onClick={() => navigate(ROUTES.adminAudit)}>
                 작업 이력
               </Button>
+              <Button type="text" onClick={() => navigate(ROUTES.adminForecast)}>
+                판매 예측
+              </Button>
             </>
           )}
           {screens.lg && status === 'authenticated' && (
@@ -185,6 +188,18 @@ export function Header() {
                 }}
               >
                 작업 이력
+              </Button>
+            )}
+            {role === 'ADMIN' && (
+              <Button
+                type="text"
+                block
+                onClick={() => {
+                  handleCloseDrawer();
+                  navigate(ROUTES.adminForecast);
+                }}
+              >
+                판매 예측
               </Button>
             )}
             {status === 'authenticated' && (

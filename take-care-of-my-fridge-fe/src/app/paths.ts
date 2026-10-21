@@ -14,4 +14,5 @@ export const ROUTES = {
   cart: '/cart',
   adminMembers: '/admin/members',
   adminAudit: '/admin/audit',
+  adminForecast: '/admin/forecast',
 } as const;
