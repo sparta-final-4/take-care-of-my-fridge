@@ -45,6 +45,7 @@
 - `OrderCreateService`: 같은 멱등 키 재요청에서 주문 상품을 읽는 부분을 `OrderReader.getOrderItems`로 바꿨다.
 - `OrderDetailResponse`를 `OrderCheckoutResponse`로 이름만 바꿨다. JSON 모양은 그대로다. 주문 상세 응답은 주문 상세 기능을 만들 때 따로 둔다.
 - `OrderRepository.findByIdAndMemberId` 추가.
+- 프론트 생성 클라이언트를 다시 생성했다. 주문 API가 스펙에 없던 상태였다. `clients.ts`에 `orderApi`를 추가했다.
 
 ### 테스트
 

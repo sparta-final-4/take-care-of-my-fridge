@@ -19,6 +19,7 @@ export interface CartItemResponse {
     'cartItemId'?: number;
     'discountRate'?: number;
     'flashDropRemaining'?: number;
+    'imageUrl'?: string;
     'listPrice'?: number;
     'productId'?: number;
     'productName'?: string;
