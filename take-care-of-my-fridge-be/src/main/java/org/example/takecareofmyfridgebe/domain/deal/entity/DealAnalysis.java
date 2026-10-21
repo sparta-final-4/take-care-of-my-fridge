@@ -57,13 +57,16 @@ public class DealAnalysis extends BaseTimeEntity {
     @Column(name = "data_cutoff_at", nullable = false)
     private LocalDateTime dataCutoffAt;
 
+    @Column(name = "synthetic_data", nullable = false)
+    private boolean syntheticData;
+
     @Column(name = "last_saved_at")
     private LocalDateTime lastSavedAt;
 
     @Builder
     private DealAnalysis(Member member, LocalDate targetWeekStart, Day dayOfWeek,
                          int discountRate, int minStock, String modelVersion,
-                         LocalDateTime dataCutoffAt) {
+                         LocalDateTime dataCutoffAt, boolean syntheticData) {
         this.member = member;
         this.targetWeekStart = targetWeekStart;
         this.dayOfWeek = dayOfWeek;
@@ -71,6 +74,7 @@ public class DealAnalysis extends BaseTimeEntity {
         this.minStock = minStock;
         this.modelVersion = modelVersion;
         this.dataCutoffAt = dataCutoffAt;
+        this.syntheticData = syntheticData;
     }
 
     public void markReviewsSaved(LocalDateTime savedAt) {

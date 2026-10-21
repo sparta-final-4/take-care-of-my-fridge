@@ -11,10 +11,15 @@ import {
   Tag,
   Typography,
 } from 'antd';
+import dayjs from 'dayjs';
 import { useState } from 'react';
+import { useSearchParams } from 'react-router';
 
 import { type AuditLogResponse, type AuditLogSearchRequest } from '@/domains/admin/api';
+import { getErrorMessage } from '@/common/api/errors';
+import { ACTION_LABELS, RESULT_LABELS } from '@/domains/admin/labels';
 import { adminQueries } from '@/domains/admin/queries';
+import { ROLE_LABELS } from '@/domains/member/labels';
 
 import styles from './AdminAuditPage.module.scss';
 
@@ -28,13 +33,41 @@ const actions: AuditLogResponse['action'][] = [
   'ROLE_CHANGE',
 ];
 
+const results: AuditLogResponse['result'][] = ['SUCCESS', 'FAILED', 'DENIED'];
+
 type Filters = Omit<AuditLogSearchRequest, 'page' | 'size'>;
 
+function pick<T extends string>(value: string | null, allowed: T[]) {
+  return allowed.find((item) => item === value);
+}
+
+function readFilters(params: URLSearchParams): Filters {
+  return {
+    from: params.get('from') ?? undefined,
+    to: params.get('to') ?? undefined,
+    action: pick(params.get('action'), actions),
+    result: pick(params.get('result'), results),
+    targetType: params.get('targetType') ?? undefined,
+    targetId: Number(params.get('targetId')) || undefined,
+  };
+}
+
 export default function AdminAuditPage() {
-  const [filters, setFilters] = useState<Filters>({});
-  const [applied, setApplied] = useState<Filters>({});
-  const [page, setPage] = useState(1);
-  const { data, isPending, isError, refetch } = useQuery(
+  const [searchParams, setSearchParams] = useSearchParams();
+  const applied = readFilters(searchParams);
+  const page = Math.max(1, Number(searchParams.get('page')) || 1);
+  // 조회 버튼을 누르기 전까지 입력 중인 조건은 화면 상태로 둔다.
+  const [filters, setFilters] = useState<Filters>(applied);
+
+  const search = (next: Filters, nextPage = 1) => {
+    const params = new URLSearchParams();
+    Object.entries(next).forEach(([key, value]) => {
+      if (value !== undefined && value !== '') params.set(key, String(value));
+    });
+    if (nextPage > 1) params.set('page', String(nextPage));
+    setSearchParams(params);
+  };
+  const { data, isPending, isError, error, refetch } = useQuery(
     adminQueries.auditLogs({ ...applied, page, size: PAGE_SIZE }),
   );
 
@@ -45,6 +78,7 @@ export default function AdminAuditPage() {
         <DatePicker
           aria-label="시작일"
           placeholder="시작일"
+          value={filters.from ? dayjs(filters.from) : null}
           onChange={(value) =>
             setFilters((previous) => ({ ...previous, from: value?.format('YYYY-MM-DD') }))
           }
@@ -52,6 +86,7 @@ export default function AdminAuditPage() {
         <DatePicker
           aria-label="종료일"
           placeholder="종료일"
+          value={filters.to ? dayjs(filters.to) : null}
           onChange={(value) =>
             setFilters((previous) => ({ ...previous, to: value?.format('YYYY-MM-DD') }))
           }
@@ -61,7 +96,8 @@ export default function AdminAuditPage() {
           placeholder="전체 작업"
           allowClear
           className={styles.select}
-          options={actions.map((action) => ({ value: action, label: action }))}
+          value={filters.action}
+          options={actions.map((action) => ({ value: action, label: ACTION_LABELS[action] }))}
           onChange={(action) => setFilters((previous) => ({ ...previous, action }))}
         />
         <Select
@@ -69,11 +105,8 @@ export default function AdminAuditPage() {
           placeholder="전체 결과"
           allowClear
           className={styles.select}
-          options={[
-            { value: 'SUCCESS', label: '성공' },
-            { value: 'FAILED', label: '실패' },
-            { value: 'DENIED', label: '권한 거부' },
-          ]}
+          value={filters.result}
+          options={results.map((result) => ({ value: result, label: RESULT_LABELS[result] }))}
           onChange={(result) => setFilters((previous) => ({ ...previous, result }))}
         />
         <Input
@@ -95,20 +128,18 @@ export default function AdminAuditPage() {
             setFilters((previous) => ({ ...previous, targetId: value ?? undefined }))
           }
         />
-        <Button
-          type="primary"
-          onClick={() => {
-            setApplied({ ...filters });
-            setPage(1);
-          }}
-        >
+        <Button type="primary" onClick={() => search(filters)}>
           조회
         </Button>
       </Space>
+      <Typography.Paragraph type="secondary">
+        기간을 비우면 최근 7일의 이력을 조회합니다.
+      </Typography.Paragraph>
       {isError ? (
         <Result
           status="error"
           title="작업 이력을 불러오지 못했습니다"
+          subTitle={getErrorMessage(error)}
           extra={<Button onClick={() => void refetch()}>다시 시도</Button>}
         />
       ) : (
@@ -116,14 +147,14 @@ export default function AdminAuditPage() {
           rowKey="auditLogId"
           loading={isPending}
           dataSource={data?.content}
-          scroll={{ x: 900 }}
+          scroll={{ x: 'max-content' }}
           locale={{ emptyText: '조건에 맞는 작업 이력이 없습니다.' }}
           pagination={{
             current: page,
             pageSize: PAGE_SIZE,
             total: data?.totalElements,
             showSizeChanger: false,
-            onChange: setPage,
+            onChange: (next) => search(applied, next),
           }}
           expandable={{
             expandedRowRender: (record) => (
@@ -145,11 +176,21 @@ export default function AdminAuditPage() {
               title: '시각',
               dataIndex: 'createdAt',
               key: 'createdAt',
-              render: (value: string) => value.replace('T', ' '),
+              render: (value: string) => dayjs(value).format('YYYY-MM-DD HH:mm'),
             },
             { title: '작업자', dataIndex: 'actorEmail', key: 'actorEmail' },
-            { title: '역할', dataIndex: 'actorRole', key: 'actorRole' },
-            { title: '작업', dataIndex: 'action', key: 'action' },
+            {
+              title: '역할',
+              dataIndex: 'actorRole',
+              key: 'actorRole',
+              render: (value: AuditLogResponse['actorRole']) => ROLE_LABELS[value],
+            },
+            {
+              title: '작업',
+              dataIndex: 'action',
+              key: 'action',
+              render: (value: AuditLogResponse['action']) => ACTION_LABELS[value],
+            },
             {
               title: '대상',
               key: 'target',
@@ -161,7 +202,7 @@ export default function AdminAuditPage() {
               key: 'result',
               render: (value: AuditLogResponse['result']) => (
                 <Tag color={value === 'SUCCESS' ? 'green' : value === 'FAILED' ? 'orange' : 'red'}>
-                  {value}
+                  {RESULT_LABELS[value]}
                 </Tag>
               ),
             },

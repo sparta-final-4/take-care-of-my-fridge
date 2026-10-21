@@ -16,4 +16,6 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select o from Order o where o.id = :id")
     Optional<Order> findByIdForUpdate(@Param("id") Long id);
+    // 내 주문만 찾는다. 남의 주문이거나 없는 번호면 비어 있다.
+    Optional<Order> findByIdAndMemberId(Long id, Long memberId);
 }

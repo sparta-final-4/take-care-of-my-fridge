@@ -16,6 +16,7 @@ import {
   Tabs,
   Tag,
   Typography,
+  theme,
 } from 'antd';
 import dayjs from 'dayjs';
 import { useSearchParams } from 'react-router';
@@ -29,11 +30,23 @@ import styles from './AdminForecastPage.module.scss';
 const numberOrDash = (value: number | null) => value?.toLocaleString('ko-KR') ?? '-';
 const dateTime = (value: string | null) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm') : '-');
 
+// URL에 직접 넣은 값은 월요일 날짜(YYYY-MM-DD)일 때만 쓰고, 나머지는 최신 주로 본다.
+function toWeekStart(value: string | null) {
+  if (!value) return undefined;
+  const date = dayjs(value);
+  return date.isValid() && date.format('YYYY-MM-DD') === value && date.day() === 1
+    ? value
+    : undefined;
+}
+
 export default function AdminForecastPage() {
+  const { token } = theme.useToken();
   const [searchParams, setSearchParams] = useSearchParams();
-  const weekStart = searchParams.get('weekStart') ?? undefined;
+  const weekStart = toWeekStart(searchParams.get('weekStart'));
   const activeTab = searchParams.get('tab') === 'result' ? 'result' : 'forecast';
-  const { data, error, isPending, isError, refetch } = useQuery(forecastQueries.detail(weekStart));
+  const { data, error, isPending, isError, isPlaceholderData, refetch } = useQuery(
+    forecastQueries.detail(weekStart),
+  );
 
   const updateParams = (key: 'weekStart' | 'tab', value?: string) => {
     const next = new URLSearchParams(searchParams);
@@ -55,13 +68,13 @@ export default function AdminForecastPage() {
         />
         <Button onClick={() => updateParams('weekStart')}>최신 주</Button>
         <Button
-          disabled={!data?.previousWeekStart}
+          disabled={isPlaceholderData || !data?.previousWeekStart}
           onClick={() => updateParams('weekStart', data?.previousWeekStart ?? undefined)}
         >
           이전 주
         </Button>
         <Button
-          disabled={!data?.nextWeekStart}
+          disabled={isPlaceholderData || !data?.nextWeekStart}
           onClick={() => updateParams('weekStart', data?.nextWeekStart ?? undefined)}
         >
           다음 주
@@ -83,7 +96,7 @@ export default function AdminForecastPage() {
           />
         )
       ) : (
-        <>
+        <Spin spinning={isPlaceholderData} tip="판매 예측을 불러오고 있습니다">
           <Typography.Title level={4}>
             {data.weekStart} ~ {data.weekEnd}
           </Typography.Title>
@@ -120,7 +133,7 @@ export default function AdminForecastPage() {
               pagination={false}
               dataSource={data.items.filter((item) => item.predictedRank !== null)}
               locale={{ emptyText: '예상 상품이 없습니다.' }}
-              scroll={{ x: 560 }}
+              scroll={{ x: 'max-content' }}
               columns={[
                 { title: '예상 순위', dataIndex: 'predictedRank', key: 'predictedRank' },
                 { title: '상품', dataIndex: 'productName', key: 'productName' },
@@ -142,7 +155,7 @@ export default function AdminForecastPage() {
             <Empty description="실제 판매량이 확정되면 비교 결과를 볼 수 있습니다." />
           ) : (
             <>
-              <Row gutter={[12, 12]} className={styles.summary}>
+              <Row gutter={[token.marginSM, token.marginSM]} className={styles.summary}>
                 <Col xs={12} md={8} lg={4}>
                   <Card size="small">
                     <Statistic
@@ -198,7 +211,7 @@ export default function AdminForecastPage() {
                 rowKey="productId"
                 pagination={false}
                 dataSource={data.items}
-                scroll={{ x: 1000 }}
+                scroll={{ x: 'max-content' }}
                 locale={{ emptyText: '비교할 상품이 없습니다.' }}
                 columns={[
                   {
@@ -264,7 +277,7 @@ export default function AdminForecastPage() {
               />
             </>
           )}
-        </>
+        </Spin>
       )}
     </section>
   );

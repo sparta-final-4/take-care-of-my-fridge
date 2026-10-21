@@ -9,6 +9,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -20,10 +21,11 @@ import java.util.stream.IntStream;
 import org.example.takecareofmyfridgebe.domain.auth.service.AuthSessionService;
 import org.example.takecareofmyfridgebe.domain.auth.service.JwtTokenService;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
+import org.example.takecareofmyfridgebe.domain.order.dto.OrderCheckoutResponse;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderCreateResult;
-import org.example.takecareofmyfridgebe.domain.order.dto.OrderDetailResponse;
 import org.example.takecareofmyfridgebe.domain.order.entity.OrderStatus;
 import org.example.takecareofmyfridgebe.domain.order.service.OrderCreateService;
+import org.example.takecareofmyfridgebe.domain.order.service.OrderQueryService;
 import org.example.takecareofmyfridgebe.global.config.SecurityConfig;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
@@ -49,16 +51,41 @@ class OrderControllerTest {
 
     private final MockMvc mvc;
     private final OrderCreateService orderCreateService;
+    private final OrderQueryService orderQueryService;
 
     @Autowired
-    OrderControllerTest(MockMvc mvc, OrderCreateService orderCreateService) {
+    OrderControllerTest(MockMvc mvc, OrderCreateService orderCreateService, OrderQueryService orderQueryService) {
         this.mvc = mvc;
         this.orderCreateService = orderCreateService;
+        this.orderQueryService = orderQueryService;
     }
 
     @BeforeEach
     void resetMock() {
-        reset(orderCreateService);
+        reset(orderCreateService, orderQueryService);
+    }
+
+    @Test
+    @DisplayName("주문 확인 조회는 로그인한 회원 번호와 주문 번호로 서비스를 부르고 200이다")
+    void getCheckout_returns200() throws Exception {
+        when(orderQueryService.getCheckout(7L, 5001L)).thenReturn(response());
+
+        mvc.perform(get("/api/orders/5001/checkout")
+                        .with(loginAsMember7()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.orderId").value(5001))
+                .andExpect(jsonPath("$.data.status").value("PENDING"));
+    }
+
+    @Test
+    @DisplayName("남의 주문이거나 없는 주문이면 404다")
+    void getCheckout_notOwned_returns404() throws Exception {
+        when(orderQueryService.getCheckout(7L, 5001L)).thenThrow(new BusinessException(ErrorCode.ORDER_NOT_FOUND));
+
+        mvc.perform(get("/api/orders/5001/checkout")
+                        .with(loginAsMember7()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error.code").value("ORDER_001"));
     }
 
     @Test
@@ -138,8 +165,8 @@ class OrderControllerTest {
         verifyNoInteractions(orderCreateService);
     }
 
-    private OrderDetailResponse response() {
-        return new OrderDetailResponse(5001L, "20261020143005123001", OrderStatus.PENDING,
+    private OrderCheckoutResponse response() {
+        return new OrderCheckoutResponse(5001L, "20261020143005123001", OrderStatus.PENDING,
                 LocalDateTime.of(2026, 10, 20, 14, 30), 3000L, 0L, 3000L, List.of());
     }
 
@@ -155,6 +182,11 @@ class OrderControllerTest {
         @Bean
         OrderCreateService orderCreateService() {
             return mock(OrderCreateService.class);
+        }
+
+        @Bean
+        OrderQueryService orderQueryService() {
+            return mock(OrderQueryService.class);
         }
 
         @Bean

@@ -92,6 +92,7 @@
 | min_stock | INT | 불가 | 50 | | 최소 재고 기준(개) |
 | model_version | VARCHAR(50) | 불가 | | | 분석 모델 버전 |
 | data_cutoff_at | DATETIME(6) | 불가 | | | 입력 데이터 기준 시각 |
+| synthetic_data | BOOLEAN | 불가 | FALSE | | 가상 데이터 사용 여부 |
 | last_saved_at | DATETIME(6) | 허용 | NULL | | 검토 결과 마지막 저장일시 |
 | created_at | DATETIME(6) | 불가 | 현재 시각 | | 분석일시 |
 

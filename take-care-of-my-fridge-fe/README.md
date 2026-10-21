@@ -15,12 +15,12 @@ cp .env.example .env
 pnpm dev
 ```
 
-| 환경               | `VITE_API_BASE_URL`          | 파일              |
-| ------------------ | ---------------------------- | ----------------- |
-| 로컬(`pnpm dev`)   | (빈 값)                      | `.env`            |
-| 운영(`pnpm build`) | `https://api.imhungry.click` | `.env.production` |
+| 환경               | `VITE_API_BASE_URL` | 파일              |
+| ------------------ | ------------------- | ----------------- |
+| 로컬(`pnpm dev`)   | (빈 값)             | `.env`            |
+| 운영(`pnpm build`) | (빈 값)             | `.env.production` |
 
-로컬에서는 Vite proxy가 `/api` 요청을 `VITE_PROXY_TARGET`(기본 `http://localhost:8080`)으로 넘깁니다. 운영은 브라우저가 API 서버를 직접 호출하므로 백엔드 CORS에서 프론트 도메인과 credentials를 허용해야 합니다.
+로컬에서는 Vite proxy가 `/api` 요청을 `VITE_PROXY_TARGET`(기본 `http://localhost:8080`)으로, 운영에서는 CloudFront가 백엔드로 넘깁니다(dev.imhungry.click → api-dev, imhungry.click → api). 브라우저 입장에서 항상 같은 출처라 CORS 설정이 필요 없고, CSRF 쿠키도 axios가 자동으로 헤더에 붙입니다.
 
 ## 새 페이지 추가
 
@@ -82,14 +82,21 @@ navigate(generatePath(ROUTES.recipeDetail, { recipeId: String(id) }));
 
 ## API 클라이언트 생성
 
-`@openapitools/openapi-generator-cli`(typescript-axios)로 `src/common/api/generated/`에 생성합니다. 생성 결과는 커밋하지 않고 직접 수정하지 않습니다.
+`@openapitools/openapi-generator-cli`(typescript-axios)로 `src/common/api/generated/`에 생성합니다. 생성 결과는 스펙(`openapi/fridge-api.json`)과 함께 커밋하고 직접 수정하지 않습니다. 둘 다 dev 백엔드 코드와 같아야 합니다.
 
-| 명령                        | 동작                                                                                        |
-| --------------------------- | ------------------------------------------------------------------------------------------- |
-| `pnpm oag:generate`         | 실행 중인 백엔드(`OPENAPI_SPEC_URL`)에서 스펙을 받아 `openapi/fridge-api.json` 갱신 후 생성 |
-| `pnpm oag:generate:offline` | 커밋된 `openapi/fridge-api.json`으로만 생성(CI용)                                           |
+| 명령                        | 동작                                                                | 누가                     |
+| --------------------------- | ------------------------------------------------------------------- | ------------------------ |
+| `pnpm oag:generate`         | 실행 중인 백엔드(`OPENAPI_SPEC_URL`)에서 스펙을 받아 갱신한 뒤 생성 | 백엔드 API를 바꾼 사람   |
+| `pnpm oag:generate:offline` | 커밋된 스펙으로 generated만 다시 생성                               | 충돌 해결·실험 되돌릴 때 |
 
-API 변경 시 `openapi/fridge-api.json`을 함께 커밋합니다.
+### 협업 절차
+
+- **API를 바꿀 때**: 최신 dev를 머지한 상태에서 백엔드를 띄우고 `pnpm oag:generate`를 실행한 뒤, 백엔드 코드·`openapi/`·`src/common/api/generated/`를 같은 PR에 커밋합니다.
+- **API를 쓰기만 할 때**: dev를 머지하면 끝입니다. 생성할 필요가 없습니다.
+- **커밋 전 실험**: 로컬 백엔드로 `pnpm oag:generate`를 실행해 붙여 봐도 됩니다. 버릴 때는 `git checkout -- openapi` 후 `pnpm oag:generate:offline`으로 되돌립니다.
+- **충돌**: 스펙·generated를 손으로 고치지 않습니다. 백엔드 충돌을 해결하고 `pnpm oag:generate`로 다시 만들어 커밋합니다. 스펙은 깔끔히 합쳐졌고 generated만 충돌했다면 `pnpm oag:generate:offline`이면 됩니다.
+
+스펙 키는 백엔드 `springdoc.writer-with-order-by-keys`로 이름순 정렬돼, 서로 다른 API를 추가한 PR은 대부분 git이 자동으로 합칩니다. 커밋된 스펙·generated가 백엔드와 다르면 `openapi-drift.yml`이 PR에 빨간 X로 경고합니다. 필수 체크가 아니라 머지를 막지는 않으니, 뜨면 oag를 최신 백엔드로 돌렸는지 확인하세요.
 
 `VITE_API_BASE_URL`은 서버 주소만 갖고, `/api` prefix는 백엔드 경로(스펙)에 들어 있습니다. 생성된 API 클래스는 `basePath`와 `axiosInstance`를 넘겨 만듭니다. 로컬은 `VITE_API_BASE_URL`이 빈 값이라, `basePath`를 넘기지 않으면 생성 코드가 `http://localhost`로 요청합니다.
 

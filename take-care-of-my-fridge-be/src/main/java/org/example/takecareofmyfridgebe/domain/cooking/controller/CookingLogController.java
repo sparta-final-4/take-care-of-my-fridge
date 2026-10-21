@@ -7,6 +7,7 @@ import org.example.takecareofmyfridgebe.domain.cooking.dto.CookingCompleteReques
 import org.example.takecareofmyfridgebe.domain.cooking.dto.CookingCompleteResponse;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.CookingLogResponse;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.CookingLogSearchRequest;
+import org.example.takecareofmyfridgebe.domain.cooking.dto.CookingLogUpdateRequest;
 import org.example.takecareofmyfridgebe.domain.cooking.facade.CookingFacade;
 import org.example.takecareofmyfridgebe.domain.cooking.service.CookingService;
 import org.example.takecareofmyfridgebe.global.response.ApiResponse;
@@ -15,6 +16,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -57,6 +60,25 @@ public class CookingLogController {
             @Valid @RequestBody CookingCompleteRequest request
     ) {
         CookingCompleteResponse response = cookingFacade.completeCooking(principal.memberId(), request);
+        return ResponseEntity.ok(ApiResponse.ok(response));
+    }
+
+    /**
+     * 요리 기록의 결과와 메모를 수정한다.
+     * 본인의 기록만 수정할 수 있으며, 다른 회원의 기록이거나 존재하지 않으면 404를 반환한다.
+     *
+     * @param principal    인증된 요청자의 회원 정보
+     * @param cookingLogId 수정할 요리 기록 ID
+     * @param request      수정 정보 (result, memo)
+     * @return 수정된 요리 기록 응답
+     */
+    @PatchMapping("/{cookingLogId}")
+    public ResponseEntity<ApiResponse<CookingLogResponse>> updateCookingLog(
+            @AuthenticationPrincipal AuthPrincipal principal,
+            @PathVariable Long cookingLogId,
+            @Valid @RequestBody CookingLogUpdateRequest request
+    ) {
+        CookingLogResponse response = cookingService.updateCookingLog(principal.memberId(), cookingLogId, request);
         return ResponseEntity.ok(ApiResponse.ok(response));
     }
 }

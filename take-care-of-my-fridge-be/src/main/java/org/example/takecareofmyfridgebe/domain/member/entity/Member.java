@@ -12,6 +12,7 @@ import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.example.takecareofmyfridgebe.global.entity.BaseTimeEntity;
@@ -57,30 +58,23 @@ public class Member extends BaseTimeEntity {
     @OneToMany(mappedBy = "member", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<MemberTaste> tastes = new ArrayList<>();
 
-    private Member(String email, String passwordHash, String nickname, Set<Taste> tastes) {
+    @Builder
+    private Member(String email, String passwordHash, String nickname, Role role, Set<Taste> tastes) {
         this.email = email;
         this.passwordHash = passwordHash;
         this.nickname = nickname;
-        this.role = Role.USER;
+        this.role = role == null ? Role.USER : role;
         this.status = Status.ACTIVE;
-        tastes.forEach(taste -> this.tastes.add(MemberTaste.create(this, taste)));
-    }
-
-    public static Member create(String email, String passwordHash, String nickname, Set<Taste> tastes) {
-        return new Member(email, passwordHash, nickname, tastes);
-    }
-
-    public static Member createInitialAdmin(String email, String passwordHash, String nickname) {
-        Member member = new Member(email, passwordHash, nickname, Set.of());
-        member.role = Role.ADMIN;
-        return member;
+        if (tastes != null) {
+            tastes.forEach(taste -> this.tastes.add(MemberTaste.builder().member(this).taste(taste).build()));
+        }
     }
 
     public void replaceTastes(Set<Taste> newTastes) {
         tastes.removeIf(existing -> !newTastes.contains(existing.getTaste()));
         for (Taste taste : newTastes) {
             if (tastes.stream().noneMatch(existing -> existing.getTaste() == taste)) {
-                tastes.add(MemberTaste.create(this, taste));
+                tastes.add(MemberTaste.builder().member(this).taste(taste).build());
             }
         }
     }

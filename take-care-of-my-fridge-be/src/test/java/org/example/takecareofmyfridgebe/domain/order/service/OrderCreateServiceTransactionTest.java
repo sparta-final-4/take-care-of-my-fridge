@@ -21,9 +21,9 @@ import org.example.takecareofmyfridgebe.domain.cart.entity.CartItem;
 import org.example.takecareofmyfridgebe.domain.cart.repository.CartItemRepository;
 import org.example.takecareofmyfridgebe.domain.cart.repository.CartRepository;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.StorageType;
+import org.example.takecareofmyfridgebe.domain.order.dto.OrderCheckoutResponse;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderCreateRequest;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderCreateResult;
-import org.example.takecareofmyfridgebe.domain.order.dto.OrderDetailResponse;
 import org.example.takecareofmyfridgebe.domain.order.entity.Order;
 import org.example.takecareofmyfridgebe.domain.order.entity.OrderItem;
 import org.example.takecareofmyfridgebe.domain.order.entity.OrderStatus;
@@ -57,7 +57,7 @@ import org.testcontainers.mysql.MySQLContainer;
 @Testcontainers
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({JpaAuditingConfig.class, QueryDslConfig.class, OrderCreateService.class, OrderNumberGenerator.class})
+@Import({JpaAuditingConfig.class, QueryDslConfig.class, OrderCreateService.class, OrderNumberGenerator.class, OrderReader.class})
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class OrderCreateServiceTransactionTest {
 
@@ -106,7 +106,7 @@ class OrderCreateServiceTransactionTest {
         CartItem item1 = saveCartItem(cart, greenOnion, 2);
         CartItem item2 = saveCartItem(cart, tofu, 1);
 
-        OrderDetailResponse response = order(1L, request(item1, item2));
+        OrderCheckoutResponse response = order(1L, request(item1, item2));
 
         assertThat(stockOf(greenOnion)).isEqualTo(8);
         assertThat(stockOf(tofu)).isEqualTo(4);
@@ -380,7 +380,7 @@ class OrderCreateServiceTransactionTest {
     }
 
     // 클릭마다 새 멱등 키를 만드는 프론트처럼 매번 다른 키로 주문한다
-    private OrderDetailResponse order(Long memberId, OrderCreateRequest request) {
+    private OrderCheckoutResponse order(Long memberId, OrderCreateRequest request) {
         return orderCreateService.createOrder(memberId, UUID.randomUUID().toString(), request).response();
     }
 

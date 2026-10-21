@@ -90,6 +90,7 @@ CREATE TABLE deal_analyses (
     min_stock         INT         NOT NULL DEFAULT 50 COMMENT '최소 재고 기준(개)',
     model_version     VARCHAR(50) NOT NULL COMMENT '분석 모델 버전',
     data_cutoff_at    DATETIME(6) NOT NULL COMMENT '입력 데이터 기준 시각',
+    synthetic_data    BOOLEAN     NOT NULL DEFAULT FALSE COMMENT '가상 데이터 사용 여부',
     last_saved_at     DATETIME(6) NULL COMMENT '검토 결과 마지막 저장일시',
     created_at        DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '분석일시',
     updated_at        DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '수정일시',

@@ -39,7 +39,7 @@ import org.testcontainers.mysql.MySQLContainer;
 @Testcontainers
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({JpaAuditingConfig.class, QueryDslConfig.class, OrderCreateService.class})
+@Import({JpaAuditingConfig.class, QueryDslConfig.class, OrderCreateService.class, OrderReader.class})
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class OrderCreateServiceConstraintTest {
 
