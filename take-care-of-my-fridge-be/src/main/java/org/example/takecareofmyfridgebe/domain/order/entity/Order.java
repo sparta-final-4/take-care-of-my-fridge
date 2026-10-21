@@ -84,6 +84,16 @@ public class Order extends BaseTimeEntity {
         this.status = OrderStatus.PENDING;
     }
 
+    // 결제 대기 주문인지 확인한다. 아니면 왜 아닌지(취소, 결제 완료)를 나눠 알려 준다.
+    public void validatePending() {
+        if (status == OrderStatus.CANCELLED) {
+            throw new BusinessException(ErrorCode.ORDER_CANCELLED);
+        }
+        if (status != OrderStatus.PENDING) {
+            throw new BusinessException(ErrorCode.ORDER_ALREADY_PAID);
+        }
+    }
+
     public void markPaid(LocalDateTime paidAt) {
         if (status != OrderStatus.PENDING) {
             throw new BusinessException(ErrorCode.INVALID_ORDER_STATUS);

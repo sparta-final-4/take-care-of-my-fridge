@@ -24,6 +24,7 @@ import org.example.takecareofmyfridgebe.domain.order.dto.OrderCheckoutResponse;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderCreateResult;
 import org.example.takecareofmyfridgebe.domain.order.entity.OrderStatus;
 import org.example.takecareofmyfridgebe.domain.order.service.OrderCreateService;
+import org.example.takecareofmyfridgebe.domain.order.service.OrderQueryService;
 import org.example.takecareofmyfridgebe.global.config.SecurityConfig;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
@@ -49,16 +50,18 @@ class OrderControllerTest {
 
     private final MockMvc mvc;
     private final OrderCreateService orderCreateService;
+    private final OrderQueryService orderQueryService;
 
     @Autowired
-    OrderControllerTest(MockMvc mvc, OrderCreateService orderCreateService) {
+    OrderControllerTest(MockMvc mvc, OrderCreateService orderCreateService, OrderQueryService orderQueryService) {
         this.mvc = mvc;
         this.orderCreateService = orderCreateService;
+        this.orderQueryService = orderQueryService;
     }
 
     @BeforeEach
     void resetMock() {
-        reset(orderCreateService);
+        reset(orderCreateService, orderQueryService);
     }
 
     @Test
@@ -155,6 +158,11 @@ class OrderControllerTest {
         @Bean
         OrderCreateService orderCreateService() {
             return mock(OrderCreateService.class);
+        }
+
+        @Bean
+        OrderQueryService orderQueryService() {
+            return mock(OrderQueryService.class);
         }
 
         @Bean

@@ -44,6 +44,7 @@ public class OrderCreateService {
     private final CartItemRepository cartItemRepository;
     private final ProductRepository productRepository;
     private final OrderNumberGenerator orderNumberGenerator;
+    private final OrderReader orderReader;
 
     // 재고 차감과 주문 저장을 한 트랜잭션으로 묶는다. 하나라도 실패하면 앞서 뺀 재고까지 롤백된다.
     // 장바구니 항목은 결제 완료 때 지우므로 여기서는 건드리지 않는다.
@@ -93,7 +94,7 @@ public class OrderCreateService {
     // 같은 키로 이미 만든 주문을 돌려준다. 고른 상품·수량이 처음 요청과 다르면 키를 잘못 재사용한 것으로 보고 거절한다.
     // 장바구니에는 같은 상품이 한 항목뿐이라 상품·수량이 같으면 같은 요청이다.
     private OrderCreateResult toExistingResult(Order order, List<Long> cartItemIds, List<CartItem> cartItems) {
-        List<OrderItem> orderItems = orderItemRepository.findByOrderIdOrderByIdAsc(order.getId());
+        List<OrderItem> orderItems = orderReader.getOrderItems(order);
         OrderCreateResult result = new OrderCreateResult(OrderCheckoutResponse.from(order, orderItems), false);
         // 결제 완료나 사용자 삭제로 장바구니 항목이 일부 사라졌으면 비교할 수 없으므로 처음 주문을 그대로 돌려준다
         if (cartItems.size() != cartItemIds.size()) {
