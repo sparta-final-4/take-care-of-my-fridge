@@ -107,7 +107,7 @@ class OrderControllerTest {
     }
 
     @Test
-    @DisplayName("장바구니 줄 번호가 비어 있으면 400이고 서비스를 부르지 않는다")
+    @DisplayName("장바구니 항목 번호가 비어 있으면 400이고 서비스를 부르지 않는다")
     void createOrder_emptyCartItemIds_returns400() throws Exception {
         mvc.perform(post("/api/orders")
                         .header("Idempotency-Key", "key-1")
@@ -122,7 +122,7 @@ class OrderControllerTest {
     }
 
     @Test
-    @DisplayName("장바구니 줄 번호가 50개를 넘으면 400이고 서비스를 부르지 않는다")
+    @DisplayName("장바구니 항목 번호가 50개를 넘으면 400이고 서비스를 부르지 않는다")
     void createOrder_tooManyCartItemIds_returns400() throws Exception {
         String ids = IntStream.rangeClosed(1, 51).mapToObj(String::valueOf).collect(Collectors.joining(","));
 

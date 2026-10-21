@@ -98,7 +98,7 @@ class OrderCreateServiceTransactionTest {
     }
 
     @Test
-    @DisplayName("주문하면 재고가 줄고 주문·주문 상품이 저장되며 장바구니는 그대로다")
+    @DisplayName("주문하면 재고가 빠지고 주문·주문 상품이 저장되며 장바구니는 그대로다")
     void createOrder_decreasesStockAndSavesOrder() {
         Product greenOnion = saveProduct("대파", 3000, 10);
         Product tofu = saveProduct("두부", 2000, 5);
@@ -157,7 +157,7 @@ class OrderCreateServiceTransactionTest {
     }
 
     @Test
-    @DisplayName("장바구니 수량이 음수인 줄은 주문을 거절하고 재고와 주문은 그대로다")
+    @DisplayName("장바구니 수량이 음수인 항목은 주문을 거절하고 재고와 주문은 그대로다")
     void createOrder_rejectsNegativeCartQuantity() {
         Product greenOnion = saveProduct("대파", 3000, 10);
         CartItem item = saveCartItem(saveCart(1L), greenOnion, -3);
@@ -170,7 +170,7 @@ class OrderCreateServiceTransactionTest {
     }
 
     @Test
-    @DisplayName("주문 뒤 장바구니 줄이 지워져도 같은 멱등 키 재전송에는 처음 주문을 돌려준다")
+    @DisplayName("주문 뒤 장바구니 항목이 지워져도 같은 멱등 키 재전송에는 처음 주문을 돌려준다")
     void createOrder_sameKeyAfterCartItemRemoved_returnsFirstOrder() {
         Product greenOnion = saveProduct("대파", 3000, 10);
         CartItem item = saveCartItem(saveCart(1L), greenOnion, 2);
@@ -186,7 +186,7 @@ class OrderCreateServiceTransactionTest {
     }
 
     @Test
-    @DisplayName("장바구니 줄의 상품이 없어졌으면 404로 거절하고 주문은 없다")
+    @DisplayName("장바구니 항목의 상품이 없어졌으면 404로 거절하고 주문은 없다")
     void createOrder_rejectsMissingProduct() {
         Cart cart = saveCart(1L);
         CartItem orphan = cartItemRepository.save(CartItem.builder().cart(cart).productId(999_999L).quantity(1).build());
@@ -211,7 +211,7 @@ class OrderCreateServiceTransactionTest {
     }
 
     @Test
-    @DisplayName("다른 회원의 장바구니 줄은 주문할 수 없고 재고는 그대로다")
+    @DisplayName("다른 회원의 장바구니 항목은 주문할 수 없고 재고는 그대로다")
     void createOrder_rejectsOthersCartItem() {
         Product greenOnion = saveProduct("대파", 3000, 10);
         saveCart(1L);
