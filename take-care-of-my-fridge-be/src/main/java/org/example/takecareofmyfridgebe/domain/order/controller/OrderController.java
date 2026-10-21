@@ -3,9 +3,9 @@ package org.example.takecareofmyfridgebe.domain.order.controller;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.auth.service.AuthSessionService;
+import org.example.takecareofmyfridgebe.domain.order.dto.OrderCheckoutResponse;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderCreateRequest;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderCreateResult;
-import org.example.takecareofmyfridgebe.domain.order.dto.OrderDetailResponse;
 import org.example.takecareofmyfridgebe.domain.order.service.OrderCreateService;
 import org.example.takecareofmyfridgebe.global.response.ApiResponse;
 import org.springframework.http.HttpStatus;
@@ -25,7 +25,7 @@ public class OrderController {
     private final OrderCreateService orderCreateService;
 
     @PostMapping
-    public ResponseEntity<ApiResponse<OrderDetailResponse>> createOrder(
+    public ResponseEntity<ApiResponse<OrderCheckoutResponse>> createOrder(
             @AuthenticationPrincipal AuthSessionService.AuthPrincipal principal,
             @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
             @Valid @RequestBody OrderCreateRequest request) {

@@ -20,8 +20,8 @@ import java.util.stream.IntStream;
 import org.example.takecareofmyfridgebe.domain.auth.service.AuthSessionService;
 import org.example.takecareofmyfridgebe.domain.auth.service.JwtTokenService;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
+import org.example.takecareofmyfridgebe.domain.order.dto.OrderCheckoutResponse;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderCreateResult;
-import org.example.takecareofmyfridgebe.domain.order.dto.OrderDetailResponse;
 import org.example.takecareofmyfridgebe.domain.order.entity.OrderStatus;
 import org.example.takecareofmyfridgebe.domain.order.service.OrderCreateService;
 import org.example.takecareofmyfridgebe.global.config.SecurityConfig;
@@ -138,8 +138,8 @@ class OrderControllerTest {
         verifyNoInteractions(orderCreateService);
     }
 
-    private OrderDetailResponse response() {
-        return new OrderDetailResponse(5001L, "20261020143005123001", OrderStatus.PENDING,
+    private OrderCheckoutResponse response() {
+        return new OrderCheckoutResponse(5001L, "20261020143005123001", OrderStatus.PENDING,
                 LocalDateTime.of(2026, 10, 20, 14, 30), 3000L, 0L, 3000L, List.of());
     }
 

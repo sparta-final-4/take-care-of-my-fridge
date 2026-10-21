@@ -6,7 +6,8 @@ import org.example.takecareofmyfridgebe.domain.order.entity.Order;
 import org.example.takecareofmyfridgebe.domain.order.entity.OrderItem;
 import org.example.takecareofmyfridgebe.domain.order.entity.OrderStatus;
 
-public record OrderDetailResponse(
+// 주문 확인 화면을 그리는 응답. 주문하기와 주문 확인 조회가 같이 쓴다. 주문 목록·상세는 각자 응답을 둔다.
+public record OrderCheckoutResponse(
         Long orderId,
         String orderNumber,
         OrderStatus status,
@@ -17,11 +18,11 @@ public record OrderDetailResponse(
         List<OrderItemResponse> items
 ) {
 
-    public static OrderDetailResponse from(Order order, List<OrderItem> items) {
+    public static OrderCheckoutResponse from(Order order, List<OrderItem> items) {
         long listPriceAmount = items.stream()
                 .mapToLong(item -> (long) item.getListPrice() * item.getQuantity())
                 .sum();
-        return new OrderDetailResponse(
+        return new OrderCheckoutResponse(
                 order.getId(),
                 order.getOrderNumber(),
                 order.getStatus(),
