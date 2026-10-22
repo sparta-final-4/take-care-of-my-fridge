@@ -25,11 +25,15 @@ import { BASE_PATH, COLLECTION_FORMATS, type RequestArgs, BaseAPI, RequiredError
 // @ts-ignore
 import type { ApiResponseCookingCompleteResponse } from '../models';
 // @ts-ignore
+import type { ApiResponseCookingLogResponse } from '../models';
+// @ts-ignore
 import type { ApiResponsePageResponseCookingLogResponse } from '../models';
 // @ts-ignore
 import type { CookingCompleteRequest } from '../models';
 // @ts-ignore
 import type { CookingLogSearchRequest } from '../models';
+// @ts-ignore
+import type { CookingLogUpdateRequest } from '../models';
 /**
  * CookingLogControllerApi - axios parameter creator
  */
@@ -107,6 +111,44 @@ export const CookingLogControllerApiAxiosParamCreator = function (configuration?
                 options: localVarRequestOptions,
             };
         },
+        /**
+         * 
+         * @param {number} cookingLogId 
+         * @param {CookingLogUpdateRequest} cookingLogUpdateRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        updateCookingLog: async (cookingLogId: number, cookingLogUpdateRequest: CookingLogUpdateRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'cookingLogId' is not null or undefined
+            assertParamExists('updateCookingLog', 'cookingLogId', cookingLogId)
+            // verify required parameter 'cookingLogUpdateRequest' is not null or undefined
+            assertParamExists('updateCookingLog', 'cookingLogUpdateRequest', cookingLogUpdateRequest)
+            const localVarPath = `/api/cooking-logs/{cookingLogId}`
+                .replace('{cookingLogId}', encodeURIComponent(String(cookingLogId)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'PATCH', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = '*/*';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(cookingLogUpdateRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
     }
 };
 
@@ -140,6 +182,19 @@ export const CookingLogControllerApiFp = function(configuration?: Configuration)
             const localVarOperationServerBasePath = operationServerMap['CookingLogControllerApi.getCookingLogs']?.[localVarOperationServerIndex]?.url;
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
+        /**
+         * 
+         * @param {number} cookingLogId 
+         * @param {CookingLogUpdateRequest} cookingLogUpdateRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async updateCookingLog(cookingLogId: number, cookingLogUpdateRequest: CookingLogUpdateRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ApiResponseCookingLogResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.updateCookingLog(cookingLogId, cookingLogUpdateRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['CookingLogControllerApi.updateCookingLog']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
     }
 };
 
@@ -167,6 +222,15 @@ export const CookingLogControllerApiFactory = function (configuration?: Configur
         getCookingLogs(requestParameters: CookingLogControllerApiGetCookingLogsRequest, options?: RawAxiosRequestConfig): AxiosPromise<ApiResponsePageResponseCookingLogResponse> {
             return localVarFp.getCookingLogs(requestParameters.request, options).then((request) => request(axios, basePath));
         },
+        /**
+         * 
+         * @param {CookingLogControllerApiUpdateCookingLogRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        updateCookingLog(requestParameters: CookingLogControllerApiUpdateCookingLogRequest, options?: RawAxiosRequestConfig): AxiosPromise<ApiResponseCookingLogResponse> {
+            return localVarFp.updateCookingLog(requestParameters.cookingLogId, requestParameters.cookingLogUpdateRequest, options).then((request) => request(axios, basePath));
+        },
     };
 };
 
@@ -190,6 +254,14 @@ export interface CookingLogControllerApiInterface {
      */
     getCookingLogs(requestParameters: CookingLogControllerApiGetCookingLogsRequest, options?: RawAxiosRequestConfig): AxiosPromise<ApiResponsePageResponseCookingLogResponse>;
 
+    /**
+     * 
+     * @param {CookingLogControllerApiUpdateCookingLogRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    updateCookingLog(requestParameters: CookingLogControllerApiUpdateCookingLogRequest, options?: RawAxiosRequestConfig): AxiosPromise<ApiResponseCookingLogResponse>;
+
 }
 
 /**
@@ -204,6 +276,15 @@ export interface CookingLogControllerApiCompleteCookingRequest {
  */
 export interface CookingLogControllerApiGetCookingLogsRequest {
     readonly request: CookingLogSearchRequest
+}
+
+/**
+ * Request parameters for updateCookingLog operation in CookingLogControllerApi.
+ */
+export interface CookingLogControllerApiUpdateCookingLogRequest {
+    readonly cookingLogId: number
+
+    readonly cookingLogUpdateRequest: CookingLogUpdateRequest
 }
 
 /**
@@ -228,6 +309,16 @@ export class CookingLogControllerApi extends BaseAPI implements CookingLogContro
      */
     public getCookingLogs(requestParameters: CookingLogControllerApiGetCookingLogsRequest, options?: RawAxiosRequestConfig) {
         return CookingLogControllerApiFp(this.configuration).getCookingLogs(requestParameters.request, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @param {CookingLogControllerApiUpdateCookingLogRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public updateCookingLog(requestParameters: CookingLogControllerApiUpdateCookingLogRequest, options?: RawAxiosRequestConfig) {
+        return CookingLogControllerApiFp(this.configuration).updateCookingLog(requestParameters.cookingLogId, requestParameters.cookingLogUpdateRequest, options).then((request) => request(this.axios, this.basePath));
     }
 }
 
