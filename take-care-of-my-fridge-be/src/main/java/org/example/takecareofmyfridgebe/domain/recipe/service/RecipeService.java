@@ -6,6 +6,7 @@ import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeCreateRequest;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeDetailResponse;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeListItemResponse;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeSort;
+import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeUpdateRequest;
 import org.example.takecareofmyfridgebe.domain.recipe.entity.Recipe;
 import org.example.takecareofmyfridgebe.domain.recipe.entity.RecipeIngredient;
 import org.example.takecareofmyfridgebe.domain.recipe.entity.RecipeStep;
@@ -63,6 +64,36 @@ public class RecipeService {
         List<RecipeStep> steps = recipeStepRepository.saveAll(request.toSteps(recipe));
 
         return RecipeDetailResponse.of(recipe, ingredients, steps);
+    }
+
+    // 기본 정보는 보낸 필드만 바꾸고, 재료와 조리 단계는 보낸 경우에만 목록 전체를 교체한다.
+    @Transactional
+    public RecipeDetailResponse updateRecipe(Long recipeId, RecipeUpdateRequest request) {
+        Recipe recipe = recipeRepository.findById(recipeId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.RECIPE_NOT_FOUND));
+        if (request.replacesIngredients()) {
+            validateIngredientsExist(request.ingredientIds());
+        }
+
+        request.applyTo(recipe);
+
+        return RecipeDetailResponse.of(recipe, updateIngredients(recipe, request), updateSteps(recipe, request));
+    }
+
+    private List<RecipeIngredient> updateIngredients(Recipe recipe, RecipeUpdateRequest request) {
+        if (!request.replacesIngredients()) {
+            return recipeIngredientRepository.findByRecipeIdOrderBySeqAsc(recipe.getId());
+        }
+        recipeIngredientRepository.deleteAllByRecipeId(recipe.getId());
+        return recipeIngredientRepository.saveAll(request.toIngredients(recipe));
+    }
+
+    private List<RecipeStep> updateSteps(Recipe recipe, RecipeUpdateRequest request) {
+        if (!request.replacesSteps()) {
+            return recipeStepRepository.findByRecipeIdOrderByStepNoAsc(recipe.getId());
+        }
+        recipeStepRepository.deleteAllByRecipeId(recipe.getId());
+        return recipeStepRepository.saveAll(request.toSteps(recipe));
     }
 
     // recipe_ingredients.ingredient_id는 FK 없이 ID로만 참조하므로 저장 전에 직접 확인한다.
