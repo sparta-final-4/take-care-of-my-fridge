@@ -40,6 +40,7 @@ models/api-response-my-recipe-list-response.ts
 models/api-response-nickname-availability-response.ts
 models/api-response-order-cancel-response.ts
 models/api-response-order-checkout-response.ts
+models/api-response-order-detail-response.ts
 models/api-response-page-response-audit-log-response.ts
 models/api-response-page-response-cooking-log-response.ts
 models/api-response-page-response-fridge-item-log-response.ts
@@ -109,6 +110,7 @@ models/nutrition.ts
 models/order-cancel-response.ts
 models/order-checkout-response.ts
 models/order-create-request.ts
+models/order-detail-response.ts
 models/order-item-response.ts
 models/order-list-request.ts
 models/order-summary-response.ts

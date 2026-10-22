@@ -1082,6 +1082,37 @@
         ]
       }
     },
+    "/api/orders/{orderId}": {
+      "get": {
+        "operationId": "getDetail",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "orderId",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseOrderDetailResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "order-controller"
+        ]
+      }
+    },
     "/api/orders/{orderId}/cancel": {
       "patch": {
         "operationId": "cancelOrder",
@@ -1775,6 +1806,20 @@
         "properties": {
           "data": {
             "$ref": "#/components/schemas/OrderCheckoutResponse"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorResponse"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ApiResponseOrderDetailResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/OrderDetailResponse"
           },
           "error": {
             "$ref": "#/components/schemas/ErrorResponse"
@@ -3382,6 +3427,53 @@
         "required": [
           "cartItemIds"
         ]
+      },
+      "OrderDetailResponse": {
+        "type": "object",
+        "properties": {
+          "confirmedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "discountAmount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrderItemResponse"
+            }
+          },
+          "listPriceAmount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "orderId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "orderNumber": {
+            "type": "string"
+          },
+          "orderedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "payAmount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "PAID",
+              "CANCELLED",
+              "CONFIRMED"
+            ]
+          }
+        }
       },
       "OrderItemResponse": {
         "type": "object",
