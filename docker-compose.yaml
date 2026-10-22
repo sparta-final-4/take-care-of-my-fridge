@@ -25,7 +25,7 @@ services:
       - "6379:6379"
 
   redisinsight:
-    image: redis/redisinsight:latest
+    image: redis/redisinsight:3.8.0
     container_name: fridge-redisinsight
     restart: unless-stopped
     ports:
