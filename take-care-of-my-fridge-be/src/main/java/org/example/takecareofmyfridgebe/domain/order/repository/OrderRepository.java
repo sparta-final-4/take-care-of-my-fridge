@@ -1,8 +1,12 @@
 package org.example.takecareofmyfridgebe.domain.order.repository;
 
 import jakarta.persistence.LockModeType;
+import java.util.Collection;
 import java.util.Optional;
 import org.example.takecareofmyfridgebe.domain.order.entity.Order;
+import org.example.takecareofmyfridgebe.domain.order.entity.OrderStatus;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -22,4 +26,6 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select o from Order o where o.id = :id and o.memberId = :memberId")
     Optional<Order> findByIdAndMemberIdForUpdate(@Param("id") Long id, @Param("memberId") Long memberId);
+
+    Page<Order> findByMemberIdAndStatusIn(Long memberId, Collection<OrderStatus> statuses, Pageable pageable);
 }
