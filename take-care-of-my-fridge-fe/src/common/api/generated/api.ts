@@ -23,6 +23,7 @@ export * from './apis/admin-product-controller-api';
 export * from './apis/auth-controller-api';
 export * from './apis/cart-controller-api';
 export * from './apis/cooking-log-controller-api';
+export * from './apis/cooking-stats-controller-api';
 export * from './apis/csrf-controller-api';
 export * from './apis/fridge-controller-api';
 export * from './apis/member-controller-api';
