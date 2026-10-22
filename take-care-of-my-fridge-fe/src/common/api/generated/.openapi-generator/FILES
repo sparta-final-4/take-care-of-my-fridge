@@ -44,6 +44,7 @@ models/api-response-page-response-audit-log-response.ts
 models/api-response-page-response-cooking-log-response.ts
 models/api-response-page-response-fridge-item-log-response.ts
 models/api-response-page-response-member-summary-response.ts
+models/api-response-page-response-order-summary-response.ts
 models/api-response-page-response-product-list-item-response.ts
 models/api-response-page-response-recipe-list-item-response.ts
 models/api-response-page-response-review-response.ts
@@ -109,11 +110,14 @@ models/order-cancel-response.ts
 models/order-checkout-response.ts
 models/order-create-request.ts
 models/order-item-response.ts
+models/order-list-request.ts
+models/order-summary-response.ts
 models/page-response-audit-log-response.ts
 models/page-response-cooking-log-response.ts
 models/page-response-fridge-item-log-response.ts
 models/page-response-member-summary-response.ts
 models/page-response-my-recipe-response.ts
+models/page-response-order-summary-response.ts
 models/page-response-product-list-item-response.ts
 models/page-response-recipe-list-item-response.ts
 models/page-response-review-response.ts

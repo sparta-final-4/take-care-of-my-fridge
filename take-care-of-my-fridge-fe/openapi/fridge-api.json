@@ -1015,6 +1015,34 @@
       }
     },
     "/api/orders": {
+      "get": {
+        "operationId": "getMyOrders",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "request",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/OrderListRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePageResponseOrderSummaryResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "order-controller"
+        ]
+      },
       "post": {
         "operationId": "createOrder",
         "parameters": [
@@ -1803,6 +1831,20 @@
         "properties": {
           "data": {
             "$ref": "#/components/schemas/PageResponseMemberSummaryResponse"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorResponse"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ApiResponsePageResponseOrderSummaryResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/PageResponseOrderSummaryResponse"
           },
           "error": {
             "$ref": "#/components/schemas/ErrorResponse"
@@ -3380,6 +3422,51 @@
           }
         }
       },
+      "OrderListRequest": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 1
+          },
+          "size": {
+            "type": "integer",
+            "format": "int32",
+            "maximum": 100,
+            "minimum": 1
+          }
+        }
+      },
+      "OrderSummaryResponse": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "orderNumber": {
+            "type": "string"
+          },
+          "orderedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "payAmount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "PAID",
+              "CANCELLED",
+              "CONFIRMED"
+            ]
+          }
+        }
+      },
       "PageResponseAuditLogResponse": {
         "type": "object",
         "properties": {
@@ -3507,6 +3594,36 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/MyRecipeResponse"
+            }
+          },
+          "isLast": {
+            "type": "boolean"
+          },
+          "pageNumber": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalElements": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "totalPages": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "PageResponseOrderSummaryResponse": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrderSummaryResponse"
             }
           },
           "isLast": {
