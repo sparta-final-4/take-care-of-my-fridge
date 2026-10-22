@@ -7,6 +7,7 @@ import org.example.takecareofmyfridgebe.domain.order.dto.OrderCancelResponse;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderCheckoutResponse;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderCreateRequest;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderCreateResult;
+import org.example.takecareofmyfridgebe.domain.order.dto.OrderDetailResponse;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderListRequest;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderSummaryResponse;
 import org.example.takecareofmyfridgebe.domain.order.service.OrderCancelService;
@@ -52,6 +53,14 @@ public class OrderController {
             @AuthenticationPrincipal AuthSessionService.AuthPrincipal principal,
             @Valid @ModelAttribute OrderListRequest request) {
         return ResponseEntity.ok(ApiResponse.ok(orderQueryService.getMyOrders(principal.memberId(), request)));
+    }
+
+    // 주문 상세 화면
+    @GetMapping("/{orderId}")
+    public ResponseEntity<ApiResponse<OrderDetailResponse>> getDetail(
+            @AuthenticationPrincipal AuthSessionService.AuthPrincipal principal,
+            @PathVariable Long orderId) {
+        return ResponseEntity.ok(ApiResponse.ok(orderQueryService.getDetail(principal.memberId(), orderId)));
     }
 
     // 주문 확인 화면(결제 대기 주문)
