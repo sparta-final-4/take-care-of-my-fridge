@@ -97,10 +97,12 @@ models/ingredient-deduction-response.ts
 models/ingredient-detail.ts
 models/ingredient-info.ts
 models/ingredient-item.ts
+models/ingredient-update.ts
 models/item.ts
 models/login-request.ts
 models/mealkit-detail.ts
 models/mealkit-info.ts
+models/mealkit-update.ts
 models/member-list-request.ts
 models/member-summary-response.ts
 models/my-info-response.ts
@@ -134,6 +136,7 @@ models/product-create-request.ts
 models/product-detail-response.ts
 models/product-list-item-response.ts
 models/product-list-request.ts
+models/product-update-request.ts
 models/recipe-detail-response.ts
 models/recipe-list-item-response.ts
 models/recipe-list-request.ts

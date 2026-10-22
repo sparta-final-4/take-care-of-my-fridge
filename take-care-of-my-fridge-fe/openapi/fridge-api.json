@@ -269,6 +269,47 @@
         ]
       }
     },
+    "/api/admin/products/{productId}": {
+      "patch": {
+        "operationId": "updateProduct",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "productId",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProductUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseProductDetailResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "admin-product-controller"
+        ]
+      }
+    },
     "/api/auth/csrf": {
       "get": {
         "operationId": "csrf",
@@ -3155,6 +3196,26 @@
           }
         }
       },
+      "IngredientUpdate": {
+        "type": "object",
+        "properties": {
+          "baseQuantity": {
+            "type": "number"
+          },
+          "ingredientId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "unit": {
+            "type": "string",
+            "maxLength": 20,
+            "minLength": 1
+          },
+          "unitAmount": {
+            "type": "number"
+          }
+        }
+      },
       "Item": {
         "type": "object",
         "properties": {
@@ -3221,6 +3282,16 @@
           "servings": {
             "type": "integer",
             "format": "int32"
+          }
+        }
+      },
+      "MealkitUpdate": {
+        "type": "object",
+        "properties": {
+          "servings": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 1
           }
         }
       },
@@ -3999,7 +4070,9 @@
         "type": "object",
         "properties": {
           "description": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 0
           },
           "detailMatchingType": {
             "type": "boolean"
@@ -4025,7 +4098,7 @@
             "type": "integer",
             "format": "int32",
             "maximum": 10000000,
-            "minimum": 0
+            "minimum": 1
           },
           "productType": {
             "type": "string",
@@ -4198,6 +4271,66 @@
             "enum": [
               "INGREDIENT",
               "MEALKIT"
+            ]
+          }
+        }
+      },
+      "ProductUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "description": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 0
+          },
+          "imageUrl": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 0,
+            "pattern": "^$|^https?://\\S+$"
+          },
+          "ingredient": {
+            "$ref": "#/components/schemas/IngredientUpdate"
+          },
+          "mealkit": {
+            "$ref": "#/components/schemas/MealkitUpdate"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1
+          },
+          "price": {
+            "type": "integer",
+            "format": "int32",
+            "maximum": 10000000,
+            "minimum": 1
+          },
+          "shelfDays": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ON_SALE",
+              "SOLD_OUT",
+              "STOPPED"
+            ]
+          },
+          "stock": {
+            "type": "integer",
+            "format": "int32",
+            "maximum": 100000,
+            "minimum": 0
+          },
+          "storage": {
+            "type": "string",
+            "enum": [
+              "REFRIGERATED",
+              "FROZEN",
+              "ROOM_TEMP"
             ]
           }
         }
