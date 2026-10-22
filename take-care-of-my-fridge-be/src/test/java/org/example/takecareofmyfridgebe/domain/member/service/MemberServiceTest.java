@@ -56,6 +56,7 @@ class MemberServiceTest {
     @Test
     void signUpCreatesActiveUserWithHashedPasswordAndTastes() {
         SignUpRequest request = new SignUpRequest("cook@example.com", "password123", "요리왕",
+                "010-1234-5678",
                 List.of(Member.Taste.SWEET, Member.Taste.SPICY));
         when(passwordEncoder.encode("password123")).thenReturn("{bcrypt}encoded");
         when(memberRepository.saveAndFlush(any(Member.class))).thenAnswer(invocation -> {
@@ -72,7 +73,9 @@ class MemberServiceTest {
         assertEquals(Member.Role.USER, member.getRole());
         assertEquals(Member.Status.ACTIVE, member.getStatus());
         assertNotEquals(request.password(), member.getPasswordHash());
+        assertEquals("01012345678", member.getPhone());
         assertEquals(2, member.getTastes().size());
+        verify(memberRepository).existsByPhone("01012345678");
     }
 
     @Test
@@ -348,7 +351,8 @@ class MemberServiceTest {
 
     @Test
     void signUpRejectsExistingEmail() {
-        SignUpRequest request = new SignUpRequest("cook@example.com", "password123", "요리왕", List.of());
+        SignUpRequest request = new SignUpRequest("cook@example.com", "password123", "요리왕",
+                "01012345678", List.of());
         when(memberRepository.existsByEmail(request.email())).thenReturn(true);
 
         BusinessException exception = assertThrows(BusinessException.class, () -> memberService.signUp(request));
@@ -359,7 +363,8 @@ class MemberServiceTest {
 
     @Test
     void signUpRejectsExistingNickname() {
-        SignUpRequest request = new SignUpRequest("cook@example.com", "password123", "요리왕", List.of());
+        SignUpRequest request = new SignUpRequest("cook@example.com", "password123", "요리왕",
+                "01012345678", List.of());
         when(memberRepository.existsByNickname(request.nickname())).thenReturn(true);
 
         BusinessException exception = assertThrows(BusinessException.class, () -> memberService.signUp(request));
@@ -371,6 +376,7 @@ class MemberServiceTest {
     @Test
     void signUpRejectsDuplicateTastes() {
         SignUpRequest request = new SignUpRequest("cook@example.com", "password123", "요리왕",
+                "01012345678",
                 List.of(Member.Taste.SWEET, Member.Taste.SWEET));
 
         BusinessException exception = assertThrows(BusinessException.class, () -> memberService.signUp(request));
@@ -381,7 +387,8 @@ class MemberServiceTest {
 
     @Test
     void signUpMapsConcurrentNicknameConflict() {
-        SignUpRequest request = new SignUpRequest("cook@example.com", "password123", "요리왕", List.of());
+        SignUpRequest request = new SignUpRequest("cook@example.com", "password123", "요리왕",
+                "01012345678", List.of());
         when(memberRepository.saveAndFlush(any(Member.class))).thenThrow(
                 new DataIntegrityViolationException("Duplicate entry for key 'uk_members_nickname'"));
 
@@ -392,12 +399,37 @@ class MemberServiceTest {
 
     @Test
     void signUpMapsConcurrentEmailConflict() {
-        SignUpRequest request = new SignUpRequest("cook@example.com", "password123", "요리왕", List.of());
+        SignUpRequest request = new SignUpRequest("cook@example.com", "password123", "요리왕",
+                "01012345678", List.of());
         when(memberRepository.saveAndFlush(any(Member.class))).thenThrow(
                 new DataIntegrityViolationException("Duplicate entry for key 'uk_members_email'"));
 
         BusinessException exception = assertThrows(BusinessException.class, () -> memberService.signUp(request));
 
         assertEquals(ErrorCode.DUPLICATE_EMAIL, exception.getErrorCode());
+    }
+
+    @Test
+    void signUpRejectsExistingPhone() {
+        SignUpRequest request = new SignUpRequest("cook@example.com", "password123", "요리왕",
+                "010-1234-5678", List.of());
+        when(memberRepository.existsByPhone("01012345678")).thenReturn(true);
+
+        BusinessException exception = assertThrows(BusinessException.class, () -> memberService.signUp(request));
+
+        assertEquals(ErrorCode.DUPLICATE_PHONE, exception.getErrorCode());
+        verify(memberRepository, never()).saveAndFlush(any(Member.class));
+    }
+
+    @Test
+    void signUpMapsConcurrentPhoneConflict() {
+        SignUpRequest request = new SignUpRequest("cook@example.com", "password123", "요리왕",
+                "01012345678", List.of());
+        when(memberRepository.saveAndFlush(any(Member.class))).thenThrow(
+                new DataIntegrityViolationException("Duplicate entry for key 'uk_members_phone'"));
+
+        BusinessException exception = assertThrows(BusinessException.class, () -> memberService.signUp(request));
+
+        assertEquals(ErrorCode.DUPLICATE_PHONE, exception.getErrorCode());
     }
 }

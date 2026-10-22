@@ -4331,6 +4331,11 @@
             "minLength": 8,
             "pattern": "^(?=.*[A-Za-z])(?=.*\\d)(?=.*[^A-Za-z0-9])[\\x21-\\x7E]+$"
           },
+          "phone": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^(010[0-9]{8}|010-[0-9]{4}-[0-9]{4})$"
+          },
           "tastes": {
             "type": "array",
             "items": {
@@ -4349,6 +4354,7 @@
           "email",
           "nickname",
           "password",
+          "phone",
           "tastes"
         ]
       },
