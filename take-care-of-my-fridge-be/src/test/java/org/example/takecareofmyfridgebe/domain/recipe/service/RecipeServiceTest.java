@@ -4,8 +4,11 @@ import org.example.takecareofmyfridgebe.domain.ingredient.entity.Ingredient;
 import org.example.takecareofmyfridgebe.domain.ingredient.repository.IngredientRepository;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeCreateRequest;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeDetailResponse;
+import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeIngredientRequest;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeListItemResponse;
+import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeNutritionRequest;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeSort;
+import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeUpdateRequest;
 import org.example.takecareofmyfridgebe.domain.recipe.entity.Recipe;
 import org.example.takecareofmyfridgebe.domain.recipe.repository.RecipeIngredientRepository;
 import org.example.takecareofmyfridgebe.domain.recipe.repository.RecipeRepository;
@@ -162,5 +165,96 @@ class RecipeServiceTest {
                 .extracting("errorCode")
                 .isEqualTo(ErrorCode.INGREDIENT_NOT_FOUND);
         verify(recipeRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("레시피 수정은 보낸 필드만 바꾸고, 재료와 조리 단계를 보내지 않으면 기존 목록을 그대로 둔다")
+    void updateRecipe_changesOnlySentFields() {
+        // given
+        Recipe stew = RecipeFixture.createRecipe(7L, "된장찌개");
+        when(recipeRepository.findById(7L)).thenReturn(Optional.of(stew));
+        when(recipeIngredientRepository.findByRecipeIdOrderBySeqAsc(7L))
+                .thenReturn(List.of(RecipeFixture.createIngredient(stew, 1, "된장", "2큰술")));
+        when(recipeStepRepository.findByRecipeIdOrderByStepNoAsc(7L))
+                .thenReturn(List.of(RecipeFixture.createStep(stew, 1, "물을 끓인다.")));
+        RecipeNutritionRequest nutrition = new RecipeNutritionRequest(null, new BigDecimal("400"), null, null, null, null);
+        RecipeUpdateRequest request = updateRequest("차돌 된장찌개", nutrition, null);
+
+        // when
+        RecipeDetailResponse result = service.updateRecipe(7L, request);
+
+        // then
+        assertThat(result.name()).isEqualTo("차돌 된장찌개");
+        assertThat(result.summary()).isEqualTo("된장찌개 만드는 법");
+        assertThat(result.nutrition().calories()).isEqualByComparingTo("400");
+        assertThat(result.nutrition().sodiumMg()).isNull();
+        assertThat(result.ingredients()).extracting(RecipeDetailResponse.IngredientItem::displayName)
+                .containsExactly("된장");
+        verify(recipeIngredientRepository, never()).deleteAllByRecipeId(anyLong());
+        verify(recipeStepRepository, never()).deleteAllByRecipeId(anyLong());
+    }
+
+    @Test
+    @DisplayName("재료를 보내면 기존 재료를 모두 지우고 새 목록을 순서 번호를 다시 매겨 저장한다")
+    void updateRecipe_replacesIngredients() {
+        // given
+        Recipe stew = RecipeFixture.createRecipe(7L, "된장찌개");
+        when(recipeRepository.findById(7L)).thenReturn(Optional.of(stew));
+        when(ingredientRepository.findAllById(List.of(30L, 40L)))
+                .thenReturn(List.of(mock(Ingredient.class), mock(Ingredient.class)));
+        when(recipeIngredientRepository.saveAll(anyList())).thenAnswer(invocation -> invocation.getArgument(0));
+        RecipeUpdateRequest request = updateRequest(null, null, List.of(
+                new RecipeIngredientRequest(30L, "차돌박이", "100g", null, "주재료", null),
+                new RecipeIngredientRequest(40L, "애호박", "1/2개", null, "부재료", null)));
+
+        // when
+        RecipeDetailResponse result = service.updateRecipe(7L, request);
+
+        // then
+        verify(recipeIngredientRepository).deleteAllByRecipeId(7L);
+        assertThat(result.ingredients()).extracting(RecipeDetailResponse.IngredientItem::seq)
+                .containsExactly(1, 2);
+        assertThat(result.ingredients()).extracting(RecipeDetailResponse.IngredientItem::ingredientId)
+                .containsExactly(30L, 40L);
+        assertThat(result.name()).isEqualTo("된장찌개");
+    }
+
+    @Test
+    @DisplayName("교체할 재료 중 없는 재료가 있으면 INGREDIENT_NOT_FOUND 예외가 발생하고 기존 재료를 지우지 않는다")
+    void updateRecipe_ingredientNotFound() {
+        // given
+        Recipe stew = RecipeFixture.createRecipe(7L, "된장찌개");
+        when(recipeRepository.findById(7L)).thenReturn(Optional.of(stew));
+        when(ingredientRepository.findAllById(List.of(99L))).thenReturn(List.of());
+        RecipeUpdateRequest request = updateRequest(null, null, List.of(
+                new RecipeIngredientRequest(99L, "없는 재료", null, null, null, null)));
+
+        // when & then
+        assertThatThrownBy(() -> service.updateRecipe(7L, request))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.INGREDIENT_NOT_FOUND);
+        verify(recipeIngredientRepository, never()).deleteAllByRecipeId(anyLong());
+        assertThat(stew.getName()).isEqualTo("된장찌개");
+    }
+
+    @Test
+    @DisplayName("없는 레시피를 수정하면 RECIPE_NOT_FOUND 예외가 발생한다")
+    void updateRecipe_notFound() {
+        // given
+        when(recipeRepository.findById(99L)).thenReturn(Optional.empty());
+        RecipeUpdateRequest request = updateRequest("새 이름", null, null);
+
+        // when & then
+        assertThatThrownBy(() -> service.updateRecipe(99L, request))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.RECIPE_NOT_FOUND);
+    }
+
+    private static RecipeUpdateRequest updateRequest(String name, RecipeNutritionRequest nutrition,
+                                                     List<RecipeIngredientRequest> ingredients) {
+        return new RecipeUpdateRequest(name, null, null, null, null, null, null, null, null, null, null, null,
+                nutrition, ingredients, null);
     }
 }
