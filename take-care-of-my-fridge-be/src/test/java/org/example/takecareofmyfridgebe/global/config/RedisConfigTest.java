@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 import org.example.takecareofmyfridgebe.support.RedisContainerSupport;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
 import org.springframework.boot.data.redis.autoconfigure.DataRedisAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -13,7 +14,8 @@ import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@SpringBootTest(classes = {DataRedisAutoConfiguration.class, RedisConfig.class})
+@SpringBootTest(classes = RedisConfig.class)
+@ImportAutoConfiguration(DataRedisAutoConfiguration.class)
 class RedisConfigTest extends RedisContainerSupport {
 
     private final RedisTemplate<String, Object> redisTemplate;
