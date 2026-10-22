@@ -1,5 +1,5 @@
-import { Empty } from 'antd';
+import { OrderListSection } from '@/domains/order/components/OrderListSection';
 
 export default function MyPageOrdersPage() {
-  return <Empty description="주문 내역 준비 중입니다" />;
+  return <OrderListSection />;
 }

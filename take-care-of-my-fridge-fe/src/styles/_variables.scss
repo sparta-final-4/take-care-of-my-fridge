@@ -30,5 +30,8 @@ $cart-total-min-width: 9ch;
 // 주문 확인 상품 목록. 99개(3자)가 행마다 같은 위치에 오도록 고정
 $order-quantity-width: 5ch;
 
+// 주문 내역 버튼 칸. 버튼이 없는 결제 대기 행도 다른 칸이 같은 위치에 오도록 고정
+$order-action-width: 88px;
+
 // 모바일 터치 영역 최소 크기
 $touch-target-size: 44px;

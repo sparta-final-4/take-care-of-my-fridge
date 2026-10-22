@@ -1,0 +1,72 @@
+@use '@/styles/variables' as *;
+@use '@/styles/mixins' as *;
+
+.loading {
+  opacity: 0.6;
+}
+
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+// 모바일은 주문번호·상태 / 주문일·금액·버튼 두 단, lg부터 한 행에 둔다. md에서는 마이페이지 메뉴가 옆에 붙어 주문번호가 잘린다
+.row {
+  display: grid;
+  grid-template-areas:
+    'number number status'
+    'date amount action';
+  grid-template-columns: minmax(0, 1fr) auto $order-action-width;
+  align-items: center;
+  gap: var(--ant-margin-sm) var(--ant-margin);
+  padding: var(--ant-padding) 0;
+  border-bottom: 1px solid var(--ant-color-border-secondary);
+
+  @include from(lg) {
+    grid-template-areas: 'number date amount status action';
+    grid-template-columns:
+      minmax(0, 1fr) $date-min-width $cart-total-min-width
+      auto $order-action-width;
+  }
+}
+
+.orderNumber {
+  grid-area: number;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.date {
+  grid-area: date;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.amount {
+  grid-area: amount;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.status {
+  grid-area: status;
+  justify-self: end;
+  margin: 0;
+
+  @include from(lg) {
+    justify-self: center;
+  }
+}
+
+.action {
+  grid-area: action;
+  width: 100%;
+  min-height: $touch-target-size;
+
+  @include from(lg) {
+    min-height: auto;
+  }
+}
