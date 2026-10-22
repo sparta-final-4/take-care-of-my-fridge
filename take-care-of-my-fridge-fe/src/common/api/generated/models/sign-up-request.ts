@@ -19,6 +19,7 @@ export interface SignUpRequest {
     'email': string;
     'nickname': string;
     'password': string;
+    'phone': string;
     'tastes': Array<SignUpRequestTastesEnum>;
 }
 
