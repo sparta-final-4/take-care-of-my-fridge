@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Alert, Button, Checkbox, Form, Input, Space, Typography } from 'antd';
 import { isAxiosError } from 'axios';
-import { useState } from 'react';
+import { useState, type ChangeEvent } from 'react';
 import { Link, useNavigate } from 'react-router';
 
 import { ROUTES } from '@/app/paths';
@@ -13,6 +13,15 @@ import { memberQueries } from '@/domains/member/queries';
 import styles from './SignUpPage.module.scss';
 
 type FormValues = SignUpRequest & { passwordConfirm: string };
+
+function formatPhone(value: string, deleting = false) {
+  const digits = value.replace(/\D/g, '').slice(0, 11);
+  if (deleting && digits.length === 7) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+  if (deleting && digits.length === 3) return digits;
+  if (digits.length >= 7) return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
+  if (digits.length >= 3) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+  return digits;
+}
 
 export default function SignUpPage() {
   const [form] = Form.useForm<FormValues>();
@@ -60,7 +69,13 @@ export default function SignUpPage() {
       return;
     }
     signupMutation.mutate(
-      { email: values.email, password: values.password, nickname, tastes: values.tastes ?? [] },
+      {
+        email: values.email,
+        password: values.password,
+        nickname,
+        phone: values.phone,
+        tastes: values.tastes ?? [],
+      },
       {
         onSuccess: () => navigate(ROUTES.signupComplete, { state: { email: values.email } }),
         onError: (error) => {
@@ -71,6 +86,9 @@ export default function SignUpPage() {
           if (getErrorCode(error) === 'M002') {
             setCheckedNickname(undefined);
             form.setFields([{ name: 'nickname', errors: ['이미 사용 중인 닉네임입니다.'] }]);
+          }
+          if (getErrorCode(error) === 'M009') {
+            form.setFields([{ name: 'phone', errors: ['이미 사용 중인 전화번호입니다.'] }]);
           }
         },
       },
@@ -87,7 +105,7 @@ export default function SignUpPage() {
         <Alert type="error" message={availabilityError} className={styles.error} />
       )}
       {signupMutation.error &&
-        !['M001', 'M002'].includes(getErrorCode(signupMutation.error) ?? '') && (
+        !['M001', 'M002', 'M009'].includes(getErrorCode(signupMutation.error) ?? '') && (
           <Alert
             type="error"
             message={getErrorMessage(signupMutation.error)}
@@ -141,6 +159,27 @@ export default function SignUpPage() {
           </Button>
           {checkedNickname && <Typography.Text type="success">사용할 수 있습니다.</Typography.Text>}
         </Space>
+        <Form.Item
+          label="전화번호"
+          name="phone"
+          getValueFromEvent={(event: ChangeEvent<HTMLInputElement>) =>
+            formatPhone(
+              event.target.value,
+              (event.nativeEvent as InputEvent).inputType?.startsWith('delete'),
+            )
+          }
+          rules={[
+            { required: true, message: '전화번호를 입력해 주세요.' },
+            { pattern: /^010-\d{4}-\d{4}$/, message: '010-XXXX-XXXX 형식으로 입력해 주세요.' },
+          ]}
+        >
+          <Input
+            inputMode="numeric"
+            autoComplete="tel-national"
+            maxLength={13}
+            placeholder="010-0000-0000"
+          />
+        </Form.Item>
         <Form.Item
           label="비밀번호"
           name="password"

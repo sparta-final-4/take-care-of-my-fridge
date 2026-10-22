@@ -26,6 +26,11 @@ public record SignUpRequest(
         @Size(max = 30, message = "닉네임은 30자 이하여야 합니다.")
         String nickname,
 
+        @NotBlank(message = "전화번호를 입력해 주세요.")
+        @Pattern(regexp = "^(010[0-9]{8}|010-[0-9]{4}-[0-9]{4})$",
+                message = "전화번호는 010-XXXX-XXXX 형식으로 입력해 주세요.")
+        String phone,
+
         @NotNull(message = "맛 선호 목록을 보내 주세요.")
         List<Member.@NotNull(message = "맛 선호에 빈 값은 사용할 수 없습니다.") Taste> tastes
 ) {
@@ -34,11 +39,16 @@ public record SignUpRequest(
         nickname = nickname == null ? null : nickname.strip();
     }
 
+    public String normalizedPhone() {
+        return phone.replace("-", "");
+    }
+
     public Member toEntity(String passwordHash, Set<Member.Taste> uniqueTastes) {
         return Member.builder()
                 .email(email)
                 .passwordHash(passwordHash)
                 .nickname(nickname)
+                .phone(normalizedPhone())
                 .tastes(uniqueTastes)
                 .build();
     }

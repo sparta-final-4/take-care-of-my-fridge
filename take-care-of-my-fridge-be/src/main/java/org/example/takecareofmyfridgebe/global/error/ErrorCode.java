@@ -25,6 +25,7 @@ public enum ErrorCode {
     LOGIN_FAILED(HttpStatus.UNAUTHORIZED, "A001", "이메일 또는 비밀번호가 올바르지 않습니다."),
     ACCOUNT_SUSPENDED(HttpStatus.FORBIDDEN, "A002", "정지된 계정입니다."),
     DUPLICATE_NICKNAME(HttpStatus.CONFLICT, "M002", "이미 사용 중인 닉네임입니다."),
+    DUPLICATE_PHONE(HttpStatus.CONFLICT, "M009", "이미 사용 중인 전화번호입니다."),
     INVALID_CURRENT_PASSWORD(HttpStatus.BAD_REQUEST, "M003", "현재 비밀번호가 일치하지 않습니다."),
     SAME_AS_CURRENT_PASSWORD(HttpStatus.BAD_REQUEST, "M004", "현재 비밀번호와 다른 비밀번호를 입력해 주세요."),
     ALREADY_ADMIN(HttpStatus.CONFLICT, "M007", "이미 관리자인 회원입니다."),
