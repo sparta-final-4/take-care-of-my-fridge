@@ -8,6 +8,9 @@ import org.example.takecareofmyfridgebe.domain.product.dto.ProductDetailResponse
 import org.example.takecareofmyfridgebe.domain.product.dto.ProductListItemResponse;
 import org.example.takecareofmyfridgebe.domain.product.dto.ProductListRequest;
 import org.example.takecareofmyfridgebe.domain.product.dto.ProductSort;
+import org.example.takecareofmyfridgebe.domain.product.dto.ProductUpdateRequest;
+import org.example.takecareofmyfridgebe.domain.product.dto.ProductUpdateRequest.IngredientUpdate;
+import org.example.takecareofmyfridgebe.domain.product.dto.ProductUpdateRequest.MealkitUpdate;
 import org.example.takecareofmyfridgebe.domain.product.entity.IngredientProduct;
 import org.example.takecareofmyfridgebe.domain.product.entity.MealkitProduct;
 import org.example.takecareofmyfridgebe.domain.product.entity.Product;
@@ -237,6 +240,97 @@ class ProductServiceTest {
                     .isEqualTo(ErrorCode.INVALID_PRODUCT_INGREDIENT);
         }
         verify(productRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("상품 수정은 보낸 필드만 바꾸고 나머지는 기존 값을 유지한다")
+    void updateProduct_changesOnlySentFields() {
+        // given
+        Product onion = ProductFixture.createProduct(5L, "양파 1kg", 3900);
+        IngredientProduct detail = ProductFixture.createIngredientDetail(onion, new BigDecimal("1000"), "g");
+        when(productRepository.findByIdForUpdate(5L)).thenReturn(Optional.of(onion));
+        when(ingredientProductRepository.findByProductId(5L)).thenReturn(Optional.of(detail));
+        ProductUpdateRequest request = new ProductUpdateRequest(null, null, null, 4500, 0, null, null,
+                ProductStatus.SOLD_OUT, new IngredientUpdate(null, null, "kg", null), null);
+
+        // when
+        ProductDetailResponse result = service.updateProduct(5L, request);
+
+        // then
+        assertThat(result.name()).isEqualTo("양파 1kg");
+        assertThat(result.price()).isEqualTo(4500);
+        assertThat(result.stock()).isZero();
+        assertThat(result.status()).isEqualTo(ProductStatus.SOLD_OUT);
+        assertThat(result.ingredient()).isEqualTo(new ProductDetailResponse.IngredientInfo(new BigDecimal("1000"), "kg"));
+        verify(ingredientRepository, never()).findById(any());
+    }
+
+    @Test
+    @DisplayName("연결 재료를 바꾸면 바꿀 재료가 상품에 연결 가능한지 확인한다")
+    void updateProduct_validatesNewIngredient() {
+        // given
+        Product onion = ProductFixture.createProduct(5L, "양파 1kg", 3900);
+        when(productRepository.findByIdForUpdate(5L)).thenReturn(Optional.of(onion));
+        when(ingredientProductRepository.findByProductId(5L))
+                .thenReturn(Optional.of(ProductFixture.createIngredientDetail(onion, BigDecimal.ONE, "개")));
+        when(ingredientRepository.findById(2L)).thenReturn(Optional.of(ingredient(Ingredient.ING_CUSTOM)));
+        ProductUpdateRequest request = new ProductUpdateRequest(null, null, null, null, null, null, null, null,
+                new IngredientUpdate(2L, null, null, null), null);
+
+        // when & then
+        assertThatThrownBy(() -> service.updateProduct(5L, request))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.INVALID_PRODUCT_INGREDIENT);
+    }
+
+    @Test
+    @DisplayName("상품 종류와 다른 상세를 보내면 아무것도 바꾸지 않고 거절한다")
+    void updateProduct_rejectsDetailOfOtherType() {
+        // given
+        Product onion = ProductFixture.createProduct(5L, "양파 1kg", 3900);
+        when(productRepository.findByIdForUpdate(5L)).thenReturn(Optional.of(onion));
+        ProductUpdateRequest request = new ProductUpdateRequest("새 이름", null, null, null, null, null, null, null,
+                null, new MealkitUpdate(2));
+
+        // when & then
+        assertThatThrownBy(() -> service.updateProduct(5L, request))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.INVALID_INPUT_VALUE);
+        assertThat(onion.getName()).isEqualTo("양파 1kg");
+    }
+
+    @Test
+    @DisplayName("상세를 보냈는데 상세 행이 없으면 PRODUCT_DETAIL_MISSING 예외가 발생한다")
+    void updateProduct_detailMissing() {
+        // given
+        Product stew = ProductFixture.createMealkitProduct(7L, "된장찌개 밀키트", 12900);
+        when(productRepository.findByIdForUpdate(7L)).thenReturn(Optional.of(stew));
+        when(mealkitProductRepository.findByProductId(7L)).thenReturn(Optional.empty());
+        ProductUpdateRequest request = new ProductUpdateRequest(null, null, null, null, null, null, null, null,
+                null, new MealkitUpdate(3));
+
+        // when & then
+        assertThatThrownBy(() -> service.updateProduct(7L, request))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.PRODUCT_DETAIL_MISSING);
+    }
+
+    @Test
+    @DisplayName("없는 상품을 수정하면 PRODUCT_NOT_FOUND 예외가 발생한다")
+    void updateProduct_notFound() {
+        // given
+        when(productRepository.findByIdForUpdate(99L)).thenReturn(Optional.empty());
+        ProductUpdateRequest request = new ProductUpdateRequest(null, null, null, 1000, null, null, null, null,
+                null, null);
+
+        // when & then
+        assertThatThrownBy(() -> service.updateProduct(99L, request))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.PRODUCT_NOT_FOUND);
     }
 
     private static Ingredient ingredient(String code) {

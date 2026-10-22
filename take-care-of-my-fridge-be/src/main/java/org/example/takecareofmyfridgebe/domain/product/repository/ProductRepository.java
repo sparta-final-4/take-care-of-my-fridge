@@ -20,4 +20,9 @@ public interface ProductRepository extends JpaRepository<Product, Long>, Product
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select p from Product p where p.id in :ids order by p.id")
     List<Product> findAllByIdInForUpdate(@Param("ids") Collection<Long> ids);
+
+    // 관리자 수정과 주문의 재고 차감이 겹쳐 재고가 덮어써지지 않도록 같은 행 잠금을 건다.
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select p from Product p where p.id = :id")
+    Optional<Product> findByIdForUpdate(@Param("id") Long id);
 }

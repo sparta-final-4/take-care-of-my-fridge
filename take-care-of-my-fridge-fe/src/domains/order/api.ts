@@ -1,5 +1,6 @@
 import {
   orderApi,
+  type OrderCancelResponse,
   type OrderCheckoutResponse,
   type OrderListRequest,
   type PageResponseOrderSummaryResponse,
@@ -19,6 +20,11 @@ export async function getOrderCheckout(
   signal?: AbortSignal,
 ): Promise<OrderCheckoutResponse> {
   return unwrap(orderApi.getCheckout({ orderId }, { signal }));
+}
+
+// 이미 취소된 주문에도 서버는 같은 성공 응답을 준다. 재고는 처음 취소할 때만 돌아간다.
+export async function cancelOrder(orderId: number): Promise<OrderCancelResponse> {
+  return unwrap(orderApi.cancelOrder({ orderId }));
 }
 
 export async function getMyOrders(

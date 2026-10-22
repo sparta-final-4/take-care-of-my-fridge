@@ -120,4 +120,22 @@ public class Product extends BaseTimeEntity {
             this.status = ProductStatus.ON_SALE;
         }
     }
+
+    // 상품 종류(productType)는 상세 테이블이 달라 바꾸지 않는다.
+    public void changeInfo(String name, String description, String imageUrl) {
+        this.name = name;
+        this.description = description;
+        this.imageUrl = imageUrl;
+    }
+
+    public void changeSales(int price, int stock, ProductStatus status) {
+        this.price = price;
+        this.stock = stock;
+        this.status = status;
+    }
+
+    public void changeStorage(StorageType storage, int shelfDays) {
+        this.storage = storage;
+        this.shelfDays = shelfDays;
+    }
 }
