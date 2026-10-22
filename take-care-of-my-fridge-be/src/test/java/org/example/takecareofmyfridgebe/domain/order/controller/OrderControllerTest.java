@@ -25,6 +25,7 @@ import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderCancelResponse;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderCheckoutResponse;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderCreateResult;
+import org.example.takecareofmyfridgebe.domain.order.dto.OrderDetailResponse;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderListRequest;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderSummaryResponse;
 import org.example.takecareofmyfridgebe.domain.order.entity.OrderStatus;
@@ -97,6 +98,30 @@ class OrderControllerTest {
                         .with(loginAsMember7()))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.error.code").value("ORDER_007"));
+    }
+
+    @Test
+    @DisplayName("주문 상세 조회는 로그인한 회원 번호와 주문 번호로 서비스를 부르고 200이다")
+    void getDetail_returns200() throws Exception {
+        when(orderQueryService.getDetail(7L, 5001L)).thenReturn(detailResponse());
+
+        mvc.perform(get("/api/orders/5001")
+                        .with(loginAsMember7()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.orderId").value(5001))
+                .andExpect(jsonPath("$.data.status").value("CONFIRMED"))
+                .andExpect(jsonPath("$.data.confirmedAt").value("2026-10-21T14:30:00"));
+    }
+
+    @Test
+    @DisplayName("주문 상세 조회에서 남의 주문이거나 없는 주문이면 404다")
+    void getDetail_notOwned_returns404() throws Exception {
+        when(orderQueryService.getDetail(7L, 5001L)).thenThrow(new BusinessException(ErrorCode.ORDER_NOT_FOUND));
+
+        mvc.perform(get("/api/orders/5001")
+                        .with(loginAsMember7()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error.code").value("ORDER_001"));
     }
 
     @Test
@@ -231,6 +256,12 @@ class OrderControllerTest {
     private OrderCheckoutResponse response() {
         return new OrderCheckoutResponse(5001L, "20261020143005123001", OrderStatus.PENDING,
                 LocalDateTime.of(2026, 10, 20, 14, 30), 3000L, 0L, 3000L, List.of());
+    }
+
+    private OrderDetailResponse detailResponse() {
+        return new OrderDetailResponse(5001L, "20261020143005123001", OrderStatus.CONFIRMED,
+                LocalDateTime.of(2026, 10, 20, 14, 30), LocalDateTime.of(2026, 10, 21, 14, 30),
+                3000L, 0L, 3000L, List.of());
     }
 
     private RequestPostProcessor loginAsMember7() {
