@@ -1,0 +1,49 @@
+@use '@/styles/mixins' as *;
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ant-margin-xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+// 모바일: 이름·상태 / 양 2줄, md부터 이름·양·상태 한 줄
+.row {
+  display: grid;
+  grid-template-areas:
+    'name status'
+    'amount status';
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0 var(--ant-margin);
+  padding: var(--ant-padding-sm) var(--ant-padding);
+  border: 1px solid var(--ant-color-border-secondary);
+  border-radius: var(--ant-border-radius);
+
+  @include from(md) {
+    grid-template-areas: 'name amount status';
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  }
+}
+
+.name {
+  grid-area: name;
+  overflow-wrap: anywhere;
+}
+
+.amount {
+  grid-area: amount;
+}
+
+.status {
+  display: inline-flex;
+  grid-area: status;
+  align-items: center;
+  gap: var(--ant-margin-xs);
+}
+
+.dDay {
+  margin: 0;
+}

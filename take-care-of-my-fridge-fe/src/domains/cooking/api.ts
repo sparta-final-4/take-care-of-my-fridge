@@ -1,5 +1,13 @@
 import { axiosInstance } from '@/common/api/axiosInstance';
+import {
+  cookingLogApi,
+  cookingStatsApi,
+  type CookingLogSearchRequest,
+  type CookingStatsResponse,
+  type PageResponseCookingLogResponse,
+} from '@/common/api/clients';
 import type { ApiResponse } from '@/common/api/types';
+import { unwrap } from '@/common/api/unwrap';
 
 export type CookingSortType = 'LATEST' | 'MOST_COOKED';
 export type CookingTabType = 'ALL' | 'UNREVIEWED' | 'REVIEWED';
@@ -49,4 +57,20 @@ export async function getMyCookedRecipes(
     { signal },
   );
   return data.data;
+}
+
+// 로그인 없이 조회할 수 있다. 요리 기록이 없으면 모든 수가 0이다.
+export async function getCookingStats(
+  recipeId: number,
+  signal?: AbortSignal,
+): Promise<CookingStatsResponse> {
+  return unwrap(cookingStatsApi.getCookingStats({ recipeId }, { signal }));
+}
+
+// 로그인한 회원 본인의 요리 기록만 최신순으로 온다.
+export async function getCookingLogs(
+  request: CookingLogSearchRequest,
+  signal?: AbortSignal,
+): Promise<PageResponseCookingLogResponse> {
+  return unwrap(cookingLogApi.getCookingLogs({ request }, { signal }));
 }

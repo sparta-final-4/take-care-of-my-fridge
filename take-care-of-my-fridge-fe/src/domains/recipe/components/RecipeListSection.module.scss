@@ -1,0 +1,5 @@
+// 정렬·페이지를 바꾸는 동안 이전 목록을 흐리게 보여 준다.
+.loading {
+  opacity: 0.5;
+  transition: opacity var(--ant-motion-duration-mid);
+}

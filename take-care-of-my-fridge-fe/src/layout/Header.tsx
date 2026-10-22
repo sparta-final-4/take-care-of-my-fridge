@@ -42,12 +42,14 @@ export function Header() {
   const handleCloseDrawer = () => setDrawerOpen(false);
   const handleNavigate = (key: (typeof NAV_ITEMS)[number]['key']) => {
     if (key === 'fridge') navigate(ROUTES.fridge);
+    if (key === 'recipes') navigate(ROUTES.recipes);
     if (key === 'products') navigate(ROUTES.products);
     if (key === 'cart') navigate(ROUTES.cart);
     if (key === 'mypage') navigate(status === 'authenticated' ? ROUTES.mypage : ROUTES.login);
   };
   const isCurrent = (key: (typeof NAV_ITEMS)[number]['key']) =>
     (key === 'fridge' && pathname === ROUTES.fridge) ||
+    (key === 'recipes' && pathname.startsWith(ROUTES.recipes)) ||
     (key === 'products' && pathname.startsWith(ROUTES.products)) ||
     (key === 'cart' && pathname === ROUTES.cart) ||
     (key === 'mypage' && pathname.startsWith(ROUTES.mypage));
