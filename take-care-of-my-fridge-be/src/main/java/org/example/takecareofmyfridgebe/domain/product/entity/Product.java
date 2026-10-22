@@ -92,6 +92,7 @@ public class Product extends BaseTimeEntity {
 
     // 재고는 음수가 될 수 없다. 모자라면 빼지 않고 거절하며, 화면에 띄울 문구(품절·재고 부족 + 상품명)를 함께 담는다.
     // 수량이 0 이하면 재고가 늘어나므로 먼저 거절한다.
+    // 판매 중인 상품의 재고가 0이 되면 품절로 바꾼다. 판매 중지 상품의 상태는 건드리지 않는다.
     public void decreaseStock(int quantity) {
         if (quantity <= 0) {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "수량은 1 이상이어야 합니다.");
@@ -103,13 +104,20 @@ public class Product extends BaseTimeEntity {
             throw new BusinessException(ErrorCode.INSUFFICIENT_STOCK, "재고 부족 · " + name);
         }
         this.stock -= quantity;
+        if (stock == 0 && status == ProductStatus.ON_SALE) {
+            this.status = ProductStatus.SOLD_OUT;
+        }
     }
 
-    // 주문 취소로 잡아 두었던 재고를 되돌린다. 수량이 0 이하면 재고가 줄어들므로 거절한다.
+    // 주문 취소·환불로 재고를 되돌린다. 수량이 0 이하면 재고가 줄어들므로 거절한다.
+    // 품절 상품은 재고가 1 이상이 되므로 판매 중으로 바꾼다. 판매 중지 상품의 상태는 건드리지 않는다.
     public void increaseStock(int quantity) {
         if (quantity <= 0) {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "수량은 1 이상이어야 합니다.");
         }
         this.stock += quantity;
+        if (status == ProductStatus.SOLD_OUT) {
+            this.status = ProductStatus.ON_SALE;
+        }
     }
 }
