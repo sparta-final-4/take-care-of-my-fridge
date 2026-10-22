@@ -16,6 +16,11 @@
 
 
 export interface RecipeListRequest {
+    'category'?: string;
+    'cuisineType'?: string;
+    'keyword'?: string;
+    'maxCookTimeMin'?: number;
+    'maxDifficulty'?: number;
     'page'?: number;
     'size'?: number;
     'sort'?: RecipeListRequestSortEnum;
