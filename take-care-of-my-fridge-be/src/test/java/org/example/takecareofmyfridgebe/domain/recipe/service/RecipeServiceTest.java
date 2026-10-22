@@ -1,5 +1,8 @@
 package org.example.takecareofmyfridgebe.domain.recipe.service;
 
+import org.example.takecareofmyfridgebe.domain.ingredient.entity.Ingredient;
+import org.example.takecareofmyfridgebe.domain.ingredient.repository.IngredientRepository;
+import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeCreateRequest;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeDetailResponse;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeListItemResponse;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeSort;
@@ -28,7 +31,10 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -42,6 +48,8 @@ class RecipeServiceTest {
     private RecipeIngredientRepository recipeIngredientRepository;
     @Mock
     private RecipeStepRepository recipeStepRepository;
+    @Mock
+    private IngredientRepository ingredientRepository;
     @InjectMocks
     private RecipeService service;
 
@@ -114,5 +122,45 @@ class RecipeServiceTest {
                 .isEqualTo(ErrorCode.RECIPE_NOT_FOUND);
         verify(recipeIngredientRepository, never()).findByRecipeIdOrderBySeqAsc(anyLong());
         verify(recipeStepRepository, never()).findByRecipeIdOrderByStepNoAsc(anyLong());
+    }
+
+    @Test
+    @DisplayName("레시피 등록 시 출처를 ADMIN으로 정하고, 재료와 조리 단계에 목록 순서대로 번호를 매겨 저장한다")
+    void createRecipe_savesWithOrder() {
+        // given
+        when(ingredientRepository.findAllById(List.of(10L, 20L)))
+                .thenReturn(List.of(mock(Ingredient.class), mock(Ingredient.class)));
+        when(recipeRepository.save(any(Recipe.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(recipeIngredientRepository.saveAll(anyList())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(recipeStepRepository.saveAll(anyList())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        // when
+        RecipeDetailResponse result = service.createRecipe(RecipeFixture.createRecipeRequest(10L, 20L));
+
+        // then
+        assertThat(result.name()).isEqualTo("된장찌개");
+        assertThat(result.ingredients()).extracting(RecipeDetailResponse.IngredientItem::seq)
+                .containsExactly(1, 2);
+        assertThat(result.ingredients()).extracting(RecipeDetailResponse.IngredientItem::ingredientId)
+                .containsExactly(10L, 20L);
+        assertThat(result.steps()).extracting(RecipeDetailResponse.StepItem::stepNo)
+                .containsExactly(1, 2);
+        verify(recipeRepository).save(argThat(recipe ->
+                recipe.getSource().equals("ADMIN") && recipe.getSourceId().length() == 20));
+    }
+
+    @Test
+    @DisplayName("없는 재료가 섞여 있으면 INGREDIENT_NOT_FOUND 예외가 발생하고 아무것도 저장하지 않는다")
+    void createRecipe_ingredientNotFound() {
+        // given
+        when(ingredientRepository.findAllById(List.of(10L, 99L))).thenReturn(List.of(mock(Ingredient.class)));
+        RecipeCreateRequest request = RecipeFixture.createRecipeRequest(10L, 99L);
+
+        // when & then
+        assertThatThrownBy(() -> service.createRecipe(request))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.INGREDIENT_NOT_FOUND);
+        verify(recipeRepository, never()).save(any());
     }
 }
