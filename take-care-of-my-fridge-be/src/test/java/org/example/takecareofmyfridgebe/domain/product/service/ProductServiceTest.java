@@ -302,6 +302,23 @@ class ProductServiceTest {
     }
 
     @Test
+    @DisplayName("상세를 보냈는데 상세 행이 없으면 PRODUCT_DETAIL_MISSING 예외가 발생한다")
+    void updateProduct_detailMissing() {
+        // given
+        Product stew = ProductFixture.createMealkitProduct(7L, "된장찌개 밀키트", 12900);
+        when(productRepository.findByIdForUpdate(7L)).thenReturn(Optional.of(stew));
+        when(mealkitProductRepository.findByProductId(7L)).thenReturn(Optional.empty());
+        ProductUpdateRequest request = new ProductUpdateRequest(null, null, null, null, null, null, null, null,
+                null, new MealkitUpdate(3));
+
+        // when & then
+        assertThatThrownBy(() -> service.updateProduct(7L, request))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.PRODUCT_DETAIL_MISSING);
+    }
+
+    @Test
     @DisplayName("없는 상품을 수정하면 PRODUCT_NOT_FOUND 예외가 발생한다")
     void updateProduct_notFound() {
         // given

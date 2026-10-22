@@ -110,7 +110,7 @@ public class ProductService {
             return detail;
         }
         if (detail == null) {
-            throw new BusinessException(ErrorCode.PRODUCT_NOT_FOUND, "상품 상세 정보를 찾을 수 없습니다.");
+            throw new BusinessException(ErrorCode.PRODUCT_DETAIL_MISSING);
         }
         if (request.ingredient().ingredientId() != null) {
             validateLinkableIngredient(request.ingredient().ingredientId());
@@ -125,7 +125,7 @@ public class ProductService {
             return detail;
         }
         if (detail == null) {
-            throw new BusinessException(ErrorCode.PRODUCT_NOT_FOUND, "상품 상세 정보를 찾을 수 없습니다.");
+            throw new BusinessException(ErrorCode.PRODUCT_DETAIL_MISSING);
         }
         request.applyTo(detail);
         return detail;
