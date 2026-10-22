@@ -10,13 +10,15 @@ CREATE TABLE members (
     email         VARCHAR(255) NOT NULL COMMENT '로그인 이메일',
     password_hash VARCHAR(255) NOT NULL COMMENT '비밀번호 해시(복원 불가)',
     nickname      VARCHAR(30)  NOT NULL COMMENT '닉네임(후기 표시 이름)',
+    phone         VARCHAR(11)  NULL COMMENT '전화번호(010 포함 숫자 11자리; 기존 회원·초기 관리자 NULL 허용)',
     role          ENUM('USER', 'ADMIN') NOT NULL DEFAULT 'USER' COMMENT '역할(가입 시 USER, 관리자 승격 시 ADMIN)',
     status        ENUM('ACTIVE', 'SUSPENDED') NOT NULL DEFAULT 'ACTIVE' COMMENT '계정 상태(정상/정지)',
     created_at    DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '가입일시',
     updated_at    DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '수정일시',
     PRIMARY KEY (id),
     CONSTRAINT uk_members_email UNIQUE (email),
-    CONSTRAINT uk_members_nickname UNIQUE (nickname)
+    CONSTRAINT uk_members_nickname UNIQUE (nickname),
+    CONSTRAINT uk_members_phone UNIQUE (phone)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '회원';
 
 -- 2. 맛 선호 (회원 1명이 여러 개 선택)
