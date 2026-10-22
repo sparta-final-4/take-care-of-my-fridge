@@ -19,6 +19,7 @@
 | email | VARCHAR(255) | 불가 | | UK | 로그인 이메일 |
 | password_hash | VARCHAR(255) | 불가 | | | 비밀번호 해시(복원 불가) |
 | nickname | VARCHAR(30) | 불가 | | UK | 닉네임. 필수·중복 불가, 후기에 표시 |
+| phone | VARCHAR(11) | 허용 | NULL | UK | 가입 시 필수인 010 전화번호. 하이픈을 제외한 숫자 11자리로 저장. 기존 회원·초기 관리자 NULL 허용 |
 | role | ENUM('USER','ADMIN') | 불가 | 'USER' | | 공개 가입은 USER. 관리자 승격 시 ADMIN |
 | status | ENUM('ACTIVE','SUSPENDED') | 불가 | 'ACTIVE' | | 정상·정지. 회원 탈퇴 기능이 없어 WITHDRAWN 없음 |
 | created_at | DATETIME(6) | 불가 | 현재 시각 | | 가입일시 |

@@ -68,7 +68,7 @@ class MemberControllerTest {
         mvc.perform(post("/api/members")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"email":"cook@example.com","password":"abcdefgh12!","nickname":"요리왕","tastes":[]}
+                                {"email":"cook@example.com","password":"abcdefgh12!","nickname":"요리왕","phone":"010-1234-5678","tastes":[]}
                                 """))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.data.memberId").value(10));
@@ -79,7 +79,7 @@ class MemberControllerTest {
         mvc.perform(post("/api/members")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"email":"cook@example.com","password":"ab1!","nickname":"요리왕","tastes":[]}
+                                {"email":"cook@example.com","password":"ab1!","nickname":"요리왕","phone":"010-1234-5678","tastes":[]}
                                 """))
                 .andExpect(status().isBadRequest());
 
@@ -93,9 +93,34 @@ class MemberControllerTest {
         mvc.perform(post("/api/members")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"email":"cook@example.com","password":"abcdefgh12!","nickname":"요리왕","tastes":[]}
+                                {"email":"cook@example.com","password":"abcdefgh12!","nickname":"요리왕","phone":"010-1234-5678","tastes":[]}
                                 """))
                 .andExpect(status().isConflict());
+    }
+
+    @Test
+    void missingPhoneIsRejectedBeforeCallingService() throws Exception {
+        mvc.perform(post("/api/members")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"cook@example.com","password":"abcdefgh12!","nickname":"요리왕","tastes":[]}
+                                """))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(memberService);
+    }
+
+    @Test
+    void duplicatePhoneReturnsConflict() throws Exception {
+        when(memberService.signUp(any())).thenThrow(new BusinessException(ErrorCode.DUPLICATE_PHONE));
+
+        mvc.perform(post("/api/members")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"cook@example.com","password":"abcdefgh12!","nickname":"요리왕","phone":"010-1234-5678","tastes":[]}
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("M009"));
     }
 
     @Test

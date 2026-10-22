@@ -7,6 +7,7 @@ apis/admin-product-controller-api.ts
 apis/auth-controller-api.ts
 apis/cart-controller-api.ts
 apis/cooking-log-controller-api.ts
+apis/cooking-stats-controller-api.ts
 apis/csrf-controller-api.ts
 apis/fridge-controller-api.ts
 apis/member-controller-api.ts
@@ -27,6 +28,8 @@ models/api-response-add-cart-item-response.ts
 models/api-response-cart-items-response.ts
 models/api-response-change-cart-item-quantity-response.ts
 models/api-response-cooking-complete-response.ts
+models/api-response-cooking-log-response.ts
+models/api-response-cooking-stats-response.ts
 models/api-response-csrf-response.ts
 models/api-response-deal-analysis-response.ts
 models/api-response-deal-review-response.ts
@@ -49,6 +52,7 @@ models/api-response-page-response-product-list-item-response.ts
 models/api-response-page-response-recipe-list-item-response.ts
 models/api-response-page-response-review-response.ts
 models/api-response-payment-confirm-response.ts
+models/api-response-payment-prepare-response.ts
 models/api-response-product-detail-response.ts
 models/api-response-recipe-detail-response.ts
 models/api-response-review-response.ts
@@ -68,6 +72,8 @@ models/cooking-complete-request.ts
 models/cooking-complete-response.ts
 models/cooking-log-response.ts
 models/cooking-log-search-request.ts
+models/cooking-log-update-request.ts
+models/cooking-stats-response.ts
 models/csrf-response.ts
 models/csrf-token.ts
 models/deal-analysis-response.ts
@@ -91,10 +97,12 @@ models/ingredient-deduction-response.ts
 models/ingredient-detail.ts
 models/ingredient-info.ts
 models/ingredient-item.ts
+models/ingredient-update.ts
 models/item.ts
 models/login-request.ts
 models/mealkit-detail.ts
 models/mealkit-info.ts
+models/mealkit-update.ts
 models/member-list-request.ts
 models/member-summary-response.ts
 models/my-info-response.ts
@@ -123,10 +131,12 @@ models/page-response-recipe-list-item-response.ts
 models/page-response-review-response.ts
 models/payment-confirm-request.ts
 models/payment-confirm-response.ts
+models/payment-prepare-response.ts
 models/product-create-request.ts
 models/product-detail-response.ts
 models/product-list-item-response.ts
 models/product-list-request.ts
+models/product-update-request.ts
 models/recipe-detail-response.ts
 models/recipe-list-item-response.ts
 models/recipe-list-request.ts

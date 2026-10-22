@@ -269,6 +269,47 @@
         ]
       }
     },
+    "/api/admin/products/{productId}": {
+      "patch": {
+        "operationId": "updateProduct",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "productId",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProductUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseProductDetailResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "admin-product-controller"
+        ]
+      }
+    },
     "/api/auth/csrf": {
       "get": {
         "operationId": "csrf",
@@ -561,6 +602,47 @@
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponseCookingCompleteResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "cooking-log-controller"
+        ]
+      }
+    },
+    "/api/cooking-logs/{cookingLogId}": {
+      "patch": {
+        "operationId": "updateCookingLog",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "cookingLogId",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CookingLogUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseCookingLogResponse"
                 }
               }
             },
@@ -1144,6 +1226,37 @@
         ]
       }
     },
+    "/api/orders/{orderId}/payments": {
+      "post": {
+        "operationId": "prepare",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "orderId",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePaymentPrepareResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "payment-controller"
+        ]
+      }
+    },
     "/api/payments/confirm": {
       "post": {
         "operationId": "confirm",
@@ -1323,6 +1436,37 @@
         },
         "tags": [
           "recipe-controller"
+        ]
+      }
+    },
+    "/api/recipes/{recipeId}/cooking-stats": {
+      "get": {
+        "operationId": "getCookingStats",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "recipeId",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseCookingStatsResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "cooking-stats-controller"
         ]
       }
     },
@@ -1590,6 +1734,34 @@
         "properties": {
           "data": {
             "$ref": "#/components/schemas/CookingCompleteResponse"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorResponse"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ApiResponseCookingLogResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/CookingLogResponse"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorResponse"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ApiResponseCookingStatsResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/CookingStatsResponse"
           },
           "error": {
             "$ref": "#/components/schemas/ErrorResponse"
@@ -1901,6 +2073,20 @@
         "properties": {
           "data": {
             "$ref": "#/components/schemas/PaymentConfirmResponse"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorResponse"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ApiResponsePaymentPrepareResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/PaymentPrepareResponse"
           },
           "error": {
             "$ref": "#/components/schemas/ErrorResponse"
@@ -2408,6 +2594,47 @@
           "to": {
             "type": "string",
             "format": "date"
+          }
+        }
+      },
+      "CookingLogUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "memo": {
+            "type": "string",
+            "maxLength": 50,
+            "minLength": 0
+          },
+          "result": {
+            "type": "string",
+            "enum": [
+              "SUCCESS",
+              "FAILED"
+            ]
+          }
+        },
+        "required": [
+          "result"
+        ]
+      },
+      "CookingStatsResponse": {
+        "type": "object",
+        "properties": {
+          "failedCount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "recipeId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "successCount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "totalCount": {
+            "type": "integer",
+            "format": "int64"
           }
         }
       },
@@ -2969,6 +3196,26 @@
           }
         }
       },
+      "IngredientUpdate": {
+        "type": "object",
+        "properties": {
+          "baseQuantity": {
+            "type": "number"
+          },
+          "ingredientId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "unit": {
+            "type": "string",
+            "maxLength": 20,
+            "minLength": 1
+          },
+          "unitAmount": {
+            "type": "number"
+          }
+        }
+      },
       "Item": {
         "type": "object",
         "properties": {
@@ -3035,6 +3282,16 @@
           "servings": {
             "type": "integer",
             "format": "int32"
+          }
+        }
+      },
+      "MealkitUpdate": {
+        "type": "object",
+        "properties": {
+          "servings": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 1
           }
         }
       },
@@ -3786,11 +4043,36 @@
           }
         }
       },
+      "PaymentPrepareResponse": {
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "orderId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "orderName": {
+            "type": "string"
+          },
+          "portonePaymentId": {
+            "type": "string"
+          }
+        }
+      },
       "ProductCreateRequest": {
         "type": "object",
         "properties": {
           "description": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 0
           },
           "detailMatchingType": {
             "type": "boolean"
@@ -3816,7 +4098,7 @@
             "type": "integer",
             "format": "int32",
             "maximum": 10000000,
-            "minimum": 0
+            "minimum": 1
           },
           "productType": {
             "type": "string",
@@ -3989,6 +4271,66 @@
             "enum": [
               "INGREDIENT",
               "MEALKIT"
+            ]
+          }
+        }
+      },
+      "ProductUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "description": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 0
+          },
+          "imageUrl": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 0,
+            "pattern": "^$|^https?://\\S+$"
+          },
+          "ingredient": {
+            "$ref": "#/components/schemas/IngredientUpdate"
+          },
+          "mealkit": {
+            "$ref": "#/components/schemas/MealkitUpdate"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1
+          },
+          "price": {
+            "type": "integer",
+            "format": "int32",
+            "maximum": 10000000,
+            "minimum": 1
+          },
+          "shelfDays": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ON_SALE",
+              "SOLD_OUT",
+              "STOPPED"
+            ]
+          },
+          "stock": {
+            "type": "integer",
+            "format": "int32",
+            "maximum": 100000,
+            "minimum": 0
+          },
+          "storage": {
+            "type": "string",
+            "enum": [
+              "REFRIGERATED",
+              "FROZEN",
+              "ROOM_TEMP"
             ]
           }
         }
@@ -4302,6 +4644,11 @@
             "minLength": 8,
             "pattern": "^(?=.*[A-Za-z])(?=.*\\d)(?=.*[^A-Za-z0-9])[\\x21-\\x7E]+$"
           },
+          "phone": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^(010[0-9]{8}|010-[0-9]{4}-[0-9]{4})$"
+          },
           "tastes": {
             "type": "array",
             "items": {
@@ -4320,6 +4667,7 @@
           "email",
           "nickname",
           "password",
+          "phone",
           "tastes"
         ]
       },

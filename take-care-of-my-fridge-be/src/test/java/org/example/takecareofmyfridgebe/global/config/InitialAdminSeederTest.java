@@ -1,7 +1,6 @@
 package org.example.takecareofmyfridgebe.global.config;
 
 import jakarta.validation.Validator;
-import org.example.takecareofmyfridgebe.domain.member.dto.SignUpRequest;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 import org.example.takecareofmyfridgebe.domain.member.repository.MemberRepository;
 import org.junit.jupiter.api.Test;
@@ -14,9 +13,8 @@ import org.springframework.boot.ApplicationArguments;
 import org.springframework.core.env.Environment;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
-import java.util.Set;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
@@ -50,7 +48,6 @@ class InitialAdminSeederTest {
     @Test
     void createsOnePermanentAdminWithEncodedPassword() {
         configuredCredentials();
-        when(validator.validate(any(SignUpRequest.class))).thenReturn(Set.of());
         when(passwordEncoder.encode("Strongpass1!")).thenReturn("encoded-password");
         when(memberRepository.existsByRole(Member.Role.ADMIN)).thenReturn(false, true);
 
@@ -64,6 +61,7 @@ class InitialAdminSeederTest {
         assertEquals(Member.Status.ACTIVE, admin.getStatus());
         assertEquals("admin@example.com", admin.getEmail());
         assertEquals("encoded-password", admin.getPasswordHash());
+        assertNull(admin.getPhone());
     }
 
     @Test
@@ -80,7 +78,6 @@ class InitialAdminSeederTest {
     @Test
     void existingUserEmailIsNotPromotedToAdmin() {
         configuredCredentials();
-        when(validator.validate(any(SignUpRequest.class))).thenReturn(Set.of());
         when(memberRepository.existsByEmail("admin@example.com")).thenReturn(true);
 
         assertThrows(IllegalStateException.class, () -> seeder.run(arguments));

@@ -19,6 +19,7 @@ erDiagram
         bigint id PK
         varchar email UK
         varchar nickname UK
+        varchar phone UK
         enum role
         enum status
     }
