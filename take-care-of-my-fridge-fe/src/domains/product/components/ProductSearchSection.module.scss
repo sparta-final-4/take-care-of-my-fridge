@@ -1,0 +1,22 @@
+@use '@/styles/variables' as *;
+@use '@/styles/mixins' as *;
+
+.label {
+  margin-right: var(--ant-margin-xs);
+}
+
+// 모바일에서는 칩을 눌러도 되는 크기로 키운다.
+.chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: $touch-target-size;
+  margin: 0;
+  padding-inline: var(--ant-padding-sm);
+  border: 1px solid var(--ant-color-border);
+  border-radius: var(--ant-border-radius-lg);
+
+  @include from(md) {
+    min-height: auto;
+    padding-block: var(--ant-padding-xxs);
+  }
+}
