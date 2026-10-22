@@ -1339,6 +1339,37 @@
         ]
       }
     },
+    "/api/recipes/{recipeId}/cooking-stats": {
+      "get": {
+        "operationId": "getCookingStats",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "recipeId",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseCookingStatsResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "cooking-stats-controller"
+        ]
+      }
+    },
     "/api/reviews": {
       "get": {
         "operationId": "getReviews",
@@ -1617,6 +1648,20 @@
         "properties": {
           "data": {
             "$ref": "#/components/schemas/CookingLogResponse"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorResponse"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ApiResponseCookingStatsResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/CookingStatsResponse"
           },
           "error": {
             "$ref": "#/components/schemas/ErrorResponse"
@@ -2443,6 +2488,27 @@
         "required": [
           "result"
         ]
+      },
+      "CookingStatsResponse": {
+        "type": "object",
+        "properties": {
+          "failedCount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "recipeId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "successCount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "totalCount": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
       },
       "CsrfResponse": {
         "type": "object",

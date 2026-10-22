@@ -7,6 +7,7 @@ apis/admin-product-controller-api.ts
 apis/auth-controller-api.ts
 apis/cart-controller-api.ts
 apis/cooking-log-controller-api.ts
+apis/cooking-stats-controller-api.ts
 apis/csrf-controller-api.ts
 apis/fridge-controller-api.ts
 apis/member-controller-api.ts
@@ -28,6 +29,7 @@ models/api-response-cart-items-response.ts
 models/api-response-change-cart-item-quantity-response.ts
 models/api-response-cooking-complete-response.ts
 models/api-response-cooking-log-response.ts
+models/api-response-cooking-stats-response.ts
 models/api-response-csrf-response.ts
 models/api-response-deal-analysis-response.ts
 models/api-response-deal-review-response.ts
@@ -69,6 +71,7 @@ models/cooking-complete-response.ts
 models/cooking-log-response.ts
 models/cooking-log-search-request.ts
 models/cooking-log-update-request.ts
+models/cooking-stats-response.ts
 models/csrf-response.ts
 models/csrf-token.ts
 models/deal-analysis-response.ts
