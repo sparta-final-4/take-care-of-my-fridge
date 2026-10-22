@@ -79,6 +79,39 @@ class OrderTest {
     }
 
     @Test
+    void confirmRejectsPendingOrderAsNotPaid() {
+        Order order = newOrder();
+
+        assertThatThrownBy(() -> order.confirm(LocalDateTime.now()))
+            .isInstanceOf(BusinessException.class)
+            .extracting("errorCode").isEqualTo(ErrorCode.ORDER_NOT_PAID);
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.PENDING);
+    }
+
+    @Test
+    void confirmRejectsCancelledOrderAsCancelled() {
+        Order order = newOrder();
+        order.cancel();
+
+        assertThatThrownBy(() -> order.confirm(LocalDateTime.now()))
+            .isInstanceOf(BusinessException.class)
+            .extracting("errorCode").isEqualTo(ErrorCode.ORDER_CANCELLED);
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+    }
+
+    @Test
+    void isConfirmedIsTrueOnlyAfterConfirm() {
+        Order order = newOrder();
+        assertThat(order.isConfirmed()).isFalse();
+
+        order.markPaid(LocalDateTime.of(2026, 10, 21, 12, 0));
+        assertThat(order.isConfirmed()).isFalse();
+
+        order.confirm(LocalDateTime.of(2026, 10, 22, 12, 0));
+        assertThat(order.isConfirmed()).isTrue();
+    }
+
+    @Test
     void validatePendingPassesForPendingOrder() {
         newOrder().validatePending();
     }

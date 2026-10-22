@@ -24,12 +24,14 @@ import org.example.takecareofmyfridgebe.domain.auth.service.JwtTokenService;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderCancelResponse;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderCheckoutResponse;
+import org.example.takecareofmyfridgebe.domain.order.dto.OrderConfirmResponse;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderCreateResult;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderDetailResponse;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderListRequest;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderSummaryResponse;
 import org.example.takecareofmyfridgebe.domain.order.entity.OrderStatus;
 import org.example.takecareofmyfridgebe.domain.order.service.OrderCancelService;
+import org.example.takecareofmyfridgebe.domain.order.service.OrderConfirmService;
 import org.example.takecareofmyfridgebe.domain.order.service.OrderCreateService;
 import org.example.takecareofmyfridgebe.domain.order.service.OrderQueryService;
 import org.example.takecareofmyfridgebe.global.config.SecurityConfig;
@@ -60,19 +62,21 @@ class OrderControllerTest {
     private final OrderCreateService orderCreateService;
     private final OrderQueryService orderQueryService;
     private final OrderCancelService orderCancelService;
+    private final OrderConfirmService orderConfirmService;
 
     @Autowired
     OrderControllerTest(MockMvc mvc, OrderCreateService orderCreateService, OrderQueryService orderQueryService,
-                        OrderCancelService orderCancelService) {
+                        OrderCancelService orderCancelService, OrderConfirmService orderConfirmService) {
         this.mvc = mvc;
         this.orderCreateService = orderCreateService;
         this.orderQueryService = orderQueryService;
         this.orderCancelService = orderCancelService;
+        this.orderConfirmService = orderConfirmService;
     }
 
     @BeforeEach
     void resetMock() {
-        reset(orderCreateService, orderQueryService, orderCancelService);
+        reset(orderCreateService, orderQueryService, orderCancelService, orderConfirmService);
     }
 
     @Test
@@ -98,6 +102,43 @@ class OrderControllerTest {
                         .with(loginAsMember7()))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.error.code").value("ORDER_007"));
+    }
+
+    @Test
+    @DisplayName("구매 확정은 로그인한 회원 번호와 주문 번호로 서비스를 부르고 200이다")
+    void confirmOrder_returns200() throws Exception {
+        when(orderConfirmService.confirm(7L, 5001L)).thenReturn(new OrderConfirmResponse(5001L, OrderStatus.CONFIRMED));
+
+        mvc.perform(patch("/api/orders/5001/confirm")
+                        .with(csrf())
+                        .with(loginAsMember7()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.orderId").value(5001))
+                .andExpect(jsonPath("$.data.status").value("CONFIRMED"));
+    }
+
+    @Test
+    @DisplayName("결제 대기 주문을 구매 확정하면 409다")
+    void confirmOrder_pendingOrder_returns409() throws Exception {
+        when(orderConfirmService.confirm(7L, 5001L)).thenThrow(new BusinessException(ErrorCode.ORDER_NOT_PAID));
+
+        mvc.perform(patch("/api/orders/5001/confirm")
+                        .with(csrf())
+                        .with(loginAsMember7()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("ORDER_009"));
+    }
+
+    @Test
+    @DisplayName("구매 확정에서 남의 주문이거나 없는 주문이면 404다")
+    void confirmOrder_notOwned_returns404() throws Exception {
+        when(orderConfirmService.confirm(7L, 5001L)).thenThrow(new BusinessException(ErrorCode.ORDER_NOT_FOUND));
+
+        mvc.perform(patch("/api/orders/5001/confirm")
+                        .with(csrf())
+                        .with(loginAsMember7()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error.code").value("ORDER_001"));
     }
 
     @Test
@@ -286,6 +327,11 @@ class OrderControllerTest {
         @Bean
         OrderCancelService orderCancelService() {
             return mock(OrderCancelService.class);
+        }
+
+        @Bean
+        OrderConfirmService orderConfirmService() {
+            return mock(OrderConfirmService.class);
         }
 
         @Bean
