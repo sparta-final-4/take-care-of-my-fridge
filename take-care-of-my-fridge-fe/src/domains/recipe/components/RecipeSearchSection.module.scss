@@ -1,0 +1,40 @@
+@use '@/styles/variables' as *;
+@use '@/styles/mixins' as *;
+
+.hint {
+  font-size: var(--ant-font-size-sm);
+}
+
+// 모바일: 라벨 위, 칩 아래 / md부터 라벨과 칩을 한 줄에 둔다.
+.filterRow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ant-margin-xs);
+
+  @include from(md) {
+    flex-direction: row;
+    align-items: center;
+    gap: var(--ant-margin);
+  }
+}
+
+.label {
+  flex-shrink: 0;
+  min-width: $recipe-filter-label-width;
+}
+
+// 모바일에서는 칩을 눌러도 되는 크기로 키운다.
+.chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: $touch-target-size;
+  margin: 0;
+  padding-inline: var(--ant-padding-sm);
+  border: 1px solid var(--ant-color-border);
+  border-radius: var(--ant-border-radius-lg);
+
+  @include from(md) {
+    min-height: auto;
+    padding-block: var(--ant-padding-xxs);
+  }
+}

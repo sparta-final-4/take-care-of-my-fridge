@@ -1,10 +1,28 @@
 import { queryOptions, useQuery } from '@tanstack/react-query';
 
-import type { CookingSortType, MyCookedRecipeItem } from './api';
+import type { CookingLogSearchRequest } from '@/common/api/clients';
+
+import {
+  getCookingLogs,
+  getCookingStats,
+  type CookingSortType,
+  type MyCookedRecipeItem,
+} from './api';
 import { MOCK_MY_COOKED_RECIPES } from './mocks';
 
 export const cookingQueries = {
   all: ['cooking'] as const,
+  stats: (recipeId: number) =>
+    queryOptions({
+      queryKey: [...cookingQueries.all, 'stats', recipeId],
+      queryFn: ({ signal }) => getCookingStats(recipeId, signal),
+    }),
+  logLists: () => [...cookingQueries.all, 'logs'] as const,
+  logs: (request: CookingLogSearchRequest) =>
+    queryOptions({
+      queryKey: [...cookingQueries.logLists(), request],
+      queryFn: ({ signal }) => getCookingLogs(request, signal),
+    }),
   myRecipesList: () => [...cookingQueries.all, 'myRecipes'] as const,
   myRecipes: (sort: CookingSortType) =>
     queryOptions({

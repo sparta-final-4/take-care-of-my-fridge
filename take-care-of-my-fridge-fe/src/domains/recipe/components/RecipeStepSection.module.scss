@@ -1,0 +1,44 @@
+@use '@/styles/variables' as *;
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ant-margin);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.step {
+  display: flex;
+  gap: var(--ant-margin-sm);
+}
+
+.number {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: $recipe-step-number-size;
+  height: $recipe-step-number-size;
+  color: var(--ant-color-white);
+  font-size: var(--ant-font-size-sm);
+  font-weight: var(--ant-font-weight-strong);
+  background: var(--ant-color-text);
+  border-radius: 50%;
+}
+
+.body {
+  min-width: 0;
+  padding-top: var(--ant-padding-xxs);
+}
+
+.stepTip {
+  font-size: var(--ant-font-size-sm);
+}
+
+.image {
+  width: 100%;
+  max-width: $recipe-step-image-max-width;
+  border-radius: var(--ant-border-radius);
+}
