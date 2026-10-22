@@ -30,7 +30,6 @@ export function MyPageLayout() {
             <NavLink
               key={item.key}
               to={item.to}
-              end
               className={({ isActive }) =>
                 isActive ? `${styles.navItem} ${styles.navItemActive}` : styles.navItem
               }

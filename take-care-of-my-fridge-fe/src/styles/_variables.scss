@@ -33,5 +33,8 @@ $order-quantity-width: 5ch;
 // 주문 내역 버튼 칸. 버튼이 없는 결제 대기 행도 다른 칸이 같은 위치에 오도록 고정
 $order-action-width: 88px;
 
+// 주문 내역 상태 칸. 머리글과 행의 칸 너비가 상태 태그 길이에 따라 달라지지 않게 고정
+$order-status-width: 80px;
+
 // 모바일 터치 영역 최소 크기
 $touch-target-size: 44px;

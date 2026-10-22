@@ -2,7 +2,7 @@ import { keepPreviousData, queryOptions } from '@tanstack/react-query';
 
 import type { OrderListRequest } from '@/common/api/clients';
 
-import { getMyOrders, getOrderCheckout } from './api';
+import { getMyOrders, getOrderCheckout, getOrderDetail } from './api';
 
 export const orderQueries = {
   all: ['orders'] as const,
@@ -17,5 +17,10 @@ export const orderQueries = {
     queryOptions({
       queryKey: [...orderQueries.all, 'checkout', orderId],
       queryFn: ({ signal }) => getOrderCheckout(orderId, signal),
+    }),
+  detail: (orderId: number) =>
+    queryOptions({
+      queryKey: [...orderQueries.all, 'detail', orderId],
+      queryFn: ({ signal }) => getOrderDetail(orderId, signal),
     }),
 };

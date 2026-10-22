@@ -19,6 +19,11 @@
       auto minmax(0, 1fr)
       $order-quantity-width $cart-total-min-width $cart-total-min-width;
   }
+
+  // 수량·단가·금액이 붙어 보이지 않게 lg부터 칸 사이를 넓힌다
+  @include from(lg) {
+    column-gap: var(--ant-margin-xl);
+  }
 }
 
 .thumb {
@@ -83,4 +88,23 @@
   text-align: right;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+// 칸 너비가 ch 단위라 격자의 글자 크기·굵기를 행과 같게 두고, 굵기는 칸 글자에만 준다
+.head {
+  display: none;
+  padding: var(--ant-padding-sm) 0;
+  border-bottom-color: var(--ant-color-text);
+
+  @include from(md) {
+    display: grid;
+  }
+}
+
+.headProduct {
+  grid-column: 1 / 3;
+}
+
+.headRight {
+  text-align: right;
 }

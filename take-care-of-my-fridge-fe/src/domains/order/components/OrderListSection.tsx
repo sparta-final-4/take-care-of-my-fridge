@@ -1,27 +1,23 @@
 import { useQuery } from '@tanstack/react-query';
-import { Button, Empty, Flex, Pagination, Result, Skeleton, Tag, Tooltip, Typography } from 'antd';
+import { Button, Empty, Flex, Pagination, Result, Skeleton, Tag, Typography } from 'antd';
 import dayjs from 'dayjs';
-import { useSearchParams } from 'react-router';
+import { generatePath, useNavigate, useSearchParams } from 'react-router';
 
-import type { OrderSummaryResponse } from '@/common/api/clients';
+import { ROUTES } from '@/app/paths';
 import { SectionCard } from '@/common/components/SectionCard';
 import { formatPrice } from '@/domains/cart/format';
+import { ORDER_STATUS_LABELS } from '@/domains/order/format';
 import { orderQueries } from '@/domains/order/queries';
 
 import styles from './OrderListSection.module.scss';
 
 const PAGE_SIZE = 10;
 
-const STATUS_LABELS: Partial<Record<NonNullable<OrderSummaryResponse['status']>, string>> = {
-  PENDING: '결제 대기',
-  PAID: '결제 완료',
-  CONFIRMED: '구매 확정',
-};
-
 // 결제 대기·결제 완료·구매 확정 주문을 최신 주문부터 보여 준다. 취소된 주문은 서버가 보내지 않는다.
 // 결제 대기는 PG 결제 뒤 서버 확인을 기다리는 주문일 수 있어 보이기만 하고, 주문 확인 화면으로 들어가는 버튼은 두지 않는다.
 // 페이지는 URL 쿼리에 두어 새로고침·뒤로 가기에도 유지한다.
 export function OrderListSection() {
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const pageParam = Number(searchParams.get('page'));
   const page = Number.isInteger(pageParam) && pageParam > 0 ? pageParam : 1;
@@ -51,6 +47,20 @@ export function OrderListSection() {
       ) : (
         <Flex vertical gap="large" className={isPlaceholderData ? styles.loading : undefined}>
           <ul className={styles.list}>
+            <li className={`${styles.row} ${styles.head}`} aria-hidden="true">
+              <Typography.Text strong className={styles.orderNumber}>
+                주문번호
+              </Typography.Text>
+              <Typography.Text strong className={styles.date}>
+                주문일
+              </Typography.Text>
+              <Typography.Text strong className={styles.amount}>
+                결제 금액
+              </Typography.Text>
+              <Typography.Text strong className={styles.status}>
+                상태
+              </Typography.Text>
+            </li>
             {orders.map((order) => (
               <li key={order.orderId} className={styles.row}>
                 <Typography.Text strong className={styles.orderNumber}>
@@ -66,15 +76,21 @@ export function OrderListSection() {
                   color={order.status === 'PAID' ? 'processing' : undefined}
                   className={styles.status}
                 >
-                  {(order.status && STATUS_LABELS[order.status]) ?? order.status}
+                  {order.status && ORDER_STATUS_LABELS[order.status]}
                 </Tag>
                 {order.status !== 'PENDING' && (
-                  // 주문 상세 화면이 생기면 연결한다.
-                  <Tooltip title="주문 상세 기능은 준비 중입니다.">
-                    <Button className={styles.action} disabled>
-                      상세 보기
-                    </Button>
-                  </Tooltip>
+                  <Button
+                    className={styles.action}
+                    onClick={() =>
+                      navigate(
+                        generatePath(ROUTES.mypageOrderDetail, {
+                          orderId: String(order.orderId),
+                        }),
+                      )
+                    }
+                  >
+                    상세 보기
+                  </Button>
                 )}
               </li>
             ))}

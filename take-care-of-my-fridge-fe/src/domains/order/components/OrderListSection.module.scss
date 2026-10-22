@@ -27,7 +27,7 @@
     grid-template-areas: 'number date amount status action';
     grid-template-columns:
       minmax(0, 1fr) $date-min-width $cart-total-min-width
-      auto $order-action-width;
+      $order-status-width $order-action-width;
   }
 }
 
@@ -68,5 +68,17 @@
 
   @include from(lg) {
     min-height: auto;
+  }
+}
+
+// 주문이 한 행으로 펼쳐지는 lg부터 보인다. 행과 같은 격자라 칸이 맞는다.
+// 칸 너비가 ch 단위라 격자의 글자 크기·굵기를 행과 같게 두고, 굵기는 칸 글자에만 준다
+.head {
+  display: none;
+  padding: var(--ant-padding-sm) 0;
+  border-bottom-color: var(--ant-color-text);
+
+  @include from(lg) {
+    display: grid;
   }
 }

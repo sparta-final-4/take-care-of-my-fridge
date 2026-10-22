@@ -8,6 +8,26 @@ interface OrderItemRowProps {
   item: OrderItemResponse;
 }
 
+// 상품이 한 행으로 펼쳐지는 md부터 보인다. 상품 행과 같은 격자라 칸이 맞는다.
+export function OrderItemHeader() {
+  return (
+    <div className={`${styles.row} ${styles.head}`} aria-hidden="true">
+      <Typography.Text strong className={styles.headProduct}>
+        상품
+      </Typography.Text>
+      <Typography.Text strong className={styles.quantity}>
+        수량
+      </Typography.Text>
+      <Typography.Text strong className={`${styles.price} ${styles.headRight}`}>
+        단가
+      </Typography.Text>
+      <Typography.Text strong className={styles.total}>
+        금액
+      </Typography.Text>
+    </div>
+  );
+}
+
 // 가격은 주문할 때 저장한 값이다. 지금 상품 가격은 쓰지 않는다.
 export function OrderItemRow({ item }: OrderItemRowProps) {
   const name = item.productName ?? '';
