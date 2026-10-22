@@ -72,4 +72,11 @@ public class IngredientProduct {
         this.unit = unit;
         this.baseQuantity = baseQuantity;
     }
+
+    public void update(Long ingredientId, BigDecimal unitAmount, String unit, BigDecimal baseQuantity) {
+        this.ingredientId = ingredientId;
+        this.unitAmount = unitAmount;
+        this.unit = unit;
+        this.baseQuantity = baseQuantity;
+    }
 }
