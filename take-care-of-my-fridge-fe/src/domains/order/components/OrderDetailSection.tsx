@@ -1,11 +1,24 @@
-import { useQuery } from '@tanstack/react-query';
-import { Button, Divider, Flex, Result, Skeleton, Tag, Tooltip, Typography } from 'antd';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  App,
+  Button,
+  Divider,
+  Flex,
+  Modal,
+  Result,
+  Skeleton,
+  Tag,
+  Tooltip,
+  Typography,
+} from 'antd';
 import dayjs from 'dayjs';
+import { useState } from 'react';
 import { useNavigate } from 'react-router';
 
 import { ROUTES } from '@/app/paths';
 import { getErrorCode } from '@/common/api/errors';
 import { formatPrice } from '@/domains/cart/format';
+import { confirmOrder } from '@/domains/order/api';
 import { ORDER_STATUS_LABELS } from '@/domains/order/format';
 import { orderQueries } from '@/domains/order/queries';
 
@@ -17,7 +30,8 @@ interface OrderDetailSectionProps {
 }
 
 // 주문할 때 저장한 상품·금액을 보여 준다. 환불 내역은 환불 상세 화면이 보여 준다.
-// 구매 확정·환불 신청은 아직 API가 없어 결제 완료 주문에 비활성으로만 둔다.
+// 구매 확정·환불 카드는 결제 완료·구매 확정 주문에 보인다. 구매 확정된 주문은 버튼을 누르면 안 되는 이유를 알린다.
+// 결제 완료 주문의 환불 신청은 아직 API가 없어 비활성으로만 둔다.
 export function OrderDetailSection({ orderId }: OrderDetailSectionProps) {
   const navigate = useNavigate();
   const validOrderId = Number.isSafeInteger(orderId) && orderId > 0;
@@ -28,6 +42,19 @@ export function OrderDetailSection({ orderId }: OrderDetailSectionProps) {
     error,
     refetch,
   } = useQuery({ ...orderQueries.detail(orderId), enabled: validOrderId });
+  const { message } = App.useApp();
+  const queryClient = useQueryClient();
+  const [confirmAsked, setConfirmAsked] = useState(false);
+  // 실패(이미 상태가 바뀐 주문 등)는 전역 알림이 서버 메시지로 알린다.
+  // 성공·실패 모두 상세와 목록을 다시 불러, 화면 상태를 서버와 맞춘다.
+  const confirmMutation = useMutation({
+    mutationFn: () => confirmOrder(orderId),
+    onSuccess: () => message.success('구매 확정되었습니다.'),
+    onSettled: () => {
+      setConfirmAsked(false);
+      return queryClient.invalidateQueries({ queryKey: orderQueries.all });
+    },
+  });
 
   const listButton = (
     <Button className={styles.button} onClick={() => navigate(ROUTES.mypageOrders)}>
@@ -48,6 +75,15 @@ export function OrderDetailSection({ orderId }: OrderDetailSectionProps) {
       />
     );
   }
+
+  const isConfirmed = order.status === 'CONFIRMED';
+  const handleConfirmClick = () => {
+    if (isConfirmed) {
+      message.info('이미 구매 확정된 주문입니다.');
+      return;
+    }
+    setConfirmAsked(true);
+  };
 
   return (
     <div className={styles.page}>
@@ -115,7 +151,7 @@ export function OrderDetailSection({ orderId }: OrderDetailSectionProps) {
             </Typography.Text>
           </Flex>
         </section>
-        {order.status === 'PAID' && (
+        {(order.status === 'PAID' || isConfirmed) && (
           <section className={styles.card} aria-label="구매 확정·환불">
             <Typography.Text strong className={styles.cardTitle}>
               구매 확정·환불
@@ -124,20 +160,46 @@ export function OrderDetailSection({ orderId }: OrderDetailSectionProps) {
               구매 확정 후에는 환불할 수 없습니다.
             </Typography.Paragraph>
             <Flex vertical gap="small">
-              <Tooltip title="구매 확정 기능은 준비 중입니다.">
-                <Button type="primary" size="large" block disabled className={styles.button}>
-                  구매 확정
-                </Button>
-              </Tooltip>
-              <Tooltip title="환불 신청 기능은 준비 중입니다.">
-                <Button size="large" block disabled className={styles.button}>
+              <Button
+                type="primary"
+                size="large"
+                block
+                onClick={handleConfirmClick}
+                className={styles.button}
+              >
+                구매 확정
+              </Button>
+              {isConfirmed ? (
+                <Button
+                  size="large"
+                  block
+                  onClick={() => message.warning('구매 확정된 주문은 환불이 불가합니다.')}
+                  className={styles.button}
+                >
                   환불 신청
                 </Button>
-              </Tooltip>
+              ) : (
+                <Tooltip title="환불 신청 기능은 준비 중입니다.">
+                  <Button size="large" block disabled className={styles.button}>
+                    환불 신청
+                  </Button>
+                </Tooltip>
+              )}
             </Flex>
           </section>
         )}
       </div>
+      <Modal
+        open={confirmAsked}
+        title="구매 확정할까요?"
+        okText="구매 확정"
+        cancelText="닫기"
+        confirmLoading={confirmMutation.isPending}
+        onOk={() => confirmMutation.mutate()}
+        onCancel={() => setConfirmAsked(false)}
+      >
+        구매 확정 후에는 환불할 수 없습니다.
+      </Modal>
     </div>
   );
 }

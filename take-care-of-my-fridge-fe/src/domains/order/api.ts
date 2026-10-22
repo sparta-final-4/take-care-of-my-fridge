@@ -2,6 +2,7 @@ import {
   orderApi,
   type OrderCancelResponse,
   type OrderCheckoutResponse,
+  type OrderConfirmResponse,
   type OrderDetailResponse,
   type OrderListRequest,
   type PageResponseOrderSummaryResponse,
@@ -33,6 +34,11 @@ export async function getOrderDetail(
 // 이미 취소된 주문에도 서버는 같은 성공 응답을 준다. 재고는 처음 취소할 때만 돌아간다.
 export async function cancelOrder(orderId: number): Promise<OrderCancelResponse> {
   return unwrap(orderApi.cancelOrder({ orderId }));
+}
+
+// 이미 구매 확정된 주문에도 서버는 같은 성공 응답을 준다.
+export async function confirmOrder(orderId: number): Promise<OrderConfirmResponse> {
+  return unwrap(orderApi.confirmOrder({ orderId }));
 }
 
 export async function getMyOrders(
