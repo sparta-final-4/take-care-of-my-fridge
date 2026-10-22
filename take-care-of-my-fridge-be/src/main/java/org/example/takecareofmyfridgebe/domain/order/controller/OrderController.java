@@ -3,16 +3,23 @@ package org.example.takecareofmyfridgebe.domain.order.controller;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.auth.service.AuthSessionService;
+import org.example.takecareofmyfridgebe.domain.order.dto.OrderCancelResponse;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderCheckoutResponse;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderCreateRequest;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderCreateResult;
+import org.example.takecareofmyfridgebe.domain.order.dto.OrderListRequest;
+import org.example.takecareofmyfridgebe.domain.order.dto.OrderSummaryResponse;
+import org.example.takecareofmyfridgebe.domain.order.service.OrderCancelService;
 import org.example.takecareofmyfridgebe.domain.order.service.OrderCreateService;
 import org.example.takecareofmyfridgebe.domain.order.service.OrderQueryService;
 import org.example.takecareofmyfridgebe.global.response.ApiResponse;
+import org.example.takecareofmyfridgebe.global.response.PageResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -27,6 +34,7 @@ public class OrderController {
 
     private final OrderCreateService orderCreateService;
     private final OrderQueryService orderQueryService;
+    private final OrderCancelService orderCancelService;
 
     @PostMapping
     public ResponseEntity<ApiResponse<OrderCheckoutResponse>> createOrder(
@@ -38,11 +46,27 @@ public class OrderController {
         return ResponseEntity.status(status).body(ApiResponse.ok(result.response()));
     }
 
+    // 내 주문 내역 화면
+    @GetMapping
+    public ResponseEntity<ApiResponse<PageResponse<OrderSummaryResponse>>> getMyOrders(
+            @AuthenticationPrincipal AuthSessionService.AuthPrincipal principal,
+            @Valid @ModelAttribute OrderListRequest request) {
+        return ResponseEntity.ok(ApiResponse.ok(orderQueryService.getMyOrders(principal.memberId(), request)));
+    }
+
     // 주문 확인 화면(결제 대기 주문)
     @GetMapping("/{orderId}/checkout")
     public ResponseEntity<ApiResponse<OrderCheckoutResponse>> getCheckout(
             @AuthenticationPrincipal AuthSessionService.AuthPrincipal principal,
             @PathVariable Long orderId) {
         return ResponseEntity.ok(ApiResponse.ok(orderQueryService.getCheckout(principal.memberId(), orderId)));
+    }
+
+    // 주문 확인 화면의 취소하기. 이미 취소된 주문에도 같은 200 응답을 준다.
+    @PatchMapping("/{orderId}/cancel")
+    public ResponseEntity<ApiResponse<OrderCancelResponse>> cancelOrder(
+            @AuthenticationPrincipal AuthSessionService.AuthPrincipal principal,
+            @PathVariable Long orderId) {
+        return ResponseEntity.ok(ApiResponse.ok(orderCancelService.cancel(principal.memberId(), orderId)));
     }
 }

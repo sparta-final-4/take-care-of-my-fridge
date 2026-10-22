@@ -45,4 +45,8 @@ public class MealkitProduct {
         this.product = product;
         this.servings = servings;
     }
+
+    public void changeServings(int servings) {
+        this.servings = servings;
+    }
 }

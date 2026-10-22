@@ -1,0 +1,25 @@
+@use '@/styles/mixins' as *;
+
+// 모바일은 가로로 넘겨 보고, md부터 3칸으로 나란히 둔다.
+.list {
+  display: grid;
+  grid-auto-columns: 70%;
+  grid-auto-flow: column;
+  gap: var(--ant-margin);
+  margin: 0;
+  padding: 0 0 var(--ant-padding-xs);
+  overflow-x: auto;
+  list-style: none;
+  scroll-snap-type: x mandatory;
+
+  @include from(md) {
+    grid-auto-flow: row;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    overflow-x: visible;
+  }
+}
+
+.item {
+  min-width: 0;
+  scroll-snap-align: start;
+}

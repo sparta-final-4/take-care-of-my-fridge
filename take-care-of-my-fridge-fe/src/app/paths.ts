@@ -11,6 +11,8 @@ export const ROUTES = {
   mypageChats: '/mypage/chats',
   mypageProfile: '/mypage/profile',
   mypageOrders: '/mypage/orders',
+  products: '/products',
+  productDetail: '/products/:productId',
   cart: '/cart',
   orderCheckout: '/orders/:orderId/checkout',
   adminMembers: '/admin/members',

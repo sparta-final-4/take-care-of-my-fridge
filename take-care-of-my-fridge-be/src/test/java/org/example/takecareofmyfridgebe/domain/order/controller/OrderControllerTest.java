@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -21,14 +22,19 @@ import java.util.stream.IntStream;
 import org.example.takecareofmyfridgebe.domain.auth.service.AuthSessionService;
 import org.example.takecareofmyfridgebe.domain.auth.service.JwtTokenService;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
+import org.example.takecareofmyfridgebe.domain.order.dto.OrderCancelResponse;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderCheckoutResponse;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderCreateResult;
+import org.example.takecareofmyfridgebe.domain.order.dto.OrderListRequest;
+import org.example.takecareofmyfridgebe.domain.order.dto.OrderSummaryResponse;
 import org.example.takecareofmyfridgebe.domain.order.entity.OrderStatus;
+import org.example.takecareofmyfridgebe.domain.order.service.OrderCancelService;
 import org.example.takecareofmyfridgebe.domain.order.service.OrderCreateService;
 import org.example.takecareofmyfridgebe.domain.order.service.OrderQueryService;
 import org.example.takecareofmyfridgebe.global.config.SecurityConfig;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
+import org.example.takecareofmyfridgebe.global.response.PageResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -52,17 +58,45 @@ class OrderControllerTest {
     private final MockMvc mvc;
     private final OrderCreateService orderCreateService;
     private final OrderQueryService orderQueryService;
+    private final OrderCancelService orderCancelService;
 
     @Autowired
-    OrderControllerTest(MockMvc mvc, OrderCreateService orderCreateService, OrderQueryService orderQueryService) {
+    OrderControllerTest(MockMvc mvc, OrderCreateService orderCreateService, OrderQueryService orderQueryService,
+                        OrderCancelService orderCancelService) {
         this.mvc = mvc;
         this.orderCreateService = orderCreateService;
         this.orderQueryService = orderQueryService;
+        this.orderCancelService = orderCancelService;
     }
 
     @BeforeEach
     void resetMock() {
-        reset(orderCreateService, orderQueryService);
+        reset(orderCreateService, orderQueryService, orderCancelService);
+    }
+
+    @Test
+    @DisplayName("주문 취소는 로그인한 회원 번호와 주문 번호로 서비스를 부르고 200이다")
+    void cancelOrder_returns200() throws Exception {
+        when(orderCancelService.cancel(7L, 5001L)).thenReturn(new OrderCancelResponse(5001L, OrderStatus.CANCELLED));
+
+        mvc.perform(patch("/api/orders/5001/cancel")
+                        .with(csrf())
+                        .with(loginAsMember7()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.orderId").value(5001))
+                .andExpect(jsonPath("$.data.status").value("CANCELLED"));
+    }
+
+    @Test
+    @DisplayName("결제가 끝난 주문을 취소하면 409다")
+    void cancelOrder_paidOrder_returns409() throws Exception {
+        when(orderCancelService.cancel(7L, 5001L)).thenThrow(new BusinessException(ErrorCode.ORDER_ALREADY_PAID));
+
+        mvc.perform(patch("/api/orders/5001/cancel")
+                        .with(csrf())
+                        .with(loginAsMember7()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("ORDER_007"));
     }
 
     @Test
@@ -86,6 +120,35 @@ class OrderControllerTest {
                         .with(loginAsMember7()))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.error.code").value("ORDER_001"));
+    }
+
+    @Test
+    @DisplayName("주문 목록은 페이지를 주지 않으면 1페이지 10개로 서비스를 부르고 200이다")
+    void getMyOrders_defaultPage_returns200() throws Exception {
+        PageResponse<OrderSummaryResponse> page = new PageResponse<>(
+                List.of(new OrderSummaryResponse(5001L, "20261020143005123001",
+                        LocalDateTime.of(2026, 10, 20, 14, 30), 3000L, OrderStatus.PAID)),
+                1, 10, 1L, 1, true);
+        when(orderQueryService.getMyOrders(7L, new OrderListRequest(1, 10))).thenReturn(page);
+
+        mvc.perform(get("/api/orders")
+                        .with(loginAsMember7()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content[0].orderId").value(5001))
+                .andExpect(jsonPath("$.data.content[0].status").value("PAID"))
+                .andExpect(jsonPath("$.data.pageNumber").value(1));
+    }
+
+    @Test
+    @DisplayName("주문 목록의 페이지 크기가 100을 넘으면 400이고 서비스를 부르지 않는다")
+    void getMyOrders_tooLargeSize_returns400() throws Exception {
+        mvc.perform(get("/api/orders")
+                        .param("size", "101")
+                        .with(loginAsMember7()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("C001"));
+
+        verifyNoInteractions(orderQueryService);
     }
 
     @Test
@@ -187,6 +250,11 @@ class OrderControllerTest {
         @Bean
         OrderQueryService orderQueryService() {
             return mock(OrderQueryService.class);
+        }
+
+        @Bean
+        OrderCancelService orderCancelService() {
+            return mock(OrderCancelService.class);
         }
 
         @Bean

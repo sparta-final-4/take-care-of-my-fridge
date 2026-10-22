@@ -137,6 +137,18 @@ class OrderCreateServiceTransactionTest extends MySqlContainerSupport {
     }
 
     @Test
+    @DisplayName("마지막 재고까지 주문하면 상품이 품절 상태로 바뀐다")
+    void createOrder_lastStock_marksProductSoldOut() {
+        Product greenOnion = saveProduct("대파", 3000, 2);
+        CartItem item = saveCartItem(saveCart(1L), greenOnion, 2);
+
+        order(1L, request(item));
+
+        assertThat(stockOf(greenOnion)).isZero();
+        assertThat(statusOf(greenOnion)).isEqualTo(ProductStatus.SOLD_OUT);
+    }
+
+    @Test
     @DisplayName("재고가 0이면 품절로 거절한다")
     void createOrder_rejectsSoldOut() {
         Product greenOnion = saveProduct("대파", 3000, 0);
@@ -316,6 +328,7 @@ class OrderCreateServiceTransactionTest extends MySqlContainerSupport {
 
         int orderedQuantity = orderItemRepository.findAll().stream().mapToInt(OrderItem::getQuantity).sum();
         assertThat(stockOf(greenOnion)).isZero();
+        assertThat(statusOf(greenOnion)).isEqualTo(ProductStatus.SOLD_OUT);
         assertThat(orderedQuantity).isEqualTo(initialStock);
         assertThat(orderRepository.count()).isEqualTo(initialStock);
         assertThat(failures).hasSize(members - initialStock).allSatisfy(e -> assertThat(e)
@@ -407,6 +420,10 @@ class OrderCreateServiceTransactionTest extends MySqlContainerSupport {
 
     private int stockOf(Product product) {
         return productRepository.findById(product.getId()).orElseThrow().getStock();
+    }
+
+    private ProductStatus statusOf(Product product) {
+        return productRepository.findById(product.getId()).orElseThrow().getStatus();
     }
 
     private Product saveProduct(String name, int price, int stock) {

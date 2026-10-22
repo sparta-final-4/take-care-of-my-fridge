@@ -7,6 +7,9 @@ import org.example.takecareofmyfridgebe.domain.product.dto.ProductCreateRequest;
 import org.example.takecareofmyfridgebe.domain.product.dto.ProductDetailResponse;
 import org.example.takecareofmyfridgebe.domain.product.dto.ProductListItemResponse;
 import org.example.takecareofmyfridgebe.domain.product.dto.ProductListRequest;
+import org.example.takecareofmyfridgebe.domain.product.dto.ProductUpdateRequest;
+import org.example.takecareofmyfridgebe.domain.product.entity.IngredientProduct;
+import org.example.takecareofmyfridgebe.domain.product.entity.MealkitProduct;
 import org.example.takecareofmyfridgebe.domain.product.entity.Product;
 import org.example.takecareofmyfridgebe.domain.product.entity.ProductStatus;
 import org.example.takecareofmyfridgebe.domain.product.entity.ProductType;
@@ -82,6 +85,50 @@ public class ProductService {
                     mealkitProductRepository.save(request.toMealkitProduct(product))
             );
         };
+    }
+
+    // 관리자는 판매 중지 상품도 수정할 수 있다(판매 재개 포함).
+    @Transactional
+    public ProductDetailResponse updateProduct(Long productId, ProductUpdateRequest request) {
+        Product product = productRepository.findByIdForUpdate(productId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.PRODUCT_NOT_FOUND));
+        if (request.hasDetailOtherThan(product.getProductType())) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "상품 종류에 맞지 않는 상세 정보입니다.");
+        }
+
+        request.applyTo(product);
+
+        return switch (product.getProductType()) {
+            case INGREDIENT -> ProductDetailResponse.ofIngredient(product, updateIngredientDetail(productId, request));
+            case MEALKIT -> ProductDetailResponse.ofMealkit(product, updateMealkitDetail(productId, request));
+        };
+    }
+
+    private IngredientProduct updateIngredientDetail(Long productId, ProductUpdateRequest request) {
+        IngredientProduct detail = ingredientProductRepository.findByProductId(productId).orElse(null);
+        if (request.ingredient() == null) {
+            return detail;
+        }
+        if (detail == null) {
+            throw new BusinessException(ErrorCode.PRODUCT_DETAIL_MISSING);
+        }
+        if (request.ingredient().ingredientId() != null) {
+            validateLinkableIngredient(request.ingredient().ingredientId());
+        }
+        request.applyTo(detail);
+        return detail;
+    }
+
+    private MealkitProduct updateMealkitDetail(Long productId, ProductUpdateRequest request) {
+        MealkitProduct detail = mealkitProductRepository.findByProductId(productId).orElse(null);
+        if (request.mealkit() == null) {
+            return detail;
+        }
+        if (detail == null) {
+            throw new BusinessException(ErrorCode.PRODUCT_DETAIL_MISSING);
+        }
+        request.applyTo(detail);
+        return detail;
     }
 
     // ingredient_products.ingredient_id는 FK 없이 ID로만 참조하므로 저장 전에 직접 확인한다.

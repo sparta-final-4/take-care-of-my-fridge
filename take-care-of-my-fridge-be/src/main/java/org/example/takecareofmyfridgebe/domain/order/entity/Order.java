@@ -102,10 +102,13 @@ public class Order extends BaseTimeEntity {
         this.paidAt = paidAt;
     }
 
+    public boolean isCancelled() {
+        return status == OrderStatus.CANCELLED;
+    }
+
+    // 결제 대기 주문만 취소한다. 이미 취소됐거나 결제 이후면 validatePending()과 같은 이유로 거절한다.
     public void cancel() {
-        if (status != OrderStatus.PENDING) {
-            throw new BusinessException(ErrorCode.ORDER_NOT_CANCELABLE);
-        }
+        validatePending();
         this.status = OrderStatus.CANCELLED;
     }
 

@@ -44,6 +44,27 @@ class OrderTest {
     }
 
     @Test
+    void cancelRejectsPaidOrderAsAlreadyPaid() {
+        Order order = newOrder();
+        order.markPaid(LocalDateTime.now());
+
+        assertThatThrownBy(order::cancel)
+            .isInstanceOf(BusinessException.class)
+            .extracting("errorCode").isEqualTo(ErrorCode.ORDER_ALREADY_PAID);
+    }
+
+    @Test
+    void cancelRejectsCancelledOrder() {
+        Order order = newOrder();
+        order.cancel();
+
+        assertThat(order.isCancelled()).isTrue();
+        assertThatThrownBy(order::cancel)
+            .isInstanceOf(BusinessException.class)
+            .extracting("errorCode").isEqualTo(ErrorCode.ORDER_CANCELLED);
+    }
+
+    @Test
     void confirmWorksOnlyAfterPaid() {
         Order order = newOrder();
 

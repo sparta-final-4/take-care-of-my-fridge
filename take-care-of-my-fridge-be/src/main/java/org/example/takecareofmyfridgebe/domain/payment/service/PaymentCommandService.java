@@ -50,7 +50,8 @@ public class PaymentCommandService {
 
         Payment payment = Payment.builder()
                 .order(order)
-                .portonePaymentId(PORTONE_PAYMENT_ID_PREFIX + UUID.randomUUID())
+                // KG이니시스는 주문번호(oid)를 40자까지만 받으므로 UUID의 하이픈을 빼 8 + 32 = 40자로 만든다
+                .portonePaymentId(PORTONE_PAYMENT_ID_PREFIX + UUID.randomUUID().toString().replace("-", ""))
                 .amount(order.getTotalAmount())
                 .expiresAt(LocalDateTime.now().plusMinutes(PAYMENT_EXPIRE_MINUTES))
                 .build();

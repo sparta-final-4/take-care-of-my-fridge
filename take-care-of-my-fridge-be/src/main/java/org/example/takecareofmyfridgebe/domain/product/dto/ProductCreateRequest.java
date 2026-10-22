@@ -27,6 +27,7 @@ public record ProductCreateRequest(
         @Size(max = 200, message = "상품명은 200자 이하여야 합니다.")
         String name,
 
+        @Size(max = MAX_DESCRIPTION_LENGTH, message = "상품 설명은 2,000자 이하여야 합니다.")
         String description,
 
         @Size(max = 500, message = "이미지 URL은 500자 이하여야 합니다.")
@@ -34,7 +35,7 @@ public record ProductCreateRequest(
         String imageUrl,
 
         @NotNull(message = "가격을 입력해 주세요.")
-        @Min(value = 0, message = "가격은 0 이상이어야 합니다.")
+        @Min(value = MIN_PRICE, message = "가격은 1원 이상이어야 합니다.")
         @Max(value = MAX_PRICE, message = "가격은 1,000만 원 이하여야 합니다.")
         Integer price,
 
@@ -57,8 +58,11 @@ public record ProductCreateRequest(
         MealkitDetail mealkit
 ) {
     // 주문 금액(가격 x 수량) 계산 시 int 오버플로가 나지 않도록 상한을 둔다
+    // 정상가는 1원 이상 (기획 Q-03 결정)
+    public static final int MIN_PRICE = 1;
     public static final int MAX_PRICE = 10_000_000;
     public static final int MAX_STOCK = 100_000;
+    public static final int MAX_DESCRIPTION_LENGTH = 2_000;
 
     // 검증 전에 앞뒤 공백을 제거하고, 빈 이미지 URL은 null로 저장한다
     public ProductCreateRequest {
