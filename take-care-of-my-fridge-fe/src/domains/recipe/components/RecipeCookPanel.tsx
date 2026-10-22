@@ -13,19 +13,20 @@ import type { RecipeFridgeMatch } from '@/domains/recipe/hooks/useRecipeFridgeMa
 import styles from './RecipeCookPanel.module.scss';
 
 interface RecipeCookPanelProps {
+  // 응답의 recipeId는 optional이라, 상세 화면이 주소에서 받은 ID를 그대로 받는다.
+  recipeId: number;
   recipe: RecipeDetailResponse;
   fridgeMatch: RecipeFridgeMatch;
 }
 
 // 요리 완료 버튼과 팝업은 요리 기록 담당 작업에서 이 카드에 붙인다.
-export function RecipeCookPanel({ recipe, fridgeMatch }: RecipeCookPanelProps) {
+export function RecipeCookPanel({ recipeId, recipe, fridgeMatch }: RecipeCookPanelProps) {
   const authenticated = useAuthStore((state) => state.status) === 'authenticated';
-  const recipeId = recipe.recipeId ?? 0;
   const ingredients = recipe.ingredients ?? [];
   // 가장 최근 기록 1건과 전체 개수만 있으면 된다.
   const { data: logs } = useQuery({
     ...cookingQueries.logs({ recipeId, page: 1, size: 1 }),
-    enabled: authenticated && recipeId > 0,
+    enabled: authenticated,
   });
 
   const { checked, fridgeItemOf, heldIds, totalCount, missingCount } = fridgeMatch;
