@@ -39,6 +39,9 @@ $order-status-width: 80px;
 // 레시피 필터 라벨("음식 종류" 5자)이 줄마다 같은 너비를 쓰도록 고정
 $recipe-filter-label-width: 5em;
 
+// 레시피 재료 줄 상태 칸("D-Day ✓ 보유")이 줄마다 같은 너비를 쓰도록 고정
+$recipe-ingredient-status-width: 10em;
+
 // 레시피 조리 순서
 $recipe-step-number-size: 24px;
 $recipe-step-image-max-width: 360px;

@@ -1,3 +1,4 @@
+@use '@/styles/variables' as *;
 @use '@/styles/mixins' as *;
 
 .list {
@@ -10,6 +11,7 @@
 }
 
 // 모바일: 이름·상태 / 양 2줄, md부터 이름·양·상태 한 줄
+// 줄마다 그리드가 따로라서, 상태 칸 너비를 고정해야 양 칸이 줄끼리 같은 위치에 온다.
 .row {
   display: grid;
   grid-template-areas:
@@ -24,7 +26,7 @@
 
   @include from(md) {
     grid-template-areas: 'name amount status';
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) $recipe-ingredient-status-width;
   }
 }
 
@@ -41,6 +43,7 @@
   display: inline-flex;
   grid-area: status;
   align-items: center;
+  justify-content: flex-end;
   gap: var(--ant-margin-xs);
 }
 
