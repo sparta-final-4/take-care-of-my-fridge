@@ -25,13 +25,14 @@ public record ProductUpdateRequest(
         @Size(min = 1, max = 200, message = "상품명은 1자 이상 200자 이하여야 합니다.")
         String name,
 
+        @Size(max = ProductCreateRequest.MAX_DESCRIPTION_LENGTH, message = "상품 설명은 2,000자 이하여야 합니다.")
         String description,
 
         @Size(max = 500, message = "이미지 URL은 500자 이하여야 합니다.")
         @Pattern(regexp = "^$|^https?://\\S+$", message = "이미지 URL은 http:// 또는 https://로 시작해야 합니다.")
         String imageUrl,
 
-        @Min(value = 0, message = "가격은 0 이상이어야 합니다.")
+        @Min(value = ProductCreateRequest.MIN_PRICE, message = "가격은 1원 이상이어야 합니다.")
         @Max(value = ProductCreateRequest.MAX_PRICE, message = "가격은 1,000만 원 이하여야 합니다.")
         Integer price,
 
