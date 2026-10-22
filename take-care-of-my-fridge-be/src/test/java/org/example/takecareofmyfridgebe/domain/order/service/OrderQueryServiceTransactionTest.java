@@ -4,8 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 
+import jakarta.persistence.EntityManagerFactory;
 import java.time.LocalDateTime;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderCheckoutResponse;
+import org.example.takecareofmyfridgebe.domain.order.dto.OrderDetailResponse;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderItemResponse;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderListRequest;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderSummaryResponse;
@@ -21,6 +23,8 @@ import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 import org.example.takecareofmyfridgebe.global.response.PageResponse;
 import org.example.takecareofmyfridgebe.support.MySqlContainerSupport;
+import org.hibernate.SessionFactory;
+import org.hibernate.stat.Statistics;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -32,7 +36,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 // 실제 DB에 저장된 주문을 서비스로 읽어, 내 주문만 보이는지와 화면마다 보이는 상태가 맞는지 확인한다.
-@DataJpaTest
+@DataJpaTest(properties = "spring.jpa.properties.hibernate.generate_statistics=true")
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({JpaAuditingConfig.class, QueryDslConfig.class, OrderQueryService.class, OrderReader.class})
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
@@ -41,15 +45,18 @@ class OrderQueryServiceTransactionTest extends MySqlContainerSupport {
     private final OrderQueryService orderQueryService;
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
+    private final Statistics statistics;
 
     @Autowired
     OrderQueryServiceTransactionTest(
             OrderQueryService orderQueryService,
             OrderRepository orderRepository,
-            OrderItemRepository orderItemRepository) {
+            OrderItemRepository orderItemRepository,
+            EntityManagerFactory entityManagerFactory) {
         this.orderQueryService = orderQueryService;
         this.orderRepository = orderRepository;
         this.orderItemRepository = orderItemRepository;
+        this.statistics = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
     }
 
     @AfterEach
@@ -110,6 +117,89 @@ class OrderQueryServiceTransactionTest extends MySqlContainerSupport {
         assertThatThrownBy(() -> orderQueryService.getCheckout(1L, order.getId()))
             .isInstanceOf(BusinessException.class)
             .extracting("errorCode").isEqualTo(ErrorCode.ORDER_CANCELLED);
+    }
+
+    @Test
+    @DisplayName("주문 상세는 주문할 때 저장한 정가·단가로 상품 금액과 할인 금액을 돌려준다")
+    void getDetail_returnsSavedPricesAndAmounts() {
+        Order order = orderRepository.save(Order.builder()
+            .orderNumber("20261022143000123030")
+            .memberId(1L)
+            .idempotencyKey("key-20261022143000123030")
+            .totalAmount(7800L)
+            .build());
+        orderItemRepository.save(item(order, 1L, "대파", 2, 2900, 2900, SaleType.NONE));
+        orderItemRepository.save(item(order, 2L, "두부", 1, 3000, 2000, SaleType.SPECIAL));
+        markPaid(order);
+
+        OrderDetailResponse response = orderQueryService.getDetail(1L, order.getId());
+
+        assertThat(response.orderId()).isEqualTo(order.getId());
+        assertThat(response.orderNumber()).isEqualTo("20261022143000123030");
+        assertThat(response.status()).isEqualTo(OrderStatus.PAID);
+        assertThat(response.orderedAt()).isNotNull();
+        assertThat(response.confirmedAt()).isNull();
+        assertThat(response.listPriceAmount()).isEqualTo(8800L);
+        assertThat(response.discountAmount()).isEqualTo(1000L);
+        assertThat(response.payAmount()).isEqualTo(7800L);
+        assertThat(response.items())
+            .extracting(OrderItemResponse::productName, OrderItemResponse::listPrice, OrderItemResponse::unitPrice,
+                OrderItemResponse::lineAmount, OrderItemResponse::saleType)
+            .containsExactly(
+                tuple("대파", 2900, 2900, 5800L, SaleType.NONE),
+                tuple("두부", 3000, 2000, 2000L, SaleType.SPECIAL));
+    }
+
+    @Test
+    @DisplayName("구매 확정된 주문은 구매 확정 시각을 같이 돌려준다")
+    void getDetail_confirmedOrder_returnsConfirmedAt() {
+        Order order = saveOrder(1L, "20261022143000123031");
+        markPaid(order);
+        confirm(order);
+        LocalDateTime savedConfirmedAt = orderRepository.findById(order.getId()).orElseThrow().getConfirmedAt();
+
+        OrderDetailResponse response = orderQueryService.getDetail(1L, order.getId());
+
+        assertThat(response.status()).isEqualTo(OrderStatus.CONFIRMED);
+        assertThat(response.confirmedAt()).isEqualTo(savedConfirmedAt);
+    }
+
+    @Test
+    @DisplayName("결제 대기와 취소된 주문도 상세로 보여 준다")
+    void getDetail_pendingAndCancelledOrders_returnsDetail() {
+        Order pending = saveOrder(1L, "20261022143000123032");
+        Order cancelled = saveOrder(1L, "20261022143000123033");
+        cancel(cancelled);
+
+        assertThat(orderQueryService.getDetail(1L, pending.getId()).status()).isEqualTo(OrderStatus.PENDING);
+        OrderDetailResponse cancelledDetail = orderQueryService.getDetail(1L, cancelled.getId());
+        assertThat(cancelledDetail.status()).isEqualTo(OrderStatus.CANCELLED);
+        assertThat(cancelledDetail.items()).hasSize(2);
+    }
+
+    @Test
+    @DisplayName("주문 상세에서 남의 주문은 없는 주문과 똑같이 404다")
+    void getDetail_othersOrder_returnsNotFound() {
+        Order othersOrder = saveOrder(2L, "20261022143000123034");
+
+        assertThatThrownBy(() -> orderQueryService.getDetail(1L, othersOrder.getId()))
+            .isInstanceOf(BusinessException.class)
+            .extracting("errorCode").isEqualTo(ErrorCode.ORDER_NOT_FOUND);
+        assertThatThrownBy(() -> orderQueryService.getDetail(1L, othersOrder.getId() + 1000))
+            .isInstanceOf(BusinessException.class)
+            .extracting("errorCode").isEqualTo(ErrorCode.ORDER_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("주문 상세는 주문 상품 수와 상관없이 주문과 주문 상품을 한 번씩 읽는다")
+    void getDetail_readsOrderAndItemsOnce() {
+        Order order = saveOrder(1L, "20261022143000123035");
+        orderItemRepository.save(item(order, 3L, "계란", 1, 6900));
+        statistics.clear();
+
+        orderQueryService.getDetail(1L, order.getId());
+
+        assertThat(statistics.getPrepareStatementCount()).isEqualTo(2L);
     }
 
     @Test
@@ -197,14 +287,19 @@ class OrderQueryServiceTransactionTest extends MySqlContainerSupport {
     }
 
     private OrderItem item(Order order, Long productId, String name, int quantity, int price) {
+        return item(order, productId, name, quantity, price, price, SaleType.NONE);
+    }
+
+    private OrderItem item(Order order, Long productId, String name, int quantity, int listPrice, int unitPrice,
+                           SaleType saleType) {
         return OrderItem.builder()
             .order(order)
             .productId(productId)
             .productName(name)
             .quantity(quantity)
-            .listPrice(price)
-            .unitPrice(price)
-            .saleType(SaleType.NONE)
+            .listPrice(listPrice)
+            .unitPrice(unitPrice)
+            .saleType(saleType)
             .build();
     }
 }
