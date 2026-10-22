@@ -5,7 +5,7 @@ import org.example.takecareofmyfridgebe.domain.ingredient.repository.IngredientR
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeCreateRequest;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeDetailResponse;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeListItemResponse;
-import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeSort;
+import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeListRequest;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeUpdateRequest;
 import org.example.takecareofmyfridgebe.domain.recipe.entity.Recipe;
 import org.example.takecareofmyfridgebe.domain.recipe.entity.RecipeIngredient;
@@ -34,10 +34,11 @@ public class RecipeService {
     private final RecipeStepRepository recipeStepRepository;
     private final IngredientRepository ingredientRepository;
 
-    public PageResponse<RecipeListItemResponse> getRecipes(RecipeSort sort, int page, int size) {
-        PageRequest pageable = PageRequest.of(page - 1, size, sort.toSort());
+    // 정렬은 request.sort()로 저장소가 적용하므로 PageRequest에는 넣지 않는다.
+    public PageResponse<RecipeListItemResponse> getRecipes(RecipeListRequest request) {
+        PageRequest pageable = PageRequest.of(request.page() - 1, request.size());
 
-        Page<RecipeListItemResponse> response = recipeRepository.findAll(pageable)
+        Page<RecipeListItemResponse> response = recipeRepository.findRecipesByCondition(request, pageable)
                 .map(RecipeListItemResponse::from);
 
         return PageResponse.of(response);

@@ -6,6 +6,7 @@ import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeCreateRequest;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeDetailResponse;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeIngredientRequest;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeListItemResponse;
+import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeListRequest;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeNutritionRequest;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeSort;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeUpdateRequest;
@@ -57,16 +58,19 @@ class RecipeServiceTest {
     private RecipeService service;
 
     @Test
-    @DisplayName("1부터 시작하는 요청 페이지를 0부터 시작하는 PageRequest로 바꾸고 정렬을 적용한다")
-    void getRecipes_convertsPageAndSort() {
+    @DisplayName("1부터 시작하는 요청 페이지를 0부터 시작하는 PageRequest로 바꾸고 검색 조건을 그대로 넘긴다")
+    void getRecipes_convertsPageAndPassesCondition() {
         // given
-        when(recipeRepository.findAll(any(Pageable.class))).thenReturn(new PageImpl<>(List.of()));
+        RecipeListRequest request = new RecipeListRequest(
+                RecipeSort.DIFFICULTY_ASC, "찌개", "한식", "국", 30, 5, 3, 10);
+        when(recipeRepository.findRecipesByCondition(any(RecipeListRequest.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of()));
 
         // when
-        service.getRecipes(RecipeSort.DIFFICULTY_ASC, 3, 10);
+        service.getRecipes(request);
 
         // then
-        verify(recipeRepository).findAll(PageRequest.of(2, 10, RecipeSort.DIFFICULTY_ASC.toSort()));
+        verify(recipeRepository).findRecipesByCondition(request, PageRequest.of(2, 10));
     }
 
     @Test
@@ -74,11 +78,12 @@ class RecipeServiceTest {
     void getRecipes_mapsToResponse() {
         // given
         Recipe stew = RecipeFixture.createRecipe(7L, "된장찌개");
-        when(recipeRepository.findAll(any(Pageable.class)))
+        when(recipeRepository.findRecipesByCondition(any(RecipeListRequest.class), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(stew), PageRequest.of(0, 20), 1));
+        RecipeListRequest request = new RecipeListRequest(null, null, null, null, null, null, null, null);
 
         // when
-        PageResponse<RecipeListItemResponse> result = service.getRecipes(RecipeSort.LATEST, 1, 20);
+        PageResponse<RecipeListItemResponse> result = service.getRecipes(request);
 
         // then
         assertThat(result.pageNumber()).isEqualTo(1);

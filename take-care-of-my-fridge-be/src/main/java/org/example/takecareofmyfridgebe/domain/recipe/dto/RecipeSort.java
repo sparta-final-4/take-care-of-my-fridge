@@ -1,19 +1,8 @@
 package org.example.takecareofmyfridgebe.domain.recipe.dto;
 
-import org.springframework.data.domain.Sort;
-
+// 정렬 조건은 RecipeRepositoryImpl이 QueryDSL 정렬로 바꾼다.
 public enum RecipeSort {
-    LATEST(Sort.by(Sort.Direction.DESC, "id")),
-    NAME_ASC(Sort.by(Sort.Order.asc("name"), Sort.Order.desc("id"))),
-    DIFFICULTY_ASC(Sort.by(Sort.Order.asc("difficulty"), Sort.Order.desc("id")));
-
-    private final Sort sort;
-
-    RecipeSort(Sort sort) {
-        this.sort = sort;
-    }
-
-    public Sort toSort() {
-        return sort;
-    }
+    LATEST,
+    NAME_ASC,
+    DIFFICULTY_ASC
 }

@@ -26,7 +26,7 @@ public class RecipeController {
     public ResponseEntity<ApiResponse<PageResponse<RecipeListItemResponse>>> getRecipes(
             @Valid @ModelAttribute RecipeListRequest request
     ) {
-        PageResponse<RecipeListItemResponse> recipes = recipeService.getRecipes(request.sort(), request.page(), request.size());
+        PageResponse<RecipeListItemResponse> recipes = recipeService.getRecipes(request);
         return ResponseEntity.ok(ApiResponse.ok(recipes));
     }
 
