@@ -4,12 +4,10 @@ import { Tag, Typography } from 'antd';
 import type { IngredientItem } from '@/common/api/clients';
 import { SectionCard } from '@/common/components/SectionCard';
 import { formatDDay } from '@/domains/fridge/format';
+import { imminentTagColor } from '@/domains/recipe/format';
 import type { RecipeFridgeMatch } from '@/domains/recipe/hooks/useRecipeFridgeMatch';
 
 import styles from './RecipeIngredientSection.module.scss';
-
-// 내 냉장고와 같은 기준(3일 이내)으로 임박 재료를 강조한다.
-const IMMINENT_DAYS = 3;
 
 interface RecipeIngredientSectionProps {
   ingredients: IngredientItem[];
@@ -20,7 +18,7 @@ export function RecipeIngredientSection({
   ingredients,
   fridgeMatch,
 }: RecipeIngredientSectionProps) {
-  const { checked, dDayOf, heldIds, totalCount } = fridgeMatch;
+  const { checked, fridgeItemOf, heldIds, totalCount } = fridgeMatch;
 
   return (
     <SectionCard
@@ -35,8 +33,7 @@ export function RecipeIngredientSection({
     >
       <ul className={styles.list}>
         {ingredients.map((item) => {
-          const dDay = dDayOf(item.ingredientId);
-          const held = dDay !== undefined;
+          const fridgeItem = fridgeItemOf(item.ingredientId);
           return (
             <li key={item.seq} className={styles.row}>
               <Typography.Text strong className={styles.name}>
@@ -47,12 +44,12 @@ export function RecipeIngredientSection({
               </Typography.Text>
               {checked && (
                 <span className={styles.status}>
-                  {held && dDay <= IMMINENT_DAYS && (
-                    <Tag color={dDay <= 1 ? 'red' : 'orange'} className={styles.dDay}>
-                      {formatDDay(dDay)}
+                  {fridgeItem?.status === 'IMMINENT' && (
+                    <Tag color={imminentTagColor(fridgeItem.dDay)} className={styles.dDay}>
+                      {formatDDay(fridgeItem.dDay)}
                     </Tag>
                   )}
-                  {held ? (
+                  {fridgeItem ? (
                     <Typography.Text type="success">
                       <CheckOutlined /> 보유
                     </Typography.Text>

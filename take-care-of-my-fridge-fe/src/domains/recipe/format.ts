@@ -14,6 +14,11 @@ export const COOK_TIME_OPTIONS = [
 
 export type CookTimeKey = (typeof COOK_TIME_OPTIONS)[number]['key'];
 
+// 임박 재료(서버 status IMMINENT) 배지 색. 오늘·내일은 더 눈에 띄게 한다.
+export function imminentTagColor(dDay: number) {
+  return dDay <= 1 ? 'red' : 'orange';
+}
+
 // 카드·상세 상단에 쓰는 "15분 · 2인분 · 한식 반찬" 한 줄
 export function formatRecipeMeta(
   recipe: Pick<RecipeListItemResponse, 'cookTimeMin' | 'servings' | 'cuisineType' | 'category'>,

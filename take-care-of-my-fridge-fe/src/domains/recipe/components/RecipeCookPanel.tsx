@@ -7,12 +7,10 @@ import { SectionCard } from '@/common/components/SectionCard';
 import { useAuthStore } from '@/common/auth/authStore';
 import { cookingQueries } from '@/domains/cooking/queries';
 import { formatDDay } from '@/domains/fridge/format';
+import { imminentTagColor } from '@/domains/recipe/format';
 import type { RecipeFridgeMatch } from '@/domains/recipe/hooks/useRecipeFridgeMatch';
 
 import styles from './RecipeCookPanel.module.scss';
-
-// 재료 목록과 같은 기준(3일 이내)으로 임박 재료를 보여 준다.
-const IMMINENT_DAYS = 3;
 
 interface RecipeCookPanelProps {
   recipe: RecipeDetailResponse;
@@ -30,7 +28,7 @@ export function RecipeCookPanel({ recipe, fridgeMatch }: RecipeCookPanelProps) {
     enabled: authenticated && recipeId > 0,
   });
 
-  const { checked, dDayOf, heldIds, totalCount, missingCount } = fridgeMatch;
+  const { checked, fridgeItemOf, heldIds, totalCount, missingCount } = fridgeMatch;
   // 같은 재료가 두 번 나오면 첫 줄만 쓴다.
   const heldIngredients = ingredients.filter(
     (item, index) =>
@@ -38,9 +36,11 @@ export function RecipeCookPanel({ recipe, fridgeMatch }: RecipeCookPanelProps) {
       heldIds.includes(item.ingredientId) &&
       ingredients.findIndex((other) => other.ingredientId === item.ingredientId) === index,
   );
-  const imminent = heldIngredients.filter((item) => {
-    const dDay = dDayOf(item.ingredientId);
-    return dDay !== undefined && dDay <= IMMINENT_DAYS;
+  const imminent = heldIngredients.flatMap((item) => {
+    const fridgeItem = fridgeItemOf(item.ingredientId);
+    return fridgeItem?.status === 'IMMINENT'
+      ? [{ seq: item.seq, name: item.displayName, dDay: fridgeItem.dDay }]
+      : [];
   });
   const cookCount = logs?.totalElements ?? 0;
   const lastCookedAt = logs?.content?.[0]?.createdAt;
@@ -61,14 +61,11 @@ export function RecipeCookPanel({ recipe, fridgeMatch }: RecipeCookPanelProps) {
         )}
         {imminent.length > 0 && (
           <Flex gap="small" wrap>
-            {imminent.map((item) => {
-              const dDay = dDayOf(item.ingredientId) ?? 0;
-              return (
-                <Tag key={item.seq} color={dDay <= 1 ? 'red' : 'orange'} className={styles.tag}>
-                  {item.displayName} {formatDDay(dDay)}
-                </Tag>
-              );
-            })}
+            {imminent.map((item) => (
+              <Tag key={item.seq} color={imminentTagColor(item.dDay)} className={styles.tag}>
+                {item.name} {formatDDay(item.dDay)}
+              </Tag>
+            ))}
           </Flex>
         )}
         {authenticated && logs && (
