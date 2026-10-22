@@ -44,7 +44,7 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
-      - run: chmod +x gradlew
+      - run: chmod +x take-care-of-my-fridge-be/gradlew
 
       - name: Run Claude Code
         id: claude
