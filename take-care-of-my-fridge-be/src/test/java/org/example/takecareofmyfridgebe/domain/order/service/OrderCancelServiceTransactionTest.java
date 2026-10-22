@@ -108,6 +108,19 @@ class OrderCancelServiceTransactionTest extends MySqlContainerSupport {
     }
 
     @Test
+    @DisplayName("품절된 상품의 주문을 취소하면 재고가 돌아오고 판매 중으로 바뀐다")
+    void cancel_soldOutProduct_marksOnSale() {
+        Product greenOnion = saveProduct("대파", 3000, 0, ProductStatus.SOLD_OUT);
+        Order order = saveOrder(1L, OrderStatus.PENDING, item(greenOnion, 2));
+
+        orderCancelService.cancel(1L, order.getId());
+
+        Product restored = productRepository.findById(greenOnion.getId()).orElseThrow();
+        assertThat(restored.getStock()).isEqualTo(2);
+        assertThat(restored.getStatus()).isEqualTo(ProductStatus.ON_SALE);
+    }
+
+    @Test
     @DisplayName("번개 드롭으로 산 주문 상품은 취소하면 1인 1개 기록이 비워진다")
     void cancel_releasesFlashDropMember() {
         Product greenOnion = saveProduct("대파", 3000, 0);
@@ -279,6 +292,10 @@ class OrderCancelServiceTransactionTest extends MySqlContainerSupport {
     }
 
     private Product saveProduct(String name, int price, int stock) {
+        return saveProduct(name, price, stock, ProductStatus.ON_SALE);
+    }
+
+    private Product saveProduct(String name, int price, int stock, ProductStatus status) {
         return productRepository.save(Product.builder()
             .productType(ProductType.INGREDIENT)
             .name(name)
@@ -287,7 +304,7 @@ class OrderCancelServiceTransactionTest extends MySqlContainerSupport {
             .stock(stock)
             .storage(StorageType.REFRIGERATED)
             .shelfDays(7)
-            .status(ProductStatus.ON_SALE)
+            .status(status)
             .build());
     }
 

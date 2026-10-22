@@ -53,5 +53,9 @@ export function useCancelOnLeave(orderId: number, enabled: boolean) {
     askCancel: () => setCancelAsked(true),
     confirm,
     close,
+    // 결제를 마친 뒤처럼 주문을 취소하지 않고 떠나는 이동 직전에 부른다
+    allowLeave: () => {
+      leaveAllowedRef.current = true;
+    },
   };
 }

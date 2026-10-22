@@ -221,6 +221,8 @@ class PaymentCommandServiceTest {
         assertThat(payment.getAmount()).isEqualTo(10000L);
         assertThat(payment.getStatus()).isEqualTo(PaymentStatus.READY);
         assertThat(payment.getPortonePaymentId()).startsWith("payment-");
+        // KG이니시스 주문번호(oid) 최대 길이
+        assertThat(payment.getPortonePaymentId()).hasSizeLessThanOrEqualTo(40);
         assertThat(payment.getExpiresAt()).isBetween(before.plusMinutes(10), after.plusMinutes(10));
     }
 
