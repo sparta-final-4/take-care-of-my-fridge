@@ -1,7 +1,7 @@
 import { LeftOutlined } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
 import { Button, Result, Skeleton } from 'antd';
-import { useNavigate } from 'react-router';
+import { useLocation, useNavigate } from 'react-router';
 
 import { ROUTES } from '@/app/paths';
 import { isNotFound } from '@/common/api/errors';
@@ -22,6 +22,7 @@ interface RecipeDetailSectionProps {
 
 export function RecipeDetailSection({ recipeId }: RecipeDetailSectionProps) {
   const navigate = useNavigate();
+  const location = useLocation();
   const {
     data: recipe,
     isPending,
@@ -31,8 +32,10 @@ export function RecipeDetailSection({ recipeId }: RecipeDetailSectionProps) {
   } = useQuery(recipeQueries.detail(recipeId));
   const fridgeMatch = useRecipeFridgeMatch(recipe?.ingredients ?? []);
 
-  // 목록에서 들어왔으면 필터가 남은 목록으로 돌아간다.
-  const handleGoBack = () => (window.history.length > 1 ? navigate(-1) : navigate(ROUTES.recipes));
+  // 앱 안에서 이동해 왔으면 이전 화면(필터가 남은 목록 등)으로 돌아간다.
+  // 주소로 바로 들어와 앱 안의 이전 화면이 없으면(location.key === 'default') 목록으로 간다.
+  // window.history.length는 외부 사이트에서 들어온 기록도 세므로 쓰지 않는다.
+  const handleGoBack = () => (location.key === 'default' ? navigate(ROUTES.recipes) : navigate(-1));
 
   if (isPending) return <Skeleton active paragraph={{ rows: 10 }} />;
   if (isError) {
