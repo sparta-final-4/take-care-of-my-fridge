@@ -5,6 +5,8 @@ import com.querydsl.core.types.OrderSpecifier;
 import com.querydsl.core.types.Predicate;
 import com.querydsl.jpa.impl.JPAQuery;
 import com.querydsl.jpa.impl.JPAQueryFactory;
+import org.example.takecareofmyfridgebe.domain.cooking.dto.CookingStatsCount;
+import org.example.takecareofmyfridgebe.domain.cooking.dto.CookingStatsResponse;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeResponse;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeReviewStatus;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeSortType;
@@ -52,6 +54,9 @@ class CookingLogRepositoryImplTest {
 
     @Mock
     private JPAQuery<MyRecipeSummaryResponse> summaryQuery;
+
+    @Mock
+    private JPAQuery<CookingStatsCount> statsCountQuery;
 
     @Mock
     private JPAQuery<Long> longQuery;
@@ -288,5 +293,70 @@ class CookingLogRepositoryImplTest {
 
         verify(summaryQuery).leftJoin(recipeReview);
         verify(summaryQuery).where(cookingLog.memberId.eq(memberId));
+    }
+
+    /**
+     * getCookingStats 호출 시 recipeId가 null이면
+     * 쿼리를 실행하지 않고 IllegalArgumentException이 발생하는지 검증한다.
+     */
+    @Test
+    void getCookingStatsThrowsWhenRecipeIdIsNull() {
+        // When & Then
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> repository.getCookingStats(null)
+        );
+        verify(queryFactory, never()).select(any(Expression.class));
+    }
+
+    /**
+     * getCookingStats 호출 시 cookingLog를 대상으로 단일 집계 쿼리를 조립하고
+     * 결과 DTO에 recipeId와 집계 카운트를 결합하여 반환하는지 검증한다.
+     */
+    @Test
+    void getCookingStatsBuildsSingleQueryAndReturnsResponse() {
+        // Given
+        Long recipeId = 12L;
+        CookingStatsCount countResult = new CookingStatsCount(10L, 7L, 3L);
+
+        when(queryFactory.select(any(Expression.class))).thenReturn(statsCountQuery);
+        when(statsCountQuery.from(cookingLog)).thenReturn(statsCountQuery);
+        when(statsCountQuery.where(cookingLog.recipeId.eq(recipeId))).thenReturn(statsCountQuery);
+        when(statsCountQuery.fetchOne()).thenReturn(countResult);
+
+        // When
+        CookingStatsResponse response = repository.getCookingStats(recipeId);
+
+        // Then
+        assertEquals(recipeId, response.recipeId());
+        assertEquals(10L, response.totalCount());
+        assertEquals(7L, response.successCount());
+        assertEquals(3L, response.failedCount());
+
+        verify(statsCountQuery).from(cookingLog);
+        verify(statsCountQuery).where(cookingLog.recipeId.eq(recipeId));
+    }
+
+    /**
+     * getCookingStats 호출 시 쿼리 결과가 null이면 모든 카운트가 0인 응답을 반환하는지 검증한다.
+     */
+    @Test
+    void getCookingStatsReturnsZeroWhenFetchOneIsNull() {
+        // Given
+        Long recipeId = 12L;
+
+        when(queryFactory.select(any(Expression.class))).thenReturn(statsCountQuery);
+        when(statsCountQuery.from(cookingLog)).thenReturn(statsCountQuery);
+        when(statsCountQuery.where(cookingLog.recipeId.eq(recipeId))).thenReturn(statsCountQuery);
+        when(statsCountQuery.fetchOne()).thenReturn(null);
+
+        // When
+        CookingStatsResponse response = repository.getCookingStats(recipeId);
+
+        // Then
+        assertEquals(recipeId, response.recipeId());
+        assertEquals(0L, response.totalCount());
+        assertEquals(0L, response.successCount());
+        assertEquals(0L, response.failedCount());
     }
 }

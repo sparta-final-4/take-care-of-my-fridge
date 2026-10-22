@@ -1,5 +1,6 @@
 package org.example.takecareofmyfridgebe.domain.cooking.repository;
 
+import org.example.takecareofmyfridgebe.domain.cooking.dto.CookingStatsResponse;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeResponse;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeReviewStatus;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeSortType;
@@ -53,4 +54,13 @@ public interface CookingLogRepositoryCustom {
      * @return 레시피 수, 총 요리 횟수, 작성/미작성 후기 수 요약
      */
     MyRecipeSummaryResponse getMyRecipesSummary(Long memberId);
+
+    /**
+     * 특정 레시피의 요리 통계(총 요리 횟수, 성공 횟수, 실패 횟수)를 단일 쿼리로 실시간 집계한다.
+     * 요리 기록이 없는 레시피는 모든 카운트가 0으로 반환된다.
+     *
+     * @param recipeId 레시피 ID (필수)
+     * @return 레시피 요리 통계 응답
+     */
+    CookingStatsResponse getCookingStats(Long recipeId);
 }

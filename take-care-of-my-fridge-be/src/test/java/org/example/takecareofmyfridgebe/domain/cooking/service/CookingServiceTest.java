@@ -4,6 +4,7 @@ import org.example.takecareofmyfridgebe.domain.cooking.dto.CookingCompleteReques
 import org.example.takecareofmyfridgebe.domain.cooking.dto.CookingLogResponse;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.CookingLogSearchRequest;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.CookingLogUpdateRequest;
+import org.example.takecareofmyfridgebe.domain.cooking.dto.CookingStatsResponse;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeListResponse;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeResponse;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeReviewResponse;
@@ -51,7 +52,8 @@ import static org.mockito.Mockito.when;
  * CookingService 단위 테스트.
  * 요리 기록 저장 및 조회 조건(recipeId, from, to)과 DTO 변환(fromChat 여부),
  * from > to 유효성 검증, 내 레시피 페이징 및 요약 통계 조립,
- * 요리 기록 수정(결과·메모) 및 더티 체킹, 타인/미존재 시 404 예외 처리를 확인한다.
+ * 요리 기록 수정(결과·메모) 및 더티 체킹, 타인/미존재 시 404 예외 처리,
+ * 레시피 요리 실패/성공 통계 조회를 확인한다.
  */
 @ExtendWith(MockitoExtension.class)
 class CookingServiceTest {
@@ -352,5 +354,27 @@ class CookingServiceTest {
         assertEquals(memberId, cookingLog.getMemberId());
         assertEquals(recipeId, cookingLog.getRecipeId());
         assertEquals(chatSessionId, cookingLog.getChatSessionId());
+    }
+
+    /**
+     * 레시피 요리 통계 조회 시 repository.getCookingStats(recipeId)를 호출하여 반환하는지 검증한다.
+     */
+    @Test
+    void getCookingStatsDelegatesToRepository() {
+        // Given
+        Long recipeId = 12L;
+        CookingStatsResponse expected = new CookingStatsResponse(recipeId, 10L, 7L, 3L);
+        when(cookingLogRepository.getCookingStats(recipeId)).thenReturn(expected);
+
+        // When
+        CookingStatsResponse actual = cookingService.getCookingStats(recipeId);
+
+        // Then
+        assertEquals(expected, actual);
+        assertEquals(recipeId, actual.recipeId());
+        assertEquals(10L, actual.totalCount());
+        assertEquals(7L, actual.successCount());
+        assertEquals(3L, actual.failedCount());
+        verify(cookingLogRepository).getCookingStats(recipeId);
     }
 }

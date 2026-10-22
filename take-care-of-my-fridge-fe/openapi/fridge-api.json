@@ -572,6 +572,47 @@
         ]
       }
     },
+    "/api/cooking-logs/{cookingLogId}": {
+      "patch": {
+        "operationId": "updateCookingLog",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "cookingLogId",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CookingLogUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseCookingLogResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "cooking-log-controller"
+        ]
+      }
+    },
     "/api/fridge/items": {
       "get": {
         "operationId": "getItems",
@@ -1085,6 +1126,37 @@
         ]
       }
     },
+    "/api/orders/{orderId}/payments": {
+      "post": {
+        "operationId": "prepare",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "orderId",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePaymentPrepareResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "payment-controller"
+        ]
+      }
+    },
     "/api/payments/confirm": {
       "post": {
         "operationId": "confirm",
@@ -1540,6 +1612,20 @@
           }
         }
       },
+      "ApiResponseCookingLogResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/CookingLogResponse"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorResponse"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
       "ApiResponseCsrfResponse": {
         "type": "object",
         "properties": {
@@ -1814,6 +1900,20 @@
         "properties": {
           "data": {
             "$ref": "#/components/schemas/PaymentConfirmResponse"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorResponse"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ApiResponsePaymentPrepareResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/PaymentPrepareResponse"
           },
           "error": {
             "$ref": "#/components/schemas/ErrorResponse"
@@ -2323,6 +2423,26 @@
             "format": "date"
           }
         }
+      },
+      "CookingLogUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "memo": {
+            "type": "string",
+            "maxLength": 50,
+            "minLength": 0
+          },
+          "result": {
+            "type": "string",
+            "enum": [
+              "SUCCESS",
+              "FAILED"
+            ]
+          }
+        },
+        "required": [
+          "result"
+        ]
       },
       "CsrfResponse": {
         "type": "object",
@@ -3603,6 +3723,29 @@
               "PAID",
               "FAILED"
             ]
+          }
+        }
+      },
+      "PaymentPrepareResponse": {
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "orderId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "orderName": {
+            "type": "string"
+          },
+          "portonePaymentId": {
+            "type": "string"
           }
         }
       },
