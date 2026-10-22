@@ -1357,6 +1357,37 @@
         ]
       }
     },
+    "/api/orders/{orderId}/confirm": {
+      "patch": {
+        "operationId": "confirmOrder",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "orderId",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseOrderConfirmResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "order-controller"
+        ]
+      }
+    },
     "/api/orders/{orderId}/payments": {
       "post": {
         "operationId": "prepare",
@@ -2078,6 +2109,20 @@
         "properties": {
           "data": {
             "$ref": "#/components/schemas/OrderCheckoutResponse"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorResponse"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ApiResponseOrderConfirmResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/OrderConfirmResponse"
           },
           "error": {
             "$ref": "#/components/schemas/ErrorResponse"
@@ -3754,6 +3799,24 @@
             "format": "date-time"
           },
           "payAmount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "PAID",
+              "CANCELLED",
+              "CONFIRMED"
+            ]
+          }
+        }
+      },
+      "OrderConfirmResponse": {
+        "type": "object",
+        "properties": {
+          "orderId": {
             "type": "integer",
             "format": "int64"
           },
