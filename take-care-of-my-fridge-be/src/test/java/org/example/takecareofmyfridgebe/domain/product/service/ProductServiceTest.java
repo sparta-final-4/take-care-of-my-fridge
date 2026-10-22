@@ -333,6 +333,49 @@ class ProductServiceTest {
                 .isEqualTo(ErrorCode.PRODUCT_NOT_FOUND);
     }
 
+    @Test
+    @DisplayName("상품을 삭제하면 행을 지우지 않고 판매 중지(STOPPED)로 바꾼다")
+    void deleteProduct_stopsProduct() {
+        // given
+        Product onion = ProductFixture.createProduct(5L, "양파 1kg", 3900);
+        when(productRepository.findByIdForUpdate(5L)).thenReturn(Optional.of(onion));
+
+        // when
+        service.deleteProduct(5L);
+
+        // then
+        assertThat(onion.getStatus()).isEqualTo(ProductStatus.STOPPED);
+        verify(productRepository, never()).delete(any());
+    }
+
+    @Test
+    @DisplayName("이미 판매 중지된 상품을 다시 삭제해도 예외 없이 판매 중지 상태를 유지한다")
+    void deleteProduct_alreadyStopped() {
+        // given
+        Product onion = ProductFixture.createProduct(5L, "양파 1kg", 3900);
+        onion.stop();
+        when(productRepository.findByIdForUpdate(5L)).thenReturn(Optional.of(onion));
+
+        // when
+        service.deleteProduct(5L);
+
+        // then
+        assertThat(onion.getStatus()).isEqualTo(ProductStatus.STOPPED);
+    }
+
+    @Test
+    @DisplayName("없는 상품을 삭제하면 PRODUCT_NOT_FOUND 예외가 발생한다")
+    void deleteProduct_notFound() {
+        // given
+        when(productRepository.findByIdForUpdate(99L)).thenReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> service.deleteProduct(99L))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.PRODUCT_NOT_FOUND);
+    }
+
     private static Ingredient ingredient(String code) {
         return Ingredient.builder()
                 .ingredientCode(code)

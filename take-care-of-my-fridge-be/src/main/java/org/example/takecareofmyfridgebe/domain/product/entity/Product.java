@@ -138,4 +138,9 @@ public class Product extends BaseTimeEntity {
         this.storage = storage;
         this.shelfDays = shelfDays;
     }
+
+    // 주문, 장바구니가 productId로 참조하므로 행을 지우지 않고 판매 중지(STOPPED)로 바꾼다.
+    public void stop() {
+        this.status = ProductStatus.STOPPED;
+    }
 }
