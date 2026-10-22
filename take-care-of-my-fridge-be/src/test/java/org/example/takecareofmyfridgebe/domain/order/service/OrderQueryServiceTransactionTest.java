@@ -7,6 +7,8 @@ import static org.assertj.core.api.Assertions.tuple;
 import java.time.LocalDateTime;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderCheckoutResponse;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderItemResponse;
+import org.example.takecareofmyfridgebe.domain.order.dto.OrderListRequest;
+import org.example.takecareofmyfridgebe.domain.order.dto.OrderSummaryResponse;
 import org.example.takecareofmyfridgebe.domain.order.entity.Order;
 import org.example.takecareofmyfridgebe.domain.order.entity.OrderItem;
 import org.example.takecareofmyfridgebe.domain.order.entity.OrderStatus;
@@ -17,6 +19,7 @@ import org.example.takecareofmyfridgebe.global.config.JpaAuditingConfig;
 import org.example.takecareofmyfridgebe.global.config.QueryDslConfig;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
+import org.example.takecareofmyfridgebe.global.response.PageResponse;
 import org.example.takecareofmyfridgebe.support.MySqlContainerSupport;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -28,7 +31,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-// 실제 DB에 저장된 주문을 서비스로 읽어, 내 주문·결제 대기 주문만 보이는지 확인한다.
+// 실제 DB에 저장된 주문을 서비스로 읽어, 내 주문만 보이는지와 화면마다 보이는 상태가 맞는지 확인한다.
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({JpaAuditingConfig.class, QueryDslConfig.class, OrderQueryService.class, OrderReader.class})
@@ -107,6 +110,78 @@ class OrderQueryServiceTransactionTest extends MySqlContainerSupport {
         assertThatThrownBy(() -> orderQueryService.getCheckout(1L, order.getId()))
             .isInstanceOf(BusinessException.class)
             .extracting("errorCode").isEqualTo(ErrorCode.ORDER_CANCELLED);
+    }
+
+    @Test
+    @DisplayName("주문 목록은 내 결제 대기·결제 완료·구매 확정 주문만 돌려주고 취소된 주문과 남의 주문은 뺀다")
+    void getMyOrders_returnsOnlyMyListedStatuses() {
+        Order pending = saveOrder(1L, "20261021143000123010");
+        Order paid = saveOrder(1L, "20261021143000123011");
+        markPaid(paid);
+        Order confirmed = saveOrder(1L, "20261021143000123012");
+        markPaid(confirmed);
+        confirm(confirmed);
+        Order cancelled = saveOrder(1L, "20261021143000123013");
+        cancel(cancelled);
+        saveOrder(2L, "20261021143000123014");
+
+        PageResponse<OrderSummaryResponse> response = orderQueryService.getMyOrders(1L, new OrderListRequest(1, 10));
+
+        assertThat(response.totalElements()).isEqualTo(3L);
+        assertThat(response.content())
+            .extracting(OrderSummaryResponse::orderId, OrderSummaryResponse::status, OrderSummaryResponse::payAmount)
+            .containsExactly(
+                tuple(confirmed.getId(), OrderStatus.CONFIRMED, 8000L),
+                tuple(paid.getId(), OrderStatus.PAID, 8000L),
+                tuple(pending.getId(), OrderStatus.PENDING, 8000L));
+    }
+
+    @Test
+    @DisplayName("주문 목록은 최신 주문부터 페이지 크기만큼 나누고 1부터 센 페이지 번호로 돌려준다")
+    void getMyOrders_pagesNewestFirst() {
+        Order first = saveOrder(1L, "20261021143000123020");
+        Order second = saveOrder(1L, "20261021143000123021");
+        Order third = saveOrder(1L, "20261021143000123022");
+
+        PageResponse<OrderSummaryResponse> firstPage = orderQueryService.getMyOrders(1L, new OrderListRequest(1, 2));
+        PageResponse<OrderSummaryResponse> secondPage = orderQueryService.getMyOrders(1L, new OrderListRequest(2, 2));
+
+        assertThat(firstPage.content()).extracting(OrderSummaryResponse::orderId)
+            .containsExactly(third.getId(), second.getId());
+        assertThat(firstPage.pageNumber()).isEqualTo(1);
+        assertThat(firstPage.totalElements()).isEqualTo(3L);
+        assertThat(firstPage.totalPages()).isEqualTo(2);
+        assertThat(firstPage.isLast()).isFalse();
+        assertThat(secondPage.content()).extracting(OrderSummaryResponse::orderId)
+            .containsExactly(first.getId());
+        assertThat(secondPage.isLast()).isTrue();
+    }
+
+    @Test
+    @DisplayName("주문이 없으면 빈 목록이다")
+    void getMyOrders_noOrders_returnsEmpty() {
+        PageResponse<OrderSummaryResponse> response = orderQueryService.getMyOrders(1L, new OrderListRequest(1, 10));
+
+        assertThat(response.content()).isEmpty();
+        assertThat(response.totalElements()).isZero();
+    }
+
+    private void markPaid(Order order) {
+        Order found = orderRepository.findById(order.getId()).orElseThrow();
+        found.markPaid(LocalDateTime.now());
+        orderRepository.save(found);
+    }
+
+    private void confirm(Order order) {
+        Order found = orderRepository.findById(order.getId()).orElseThrow();
+        found.confirm(LocalDateTime.now());
+        orderRepository.save(found);
+    }
+
+    private void cancel(Order order) {
+        Order found = orderRepository.findById(order.getId()).orElseThrow();
+        found.cancel();
+        orderRepository.save(found);
     }
 
     private Order saveOrder(Long memberId, String orderNumber) {
