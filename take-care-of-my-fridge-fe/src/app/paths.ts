@@ -21,4 +21,5 @@ export const ROUTES = {
   adminMembers: '/admin/members',
   adminAudit: '/admin/audit',
   adminForecast: '/admin/forecast',
+  adminSaleEventNew: '/admin/sale-events/new',
 } as const;

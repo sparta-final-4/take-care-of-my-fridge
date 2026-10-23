@@ -27,6 +27,17 @@ $cart-quantity-min-width: 3ch;
 // 999,999원(8자)이 줄마다 같은 위치에 오도록 고정
 $cart-total-min-width: 9ch;
 
+// 할인 행사 등록 상품 표 썸네일
+$sale-thumb-size: 40px;
+// 시작·종료 시각 선택 칸 너비
+$sale-date-time-width: 200px;
+// 일괄 할인율 입력칸 너비("일괄 할인율(%)" 안내 문구가 잘리지 않는 너비)
+$sale-bulk-rate-width: 140px;
+// 상품 종류 선택 칸 너비
+$sale-type-filter-width: 160px;
+// 할인율·한정 수량 입력칸 너비
+$sale-number-input-width: 96px;
+
 // 주문 확인 상품 목록. 99개(3자)가 행마다 같은 위치에 오도록 고정
 $order-quantity-width: 5ch;
 

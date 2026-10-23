@@ -4,6 +4,7 @@ import {
   AdminForecastControllerApi,
   AdminMemberControllerApi,
   AdminProductControllerApi,
+  AdminSaleEventControllerApi,
   AuthControllerApi,
   CartControllerApi,
   CookingLogControllerApi,
@@ -43,5 +44,10 @@ export const adminAuditApi = new AdminAuditControllerApi(undefined, basePath, ax
 export const adminForecastApi = new AdminForecastControllerApi(undefined, basePath, axiosInstance);
 export const adminMemberApi = new AdminMemberControllerApi(undefined, basePath, axiosInstance);
 export const adminProductApi = new AdminProductControllerApi(undefined, basePath, axiosInstance);
+export const adminSaleEventApi = new AdminSaleEventControllerApi(
+  undefined,
+  basePath,
+  axiosInstance,
+);
 
 export * from './generated/models';
