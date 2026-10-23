@@ -63,9 +63,9 @@ public class PortOneClient implements PaymentGateway {
                         .body(PortOneCancelResponse.class);
                 return response == null ? null : response.cancellationId();
             } catch (HttpClientErrorException e) {
-                // 다른 요청이 먼저 취소했으면 원하는 결과(취소됨)는 이미 이뤄졌으므로 성공으로 본다
-                // TODO: 부분 환불에서는 이미 전액 취소된 결제를 성공으로 보면 안 된다. 환불 실패 처리 때 나눈다
-                if (isAlreadyCancelled(e)) {
+                // 전액 취소는 다른 요청이 먼저 취소했어도 원하는 결과(취소됨)가 이뤄졌으므로 성공으로 본다.
+                // 부분 취소는 이번 금액이 환불되지 않았으므로 성공으로 보지 않고 예외를 그대로 던진다
+                if (amount == null && isAlreadyCancelled(e)) {
                     log.info("PortOne 결제가 이미 취소됨: paymentId={}", paymentId);
                     return null;
                 }

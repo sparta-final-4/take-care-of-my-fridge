@@ -106,7 +106,7 @@ class PortOneClientTest {
     }
 
     @Test
-    @DisplayName("이미 취소된 결제를 취소하면 성공으로 보고 취소 건 ID는 없다")
+    @DisplayName("이미 취소된 결제를 전액 취소하면 성공으로 보고 취소 건 ID는 없다")
     void cancelPayment_alreadyCancelled_succeeds() {
         server.expect(requestTo(BASE_URL + "/payments/" + PAYMENT_ID + "/cancel"))
                 .andExpect(method(HttpMethod.POST))
@@ -114,6 +114,19 @@ class PortOneClientTest {
                         .body("{\"type\":\"PAYMENT_ALREADY_CANCELLED\",\"message\":\"이미 취소된 결제입니다.\"}"));
 
         assertThat(client.cancelPayment(PAYMENT_ID, "보상 취소", null)).isNull();
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("이미 취소된 결제를 부분 취소하면 이번 금액이 환불되지 않았으므로 그대로 던진다")
+    void cancelPayment_partialAlreadyCancelled_throws() {
+        server.expect(requestTo(BASE_URL + "/payments/" + PAYMENT_ID + "/cancel"))
+                .andExpect(method(HttpMethod.POST))
+                .andRespond(withStatus(HttpStatus.CONFLICT).contentType(MediaType.APPLICATION_JSON)
+                        .body("{\"type\":\"PAYMENT_ALREADY_CANCELLED\",\"message\":\"이미 취소된 결제입니다.\"}"));
+
+        assertThatThrownBy(() -> client.cancelPayment(PAYMENT_ID, "단순 변심", 6000L))
+                .isInstanceOf(HttpClientErrorException.class);
         server.verify();
     }
 
