@@ -28,8 +28,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class SaleEventCreateService {
 
-    // 한 상품은 예정·진행 중인 행사 하나에만 들어간다
-    private static final List<SaleEventStatus> OPEN_STATUSES = List.of(SaleEventStatus.SCHEDULED, SaleEventStatus.ACTIVE);
 
     private final SaleEventRepository saleEventRepository;
     private final SaleEventItemRepository saleEventItemRepository;
@@ -82,7 +80,7 @@ public class SaleEventCreateService {
 
         Set<Long> productIdsInSale = new HashSet<>(
                 saleEventItemRepository.findProductIdsInOpenSaleEvent(
-                        productIds, OPEN_STATUSES, LocalDateTime.now(SaleEvent.ZONE)));
+                        productIds, SaleEventStatus.OPEN, LocalDateTime.now(SaleEvent.ZONE)));
         products.stream()
                 .filter(product -> productIdsInSale.contains(product.getId()))
                 .findFirst()

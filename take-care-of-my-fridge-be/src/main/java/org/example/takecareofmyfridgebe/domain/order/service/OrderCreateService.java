@@ -24,6 +24,7 @@ import org.example.takecareofmyfridgebe.domain.product.entity.ProductStatus;
 import org.example.takecareofmyfridgebe.domain.product.repository.ProductRepository;
 import org.example.takecareofmyfridgebe.domain.sale.dto.ActiveSale;
 import org.example.takecareofmyfridgebe.domain.sale.dto.FlashDropQuantity;
+import org.example.takecareofmyfridgebe.domain.sale.entity.SaleEvent;
 import org.example.takecareofmyfridgebe.domain.sale.entity.SaleEventType;
 import org.example.takecareofmyfridgebe.domain.sale.service.SaleEventStockService;
 import org.example.takecareofmyfridgebe.domain.sale.service.SaleEventReader;
@@ -210,7 +211,7 @@ public class OrderCreateService {
     // 이미 산 번개 드롭을 장바구니에 담은 경우는 여기서 막는다. 같은 회원의 주문하기는 장바구니 잠금으로 하나씩 처리된다.
     private void validateFlashDropLimit(Long memberId, CartItem item, Product product, ActiveSale sale) {
         boolean bought = orderItemRepository.existsBySaleEventItemIdAndFlashDropMemberId(sale.saleEventItemId(), memberId);
-        if (item.getQuantity() > 1 || bought) {
+        if (item.getQuantity() > SaleEvent.FLASH_DROP_PURCHASE_LIMIT || bought) {
             throw new BusinessException(ErrorCode.PURCHASE_LIMIT_EXCEEDED, "구매 한도 초과 · " + product.getName());
         }
     }

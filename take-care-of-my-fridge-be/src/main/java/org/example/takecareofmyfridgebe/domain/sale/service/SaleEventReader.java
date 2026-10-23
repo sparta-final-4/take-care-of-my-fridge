@@ -2,7 +2,6 @@ package org.example.takecareofmyfridgebe.domain.sale.service;
 
 import java.time.LocalDateTime;
 import java.util.Collection;
-import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -20,9 +19,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class SaleEventReader {
 
-    // 종료로 닫은 행사만 뺀다. 상태는 스케줄러가 늦게 바꿔도 되고, 진행 중인지는 시각으로 판단한다.
-    private static final List<SaleEventStatus> OPEN_STATUSES = List.of(SaleEventStatus.SCHEDULED, SaleEventStatus.ACTIVE);
-
     private final SaleEventItemRepository saleEventItemRepository;
 
     // 상품 ID별 진행 중 할인을 한 번에 돌려준다. 할인이 없는 상품은 맵에 없다.
@@ -31,7 +27,8 @@ public class SaleEventReader {
             return Map.of();
         }
         return saleEventItemRepository
-                .findActiveByProductIds(productIds, OPEN_STATUSES, LocalDateTime.now(SaleEvent.ZONE))
+                // 종료로 닫은 행사만 뺀다. 상태는 스케줄러가 늦게 바꿔도 되고, 진행 중인지는 시각으로 판단한다.
+                .findActiveByProductIds(productIds, SaleEventStatus.OPEN, LocalDateTime.now(SaleEvent.ZONE))
                 .stream()
                 .collect(Collectors.toMap(ActiveSale::productId, Function.identity(), (first, second) -> first));
     }

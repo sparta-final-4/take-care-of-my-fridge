@@ -25,8 +25,6 @@ import org.springframework.data.support.PageableExecutionUtils;
 public class SaleEventItemRepositoryImpl implements SaleEventItemRepositoryCustom {
 
     private static final char LIKE_ESCAPE = '\\';
-    // 한 상품은 예정·진행 중인 행사 하나에만 들어간다
-    private static final List<SaleEventStatus> OPEN_STATUSES = List.of(SaleEventStatus.SCHEDULED, SaleEventStatus.ACTIVE);
 
     private final JPAQueryFactory queryFactory;
 
@@ -62,7 +60,7 @@ public class SaleEventItemRepositoryImpl implements SaleEventItemRepositoryCusto
         return JPAExpressions.selectOne()
                 .from(saleEventItem)
                 .join(saleEventItem.saleEvent, saleEvent)
-                .where(saleEventItem.productId.eq(product.id), saleEvent.status.in(OPEN_STATUSES),
+                .where(saleEventItem.productId.eq(product.id), saleEvent.status.in(SaleEventStatus.OPEN),
                         saleEvent.endsAt.gt(LocalDateTime.now(SaleEvent.ZONE)))
                 .notExists();
     }
