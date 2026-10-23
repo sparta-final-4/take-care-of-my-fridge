@@ -101,6 +101,10 @@ public class KafkaConfig {
     // Consumer 설정
     // ----------------------------------------------------
 
+    /**
+     * group.id 기본값을 두지 않는다. @KafkaListener마다 groupId를 반드시 지정한다 (예: groupId = "fridge").
+     * 같은 groupId를 쓰는 리스너는 메시지를 나눠 받으므로, 도메인마다 다른 groupId를 쓴다.
+     */
     @Bean
     public ConsumerFactory<String, String> consumerFactory() {
         Map<String, Object> props = new HashMap<>();
