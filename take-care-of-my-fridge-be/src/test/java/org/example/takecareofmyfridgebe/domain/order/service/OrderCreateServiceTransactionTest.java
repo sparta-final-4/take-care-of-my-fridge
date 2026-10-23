@@ -22,6 +22,7 @@ import org.example.takecareofmyfridgebe.domain.cart.repository.CartItemRepositor
 import org.example.takecareofmyfridgebe.domain.cart.repository.CartRepository;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.StorageType;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderCheckoutResponse;
+import org.example.takecareofmyfridgebe.domain.order.dto.OrderCreateItemRequest;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderCreateRequest;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderCreateResult;
 import org.example.takecareofmyfridgebe.domain.order.entity.Order;
@@ -34,6 +35,8 @@ import org.example.takecareofmyfridgebe.domain.product.entity.Product;
 import org.example.takecareofmyfridgebe.domain.product.entity.ProductStatus;
 import org.example.takecareofmyfridgebe.domain.product.entity.ProductType;
 import org.example.takecareofmyfridgebe.domain.product.repository.ProductRepository;
+import org.example.takecareofmyfridgebe.domain.sale.service.SaleEventReader;
+import org.example.takecareofmyfridgebe.domain.sale.service.SaleEventStockService;
 import org.example.takecareofmyfridgebe.global.config.JpaAuditingConfig;
 import org.example.takecareofmyfridgebe.global.config.QueryDslConfig;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
@@ -53,7 +56,8 @@ import org.springframework.transaction.annotation.Transactional;
 // 응답이 아니라 커밋된 재고·주문·장바구니 상태를 다시 읽어 확인한다.
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({JpaAuditingConfig.class, QueryDslConfig.class, OrderCreateService.class, OrderNumberGenerator.class, OrderReader.class})
+@Import({JpaAuditingConfig.class, QueryDslConfig.class, OrderCreateService.class, OrderNumberGenerator.class, OrderReader.class,
+    SaleEventReader.class, SaleEventStockService.class})
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class OrderCreateServiceTransactionTest extends MySqlContainerSupport {
 
@@ -415,7 +419,14 @@ class OrderCreateServiceTransactionTest extends MySqlContainerSupport {
     }
 
     private OrderCreateRequest request(CartItem... items) {
-        return new OrderCreateRequest(Arrays.stream(items).map(CartItem::getId).toList());
+        return new OrderCreateRequest(Arrays.stream(items)
+            .map(item -> new OrderCreateItemRequest(item.getId(), priceOf(item), null))
+            .toList());
+    }
+
+    private int priceOf(CartItem item) {
+        // 상품이 없는 항목을 주문하는 테스트도 있어 가격은 없으면 0으로 둔다
+        return productRepository.findById(item.getProductId()).map(Product::getPrice).orElse(0);
     }
 
     private int stockOf(Product product) {

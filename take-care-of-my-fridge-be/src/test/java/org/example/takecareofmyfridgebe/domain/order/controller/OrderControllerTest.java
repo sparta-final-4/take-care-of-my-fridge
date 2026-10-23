@@ -56,7 +56,7 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 @Import({SecurityConfig.class, OrderControllerTest.TestConfig.class})
 class OrderControllerTest {
 
-    private static final String BODY = "{\"cartItemIds\": [11]}";
+    private static final String BODY = "{\"items\": [{\"cartItemId\": 11, \"unitPrice\": 3000, \"saleType\": null}]}";
 
     private final MockMvc mvc;
     private final OrderCreateService orderCreateService;
@@ -268,7 +268,7 @@ class OrderControllerTest {
         mvc.perform(post("/api/orders")
                         .header("Idempotency-Key", "key-1")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"cartItemIds\": []}")
+                        .content("{\"items\": []}")
                         .with(csrf())
                         .with(loginAsMember7()))
                 .andExpect(status().isBadRequest())
@@ -280,12 +280,14 @@ class OrderControllerTest {
     @Test
     @DisplayName("장바구니 항목 번호가 50개를 넘으면 400이고 서비스를 부르지 않는다")
     void createOrder_tooManyCartItemIds_returns400() throws Exception {
-        String ids = IntStream.rangeClosed(1, 51).mapToObj(String::valueOf).collect(Collectors.joining(","));
+        String items = IntStream.rangeClosed(1, 51)
+                .mapToObj(id -> "{\"cartItemId\": " + id + ", \"unitPrice\": 3000}")
+                .collect(Collectors.joining(","));
 
         mvc.perform(post("/api/orders")
                         .header("Idempotency-Key", "key-1")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"cartItemIds\": [" + ids + "]}")
+                        .content("{\"items\": [" + items + "]}")
                         .with(csrf())
                         .with(loginAsMember7()))
                 .andExpect(status().isBadRequest())

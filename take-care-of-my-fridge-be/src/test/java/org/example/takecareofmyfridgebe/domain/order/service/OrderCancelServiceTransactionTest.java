@@ -22,6 +22,7 @@ import org.example.takecareofmyfridgebe.domain.cart.repository.CartItemRepositor
 import org.example.takecareofmyfridgebe.domain.cart.repository.CartRepository;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.StorageType;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderCancelResponse;
+import org.example.takecareofmyfridgebe.domain.order.dto.OrderCreateItemRequest;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderCreateRequest;
 import org.example.takecareofmyfridgebe.domain.order.entity.Order;
 import org.example.takecareofmyfridgebe.domain.order.entity.OrderItem;
@@ -33,6 +34,13 @@ import org.example.takecareofmyfridgebe.domain.product.entity.Product;
 import org.example.takecareofmyfridgebe.domain.product.entity.ProductStatus;
 import org.example.takecareofmyfridgebe.domain.product.entity.ProductType;
 import org.example.takecareofmyfridgebe.domain.product.repository.ProductRepository;
+import org.example.takecareofmyfridgebe.domain.sale.entity.SaleEvent;
+import org.example.takecareofmyfridgebe.domain.sale.entity.SaleEventItem;
+import org.example.takecareofmyfridgebe.domain.sale.entity.SaleEventType;
+import org.example.takecareofmyfridgebe.domain.sale.repository.SaleEventItemRepository;
+import org.example.takecareofmyfridgebe.domain.sale.repository.SaleEventRepository;
+import org.example.takecareofmyfridgebe.domain.sale.service.SaleEventReader;
+import org.example.takecareofmyfridgebe.domain.sale.service.SaleEventStockService;
 import org.example.takecareofmyfridgebe.global.config.JpaAuditingConfig;
 import org.example.takecareofmyfridgebe.global.config.QueryDslConfig;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
@@ -53,7 +61,8 @@ import org.springframework.transaction.annotation.Transactional;
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({JpaAuditingConfig.class, QueryDslConfig.class, OrderCancelService.class, OrderCreateService.class,
-    OrderNumberGenerator.class, OrderReader.class})
+    OrderNumberGenerator.class, OrderReader.class, SaleEventReader.class,
+    SaleEventStockService.class})
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class OrderCancelServiceTransactionTest extends MySqlContainerSupport {
 
@@ -64,6 +73,8 @@ class OrderCancelServiceTransactionTest extends MySqlContainerSupport {
     private final CartRepository cartRepository;
     private final CartItemRepository cartItemRepository;
     private final ProductRepository productRepository;
+    private final SaleEventRepository saleEventRepository;
+    private final SaleEventItemRepository saleEventItemRepository;
 
     @Autowired
     OrderCancelServiceTransactionTest(
@@ -73,7 +84,9 @@ class OrderCancelServiceTransactionTest extends MySqlContainerSupport {
             OrderItemRepository orderItemRepository,
             CartRepository cartRepository,
             CartItemRepository cartItemRepository,
-            ProductRepository productRepository) {
+            ProductRepository productRepository,
+            SaleEventRepository saleEventRepository,
+            SaleEventItemRepository saleEventItemRepository) {
         this.orderCancelService = orderCancelService;
         this.orderCreateService = orderCreateService;
         this.orderRepository = orderRepository;
@@ -81,6 +94,8 @@ class OrderCancelServiceTransactionTest extends MySqlContainerSupport {
         this.cartRepository = cartRepository;
         this.cartItemRepository = cartItemRepository;
         this.productRepository = productRepository;
+        this.saleEventRepository = saleEventRepository;
+        this.saleEventItemRepository = saleEventItemRepository;
     }
 
     @AfterEach
@@ -89,6 +104,8 @@ class OrderCancelServiceTransactionTest extends MySqlContainerSupport {
         orderRepository.deleteAll();
         cartItemRepository.deleteAll();
         cartRepository.deleteAll();
+        saleEventItemRepository.deleteAll();
+        saleEventRepository.deleteAll();
         productRepository.deleteAll();
     }
 
@@ -121,10 +138,11 @@ class OrderCancelServiceTransactionTest extends MySqlContainerSupport {
     }
 
     @Test
-    @DisplayName("번개 드롭으로 산 주문 상품은 취소하면 1인 1개 기록이 비워진다")
-    void cancel_releasesFlashDropMember() {
+    @DisplayName("번개 드롭으로 산 주문 상품은 취소하면 1인 1개 기록이 비워지고 번개 드롭 남은 수량이 돌아온다")
+    void cancel_releasesFlashDropMemberAndRestoresRemaining() {
         Product greenOnion = saveProduct("대파", 3000, 0);
-        Order order = saveOrder(1L, OrderStatus.PENDING, flashDropItem(greenOnion, 1L));
+        SaleEventItem saleEventItem = saveFlashDrop(greenOnion, 5);
+        Order order = saveOrder(1L, OrderStatus.PENDING, flashDropItem(greenOnion, 1L).saleEventItemId(saleEventItem.getId()));
 
         orderCancelService.cancel(1L, order.getId());
 
@@ -132,6 +150,7 @@ class OrderCancelServiceTransactionTest extends MySqlContainerSupport {
             .extracting(OrderItem::getFlashDropMemberId)
             .containsOnlyNulls();
         assertThat(stockOf(greenOnion)).isEqualTo(1);
+        assertThat(saleEventItemRepository.findById(saleEventItem.getId()).orElseThrow().getRemainingQuantity()).isEqualTo(5);
     }
 
     @Test
@@ -211,7 +230,7 @@ class OrderCancelServiceTransactionTest extends MySqlContainerSupport {
         });
         Stream<Callable<Void>> orders = items.stream().map(item -> () -> {
             orderCreateService.createOrder(item.getCart().getMemberId(), UUID.randomUUID().toString(),
-                new OrderCreateRequest(List.of(item.getId())));
+                new OrderCreateRequest(List.of(new OrderCreateItemRequest(item.getId(), 3000, null))));
             return null;
         });
         List<Throwable> failures = runConcurrently(Stream.concat(cancel, orders).toList());
@@ -250,7 +269,7 @@ class OrderCancelServiceTransactionTest extends MySqlContainerSupport {
     private Long createOrder(Long memberId, Product product, int quantity) {
         CartItem item = saveCartItem(saveCart(memberId), product, quantity);
         return orderCreateService.createOrder(memberId, UUID.randomUUID().toString(),
-            new OrderCreateRequest(List.of(item.getId()))).response().orderId();
+            new OrderCreateRequest(List.of(new OrderCreateItemRequest(item.getId(), product.getPrice(), null)))).response().orderId();
     }
 
     // 재고는 이미 빠진 상태로 두고 주문만 저장한다. 결제 완료 주문은 저장 전에 상태를 바꾼다.
@@ -277,6 +296,17 @@ class OrderCancelServiceTransactionTest extends MySqlContainerSupport {
             .listPrice(product.getPrice())
             .unitPrice(product.getPrice())
             .saleType(SaleType.NONE);
+    }
+
+    // 한정 수량에서 하나가 팔린 상태로 만든다
+    private SaleEventItem saveFlashDrop(Product product, int limitedQuantity) {
+        SaleEvent event = saleEventRepository.save(SaleEvent.builder().type(SaleEventType.FLASH_DROP)
+            .startsAt(LocalDateTime.now().minusHours(1)).endsAt(LocalDateTime.now().plusHours(1)).build());
+        SaleEventItem item = saleEventItemRepository.save(SaleEventItem.builder().saleEvent(event)
+            .productId(product.getId()).listPrice(product.getPrice()).discountRate(50)
+            .limitedQuantity(limitedQuantity).build());
+        item.decreaseRemaining(1);
+        return saleEventItemRepository.save(item);
     }
 
     private OrderItem.OrderItemBuilder flashDropItem(Product product, Long memberId) {
