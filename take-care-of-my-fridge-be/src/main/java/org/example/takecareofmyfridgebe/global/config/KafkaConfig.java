@@ -126,7 +126,8 @@ public class KafkaConfig {
 
         DefaultJacksonJavaTypeMapper typeMapper = new DefaultJacksonJavaTypeMapper();
         typeMapper.setTypePrecedence(JacksonJavaTypeMapper.TypePrecedence.INFERRED);
-        typeMapper.addTrustedPackages("org.example.takecareofmyfridgebe.");
+        // INFERRED에서는 쓰이지 않는 방어적 설정. 나중에 타입 결정 방식이 바뀌어도 프로젝트 패키지만 허용하도록 남겨둔다
+        typeMapper.addTrustedPackages("org.example.takecareofmyfridgebe");
 
         converter.setTypeMapper(typeMapper);
         return converter;
