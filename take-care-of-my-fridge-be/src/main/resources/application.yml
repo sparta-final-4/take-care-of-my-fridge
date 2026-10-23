@@ -30,6 +30,9 @@ spring:
       timeout: 3000ms
       connect-timeout: 2000ms
 
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+
 app:
   auth:
     jwt-secret: WavSy2onX+rGXL9EhdkwDNgkscczEziOL09OsXSj7jEy0XurFwGtpB36WShSTM3t
