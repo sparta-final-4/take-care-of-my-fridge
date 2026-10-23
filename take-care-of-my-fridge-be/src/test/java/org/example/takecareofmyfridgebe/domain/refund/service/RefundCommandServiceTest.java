@@ -12,6 +12,7 @@ import org.example.takecareofmyfridgebe.domain.product.entity.ProductStatus;
 import org.example.takecareofmyfridgebe.domain.product.entity.ProductType;
 import org.example.takecareofmyfridgebe.domain.refund.dto.RefundCreateRequest;
 import org.example.takecareofmyfridgebe.domain.refund.dto.RefundRequested;
+import org.example.takecareofmyfridgebe.domain.refund.dto.RefundResponse;
 import org.example.takecareofmyfridgebe.domain.refund.entity.Refund;
 import org.example.takecareofmyfridgebe.domain.refund.entity.RefundItem;
 import org.example.takecareofmyfridgebe.domain.refund.entity.RefundReasonType;
@@ -73,7 +74,7 @@ class RefundCommandServiceTest extends MySqlContainerSupport {
     @Test
     @DisplayName("일부 수량을 환불 신청하면 단가 × 수량 금액으로 요청 상태 환불이 저장된다")
     void partialRefund() {
-        RefundRequested requested = refundCommandService.request(MEMBER_ID, order.getId(), request(item(itemA, 2)));
+        RefundRequested requested = refundCommandService.request(MEMBER_ID, request(order.getId(), item(itemA, 2)));
         Long refundId = requested.refundId();
         flushAndClear();
 
@@ -92,8 +93,8 @@ class RefundCommandServiceTest extends MySqlContainerSupport {
     @Test
     @DisplayName("여러 상품을 한 번에 환불하면 금액을 합산한다")
     void multipleItems() {
-        Long refundId = refundCommandService.request(MEMBER_ID, order.getId(),
-                request(item(itemA, 1), item(itemB, 3))).refundId();
+        Long refundId = refundCommandService.request(MEMBER_ID,
+                request(order.getId(), item(itemA, 1), item(itemB, 3))).refundId();
         flushAndClear();
 
         assertThat(entityManager.find(Refund.class, refundId).getRefundAmount()).isEqualTo(9000L);
@@ -103,17 +104,17 @@ class RefundCommandServiceTest extends MySqlContainerSupport {
     @Test
     @DisplayName("남은 수량까지는 다시 신청할 수 있고 넘으면 거절한다")
     void remainingQuantity() {
-        refundCommandService.request(MEMBER_ID, order.getId(), request(item(itemA, 3)));
-        refundCommandService.request(MEMBER_ID, order.getId(), request(item(itemA, 2)));
+        refundCommandService.request(MEMBER_ID, request(order.getId(), item(itemA, 3)));
+        refundCommandService.request(MEMBER_ID, request(order.getId(), item(itemA, 2)));
 
-        assertError(() -> refundCommandService.request(MEMBER_ID, order.getId(), request(item(itemA, 1))),
+        assertError(() -> refundCommandService.request(MEMBER_ID, request(order.getId(), item(itemA, 1))),
                 ErrorCode.EXCEED_REFUNDABLE_QUANTITY);
     }
 
     @Test
     @DisplayName("한 번에 주문 수량보다 많이 신청하면 거절한다")
     void exceedOrderQuantity() {
-        assertError(() -> refundCommandService.request(MEMBER_ID, order.getId(), request(item(itemA, 6))),
+        assertError(() -> refundCommandService.request(MEMBER_ID, request(order.getId(), item(itemA, 6))),
                 ErrorCode.EXCEED_REFUNDABLE_QUANTITY);
     }
 
@@ -124,7 +125,7 @@ class RefundCommandServiceTest extends MySqlContainerSupport {
         confirmed.confirm(LocalDateTime.now());
         flushAndClear();
 
-        assertError(() -> refundCommandService.request(MEMBER_ID, order.getId(), request(item(itemA, 1))),
+        assertError(() -> refundCommandService.request(MEMBER_ID, request(order.getId(), item(itemA, 1))),
                 ErrorCode.REFUND_ORDER_CONFIRMED);
     }
 
@@ -135,14 +136,14 @@ class RefundCommandServiceTest extends MySqlContainerSupport {
         OrderItem item = orderItem(pending, 10L, 1, 3000, SaleType.NONE);
         flushAndClear();
 
-        assertError(() -> refundCommandService.request(MEMBER_ID, pending.getId(), request(item(item, 1))),
+        assertError(() -> refundCommandService.request(MEMBER_ID, request(pending.getId(), item(item, 1))),
                 ErrorCode.INVALID_REFUND_STATUS);
     }
 
     @Test
     @DisplayName("다른 회원의 주문은 없는 주문처럼 거절한다")
     void otherMembersOrder() {
-        assertError(() -> refundCommandService.request(OTHER_MEMBER_ID, order.getId(), request(item(itemA, 1))),
+        assertError(() -> refundCommandService.request(OTHER_MEMBER_ID, request(order.getId(), item(itemA, 1))),
                 ErrorCode.ORDER_NOT_FOUND);
     }
 
@@ -153,24 +154,24 @@ class RefundCommandServiceTest extends MySqlContainerSupport {
         OrderItem otherItem = orderItem(other, 10L, 1, 3000, SaleType.NONE);
         flushAndClear();
 
-        assertError(() -> refundCommandService.request(MEMBER_ID, order.getId(), request(item(otherItem, 1))),
+        assertError(() -> refundCommandService.request(MEMBER_ID, request(order.getId(), item(otherItem, 1))),
                 ErrorCode.REFUND_ITEM_NOT_FOUND);
     }
 
     @Test
     @DisplayName("특가·번개 드롭 상품은 환불할 수 없다")
     void saleItems() {
-        assertError(() -> refundCommandService.request(MEMBER_ID, order.getId(), request(item(specialItem, 1))),
+        assertError(() -> refundCommandService.request(MEMBER_ID, request(order.getId(), item(specialItem, 1))),
                 ErrorCode.NON_REFUNDABLE_SALE_ITEM);
-        assertError(() -> refundCommandService.request(MEMBER_ID, order.getId(), request(item(flashDropItem, 1))),
+        assertError(() -> refundCommandService.request(MEMBER_ID, request(order.getId(), item(flashDropItem, 1))),
                 ErrorCode.NON_REFUNDABLE_SALE_ITEM);
     }
 
     @Test
     @DisplayName("같은 상품을 한 요청에 두 번 넣으면 거절한다")
     void duplicateItem() {
-        assertError(() -> refundCommandService.request(MEMBER_ID, order.getId(),
-                request(item(itemA, 1), item(itemA, 1))), ErrorCode.INVALID_INPUT_VALUE);
+        assertError(() -> refundCommandService.request(MEMBER_ID,
+                request(order.getId(), item(itemA, 1), item(itemA, 1))), ErrorCode.INVALID_INPUT_VALUE);
     }
 
     @Test
@@ -183,13 +184,17 @@ class RefundCommandServiceTest extends MySqlContainerSupport {
         OrderItem tofuItem = orderItem(paid, tofu.getId(), 2, 2000, SaleType.NONE);
         pay(paid);
         flushAndClear();
-        Long refundId = refundCommandService.request(MEMBER_ID, paid.getId(),
-                request(item(greenOnionItem, 2), item(tofuItem, 1))).refundId();
+        Long refundId = refundCommandService.request(MEMBER_ID,
+                request(paid.getId(), item(greenOnionItem, 2), item(tofuItem, 1))).refundId();
         flushAndClear();
 
-        refundCommandService.complete(refundId, "cancellation-1");
+        RefundResponse response = refundCommandService.complete(refundId, "cancellation-1");
         flushAndClear();
 
+        assertThat(response.refundId()).isEqualTo(refundId);
+        assertThat(response.status()).isEqualTo(RefundStatus.COMPLETED);
+        assertThat(response.refundAmount()).isEqualTo(8000L);
+        assertThat(response.refundedAt()).isNotNull();
         Refund refund = entityManager.find(Refund.class, refundId);
         assertThat(refund.getStatus()).isEqualTo(RefundStatus.COMPLETED);
         assertThat(refund.getPortoneCancellationId()).isEqualTo("cancellation-1");
@@ -208,7 +213,7 @@ class RefundCommandServiceTest extends MySqlContainerSupport {
         OrderItem greenOnionItem = orderItem(paid, greenOnion.getId(), 3, 3000, SaleType.NONE);
         pay(paid);
         flushAndClear();
-        Long refundId = refundCommandService.request(MEMBER_ID, paid.getId(), request(item(greenOnionItem, 2)))
+        Long refundId = refundCommandService.request(MEMBER_ID, request(paid.getId(), item(greenOnionItem, 2)))
                 .refundId();
         refundCommandService.complete(refundId, "cancellation-1");
         flushAndClear();
@@ -248,8 +253,8 @@ class RefundCommandServiceTest extends MySqlContainerSupport {
         entityManager.persist(payment);
     }
 
-    private RefundCreateRequest request(RefundCreateRequest.Item... items) {
-        return new RefundCreateRequest(List.of(items), RefundReasonType.CHANGE_OF_MIND, null);
+    private RefundCreateRequest request(Long orderId, RefundCreateRequest.Item... items) {
+        return new RefundCreateRequest(orderId, List.of(items), RefundReasonType.CHANGE_OF_MIND, null);
     }
 
     private RefundCreateRequest.Item item(OrderItem orderItem, int quantity) {

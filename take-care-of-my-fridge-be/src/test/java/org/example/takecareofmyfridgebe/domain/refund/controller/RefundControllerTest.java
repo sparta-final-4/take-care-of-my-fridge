@@ -1,0 +1,187 @@
+package org.example.takecareofmyfridgebe.domain.refund.controller;
+
+import org.example.takecareofmyfridgebe.domain.auth.service.AuthSessionService;
+import org.example.takecareofmyfridgebe.domain.auth.service.AuthSessionService.AuthPrincipal;
+import org.example.takecareofmyfridgebe.domain.auth.service.JwtTokenService;
+import org.example.takecareofmyfridgebe.domain.member.entity.Member;
+import org.example.takecareofmyfridgebe.domain.refund.dto.RefundCreateRequest;
+import org.example.takecareofmyfridgebe.domain.refund.dto.RefundResponse;
+import org.example.takecareofmyfridgebe.domain.refund.entity.RefundReasonType;
+import org.example.takecareofmyfridgebe.domain.refund.entity.RefundStatus;
+import org.example.takecareofmyfridgebe.domain.refund.facade.RefundFacade;
+import org.example.takecareofmyfridgebe.global.config.SecurityConfig;
+import org.example.takecareofmyfridgebe.global.error.BusinessException;
+import org.example.takecareofmyfridgebe.global.error.ErrorCode;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+/**
+ * RefundController의 웹 계층(MockMvc + SecurityConfig) 슬라이스 테스트.
+ * 인증 여부, 요청 검증, 토큰의 회원 ID 전달, 비즈니스 예외 응답 변환을 확인한다.
+ */
+@WebMvcTest(RefundController.class)
+@Import({SecurityConfig.class, RefundControllerTest.TestConfig.class})
+class RefundControllerTest {
+
+    private static final Long MEMBER_ID = 7L;
+    private static final String VALID_ITEMS = "[{\"orderItemId\": 1, \"quantity\": 2}]";
+
+    @Autowired
+    private MockMvc mvc;
+
+    @Autowired
+    private RefundFacade refundFacade;
+
+    @BeforeEach
+    void resetMock() {
+        reset(refundFacade);
+    }
+
+    /**
+     * 비로그인 상태로 환불을 신청하면 Facade를 호출하지 않고 401(A003)을 반환하는지 검증한다.
+     */
+    @Test
+    void requestWithoutLoginReturnsUnauthorized() throws Exception {
+        mvc.perform(post("/api/refunds")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody("10", VALID_ITEMS, "\"CHANGE_OF_MIND\"", "null")))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value(ErrorCode.UNAUTHORIZED.getCode()));
+
+        verifyNoInteractions(refundFacade);
+    }
+
+    /**
+     * 환불 신청 시 토큰의 회원 ID와 요청 본문이 Facade로 전달되고,
+     * 201과 함께 응답 DTO가 규격대로 직렬화되는지 검증한다.
+     */
+    @Test
+    void requestPassesTokenMemberIdAndReturnsCreated() throws Exception {
+        RefundCreateRequest request = new RefundCreateRequest(
+                10L, List.of(new RefundCreateRequest.Item(1L, 2)), RefundReasonType.CHANGE_OF_MIND, "포장이 뜯겨 있어요");
+        RefundResponse response = new RefundResponse(
+                100L, RefundStatus.COMPLETED, 6000L, LocalDateTime.of(2026, 10, 23, 10, 0));
+        when(refundFacade.request(MEMBER_ID, request)).thenReturn(response);
+
+        mvc.perform(post("/api/refunds")
+                        .with(csrf())
+                        .with(loginUser())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody("10", VALID_ITEMS, "\"CHANGE_OF_MIND\"", "\"포장이 뜯겨 있어요\"")))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.refundId").value(100))
+                .andExpect(jsonPath("$.data.status").value("COMPLETED"))
+                .andExpect(jsonPath("$.data.refundAmount").value(6000))
+                .andExpect(jsonPath("$.data.refundedAt").value("2026-10-23T10:00:00"));
+
+        verify(refundFacade).request(MEMBER_ID, request);
+    }
+
+    /**
+     * 주문 ID 누락, 빈 상품 목록, 0개 수량, 사유 누락, 500자를 넘는 상세 사유면
+     * Facade를 호출하지 않고 400(C001)을 반환하는지 검증한다.
+     */
+    @Test
+    void requestWithInvalidBodyReturnsBadRequest() throws Exception {
+        for (String body : List.of(
+                requestBody("null", VALID_ITEMS, "\"CHANGE_OF_MIND\"", "null"),
+                requestBody("10", "[]", "\"CHANGE_OF_MIND\"", "null"),
+                requestBody("10", "[{\"orderItemId\": 1, \"quantity\": 0}]", "\"CHANGE_OF_MIND\"", "null"),
+                requestBody("10", VALID_ITEMS, "null", "null"),
+                requestBody("10", VALID_ITEMS, "\"ETC\"", "\"" + "가".repeat(501) + "\""))) {
+            mvc.perform(post("/api/refunds")
+                            .with(csrf())
+                            .with(loginUser())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.success").value(false))
+                    .andExpect(jsonPath("$.error.code").value(ErrorCode.INVALID_INPUT_VALUE.getCode()));
+        }
+
+        verifyNoInteractions(refundFacade);
+    }
+
+    /**
+     * 구매 확정된 주문을 환불하려 하면 해당 ErrorCode의 상태와 코드(409, REFUND_010)로 응답하는지 검증한다.
+     */
+    @Test
+    void requestConfirmedOrderReturnsErrorCode() throws Exception {
+        when(refundFacade.request(anyLong(), any()))
+                .thenThrow(new BusinessException(ErrorCode.REFUND_ORDER_CONFIRMED));
+
+        mvc.perform(post("/api/refunds")
+                        .with(csrf())
+                        .with(loginUser())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody("10", VALID_ITEMS, "\"CHANGE_OF_MIND\"", "null")))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value(ErrorCode.REFUND_ORDER_CONFIRMED.getCode()));
+    }
+
+    private static RequestPostProcessor loginUser() {
+        return authentication(new UsernamePasswordAuthenticationToken(
+                new AuthPrincipal(MEMBER_ID, 8L, Member.Role.USER), null,
+                List.of(new SimpleGrantedAuthority("ROLE_USER"))));
+    }
+
+    private static String requestBody(String orderId, String items, String reasonType, String reasonDetail) {
+        return """
+                {
+                  "orderId": %s,
+                  "items": %s,
+                  "reasonType": %s,
+                  "reasonDetail": %s
+                }
+                """.formatted(orderId, items, reasonType, reasonDetail);
+    }
+
+    @TestConfiguration
+    static class TestConfig {
+
+        @Bean
+        RefundFacade refundFacade() {
+            return mock(RefundFacade.class);
+        }
+
+        @Bean
+        JwtTokenService jwtTokenService() {
+            return mock(JwtTokenService.class);
+        }
+
+        @Bean
+        AuthSessionService authSessionService() {
+            return mock(AuthSessionService.class);
+        }
+    }
+}

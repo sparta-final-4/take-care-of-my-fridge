@@ -13,6 +13,7 @@ import org.example.takecareofmyfridgebe.domain.payment.repository.PaymentReposit
 import org.example.takecareofmyfridgebe.domain.product.repository.ProductRepository;
 import org.example.takecareofmyfridgebe.domain.refund.dto.RefundCreateRequest;
 import org.example.takecareofmyfridgebe.domain.refund.dto.RefundRequested;
+import org.example.takecareofmyfridgebe.domain.refund.dto.RefundResponse;
 import org.example.takecareofmyfridgebe.domain.refund.dto.RefundedQuantity;
 import org.example.takecareofmyfridgebe.domain.refund.entity.Refund;
 import org.example.takecareofmyfridgebe.domain.refund.entity.RefundItem;
@@ -48,10 +49,10 @@ public class RefundCommandService {
 
     // 주문 행을 잠그고 검증하므로 같은 주문의 환불 신청과 구매 확정이 하나씩 처리돼 누적 수량이 주문 수량을 넘지 않는다
     @Transactional
-    public RefundRequested request(Long memberId, Long orderId, RefundCreateRequest request) {
-        Order order = orderReader.getOwnedOrderForUpdate(memberId, orderId);
+    public RefundRequested request(Long memberId, RefundCreateRequest request) {
+        Order order = orderReader.getOwnedOrderForUpdate(memberId, request.orderId());
         validateRefundableOrder(order);
-        Payment payment = getPaidPayment(orderId);
+        Payment payment = getPaidPayment(order.getId());
 
         Map<Long, OrderItem> orderItemsById = orderReader.getOrderItems(order).stream()
                 .collect(Collectors.toMap(OrderItem::getId, Function.identity()));
@@ -101,13 +102,14 @@ public class RefundCommandService {
 
     // PG 취소가 끝난 환불을 완료하고 환불 수량만큼 재고를 되돌린다
     @Transactional
-    public void complete(Long refundId, String portoneCancellationId) {
+    public RefundResponse complete(Long refundId, String portoneCancellationId) {
         Refund refund = refundRepository.findByIdForUpdate(refundId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.REFUND_NOT_FOUND));
         // OSIV로 신청 때 읽은 엔티티가 재사용되면 잠금 후에도 예전 상태가 남으므로 DB 값으로 다시 읽는다
         entityManager.refresh(refund);
         refund.complete(portoneCancellationId, LocalDateTime.now());
         restoreStock(refundItemRepository.findWithOrderItemByRefundId(refundId));
+        return RefundResponse.from(refund);
     }
 
     // 주문하기와 같은 순서(상품 ID 순)로 상품 행을 잠가, 동시에 들어온 주문하기의 재고 차감과 섞이지 않게 한다
