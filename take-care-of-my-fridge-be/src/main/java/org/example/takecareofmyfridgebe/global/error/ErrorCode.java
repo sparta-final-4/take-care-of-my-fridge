@@ -63,6 +63,9 @@ public enum ErrorCode {
     ORDER_CANCELLED(HttpStatus.CONFLICT, "ORDER_008", "취소된 주문입니다."),
     ORDER_NOT_PAID(HttpStatus.CONFLICT, "ORDER_009", "결제 완료된 주문만 구매 확정할 수 있습니다."),
 
+    // Sale event
+    SALE_EVENT_PRODUCT_DUPLICATED(HttpStatus.CONFLICT, "SALE_001", "이미 행사가 있는 상품입니다."),
+
     // Payment
     PAYMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "PAYMENT_001", "결제 정보를 찾을 수 없습니다."),
     PAYMENT_AMOUNT_MISMATCH(HttpStatus.BAD_REQUEST, "PAYMENT_002", "결제 금액이 일치하지 않습니다."),

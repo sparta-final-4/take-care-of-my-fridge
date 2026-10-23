@@ -56,17 +56,18 @@ public class SaleEventItem extends BaseTimeEntity {
     @Column(name = "remaining_quantity")
     private Integer remainingQuantity;
 
+    // 할인가는 정가에서 할인율만큼 뺀 값이며 원 아래는 버린다.
     @Builder
     private SaleEventItem(
         SaleEvent saleEvent,
         Long productId,
-        int salePrice,
+        int listPrice,
         int discountRate,
         Integer limitedQuantity
     ) {
         this.saleEvent = saleEvent;
         this.productId = productId;
-        this.salePrice = salePrice;
+        this.salePrice = (int) ((long) listPrice * (100 - discountRate) / 100);
         this.discountRate = discountRate;
         this.limitedQuantity = limitedQuantity;
         this.remainingQuantity = limitedQuantity;
