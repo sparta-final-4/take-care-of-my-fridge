@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
 import java.util.Optional;
 
 public interface RefundRepository extends JpaRepository<Refund, Long> {
@@ -15,4 +16,8 @@ public interface RefundRepository extends JpaRepository<Refund, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select r from Refund r where r.id = :id")
     Optional<Refund> findByIdForUpdate(@Param("id") Long id);
+
+    // 주문의 모든 결제에 걸린 환불을 최신순으로 찾는다
+    @Query("select r from Refund r where r.payment.order.id = :orderId order by r.id desc")
+    List<Refund> findByOrderIdOrderByIdDesc(@Param("orderId") Long orderId);
 }

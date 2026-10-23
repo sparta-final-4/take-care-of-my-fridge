@@ -4,6 +4,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.auth.service.AuthSessionService.AuthPrincipal;
 import org.example.takecareofmyfridgebe.domain.refund.dto.RefundCreateRequest;
+import org.example.takecareofmyfridgebe.domain.refund.dto.RefundHistoryResponse;
 import org.example.takecareofmyfridgebe.domain.refund.dto.RefundResponse;
 import org.example.takecareofmyfridgebe.domain.refund.dto.RefundableItemResponse;
 import org.example.takecareofmyfridgebe.domain.refund.facade.RefundFacade;
@@ -36,6 +37,14 @@ public class RefundController {
             @Valid @RequestBody RefundCreateRequest request) {
         RefundResponse response = refundFacade.request(principal.memberId(), request);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok(response));
+    }
+
+    // 환불 상세 화면. 주문의 환불 내역을 최신순으로 보여준다
+    @GetMapping
+    public ResponseEntity<ApiResponse<List<RefundHistoryResponse>>> getRefundHistory(
+            @AuthenticationPrincipal AuthPrincipal principal,
+            @RequestParam Long orderId) {
+        return ResponseEntity.ok(ApiResponse.ok(refundQueryService.getRefundHistory(principal.memberId(), orderId)));
     }
 
     // 환불 신청 화면. 주문 상품마다 남은 환불 가능 수량을 보여준다

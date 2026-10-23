@@ -6,6 +6,8 @@ import org.example.takecareofmyfridgebe.domain.auth.service.JwtTokenService;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 import org.example.takecareofmyfridgebe.domain.order.entity.SaleType;
 import org.example.takecareofmyfridgebe.domain.refund.dto.RefundCreateRequest;
+import org.example.takecareofmyfridgebe.domain.refund.dto.RefundHistoryItemResponse;
+import org.example.takecareofmyfridgebe.domain.refund.dto.RefundHistoryResponse;
 import org.example.takecareofmyfridgebe.domain.refund.dto.RefundResponse;
 import org.example.takecareofmyfridgebe.domain.refund.dto.RefundableItemResponse;
 import org.example.takecareofmyfridgebe.domain.refund.entity.RefundReasonType;
@@ -220,6 +222,62 @@ class RefundControllerTest {
         mvc.perform(get("/api/refunds/refundable-items").param("orderId", "10").with(loginUser()))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.error.code").value(ErrorCode.REFUND_ORDER_CONFIRMED.getCode()));
+    }
+
+    /**
+     * 비로그인 상태로 환불 내역을 조회하면 서비스를 호출하지 않고 401(A003)을 반환하는지 검증한다.
+     */
+    @Test
+    void getRefundHistoryWithoutLoginReturnsUnauthorized() throws Exception {
+        mvc.perform(get("/api/refunds").param("orderId", "10"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error.code").value(ErrorCode.UNAUTHORIZED.getCode()));
+
+        verifyNoInteractions(refundQueryService);
+    }
+
+    /**
+     * orderId 없이 환불 내역을 조회하면 서비스를 호출하지 않고 400(C001)을 반환하는지 검증한다.
+     */
+    @Test
+    void getRefundHistoryWithoutOrderIdReturnsBadRequest() throws Exception {
+        mvc.perform(get("/api/refunds").with(loginUser()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value(ErrorCode.INVALID_INPUT_VALUE.getCode()));
+
+        verifyNoInteractions(refundQueryService);
+    }
+
+    /**
+     * 토큰의 회원 ID와 쿼리의 주문 ID로 서비스를 호출하고, 환불 내역과 환불 상품이 규격대로 직렬화되는지 검증한다.
+     */
+    @Test
+    void getRefundHistoryPassesTokenMemberIdAndReturnsHistory() throws Exception {
+        when(refundQueryService.getRefundHistory(MEMBER_ID, 10L)).thenReturn(List.of(
+                new RefundHistoryResponse(100L, RefundStatus.COMPLETED, RefundReasonType.CHANGE_OF_MIND,
+                        "포장이 뜯겨 있어요", 6000L, LocalDateTime.of(2026, 10, 23, 9, 59),
+                        LocalDateTime.of(2026, 10, 23, 10, 0),
+                        List.of(new RefundHistoryItemResponse(1L, "대파", "https://img.test/greenonion.png",
+                                3000, 2, 6000L)))));
+
+        mvc.perform(get("/api/refunds").param("orderId", "10").with(loginUser()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data[0].refundId").value(100))
+                .andExpect(jsonPath("$.data[0].status").value("COMPLETED"))
+                .andExpect(jsonPath("$.data[0].reasonType").value("CHANGE_OF_MIND"))
+                .andExpect(jsonPath("$.data[0].reasonDetail").value("포장이 뜯겨 있어요"))
+                .andExpect(jsonPath("$.data[0].refundAmount").value(6000))
+                .andExpect(jsonPath("$.data[0].requestedAt").value("2026-10-23T09:59:00"))
+                .andExpect(jsonPath("$.data[0].refundedAt").value("2026-10-23T10:00:00"))
+                .andExpect(jsonPath("$.data[0].items[0].orderItemId").value(1))
+                .andExpect(jsonPath("$.data[0].items[0].productName").value("대파"))
+                .andExpect(jsonPath("$.data[0].items[0].productImageUrl").value("https://img.test/greenonion.png"))
+                .andExpect(jsonPath("$.data[0].items[0].unitPrice").value(3000))
+                .andExpect(jsonPath("$.data[0].items[0].quantity").value(2))
+                .andExpect(jsonPath("$.data[0].items[0].amount").value(6000));
+
+        verify(refundQueryService).getRefundHistory(MEMBER_ID, 10L);
     }
 
     private static RequestPostProcessor loginUser() {

@@ -6,10 +6,13 @@ import org.example.takecareofmyfridgebe.domain.order.entity.OrderItem;
 import org.example.takecareofmyfridgebe.domain.order.entity.SaleType;
 import org.example.takecareofmyfridgebe.domain.order.service.OrderReader;
 import org.example.takecareofmyfridgebe.domain.payment.entity.Payment;
+import org.example.takecareofmyfridgebe.domain.refund.dto.RefundHistoryItemResponse;
+import org.example.takecareofmyfridgebe.domain.refund.dto.RefundHistoryResponse;
 import org.example.takecareofmyfridgebe.domain.refund.dto.RefundableItemResponse;
 import org.example.takecareofmyfridgebe.domain.refund.entity.Refund;
 import org.example.takecareofmyfridgebe.domain.refund.entity.RefundItem;
 import org.example.takecareofmyfridgebe.domain.refund.entity.RefundReasonType;
+import org.example.takecareofmyfridgebe.domain.refund.entity.RefundStatus;
 import org.example.takecareofmyfridgebe.global.config.JpaAuditingConfig;
 import org.example.takecareofmyfridgebe.global.config.QueryDslConfig;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
@@ -145,6 +148,80 @@ class RefundQueryServiceTest extends MySqlContainerSupport {
                 ErrorCode.ORDER_NOT_FOUND);
     }
 
+    @Test
+    @DisplayName("환불 내역은 상태와 관계없이 최신순으로, 환불마다 자기 상품만 묶어 돌려준다")
+    void history_latestFirstWithItems() {
+        Refund first = refund(payment, itemA, 2);
+        addItem(first, itemB, 1);
+        first.complete("cancellation-1", LocalDateTime.now());
+        Refund second = refund(payment, itemA, 1);
+        second.fail("PG 거절");
+        Refund third = refund(payment, itemB, 1);
+        flushAndClear();
+
+        List<RefundHistoryResponse> history = refundQueryService.getRefundHistory(MEMBER_ID, order.getId());
+
+        assertThat(history)
+                .extracting(RefundHistoryResponse::refundId, RefundHistoryResponse::status)
+                .containsExactly(
+                        tuple(third.getId(), RefundStatus.REQUESTED),
+                        tuple(second.getId(), RefundStatus.FAILED),
+                        tuple(first.getId(), RefundStatus.COMPLETED));
+        RefundHistoryResponse completed = history.get(2);
+        assertThat(completed.reasonType()).isEqualTo(RefundReasonType.CHANGE_OF_MIND);
+        assertThat(completed.requestedAt()).isNotNull();
+        assertThat(completed.refundedAt()).isNotNull();
+        assertThat(completed.items())
+                .extracting(RefundHistoryItemResponse::orderItemId, RefundHistoryItemResponse::productName,
+                        RefundHistoryItemResponse::unitPrice, RefundHistoryItemResponse::quantity,
+                        RefundHistoryItemResponse::amount)
+                .containsExactly(
+                        tuple(itemA.getId(), "상품10", 3000, 2, 6000L),
+                        tuple(itemB.getId(), "상품20", 2000, 1, 2000L));
+        assertThat(history.get(0).refundedAt()).isNull();
+        assertThat(history.get(0).items()).extracting(RefundHistoryItemResponse::orderItemId)
+                .containsExactly(itemB.getId());
+    }
+
+    @Test
+    @DisplayName("다른 주문의 환불은 내역에 넣지 않는다")
+    void history_onlyThisOrder() {
+        Order other = order("20261023-000003");
+        OrderItem otherItem = orderItem(other, 10L, 1, 3000, SaleType.NONE);
+        Payment otherPayment = pay(other);
+        Refund mine = refund(payment, itemA, 1);
+        refund(otherPayment, otherItem, 1);
+        flushAndClear();
+
+        assertThat(refundQueryService.getRefundHistory(MEMBER_ID, order.getId()))
+                .extracting(RefundHistoryResponse::refundId)
+                .containsExactly(mine.getId());
+    }
+
+    @Test
+    @DisplayName("환불이 없으면 빈 내역을 돌려준다")
+    void history_empty() {
+        assertThat(refundQueryService.getRefundHistory(MEMBER_ID, order.getId())).isEmpty();
+    }
+
+    @Test
+    @DisplayName("구매 확정된 주문도 지난 환불 내역을 보여준다")
+    void history_confirmedOrder() {
+        refund(payment, itemA, 1).complete("cancellation-1", LocalDateTime.now());
+        flushAndClear();
+        entityManager.find(Order.class, order.getId()).confirm(LocalDateTime.now());
+        flushAndClear();
+
+        assertThat(refundQueryService.getRefundHistory(MEMBER_ID, order.getId())).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("다른 회원의 주문 환불 내역은 없는 주문처럼 거절한다")
+    void history_otherMembersOrder() {
+        assertError(() -> refundQueryService.getRefundHistory(OTHER_MEMBER_ID, order.getId()),
+                ErrorCode.ORDER_NOT_FOUND);
+    }
+
     private Order order(String orderNumber) {
         Order created = Order.builder().orderNumber(orderNumber).memberId(MEMBER_ID).totalAmount(23000L).build();
         entityManager.persist(created);
@@ -168,15 +245,23 @@ class RefundQueryServiceTest extends MySqlContainerSupport {
         return created;
     }
 
-    // 요청 상태 환불 한 건을 상품 하나로 만든다
     private Refund refund(OrderItem orderItem, int quantity) {
-        Refund created = Refund.builder().payment(entityManager.find(Payment.class, payment.getId()))
+        return refund(payment, orderItem, quantity);
+    }
+
+    // 요청 상태 환불 한 건을 상품 하나로 만든다. 환불 금액은 검증 대상이 아니라 첫 상품 금액만 넣는다
+    private Refund refund(Payment target, OrderItem orderItem, int quantity) {
+        Refund created = Refund.builder().payment(entityManager.find(Payment.class, target.getId()))
                 .refundAmount((long) orderItem.getUnitPrice() * quantity)
                 .reasonType(RefundReasonType.CHANGE_OF_MIND).build();
         entityManager.persist(created);
-        entityManager.persist(RefundItem.builder().refund(created)
-                .orderItem(entityManager.find(OrderItem.class, orderItem.getId())).quantity(quantity).build());
+        addItem(created, orderItem, quantity);
         return created;
+    }
+
+    private void addItem(Refund target, OrderItem orderItem, int quantity) {
+        entityManager.persist(RefundItem.builder().refund(target)
+                .orderItem(entityManager.find(OrderItem.class, orderItem.getId())).quantity(quantity).build());
     }
 
     private void assertError(Runnable action, ErrorCode expected) {
