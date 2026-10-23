@@ -21,6 +21,7 @@ export * from './apis/admin-forecast-controller-api';
 export * from './apis/admin-member-controller-api';
 export * from './apis/admin-product-controller-api';
 export * from './apis/admin-recipe-controller-api';
+export * from './apis/admin-sale-event-controller-api';
 export * from './apis/auth-controller-api';
 export * from './apis/cart-controller-api';
 export * from './apis/cooking-log-controller-api';

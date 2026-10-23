@@ -18,12 +18,14 @@
 export interface CartItemResponse {
     'cartItemId'?: number;
     'discountRate'?: number;
+    'flashDropLimit'?: number;
     'flashDropRemaining'?: number;
     'imageUrl'?: string;
     'listPrice'?: number;
     'productId'?: number;
     'productName'?: string;
     'quantity'?: number;
+    'saleEndsAt'?: string;
     'saleType'?: CartItemResponseSaleTypeEnum;
     'soldOut'?: boolean;
     'unitPrice'?: number;

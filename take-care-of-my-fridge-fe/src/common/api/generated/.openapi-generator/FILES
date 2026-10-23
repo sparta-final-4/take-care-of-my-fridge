@@ -5,6 +5,7 @@ apis/admin-forecast-controller-api.ts
 apis/admin-member-controller-api.ts
 apis/admin-product-controller-api.ts
 apis/admin-recipe-controller-api.ts
+apis/admin-sale-event-controller-api.ts
 apis/auth-controller-api.ts
 apis/cart-controller-api.ts
 apis/cooking-log-controller-api.ts
@@ -54,11 +55,13 @@ models/api-response-page-response-order-summary-response.ts
 models/api-response-page-response-product-list-item-response.ts
 models/api-response-page-response-recipe-list-item-response.ts
 models/api-response-page-response-review-response.ts
+models/api-response-page-response-sale-candidate-product-response.ts
 models/api-response-payment-confirm-response.ts
 models/api-response-payment-prepare-response.ts
 models/api-response-product-detail-response.ts
 models/api-response-recipe-detail-response.ts
 models/api-response-review-response.ts
+models/api-response-sale-event-create-response.ts
 models/api-response-sign-up-response.ts
 models/api-response-void.ts
 models/audit-log-response.ts
@@ -86,6 +89,7 @@ models/email-availability-request.ts
 models/email-availability-response.ts
 models/error-response.ts
 models/excluded.ts
+models/flash-drop-create-request.ts
 models/forecast-response.ts
 models/fridge-item-create-request.ts
 models/fridge-item-log-response.ts
@@ -120,6 +124,7 @@ models/nutrition.ts
 models/order-cancel-response.ts
 models/order-checkout-response.ts
 models/order-confirm-response.ts
+models/order-create-item-request.ts
 models/order-create-request.ts
 models/order-detail-response.ts
 models/order-item-response.ts
@@ -134,6 +139,7 @@ models/page-response-order-summary-response.ts
 models/page-response-product-list-item-response.ts
 models/page-response-recipe-list-item-response.ts
 models/page-response-review-response.ts
+models/page-response-sale-candidate-product-response.ts
 models/payment-confirm-request.ts
 models/payment-confirm-response.ts
 models/payment-prepare-response.ts
@@ -157,8 +163,13 @@ models/review-response.ts
 models/review-search-request.ts
 models/review-update-request.ts
 models/review.ts
+models/sale-candidate-product-response.ts
+models/sale-candidate-products-request.ts
+models/sale-event-create-response.ts
 models/sign-up-request.ts
 models/sign-up-response.ts
+models/special-sale-create-request.ts
+models/special-sale-item-request.ts
 models/step-item.ts
 models/summary.ts
 models/used-ingredient-request.ts

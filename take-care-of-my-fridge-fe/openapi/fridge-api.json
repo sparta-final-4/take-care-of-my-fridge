@@ -410,6 +410,96 @@
         ]
       }
     },
+    "/api/admin/sale-events/flash-drop": {
+      "post": {
+        "operationId": "createFlashDrop",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FlashDropCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseSaleEventCreateResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "admin-sale-event-controller"
+        ]
+      }
+    },
+    "/api/admin/sale-events/products": {
+      "get": {
+        "operationId": "getCandidateProducts",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "request",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/SaleCandidateProductsRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePageResponseSaleCandidateProductResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "admin-sale-event-controller"
+        ]
+      }
+    },
+    "/api/admin/sale-events/special": {
+      "post": {
+        "operationId": "createSpecialSale",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SpecialSaleCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseSaleEventCreateResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "admin-sale-event-controller"
+        ]
+      }
+    },
     "/api/auth/csrf": {
       "get": {
         "operationId": "csrf",
@@ -2258,6 +2348,20 @@
           }
         }
       },
+      "ApiResponsePageResponseSaleCandidateProductResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/PageResponseSaleCandidateProductResponse"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorResponse"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
       "ApiResponsePaymentConfirmResponse": {
         "type": "object",
         "properties": {
@@ -2319,6 +2423,20 @@
         "properties": {
           "data": {
             "$ref": "#/components/schemas/ReviewResponse"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorResponse"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ApiResponseSaleEventCreateResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/SaleEventCreateResponse"
           },
           "error": {
             "$ref": "#/components/schemas/ErrorResponse"
@@ -2546,6 +2664,10 @@
             "type": "integer",
             "format": "int32"
           },
+          "flashDropLimit": {
+            "type": "integer",
+            "format": "int32"
+          },
           "flashDropRemaining": {
             "type": "integer",
             "format": "int32"
@@ -2567,6 +2689,10 @@
           "quantity": {
             "type": "integer",
             "format": "int32"
+          },
+          "saleEndsAt": {
+            "type": "string",
+            "format": "date-time"
           },
           "saleType": {
             "type": "string",
@@ -3009,6 +3135,44 @@
             "type": "string"
           }
         }
+      },
+      "FlashDropCreateRequest": {
+        "type": "object",
+        "properties": {
+          "discountRate": {
+            "type": "integer",
+            "format": "int32",
+            "maximum": 99,
+            "minimum": 1
+          },
+          "endsAfterStarts": {
+            "type": "boolean"
+          },
+          "endsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "limitedQuantity": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 1
+          },
+          "productId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "startsAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "discountRate",
+          "endsAt",
+          "limitedQuantity",
+          "productId",
+          "startsAt"
+        ]
       },
       "ForecastResponse": {
         "type": "object",
@@ -3831,21 +3995,44 @@
           }
         }
       },
+      "OrderCreateItemRequest": {
+        "type": "object",
+        "properties": {
+          "cartItemId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "saleType": {
+            "type": "string",
+            "enum": [
+              "SPECIAL",
+              "FLASH_DROP"
+            ]
+          },
+          "unitPrice": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "required": [
+          "cartItemId",
+          "unitPrice"
+        ]
+      },
       "OrderCreateRequest": {
         "type": "object",
         "properties": {
-          "cartItemIds": {
+          "items": {
             "type": "array",
             "items": {
-              "type": "integer",
-              "format": "int64"
+              "$ref": "#/components/schemas/OrderCreateItemRequest"
             },
             "maxItems": 50,
             "minItems": 0
           }
         },
         "required": [
-          "cartItemIds"
+          "items"
         ]
       },
       "OrderDetailResponse": {
@@ -4226,6 +4413,36 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/ReviewResponse"
+            }
+          },
+          "isLast": {
+            "type": "boolean"
+          },
+          "pageNumber": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalElements": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "totalPages": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "PageResponseSaleCandidateProductResponse": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SaleCandidateProductResponse"
             }
           },
           "isLast": {
@@ -5166,6 +5383,73 @@
           "rating"
         ]
       },
+      "SaleCandidateProductResponse": {
+        "type": "object",
+        "properties": {
+          "imageUrl": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "price": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "productId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "productType": {
+            "type": "string",
+            "enum": [
+              "INGREDIENT",
+              "MEALKIT"
+            ]
+          },
+          "stock": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "SaleCandidateProductsRequest": {
+        "type": "object",
+        "properties": {
+          "keyword": {
+            "type": "string",
+            "maxLength": 50,
+            "minLength": 0
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 1
+          },
+          "size": {
+            "type": "integer",
+            "format": "int32",
+            "maximum": 100,
+            "minimum": 1
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "INGREDIENT",
+              "MEALKIT"
+            ]
+          }
+        }
+      },
+      "SaleEventCreateResponse": {
+        "type": "object",
+        "properties": {
+          "saleEventId": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
       "SignUpRequest": {
         "type": "object",
         "properties": {
@@ -5215,6 +5499,56 @@
             "format": "int64"
           }
         }
+      },
+      "SpecialSaleCreateRequest": {
+        "type": "object",
+        "properties": {
+          "endsAfterStarts": {
+            "type": "boolean"
+          },
+          "endsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SpecialSaleItemRequest"
+            },
+            "minItems": 1
+          },
+          "productIdsUnique": {
+            "type": "boolean"
+          },
+          "startsAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "endsAt",
+          "items",
+          "startsAt"
+        ]
+      },
+      "SpecialSaleItemRequest": {
+        "type": "object",
+        "properties": {
+          "discountRate": {
+            "type": "integer",
+            "format": "int32",
+            "maximum": 99,
+            "minimum": 1
+          },
+          "productId": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "required": [
+          "discountRate",
+          "productId"
+        ]
       },
       "StepItem": {
         "type": "object",
