@@ -15,6 +15,8 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.example.takecareofmyfridgebe.global.entity.BaseTimeEntity;
+import org.example.takecareofmyfridgebe.global.error.BusinessException;
+import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 
 @Entity
 @Table(
@@ -71,5 +73,21 @@ public class SaleEventItem extends BaseTimeEntity {
         this.discountRate = discountRate;
         this.limitedQuantity = limitedQuantity;
         this.remainingQuantity = limitedQuantity;
+    }
+
+    // 번개 드롭 남은 수량을 줄인다. 모자라면 빼지 않고 거절한다.
+    public void decreaseRemaining(int quantity) {
+        if (remainingQuantity == null || remainingQuantity < quantity) {
+            throw new BusinessException(ErrorCode.INSUFFICIENT_STOCK, "품절 · 번개 드롭");
+        }
+        this.remainingQuantity -= quantity;
+    }
+
+    // 주문 취소로 남은 수량을 되돌린다. 한정 수량을 넘지 않는다.
+    public void increaseRemaining(int quantity) {
+        if (remainingQuantity == null) {
+            return;
+        }
+        this.remainingQuantity = Math.min(limitedQuantity, remainingQuantity + quantity);
     }
 }
