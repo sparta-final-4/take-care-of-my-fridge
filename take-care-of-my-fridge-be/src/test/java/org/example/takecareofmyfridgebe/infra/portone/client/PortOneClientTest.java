@@ -18,8 +18,8 @@ import java.time.ZoneId;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.jsonPath;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
@@ -92,14 +92,28 @@ class PortOneClientTest {
     }
 
     @Test
-    @DisplayName("이미 취소된 결제를 취소하면 성공으로 본다")
+    @DisplayName("부분 취소에 성공하면 요청 금액을 보내고 PG 취소 건 ID를 돌려준다")
+    void cancelPayment_returnsCancellationId() {
+        server.expect(requestTo(BASE_URL + "/payments/" + PAYMENT_ID + "/cancel"))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(jsonPath("$.amount").value(6000))
+                .andRespond(withSuccess("""
+                        {"cancellation":{"status":"SUCCEEDED","id":"cancellation-1","totalAmount":6000}}""",
+                        MediaType.APPLICATION_JSON));
+
+        assertThat(client.cancelPayment(PAYMENT_ID, "단순 변심", 6000L)).isEqualTo("cancellation-1");
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("이미 취소된 결제를 취소하면 성공으로 보고 취소 건 ID는 없다")
     void cancelPayment_alreadyCancelled_succeeds() {
         server.expect(requestTo(BASE_URL + "/payments/" + PAYMENT_ID + "/cancel"))
                 .andExpect(method(HttpMethod.POST))
                 .andRespond(withStatus(HttpStatus.CONFLICT).contentType(MediaType.APPLICATION_JSON)
                         .body("{\"type\":\"PAYMENT_ALREADY_CANCELLED\",\"message\":\"이미 취소된 결제입니다.\"}"));
 
-        assertThatCode(() -> client.cancelPayment(PAYMENT_ID, "보상 취소", null)).doesNotThrowAnyException();
+        assertThat(client.cancelPayment(PAYMENT_ID, "보상 취소", null)).isNull();
         server.verify();
     }
 

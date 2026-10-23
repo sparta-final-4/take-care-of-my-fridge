@@ -1,12 +1,17 @@
 package org.example.takecareofmyfridgebe.domain.refund.service;
 
 import jakarta.persistence.EntityManager;
+import org.example.takecareofmyfridgebe.domain.ingredient.entity.StorageType;
 import org.example.takecareofmyfridgebe.domain.order.entity.Order;
 import org.example.takecareofmyfridgebe.domain.order.entity.OrderItem;
 import org.example.takecareofmyfridgebe.domain.order.entity.SaleType;
 import org.example.takecareofmyfridgebe.domain.order.service.OrderReader;
 import org.example.takecareofmyfridgebe.domain.payment.entity.Payment;
+import org.example.takecareofmyfridgebe.domain.product.entity.Product;
+import org.example.takecareofmyfridgebe.domain.product.entity.ProductStatus;
+import org.example.takecareofmyfridgebe.domain.product.entity.ProductType;
 import org.example.takecareofmyfridgebe.domain.refund.dto.RefundCreateRequest;
+import org.example.takecareofmyfridgebe.domain.refund.dto.RefundRequested;
 import org.example.takecareofmyfridgebe.domain.refund.entity.Refund;
 import org.example.takecareofmyfridgebe.domain.refund.entity.RefundItem;
 import org.example.takecareofmyfridgebe.domain.refund.entity.RefundReasonType;
@@ -68,9 +73,13 @@ class RefundCommandServiceTest extends MySqlContainerSupport {
     @Test
     @DisplayName("일부 수량을 환불 신청하면 단가 × 수량 금액으로 요청 상태 환불이 저장된다")
     void partialRefund() {
-        Long refundId = refundCommandService.request(MEMBER_ID, order.getId(), request(item(itemA, 2)));
+        RefundRequested requested = refundCommandService.request(MEMBER_ID, order.getId(), request(item(itemA, 2)));
+        Long refundId = requested.refundId();
         flushAndClear();
 
+        assertThat(requested.portonePaymentId()).isEqualTo("payment-" + order.getOrderNumber());
+        assertThat(requested.refundAmount()).isEqualTo(6000L);
+        assertThat(requested.reason()).isEqualTo("단순 변심");
         Refund refund = entityManager.find(Refund.class, refundId);
         assertThat(refund.getStatus()).isEqualTo(RefundStatus.REQUESTED);
         assertThat(refund.getRefundAmount()).isEqualTo(6000L);
@@ -84,7 +93,7 @@ class RefundCommandServiceTest extends MySqlContainerSupport {
     @DisplayName("여러 상품을 한 번에 환불하면 금액을 합산한다")
     void multipleItems() {
         Long refundId = refundCommandService.request(MEMBER_ID, order.getId(),
-                request(item(itemA, 1), item(itemB, 3)));
+                request(item(itemA, 1), item(itemB, 3))).refundId();
         flushAndClear();
 
         assertThat(entityManager.find(Refund.class, refundId).getRefundAmount()).isEqualTo(9000L);
@@ -162,6 +171,59 @@ class RefundCommandServiceTest extends MySqlContainerSupport {
     void duplicateItem() {
         assertError(() -> refundCommandService.request(MEMBER_ID, order.getId(),
                 request(item(itemA, 1), item(itemA, 1))), ErrorCode.INVALID_INPUT_VALUE);
+    }
+
+    @Test
+    @DisplayName("환불을 완료하면 취소 ID와 환불 시각이 남고 환불 수량만큼 재고가 돌아온다")
+    void complete_restoresStock() {
+        Product greenOnion = product("대파", 8, ProductStatus.ON_SALE);
+        Product tofu = product("두부", 0, ProductStatus.SOLD_OUT);
+        Order paid = order("20261022-000004");
+        OrderItem greenOnionItem = orderItem(paid, greenOnion.getId(), 3, 3000, SaleType.NONE);
+        OrderItem tofuItem = orderItem(paid, tofu.getId(), 2, 2000, SaleType.NONE);
+        pay(paid);
+        flushAndClear();
+        Long refundId = refundCommandService.request(MEMBER_ID, paid.getId(),
+                request(item(greenOnionItem, 2), item(tofuItem, 1))).refundId();
+        flushAndClear();
+
+        refundCommandService.complete(refundId, "cancellation-1");
+        flushAndClear();
+
+        Refund refund = entityManager.find(Refund.class, refundId);
+        assertThat(refund.getStatus()).isEqualTo(RefundStatus.COMPLETED);
+        assertThat(refund.getPortoneCancellationId()).isEqualTo("cancellation-1");
+        assertThat(refund.getRefundedAt()).isNotNull();
+        assertThat(entityManager.find(Product.class, greenOnion.getId()).getStock()).isEqualTo(10);
+        Product restoredTofu = entityManager.find(Product.class, tofu.getId());
+        assertThat(restoredTofu.getStock()).isEqualTo(1);
+        assertThat(restoredTofu.getStatus()).isEqualTo(ProductStatus.ON_SALE);
+    }
+
+    @Test
+    @DisplayName("이미 완료된 환불을 다시 완료하면 거절하고 재고는 한 번만 돌아온다")
+    void complete_twice_rejects() {
+        Product greenOnion = product("대파", 8, ProductStatus.ON_SALE);
+        Order paid = order("20261022-000005");
+        OrderItem greenOnionItem = orderItem(paid, greenOnion.getId(), 3, 3000, SaleType.NONE);
+        pay(paid);
+        flushAndClear();
+        Long refundId = refundCommandService.request(MEMBER_ID, paid.getId(), request(item(greenOnionItem, 2)))
+                .refundId();
+        refundCommandService.complete(refundId, "cancellation-1");
+        flushAndClear();
+
+        assertError(() -> refundCommandService.complete(refundId, "cancellation-2"), ErrorCode.INVALID_REFUND_STATE);
+        flushAndClear();
+        assertThat(entityManager.find(Product.class, greenOnion.getId()).getStock()).isEqualTo(10);
+    }
+
+    private Product product(String name, int stock, ProductStatus status) {
+        Product product = Product.builder().productType(ProductType.INGREDIENT).name(name)
+                .imageUrl("https://img.test/" + name + ".png").price(3000).stock(stock)
+                .storage(StorageType.REFRIGERATED).shelfDays(7).status(status).build();
+        entityManager.persist(product);
+        return product;
     }
 
     private Order order(String orderNumber) {

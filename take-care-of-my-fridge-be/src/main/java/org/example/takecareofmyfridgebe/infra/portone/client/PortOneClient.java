@@ -6,6 +6,7 @@ import org.example.takecareofmyfridgebe.domain.payment.port.PaymentGateway;
 import org.example.takecareofmyfridgebe.domain.payment.port.PaymentGatewayResponse;
 import org.example.takecareofmyfridgebe.infra.portone.config.PortOneProperties;
 import org.example.takecareofmyfridgebe.infra.portone.dto.PortOneCancelRequest;
+import org.example.takecareofmyfridgebe.infra.portone.dto.PortOneCancelResponse;
 import org.example.takecareofmyfridgebe.infra.portone.dto.PortOneErrorResponse;
 import org.example.takecareofmyfridgebe.infra.portone.dto.PortOnePaymentResponse;
 import org.springframework.stereotype.Component;
@@ -47,25 +48,26 @@ public class PortOneClient implements PaymentGateway {
 
     // amount가 null이면 전액 취소한다
     @Override
-    public void cancelPayment(String paymentId, String reason, Long amount) {
+    public String cancelPayment(String paymentId, String reason, Long amount) {
         // 재시도해도 한 번만 취소되도록 모든 시도에 같은 키를 쓴다
         String idempotencyKey = UUID.randomUUID().toString();
         log.info("PortOne 결제 취소 요청: paymentId={}, reason={}, idempotencyKey={}", paymentId, reason, idempotencyKey);
 
         for (int attempt = 1; attempt <= MAX_CANCEL_ATTEMPTS; attempt++) {
             try {
-                portOneRestClient.post()
+                PortOneCancelResponse response = portOneRestClient.post()
                         .uri("/payments/{paymentId}/cancel", paymentId)
                         .header("Idempotency-Key", "\"" + idempotencyKey + "\"")
                         .body(new PortOneCancelRequest(amount, reason, portOneProperties.storeId()))
                         .retrieve()
-                        .toBodilessEntity();
-                return;
+                        .body(PortOneCancelResponse.class);
+                return response == null ? null : response.cancellationId();
             } catch (HttpClientErrorException e) {
                 // 다른 요청이 먼저 취소했으면 원하는 결과(취소됨)는 이미 이뤄졌으므로 성공으로 본다
+                // TODO: 부분 환불에서는 이미 전액 취소된 결제를 성공으로 보면 안 된다. 환불 실패 처리 때 나눈다
                 if (isAlreadyCancelled(e)) {
                     log.info("PortOne 결제가 이미 취소됨: paymentId={}", paymentId);
-                    return;
+                    return null;
                 }
                 throw e;
             } catch (ResourceAccessException e) {
@@ -76,6 +78,8 @@ public class PortOneClient implements PaymentGateway {
                 }
             }
         }
+        // 마지막 시도는 성공하거나 예외를 던지므로 여기에 오지 않는다
+        throw new IllegalStateException("PortOne 취소 재시도 횟수 초과: paymentId=" + paymentId);
     }
 
     private boolean isAlreadyCancelled(HttpClientErrorException e) {

@@ -1,5 +1,6 @@
 package org.example.takecareofmyfridgebe.domain.refund.service;
 
+import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.order.entity.Order;
 import org.example.takecareofmyfridgebe.domain.order.entity.OrderItem;
@@ -9,7 +10,9 @@ import org.example.takecareofmyfridgebe.domain.order.service.OrderReader;
 import org.example.takecareofmyfridgebe.domain.payment.entity.Payment;
 import org.example.takecareofmyfridgebe.domain.payment.entity.PaymentStatus;
 import org.example.takecareofmyfridgebe.domain.payment.repository.PaymentRepository;
+import org.example.takecareofmyfridgebe.domain.product.repository.ProductRepository;
 import org.example.takecareofmyfridgebe.domain.refund.dto.RefundCreateRequest;
+import org.example.takecareofmyfridgebe.domain.refund.dto.RefundRequested;
 import org.example.takecareofmyfridgebe.domain.refund.dto.RefundedQuantity;
 import org.example.takecareofmyfridgebe.domain.refund.entity.Refund;
 import org.example.takecareofmyfridgebe.domain.refund.entity.RefundItem;
@@ -21,12 +24,13 @@ import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-// 환불 신청을 검증하고 요청 상태로 저장한다. PG 취소는 하지 않는다.
+// 환불 상태를 바꾸고, 완료 시 재고를 되돌린다. 외부 PG 호출은 하지 않는다.
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -37,12 +41,14 @@ public class RefundCommandService {
 
     private final OrderReader orderReader;
     private final PaymentRepository paymentRepository;
+    private final ProductRepository productRepository;
     private final RefundRepository refundRepository;
     private final RefundItemRepository refundItemRepository;
+    private final EntityManager entityManager;
 
     // 주문 행을 잠그고 검증하므로 같은 주문의 환불 신청과 구매 확정이 하나씩 처리돼 누적 수량이 주문 수량을 넘지 않는다
     @Transactional
-    public Long request(Long memberId, Long orderId, RefundCreateRequest request) {
+    public RefundRequested request(Long memberId, Long orderId, RefundCreateRequest request) {
         Order order = orderReader.getOwnedOrderForUpdate(memberId, orderId);
         validateRefundableOrder(order);
         Payment payment = getPaidPayment(orderId);
@@ -90,7 +96,27 @@ public class RefundCommandService {
                         .quantity(item.quantity())
                         .build())
                 .toList());
-        return refund.getId();
+        return RefundRequested.from(refund);
+    }
+
+    // PG 취소가 끝난 환불을 완료하고 환불 수량만큼 재고를 되돌린다
+    @Transactional
+    public void complete(Long refundId, String portoneCancellationId) {
+        Refund refund = refundRepository.findByIdForUpdate(refundId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.REFUND_NOT_FOUND));
+        // OSIV로 신청 때 읽은 엔티티가 재사용되면 잠금 후에도 예전 상태가 남으므로 DB 값으로 다시 읽는다
+        entityManager.refresh(refund);
+        refund.complete(portoneCancellationId, LocalDateTime.now());
+        restoreStock(refundItemRepository.findWithOrderItemByRefundId(refundId));
+    }
+
+    // 주문하기와 같은 순서(상품 ID 순)로 상품 행을 잠가, 동시에 들어온 주문하기의 재고 차감과 섞이지 않게 한다
+    private void restoreStock(List<RefundItem> refundItems) {
+        Map<Long, Integer> quantitiesByProductId = refundItems.stream()
+                .collect(Collectors.toMap(item -> item.getOrderItem().getProductId(), RefundItem::getQuantity,
+                        Integer::sum));
+        productRepository.findAllByIdInForUpdate(quantitiesByProductId.keySet())
+                .forEach(product -> product.increaseStock(quantitiesByProductId.get(product.getId())));
     }
 
     private void validateRefundableOrder(Order order) {
