@@ -15,6 +15,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.example.takecareofmyfridgebe.global.entity.BaseTimeEntity;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 
 @Entity
@@ -47,6 +48,9 @@ public class Ingredient extends BaseTimeEntity {
     @Column(name = "base_unit", length = 20, nullable = false)
     private String baseUnit;
 
+    @Column(name = "unit_weight_g", precision = 8, scale = 2)
+    private BigDecimal unitWeightG;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "default_storage", nullable = false)
     private StorageType defaultStorage;
@@ -62,6 +66,7 @@ public class Ingredient extends BaseTimeEntity {
         String ingredientCode,
         String name,
         String baseUnit,
+        BigDecimal unitWeightG,
         StorageType defaultStorage,
         int defaultShelfDays,
         boolean basicSeasoning
@@ -69,6 +74,7 @@ public class Ingredient extends BaseTimeEntity {
         this.ingredientCode = ingredientCode;
         this.name = name;
         this.baseUnit = baseUnit;
+        this.unitWeightG = unitWeightG;
         this.defaultStorage = defaultStorage;
         this.defaultShelfDays = defaultShelfDays;
         this.basicSeasoning = basicSeasoning;
