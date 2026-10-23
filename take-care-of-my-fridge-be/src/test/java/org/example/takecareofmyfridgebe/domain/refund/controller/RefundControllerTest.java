@@ -4,11 +4,14 @@ import org.example.takecareofmyfridgebe.domain.auth.service.AuthSessionService;
 import org.example.takecareofmyfridgebe.domain.auth.service.AuthSessionService.AuthPrincipal;
 import org.example.takecareofmyfridgebe.domain.auth.service.JwtTokenService;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
+import org.example.takecareofmyfridgebe.domain.order.entity.SaleType;
 import org.example.takecareofmyfridgebe.domain.refund.dto.RefundCreateRequest;
 import org.example.takecareofmyfridgebe.domain.refund.dto.RefundResponse;
+import org.example.takecareofmyfridgebe.domain.refund.dto.RefundableItemResponse;
 import org.example.takecareofmyfridgebe.domain.refund.entity.RefundReasonType;
 import org.example.takecareofmyfridgebe.domain.refund.entity.RefundStatus;
 import org.example.takecareofmyfridgebe.domain.refund.facade.RefundFacade;
+import org.example.takecareofmyfridgebe.domain.refund.service.RefundQueryService;
 import org.example.takecareofmyfridgebe.global.config.SecurityConfig;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
@@ -37,6 +40,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -58,9 +62,12 @@ class RefundControllerTest {
     @Autowired
     private RefundFacade refundFacade;
 
+    @Autowired
+    private RefundQueryService refundQueryService;
+
     @BeforeEach
     void resetMock() {
-        reset(refundFacade);
+        reset(refundFacade, refundQueryService);
     }
 
     /**
@@ -149,6 +156,72 @@ class RefundControllerTest {
                 .andExpect(jsonPath("$.error.code").value(ErrorCode.REFUND_ORDER_CONFIRMED.getCode()));
     }
 
+    /**
+     * 비로그인 상태로 환불 가능 수량을 조회하면 서비스를 호출하지 않고 401(A003)을 반환하는지 검증한다.
+     */
+    @Test
+    void getRefundableItemsWithoutLoginReturnsUnauthorized() throws Exception {
+        mvc.perform(get("/api/refunds/refundable-items").param("orderId", "10"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error.code").value(ErrorCode.UNAUTHORIZED.getCode()));
+
+        verifyNoInteractions(refundQueryService);
+    }
+
+    /**
+     * orderId 없이 조회하면 서비스를 호출하지 않고 400(C001)을 반환하는지 검증한다.
+     */
+    @Test
+    void getRefundableItemsWithoutOrderIdReturnsBadRequest() throws Exception {
+        mvc.perform(get("/api/refunds/refundable-items").with(loginUser()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value(ErrorCode.INVALID_INPUT_VALUE.getCode()));
+
+        verifyNoInteractions(refundQueryService);
+    }
+
+    /**
+     * 토큰의 회원 ID와 쿼리의 주문 ID로 서비스를 호출하고, 상품별 환불 가능 수량이 규격대로 직렬화되는지 검증한다.
+     */
+    @Test
+    void getRefundableItemsPassesTokenMemberIdAndReturnsItems() throws Exception {
+        when(refundQueryService.getRefundableItems(MEMBER_ID, 10L)).thenReturn(List.of(
+                new RefundableItemResponse(1L, 100L, "대파", "https://img.test/greenonion.png", 3000,
+                        5, 2, 3, SaleType.NONE, true),
+                new RefundableItemResponse(2L, 200L, "두부", null, 1000, 1, 0, 0, SaleType.SPECIAL, false)));
+
+        mvc.perform(get("/api/refunds/refundable-items").param("orderId", "10").with(loginUser()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data[0].orderItemId").value(1))
+                .andExpect(jsonPath("$.data[0].productId").value(100))
+                .andExpect(jsonPath("$.data[0].productName").value("대파"))
+                .andExpect(jsonPath("$.data[0].productImageUrl").value("https://img.test/greenonion.png"))
+                .andExpect(jsonPath("$.data[0].unitPrice").value(3000))
+                .andExpect(jsonPath("$.data[0].orderedQuantity").value(5))
+                .andExpect(jsonPath("$.data[0].refundedQuantity").value(2))
+                .andExpect(jsonPath("$.data[0].refundableQuantity").value(3))
+                .andExpect(jsonPath("$.data[0].saleType").value("NONE"))
+                .andExpect(jsonPath("$.data[0].refundable").value(true))
+                .andExpect(jsonPath("$.data[1].saleType").value("SPECIAL"))
+                .andExpect(jsonPath("$.data[1].refundable").value(false));
+
+        verify(refundQueryService).getRefundableItems(MEMBER_ID, 10L);
+    }
+
+    /**
+     * 구매 확정된 주문을 조회하면 409(REFUND_010)로 응답하는지 검증한다.
+     */
+    @Test
+    void getRefundableItemsConfirmedOrderReturnsErrorCode() throws Exception {
+        when(refundQueryService.getRefundableItems(MEMBER_ID, 10L))
+                .thenThrow(new BusinessException(ErrorCode.REFUND_ORDER_CONFIRMED));
+
+        mvc.perform(get("/api/refunds/refundable-items").param("orderId", "10").with(loginUser()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value(ErrorCode.REFUND_ORDER_CONFIRMED.getCode()));
+    }
+
     private static RequestPostProcessor loginUser() {
         return authentication(new UsernamePasswordAuthenticationToken(
                 new AuthPrincipal(MEMBER_ID, 8L, Member.Role.USER), null,
@@ -172,6 +245,11 @@ class RefundControllerTest {
         @Bean
         RefundFacade refundFacade() {
             return mock(RefundFacade.class);
+        }
+
+        @Bean
+        RefundQueryService refundQueryService() {
+            return mock(RefundQueryService.class);
         }
 
         @Bean

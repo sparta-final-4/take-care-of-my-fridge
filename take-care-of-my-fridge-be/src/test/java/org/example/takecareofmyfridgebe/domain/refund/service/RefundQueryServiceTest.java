@@ -1,0 +1,193 @@
+package org.example.takecareofmyfridgebe.domain.refund.service;
+
+import jakarta.persistence.EntityManager;
+import org.example.takecareofmyfridgebe.domain.order.entity.Order;
+import org.example.takecareofmyfridgebe.domain.order.entity.OrderItem;
+import org.example.takecareofmyfridgebe.domain.order.entity.SaleType;
+import org.example.takecareofmyfridgebe.domain.order.service.OrderReader;
+import org.example.takecareofmyfridgebe.domain.payment.entity.Payment;
+import org.example.takecareofmyfridgebe.domain.refund.dto.RefundableItemResponse;
+import org.example.takecareofmyfridgebe.domain.refund.entity.Refund;
+import org.example.takecareofmyfridgebe.domain.refund.entity.RefundItem;
+import org.example.takecareofmyfridgebe.domain.refund.entity.RefundReasonType;
+import org.example.takecareofmyfridgebe.global.config.JpaAuditingConfig;
+import org.example.takecareofmyfridgebe.global.config.QueryDslConfig;
+import org.example.takecareofmyfridgebe.global.error.BusinessException;
+import org.example.takecareofmyfridgebe.global.error.ErrorCode;
+import org.example.takecareofmyfridgebe.support.MySqlContainerSupport;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
+import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
+import org.springframework.context.annotation.Import;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
+
+@DataJpaTest
+@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
+@Import({JpaAuditingConfig.class, QueryDslConfig.class, RefundQueryService.class, OrderReader.class})
+class RefundQueryServiceTest extends MySqlContainerSupport {
+
+    private static final Long MEMBER_ID = 1L;
+    private static final Long OTHER_MEMBER_ID = 2L;
+
+    private final RefundQueryService refundQueryService;
+    private final EntityManager entityManager;
+
+    private Order order;
+    private Payment payment;
+    private OrderItem itemA; // 단가 3,000원, 5개
+    private OrderItem itemB; // 단가 2,000원, 3개
+    private OrderItem specialItem;
+    private OrderItem flashDropItem;
+
+    @Autowired
+    RefundQueryServiceTest(RefundQueryService refundQueryService, EntityManager entityManager) {
+        this.refundQueryService = refundQueryService;
+        this.entityManager = entityManager;
+    }
+
+    @BeforeEach
+    void setUp() {
+        order = order("20261023-000001");
+        itemA = orderItem(order, 10L, 5, 3000, SaleType.NONE);
+        itemB = orderItem(order, 20L, 3, 2000, SaleType.NONE);
+        specialItem = orderItem(order, 30L, 1, 1000, SaleType.SPECIAL);
+        flashDropItem = orderItem(order, 40L, 1, 1000, SaleType.FLASH_DROP);
+        payment = pay(order);
+        flushAndClear();
+    }
+
+    @Test
+    @DisplayName("환불이 없으면 일반 상품은 주문 수량 전부, 특가·번개 드롭 상품은 0개를 주문 상품 순서대로 돌려준다")
+    void noRefunds() {
+        List<RefundableItemResponse> items = refundQueryService.getRefundableItems(MEMBER_ID, order.getId());
+
+        assertThat(items)
+                .extracting(RefundableItemResponse::orderItemId, RefundableItemResponse::orderedQuantity,
+                        RefundableItemResponse::refundedQuantity, RefundableItemResponse::refundableQuantity,
+                        RefundableItemResponse::refundable)
+                .containsExactly(
+                        tuple(itemA.getId(), 5, 0, 5, true),
+                        tuple(itemB.getId(), 3, 0, 3, true),
+                        tuple(specialItem.getId(), 1, 0, 0, false),
+                        tuple(flashDropItem.getId(), 1, 0, 0, false));
+        assertThat(items.get(0))
+                .extracting(RefundableItemResponse::productId, RefundableItemResponse::productName,
+                        RefundableItemResponse::unitPrice, RefundableItemResponse::saleType)
+                .containsExactly(10L, "상품10", 3000, SaleType.NONE);
+    }
+
+    @Test
+    @DisplayName("요청·완료된 환불 수량은 빼고, 실패한 환불 수량은 다시 환불할 수 있게 둔다")
+    void subtractsCountedRefunds() {
+        refund(itemA, 2);                    // 요청 상태
+        refund(itemA, 1).complete("cancellation-1", LocalDateTime.now());
+        refund(itemB, 3).fail("PG 거절");     // 실패 상태
+        flushAndClear();
+
+        List<RefundableItemResponse> items = refundQueryService.getRefundableItems(MEMBER_ID, order.getId());
+
+        assertThat(items)
+                .extracting(RefundableItemResponse::orderItemId, RefundableItemResponse::refundedQuantity,
+                        RefundableItemResponse::refundableQuantity, RefundableItemResponse::refundable)
+                .startsWith(
+                        tuple(itemA.getId(), 3, 2, true),
+                        tuple(itemB.getId(), 0, 3, true));
+    }
+
+    @Test
+    @DisplayName("주문 수량을 모두 환불했으면 남은 수량 0개, 환불 불가로 돌려준다")
+    void fullyRefunded() {
+        refund(itemB, 3).complete("cancellation-1", LocalDateTime.now());
+        flushAndClear();
+
+        RefundableItemResponse itemBResponse = refundQueryService.getRefundableItems(MEMBER_ID, order.getId()).get(1);
+
+        assertThat(itemBResponse)
+                .extracting(RefundableItemResponse::refundedQuantity, RefundableItemResponse::refundableQuantity,
+                        RefundableItemResponse::refundable)
+                .containsExactly(3, 0, false);
+    }
+
+    @Test
+    @DisplayName("구매 확정된 주문은 조회를 거절한다")
+    void confirmedOrder() {
+        entityManager.find(Order.class, order.getId()).confirm(LocalDateTime.now());
+        flushAndClear();
+
+        assertError(() -> refundQueryService.getRefundableItems(MEMBER_ID, order.getId()),
+                ErrorCode.REFUND_ORDER_CONFIRMED);
+    }
+
+    @Test
+    @DisplayName("결제 전 주문은 조회를 거절한다")
+    void pendingOrder() {
+        Order pending = order("20261023-000002");
+        orderItem(pending, 10L, 1, 3000, SaleType.NONE);
+        flushAndClear();
+
+        assertError(() -> refundQueryService.getRefundableItems(MEMBER_ID, pending.getId()),
+                ErrorCode.INVALID_REFUND_STATUS);
+    }
+
+    @Test
+    @DisplayName("다른 회원의 주문은 없는 주문처럼 거절한다")
+    void otherMembersOrder() {
+        assertError(() -> refundQueryService.getRefundableItems(OTHER_MEMBER_ID, order.getId()),
+                ErrorCode.ORDER_NOT_FOUND);
+    }
+
+    private Order order(String orderNumber) {
+        Order created = Order.builder().orderNumber(orderNumber).memberId(MEMBER_ID).totalAmount(23000L).build();
+        entityManager.persist(created);
+        return created;
+    }
+
+    private OrderItem orderItem(Order target, Long productId, int quantity, int unitPrice, SaleType saleType) {
+        OrderItem item = OrderItem.builder().order(target).productId(productId).productName("상품" + productId)
+                .quantity(quantity).listPrice(unitPrice).unitPrice(unitPrice).saleType(saleType).build();
+        entityManager.persist(item);
+        return item;
+    }
+
+    private Payment pay(Order target) {
+        LocalDateTime paidAt = LocalDateTime.now();
+        Payment created = Payment.builder().order(target).portonePaymentId("payment-" + target.getOrderNumber())
+                .amount(target.getTotalAmount()).expiresAt(paidAt.plusMinutes(10)).build();
+        created.complete(paidAt);
+        target.markPaid(paidAt);
+        entityManager.persist(created);
+        return created;
+    }
+
+    // 요청 상태 환불 한 건을 상품 하나로 만든다
+    private Refund refund(OrderItem orderItem, int quantity) {
+        Refund created = Refund.builder().payment(entityManager.find(Payment.class, payment.getId()))
+                .refundAmount((long) orderItem.getUnitPrice() * quantity)
+                .reasonType(RefundReasonType.CHANGE_OF_MIND).build();
+        entityManager.persist(created);
+        entityManager.persist(RefundItem.builder().refund(created)
+                .orderItem(entityManager.find(OrderItem.class, orderItem.getId())).quantity(quantity).build());
+        return created;
+    }
+
+    private void assertError(Runnable action, ErrorCode expected) {
+        assertThatThrownBy(action::run)
+                .isInstanceOf(BusinessException.class)
+                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isEqualTo(expected);
+    }
+
+    private void flushAndClear() {
+        entityManager.flush();
+        entityManager.clear();
+    }
+}
