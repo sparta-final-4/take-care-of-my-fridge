@@ -5,7 +5,7 @@ import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.product.dto.ProductDetailResponse;
 import org.example.takecareofmyfridgebe.domain.product.dto.ProductListItemResponse;
 import org.example.takecareofmyfridgebe.domain.product.dto.ProductListRequest;
-import org.example.takecareofmyfridgebe.domain.product.service.ProductService;
+import org.example.takecareofmyfridgebe.domain.product.facade.ProductFacade;
 import org.example.takecareofmyfridgebe.global.response.ApiResponse;
 import org.example.takecareofmyfridgebe.global.response.PageResponse;
 import org.springframework.http.ResponseEntity;
@@ -20,19 +20,19 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class ProductController {
 
-    private final ProductService productService;
+    private final ProductFacade productFacade;
 
     @GetMapping
     public ResponseEntity<ApiResponse<PageResponse<ProductListItemResponse>>> getProducts(
             @Valid @ModelAttribute ProductListRequest request
     ) {
-        PageResponse<ProductListItemResponse> products = productService.getProducts(request);
+        PageResponse<ProductListItemResponse> products = productFacade.getProducts(request);
         return ResponseEntity.ok(ApiResponse.ok(products));
     }
 
     @GetMapping("/{productId}")
     public ResponseEntity<ApiResponse<ProductDetailResponse>> getProduct(@PathVariable Long productId) {
-        ProductDetailResponse product = productService.getProduct(productId);
+        ProductDetailResponse product = productFacade.getProduct(productId);
         return ResponseEntity.ok(ApiResponse.ok(product));
     }
 }

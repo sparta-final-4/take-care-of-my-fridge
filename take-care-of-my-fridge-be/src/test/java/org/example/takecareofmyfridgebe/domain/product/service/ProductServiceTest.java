@@ -112,7 +112,7 @@ class ProductServiceTest {
         assertThat(result.pageNumber()).isEqualTo(2);
         assertThat(result.totalElements()).isEqualTo(21);
         assertThat(result.content()).containsExactly(new ProductListItemResponse(
-                5L, ProductType.INGREDIENT, "양파 1kg", null, 3900, ProductStatus.ON_SALE));
+                5L, ProductType.INGREDIENT, "양파 1kg", null, 3900, ProductStatus.ON_SALE, null));
     }
 
     private static ProductListRequest listRequest(ProductSort sort, int page) {

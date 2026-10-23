@@ -7,6 +7,7 @@ import org.example.takecareofmyfridgebe.domain.product.entity.MealkitProduct;
 import org.example.takecareofmyfridgebe.domain.product.entity.Product;
 import org.example.takecareofmyfridgebe.domain.product.entity.ProductStatus;
 import org.example.takecareofmyfridgebe.domain.product.entity.ProductType;
+import org.example.takecareofmyfridgebe.domain.sale.dto.SaleInfoResponse;
 
 import java.math.BigDecimal;
 
@@ -24,7 +25,9 @@ public record ProductDetailResponse(
         int shelfDays,
         ProductStatus status,
         IngredientInfo ingredient,
-        MealkitInfo mealkit
+        MealkitInfo mealkit,
+        // 진행 중인 할인 정보. 할인이 없으면 null
+        SaleInfoResponse sale
 ) {
     public record IngredientInfo(
             BigDecimal unitAmount,
@@ -41,6 +44,11 @@ public record ProductDetailResponse(
         public static MealkitInfo from(MealkitProduct mealkitProduct) {
             return new MealkitInfo(mealkitProduct.getServings());
         }
+    }
+
+    public ProductDetailResponse withSale(SaleInfoResponse sale) {
+        return new ProductDetailResponse(productId, productType, name, description, imageUrl, price, stock, storage,
+                shelfDays, status, ingredient, mealkit, sale);
     }
 
     // 상세 행이 없으면(null) 해당 정보 없이 기본 정보만 반환

@@ -7,13 +7,15 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.sale.dto.ActiveSale;
+import org.example.takecareofmyfridgebe.domain.sale.dto.SaleInfoResponse;
 import org.example.takecareofmyfridgebe.domain.sale.entity.SaleEvent;
 import org.example.takecareofmyfridgebe.domain.sale.entity.SaleEventStatus;
 import org.example.takecareofmyfridgebe.domain.sale.repository.SaleEventItemRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-// 장바구니·주문이 서버에서 직접 부르는 진행 중 할인 조회. 결제 금액과 이어지므로 화면 표시용 경로와 섞지 않는다.
+// 진행 중 할인 조회. 장바구니·주문은 금액을 정하려고 `findActiveSales`를 서버에서 직접 부르고,
+// 상품 목록·상세는 퍼사드가 표시용 `findSaleInfos`를 불러 응답에 합친다. 결제 금액과 이어지는 경로는 표시용과 섞지 않는다.
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -31,5 +33,12 @@ public class SaleEventReader {
                 .findActiveByProductIds(productIds, SaleEventStatus.OPEN, LocalDateTime.now(SaleEvent.ZONE))
                 .stream()
                 .collect(Collectors.toMap(ActiveSale::productId, Function.identity(), (first, second) -> first));
+    }
+
+    // 상품 목록·상세에 붙일 표시용 할인 정보. 상품 서비스가 아니라 그 위의 퍼사드가 불러 응답에 합친다.
+    // 할인이 없는 상품은 맵에 없다.
+    public Map<Long, SaleInfoResponse> findSaleInfos(Collection<Long> productIds) {
+        return findActiveSales(productIds).entrySet().stream()
+                .collect(Collectors.toMap(Map.Entry::getKey, entry -> SaleInfoResponse.from(entry.getValue())));
     }
 }
