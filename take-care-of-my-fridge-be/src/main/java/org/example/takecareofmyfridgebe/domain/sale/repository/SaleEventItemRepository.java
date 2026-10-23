@@ -3,6 +3,7 @@ package org.example.takecareofmyfridgebe.domain.sale.repository;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
+import org.example.takecareofmyfridgebe.domain.sale.dto.ActiveSale;
 import org.example.takecareofmyfridgebe.domain.sale.entity.SaleEventItem;
 import org.example.takecareofmyfridgebe.domain.sale.entity.SaleEventStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -18,6 +19,22 @@ public interface SaleEventItemRepository extends JpaRepository<SaleEventItem, Lo
         where i.productId in :productIds and e.status in :statuses and e.endsAt > :now
         """)
     List<Long> findProductIdsInOpenSaleEvent(
+        @Param("productIds") Collection<Long> productIds,
+        @Param("statuses") Collection<SaleEventStatus> statuses,
+        @Param("now") LocalDateTime now
+    );
+
+    // 진행 중인 행사의 상품. 상태가 아니라 시간(시작 ≤ 지금 < 종료)으로 판단하고, 종료로 닫은 행사만 뺀다.
+    // 열기·닫기 스케줄러가 늦어도 시작·종료가 그 시각에 맞게 반영된다.
+    // 엔티티가 아니라 값으로 읽는다. 엔티티로 읽으면 영속성 컨텍스트에 남아, 뒤이은 잠금 조회가 최신 남은 수량 대신 이 시점의 값을 돌려준다.
+    @Query("""
+        select new org.example.takecareofmyfridgebe.domain.sale.dto.ActiveSale(
+            i.productId, i.id, e.type, i.salePrice, i.discountRate, e.endsAt, i.remainingQuantity, i.limitedQuantity)
+        from SaleEventItem i join i.saleEvent e
+        where i.productId in :productIds and e.status in :statuses
+          and e.startsAt <= :now and e.endsAt > :now
+        """)
+    List<ActiveSale> findActiveByProductIds(
         @Param("productIds") Collection<Long> productIds,
         @Param("statuses") Collection<SaleEventStatus> statuses,
         @Param("now") LocalDateTime now
