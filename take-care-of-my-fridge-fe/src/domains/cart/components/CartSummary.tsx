@@ -19,12 +19,21 @@ export function CartSummary({ checkedItems }: CartSummaryProps) {
   const navigate = useNavigate();
   const orderMutation = useMutation({
     mutationFn: ({
-      cartItemIds,
+      items,
       idempotencyKey,
     }: {
-      cartItemIds: number[];
+      items: CartItemResponse[];
       idempotencyKey: string;
-    }) => createOrder(cartItemIds, idempotencyKey),
+    }) =>
+      createOrder(
+        items.map(({ cartItemId, unitPrice, saleType }) => ({
+          cartItemId,
+          unitPrice,
+          // 할인이 없으면 null이지만 생성 타입은 생략으로 받는다. 서버는 생략을 null로 읽는다.
+          saleType: saleType ?? undefined,
+        })),
+        idempotencyKey,
+      ),
   });
   // 주문 시도 하나에 멱등 키 하나. 응답을 받기 전에 다시 누르면 같은 키를 보내 주문이 둘 생기지 않게 한다.
   const attemptRef = useRef<{ request: string; idempotencyKey: string } | null>(null);
@@ -44,7 +53,7 @@ export function CartSummary({ checkedItems }: CartSummaryProps) {
     }
     const { idempotencyKey } = attemptRef.current;
     orderMutation.mutate(
-      { cartItemIds: checkedItems.map((item) => item.cartItemId), idempotencyKey },
+      { items: checkedItems, idempotencyKey },
       {
         onSuccess: ({ orderId }) => {
           attemptRef.current = null;
