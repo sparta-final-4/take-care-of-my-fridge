@@ -1,9 +1,11 @@
 package org.example.takecareofmyfridgebe.domain.cart.dto;
 
+import java.time.LocalDateTime;
 import lombok.Builder;
 import org.example.takecareofmyfridgebe.domain.cart.entity.CartItem;
 import org.example.takecareofmyfridgebe.domain.product.entity.Product;
 import org.example.takecareofmyfridgebe.domain.product.entity.ProductStatus;
+import org.example.takecareofmyfridgebe.domain.sale.dto.ActiveSale;
 import org.example.takecareofmyfridgebe.domain.sale.entity.SaleEventType;
 
 @Builder
@@ -18,11 +20,16 @@ public record CartItemResponse(
         SaleEventType saleType,
         Integer discountRate,
         Integer flashDropRemaining,
+        // 번개 드롭 한정 수량(총 판매 수량). 번개 드롭이 아니면 null
+        Integer flashDropLimit,
+        // 진행 중 할인의 종료 시각. 프론트가 1초마다 남은 시간을 계산한다. 할인이 없으면 null
+        LocalDateTime saleEndsAt,
         boolean soldOut
 ) {
 
-    // TODO: 할인 행사 연동 시 할인가·할인 구분·할인율·번개 드롭 남은 수량을 채운다
-    public static CartItemResponse from(CartItem item, Product product) {
+    // sale은 진행 중인 할인이고 없으면 null이다. 번개 드롭은 남은 수량이 0이면 그 항목만 품절로 본다.
+    public static CartItemResponse from(CartItem item, Product product, ActiveSale sale) {
+        boolean flashDrop = sale != null && sale.type() == SaleEventType.FLASH_DROP;
         return CartItemResponse.builder()
                 .cartItemId(item.getId())
                 .productId(item.getProductId())
@@ -30,8 +37,13 @@ public record CartItemResponse(
                 .imageUrl(product.getImageUrl())
                 .quantity(item.getQuantity())
                 .listPrice(product.getPrice())
-                .unitPrice(product.getPrice())
-                .soldOut(isUnavailable(product))
+                .unitPrice(sale == null ? product.getPrice() : sale.salePrice())
+                .saleType(sale == null ? null : sale.type())
+                .discountRate(sale == null ? null : sale.discountRate())
+                .flashDropRemaining(flashDrop ? sale.remainingQuantity() : null)
+                .flashDropLimit(flashDrop ? sale.limitedQuantity() : null)
+                .saleEndsAt(sale == null ? null : sale.endsAt())
+                .soldOut(isUnavailable(product) || (flashDrop && sale.remainingQuantity() == 0))
                 .build();
     }
 

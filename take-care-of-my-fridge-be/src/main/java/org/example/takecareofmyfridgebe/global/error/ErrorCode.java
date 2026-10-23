@@ -51,6 +51,7 @@ public enum ErrorCode {
     // Cart
     CART_ITEM_NOT_FOUND(HttpStatus.NOT_FOUND, "CART_001", "장바구니 상품을 찾을 수 없습니다."),
     CART_QUANTITY_EXCEEDS_STOCK(HttpStatus.CONFLICT, "CART_002", "재고보다 많이 담을 수 없습니다."),
+    PURCHASE_LIMIT_EXCEEDED(HttpStatus.CONFLICT, "CART_003", "구매 한도를 넘었습니다."),
 
     // Order
     ORDER_NOT_FOUND(HttpStatus.NOT_FOUND, "ORDER_001", "주문을 찾을 수 없습니다."),
