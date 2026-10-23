@@ -2,6 +2,7 @@ package org.example.takecareofmyfridgebe.domain.review.service;
 
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 import org.example.takecareofmyfridgebe.domain.member.repository.MemberRepository;
+import org.example.takecareofmyfridgebe.domain.recipe.service.RecipeService;
 import org.example.takecareofmyfridgebe.domain.review.dto.ReviewCreateRequest;
 import org.example.takecareofmyfridgebe.domain.review.dto.ReviewResponse;
 import org.example.takecareofmyfridgebe.domain.review.dto.ReviewSearchRequest;
@@ -51,6 +52,9 @@ class RecipeReviewServiceTest {
     @Mock
     private MemberRepository memberRepository;
 
+    @Mock
+    private RecipeService recipeService;
+
     @InjectMocks
     private RecipeReviewService recipeReviewService;
 
@@ -68,19 +72,19 @@ class RecipeReviewServiceTest {
                 .content(content)
                 .build();
         ReflectionTestUtils.setField(review, "id", id);
-        ReflectionTestUtils.setField(review, "createdAt", LocalDateTime.now());
-        ReflectionTestUtils.setField(review, "updatedAt", LocalDateTime.now());
+        ReflectionTestUtils.setField(review, "createdAt", LocalDateTime.of(2026, 10, 20, 12, 0));
+        ReflectionTestUtils.setField(review, "updatedAt", LocalDateTime.of(2026, 10, 20, 12, 0));
         return review;
     }
 
     /**
-     * mine=true 조건으로 조회할 때 로그인 상태가 아니면(currentMemberId == null)
-     * 401 UNAUTHORIZED 에러를 반환하는지 검증한다.
+     * mine=true이면서 비로그인 상태(currentMemberId == null)로 조회 요청 시
+     * 401 UNAUTHORIZED 예외가 발생하는지 검증한다.
      */
     @Test
-    void getReviewsThrowsUnauthorizedWhenMineIsTrueAndNotLoggedIn() {
-        // Given: mine=true 조건 및 비로그인 상태
-        ReviewSearchRequest request = new ReviewSearchRequest(10L, true, ReviewSortType.LATEST, 1, 10);
+    void getReviewsThrowsUnauthorizedWhenMineRequestedWithoutLogin() {
+        // Given
+        ReviewSearchRequest request = new ReviewSearchRequest(1L, true, ReviewSortType.LATEST, 1, 20);
 
         // When & Then
         BusinessException exception = assertThrows(
@@ -91,42 +95,58 @@ class RecipeReviewServiceTest {
     }
 
     /**
-     * 후기 목록 조회 시 작성자 닉네임과 로그인 회원 기준 mine 여부(본인 후기 true, 타인 후기 false)가
-     * ReviewResponse로 올바르게 변환되는지 검증한다.
+     * 정상적인 후기 목록 조회 시 페이징 응답 및 DTO의 mine 플래그가 정상 설정되는지 검증한다.
      */
     @Test
-    void getReviewsMapsEntitiesToResponsesWithNicknameAndMineFlag() {
-        // Given: 1번 회원(본인)과 2번 회원(타인)이 작성한 후기 엔티티 2건
-        Member member1 = createMember(1L, "작성자1");
-        Member member2 = createMember(2L, "작성자2");
-        RecipeReview review1 = createReview(101L, member1, 10L, 5, "맛있어요!");
+    void getReviewsReturnsPagedResponseWithMineFlag() {
+        // Given
+        Long currentMemberId = 1L;
+        Member member1 = createMember(1L, "사용자1");
+        Member member2 = createMember(2L, "사용자2");
+
+        RecipeReview review1 = createReview(101L, member1, 10L, 5, "최고예요!");
         RecipeReview review2 = createReview(102L, member2, 10L, 4, "좋아요");
 
+        ReviewSearchRequest request = new ReviewSearchRequest(10L, false, ReviewSortType.LATEST, 1, 20);
         Page<RecipeReview> reviewPage = new PageImpl<>(List.of(review1, review2));
-        ReviewSearchRequest request = new ReviewSearchRequest(10L, false, ReviewSortType.LATEST, 1, 10);
 
-        when(recipeReviewRepository.findReviewsByCondition(request, 1L)).thenReturn(reviewPage);
+        when(recipeReviewRepository.findReviewsByCondition(request, currentMemberId)).thenReturn(reviewPage);
 
         // When
-        PageResponse<ReviewResponse> response = recipeReviewService.getReviews(request, 1L);
+        PageResponse<ReviewResponse> response = recipeReviewService.getReviews(request, currentMemberId);
 
         // Then
         assertEquals(2, response.content().size());
+        assertEquals(101L, response.content().get(0).id());
+        assertTrue(response.content().get(0).mine());
+        assertEquals("사용자1", response.content().get(0).nickname());
 
-        ReviewResponse first = response.content().get(0);
-        assertEquals(101L, first.id());
-        assertEquals("작성자1", first.nickname());
-        assertTrue(first.mine());
-
-        ReviewResponse second = response.content().get(1);
-        assertEquals(102L, second.id());
-        assertEquals("작성자2", second.nickname());
-        assertFalse(second.mine());
+        assertEquals(102L, response.content().get(1).id());
+        assertFalse(response.content().get(1).mine());
+        assertEquals("사용자2", response.content().get(1).nickname());
     }
 
     /**
-     * 정상적인 후기 작성 요청 시 memberRepository.findById로 회원을 조회하고
-     * 저장된 엔티티를 ReviewResponse로 변환하여 반환하는지 검증한다.
+     * 후기 작성 시 레시피가 존재하지 않으면 404 RECIPE_NOT_FOUND 예외가 발생하는지 검증한다.
+     */
+    @Test
+    void createReviewThrowsRecipeNotFoundWhenRecipeDoesNotExist() {
+        // Given
+        Long memberId = 1L;
+        ReviewCreateRequest request = new ReviewCreateRequest(999L, 5, "후기 내용");
+        when(recipeService.existsById(999L)).thenReturn(false);
+
+        // When & Then
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> recipeReviewService.createReview(memberId, request)
+        );
+        assertEquals(ErrorCode.RECIPE_NOT_FOUND, exception.getErrorCode());
+        verify(recipeReviewRepository, never()).save(any(RecipeReview.class));
+    }
+
+    /**
+     * 정상적인 후기 작성 요청 시 엔티티를 저장하고 작성자의 후기 DTO(mine=true)를 반환하는지 검증한다.
      */
     @Test
     void createReviewSavesReviewAndReturnsResponse() {
@@ -135,6 +155,7 @@ class RecipeReviewServiceTest {
         Member member = createMember(memberId, "사용자1");
         ReviewCreateRequest request = new ReviewCreateRequest(10L, 5, "정말 맛있어요!");
 
+        when(recipeService.existsById(10L)).thenReturn(true);
         when(recipeReviewRepository.existsByMemberIdAndRecipeId(memberId, 10L)).thenReturn(false);
         when(memberRepository.findById(memberId)).thenReturn(Optional.of(member));
 
@@ -161,6 +182,7 @@ class RecipeReviewServiceTest {
         Long memberId = 999L;
         ReviewCreateRequest request = new ReviewCreateRequest(10L, 5, "후기 내용");
 
+        when(recipeService.existsById(10L)).thenReturn(true);
         when(recipeReviewRepository.existsByMemberIdAndRecipeId(memberId, 10L)).thenReturn(false);
         when(memberRepository.findById(memberId)).thenReturn(Optional.empty());
 
@@ -183,6 +205,7 @@ class RecipeReviewServiceTest {
         Long memberId = 1L;
         ReviewCreateRequest request = new ReviewCreateRequest(10L, 5, "중복 후기");
 
+        when(recipeService.existsById(10L)).thenReturn(true);
         when(recipeReviewRepository.existsByMemberIdAndRecipeId(memberId, 10L)).thenReturn(true);
 
         // When & Then
@@ -205,6 +228,7 @@ class RecipeReviewServiceTest {
         Member member = createMember(memberId, "사용자1");
         ReviewCreateRequest request = new ReviewCreateRequest(10L, 5, "동시 후기");
 
+        when(recipeService.existsById(10L)).thenReturn(true);
         when(recipeReviewRepository.existsByMemberIdAndRecipeId(memberId, 10L)).thenReturn(false);
         when(memberRepository.findById(memberId)).thenReturn(Optional.of(member));
         when(recipeReviewRepository.save(any(RecipeReview.class)))

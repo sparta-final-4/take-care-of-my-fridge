@@ -90,6 +90,27 @@ class CookingStatsControllerTest {
         verify(cookingService).getCookingStats(recipeId);
     }
 
+    /**
+     * 존재하지 않는 레시피의 요리 통계를 조회하면 404 Not Found를 반환한다.
+     */
+    @Test
+    void getCookingStatsWhenRecipeNotFoundReturns404() throws Exception {
+        // Given
+        Long recipeId = 999L;
+        when(cookingService.getCookingStats(recipeId))
+                .thenThrow(new org.example.takecareofmyfridgebe.global.error.BusinessException(
+                        org.example.takecareofmyfridgebe.global.error.ErrorCode.RECIPE_NOT_FOUND));
+
+        // When & Then
+        mvc.perform(get("/api/recipes/{recipeId}/cooking-stats", recipeId))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value(
+                        org.example.takecareofmyfridgebe.global.error.ErrorCode.RECIPE_NOT_FOUND.getCode()));
+
+        verify(cookingService).getCookingStats(recipeId);
+    }
+
     @TestConfiguration
     static class TestConfig {
         @Bean

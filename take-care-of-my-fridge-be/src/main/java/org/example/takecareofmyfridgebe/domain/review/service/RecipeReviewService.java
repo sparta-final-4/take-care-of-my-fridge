@@ -3,6 +3,7 @@ package org.example.takecareofmyfridgebe.domain.review.service;
 import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 import org.example.takecareofmyfridgebe.domain.member.repository.MemberRepository;
+import org.example.takecareofmyfridgebe.domain.recipe.service.RecipeService;
 import org.example.takecareofmyfridgebe.domain.review.dto.ReviewCreateRequest;
 import org.example.takecareofmyfridgebe.domain.review.dto.ReviewResponse;
 import org.example.takecareofmyfridgebe.domain.review.dto.ReviewSearchRequest;
@@ -24,6 +25,7 @@ public class RecipeReviewService {
 
     private final RecipeReviewRepository recipeReviewRepository;
     private final MemberRepository memberRepository;
+    private final RecipeService recipeService;
 
     /**
      * 레시피 후기 목록을 검색 조건(recipeId, mine, sort, page, size)으로 조회한다.
@@ -44,8 +46,9 @@ public class RecipeReviewService {
 
     /**
      * 레시피 후기를 작성하여 저장한다.
+     * 레시피가 존재하지 않으면 404(RECIPE_NOT_FOUND) 예외를 발생시킨다.
      * 회원당 동일 레시피에는 1개의 후기만 작성할 수 있으며, 이미 존재하는 경우 409(REVIEW_ALREADY_EXISTS) 예외를 발생시킨다.
-     * 동시 요청으로 인한 DB 유니크 제약 위반(DataIntegrityViolationException) 발생 시에도 409로 변환한다.
+     * 동시 작성으로 인한 DB 유니크 제약 위반(DataIntegrityViolationException) 발생 시에도 409로 변환한다.
      *
      * @param memberId 작성자 회원 ID
      * @param request  후기 생성 정보 (recipeId, rating, content)
@@ -53,7 +56,9 @@ public class RecipeReviewService {
      */
     @Transactional
     public ReviewResponse createReview(Long memberId, ReviewCreateRequest request) {
-        // TODO: 레시피 도메인에 RecipeRepository/Service가 구현되면 레시피 존재 여부 검증 추가
+        if (!recipeService.existsById(request.recipeId())) {
+            throw new BusinessException(ErrorCode.RECIPE_NOT_FOUND);
+        }
 
         if (recipeReviewRepository.existsByMemberIdAndRecipeId(memberId, request.recipeId())) {
             throw new BusinessException(ErrorCode.REVIEW_ALREADY_EXISTS);
@@ -67,6 +72,7 @@ public class RecipeReviewService {
             RecipeReview savedReview = recipeReviewRepository.save(review);
             return ReviewResponse.from(savedReview, memberId);
         } catch (DataIntegrityViolationException e) {
+            // 동시 작성으로 인한 유니크 제약 위반 시 409 처리
             throw new BusinessException(ErrorCode.REVIEW_ALREADY_EXISTS);
         }
     }

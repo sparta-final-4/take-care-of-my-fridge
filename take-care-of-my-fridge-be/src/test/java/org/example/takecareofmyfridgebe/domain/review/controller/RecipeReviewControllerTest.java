@@ -203,6 +203,30 @@ class RecipeReviewControllerTest {
     }
 
     /**
+     * 존재하지 않는 레시피에 후기를 작성하려고 하면 404 Not Found(RECIPE_001)를 반환하는지 검증한다.
+     */
+    @Test
+    void createReviewWhenRecipeNotFoundReturns404() throws Exception {
+        when(recipeReviewService.createReview(eq(7L), any(ReviewCreateRequest.class)))
+                .thenThrow(new BusinessException(ErrorCode.RECIPE_NOT_FOUND));
+
+        mvc.perform(post("/api/reviews")
+                        .with(authentication(auth(7L)))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "recipeId": 999,
+                                  "rating": 5,
+                                  "content": "맛있어요"
+                                }
+                                """))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value(ErrorCode.RECIPE_NOT_FOUND.getCode()));
+    }
+
+    /**
      * 후기 작성 시 내용이 100자를 초과하거나 별점이 범위를 벗어나면
      * 서비스를 호출하지 않고 400 Bad Request 에러를 반환하는지 검증한다.
      */
