@@ -3,6 +3,7 @@ import { Typography } from 'antd';
 import dayjs from 'dayjs';
 import { useEffect, useState } from 'react';
 
+import { serverNow } from '@/common/api/serverClock';
 import { formatRemaining } from '@/domains/cart/format';
 import { cartQueries } from '@/domains/cart/queries';
 
@@ -11,10 +12,10 @@ interface SaleCountdownProps {
 }
 
 // 종료 시각까지 남은 시간을 1초마다 다시 그린다. 0이 되면 장바구니를 다시 읽어 할인이 끝난 가격을 보여 준다.
-// 기기 시계가 틀리면 그만큼 일찍·늦게 끝나 보이지만, 실제 가격은 주문할 때 서버가 정한다.
+// 현재 시각은 기기 시계가 아니라 서버 시각(응답의 Date 헤더 기준)이라 모든 사용자가 같은 시간을 본다.
 export function SaleCountdown({ endsAt }: SaleCountdownProps) {
   const queryClient = useQueryClient();
-  const [now, setNow] = useState(() => Date.now());
+  const [now, setNow] = useState(() => serverNow());
   const remaining = dayjs(endsAt).valueOf() - now;
   const expired = remaining <= 0;
 
@@ -23,7 +24,7 @@ export function SaleCountdown({ endsAt }: SaleCountdownProps) {
       void queryClient.invalidateQueries({ queryKey: cartQueries.all });
       return;
     }
-    const timer = setInterval(() => setNow(Date.now()), 1000);
+    const timer = setInterval(() => setNow(serverNow()), 1000);
     return () => clearInterval(timer);
   }, [expired, queryClient]);
 
