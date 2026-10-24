@@ -345,11 +345,11 @@ class RecipeReviewServiceTest {
 
     /**
      * 동시 요청으로 인해 DB 유니크 제약(uk_recipe_reviews_member_id_recipe_id) 위반 시
-     * 409 REVIEW_ALREADY_EXISTS 예외로 변환하여 던지는지 검증한다.
+     * 대소문자 무관하게 409 REVIEW_ALREADY_EXISTS 예외로 변환하여 던지는지 검증한다.
      */
     @Test
     void createReviewConvertsDataIntegrityViolationExceptionToConflict() {
-        // Given: 사전 조회는 통과했으나 save 시점에 DB 유니크 제약 위반 발생
+        // Given: 사전 조회는 통과했으나 save 시점에 DB 유니크 제약 위반 발생 (대문자 포함 메시지)
         Long memberId = 1L;
         Member member = createMember(memberId, "사용자1");
         ReviewCreateRequest request = new ReviewCreateRequest(10L, 5, "동시 후기");
@@ -359,7 +359,7 @@ class RecipeReviewServiceTest {
         when(recipeReviewRepository.existsByMemberIdAndRecipeId(memberId, 10L)).thenReturn(false);
         when(memberRepository.findById(memberId)).thenReturn(Optional.of(member));
         when(recipeReviewRepository.save(any(RecipeReview.class)))
-                .thenThrow(new DataIntegrityViolationException("Duplicate entry for key 'uk_recipe_reviews_member_id_recipe_id'"));
+                .thenThrow(new DataIntegrityViolationException("Duplicate entry for key 'UK_RECIPE_REVIEWS_MEMBER_ID_RECIPE_ID'"));
 
         // When & Then
         BusinessException exception = assertThrows(
@@ -370,7 +370,7 @@ class RecipeReviewServiceTest {
     }
 
     /**
-     * 유니크 제약 위반이 아닌 다른 DB 무결성 위반(예: 외래키 위반, 컬럼 길이 초과 등)은
+     * 유니크 제약 위반이 아닌 다른 DB 무결성 위반(예: 외래키 위반 등)은
      * 409로 변환하지 않고 DataIntegrityViolationException 그대로 다시 던지는지 검증한다.
      */
     @Test

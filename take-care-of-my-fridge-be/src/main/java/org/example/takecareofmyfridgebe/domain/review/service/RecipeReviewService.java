@@ -103,8 +103,8 @@ public class RecipeReviewService {
             String recipeName = getRecipeName(savedReview.getRecipeId());
             return ReviewResponse.from(savedReview, memberId, recipeName);
         } catch (DataIntegrityViolationException e) {
-            String message = String.valueOf(e.getMostSpecificCause() != null ? e.getMostSpecificCause().getMessage() : e.getMessage());
-            if (message.contains("uk_recipe_reviews_member_id_recipe_id")) {
+            String message = e.getMostSpecificCause().getMessage();
+            if (message != null && message.toLowerCase().contains("uk_recipe_reviews_member_id_recipe_id")) {
                 throw new BusinessException(ErrorCode.REVIEW_ALREADY_EXISTS);
             }
             throw e;

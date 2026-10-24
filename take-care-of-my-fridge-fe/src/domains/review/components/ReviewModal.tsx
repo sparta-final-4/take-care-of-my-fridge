@@ -1,5 +1,4 @@
 import { App, Form, Input, Modal, Rate, Typography } from 'antd';
-import { isAxiosError } from 'axios';
 
 import { getErrorCode, getErrorMessage } from '@/common/api/errors';
 import { useCreateReview, useUpdateReview } from '../queries';
@@ -90,15 +89,9 @@ export function ReviewModal({
             },
             onError: (error) => {
               const code = getErrorCode(error);
-              if (
-                code === 'REVIEW_002' ||
-                (isAxiosError(error) && error.response?.status === 409)
-              ) {
+              if (code === 'REVIEW_002') {
                 message.error('이미 후기를 작성한 레시피예요');
-              } else if (
-                code === 'REVIEW_003' ||
-                (isAxiosError(error) && error.response?.status === 403)
-              ) {
+              } else if (code === 'REVIEW_003') {
                 message.error('요리를 완료한 레시피만 후기를 쓸 수 있어요.');
               } else {
                 message.error(getErrorMessage(error));
