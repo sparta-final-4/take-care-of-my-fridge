@@ -1660,6 +1660,26 @@
         ]
       }
     },
+    "/api/recipes/classifications": {
+      "get": {
+        "operationId": "getClassifications",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseRecipeClassificationResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "recipe-controller"
+        ]
+      }
+    },
     "/api/recipes/{recipeId}": {
       "get": {
         "operationId": "getRecipe",
@@ -1719,6 +1739,67 @@
         },
         "tags": [
           "cooking-stats-controller"
+        ]
+      }
+    },
+    "/api/refunds": {
+      "post": {
+        "operationId": "request",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefundCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseRefundResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "refund-controller"
+        ]
+      }
+    },
+    "/api/refunds/refundable-items": {
+      "get": {
+        "operationId": "getRefundableItems",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "orderId",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListRefundableItemResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "refund-controller"
         ]
       }
     },
@@ -2138,6 +2219,23 @@
           }
         }
       },
+      "ApiResponseListRefundableItemResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RefundableItemResponse"
+            }
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorResponse"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
       "ApiResponseMyInfoResponse": {
         "type": "object",
         "properties": {
@@ -2404,11 +2502,39 @@
           }
         }
       },
+      "ApiResponseRecipeClassificationResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/RecipeClassificationResponse"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorResponse"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
       "ApiResponseRecipeDetailResponse": {
         "type": "object",
         "properties": {
           "data": {
             "$ref": "#/components/schemas/RecipeDetailResponse"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorResponse"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ApiResponseRefundResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/RefundResponse"
           },
           "error": {
             "$ref": "#/components/schemas/ErrorResponse"
@@ -3573,30 +3699,18 @@
       "Item": {
         "type": "object",
         "properties": {
-          "expirationDate": {
-            "type": "string",
-            "format": "date"
+          "orderItemId": {
+            "type": "integer",
+            "format": "int64"
           },
           "quantity": {
-            "type": "number"
-          },
-          "rawName": {
-            "type": "string",
-            "maxLength": 200,
-            "minLength": 0
-          },
-          "storage": {
-            "type": "string",
-            "enum": [
-              "REFRIGERATED",
-              "FROZEN",
-              "ROOM_TEMP"
-            ]
+            "type": "integer",
+            "format": "int32",
+            "minimum": 1
           }
         },
         "required": [
-          "quantity",
-          "rawName"
+          "orderItemId"
         ]
       },
       "LoginRequest": {
@@ -4807,6 +4921,23 @@
           }
         }
       },
+      "RecipeClassificationResponse": {
+        "type": "object",
+        "properties": {
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "cuisineTypes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
       "RecipeCreateRequest": {
         "type": "object",
         "properties": {
@@ -5217,6 +5348,112 @@
             "type": "string",
             "maxLength": 2000,
             "minLength": 0
+          }
+        }
+      },
+      "RefundCreateRequest": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Item"
+            },
+            "minItems": 1
+          },
+          "orderId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "reasonDetail": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 0
+          },
+          "reasonType": {
+            "type": "string",
+            "enum": [
+              "CHANGE_OF_MIND",
+              "ORDER_MISTAKE",
+              "NO_LONGER_NEEDED",
+              "ETC"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "orderId",
+          "reasonType"
+        ]
+      },
+      "RefundResponse": {
+        "type": "object",
+        "properties": {
+          "refundAmount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "refundId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "refundedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "REQUESTED",
+              "COMPLETED",
+              "FAILED"
+            ]
+          }
+        }
+      },
+      "RefundableItemResponse": {
+        "type": "object",
+        "properties": {
+          "orderItemId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "orderedQuantity": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "productId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "productImageUrl": {
+            "type": "string"
+          },
+          "productName": {
+            "type": "string"
+          },
+          "refundable": {
+            "type": "boolean"
+          },
+          "refundableQuantity": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "refundedQuantity": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "saleType": {
+            "type": "string",
+            "enum": [
+              "NONE",
+              "SPECIAL",
+              "FLASH_DROP"
+            ]
+          },
+          "unitPrice": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },

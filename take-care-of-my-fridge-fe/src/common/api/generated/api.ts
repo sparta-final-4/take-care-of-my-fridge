@@ -35,5 +35,6 @@ export * from './apis/payment-controller-api';
 export * from './apis/product-controller-api';
 export * from './apis/recipe-controller-api';
 export * from './apis/recipe-review-controller-api';
+export * from './apis/refund-controller-api';
 export * from './apis/webhook-controller-api';
 

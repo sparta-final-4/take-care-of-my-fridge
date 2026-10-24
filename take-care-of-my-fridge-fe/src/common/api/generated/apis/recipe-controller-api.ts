@@ -25,6 +25,8 @@ import { BASE_PATH, COLLECTION_FORMATS, type RequestArgs, BaseAPI, RequiredError
 // @ts-ignore
 import type { ApiResponsePageResponseRecipeListItemResponse } from '../models';
 // @ts-ignore
+import type { ApiResponseRecipeClassificationResponse } from '../models';
+// @ts-ignore
 import type { ApiResponseRecipeDetailResponse } from '../models';
 // @ts-ignore
 import type { RecipeListRequest } from '../models';
@@ -33,6 +35,35 @@ import type { RecipeListRequest } from '../models';
  */
 export const RecipeControllerApiAxiosParamCreator = function (configuration?: Configuration) {
     return {
+        /**
+         * 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        getClassifications: async (options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/api/recipes/classifications`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            localVarHeaderParameter['Accept'] = '*/*';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
         /**
          * 
          * @param {number} recipeId 
@@ -115,6 +146,17 @@ export const RecipeControllerApiFp = function(configuration?: Configuration) {
     return {
         /**
          * 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async getClassifications(options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ApiResponseRecipeClassificationResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.getClassifications(options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['RecipeControllerApi.getClassifications']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
          * @param {number} recipeId 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
@@ -148,6 +190,14 @@ export const RecipeControllerApiFactory = function (configuration?: Configuratio
     return {
         /**
          * 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        getClassifications(options?: RawAxiosRequestConfig): AxiosPromise<ApiResponseRecipeClassificationResponse> {
+            return localVarFp.getClassifications(options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
          * @param {RecipeControllerApiGetRecipeRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
@@ -171,6 +221,13 @@ export const RecipeControllerApiFactory = function (configuration?: Configuratio
  * RecipeControllerApi - interface
  */
 export interface RecipeControllerApiInterface {
+    /**
+     * 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    getClassifications(options?: RawAxiosRequestConfig): AxiosPromise<ApiResponseRecipeClassificationResponse>;
+
     /**
      * 
      * @param {RecipeControllerApiGetRecipeRequest} requestParameters Request parameters.
@@ -207,6 +264,15 @@ export interface RecipeControllerApiGetRecipesRequest {
  * RecipeControllerApi - object-oriented interface
  */
 export class RecipeControllerApi extends BaseAPI implements RecipeControllerApiInterface {
+    /**
+     * 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public getClassifications(options?: RawAxiosRequestConfig) {
+        return RecipeControllerApiFp(this.configuration).getClassifications(options).then((request) => request(this.axios, this.basePath));
+    }
+
     /**
      * 
      * @param {RecipeControllerApiGetRecipeRequest} requestParameters Request parameters.
