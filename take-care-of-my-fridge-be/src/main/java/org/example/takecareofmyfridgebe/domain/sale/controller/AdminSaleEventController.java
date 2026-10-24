@@ -4,11 +4,14 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.sale.dto.FlashDropCreateRequest;
 import org.example.takecareofmyfridgebe.domain.sale.dto.SaleEventCreateResponse;
+import org.example.takecareofmyfridgebe.domain.sale.dto.SaleEventListRequest;
+import org.example.takecareofmyfridgebe.domain.sale.dto.SaleEventListResponse;
 import org.example.takecareofmyfridgebe.domain.sale.dto.SaleCandidateProductResponse;
 import org.example.takecareofmyfridgebe.domain.sale.dto.SaleCandidateProductsRequest;
 import org.example.takecareofmyfridgebe.domain.sale.dto.SpecialSaleCreateRequest;
 import org.example.takecareofmyfridgebe.domain.sale.service.SaleEventCreateService;
 import org.example.takecareofmyfridgebe.domain.sale.service.SaleCandidateProductQueryService;
+import org.example.takecareofmyfridgebe.domain.sale.service.SaleEventListQueryService;
 import org.example.takecareofmyfridgebe.global.response.ApiResponse;
 import org.example.takecareofmyfridgebe.global.response.PageResponse;
 import org.springframework.http.HttpStatus;
@@ -27,6 +30,7 @@ public class AdminSaleEventController {
 
     private final SaleEventCreateService saleEventCreateService;
     private final SaleCandidateProductQueryService saleCandidateProductQueryService;
+    private final SaleEventListQueryService saleEventListQueryService;
 
     @PostMapping("/special")
     public ResponseEntity<ApiResponse<SaleEventCreateResponse>> createSpecialSale(
@@ -50,5 +54,13 @@ public class AdminSaleEventController {
             @Valid @ModelAttribute SaleCandidateProductsRequest request
     ) {
         return ResponseEntity.ok(ApiResponse.ok(saleCandidateProductQueryService.getCandidates(request)));
+    }
+
+    // 행사 목록 탭. 상태·종류·시작일·종료일로 거르고 최신 행사부터 준다.
+    @GetMapping
+    public ResponseEntity<ApiResponse<PageResponse<SaleEventListResponse>>> getSaleEvents(
+            @Valid @ModelAttribute SaleEventListRequest request
+    ) {
+        return ResponseEntity.ok(ApiResponse.ok(saleEventListQueryService.getSaleEvents(request)));
     }
 }
