@@ -1,6 +1,7 @@
 package org.example.takecareofmyfridgebe.domain.review.service;
 
 import lombok.RequiredArgsConstructor;
+import org.example.takecareofmyfridgebe.domain.cooking.service.CookingService;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 import org.example.takecareofmyfridgebe.domain.member.repository.MemberRepository;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeSummary;
@@ -31,6 +32,7 @@ public class RecipeReviewService {
     private final RecipeReviewRepository recipeReviewRepository;
     private final MemberRepository memberRepository;
     private final RecipeService recipeService;
+    private final CookingService cookingService;
 
     /**
      * 레시피 후기 목록을 검색 조건(recipeId, mine, sort, page, size)으로 조회한다.
@@ -70,6 +72,7 @@ public class RecipeReviewService {
     /**
      * 레시피 후기를 작성하여 저장한다.
      * 레시피가 존재하지 않으면 404(RECIPE_NOT_FOUND) 예외를 발생시킨다.
+     * 요리 완료 기록이 없는 레시피면 403(REVIEW_NOT_COOKED) 예외를 발생시킨다.
      * 회원당 동일 레시피에는 1개의 후기만 작성할 수 있으며, 이미 존재하는 경우 409(REVIEW_ALREADY_EXISTS) 예외를 발생시킨다.
      * 동시 작성으로 인한 DB 유니크 제약 위반(DataIntegrityViolationException) 발생 시에도 409로 변환한다.
      *
@@ -81,6 +84,10 @@ public class RecipeReviewService {
     public ReviewResponse createReview(Long memberId, ReviewCreateRequest request) {
         if (!recipeService.existsById(request.recipeId())) {
             throw new BusinessException(ErrorCode.RECIPE_NOT_FOUND);
+        }
+
+        if (!cookingService.hasCooked(memberId, request.recipeId())) {
+            throw new BusinessException(ErrorCode.REVIEW_NOT_COOKED);
         }
 
         if (recipeReviewRepository.existsByMemberIdAndRecipeId(memberId, request.recipeId())) {
@@ -96,8 +103,11 @@ public class RecipeReviewService {
             String recipeName = getRecipeName(savedReview.getRecipeId());
             return ReviewResponse.from(savedReview, memberId, recipeName);
         } catch (DataIntegrityViolationException e) {
-            // 동시 작성으로 인한 유니크 제약 위반 시 409 처리
-            throw new BusinessException(ErrorCode.REVIEW_ALREADY_EXISTS);
+            String message = String.valueOf(e.getMostSpecificCause() != null ? e.getMostSpecificCause().getMessage() : e.getMessage());
+            if (message.contains("uk_recipe_reviews_member_id_recipe_id")) {
+                throw new BusinessException(ErrorCode.REVIEW_ALREADY_EXISTS);
+            }
+            throw e;
         }
     }
 

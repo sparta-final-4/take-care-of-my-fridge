@@ -1,3 +1,5 @@
+// 요리 기록은 삭제 API가 없어서 실행할 때마다 쌓임
+
 ### 1. 로그인
 POST http://localhost:8080/api/auth/login
 Content-Type: application/json
@@ -34,8 +36,8 @@ Cookie: access_token={{accessToken}}
     client.log("CSRF 토큰 저장 완료: " + response.body.data.token);
 %}
 
-### 3. 레시피 목록 조회 (첫 번째 레시피 ID 추출)
-GET http://localhost:8080/api/recipes?size=1
+### 3. 레시피 목록 조회 (후기 작성용 recipeId 및 미요리 테스트용 uncookedRecipeId 추출)
+GET http://localhost:8080/api/recipes?size=5
 Cookie: access_token={{accessToken}}
 
 > {%
@@ -47,6 +49,13 @@ Cookie: access_token={{accessToken}}
     if (response.body && response.body.data && response.body.data.content && response.body.data.content.length > 0) {
         client.global.set("recipeId", response.body.data.content[0].recipeId);
         client.log("선택된 레시피 ID: " + response.body.data.content[0].recipeId);
+
+        if (response.body.data.content.length > 1) {
+            client.global.set("uncookedRecipeId", response.body.data.content[1].recipeId);
+            client.log("요리 미완료 테스트용 레시피 ID: " + response.body.data.content[1].recipeId);
+        } else {
+            client.global.set("uncookedRecipeId", 999999);
+        }
     }
 %}
 
@@ -74,6 +83,45 @@ Cookie: access_token={{accessToken}}; XSRF-TOKEN={{csrfToken}}
 > {%
     client.test("이전 후기 정리 (기존 후기 있으면 200, 없으면 404)", () => {
         client.assert(response.status === 200 || response.status === 404, "상태 코드는 200 또는 404여야 합니다.");
+    });
+%}
+
+### 4-3. 요리 완료 기록 생성 (후기 작성 사전 조건)
+POST http://localhost:8080/api/cooking-logs
+Content-Type: application/json
+X-XSRF-TOKEN: {{csrfToken}}
+Cookie: access_token={{accessToken}}; XSRF-TOKEN={{csrfToken}}
+
+{
+  "recipeId": {{recipeId}},
+  "result": "SUCCESS",
+  "memo": "후기 작성을 위한 사전 요리 완료"
+}
+
+> {%
+    client.test("사전 요리 완료 기록 성공", () => {
+        client.assert(response.status === 200, "상태 코드는 200이어야 합니다. 현재: " + response.status);
+    });
+%}
+
+### 4-4. 요리하지 않은 레시피 후기 작성 시 403 Forbidden 확인
+POST http://localhost:8080/api/reviews
+Content-Type: application/json
+X-XSRF-TOKEN: {{csrfToken}}
+Cookie: access_token={{accessToken}}; XSRF-TOKEN={{csrfToken}}
+
+{
+  "recipeId": {{uncookedRecipeId}},
+  "rating": 5,
+  "content": "요리하지 않은 레시피 후기 작성 시도"
+}
+
+> {%
+    client.test("요리 미완료 레시피 후기 작성 실패 (403 Forbidden)", () => {
+        client.assert(response.status === 403, "요리 기록이 없으면 403을 반환해야 합니다. 현재: " + response.status);
+        if (response.body && response.body.error) {
+            client.assert(response.body.error.code === "REVIEW_003", "에러 코드는 REVIEW_003이어야 합니다.");
+        }
     });
 %}
 

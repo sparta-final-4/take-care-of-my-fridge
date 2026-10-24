@@ -424,4 +424,22 @@ class CookingServiceTest {
         assertEquals(HttpStatus.NOT_FOUND, exception.getErrorCode().getStatus());
         verify(cookingLogRepository, never()).getCookingStats(any());
     }
+
+    /**
+     * 특정 레시피 요리 완료 여부 조회 시 repository.existsByMemberIdAndRecipeId를 호출하여 반환한다.
+     */
+    @Test
+    void hasCookedDelegatesToRepository() {
+        // Given
+        Long memberId = 1L;
+        Long recipeId = 10L;
+        when(cookingLogRepository.existsByMemberIdAndRecipeId(memberId, recipeId)).thenReturn(true);
+
+        // When
+        boolean actual = cookingService.hasCooked(memberId, recipeId);
+
+        // Then
+        assertTrue(actual);
+        verify(cookingLogRepository).existsByMemberIdAndRecipeId(memberId, recipeId);
+    }
 }

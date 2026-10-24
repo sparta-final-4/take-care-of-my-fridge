@@ -1,5 +1,6 @@
 package org.example.takecareofmyfridgebe.domain.review.service;
 
+import org.example.takecareofmyfridgebe.domain.cooking.service.CookingService;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 import org.example.takecareofmyfridgebe.domain.member.repository.MemberRepository;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeSummary;
@@ -54,6 +55,9 @@ class RecipeReviewServiceTest {
 
     @Mock
     private RecipeService recipeService;
+
+    @Mock
+    private CookingService cookingService;
 
     @InjectMocks
     private RecipeReviewService recipeReviewService;
@@ -218,7 +222,7 @@ class RecipeReviewServiceTest {
     }
 
     /**
-     * 후기 작성 시 레시피가 존재하지 않으면 404 RECIPE_NOT_FOUND 예외가 발생하는지 검증한다.
+     * 후기 작성 시 레시피가 존재하지 않으면 404 RECIPE_NOT_FOUND 예외가 발생하고 요리 기록 확인을 수행하지 않는지 검증한다.
      */
     @Test
     void createReviewThrowsRecipeNotFoundWhenRecipeDoesNotExist() {
@@ -233,6 +237,29 @@ class RecipeReviewServiceTest {
                 () -> recipeReviewService.createReview(memberId, request)
         );
         assertEquals(ErrorCode.RECIPE_NOT_FOUND, exception.getErrorCode());
+        verify(cookingService, never()).hasCooked(any(), any());
+        verify(recipeReviewRepository, never()).save(any(RecipeReview.class));
+    }
+
+    /**
+     * 후기 작성 시 요리 기록이 없으면 403 REVIEW_NOT_COOKED 예외가 발생하고 중복 확인을 수행하지 않는지 검증한다.
+     */
+    @Test
+    void createReviewThrowsForbiddenWhenNotCooked() {
+        // Given
+        Long memberId = 1L;
+        ReviewCreateRequest request = new ReviewCreateRequest(10L, 5, "후기 내용");
+
+        when(recipeService.existsById(10L)).thenReturn(true);
+        when(cookingService.hasCooked(memberId, 10L)).thenReturn(false);
+
+        // When & Then
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> recipeReviewService.createReview(memberId, request)
+        );
+        assertEquals(ErrorCode.REVIEW_NOT_COOKED, exception.getErrorCode());
+        verify(recipeReviewRepository, never()).existsByMemberIdAndRecipeId(any(), any());
         verify(recipeReviewRepository, never()).save(any(RecipeReview.class));
     }
 
@@ -247,6 +274,7 @@ class RecipeReviewServiceTest {
         ReviewCreateRequest request = new ReviewCreateRequest(10L, 5, "정말 맛있어요!");
 
         when(recipeService.existsById(10L)).thenReturn(true);
+        when(cookingService.hasCooked(memberId, 10L)).thenReturn(true);
         when(recipeReviewRepository.existsByMemberIdAndRecipeId(memberId, 10L)).thenReturn(false);
         when(memberRepository.findById(memberId)).thenReturn(Optional.of(member));
 
@@ -279,6 +307,7 @@ class RecipeReviewServiceTest {
         ReviewCreateRequest request = new ReviewCreateRequest(10L, 5, "후기 내용");
 
         when(recipeService.existsById(10L)).thenReturn(true);
+        when(cookingService.hasCooked(memberId, 10L)).thenReturn(true);
         when(recipeReviewRepository.existsByMemberIdAndRecipeId(memberId, 10L)).thenReturn(false);
         when(memberRepository.findById(memberId)).thenReturn(Optional.empty());
 
@@ -302,6 +331,7 @@ class RecipeReviewServiceTest {
         ReviewCreateRequest request = new ReviewCreateRequest(10L, 5, "중복 후기");
 
         when(recipeService.existsById(10L)).thenReturn(true);
+        when(cookingService.hasCooked(memberId, 10L)).thenReturn(true);
         when(recipeReviewRepository.existsByMemberIdAndRecipeId(memberId, 10L)).thenReturn(true);
 
         // When & Then
@@ -314,7 +344,7 @@ class RecipeReviewServiceTest {
     }
 
     /**
-     * 동시 요청으로 인해 DB 유니크 제약 위반(DataIntegrityViolationException)이 발생하면
+     * 동시 요청으로 인해 DB 유니크 제약(uk_recipe_reviews_member_id_recipe_id) 위반 시
      * 409 REVIEW_ALREADY_EXISTS 예외로 변환하여 던지는지 검증한다.
      */
     @Test
@@ -325,10 +355,11 @@ class RecipeReviewServiceTest {
         ReviewCreateRequest request = new ReviewCreateRequest(10L, 5, "동시 후기");
 
         when(recipeService.existsById(10L)).thenReturn(true);
+        when(cookingService.hasCooked(memberId, 10L)).thenReturn(true);
         when(recipeReviewRepository.existsByMemberIdAndRecipeId(memberId, 10L)).thenReturn(false);
         when(memberRepository.findById(memberId)).thenReturn(Optional.of(member));
         when(recipeReviewRepository.save(any(RecipeReview.class)))
-                .thenThrow(new DataIntegrityViolationException("Unique constraint violated"));
+                .thenThrow(new DataIntegrityViolationException("Duplicate entry for key 'uk_recipe_reviews_member_id_recipe_id'"));
 
         // When & Then
         BusinessException exception = assertThrows(
@@ -336,6 +367,31 @@ class RecipeReviewServiceTest {
                 () -> recipeReviewService.createReview(memberId, request)
         );
         assertEquals(ErrorCode.REVIEW_ALREADY_EXISTS, exception.getErrorCode());
+    }
+
+    /**
+     * 유니크 제약 위반이 아닌 다른 DB 무결성 위반(예: 외래키 위반, 컬럼 길이 초과 등)은
+     * 409로 변환하지 않고 DataIntegrityViolationException 그대로 다시 던지는지 검증한다.
+     */
+    @Test
+    void createReviewRethrowsDataIntegrityViolationExceptionWhenNotUniqueConstraint() {
+        // Given: 유니크 제약이 아닌 다른 무결성 제약 위반 발생
+        Long memberId = 1L;
+        Member member = createMember(memberId, "사용자1");
+        ReviewCreateRequest request = new ReviewCreateRequest(10L, 5, "후기 내용");
+
+        when(recipeService.existsById(10L)).thenReturn(true);
+        when(cookingService.hasCooked(memberId, 10L)).thenReturn(true);
+        when(recipeReviewRepository.existsByMemberIdAndRecipeId(memberId, 10L)).thenReturn(false);
+        when(memberRepository.findById(memberId)).thenReturn(Optional.of(member));
+        when(recipeReviewRepository.save(any(RecipeReview.class)))
+                .thenThrow(new DataIntegrityViolationException("Cannot add or update a child row: a foreign key constraint fails"));
+
+        // When & Then
+        assertThrows(
+                DataIntegrityViolationException.class,
+                () -> recipeReviewService.createReview(memberId, request)
+        );
     }
 
     /**

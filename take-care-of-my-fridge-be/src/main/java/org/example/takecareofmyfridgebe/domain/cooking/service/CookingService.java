@@ -47,6 +47,17 @@ public class CookingService {
     }
 
     /**
+     * 회원이 특정 레시피를 요리 완료한 기록이 존재하는지 확인한다.
+     *
+     * @param memberId 회원 ID
+     * @param recipeId 레시피 ID
+     * @return 요리 완료 기록 존재 여부
+     */
+    public boolean hasCooked(Long memberId, Long recipeId) {
+        return cookingLogRepository.existsByMemberIdAndRecipeId(memberId, recipeId);
+    }
+
+    /**
      * 로그인한 회원의 요리 기록을 레시피 및 기간 조건으로 최신순 페이지 조회한다.
      *
      * @param memberId 조회 대상 회원 ID
