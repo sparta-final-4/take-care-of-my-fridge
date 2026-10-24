@@ -57,9 +57,53 @@ describe('setSession', () => {
 
     await setSession(null);
 
+    // 재요청을 기다리지 않아도 이전 데이터는 setSession이 끝날 때 이미 비어 있다.
     expect(queryClient.getQueryData(['cart'])).toBeUndefined();
+    expect(queryClient.getQueryData(['me'])).toBeUndefined();
+    await vi.waitFor(() => expect(observer.getCurrentResult().data).toBe('새 데이터'));
     expect(queryFn).toHaveBeenCalledOnce();
-    expect(observer.getCurrentResult().data).toBe('새 데이터');
     unsubscribe();
+  });
+
+  // 로그인 상태를 먼저 바꾼 뒤 다시 받아야, status에 따라 켜지는 쿼리가 새 상태 기준으로 요청된다.
+  describe('로그인 상태에 따라 켜지는 쿼리', () => {
+    const authenticated = () => useAuthStore.getState().status === 'authenticated';
+
+    it('로그인하면 다시 받는다', async () => {
+      const queryFn = vi.fn<() => Promise<string>>().mockResolvedValue('장바구니');
+      const observer = new QueryObserver(queryClient, {
+        queryKey: ['cart'],
+        queryFn,
+        enabled: authenticated,
+      });
+      const unsubscribe = observer.subscribe(() => undefined);
+      expect(queryFn).not.toHaveBeenCalled();
+
+      await setSession({ memberId: 1, role: 'USER' } as Parameters<typeof setSession>[0]);
+
+      await vi.waitFor(() => expect(observer.getCurrentResult().data).toBe('장바구니'));
+      expect(queryFn).toHaveBeenCalledOnce();
+      unsubscribe();
+    });
+
+    it('로그아웃하면 요청하지 않는다', async () => {
+      useAuthStore.setState({ status: 'authenticated' });
+      queryClient.setQueryData(['cart'], '이전 회원 장바구니');
+      const queryFn = vi.fn<() => Promise<string>>().mockResolvedValue('장바구니');
+      const observer = new QueryObserver(queryClient, {
+        queryKey: ['cart'],
+        queryFn,
+        enabled: authenticated,
+        staleTime: Infinity,
+      });
+      const unsubscribe = observer.subscribe(() => undefined);
+
+      await setSession(null);
+      await new Promise((resolve) => setTimeout(resolve));
+
+      expect(queryFn).not.toHaveBeenCalled();
+      expect(observer.getCurrentResult().data).toBeUndefined();
+      unsubscribe();
+    });
   });
 });
