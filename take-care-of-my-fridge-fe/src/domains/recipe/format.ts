@@ -1,9 +1,10 @@
 import type { RecipeListItemResponse } from '@/common/api/clients';
 
-// 백엔드 cuisineType·category는 값이 같은지 비교한다(Recipe.java 주석: 한식/서양/중국…, 밥/국/반찬…).
-// 실제 레시피 데이터의 값과 다르면 이 목록만 맞추면 된다.
+// 백엔드는 cuisineType, category가 값 하나와 정확히 같은지만 비교한다.
+// 칩 값은 실제 레시피 데이터(식약처 MFDS, 농식품부 MAFRA)에 있는 값만 쓴다.
+// 두 출처의 분류 체계가 달라 "국"은 "국&찌개" 같은 비슷한 분류를 함께 찾지 못한다(백엔드 분류 통합 후 묶는다).
 export const CUISINE_OPTIONS = ['한식', '서양', '중국', '일본'] as const;
-export const CATEGORY_OPTIONS = ['밥', '국', '반찬', '면', '후식'] as const;
+export const CATEGORY_OPTIONS = ['밥', '국', '반찬', '만두/면류', '후식'] as const;
 
 // maxCookTimeMin은 그 값을 포함한다.
 export const COOK_TIME_OPTIONS = [

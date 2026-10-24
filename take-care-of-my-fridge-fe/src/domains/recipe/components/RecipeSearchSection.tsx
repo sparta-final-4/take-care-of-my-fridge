@@ -1,10 +1,26 @@
-import { Flex, Input, Tag, Typography } from 'antd';
+import { useQuery } from '@tanstack/react-query';
+import { Button, Flex, Input, Tag, Typography } from 'antd';
+import { useState } from 'react';
 
 import { SectionCard } from '@/common/components/SectionCard';
-import { CATEGORY_OPTIONS, COOK_TIME_OPTIONS, CUISINE_OPTIONS } from '@/domains/recipe/format';
+import { COOK_TIME_OPTIONS } from '@/domains/recipe/format';
 import { useRecipeFilters } from '@/domains/recipe/hooks/useRecipeFilters';
+import { recipeQueries } from '@/domains/recipe/queries';
 
 import styles from './RecipeSearchSection.module.scss';
+
+const CATEGORY_PREVIEW_COUNT = 10;
+
+interface FilterRow {
+  label: string;
+  chips: Array<{
+    key: string;
+    label: string;
+    checked: boolean;
+    onChange: (checked: boolean) => void;
+  }>;
+  toggle?: { expanded: boolean; onToggle: () => void };
+}
 
 export function RecipeSearchSection() {
   const {
@@ -17,12 +33,21 @@ export function RecipeSearchSection() {
     setCategory,
     setCookTime,
   } = useRecipeFilters();
+  // 분류를 못 받아 오면 해당 칩 줄만 비워 두고 검색, 조리 시간 필터는 그대로 쓴다.
+  const { data: classifications } = useQuery(recipeQueries.classifications());
+  const [showAllCategories, setShowAllCategories] = useState(false);
+
+  // 요리 분류는 수가 많아 앞부분만 보이고, 접혀 있어도 고른 분류는 함께 보인다.
+  const categories = classifications?.categories ?? [];
+  const visibleCategories = showAllCategories
+    ? categories
+    : categories.filter((value, index) => index < CATEGORY_PREVIEW_COUNT || value === category);
 
   // 칩은 하나만 고를 수 있고, 고른 칩을 다시 누르면 해제한다.
-  const filterRows = [
+  const filterRows: FilterRow[] = [
     {
       label: '음식 종류',
-      chips: CUISINE_OPTIONS.map((value) => ({
+      chips: (classifications?.cuisineTypes ?? []).map((value) => ({
         key: value,
         label: value,
         checked: cuisineType === value,
@@ -31,12 +56,19 @@ export function RecipeSearchSection() {
     },
     {
       label: '요리 분류',
-      chips: CATEGORY_OPTIONS.map((value) => ({
+      chips: visibleCategories.map((value) => ({
         key: value,
         label: value,
         checked: category === value,
         onChange: (checked: boolean) => setCategory(checked ? value : undefined),
       })),
+      toggle:
+        categories.length > CATEGORY_PREVIEW_COUNT
+          ? {
+              expanded: showAllCategories,
+              onToggle: () => setShowAllCategories((prev) => !prev),
+            }
+          : undefined,
     },
     {
       label: '조리 시간',
@@ -87,6 +119,16 @@ export function RecipeSearchSection() {
                   {chip.label}
                 </Tag.CheckableTag>
               ))}
+              {row.toggle && (
+                <Button
+                  type="link"
+                  className={styles.toggle}
+                  aria-expanded={row.toggle.expanded}
+                  onClick={row.toggle.onToggle}
+                >
+                  {row.toggle.expanded ? '접기' : '더보기'}
+                </Button>
+              )}
             </Flex>
           </div>
         ))}

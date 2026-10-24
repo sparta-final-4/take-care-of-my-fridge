@@ -1,12 +1,7 @@
 import { useSearchParams } from 'react-router';
 
 import type { RecipeListRequest, RecipeListRequestSortEnum } from '@/common/api/clients';
-import {
-  CATEGORY_OPTIONS,
-  COOK_TIME_OPTIONS,
-  CUISINE_OPTIONS,
-  type CookTimeKey,
-} from '@/domains/recipe/format';
+import { COOK_TIME_OPTIONS, type CookTimeKey } from '@/domains/recipe/format';
 
 export const RECIPE_SORT_OPTIONS: Array<{ value: RecipeListRequestSortEnum; label: string }> = [
   { value: 'LATEST', label: '최신순' },
@@ -14,17 +9,14 @@ export const RECIPE_SORT_OPTIONS: Array<{ value: RecipeListRequestSortEnum; labe
   { value: 'NAME_ASC', label: '이름순' },
 ];
 
-function pick<T extends string>(options: readonly T[], value: string | null) {
-  return options.find((option) => option === value);
-}
-
 // 검색어·필터·정렬·페이지는 URL 쿼리에 두어 새로고침·뒤로 가기에도 유지한다.
 // 기본값은 URL에서 지워 주소를 짧게 둔다.
 export function useRecipeFilters() {
   const [searchParams, setSearchParams] = useSearchParams();
   const keyword = searchParams.get('q')?.trim() ?? '';
-  const cuisineType = pick(CUISINE_OPTIONS, searchParams.get('cuisine'));
-  const category = pick(CATEGORY_OPTIONS, searchParams.get('category'));
+  // 분류 값은 서버 목록에서 오므로 URL 값을 그대로 쓴다. 없는 값이면 결과가 비어 있을 뿐이다.
+  const cuisineType = searchParams.get('cuisine') || undefined;
+  const category = searchParams.get('category') || undefined;
   const cookTime = COOK_TIME_OPTIONS.find((option) => option.key === searchParams.get('time'));
   const sort =
     RECIPE_SORT_OPTIONS.find((option) => option.value === searchParams.get('sort'))?.value ??

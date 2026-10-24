@@ -2,10 +2,17 @@ import { keepPreviousData, queryOptions } from '@tanstack/react-query';
 
 import type { RecipeListRequest } from '@/common/api/clients';
 
-import { getRecipe, getRecipes } from './api';
+import { getRecipe, getRecipeClassifications, getRecipes } from './api';
 
 export const recipeQueries = {
   all: ['recipes'] as const,
+  // 분류는 레시피 등록, 수정 때만 바뀌므로 화면을 새로 열기 전까지 다시 받지 않는다.
+  classifications: () =>
+    queryOptions({
+      queryKey: [...recipeQueries.all, 'classifications'],
+      queryFn: ({ signal }) => getRecipeClassifications(signal),
+      staleTime: Infinity,
+    }),
   list: (request: RecipeListRequest) =>
     queryOptions({
       queryKey: [...recipeQueries.all, 'list', request],
