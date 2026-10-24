@@ -1,6 +1,6 @@
 # API 계약 초안
 
-상태: 초안 · 회원가입 컨트롤러 구현, DB 통합 검증 대기 · 다른 회원 API는 제안 단계 · 근거: S1, S3, S4, S5
+상태: 초안 · 회원가입 컨트롤러 구현, DB 통합 검증 대기 · 다른 회원 API는 제안 단계 · 냉장고/요리 기록/후기 API 구현 완료 · 근거: S1, S3, S4, S5
 
 ## 공통 규칙
 
@@ -105,6 +105,78 @@ HTTP 메서드·경로·DTO 이름은 구현 전 합의합니다.
 - 맛 선호 변경은 `PUT /members/me/tastes` 요청 본문 `{"tastes":["SALTY","UMAMI"]}`으로 목록 전체를 교체합니다. 빈 목록은 모든 맛 선호를 지웁니다. 중복 값은 허용하고 서버에서 한 번만 저장합니다. 목록 누락·null, null 항목, 허용하지 않는 맛 값은 400입니다. 성공 본문은 공통 `ApiResponse.ok()` 형식입니다.
 - 가입 성공 데이터는 `{ memberId: number }`입니다. 이메일 중복은 `M001`, 닉네임 중복은 `M002`로 응답합니다.
 - `POST /members`는 익명 요청을 허용합니다. 다른 POST 경로의 CSRF 보호는 유지합니다.
+
+## 냉장고 API
+
+상태: **구현 완료** · 담당: 이현정 · 근거: 실제 백엔드 컨트롤러 및 서비스 구현
+
+경로는 prefix(/api)를 뺀 값입니다. 냉장고 재료 관리는 본인(`memberId`) 소유의 재료만 접근 가능합니다.
+
+| 기능 | Method / Path | 권한 | 요청 | 성공 응답 | 주요 오류 |
+|---|---|---|---|---|---|
+| 냉장고 재료 목록 조회 | GET /fridge/items | 로그인 | Query: storage, sort, imminentOnly | 200, `List<FridgeItemResponse>` | 400 정렬/보관방식 오류, 401 |
+| 냉장고 재료 이력 조회 | GET /fridge/logs | 로그인 | Query: action, from, to, page, size | 200, `PageResponse<FridgeItemLogResponse>` | 400 from>to 또는 page/size 오류, 401 |
+| 냉장고 재료 일괄 등록 | POST /fridge/items | 로그인 | Body: `items`: `[{ rawName, quantity, storage?, expirationDate? }]` (1~20개) | 200, `List<FridgeItemResponse>` | 400 수량<=0 또는 누락, 401 |
+| 냉장고 재료 정보 수정 | PATCH /fridge/items/{fridgeId} | 로그인 | Path: fridgeId<br>Body: rawName, quantity, storage, expirationDate | 200, `FridgeItemResponse` | 400 검증 오류, 401, 404 재료 없음/타인 재료 |
+| 냉장고 재료 빼기(일부/전부) | POST /fridge/items/{fridgeId}/take-out | 로그인 | Path: fridgeId<br>Body: action, quantity? (null이면 전량) | 200, `FridgeItemTakeOutResponse` | 400 수량<=0, 401, 404 재료 없음/타인 재료 |
+| 냉장고 재료 비우기(삭제) | DELETE /fridge/items/{fridgeId} | 로그인 | Path: fridgeId<br>Query: reason (CONSUMED, DISCARDED, WRONG_ENTRY) | 200, 공통 성공 응답 | 400 사유 누락/오류, 401, 404 재료 없음/타인 재료 |
+
+- **본인 소유 검증**: 타인의 냉장고 재료이거나 존재하지 않는 재료에 대한 수정·삭제·빼기 요청은 리소스 존재 여부 노출을 방지하기 위해 404 `FRIDGE_ITEM_NOT_FOUND`로 통일합니다.
+- **표준 재료 매핑**: 등록 시 원문 재료명(`rawName`)은 `IngredientMatcher`를 통해 표준 사전 재료(`Ingredient`)와 자동 매핑되며, 사전에 없는 이름은 직접 입력 재료(`ING_CUSTOM`)로 매핑됩니다.
+- **기본값 자동 설정**: 재료 등록 시 보관방식(`storage`)과 소비기한(`expirationDate`)이 비어 있으면 매핑된 표준 재료의 기본 보관방식 및 기본 소비기한 일수(`오늘 + defaultShelfDays`)로 자동 계산되어 저장됩니다.
+- **선택적 재매핑**: 재료 정보 수정(`PATCH /fridge/items/{fridgeId}`) 시 `rawName`이 기존과 달라진 경우에만 표준 재료를 다시 매핑하고, 이름이 같으면 기존 매핑을 유지합니다.
+- **수량 차감 및 0.05 미만 보정**: 재료 수량 차감 후 남은 양이 0.05 미만(`ZERO_THRESHOLD`)이면 잔여 수량을 0으로 보정하며, 수량이 0이 된 재료는 냉장고 테이블(`fridge`)에서 자동 삭제됩니다.
+- **이력 기록 구분**:
+  - `DELETE /fridge/items/{fridgeId}`: 사유(`reason`)가 `CONSUMED`(다 먹었어요) 또는 `DISCARDED`(버렸어요)이면 `fridge_item_logs`에 이력을 저장한 뒤 삭제하고, `WRONG_ENTRY`(잘못 등록)는 이력 없이 즉시 삭제합니다.
+  - `POST /fridge/items/{fridgeId}/take-out`: `quantity`가 null이거나 남은 양 이상이면 전체를 빼며, 실제로 뺀 수량을 이력에 기록합니다.
+- **동시성 제어**: 단건 수정·삭제·빼기 시 `SELECT ... FOR UPDATE` 비관적 락을 적용하여 수량 동시성 경합을 방지합니다.
+
+## 요리 기록 API
+
+상태: **구현 완료** · 담당: 이현정 · 근거: 실제 백엔드 컨트롤러 및 서비스 구현
+
+경로는 prefix(/api)를 뺀 값입니다. 요리 완료 기록과 본인의 요리 이력 관리 기능을 제공합니다.
+
+| 기능 | Method / Path | 권한 | 요청 | 성공 응답 | 주요 오류 |
+|---|---|---|---|---|---|
+| 요리 완료 등록 | POST /cooking-logs | 로그인 | Body: recipeId, result, memo?, chatSessionId?, usedIngredients?: `[{ ingredientId, quantity? }]` | 200, `CookingCompleteResponse` | 400 재료 중복, 401, 404 레시피/상담세션 없음 |
+| 요리 기록 목록 조회 | GET /cooking-logs | 로그인 | Query: recipeId, from, to, page, size | 200, `PageResponse<CookingLogResponse>` | 400 from>to 또는 page/size 오류, 401 |
+| 요리 기록 결과·메모 수정 | PATCH /cooking-logs/{cookingLogId} | 로그인 | Path: cookingLogId<br>Body: result, memo? (최대 50자) | 200, `CookingLogResponse` | 400 result 누락, 401, 404 기록 없음/타인 기록 |
+| 레시피 요리 통계 조회 | GET /recipes/{recipeId}/cooking-stats | 공개 | Path: recipeId | 200, `CookingStatsResponse` | 404 레시피 없음 |
+| 마이 레시피 목록 및 통계 조회 | GET /me/recipes | 로그인 | Query: reviewStatus, sort, page, size | 200, `MyRecipeListResponse` | 400 정렬/필터 오류, 401 |
+
+- **요리 완료 원자적 처리 (`POST /cooking-logs`)**:
+  1. 레시피 존재 여부를 `RecipeService.existsById`로 검증하며, 없으면 404 `RECIPE_NOT_FOUND`입니다.
+  2. `chatSessionId`가 전달된 경우 본인 소유의 상담 세션인지 먼저 검증하며, 없거나 타인의 세션이면 404 `CHAT_SESSION_NOT_FOUND`로 즉시 실패합니다.
+  3. 요리 기록(`CookingLog`)을 생성·저장합니다.
+  4. 냉장고 재료를 자동 차감(`FridgeService.consumeForCooking`)합니다:
+     - 데드락(교착) 방지를 위해 `ingredientId` 오름차순으로 정렬하여 비관적 락을 획득합니다.
+     - 동일 재료가 여러 개면 소비기한 빠른 순(FIFO)으로 순차 차감합니다.
+     - 기본 양념(`basicSeasoning=true`), 직접 입력 재료(`ING_CUSTOM`), 밀키트(`ING_MEALKIT`)는 차감 대상에서 자동 제외됩니다.
+     - 냉장고에 보유하지 않은 재료는 에러 없이 건너뛰며, 실제 차감된 내역만 응답의 `deductions` 목록에 반환됩니다.
+  5. 연결된 상담 세션이 `ACTIVE` 상태이면 요리 완료에 따라 세션을 종료(`complete`) 처리합니다.
+- **요리 기록 수정 (`PATCH /cooking-logs/{cookingLogId}`)**: 본인 기록만 수정 가능(미존재 또는 타인 기록 시 404 `COOKING_LOG_NOT_FOUND`). 냉장고 재료 차감 내역은 되돌릴 수 없으므로 결과(`result`)와 메모(`memo`)만 수정할 수 있습니다.
+- **레시피 요리 통계 (`GET /recipes/{recipeId}/cooking-stats`)**: 비로그인 요청을 허용합니다. 레시피가 없으면 404이며, 요리 기록이 하나도 없으면 모든 카운트(총 횟수, 성공, 실패)가 0으로 반환됩니다.
+- **마이 레시피 (`GET /me/recipes`)**: 회원이 요리 완료한 레시피들을 그룹화하여 후기 작성 상태(`reviewStatus`: ALL, PENDING, COMPLETED) 필터링과 전체 요약 통계(총 요리 수, 고유 레시피 수, 성공 수, 작성 후기 수)를 함께 반환합니다.
+
+## 후기 API
+
+상태: **구현 완료** · 담당: 이현정 · 근거: 실제 백엔드 컨트롤러 및 서비스 구현
+
+경로는 prefix(/api)를 뺀 값입니다. 레시피별 후기 작성·수정·삭제 및 목록 조회를 제공합니다.
+
+| 기능 | Method / Path | 권한 | 요청 | 성공 응답 | 주요 오류 |
+|---|---|---|---|---|---|
+| 레시피 후기 목록 조회 | GET /reviews | 공개 | Query: recipeId, mine, sort, page, size | 200, `PageResponse<ReviewResponse>` | 400 sort/page/size 오류, 401 (mine=true 비로그인) |
+| 레시피 후기 작성 | POST /reviews | 로그인 | Body: recipeId, rating (1~5), content (최대 100자) | 200, `ReviewResponse` | 400 별점/내용 오류, 401, 404 레시피 없음, 409 이미 후기 작성함 |
+| 레시피 후기 수정 | PATCH /reviews/{reviewId} | 로그인 | Path: reviewId<br>Body: rating (1~5), content (최대 100자) | 200, `ReviewResponse` | 400 별점/내용 오류, 401, 404 후기 없음/타인 후기 |
+| 레시피 후기 삭제 | DELETE /reviews/{reviewId} | 로그인 | Path: reviewId | 200, 공통 성공 응답 | 401, 404 후기 없음/타인 후기 |
+
+- **목록 조회 비로그인 허용**: `GET /reviews`는 비로그인 사용자도 조회할 수 있습니다. 단, 내 후기만 필터링하는 `mine=true` 파라미터는 비로그인 시 401 `UNAUTHORIZED`가 발생합니다.
+- **응답 내 본인 글 여부**: 목록 응답의 각 후기 항목에는 로그인 사용자가 작성한 글인지 나타내는 `isMine` (boolean) 필드가 포함됩니다.
+- **1회원 1레시피 1후기 제한**: 동일 회원이 동일 레시피에 2건 이상의 후기를 작성할 수 없습니다. 이미 존재하는 경우 409 `REVIEW_ALREADY_EXISTS`를 반환하며, 동시 요청으로 인한 DB 유니크 제약(`uk_recipe_reviews_member_id_recipe_id`) 위반 시에도 409로 변환 처리합니다.
+- **레시피 존재 검증**: 후기 작성 시 레시피 존재 여부를 `RecipeService.existsById`로 확인하며, 미존재 시 404 `RECIPE_NOT_FOUND`를 반환합니다.
+- **본인 후기 검증**: 후기 수정 및 삭제는 작성자 본인만 가능하며, 타인의 후기이거나 존재하지 않는 후기인 경우 404 `REVIEW_NOT_FOUND`로 통일하여 존재 여부를 노출하지 않습니다.
 
 ## 엔드포인트 작성 템플릿
 
