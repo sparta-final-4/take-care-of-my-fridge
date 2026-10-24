@@ -15,10 +15,10 @@ import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeSummaryRespon
 import org.example.takecareofmyfridgebe.domain.cooking.entity.CookingLog;
 import org.example.takecareofmyfridgebe.domain.cooking.entity.CookingResult;
 import org.example.takecareofmyfridgebe.domain.cooking.repository.CookingLogRepository;
+import org.example.takecareofmyfridgebe.domain.recipe.service.RecipeService;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 import org.example.takecareofmyfridgebe.global.response.PageResponse;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -61,6 +61,9 @@ class CookingServiceTest {
     @Mock
     private CookingLogRepository cookingLogRepository;
 
+    @Mock
+    private RecipeService recipeService;
+
     @InjectMocks
     private CookingService cookingService;
 
@@ -76,6 +79,7 @@ class CookingServiceTest {
         CookingLog savedLog = request.toEntity(memberId);
         ReflectionTestUtils.setField(savedLog, "id", 100L);
 
+        when(recipeService.existsById(12L)).thenReturn(true);
         when(cookingLogRepository.save(any(CookingLog.class))).thenReturn(savedLog);
 
         // When
@@ -83,7 +87,29 @@ class CookingServiceTest {
 
         // Then
         assertEquals(100L, result.getId());
+        verify(recipeService).existsById(12L);
         verify(cookingLogRepository).save(any(CookingLog.class));
+    }
+
+    /**
+     * 요리 완료 요청 시 존재하지 않는 레시피이면 404 RECIPE_NOT_FOUND 예외가 발생한다.
+     */
+    @Test
+    void saveCookingLogThrowsWhenRecipeNotFound() {
+        // Given
+        Long memberId = 7L;
+        CookingCompleteRequest request = new CookingCompleteRequest(
+                999L, CookingResult.SUCCESS, "맛있어요", null, List.of());
+        when(recipeService.existsById(999L)).thenReturn(false);
+
+        // When & Then
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> cookingService.saveCookingLog(memberId, request)
+        );
+        assertEquals(ErrorCode.RECIPE_NOT_FOUND, exception.getErrorCode());
+        assertEquals(HttpStatus.NOT_FOUND, exception.getErrorCode().getStatus());
+        verify(cookingLogRepository, never()).save(any(CookingLog.class));
     }
 
     /**
@@ -364,6 +390,7 @@ class CookingServiceTest {
         // Given
         Long recipeId = 12L;
         CookingStatsResponse expected = new CookingStatsResponse(recipeId, 10L, 7L, 3L);
+        when(recipeService.existsById(recipeId)).thenReturn(true);
         when(cookingLogRepository.getCookingStats(recipeId)).thenReturn(expected);
 
         // When
@@ -375,6 +402,44 @@ class CookingServiceTest {
         assertEquals(10L, actual.totalCount());
         assertEquals(7L, actual.successCount());
         assertEquals(3L, actual.failedCount());
+        verify(recipeService).existsById(recipeId);
         verify(cookingLogRepository).getCookingStats(recipeId);
+    }
+
+    /**
+     * 레시피 요리 통계 조회 시 존재하지 않는 레시피이면 404 RECIPE_NOT_FOUND 예외가 발생한다.
+     */
+    @Test
+    void getCookingStatsThrowsWhenRecipeNotFound() {
+        // Given
+        Long recipeId = 999L;
+        when(recipeService.existsById(recipeId)).thenReturn(false);
+
+        // When & Then
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> cookingService.getCookingStats(recipeId)
+        );
+        assertEquals(ErrorCode.RECIPE_NOT_FOUND, exception.getErrorCode());
+        assertEquals(HttpStatus.NOT_FOUND, exception.getErrorCode().getStatus());
+        verify(cookingLogRepository, never()).getCookingStats(any());
+    }
+
+    /**
+     * 특정 레시피 요리 완료 여부 조회 시 repository.existsByMemberIdAndRecipeId를 호출하여 반환한다.
+     */
+    @Test
+    void hasCookedDelegatesToRepository() {
+        // Given
+        Long memberId = 1L;
+        Long recipeId = 10L;
+        when(cookingLogRepository.existsByMemberIdAndRecipeId(memberId, recipeId)).thenReturn(true);
+
+        // When
+        boolean actual = cookingService.hasCooked(memberId, recipeId);
+
+        // Then
+        assertTrue(actual);
+        verify(cookingLogRepository).existsByMemberIdAndRecipeId(memberId, recipeId);
     }
 }

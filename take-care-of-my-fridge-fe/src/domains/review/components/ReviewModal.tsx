@@ -1,5 +1,4 @@
 import { App, Form, Input, Modal, Rate, Typography } from 'antd';
-import { isAxiosError } from 'axios';
 
 import { getErrorCode, getErrorMessage } from '@/common/api/errors';
 import { useCreateReview, useUpdateReview } from '../queries';
@@ -67,7 +66,6 @@ export function ReviewModal({
           {
             onSuccess: () => {
               message.success('후기가 수정되었습니다.');
-              // TODO: 가짜 데이터에서 실제 백엔드 목록 연동 시 쿼리 무효화 및 상태 반영
               onSuccess?.();
               onClose();
             },
@@ -86,17 +84,15 @@ export function ReviewModal({
           {
             onSuccess: () => {
               message.success('후기가 등록되었습니다.');
-              // TODO: 가짜 데이터에서 실제 백엔드 목록 연동 시 쿼리 무효화 및 상태 반영
               onSuccess?.();
               onClose();
             },
             onError: (error) => {
               const code = getErrorCode(error);
-              if (
-                code === 'REVIEW_002' ||
-                (isAxiosError(error) && error.response?.status === 409)
-              ) {
+              if (code === 'REVIEW_002') {
                 message.error('이미 후기를 작성한 레시피예요');
+              } else if (code === 'REVIEW_003') {
+                message.error('요리를 완료한 레시피만 후기를 쓸 수 있어요.');
               } else {
                 message.error(getErrorMessage(error));
               }

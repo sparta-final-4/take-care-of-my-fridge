@@ -12,6 +12,7 @@ import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeSearchRequest
 import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeSummaryResponse;
 import org.example.takecareofmyfridgebe.domain.cooking.entity.CookingLog;
 import org.example.takecareofmyfridgebe.domain.cooking.repository.CookingLogRepository;
+import org.example.takecareofmyfridgebe.domain.recipe.service.RecipeService;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 import org.example.takecareofmyfridgebe.global.response.PageResponse;
@@ -26,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class CookingService {
 
     private final CookingLogRepository cookingLogRepository;
+    private final RecipeService recipeService;
 
     /**
      * 요리 완료 기록을 생성하여 저장한다.
@@ -36,10 +38,23 @@ public class CookingService {
      */
     @Transactional
     public CookingLog saveCookingLog(Long memberId, CookingCompleteRequest request) {
-        // TODO: 레시피 도메인에 RecipeRepository/Service가 구현되면 레시피 존재 여부 검증 추가
+        if (!recipeService.existsById(request.recipeId())) {
+            throw new BusinessException(ErrorCode.RECIPE_NOT_FOUND);
+        }
 
         CookingLog cookingLog = request.toEntity(memberId);
         return cookingLogRepository.save(cookingLog);
+    }
+
+    /**
+     * 회원이 특정 레시피를 요리 완료한 기록이 존재하는지 확인한다.
+     *
+     * @param memberId 회원 ID
+     * @param recipeId 레시피 ID
+     * @return 요리 완료 기록 존재 여부
+     */
+    public boolean hasCooked(Long memberId, Long recipeId) {
+        return cookingLogRepository.existsByMemberIdAndRecipeId(memberId, recipeId);
     }
 
     /**
@@ -103,13 +118,15 @@ public class CookingService {
 
     /**
      * 특정 레시피의 요리 통계(총 요리 횟수, 성공 횟수, 실패 횟수)를 계산하여 반환한다.
-     * 요리 기록이 없는 경우 404가 아닌 모두 0인 통계를 반환한다.
+     * 레시피가 없으면 404(RECIPE_NOT_FOUND) 예외를 던지고, 요리 기록이 없는 경우 모두 0인 통계를 반환한다.
      *
      * @param recipeId 레시피 ID
      * @return 레시피 요리 통계 응답
      */
     public CookingStatsResponse getCookingStats(Long recipeId) {
-        // TODO: 레시피 도메인에 RecipeService/Repository 조회 메서드가 생기면 레시피 존재 여부 확인 추가
+        if (!recipeService.existsById(recipeId)) {
+            throw new BusinessException(ErrorCode.RECIPE_NOT_FOUND);
+        }
         return cookingLogRepository.getCookingStats(recipeId);
     }
 }

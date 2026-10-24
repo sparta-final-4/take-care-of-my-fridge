@@ -5,8 +5,10 @@ import { useLocation, useNavigate } from 'react-router';
 
 import { ROUTES } from '@/app/paths';
 import { isNotFound } from '@/common/api/errors';
+import { RecipeCookingStats } from '@/domains/cooking/components/RecipeCookingStats';
 import { useRecipeFridgeMatch } from '@/domains/recipe/hooks/useRecipeFridgeMatch';
 import { recipeQueries } from '@/domains/recipe/queries';
+import { RecipeReviewSection } from '@/domains/review/components/RecipeReviewSection';
 
 import { RecipeCookPanel } from './RecipeCookPanel';
 import { RecipeFailureNotice } from './RecipeFailureNotice';
@@ -67,6 +69,8 @@ export function RecipeDetailSection({ recipeId }: RecipeDetailSectionProps) {
             fridgeMatch={fridgeMatch}
           />
           <RecipeStepSection steps={recipe.steps ?? []} tip={recipe.tip} />
+          <RecipeCookingStats recipeId={recipeId} />
+          <RecipeReviewSection recipeId={recipeId} />
           <RecipeNutritionSection nutrition={recipe.nutrition} />
         </div>
         <div className={styles.column}>

@@ -24,7 +24,7 @@ import {
 // 새 컨트롤러가 생기면 사용자·관리자 그룹 안에 이름순으로 추가한다.
 // WebhookControllerApi는 PortOne 서버가 호출하는 API라 프론트에서 만들지 않는다.
 
-const basePath = import.meta.env.VITE_API_BASE_URL;
+const basePath = import.meta.env.VITE_API_BASE_URL ?? '';
 
 export const authApi = new AuthControllerApi(undefined, basePath, axiosInstance);
 export const cartApi = new CartControllerApi(undefined, basePath, axiosInstance);

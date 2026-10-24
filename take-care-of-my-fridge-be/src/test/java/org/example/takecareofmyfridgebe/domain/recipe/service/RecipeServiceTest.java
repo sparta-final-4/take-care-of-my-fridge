@@ -10,6 +10,7 @@ import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeListItemResponse
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeListRequest;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeNutritionRequest;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeSort;
+import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeSummary;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeUpdateRequest;
 import org.example.takecareofmyfridgebe.domain.recipe.entity.Recipe;
 import org.example.takecareofmyfridgebe.domain.recipe.repository.RecipeIngredientRepository;
@@ -31,10 +32,14 @@ import org.springframework.data.domain.Pageable;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.argThat;
@@ -277,5 +282,103 @@ class RecipeServiceTest {
                                                      List<RecipeIngredientRequest> ingredients) {
         return new RecipeUpdateRequest(name, null, null, null, null, null, null, null, null, null, null, null,
                 nutrition, ingredients, null);
+    }
+
+    /**
+     * 레시피 ID가 존재하면 existsById는 true를 반환한다.
+     */
+    @Test
+    void existsByIdReturnsTrueWhenRecipeExists() {
+        // Given
+        Long recipeId = 1L;
+        when(recipeRepository.existsById(recipeId)).thenReturn(true);
+
+        // When
+        boolean exists = service.existsById(recipeId);
+
+        // Then
+        assertTrue(exists);
+        verify(recipeRepository).existsById(recipeId);
+    }
+
+    /**
+     * 레시피 ID가 존재하지 않으면 existsById는 false를 반환한다.
+     */
+    @Test
+    void existsByIdReturnsFalseWhenRecipeDoesNotExist() {
+        // Given
+        Long recipeId = 99L;
+        when(recipeRepository.existsById(recipeId)).thenReturn(false);
+
+        // When
+        boolean exists = service.existsById(recipeId);
+
+        // Then
+        assertFalse(exists);
+        verify(recipeRepository).existsById(recipeId);
+    }
+
+    /**
+     * 레시피 ID가 null이면 existsById는 저장소 조회 없이 false를 반환한다.
+     */
+    @Test
+    void existsByIdReturnsFalseWhenIdIsNull() {
+        // When
+        boolean exists = service.existsById(null);
+
+        // Then
+        assertFalse(exists);
+        verify(recipeRepository, never()).existsById(anyLong());
+    }
+
+    /**
+     * 여러 레시피 ID 목록으로 요약 정보를 조회하면 존재하는 ID만 Map으로 반환된다.
+     */
+    @Test
+    void findSummariesReturnsMappedSummariesForExistingIds() {
+        // Given
+        Recipe recipe1 = RecipeFixture.createRecipe(1L, "된장찌개");
+        Recipe recipe2 = RecipeFixture.createRecipe(2L, "김치찌개");
+        when(recipeRepository.findAllById(List.of(1L, 2L, 99L)))
+                .thenReturn(List.of(recipe1, recipe2));
+
+        // When
+        Map<Long, RecipeSummary> summaries = service.findSummaries(List.of(1L, 2L, 99L));
+
+        // Then
+        assertEquals(2, summaries.size());
+        assertEquals(new RecipeSummary(1L, "된장찌개", recipe1.getImageUrl()), summaries.get(1L));
+        assertEquals(new RecipeSummary(2L, "김치찌개", recipe2.getImageUrl()), summaries.get(2L));
+        assertFalse(summaries.containsKey(99L));
+    }
+
+    /**
+     * 빈 ID 목록이나 null로 요약 정보를 조회하면 저장소 호출 없이 빈 Map을 반환한다.
+     */
+    @Test
+    void findSummariesReturnsEmptyMapWhenIdsEmptyOrNull() {
+        // When & Then
+        assertTrue(service.findSummaries(List.of()).isEmpty());
+        assertTrue(service.findSummaries(null).isEmpty());
+        verify(recipeRepository, never()).findAllById(any());
+    }
+
+    /**
+     * 중복 ID나 null 요소가 포함된 목록으로 요약 정보를 조회해도
+     * 중복 제거 및 null 제외 후 안전하게 조회된다.
+     */
+    @Test
+    void findSummariesHandlesDuplicatesAndNullsSafely() {
+        // Given
+        Recipe recipe1 = RecipeFixture.createRecipe(1L, "된장찌개");
+        when(recipeRepository.findAllById(List.of(1L))).thenReturn(List.of(recipe1));
+
+        // When
+        Map<Long, RecipeSummary> summaries = service.findSummaries(java.util.Arrays.asList(1L, 1L, null));
+
+        // Then
+        assertEquals(1, summaries.size());
+        assertEquals(new RecipeSummary(1L, "된장찌개", recipe1.getImageUrl()), summaries.get(1L));
+        verify(recipeRepository).findAllById(List.of(1L));
     }
 }

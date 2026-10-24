@@ -25,8 +25,14 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
+import java.util.stream.Collectors;
+import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeSummary;
 
 @Service
 @RequiredArgsConstructor
@@ -124,5 +130,43 @@ public class RecipeService {
     // (source, source_id)가 유니크라서 관리자 등록 레시피에도 겹치지 않는 원본 코드가 필요하다. 컬럼 길이(20자)에 맞춘다.
     private static String newSourceId() {
         return UUID.randomUUID().toString().replace("-", "").substring(0, 20);
+    }
+
+    /**
+     * 다른 도메인(review, cooking)에서 쓰는 조회.
+     * 레시피 존재 여부를 확인한다.
+     */
+    public boolean existsById(Long recipeId) {
+        if (recipeId == null) {
+            return false;
+        }
+        return recipeRepository.existsById(recipeId);
+    }
+
+    /**
+     * 다른 도메인(review, cooking)에서 쓰는 조회.
+     * ID 목록에 해당하는 레시피의 요약 정보(이름, 이미지)를 한 번의 쿼리로 조회한다.
+     * 비어 있으면 빈 Map을 반환하고, 없는 ID는 Map에서 빠진다.
+     */
+    public Map<Long, RecipeSummary> findSummaries(Collection<Long> recipeIds) {
+        if (recipeIds == null || recipeIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        List<Long> distinctIds = recipeIds.stream()
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+
+        if (distinctIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        return recipeRepository.findAllById(distinctIds).stream()
+                .collect(Collectors.toMap(
+                        Recipe::getId,
+                        recipe -> new RecipeSummary(recipe.getId(), recipe.getName(), recipe.getImageUrl()),
+                        (existing, replacing) -> existing
+                ));
     }
 }

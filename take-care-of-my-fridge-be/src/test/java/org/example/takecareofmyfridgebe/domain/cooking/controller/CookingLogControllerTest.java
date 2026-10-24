@@ -184,6 +184,29 @@ class CookingLogControllerTest {
     }
 
     /**
+     * 존재하지 않는 레시피로 요리 완료 요청 시 404 Not Found(RECIPE_001)를 반환하는지 검증한다.
+     */
+    @Test
+    void completeCookingWhenRecipeNotFoundReturns404() throws Exception {
+        when(cookingFacade.completeCooking(eq(7L), any(CookingCompleteRequest.class)))
+                .thenThrow(new BusinessException(ErrorCode.RECIPE_NOT_FOUND));
+
+        mvc.perform(post("/api/cooking-logs")
+                        .with(authentication(auth(7L)))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "recipeId": 999,
+                                  "result": "SUCCESS"
+                                }
+                                """))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value(ErrorCode.RECIPE_NOT_FOUND.getCode()));
+    }
+
+    /**
      * 중복된 ingredientId가 요청 본문에 포함되면 400 Bad Request(C001) 에러를 반환하는지 검증한다.
      */
     @Test

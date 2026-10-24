@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 public record ReviewResponse(
         Long id,
         Long recipeId,
+        String recipeName,
         int rating,
         String content,
         String nickname,
@@ -17,7 +18,7 @@ public record ReviewResponse(
         @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
         LocalDateTime updatedAt
 ) {
-    public static ReviewResponse from(RecipeReview review, Long currentMemberId) {
+    public static ReviewResponse from(RecipeReview review, Long currentMemberId, String recipeName) {
         Long authorId = review.getMember() != null ? review.getMember().getId() : null;
         boolean isMine = currentMemberId != null && currentMemberId.equals(authorId);
         String nickname = review.getMember() != null ? review.getMember().getNickname() : null;
@@ -25,6 +26,7 @@ public record ReviewResponse(
         return new ReviewResponse(
                 review.getId(),
                 review.getRecipeId(),
+                recipeName,
                 review.getRating(),
                 review.getContent(),
                 nickname,
@@ -32,5 +34,9 @@ public record ReviewResponse(
                 review.getCreatedAt(),
                 review.getUpdatedAt()
         );
+    }
+
+    public static ReviewResponse from(RecipeReview review, Long currentMemberId) {
+        return from(review, currentMemberId, null);
     }
 }

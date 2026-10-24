@@ -83,7 +83,7 @@ class RecipeReviewControllerTest {
     void getReviewsPermittedWithoutAuthentication() throws Exception {
         // Given
         ReviewResponse review = new ReviewResponse(
-                100L, 10L, 5, "맛있어요", "닉네임", false, LocalDateTime.now(), LocalDateTime.now());
+                100L, 10L, "김치찌개", 5, "맛있어요", "닉네임", false, LocalDateTime.now(), LocalDateTime.now());
         PageResponse<ReviewResponse> pageResponse = PageResponse.of(
                 new PageImpl<>(List.of(review), PageRequest.of(0, 10), 1));
 
@@ -111,7 +111,7 @@ class RecipeReviewControllerTest {
     void getReviewsWithEmptyQueryParamsUsesDefaultsAndTokenMemberId() throws Exception {
         // Given
         ReviewResponse review = new ReviewResponse(
-                100L, 10L, 5, "맛있어요", "닉네임", true, LocalDateTime.now(), LocalDateTime.now());
+                100L, 10L, "김치찌개", 5, "맛있어요", "닉네임", true, LocalDateTime.now(), LocalDateTime.now());
         PageResponse<ReviewResponse> pageResponse = PageResponse.of(
                 new PageImpl<>(List.of(review), PageRequest.of(0, 10), 1));
 
@@ -180,7 +180,7 @@ class RecipeReviewControllerTest {
     void createReviewReturnsSuccess() throws Exception {
         // Given
         ReviewResponse review = new ReviewResponse(
-                100L, 10L, 5, "맛있어요", "닉네임", true, LocalDateTime.now(), LocalDateTime.now());
+                100L, 10L, "김치찌개", 5, "맛있어요", "닉네임", true, LocalDateTime.now(), LocalDateTime.now());
 
         when(recipeReviewService.createReview(eq(7L), any(ReviewCreateRequest.class)))
                 .thenReturn(review);
@@ -200,6 +200,30 @@ class RecipeReviewControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.id").value(100L));
+    }
+
+    /**
+     * 존재하지 않는 레시피에 후기를 작성하려고 하면 404 Not Found(RECIPE_001)를 반환하는지 검증한다.
+     */
+    @Test
+    void createReviewWhenRecipeNotFoundReturns404() throws Exception {
+        when(recipeReviewService.createReview(eq(7L), any(ReviewCreateRequest.class)))
+                .thenThrow(new BusinessException(ErrorCode.RECIPE_NOT_FOUND));
+
+        mvc.perform(post("/api/reviews")
+                        .with(authentication(auth(7L)))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "recipeId": 999,
+                                  "rating": 5,
+                                  "content": "맛있어요"
+                                }
+                                """))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value(ErrorCode.RECIPE_NOT_FOUND.getCode()));
     }
 
     /**
@@ -234,7 +258,7 @@ class RecipeReviewControllerTest {
     void updateReviewReturnsSuccess() throws Exception {
         // Given
         ReviewResponse updated = new ReviewResponse(
-                100L, 10L, 4, "수정된 후기", "닉네임", true, LocalDateTime.now(), LocalDateTime.now());
+                100L, 10L, "김치찌개", 4, "수정된 후기", "닉네임", true, LocalDateTime.now(), LocalDateTime.now());
 
         when(recipeReviewService.updateReview(eq(7L), eq(100L), any(ReviewUpdateRequest.class)))
                 .thenReturn(updated);
