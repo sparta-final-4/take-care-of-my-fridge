@@ -9,6 +9,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -148,8 +149,9 @@ class CartServiceTest {
         assertThat(result.items()).extracting(CartItemResponse::flashDropRemaining).containsExactly(null, null, 0);
         assertThat(result.items()).extracting(CartItemResponse::flashDropLimit).containsExactly(null, null, 10);
         assertThat(result.items()).extracting(CartItemResponse::saleEndsAt)
-                .satisfiesExactly(ends -> assertThat(ends).isNull(), ends -> assertThat(ends).isNotNull(),
-                        ends -> assertThat(ends).isNotNull());
+                .satisfiesExactly(ends -> assertThat(ends).isNull(),
+                        ends -> assertThat(ends.getOffset()).isEqualTo(ZoneOffset.of("+09:00")),
+                        ends -> assertThat(ends.getOffset()).isEqualTo(ZoneOffset.of("+09:00")));
         assertThat(result.items()).extracting(CartItemResponse::soldOut).containsExactly(false, false, true);
     }
 
