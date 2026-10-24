@@ -2,6 +2,7 @@ package org.example.takecareofmyfridgebe.domain.recipe.service;
 
 import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.ingredient.repository.IngredientRepository;
+import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeClassificationResponse;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeCreateRequest;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeDetailResponse;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeListItemResponse;
@@ -13,9 +14,12 @@ import org.example.takecareofmyfridgebe.domain.recipe.entity.RecipeStep;
 import org.example.takecareofmyfridgebe.domain.recipe.repository.RecipeIngredientRepository;
 import org.example.takecareofmyfridgebe.domain.recipe.repository.RecipeRepository;
 import org.example.takecareofmyfridgebe.domain.recipe.repository.RecipeStepRepository;
+import org.example.takecareofmyfridgebe.global.config.CacheNames;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 import org.example.takecareofmyfridgebe.global.response.PageResponse;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -28,6 +32,8 @@ import java.util.UUID;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class RecipeService {
+
+    private static final String CLASSIFICATIONS_KEY = "'all'";
 
     private final RecipeRepository recipeRepository;
     private final RecipeIngredientRepository recipeIngredientRepository;
@@ -44,6 +50,15 @@ public class RecipeService {
         return PageResponse.of(response);
     }
 
+    // 분류 값은 레시피 등록, 수정 때만 바뀌므로 캐시하고, 그때 비운다.
+    @Cacheable(cacheNames = CacheNames.RECIPE_CLASSIFICATIONS, key = CLASSIFICATIONS_KEY)
+    public RecipeClassificationResponse getClassifications() {
+        return new RecipeClassificationResponse(
+                recipeRepository.findDistinctCuisineTypes(),
+                recipeRepository.findDistinctCategories()
+        );
+    }
+
     public RecipeDetailResponse getRecipe(Long recipeId) {
         Recipe recipe = recipeRepository.findById(recipeId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.RECIPE_NOT_FOUND));
@@ -57,6 +72,7 @@ public class RecipeService {
 
     // 레시피, 재료, 조리 단계를 한 트랜잭션으로 저장한다.
     @Transactional
+    @CacheEvict(cacheNames = CacheNames.RECIPE_CLASSIFICATIONS, key = CLASSIFICATIONS_KEY)
     public RecipeDetailResponse createRecipe(RecipeCreateRequest request) {
         validateIngredientsExist(request.ingredientIds());
 
@@ -69,6 +85,7 @@ public class RecipeService {
 
     // 기본 정보는 보낸 필드만 바꾸고, 재료와 조리 단계는 보낸 경우에만 목록 전체를 교체한다.
     @Transactional
+    @CacheEvict(cacheNames = CacheNames.RECIPE_CLASSIFICATIONS, key = CLASSIFICATIONS_KEY)
     public RecipeDetailResponse updateRecipe(Long recipeId, RecipeUpdateRequest request) {
         Recipe recipe = recipeRepository.findById(recipeId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.RECIPE_NOT_FOUND));

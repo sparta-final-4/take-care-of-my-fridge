@@ -2,6 +2,7 @@ package org.example.takecareofmyfridgebe.domain.recipe.controller;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeClassificationResponse;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeDetailResponse;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeListItemResponse;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeListRequest;
@@ -28,6 +29,12 @@ public class RecipeController {
     ) {
         PageResponse<RecipeListItemResponse> recipes = recipeService.getRecipes(request);
         return ResponseEntity.ok(ApiResponse.ok(recipes));
+    }
+
+    @GetMapping("/classifications")
+    public ResponseEntity<ApiResponse<RecipeClassificationResponse>> getClassifications() {
+        RecipeClassificationResponse classifications = recipeService.getClassifications();
+        return ResponseEntity.ok(ApiResponse.ok(classifications));
     }
 
     @GetMapping("/{recipeId}")

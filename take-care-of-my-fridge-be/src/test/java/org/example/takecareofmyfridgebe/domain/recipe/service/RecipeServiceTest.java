@@ -2,6 +2,7 @@ package org.example.takecareofmyfridgebe.domain.recipe.service;
 
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.Ingredient;
 import org.example.takecareofmyfridgebe.domain.ingredient.repository.IngredientRepository;
+import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeClassificationResponse;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeCreateRequest;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeDetailResponse;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeIngredientRequest;
@@ -90,6 +91,21 @@ class RecipeServiceTest {
         assertThat(result.totalElements()).isEqualTo(1);
         assertThat(result.content()).containsExactly(new RecipeListItemResponse(
                 7L, "된장찌개", "된장찌개 만드는 법", null, "한식", "국", 30, 2, 3, new BigDecimal("350.00")));
+    }
+
+    @Test
+    @DisplayName("분류 조회는 저장소가 준 음식 종류와 요리 분류를 그대로 담는다")
+    void getClassifications_returnsDistinctValues() {
+        // given
+        when(recipeRepository.findDistinctCuisineTypes()).thenReturn(List.of("양식", "한식"));
+        when(recipeRepository.findDistinctCategories()).thenReturn(List.of("국", "밥"));
+
+        // when
+        RecipeClassificationResponse response = service.getClassifications();
+
+        // then
+        assertThat(response.cuisineTypes()).containsExactly("양식", "한식");
+        assertThat(response.categories()).containsExactly("국", "밥");
     }
 
     @Test

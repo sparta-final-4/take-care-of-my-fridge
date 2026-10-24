@@ -2,6 +2,7 @@ package org.example.takecareofmyfridgebe.domain.recipe.repository;
 
 import com.querydsl.core.types.OrderSpecifier;
 import com.querydsl.core.types.dsl.BooleanExpression;
+import com.querydsl.core.types.dsl.StringPath;
 import com.querydsl.jpa.impl.JPAQuery;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import lombok.RequiredArgsConstructor;
@@ -50,6 +51,26 @@ public class RecipeRepositoryImpl implements RecipeRepositoryCustom {
                 .where(where);
 
         return PageableExecutionUtils.getPage(content, pageable, countQuery::fetchOne);
+    }
+
+    @Override
+    public List<String> findDistinctCuisineTypes() {
+        return findDistinctValues(recipe.cuisineType);
+    }
+
+    @Override
+    public List<String> findDistinctCategories() {
+        return findDistinctValues(recipe.category);
+    }
+
+    private List<String> findDistinctValues(StringPath column) {
+        return queryFactory
+                .select(column)
+                .distinct()
+                .from(recipe)
+                .where(column.isNotNull(), column.trim().isNotEmpty())
+                .orderBy(column.asc())
+                .fetch();
     }
 
     private BooleanExpression nameContains(String keyword) {
