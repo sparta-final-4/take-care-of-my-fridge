@@ -2,8 +2,10 @@ import {
   adminSaleEventApi,
   type FlashDropCreateRequest,
   type PageResponseSaleCandidateProductResponse,
+  type PageResponseSaleEventListResponse,
   type SaleCandidateProductsRequest,
   type SaleEventCreateResponse,
+  type SaleEventListRequest,
   type SpecialSaleCreateRequest,
 } from '@/common/api/clients';
 import { unwrap } from '@/common/api/unwrap';
@@ -26,4 +28,11 @@ export async function getSaleCandidateProducts(
   signal?: AbortSignal,
 ): Promise<PageResponseSaleCandidateProductResponse> {
   return unwrap(adminSaleEventApi.getCandidateProducts({ request }, { signal }));
+}
+
+export async function getSaleEvents(
+  request: SaleEventListRequest,
+  signal?: AbortSignal,
+): Promise<PageResponseSaleEventListResponse> {
+  return unwrap(adminSaleEventApi.getSaleEvents({ request }, { signal }));
 }

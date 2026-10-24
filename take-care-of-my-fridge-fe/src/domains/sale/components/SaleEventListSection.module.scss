@@ -1,0 +1,19 @@
+@use '@/styles/variables' as *;
+
+.search {
+  max-width: 320px;
+}
+
+.filter {
+  width: $sale-type-filter-width;
+}
+
+.date {
+  width: $sale-type-filter-width;
+}
+
+// 칸의 글자(기간 등)가 줄바꿈되지 않게 한다. 열이 많아 좌우 여백만 줄이고, 행 높이는 등록 화면의 표와 같게 둔다.
+.table :global(.ant-table-cell) {
+  padding-inline: var(--ant-padding-xs);
+  white-space: nowrap;
+}

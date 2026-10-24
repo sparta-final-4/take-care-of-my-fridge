@@ -4,7 +4,6 @@ import {
   Button,
   DatePicker,
   Drawer,
-  Empty,
   Flex,
   Form,
   InputNumber,
@@ -22,6 +21,7 @@ import {
   type SaleItemDraft,
   type SaleProductChoice,
 } from '@/domains/sale/components/SaleProductPicker';
+import { SaleEventListSection } from '@/domains/sale/components/SaleEventListSection';
 import { MAX_DISCOUNT_RATE, MIN_DISCOUNT_RATE, salePriceOf } from '@/domains/sale/format';
 import { saleQueries } from '@/domains/sale/queries';
 
@@ -63,7 +63,7 @@ export function SaleEventCreateSection() {
   const [kind, setKind] = useState<SaleKind>('SPECIAL');
   const [drafts, setDrafts] = useState<SaleItemDraft[]>([]);
   const [summaryOpen, setSummaryOpen] = useState(false);
-  // 행사 목록 탭은 자리만 만들어 두었다. 목록·수정·종료 화면을 만들 때 채운다.
+  // 행사 목록 탭은 조회만 한다. 수정·종료 화면은 아직 없다.
   const [listTab, setListTab] = useState(false);
   const [bulkRate, setBulkRate] = useState<number | null>(null);
   const startsAt = Form.useWatch('startsAt', form);
@@ -160,7 +160,7 @@ export function SaleEventCreateSection() {
         ]}
       />
       {listTab ? (
-        <Empty description="행사 목록은 준비 중입니다." />
+        <SaleEventListSection />
       ) : (
         <Form<SaleEventFormValues> form={form} layout="vertical" onFinish={handleFinish}>
           {/* 시작·종료는 범위 선택기가 좁은 화면에서 달력이 화면 밖으로 나가 따로 받는다. 선택 개수와 등록은 같은 줄 끝에 둬서 표를 오래 내리지 않아도 누를 수 있다. */}

@@ -4,3 +4,14 @@ export const salePriceOf = (price: number, discountRate: number) =>
 
 export const MIN_DISCOUNT_RATE = 1;
 export const MAX_DISCOUNT_RATE = 99;
+
+export const SALE_STATUS_LABELS = {
+  SCHEDULED: '예정',
+  ACTIVE: '진행 중',
+  ENDED: '종료',
+} as const;
+
+export const SALE_TYPE_LABELS = {
+  SPECIAL: '특가',
+  FLASH_DROP: '번개 드롭',
+} as const;

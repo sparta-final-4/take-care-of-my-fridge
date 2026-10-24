@@ -7,7 +7,7 @@ import styles from './AdminSaleEventCreatePage.module.scss';
 export default function AdminSaleEventCreatePage() {
   return (
     <section className={styles.container}>
-      <Typography.Title level={2}>할인 행사 등록</Typography.Title>
+      <Typography.Title level={2}>할인 행사 관리</Typography.Title>
       <SaleEventCreateSection />
     </section>
   );
