@@ -42,6 +42,10 @@ public class SaleEventItem extends BaseTimeEntity {
     @Column(name = "product_id", nullable = false)
     private Long productId;
 
+    // 등록 당시 정가. 종료된 행사 목록에서 그 당시 정가를 보여 주려고 저장한다.
+    @Column(name = "list_price", nullable = false)
+    private int listPrice;
+
     // 할인가 (번개 드롭은 번개 드롭가)
     @Column(name = "sale_price", nullable = false)
     private int salePrice;
@@ -69,6 +73,7 @@ public class SaleEventItem extends BaseTimeEntity {
     ) {
         this.saleEvent = saleEvent;
         this.productId = productId;
+        this.listPrice = listPrice;
         this.salePrice = (int) ((long) listPrice * (100 - discountRate) / 100);
         this.discountRate = discountRate;
         this.limitedQuantity = limitedQuantity;
