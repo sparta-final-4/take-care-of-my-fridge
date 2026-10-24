@@ -4,8 +4,6 @@ import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.order.entity.Order;
 import org.example.takecareofmyfridgebe.domain.order.entity.OrderItem;
-import org.example.takecareofmyfridgebe.domain.order.entity.OrderStatus;
-import org.example.takecareofmyfridgebe.domain.order.entity.SaleType;
 import org.example.takecareofmyfridgebe.domain.order.service.OrderReader;
 import org.example.takecareofmyfridgebe.domain.payment.entity.Payment;
 import org.example.takecareofmyfridgebe.domain.payment.entity.PaymentStatus;
@@ -13,6 +11,7 @@ import org.example.takecareofmyfridgebe.domain.payment.repository.PaymentReposit
 import org.example.takecareofmyfridgebe.domain.product.repository.ProductRepository;
 import org.example.takecareofmyfridgebe.domain.refund.dto.RefundCreateRequest;
 import org.example.takecareofmyfridgebe.domain.refund.dto.RefundRequested;
+import org.example.takecareofmyfridgebe.domain.refund.dto.RefundResponse;
 import org.example.takecareofmyfridgebe.domain.refund.dto.RefundedQuantity;
 import org.example.takecareofmyfridgebe.domain.refund.entity.Refund;
 import org.example.takecareofmyfridgebe.domain.refund.entity.RefundItem;
@@ -36,9 +35,6 @@ import java.util.stream.Collectors;
 @Transactional(readOnly = true)
 public class RefundCommandService {
 
-    // 처리 중이거나 끝난 환불의 수량만 누적에 넣는다. 실패한 환불 수량은 다시 신청할 수 있다
-    private static final List<RefundStatus> COUNTED_STATUSES = List.of(RefundStatus.REQUESTED, RefundStatus.COMPLETED);
-
     private final OrderReader orderReader;
     private final PaymentRepository paymentRepository;
     private final ProductRepository productRepository;
@@ -48,10 +44,10 @@ public class RefundCommandService {
 
     // 주문 행을 잠그고 검증하므로 같은 주문의 환불 신청과 구매 확정이 하나씩 처리돼 누적 수량이 주문 수량을 넘지 않는다
     @Transactional
-    public RefundRequested request(Long memberId, Long orderId, RefundCreateRequest request) {
-        Order order = orderReader.getOwnedOrderForUpdate(memberId, orderId);
-        validateRefundableOrder(order);
-        Payment payment = getPaidPayment(orderId);
+    public RefundRequested request(Long memberId, RefundCreateRequest request) {
+        Order order = orderReader.getOwnedOrderForUpdate(memberId, request.orderId());
+        RefundableOrderPolicy.validateRefundableOrder(order);
+        Payment payment = getPaidPayment(order.getId());
 
         Map<Long, OrderItem> orderItemsById = orderReader.getOrderItems(order).stream()
                 .collect(Collectors.toMap(OrderItem::getId, Function.identity()));
@@ -61,7 +57,7 @@ public class RefundCommandService {
         }
 
         Map<Long, Long> refundedById = refundItemRepository
-                .findRefundedQuantitiesByOrderItemIds(requestedIds, COUNTED_STATUSES).stream()
+                .findRefundedQuantitiesByOrderItemIds(requestedIds, RefundStatus.COUNTED).stream()
                 .collect(Collectors.toMap(RefundedQuantity::orderItemId, RefundedQuantity::quantity));
 
         for (RefundCreateRequest.Item item : request.items()) {
@@ -69,7 +65,7 @@ public class RefundCommandService {
             if (orderItem == null) {
                 throw new BusinessException(ErrorCode.REFUND_ITEM_NOT_FOUND);
             }
-            if (orderItem.getSaleType() != SaleType.NONE) {
+            if (!RefundableOrderPolicy.isRefundableItem(orderItem)) {
                 throw new BusinessException(ErrorCode.NON_REFUNDABLE_SALE_ITEM);
             }
             long refunded = refundedById.getOrDefault(orderItem.getId(), 0L);
@@ -101,13 +97,14 @@ public class RefundCommandService {
 
     // PG 취소가 끝난 환불을 완료하고 환불 수량만큼 재고를 되돌린다
     @Transactional
-    public void complete(Long refundId, String portoneCancellationId) {
+    public RefundResponse complete(Long refundId, String portoneCancellationId) {
         Refund refund = refundRepository.findByIdForUpdate(refundId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.REFUND_NOT_FOUND));
         // OSIV로 신청 때 읽은 엔티티가 재사용되면 잠금 후에도 예전 상태가 남으므로 DB 값으로 다시 읽는다
         entityManager.refresh(refund);
         refund.complete(portoneCancellationId, LocalDateTime.now());
         restoreStock(refundItemRepository.findWithOrderItemByRefundId(refundId));
+        return RefundResponse.from(refund);
     }
 
     // 주문하기와 같은 순서(상품 ID 순)로 상품 행을 잠가, 동시에 들어온 주문하기의 재고 차감과 섞이지 않게 한다
@@ -117,15 +114,6 @@ public class RefundCommandService {
                         Integer::sum));
         productRepository.findAllByIdInForUpdate(quantitiesByProductId.keySet())
                 .forEach(product -> product.increaseStock(quantitiesByProductId.get(product.getId())));
-    }
-
-    private void validateRefundableOrder(Order order) {
-        if (order.getStatus() == OrderStatus.CONFIRMED) {
-            throw new BusinessException(ErrorCode.REFUND_ORDER_CONFIRMED);
-        }
-        if (order.getStatus() != OrderStatus.PAID) {
-            throw new BusinessException(ErrorCode.INVALID_REFUND_STATUS);
-        }
     }
 
     // 주문 잠금으로 한 주문의 결제 완료는 한 건만 남는다

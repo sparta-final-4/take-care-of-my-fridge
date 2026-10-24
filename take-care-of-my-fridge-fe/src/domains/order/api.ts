@@ -3,6 +3,7 @@ import {
   type OrderCancelResponse,
   type OrderCheckoutResponse,
   type OrderConfirmResponse,
+  type OrderCreateItemRequest,
   type OrderDetailResponse,
   type OrderListRequest,
   type PageResponseOrderSummaryResponse,
@@ -10,11 +11,12 @@ import {
 import { unwrap } from '@/common/api/unwrap';
 
 // 같은 멱등 키로 다시 보내면 서버는 처음 만든 주문을 돌려준다.
+// items에는 사용자가 장바구니에서 본 단가와 할인 구분을 담는다. 주문 시점 값과 다르면 서버가 409로 거절한다.
 export async function createOrder(
-  cartItemIds: number[],
+  items: OrderCreateItemRequest[],
   idempotencyKey: string,
 ): Promise<OrderCheckoutResponse> {
-  return unwrap(orderApi.createOrder({ orderCreateRequest: { cartItemIds }, idempotencyKey }));
+  return unwrap(orderApi.createOrder({ orderCreateRequest: { items }, idempotencyKey }));
 }
 
 export async function getOrderCheckout(

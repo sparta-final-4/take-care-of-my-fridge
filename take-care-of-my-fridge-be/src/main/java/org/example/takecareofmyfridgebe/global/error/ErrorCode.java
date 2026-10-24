@@ -51,6 +51,7 @@ public enum ErrorCode {
     // Cart
     CART_ITEM_NOT_FOUND(HttpStatus.NOT_FOUND, "CART_001", "장바구니 상품을 찾을 수 없습니다."),
     CART_QUANTITY_EXCEEDS_STOCK(HttpStatus.CONFLICT, "CART_002", "재고보다 많이 담을 수 없습니다."),
+    PURCHASE_LIMIT_EXCEEDED(HttpStatus.CONFLICT, "CART_003", "구매 한도를 넘었습니다."),
 
     // Order
     ORDER_NOT_FOUND(HttpStatus.NOT_FOUND, "ORDER_001", "주문을 찾을 수 없습니다."),
@@ -62,6 +63,10 @@ public enum ErrorCode {
     ORDER_ALREADY_PAID(HttpStatus.CONFLICT, "ORDER_007", "이미 결제가 완료된 주문입니다."),
     ORDER_CANCELLED(HttpStatus.CONFLICT, "ORDER_008", "취소된 주문입니다."),
     ORDER_NOT_PAID(HttpStatus.CONFLICT, "ORDER_009", "결제 완료된 주문만 구매 확정할 수 있습니다."),
+    ORDER_PRICE_CHANGED(HttpStatus.CONFLICT, "ORDER_010", "가격이 바뀌었습니다."),
+
+    // Sale event
+    SALE_EVENT_PRODUCT_DUPLICATED(HttpStatus.CONFLICT, "SALE_001", "이미 행사가 있는 상품입니다."),
 
     // Payment
     PAYMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "PAYMENT_001", "결제 정보를 찾을 수 없습니다."),

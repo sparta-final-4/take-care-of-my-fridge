@@ -15,6 +15,9 @@ public interface RefundItemRepository extends JpaRepository<RefundItem, Long> {
     @Query("select ri from RefundItem ri join fetch ri.orderItem where ri.refund.id = :refundId")
     List<RefundItem> findWithOrderItemByRefundId(@Param("refundId") Long refundId);
 
+    @Query("select ri from RefundItem ri join fetch ri.orderItem where ri.refund.id in :refundIds order by ri.id")
+    List<RefundItem> findWithOrderItemByRefundIdIn(@Param("refundIds") Collection<Long> refundIds);
+
     // 주문 상품별로 statuses 상태인 환불의 수량을 합산한다. 환불이 없는 주문 상품은 결과에 없다
     @Query("""
         select new org.example.takecareofmyfridgebe.domain.refund.dto.RefundedQuantity(

@@ -1,6 +1,7 @@
 import axios, { isAxiosError, type InternalAxiosRequestConfig } from 'axios';
 
 import { getErrorCode } from './errors';
+import { syncServerClock } from './serverClock';
 
 // 모든 API 호출이 쓰는 axios 인스턴스. 생성된 API 클래스에도 이 인스턴스를 넘긴다.
 // baseURL은 서버 주소(origin)만 갖고, /api prefix는 생성된 API 경로에 들어 있다.
@@ -35,6 +36,18 @@ axiosInstance.interceptors.request.use(async (config) => {
   if (!SAFE_METHODS.includes(config.method ?? 'get') && !hasCsrfCookie()) await issueCsrfCookie();
   return config;
 });
+
+// 모든 응답의 Date 헤더로 서버 시각 차이를 갱신한다. 성공·실패 응답 모두 서버 시각을 담고 있다.
+axiosInstance.interceptors.response.use(
+  (response) => {
+    syncServerClock(response.headers.date);
+    return response;
+  },
+  (error: unknown) => {
+    if (isAxiosError(error)) syncServerClock(error.response?.headers.date);
+    return Promise.reject(error);
+  },
+);
 
 axiosInstance.interceptors.response.use(undefined, async (error: unknown) => {
   if (!isAxiosError(error) || error.response?.status !== 403) return Promise.reject(error);

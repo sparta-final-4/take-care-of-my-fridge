@@ -16,6 +16,7 @@ import lombok.NoArgsConstructor;
 import org.example.takecareofmyfridgebe.global.entity.BaseTimeEntity;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 @Entity
 @Table(
@@ -28,6 +29,12 @@ import java.time.LocalDateTime;
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class SaleEvent extends BaseTimeEntity {
+
+    // 행사 시각은 한국 시간이다. 서버 시간대와 관계없이 같은 기준으로 비교한다.
+    public static final ZoneId ZONE = ZoneId.of("Asia/Seoul");
+
+    // 번개 드롭은 한 사람이 1개까지만 살 수 있다.
+    public static final int FLASH_DROP_PURCHASE_LIMIT = 1;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

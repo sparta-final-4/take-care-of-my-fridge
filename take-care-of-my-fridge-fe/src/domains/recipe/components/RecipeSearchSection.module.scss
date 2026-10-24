@@ -38,3 +38,15 @@
     padding-block: var(--ant-padding-xxs);
   }
 }
+
+// 칩과 같은 높이로 맞춰 모바일에서도 누르기 쉽게 한다.
+.toggle {
+  min-height: $touch-target-size;
+  padding-inline: var(--ant-padding-xs);
+
+  @include from(md) {
+    min-height: auto;
+    height: auto;
+    padding-block: var(--ant-padding-xxs);
+  }
+}

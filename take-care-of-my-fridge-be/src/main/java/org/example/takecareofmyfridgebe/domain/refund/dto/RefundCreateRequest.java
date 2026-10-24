@@ -10,6 +10,9 @@ import org.example.takecareofmyfridgebe.domain.refund.entity.RefundReasonType;
 import java.util.List;
 
 public record RefundCreateRequest(
+        @NotNull(message = "주문 ID가 비어 있습니다.")
+        Long orderId,
+
         @NotEmpty(message = "환불할 상품을 선택해 주세요.")
         List<@NotNull(message = "환불할 상품 정보가 비어 있습니다.") @Valid Item> items,
 

@@ -70,7 +70,7 @@ export function RecipeDetailSection({ recipeId }: RecipeDetailSectionProps) {
           <RecipeNutritionSection nutrition={recipe.nutrition} />
         </div>
         <div className={styles.column}>
-          <RecipeCookPanel recipe={recipe} fridgeMatch={fridgeMatch} />
+          <RecipeCookPanel recipeId={recipeId} recipe={recipe} fridgeMatch={fridgeMatch} />
           <RecipeFailureNotice recipeId={recipeId} />
         </div>
       </div>
