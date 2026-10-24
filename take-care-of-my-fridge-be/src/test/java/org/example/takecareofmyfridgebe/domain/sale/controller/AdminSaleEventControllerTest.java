@@ -1,8 +1,10 @@
 package org.example.takecareofmyfridgebe.domain.sale.controller;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
@@ -20,6 +22,14 @@ import org.example.takecareofmyfridgebe.domain.sale.dto.FlashDropCreateRequest;
 import org.example.takecareofmyfridgebe.domain.sale.dto.SaleEventCreateResponse;
 import org.example.takecareofmyfridgebe.domain.sale.dto.SaleCandidateProductResponse;
 import org.example.takecareofmyfridgebe.domain.sale.dto.SaleCandidateProductsRequest;
+import org.example.takecareofmyfridgebe.domain.sale.dto.SaleEventListRequest;
+import org.example.takecareofmyfridgebe.domain.sale.dto.SaleEventListResponse;
+import org.example.takecareofmyfridgebe.domain.sale.entity.SaleEventStatus;
+import org.example.takecareofmyfridgebe.domain.sale.entity.SaleEventType;
+import org.example.takecareofmyfridgebe.domain.sale.service.SaleEventListQueryService;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import org.mockito.ArgumentCaptor;
 import org.example.takecareofmyfridgebe.domain.sale.dto.SpecialSaleCreateRequest;
 import org.example.takecareofmyfridgebe.domain.product.entity.ProductType;
 import org.example.takecareofmyfridgebe.domain.sale.service.SaleEventCreateService;
@@ -58,18 +68,21 @@ class AdminSaleEventControllerTest {
     private final MockMvc mvc;
     private final SaleEventCreateService saleEventCreateService;
     private final SaleCandidateProductQueryService saleCandidateProductQueryService;
+    private final SaleEventListQueryService saleEventListQueryService;
 
     @Autowired
     AdminSaleEventControllerTest(MockMvc mvc, SaleEventCreateService saleEventCreateService,
-                                 SaleCandidateProductQueryService saleCandidateProductQueryService) {
+                                 SaleCandidateProductQueryService saleCandidateProductQueryService,
+                                 SaleEventListQueryService saleEventListQueryService) {
         this.mvc = mvc;
         this.saleEventCreateService = saleEventCreateService;
         this.saleCandidateProductQueryService = saleCandidateProductQueryService;
+        this.saleEventListQueryService = saleEventListQueryService;
     }
 
     @BeforeEach
     void resetMock() {
-        reset(saleEventCreateService, saleCandidateProductQueryService);
+        reset(saleEventCreateService, saleCandidateProductQueryService, saleEventListQueryService);
     }
 
     @Test
@@ -211,6 +224,54 @@ class AdminSaleEventControllerTest {
         verifyNoInteractions(saleCandidateProductQueryService);
     }
 
+    @Test
+    @DisplayName("관리자가 행사 목록을 조회하면 조건을 서비스에 넘기고, 날짜 하나만 주면 그 하루로 본다")
+    void getSaleEvents_returns200() throws Exception {
+        when(saleEventListQueryService.getSaleEvents(any(SaleEventListRequest.class)))
+                .thenReturn(new PageResponse<>(List.of(
+                        new SaleEventListResponse(1L, SaleEventType.FLASH_DROP, SaleEventStatus.ACTIVE,
+                                LocalDateTime.of(2026, 10, 1, 18, 0), LocalDateTime.of(2026, 10, 1, 20, 0),
+                                3L, "대파", 3000, 1500, 50, 10, 3, 7L)),
+                        1, 10, 1, 1, true));
+
+        mvc.perform(get("/api/admin/sale-events").param("status", "ACTIVE").param("type", "FLASH_DROP")
+                        .param("startFrom", "2026-10-01").with(loginAs(Member.Role.ADMIN)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content[0].saleEventId").value(1))
+                .andExpect(jsonPath("$.data.content[0].type").value("FLASH_DROP"))
+                .andExpect(jsonPath("$.data.content[0].productName").value("대파"))
+                .andExpect(jsonPath("$.data.content[0].remainingQuantity").value(3))
+                .andExpect(jsonPath("$.data.content[0].soldQuantity").value(7));
+
+        ArgumentCaptor<SaleEventListRequest> captor = ArgumentCaptor.forClass(SaleEventListRequest.class);
+        verify(saleEventListQueryService).getSaleEvents(captor.capture());
+        assertThat(captor.getValue().status()).isEqualTo(SaleEventStatus.ACTIVE);
+        assertThat(captor.getValue().startFrom()).isEqualTo(LocalDate.of(2026, 10, 1));
+        assertThat(captor.getValue().startTo()).isEqualTo(LocalDate.of(2026, 10, 1));
+    }
+
+    @Test
+    @DisplayName("기간 순서·페이지 값이 잘못되면 400, 일반 회원은 403이며 서비스를 부르지 않는다")
+    void getSaleEvents_invalidOrNonAdmin_rejects() throws Exception {
+        mvc.perform(get("/api/admin/sale-events").param("startFrom", "2026-10-20").param("startTo", "2026-10-01")
+                        .with(loginAs(Member.Role.ADMIN)))
+                .andExpect(status().isBadRequest());
+        mvc.perform(get("/api/admin/sale-events").param("endFrom", "2026-10-20").param("endTo", "2026-10-01")
+                        .with(loginAs(Member.Role.ADMIN)))
+                .andExpect(status().isBadRequest());
+        mvc.perform(get("/api/admin/sale-events").param("page", "0").with(loginAs(Member.Role.ADMIN)))
+                .andExpect(status().isBadRequest());
+        mvc.perform(get("/api/admin/sale-events").param("sort", "NOPE").with(loginAs(Member.Role.ADMIN)))
+                .andExpect(status().isBadRequest());
+        mvc.perform(get("/api/admin/sale-events").param("direction", "UP").with(loginAs(Member.Role.ADMIN)))
+                .andExpect(status().isBadRequest());
+        mvc.perform(get("/api/admin/sale-events").param("startFrom", "not-a-date").with(loginAs(Member.Role.ADMIN)))
+                .andExpect(status().isBadRequest());
+        mvc.perform(get("/api/admin/sale-events").with(loginAs(Member.Role.USER)))
+                .andExpect(status().isForbidden());
+        verifyNoInteractions(saleEventListQueryService);
+    }
+
     private RequestPostProcessor loginAs(Member.Role role) {
         return authentication(new UsernamePasswordAuthenticationToken(
                 new AuthSessionService.AuthPrincipal(7L, 8L, role), null,
@@ -227,6 +288,11 @@ class AdminSaleEventControllerTest {
         @Bean
         SaleCandidateProductQueryService saleCandidateProductQueryService() {
             return mock(SaleCandidateProductQueryService.class);
+        }
+
+        @Bean
+        SaleEventListQueryService saleEventListQueryService() {
+            return mock(SaleEventListQueryService.class);
         }
 
         @Bean
