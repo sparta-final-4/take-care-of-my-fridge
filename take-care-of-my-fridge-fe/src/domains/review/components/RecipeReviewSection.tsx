@@ -1,15 +1,5 @@
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
-import {
-  App,
-  Button,
-  Empty,
-  Flex,
-  Popconfirm,
-  Rate,
-  Segmented,
-  Skeleton,
-  Typography,
-} from 'antd';
+import { App, Button, Empty, Flex, Popconfirm, Rate, Segmented, Skeleton, Typography } from 'antd';
 import dayjs from 'dayjs';
 import { useState } from 'react';
 
@@ -120,9 +110,7 @@ export function RecipeReviewSection({ recipeId }: RecipeReviewSectionProps) {
     if (!hasCooked) {
       return (
         <div className={styles.noticeBox}>
-          <Typography.Text type="secondary">
-            요리를 완료하면 후기를 쓸 수 있어요
-          </Typography.Text>
+          <Typography.Text type="secondary">요리를 완료하면 후기를 쓸 수 있어요</Typography.Text>
         </div>
       );
     }
@@ -227,12 +215,7 @@ export function RecipeReviewSection({ recipeId }: RecipeReviewSectionProps) {
                         cancelText="취소"
                         okButtonProps={{ danger: true }}
                       >
-                        <Button
-                          type="link"
-                          danger
-                          size="small"
-                          loading={deleteMutation.isPending}
-                        >
+                        <Button type="link" danger size="small" loading={deleteMutation.isPending}>
                           삭제
                         </Button>
                       </Popconfirm>
