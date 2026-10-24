@@ -23,6 +23,7 @@ export interface ReviewResponse {
     'nickname'?: string;
     'rating'?: number;
     'recipeId'?: number;
+    'recipeName'?: string;
     'updatedAt'?: string;
 }
 

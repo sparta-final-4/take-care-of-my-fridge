@@ -3,6 +3,7 @@ package org.example.takecareofmyfridgebe.domain.review.service;
 import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 import org.example.takecareofmyfridgebe.domain.member.repository.MemberRepository;
+import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeSummary;
 import org.example.takecareofmyfridgebe.domain.recipe.service.RecipeService;
 import org.example.takecareofmyfridgebe.domain.review.dto.ReviewCreateRequest;
 import org.example.takecareofmyfridgebe.domain.review.dto.ReviewResponse;
@@ -18,6 +19,10 @@ import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -30,6 +35,8 @@ public class RecipeReviewService {
     /**
      * 레시피 후기 목록을 검색 조건(recipeId, mine, sort, page, size)으로 조회한다.
      * mine=true인 경우 로그인이 필수이며, 비로그인 요청 시 401(UNAUTHORIZED) 예외를 발생시킨다.
+     * 조회된 후기들의 recipeId를 모아 findSummaries로 한 번에 레시피명을 조회해 매핑한다.
+     * 후기 목록이 비어 있으면 findSummaries를 호출하지 않고 빈 목록을 반환한다.
      *
      * @param request         조회 필터 및 페이징 조건
      * @param currentMemberId 현재 로그인한 회원의 ID (비로그인 시 null)
@@ -41,7 +48,23 @@ public class RecipeReviewService {
         }
 
         Page<RecipeReview> reviews = recipeReviewRepository.findReviewsByCondition(request, currentMemberId);
-        return PageResponse.of(reviews.map(review -> ReviewResponse.from(review, currentMemberId)));
+        if (reviews.isEmpty()) {
+            return PageResponse.of(reviews.map(review -> ReviewResponse.from(review, currentMemberId, null)));
+        }
+
+        List<Long> recipeIds = reviews.getContent().stream()
+                .map(RecipeReview::getRecipeId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+
+        Map<Long, RecipeSummary> summaries = recipeService.findSummaries(recipeIds);
+
+        return PageResponse.of(reviews.map(review -> {
+            RecipeSummary summary = summaries.get(review.getRecipeId());
+            String recipeName = summary != null ? summary.name() : null;
+            return ReviewResponse.from(review, currentMemberId, recipeName);
+        }));
     }
 
     /**
@@ -52,7 +75,7 @@ public class RecipeReviewService {
      *
      * @param memberId 작성자 회원 ID
      * @param request  후기 생성 정보 (recipeId, rating, content)
-     * @return 작성된 후기 상세 응답
+     * @return 작성된 후기 상세 응답 (recipeName 포함)
      */
     @Transactional
     public ReviewResponse createReview(Long memberId, ReviewCreateRequest request) {
@@ -70,7 +93,8 @@ public class RecipeReviewService {
 
         try {
             RecipeReview savedReview = recipeReviewRepository.save(review);
-            return ReviewResponse.from(savedReview, memberId);
+            String recipeName = getRecipeName(savedReview.getRecipeId());
+            return ReviewResponse.from(savedReview, memberId, recipeName);
         } catch (DataIntegrityViolationException e) {
             // 동시 작성으로 인한 유니크 제약 위반 시 409 처리
             throw new BusinessException(ErrorCode.REVIEW_ALREADY_EXISTS);
@@ -84,13 +108,14 @@ public class RecipeReviewService {
      * @param memberId 수정 요청한 회원 ID
      * @param reviewId 수정할 후기 ID
      * @param request  수정할 후기 정보 (rating, content)
-     * @return 수정된 후기 상세 응답
+     * @return 수정된 후기 상세 응답 (recipeName 포함)
      */
     @Transactional
     public ReviewResponse updateReview(Long memberId, Long reviewId, ReviewUpdateRequest request) {
         RecipeReview review = getReviewEntity(memberId, reviewId);
         review.update(request.rating(), request.content());
-        return ReviewResponse.from(review, memberId);
+        String recipeName = getRecipeName(review.getRecipeId());
+        return ReviewResponse.from(review, memberId, recipeName);
     }
 
     /**
@@ -109,5 +134,14 @@ public class RecipeReviewService {
     private RecipeReview getReviewEntity(Long memberId, Long reviewId) {
         return recipeReviewRepository.findByIdAndMemberId(reviewId, memberId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.REVIEW_NOT_FOUND));
+    }
+
+    private String getRecipeName(Long recipeId) {
+        if (recipeId == null) {
+            return null;
+        }
+        Map<Long, RecipeSummary> summaries = recipeService.findSummaries(List.of(recipeId));
+        RecipeSummary summary = summaries.get(recipeId);
+        return summary != null ? summary.name() : null;
     }
 }

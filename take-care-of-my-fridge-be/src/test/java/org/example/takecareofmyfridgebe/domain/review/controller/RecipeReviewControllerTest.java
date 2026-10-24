@@ -83,7 +83,7 @@ class RecipeReviewControllerTest {
     void getReviewsPermittedWithoutAuthentication() throws Exception {
         // Given
         ReviewResponse review = new ReviewResponse(
-                100L, 10L, 5, "맛있어요", "닉네임", false, LocalDateTime.now(), LocalDateTime.now());
+                100L, 10L, "김치찌개", 5, "맛있어요", "닉네임", false, LocalDateTime.now(), LocalDateTime.now());
         PageResponse<ReviewResponse> pageResponse = PageResponse.of(
                 new PageImpl<>(List.of(review), PageRequest.of(0, 10), 1));
 
@@ -111,7 +111,7 @@ class RecipeReviewControllerTest {
     void getReviewsWithEmptyQueryParamsUsesDefaultsAndTokenMemberId() throws Exception {
         // Given
         ReviewResponse review = new ReviewResponse(
-                100L, 10L, 5, "맛있어요", "닉네임", true, LocalDateTime.now(), LocalDateTime.now());
+                100L, 10L, "김치찌개", 5, "맛있어요", "닉네임", true, LocalDateTime.now(), LocalDateTime.now());
         PageResponse<ReviewResponse> pageResponse = PageResponse.of(
                 new PageImpl<>(List.of(review), PageRequest.of(0, 10), 1));
 
@@ -180,7 +180,7 @@ class RecipeReviewControllerTest {
     void createReviewReturnsSuccess() throws Exception {
         // Given
         ReviewResponse review = new ReviewResponse(
-                100L, 10L, 5, "맛있어요", "닉네임", true, LocalDateTime.now(), LocalDateTime.now());
+                100L, 10L, "김치찌개", 5, "맛있어요", "닉네임", true, LocalDateTime.now(), LocalDateTime.now());
 
         when(recipeReviewService.createReview(eq(7L), any(ReviewCreateRequest.class)))
                 .thenReturn(review);
@@ -258,7 +258,7 @@ class RecipeReviewControllerTest {
     void updateReviewReturnsSuccess() throws Exception {
         // Given
         ReviewResponse updated = new ReviewResponse(
-                100L, 10L, 4, "수정된 후기", "닉네임", true, LocalDateTime.now(), LocalDateTime.now());
+                100L, 10L, "김치찌개", 4, "수정된 후기", "닉네임", true, LocalDateTime.now(), LocalDateTime.now());
 
         when(recipeReviewService.updateReview(eq(7L), eq(100L), any(ReviewUpdateRequest.class)))
                 .thenReturn(updated);
