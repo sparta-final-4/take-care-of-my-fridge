@@ -1,0 +1,330 @@
+### 1. 로그인
+POST http://localhost:8080/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "cookie@naver.com",
+  "password": "rkddkwlrnldudnj1!"
+}
+
+> {%
+    client.test("로그인 성공", () => {
+        client.assert(response.status === 200, "상태 코드는 200이어야 합니다.");
+    });
+
+    const setCookie = response.headers.valueOf("Set-Cookie");
+    if (setCookie) {
+        const match = /access_token=([^;]+)/.exec(setCookie);
+        if (match) {
+            client.global.set("accessToken", match[1]);
+            client.log("accessToken 저장 완료");
+        }
+    }
+%}
+
+### 2. CSRF 토큰 발급
+GET http://localhost:8080/api/auth/csrf
+Cookie: access_token={{accessToken}}
+
+> {%
+    client.test("CSRF 토큰 발급 성공", () => {
+        client.assert(response.status === 200, "상태 코드는 200이어야 합니다.");
+    });
+    client.global.set("csrfToken", response.body.data.token);
+    client.log("CSRF 토큰 저장 완료: " + response.body.data.token);
+%}
+
+### 3-1. 냉장고 재료 일괄 등록 (사전 재료 3개 + 사전 미등재 1개, 기본값 적용 1개)
+POST http://localhost:8080/api/fridge/items
+Content-Type: application/json
+X-XSRF-TOKEN: {{csrfToken}}
+Cookie: access_token={{accessToken}}; XSRF-TOKEN={{csrfToken}}
+
+{
+  "items": [
+    {
+      "rawName": "양파",
+      "quantity": 5
+    },
+    {
+      "rawName": "두부",
+      "quantity": 2,
+      "storage": "REFRIGERATED",
+      "expirationDate": "2026-10-30"
+    },
+    {
+      "rawName": "대파",
+      "quantity": 3,
+      "storage": "REFRIGERATED",
+      "expirationDate": "2026-10-25"
+    },
+    {
+      "rawName": "특수우주버섯XYZ",
+      "quantity": 1,
+      "storage": "ROOM_TEMP",
+      "expirationDate": "2026-11-01"
+    }
+  ]
+}
+
+> {%
+    client.test("등록 성공 및 기본값/매핑 확인", () => {
+        client.assert(response.status === 200, "상태 코드는 200이어야 합니다. 현재: " + response.status);
+        client.assert(response.body && response.body.data && response.body.data.length === 4, "4개 항목이 등록되어야 합니다.");
+
+        // 비운 보관 방법·소비기한이 사전 기본값으로 채워졌는지 확인 (양파)
+        const defaultItem = response.body.data[0];
+        client.assert(defaultItem.storage !== null && defaultItem.storage !== undefined, "보관방법 기본값이 채워져야 합니다.");
+        client.assert(defaultItem.expirationDate !== null && defaultItem.expirationDate !== undefined, "소비기한 기본값이 채워져야 합니다.");
+
+        // 사전에 없는 재료가 기타(ING_CUSTOM)로 매핑됐는지 확인
+        const customItem = response.body.data[3];
+        client.assert(customItem.ingredientName === "기타", "사전에 없는 재료의 표준 재료명은 '기타'여야 합니다.");
+    });
+
+    if (response.status === 200 && response.body && response.body.data && response.body.data.length >= 4) {
+        client.global.set("fridgeId1", response.body.data[0].id);
+        client.global.set("fridgeId2", response.body.data[1].id);
+        client.global.set("fridgeId3", response.body.data[2].id);
+        client.global.set("fridgeIdCustom", response.body.data[3].id);
+    }
+%}
+
+### 3-2. 냉장고 재료 목록 조회 (기본)
+GET http://localhost:8080/api/fridge/items
+Cookie: access_token={{accessToken}}
+
+> {%
+    client.test("기본 목록 조회 성공", () => {
+        client.assert(response.status === 200, "상태 코드는 200이어야 합니다.");
+        client.assert(response.body.data.length >= 4, "등록한 재료를 포함해 목록이 조회되어야 합니다.");
+    });
+%}
+
+### 3-3. 냉장고 재료 목록 조회 (보관 방식 필터: 냉장)
+GET http://localhost:8080/api/fridge/items?storage=REFRIGERATED
+Cookie: access_token={{accessToken}}
+
+> {%
+    client.test("냉장 목록 조회 성공", () => {
+        client.assert(response.status === 200, "상태 코드는 200이어야 합니다.");
+        const allRefrigerated = response.body.data.every(item => item.storage === "REFRIGERATED");
+        client.assert(allRefrigerated, "조회된 모든 재료의 보관 방식이 REFRIGERATED여야 합니다.");
+    });
+%}
+
+### 3-4. 냉장고 재료 목록 조회 (임박 재료만 필터)
+GET http://localhost:8080/api/fridge/items?imminentOnly=true
+Cookie: access_token={{accessToken}}
+
+> {%
+    client.test("임박 재료 목록 조회 성공", () => {
+        client.assert(response.status === 200, "상태 코드는 200이어야 합니다.");
+    });
+%}
+
+### 3-5. 냉장고 재료 목록 조회 (정렬 조건 변경: 이름순)
+GET http://localhost:8080/api/fridge/items?sort=NAME
+Cookie: access_token={{accessToken}}
+
+> {%
+    client.test("이름순 정렬 목록 조회 성공", () => {
+        client.assert(response.status === 200, "상태 코드는 200이어야 합니다.");
+    });
+%}
+
+### 4. 냉장고 재료 정보 수정 (이름, 수량, 소비기한 변경)
+PATCH http://localhost:8080/api/fridge/items/{{fridgeId1}}
+Content-Type: application/json
+X-XSRF-TOKEN: {{csrfToken}}
+Cookie: access_token={{accessToken}}; XSRF-TOKEN={{csrfToken}}
+
+{
+  "rawName": "깐양파",
+  "quantity": 4,
+  "storage": "REFRIGERATED",
+  "expirationDate": "2026-11-05"
+}
+
+> {%
+    client.test("재료 수정 성공", () => {
+        client.assert(response.status === 200, "상태 코드는 200이어야 합니다.");
+        client.assert(response.body.data.rawName === "깐양파", "이름이 깐양파로 변경되어야 합니다.");
+        client.assert(response.body.data.quantity === 4, "수량이 4로 변경되어야 합니다.");
+        client.assert(response.body.data.expirationDate === "2026-11-05", "소비기한이 2026-11-05로 변경되어야 합니다.");
+    });
+%}
+
+### 5. 재료 빼기: 일부 수량 차감 (남은 수량 확인)
+POST http://localhost:8080/api/fridge/items/{{fridgeId1}}/take-out
+Content-Type: application/json
+X-XSRF-TOKEN: {{csrfToken}}
+Cookie: access_token={{accessToken}}; XSRF-TOKEN={{csrfToken}}
+
+{
+  "action": "CONSUMED",
+  "quantity": 1
+}
+
+> {%
+    client.test("일부 수량 차감 성공 및 잔여 수량 확인", () => {
+        client.assert(response.status === 200, "상태 코드는 200이어야 합니다.");
+        client.assert(response.body.data.removed === false, "일부 차감이므로 삭제되지 않아야 합니다.");
+        client.assert(response.body.data.remainingQuantity === 3, "남은 수량이 3이어야 합니다.");
+    });
+%}
+
+### 6-1. 재료 빼기: 수량 비워서 전부 차감 (삭제 처리)
+POST http://localhost:8080/api/fridge/items/{{fridgeId1}}/take-out
+Content-Type: application/json
+X-XSRF-TOKEN: {{csrfToken}}
+Cookie: access_token={{accessToken}}; XSRF-TOKEN={{csrfToken}}
+
+{
+  "action": "CONSUMED"
+}
+
+> {%
+    client.test("전부 차감 및 삭제 처리 확인", () => {
+        client.assert(response.status === 200, "상태 코드는 200이어야 합니다.");
+        client.assert(response.body.data.removed === true, "전부 뺐으므로 removed가 true여야 합니다.");
+        client.assert(response.body.data.remainingQuantity === 0, "남은 수량이 0이어야 합니다.");
+    });
+%}
+
+### 6-2. 목록에서 완전히 삭제되었는지 조회 확인
+GET http://localhost:8080/api/fridge/items
+Cookie: access_token={{accessToken}}
+
+> {%
+    client.test("전부 뺀 재료가 목록에서 사라졌는지 확인", () => {
+        client.assert(response.status === 200, "상태 코드는 200이어야 합니다.");
+        const targetId = parseInt(client.global.get("fridgeId1"));
+        const exists = response.body.data.some(item => item.id === targetId);
+        client.assert(!exists, "차감 완료된 재료는 목록에 존재하지 않아야 합니다.");
+    });
+%}
+
+### 7. 재료 빼기: 버림(DISCARDED) 처리
+POST http://localhost:8080/api/fridge/items/{{fridgeId2}}/take-out
+Content-Type: application/json
+X-XSRF-TOKEN: {{csrfToken}}
+Cookie: access_token={{accessToken}}; XSRF-TOKEN={{csrfToken}}
+
+{
+  "action": "DISCARDED",
+  "quantity": 1
+}
+
+> {%
+    client.test("버림(DISCARDED) 처리 성공", () => {
+        client.assert(response.status === 200, "상태 코드는 200이어야 합니다.");
+        client.assert(response.body.data.remainingQuantity === 1, "남은 수량이 1이어야 합니다.");
+    });
+%}
+
+### 8. 재료 단건 삭제: 잘못 등록(reason=WRONG_ENTRY)
+DELETE http://localhost:8080/api/fridge/items/{{fridgeIdCustom}}?reason=WRONG_ENTRY
+X-XSRF-TOKEN: {{csrfToken}}
+Cookie: access_token={{accessToken}}; XSRF-TOKEN={{csrfToken}}
+
+> {%
+    client.test("잘못 등록된 재료 삭제 성공", () => {
+        client.assert(response.status === 200, "상태 코드는 200이어야 합니다.");
+    });
+%}
+
+### 9-1. 냉장고 이력 조회 (기본)
+GET http://localhost:8080/api/fridge/logs
+Cookie: access_token={{accessToken}}
+
+> {%
+    client.test("이력 조회 성공", () => {
+        client.assert(response.status === 200, "상태 코드는 200이어야 합니다.");
+        client.assert(response.body.data.content.length >= 1, "이력이 1건 이상 존재해야 합니다.");
+    });
+%}
+
+### 9-2. 냉장고 이력 조회 (action 필터: DISCARDED)
+GET http://localhost:8080/api/fridge/logs?action=DISCARDED
+Cookie: access_token={{accessToken}}
+
+> {%
+    client.test("버린 이력 필터 조회 성공", () => {
+        client.assert(response.status === 200, "상태 코드는 200이어야 합니다.");
+        const allDiscarded = response.body.data.content.every(log => log.action === "DISCARDED");
+        client.assert(allDiscarded, "모든 이력의 action이 DISCARDED여야 합니다.");
+    });
+%}
+
+### 9-3. 냉장고 이력 조회 (기간 필터: from ~ to)
+GET http://localhost:8080/api/fridge/logs?from=2026-01-01&to=2026-12-31
+Cookie: access_token={{accessToken}}
+
+> {%
+    client.test("기간 필터 이력 조회 성공", () => {
+        client.assert(response.status === 200, "상태 코드는 200이어야 합니다.");
+    });
+%}
+
+### 10-1. 실패 검증: 존재하지 않는 fridgeId 수정 시 404
+PATCH http://localhost:8080/api/fridge/items/9999999
+Content-Type: application/json
+X-XSRF-TOKEN: {{csrfToken}}
+Cookie: access_token={{accessToken}}; XSRF-TOKEN={{csrfToken}}
+
+{
+  "rawName": "없는재료",
+  "quantity": 1,
+  "storage": "REFRIGERATED",
+  "expirationDate": "2026-11-01"
+}
+
+> {%
+    client.test("없는 재료 수정 실패 (404)", () => {
+        client.assert(response.status === 404, "존재하지 않는 재료는 404를 반환해야 합니다.");
+    });
+%}
+
+### 10-2. 실패 검증: 수량 0 이하 등록 시 400
+POST http://localhost:8080/api/fridge/items
+Content-Type: application/json
+X-XSRF-TOKEN: {{csrfToken}}
+Cookie: access_token={{accessToken}}; XSRF-TOKEN={{csrfToken}}
+
+{
+  "items": [
+    {
+      "rawName": "양파",
+      "quantity": 0
+    }
+  ]
+}
+
+> {%
+    client.test("수량 0 이하 등록 실패 (400)", () => {
+        client.assert(response.status === 400, "수량이 0 이하이면 400을 반환해야 합니다.");
+    });
+%}
+
+### 11-1. 정리: 테스트 생성 잔여 재료 삭제 1 (fridgeId2)
+DELETE http://localhost:8080/api/fridge/items/{{fridgeId2}}?reason=WRONG_ENTRY
+X-XSRF-TOKEN: {{csrfToken}}
+Cookie: access_token={{accessToken}}; XSRF-TOKEN={{csrfToken}}
+
+> {%
+    client.test("잔여 재료 1 삭제 성공", () => {
+        client.assert(response.status === 200, "상태 코드는 200이어야 합니다.");
+    });
+%}
+
+### 11-2. 정리: 테스트 생성 잔여 재료 삭제 2 (fridgeId3)
+DELETE http://localhost:8080/api/fridge/items/{{fridgeId3}}?reason=WRONG_ENTRY
+X-XSRF-TOKEN: {{csrfToken}}
+Cookie: access_token={{accessToken}}; XSRF-TOKEN={{csrfToken}}
+
+> {%
+    client.test("잔여 재료 2 삭제 성공", () => {
+        client.assert(response.status === 200, "상태 코드는 200이어야 합니다.");
+    });
+%}
