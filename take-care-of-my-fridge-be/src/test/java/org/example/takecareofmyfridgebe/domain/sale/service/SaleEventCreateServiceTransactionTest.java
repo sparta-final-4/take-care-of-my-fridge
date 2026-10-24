@@ -97,11 +97,11 @@ class SaleEventCreateServiceTransactionTest extends MySqlContainerSupport {
         assertThat(saved.getType()).isEqualTo(SaleEventType.SPECIAL);
         assertThat(saved.getStatus()).isEqualTo(SaleEventStatus.SCHEDULED);
         assertThat(saleEventItemRepository.findAll())
-                .extracting(SaleEventItem::getProductId, SaleEventItem::getSalePrice,
+                .extracting(SaleEventItem::getProductId, SaleEventItem::getListPrice, SaleEventItem::getSalePrice,
                         SaleEventItem::getDiscountRate, SaleEventItem::getLimitedQuantity)
                 .containsExactlyInAnyOrder(
-                        tuple(greenOnion.getId(), 2400, 20, null),
-                        tuple(tofu.getId(), 1699, 15, null));
+                        tuple(greenOnion.getId(), greenOnion.getPrice(), 2400, 20, null),
+                        tuple(tofu.getId(), tofu.getPrice(), 1699, 15, null));
     }
 
     @Test
@@ -115,6 +115,7 @@ class SaleEventCreateServiceTransactionTest extends MySqlContainerSupport {
         assertThat(saved.getType()).isEqualTo(SaleEventType.FLASH_DROP);
         assertThat(saved.getStatus()).isEqualTo(SaleEventStatus.SCHEDULED);
         SaleEventItem item = saleEventItemRepository.findAll().get(0);
+        assertThat(item.getListPrice()).isEqualTo(3000);
         assertThat(item.getSalePrice()).isEqualTo(1500);
         assertThat(item.getLimitedQuantity()).isEqualTo(10);
         assertThat(item.getRemainingQuantity()).isEqualTo(10);
