@@ -1,11 +1,12 @@
 package org.example.takecareofmyfridgebe.domain.cart.dto;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import lombok.Builder;
 import org.example.takecareofmyfridgebe.domain.cart.entity.CartItem;
 import org.example.takecareofmyfridgebe.domain.product.entity.Product;
 import org.example.takecareofmyfridgebe.domain.product.entity.ProductStatus;
 import org.example.takecareofmyfridgebe.domain.sale.dto.ActiveSale;
+import org.example.takecareofmyfridgebe.domain.sale.entity.SaleEvent;
 import org.example.takecareofmyfridgebe.domain.sale.entity.SaleEventType;
 
 @Builder
@@ -22,8 +23,8 @@ public record CartItemResponse(
         Integer flashDropRemaining,
         // 번개 드롭 한정 수량(총 판매 수량). 번개 드롭이 아니면 null
         Integer flashDropLimit,
-        // 진행 중 할인의 종료 시각. 프론트가 1초마다 남은 시간을 계산한다. 할인이 없으면 null
-        LocalDateTime saleEndsAt,
+        // 진행 중 할인의 종료 시각(+09:00 포함). 프론트가 서버 시각 기준으로 남은 시간을 계산한다. 할인이 없으면 null
+        OffsetDateTime saleEndsAt,
         boolean soldOut
 ) {
 
@@ -42,7 +43,7 @@ public record CartItemResponse(
                 .discountRate(sale == null ? null : sale.discountRate())
                 .flashDropRemaining(flashDrop ? sale.remainingQuantity() : null)
                 .flashDropLimit(flashDrop ? sale.limitedQuantity() : null)
-                .saleEndsAt(sale == null ? null : sale.endsAt())
+                .saleEndsAt(sale == null ? null : sale.endsAt().atZone(SaleEvent.ZONE).toOffsetDateTime())
                 .soldOut(isUnavailable(product) || (flashDrop && sale.remainingQuantity() == 0))
                 .build();
     }
