@@ -58,6 +58,7 @@ models/api-response-page-response-product-list-item-response.ts
 models/api-response-page-response-recipe-list-item-response.ts
 models/api-response-page-response-review-response.ts
 models/api-response-page-response-sale-candidate-product-response.ts
+models/api-response-page-response-sale-event-list-response.ts
 models/api-response-payment-confirm-response.ts
 models/api-response-payment-prepare-response.ts
 models/api-response-product-detail-response.ts
@@ -144,6 +145,7 @@ models/page-response-product-list-item-response.ts
 models/page-response-recipe-list-item-response.ts
 models/page-response-review-response.ts
 models/page-response-sale-candidate-product-response.ts
+models/page-response-sale-event-list-response.ts
 models/payment-confirm-request.ts
 models/payment-confirm-response.ts
 models/payment-prepare-response.ts
@@ -174,6 +176,8 @@ models/review.ts
 models/sale-candidate-product-response.ts
 models/sale-candidate-products-request.ts
 models/sale-event-create-response.ts
+models/sale-event-list-request.ts
+models/sale-event-list-response.ts
 models/sign-up-request.ts
 models/sign-up-response.ts
 models/special-sale-create-request.ts

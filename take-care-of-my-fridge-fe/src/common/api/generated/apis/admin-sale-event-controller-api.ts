@@ -25,11 +25,15 @@ import { BASE_PATH, COLLECTION_FORMATS, type RequestArgs, BaseAPI, RequiredError
 // @ts-ignore
 import type { ApiResponsePageResponseSaleCandidateProductResponse } from '../models';
 // @ts-ignore
+import type { ApiResponsePageResponseSaleEventListResponse } from '../models';
+// @ts-ignore
 import type { ApiResponseSaleEventCreateResponse } from '../models';
 // @ts-ignore
 import type { FlashDropCreateRequest } from '../models';
 // @ts-ignore
 import type { SaleCandidateProductsRequest } from '../models';
+// @ts-ignore
+import type { SaleEventListRequest } from '../models';
 // @ts-ignore
 import type { SpecialSaleCreateRequest } from '../models';
 /**
@@ -143,6 +147,44 @@ export const AdminSaleEventControllerApiAxiosParamCreator = function (configurat
                 options: localVarRequestOptions,
             };
         },
+        /**
+         * 
+         * @param {SaleEventListRequest} request 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        getSaleEvents: async (request: SaleEventListRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'request' is not null or undefined
+            assertParamExists('getSaleEvents', 'request', request)
+            const localVarPath = `/api/admin/sale-events`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            if (request !== undefined) {
+                for (const [key, value] of Object.entries(request)) {
+                    localVarQueryParameter[key] = value;
+                }
+            }
+
+            localVarHeaderParameter['Accept'] = '*/*';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
     }
 };
 
@@ -188,6 +230,18 @@ export const AdminSaleEventControllerApiFp = function(configuration?: Configurat
             const localVarOperationServerBasePath = operationServerMap['AdminSaleEventControllerApi.getCandidateProducts']?.[localVarOperationServerIndex]?.url;
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
+        /**
+         * 
+         * @param {SaleEventListRequest} request 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async getSaleEvents(request: SaleEventListRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ApiResponsePageResponseSaleEventListResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.getSaleEvents(request, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['AdminSaleEventControllerApi.getSaleEvents']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
     }
 };
 
@@ -224,6 +278,15 @@ export const AdminSaleEventControllerApiFactory = function (configuration?: Conf
         getCandidateProducts(requestParameters: AdminSaleEventControllerApiGetCandidateProductsRequest, options?: RawAxiosRequestConfig): AxiosPromise<ApiResponsePageResponseSaleCandidateProductResponse> {
             return localVarFp.getCandidateProducts(requestParameters.request, options).then((request) => request(axios, basePath));
         },
+        /**
+         * 
+         * @param {AdminSaleEventControllerApiGetSaleEventsRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        getSaleEvents(requestParameters: AdminSaleEventControllerApiGetSaleEventsRequest, options?: RawAxiosRequestConfig): AxiosPromise<ApiResponsePageResponseSaleEventListResponse> {
+            return localVarFp.getSaleEvents(requestParameters.request, options).then((request) => request(axios, basePath));
+        },
     };
 };
 
@@ -255,6 +318,14 @@ export interface AdminSaleEventControllerApiInterface {
      */
     getCandidateProducts(requestParameters: AdminSaleEventControllerApiGetCandidateProductsRequest, options?: RawAxiosRequestConfig): AxiosPromise<ApiResponsePageResponseSaleCandidateProductResponse>;
 
+    /**
+     * 
+     * @param {AdminSaleEventControllerApiGetSaleEventsRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    getSaleEvents(requestParameters: AdminSaleEventControllerApiGetSaleEventsRequest, options?: RawAxiosRequestConfig): AxiosPromise<ApiResponsePageResponseSaleEventListResponse>;
+
 }
 
 /**
@@ -276,6 +347,13 @@ export interface AdminSaleEventControllerApiCreateSpecialSaleRequest {
  */
 export interface AdminSaleEventControllerApiGetCandidateProductsRequest {
     readonly request: SaleCandidateProductsRequest
+}
+
+/**
+ * Request parameters for getSaleEvents operation in AdminSaleEventControllerApi.
+ */
+export interface AdminSaleEventControllerApiGetSaleEventsRequest {
+    readonly request: SaleEventListRequest
 }
 
 /**
@@ -310,6 +388,16 @@ export class AdminSaleEventControllerApi extends BaseAPI implements AdminSaleEve
      */
     public getCandidateProducts(requestParameters: AdminSaleEventControllerApiGetCandidateProductsRequest, options?: RawAxiosRequestConfig) {
         return AdminSaleEventControllerApiFp(this.configuration).getCandidateProducts(requestParameters.request, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @param {AdminSaleEventControllerApiGetSaleEventsRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public getSaleEvents(requestParameters: AdminSaleEventControllerApiGetSaleEventsRequest, options?: RawAxiosRequestConfig) {
+        return AdminSaleEventControllerApiFp(this.configuration).getSaleEvents(requestParameters.request, options).then((request) => request(this.axios, this.basePath));
     }
 }
 

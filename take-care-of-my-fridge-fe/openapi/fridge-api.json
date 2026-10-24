@@ -410,6 +410,36 @@
         ]
       }
     },
+    "/api/admin/sale-events": {
+      "get": {
+        "operationId": "getSaleEvents",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "request",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/SaleEventListRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePageResponseSaleEventListResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "admin-sale-event-controller"
+        ]
+      }
+    },
     "/api/admin/sale-events/flash-drop": {
       "post": {
         "operationId": "createFlashDrop",
@@ -2451,6 +2481,20 @@
         "properties": {
           "data": {
             "$ref": "#/components/schemas/PageResponseSaleCandidateProductResponse"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorResponse"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ApiResponsePageResponseSaleEventListResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/PageResponseSaleEventListResponse"
           },
           "error": {
             "$ref": "#/components/schemas/ErrorResponse"
@@ -4580,6 +4624,36 @@
           }
         }
       },
+      "PageResponseSaleEventListResponse": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SaleEventListResponse"
+            }
+          },
+          "isLast": {
+            "type": "boolean"
+          },
+          "pageNumber": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalElements": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "totalPages": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
       "PaymentConfirmRequest": {
         "type": "object",
         "properties": {
@@ -5684,6 +5758,150 @@
           "saleEventId": {
             "type": "integer",
             "format": "int64"
+          }
+        }
+      },
+      "SaleEventListRequest": {
+        "type": "object",
+        "properties": {
+          "direction": {
+            "type": "string",
+            "enum": [
+              "ASC",
+              "DESC"
+            ]
+          },
+          "endFrom": {
+            "type": "string",
+            "format": "date"
+          },
+          "endRangeOrdered": {
+            "type": "boolean"
+          },
+          "endTo": {
+            "type": "string",
+            "format": "date"
+          },
+          "keyword": {
+            "type": "string",
+            "maxLength": 50,
+            "minLength": 0
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 1
+          },
+          "size": {
+            "type": "integer",
+            "format": "int32",
+            "maximum": 100,
+            "minimum": 1
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "PRODUCT_NAME",
+              "TYPE",
+              "STATUS",
+              "LIST_PRICE",
+              "SALE_PRICE",
+              "DISCOUNT_RATE",
+              "LIMITED_QUANTITY",
+              "REMAINING_QUANTITY",
+              "SOLD_QUANTITY",
+              "STARTS_AT",
+              "ENDS_AT"
+            ]
+          },
+          "startFrom": {
+            "type": "string",
+            "format": "date"
+          },
+          "startRangeOrdered": {
+            "type": "boolean"
+          },
+          "startTo": {
+            "type": "string",
+            "format": "date"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "SCHEDULED",
+              "ACTIVE",
+              "ENDED"
+            ]
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "SPECIAL",
+              "FLASH_DROP"
+            ]
+          }
+        }
+      },
+      "SaleEventListResponse": {
+        "type": "object",
+        "properties": {
+          "discountRate": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "endsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "limitedQuantity": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "listPrice": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "productId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "productName": {
+            "type": "string"
+          },
+          "remainingQuantity": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "saleEventId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "salePrice": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "soldQuantity": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "startsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "SCHEDULED",
+              "ACTIVE",
+              "ENDED"
+            ]
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "SPECIAL",
+              "FLASH_DROP"
+            ]
           }
         }
       },
