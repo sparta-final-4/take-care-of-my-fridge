@@ -1,4 +1,4 @@
-import { Flex, Spin } from 'antd';
+import { Button, Flex, Result, Spin } from 'antd';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { generatePath, useNavigate } from 'react-router';
@@ -56,7 +56,12 @@ export default function MyPageRecipesPage() {
       : MyRecipeSearchRequestSortEnum.Recent;
 
   // 실제 API 연동 쿼리 (탭·정렬·페이지 전환 시 깜빡임 방지를 위해 keepPreviousData 적용)
-  const { data: myRecipeData, isLoading } = useQuery({
+  const {
+    data: myRecipeData,
+    isLoading,
+    isError,
+    refetch,
+  } = useQuery({
     ...cookingQueries.myRecipes({
       page,
       size: PAGE_SIZE,
@@ -132,6 +137,18 @@ export default function MyPageRecipesPage() {
       <Flex justify="center" align="center" className={styles.loadingWrapper}>
         <Spin size="large" />
       </Flex>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className={styles.container}>
+        <Result
+          status="error"
+          title="내 레시피를 불러오지 못했어요"
+          extra={<Button onClick={() => void refetch()}>다시 시도</Button>}
+        />
+      </div>
     );
   }
 

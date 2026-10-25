@@ -17,7 +17,12 @@ export function RecipeCookingHistorySection({ recipeId }: RecipeCookingHistorySe
   const [editingLog, setEditingLog] = useState<CookingLogResponse | null>(null);
 
   // 펼쳐졌을 때만 렌더링되므로 마운트 시 조회된다.
-  const { data: logsPage, isLoading } = useQuery(cookingQueries.logs({ recipeId }));
+  const {
+    data: logsPage,
+    isLoading,
+    isError,
+    refetch,
+  } = useQuery(cookingQueries.logs({ recipeId }));
   const logs = logsPage?.content ?? [];
 
   return (
@@ -32,6 +37,15 @@ export function RecipeCookingHistorySection({ recipeId }: RecipeCookingHistorySe
           <Typography.Text type="secondary" className={styles.historyEmptyText}>
             요리 기록을 불러오는 중...
           </Typography.Text>
+        </Flex>
+      ) : isError ? (
+        <Flex align="center" gap="small" className={styles.historyLoadingWrapper}>
+          <Typography.Text type="secondary" className={styles.historyEmptyText}>
+            요리 기록을 불러오지 못했어요.
+          </Typography.Text>
+          <Button size="small" onClick={() => void refetch()}>
+            다시 시도
+          </Button>
         </Flex>
       ) : logs.length === 0 ? (
         <Typography.Text type="secondary" className={styles.historyEmptyText}>
