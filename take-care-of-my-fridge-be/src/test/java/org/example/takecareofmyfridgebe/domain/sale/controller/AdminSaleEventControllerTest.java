@@ -19,7 +19,7 @@ import org.example.takecareofmyfridgebe.domain.auth.service.AuthSessionService;
 import org.example.takecareofmyfridgebe.domain.auth.service.JwtTokenService;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 import org.example.takecareofmyfridgebe.domain.sale.dto.FlashDropCreateRequest;
-import org.example.takecareofmyfridgebe.domain.sale.dto.SaleEventCreateResponse;
+import org.example.takecareofmyfridgebe.domain.sale.dto.SaleEventsCreateResponse;
 import org.example.takecareofmyfridgebe.domain.sale.dto.SaleCandidateProductResponse;
 import org.example.takecareofmyfridgebe.domain.sale.dto.SaleCandidateProductsRequest;
 import org.example.takecareofmyfridgebe.domain.sale.dto.SaleEventListRequest;
@@ -62,7 +62,8 @@ class AdminSaleEventControllerTest {
             """;
     private static final String FLASH_DROP_BODY = """
             {"startsAt": "2099-10-13T18:00:00", "endsAt": "2099-10-13T20:00:00",
-             "productId": 103, "discountRate": 50, "limitedQuantity": 10}
+             "items": [{"productId": 103, "discountRate": 50, "limitedQuantity": 10},
+                       {"productId": 104, "discountRate": 40, "limitedQuantity": 5}]}
             """;
 
     private final MockMvc mvc;
@@ -86,29 +87,31 @@ class AdminSaleEventControllerTest {
     }
 
     @Test
-    @DisplayName("관리자가 특가를 등록하면 201과 행사 번호를 돌려준다")
+    @DisplayName("관리자가 특가를 등록하면 201과 상품마다 만든 행사 번호를 돌려준다")
     void createSpecialSale_returns201() throws Exception {
         when(saleEventCreateService.createSpecialSale(any(SpecialSaleCreateRequest.class)))
-                .thenReturn(new SaleEventCreateResponse(7L));
+                .thenReturn(new SaleEventsCreateResponse(List.of(7L, 8L)));
 
         mvc.perform(post("/api/admin/sale-events/special")
                         .with(csrf()).with(loginAs(Member.Role.ADMIN))
                         .contentType(MediaType.APPLICATION_JSON).content(SPECIAL_BODY))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.data.saleEventId").value(7));
+                .andExpect(jsonPath("$.data.saleEventIds[0]").value(7))
+                .andExpect(jsonPath("$.data.saleEventIds[1]").value(8));
     }
 
     @Test
-    @DisplayName("관리자가 번개 드롭을 등록하면 201과 행사 번호를 돌려준다")
+    @DisplayName("관리자가 번개 드롭을 등록하면 201과 상품마다 만든 행사 번호를 돌려준다")
     void createFlashDrop_returns201() throws Exception {
         when(saleEventCreateService.createFlashDrop(any(FlashDropCreateRequest.class)))
-                .thenReturn(new SaleEventCreateResponse(8L));
+                .thenReturn(new SaleEventsCreateResponse(List.of(8L, 9L)));
 
         mvc.perform(post("/api/admin/sale-events/flash-drop")
                         .with(csrf()).with(loginAs(Member.Role.ADMIN))
                         .contentType(MediaType.APPLICATION_JSON).content(FLASH_DROP_BODY))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.data.saleEventId").value(8));
+                .andExpect(jsonPath("$.data.saleEventIds[0]").value(8))
+                .andExpect(jsonPath("$.data.saleEventIds[1]").value(9));
     }
 
     @Test
@@ -160,16 +163,33 @@ class AdminSaleEventControllerTest {
     }
 
     @Test
-    @DisplayName("번개 드롭에 한정 수량이 없거나 0이면 400이고 서비스를 부르지 않는다")
-    void createFlashDrop_invalidLimitedQuantity_returns400() throws Exception {
+    @DisplayName("번개 드롭 입력값이 잘못되면 400이고 서비스를 부르지 않는다")
+    void createFlashDrop_invalidInput_returns400() throws Exception {
         List<String> bodies = List.of(
+                // 한정 수량 없음
                 """
                 {"startsAt": "2099-10-13T18:00:00", "endsAt": "2099-10-13T20:00:00",
-                 "productId": 103, "discountRate": 50}
+                 "items": [{"productId": 103, "discountRate": 50}]}
                 """,
+                // 한정 수량 0
                 """
                 {"startsAt": "2099-10-13T18:00:00", "endsAt": "2099-10-13T20:00:00",
-                 "productId": 103, "discountRate": 50, "limitedQuantity": 0}
+                 "items": [{"productId": 103, "discountRate": 50, "limitedQuantity": 0}]}
+                """,
+                // 종료가 시작보다 빠름
+                """
+                {"startsAt": "2099-10-13T20:00:00", "endsAt": "2099-10-13T18:00:00",
+                 "items": [{"productId": 103, "discountRate": 50, "limitedQuantity": 5}]}
+                """,
+                // 같은 상품 두 번
+                """
+                {"startsAt": "2099-10-13T18:00:00", "endsAt": "2099-10-13T20:00:00",
+                 "items": [{"productId": 103, "discountRate": 50, "limitedQuantity": 5},
+                           {"productId": 103, "discountRate": 40, "limitedQuantity": 5}]}
+                """,
+                // 상품 없음
+                """
+                {"startsAt": "2099-10-13T18:00:00", "endsAt": "2099-10-13T20:00:00", "items": []}
                 """);
 
         for (String body : bodies) {
