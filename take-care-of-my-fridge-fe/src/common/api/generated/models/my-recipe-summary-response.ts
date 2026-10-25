@@ -19,11 +19,11 @@
 import type { MostCookedRecipeResponse } from './most-cooked-recipe-response';
 
 export interface MyRecipeSummaryResponse {
+    'consumedIngredientCount'?: number;
+    'mostCookedRecipe'?: MostCookedRecipeResponse;
     'notWrittenCount'?: number;
     'recipeCount'?: number;
     'totalCookCount'?: number;
     'writtenCount'?: number;
-    'mostCookedRecipe'?: MostCookedRecipeResponse;
-    'consumedIngredientCount'?: number;
 }
 

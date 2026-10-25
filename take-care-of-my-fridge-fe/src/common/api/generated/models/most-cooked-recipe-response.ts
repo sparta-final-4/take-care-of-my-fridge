@@ -16,8 +16,8 @@
 
 
 export interface MostCookedRecipeResponse {
+    'cookCount'?: number;
     'recipeId'?: number;
     'recipeName'?: string;
-    'cookCount'?: number;
 }
 
