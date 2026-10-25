@@ -4,21 +4,21 @@ import {
   type PageResponseSaleCandidateProductResponse,
   type PageResponseSaleEventListResponse,
   type SaleCandidateProductsRequest,
-  type SaleEventCreateResponse,
   type SaleEventListRequest,
+  type SaleEventsCreateResponse,
   type SpecialSaleCreateRequest,
 } from '@/common/api/clients';
 import { unwrap } from '@/common/api/unwrap';
 
 export async function createSpecialSale(
   request: SpecialSaleCreateRequest,
-): Promise<SaleEventCreateResponse> {
+): Promise<SaleEventsCreateResponse> {
   return unwrap(adminSaleEventApi.createSpecialSale({ specialSaleCreateRequest: request }));
 }
 
 export async function createFlashDrop(
   request: FlashDropCreateRequest,
-): Promise<SaleEventCreateResponse> {
+): Promise<SaleEventsCreateResponse> {
   return unwrap(adminSaleEventApi.createFlashDrop({ flashDropCreateRequest: request }));
 }
 

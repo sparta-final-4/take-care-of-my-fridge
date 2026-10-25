@@ -84,9 +84,13 @@ export function SaleEventCreateSection() {
         return createFlashDrop({
           startsAt,
           endsAt,
-          productId: draft.product.productId,
-          discountRate: draft.discountRate ?? 0,
-          limitedQuantity: draft.limitedQuantity ?? 0,
+          items: [
+            {
+              productId: draft.product.productId,
+              discountRate: draft.discountRate ?? 0,
+              limitedQuantity: draft.limitedQuantity ?? 0,
+            },
+          ],
         });
       }
       return createSpecialSale({
