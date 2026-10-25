@@ -458,7 +458,7 @@
             "content": {
               "*/*": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiResponseSaleEventCreateResponse"
+                  "$ref": "#/components/schemas/ApiResponseSaleEventsCreateResponse"
                 }
               }
             },
@@ -518,7 +518,77 @@
             "content": {
               "*/*": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiResponseSaleEventCreateResponse"
+                  "$ref": "#/components/schemas/ApiResponseSaleEventsCreateResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "admin-sale-event-controller"
+        ]
+      }
+    },
+    "/api/admin/sale-events/{saleEventId}": {
+      "get": {
+        "operationId": "getSaleEvent",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "saleEventId",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseSaleEventDetailResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "admin-sale-event-controller"
+        ]
+      },
+      "patch": {
+        "operationId": "updateSaleEvent",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "saleEventId",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaleEventUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseVoid"
                 }
               }
             },
@@ -2602,11 +2672,25 @@
           }
         }
       },
-      "ApiResponseSaleEventCreateResponse": {
+      "ApiResponseSaleEventDetailResponse": {
         "type": "object",
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/SaleEventCreateResponse"
+            "$ref": "#/components/schemas/SaleEventDetailResponse"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorResponse"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ApiResponseSaleEventsCreateResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/SaleEventsCreateResponse"
           },
           "error": {
             "$ref": "#/components/schemas/ErrorResponse"
@@ -3309,18 +3393,42 @@
       "FlashDropCreateRequest": {
         "type": "object",
         "properties": {
-          "discountRate": {
-            "type": "integer",
-            "format": "int32",
-            "maximum": 99,
-            "minimum": 1
-          },
           "endsAfterStarts": {
             "type": "boolean"
           },
           "endsAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FlashDropItemRequest"
+            },
+            "minItems": 1
+          },
+          "productIdsUnique": {
+            "type": "boolean"
+          },
+          "startsAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "endsAt",
+          "items",
+          "startsAt"
+        ]
+      },
+      "FlashDropItemRequest": {
+        "type": "object",
+        "properties": {
+          "discountRate": {
+            "type": "integer",
+            "format": "int32",
+            "maximum": 99,
+            "minimum": 1
           },
           "limitedQuantity": {
             "type": "integer",
@@ -3330,18 +3438,12 @@
           "productId": {
             "type": "integer",
             "format": "int64"
-          },
-          "startsAt": {
-            "type": "string",
-            "format": "date-time"
           }
         },
         "required": [
           "discountRate",
-          "endsAt",
           "limitedQuantity",
-          "productId",
-          "startsAt"
+          "productId"
         ]
       },
       "ForecastResponse": {
@@ -5755,14 +5857,99 @@
           }
         }
       },
-      "SaleEventCreateResponse": {
+      "SaleEventDetailItem": {
         "type": "object",
         "properties": {
+          "discountRate": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "limitedQuantity": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "listPrice": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "productId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "productName": {
+            "type": "string"
+          },
+          "remainingQuantity": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "salePrice": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "SaleEventDetailResponse": {
+        "type": "object",
+        "properties": {
+          "endsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SaleEventDetailItem"
+            }
+          },
           "saleEventId": {
             "type": "integer",
             "format": "int64"
+          },
+          "startsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "SCHEDULED",
+              "ACTIVE",
+              "ENDED"
+            ]
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "SPECIAL",
+              "FLASH_DROP"
+            ]
           }
         }
+      },
+      "SaleEventItemUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "discountRate": {
+            "type": "integer",
+            "format": "int32",
+            "maximum": 99,
+            "minimum": 1
+          },
+          "limitedQuantity": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 1
+          },
+          "productId": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "required": [
+          "discountRate",
+          "productId"
+        ]
       },
       "SaleEventListRequest": {
         "type": "object",
@@ -5905,6 +6092,49 @@
               "SPECIAL",
               "FLASH_DROP"
             ]
+          }
+        }
+      },
+      "SaleEventUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "endsAfterStarts": {
+            "type": "boolean"
+          },
+          "endsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SaleEventItemUpdateRequest"
+            },
+            "minItems": 1
+          },
+          "productIdsUnique": {
+            "type": "boolean"
+          },
+          "startsAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "endsAt",
+          "items",
+          "startsAt"
+        ]
+      },
+      "SaleEventsCreateResponse": {
+        "type": "object",
+        "properties": {
+          "saleEventIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            }
           }
         }
       },

@@ -14,13 +14,15 @@
  */
 
 
+// May contain unused imports in some cases
+// @ts-ignore
+import type { FlashDropItemRequest } from './flash-drop-item-request';
 
 export interface FlashDropCreateRequest {
-    'discountRate': number;
     'endsAfterStarts'?: boolean;
     'endsAt': string;
-    'limitedQuantity': number;
-    'productId': number;
+    'items': Array<FlashDropItemRequest>;
+    'productIdsUnique'?: boolean;
     'startsAt': string;
 }
 

@@ -14,16 +14,14 @@
  */
 
 
-// May contain unused imports in some cases
-// @ts-ignore
-import type { ErrorResponse } from './error-response';
-// May contain unused imports in some cases
-// @ts-ignore
-import type { SaleEventCreateResponse } from './sale-event-create-response';
 
-export interface ApiResponseSaleEventCreateResponse {
-    'data'?: SaleEventCreateResponse;
-    'error'?: ErrorResponse;
-    'success'?: boolean;
+export interface SaleEventDetailItem {
+    'discountRate'?: number;
+    'limitedQuantity'?: number;
+    'listPrice'?: number;
+    'productId'?: number;
+    'productName'?: string;
+    'remainingQuantity'?: number;
+    'salePrice'?: number;
 }
 

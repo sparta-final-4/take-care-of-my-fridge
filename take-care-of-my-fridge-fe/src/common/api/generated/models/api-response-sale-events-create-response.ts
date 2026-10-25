@@ -14,8 +14,16 @@
  */
 
 
+// May contain unused imports in some cases
+// @ts-ignore
+import type { ErrorResponse } from './error-response';
+// May contain unused imports in some cases
+// @ts-ignore
+import type { SaleEventsCreateResponse } from './sale-events-create-response';
 
-export interface SaleEventCreateResponse {
-    'saleEventId'?: number;
+export interface ApiResponseSaleEventsCreateResponse {
+    'data'?: SaleEventsCreateResponse;
+    'error'?: ErrorResponse;
+    'success'?: boolean;
 }
 
