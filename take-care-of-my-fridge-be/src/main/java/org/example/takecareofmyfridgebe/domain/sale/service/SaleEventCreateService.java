@@ -1,6 +1,7 @@
 package org.example.takecareofmyfridgebe.domain.sale.service;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -12,8 +13,10 @@ import org.example.takecareofmyfridgebe.domain.product.entity.Product;
 import org.example.takecareofmyfridgebe.domain.product.entity.ProductStatus;
 import org.example.takecareofmyfridgebe.domain.product.repository.ProductRepository;
 import org.example.takecareofmyfridgebe.domain.sale.dto.FlashDropCreateRequest;
-import org.example.takecareofmyfridgebe.domain.sale.dto.SaleEventCreateResponse;
+import org.example.takecareofmyfridgebe.domain.sale.dto.FlashDropItemRequest;
+import org.example.takecareofmyfridgebe.domain.sale.dto.SaleEventsCreateResponse;
 import org.example.takecareofmyfridgebe.domain.sale.dto.SpecialSaleCreateRequest;
+import org.example.takecareofmyfridgebe.domain.sale.dto.SpecialSaleItemRequest;
 import org.example.takecareofmyfridgebe.domain.sale.entity.SaleEvent;
 import org.example.takecareofmyfridgebe.domain.sale.entity.SaleEventStatus;
 import org.example.takecareofmyfridgebe.domain.sale.repository.SaleEventItemRepository;
@@ -34,28 +37,38 @@ public class SaleEventCreateService {
     private final ProductRepository productRepository;
 
     @Transactional
-    public SaleEventCreateResponse createSpecialSale(SpecialSaleCreateRequest request) {
+    public SaleEventsCreateResponse createSpecialSale(SpecialSaleCreateRequest request) {
         validateStartsAt(request.startsAt());
         Map<Long, Product> productsById = lockAvailableProducts(request.productIds());
 
-        SaleEvent saleEvent = saleEventRepository.save(request.toSaleEvent());
-        saleEventItemRepository.saveAll(request.items().stream()
-                .map(item -> item.toSaleEventItem(saleEvent, productsById.get(item.productId()).getPrice()))
-                .toList());
-        return SaleEventCreateResponse.from(saleEvent);
+        // 상품마다 행사를 따로 만든다. 같은 기간을 한 번에 입력해도 시각 수정·삭제·종료는 상품 하나씩 한다.
+        List<SaleEvent> saleEvents = new ArrayList<>();
+        for (SpecialSaleItemRequest item : request.items()) {
+            SaleEvent saleEvent = saleEventRepository.save(request.toSaleEvent());
+            saleEventItemRepository.save(item.toSaleEventItem(saleEvent, productsById.get(item.productId()).getPrice()));
+            saleEvents.add(saleEvent);
+        }
+        return SaleEventsCreateResponse.from(saleEvents);
     }
 
     @Transactional
-    public SaleEventCreateResponse createFlashDrop(FlashDropCreateRequest request) {
+    public SaleEventsCreateResponse createFlashDrop(FlashDropCreateRequest request) {
         validateStartsAt(request.startsAt());
-        Product product = lockAvailableProducts(List.of(request.productId())).get(request.productId());
-        if (request.limitedQuantity() > product.getStock()) {
-            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "한정 수량이 재고보다 많습니다 · " + product.getName());
+        Map<Long, Product> productsById = lockAvailableProducts(request.productIds());
+        for (FlashDropItemRequest item : request.items()) {
+            Product product = productsById.get(item.productId());
+            if (item.limitedQuantity() > product.getStock()) {
+                throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "한정 수량이 재고보다 많습니다 · " + product.getName());
+            }
         }
 
-        SaleEvent saleEvent = saleEventRepository.save(request.toSaleEvent());
-        saleEventItemRepository.save(request.toSaleEventItem(saleEvent, product.getPrice()));
-        return SaleEventCreateResponse.from(saleEvent);
+        List<SaleEvent> saleEvents = new ArrayList<>();
+        for (FlashDropItemRequest item : request.items()) {
+            SaleEvent saleEvent = saleEventRepository.save(request.toSaleEvent());
+            saleEventItemRepository.save(item.toSaleEventItem(saleEvent, productsById.get(item.productId()).getPrice()));
+            saleEvents.add(saleEvent);
+        }
+        return SaleEventsCreateResponse.from(saleEvents);
     }
 
     private void validateStartsAt(LocalDateTime startsAt) {

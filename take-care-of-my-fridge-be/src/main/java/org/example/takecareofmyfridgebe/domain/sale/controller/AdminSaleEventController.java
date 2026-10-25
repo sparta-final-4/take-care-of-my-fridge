@@ -3,9 +3,9 @@ package org.example.takecareofmyfridgebe.domain.sale.controller;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.sale.dto.FlashDropCreateRequest;
-import org.example.takecareofmyfridgebe.domain.sale.dto.SaleEventCreateResponse;
 import org.example.takecareofmyfridgebe.domain.sale.dto.SaleEventListRequest;
 import org.example.takecareofmyfridgebe.domain.sale.dto.SaleEventListResponse;
+import org.example.takecareofmyfridgebe.domain.sale.dto.SaleEventsCreateResponse;
 import org.example.takecareofmyfridgebe.domain.sale.dto.SaleCandidateProductResponse;
 import org.example.takecareofmyfridgebe.domain.sale.dto.SaleCandidateProductsRequest;
 import org.example.takecareofmyfridgebe.domain.sale.dto.SpecialSaleCreateRequest;
@@ -33,18 +33,18 @@ public class AdminSaleEventController {
     private final SaleEventListQueryService saleEventListQueryService;
 
     @PostMapping("/special")
-    public ResponseEntity<ApiResponse<SaleEventCreateResponse>> createSpecialSale(
+    public ResponseEntity<ApiResponse<SaleEventsCreateResponse>> createSpecialSale(
             @Valid @RequestBody SpecialSaleCreateRequest request
     ) {
-        SaleEventCreateResponse response = saleEventCreateService.createSpecialSale(request);
+        SaleEventsCreateResponse response = saleEventCreateService.createSpecialSale(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok(response));
     }
 
     @PostMapping("/flash-drop")
-    public ResponseEntity<ApiResponse<SaleEventCreateResponse>> createFlashDrop(
+    public ResponseEntity<ApiResponse<SaleEventsCreateResponse>> createFlashDrop(
             @Valid @RequestBody FlashDropCreateRequest request
     ) {
-        SaleEventCreateResponse response = saleEventCreateService.createFlashDrop(request);
+        SaleEventsCreateResponse response = saleEventCreateService.createFlashDrop(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok(response));
     }
 
@@ -56,7 +56,7 @@ public class AdminSaleEventController {
         return ResponseEntity.ok(ApiResponse.ok(saleCandidateProductQueryService.getCandidates(request)));
     }
 
-    // 행사 목록 탭. 상태·종류·시작일·종료일로 거르고 최신 행사부터 준다.
+    // 행사 목록 탭. 상태·종류·상품 이름·시작일·종료일로 거르고, 정렬을 비우면 최신 행사부터 준다.
     @GetMapping
     public ResponseEntity<ApiResponse<PageResponse<SaleEventListResponse>>> getSaleEvents(
             @Valid @ModelAttribute SaleEventListRequest request
