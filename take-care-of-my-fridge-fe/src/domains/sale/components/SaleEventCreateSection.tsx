@@ -76,24 +76,23 @@ export function SaleEventCreateSection() {
     );
 
   const registration = useMutation({
-    mutationFn: (values: SaleEventFormValues) => {
+    // 등록 응답(만든 행사 번호)은 화면에서 쓰지 않는다.
+    mutationFn: async (values: SaleEventFormValues) => {
       const startsAt = values.startsAt.format(REQUEST_TIME_FORMAT);
       const endsAt = values.endsAt.format(REQUEST_TIME_FORMAT);
       if (flashDrop) {
-        const [draft] = drafts;
-        return createFlashDrop({
+        await createFlashDrop({
           startsAt,
           endsAt,
-          items: [
-            {
-              productId: draft.product.productId,
-              discountRate: draft.discountRate ?? 0,
-              limitedQuantity: draft.limitedQuantity ?? 0,
-            },
-          ],
+          items: drafts.map((draft) => ({
+            productId: draft.product.productId,
+            discountRate: draft.discountRate ?? 0,
+            limitedQuantity: draft.limitedQuantity ?? 0,
+          })),
         });
+        return;
       }
-      return createSpecialSale({
+      await createSpecialSale({
         startsAt,
         endsAt,
         items: drafts.map((draft) => ({
@@ -123,8 +122,6 @@ export function SaleEventCreateSection() {
         const removed = new Set(choices.map((choice) => choice.productId));
         return current.filter((draft) => !removed.has(draft.product.productId));
       }
-      // 번개 드롭은 상품 하나라서 새로 고르면 이전 선택을 바꾼다.
-      if (flashDrop) return choices.slice(0, 1).map(toDraft);
       const kept = new Set(current.map((draft) => draft.product.productId));
       return [...current, ...choices.filter((choice) => !kept.has(choice.productId)).map(toDraft)];
     });
@@ -220,26 +217,24 @@ export function SaleEventCreateSection() {
                 />
               </Form.Item>
               <Flex align="center" gap="small" wrap className={styles.actions}>
-                {!flashDrop && (
-                  <Space.Compact>
-                    <InputNumber
-                      aria-label="일괄 할인율"
-                      placeholder="일괄 할인율(%)"
-                      min={MIN_DISCOUNT_RATE}
-                      max={MAX_DISCOUNT_RATE}
-                      precision={0}
-                      value={bulkRate}
-                      onChange={setBulkRate}
-                      className={styles.bulkRate}
-                    />
-                    <Button
-                      disabled={drafts.length === 0 || bulkRate === null}
-                      onClick={handleApplyBulkRate}
-                    >
-                      일괄 적용
-                    </Button>
-                  </Space.Compact>
-                )}
+                <Space.Compact>
+                  <InputNumber
+                    aria-label="일괄 할인율"
+                    placeholder="일괄 할인율(%)"
+                    min={MIN_DISCOUNT_RATE}
+                    max={MAX_DISCOUNT_RATE}
+                    precision={0}
+                    value={bulkRate}
+                    onChange={setBulkRate}
+                    className={styles.bulkRate}
+                  />
+                  <Button
+                    disabled={drafts.length === 0 || bulkRate === null}
+                    onClick={handleApplyBulkRate}
+                  >
+                    일괄 적용
+                  </Button>
+                </Space.Compact>
                 <Button disabled={drafts.length === 0} onClick={() => setSummaryOpen(true)}>
                   고른 상품 {drafts.length}개
                 </Button>
@@ -263,15 +258,12 @@ export function SaleEventCreateSection() {
           </div>
           {/* 상품 표는 Form.Item 밖에 둔다. 안에 두면 antd가 선택 칸 너비를 100%로 덮는다. */}
           <Flex vertical gap="small" className={styles.block}>
-            <Typography.Text strong>
-              {flashDrop ? '번개 드롭 상품 (하나)' : '특가 상품 (여러 개 가능)'}
-            </Typography.Text>
+            <Typography.Text strong>{KIND_LABELS[kind]} 상품 (여러 개 가능)</Typography.Text>
             <Typography.Text type="secondary">
               상품을 체크한 행에서 할인율{flashDrop ? '과 한정 수량' : ''}을 입력합니다. 판매 중이고
               재고가 있으며 예정·진행 중인 행사에 들지 않은 상품만 나옵니다.
             </Typography.Text>
             <SaleProductPicker
-              multiple={!flashDrop}
               withLimitedQuantity={flashDrop}
               drafts={drafts}
               onToggle={handleToggle}

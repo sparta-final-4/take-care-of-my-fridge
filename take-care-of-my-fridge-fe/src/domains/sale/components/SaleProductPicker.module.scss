@@ -24,6 +24,10 @@
   background: var(--ant-color-fill-tertiary);
 }
 
+.row {
+  cursor: pointer;
+}
+
 .numberInput {
   width: $sale-number-input-width;
 }

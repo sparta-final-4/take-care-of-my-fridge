@@ -42,8 +42,6 @@ interface PickerRow {
 }
 
 interface SaleProductPickerProps {
-  // 특가는 여러 상품, 번개 드롭은 상품 하나를 고른다.
-  multiple: boolean;
   // 번개 드롭만 한정 수량을 입력한다.
   withLimitedQuantity: boolean;
   drafts: SaleItemDraft[];
@@ -52,7 +50,6 @@ interface SaleProductPickerProps {
 }
 
 export function SaleProductPicker({
-  multiple,
   withLimitedQuantity,
   drafts,
   onToggle,
@@ -240,8 +237,18 @@ export function SaleProductPicker({
         dataSource={rows}
         columns={columns}
         scroll={{ x: 'max-content' }}
+        rowClassName={styles.row}
+        onRow={(row) => ({
+          // 입력칸·체크박스를 누를 때는 따로 처리되므로, 그 밖의 칸을 눌렀을 때만 선택을 바꾼다.
+          onClick: (event) => {
+            if ((event.target as HTMLElement).closest('input, button, .ant-checkbox-wrapper'))
+              return;
+            const selected = drafts.some((draft) => draft.product.productId === row.productId);
+            onToggle([toChoice(row)], !selected);
+          },
+        })}
         rowSelection={{
-          type: multiple ? 'checkbox' : 'radio',
+          type: 'checkbox',
           selectedRowKeys: drafts.map((draft) => draft.product.productId),
           onSelect: (row, selected) => onToggle([toChoice(row)], selected),
           onSelectAll: (selected, _rows, changeRows) =>
