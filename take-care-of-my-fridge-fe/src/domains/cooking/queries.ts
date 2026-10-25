@@ -1,14 +1,12 @@
-import { queryOptions, useQuery } from '@tanstack/react-query';
+import { queryOptions, useMutation, useQueryClient } from '@tanstack/react-query';
 
-import type { CookingLogSearchRequest } from '@/common/api/clients';
+import type {
+  CookingLogSearchRequest,
+  CookingLogUpdateRequest,
+  MyRecipeSearchRequest,
+} from '@/common/api/clients';
 
-import {
-  getCookingLogs,
-  getCookingStats,
-  type CookingSortType,
-  type MyCookedRecipeItem,
-} from './api';
-import { MOCK_MY_COOKED_RECIPES } from './mocks';
+import { getCookingLogs, getCookingStats, getMyRecipes, updateCookingLog } from './api';
 
 export const cookingQueries = {
   all: ['cooking'] as const,
@@ -24,21 +22,30 @@ export const cookingQueries = {
       queryFn: ({ signal }) => getCookingLogs(request, signal),
     }),
   myRecipesList: () => [...cookingQueries.all, 'myRecipes'] as const,
-  myRecipes: (sort: CookingSortType) =>
+  myRecipes: (request: MyRecipeSearchRequest = {}) =>
     queryOptions({
-      queryKey: [...cookingQueries.myRecipesList(), sort],
-      // TODO: 백엔드에 GET /api/me/recipes 구현 시 getMyCookedRecipes(sort, signal)로 교체
-      queryFn: async (): Promise<MyCookedRecipeItem[]> => {
-        // 실제 API 준비 전까지는 mock 데이터 반환
-        return Promise.resolve(MOCK_MY_COOKED_RECIPES);
-      },
+      queryKey: [...cookingQueries.myRecipesList(), request],
+      queryFn: ({ signal }) => getMyRecipes(request, signal),
     }),
 };
 
 /**
- * 로그인한 회원의 요리 완료 레시피 목록 훅.
- * 컴포넌트는 api.ts 대신 queries.ts의 훅을 사용한다.
+ * 요리 기록 결과·메모 수정 Mutation
+ * 성공 시 cookingQueries.all 전체를 무효화하여
+ * 요리 기록 목록, 성공/실패 통계, 마이페이지 레시피 요약을 최신화한다.
  */
-export function useMyCookedRecipes(sort: CookingSortType = 'LATEST') {
-  return useQuery(cookingQueries.myRecipes(sort));
+export function useUpdateCookingLog() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      cookingLogId,
+      request,
+    }: {
+      cookingLogId: number;
+      request: CookingLogUpdateRequest;
+    }) => updateCookingLog(cookingLogId, request),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: cookingQueries.all });
+    },
+  });
 }

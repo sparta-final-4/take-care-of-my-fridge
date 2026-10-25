@@ -12,6 +12,7 @@ import {
   CsrfControllerApi,
   FridgeControllerApi,
   MemberControllerApi,
+  MyRecipeControllerApi,
   OrderControllerApi,
   PaymentControllerApi,
   ProductControllerApi,
@@ -34,6 +35,7 @@ export const csrfApi = new CsrfControllerApi(undefined, basePath, axiosInstance)
 
 export const fridgeApi = new FridgeControllerApi(undefined, basePath, axiosInstance);
 export const memberApi = new MemberControllerApi(undefined, basePath, axiosInstance);
+export const myRecipeApi = new MyRecipeControllerApi(undefined, basePath, axiosInstance);
 export const orderApi = new OrderControllerApi(undefined, basePath, axiosInstance);
 export const paymentApi = new PaymentControllerApi(undefined, basePath, axiosInstance);
 export const productApi = new ProductControllerApi(undefined, basePath, axiosInstance);

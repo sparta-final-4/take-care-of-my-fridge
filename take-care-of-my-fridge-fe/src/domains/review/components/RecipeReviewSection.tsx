@@ -1,4 +1,4 @@
-import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { App, Button, Empty, Flex, Popconfirm, Rate, Segmented, Skeleton, Typography } from 'antd';
 import dayjs from 'dayjs';
 import { useState } from 'react';
@@ -21,6 +21,7 @@ const PAGE_SIZE = 10;
 
 export function RecipeReviewSection({ recipeId }: RecipeReviewSectionProps) {
   const { message } = App.useApp();
+  const queryClient = useQueryClient();
   const authStatus = useAuthStore((state) => state.status);
   const authenticated = authStatus === 'authenticated';
 
@@ -72,6 +73,7 @@ export function RecipeReviewSection({ recipeId }: RecipeReviewSectionProps) {
     deleteMutation.mutate(reviewId, {
       onSuccess: () => {
         message.success('후기가 삭제되었습니다.');
+        queryClient.invalidateQueries({ queryKey: cookingQueries.all });
       },
     });
   };
@@ -245,6 +247,9 @@ export function RecipeReviewSection({ recipeId }: RecipeReviewSectionProps) {
         recipeId={recipeId}
         initialReview={editingReview}
         onClose={() => setModalOpen(false)}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: cookingQueries.all });
+        }}
       />
     </SectionCard>
   );

@@ -1,14 +1,15 @@
 import { Fragment } from 'react';
 import { DownOutlined, UpOutlined } from '@ant-design/icons';
-import { Button, Empty, Flex, Select, Space, Tabs, Tag, Typography } from 'antd';
+import { Button, Empty, Flex, Pagination, Select, Space, Tabs, Tag, Typography } from 'antd';
 import dayjs from 'dayjs';
 
-import type { CookingSortType, CookingTabType, MyCookedRecipeItem } from '../api';
+import type { CookingSortType, CookingTabType, MyRecipeResponse } from '../api';
+import { RecipeCookingHistorySection } from './RecipeCookingHistorySection';
 
 import styles from './MyRecipeListSection.module.scss';
 
 export interface MyRecipeListSectionProps {
-  recipes: MyCookedRecipeItem[];
+  recipes: MyRecipeResponse[];
   allCount: number;
   unreviewedCount: number;
   reviewedCount: number;
@@ -16,10 +17,14 @@ export interface MyRecipeListSectionProps {
   currentTab: CookingTabType;
   currentSort: CookingSortType;
   expandedRecipeId: number | null;
+  currentPage: number;
+  pageSize: number;
+  totalElements: number;
   onTabChange: (tab: CookingTabType) => void;
   onSortChange: (sort: CookingSortType) => void;
+  onPageChange: (page: number) => void;
   onToggleExpand: (recipeId: number) => void;
-  onOpenReviewModal: (recipe: MyCookedRecipeItem) => void;
+  onOpenReviewModal: (recipe: MyRecipeResponse) => void;
   onViewRecipe: (recipeId: number) => void;
 }
 
@@ -32,8 +37,12 @@ export function MyRecipeListSection({
   currentTab,
   currentSort,
   expandedRecipeId,
+  currentPage,
+  pageSize,
+  totalElements,
   onTabChange,
   onSortChange,
+  onPageChange,
   onToggleExpand,
   onOpenReviewModal,
   onViewRecipe,
@@ -44,183 +53,190 @@ export function MyRecipeListSection({
         <Empty description="아직 요리 완료한 레시피가 없어요" />
       </div>
     ) : (
-      <div className={styles.tableWrapper}>
-        <table className={styles.table}>
-          <thead>
-            <tr>
-              <th scope="col" className={styles.thRecipe}>
-                레시피
-              </th>
-              <th scope="col" className={styles.thCookCount}>
-                요리 횟수
-              </th>
-              <th scope="col" className={styles.thLastCooked}>
-                마지막 요리
-              </th>
-              <th scope="col" className={styles.thReview}>
-                내 후기
-              </th>
-              <th scope="col" className={styles.thActions} aria-label="액션" />
-            </tr>
-          </thead>
-          <tbody>
-            {recipes.map((item) => {
-              const isExpanded = expandedRecipeId === item.recipeId;
-              const hasReview = Boolean(item.review);
+      <>
+        <div className={styles.tableWrapper}>
+          <table className={styles.table}>
+            <thead>
+              <tr>
+                <th scope="col" className={styles.thRecipe}>
+                  레시피
+                </th>
+                <th scope="col" className={styles.thCookCount}>
+                  요리 횟수
+                </th>
+                <th scope="col" className={styles.thLastCooked}>
+                  마지막 요리
+                </th>
+                <th scope="col" className={styles.thReview}>
+                  내 후기
+                </th>
+                <th scope="col" className={styles.thActions} aria-label="액션" />
+              </tr>
+            </thead>
+            <tbody>
+              {recipes.map((item) => {
+                const recipeId = item.recipeId ?? 0;
+                const isExpanded = expandedRecipeId === recipeId;
+                const hasReview = Boolean(item.review);
 
-              return (
-                <Fragment key={item.recipeId}>
-                  <tr className={styles.dataRow}>
-                    {/* 레시피 정보 (이미지, 배지, 이름) */}
-                    <td className={styles.tdRecipe}>
-                      <div className={styles.recipeCell}>
-                        <div className={styles.thumbnail}>
-                          {item.imageUrl ? (
-                            <img src={item.imageUrl} alt={item.recipeName} />
-                          ) : (
-                            <span className={styles.placeholderImg}>[이미지]</span>
-                          )}
-                        </div>
-                        <div className={styles.recipeInfo}>
-                          {item.isAiRecommended && (
-                            <Tag color="default" className={styles.aiTag}>
-                              AI 추천
-                            </Tag>
-                          )}
-                          <Typography.Text strong className={styles.recipeName}>
-                            {item.recipeName}
-                          </Typography.Text>
-                        </div>
-                      </div>
-                    </td>
-
-                    {/* 요리 횟수 (펼침 토글 버튼) */}
-                    <td className={styles.tdCookCount}>
-                      <button
-                        type="button"
-                        className={styles.expandTrigger}
-                        onClick={() => onToggleExpand(item.recipeId)}
-                        aria-expanded={isExpanded}
-                        aria-label={`${item.recipeName} 요리 기록 펼치기`}
-                      >
-                        <span>{item.cookCount}회</span>
-                        {isExpanded ? (
-                          <UpOutlined className={styles.expandIcon} />
-                        ) : (
-                          <DownOutlined className={styles.expandIcon} />
-                        )}
-                      </button>
-                    </td>
-
-                    {/* 마지막 요리 일자 (MM.DD) */}
-                    <td className={styles.tdLastCooked}>
-                      <Typography.Text type="secondary">
-                        {dayjs(item.lastCookedAt).format('MM.DD')}
-                      </Typography.Text>
-                    </td>
-
-                    {/* 내 후기 (별점 또는 미작성 배지) */}
-                    <td className={styles.tdReview}>
-                      {hasReview && item.review ? (
-                        <span className={styles.ratingText}>★ {item.review.rating}</span>
-                      ) : (
-                        <Tag className={styles.unreviewedTag}>미작성</Tag>
-                      )}
-                    </td>
-
-                    {/* 버튼들: [레시피 보기], [후기 쓰기 / 후기 수정] */}
-                    <td className={styles.tdActions}>
-                      <Space size="small">
-                        <Button
-                          type="default"
-                          size="middle"
-                          onClick={() => onViewRecipe(item.recipeId)}
-                        >
-                          레시피 보기
-                        </Button>
-                        {hasReview ? (
-                          <Button
-                            type="default"
-                            size="middle"
-                            onClick={() => onOpenReviewModal(item)}
+                return (
+                  <Fragment key={recipeId}>
+                    <tr className={styles.dataRow}>
+                      {/* 레시피 정보 (이미지, 배지, 이름) */}
+                      <td className={styles.tdRecipe}>
+                        <div className={styles.recipeCell}>
+                          <button
+                            type="button"
+                            className={styles.thumbnailButton}
+                            onClick={() => onViewRecipe(recipeId)}
+                            aria-label={`${item.recipeName ?? '레시피'} 상세 보기`}
                           >
-                            후기 수정
-                          </Button>
-                        ) : (
-                          <Button
-                            color="default"
-                            variant="solid"
-                            size="middle"
-                            onClick={() => onOpenReviewModal(item)}
-                          >
-                            후기 쓰기
-                          </Button>
-                        )}
-                      </Space>
-                    </td>
-                  </tr>
-
-                  {/* 아코디언 펼침 내용: 내 후기 + 요리 기록 */}
-                  {isExpanded && (
-                    <tr className={styles.expandedRow}>
-                      <td colSpan={5} className={styles.expandedCell}>
-                        <div className={styles.expandedPanel}>
-                          {/* 내 후기 영역 */}
-                          {item.review ? (
-                            <div className={styles.detailReviewSection}>
-                              <Typography.Text type="secondary" className={styles.detailLabel}>
-                                내 후기
-                              </Typography.Text>
-                              <div className={styles.detailReviewContent}>
-                                <Flex align="center" gap="small" className={styles.reviewHeader}>
-                                  <span className={styles.ratingText}>★ {item.review.rating}</span>
-                                  <Typography.Text className={styles.reviewText}>
-                                    &ldquo;{item.review.content}&rdquo;
-                                  </Typography.Text>
-                                </Flex>
-                                <Typography.Text type="secondary" className={styles.reviewDate}>
-                                  {dayjs(item.review.updatedAt).format('MM.DD')} 수정됨
-                                </Typography.Text>
-                              </div>
+                            <div className={styles.thumbnail}>
+                              {item.recipeImageUrl ? (
+                                <img src={item.recipeImageUrl} alt={item.recipeName ?? '레시피'} />
+                              ) : (
+                                <span className={styles.placeholderImg}>[이미지]</span>
+                              )}
                             </div>
-                          ) : null}
-
-                          {/* 요리 기록 영역 */}
-                          <div className={styles.detailHistorySection}>
-                            <Typography.Text type="secondary" className={styles.detailLabel}>
-                              요리 기록
-                            </Typography.Text>
-                            <div className={styles.historyList}>
-                              {item.history.map((hist) => (
-                                <div key={hist.id} className={styles.historyItem}>
-                                  <span className={styles.historyDate}>
-                                    {dayjs(hist.date).format('MM.DD')}
-                                  </span>
-                                  <Tag
-                                    color={hist.result === 'SUCCESS' ? 'default' : undefined}
-                                    className={
-                                      hist.result === 'SUCCESS'
-                                        ? styles.successTag
-                                        : styles.failedTag
-                                    }
-                                  >
-                                    {hist.result === 'SUCCESS' ? '성공' : '실패'}
-                                  </Tag>
-                                  <span className={styles.historyMemo}>{hist.memo}</span>
-                                </div>
-                              ))}
-                            </div>
+                          </button>
+                          <div className={styles.recipeInfo}>
+                            {item.fromChat && (
+                              <Tag color="default" className={styles.aiTag}>
+                                AI 추천
+                              </Tag>
+                            )}
+                            <button
+                              type="button"
+                              className={styles.recipeNameButton}
+                              onClick={() => onViewRecipe(recipeId)}
+                              title={item.recipeName}
+                            >
+                              {item.recipeName}
+                            </button>
                           </div>
                         </div>
                       </td>
+
+                      {/* 요리 횟수 (펼침 토글 버튼) */}
+                      <td className={styles.tdCookCount}>
+                        <button
+                          type="button"
+                          className={styles.expandTrigger}
+                          onClick={() => onToggleExpand(recipeId)}
+                          aria-expanded={isExpanded}
+                          aria-label={`${item.recipeName ?? '레시피'} 요리 기록 펼치기`}
+                        >
+                          <span>{item.cookCount ?? 0}회</span>
+                          {isExpanded ? (
+                            <UpOutlined className={styles.expandIcon} />
+                          ) : (
+                            <DownOutlined className={styles.expandIcon} />
+                          )}
+                        </button>
+                      </td>
+
+                      {/* 마지막 요리 일자 (MM.DD) */}
+                      <td className={styles.tdLastCooked}>
+                        <Typography.Text type="secondary">
+                          {item.lastCookedAt ? dayjs(item.lastCookedAt).format('MM.DD') : '-'}
+                        </Typography.Text>
+                      </td>
+
+                      {/* 내 후기 (별점 또는 미작성 배지) */}
+                      <td className={styles.tdReview}>
+                        {hasReview && item.review ? (
+                          <span className={styles.ratingText}>★ {item.review.rating ?? 0}</span>
+                        ) : (
+                          <Tag className={styles.unreviewedTag}>미작성</Tag>
+                        )}
+                      </td>
+
+                      {/* 버튼들: [레시피 보기], [후기 쓰기 / 후기 수정] */}
+                      <td className={styles.tdActions}>
+                        <Space size="small">
+                          <Button
+                            type="default"
+                            size="middle"
+                            onClick={() => onViewRecipe(recipeId)}
+                          >
+                            레시피 보기
+                          </Button>
+                          {hasReview ? (
+                            <Button
+                              type="default"
+                              size="middle"
+                              onClick={() => onOpenReviewModal(item)}
+                            >
+                              후기 수정
+                            </Button>
+                          ) : (
+                            <Button
+                              color="default"
+                              variant="solid"
+                              size="middle"
+                              onClick={() => onOpenReviewModal(item)}
+                            >
+                              후기 쓰기
+                            </Button>
+                          )}
+                        </Space>
+                      </td>
                     </tr>
-                  )}
-                </Fragment>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+
+                    {/* 아코디언 펼침 내용: 내 후기 + 요리 기록 */}
+                    {isExpanded && (
+                      <tr className={styles.expandedRow}>
+                        <td colSpan={5} className={styles.expandedCell}>
+                          <div className={styles.expandedPanel}>
+                            {/* 내 후기 영역 */}
+                            {item.review ? (
+                              <div className={styles.detailReviewSection}>
+                                <Typography.Text type="secondary" className={styles.detailLabel}>
+                                  내 후기
+                                </Typography.Text>
+                                <div className={styles.detailReviewContent}>
+                                  <Flex align="center" gap="small" className={styles.reviewHeader}>
+                                    <span className={styles.ratingText}>
+                                      ★ {item.review.rating ?? 0}
+                                    </span>
+                                    <Typography.Text className={styles.reviewText}>
+                                      &ldquo;{item.review.content}&rdquo;
+                                    </Typography.Text>
+                                  </Flex>
+                                  {item.review.updatedAt && (
+                                    <Typography.Text type="secondary" className={styles.reviewDate}>
+                                      {dayjs(item.review.updatedAt).format('MM.DD')} 수정됨
+                                    </Typography.Text>
+                                  )}
+                                </div>
+                              </div>
+                            ) : null}
+
+                            {/* 요리 기록 영역 (펼쳤을 때만 조회) */}
+                            <RecipeCookingHistorySection recipeId={recipeId} />
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        {totalElements > pageSize && (
+          <div className={styles.paginationWrapper}>
+            <Pagination
+              current={currentPage}
+              pageSize={pageSize}
+              total={totalElements}
+              onChange={onPageChange}
+              showSizeChanger={false}
+            />
+          </div>
+        )}
+      </>
     );
 
   const tabItems = [
