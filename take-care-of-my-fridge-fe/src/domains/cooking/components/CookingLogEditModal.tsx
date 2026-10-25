@@ -65,9 +65,7 @@ export function CookingLogEditModal({ open, log, onClose }: CookingLogEditModalP
       destroyOnClose
     >
       <div style={{ marginBottom: 16 }}>
-        <Typography.Text type="secondary">
-          결과와 메모만 바꿀 수 있어요
-        </Typography.Text>
+        <Typography.Text type="secondary">결과와 메모만 바꿀 수 있어요</Typography.Text>
       </div>
 
       <Form form={form} layout="vertical" preserve={false}>
