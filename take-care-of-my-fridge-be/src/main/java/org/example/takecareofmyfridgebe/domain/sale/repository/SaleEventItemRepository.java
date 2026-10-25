@@ -42,6 +42,9 @@ public interface SaleEventItemRepository extends JpaRepository<SaleEventItem, Lo
         @Param("now") LocalDateTime now
     );
 
+    // 행사에 든 상품을 먼저 담은 순서로 읽는다.
+    List<SaleEventItem> findBySaleEventIdOrderById(Long saleEventId);
+
     // 번개 드롭 남은 수량을 바꾸기 전에 행을 잠근다. 잠그는 순서가 엇갈리지 않도록 ID 순으로 읽는다.
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select i from SaleEventItem i where i.id in :ids order by i.id")

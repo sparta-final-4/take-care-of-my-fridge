@@ -74,10 +74,23 @@ public class SaleEventItem extends BaseTimeEntity {
         this.saleEvent = saleEvent;
         this.productId = productId;
         this.listPrice = listPrice;
-        this.salePrice = (int) ((long) listPrice * (100 - discountRate) / 100);
+        this.salePrice = calculateSalePrice(listPrice, discountRate);
         this.discountRate = discountRate;
         this.limitedQuantity = limitedQuantity;
         this.remainingQuantity = limitedQuantity;
+    }
+
+    // 시작 전 행사의 정가·할인율·한정 수량을 바꾼다. 아직 팔리지 않았으므로 남은 수량도 한정 수량으로 맞춘다.
+    public void update(int listPrice, int discountRate, Integer limitedQuantity) {
+        this.listPrice = listPrice;
+        this.salePrice = calculateSalePrice(listPrice, discountRate);
+        this.discountRate = discountRate;
+        this.limitedQuantity = limitedQuantity;
+        this.remainingQuantity = limitedQuantity;
+    }
+
+    private static int calculateSalePrice(int listPrice, int discountRate) {
+        return (int) ((long) listPrice * (100 - discountRate) / 100);
     }
 
     // 번개 드롭 남은 수량을 줄인다. 모자라면 빼지 않고 거절한다.

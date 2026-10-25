@@ -62,4 +62,15 @@ public class SaleEvent extends BaseTimeEntity {
         this.endsAt = endsAt;
         this.status = SaleEventStatus.SCHEDULED;
     }
+
+    // 시작 전 행사의 시작·종료 시각을 바꾼다.
+    public void reschedule(LocalDateTime startsAt, LocalDateTime endsAt) {
+        this.startsAt = startsAt;
+        this.endsAt = endsAt;
+    }
+
+    // 상태 정리가 늦어도 시작 시각이 지났으면 이미 시작한 행사로 본다.
+    public boolean isEditable(LocalDateTime now) {
+        return status == SaleEventStatus.SCHEDULED && startsAt.isAfter(now);
+    }
 }
