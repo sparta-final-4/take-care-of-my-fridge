@@ -7,7 +7,7 @@ import org.springframework.data.repository.query.Param;
 
 public interface FridgeItemLogRepository extends JpaRepository<FridgeItemLog, Long>, FridgeItemLogRepositoryCustom {
 
-    @Query("SELECT COUNT(DISTINCT concat(l.cookingLogId, '_', l.ingredient.id)) " +
+    @Query("SELECT COUNT(DISTINCT l.ingredient.id) " +
            "FROM FridgeItemLog l " +
            "WHERE l.memberId = :memberId AND l.cookingLogId IS NOT NULL")
     long countConsumedByCooking(@Param("memberId") Long memberId);

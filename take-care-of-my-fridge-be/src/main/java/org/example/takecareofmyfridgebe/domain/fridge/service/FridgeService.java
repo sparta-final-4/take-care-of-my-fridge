@@ -327,10 +327,10 @@ public class FridgeService {
     }
 
     /**
-     * 요리 완료로 인해 냉장고에서 차감·소진된 재료의 이력 개수를 조회한다.
+     * 요리 완료로 소진한 재료 종류 수를 조회한다.
      *
      * @param memberId 회원 ID
-     * @return 요리 완료로 소진된 재료 이력 수
+     * @return 요리 완료로 소진한 재료 종류 수
      */
     public long countConsumedByCooking(Long memberId) {
         if (memberId == null) {

@@ -29,12 +29,16 @@ export type {
   PageResponseCookingLogResponse,
 };
 
+/**
+ * 지금까지 요리 기록 요약 통계
+ */
 export interface ThisMonthCookingSummary {
   completedCookCount: number;
   consumedIngredientCount: number;
   mostCookedRecipeName: string;
   mostCookedRecipeCount: number;
 }
+export type MyCookingSummary = ThisMonthCookingSummary;
 
 /**
  * 로그인한 회원이 요리 완료한 레시피 목록과 요약 통계를 조회한다.

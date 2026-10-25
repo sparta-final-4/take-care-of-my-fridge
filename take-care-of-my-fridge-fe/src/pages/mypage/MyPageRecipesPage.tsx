@@ -102,10 +102,10 @@ export default function MyPageRecipesPage() {
 
   // 후기 모달 열기
   const handleOpenReviewModal = (recipe: MyRecipeResponse) => {
-    const recipeId = recipe.recipeId ?? 0;
+    if (!recipe.recipeId) return;
     setReviewModalState({
       open: true,
-      recipeId,
+      recipeId: recipe.recipeId,
       recipeName: recipe.recipeName ?? '',
       initialReview: recipe.review?.id
         ? {
@@ -135,7 +135,7 @@ export default function MyPageRecipesPage() {
     );
   }
 
-  // 하단 이번 달 요리 기록 카드용 요약 데이터 (전체 데이터 기준)
+  // 하단 지금까지 요리 기록 카드용 요약 데이터 (전체 데이터 기준)
   const bottomSummary = {
     completedCookCount: totalCookCount,
     consumedIngredientCount: Number(summary?.consumedIngredientCount ?? 0),
@@ -166,7 +166,7 @@ export default function MyPageRecipesPage() {
         onViewRecipe={handleViewRecipe}
       />
 
-      {/* 2. 하단 이번 달 요리 기록 & 후기 유도 카드 */}
+      {/* 2. 하단 지금까지 요리 기록 & 후기 유도 카드 */}
       <MyCookingSummaryCards
         summary={bottomSummary}
         unreviewedCount={unreviewedCount}
