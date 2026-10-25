@@ -2,7 +2,7 @@ import { keepPreviousData, queryOptions } from '@tanstack/react-query';
 
 import type { SaleCandidateProductsRequest, SaleEventListRequest } from '@/common/api/clients';
 
-import { getSaleCandidateProducts, getSaleEvents } from './api';
+import { getSaleCandidateProducts, getSaleEvent, getSaleEvents } from './api';
 
 export const saleQueries = {
   all: ['sale'] as const,
@@ -20,5 +20,11 @@ export const saleQueries = {
       queryKey: [...saleQueries.all, 'events', request],
       queryFn: ({ signal }) => getSaleEvents(request, signal),
       placeholderData: keepPreviousData,
+    }),
+  // 행사를 고치면 값이 달라져 수정 뒤 all을 무효화한다.
+  event: (saleEventId: number) =>
+    queryOptions({
+      queryKey: [...saleQueries.all, 'event', saleEventId],
+      queryFn: ({ signal }) => getSaleEvent(saleEventId, signal),
     }),
 };

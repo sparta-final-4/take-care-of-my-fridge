@@ -22,16 +22,20 @@ import {
   type SaleProductChoice,
 } from '@/domains/sale/components/SaleProductPicker';
 import { SaleEventListSection } from '@/domains/sale/components/SaleEventListSection';
-import { MAX_DISCOUNT_RATE, MIN_DISCOUNT_RATE, salePriceOf } from '@/domains/sale/format';
+import {
+  DATE_TIME_FORMAT,
+  disabledDateBefore,
+  disabledTimeBefore,
+  MAX_DISCOUNT_RATE,
+  MIN_DISCOUNT_RATE,
+  REQUEST_TIME_FORMAT,
+  salePriceOf,
+} from '@/domains/sale/format';
 import { saleQueries } from '@/domains/sale/queries';
 
 import styles from './SaleEventCreateSection.module.scss';
 
 type SaleKind = 'SPECIAL' | 'FLASH_DROP';
-
-const DATE_TIME_FORMAT = 'YYYY-MM-DD HH:mm';
-// 서버는 시각을 한국 시간으로 비교하므로 시간대 없는 형식으로 보낸다.
-const REQUEST_TIME_FORMAT = 'YYYY-MM-DDTHH:mm:ss';
 
 interface SaleEventFormValues {
   startsAt: Dayjs;
@@ -39,20 +43,6 @@ interface SaleEventFormValues {
 }
 
 const LIST_TAB = 'LIST';
-
-const range = (count: number) => Array.from({ length: count }, (_, index) => index);
-
-// minimum 이전의 날짜는 막는다.
-const disabledDateBefore = (minimum: Dayjs) => (date: Dayjs) => date.isBefore(minimum, 'day');
-
-// minimum과 같은 날에는 그 시각 이전(같은 분 포함)의 시·분을 막는다.
-const disabledTimeBefore = (minimum: Dayjs) => (date: Dayjs | null) => {
-  if (!date?.isSame(minimum, 'day')) return {};
-  return {
-    disabledHours: () => range(minimum.hour()),
-    disabledMinutes: (hour: number) => (hour === minimum.hour() ? range(minimum.minute() + 1) : []),
-  };
-};
 
 const KIND_LABELS: Record<SaleKind, string> = { SPECIAL: '특가', FLASH_DROP: '번개 드롭' };
 
@@ -63,7 +53,7 @@ export function SaleEventCreateSection() {
   const [kind, setKind] = useState<SaleKind>('SPECIAL');
   const [drafts, setDrafts] = useState<SaleItemDraft[]>([]);
   const [summaryOpen, setSummaryOpen] = useState(false);
-  // 행사 목록 탭은 조회만 한다. 수정·종료 화면은 아직 없다.
+  // 행사 목록 탭은 조회와 수정만 한다. 삭제·종료는 아직 없다.
   const [listTab, setListTab] = useState(false);
   const [bulkRate, setBulkRate] = useState<number | null>(null);
   const startsAt = Form.useWatch('startsAt', form);

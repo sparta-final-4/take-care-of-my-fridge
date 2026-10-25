@@ -17,3 +17,18 @@
   padding-inline: var(--ant-padding-xs);
   white-space: nowrap;
 }
+
+// 작업 열 아이콘이 기본 크기라 작아 보여 키운다.
+.action:global(.ant-btn-icon-only) :global(.anticon) {
+  font-size: var(--ant-font-size-xl);
+}
+
+// 눌러서 수정 칸을 여는 행(예정 행사)이라는 것을 마우스 모양으로 알린다.
+.editableRow {
+  cursor: pointer;
+}
+
+// 삭제 아이콘은 누를 수 없는 동안에도 살짝 붉게 보여, 다른 아이콘과 구분한다.
+.delete:global(.ant-btn):disabled {
+  color: var(--ant-color-error-border-hover);
+}

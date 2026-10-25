@@ -1,0 +1,41 @@
+@use '@/styles/variables' as *;
+
+.notice {
+  margin-bottom: var(--ant-margin);
+}
+
+.fields {
+  column-gap: var(--ant-margin);
+}
+
+.dateTime {
+  width: $sale-edit-date-time-width;
+}
+
+// 행사 항목이 여럿(예전에 묶어 등록한 행사)이면 시각 아래에 항목마다 한 줄씩 둔다. 항목이 하나면 시각 옆에 붙는다.
+.item {
+  width: 100%;
+  padding-top: var(--ant-padding);
+  border-top: 1px solid var(--ant-color-border-secondary);
+}
+
+.number {
+  width: $sale-number-input-width;
+}
+
+// 상품 이름과 가격을 한 줄로 두고, 입력칸 바로 왼쪽에 붙여 값을 고치는 자리와 결과가 멀어지지 않게 한다.
+.itemHead {
+  min-width: $sale-edit-item-head-min-width;
+  margin-bottom: var(--ant-margin-sm);
+}
+
+// 입력칸 아래 여백(Form.Item)만큼 올려 입력칸과 같은 높이에 맞추고, 남는 폭이 있으면 오른쪽 끝에 둔다.
+.actions {
+  margin-bottom: var(--ant-margin-lg);
+  margin-inline-start: auto;
+}
+
+// 가격 문구는 입력칸과 같은 높이에 맞춘다. 입력칸 아래 여백(Form.Item)만큼 올리고, 입력칸 높이에 글자를 가운데로 맞춘다.
+.price {
+  margin-bottom: calc(var(--ant-margin-lg) + var(--ant-margin-xxs));
+}

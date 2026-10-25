@@ -37,6 +37,10 @@ $sale-bulk-rate-width: 140px;
 $sale-type-filter-width: 160px;
 // 할인율·한정 수량 입력칸 너비
 $sale-number-input-width: 96px;
+// 행사 수정 칸의 시작·종료 시각 입력칸 너비("YYYY-MM-DD HH:mm"이 잘리지 않는 너비). 입력칸·버튼이 한 줄에 들어가게 등록 화면보다 좁다.
+$sale-edit-date-time-width: 180px;
+// 행사 수정 칸에서 상품 이름과 "정가 → 할인가"가 줄어들 수 있는 최소 너비(더 길면 줄바꿈)
+$sale-edit-item-head-min-width: 180px;
 
 // 주문 확인 상품 목록. 99개(3자)가 행마다 같은 위치에 오도록 고정
 $order-quantity-width: 5ch;

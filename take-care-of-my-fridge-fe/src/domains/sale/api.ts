@@ -4,8 +4,10 @@ import {
   type PageResponseSaleCandidateProductResponse,
   type PageResponseSaleEventListResponse,
   type SaleCandidateProductsRequest,
+  type SaleEventDetailResponse,
   type SaleEventListRequest,
   type SaleEventsCreateResponse,
+  type SaleEventUpdateRequest,
   type SpecialSaleCreateRequest,
 } from '@/common/api/clients';
 import { unwrap } from '@/common/api/unwrap';
@@ -35,4 +37,20 @@ export async function getSaleEvents(
   signal?: AbortSignal,
 ): Promise<PageResponseSaleEventListResponse> {
   return unwrap(adminSaleEventApi.getSaleEvents({ request }, { signal }));
+}
+
+// 수정 화면에 보여 줄 행사 하나와 그 행사 항목들
+export async function getSaleEvent(
+  saleEventId: number,
+  signal?: AbortSignal,
+): Promise<SaleEventDetailResponse> {
+  return unwrap(adminSaleEventApi.getSaleEvent({ saleEventId }, { signal }));
+}
+
+// 시작 전인 행사의 시각과 행사 항목 값을 한 번에 고친다.
+export async function updateSaleEvent(
+  saleEventId: number,
+  request: SaleEventUpdateRequest,
+): Promise<void> {
+  await unwrap(adminSaleEventApi.updateSaleEvent({ saleEventId, saleEventUpdateRequest: request }));
 }

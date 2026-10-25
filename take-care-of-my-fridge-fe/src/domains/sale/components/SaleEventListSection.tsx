@@ -1,12 +1,28 @@
+import { DeleteOutlined, EditOutlined, StopOutlined } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
-import { Button, DatePicker, Flex, Input, Result, Select, Table, Tag } from 'antd';
+import {
+  Button,
+  DatePicker,
+  Drawer,
+  Flex,
+  Grid,
+  Input,
+  Result,
+  Select,
+  Space,
+  Table,
+  Tag,
+  Typography,
+} from 'antd';
 import type { TableColumnsType, TablePaginationConfig } from 'antd';
 import type { SorterResult } from 'antd/es/table/interface';
 import dayjs from 'dayjs';
+import { useState } from 'react';
 import { useSearchParams } from 'react-router';
 
 import type { SaleEventListRequest, SaleEventListResponse } from '@/common/api/clients';
 import { formatPrice } from '@/domains/cart/format';
+import { SaleEventEditPanel } from '@/domains/sale/components/SaleEventEditPanel';
 import { SALE_STATUS_LABELS, SALE_TYPE_LABELS } from '@/domains/sale/format';
 import { saleQueries } from '@/domains/sale/queries';
 
@@ -18,7 +34,7 @@ const PAGE_SIZE = 10;
 const TABLE_WIDTH = 1095;
 const ALL = 'ALL';
 const DATE_FORMAT = 'YYYY-MM-DD';
-const DATE_TIME_FORMAT = 'YYYY-MM-DD HH:mm';
+const TIME_FORMAT = 'HH:mm';
 
 const STATUS_COLORS = { SCHEDULED: 'blue', ACTIVE: 'green', ENDED: 'default' } as const;
 // 상태와 색이 겹치지 않게 종류는 보라·주황 계열로 구분한다.
@@ -43,6 +59,16 @@ interface EventRow {
   remainingQuantity?: number;
   soldQuantity: number;
 }
+
+// 시각은 열을 좁히려고 날짜와 시간을 두 줄로 나눠 보여 준다.
+const renderDateTime = (value: string) => (
+  <Flex vertical>
+    <span>{dayjs(value).format(DATE_FORMAT)}</span>
+    <Typography.Text type="secondary">{dayjs(value).format(TIME_FORMAT)}</Typography.Text>
+  </Flex>
+);
+
+const rowKeyOf = (row: EventRow) => `${row.saleEventId}-${row.productId}`;
 
 const toRow = (event: SaleEventListResponse): EventRow[] => {
   const { saleEventId, productId, productName, type, status, startsAt, endsAt } = event;
@@ -105,6 +131,10 @@ const isSortKey = (value: string | null): value is (typeof SORT_KEYS)[SortColumn
 // 행사 목록 탭. 조건은 주소 쿼리에 두어 새로고침해도 남는다.
 export function SaleEventListSection() {
   const [searchParams, setSearchParams] = useSearchParams();
+  // 행 아래로 펼친 수정 칸의 행 키. 한 번에 하나만 펼친다.
+  const [editing, setEditing] = useState<{ key: string; saleEventId: number } | null>(null);
+  // 좁은 화면은 표가 가로로 스크롤돼 행 아래 칸이 한 화면에 들어오지 않아, 아래에서 올라오는 패널로 연다.
+  const narrow = !Grid.useBreakpoint().xl;
   const statusParam = searchParams.get('status');
   const typeParam = searchParams.get('kind');
   const status = isStatus(statusParam) ? statusParam : undefined;
@@ -119,6 +149,7 @@ export function SaleEventListSection() {
 
   // 값이 없으면 쿼리에서 지운다. 조건이 바뀌면 첫 페이지로 돌아간다.
   const updateSearch = (changes: Record<string, string | undefined>) => {
+    setEditing(null);
     const next = new URLSearchParams(searchParams);
     if (!('listPage' in changes)) next.delete('listPage');
     Object.entries(changes).forEach(([key, value]) =>
@@ -167,12 +198,18 @@ export function SaleEventListSection() {
     });
   };
 
+  // 수정 칸이 열려 있는 행을 다시 누르면 닫는다.
+  const toggleEditing = (row: EventRow) =>
+    setEditing(
+      editing?.key === rowKeyOf(row) ? null : { key: rowKeyOf(row), saleEventId: row.saleEventId },
+    );
+
   const columns: TableColumnsType<EventRow> = [
     {
       title: '상품',
       dataIndex: 'productName',
       key: 'productName',
-      width: 140,
+      width: 136,
       ellipsis: true,
       sorter: true,
       sortOrder: sortOrderOf('productName'),
@@ -181,7 +218,7 @@ export function SaleEventListSection() {
       title: '종류',
       dataIndex: 'type',
       key: 'type',
-      width: 70,
+      width: 90,
       sorter: true,
       sortOrder: sortOrderOf('type'),
       render: (value: Type) => <Tag color={TYPE_COLORS[value]}>{SALE_TYPE_LABELS[value]}</Tag>,
@@ -203,7 +240,7 @@ export function SaleEventListSection() {
       title: '정가',
       dataIndex: 'listPrice',
       key: 'listPrice',
-      width: 85,
+      width: 80,
       sorter: true,
       sortOrder: sortOrderOf('listPrice'),
       align: 'right',
@@ -213,7 +250,7 @@ export function SaleEventListSection() {
       title: '할인가',
       dataIndex: 'salePrice',
       key: 'salePrice',
-      width: 85,
+      width: 80,
       sorter: true,
       sortOrder: sortOrderOf('salePrice'),
       align: 'right',
@@ -223,7 +260,7 @@ export function SaleEventListSection() {
       title: '할인율',
       dataIndex: 'discountRate',
       key: 'discountRate',
-      width: 85,
+      width: 80,
       sorter: true,
       sortOrder: sortOrderOf('discountRate'),
       align: 'right',
@@ -254,26 +291,75 @@ export function SaleEventListSection() {
       title: '판매량',
       dataIndex: 'soldQuantity',
       key: 'soldQuantity',
-      width: 90,
+      width: 59,
       align: 'right',
     },
     {
       title: '시작',
       dataIndex: 'startsAt',
       key: 'startsAt',
-      width: 135,
+      width: 100,
       sorter: true,
       sortOrder: sortOrderOf('startsAt'),
-      render: (value: string) => dayjs(value).format(DATE_TIME_FORMAT),
+      render: renderDateTime,
     },
     {
       title: '종료',
       dataIndex: 'endsAt',
       key: 'endsAt',
-      width: 135,
+      width: 100,
       sorter: true,
       sortOrder: sortOrderOf('endsAt'),
-      render: (value: string) => dayjs(value).format(DATE_TIME_FORMAT),
+      render: renderDateTime,
+    },
+    {
+      title: '작업',
+      key: 'actions',
+      width: 100,
+      // 예정 행사는 수정·삭제, 진행 중 행사는 종료만 한다. 삭제·종료는 API가 붙기 전까지 누를 수 없다.
+      render: (_: unknown, row: EventRow) => {
+        if (row.status === 'SCHEDULED') {
+          return (
+            <Space size={0}>
+              <Button
+                type="text"
+                className={styles.action}
+                icon={<EditOutlined />}
+                aria-label="수정"
+                title="수정"
+                onClick={(event) => {
+                  // 행 전체가 눌려도 펼쳐지므로 아이콘 클릭이 행 클릭으로 한 번 더 번지지 않게 한다.
+                  event.stopPropagation();
+                  toggleEditing(row);
+                }}
+              />
+              <Button
+                type="text"
+                className={`${styles.action} ${styles.delete}`}
+                danger
+                disabled
+                icon={<DeleteOutlined />}
+                aria-label="삭제"
+                title="삭제(준비 중)"
+              />
+            </Space>
+          );
+        }
+        if (row.status === 'ACTIVE') {
+          return (
+            <Button
+              type="text"
+              className={styles.action}
+              danger
+              disabled
+              icon={<StopOutlined />}
+              aria-label="종료"
+              title="종료(준비 중)"
+            />
+          );
+        }
+        return null;
+      },
     },
   ];
 
@@ -345,12 +431,22 @@ export function SaleEventListSection() {
       </Flex>
       <Table<EventRow>
         className={styles.table}
-        rowKey={(row) => `${row.saleEventId}-${row.productId}`}
+        rowKey={rowKeyOf}
         loading={events.isPending}
         dataSource={rows}
         columns={columns}
         tableLayout="fixed"
         scroll={{ x: TABLE_WIDTH }}
+        // 예정 행사는 아이콘이 아니라 행 어디를 눌러도 수정 칸이 열린다.
+        rowClassName={(row) => (row.status === 'SCHEDULED' ? styles.editableRow : '')}
+        onRow={(row) => (row.status === 'SCHEDULED' ? { onClick: () => toggleEditing(row) } : {})}
+        expandable={{
+          expandedRowKeys: editing === null || narrow ? [] : [editing.key],
+          showExpandColumn: false,
+          expandedRowRender: (row) => (
+            <SaleEventEditPanel saleEventId={row.saleEventId} onClose={() => setEditing(null)} />
+          ),
+        }}
         onChange={handleChangeTable}
         pagination={{
           current: page,
@@ -360,6 +456,23 @@ export function SaleEventListSection() {
         }}
         locale={{ emptyText: '조건에 맞는 행사가 없습니다.' }}
       />
+      {narrow && (
+        <Drawer
+          open={editing !== null}
+          title="행사 수정"
+          placement="bottom"
+          styles={{ wrapper: { height: 'auto', maxHeight: '80vh' } }}
+          destroyOnHidden
+          onClose={() => setEditing(null)}
+        >
+          {editing && (
+            <SaleEventEditPanel
+              saleEventId={editing.saleEventId}
+              onClose={() => setEditing(null)}
+            />
+          )}
+        </Drawer>
+      )}
     </Flex>
   );
 }
