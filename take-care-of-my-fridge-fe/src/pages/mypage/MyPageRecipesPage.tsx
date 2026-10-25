@@ -135,14 +135,12 @@ export default function MyPageRecipesPage() {
     );
   }
 
-  // 하단 카드용 요약 데이터
-  const mostCookedRecipe = [...recipes].sort((a, b) => (b.cookCount ?? 0) - (a.cookCount ?? 0))[0];
-
+  // 하단 이번 달 요리 기록 카드용 요약 데이터 (전체 데이터 기준)
   const bottomSummary = {
     completedCookCount: totalCookCount,
-    consumedIngredientCount: 0,
-    mostCookedRecipeName: mostCookedRecipe?.recipeName ?? '-',
-    mostCookedRecipeCount: mostCookedRecipe?.cookCount ?? 0,
+    consumedIngredientCount: Number(summary?.consumedIngredientCount ?? 0),
+    mostCookedRecipeName: summary?.mostCookedRecipe?.recipeName || '-',
+    mostCookedRecipeCount: Number(summary?.mostCookedRecipe?.cookCount ?? 0),
   };
 
   return (

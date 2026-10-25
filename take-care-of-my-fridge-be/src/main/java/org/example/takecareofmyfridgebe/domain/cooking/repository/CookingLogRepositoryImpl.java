@@ -10,11 +10,11 @@ import com.querydsl.jpa.impl.JPAQueryFactory;
 import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.CookingStatsCount;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.CookingStatsResponse;
+import org.example.takecareofmyfridgebe.domain.cooking.dto.MostCookedRecipeDto;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeResponse;
-import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeReviewResponse;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeReviewStatus;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeSortType;
-import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeSummaryResponse;
+import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeSummaryCount;
 import org.example.takecareofmyfridgebe.domain.cooking.entity.CookingLog;
 import org.example.takecareofmyfridgebe.domain.cooking.entity.CookingResult;
 import org.springframework.data.domain.Page;
@@ -24,6 +24,7 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 import static org.example.takecareofmyfridgebe.domain.cooking.entity.QCookingLog.cookingLog;
 import static org.example.takecareofmyfridgebe.domain.recipe.entity.QRecipe.recipe;
@@ -141,14 +142,14 @@ public class CookingLogRepositoryImpl implements CookingLogRepositoryCustom {
     }
 
     @Override
-    public MyRecipeSummaryResponse getMyRecipesSummary(Long memberId) {
+    public MyRecipeSummaryCount getMyRecipesSummaryCount(Long memberId) {
         if (memberId == null) {
             throw new IllegalArgumentException("회원 ID는 필수입니다.");
         }
 
-        MyRecipeSummaryResponse summary = queryFactory
+        MyRecipeSummaryCount summary = queryFactory
                 .select(Projections.constructor(
-                        MyRecipeSummaryResponse.class,
+                        MyRecipeSummaryCount.class,
                         cookingLog.recipeId.countDistinct(),
                         cookingLog.count(),
                         recipeReview.recipeId.countDistinct()
@@ -161,7 +162,33 @@ public class CookingLogRepositoryImpl implements CookingLogRepositoryCustom {
                 .where(cookingLog.memberId.eq(memberId))
                 .fetchOne();
 
-        return summary != null ? summary : MyRecipeSummaryResponse.empty();
+        return summary != null ? summary : MyRecipeSummaryCount.empty();
+    }
+
+    @Override
+    public Optional<MostCookedRecipeDto> findMostCookedRecipe(Long memberId) {
+        if (memberId == null) {
+            throw new IllegalArgumentException("회원 ID는 필수입니다.");
+        }
+
+        MostCookedRecipeDto result = queryFactory
+                .select(Projections.constructor(
+                        MostCookedRecipeDto.class,
+                        cookingLog.recipeId,
+                        cookingLog.count()
+                ))
+                .from(cookingLog)
+                .where(cookingLog.memberId.eq(memberId))
+                .groupBy(cookingLog.recipeId)
+                .orderBy(
+                        cookingLog.count().desc(),
+                        cookingLog.createdAt.max().desc(),
+                        cookingLog.recipeId.desc()
+                )
+                .limit(1)
+                .fetchOne();
+
+        return Optional.ofNullable(result);
     }
 
     @Override

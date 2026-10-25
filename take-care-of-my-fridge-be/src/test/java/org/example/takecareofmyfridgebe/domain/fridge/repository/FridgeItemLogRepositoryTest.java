@@ -159,6 +159,63 @@ class FridgeItemLogRepositoryTest extends MySqlContainerSupport {
         entityManager.clear();
     }
 
+    /**
+     * countConsumedByCooking은 (cooking_log_id, ingredient_id) 조합 개수를 센다.
+     * 1) 같은 요리에서 같은 재료가 두 줄 차감되어도 1개로 집계된다.
+     * 2) 같은 요리에서 서로 다른 재료 2개가 차감되면 2개로 집계된다.
+     * 3) 다른 회원의 요리 차감 이력 및 cookingLogId가 없는(단순 폐기 등) 이력은 제외된다.
+     */
+    @Test
+    void countConsumedByCookingCountsDistinctCookingLogAndIngredientCombinations() {
+        Ingredient onion = Ingredient.builder()
+                .ingredientCode("ING_ONION")
+                .name("양파")
+                .baseUnit("개")
+                .defaultStorage(StorageType.ROOM_TEMP)
+                .defaultShelfDays(7)
+                .basicSeasoning(false)
+                .build();
+        entityManager.persist(onion);
+
+        Long cookingLog1 = 101L;
+        Long cookingLog2 = 102L;
+
+        // 1) cookingLog1에서 같은 재료(두부) 2줄 차감
+        saveCookingItemLog(MEMBER_ID, tofu, cookingLog1, 1L);
+        saveCookingItemLog(MEMBER_ID, tofu, cookingLog1, 2L);
+        flushAndClear();
+
+        // 같은 요리에서 같은 재료 두 줄 차감 -> 1
+        assertEquals(1L, fridgeItemLogRepository.countConsumedByCooking(MEMBER_ID));
+
+        // 2) cookingLog1에서 다른 재료(양파) 1줄 차감 추가 -> 2
+        saveCookingItemLog(MEMBER_ID, onion, cookingLog1, 3L);
+        flushAndClear();
+
+        assertEquals(2L, fridgeItemLogRepository.countConsumedByCooking(MEMBER_ID));
+
+        // 3) 다른 회원(OTHER_MEMBER_ID)의 요리 차감 이력 및 cookingLogId 없는 이력
+        saveCookingItemLog(OTHER_MEMBER_ID, tofu, cookingLog2, 4L);
+        saveCookingItemLog(OTHER_MEMBER_ID, onion, cookingLog2, 5L);
+        saveCookingItemLog(MEMBER_ID, tofu, null, 6L);
+        flushAndClear();
+
+        assertEquals(2L, fridgeItemLogRepository.countConsumedByCooking(MEMBER_ID));
+    }
+
+    private Long saveCookingItemLog(Long memberId, Ingredient ingredient, Long cookingLogId, Long fridgeId) {
+        FridgeItemLog itemLog = fridgeItemLogRepository.save(FridgeItemLog.builder()
+                .memberId(memberId)
+                .ingredient(ingredient)
+                .cookingLogId(cookingLogId)
+                .fridgeId(fridgeId)
+                .rawName(ingredient.getName())
+                .quantity(BigDecimal.ONE)
+                .action(FridgeItemAction.CONSUMED)
+                .build());
+        return itemLog.getId();
+    }
+
     private static List<Long> ids(Page<FridgeItemLog> page) {
         return page.getContent().stream().map(FridgeItemLog::getId).toList();
     }

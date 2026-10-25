@@ -35,7 +35,9 @@ export function MyCookingSummaryCards({
             <div className={styles.summaryRow}>
               <span className={styles.summaryLabel}>가장 많이 만든 레시피</span>
               <span className={styles.summaryValue}>
-                {summary.mostCookedRecipeName} · {summary.mostCookedRecipeCount}회
+                {summary.mostCookedRecipeName && summary.mostCookedRecipeName !== '-'
+                  ? `${summary.mostCookedRecipeName} · ${summary.mostCookedRecipeCount}회`
+                  : '-'}
               </span>
             </div>
           </div>

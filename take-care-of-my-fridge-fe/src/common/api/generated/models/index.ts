@@ -90,6 +90,7 @@ export * from './mealkit-info';
 export * from './mealkit-update';
 export * from './member-list-request';
 export * from './member-summary-response';
+export * from './most-cooked-recipe-response';
 export * from './my-info-response';
 export * from './my-recipe-list-response';
 export * from './my-recipe-response';

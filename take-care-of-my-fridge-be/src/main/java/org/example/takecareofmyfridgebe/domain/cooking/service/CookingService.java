@@ -6,12 +6,16 @@ import org.example.takecareofmyfridgebe.domain.cooking.dto.CookingLogResponse;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.CookingLogSearchRequest;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.CookingLogUpdateRequest;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.CookingStatsResponse;
+import org.example.takecareofmyfridgebe.domain.cooking.dto.MostCookedRecipeResponse;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeListResponse;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeResponse;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeSearchRequest;
+import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeSummaryCount;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeSummaryResponse;
 import org.example.takecareofmyfridgebe.domain.cooking.entity.CookingLog;
 import org.example.takecareofmyfridgebe.domain.cooking.repository.CookingLogRepository;
+import org.example.takecareofmyfridgebe.domain.fridge.service.FridgeService;
+import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeSummary;
 import org.example.takecareofmyfridgebe.domain.recipe.service.RecipeService;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
@@ -21,6 +25,9 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+import java.util.Map;
+
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -28,6 +35,7 @@ public class CookingService {
 
     private final CookingLogRepository cookingLogRepository;
     private final RecipeService recipeService;
+    private final FridgeService fridgeService;
 
     /**
      * 요리 완료 기록을 생성하여 저장한다.
@@ -92,17 +100,36 @@ public class CookingService {
                 request.sort(),
                 PageRequest.of(request.page() - 1, request.size())
         );
-        MyRecipeSummaryResponse summary = cookingLogRepository.getMyRecipesSummary(memberId);
+        MyRecipeSummaryCount summaryCount = cookingLogRepository.getMyRecipesSummaryCount(memberId);
+
+        MostCookedRecipeResponse mostCookedRecipe = cookingLogRepository.findMostCookedRecipe(memberId)
+                .map(dto -> {
+                    Map<Long, RecipeSummary> summaries = recipeService.findSummaries(List.of(dto.recipeId()));
+                    String recipeName = summaries.containsKey(dto.recipeId())
+                            ? summaries.get(dto.recipeId()).name()
+                            : null;
+                    return new MostCookedRecipeResponse(dto.recipeId(), recipeName, dto.cookCount());
+                })
+                .orElse(null);
+
+        long consumedIngredientCount = fridgeService.countConsumedByCooking(memberId);
+
+        MyRecipeSummaryResponse summary = new MyRecipeSummaryResponse(
+                summaryCount.recipeCount(),
+                summaryCount.totalCookCount(),
+                summaryCount.writtenCount(),
+                summaryCount.notWrittenCount(),
+                mostCookedRecipe,
+                consumedIngredientCount
+        );
 
         return new MyRecipeListResponse(summary, PageResponse.of(recipePage));
     }
 
     /**
-     * 로그인한 회원의 요리 기록 결과와 메모를 수정한다.
-     * 본인의 기록만 수정할 수 있으며, 다른 회원의 기록이거나 존재하지 않으면 404 예외를 던진다.
-     * 재료 차감과 묶인 값은 되돌리기 어려워 결과와 메모만 수정하며 JPA 더티 체킹으로 반영한다.
+     * 로그인한 회원의 요리 기록을 수정(결과, 메모)한다.
      *
-     * @param memberId     회원 ID
+     * @param memberId     수정 요청 회원 ID
      * @param cookingLogId 요리 기록 ID
      * @param request      수정 정보 (result, memo)
      * @return 수정된 요리 기록 응답
@@ -118,7 +145,7 @@ public class CookingService {
 
     /**
      * 특정 레시피의 요리 통계(총 요리 횟수, 성공 횟수, 실패 횟수)를 계산하여 반환한다.
-     * 레시피가 없으면 404(RECIPE_NOT_FOUND) 예외를 던지고, 요리 기록이 없는 경우 모두 0인 통계를 반환한다.
+     * 레시피가 없으면 404(RECIPE_NOT_FOUND) 예외가 발생하고, 요리 기록이 없는 경우 모두 0의 통계를 반환한다.
      *
      * @param recipeId 레시피 ID
      * @return 레시피 요리 통계 응답

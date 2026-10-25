@@ -4027,6 +4027,13 @@
           "writtenCount": {
             "type": "integer",
             "format": "int64"
+          },
+          "mostCookedRecipe": {
+            "$ref": "#/components/schemas/MostCookedRecipeResponse"
+          },
+          "consumedIngredientCount": {
+            "type": "integer",
+            "format": "int64"
           }
         }
       },
@@ -6069,6 +6076,22 @@
         "required": [
           "ingredientId"
         ]
+      },
+      "MostCookedRecipeResponse": {
+        "type": "object",
+        "properties": {
+          "recipeId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "recipeName": {
+            "type": "string"
+          },
+          "cookCount": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
       }
     }
   }

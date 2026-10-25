@@ -699,6 +699,18 @@ class FridgeServiceTest {
         assertEquals(500L, logs.get(1).getCookingLogId());
     }
 
+    @Test
+    void countConsumedByCookingReturnsCountFromRepository() {
+        Long memberId = 7L;
+        org.mockito.Mockito.when(fridgeItemLogRepository.countConsumedByCooking(memberId))
+                .thenReturn(42L);
+
+        long result = fridgeService.countConsumedByCooking(memberId);
+
+        assertEquals(42L, result);
+        org.mockito.Mockito.verify(fridgeItemLogRepository).countConsumedByCooking(memberId);
+    }
+
     // 7번 회원이 보유한 100번 재료(두부)
     private static Fridge fridgeWithQuantity(String quantity) {
         Ingredient ingredient = Ingredient.builder()

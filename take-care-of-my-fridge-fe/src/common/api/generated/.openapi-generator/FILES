@@ -117,6 +117,7 @@ models/mealkit-info.ts
 models/mealkit-update.ts
 models/member-list-request.ts
 models/member-summary-response.ts
+models/most-cooked-recipe-response.ts
 models/my-info-response.ts
 models/my-recipe-list-response.ts
 models/my-recipe-response.ts

@@ -5,16 +5,21 @@ import org.example.takecareofmyfridgebe.domain.cooking.dto.CookingLogResponse;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.CookingLogSearchRequest;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.CookingLogUpdateRequest;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.CookingStatsResponse;
+import org.example.takecareofmyfridgebe.domain.cooking.dto.MostCookedRecipeDto;
+import org.example.takecareofmyfridgebe.domain.cooking.dto.MostCookedRecipeResponse;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeListResponse;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeResponse;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeReviewResponse;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeReviewStatus;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeSearchRequest;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeSortType;
+import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeSummaryCount;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeSummaryResponse;
 import org.example.takecareofmyfridgebe.domain.cooking.entity.CookingLog;
 import org.example.takecareofmyfridgebe.domain.cooking.entity.CookingResult;
 import org.example.takecareofmyfridgebe.domain.cooking.repository.CookingLogRepository;
+import org.example.takecareofmyfridgebe.domain.fridge.service.FridgeService;
+import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeSummary;
 import org.example.takecareofmyfridgebe.domain.recipe.service.RecipeService;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
@@ -33,6 +38,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -63,6 +69,9 @@ class CookingServiceTest {
 
     @Mock
     private RecipeService recipeService;
+
+    @Mock
+    private FridgeService fridgeService;
 
     @InjectMocks
     private CookingService cookingService;
@@ -99,7 +108,7 @@ class CookingServiceTest {
         // Given
         Long memberId = 7L;
         CookingCompleteRequest request = new CookingCompleteRequest(
-                999L, CookingResult.SUCCESS, "맛있어요", null, List.of());
+                999L, CookingResult.SUCCESS, null, null, List.of());
         when(recipeService.existsById(999L)).thenReturn(false);
 
         // When & Then
@@ -109,67 +118,42 @@ class CookingServiceTest {
         );
         assertEquals(ErrorCode.RECIPE_NOT_FOUND, exception.getErrorCode());
         assertEquals(HttpStatus.NOT_FOUND, exception.getErrorCode().getStatus());
-        verify(cookingLogRepository, never()).save(any(CookingLog.class));
+        verify(cookingLogRepository, never()).save(any());
     }
 
     /**
-     * 조회 기간의 시작일(from)이 종료일(to)보다 늦으면
-     * 400 INVALID_INPUT_VALUE 예외가 발생하고 repository 조회를 호출하지 않는지 검증한다.
+     * getCookingLogs 호출 시 정상 조건이면 repository 조회 결과를 CookingLogResponse DTO로 변환하여 반환한다.
+     * chatSessionId가 존재하면 fromChat=true, 없으면 false로 변환된다.
      */
     @Test
-    void getCookingLogsThrowsWhenFromIsAfterTo() {
-        // Given
-        CookingLogSearchRequest request = new CookingLogSearchRequest(
-                null, LocalDate.of(2026, 10, 10), LocalDate.of(2026, 10, 1), 1, 20);
-
-        // When & Then
-        BusinessException exception = assertThrows(
-                BusinessException.class,
-                () -> cookingService.getCookingLogs(7L, request)
-        );
-        assertEquals(ErrorCode.INVALID_INPUT_VALUE, exception.getErrorCode());
-        assertEquals(HttpStatus.BAD_REQUEST, exception.getErrorCode().getStatus());
-        verifyNoInteractions(cookingLogRepository);
-    }
-
-    /**
-     * 요리 기록 조회 시:
-     * 1) 조건(recipeId, from, to)과 1부터 시작하는 page를 0부터 시작하는 PageRequest로 넘기는지
-     * 2) chatSessionId 존재 여부에 따라 fromChat이 올바르게 매핑되는지 검증한다.
-     */
-    @Test
-    void getCookingLogsMapsEntitiesToResponsesWithFromChatFlag() {
+    void getCookingLogsReturnsPagedResponse() {
         // Given
         Long memberId = 7L;
         CookingLogSearchRequest request = new CookingLogSearchRequest(
-                12L, LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 31), 1, 20);
+                12L, LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 15), 1, 10);
 
-        CookingLog logWithChat = CookingLog.builder()
+        CookingLog log1 = CookingLog.builder()
                 .memberId(memberId)
                 .recipeId(12L)
                 .chatSessionId(5L)
                 .result(CookingResult.SUCCESS)
-                .memo("상담 후 요리")
+                .memo("성공 메모")
                 .build();
-        ReflectionTestUtils.setField(logWithChat, "id", 101L);
-        ReflectionTestUtils.setField(logWithChat, "createdAt", LocalDateTime.of(2026, 10, 15, 12, 0));
+        ReflectionTestUtils.setField(log1, "id", 101L);
 
-        CookingLog logWithoutChat = CookingLog.builder()
+        CookingLog log2 = CookingLog.builder()
                 .memberId(memberId)
                 .recipeId(12L)
                 .chatSessionId(null)
                 .result(CookingResult.FAILED)
-                .memo("직접 요리")
+                .memo("실패 메모")
                 .build();
-        ReflectionTestUtils.setField(logWithoutChat, "id", 102L);
-        ReflectionTestUtils.setField(logWithoutChat, "createdAt", LocalDateTime.of(2026, 10, 16, 18, 0));
+        ReflectionTestUtils.setField(log2, "id", 102L);
 
-        Page<CookingLog> page = new PageImpl<>(List.of(logWithChat, logWithoutChat));
-
+        Page<CookingLog> page = new PageImpl<>(List.of(log1, log2), PageRequest.of(0, 10), 2L);
         when(cookingLogRepository.findLogsByCondition(
-                eq(memberId), eq(12L),
-                eq(LocalDate.of(2026, 10, 1)), eq(LocalDate.of(2026, 10, 31)),
-                eq(PageRequest.of(0, 20))
+                eq(memberId), eq(12L), eq(LocalDate.of(2026, 10, 1)), eq(LocalDate.of(2026, 10, 15)),
+                eq(PageRequest.of(0, 10))
         )).thenReturn(page);
 
         // When
@@ -177,26 +161,51 @@ class CookingServiceTest {
 
         // Then
         assertEquals(2, response.content().size());
+        assertEquals(1, response.pageNumber());
+        assertEquals(10, response.pageSize());
+        assertEquals(2L, response.totalElements());
 
-        CookingLogResponse first = response.content().get(0);
-        assertEquals(101L, first.id());
-        assertTrue(first.fromChat());
-        assertEquals(CookingResult.SUCCESS, first.result());
-        assertEquals("상담 후 요리", first.memo());
+        CookingLogResponse dto1 = response.content().get(0);
+        assertEquals(101L, dto1.id());
+        assertEquals(12L, dto1.recipeId());
+        assertTrue(dto1.fromChat());
+        assertEquals(CookingResult.SUCCESS, dto1.result());
+        assertEquals("성공 메모", dto1.memo());
 
-        CookingLogResponse second = response.content().get(1);
-        assertEquals(102L, second.id());
-        assertFalse(second.fromChat());
-        assertEquals(CookingResult.FAILED, second.result());
+        CookingLogResponse dto2 = response.content().get(1);
+        assertEquals(102L, dto2.id());
+        assertEquals(12L, dto2.recipeId());
+        assertFalse(dto2.fromChat());
+        assertEquals(CookingResult.FAILED, dto2.result());
+        assertEquals("실패 메모", dto2.memo());
     }
 
     /**
-     * 내 레시피 목록 조회 시 1-based page를 0-based PageRequest로 변환하고
-     * 레시피 목록과 전체 요약 통계를 결합해 MyRecipeListResponse로 반환하는지 검증한다.
+     * getCookingLogs 호출 시 시작일(from)이 종료일(to)보다 이후이면 INVALID_INPUT_VALUE 예외가 발생한다.
      */
     @Test
-    void getMyRecipesReturnsSummaryAndPageResponse() {
-        // Given: 회원 ID, 요청 파라미터(page=2, size=5), 모킹용 레시피 페이지 및 요약 통계 준비
+    void getCookingLogsThrowsWhenFromIsAfterTo() {
+        // Given
+        Long memberId = 7L;
+        CookingLogSearchRequest request = new CookingLogSearchRequest(
+                null, LocalDate.of(2026, 10, 15), LocalDate.of(2026, 10, 1), 1, 10);
+
+        // When & Then
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> cookingService.getCookingLogs(memberId, request)
+        );
+        assertEquals(ErrorCode.INVALID_INPUT_VALUE, exception.getErrorCode());
+        assertEquals(HttpStatus.BAD_REQUEST, exception.getErrorCode().getStatus());
+        verifyNoInteractions(cookingLogRepository);
+    }
+
+    /**
+     * getMyRecipes 호출 시 repository에서 조회된 레시피 페이징 결과와 전체 요약 통계(summary)를 조합하여 반환하는지 검증한다.
+     */
+    @Test
+    void getMyRecipesReturnsSummaryAndPagedRecipes() {
+        // Given: 레시피 목록 및 요약 통계 준비
         Long memberId = 7L;
         MyRecipeSearchRequest request = new MyRecipeSearchRequest(
                 MyRecipeReviewStatus.WRITTEN, MyRecipeSortType.MOST, 2, 5);
@@ -207,25 +216,35 @@ class CookingServiceTest {
                 new MyRecipeReviewResponse(101L, 5, "맛있어요", LocalDateTime.of(2026, 10, 12, 19, 0))
         );
         Page<MyRecipeResponse> recipePage = new PageImpl<>(List.of(recipe), PageRequest.of(1, 5), 6L);
-        MyRecipeSummaryResponse summary = new MyRecipeSummaryResponse(4L, 10L, 3L, 1L);
+        MyRecipeSummaryCount summaryCount = new MyRecipeSummaryCount(4L, 10L, 3L, 1L);
 
         when(cookingLogRepository.findMyRecipes(
                 eq(memberId), eq(MyRecipeReviewStatus.WRITTEN), eq(MyRecipeSortType.MOST),
                 eq(PageRequest.of(1, 5))
         )).thenReturn(recipePage);
 
-        when(cookingLogRepository.getMyRecipesSummary(eq(memberId)))
-                .thenReturn(summary);
+        when(cookingLogRepository.getMyRecipesSummaryCount(eq(memberId)))
+                .thenReturn(summaryCount);
+        when(cookingLogRepository.findMostCookedRecipe(eq(memberId)))
+                .thenReturn(Optional.of(new MostCookedRecipeDto(1L, 3L)));
+        when(recipeService.findSummaries(eq(List.of(1L))))
+                .thenReturn(Map.of(1L, new RecipeSummary(1L, "불닭 참치 두부조림", "https://image.com/tofu.jpg")));
+        when(fridgeService.countConsumedByCooking(eq(memberId)))
+                .thenReturn(5L);
 
         // When: 서비스 메서드 호출
         MyRecipeListResponse response = cookingService.getMyRecipes(memberId, request);
 
         // Then: 요약 통계(summary) 및 페이징된 레시피 목록(recipes) 결합 확인
-        assertEquals(summary, response.summary());
         assertEquals(4L, response.summary().recipeCount());
         assertEquals(10L, response.summary().totalCookCount());
         assertEquals(3L, response.summary().writtenCount());
         assertEquals(1L, response.summary().notWrittenCount());
+        assertNotNull(response.summary().mostCookedRecipe());
+        assertEquals(1L, response.summary().mostCookedRecipe().recipeId());
+        assertEquals("불닭 참치 두부조림", response.summary().mostCookedRecipe().recipeName());
+        assertEquals(3L, response.summary().mostCookedRecipe().cookCount());
+        assertEquals(5L, response.summary().consumedIngredientCount());
 
         PageResponse<MyRecipeResponse> recipes = response.recipes();
         assertEquals(2, recipes.pageNumber());
@@ -243,11 +262,14 @@ class CookingServiceTest {
 
         verify(cookingLogRepository).findMyRecipes(
                 eq(memberId), eq(MyRecipeReviewStatus.WRITTEN), eq(MyRecipeSortType.MOST), eq(PageRequest.of(1, 5)));
-        verify(cookingLogRepository).getMyRecipesSummary(eq(memberId));
+        verify(cookingLogRepository).getMyRecipesSummaryCount(eq(memberId));
+        verify(cookingLogRepository).findMostCookedRecipe(eq(memberId));
+        verify(recipeService).findSummaries(eq(List.of(1L)));
+        verify(fridgeService).countConsumedByCooking(eq(memberId));
     }
 
     /**
-     * 요리 기록이 없는 회원의 경우 빈 페이지와 0으로 초기화된 요약 통계를 반환하는지 검증한다.
+     * 요리 기록이 없는 회원의 경우 빈 페이지와 0으로 초기화된 요약 통계(mostCookedRecipe=null, consumedIngredientCount=0)를 반환하는지 검증한다.
      */
     @Test
     void getMyRecipesWithEmptyResultReturnsZeroSummaryAndEmptyPage() {
@@ -257,15 +279,19 @@ class CookingServiceTest {
                 MyRecipeReviewStatus.ALL, MyRecipeSortType.RECENT, 1, 10);
 
         Page<MyRecipeResponse> emptyPage = new PageImpl<>(List.of(), PageRequest.of(0, 10), 0L);
-        MyRecipeSummaryResponse zeroSummary = new MyRecipeSummaryResponse(0L, 0L, 0L, 0L);
+        MyRecipeSummaryCount zeroSummary = new MyRecipeSummaryCount(0L, 0L, 0L, 0L);
 
         when(cookingLogRepository.findMyRecipes(
                 eq(memberId), eq(MyRecipeReviewStatus.ALL), eq(MyRecipeSortType.RECENT),
                 eq(PageRequest.of(0, 10))
         )).thenReturn(emptyPage);
 
-        when(cookingLogRepository.getMyRecipesSummary(eq(memberId)))
+        when(cookingLogRepository.getMyRecipesSummaryCount(eq(memberId)))
                 .thenReturn(zeroSummary);
+        when(cookingLogRepository.findMostCookedRecipe(eq(memberId)))
+                .thenReturn(Optional.empty());
+        when(fridgeService.countConsumedByCooking(eq(memberId)))
+                .thenReturn(0L);
 
         // When: 서비스 메서드 호출
         MyRecipeListResponse response = cookingService.getMyRecipes(memberId, request);
@@ -275,8 +301,38 @@ class CookingServiceTest {
         assertEquals(0L, response.summary().totalCookCount());
         assertEquals(0L, response.summary().writtenCount());
         assertEquals(0L, response.summary().notWrittenCount());
+        assertNull(response.summary().mostCookedRecipe());
+        assertEquals(0L, response.summary().consumedIngredientCount());
         assertTrue(response.recipes().content().isEmpty());
         assertEquals(0L, response.recipes().totalElements());
+    }
+
+    /**
+     * 레시피 요약 정보(RecipeService.findSummaries)에서 레시피를 찾을 수 없는 경우,
+     * mostCookedRecipe의 recipeName이 빈 문자열이 아닌 null로 설정되는지 검증한다.
+     */
+    @Test
+    void getMyRecipesWhenRecipeSummaryMissingReturnsNullRecipeName() {
+        Long memberId = 7L;
+        MyRecipeSearchRequest request = new MyRecipeSearchRequest(
+                MyRecipeReviewStatus.ALL, MyRecipeSortType.RECENT, 1, 10);
+        Page<MyRecipeResponse> emptyPage = new PageImpl<>(List.of(), PageRequest.of(0, 10), 0L);
+        MyRecipeSummaryCount summaryCount = new MyRecipeSummaryCount(1L, 2L, 0L, 1L);
+
+        when(cookingLogRepository.findMyRecipes(any(), any(), any(), any())).thenReturn(emptyPage);
+        when(cookingLogRepository.getMyRecipesSummaryCount(memberId)).thenReturn(summaryCount);
+        when(cookingLogRepository.findMostCookedRecipe(memberId))
+                .thenReturn(Optional.of(new MostCookedRecipeDto(999L, 2L)));
+        when(recipeService.findSummaries(List.of(999L))).thenReturn(Map.of());
+        when(fridgeService.countConsumedByCooking(memberId)).thenReturn(1L);
+
+        MyRecipeListResponse response = cookingService.getMyRecipes(memberId, request);
+
+        assertNotNull(response.summary().mostCookedRecipe());
+        assertEquals(999L, response.summary().mostCookedRecipe().recipeId());
+        assertNull(response.summary().mostCookedRecipe().recipeName());
+        assertEquals(2L, response.summary().mostCookedRecipe().cookCount());
+        assertEquals(1L, response.summary().consumedIngredientCount());
     }
 
     /**
