@@ -38,6 +38,8 @@ public enum ErrorCode {
     DEAL_ANALYSIS_NOT_FOUND(HttpStatus.NOT_FOUND, "D002", "할인 후보 분석 결과가 없습니다."),
     DEAL_CANDIDATE_NOT_IN_ANALYSIS(HttpStatus.BAD_REQUEST, "D003", "이 분석의 할인 후보가 아닙니다."),
     DEAL_REVIEW_LOCKED(HttpStatus.CONFLICT, "D004", "이미 행사 요청한 후보는 검토 상태를 바꿀 수 없습니다."),
+    DEAL_EVENT_NOT_AVAILABLE(HttpStatus.CONFLICT, "D005", "선택되지 않았거나 이미 행사에 등록된 후보입니다."),
+    DEAL_SYNTHETIC_ANALYSIS(HttpStatus.CONFLICT, "D006", "가상 데이터 분석 결과로는 행사를 등록할 수 없습니다."),
 
     // Product
     PRODUCT_NOT_FOUND(HttpStatus.NOT_FOUND, "PRODUCT_001", "상품을 찾을 수 없습니다."),

@@ -33,6 +33,7 @@ public class AdminAuditLog extends BaseTimeEntity {
 
     public static final String TARGET_MEMBER = "Member";
     public static final String TARGET_DEAL_ANALYSIS = "DealAnalysis";
+    public static final String TARGET_DEAL_CANDIDATE = "DealCandidate";
 
     public enum Result {
         SUCCESS, FAILED, DENIED

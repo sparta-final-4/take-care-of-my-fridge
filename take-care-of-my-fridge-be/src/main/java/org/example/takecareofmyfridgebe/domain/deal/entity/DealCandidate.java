@@ -136,4 +136,17 @@ public class DealCandidate extends BaseTimeEntity {
         }
         this.reviewStatus = status;
     }
+
+    public void registerEvent(Long eventId, LocalDateTime requestedAt) {
+        requireEventAvailable();
+        this.eventRequestStatus = EventRequestStatus.APPROVED;
+        this.eventRequestedAt = requestedAt;
+        this.promotionId = eventId;
+    }
+
+    public void requireEventAvailable() {
+        if (excluded || reviewStatus != ReviewStatus.SELECTED || eventRequestStatus != EventRequestStatus.NONE) {
+            throw new BusinessException(ErrorCode.DEAL_EVENT_NOT_AVAILABLE);
+        }
+    }
 }
