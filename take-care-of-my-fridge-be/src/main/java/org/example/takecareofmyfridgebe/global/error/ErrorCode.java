@@ -82,6 +82,7 @@ public enum ErrorCode {
     PAYMENT_EXPIRED(HttpStatus.CONFLICT, "PAYMENT_006", "결제 가능 시간이 지나 결제가 취소되었습니다."),
     PAYMENT_ORDER_NOT_PAYABLE(HttpStatus.CONFLICT, "PAYMENT_007", "이미 결제됐거나 취소된 주문입니다."),
     PAYMENT_IN_PROGRESS(HttpStatus.CONFLICT, "PAYMENT_008", "이미 진행 중인 결제가 있습니다. 잠시 후 다시 시도해 주세요."),
+    PG_CANCEL_REJECTED(HttpStatus.BAD_GATEWAY, "PAYMENT_009", "PG사가 결제 취소를 거절했습니다."),
 
     // Webhook
     INVALID_WEBHOOK_SIGNATURE(HttpStatus.UNAUTHORIZED, "WEBHOOK_001", "웹훅 서명이 유효하지 않습니다."),
@@ -99,6 +100,7 @@ public enum ErrorCode {
     INVALID_REFUND_STATE(HttpStatus.CONFLICT, "REFUND_009", "유효하지 않은 환불 상태 변경입니다."),
     REFUND_ORDER_CONFIRMED(HttpStatus.CONFLICT, "REFUND_010", "구매 확정된 주문은 환불할 수 없습니다."),
     NON_REFUNDABLE_SALE_ITEM(HttpStatus.BAD_REQUEST, "REFUND_011", "특가·번개 드롭 상품은 환불할 수 없습니다."),
+    REFUND_PG_REJECTED(HttpStatus.CONFLICT, "REFUND_012", "결제사에서 환불이 거절되었습니다. 잠시 후 다시 시도해 주세요."),
 
     // Chat
     CHAT_ROOM_NOT_FOUND(HttpStatus.NOT_FOUND, "CHAT_001", "채팅방을 찾을 수 없습니다."),

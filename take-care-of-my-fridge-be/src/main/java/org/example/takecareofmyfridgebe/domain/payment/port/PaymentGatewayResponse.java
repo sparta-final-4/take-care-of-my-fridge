@@ -1,17 +1,25 @@
 package org.example.takecareofmyfridgebe.domain.payment.port;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 public record PaymentGatewayResponse(
         String id,
         String status,
         Long totalAmount,   // PG 응답에 금액이 없으면 null
-        long cancelledAmount, // 총 취소 금액. TODO: 환불 도메인에서 사용
-        LocalDateTime paidAt // PG가 기록한 결제 완료 시각(서버 시간대). 결제 완료 전이면 null
+        long cancelledAmount, // 총 취소 금액. 환불 쪽이 우리 환불 기록과 맞춰 볼 때 쓴다
+        LocalDateTime paidAt, // PG가 기록한 결제 완료 시각(서버 시간대). 결제 완료 전이면 null
+        List<Cancellation> cancellations // PG 취소 건. 취소가 없으면 빈 목록
 ) {
     private static final String STATUS_PAID = "PAID";
     private static final String STATUS_FAILED = "FAILED";
     private static final String STATUS_CANCELLED = "CANCELLED";
+
+    // 취소 건이 필요 없는 결제 검증에서 쓴다
+    public PaymentGatewayResponse(String id, String status, Long totalAmount, long cancelledAmount,
+                                  LocalDateTime paidAt) {
+        this(id, status, totalAmount, cancelledAmount, paidAt, List.of());
+    }
 
     public boolean isPaid() {
         return STATUS_PAID.equals(status);
@@ -25,5 +33,13 @@ public record PaymentGatewayResponse(
     // 전액 취소된 상태. 부분 취소(PARTIAL_CANCELLED)는 포함하지 않는다
     public boolean isCancelled() {
         return STATUS_CANCELLED.equals(status);
+    }
+
+    // PG 취소 건 하나. 완료된 취소만 succeeded가 true
+    public record Cancellation(
+            String id,
+            long totalAmount,
+            boolean succeeded
+    ) {
     }
 }

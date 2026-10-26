@@ -16,4 +16,9 @@ public record RefundResponse(
         return new RefundResponse(refund.getId(), refund.getStatus(), refund.getRefundAmount(),
                 refund.getRefundedAt());
     }
+
+    // PG 취소 결과를 확정하지 못해 요청 상태로 남은 환불. 웹훅·스케줄러가 마무리한다
+    public static RefundResponse requested(RefundRequested refund) {
+        return new RefundResponse(refund.refundId(), RefundStatus.REQUESTED, refund.refundAmount(), null);
+    }
 }

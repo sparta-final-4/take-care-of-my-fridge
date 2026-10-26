@@ -6,6 +6,7 @@ import org.example.takecareofmyfridgebe.domain.order.entity.OrderItem;
 import org.example.takecareofmyfridgebe.domain.order.entity.SaleType;
 import org.example.takecareofmyfridgebe.domain.order.service.OrderReader;
 import org.example.takecareofmyfridgebe.domain.payment.entity.Payment;
+import org.example.takecareofmyfridgebe.domain.payment.service.PaymentHistoryRecorder;
 import org.example.takecareofmyfridgebe.domain.refund.dto.RefundHistoryItemResponse;
 import org.example.takecareofmyfridgebe.domain.refund.dto.RefundHistoryResponse;
 import org.example.takecareofmyfridgebe.domain.refund.dto.RefundableItemResponse;
@@ -35,7 +36,8 @@ import static org.assertj.core.api.Assertions.tuple;
 
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({JpaAuditingConfig.class, QueryDslConfig.class, RefundQueryService.class, OrderReader.class})
+@Import({JpaAuditingConfig.class, QueryDslConfig.class, RefundQueryService.class, OrderReader.class,
+        PaymentHistoryRecorder.class})
 class RefundQueryServiceTest extends MySqlContainerSupport {
 
     private static final Long MEMBER_ID = 1L;

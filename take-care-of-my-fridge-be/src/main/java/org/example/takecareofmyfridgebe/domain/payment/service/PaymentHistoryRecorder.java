@@ -11,11 +11,17 @@ import org.example.takecareofmyfridgebe.domain.payment.repository.PaymentReposit
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-// 결제 이력을 남기는 곳을 한 곳으로 모은다. 결제 상태 변경과 같은 트랜잭션에서 부르면 함께 저장·롤백된다
+import java.util.List;
+
+// 결제 이력을 남기는 곳을 한 곳으로 모은다. 결제 상태 변경과 같은 트랜잭션에서 부르면 함께 저장·롤백된다.
+// 환불 쪽은 환불이 완료될 때 recordCancellation만 부른다
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class PaymentHistoryRecorder {
+
+    private static final List<PaymentEventType> CANCEL_EVENTS =
+            List.of(PaymentEventType.PARTIAL_CANCELLED, PaymentEventType.CANCELLED);
 
     private final PaymentHistoryRepository paymentHistoryRepository;
     private final PaymentRepository paymentRepository;
@@ -54,6 +60,25 @@ public class PaymentHistoryRecorder {
         }
         save(payment, PaymentEventType.CANCELLED, payment.getAmount(), payment.getAmount(), null, pgCancellationId,
                 changedBy, reason);
+    }
+
+    // 결제 완료된 결제의 PG 취소(환불·콘솔 취소). 누적 취소 금액이 결제 금액에 닿으면 전액 취소로 남긴다
+    @Transactional
+    public void recordCancellation(Payment payment, long amount, long cancelledAmountAfter, Long refundId,
+                                   String pgCancellationId, PaymentChangedBy changedBy, String reason) {
+        PaymentEventType eventType = cancelledAmountAfter >= payment.getAmount()
+                ? PaymentEventType.CANCELLED
+                : PaymentEventType.PARTIAL_CANCELLED;
+        save(payment, eventType, amount, cancelledAmountAfter, refundId, pgCancellationId, changedBy, reason);
+    }
+
+    // 환불이 아닌 PG 취소 금액의 합. 환불 쪽이 PG 누적 취소 금액과 맞춰 볼 때 쓴다
+    public long sumCancelledWithoutRefund(Long paymentId) {
+        return paymentHistoryRepository.sumAmountWithoutRefund(paymentId, CANCEL_EVENTS);
+    }
+
+    public List<String> findPgCancellationIds(Long paymentId) {
+        return paymentHistoryRepository.findPgCancellationIds(paymentId);
     }
 
     // 웹훅·스케줄러가 넘기는 결제는 영속 상태가 아닐 수 있으므로 ID로 참조만 건다

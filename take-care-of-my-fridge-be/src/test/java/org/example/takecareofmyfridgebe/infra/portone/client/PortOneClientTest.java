@@ -1,6 +1,8 @@
 package org.example.takecareofmyfridgebe.infra.portone.client;
 
 import org.example.takecareofmyfridgebe.domain.payment.port.PaymentGatewayResponse;
+import org.example.takecareofmyfridgebe.global.error.BusinessException;
+import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 import org.example.takecareofmyfridgebe.infra.portone.config.PortOneProperties;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -8,10 +10,12 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.test.web.client.ExpectedCount;
 import org.springframework.test.web.client.MockRestServiceServer;
-import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 
+import java.net.SocketTimeoutException;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -19,6 +23,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.jsonPath;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
@@ -118,7 +123,7 @@ class PortOneClientTest {
     }
 
     @Test
-    @DisplayName("이미 취소된 결제를 부분 취소하면 이번 금액이 환불되지 않았으므로 그대로 던진다")
+    @DisplayName("이미 취소된 결제를 부분 취소하면 이번 금액이 환불되지 않았으므로 거절로 던진다")
     void cancelPayment_partialAlreadyCancelled_throws() {
         server.expect(requestTo(BASE_URL + "/payments/" + PAYMENT_ID + "/cancel"))
                 .andExpect(method(HttpMethod.POST))
@@ -126,19 +131,22 @@ class PortOneClientTest {
                         .body("{\"type\":\"PAYMENT_ALREADY_CANCELLED\",\"message\":\"이미 취소된 결제입니다.\"}"));
 
         assertThatThrownBy(() -> client.cancelPayment(PAYMENT_ID, "단순 변심", 6000L))
-                .isInstanceOf(HttpClientErrorException.class);
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode").isEqualTo(ErrorCode.PG_CANCEL_REJECTED);
         server.verify();
     }
 
     @Test
-    @DisplayName("이미 취소된 경우가 아닌 취소 오류는 그대로 던진다")
+    @DisplayName("이미 취소된 경우가 아닌 4xx 취소 오류는 PG 거절로 던지고 PG 오류 내용을 메시지에 담는다")
     void cancelPayment_otherError_throws() {
         server.expect(requestTo(BASE_URL + "/payments/" + PAYMENT_ID + "/cancel"))
                 .andRespond(withStatus(HttpStatus.BAD_REQUEST).contentType(MediaType.APPLICATION_JSON)
                         .body("{\"type\":\"CANCELLABLE_AMOUNT_CONSISTENCY_BROKEN\",\"message\":\"취소 가능 금액 불일치\"}"));
 
         assertThatThrownBy(() -> client.cancelPayment(PAYMENT_ID, "보상 취소", null))
-                .isInstanceOf(HttpClientErrorException.class);
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("CANCELLABLE_AMOUNT_CONSISTENCY_BROKEN")
+                .extracting("errorCode").isEqualTo(ErrorCode.PG_CANCEL_REJECTED);
     }
 
     @Test
@@ -148,6 +156,54 @@ class PortOneClientTest {
                 .andRespond(withStatus(HttpStatus.CONFLICT).contentType(MediaType.TEXT_PLAIN).body("conflict"));
 
         assertThatThrownBy(() -> client.cancelPayment(PAYMENT_ID, "보상 취소", null))
-                .isInstanceOf(HttpClientErrorException.class);
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("conflict")
+                .extracting("errorCode").isEqualTo(ErrorCode.PG_CANCEL_REJECTED);
+    }
+
+    @Test
+    @DisplayName("넘겨받은 멱등 키를 따옴표로 감싸 Idempotency-Key 헤더로 보낸다")
+    void cancelPayment_sendsIdempotencyKey() {
+        server.expect(requestTo(BASE_URL + "/payments/" + PAYMENT_ID + "/cancel"))
+                .andExpect(header("Idempotency-Key", "\"refund-100\""))
+                .andRespond(withSuccess("""
+                        {"cancellation":{"status":"SUCCEEDED","id":"cancellation-1","totalAmount":6000}}""",
+                        MediaType.APPLICATION_JSON));
+
+        assertThat(client.cancelPayment(PAYMENT_ID, "단순 변심", 6000L, "refund-100")).isEqualTo("cancellation-1");
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("타임아웃은 같은 멱등 키로 3번까지 시도하고, 마지막도 실패하면 결과를 모르므로 그대로 던진다")
+    void cancelPayment_timeout_retriesThenThrows() {
+        server.expect(ExpectedCount.times(3), requestTo(BASE_URL + "/payments/" + PAYMENT_ID + "/cancel"))
+                .andExpect(header("Idempotency-Key", "\"refund-100\""))
+                .andRespond(request -> {
+                    throw new SocketTimeoutException("timeout");
+                });
+
+        assertThatThrownBy(() -> client.cancelPayment(PAYMENT_ID, "단순 변심", 6000L, "refund-100"))
+                .isInstanceOf(ResourceAccessException.class);
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("부분 취소된 결제를 조회하면 취소 건 ID·금액·완료 여부를 함께 돌려준다")
+    void getPayment_withCancellations() {
+        server.expect(requestTo(BASE_URL + "/payments/" + PAYMENT_ID + "?storeId=store-1"))
+                .andRespond(withSuccess("""
+                        {"id":"payment-1","status":"PARTIAL_CANCELLED","amount":{"total":10000,"cancelled":6000},
+                         "cancellations":[
+                           {"status":"SUCCEEDED","id":"cancellation-1","totalAmount":6000},
+                           {"status":"FAILED","id":"cancellation-2","totalAmount":1000}]}""",
+                        MediaType.APPLICATION_JSON));
+
+        assertThat(client.getPayment(PAYMENT_ID)).hasValueSatisfying(pg -> {
+            assertThat(pg.cancelledAmount()).isEqualTo(6000L);
+            assertThat(pg.cancellations()).containsExactly(
+                    new PaymentGatewayResponse.Cancellation("cancellation-1", 6000L, true),
+                    new PaymentGatewayResponse.Cancellation("cancellation-2", 1000L, false));
+        });
     }
 }

@@ -7,6 +7,10 @@ import org.example.takecareofmyfridgebe.domain.order.entity.OrderItem;
 import org.example.takecareofmyfridgebe.domain.order.entity.SaleType;
 import org.example.takecareofmyfridgebe.domain.order.service.OrderReader;
 import org.example.takecareofmyfridgebe.domain.payment.entity.Payment;
+import org.example.takecareofmyfridgebe.domain.payment.entity.PaymentChangedBy;
+import org.example.takecareofmyfridgebe.domain.payment.entity.PaymentEventType;
+import org.example.takecareofmyfridgebe.domain.payment.entity.PaymentHistory;
+import org.example.takecareofmyfridgebe.domain.payment.service.PaymentHistoryRecorder;
 import org.example.takecareofmyfridgebe.domain.product.entity.Product;
 import org.example.takecareofmyfridgebe.domain.product.entity.ProductStatus;
 import org.example.takecareofmyfridgebe.domain.product.entity.ProductType;
@@ -39,7 +43,8 @@ import static org.assertj.core.api.Assertions.tuple;
 
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({JpaAuditingConfig.class, QueryDslConfig.class, RefundCommandService.class, OrderReader.class})
+@Import({JpaAuditingConfig.class, QueryDslConfig.class, RefundCommandService.class, OrderReader.class,
+        PaymentHistoryRecorder.class})
 class RefundCommandServiceTest extends MySqlContainerSupport {
 
     private static final Long MEMBER_ID = 1L;
@@ -104,8 +109,10 @@ class RefundCommandServiceTest extends MySqlContainerSupport {
     @Test
     @DisplayName("남은 수량까지는 다시 신청할 수 있고 넘으면 거절한다")
     void remainingQuantity() {
-        refundCommandService.request(MEMBER_ID, request(order.getId(), item(itemA, 3)));
-        refundCommandService.request(MEMBER_ID, request(order.getId(), item(itemA, 2)));
+        Long first = refundCommandService.request(MEMBER_ID, request(order.getId(), item(itemA, 3))).refundId();
+        refundCommandService.complete(first, "cancellation-1", PaymentChangedBy.USER);
+        Long second = refundCommandService.request(MEMBER_ID, request(order.getId(), item(itemA, 2))).refundId();
+        refundCommandService.complete(second, "cancellation-2", PaymentChangedBy.USER);
 
         assertError(() -> refundCommandService.request(MEMBER_ID, request(order.getId(), item(itemA, 1))),
                 ErrorCode.EXCEED_REFUNDABLE_QUANTITY);
@@ -188,7 +195,7 @@ class RefundCommandServiceTest extends MySqlContainerSupport {
                 request(paid.getId(), item(greenOnionItem, 2), item(tofuItem, 1))).refundId();
         flushAndClear();
 
-        RefundResponse response = refundCommandService.complete(refundId, "cancellation-1");
+        RefundResponse response = refundCommandService.complete(refundId, "cancellation-1", PaymentChangedBy.USER);
         flushAndClear();
 
         assertThat(response.refundId()).isEqualTo(refundId);
@@ -206,8 +213,8 @@ class RefundCommandServiceTest extends MySqlContainerSupport {
     }
 
     @Test
-    @DisplayName("이미 완료된 환불을 다시 완료하면 거절하고 재고는 한 번만 돌아온다")
-    void complete_twice_rejects() {
+    @DisplayName("이미 완료된 환불을 다시 완료하면 바꾸지 않고 현재 상태를 돌려주며 재고는 한 번만 돌아온다")
+    void complete_twice_keepsFirst() {
         Product greenOnion = product("대파", 8, ProductStatus.ON_SALE);
         Order paid = order("20261022-000005");
         OrderItem greenOnionItem = orderItem(paid, greenOnion.getId(), 3, 3000, SaleType.NONE);
@@ -215,12 +222,82 @@ class RefundCommandServiceTest extends MySqlContainerSupport {
         flushAndClear();
         Long refundId = refundCommandService.request(MEMBER_ID, request(paid.getId(), item(greenOnionItem, 2)))
                 .refundId();
-        refundCommandService.complete(refundId, "cancellation-1");
+        refundCommandService.complete(refundId, "cancellation-1", PaymentChangedBy.USER);
         flushAndClear();
 
-        assertError(() -> refundCommandService.complete(refundId, "cancellation-2"), ErrorCode.INVALID_REFUND_STATE);
+        RefundResponse second = refundCommandService.complete(refundId, "cancellation-2", PaymentChangedBy.WEBHOOK);
         flushAndClear();
+
+        assertThat(second.status()).isEqualTo(RefundStatus.COMPLETED);
+        assertThat(entityManager.find(Refund.class, refundId).getPortoneCancellationId()).isEqualTo("cancellation-1");
         assertThat(entityManager.find(Product.class, greenOnion.getId()).getStock()).isEqualTo(10);
+    }
+
+    @Test
+    @DisplayName("같은 주문에 진행 중인 환불이 있으면 새 신청을 거절한다")
+    void requestedRefundExists_rejects() {
+        refundCommandService.request(MEMBER_ID, request(order.getId(), item(itemA, 1)));
+
+        assertError(() -> refundCommandService.request(MEMBER_ID, request(order.getId(), item(itemB, 1))),
+                ErrorCode.DUPLICATE_REFUND_REQUEST);
+    }
+
+    @Test
+    @DisplayName("실패한 환불의 수량은 다시 신청할 수 있다")
+    void failedRefund_canRequestAgain() {
+        Long refundId = refundCommandService.request(MEMBER_ID, request(order.getId(), item(itemA, 5))).refundId();
+        RefundResponse failed = refundCommandService.fail(refundId, "PG 취소 거절");
+        flushAndClear();
+
+        assertThat(failed.status()).isEqualTo(RefundStatus.FAILED);
+        assertThat(entityManager.find(Refund.class, refundId).getFailReason()).isEqualTo("PG 취소 거절");
+        Long retried = refundCommandService.request(MEMBER_ID, request(order.getId(), item(itemA, 5))).refundId();
+        assertThat(retried).isNotEqualTo(refundId);
+    }
+
+    @Test
+    @DisplayName("이미 완료된 환불을 실패로 바꾸려 하면 바꾸지 않는다")
+    void failCompleted_keepsCompleted() {
+        Long refundId = refundCommandService.request(MEMBER_ID, request(order.getId(), item(itemA, 1))).refundId();
+        refundCommandService.complete(refundId, "cancellation-1", PaymentChangedBy.USER);
+        flushAndClear();
+
+        assertThat(refundCommandService.fail(refundId, "늦게 도착한 실패").status()).isEqualTo(RefundStatus.COMPLETED);
+    }
+
+    @Test
+    @DisplayName("환불을 완료하면 결제 이력에 부분 취소를, 누적 취소가 결제 금액에 닿으면 전액 취소를 남긴다")
+    void complete_recordsPaymentHistory() {
+        Long first = refundCommandService.request(MEMBER_ID, request(order.getId(), item(itemA, 5))).refundId();
+        refundCommandService.complete(first, "cancellation-1", PaymentChangedBy.USER);
+        Long second = refundCommandService.request(MEMBER_ID, request(order.getId(), item(itemB, 3))).refundId();
+        refundCommandService.complete(second, "cancellation-2", PaymentChangedBy.WEBHOOK);
+        // 남은 2,000원(특가·번개 드롭)은 콘솔에서 직접 취소됐다
+        refundCommandService.recordUnknownCancellation(paymentId(), 2000L, "console-1", PaymentChangedBy.WEBHOOK);
+        flushAndClear();
+
+        assertThat(histories())
+                .extracting(PaymentHistory::getEventType, PaymentHistory::getAmount, PaymentHistory::getCancelledAmount,
+                        PaymentHistory::getRefundId, PaymentHistory::getPgCancellationId, PaymentHistory::getChangedBy)
+                .containsExactly(
+                        tuple(PaymentEventType.PARTIAL_CANCELLED, 15000L, 15000L, first, "cancellation-1",
+                                PaymentChangedBy.USER),
+                        tuple(PaymentEventType.PARTIAL_CANCELLED, 6000L, 21000L, second, "cancellation-2",
+                                PaymentChangedBy.WEBHOOK),
+                        tuple(PaymentEventType.CANCELLED, 2000L, 23000L, null, "console-1", PaymentChangedBy.WEBHOOK));
+    }
+
+    private Long paymentId() {
+        return entityManager.createQuery("select p.id from Payment p where p.order.id = :orderId", Long.class)
+                .setParameter("orderId", order.getId())
+                .getSingleResult();
+    }
+
+    private List<PaymentHistory> histories() {
+        return entityManager.createQuery(
+                        "select h from PaymentHistory h where h.payment.id = :paymentId order by h.id", PaymentHistory.class)
+                .setParameter("paymentId", paymentId())
+                .getResultList();
     }
 
     private Product product(String name, int stock, ProductStatus status) {
