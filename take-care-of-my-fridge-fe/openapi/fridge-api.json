@@ -629,6 +629,35 @@
       }
     },
     "/api/admin/sale-events/{saleEventId}": {
+      "delete": {
+        "operationId": "deleteSaleEvent",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "saleEventId",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "admin-sale-event-controller"
+        ]
+      },
       "get": {
         "operationId": "getSaleEvent",
         "parameters": [
@@ -681,6 +710,37 @@
           },
           "required": true
         },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "admin-sale-event-controller"
+        ]
+      }
+    },
+    "/api/admin/sale-events/{saleEventId}/end": {
+      "patch": {
+        "operationId": "endSaleEvent",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "saleEventId",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {

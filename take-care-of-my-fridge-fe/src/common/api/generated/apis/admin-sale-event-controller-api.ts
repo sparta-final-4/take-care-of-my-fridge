@@ -117,6 +117,72 @@ export const AdminSaleEventControllerApiAxiosParamCreator = function (configurat
         },
         /**
          * 
+         * @param {number} saleEventId 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        deleteSaleEvent: async (saleEventId: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'saleEventId' is not null or undefined
+            assertParamExists('deleteSaleEvent', 'saleEventId', saleEventId)
+            const localVarPath = `/api/admin/sale-events/{saleEventId}`
+                .replace('{saleEventId}', encodeURIComponent(String(saleEventId)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'DELETE', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            localVarHeaderParameter['Accept'] = '*/*';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @param {number} saleEventId 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        endSaleEvent: async (saleEventId: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'saleEventId' is not null or undefined
+            assertParamExists('endSaleEvent', 'saleEventId', saleEventId)
+            const localVarPath = `/api/admin/sale-events/{saleEventId}/end`
+                .replace('{saleEventId}', encodeURIComponent(String(saleEventId)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'PATCH', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            localVarHeaderParameter['Accept'] = '*/*';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
          * @param {SaleCandidateProductsRequest} request 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
@@ -297,6 +363,30 @@ export const AdminSaleEventControllerApiFp = function(configuration?: Configurat
         },
         /**
          * 
+         * @param {number} saleEventId 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async deleteSaleEvent(saleEventId: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ApiResponseVoid>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.deleteSaleEvent(saleEventId, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['AdminSaleEventControllerApi.deleteSaleEvent']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @param {number} saleEventId 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async endSaleEvent(saleEventId: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ApiResponseVoid>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.endSaleEvent(saleEventId, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['AdminSaleEventControllerApi.endSaleEvent']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
          * @param {SaleCandidateProductsRequest} request 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
@@ -373,6 +463,24 @@ export const AdminSaleEventControllerApiFactory = function (configuration?: Conf
         },
         /**
          * 
+         * @param {AdminSaleEventControllerApiDeleteSaleEventRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        deleteSaleEvent(requestParameters: AdminSaleEventControllerApiDeleteSaleEventRequest, options?: RawAxiosRequestConfig): AxiosPromise<ApiResponseVoid> {
+            return localVarFp.deleteSaleEvent(requestParameters.saleEventId, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @param {AdminSaleEventControllerApiEndSaleEventRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        endSaleEvent(requestParameters: AdminSaleEventControllerApiEndSaleEventRequest, options?: RawAxiosRequestConfig): AxiosPromise<ApiResponseVoid> {
+            return localVarFp.endSaleEvent(requestParameters.saleEventId, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
          * @param {AdminSaleEventControllerApiGetCandidateProductsRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
@@ -432,6 +540,22 @@ export interface AdminSaleEventControllerApiInterface {
 
     /**
      * 
+     * @param {AdminSaleEventControllerApiDeleteSaleEventRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    deleteSaleEvent(requestParameters: AdminSaleEventControllerApiDeleteSaleEventRequest, options?: RawAxiosRequestConfig): AxiosPromise<ApiResponseVoid>;
+
+    /**
+     * 
+     * @param {AdminSaleEventControllerApiEndSaleEventRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    endSaleEvent(requestParameters: AdminSaleEventControllerApiEndSaleEventRequest, options?: RawAxiosRequestConfig): AxiosPromise<ApiResponseVoid>;
+
+    /**
+     * 
      * @param {AdminSaleEventControllerApiGetCandidateProductsRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
@@ -476,6 +600,20 @@ export interface AdminSaleEventControllerApiCreateFlashDropRequest {
  */
 export interface AdminSaleEventControllerApiCreateSpecialSaleRequest {
     readonly specialSaleCreateRequest: SpecialSaleCreateRequest
+}
+
+/**
+ * Request parameters for deleteSaleEvent operation in AdminSaleEventControllerApi.
+ */
+export interface AdminSaleEventControllerApiDeleteSaleEventRequest {
+    readonly saleEventId: number
+}
+
+/**
+ * Request parameters for endSaleEvent operation in AdminSaleEventControllerApi.
+ */
+export interface AdminSaleEventControllerApiEndSaleEventRequest {
+    readonly saleEventId: number
 }
 
 /**
@@ -530,6 +668,26 @@ export class AdminSaleEventControllerApi extends BaseAPI implements AdminSaleEve
      */
     public createSpecialSale(requestParameters: AdminSaleEventControllerApiCreateSpecialSaleRequest, options?: RawAxiosRequestConfig) {
         return AdminSaleEventControllerApiFp(this.configuration).createSpecialSale(requestParameters.specialSaleCreateRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @param {AdminSaleEventControllerApiDeleteSaleEventRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public deleteSaleEvent(requestParameters: AdminSaleEventControllerApiDeleteSaleEventRequest, options?: RawAxiosRequestConfig) {
+        return AdminSaleEventControllerApiFp(this.configuration).deleteSaleEvent(requestParameters.saleEventId, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @param {AdminSaleEventControllerApiEndSaleEventRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public endSaleEvent(requestParameters: AdminSaleEventControllerApiEndSaleEventRequest, options?: RawAxiosRequestConfig) {
+        return AdminSaleEventControllerApiFp(this.configuration).endSaleEvent(requestParameters.saleEventId, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**
