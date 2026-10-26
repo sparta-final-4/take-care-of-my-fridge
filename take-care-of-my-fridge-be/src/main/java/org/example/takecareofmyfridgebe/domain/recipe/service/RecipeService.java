@@ -2,11 +2,13 @@ package org.example.takecareofmyfridgebe.domain.recipe.service;
 
 import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.ingredient.repository.IngredientRepository;
+import org.example.takecareofmyfridgebe.domain.ingredient.service.IngredientService;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeClassificationResponse;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeCreateRequest;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeDetailResponse;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeListItemResponse;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeListRequest;
+import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeSummary;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeUpdateRequest;
 import org.example.takecareofmyfridgebe.domain.recipe.entity.Recipe;
 import org.example.takecareofmyfridgebe.domain.recipe.entity.RecipeIngredient;
@@ -30,9 +32,9 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
-import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeSummary;
 
 @Service
 @RequiredArgsConstructor
@@ -45,6 +47,7 @@ public class RecipeService {
     private final RecipeIngredientRepository recipeIngredientRepository;
     private final RecipeStepRepository recipeStepRepository;
     private final IngredientRepository ingredientRepository;
+    private final IngredientService ingredientService;
 
     // 정렬은 request.sort()로 저장소가 적용하므로 PageRequest에는 넣지 않는다.
     public PageResponse<RecipeListItemResponse> getRecipes(RecipeListRequest request) {
@@ -69,11 +72,7 @@ public class RecipeService {
         Recipe recipe = recipeRepository.findById(recipeId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.RECIPE_NOT_FOUND));
 
-        return RecipeDetailResponse.of(
-                recipe,
-                recipeIngredientRepository.findByRecipeIdOrderBySeqAsc(recipeId),
-                recipeStepRepository.findByRecipeIdOrderByStepNoAsc(recipeId)
-        );
+        return toDetailResponse(recipe);
     }
 
     // 레시피, 재료, 조리 단계를 한 트랜잭션으로 저장한다.
@@ -86,7 +85,7 @@ public class RecipeService {
         List<RecipeIngredient> ingredients = recipeIngredientRepository.saveAll(request.toIngredients(recipe));
         List<RecipeStep> steps = recipeStepRepository.saveAll(request.toSteps(recipe));
 
-        return RecipeDetailResponse.of(recipe, ingredients, steps);
+        return toDetailResponse(recipe, ingredients, steps);
     }
 
     // 기본 정보는 보낸 필드만 바꾸고, 재료와 조리 단계는 보낸 경우에만 목록 전체를 교체한다.
@@ -101,7 +100,29 @@ public class RecipeService {
 
         request.applyTo(recipe);
 
-        return RecipeDetailResponse.of(recipe, updateIngredients(recipe, request), updateSteps(recipe, request));
+        return toDetailResponse(recipe, updateIngredients(recipe, request), updateSteps(recipe, request));
+    }
+
+    private RecipeDetailResponse toDetailResponse(Recipe recipe) {
+        return toDetailResponse(
+                recipe,
+                recipeIngredientRepository.findByRecipeIdOrderBySeqAsc(recipe.getId()),
+                recipeStepRepository.findByRecipeIdOrderByStepNoAsc(recipe.getId())
+        );
+    }
+
+    private RecipeDetailResponse toDetailResponse(
+            Recipe recipe,
+            List<RecipeIngredient> ingredients,
+            List<RecipeStep> steps
+    ) {
+        List<Long> ingredientIds = ingredients.stream()
+                .map(RecipeIngredient::getIngredientId)
+                .filter(Objects::nonNull)
+                .toList();
+        Set<Long> basicSeasoningIds = ingredientService.findBasicSeasoningIds(ingredientIds);
+
+        return RecipeDetailResponse.of(recipe, ingredients, steps, basicSeasoningIds);
     }
 
     private List<RecipeIngredient> updateIngredients(Recipe recipe, RecipeUpdateRequest request) {

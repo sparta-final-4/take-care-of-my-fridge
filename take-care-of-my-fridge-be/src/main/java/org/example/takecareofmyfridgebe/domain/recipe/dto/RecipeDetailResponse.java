@@ -7,6 +7,7 @@ import org.example.takecareofmyfridgebe.domain.recipe.entity.RecipeStep;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Set;
 
 @Builder
 public record RecipeDetailResponse(
@@ -48,11 +49,21 @@ public record RecipeDetailResponse(
             String displayName,
             String amount,
             String role,
-            String groupName
+            String groupName,
+            BigDecimal quantity,
+            boolean basicSeasoning
     ) {
-        public static IngredientItem from(RecipeIngredient ingredient) {
-            return new IngredientItem(ingredient.getSeq(), ingredient.getIngredientId(), ingredient.getDisplayName(),
-                    ingredient.getAmount(), ingredient.getRole(), ingredient.getGroupName());
+        public static IngredientItem from(RecipeIngredient ingredient, boolean basicSeasoning) {
+            return new IngredientItem(
+                    ingredient.getSeq(),
+                    ingredient.getIngredientId(),
+                    ingredient.getDisplayName(),
+                    ingredient.getAmount(),
+                    ingredient.getRole(),
+                    ingredient.getGroupName(),
+                    ingredient.getQuantity(),
+                    basicSeasoning
+            );
         }
     }
 
@@ -67,7 +78,12 @@ public record RecipeDetailResponse(
         }
     }
 
-    public static RecipeDetailResponse of(Recipe recipe, List<RecipeIngredient> ingredients, List<RecipeStep> steps) {
+    public static RecipeDetailResponse of(
+            Recipe recipe,
+            List<RecipeIngredient> ingredients,
+            List<RecipeStep> steps,
+            Set<Long> basicSeasoningIds
+    ) {
         return RecipeDetailResponse.builder()
                 .recipeId(recipe.getId())
                 .name(recipe.getName())
@@ -83,7 +99,12 @@ public record RecipeDetailResponse(
                 .tip(recipe.getTip())
                 .tipSummary(recipe.getTipSummary())
                 .nutrition(Nutrition.from(recipe))
-                .ingredients(ingredients.stream().map(IngredientItem::from).toList())
+                .ingredients(ingredients.stream()
+                        .map(ingredient -> IngredientItem.from(
+                                ingredient,
+                                basicSeasoningIds.contains(ingredient.getIngredientId())
+                        ))
+                        .toList())
                 .steps(steps.stream().map(StepItem::from).toList())
                 .build();
     }

@@ -34,6 +34,22 @@ public class IngredientService {
                 .collect(Collectors.toSet());
     }
 
+    /**
+     * 재료 ID 목록 중 기본 양념(is_basic_seasoning = true)인 재료 ID 목록을 조회한다.
+     *
+     * @param ingredientIds 검사할 재료 ID 컬렉션
+     * @return 기본 양념 재료 ID Set
+     */
+    public Set<Long> findBasicSeasoningIds(Collection<Long> ingredientIds) {
+        if (ingredientIds == null || ingredientIds.isEmpty()) {
+            return Collections.emptySet();
+        }
+        return ingredientRepository.findAllById(ingredientIds).stream()
+                .filter(Ingredient::isBasicSeasoning)
+                .map(Ingredient::getId)
+                .collect(Collectors.toSet());
+    }
+
     private boolean isExcludedFromCookingDeduction(Ingredient ingredient) {
         return ingredient.isBasicSeasoning() || ingredient.isCustom() || ingredient.isMealkit();
     }
