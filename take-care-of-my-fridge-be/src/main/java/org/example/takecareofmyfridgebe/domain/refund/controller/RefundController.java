@@ -30,7 +30,8 @@ public class RefundController {
     private final RefundFacade refundFacade;
     private final RefundQueryService refundQueryService;
 
-    // 환불 신청 화면의 환불하기. 신청 즉시 PG 취소까지 마친 결과를 돌려준다
+    // 환불 신청 화면의 환불하기. 신청 즉시 PG 취소까지 마친 결과를 돌려준다.
+    // PG 결과를 확정하지 못하면 요청 상태(REQUESTED)로 돌려주고 웹훅·스케줄러가 마무리한다
     @PostMapping
     public ResponseEntity<ApiResponse<RefundResponse>> request(
             @AuthenticationPrincipal AuthPrincipal principal,
