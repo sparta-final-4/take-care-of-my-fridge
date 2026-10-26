@@ -1,14 +1,41 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Alert, App, Button, Empty, Result, Space, Table, Tag, Typography } from 'antd';
+import {
+  Alert,
+  App,
+  Button,
+  DatePicker,
+  Drawer,
+  Empty,
+  Form,
+  InputNumber,
+  Result,
+  Select,
+  Space,
+  Table,
+  Tag,
+  Typography,
+} from 'antd';
+import type { Dayjs } from 'dayjs';
+import dayjs from 'dayjs';
+import { useState } from 'react';
 import { useNavigate } from 'react-router';
 
 import { ROUTES } from '@/app/paths';
-import type { Candidate } from '@/common/api/clients';
+import type { Candidate, DealEventRequestTypeEnum } from '@/common/api/clients';
 import { getErrorCode } from '@/common/api/errors';
-import { saveDealReview } from '@/domains/deal/api';
+import { registerDealEvent, saveDealReview } from '@/domains/deal/api';
 import { dealQueries } from '@/domains/deal/queries';
+import { DATE_TIME_FORMAT, REQUEST_TIME_FORMAT } from '@/domains/sale/format';
+import { saleQueries } from '@/domains/sale/queries';
 
 import styles from './AdminDealPage.module.scss';
+
+interface EventFormValues {
+  type: DealEventRequestTypeEnum;
+  startsAt: Dayjs;
+  endsAt: Dayjs;
+  limitedQuantity?: number;
+}
 
 const money = (value?: number) =>
   value === undefined ? '-' : `${value.toLocaleString('ko-KR')}원`;
@@ -17,6 +44,9 @@ export default function AdminDealPage() {
   const navigate = useNavigate();
   const { message } = App.useApp();
   const queryClient = useQueryClient();
+  const [form] = Form.useForm<EventFormValues>();
+  const [candidate, setCandidate] = useState<Candidate | null>(null);
+  const type = Form.useWatch('type', form);
   const { data: analysis, error, isPending, isError, refetch } = useQuery(dealQueries.latest());
 
   const review = useMutation({
@@ -26,6 +56,24 @@ export default function AdminDealPage() {
       }),
     onSuccess: () => {
       void message.success('행사 후보로 선택했습니다.');
+      return queryClient.invalidateQueries({ queryKey: dealQueries.all });
+    },
+  });
+
+  const registration = useMutation({
+    mutationFn: (values: EventFormValues) =>
+      registerDealEvent(analysis!.analysisId!, {
+        candidateId: candidate!.candidateId!,
+        type: values.type,
+        startsAt: values.startsAt.format(REQUEST_TIME_FORMAT),
+        endsAt: values.endsAt.format(REQUEST_TIME_FORMAT),
+        ...(values.type === 'FLASH_DROP' ? { limitedQuantity: values.limitedQuantity } : {}),
+      }),
+    onSuccess: () => {
+      void message.success('할인 행사를 등록했습니다.');
+      setCandidate(null);
+      form.resetFields();
+      void queryClient.invalidateQueries({ queryKey: saleQueries.all });
       return queryClient.invalidateQueries({ queryKey: dealQueries.all });
     },
   });
@@ -102,19 +150,106 @@ export default function AdminDealPage() {
           },
           {
             title: '작업',
-            render: (_, item) =>
-              item.eventRequestStatus === 'NONE' && item.reviewStatus !== 'SELECTED' ? (
-                <Button
-                  loading={review.isPending}
-                  disabled={item.candidateId === undefined}
-                  onClick={() => review.mutate(item.candidateId!)}
-                >
-                  선택
-                </Button>
-              ) : null,
+            render: (_, item) => (
+              <Space>
+                {item.eventRequestStatus === 'NONE' && item.reviewStatus !== 'SELECTED' && (
+                  <Button
+                    loading={review.isPending}
+                    disabled={item.candidateId === undefined}
+                    onClick={() => review.mutate(item.candidateId!)}
+                  >
+                    선택
+                  </Button>
+                )}
+                {item.eventRequestStatus === 'NONE' && item.reviewStatus === 'SELECTED' && (
+                  <Button
+                    type="primary"
+                    disabled={analysis.syntheticData}
+                    onClick={() => {
+                      form.setFieldsValue({ type: 'SPECIAL' });
+                      setCandidate(item);
+                    }}
+                  >
+                    행사 등록
+                  </Button>
+                )}
+              </Space>
+            ),
           },
         ]}
       />
+      <Drawer
+        title={`${candidate?.productName ?? ''} 행사 등록`}
+        open={candidate !== null}
+        onClose={() => {
+          setCandidate(null);
+          form.resetFields();
+        }}
+        destroyOnHidden
+        width="min(440px, 100vw)"
+      >
+        <Typography.Paragraph>
+          추천 할인율 {analysis.discountRate}% · 분석 당시 예상 할인가{' '}
+          {money(candidate?.discountPrice)}
+        </Typography.Paragraph>
+        <Form<EventFormValues>
+          form={form}
+          layout="vertical"
+          onFinish={(values) => registration.mutate(values)}
+        >
+          <Form.Item name="type" label="행사 종류" rules={[{ required: true }]}>
+            <Select
+              options={[
+                { label: '특가', value: 'SPECIAL' },
+                { label: '번개 드롭', value: 'FLASH_DROP' },
+              ]}
+            />
+          </Form.Item>
+          <Form.Item
+            name="startsAt"
+            label="시작 시각"
+            rules={[
+              { required: true, message: '시작 시각을 정해 주세요.' },
+              {
+                validator: (_, value: Dayjs | undefined) =>
+                  !value || value.isAfter(dayjs())
+                    ? Promise.resolve()
+                    : Promise.reject(new Error('시작 시각은 지금 이후여야 합니다.')),
+              },
+            ]}
+          >
+            <DatePicker showTime format={DATE_TIME_FORMAT} className={styles.dateTime} />
+          </Form.Item>
+          <Form.Item
+            name="endsAt"
+            label="종료 시각"
+            dependencies={['startsAt']}
+            rules={[
+              { required: true, message: '종료 시각을 정해 주세요.' },
+              {
+                validator: (_, value: Dayjs | undefined) =>
+                  !value || value.isAfter(form.getFieldValue('startsAt'))
+                    ? Promise.resolve()
+                    : Promise.reject(new Error('종료 시각은 시작 시각보다 늦어야 합니다.')),
+              },
+            ]}
+          >
+            <DatePicker showTime format={DATE_TIME_FORMAT} className={styles.dateTime} />
+          </Form.Item>
+          {type === 'FLASH_DROP' && (
+            <Form.Item
+              name="limitedQuantity"
+              label="한정 수량"
+              rules={[{ required: true }, { type: 'number', min: 1 }]}
+            >
+              <InputNumber min={1} precision={0} className={styles.dateTime} />
+            </Form.Item>
+          )}
+          <Button type="primary" htmlType="submit" loading={registration.isPending} block>
+            행사 등록
+          </Button>
+        </Form>
+      </Drawer>
     </section>
   );
 }
