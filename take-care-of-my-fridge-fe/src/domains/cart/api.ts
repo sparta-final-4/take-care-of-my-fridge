@@ -16,6 +16,10 @@ export interface CartItemResponse {
   saleType: 'SPECIAL' | 'FLASH_DROP' | null;
   discountRate: number | null;
   flashDropRemaining: number | null;
+  // 번개 드롭 한정 수량(총 판매 수량)
+  flashDropLimit: number | null;
+  // 진행 중인 할인의 종료 시각. 남은 시간은 이 값으로 화면이 계산한다.
+  saleEndsAt: string | null;
   soldOut: boolean;
 }
 

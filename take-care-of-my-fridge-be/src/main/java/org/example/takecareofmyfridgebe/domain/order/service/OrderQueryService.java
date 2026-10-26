@@ -3,6 +3,7 @@ package org.example.takecareofmyfridgebe.domain.order.service;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderCheckoutResponse;
+import org.example.takecareofmyfridgebe.domain.order.dto.OrderDetailResponse;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderListRequest;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderSummaryResponse;
 import org.example.takecareofmyfridgebe.domain.order.entity.Order;
@@ -31,6 +32,12 @@ public class OrderQueryService {
         Order order = orderReader.getOwnedOrder(memberId, orderId);
         order.validatePending();
         return OrderCheckoutResponse.from(order, orderReader.getOrderItems(order));
+    }
+
+    // 주문 상세 화면용. 목록에서 빠지는 취소 주문까지 모든 상태를 보여 준다.
+    public OrderDetailResponse getDetail(Long memberId, Long orderId) {
+        Order order = orderReader.getOwnedOrder(memberId, orderId);
+        return OrderDetailResponse.from(order, orderReader.getOrderItems(order));
     }
 
     // 내 주문 내역 화면용. 최신 주문이 먼저 온다. id는 주문 순서대로 늘어나 같은 시각의 주문도 순서가 정해진다.

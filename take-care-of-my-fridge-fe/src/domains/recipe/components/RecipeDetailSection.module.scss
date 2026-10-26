@@ -1,0 +1,31 @@
+@use '@/styles/mixins' as *;
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ant-margin-sm);
+}
+
+.back {
+  align-self: flex-start;
+  padding-inline: 0;
+}
+
+// 모바일: 레시피 내용 아래에 요리 완료·후기 / lg부터 MainPage와 같은 좌우 비율
+.row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--ant-margin-lg);
+  align-items: start;
+
+  @include from(lg) {
+    grid-template-columns: minmax(0, 780fr) minmax(0, 416fr);
+  }
+}
+
+.column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ant-margin-lg);
+  min-width: 0;
+}

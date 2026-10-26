@@ -326,4 +326,16 @@ public class FridgeService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.FRIDGE_ITEM_NOT_FOUND));
     }
 
+    /**
+     * 요리 완료로 소진한 재료 종류 수를 조회한다.
+     *
+     * @param memberId 회원 ID
+     * @return 요리 완료로 소진한 재료 종류 수
+     */
+    public long countConsumedByCooking(Long memberId) {
+        if (memberId == null) {
+            return 0L;
+        }
+        return fridgeItemLogRepository.countConsumedByCooking(memberId);
+    }
 }

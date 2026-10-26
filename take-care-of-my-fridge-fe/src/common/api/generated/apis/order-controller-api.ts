@@ -27,6 +27,10 @@ import type { ApiResponseOrderCancelResponse } from '../models';
 // @ts-ignore
 import type { ApiResponseOrderCheckoutResponse } from '../models';
 // @ts-ignore
+import type { ApiResponseOrderConfirmResponse } from '../models';
+// @ts-ignore
+import type { ApiResponseOrderDetailResponse } from '../models';
+// @ts-ignore
 import type { ApiResponsePageResponseOrderSummaryResponse } from '../models';
 // @ts-ignore
 import type { OrderCreateRequest } from '../models';
@@ -47,6 +51,39 @@ export const OrderControllerApiAxiosParamCreator = function (configuration?: Con
             // verify required parameter 'orderId' is not null or undefined
             assertParamExists('cancelOrder', 'orderId', orderId)
             const localVarPath = `/api/orders/{orderId}/cancel`
+                .replace('{orderId}', encodeURIComponent(String(orderId)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'PATCH', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            localVarHeaderParameter['Accept'] = '*/*';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @param {number} orderId 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        confirmOrder: async (orderId: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'orderId' is not null or undefined
+            assertParamExists('confirmOrder', 'orderId', orderId)
+            const localVarPath = `/api/orders/{orderId}/confirm`
                 .replace('{orderId}', encodeURIComponent(String(orderId)));
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
@@ -143,6 +180,39 @@ export const OrderControllerApiAxiosParamCreator = function (configuration?: Con
         },
         /**
          * 
+         * @param {number} orderId 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        getDetail: async (orderId: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'orderId' is not null or undefined
+            assertParamExists('getDetail', 'orderId', orderId)
+            const localVarPath = `/api/orders/{orderId}`
+                .replace('{orderId}', encodeURIComponent(String(orderId)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            localVarHeaderParameter['Accept'] = '*/*';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
          * @param {OrderListRequest} request 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
@@ -202,6 +272,18 @@ export const OrderControllerApiFp = function(configuration?: Configuration) {
         },
         /**
          * 
+         * @param {number} orderId 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async confirmOrder(orderId: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ApiResponseOrderConfirmResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.confirmOrder(orderId, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['OrderControllerApi.confirmOrder']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
          * @param {OrderCreateRequest} orderCreateRequest 
          * @param {string} [idempotencyKey] 
          * @param {*} [options] Override http request option.
@@ -223,6 +305,18 @@ export const OrderControllerApiFp = function(configuration?: Configuration) {
             const localVarAxiosArgs = await localVarAxiosParamCreator.getCheckout(orderId, options);
             const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
             const localVarOperationServerBasePath = operationServerMap['OrderControllerApi.getCheckout']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @param {number} orderId 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async getDetail(orderId: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ApiResponseOrderDetailResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.getDetail(orderId, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['OrderControllerApi.getDetail']?.[localVarOperationServerIndex]?.url;
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
@@ -257,6 +351,15 @@ export const OrderControllerApiFactory = function (configuration?: Configuration
         },
         /**
          * 
+         * @param {OrderControllerApiConfirmOrderRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        confirmOrder(requestParameters: OrderControllerApiConfirmOrderRequest, options?: RawAxiosRequestConfig): AxiosPromise<ApiResponseOrderConfirmResponse> {
+            return localVarFp.confirmOrder(requestParameters.orderId, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
          * @param {OrderControllerApiCreateOrderRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
@@ -272,6 +375,15 @@ export const OrderControllerApiFactory = function (configuration?: Configuration
          */
         getCheckout(requestParameters: OrderControllerApiGetCheckoutRequest, options?: RawAxiosRequestConfig): AxiosPromise<ApiResponseOrderCheckoutResponse> {
             return localVarFp.getCheckout(requestParameters.orderId, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @param {OrderControllerApiGetDetailRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        getDetail(requestParameters: OrderControllerApiGetDetailRequest, options?: RawAxiosRequestConfig): AxiosPromise<ApiResponseOrderDetailResponse> {
+            return localVarFp.getDetail(requestParameters.orderId, options).then((request) => request(axios, basePath));
         },
         /**
          * 
@@ -299,6 +411,14 @@ export interface OrderControllerApiInterface {
 
     /**
      * 
+     * @param {OrderControllerApiConfirmOrderRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    confirmOrder(requestParameters: OrderControllerApiConfirmOrderRequest, options?: RawAxiosRequestConfig): AxiosPromise<ApiResponseOrderConfirmResponse>;
+
+    /**
+     * 
      * @param {OrderControllerApiCreateOrderRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
@@ -312,6 +432,14 @@ export interface OrderControllerApiInterface {
      * @throws {RequiredError}
      */
     getCheckout(requestParameters: OrderControllerApiGetCheckoutRequest, options?: RawAxiosRequestConfig): AxiosPromise<ApiResponseOrderCheckoutResponse>;
+
+    /**
+     * 
+     * @param {OrderControllerApiGetDetailRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    getDetail(requestParameters: OrderControllerApiGetDetailRequest, options?: RawAxiosRequestConfig): AxiosPromise<ApiResponseOrderDetailResponse>;
 
     /**
      * 
@@ -331,6 +459,13 @@ export interface OrderControllerApiCancelOrderRequest {
 }
 
 /**
+ * Request parameters for confirmOrder operation in OrderControllerApi.
+ */
+export interface OrderControllerApiConfirmOrderRequest {
+    readonly orderId: number
+}
+
+/**
  * Request parameters for createOrder operation in OrderControllerApi.
  */
 export interface OrderControllerApiCreateOrderRequest {
@@ -343,6 +478,13 @@ export interface OrderControllerApiCreateOrderRequest {
  * Request parameters for getCheckout operation in OrderControllerApi.
  */
 export interface OrderControllerApiGetCheckoutRequest {
+    readonly orderId: number
+}
+
+/**
+ * Request parameters for getDetail operation in OrderControllerApi.
+ */
+export interface OrderControllerApiGetDetailRequest {
     readonly orderId: number
 }
 
@@ -369,6 +511,16 @@ export class OrderControllerApi extends BaseAPI implements OrderControllerApiInt
 
     /**
      * 
+     * @param {OrderControllerApiConfirmOrderRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public confirmOrder(requestParameters: OrderControllerApiConfirmOrderRequest, options?: RawAxiosRequestConfig) {
+        return OrderControllerApiFp(this.configuration).confirmOrder(requestParameters.orderId, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
      * @param {OrderControllerApiCreateOrderRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
@@ -385,6 +537,16 @@ export class OrderControllerApi extends BaseAPI implements OrderControllerApiInt
      */
     public getCheckout(requestParameters: OrderControllerApiGetCheckoutRequest, options?: RawAxiosRequestConfig) {
         return OrderControllerApiFp(this.configuration).getCheckout(requestParameters.orderId, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @param {OrderControllerApiGetDetailRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public getDetail(requestParameters: OrderControllerApiGetDetailRequest, options?: RawAxiosRequestConfig) {
+        return OrderControllerApiFp(this.configuration).getDetail(requestParameters.orderId, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**

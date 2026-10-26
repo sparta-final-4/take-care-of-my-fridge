@@ -20,22 +20,24 @@ export function MyCookingSummaryCards({
 
   return (
     <div className={styles.container}>
-      {/* 1. 이번 달 요리 기록 카드 */}
+      {/* 1. 지금까지 요리 기록 카드 */}
       <div className={styles.cardItem}>
-        <SectionCard title="이번 달 요리 기록">
+        <SectionCard title="지금까지 요리 기록">
           <div className={styles.summaryContent}>
             <div className={styles.summaryRow}>
               <span className={styles.summaryLabel}>요리 완료</span>
               <span className={styles.summaryValue}>{summary.completedCookCount}번</span>
             </div>
             <div className={styles.summaryRow}>
-              <span className={styles.summaryLabel}>냉장고에서 소진한 재료</span>
-              <span className={styles.summaryValue}>{summary.consumedIngredientCount}개</span>
+              <span className={styles.summaryLabel}>요리에 쓴 재료</span>
+              <span className={styles.summaryValue}>{summary.consumedIngredientCount}종</span>
             </div>
             <div className={styles.summaryRow}>
               <span className={styles.summaryLabel}>가장 많이 만든 레시피</span>
               <span className={styles.summaryValue}>
-                {summary.mostCookedRecipeName} · {summary.mostCookedRecipeCount}회
+                {summary.mostCookedRecipeName && summary.mostCookedRecipeName !== '-'
+                  ? `${summary.mostCookedRecipeName} · ${summary.mostCookedRecipeCount}회`
+                  : '-'}
               </span>
             </div>
           </div>

@@ -8,4 +8,6 @@ import java.util.Optional;
 public interface CookingLogRepository extends JpaRepository<CookingLog, Long>, CookingLogRepositoryCustom {
 
     Optional<CookingLog> findByIdAndMemberId(Long id, Long memberId);
+
+    boolean existsByMemberIdAndRecipeId(Long memberId, Long recipeId);
 }

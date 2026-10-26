@@ -1,0 +1,53 @@
+@use '@/styles/variables' as *;
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ant-margin-md);
+}
+
+.noticeBox {
+  padding: var(--ant-padding-sm) var(--ant-padding-md);
+  background-color: var(--ant-color-bg-container-disabled);
+  border-radius: var(--ant-border-radius);
+  text-align: center;
+}
+
+.myReviewBox {
+  padding: var(--ant-padding-md);
+  background-color: var(--ant-color-primary-bg);
+  border: 1px solid var(--ant-color-primary-border);
+  border-radius: var(--ant-border-radius);
+}
+
+.myReviewHeader {
+  margin-bottom: var(--ant-margin-xs);
+}
+
+.myReviewBadge {
+  color: var(--ant-color-primary-text);
+  font-size: 13px;
+}
+
+.reviewItem {
+  padding-block: var(--ant-padding-sm);
+  border-bottom: 1px solid var(--ant-color-border-secondary);
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.header {
+  margin-bottom: var(--ant-margin-xxs);
+}
+
+.content {
+  margin-bottom: 0 !important;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.moreButtonWrapper {
+  padding-top: var(--ant-padding-sm);
+}

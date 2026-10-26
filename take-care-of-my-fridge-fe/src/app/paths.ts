@@ -11,6 +11,9 @@ export const ROUTES = {
   mypageChats: '/mypage/chats',
   mypageProfile: '/mypage/profile',
   mypageOrders: '/mypage/orders',
+  mypageOrderDetail: '/mypage/orders/:orderId',
+  recipes: '/recipes',
+  recipeDetail: '/recipes/:recipeId',
   products: '/products',
   productDetail: '/products/:productId',
   cart: '/cart',
@@ -18,4 +21,5 @@ export const ROUTES = {
   adminMembers: '/admin/members',
   adminAudit: '/admin/audit',
   adminForecast: '/admin/forecast',
+  adminSaleEventNew: '/admin/sale-events/new',
 } as const;

@@ -10,12 +10,15 @@ import org.example.takecareofmyfridgebe.domain.cart.entity.CartItem;
 import org.example.takecareofmyfridgebe.domain.cart.repository.CartItemRepository;
 import org.example.takecareofmyfridgebe.domain.cart.repository.CartRepository;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.StorageType;
+import org.example.takecareofmyfridgebe.domain.order.dto.OrderCreateItemRequest;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderCreateRequest;
 import org.example.takecareofmyfridgebe.domain.order.repository.OrderItemRepository;
 import org.example.takecareofmyfridgebe.domain.order.repository.OrderRepository;
 import org.example.takecareofmyfridgebe.domain.product.entity.Product;
 import org.example.takecareofmyfridgebe.domain.product.entity.ProductType;
 import org.example.takecareofmyfridgebe.domain.product.repository.ProductRepository;
+import org.example.takecareofmyfridgebe.domain.sale.service.SaleEventReader;
+import org.example.takecareofmyfridgebe.domain.sale.service.SaleEventStockService;
 import org.example.takecareofmyfridgebe.global.config.JpaAuditingConfig;
 import org.example.takecareofmyfridgebe.global.config.QueryDslConfig;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
@@ -35,7 +38,8 @@ import org.springframework.transaction.annotation.Transactional;
 // 주문번호 생성기를 대신해 같은 번호를 두 번 내게 하고, 유니크 위반이 409로 바뀌며 롤백되는지 DB 상태로 확인한다.
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({JpaAuditingConfig.class, QueryDslConfig.class, OrderCreateService.class, OrderReader.class})
+@Import({JpaAuditingConfig.class, QueryDslConfig.class, OrderCreateService.class, OrderReader.class,
+    SaleEventReader.class, SaleEventStockService.class})
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class OrderCreateServiceConstraintTest extends MySqlContainerSupport {
 
@@ -83,9 +87,9 @@ class OrderCreateServiceConstraintTest extends MySqlContainerSupport {
             .storage(StorageType.REFRIGERATED).shelfDays(7).build());
         CartItem itemOfMember1 = saveCartItem(1L, greenOnion);
         CartItem itemOfMember2 = saveCartItem(2L, greenOnion);
-        orderCreateService.createOrder(1L, "key-1", new OrderCreateRequest(List.of(itemOfMember1.getId())));
+        orderCreateService.createOrder(1L, "key-1", new OrderCreateRequest(List.of(new OrderCreateItemRequest(itemOfMember1.getId(), 3000, null))));
 
-        assertThatThrownBy(() -> orderCreateService.createOrder(2L, "key-2", new OrderCreateRequest(List.of(itemOfMember2.getId()))))
+        assertThatThrownBy(() -> orderCreateService.createOrder(2L, "key-2", new OrderCreateRequest(List.of(new OrderCreateItemRequest(itemOfMember2.getId(), 3000, null)))))
             .isInstanceOf(BusinessException.class)
             .extracting("errorCode").isEqualTo(ErrorCode.ORDER_NUMBER_CONFLICT);
         assertThat(orderRepository.count()).isEqualTo(1);

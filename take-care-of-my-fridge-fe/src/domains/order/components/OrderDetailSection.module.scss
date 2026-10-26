@@ -1,0 +1,98 @@
+@use '@/styles/variables' as *;
+@use '@/styles/mixins' as *;
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ant-margin-lg);
+}
+
+.card {
+  min-width: 0;
+  padding: var(--ant-padding-lg);
+  background: var(--ant-color-bg-container);
+  border: 1px solid var(--ant-color-border);
+  border-radius: var(--ant-border-radius-lg);
+}
+
+.heading {
+  min-width: 0;
+}
+
+.title {
+  margin: 0;
+}
+
+.tag {
+  margin: 0;
+}
+
+.meta {
+  font-variant-numeric: tabular-nums;
+}
+
+// 좁은 화면에서 주문번호와 주문 시각이 중간에서 끊기지 않고 둘 사이에서만 나뉘게 한다
+.nowrap {
+  white-space: nowrap;
+}
+
+// 터치 화면에서 누르기 쉽게 lg 미만은 높이를 키운다
+.button {
+  min-height: $touch-target-size;
+
+  @include from(lg) {
+    min-height: auto;
+  }
+}
+
+// 구분선은 카드 끝에서 조금 띄우고, 머리글과 상품 내용은 그보다 더 안쪽에 둔다.
+// 둘을 더한 여백이 다른 카드의 안쪽 여백과 같아 열이 맞는다. 마지막 상품의 구분선은 카드 테두리와 겹치므로 뺀다
+.list {
+  padding-block: 0;
+  padding-inline: var(--ant-padding-sm);
+
+  > * {
+    padding-inline: calc(var(--ant-padding-lg) - var(--ant-padding-sm));
+  }
+
+  > :last-child {
+    border-bottom: 0;
+  }
+}
+
+// lg 미만은 결제 금액 아래에 구매 확정·환불이 온다
+.bottom {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--ant-margin-lg);
+  align-items: start;
+
+  @include from(lg) {
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  }
+}
+
+.cardTitle {
+  font-size: var(--ant-font-size-lg);
+}
+
+.rows {
+  margin-top: var(--ant-margin);
+}
+
+.amount {
+  font-variant-numeric: tabular-nums;
+}
+
+.divider {
+  margin: var(--ant-margin) 0;
+}
+
+.total {
+  font-size: var(--ant-font-size-lg);
+  font-variant-numeric: tabular-nums;
+}
+
+.notice {
+  margin: var(--ant-margin-xs) 0 var(--ant-margin);
+}

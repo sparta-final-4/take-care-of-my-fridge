@@ -24,11 +24,14 @@ import org.example.takecareofmyfridgebe.domain.auth.service.JwtTokenService;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderCancelResponse;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderCheckoutResponse;
+import org.example.takecareofmyfridgebe.domain.order.dto.OrderConfirmResponse;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderCreateResult;
+import org.example.takecareofmyfridgebe.domain.order.dto.OrderDetailResponse;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderListRequest;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderSummaryResponse;
 import org.example.takecareofmyfridgebe.domain.order.entity.OrderStatus;
 import org.example.takecareofmyfridgebe.domain.order.service.OrderCancelService;
+import org.example.takecareofmyfridgebe.domain.order.service.OrderConfirmService;
 import org.example.takecareofmyfridgebe.domain.order.service.OrderCreateService;
 import org.example.takecareofmyfridgebe.domain.order.service.OrderQueryService;
 import org.example.takecareofmyfridgebe.global.config.SecurityConfig;
@@ -53,25 +56,27 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 @Import({SecurityConfig.class, OrderControllerTest.TestConfig.class})
 class OrderControllerTest {
 
-    private static final String BODY = "{\"cartItemIds\": [11]}";
+    private static final String BODY = "{\"items\": [{\"cartItemId\": 11, \"unitPrice\": 3000, \"saleType\": null}]}";
 
     private final MockMvc mvc;
     private final OrderCreateService orderCreateService;
     private final OrderQueryService orderQueryService;
     private final OrderCancelService orderCancelService;
+    private final OrderConfirmService orderConfirmService;
 
     @Autowired
     OrderControllerTest(MockMvc mvc, OrderCreateService orderCreateService, OrderQueryService orderQueryService,
-                        OrderCancelService orderCancelService) {
+                        OrderCancelService orderCancelService, OrderConfirmService orderConfirmService) {
         this.mvc = mvc;
         this.orderCreateService = orderCreateService;
         this.orderQueryService = orderQueryService;
         this.orderCancelService = orderCancelService;
+        this.orderConfirmService = orderConfirmService;
     }
 
     @BeforeEach
     void resetMock() {
-        reset(orderCreateService, orderQueryService, orderCancelService);
+        reset(orderCreateService, orderQueryService, orderCancelService, orderConfirmService);
     }
 
     @Test
@@ -97,6 +102,67 @@ class OrderControllerTest {
                         .with(loginAsMember7()))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.error.code").value("ORDER_007"));
+    }
+
+    @Test
+    @DisplayName("구매 확정은 로그인한 회원 번호와 주문 번호로 서비스를 부르고 200이다")
+    void confirmOrder_returns200() throws Exception {
+        when(orderConfirmService.confirm(7L, 5001L)).thenReturn(new OrderConfirmResponse(5001L, OrderStatus.CONFIRMED));
+
+        mvc.perform(patch("/api/orders/5001/confirm")
+                        .with(csrf())
+                        .with(loginAsMember7()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.orderId").value(5001))
+                .andExpect(jsonPath("$.data.status").value("CONFIRMED"));
+    }
+
+    @Test
+    @DisplayName("결제 대기 주문을 구매 확정하면 409다")
+    void confirmOrder_pendingOrder_returns409() throws Exception {
+        when(orderConfirmService.confirm(7L, 5001L)).thenThrow(new BusinessException(ErrorCode.ORDER_NOT_PAID));
+
+        mvc.perform(patch("/api/orders/5001/confirm")
+                        .with(csrf())
+                        .with(loginAsMember7()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("ORDER_009"));
+    }
+
+    @Test
+    @DisplayName("구매 확정에서 남의 주문이거나 없는 주문이면 404다")
+    void confirmOrder_notOwned_returns404() throws Exception {
+        when(orderConfirmService.confirm(7L, 5001L)).thenThrow(new BusinessException(ErrorCode.ORDER_NOT_FOUND));
+
+        mvc.perform(patch("/api/orders/5001/confirm")
+                        .with(csrf())
+                        .with(loginAsMember7()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error.code").value("ORDER_001"));
+    }
+
+    @Test
+    @DisplayName("주문 상세 조회는 로그인한 회원 번호와 주문 번호로 서비스를 부르고 200이다")
+    void getDetail_returns200() throws Exception {
+        when(orderQueryService.getDetail(7L, 5001L)).thenReturn(detailResponse());
+
+        mvc.perform(get("/api/orders/5001")
+                        .with(loginAsMember7()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.orderId").value(5001))
+                .andExpect(jsonPath("$.data.status").value("CONFIRMED"))
+                .andExpect(jsonPath("$.data.confirmedAt").value("2026-10-21T14:30:00"));
+    }
+
+    @Test
+    @DisplayName("주문 상세 조회에서 남의 주문이거나 없는 주문이면 404다")
+    void getDetail_notOwned_returns404() throws Exception {
+        when(orderQueryService.getDetail(7L, 5001L)).thenThrow(new BusinessException(ErrorCode.ORDER_NOT_FOUND));
+
+        mvc.perform(get("/api/orders/5001")
+                        .with(loginAsMember7()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error.code").value("ORDER_001"));
     }
 
     @Test
@@ -202,7 +268,7 @@ class OrderControllerTest {
         mvc.perform(post("/api/orders")
                         .header("Idempotency-Key", "key-1")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"cartItemIds\": []}")
+                        .content("{\"items\": []}")
                         .with(csrf())
                         .with(loginAsMember7()))
                 .andExpect(status().isBadRequest())
@@ -214,12 +280,14 @@ class OrderControllerTest {
     @Test
     @DisplayName("장바구니 항목 번호가 50개를 넘으면 400이고 서비스를 부르지 않는다")
     void createOrder_tooManyCartItemIds_returns400() throws Exception {
-        String ids = IntStream.rangeClosed(1, 51).mapToObj(String::valueOf).collect(Collectors.joining(","));
+        String items = IntStream.rangeClosed(1, 51)
+                .mapToObj(id -> "{\"cartItemId\": " + id + ", \"unitPrice\": 3000}")
+                .collect(Collectors.joining(","));
 
         mvc.perform(post("/api/orders")
                         .header("Idempotency-Key", "key-1")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"cartItemIds\": [" + ids + "]}")
+                        .content("{\"items\": [" + items + "]}")
                         .with(csrf())
                         .with(loginAsMember7()))
                 .andExpect(status().isBadRequest())
@@ -231,6 +299,12 @@ class OrderControllerTest {
     private OrderCheckoutResponse response() {
         return new OrderCheckoutResponse(5001L, "20261020143005123001", OrderStatus.PENDING,
                 LocalDateTime.of(2026, 10, 20, 14, 30), 3000L, 0L, 3000L, List.of());
+    }
+
+    private OrderDetailResponse detailResponse() {
+        return new OrderDetailResponse(5001L, "20261020143005123001", OrderStatus.CONFIRMED,
+                LocalDateTime.of(2026, 10, 20, 14, 30), LocalDateTime.of(2026, 10, 21, 14, 30),
+                3000L, 0L, 3000L, List.of());
     }
 
     private RequestPostProcessor loginAsMember7() {
@@ -255,6 +329,11 @@ class OrderControllerTest {
         @Bean
         OrderCancelService orderCancelService() {
             return mock(OrderCancelService.class);
+        }
+
+        @Bean
+        OrderConfirmService orderConfirmService() {
+            return mock(OrderConfirmService.class);
         }
 
         @Bean

@@ -7,10 +7,11 @@ import com.querydsl.jpa.impl.JPAQuery;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.CookingStatsCount;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.CookingStatsResponse;
+import org.example.takecareofmyfridgebe.domain.cooking.dto.MostCookedRecipeDto;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeResponse;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeReviewStatus;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeSortType;
-import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeSummaryResponse;
+import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeSummaryCount;
 import org.example.takecareofmyfridgebe.domain.cooking.entity.CookingLog;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -22,6 +23,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 
 import java.util.List;
+import java.util.Optional;
 
 import static org.example.takecareofmyfridgebe.domain.cooking.entity.QCookingLog.cookingLog;
 import static org.example.takecareofmyfridgebe.domain.recipe.entity.QRecipe.recipe;
@@ -29,6 +31,7 @@ import static org.example.takecareofmyfridgebe.domain.review.entity.QRecipeRevie
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -53,7 +56,10 @@ class CookingLogRepositoryImplTest {
     private JPAQuery<MyRecipeResponse> myRecipeQuery;
 
     @Mock
-    private JPAQuery<MyRecipeSummaryResponse> summaryQuery;
+    private JPAQuery<MyRecipeSummaryCount> summaryQuery;
+
+    @Mock
+    private JPAQuery<MostCookedRecipeDto> mostCookedQuery;
 
     @Mock
     private JPAQuery<CookingStatsCount> statsCountQuery;
@@ -97,27 +103,39 @@ class CookingLogRepositoryImplTest {
     }
 
     /**
-     * getMyRecipesSummary 호출 시 memberId가 null이면
+     * getMyRecipesSummaryCount 호출 시 memberId가 null이면
      * 쿼리를 실행하지 않고 IllegalArgumentException이 발생하는지 검증한다.
      */
     @Test
-    void getMyRecipesSummaryThrowsWhenMemberIdIsNull() {
+    void getMyRecipesSummaryCountThrowsWhenMemberIdIsNull() {
         // When & Then
         assertThrows(
                 IllegalArgumentException.class,
-                () -> repository.getMyRecipesSummary(null)
+                () -> repository.getMyRecipesSummaryCount(null)
         );
         verify(queryFactory, never()).select(any(Expression.class));
     }
 
     /**
-     * 기본 조회(reviewStatus=ALL, sort=RECENT)일 때:
-     * 1) Recipe 및 RecipeReview left join이 정확히 호출되는지
-     * 2) where 절에 memberId 조건만 들어가고 reviewStatus 필터는 null(생략)인지
-     * 3) orderBy 절이 max(createdAt) DESC, recipeId DESC 순서로 들어가는지 검증한다.
+     * findMostCookedRecipe 호출 시 memberId가 null이면
+     * 쿼리를 실행하지 않고 IllegalArgumentException이 발생하는지 검증한다.
      */
     @Test
-    void findMyRecipesWithDefaultCondition() {
+    void findMostCookedRecipeThrowsWhenMemberIdIsNull() {
+        // When & Then
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> repository.findMostCookedRecipe(null)
+        );
+        verify(queryFactory, never()).select(any(Expression.class));
+    }
+
+    /**
+     * findMyRecipes 호출 시 recipe 및 recipeReview 테이블과의 left join이 호출되고,
+     * 기본 ALL 조회에서는 where 절에 reviewId 조건이 포함되지 않는지 검증한다.
+     */
+    @Test
+    void findMyRecipesBuildsCorrectJoinsAndBasicWhereClause() {
         // Given
         Long memberId = 7L;
         PageRequest pageRequest = PageRequest.of(0, 10);
@@ -136,9 +154,13 @@ class CookingLogRepositoryImplTest {
         when(myRecipeQuery.limit(10L)).thenReturn(myRecipeQuery);
         when(myRecipeQuery.fetch()).thenReturn(List.of());
 
-        // countQuery mocking (lenient: PageableExecutionUtils가 첫 페이지 빈 리스트일 때 countQuery 호출을 생략할 수 있음)
         lenient().when(queryFactory.select(cookingLog.recipeId.countDistinct())).thenReturn(longQuery);
         lenient().when(longQuery.from(cookingLog)).thenReturn(longQuery);
+        lenient().when(longQuery.leftJoin(recipeReview)).thenReturn(longQuery);
+        lenient().when(longQuery.on(recipeReview.member.id.eq(cookingLog.memberId)
+                .and(recipeReview.recipeId.eq(cookingLog.recipeId)))).thenReturn(longQuery);
+        lenient().when(longQuery.where(any(Predicate[].class))).thenReturn(longQuery);
+        lenient().when(longQuery.fetchOne()).thenReturn(0L);
         lenient().when(longQuery.leftJoin(recipeReview)).thenReturn(longQuery);
         lenient().when(longQuery.on(recipeReview.member.id.eq(cookingLog.memberId)
                 .and(recipeReview.recipeId.eq(cookingLog.recipeId)))).thenReturn(longQuery);
@@ -149,24 +171,18 @@ class CookingLogRepositoryImplTest {
         Page<MyRecipeResponse> result = repository.findMyRecipes(
                 memberId, MyRecipeReviewStatus.ALL, MyRecipeSortType.RECENT, pageRequest);
 
-        // Then: Recipe 및 Review left join 호출 확인
+        // Then: 조인 호출 확인
         verify(myRecipeQuery).leftJoin(recipe);
         verify(myRecipeQuery).leftJoin(recipeReview);
 
-        // Then: where 조건 캡처 및 확인 (reviewStatus=ALL 이므로 두 번째 인자는 null)
+        // where 절에 memberId 조건만 포함되고 reviewStatus 조건(null)은 없음 확인
         ArgumentCaptor<Predicate[]> whereCaptor = ArgumentCaptor.forClass(Predicate[].class);
         verify(myRecipeQuery).where(whereCaptor.capture());
         Predicate[] predicates = whereCaptor.getValue();
         assertEquals(cookingLog.memberId.eq(memberId), predicates[0]);
         assertNull(predicates[1]);
 
-        // Then: orderBy 정렬 확인 (RECENT: max(createdAt) desc, recipeId desc)
-        ArgumentCaptor<OrderSpecifier[]> orderCaptor = ArgumentCaptor.forClass(OrderSpecifier[].class);
-        verify(myRecipeQuery).orderBy(orderCaptor.capture());
-        OrderSpecifier[] orderSpecifiers = orderCaptor.getValue();
-        assertEquals(cookingLog.createdAt.max().desc(), orderSpecifiers[0]);
-        assertEquals(cookingLog.recipeId.desc(), orderSpecifiers[1]);
-
+        assertEquals(0, result.getContent().size());
         assertEquals(0, result.getTotalElements());
     }
 
@@ -195,9 +211,13 @@ class CookingLogRepositoryImplTest {
         when(myRecipeQuery.limit(5L)).thenReturn(myRecipeQuery);
         when(myRecipeQuery.fetch()).thenReturn(List.of());
 
-        // countQuery mocking
         lenient().when(queryFactory.select(cookingLog.recipeId.countDistinct())).thenReturn(longQuery);
         lenient().when(longQuery.from(cookingLog)).thenReturn(longQuery);
+        lenient().when(longQuery.leftJoin(recipeReview)).thenReturn(longQuery);
+        lenient().when(longQuery.on(recipeReview.member.id.eq(cookingLog.memberId)
+                .and(recipeReview.recipeId.eq(cookingLog.recipeId)))).thenReturn(longQuery);
+        lenient().when(longQuery.where(any(Predicate[].class))).thenReturn(longQuery);
+        lenient().when(longQuery.fetchOne()).thenReturn(0L);
         lenient().when(longQuery.leftJoin(recipeReview)).thenReturn(longQuery);
         lenient().when(longQuery.on(recipeReview.member.id.eq(cookingLog.memberId)
                 .and(recipeReview.recipeId.eq(cookingLog.recipeId)))).thenReturn(longQuery);
@@ -207,14 +227,14 @@ class CookingLogRepositoryImplTest {
         // When
         repository.findMyRecipes(memberId, MyRecipeReviewStatus.WRITTEN, MyRecipeSortType.MOST, pageRequest);
 
-        // Then: where 조건 캡처 및 확인 (reviewStatus=WRITTEN -> recipeReview.id.isNotNull())
+        // Then: where 조건 캡처 및 확인
         ArgumentCaptor<Predicate[]> whereCaptor = ArgumentCaptor.forClass(Predicate[].class);
         verify(myRecipeQuery).where(whereCaptor.capture());
         Predicate[] predicates = whereCaptor.getValue();
         assertEquals(cookingLog.memberId.eq(memberId), predicates[0]);
         assertEquals(recipeReview.id.isNotNull(), predicates[1]);
 
-        // Then: orderBy 정렬 확인 (MOST: count() desc, max(createdAt) desc, recipeId desc)
+        // Then: orderBy 정렬 확인
         ArgumentCaptor<OrderSpecifier[]> orderCaptor = ArgumentCaptor.forClass(OrderSpecifier[].class);
         verify(myRecipeQuery).orderBy(orderCaptor.capture());
         OrderSpecifier[] orderSpecifiers = orderCaptor.getValue();
@@ -265,14 +285,14 @@ class CookingLogRepositoryImplTest {
     }
 
     /**
-     * getMyRecipesSummary 단일 쿼리로 recipeCount, totalCookCount, writtenCount를 조회하고
+     * getMyRecipesSummaryCount 단일 쿼리로 recipeCount, totalCookCount, writtenCount를 조회하고
      * notWrittenCount(recipeCount - writtenCount)가 자동 산출되는지 검증한다.
      */
     @Test
-    void getMyRecipesSummaryBuildsSingleQueryAndCalculatesCounts() {
+    void getMyRecipesSummaryCountBuildsSingleQueryAndCalculatesCounts() {
         // Given: 레시피 3개, 총 요리 7회, 후기 2건 작성 -> 미작성 1건
         Long memberId = 7L;
-        MyRecipeSummaryResponse expectedSummary = new MyRecipeSummaryResponse(3L, 7L, 2L);
+        MyRecipeSummaryCount expectedSummary = new MyRecipeSummaryCount(3L, 7L, 2L);
 
         when(queryFactory.select(any(Expression.class))).thenReturn(summaryQuery);
         when(summaryQuery.from(cookingLog)).thenReturn(summaryQuery);
@@ -283,7 +303,7 @@ class CookingLogRepositoryImplTest {
         when(summaryQuery.fetchOne()).thenReturn(expectedSummary);
 
         // When
-        MyRecipeSummaryResponse summary = repository.getMyRecipesSummary(memberId);
+        MyRecipeSummaryCount summary = repository.getMyRecipesSummaryCount(memberId);
 
         // Then: 조인 및 조건 호출 확인과 자동 계산된 notWrittenCount 확인
         assertEquals(3L, summary.recipeCount());
@@ -293,6 +313,29 @@ class CookingLogRepositoryImplTest {
 
         verify(summaryQuery).leftJoin(recipeReview);
         verify(summaryQuery).where(cookingLog.memberId.eq(memberId));
+    }
+
+    /**
+     * findMostCookedRecipe 호출 시 query 조립과 결과 DTO 반환을 검증한다.
+     */
+    @Test
+    void findMostCookedRecipeBuildsQueryAndReturnsResult() {
+        Long memberId = 7L;
+        MostCookedRecipeDto expected = new MostCookedRecipeDto(1L, 5L);
+
+        when(queryFactory.select(any(Expression.class))).thenReturn(mostCookedQuery);
+        when(mostCookedQuery.from(cookingLog)).thenReturn(mostCookedQuery);
+        when(mostCookedQuery.where(cookingLog.memberId.eq(memberId))).thenReturn(mostCookedQuery);
+        when(mostCookedQuery.groupBy(cookingLog.recipeId)).thenReturn(mostCookedQuery);
+        when(mostCookedQuery.orderBy(any(OrderSpecifier[].class))).thenReturn(mostCookedQuery);
+        when(mostCookedQuery.limit(1L)).thenReturn(mostCookedQuery);
+        when(mostCookedQuery.fetchOne()).thenReturn(expected);
+
+        Optional<MostCookedRecipeDto> result = repository.findMostCookedRecipe(memberId);
+
+        assertTrue(result.isPresent());
+        assertEquals(1L, result.get().recipeId());
+        assertEquals(5L, result.get().cookCount());
     }
 
     /**

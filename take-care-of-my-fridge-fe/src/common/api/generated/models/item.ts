@@ -16,18 +16,7 @@
 
 
 export interface Item {
-    'expirationDate'?: string;
-    'quantity': number;
-    'rawName': string;
-    'storage'?: ItemStorageEnum;
+    'orderItemId': number;
+    'quantity'?: number;
 }
-
-export const ItemStorageEnum = {
-    Refrigerated: 'REFRIGERATED',
-    Frozen: 'FROZEN',
-    RoomTemp: 'ROOM_TEMP',
-} as const;
-
-export type ItemStorageEnum = typeof ItemStorageEnum[keyof typeof ItemStorageEnum];
-
 

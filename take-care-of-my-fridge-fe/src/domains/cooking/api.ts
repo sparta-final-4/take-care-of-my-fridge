@@ -1,52 +1,86 @@
-import { axiosInstance } from '@/common/api/axiosInstance';
-import type { ApiResponse } from '@/common/api/types';
+import {
+  cookingLogApi,
+  cookingStatsApi,
+  myRecipeApi,
+  type CookingLogResponse,
+  type CookingLogSearchRequest,
+  type CookingLogUpdateRequest,
+  type CookingStatsResponse,
+  type MyRecipeListResponse,
+  type MyRecipeResponse,
+  type MyRecipeSearchRequest,
+  type MyRecipeSummaryResponse,
+  type PageResponseCookingLogResponse,
+} from '@/common/api/clients';
+import { unwrap } from '@/common/api/unwrap';
 
 export type CookingSortType = 'LATEST' | 'MOST_COOKED';
 export type CookingTabType = 'ALL' | 'UNREVIEWED' | 'REVIEWED';
 
-export interface CookingHistoryItem {
-  id: number;
-  date: string; // 'YYYY-MM-DD'
-  result: 'SUCCESS' | 'FAILED';
-  memo: string;
-}
+export type {
+  CookingLogResponse,
+  CookingLogSearchRequest,
+  CookingLogUpdateRequest,
+  CookingStatsResponse,
+  MyRecipeListResponse,
+  MyRecipeResponse,
+  MyRecipeSummaryResponse,
+  MyRecipeSearchRequest,
+  PageResponseCookingLogResponse,
+};
 
-export interface MyRecipeReviewItem {
-  id: number;
-  rating: number;
-  content: string;
-  updatedAt: string;
-}
-
-export interface MyCookedRecipeItem {
-  recipeId: number;
-  recipeName: string;
-  imageUrl?: string;
-  isAiRecommended: boolean;
-  cookCount: number;
-  lastCookedAt: string; // 'YYYY-MM-DD'
-  review: MyRecipeReviewItem | null;
-  history: CookingHistoryItem[];
-}
-
+/**
+ * 지금까지 요리 기록 요약 통계
+ */
 export interface ThisMonthCookingSummary {
   completedCookCount: number;
   consumedIngredientCount: number;
   mostCookedRecipeName: string;
   mostCookedRecipeCount: number;
 }
+export type MyCookingSummary = ThisMonthCookingSummary;
 
 /**
- * 로그인한 회원의 요리 완료 레시피 목록을 조회한다.
- * TODO: 백엔드에 GET /api/me/recipes 가 구현되면 실제 API로 교체
+ * 로그인한 회원이 요리 완료한 레시피 목록과 요약 통계를 조회한다.
  */
-export async function getMyCookedRecipes(
-  sort: CookingSortType = 'LATEST',
+export async function getMyRecipes(
+  request: MyRecipeSearchRequest = {},
   signal?: AbortSignal,
-): Promise<MyCookedRecipeItem[]> {
-  const { data } = await axiosInstance.get<ApiResponse<MyCookedRecipeItem[]>>(
-    `/api/me/recipes?sort=${sort}`,
-    { signal },
+): Promise<MyRecipeListResponse> {
+  return unwrap(myRecipeApi.getMyRecipes({ request }, { signal }));
+}
+
+/**
+ * 특정 레시피의 요리 통계(총 요리, 성공, 실패)를 조회한다.
+ */
+export async function getCookingStats(
+  recipeId: number,
+  signal?: AbortSignal,
+): Promise<CookingStatsResponse> {
+  return unwrap(cookingStatsApi.getCookingStats({ recipeId }, { signal }));
+}
+
+/**
+ * 로그인한 회원 본인의 요리 기록을 조회한다. (recipeId별 필터링 가능)
+ */
+export async function getCookingLogs(
+  request: CookingLogSearchRequest,
+  signal?: AbortSignal,
+): Promise<PageResponseCookingLogResponse> {
+  return unwrap(cookingLogApi.getCookingLogs({ request }, { signal }));
+}
+
+/**
+ * 요리 기록의 결과(성공/실패)와 메모를 수정한다.
+ */
+export async function updateCookingLog(
+  cookingLogId: number,
+  request: CookingLogUpdateRequest,
+): Promise<CookingLogResponse> {
+  return unwrap(
+    cookingLogApi.updateCookingLog({
+      cookingLogId,
+      cookingLogUpdateRequest: request,
+    }),
   );
-  return data.data;
 }

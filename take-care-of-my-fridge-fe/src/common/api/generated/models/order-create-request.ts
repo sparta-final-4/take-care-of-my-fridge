@@ -14,8 +14,11 @@
  */
 
 
+// May contain unused imports in some cases
+// @ts-ignore
+import type { OrderCreateItemRequest } from './order-create-item-request';
 
 export interface OrderCreateRequest {
-    'cartItemIds': Array<number>;
+    'items': Array<OrderCreateItemRequest>;
 }
 

@@ -14,6 +14,9 @@ public interface OrderItemRepository extends JpaRepository<OrderItem, Long> {
 
     List<OrderItem> findByOrderIdOrderByIdAsc(Long orderId);
 
+    // 이 회원이 이미 산(취소하지 않은) 번개 드롭인지 확인한다
+    boolean existsBySaleEventItemIdAndFlashDropMemberId(Long saleEventItemId, Long flashDropMemberId);
+
     // 구매 확정된 주문만, confirmedAt이 [from, to) 범위인 것을 날짜·상품·판매유형별로 합산
     @Query("""
         select new org.example.takecareofmyfridgebe.domain.order.dto.DailyProductSales(

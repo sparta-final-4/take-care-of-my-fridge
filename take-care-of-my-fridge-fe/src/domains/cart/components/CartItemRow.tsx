@@ -2,6 +2,7 @@ import { CloseOutlined, MinusOutlined, PlusOutlined } from '@ant-design/icons';
 import { Button, Checkbox, Flex, Tag, Typography } from 'antd';
 
 import type { CartItemResponse } from '@/domains/cart/api';
+import { SaleCountdown } from '@/domains/cart/components/SaleCountdown';
 import { formatPrice, SALE_TYPE_LABELS } from '@/domains/cart/format';
 import styles from './CartItemRow.module.scss';
 
@@ -59,6 +60,12 @@ export function CartItemRow({
           )}
           <Typography.Text strong={!soldOut}>{formatPrice(item.unitPrice)}</Typography.Text>
         </Flex>
+        {item.saleEndsAt && !soldOut && <SaleCountdown endsAt={item.saleEndsAt} />}
+        {item.flashDropRemaining !== null && !soldOut && (
+          <Typography.Text type="secondary">
+            재고 {item.flashDropRemaining} / {item.flashDropLimit}개
+          </Typography.Text>
+        )}
       </Flex>
       <Flex align="center" className={styles.quantity}>
         <Button

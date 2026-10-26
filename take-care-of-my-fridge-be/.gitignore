@@ -38,3 +38,7 @@ out/
 
 ### CI ###
 jacoco-comment.md
+
+### Local config ###
+# 개인 로컬 설정 (dev 접속 정보 등 비밀 값). 각자 만들어서 사용
+application-local.yml

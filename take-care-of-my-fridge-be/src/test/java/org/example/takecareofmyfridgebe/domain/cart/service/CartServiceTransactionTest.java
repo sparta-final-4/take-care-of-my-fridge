@@ -19,6 +19,7 @@ import org.example.takecareofmyfridgebe.domain.product.entity.Product;
 import org.example.takecareofmyfridgebe.domain.product.entity.ProductStatus;
 import org.example.takecareofmyfridgebe.domain.product.entity.ProductType;
 import org.example.takecareofmyfridgebe.domain.product.repository.ProductRepository;
+import org.example.takecareofmyfridgebe.domain.sale.service.SaleEventReader;
 import org.example.takecareofmyfridgebe.global.config.JpaAuditingConfig;
 import org.example.takecareofmyfridgebe.global.config.QueryDslConfig;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
@@ -38,7 +39,7 @@ import org.springframework.transaction.annotation.Transactional;
 // 테스트 트랜잭션이 켜져 있으면 서비스에서 @Transactional이 빠져도 가려진다.
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({JpaAuditingConfig.class, QueryDslConfig.class, CartService.class})
+@Import({JpaAuditingConfig.class, QueryDslConfig.class, CartService.class, SaleEventReader.class})
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class CartServiceTransactionTest extends MySqlContainerSupport {
 

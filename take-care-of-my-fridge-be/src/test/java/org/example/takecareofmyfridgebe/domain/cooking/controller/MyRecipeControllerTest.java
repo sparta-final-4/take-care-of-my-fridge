@@ -2,6 +2,7 @@ package org.example.takecareofmyfridgebe.domain.cooking.controller;
 
 import org.example.takecareofmyfridgebe.domain.auth.service.AuthSessionService;
 import org.example.takecareofmyfridgebe.domain.auth.service.JwtTokenService;
+import org.example.takecareofmyfridgebe.domain.cooking.dto.MostCookedRecipeResponse;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeListResponse;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeResponse;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeReviewResponse;
@@ -91,7 +92,8 @@ class MyRecipeControllerTest {
     void getMyRecipesWithDefaultParametersReturnsOk() throws Exception {
         // Given: 요약 통계와 레시피 목록 DTO 준비
         Long memberId = 7L;
-        MyRecipeSummaryResponse summary = new MyRecipeSummaryResponse(2L, 4L, 1L, 1L);
+        MostCookedRecipeResponse mostCooked = new MostCookedRecipeResponse(1L, "불닭 참치 두부조림", 3L);
+        MyRecipeSummaryResponse summary = new MyRecipeSummaryResponse(2L, 4L, 1L, 1L, mostCooked, 7L);
         MyRecipeResponse recipe1 = new MyRecipeResponse(
                 1L,
                 "불닭 참치 두부조림",
@@ -133,6 +135,10 @@ class MyRecipeControllerTest {
                 .andExpect(jsonPath("$.data.summary.totalCookCount").value(4))
                 .andExpect(jsonPath("$.data.summary.writtenCount").value(1))
                 .andExpect(jsonPath("$.data.summary.notWrittenCount").value(1))
+                .andExpect(jsonPath("$.data.summary.mostCookedRecipe.recipeId").value(1))
+                .andExpect(jsonPath("$.data.summary.mostCookedRecipe.recipeName").value("불닭 참치 두부조림"))
+                .andExpect(jsonPath("$.data.summary.mostCookedRecipe.cookCount").value(3))
+                .andExpect(jsonPath("$.data.summary.consumedIngredientCount").value(7))
                 .andExpect(jsonPath("$.data.recipes.content[0].recipeId").value(1))
                 .andExpect(jsonPath("$.data.recipes.content[0].recipeName").value("불닭 참치 두부조림"))
                 .andExpect(jsonPath("$.data.recipes.content[0].recipeImageUrl").value("https://image.example.com/tofu.jpg"))
@@ -169,7 +175,7 @@ class MyRecipeControllerTest {
     void getMyRecipesWithCustomParametersPassesToService() throws Exception {
         // Given: 2페이지 조회 시 빈 페이지 응답 준비
         Long memberId = 7L;
-        MyRecipeSummaryResponse summary = new MyRecipeSummaryResponse(10L, 20L, 6L, 4L);
+        MyRecipeSummaryResponse summary = new MyRecipeSummaryResponse(10L, 20L, 6L, 4L, null, 0L);
         PageResponse<MyRecipeResponse> emptyPage = new PageResponse<>(List.of(), 2, 5, 6L, 2, true);
         when(cookingService.getMyRecipes(eq(memberId), any(MyRecipeSearchRequest.class)))
                 .thenReturn(new MyRecipeListResponse(summary, emptyPage));

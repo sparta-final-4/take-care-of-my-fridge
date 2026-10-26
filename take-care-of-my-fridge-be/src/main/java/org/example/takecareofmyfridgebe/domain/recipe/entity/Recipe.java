@@ -164,4 +164,37 @@ public class Recipe extends BaseTimeEntity {
         this.imageUrl = imageUrl;
         this.ingredientsRaw = ingredientsRaw;
     }
+
+    // 수정은 의미 단위로 나눠 바꾼다. 출처(source, sourceId)와 후기 요약(tipSummary)은 바꾸지 않는다.
+    public void changeBasicInfo(String name, String summary, String imageUrl, String tags, String tip) {
+        this.name = name;
+        this.summary = summary;
+        this.imageUrl = imageUrl;
+        this.tags = tags;
+        this.tip = tip;
+    }
+
+    public void changeClassification(String cuisineType, String category, String cookMethod,
+                                     String mainIngredientCategory) {
+        this.cuisineType = cuisineType;
+        this.category = category;
+        this.cookMethod = cookMethod;
+        this.mainIngredientCategory = mainIngredientCategory;
+    }
+
+    public void changeCookingInfo(Integer cookTimeMin, Integer servings, int difficulty) {
+        this.cookTimeMin = cookTimeMin;
+        this.servings = servings;
+        this.difficulty = difficulty;
+    }
+
+    public void changeNutrition(BigDecimal weightG, BigDecimal calories, BigDecimal carbsG,
+                                BigDecimal proteinG, BigDecimal fatG, BigDecimal sodiumMg) {
+        this.weightG = weightG;
+        this.calories = calories;
+        this.carbsG = carbsG;
+        this.proteinG = proteinG;
+        this.fatG = fatG;
+        this.sodiumMg = sodiumMg;
+    }
 }

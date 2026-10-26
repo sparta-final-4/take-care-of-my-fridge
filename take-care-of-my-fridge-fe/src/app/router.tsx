@@ -21,6 +21,11 @@ export const router = createBrowserRouter([
       { path: ROUTES.login, lazy: page(() => import('@/pages/auth/LoginPage')) },
       { path: ROUTES.signup, lazy: page(() => import('@/pages/auth/SignUpPage')) },
       { path: ROUTES.signupComplete, lazy: page(() => import('@/pages/auth/SignUpCompletePage')) },
+      { path: ROUTES.recipes, lazy: page(() => import('@/pages/recipe/RecipesPage')) },
+      {
+        path: ROUTES.recipeDetail,
+        lazy: page(() => import('@/pages/recipe/RecipeDetailPage')),
+      },
       { path: ROUTES.products, lazy: page(() => import('@/pages/product/ProductsPage')) },
       {
         path: ROUTES.productDetail,
@@ -51,6 +56,10 @@ export const router = createBrowserRouter([
                 path: ROUTES.mypageOrders,
                 lazy: page(() => import('@/pages/mypage/MyPageOrdersPage')),
               },
+              {
+                path: ROUTES.mypageOrderDetail,
+                lazy: page(() => import('@/pages/mypage/MyPageOrderDetailPage')),
+              },
             ],
           },
           { path: ROUTES.cart, lazy: page(() => import('@/pages/order/CartPage')) },
@@ -68,6 +77,10 @@ export const router = createBrowserRouter([
           {
             path: ROUTES.adminForecast,
             lazy: page(() => import('@/pages/admin/AdminForecastPage')),
+          },
+          {
+            path: ROUTES.adminSaleEventNew,
+            lazy: page(() => import('@/pages/admin/AdminSaleEventCreatePage')),
           },
         ],
       },

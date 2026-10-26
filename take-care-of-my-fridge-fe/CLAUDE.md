@@ -244,7 +244,7 @@ const handleSave = (values: UpdatePageRequest) =>
 - 상태(`useAuthStore`의 `status`): `initializing` / `authenticated` / `anonymous` / `error`.
 - **초기화**: `src/app/App.tsx`에서 `initSession()` 호출. 성공 → `authenticated`, 401 → `anonymous`, 그 외 오류 → `error`. 진행 중인 Promise를 재사용해 중복 요청을 막는다(StrictMode를 끄지 않는다).
 - **`RequireAuth`**: `initializing`이면 로딩, `error`면 재시도 버튼, `anonymous`면 현재 경로를 `redirect`로 붙여 로그인으로 이동.
-- **세션 전환**(`session.ts`): 로그인·로그아웃·만료 시 `cancelQueries` 후 `clear`. 화면 이동은 하지 않고 상태만 바꾼다(이동은 `RequireAuth`).
+- **세션 전환**(`session.ts`): 로그인·로그아웃·만료 시 `cancelQueries` → observer가 없는 쿼리만 `removeQueries` → 상태 변경(`flushSync`) → `resetQueries`(기다리지 않음). 화면에 붙은 쿼리를 `clear`·`type: 'inactive'`로 지우면 다시 받지 못해 로딩에 멈추므로 쓰지 않는다. 상태를 먼저 바꿔야 `enabled`가 새 상태 기준으로 계산된다. 화면 이동은 하지 않고 상태만 바꾼다(이동은 `RequireAuth`).
 - 전환마다 `sessionId`를 올리고, `await` 후 상태를 바꾸기 전에 `sessionId`가 그대로인지 확인한다.
 - 요청마다 시작 시점의 `sessionId`를 기록해, 이전 세션 요청의 401로 현재 세션을 끝내지 않는다. 이전 세션 mutation의 실패도 알리지 않는다.
 - 세션이 바뀌어도 계속 마운트되는 컴포넌트(헤더 등)의 mutation은 `onMutate`에서 `sessionId`를 기록하고 콜백에서 비교한다.

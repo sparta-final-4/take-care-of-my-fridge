@@ -1,25 +1,32 @@
-import { App, Flex, Spin } from 'antd';
-import { useMemo, useState } from 'react';
+import { Button, Flex, Result, Spin } from 'antd';
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
+import { generatePath, useNavigate } from 'react-router';
 
-import type { CookingSortType, CookingTabType, MyCookedRecipeItem } from '@/domains/cooking/api';
+import { ROUTES } from '@/app/paths';
 import {
-  calculateThisMonthSummary,
-  countRecipesByTab,
-  filterAndSortMyRecipes,
-} from '@/domains/cooking/mocks';
-import { useMyCookedRecipes } from '@/domains/cooking/queries';
+  MyRecipeSearchRequestReviewStatusEnum,
+  MyRecipeSearchRequestSortEnum,
+  type MyRecipeResponse,
+} from '@/common/api/clients';
+import type { CookingSortType, CookingTabType } from '@/domains/cooking/api';
+import { cookingQueries } from '@/domains/cooking/queries';
 import { MyCookingSummaryCards } from '@/domains/cooking/components/MyCookingSummaryCards';
 import { MyRecipeListSection } from '@/domains/cooking/components/MyRecipeListSection';
 import { ReviewModal, type InitialReviewData } from '@/domains/review/components/ReviewModal';
 
 import styles from './MyPageRecipesPage.module.scss';
 
-export default function MyPageRecipesPage() {
-  const { message } = App.useApp();
+const PAGE_SIZE = 5;
 
+export default function MyPageRecipesPage() {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+
+  const [page, setPage] = useState<number>(1);
   const [tab, setTab] = useState<CookingTabType>('ALL');
   const [sort, setSort] = useState<CookingSortType>('LATEST');
-  const [expandedRecipeId, setExpandedRecipeId] = useState<number | null>(1); // 와이어프레임처럼 첫 번째 레시피 기본 펼침
+  const [expandedRecipeId, setExpandedRecipeId] = useState<number | null>(null);
 
   // 후기 작성/수정 모달 상태
   const [reviewModalState, setReviewModalState] = useState<{
@@ -34,20 +41,64 @@ export default function MyPageRecipesPage() {
     initialReview: null,
   });
 
-  // 요리 완료 레시피 목록 쿼리 (가짜 데이터 연동)
-  const { data: rawRecipes = [], isLoading } = useMyCookedRecipes(sort);
+  // 탭 매핑 (ALL -> ALL, UNREVIEWED -> NOT_WRITTEN, REVIEWED -> WRITTEN)
+  const reviewStatusParam =
+    tab === 'UNREVIEWED'
+      ? MyRecipeSearchRequestReviewStatusEnum.NotWritten
+      : tab === 'REVIEWED'
+        ? MyRecipeSearchRequestReviewStatusEnum.Written
+        : MyRecipeSearchRequestReviewStatusEnum.All;
 
-  // 탭별 개수 계산
-  const counts = useMemo(() => countRecipesByTab(rawRecipes), [rawRecipes]);
+  // 정렬 매핑 (LATEST -> RECENT, MOST_COOKED -> MOST)
+  const sortParam =
+    sort === 'MOST_COOKED'
+      ? MyRecipeSearchRequestSortEnum.Most
+      : MyRecipeSearchRequestSortEnum.Recent;
 
-  // 필터 및 정렬 적용된 레시피 목록
-  const displayedRecipes = useMemo(
-    () => filterAndSortMyRecipes(rawRecipes, tab, sort),
-    [rawRecipes, tab, sort],
-  );
+  // 실제 API 연동 쿼리 (탭·정렬·페이지 전환 시 깜빡임 방지를 위해 keepPreviousData 적용)
+  const {
+    data: myRecipeData,
+    isLoading,
+    isError,
+    refetch,
+  } = useQuery({
+    ...cookingQueries.myRecipes({
+      page,
+      size: PAGE_SIZE,
+      reviewStatus: reviewStatusParam,
+      sort: sortParam,
+    }),
+    placeholderData: keepPreviousData,
+  });
 
-  // 이번 달 통계 데이터 계산
-  const summary = useMemo(() => calculateThisMonthSummary(rawRecipes), [rawRecipes]);
+  const recipes = myRecipeData?.recipes?.content ?? [];
+  const totalElements = myRecipeData?.recipes?.totalElements ?? 0;
+  const summary = myRecipeData?.summary;
+
+  const allCount = Number(summary?.recipeCount ?? 0);
+  const totalCookCount = Number(summary?.totalCookCount ?? 0);
+  const unreviewedCount = Number(summary?.notWrittenCount ?? 0);
+  const reviewedCount = Number(summary?.writtenCount ?? 0);
+
+  // 탭 변경
+  const handleTabChange = (nextTab: CookingTabType) => {
+    setTab(nextTab);
+    setPage(1);
+    setExpandedRecipeId(null);
+  };
+
+  // 정렬 변경
+  const handleSortChange = (nextSort: CookingSortType) => {
+    setSort(nextSort);
+    setPage(1);
+    setExpandedRecipeId(null);
+  };
+
+  // 페이지 변경
+  const handlePageChange = (nextPage: number) => {
+    setPage(nextPage);
+    setExpandedRecipeId(null);
+  };
 
   // 아코디언 펼침/접힘 토글 (한 번에 하나만 펼침)
   const handleToggleExpand = (recipeId: number) => {
@@ -55,16 +106,17 @@ export default function MyPageRecipesPage() {
   };
 
   // 후기 모달 열기
-  const handleOpenReviewModal = (recipe: MyCookedRecipeItem) => {
+  const handleOpenReviewModal = (recipe: MyRecipeResponse) => {
+    if (!recipe.recipeId) return;
     setReviewModalState({
       open: true,
       recipeId: recipe.recipeId,
-      recipeName: recipe.recipeName,
-      initialReview: recipe.review
+      recipeName: recipe.recipeName ?? '',
+      initialReview: recipe.review?.id
         ? {
             id: recipe.review.id,
-            rating: recipe.review.rating,
-            content: recipe.review.content,
+            rating: recipe.review.rating ?? 5,
+            content: recipe.review.content ?? '',
           }
         : null,
     });
@@ -75,10 +127,9 @@ export default function MyPageRecipesPage() {
     setReviewModalState((prev) => ({ ...prev, open: false }));
   };
 
-  // [레시피 보기] 클릭 핸들러
+  // [레시피 보기] 및 레시피 이름 클릭 시 레시피 상세 화면으로 이동
   const handleViewRecipe = (recipeId: number) => {
-    // TODO: 레시피 상세 경로(ROUTES.recipeDetail)가 등록되면 navigate(`${ROUTES.recipeDetail}/${recipeId}`)로 이동
-    message.info(`레시피 상세 화면이 준비 중입니다. (레시피 ID: ${recipeId})`);
+    navigate(generatePath(ROUTES.recipeDetail, { recipeId: String(recipeId) }));
   };
 
   if (isLoading) {
@@ -89,39 +140,66 @@ export default function MyPageRecipesPage() {
     );
   }
 
+  if (isError) {
+    return (
+      <div className={styles.container}>
+        <Result
+          status="error"
+          title="내 레시피를 불러오지 못했어요"
+          extra={<Button onClick={() => void refetch()}>다시 시도</Button>}
+        />
+      </div>
+    );
+  }
+
+  // 하단 지금까지 요리 기록 카드용 요약 데이터 (전체 데이터 기준)
+  const bottomSummary = {
+    completedCookCount: totalCookCount,
+    consumedIngredientCount: Number(summary?.consumedIngredientCount ?? 0),
+    mostCookedRecipeName: summary?.mostCookedRecipe?.recipeName || '-',
+    mostCookedRecipeCount: Number(summary?.mostCookedRecipe?.cookCount ?? 0),
+  };
+
   return (
     <div className={styles.container}>
       {/* 1. 상단 내 레시피 관리 목록 섹션 */}
       <MyRecipeListSection
-        recipes={displayedRecipes}
-        allCount={counts.ALL}
-        unreviewedCount={counts.UNREVIEWED}
-        reviewedCount={counts.REVIEWED}
-        totalCookCount={summary.completedCookCount}
+        recipes={recipes}
+        allCount={allCount}
+        unreviewedCount={unreviewedCount}
+        reviewedCount={reviewedCount}
+        totalCookCount={totalCookCount}
         currentTab={tab}
         currentSort={sort}
         expandedRecipeId={expandedRecipeId}
-        onTabChange={setTab}
-        onSortChange={setSort}
+        currentPage={page}
+        pageSize={PAGE_SIZE}
+        totalElements={totalElements}
+        onTabChange={handleTabChange}
+        onSortChange={handleSortChange}
+        onPageChange={handlePageChange}
         onToggleExpand={handleToggleExpand}
         onOpenReviewModal={handleOpenReviewModal}
         onViewRecipe={handleViewRecipe}
       />
 
-      {/* 2. 하단 이번 달 요리 기록 & 후기 유도 카드 */}
+      {/* 2. 하단 지금까지 요리 기록 & 후기 유도 카드 */}
       <MyCookingSummaryCards
-        summary={summary}
-        unreviewedCount={counts.UNREVIEWED}
-        onGoToUnreviewed={() => setTab('UNREVIEWED')}
+        summary={bottomSummary}
+        unreviewedCount={unreviewedCount}
+        onGoToUnreviewed={() => handleTabChange('UNREVIEWED')}
       />
 
-      {/* 3. 후기 쓰기/수정 모달 (실제 API 연동) */}
+      {/* 3. 후기 쓰기/수정 모달 (저장 성공 시 cookingQueries.all 무효화) */}
       <ReviewModal
         open={reviewModalState.open}
         recipeId={reviewModalState.recipeId}
         recipeName={reviewModalState.recipeName}
         initialReview={reviewModalState.initialReview}
         onClose={handleCloseReviewModal}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: cookingQueries.all });
+        }}
       />
     </div>
   );

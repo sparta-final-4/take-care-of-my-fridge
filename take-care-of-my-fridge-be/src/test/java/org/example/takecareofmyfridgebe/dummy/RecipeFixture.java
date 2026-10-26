@@ -1,11 +1,16 @@
 package org.example.takecareofmyfridgebe.dummy;
 
+import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeCreateRequest;
+import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeIngredientRequest;
+import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeStepRequest;
 import org.example.takecareofmyfridgebe.domain.recipe.entity.Recipe;
 import org.example.takecareofmyfridgebe.domain.recipe.entity.RecipeIngredient;
 import org.example.takecareofmyfridgebe.domain.recipe.entity.RecipeStep;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
+import java.util.Arrays;
+import java.util.List;
 
 public class RecipeFixture {
 
@@ -43,5 +48,14 @@ public class RecipeFixture {
                 .stepNo(stepNo)
                 .description(description)
                 .build();
+    }
+
+    public static RecipeCreateRequest createRecipeRequest(Long... ingredientIds) {
+        List<RecipeIngredientRequest> ingredients = Arrays.stream(ingredientIds)
+                .map(id -> new RecipeIngredientRequest(id, "재료" + id, "1큰술", null, "주재료", null))
+                .toList();
+        return new RecipeCreateRequest("된장찌개", "구수한 찌개", null, "한식", "국", "끓이기", null,
+                30, 2, 3, null, null, null, ingredients,
+                List.of(new RecipeStepRequest("물을 끓인다.", null, null), new RecipeStepRequest("된장을 푼다.", null, null)));
     }
 }

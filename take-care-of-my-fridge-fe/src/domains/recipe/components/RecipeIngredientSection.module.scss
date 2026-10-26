@@ -1,0 +1,52 @@
+@use '@/styles/variables' as *;
+@use '@/styles/mixins' as *;
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ant-margin-xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+// 모바일: 이름·상태 / 양 2줄, md부터 이름·양·상태 한 줄
+// 줄마다 그리드가 따로라서, 상태 칸 너비를 고정해야 양 칸이 줄끼리 같은 위치에 온다.
+.row {
+  display: grid;
+  grid-template-areas:
+    'name status'
+    'amount status';
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0 var(--ant-margin);
+  padding: var(--ant-padding-sm) var(--ant-padding);
+  border: 1px solid var(--ant-color-border-secondary);
+  border-radius: var(--ant-border-radius);
+
+  @include from(md) {
+    grid-template-areas: 'name amount status';
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) $recipe-ingredient-status-width;
+  }
+}
+
+.name {
+  grid-area: name;
+  overflow-wrap: anywhere;
+}
+
+.amount {
+  grid-area: amount;
+}
+
+.status {
+  display: inline-flex;
+  grid-area: status;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--ant-margin-xs);
+}
+
+.dDay {
+  margin: 0;
+}

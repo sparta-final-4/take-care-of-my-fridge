@@ -1,15 +1,17 @@
 package org.example.takecareofmyfridgebe.domain.cooking.repository;
 
 import org.example.takecareofmyfridgebe.domain.cooking.dto.CookingStatsResponse;
+import org.example.takecareofmyfridgebe.domain.cooking.dto.MostCookedRecipeDto;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeResponse;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeReviewStatus;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeSortType;
-import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeSummaryResponse;
+import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeSummaryCount;
 import org.example.takecareofmyfridgebe.domain.cooking.entity.CookingLog;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
 import java.time.LocalDate;
+import java.util.Optional;
 
 public interface CookingLogRepositoryCustom {
 
@@ -48,12 +50,21 @@ public interface CookingLogRepositoryCustom {
     );
 
     /**
-     * 회원의 요리 완료 레시피 전체 요약 통계를 단일 쿼리로 조회한다.
+     * 회원의 요리 완료 레시피 전체 요약 통계 카운트를 단일 쿼리로 조회한다.
      *
      * @param memberId 회원 ID (필수)
-     * @return 레시피 수, 총 요리 횟수, 작성/미작성 후기 수 요약
+     * @return 레시피 수, 총 요리 횟수, 작성/미작성 후기 수
      */
-    MyRecipeSummaryResponse getMyRecipesSummary(Long memberId);
+    MyRecipeSummaryCount getMyRecipesSummaryCount(Long memberId);
+
+    /**
+     * 회원이 가장 많이 요리한 레시피의 ID와 요리 횟수를 조회한다.
+     * 요리 횟수가 같으면 가장 최근에 요리한 레시피를 우선한다.
+     *
+     * @param memberId 회원 ID (필수)
+     * @return 가장 많이 요리한 레시피 ID 및 횟수 (없으면 empty)
+     */
+    Optional<MostCookedRecipeDto> findMostCookedRecipe(Long memberId);
 
     /**
      * 특정 레시피의 요리 통계(총 요리 횟수, 성공 횟수, 실패 횟수)를 단일 쿼리로 실시간 집계한다.

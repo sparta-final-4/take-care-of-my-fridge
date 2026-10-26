@@ -1,0 +1,56 @@
+import {
+  adminSaleEventApi,
+  type FlashDropCreateRequest,
+  type PageResponseSaleCandidateProductResponse,
+  type PageResponseSaleEventListResponse,
+  type SaleCandidateProductsRequest,
+  type SaleEventDetailResponse,
+  type SaleEventListRequest,
+  type SaleEventsCreateResponse,
+  type SaleEventUpdateRequest,
+  type SpecialSaleCreateRequest,
+} from '@/common/api/clients';
+import { unwrap } from '@/common/api/unwrap';
+
+export async function createSpecialSale(
+  request: SpecialSaleCreateRequest,
+): Promise<SaleEventsCreateResponse> {
+  return unwrap(adminSaleEventApi.createSpecialSale({ specialSaleCreateRequest: request }));
+}
+
+export async function createFlashDrop(
+  request: FlashDropCreateRequest,
+): Promise<SaleEventsCreateResponse> {
+  return unwrap(adminSaleEventApi.createFlashDrop({ flashDropCreateRequest: request }));
+}
+
+// 행사에 넣을 수 있는 상품(판매 중, 재고 있음, 예정·진행 중인 행사에 들지 않음)만 온다.
+export async function getSaleCandidateProducts(
+  request: SaleCandidateProductsRequest,
+  signal?: AbortSignal,
+): Promise<PageResponseSaleCandidateProductResponse> {
+  return unwrap(adminSaleEventApi.getCandidateProducts({ request }, { signal }));
+}
+
+export async function getSaleEvents(
+  request: SaleEventListRequest,
+  signal?: AbortSignal,
+): Promise<PageResponseSaleEventListResponse> {
+  return unwrap(adminSaleEventApi.getSaleEvents({ request }, { signal }));
+}
+
+// 수정 화면에 보여 줄 행사 하나와 그 행사 항목들
+export async function getSaleEvent(
+  saleEventId: number,
+  signal?: AbortSignal,
+): Promise<SaleEventDetailResponse> {
+  return unwrap(adminSaleEventApi.getSaleEvent({ saleEventId }, { signal }));
+}
+
+// 시작 전인 행사의 시각과 행사 항목 값을 한 번에 고친다.
+export async function updateSaleEvent(
+  saleEventId: number,
+  request: SaleEventUpdateRequest,
+): Promise<void> {
+  await unwrap(adminSaleEventApi.updateSaleEvent({ saleEventId, saleEventUpdateRequest: request }));
+}

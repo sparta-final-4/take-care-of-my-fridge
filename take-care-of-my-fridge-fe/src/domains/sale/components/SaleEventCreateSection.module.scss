@@ -1,0 +1,22 @@
+@use '@/styles/variables' as *;
+
+.period {
+  margin-bottom: var(--ant-margin-lg);
+}
+
+.dateTime {
+  width: $sale-date-time-width;
+}
+
+// 시작·종료 입력칸 아래 여백(Form.Item)만큼 올려 입력칸과 같은 높이에 맞춘다.
+.actions {
+  margin-bottom: var(--ant-margin-lg);
+}
+
+.block {
+  margin-bottom: var(--ant-margin-lg);
+}
+
+.bulkRate {
+  width: $sale-bulk-rate-width;
+}

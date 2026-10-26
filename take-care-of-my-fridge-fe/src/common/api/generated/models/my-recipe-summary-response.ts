@@ -14,8 +14,13 @@
  */
 
 
+// May contain unused imports in some cases
+// @ts-ignore
+import type { MostCookedRecipeResponse } from './most-cooked-recipe-response';
 
 export interface MyRecipeSummaryResponse {
+    'consumedIngredientCount'?: number;
+    'mostCookedRecipe'?: MostCookedRecipeResponse;
     'notWrittenCount'?: number;
     'recipeCount'?: number;
     'totalCookCount'?: number;

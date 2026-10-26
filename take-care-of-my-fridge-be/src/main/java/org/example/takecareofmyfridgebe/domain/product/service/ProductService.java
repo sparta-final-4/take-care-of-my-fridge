@@ -104,6 +104,15 @@ public class ProductService {
         };
     }
 
+    // 이미 판매 중지된 상품을 다시 삭제해도 같은 결과이므로 성공으로 처리한다.
+    // 주문 생성과 같은 행 잠금을 걸어, 삭제 직후 진행 중인 주문이 판매 중지 상품을 사지 않게 한다.
+    @Transactional
+    public void deleteProduct(Long productId) {
+        Product product = productRepository.findByIdForUpdate(productId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.PRODUCT_NOT_FOUND));
+        product.stop();
+    }
+
     private IngredientProduct updateIngredientDetail(Long productId, ProductUpdateRequest request) {
         IngredientProduct detail = ingredientProductRepository.findByProductId(productId).orElse(null);
         if (request.ingredient() == null) {

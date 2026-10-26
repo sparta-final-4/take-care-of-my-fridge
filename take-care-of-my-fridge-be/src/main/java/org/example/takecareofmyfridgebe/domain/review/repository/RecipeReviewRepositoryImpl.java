@@ -72,9 +72,11 @@ public class RecipeReviewRepositoryImpl implements RecipeReviewRepositoryCustom 
         List<OrderSpecifier<?>> orders = new ArrayList<>();
         if (sort == ReviewSortType.RATING) {
             orders.add(recipeReview.rating.desc());
+            orders.add(recipeReview.createdAt.desc());
             orders.add(recipeReview.id.desc());
         } else {
             // LATEST (기본)
+            orders.add(recipeReview.createdAt.desc());
             orders.add(recipeReview.id.desc());
         }
         return orders.toArray(new OrderSpecifier<?>[0]);

@@ -25,6 +25,8 @@ import { BASE_PATH, COLLECTION_FORMATS, type RequestArgs, BaseAPI, RequiredError
 // @ts-ignore
 import type { ApiResponseProductDetailResponse } from '../models';
 // @ts-ignore
+import type { ApiResponseVoid } from '../models';
+// @ts-ignore
 import type { ProductCreateRequest } from '../models';
 // @ts-ignore
 import type { ProductUpdateRequest } from '../models';
@@ -61,6 +63,39 @@ export const AdminProductControllerApiAxiosParamCreator = function (configuratio
             let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
             localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
             localVarRequestOptions.data = serializeDataIfNeeded(productCreateRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @param {number} productId 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        deleteProduct: async (productId: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'productId' is not null or undefined
+            assertParamExists('deleteProduct', 'productId', productId)
+            const localVarPath = `/api/admin/products/{productId}`
+                .replace('{productId}', encodeURIComponent(String(productId)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'DELETE', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            localVarHeaderParameter['Accept'] = '*/*';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
 
             return {
                 url: toPathString(localVarUrlObj),
@@ -129,6 +164,18 @@ export const AdminProductControllerApiFp = function(configuration?: Configuratio
         /**
          * 
          * @param {number} productId 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async deleteProduct(productId: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ApiResponseVoid>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.deleteProduct(productId, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['AdminProductControllerApi.deleteProduct']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @param {number} productId 
          * @param {ProductUpdateRequest} productUpdateRequest 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
@@ -159,6 +206,15 @@ export const AdminProductControllerApiFactory = function (configuration?: Config
         },
         /**
          * 
+         * @param {AdminProductControllerApiDeleteProductRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        deleteProduct(requestParameters: AdminProductControllerApiDeleteProductRequest, options?: RawAxiosRequestConfig): AxiosPromise<ApiResponseVoid> {
+            return localVarFp.deleteProduct(requestParameters.productId, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
          * @param {AdminProductControllerApiUpdateProductRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
@@ -183,6 +239,14 @@ export interface AdminProductControllerApiInterface {
 
     /**
      * 
+     * @param {AdminProductControllerApiDeleteProductRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    deleteProduct(requestParameters: AdminProductControllerApiDeleteProductRequest, options?: RawAxiosRequestConfig): AxiosPromise<ApiResponseVoid>;
+
+    /**
+     * 
      * @param {AdminProductControllerApiUpdateProductRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
@@ -196,6 +260,13 @@ export interface AdminProductControllerApiInterface {
  */
 export interface AdminProductControllerApiCreateProductRequest {
     readonly productCreateRequest: ProductCreateRequest
+}
+
+/**
+ * Request parameters for deleteProduct operation in AdminProductControllerApi.
+ */
+export interface AdminProductControllerApiDeleteProductRequest {
+    readonly productId: number
 }
 
 /**
@@ -219,6 +290,16 @@ export class AdminProductControllerApi extends BaseAPI implements AdminProductCo
      */
     public createProduct(requestParameters: AdminProductControllerApiCreateProductRequest, options?: RawAxiosRequestConfig) {
         return AdminProductControllerApiFp(this.configuration).createProduct(requestParameters.productCreateRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @param {AdminProductControllerApiDeleteProductRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public deleteProduct(requestParameters: AdminProductControllerApiDeleteProductRequest, options?: RawAxiosRequestConfig) {
+        return AdminProductControllerApiFp(this.configuration).deleteProduct(requestParameters.productId, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**

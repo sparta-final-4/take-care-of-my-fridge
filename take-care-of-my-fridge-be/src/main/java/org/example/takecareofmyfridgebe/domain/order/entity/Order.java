@@ -112,9 +112,17 @@ public class Order extends BaseTimeEntity {
         this.status = OrderStatus.CANCELLED;
     }
 
+    public boolean isConfirmed() {
+        return status == OrderStatus.CONFIRMED;
+    }
+
+    // 결제 완료 주문만 구매 확정한다. 취소된 주문과 결제 전 주문은 이유를 나눠 거절한다.
     public void confirm(LocalDateTime confirmedAt) {
+        if (status == OrderStatus.CANCELLED) {
+            throw new BusinessException(ErrorCode.ORDER_CANCELLED);
+        }
         if (status != OrderStatus.PAID) {
-            throw new BusinessException(ErrorCode.INVALID_ORDER_STATUS);
+            throw new BusinessException(ErrorCode.ORDER_NOT_PAID);
         }
         this.status = OrderStatus.CONFIRMED;
         this.confirmedAt = confirmedAt;
