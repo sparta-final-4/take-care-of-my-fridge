@@ -13,6 +13,7 @@ import {
   getCookingLogs,
   getCookingStats,
   getMyRecipes,
+  getPopularRecipes,
   updateCookingLog,
 } from './api';
 
@@ -34,6 +35,13 @@ export const cookingQueries = {
     queryOptions({
       queryKey: [...cookingQueries.myRecipesList(), request],
       queryFn: ({ signal }) => getMyRecipes(request, signal),
+    }),
+  popularList: () => [...cookingQueries.all, 'popular'] as const,
+  popular: (size = 6) =>
+    queryOptions({
+      queryKey: [...cookingQueries.popularList(), size],
+      queryFn: ({ signal }) => getPopularRecipes(size, signal),
+      staleTime: 10 * 60 * 1000,
     }),
 };
 

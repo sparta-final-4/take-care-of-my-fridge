@@ -1,9 +1,9 @@
 import { Typography } from 'antd';
 
 import { SectionCard } from '@/common/components/SectionCard';
+import { PopularRecipeSection } from '@/domains/cooking/components/PopularRecipeSection';
 import { IngredientInputSection } from '@/domains/fridge/components/IngredientInputSection';
 import { MyFridgeSection } from '@/domains/fridge/components/MyFridgeSection';
-import { RecentReviewSection } from '@/domains/review/components/RecentReviewSection';
 
 import styles from './MainPage.module.scss';
 
@@ -32,7 +32,7 @@ export default function MainPage() {
             </SectionCard>
           </div>
           <div className={styles.rightStackItem}>
-            <RecentReviewSection />
+            <PopularRecipeSection />
           </div>
         </div>
       </div>

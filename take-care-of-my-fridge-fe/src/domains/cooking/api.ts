@@ -2,6 +2,7 @@ import {
   cookingLogApi,
   cookingStatsApi,
   myRecipeApi,
+  popularRecipeApi,
   type CookingCompleteRequest,
   type CookingCompleteResponse,
   type CookingLogResponse,
@@ -13,6 +14,7 @@ import {
   type MyRecipeSearchRequest,
   type MyRecipeSummaryResponse,
   type PageResponseCookingLogResponse,
+  type PopularRecipeResponse,
 } from '@/common/api/clients';
 import { unwrap } from '@/common/api/unwrap';
 
@@ -31,6 +33,7 @@ export type {
   MyRecipeSummaryResponse,
   MyRecipeSearchRequest,
   PageResponseCookingLogResponse,
+  PopularRecipeResponse,
 };
 
 /**
@@ -100,4 +103,14 @@ export async function completeCooking(
       cookingCompleteRequest: request,
     }),
   );
+}
+
+/**
+ * 최근 30일 요리 기록 기반 인기 레시피 목록을 조회한다 (기본 6건).
+ */
+export async function getPopularRecipes(
+  size = 6,
+  signal?: AbortSignal,
+): Promise<PopularRecipeResponse[]> {
+  return unwrap(popularRecipeApi.getPopularRecipes({ size }, { signal }));
 }
