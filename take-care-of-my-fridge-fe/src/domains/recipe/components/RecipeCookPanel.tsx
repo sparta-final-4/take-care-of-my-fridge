@@ -13,7 +13,6 @@ import { cookingQueries } from '@/domains/cooking/queries';
 import { formatDDay } from '@/domains/fridge/format';
 import { imminentTagColor } from '@/domains/recipe/format';
 import type { RecipeFridgeMatch } from '@/domains/recipe/hooks/useRecipeFridgeMatch';
-import { ReviewModal } from '@/domains/review/components/ReviewModal';
 
 import styles from './RecipeCookPanel.module.scss';
 
@@ -24,7 +23,6 @@ interface RecipeCookPanelProps {
   fridgeMatch: RecipeFridgeMatch;
 }
 
-// 요리 완료 버튼과 팝업은 요리 기록 담당 작업에서 이 카드에 붙인다.
 export function RecipeCookPanel({ recipeId, recipe, fridgeMatch }: RecipeCookPanelProps) {
   const navigate = useNavigate();
   const { modal } = App.useApp();
@@ -32,7 +30,6 @@ export function RecipeCookPanel({ recipeId, recipe, fridgeMatch }: RecipeCookPan
   const ingredients = recipe.ingredients ?? [];
 
   const [cookingModalOpen, setCookingModalOpen] = useState(false);
-  const [reviewModalOpen, setReviewModalOpen] = useState(false);
 
   // 가장 최근 기록 1건과 전체 개수만 있으면 된다.
   const { data: logs } = useQuery({
@@ -125,14 +122,6 @@ export function RecipeCookPanel({ recipeId, recipe, fridgeMatch }: RecipeCookPan
         recipeId={recipeId}
         recipeName={recipe.name ?? '레시피'}
         ingredients={ingredients}
-        onOpenReview={() => setReviewModalOpen(true)}
-      />
-
-      <ReviewModal
-        open={reviewModalOpen}
-        onClose={() => setReviewModalOpen(false)}
-        recipeId={recipeId}
-        recipeName={recipe.name}
       />
     </>
   );

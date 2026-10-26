@@ -1,6 +1,19 @@
 import { MinusOutlined, PlusOutlined, DownOutlined, UpOutlined } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
-import { Alert, App, Button, Checkbox, Input, InputNumber, Modal, Radio, Typography } from 'antd';
+import {
+  Alert,
+  App,
+  Button,
+  Checkbox,
+  Flex,
+  Input,
+  InputNumber,
+  Modal,
+  Radio,
+  Result,
+  Spin,
+  Typography,
+} from 'antd';
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 
@@ -21,7 +34,6 @@ export interface CookingCompleteModalProps {
   recipeName: string;
   ingredients: IngredientItem[];
   chatSessionId?: number;
-  onOpenReview?: () => void;
 }
 
 interface HeldItemState {
@@ -250,7 +262,8 @@ function CookingCompleteModalBody({
 
     const usedIngredients = checkedItems.map((item) => ({
       ingredientId: item.ingredientId,
-      quantity: item.isAll ? undefined : (item.quantity ?? undefined),
+      // [전부] 선택 시 명시적 null 전송 (서버에서 전부 차감 처리)
+      quantity: (item.isAll ? null : (item.quantity ?? null)) as unknown as number,
     }));
 
     completeCookingMutation.mutate(
@@ -482,7 +495,12 @@ export function CookingCompleteModal(props: CookingCompleteModalProps) {
   const authenticated = useAuthStore((state) => state.status) === 'authenticated';
 
   // 냉장고 전체 아이템 조회 (소비기한 만료 항목 포함)
-  const { data: fridgeItems = [] } = useQuery({
+  const {
+    data: fridgeItems,
+    isLoading,
+    isError,
+    refetch,
+  } = useQuery({
     ...fridgeQueries.items('EXPIRATION'),
     enabled: authenticated && open,
   });
@@ -497,14 +515,36 @@ export function CookingCompleteModal(props: CookingCompleteModalProps) {
       destroyOnClose
     >
       {open && (
-        <CookingCompleteModalBody
-          key={recipeId}
-          recipeId={recipeId}
-          ingredients={ingredients}
-          fridgeItems={fridgeItems}
-          chatSessionId={chatSessionId}
-          onClose={onClose}
-        />
+        <>
+          {isLoading && (
+            <Flex justify="center" align="center" style={{ minHeight: 200 }}>
+              <Spin tip="냉장고 재료를 불러오는 중..." />
+            </Flex>
+          )}
+
+          {isError && (
+            <Result
+              status="error"
+              title="냉장고 재료를 불러오지 못했어요"
+              extra={
+                <Button type="primary" onClick={() => void refetch()}>
+                  다시 시도
+                </Button>
+              }
+            />
+          )}
+
+          {!isLoading && !isError && fridgeItems && (
+            <CookingCompleteModalBody
+              key={recipeId}
+              recipeId={recipeId}
+              ingredients={ingredients}
+              fridgeItems={fridgeItems}
+              chatSessionId={chatSessionId}
+              onClose={onClose}
+            />
+          )}
+        </>
       )}
     </Modal>
   );
