@@ -11,8 +11,9 @@ import org.testcontainers.mysql.MySQLContainer;
  */
 public abstract class MySqlContainerSupport {
 
+    // 캐시된 Spring 컨텍스트마다 연결 풀이 열려 있어, 컨텍스트가 늘면 기본 한도(151)를 넘는다.
     @ServiceConnection
-    static final MySQLContainer MYSQL = new MySQLContainer("mysql:8.4");
+    static final MySQLContainer MYSQL = new MySQLContainer("mysql:8.4").withCommand("--max-connections=400");
 
     static {
         MYSQL.start();
