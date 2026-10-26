@@ -173,6 +173,41 @@ erDiagram
 | order_items.sale_event_item_id | 할인으로 샀을 때의 행사 항목 | 할인 행사 |
 | order_items.flash_drop_member_id | 번개 드롭 1인 1개 확인용 회원 | 회원 |
 
+## 할인 행사 테이블 관계
+
+할인 행사 테이블 2개입니다. 컬럼 정의는 [데이터 사전](data-dictionary.md#sale_events--할인-행사)에 있습니다.
+
+```mermaid
+erDiagram
+    sale_events ||--o{ sale_event_items : "포함"
+
+    sale_events {
+        bigint id PK
+        enum type
+        datetime starts_at
+        datetime ends_at
+        enum status
+    }
+    sale_event_items {
+        bigint id PK
+        bigint sale_event_id FK
+        bigint product_id "외부 참조"
+        int list_price
+        int sale_price
+        int discount_rate
+        int limited_quantity
+        int remaining_quantity
+    }
+```
+
+| 관계 | 의미 | 필수 여부 |
+|---|---|---|
+| sale_events 1 : N sale_event_items | 할인 행사 하나에 행사 항목 | 행사 항목에는 할인 행사가 반드시 있음 |
+
+| 컬럼 | 가리키는 대상 | 소유 도메인 |
+|---|---|---|
+| sale_event_items.product_id | 할인 상품 | 상품 |
+
 ## 확정 절차
 
 담당자·도메인 정책 확인 → 데이터 사전 → 관계 필수성·삭제 정책 → 키·인덱스 → 마이그레이션 검토. [DB 규칙](../conventions/database.md)의 미결정 항목(Q-06, Q-07)을 먼저 해결합니다.

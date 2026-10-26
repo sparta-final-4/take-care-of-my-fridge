@@ -201,6 +201,36 @@
 
 - 같은 행사 항목에 같은 회원은 한 번만 들어갈 수 있습니다(번개 드롭 1인 1개). NULL은 여러 건 가능합니다.
 
+## sale_events — 할인 행사
+
+- 상품 하나에 대한 한 번의 할인 기간입니다. 등록하면 상품마다 한 건씩 만들어지고, 예정에서 진행 중, 종료로 바뀝니다.
+- 제약 이름: 인덱스 `idx_sale_events_status_starts_at`(status, starts_at), `idx_sale_events_status_ends_at`(status, ends_at).
+
+| 컬럼 | 타입 | NULL | 기본값 | 제약 | 의미 |
+|---|---|---|---|---|---|
+| type | ENUM('SPECIAL','FLASH_DROP') | 불가 | | | 특가·번개 드롭 |
+| starts_at | DATETIME(6) | 불가 | | 인덱스 | 시작 시각(한국 시각) |
+| ends_at | DATETIME(6) | 불가 | | 인덱스 | 종료 시각. 중간에 종료해도 바뀌지 않음 |
+| status | ENUM('SCHEDULED','ACTIVE','ENDED') | 불가 | | 인덱스 | 예정·진행 중·종료 |
+
+## sale_event_items — 할인 행사 항목
+
+- 할인 행사에 든 상품과 가격입니다. 등록은 상품마다 행사를 하나씩 만들어서 지금은 행사 하나에 항목 하나입니다.
+- 제약 이름: 인덱스 `idx_sale_event_items_product_id`(product_id).
+
+| 컬럼 | 타입 | NULL | 기본값 | 제약 | 의미 |
+|---|---|---|---|---|---|
+| sale_event_id | BIGINT | 불가 | | FK | 소속 할인 행사 |
+| product_id | BIGINT | 불가 | | 인덱스 | 할인 상품. 물리 FK 없이 상품 번호만 저장 |
+| list_price | INT | 불가 | | | 등록(수정) 때 읽은 정가(원). 종료된 행사의 정가 표시에 씀 |
+| sale_price | INT | 불가 | | | 할인가(원). 정가 × (100 − 할인율) / 100의 원 아래 버림 |
+| discount_rate | INT | 불가 | | | 할인율(1~99) |
+| limited_quantity | INT | 허용 | NULL | | 번개 드롭 한정 수량. 특가는 NULL |
+| remaining_quantity | INT | 허용 | NULL | | 번개 드롭 남은 수량. 특가는 NULL. 주문하면 줄고 취소하면 한정 수량까지 늘어남 |
+
+- 번개 드롭 1인 1개는 `order_items`의 UK(sale_event_item_id, flash_drop_member_id)가 막습니다.
+- 실행용 DDL 초안은 [sale-event.sql](sale-event.sql)에 있습니다.
+
 ## 다른 도메인에 요청할 컬럼
 
 | 도메인 | 필요한 데이터 | 근거 |

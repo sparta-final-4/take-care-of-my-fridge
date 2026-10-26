@@ -56,6 +56,23 @@ Q-01~Q-17에 의존하는 테스트는 기대값을 합의한 뒤 구현합니�
 | ORDER-09 | P1 | 주문 목록 조회 | 결제 대기·결제 완료·구매 확정만 최신순, 취소 제외, 1부터 센 페이지 | `OrderQueryServiceTransactionTest` |
 | ORDER-10 | P1 | 주문번호 생성 | 20자리 숫자, 동시에 만들어도 안 겹침, 겹치면 `ORDER_005` | `OrderNumberGeneratorTest`, `OrderCreateServiceConstraintTest` |
 
+## 할인 행사 필수 시나리오
+
+| ID | 우선순위 | 조건·행동 | 기대 결과 | 대응 테스트 |
+|---|---|---|---|---|
+| SALE-01 | P0 | 같은 상품을 동시에 5번 등록 | 행사 하나만 저장, 나머지는 `SALE_001` | `SaleEventCreateServiceTransactionTest` |
+| SALE-02 | P0 | 예정·진행 중 행사에 든 상품, 판매 중지·품절 상품, 없는 상품, 한정 수량이 재고보다 많음 | 거절하고 아무것도 저장되지 않음(상품이 여럿이면 다른 상품도) | `SaleEventCreateServiceTransactionTest` |
+| SALE-03 | P0 | 시작 전 행사 수정, 진행 중·종료·시작 시각이 지난 행사 수정 | 시작 전만 수정, 나머지는 거절하고 값 불변, 하나라도 거절되면 전부 불변 | `SaleEventUpdateServiceTransactionTest` |
+| SALE-04 | P0 | 진행 중 행사 종료, 예정·종료 행사 종료 | 상태만 종료로 바뀌고 종료 시각·항목 불변, 나머지는 `SALE_004`, 종료 뒤 할인 조회에서 빠짐 | `SaleEventTerminationServiceTransactionTest` |
+| SALE-05 | P0 | 시작 전 행사 삭제, 시작한 행사 삭제 | 행사와 항목이 지워지고 다른 행사는 남음, 시작한 행사는 `SALE_005`로 모두 그대로 | `SaleEventTerminationServiceTransactionTest` |
+| SALE-06 | P0 | 상태 갱신 | 시작 시각이 지난 예정은 진행 중, 종료 시각이 지난 행사는 종료, 같은 시각에 두 번 처리해도 결과가 같음 | `SaleEventLifecycleTransactionTest`, `SaleEventSchedulerTest` |
+| SALE-07 | P0 | 상태 갱신 전에 시각이 지난 행사 조회 | 시각으로 판단해 진행 중으로 조회, 종료로 닫은 행사는 빠짐 | `SaleEventLifecycleTransactionTest` |
+| SALE-08 | P1 | 목록 조회 | 상품마다 한 행, 종료는 등록 당시 정가·나머지는 현재 정가, 필터·정렬·판매량 | `SaleEventListQueryServiceTest` |
+| SALE-09 | P1 | 상세 조회, 후보 상품 조회 | 상세는 시각과 행사 항목, 없는 행사는 404. 후보는 판매 중·재고 있음·예정/진행 행사 없는 상품만 | `SaleEventDetailQueryServiceTest`, `SaleCandidateProductQueryServiceTest` |
+| SALE-10 | P1 | 권한·입력값 | 일반 회원 403, 비로그인 401, 잘못된 입력 400이고 서비스 호출 없음 | `AdminSaleEventControllerTest` |
+
+번개 드롭 동시 주문과 1인 1개는 ORDER-07·08에서 검증합니다.
+
 ## 다른 담당과 공동 검증
 
 - 요리 기록과 재료 차감의 일관성.
