@@ -17,6 +17,7 @@ import {
   ProductControllerApi,
   RecipeControllerApi,
   RecipeReviewControllerApi,
+  RefundControllerApi,
 } from './generated';
 
 // 생성된 API 클래스의 인스턴스는 여기서만 만든다. 도메인 api.ts에서만 import한다.
@@ -39,6 +40,7 @@ export const paymentApi = new PaymentControllerApi(undefined, basePath, axiosIns
 export const productApi = new ProductControllerApi(undefined, basePath, axiosInstance);
 export const recipeApi = new RecipeControllerApi(undefined, basePath, axiosInstance);
 export const recipeReviewApi = new RecipeReviewControllerApi(undefined, basePath, axiosInstance);
+export const refundApi = new RefundControllerApi(undefined, basePath, axiosInstance);
 
 export const adminAuditApi = new AdminAuditControllerApi(undefined, basePath, axiosInstance);
 export const adminForecastApi = new AdminForecastControllerApi(undefined, basePath, axiosInstance);

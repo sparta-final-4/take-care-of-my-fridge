@@ -1773,6 +1773,35 @@
       }
     },
     "/api/refunds": {
+      "get": {
+        "operationId": "getRefundHistory",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "orderId",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListRefundHistoryResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "refund-controller"
+        ]
+      },
       "post": {
         "operationId": "request",
         "requestBody": {
@@ -2239,6 +2268,23 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/FridgeItemResponse"
+            }
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorResponse"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ApiResponseListRefundHistoryResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RefundHistoryResponse"
             }
           },
           "error": {
@@ -5459,6 +5505,80 @@
           "orderId",
           "reasonType"
         ]
+      },
+      "RefundHistoryItemResponse": {
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "orderItemId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "productImageUrl": {
+            "type": "string"
+          },
+          "productName": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "unitPrice": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "RefundHistoryResponse": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RefundHistoryItemResponse"
+            }
+          },
+          "reasonDetail": {
+            "type": "string"
+          },
+          "reasonType": {
+            "type": "string",
+            "enum": [
+              "CHANGE_OF_MIND",
+              "ORDER_MISTAKE",
+              "NO_LONGER_NEEDED",
+              "ETC"
+            ]
+          },
+          "refundAmount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "refundId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "refundedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "requestedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "REQUESTED",
+              "COMPLETED",
+              "FAILED"
+            ]
+          }
+        }
       },
       "RefundResponse": {
         "type": "object",

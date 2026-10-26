@@ -12,6 +12,8 @@ export const ROUTES = {
   mypageProfile: '/mypage/profile',
   mypageOrders: '/mypage/orders',
   mypageOrderDetail: '/mypage/orders/:orderId',
+  mypageOrderRefund: '/mypage/orders/:orderId/refund',
+  mypageOrderRefunds: '/mypage/orders/:orderId/refunds',
   recipes: '/recipes',
   recipeDetail: '/recipes/:recipeId',
   products: '/products',

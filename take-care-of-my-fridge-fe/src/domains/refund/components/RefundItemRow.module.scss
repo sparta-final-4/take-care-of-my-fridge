@@ -1,0 +1,187 @@
+@use '@/styles/variables' as *;
+@use '@/styles/mixins' as *;
+
+// 모바일은 상품 정보 아래에 수량·단가·금액, 그 아래에 환불 수량·상태를 둔다.
+// xl부터 figures·actions가 display: contents로 풀려 모든 칸이 한 행에 온다.
+.row {
+  display: grid;
+  grid-template-areas:
+    'check thumb info'
+    'check thumb figures'
+    'check actions actions';
+  grid-template-columns: auto auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--ant-margin-sm) var(--ant-margin);
+  padding: var(--ant-padding) 0;
+  border-bottom: 1px solid var(--ant-color-border-secondary);
+
+  @include from(xl) {
+    grid-template-areas: 'check thumb info quantity price amount stepper status';
+    grid-template-columns:
+      auto auto minmax(0, 1fr) $order-quantity-width $cart-total-min-width $cart-total-min-width
+      $refund-stepper-width $refund-status-width;
+  }
+}
+
+// 환불할 수 없는 상품은 흐리게 보여 선택할 수 있는 상품과 구분한다
+.rowDisabled {
+  @extend .row;
+
+  color: var(--ant-color-text-tertiary);
+  background: var(--ant-color-fill-quaternary);
+}
+
+.check {
+  grid-area: check;
+  display: flex;
+  justify-content: center;
+  min-width: var(--ant-control-height-sm);
+}
+
+.thumb {
+  grid-area: thumb;
+  width: $cart-thumb-size;
+  height: $cart-thumb-size;
+  overflow: hidden;
+  background: var(--ant-color-fill-tertiary);
+  border-radius: var(--ant-border-radius);
+}
+
+.image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.imagePlaceholder {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.info {
+  grid-area: info;
+  min-width: 0;
+}
+
+.name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tag {
+  margin: 0;
+}
+
+.blockedTag {
+  border-style: dashed;
+}
+
+.figures {
+  grid-area: figures;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ant-margin);
+
+  @include from(xl) {
+    display: contents;
+  }
+}
+
+.actions {
+  grid-area: actions;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ant-margin-sm);
+
+  @include from(xl) {
+    display: contents;
+  }
+}
+
+.quantity {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+
+  @include from(xl) {
+    grid-area: quantity;
+    text-align: center;
+  }
+}
+
+.price {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+
+  @include from(xl) {
+    grid-area: price;
+    text-align: right;
+  }
+}
+
+.listPrice {
+  font-size: var(--ant-font-size-sm);
+}
+
+.amount {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+
+  @include from(xl) {
+    grid-area: amount;
+  }
+}
+
+.stepper {
+  @include from(xl) {
+    grid-area: stepper;
+    justify-content: center;
+  }
+}
+
+.stepperValue {
+  min-width: $cart-quantity-min-width;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.status {
+  @include from(xl) {
+    grid-area: status;
+  }
+}
+
+// 터치 화면에서 누르기 쉽게 md 미만은 버튼을 키운다
+.touchButton {
+  min-width: $touch-target-size;
+  min-height: $touch-target-size;
+
+  @include from(md) {
+    min-width: 0;
+    min-height: 0;
+  }
+}
+
+// 칸 너비가 ch 단위라 격자의 글자 크기·굵기를 행과 같게 두고, 굵기는 칸 글자에만 준다
+.head {
+  display: none;
+  padding: var(--ant-padding-sm) 0;
+  border-bottom-color: var(--ant-color-text);
+
+  @include from(xl) {
+    display: grid;
+  }
+}
+
+.headCheck {
+  grid-area: check;
+}
+
+.headProduct {
+  grid-column: 2 / 4;
+}

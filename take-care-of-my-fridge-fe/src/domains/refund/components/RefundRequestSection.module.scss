@@ -1,0 +1,131 @@
+@use '@/styles/variables' as *;
+@use '@/styles/mixins' as *;
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ant-margin-lg);
+}
+
+.card {
+  min-width: 0;
+  padding: var(--ant-padding);
+  background: var(--ant-color-bg-container);
+  border: 1px solid var(--ant-color-border);
+  border-radius: var(--ant-border-radius-lg);
+
+  @include from(md) {
+    padding: var(--ant-padding-lg);
+  }
+}
+
+.title {
+  margin: 0;
+}
+
+.meta {
+  font-variant-numeric: tabular-nums;
+}
+
+// 좁은 화면에서 주문번호와 주문 시각이 중간에서 끊기지 않고 둘 사이에서만 나뉘게 한다
+.nowrap {
+  white-space: nowrap;
+}
+
+.alert {
+  margin-top: var(--ant-margin);
+}
+
+.list {
+  margin-top: var(--ant-margin);
+}
+
+.listFooter {
+  margin-top: var(--ant-margin);
+}
+
+// lg 미만은 환불 사유 아래에 환불 금액·안내가 온다
+.bottom {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--ant-margin-lg);
+  align-items: start;
+
+  @include from(lg) {
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  }
+}
+
+.cardTitle {
+  font-size: var(--ant-font-size-lg);
+}
+
+.reasonItem {
+  margin: var(--ant-margin) 0;
+}
+
+// 사유는 테두리가 있는 칸으로 나눠 누를 곳을 넓힌다. md부터 두 칸씩 놓는다.
+.reasons {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--ant-margin-sm);
+  width: 100%;
+
+  @include from(md) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.reason {
+  min-height: $touch-target-size;
+  margin: 0;
+  padding: var(--ant-padding-xs) var(--ant-padding-sm);
+  border: 1px solid var(--ant-color-border);
+  border-radius: var(--ant-border-radius);
+  align-items: center;
+}
+
+.rows {
+  margin: var(--ant-margin-sm) 0;
+}
+
+.amount {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.divider {
+  margin: var(--ant-margin-sm) 0;
+}
+
+.total {
+  font-size: var(--ant-font-size-heading-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.tag {
+  margin: 0;
+}
+
+.notice {
+  margin: var(--ant-margin-sm) 0 var(--ant-margin);
+}
+
+// 터치 화면에서 누르기 쉽게 lg 미만은 높이를 키운다
+.button {
+  min-height: $touch-target-size;
+
+  @include from(lg) {
+    min-height: auto;
+  }
+}
+
+.guide {
+  margin: var(--ant-margin-sm) 0 0;
+  padding-left: var(--ant-padding-lg);
+  color: var(--ant-color-text-secondary);
+
+  > li + li {
+    margin-top: var(--ant-margin-xs);
+  }
+}

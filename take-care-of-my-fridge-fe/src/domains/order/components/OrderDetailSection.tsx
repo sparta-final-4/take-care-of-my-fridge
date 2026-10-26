@@ -1,19 +1,9 @@
+import { RightOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import {
-  App,
-  Button,
-  Divider,
-  Flex,
-  Modal,
-  Result,
-  Skeleton,
-  Tag,
-  Tooltip,
-  Typography,
-} from 'antd';
+import { App, Button, Divider, Flex, Modal, Result, Skeleton, Tag, Typography } from 'antd';
 import dayjs from 'dayjs';
 import { useState } from 'react';
-import { useNavigate } from 'react-router';
+import { generatePath, useNavigate } from 'react-router';
 
 import { ROUTES } from '@/app/paths';
 import { getErrorCode } from '@/common/api/errors';
@@ -21,6 +11,8 @@ import { formatPrice } from '@/domains/cart/format';
 import { confirmOrder } from '@/domains/order/api';
 import { ORDER_STATUS_LABELS } from '@/domains/order/format';
 import { orderQueries } from '@/domains/order/queries';
+import { getOrderItemRefundState, sumRefundAmountByStatus } from '@/domains/refund/format';
+import { refundQueries } from '@/domains/refund/queries';
 
 import { OrderItemHeader, OrderItemRow } from './OrderItemRow';
 import styles from './OrderDetailSection.module.scss';
@@ -30,8 +22,9 @@ interface OrderDetailSectionProps {
 }
 
 // 주문할 때 저장한 상품·금액을 보여 준다. 환불 내역은 환불 상세 화면이 보여 준다.
+// 결제 완료·구매 확정 주문은 상품별 환불 표시와 환불 금액을 더하고, 환불이 있으면 환불 상세로 가는 버튼을 둔다.
 // 구매 확정·환불 카드는 결제 완료·구매 확정 주문에 보인다. 구매 확정된 주문은 버튼을 누르면 안 되는 이유를 알린다.
-// 결제 완료 주문의 환불 신청은 아직 API가 없어 비활성으로만 둔다.
+// 결제 완료 주문의 환불 신청은 환불 신청 화면으로 이동하고, 환불할 수 있는 수량이 없으면 안내만 한다.
 export function OrderDetailSection({ orderId }: OrderDetailSectionProps) {
   const navigate = useNavigate();
   const validOrderId = Number.isSafeInteger(orderId) && orderId > 0;
@@ -42,6 +35,16 @@ export function OrderDetailSection({ orderId }: OrderDetailSectionProps) {
     error,
     refetch,
   } = useQuery({ ...orderQueries.detail(orderId), enabled: validOrderId });
+  // 환불 조회 실패는 화면을 막지 않는다. 환불 표시 없이 주문만 보여 준다.
+  const hasRefundSection = order?.status === 'PAID' || order?.status === 'CONFIRMED';
+  const { data: refundHistory = [] } = useQuery({
+    ...refundQueries.history(orderId),
+    enabled: hasRefundSection,
+  });
+  const { data: refundableItems } = useQuery({
+    ...refundQueries.refundableItems(orderId),
+    enabled: hasRefundSection,
+  });
   const { message } = App.useApp();
   const queryClient = useQueryClient();
   const [confirmAsked, setConfirmAsked] = useState(false);
@@ -77,6 +80,19 @@ export function OrderDetailSection({ orderId }: OrderDetailSectionProps) {
   }
 
   const isConfirmed = order.status === 'CONFIRMED';
+  const refundedAmount = sumRefundAmountByStatus(refundHistory, 'COMPLETED');
+  const refundByProductId = new Map(refundableItems?.map((item) => [item.productId, item]));
+  // 환불 가능 상품을 아직 못 읽었으면 막지 않고, 환불 신청 화면이 다시 확인한다
+  const nothingToRefund =
+    refundableItems !== undefined &&
+    refundableItems.every((item) => (item.refundableQuantity ?? 0) === 0);
+  const handleRefundClick = () => {
+    if (nothingToRefund) {
+      message.info('환불할 수 있는 상품이 없습니다.');
+      return;
+    }
+    navigate(generatePath(ROUTES.mypageOrderRefund, { orderId: String(orderId) }));
+  };
   const handleConfirmClick = () => {
     if (isConfirmed) {
       message.info('이미 구매 확정된 주문입니다.');
@@ -119,10 +135,27 @@ export function OrderDetailSection({ orderId }: OrderDetailSectionProps) {
         {listButton}
       </Flex>
       <section className={`${styles.card} ${styles.list}`} aria-label="주문 상품">
-        <OrderItemHeader />
-        {order.items?.map((item) => (
-          <OrderItemRow key={item.productId} item={item} />
-        ))}
+        <OrderItemHeader showRefund={hasRefundSection} />
+        {order.items?.map((item) => {
+          const refundItem = refundByProductId.get(item.productId);
+          const refundState = refundItem ? getOrderItemRefundState(refundItem) : 'none';
+          return (
+            <OrderItemRow
+              key={item.productId}
+              item={item}
+              showRefund={hasRefundSection}
+              refund={
+                refundState === 'saleBlocked' ? (
+                  <Typography.Text type="secondary">환불 불가</Typography.Text>
+                ) : refundState === 'none' ? null : (
+                  <Tag className={styles.tag}>
+                    {refundState === 'partial' ? '부분 환불' : '환불'}
+                  </Tag>
+                )
+              }
+            />
+          );
+        })}
       </section>
       <div className={styles.bottom}>
         <section className={styles.card} aria-label="결제 금액">
@@ -142,12 +175,41 @@ export function OrderDetailSection({ orderId }: OrderDetailSectionProps) {
                 {order.discountAmount ? `-${formatPrice(order.discountAmount)}` : formatPrice(0)}
               </Typography.Text>
             </Flex>
+            <Flex justify="space-between">
+              <Typography.Text>결제 금액</Typography.Text>
+              <Typography.Text className={styles.amount}>
+                {formatPrice(order.payAmount ?? 0)}
+              </Typography.Text>
+            </Flex>
+            {refundHistory.length > 0 && (
+              <>
+                <Flex justify="space-between">
+                  <Typography.Text type="secondary">환불 금액</Typography.Text>
+                  <Typography.Text className={styles.amount}>
+                    {refundedAmount ? `-${formatPrice(refundedAmount)}` : formatPrice(0)}
+                  </Typography.Text>
+                </Flex>
+                <Flex justify="flex-end">
+                  <Button
+                    onClick={() =>
+                      navigate(
+                        generatePath(ROUTES.mypageOrderRefunds, { orderId: String(orderId) }),
+                      )
+                    }
+                    className={styles.button}
+                  >
+                    환불 상세 보기
+                    <RightOutlined />
+                  </Button>
+                </Flex>
+              </>
+            )}
           </Flex>
           <Divider className={styles.divider} />
           <Flex justify="space-between" align="baseline">
-            <Typography.Text strong>결제 금액</Typography.Text>
+            <Typography.Text strong>최종 결제 금액</Typography.Text>
             <Typography.Text strong className={styles.total}>
-              {formatPrice(order.payAmount ?? 0)}
+              {formatPrice((order.payAmount ?? 0) - refundedAmount)}
             </Typography.Text>
           </Flex>
         </section>
@@ -179,11 +241,9 @@ export function OrderDetailSection({ orderId }: OrderDetailSectionProps) {
                   환불 신청
                 </Button>
               ) : (
-                <Tooltip title="환불 신청 기능은 준비 중입니다.">
-                  <Button size="large" block disabled className={styles.button}>
-                    환불 신청
-                  </Button>
-                </Tooltip>
+                <Button size="large" block onClick={handleRefundClick} className={styles.button}>
+                  환불 신청
+                </Button>
               )}
             </Flex>
           </section>

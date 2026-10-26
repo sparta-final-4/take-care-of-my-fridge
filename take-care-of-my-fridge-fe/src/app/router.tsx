@@ -60,6 +60,14 @@ export const router = createBrowserRouter([
                 path: ROUTES.mypageOrderDetail,
                 lazy: page(() => import('@/pages/mypage/MyPageOrderDetailPage')),
               },
+              {
+                path: ROUTES.mypageOrderRefund,
+                lazy: page(() => import('@/pages/mypage/MyPageRefundRequestPage')),
+              },
+              {
+                path: ROUTES.mypageOrderRefunds,
+                lazy: page(() => import('@/pages/mypage/MyPageRefundDetailPage')),
+              },
             ],
           },
           { path: ROUTES.cart, lazy: page(() => import('@/pages/order/CartPage')) },

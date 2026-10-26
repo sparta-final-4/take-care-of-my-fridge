@@ -1,0 +1,143 @@
+@use '@/styles/variables' as *;
+@use '@/styles/mixins' as *;
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ant-margin-lg);
+}
+
+.card {
+  min-width: 0;
+  margin: 0;
+  padding: var(--ant-padding-lg);
+  background: var(--ant-color-bg-container);
+  border: 1px solid var(--ant-color-border);
+  border-radius: var(--ant-border-radius-lg);
+}
+
+.heading {
+  min-width: 0;
+}
+
+.title {
+  margin: 0;
+}
+
+.tag {
+  margin: 0;
+}
+
+.meta {
+  font-variant-numeric: tabular-nums;
+}
+
+// 좁은 화면에서 주문번호와 주문 시각이 중간에서 끊기지 않고 둘 사이에서만 나뉘게 한다
+.nowrap {
+  white-space: nowrap;
+}
+
+// 터치 화면에서 누르기 쉽게 lg 미만은 높이를 키운다
+.button {
+  min-height: $touch-target-size;
+
+  @include from(lg) {
+    min-height: auto;
+  }
+}
+
+// 주문 상세의 상품 목록과 같은 안쪽 여백. 마지막 상품의 구분선은 카드 테두리와 겹치므로 뺀다
+.list {
+  padding-block: 0;
+  padding-inline: var(--ant-padding-sm);
+
+  > * {
+    padding-inline: calc(var(--ant-padding-lg) - var(--ant-padding-sm));
+  }
+
+  > :last-child {
+    border-bottom: 0;
+  }
+}
+
+// lg 미만은 결제·환불 금액 아래에 환불 내역이 온다
+.bottom {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--ant-margin-lg);
+  align-items: start;
+
+  @include from(lg) {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+
+.cardTitle {
+  font-size: var(--ant-font-size-lg);
+}
+
+.rows {
+  margin-top: var(--ant-margin);
+}
+
+.amount {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.divider {
+  margin: var(--ant-margin) 0;
+}
+
+.total {
+  font-size: var(--ant-font-size-lg);
+  font-variant-numeric: tabular-nums;
+}
+
+.notice {
+  margin: var(--ant-margin-sm) 0 0;
+}
+
+.history {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--ant-margin-sm);
+  padding: var(--ant-padding-sm);
+  border: 1px solid var(--ant-color-border);
+  border-radius: var(--ant-border-radius);
+}
+
+.thumb {
+  width: $sale-thumb-size;
+  height: $sale-thumb-size;
+  overflow: hidden;
+  background: var(--ant-color-fill-tertiary);
+  border-radius: var(--ant-border-radius);
+}
+
+.image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.imagePlaceholder {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.historyInfo {
+  min-width: 0;
+}
+
+.name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.historyAside {
+  flex-shrink: 0;
+}
