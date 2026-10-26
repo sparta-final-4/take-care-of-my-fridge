@@ -7,6 +7,7 @@ import org.example.takecareofmyfridgebe.domain.order.entity.OrderStatus;
 import org.example.takecareofmyfridgebe.domain.order.repository.OrderItemRepository;
 import org.example.takecareofmyfridgebe.domain.order.repository.OrderRepository;
 import org.example.takecareofmyfridgebe.domain.payment.entity.Payment;
+import org.example.takecareofmyfridgebe.domain.payment.entity.PaymentEventType;
 import org.example.takecareofmyfridgebe.domain.payment.entity.PaymentStatus;
 import org.example.takecareofmyfridgebe.domain.payment.repository.PaymentRepository;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
@@ -63,6 +64,12 @@ public class PaymentService {
     // 스케줄러가 만료 처리할 결제 대기 건을 afterId 다음부터 id 순으로 조회한다
     public List<Payment> findExpiredReady(LocalDateTime now, long afterId, int limit) {
         return paymentRepository.findExpired(PaymentStatus.READY, now, afterId, PageRequest.of(0, limit));
+    }
+
+    // 스케줄러가 보상 취소를 다시 시도할 결제를 afterId 다음부터 id 순으로 조회한다
+    public List<Payment> findCompensationPending(long afterId, int limit) {
+        return paymentRepository.findCompensationPending(PaymentStatus.FAILED, PaymentEventType.PAID,
+                PaymentEventType.CANCELLED, afterId, PageRequest.of(0, limit));
     }
 
     // 웹훅처럼 결제가 없을 수도 있는 요청에서 쓴다

@@ -2,6 +2,7 @@ package org.example.takecareofmyfridgebe.domain.payment.repository;
 
 import jakarta.persistence.LockModeType;
 import org.example.takecareofmyfridgebe.domain.payment.entity.Payment;
+import org.example.takecareofmyfridgebe.domain.payment.entity.PaymentEventType;
 import org.example.takecareofmyfridgebe.domain.payment.entity.PaymentStatus;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -30,4 +31,17 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
     @Query("select p from Payment p where p.status = :status and p.expiresAt < :now and p.id > :afterId order by p.id")
     List<Payment> findExpired(@Param("status") PaymentStatus status, @Param("now") LocalDateTime now,
                               @Param("afterId") long afterId, Pageable pageable);
+
+    // 실패 처리했는데 PG에서 결제된 기록(PAID)만 있고 보상 취소 기록(CANCELLED)이 없는 결제를 id 순으로 나눠 읽는다
+    @Query("""
+        select p from Payment p
+        where p.status = :status and p.id > :afterId
+          and exists (select h.id from PaymentHistory h where h.payment = p and h.eventType = :paidEvent)
+          and not exists (select h.id from PaymentHistory h where h.payment = p and h.eventType = :cancelledEvent)
+        order by p.id
+        """)
+    List<Payment> findCompensationPending(@Param("status") PaymentStatus status,
+                                          @Param("paidEvent") PaymentEventType paidEvent,
+                                          @Param("cancelledEvent") PaymentEventType cancelledEvent,
+                                          @Param("afterId") long afterId, Pageable pageable);
 }

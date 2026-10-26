@@ -83,4 +83,18 @@ class PaymentTimeoutSchedulerTest {
                 eq(PaymentTimeoutScheduler.BATCH_SIZE));
         verify(paymentFacade).expire(last);
     }
+
+    @Test
+    @DisplayName("보상 취소 재시도는 한 건이 실패해도 나머지 건을 계속 시도한다")
+    void retryCompensations_oneFailure_othersStillProcessed() {
+        Payment first = payment(1L);
+        Payment second = payment(2L);
+        given(paymentService.findCompensationPending(0L, PaymentTimeoutScheduler.BATCH_SIZE))
+                .willReturn(List.of(first, second));
+        willThrow(new IllegalStateException("PG 오류")).given(paymentFacade).retryCompensation(first);
+
+        scheduler.retryCompensations();
+
+        verify(paymentFacade).retryCompensation(second);
+    }
 }

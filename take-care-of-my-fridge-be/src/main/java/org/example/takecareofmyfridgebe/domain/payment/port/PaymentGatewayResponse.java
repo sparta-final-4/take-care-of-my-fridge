@@ -21,4 +21,9 @@ public record PaymentGatewayResponse(
     public boolean isFailed() {
         return STATUS_FAILED.equals(status) || STATUS_CANCELLED.equals(status);
     }
+
+    // 전액 취소된 상태. 부분 취소(PARTIAL_CANCELLED)는 포함하지 않는다
+    public boolean isCancelled() {
+        return STATUS_CANCELLED.equals(status);
+    }
 }
