@@ -6,6 +6,7 @@ import org.example.takecareofmyfridgebe.domain.payment.entity.Payment;
 import org.example.takecareofmyfridgebe.domain.payment.entity.PaymentChangedBy;
 import org.example.takecareofmyfridgebe.domain.payment.facade.PaymentFacade;
 import org.example.takecareofmyfridgebe.domain.payment.service.PaymentService;
+import org.example.takecareofmyfridgebe.domain.refund.facade.RefundFacade;
 import org.example.takecareofmyfridgebe.infra.portone.dto.PortOneWebhook;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
@@ -13,18 +14,20 @@ import org.springframework.stereotype.Component;
 import java.util.Optional;
 import java.util.Set;
 
-// 서명 검증을 통과한 웹훅을 기록하고 결제 상태 동기화를 PaymentFacade에 맡긴다
+// 서명 검증을 통과한 웹훅을 기록하고 결제 상태 동기화를 PaymentFacade에 맡긴다.
+// 취소 웹훅은 결제 완료된 결제의 환불을 PG와 맞추도록 RefundFacade에도 넘긴다
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class WebhookHandler {
 
-    // TODO: 환불 도메인 구현 후 Transaction.PartialCancelled 처리 추가
-    private static final Set<String> HANDLED_TYPES =
-            Set.of("Transaction.Paid", "Transaction.Failed", "Transaction.Cancelled");
+    private static final Set<String> HANDLED_TYPES = Set.of(
+            "Transaction.Paid", "Transaction.Failed", "Transaction.Cancelled", "Transaction.PartialCancelled");
+    private static final Set<String> CANCEL_TYPES = Set.of("Transaction.Cancelled", "Transaction.PartialCancelled");
 
     private final PaymentService paymentService;
     private final PaymentFacade paymentFacade;
+    private final RefundFacade refundFacade;
     private final WebhookEventService webhookEventService;
 
     public void handle(String webhookId, PortOneWebhook webhook, String rawPayload) {
@@ -60,7 +63,11 @@ public class WebhookHandler {
             }
 
             paymentId = payment.get().getId();
-            if (paymentFacade.syncWithPg(payment.get(), PaymentChangedBy.WEBHOOK)) {
+            boolean changed = paymentFacade.syncWithPg(payment.get(), PaymentChangedBy.WEBHOOK);
+            if (CANCEL_TYPES.contains(webhook.type())) {
+                changed = refundFacade.syncWithPg(webhook.paymentId(), PaymentChangedBy.WEBHOOK, null) || changed;
+            }
+            if (changed) {
                 webhookEventService.markProcessed(eventId.get(), paymentId);
             } else {
                 webhookEventService.markIgnored(eventId.get(), paymentId);
