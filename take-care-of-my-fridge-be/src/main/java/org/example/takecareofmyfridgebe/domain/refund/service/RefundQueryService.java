@@ -8,8 +8,11 @@ import org.example.takecareofmyfridgebe.domain.payment.entity.Payment;
 import org.example.takecareofmyfridgebe.domain.payment.entity.PaymentStatus;
 import org.example.takecareofmyfridgebe.domain.payment.repository.PaymentRepository;
 import org.example.takecareofmyfridgebe.domain.payment.service.PaymentHistoryRecorder;
+import org.example.takecareofmyfridgebe.domain.refund.dto.RefundAmountByStatus;
 import org.example.takecareofmyfridgebe.domain.refund.dto.RefundHistoryResponse;
 import org.example.takecareofmyfridgebe.domain.refund.dto.RefundResponse;
+import org.example.takecareofmyfridgebe.domain.refund.dto.RefundSummaryResponse;
+import org.example.takecareofmyfridgebe.domain.refund.dto.RefundSummaryStatus;
 import org.example.takecareofmyfridgebe.domain.refund.dto.RefundSyncState;
 import org.example.takecareofmyfridgebe.domain.refund.dto.RefundableItemResponse;
 import org.example.takecareofmyfridgebe.domain.refund.dto.RefundedQuantity;
@@ -25,6 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -35,6 +39,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class RefundQueryService {
+
+    private static final int MAX_SUMMARY_ORDERS = 50;
 
     private final OrderReader orderReader;
     private final PaymentRepository paymentRepository;
@@ -76,6 +82,58 @@ public class RefundQueryService {
                 .map(refund -> RefundHistoryResponse.from(refund,
                         itemsByRefundId.getOrDefault(refund.getId(), List.of())))
                 .toList();
+    }
+
+    // 주문 목록·주문 상세의 환불 요약. 회원의 주문만 돌려주고, 요청한 주문 순서를 지킨다.
+    // 주문 수와 관계없이 주문 상품, 상품별 완료 수량, 주문별 상태별 금액을 한 번씩 읽는다
+    public List<RefundSummaryResponse> getRefundSummaries(Long memberId, List<Long> orderIds) {
+        if (orderIds == null || orderIds.isEmpty() || orderIds.size() > MAX_SUMMARY_ORDERS) {
+            throw new BusinessException(ErrorCode.INVALID_REFUND_SUMMARY_REQUEST);
+        }
+        Map<Long, List<OrderItem>> itemsByOrderId = refundRepository.findOwnedOrderItems(memberId, orderIds).stream()
+                .collect(Collectors.groupingBy(item -> item.getOrder().getId(), LinkedHashMap::new,
+                        Collectors.toList()));
+        if (itemsByOrderId.isEmpty()) {
+            return List.of();
+        }
+
+        Map<Long, Long> completedById = refundItemRepository
+                .findRefundedQuantitiesByOrderItemIds(itemsByOrderId.values().stream()
+                                .flatMap(List::stream).map(OrderItem::getId).toList(),
+                        List.of(RefundStatus.COMPLETED)).stream()
+                .collect(Collectors.toMap(RefundedQuantity::orderItemId, RefundedQuantity::quantity));
+        Map<Long, Map<RefundStatus, Long>> amountsByOrderId = refundRepository
+                .sumAmountByOrderIdsGroupByStatus(itemsByOrderId.keySet()).stream()
+                .collect(Collectors.groupingBy(RefundAmountByStatus::orderId,
+                        Collectors.toMap(RefundAmountByStatus::status, RefundAmountByStatus::amount)));
+
+        return orderIds.stream()
+                .distinct()
+                .filter(itemsByOrderId::containsKey)
+                .map(orderId -> {
+                    Map<RefundStatus, Long> amounts = amountsByOrderId.getOrDefault(orderId, Map.of());
+                    long completedAmount = amounts.getOrDefault(RefundStatus.COMPLETED, 0L);
+                    return new RefundSummaryResponse(orderId,
+                            summaryStatus(itemsByOrderId.get(orderId), completedById, amounts), completedAmount);
+                })
+                .toList();
+    }
+
+    // 진행 중 환불이 있으면 진행 중, 환불 가능한 상품을 모두 완료했으면 전체 환불, 완료된 환불이 있으면 부분 환불
+    private RefundSummaryStatus summaryStatus(List<OrderItem> items, Map<Long, Long> completedById,
+                                              Map<RefundStatus, Long> amounts) {
+        if (amounts.getOrDefault(RefundStatus.REQUESTED, 0L) > 0) {
+            return RefundSummaryStatus.IN_PROGRESS;
+        }
+        List<OrderItem> refundableItems = items.stream().filter(RefundableOrderPolicy::isRefundableItem).toList();
+        boolean allRefunded = !refundableItems.isEmpty() && refundableItems.stream()
+                .allMatch(item -> completedById.getOrDefault(item.getId(), 0L) >= item.getQuantity());
+        if (allRefunded) {
+            return RefundSummaryStatus.FULL;
+        }
+        return amounts.getOrDefault(RefundStatus.COMPLETED, 0L) > 0
+                ? RefundSummaryStatus.PARTIAL
+                : RefundSummaryStatus.NONE;
     }
 
     public RefundResponse getRefund(Long refundId) {

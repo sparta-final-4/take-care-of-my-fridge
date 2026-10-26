@@ -6,6 +6,7 @@ import org.example.takecareofmyfridgebe.domain.auth.service.AuthSessionService.A
 import org.example.takecareofmyfridgebe.domain.refund.dto.RefundCreateRequest;
 import org.example.takecareofmyfridgebe.domain.refund.dto.RefundHistoryResponse;
 import org.example.takecareofmyfridgebe.domain.refund.dto.RefundResponse;
+import org.example.takecareofmyfridgebe.domain.refund.dto.RefundSummaryResponse;
 import org.example.takecareofmyfridgebe.domain.refund.dto.RefundableItemResponse;
 import org.example.takecareofmyfridgebe.domain.refund.facade.RefundFacade;
 import org.example.takecareofmyfridgebe.domain.refund.service.RefundQueryService;
@@ -46,6 +47,14 @@ public class RefundController {
             @AuthenticationPrincipal AuthPrincipal principal,
             @RequestParam Long orderId) {
         return ResponseEntity.ok(ApiResponse.ok(refundQueryService.getRefundHistory(principal.memberId(), orderId)));
+    }
+
+    // 주문 목록·주문 상세. 주문마다 환불 상태(부분·전체 환불 등)와 완료된 환불 금액을 보여준다. 한 번에 최대 50건
+    @GetMapping("/summaries")
+    public ResponseEntity<ApiResponse<List<RefundSummaryResponse>>> getRefundSummaries(
+            @AuthenticationPrincipal AuthPrincipal principal,
+            @RequestParam List<Long> orderIds) {
+        return ResponseEntity.ok(ApiResponse.ok(refundQueryService.getRefundSummaries(principal.memberId(), orderIds)));
     }
 
     // 환불 신청 화면. 주문 상품마다 남은 환불 가능 수량을 보여준다

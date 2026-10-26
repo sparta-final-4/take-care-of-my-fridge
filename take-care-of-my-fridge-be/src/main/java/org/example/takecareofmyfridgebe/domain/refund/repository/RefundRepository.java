@@ -1,6 +1,8 @@
 package org.example.takecareofmyfridgebe.domain.refund.repository;
 
 import jakarta.persistence.LockModeType;
+import org.example.takecareofmyfridgebe.domain.order.entity.OrderItem;
+import org.example.takecareofmyfridgebe.domain.refund.dto.RefundAmountByStatus;
 import org.example.takecareofmyfridgebe.domain.refund.entity.Refund;
 import org.example.takecareofmyfridgebe.domain.refund.entity.RefundStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -9,6 +11,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -39,4 +42,17 @@ public interface RefundRepository extends JpaRepository<Refund, Long> {
     @Query("select distinct r.payment.portonePaymentId from Refund r where r.status = :status and r.createdAt < :before")
     List<String> findPortonePaymentIdsByStatusAndCreatedAtBefore(@Param("status") RefundStatus status,
                                                                  @Param("before") LocalDateTime before);
+
+    // 환불 요약. 회원의 주문만 골라 주문 상품을 읽는다 (주문 도메인을 고치지 않으려고 환불 쪽에 둔다)
+    @Query("select oi from OrderItem oi join fetch oi.order o where o.id in :orderIds and o.memberId = :memberId order by oi.id")
+    List<OrderItem> findOwnedOrderItems(@Param("memberId") Long memberId, @Param("orderIds") Collection<Long> orderIds);
+
+    @Query("""
+        select new org.example.takecareofmyfridgebe.domain.refund.dto.RefundAmountByStatus(
+            r.payment.order.id, r.status, sum(r.refundAmount))
+        from Refund r
+        where r.payment.order.id in :orderIds
+        group by r.payment.order.id, r.status
+        """)
+    List<RefundAmountByStatus> sumAmountByOrderIdsGroupByStatus(@Param("orderIds") Collection<Long> orderIds);
 }
