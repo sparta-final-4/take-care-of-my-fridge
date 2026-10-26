@@ -16,6 +16,7 @@ apis/member-controller-api.ts
 apis/my-recipe-controller-api.ts
 apis/order-controller-api.ts
 apis/payment-controller-api.ts
+apis/popular-recipe-controller-api.ts
 apis/product-controller-api.ts
 apis/recipe-controller-api.ts
 apis/recipe-review-controller-api.ts
@@ -41,6 +42,7 @@ models/api-response-forecast-response.ts
 models/api-response-fridge-item-response.ts
 models/api-response-fridge-item-take-out-response.ts
 models/api-response-list-fridge-item-response.ts
+models/api-response-list-popular-recipe-response.ts
 models/api-response-list-refund-history-response.ts
 models/api-response-list-refundable-item-response.ts
 models/api-response-my-info-response.ts
@@ -153,6 +155,7 @@ models/page-response-sale-event-list-response.ts
 models/payment-confirm-request.ts
 models/payment-confirm-response.ts
 models/payment-prepare-response.ts
+models/popular-recipe-response.ts
 models/product-create-request.ts
 models/product-detail-response.ts
 models/product-list-item-response.ts
