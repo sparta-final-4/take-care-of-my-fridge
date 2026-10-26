@@ -114,6 +114,9 @@ export function Header() {
               <Button type="text" onClick={() => navigate(ROUTES.adminForecast)}>
                 판매 예측
               </Button>
+              <Button type="text" onClick={() => navigate(ROUTES.adminProductNew)}>
+                상품 등록
+              </Button>
               <Button type="text" onClick={() => navigate(ROUTES.adminSaleEventNew)}>
                 할인 행사
               </Button>
@@ -207,6 +210,18 @@ export function Header() {
                 }}
               >
                 판매 예측
+              </Button>
+            )}
+            {role === 'ADMIN' && (
+              <Button
+                type="text"
+                block
+                onClick={() => {
+                  handleCloseDrawer();
+                  navigate(ROUTES.adminProductNew);
+                }}
+              >
+                상품 등록
               </Button>
             )}
             {role === 'ADMIN' && (

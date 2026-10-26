@@ -23,6 +23,7 @@ export const ROUTES = {
   adminMembers: '/admin/members',
   adminAudit: '/admin/audit',
   adminForecast: '/admin/forecast',
+  adminProductNew: '/admin/products/new',
   adminDeals: '/admin/deals',
   adminSaleEventNew: '/admin/sale-events/new',
 } as const;

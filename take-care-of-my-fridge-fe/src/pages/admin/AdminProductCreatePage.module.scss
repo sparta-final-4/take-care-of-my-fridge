@@ -1,0 +1,14 @@
+.container {
+  width: 100%;
+  max-width: 760px;
+  margin: var(--ant-margin-xl) auto;
+  padding: 0 var(--ant-padding-lg);
+}
+
+.fullWidth {
+  width: 100%;
+}
+
+.notice {
+  margin-bottom: var(--ant-margin-lg);
+}

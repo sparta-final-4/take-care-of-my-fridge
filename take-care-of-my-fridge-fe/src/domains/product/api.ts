@@ -1,6 +1,8 @@
 import {
+  adminProductApi,
   productApi,
   type PageResponseProductListItemResponse,
+  type ProductCreateRequest,
   type ProductDetailResponse,
   type ProductListRequest,
 } from '@/common/api/clients';
@@ -18,4 +20,8 @@ export async function getProduct(
   signal?: AbortSignal,
 ): Promise<ProductDetailResponse> {
   return unwrap(productApi.getProduct({ productId }, { signal }));
+}
+
+export async function createProduct(request: ProductCreateRequest): Promise<ProductDetailResponse> {
+  return unwrap(adminProductApi.createProduct({ productCreateRequest: request }));
 }
