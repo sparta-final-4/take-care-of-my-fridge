@@ -146,19 +146,21 @@
 ## carts — 장바구니
 
 - 회원당 장바구니 하나입니다. 처음 상품을 담을 때 만들고, 상품이 모두 지워져도 남깁니다.
+- 제약 이름: `uk_carts_member_id`.
 
 | 컬럼 | 타입 | NULL | 기본값 | 제약 | 의미 |
 |---|---|---|---|---|---|
-| member_id | BIGINT | 불가 | | UK uk_carts_member_id | 장바구니 주인. 물리 FK 없이 회원 번호만 저장 |
+| member_id | BIGINT | 불가 | | UK | 장바구니 주인. 물리 FK 없이 회원 번호만 저장 |
 
 ## cart_items — 장바구니 상품
 
 - 같은 장바구니에 같은 상품은 하나입니다. 다시 담으면 수량을 더합니다.
+- 제약 이름: FK `fk_cart_items_cart`, UK `uk_cart_items_cart_id_product_id`.
 
 | 컬럼 | 타입 | NULL | 기본값 | 제약 | 의미 |
 |---|---|---|---|---|---|
-| cart_id | BIGINT | 불가 | | FK fk_cart_items_cart, UK uk_cart_items_cart_id_product_id | 소속 장바구니 |
-| product_id | BIGINT | 불가 | | UK uk_cart_items_cart_id_product_id | 담은 상품. 물리 FK 없이 상품 번호만 저장 |
+| cart_id | BIGINT | 불가 | | FK, UK(cart_id, product_id) | 소속 장바구니 |
+| product_id | BIGINT | 불가 | | UK(cart_id, product_id) | 담은 상품. 물리 FK 없이 상품 번호만 저장 |
 | quantity | INT | 불가 | | | 담은 수량(1 이상) |
 
 - 가격·할인은 저장하지 않습니다. 조회할 때 상품의 현재 정가와 진행 중인 할인을 읽습니다.

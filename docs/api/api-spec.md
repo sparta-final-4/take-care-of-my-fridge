@@ -201,12 +201,48 @@ HTTP 메서드·경로·DTO 이름은 구현 전 합의합니다.
 
 경로는 prefix(/api)를 뺀 값입니다. 회원 번호는 로그인 정보에서만 읽고 요청에는 받지 않습니다.
 
-| 기능 | Method / Path | 권한 | 요청 | 성공 응답 | 주요 오류 |
-|---|---|---|---|---|---|
-| 장바구니 담기 | POST /cart-items | 로그인 | Body: `productId`, `quantity`(생략하면 1) | 새 항목 201, 이미 담긴 상품에 수량만 더하면 200, `AddCartItemResponse`(productId, quantity) | 400 수량 1 미만, 401, 404 상품 없음, 409 재고 초과(`CART_002`)·구매 한도 초과(`CART_003`)·판매 중지(`PRODUCT_005`) |
-| 장바구니 조회 | GET /cart-items | 로그인 | 없음 | 200, `CartItemsResponse`(items, 담은 순서) | 401 |
-| 수량 변경 | PATCH /cart-items/{cartItemId} | 로그인 | Path: cartItemId<br>Body: `quantity`(1 이상, 바꿀 값) | 200, `ChangeCartItemQuantityResponse`(cartItemId, quantity) | 400, 401, 404 항목 없음·타인 항목(`CART_001`), 409 재고 초과·구매 한도 초과·판매 중지 |
-| 항목 삭제 | DELETE /cart-items | 로그인 | Query: `cartItemIds`(1개 이상) | 200, 공통 성공 응답 | 400 목록 누락·비어 있음·숫자 아님, 401 |
+| 기능 | Method / Path | 권한 | 성공 응답 |
+|---|---|---|---|
+| 장바구니 담기 | POST /cart-items | 로그인 | 새 항목 201, 수량만 더하면 200 |
+| 장바구니 조회 | GET /cart-items | 로그인 | 200 |
+| 수량 변경 | PATCH /cart-items/{cartItemId} | 로그인 | 200 |
+| 항목 삭제 | DELETE /cart-items | 로그인 | 200 |
+
+요청 값입니다.
+
+| 기능 | 위치 | 이름 | 설명 |
+|---|---|---|---|
+| 장바구니 담기 | Body | productId | 담을 상품. 필수 |
+| 장바구니 담기 | Body | quantity | 담을 수량. 1 이상, 생략하면 1 |
+| 수량 변경 | Path | cartItemId | 바꿀 항목 |
+| 수량 변경 | Body | quantity | 바꿀 수량. 1 이상, 필수 |
+| 항목 삭제 | Query | cartItemIds | 지울 항목 번호. 1개 이상 |
+
+응답 데이터입니다.
+
+| 기능 | 응답 | 필드 |
+|---|---|---|
+| 장바구니 담기 | AddCartItemResponse | productId, quantity |
+| 장바구니 조회 | CartItemsResponse | items(담은 순서) |
+| 수량 변경 | ChangeCartItemQuantityResponse | cartItemId, quantity |
+| 항목 삭제 | 공통 성공 응답 | 없음 |
+
+오류입니다. 401은 모든 기능에 공통입니다.
+
+| 기능 | HTTP | 코드 | 조건 |
+|---|---|---|---|
+| 장바구니 담기 | 400 | 공통 | 상품 번호가 없거나 수량이 1 미만 |
+| 장바구니 담기 | 404 | `PRODUCT_001` | 상품 없음 |
+| 장바구니 담기 | 409 | `PRODUCT_005` | 판매 중지 상품 |
+| 장바구니 담기 | 409 | `CART_002` | 재고 초과 |
+| 장바구니 담기 | 409 | `CART_003` | 번개 드롭 구매 한도 초과 |
+| 수량 변경 | 400 | 공통 | 수량이 없거나 1 미만 |
+| 수량 변경 | 404 | `CART_001` | 항목 없음 또는 타인 항목 |
+| 수량 변경 | 404 | `PRODUCT_001` | 상품 없음 |
+| 수량 변경 | 409 | `PRODUCT_005` | 판매 중지 상품 |
+| 수량 변경 | 409 | `CART_002` | 재고 초과 |
+| 수량 변경 | 409 | `CART_003` | 번개 드롭 구매 한도 초과 |
+| 항목 삭제 | 400 | 공통 | cartItemIds가 없거나 비어 있거나 숫자가 아님 |
 
 조회 항목(`CartItemResponse`): cartItemId, productId, productName, imageUrl, quantity, listPrice(정가), unitPrice(지금 단가), saleType(`SPECIAL`·`FLASH_DROP`·null), discountRate, flashDropRemaining(남은 수량), flashDropLimit(한정 수량), saleEndsAt(종료 시각, +09:00 포함), soldOut(품절 여부). 할인이 없으면 saleType·discountRate·saleEndsAt은 null이고 unitPrice는 정가입니다. 번개 드롭이 아니면 flashDropRemaining·flashDropLimit은 null입니다.
 
