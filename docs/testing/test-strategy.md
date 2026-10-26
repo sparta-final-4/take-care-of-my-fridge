@@ -30,6 +30,17 @@
 
 Q-01~Q-17에 의존하는 테스트는 기대값을 합의한 뒤 구현합니다.
 
+## 장바구니 필수 시나리오
+
+| ID | 우선순위 | 조건·행동 | 기대 결과 | 대응 테스트 |
+|---|---|---|---|---|
+| CART-01 | P0 | 재고를 넘는 수량 담기·올리기(기존 수량과 합산, int 넘침 포함) | 거절, 수량 불변, 처음 담다 실패하면 장바구니도 남지 않음 | `CartServiceTransactionTest` |
+| CART-02 | P0 | 번개 드롭 상품을 이미 담았는데 더 담기·수량 2로 바꾸기 | `CART_003`으로 거절, 수량 불변 | `CartServiceTest` |
+| CART-03 | P0 | 타인 항목의 수량 변경·삭제 | 변경은 404, 삭제는 내 항목만 지움 | `CartServiceTransactionTest`, `CartItemRepositoryTest` |
+| CART-04 | P0 | 담은 뒤 재고가 줄거나 상품이 판매 중지 | 내리기만 허용, 올리기·판매 중지 변경 거절, 조회는 품절 표시 | `CartServiceTransactionTest` |
+| CART-05 | P1 | 진행 중 할인이 있는 상품 조회 | 항목마다 할인가·구분·종료 시각, 번개 드롭 남은 수량 0이면 그 항목만 품절 | `CartServiceTest` |
+| CART-06 | P1 | 같은 삭제 요청 두 번, 남의 항목·없는 번호 섞기 | 내 항목만 지우고 오류 없음 | `CartServiceTransactionTest` |
+
 ## 다른 담당과 공동 검증
 
 - 요리 기록과 재료 차감의 일관성.

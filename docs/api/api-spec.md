@@ -195,6 +195,30 @@ HTTP 메서드·경로·DTO 이름은 구현 전 합의합니다.
 - **레시피 존재 검증**: 후기 작성 시 레시피 존재 여부를 `RecipeService.existsById`로 확인하며, 미존재 시 404 `RECIPE_NOT_FOUND`를 반환합니다.
 - **본인 후기 검증**: 후기 수정 및 삭제는 작성자 본인만 가능하며, 타인의 후기이거나 존재하지 않는 후기인 경우 404 `REVIEW_NOT_FOUND`로 통일하여 존재 여부를 노출하지 않습니다.
 
+## 장바구니 API
+
+상태: **구현 완료** · 담당: 장준혁 · 근거: 실제 백엔드 컨트롤러 및 서비스 구현
+
+경로는 prefix(/api)를 뺀 값입니다. 회원 번호는 로그인 정보에서만 읽고 요청에는 받지 않습니다.
+
+| 기능 | Method / Path | 권한 | 요청 | 성공 응답 | 주요 오류 |
+|---|---|---|---|---|---|
+| 장바구니 담기 | POST /cart-items | 로그인 | Body: `productId`, `quantity`(생략하면 1) | 새 항목 201, 이미 담긴 상품에 수량만 더하면 200, `AddCartItemResponse`(productId, quantity) | 400 수량 1 미만, 401, 404 상품 없음, 409 재고 초과(`CART_002`)·구매 한도 초과(`CART_003`)·판매 중지(`PRODUCT_005`) |
+| 장바구니 조회 | GET /cart-items | 로그인 | 없음 | 200, `CartItemsResponse`(items, 담은 순서) | 401 |
+| 수량 변경 | PATCH /cart-items/{cartItemId} | 로그인 | Path: cartItemId<br>Body: `quantity`(1 이상, 바꿀 값) | 200, `ChangeCartItemQuantityResponse`(cartItemId, quantity) | 400, 401, 404 항목 없음·타인 항목(`CART_001`), 409 재고 초과·구매 한도 초과·판매 중지 |
+| 항목 삭제 | DELETE /cart-items | 로그인 | Query: `cartItemIds`(1개 이상) | 200, 공통 성공 응답 | 400 목록 누락·비어 있음·숫자 아님, 401 |
+
+조회 항목(`CartItemResponse`): cartItemId, productId, productName, imageUrl, quantity, listPrice(정가), unitPrice(지금 단가), saleType(`SPECIAL`·`FLASH_DROP`·null), discountRate, flashDropRemaining(남은 수량), flashDropLimit(한정 수량), saleEndsAt(종료 시각, +09:00 포함), soldOut(품절 여부). 할인이 없으면 saleType·discountRate·saleEndsAt은 null이고 unitPrice는 정가입니다. 번개 드롭이 아니면 flashDropRemaining·flashDropLimit은 null입니다.
+
+- **담기**: 장바구니가 없으면 만들고, 이미 담긴 상품이면 수량을 더합니다. 장바구니는 회원당 하나, 한 장바구니에 같은 상품은 하나입니다.
+- **재고 확인**: 담을 때는 기존 수량과 요청 수량의 합이 재고를 넘으면 거절합니다. 재고는 응답으로 주지 않습니다.
+- **수량 변경**: 담은 뒤 재고가 줄었어도 수량을 내리는 것은 허용하고, 현재 수량보다 올리는 것은 재고까지만 허용합니다.
+- **번개 드롭 한도**: 진행 중인 번개 드롭 상품은 1인 1개라 합친 수량이 1을 넘으면 `CART_003`으로 거절합니다.
+- **할인 조회**: 조회할 때 진행 중인 할인을 한 번에 읽어 항목마다 단가를 붙입니다. 장바구니에는 할인 가격을 저장하지 않으므로 할인이 끝나면 다음 조회부터 정가가 보입니다.
+- **품절 표시**: 재고 0, 판매 중지, 번개 드롭 남은 수량 0이면 그 항목만 `soldOut=true`입니다.
+- **본인 소유 검증**: 타인의 항목이거나 없는 항목의 수량 변경은 `CART_001`(404)로 통일합니다. 삭제는 내 항목만 지우고, 남의 항목·없는 번호는 오류 없이 무시합니다. 같은 요청을 두 번 보내도 결과가 같습니다.
+- **재고를 잡지 않음**: 장바구니는 재고를 줄이거나 잡아 두지 않습니다. 재고는 주문을 만들 때 줄어듭니다.
+
 ## 엔드포인트 작성 템플릿
 
 ### <기능명>

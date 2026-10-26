@@ -104,6 +104,35 @@ erDiagram
 - 할인 후보와 행사 등록: 선택된 후보를 기존 행사 생성 서비스로 직접 등록합니다. 성공 시 deal_candidates.event_request_status를 APPROVED로 바꾸고 promotion_id에 생성된 sale_events ID를 기록합니다.
 - 예측 실행과 실적: 대상 주·입력 기준 시각·실적 확정 시각(confirmed_at)을 연결합니다.
 
+## 장바구니 테이블 관계
+
+장바구니 테이블 2개입니다. 컬럼 정의는 [데이터 사전](data-dictionary.md#carts--장바구니)에 있습니다.
+
+```mermaid
+erDiagram
+    carts ||--o{ cart_items : "담음"
+
+    carts {
+        bigint id PK
+        bigint member_id UK "외부 참조"
+    }
+    cart_items {
+        bigint id PK
+        bigint cart_id FK
+        bigint product_id "외부 참조"
+        int quantity
+    }
+```
+
+| 관계 | 의미 | 필수 여부 |
+|---|---|---|
+| carts 1 : N cart_items | 장바구니 하나에 상품 여러 개. (cart_id, product_id)는 중복 불가 | 항목에는 장바구니가 반드시 있음 |
+
+| 컬럼 | 가리키는 대상 | 소유 도메인 |
+|---|---|---|
+| carts.member_id | 장바구니 주인 | 회원 |
+| cart_items.product_id | 담은 상품 | 상품 |
+
 ## 확정 절차
 
 담당자·도메인 정책 확인 → 데이터 사전 → 관계 필수성·삭제 정책 → 키·인덱스 → 마이그레이션 검토. [DB 규칙](../conventions/database.md)의 미결정 항목(Q-06, Q-07)을 먼저 해결합니다.
