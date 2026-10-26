@@ -12,6 +12,7 @@ import org.example.takecareofmyfridgebe.domain.payment.entity.PaymentStatus;
 import org.example.takecareofmyfridgebe.domain.payment.port.PaymentGateway;
 import org.example.takecareofmyfridgebe.domain.payment.port.PaymentGatewayResponse;
 import org.example.takecareofmyfridgebe.domain.payment.service.PaymentCommandService;
+import org.example.takecareofmyfridgebe.domain.payment.service.PaymentHistoryRecorder;
 import org.example.takecareofmyfridgebe.domain.payment.service.PaymentService;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
@@ -62,6 +63,9 @@ class PaymentFacadeTest {
 
     @Mock
     private PaymentGateway paymentGateway;
+
+    @Mock
+    private PaymentHistoryRecorder paymentHistoryRecorder;
 
     @InjectMocks
     private PaymentFacade paymentFacade;
@@ -702,5 +706,92 @@ class PaymentFacadeTest {
                 .isInstanceOf(IllegalStateException.class);
         verify(paymentCommandService, never()).create(any());
         verify(paymentCommandService, never()).fail(any(), any(), any());
+    }
+
+    // 보상 취소 이력과 재시도
+
+    @Test
+    @DisplayName("보상 취소 전에 PG 결제됨을 남기고, 취소에 성공하면 취소 ID와 함께 보상 취소를 남긴다")
+    void sync_compensation_recordsHistoryAroundCancel() {
+        Payment payment = syncPayment();
+        payment.fail(FailReason.USER_CANCELLED);
+        givenPgPayment("PAID", AMOUNT);
+        given(paymentGateway.cancelPayment(eq(PORTONE_PAYMENT_ID), anyString(), isNull())).willReturn("cancel-1");
+
+        paymentFacade.syncWithPg(payment, PaymentChangedBy.WEBHOOK);
+
+        InOrder inOrder = inOrder(paymentHistoryRecorder, paymentGateway);
+        inOrder.verify(paymentHistoryRecorder).recordUnacceptedPaid(eq(payment), eq(PaymentChangedBy.WEBHOOK), anyString());
+        inOrder.verify(paymentGateway).cancelPayment(eq(PORTONE_PAYMENT_ID), anyString(), isNull());
+        inOrder.verify(paymentHistoryRecorder).recordCompensationCancelled(eq(payment), eq("cancel-1"),
+                eq(PaymentChangedBy.WEBHOOK), anyString());
+    }
+
+    @Test
+    @DisplayName("보상 취소가 실패하면 보상 취소 기록을 남기지 않아 재시도 대상으로 남는다")
+    void sync_compensationFails_noCancelledHistory() {
+        Payment payment = syncPayment();
+        payment.fail(FailReason.USER_CANCELLED);
+        givenPgPayment("PAID", AMOUNT);
+        willThrow(new IllegalStateException("PG 오류")).given(paymentGateway).cancelPayment(anyString(), anyString(), isNull());
+
+        assertThatThrownBy(() -> paymentFacade.syncWithPg(payment, PaymentChangedBy.WEBHOOK))
+                .isInstanceOf(IllegalStateException.class);
+        verify(paymentHistoryRecorder).recordUnacceptedPaid(eq(payment), eq(PaymentChangedBy.WEBHOOK), anyString());
+        verify(paymentHistoryRecorder, never()).recordCompensationCancelled(any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("PG CANCELLED + 우리 FAILED면 보상 취소가 끝난 것으로 기록만 남긴다")
+    void sync_pgCancelled_failed_recordsCompensation() {
+        Payment payment = syncPayment();
+        payment.fail(FailReason.AMOUNT_MISMATCH);
+        givenPgPayment("CANCELLED", AMOUNT);
+
+        assertThat(paymentFacade.syncWithPg(payment, PaymentChangedBy.WEBHOOK)).isTrue();
+        verify(paymentHistoryRecorder).recordCompensationCancelled(eq(payment), isNull(), eq(PaymentChangedBy.WEBHOOK),
+                anyString());
+        verify(paymentGateway, never()).cancelPayment(anyString(), anyString(), any());
+    }
+
+    @Test
+    @DisplayName("재시도할 때 PG에서 아직 결제 상태면 다시 보상 취소하고 스케줄러로 기록한다")
+    void retryCompensation_pgPaid_cancels() {
+        Payment payment = syncPayment();
+        payment.fail(FailReason.USER_CANCELLED);
+        givenPgPayment("PAID", AMOUNT);
+        given(paymentGateway.cancelPayment(eq(PORTONE_PAYMENT_ID), anyString(), isNull())).willReturn("cancel-1");
+
+        paymentFacade.retryCompensation(payment);
+
+        verify(paymentHistoryRecorder).recordCompensationCancelled(eq(payment), eq("cancel-1"),
+                eq(PaymentChangedBy.SCHEDULER), anyString());
+    }
+
+    @Test
+    @DisplayName("재시도할 때 PG에서 이미 취소됐으면 취소하지 않고 기록만 남긴다")
+    void retryCompensation_pgCancelled_recordsOnly() {
+        Payment payment = syncPayment();
+        payment.fail(FailReason.USER_CANCELLED);
+        givenPgPayment("CANCELLED", AMOUNT);
+
+        paymentFacade.retryCompensation(payment);
+
+        verify(paymentGateway, never()).cancelPayment(anyString(), anyString(), any());
+        verify(paymentHistoryRecorder).recordCompensationCancelled(eq(payment), isNull(),
+                eq(PaymentChangedBy.SCHEDULER), anyString());
+    }
+
+    @Test
+    @DisplayName("재시도할 때 PG 상태가 예상과 다르면 아무것도 하지 않는다")
+    void retryCompensation_unexpectedPgStatus_noChange() {
+        Payment payment = syncPayment();
+        payment.fail(FailReason.USER_CANCELLED);
+        givenPgPayment("PARTIAL_CANCELLED", AMOUNT);
+
+        paymentFacade.retryCompensation(payment);
+
+        verify(paymentGateway, never()).cancelPayment(anyString(), anyString(), any());
+        verifyNoInteractions(paymentHistoryRecorder);
     }
 }

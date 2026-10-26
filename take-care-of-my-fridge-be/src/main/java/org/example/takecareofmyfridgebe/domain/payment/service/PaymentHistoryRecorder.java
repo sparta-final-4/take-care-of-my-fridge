@@ -35,6 +35,27 @@ public class PaymentHistoryRecorder {
         save(payment, PaymentEventType.FAILED, null, 0, null, null, changedBy, reason.getDescription());
     }
 
+    // 받지 않기로 한 결제가 PG에서 결제됐다. 보상 취소가 끝나 CANCELLED가 남기 전까지 재시도 대상이 된다.
+    // 웹훅 재전송 등으로 여러 번 불려도 한 번만 남긴다
+    @Transactional
+    public void recordUnacceptedPaid(Payment payment, PaymentChangedBy changedBy, String reason) {
+        if (paymentHistoryRepository.existsByPaymentIdAndEventType(payment.getId(), PaymentEventType.PAID)) {
+            return;
+        }
+        save(payment, PaymentEventType.PAID, payment.getAmount(), 0, null, null, changedBy, reason);
+    }
+
+    // 받지 않은 결제의 PG 전액 취소(보상 취소). 이미 남겼으면 다시 남기지 않는다
+    @Transactional
+    public void recordCompensationCancelled(Payment payment, String pgCancellationId, PaymentChangedBy changedBy,
+                                            String reason) {
+        if (paymentHistoryRepository.existsByPaymentIdAndEventType(payment.getId(), PaymentEventType.CANCELLED)) {
+            return;
+        }
+        save(payment, PaymentEventType.CANCELLED, payment.getAmount(), payment.getAmount(), null, pgCancellationId,
+                changedBy, reason);
+    }
+
     // 웹훅·스케줄러가 넘기는 결제는 영속 상태가 아닐 수 있으므로 ID로 참조만 건다
     private void save(Payment payment, PaymentEventType eventType, Long amount, long cancelledAmount, Long refundId,
                       String pgCancellationId, PaymentChangedBy changedBy, String reason) {
