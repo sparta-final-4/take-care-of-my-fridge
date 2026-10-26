@@ -37,6 +37,8 @@ import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
@@ -313,10 +315,23 @@ class RefundControllerTest {
     }
 
     /**
-     * 주문 수가 범위를 벗어나면 400(REFUND_013)으로 응답하는지 검증한다.
+     * 빈 값이 섞인 주문 ID 목록(orderIds=10,,11)도 500 없이 서비스로 넘어가는지 검증한다. 빈 값은 서비스가 걸러낸다.
      */
     @Test
-    void getRefundSummariesTooManyOrdersReturnsBadRequest() throws Exception {
+    void getRefundSummariesWithEmptyElementPassesToService() throws Exception {
+        when(refundQueryService.getRefundSummaries(eq(MEMBER_ID), any())).thenReturn(List.of());
+
+        mvc.perform(get("/api/refunds/summaries").param("orderIds", "10,,11").with(loginUser()))
+                .andExpect(status().isOk());
+
+        verify(refundQueryService).getRefundSummaries(eq(MEMBER_ID), argThat(ids -> ids.containsAll(List.of(10L, 11L))));
+    }
+
+    /**
+     * 서비스가 REFUND_013으로 거절하면 400과 해당 오류 코드로 응답하는지 검증한다. 1~50건 범위 판단은 서비스 테스트가 맡는다.
+     */
+    @Test
+    void getRefundSummariesBusinessExceptionReturnsErrorCode() throws Exception {
         when(refundQueryService.getRefundSummaries(MEMBER_ID, List.of(10L)))
                 .thenThrow(new BusinessException(ErrorCode.INVALID_REFUND_SUMMARY_REQUEST));
 

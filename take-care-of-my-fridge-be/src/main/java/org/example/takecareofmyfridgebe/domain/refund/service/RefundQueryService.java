@@ -31,6 +31,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -85,9 +86,14 @@ public class RefundQueryService {
     }
 
     // 주문 목록·주문 상세의 환불 요약. 회원의 주문만 돌려주고, 요청한 주문 순서를 지킨다.
+    // 빈 값(orderIds=1,,2)과 중복을 뺀 고유 주문 1~50건만 받는다.
     // 주문 수와 관계없이 주문 상품, 상품별 완료 수량, 주문별 상태별 금액을 한 번씩 읽는다
-    public List<RefundSummaryResponse> getRefundSummaries(Long memberId, List<Long> orderIds) {
-        if (orderIds == null || orderIds.isEmpty() || orderIds.size() > MAX_SUMMARY_ORDERS) {
+    public List<RefundSummaryResponse> getRefundSummaries(Long memberId, List<Long> requestedOrderIds) {
+        List<Long> orderIds = requestedOrderIds == null ? List.of() : requestedOrderIds.stream()
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        if (orderIds.isEmpty() || orderIds.size() > MAX_SUMMARY_ORDERS) {
             throw new BusinessException(ErrorCode.INVALID_REFUND_SUMMARY_REQUEST);
         }
         Map<Long, List<OrderItem>> itemsByOrderId = refundRepository.findOwnedOrderItems(memberId, orderIds).stream()
@@ -108,7 +114,6 @@ public class RefundQueryService {
                         Collectors.toMap(RefundAmountByStatus::status, RefundAmountByStatus::amount)));
 
         return orderIds.stream()
-                .distinct()
                 .filter(itemsByOrderId::containsKey)
                 .map(orderId -> {
                     Map<RefundStatus, Long> amounts = amountsByOrderId.getOrDefault(orderId, Map.of());
@@ -119,10 +124,10 @@ public class RefundQueryService {
                 .toList();
     }
 
-    // 진행 중 환불이 있으면 진행 중, 환불 가능한 상품을 모두 완료했으면 전체 환불, 완료된 환불이 있으면 부분 환불
+    // 진행 중 환불이 있으면 진행 중이 가장 먼저다. 그다음 환불 가능한 상품을 모두 완료했으면 전체 환불, 완료된 환불이 있으면 부분 환불
     private RefundSummaryStatus summaryStatus(List<OrderItem> items, Map<Long, Long> completedById,
                                               Map<RefundStatus, Long> amounts) {
-        if (amounts.getOrDefault(RefundStatus.REQUESTED, 0L) > 0) {
+        if (amounts.containsKey(RefundStatus.REQUESTED)) {
             return RefundSummaryStatus.IN_PROGRESS;
         }
         List<OrderItem> refundableItems = items.stream().filter(RefundableOrderPolicy::isRefundableItem).toList();

@@ -30,6 +30,9 @@ import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabas
 import org.springframework.context.annotation.Import;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.LongStream;
 
@@ -257,8 +260,8 @@ class RefundQueryServiceTest extends MySqlContainerSupport {
     }
 
     @Test
-    @DisplayName("환불 요약: 진행 중 환불이 있으면 IN_PROGRESS이고 금액은 완료된 환불만 센다. 실패한 환불은 세지 않는다")
-    void summaries_inProgress() {
+    @DisplayName("환불 요약: 완료된 환불이 있어도 진행 중 환불이 있으면 PARTIAL보다 IN_PROGRESS가 먼저다. 금액은 완료된 환불만 세고 실패한 환불은 세지 않는다")
+    void summaries_inProgressBeforePartial() {
         complete(refund(itemA, 1));
         refund(itemB, 1).fail("PG 거절");
         refund(itemA, 2);
@@ -276,12 +279,25 @@ class RefundQueryServiceTest extends MySqlContainerSupport {
     }
 
     @Test
-    @DisplayName("환불 요약: 주문 ID가 없거나 50건을 넘으면 거절한다")
+    @DisplayName("환불 요약: 고유 주문 ID가 없거나 50건을 넘으면 거절한다")
     void summaries_invalidSize() {
         assertError(() -> refundQueryService.getRefundSummaries(MEMBER_ID, List.of()),
                 ErrorCode.INVALID_REFUND_SUMMARY_REQUEST);
+        assertError(() -> refundQueryService.getRefundSummaries(MEMBER_ID, Arrays.asList(null, null)),
+                ErrorCode.INVALID_REFUND_SUMMARY_REQUEST);
         assertError(() -> refundQueryService.getRefundSummaries(MEMBER_ID,
                 LongStream.rangeClosed(1, 51).boxed().toList()), ErrorCode.INVALID_REFUND_SUMMARY_REQUEST);
+    }
+
+    @Test
+    @DisplayName("환불 요약: 같은 주문 ID를 50번 넘게 보내도 고유 주문 기준으로 받고, 빈 값은 빼고 한 번만 돌려준다")
+    void summaries_duplicatesAndNullsIgnored() {
+        List<Long> requested = new ArrayList<>(Collections.nCopies(60, order.getId()));
+        requested.add(null);
+
+        assertThat(refundQueryService.getRefundSummaries(MEMBER_ID, requested))
+                .extracting(RefundSummaryResponse::orderId)
+                .containsExactly(order.getId());
     }
 
     private void complete(Refund target) {

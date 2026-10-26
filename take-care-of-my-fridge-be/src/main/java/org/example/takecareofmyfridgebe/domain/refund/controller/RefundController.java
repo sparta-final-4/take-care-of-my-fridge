@@ -49,7 +49,8 @@ public class RefundController {
         return ResponseEntity.ok(ApiResponse.ok(refundQueryService.getRefundHistory(principal.memberId(), orderId)));
     }
 
-    // 주문 목록·주문 상세. 주문마다 환불 상태(부분·전체 환불 등)와 완료된 환불 금액을 보여준다. 한 번에 최대 50건
+    // 주문 목록·주문 상세. 주문마다 환불 상태(부분·전체 환불 등)와 완료된 환불 금액을 보여준다.
+    // 중복을 뺀 고유 주문 기준으로 한 번에 1~50건
     @GetMapping("/summaries")
     public ResponseEntity<ApiResponse<List<RefundSummaryResponse>>> getRefundSummaries(
             @AuthenticationPrincipal AuthPrincipal principal,
