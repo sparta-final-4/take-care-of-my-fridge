@@ -7,12 +7,17 @@ import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeSummary;
 import org.example.takecareofmyfridgebe.domain.recipe.service.RecipeService;
 import org.example.takecareofmyfridgebe.domain.review.dto.RecipeRatingStat;
 import org.example.takecareofmyfridgebe.domain.review.service.RecipeReviewService;
+import org.example.takecareofmyfridgebe.global.config.CacheConfig;
 import org.example.takecareofmyfridgebe.global.config.CacheNames;
+import org.example.takecareofmyfridgebe.global.config.RedisConfig;
 import org.example.takecareofmyfridgebe.support.RedisContainerSupport;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
+import org.springframework.boot.cache.autoconfigure.CacheAutoConfiguration;
+import org.springframework.boot.data.redis.autoconfigure.DataRedisAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
@@ -30,7 +35,15 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-@SpringBootTest
+@SpringBootTest(classes = {
+        RedisConfig.class,
+        CacheConfig.class,
+        PopularRecipeService.class
+})
+@ImportAutoConfiguration({
+        DataRedisAutoConfiguration.class,
+        CacheAutoConfiguration.class
+})
 class PopularRecipeServiceCacheIntegrationTest extends RedisContainerSupport {
 
     @MockitoBean
@@ -47,6 +60,9 @@ class PopularRecipeServiceCacheIntegrationTest extends RedisContainerSupport {
 
     @Autowired
     private CacheManager cacheManager;
+
+    @Autowired
+    private org.springframework.data.redis.core.StringRedisTemplate stringRedisTemplate;
 
     @BeforeEach
     void clearCache() {
@@ -75,6 +91,13 @@ class PopularRecipeServiceCacheIntegrationTest extends RedisContainerSupport {
 
         // When: 첫 번째 호출 (캐시 미스 -> DB 조회 및 Redis 저장)
         List<PopularRecipeResponse> firstCall = popularRecipeService.getPopularRecipes(size);
+
+        System.out.println("DEBUG_REDIS_KEYS: " + stringRedisTemplate.keys("*"));
+        for (String k : stringRedisTemplate.keys("*")) {
+            System.out.println("DEBUG_REDIS_KEY[" + k + "] = " + stringRedisTemplate.opsForValue().get(k));
+        }
+        Object cachedValue = cacheManager.getCache(CacheNames.POPULAR_RECIPES).get(size);
+        System.out.println("DEBUG_CACHE_CHECK: cachedValue = " + cachedValue);
 
         // Then
         assertEquals(1, firstCall.size());
