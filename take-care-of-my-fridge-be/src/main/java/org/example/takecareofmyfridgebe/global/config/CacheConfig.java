@@ -34,6 +34,7 @@ public class CacheConfig implements CachingConfigurer {
 
     // 레시피 등록, 수정 시 비우고, SQL로 직접 적재한 데이터는 TTL이 지나면 반영된다.
     private static final Duration RECIPE_CLASSIFICATIONS_TTL = Duration.ofHours(1);
+    private static final Duration POPULAR_RECIPES_TTL = Duration.ofHours(24);
 
     // transactionAware: @Transactional 메서드의 @CacheEvict를 커밋 이후로 미뤄,
     // 커밋 전에 다른 요청이 옛 값을 다시 캐시에 넣는 것을 막는다.
@@ -51,7 +52,8 @@ public class CacheConfig implements CachingConfigurer {
                 .cacheDefaults(defaults)
                 .withInitialCacheConfigurations(
                         Map.of(
-                                CacheNames.RECIPE_CLASSIFICATIONS, defaults.entryTtl(RECIPE_CLASSIFICATIONS_TTL)
+                                CacheNames.RECIPE_CLASSIFICATIONS, defaults.entryTtl(RECIPE_CLASSIFICATIONS_TTL),
+                                CacheNames.POPULAR_RECIPES, defaults.entryTtl(POPULAR_RECIPES_TTL)
                         )
                 )
                 .transactionAware()

@@ -15,6 +15,7 @@ import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeResponse;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeReviewStatus;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeSortType;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeSummaryCount;
+import org.example.takecareofmyfridgebe.domain.cooking.dto.PopularRecipeCookingCount;
 import org.example.takecareofmyfridgebe.domain.cooking.entity.CookingLog;
 import org.example.takecareofmyfridgebe.domain.cooking.entity.CookingResult;
 import org.springframework.data.domain.Page;
@@ -23,6 +24,8 @@ import org.springframework.data.support.PageableExecutionUtils;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
@@ -256,5 +259,30 @@ public class CookingLogRepositoryImpl implements CookingLogRepositoryCustom {
                 cookingLog.createdAt.max().desc(),
                 cookingLog.recipeId.desc()
         };
+    }
+
+    @Override
+    public List<PopularRecipeCookingCount> findPopularCookingCounts(LocalDateTime since, int size) {
+        if (since == null || size <= 0) {
+            return Collections.emptyList();
+        }
+
+        return queryFactory
+                .select(Projections.constructor(
+                        PopularRecipeCookingCount.class,
+                        cookingLog.recipeId,
+                        cookingLog.memberId.countDistinct()
+                ))
+                .from(cookingLog)
+                .where(cookingLog.createdAt.goe(since))
+                .groupBy(cookingLog.recipeId)
+                .orderBy(
+                        cookingLog.memberId.countDistinct().desc(),
+                        cookingLog.count().desc(),
+                        cookingLog.createdAt.max().desc(),
+                        cookingLog.recipeId.asc()
+                )
+                .limit(size)
+                .fetch();
     }
 }

@@ -5,6 +5,7 @@ import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 import org.example.takecareofmyfridgebe.domain.member.repository.MemberRepository;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeSummary;
 import org.example.takecareofmyfridgebe.domain.recipe.service.RecipeService;
+import org.example.takecareofmyfridgebe.domain.review.dto.RecipeRatingStat;
 import org.example.takecareofmyfridgebe.domain.review.dto.ReviewCreateRequest;
 import org.example.takecareofmyfridgebe.domain.review.dto.ReviewResponse;
 import org.example.takecareofmyfridgebe.domain.review.dto.ReviewSearchRequest;
@@ -116,7 +117,7 @@ class RecipeReviewServiceTest {
 
         when(recipeReviewRepository.findReviewsByCondition(request, currentMemberId)).thenReturn(reviewPage);
         when(recipeService.findSummaries(List.of(10L))).thenReturn(Map.of(
-                10L, new RecipeSummary(10L, "김치찌개", "image1.jpg")
+                10L, new RecipeSummary(10L, "김치찌개", "image1.jpg", null)
         ));
 
         // When
@@ -156,8 +157,8 @@ class RecipeReviewServiceTest {
         when(recipeReviewRepository.findReviewsByCondition(request, currentMemberId)).thenReturn(reviewPage);
         when(recipeService.findSummaries(argThat(ids -> ids.size() == 2 && ids.containsAll(List.of(10L, 20L)))))
                 .thenReturn(Map.of(
-                        10L, new RecipeSummary(10L, "김치찌개", "kimchi.jpg"),
-                        20L, new RecipeSummary(20L, "된장찌개", "doenjang.jpg")
+                        10L, new RecipeSummary(10L, "김치찌개", "kimchi.jpg", null),
+                        20L, new RecipeSummary(20L, "된장찌개", "doenjang.jpg", null)
                 ));
 
         // When
@@ -281,7 +282,7 @@ class RecipeReviewServiceTest {
         RecipeReview savedReview = createReview(100L, member, 10L, 5, "정말 맛있어요!");
         when(recipeReviewRepository.save(any(RecipeReview.class))).thenReturn(savedReview);
         when(recipeService.findSummaries(List.of(10L))).thenReturn(Map.of(
-                10L, new RecipeSummary(10L, "김치찌개", "image.jpg")
+                10L, new RecipeSummary(10L, "김치찌개", "image.jpg", null)
         ));
 
         // When
@@ -408,7 +409,7 @@ class RecipeReviewServiceTest {
         ReviewUpdateRequest updateRequest = new ReviewUpdateRequest(5, "다시 해보니 정말 맛있네요!");
         when(recipeReviewRepository.findByIdAndMemberId(reviewId, memberId)).thenReturn(Optional.of(review));
         when(recipeService.findSummaries(List.of(10L))).thenReturn(Map.of(
-                10L, new RecipeSummary(10L, "김치찌개", "image.jpg")
+                10L, new RecipeSummary(10L, "김치찌개", "image.jpg", null)
         ));
 
         // When
@@ -461,5 +462,34 @@ class RecipeReviewServiceTest {
 
         // Then
         verify(recipeReviewRepository).delete(review);
+    }
+
+    @Test
+    @DisplayName("recipeIds가 비어있거나 null이면 저장소 호출 없이 빈 Map을 반환한다")
+    void findRatingStatsReturnsEmptyMapWhenIdsEmptyOrNull() {
+        // When & Then
+        assertTrue(recipeReviewService.findRatingStats(List.of()).isEmpty());
+        assertTrue(recipeReviewService.findRatingStats(null).isEmpty());
+        verify(recipeReviewRepository, never()).findRatingStatsByRecipeIds(any());
+    }
+
+    @Test
+    @DisplayName("레시피 ID 목록으로 별점 통계를 조회하면 ID를 키로 하는 Map을 반환하고 평점은 소수 첫째자리로 반올림된다")
+    void findRatingStatsReturnsMapWithRoundedRatings() {
+        // Given
+        RecipeRatingStat stat1 = new RecipeRatingStat(10L, 4.666, 3L);
+        RecipeRatingStat stat2 = new RecipeRatingStat(20L, 3.0, 1L);
+        when(recipeReviewRepository.findRatingStatsByRecipeIds(argThat(ids -> ids.containsAll(List.of(10L, 20L)))))
+                .thenReturn(List.of(stat1, stat2));
+
+        // When
+        Map<Long, RecipeRatingStat> result = recipeReviewService.findRatingStats(List.of(10L, 20L, 10L));
+
+        // Then
+        assertEquals(2, result.size());
+        assertEquals(4.7, result.get(10L).averageRating());
+        assertEquals(3L, result.get(10L).reviewCount());
+        assertEquals(3.0, result.get(20L).averageRating());
+        assertEquals(1L, result.get(20L).reviewCount());
     }
 }

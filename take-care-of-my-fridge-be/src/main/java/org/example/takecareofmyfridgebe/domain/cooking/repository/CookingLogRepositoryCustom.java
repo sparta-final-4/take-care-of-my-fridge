@@ -6,11 +6,14 @@ import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeResponse;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeReviewStatus;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeSortType;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeSummaryCount;
+import org.example.takecareofmyfridgebe.domain.cooking.dto.PopularRecipeCookingCount;
 import org.example.takecareofmyfridgebe.domain.cooking.entity.CookingLog;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 public interface CookingLogRepositoryCustom {
@@ -74,4 +77,14 @@ public interface CookingLogRepositoryCustom {
      * @return 레시피 요리 통계 응답
      */
     CookingStatsResponse getCookingStats(Long recipeId);
+
+    /**
+     * 지정한 시각 이후의 요리 기록을 바탕으로 인기 레시피 집계 결과를 조회한다.
+     * 정렬 기준: 만든 회원 수 DESC -> 총 요리 횟수 DESC -> 마지막 요리 최근 순 DESC -> recipe_id ASC
+     *
+     * @param since 집계 기준 시작 일시 (예: 현재 - 30일)
+     * @param size  조회할 최대 레시피 개수
+     * @return 인기 레시피 ID 및 만든 회원 수 목록
+     */
+    List<PopularRecipeCookingCount> findPopularCookingCounts(LocalDateTime since, int size);
 }

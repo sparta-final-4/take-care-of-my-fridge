@@ -7,6 +7,7 @@ import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeResponse;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeReviewStatus;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeSortType;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeSummaryCount;
+import org.example.takecareofmyfridgebe.domain.cooking.dto.PopularRecipeCookingCount;
 import org.example.takecareofmyfridgebe.domain.cooking.entity.CookingLog;
 import org.example.takecareofmyfridgebe.domain.cooking.entity.CookingResult;
 import org.example.takecareofmyfridgebe.domain.fridge.entity.FridgeItemAction;
@@ -452,5 +453,64 @@ class CookingLogRepositoryTest extends MySqlContainerSupport {
         assertEquals(0L, statsC.totalCount());
         assertEquals(0L, statsC.successCount());
         assertEquals(0L, statsC.failedCount());
+    }
+
+    /**
+     * findPopularCookingCounts:
+     * - 30일 이전 기록은 집계에서 제외된다.
+     * - 같은 회원이 여러 번 만들어도 회원 수(cookedMemberCount)는 1명으로 집계된다.
+     * - 정렬: 만든 회원 수 많은 순 -> 요리 횟수 많은 순 -> 마지막 요리 최근 순 -> recipe_id 순
+     * - size 파라미터만큼만 조회된다.
+     */
+    @Test
+    void findPopularCookingCountsCalculatesPopularRecipesCorrectly() {
+        // Given
+        LocalDateTime now = LocalDateTime.of(2026, 10, 26, 12, 0);
+        LocalDateTime since = now.minusDays(30);
+
+        Long member1 = testMember.getId();
+        Long member2 = OTHER_MEMBER_ID;
+        Long member3 = 888L;
+
+        // recipeA: member1(2회), member2(1회) -> 고유 회원 2명, 요리 3회
+        saveCookingLog(member1, recipeA.getId(), null, CookingResult.SUCCESS, "A1", now.minusDays(10));
+        saveCookingLog(member1, recipeA.getId(), null, CookingResult.SUCCESS, "A2", now.minusDays(5));
+        saveCookingLog(member2, recipeA.getId(), null, CookingResult.SUCCESS, "A3", now.minusDays(2));
+
+        // recipeB: member1(1회), member2(1회) -> 고유 회원 2명, 요리 2회
+        saveCookingLog(member1, recipeB.getId(), null, CookingResult.SUCCESS, "B1", now.minusDays(8));
+        saveCookingLog(member2, recipeB.getId(), null, CookingResult.SUCCESS, "B2", now.minusDays(1));
+
+        // recipeC: member3(1회) -> 고유 회원 1명, 요리 1회
+        saveCookingLog(member3, recipeC.getId(), null, CookingResult.SUCCESS, "C1", now.minusDays(3));
+
+        // 30일 이전 기록 (31일 전): 집계에 포함되지 않아야 함
+        saveCookingLog(member1, recipeC.getId(), null, CookingResult.SUCCESS, "C_OLD", now.minusDays(31));
+
+        flushAndClear();
+
+        // When: size 2로 조회
+        List<PopularRecipeCookingCount> top2 = cookingLogRepository.findPopularCookingCounts(since, 2);
+
+        // Then: size 제한 및 순위 검증 (recipeA 1위, recipeB 2위)
+        assertEquals(2, top2.size());
+        assertEquals(recipeA.getId(), top2.get(0).recipeId());
+        assertEquals(2L, top2.get(0).cookedMemberCount()); // member1 중복 제거되어 2명
+        assertEquals(recipeB.getId(), top2.get(1).recipeId());
+        assertEquals(2L, top2.get(1).cookedMemberCount());
+
+        // When: 전체 조회 (size 10)
+        List<PopularRecipeCookingCount> all = cookingLogRepository.findPopularCookingCounts(since, 10);
+
+        // Then: 총 3개 레시피가 순서대로 정렬됨 (recipeA -> recipeB -> recipeC)
+        assertEquals(3, all.size());
+        assertEquals(recipeA.getId(), all.get(0).recipeId());
+        assertEquals(recipeB.getId(), all.get(1).recipeId());
+        assertEquals(recipeC.getId(), all.get(2).recipeId());
+        assertEquals(1L, all.get(2).cookedMemberCount()); // 31일 전 기록 제외되어 1명
+
+        // When: 요리 기록이 없는 기간(미래)으로 조회 시 빈 목록 반환
+        List<PopularRecipeCookingCount> empty = cookingLogRepository.findPopularCookingCounts(now.plusDays(1), 10);
+        assertTrue(empty.isEmpty());
     }
 }

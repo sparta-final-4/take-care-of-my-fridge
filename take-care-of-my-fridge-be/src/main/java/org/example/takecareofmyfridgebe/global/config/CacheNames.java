@@ -7,6 +7,7 @@ package org.example.takecareofmyfridgebe.global.config;
 public final class CacheNames {
 
     public static final String RECIPE_CLASSIFICATIONS = "recipe:classifications";
+    public static final String POPULAR_RECIPES = "recipe:popular";
 
     private CacheNames() {
     }

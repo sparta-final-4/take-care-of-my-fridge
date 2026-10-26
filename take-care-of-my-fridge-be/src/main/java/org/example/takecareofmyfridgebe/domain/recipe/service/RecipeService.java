@@ -186,7 +186,7 @@ public class RecipeService {
         return recipeRepository.findAllById(distinctIds).stream()
                 .collect(Collectors.toMap(
                         Recipe::getId,
-                        recipe -> new RecipeSummary(recipe.getId(), recipe.getName(), recipe.getImageUrl()),
+                        recipe -> new RecipeSummary(recipe.getId(), recipe.getName(), recipe.getImageUrl(), recipe.getTipSummary()),
                         (existing, replacing) -> existing
                 ));
     }

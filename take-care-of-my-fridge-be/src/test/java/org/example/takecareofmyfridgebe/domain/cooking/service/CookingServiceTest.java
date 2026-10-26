@@ -228,7 +228,7 @@ class CookingServiceTest {
         when(cookingLogRepository.findMostCookedRecipe(eq(memberId)))
                 .thenReturn(Optional.of(new MostCookedRecipeDto(1L, 3L)));
         when(recipeService.findSummaries(eq(List.of(1L))))
-                .thenReturn(Map.of(1L, new RecipeSummary(1L, "불닭 참치 두부조림", "https://image.com/tofu.jpg")));
+                .thenReturn(Map.of(1L, new RecipeSummary(1L, "불닭 참치 두부조림", "https://image.com/tofu.jpg", null)));
         when(fridgeService.countConsumedByCooking(eq(memberId)))
                 .thenReturn(5L);
 

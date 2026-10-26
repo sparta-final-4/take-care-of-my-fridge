@@ -408,8 +408,8 @@ class RecipeServiceTest {
 
         // Then
         assertEquals(2, summaries.size());
-        assertEquals(new RecipeSummary(1L, "된장찌개", recipe1.getImageUrl()), summaries.get(1L));
-        assertEquals(new RecipeSummary(2L, "김치찌개", recipe2.getImageUrl()), summaries.get(2L));
+        assertEquals(new RecipeSummary(1L, "된장찌개", recipe1.getImageUrl(), recipe1.getTipSummary()), summaries.get(1L));
+        assertEquals(new RecipeSummary(2L, "김치찌개", recipe2.getImageUrl(), recipe2.getTipSummary()), summaries.get(2L));
         assertFalse(summaries.containsKey(99L));
     }
 
@@ -439,7 +439,7 @@ class RecipeServiceTest {
 
         // Then
         assertEquals(1, summaries.size());
-        assertEquals(new RecipeSummary(1L, "된장찌개", recipe1.getImageUrl()), summaries.get(1L));
+        assertEquals(new RecipeSummary(1L, "된장찌개", recipe1.getImageUrl(), recipe1.getTipSummary()), summaries.get(1L));
         verify(recipeRepository).findAllById(List.of(1L));
     }
 }

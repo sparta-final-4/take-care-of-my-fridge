@@ -6,6 +6,7 @@ import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 import org.example.takecareofmyfridgebe.domain.member.repository.MemberRepository;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeSummary;
 import org.example.takecareofmyfridgebe.domain.recipe.service.RecipeService;
+import org.example.takecareofmyfridgebe.domain.review.dto.RecipeRatingStat;
 import org.example.takecareofmyfridgebe.domain.review.dto.ReviewCreateRequest;
 import org.example.takecareofmyfridgebe.domain.review.dto.ReviewResponse;
 import org.example.takecareofmyfridgebe.domain.review.dto.ReviewSearchRequest;
@@ -20,9 +21,11 @@ import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -153,5 +156,34 @@ public class RecipeReviewService {
         Map<Long, RecipeSummary> summaries = recipeService.findSummaries(List.of(recipeId));
         RecipeSummary summary = summaries.get(recipeId);
         return summary != null ? summary.name() : null;
+    }
+
+    /**
+     * 레시피 ID 목록의 별점 통계(평균 평점, 리뷰 수)를 한 번에 조회한다.
+     * ID 목록이 비어 있으면 DB 쿼리를 실행하지 않고 빈 맵을 반환한다.
+     *
+     * @param recipeIds 레시피 ID 목록
+     * @return 레시피 ID를 키로 하는 별점 통계 맵
+     */
+    public Map<Long, RecipeRatingStat> findRatingStats(java.util.Collection<Long> recipeIds) {
+        if (recipeIds == null || recipeIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        List<Long> distinctIds = recipeIds.stream()
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+
+        if (distinctIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        return recipeReviewRepository.findRatingStatsByRecipeIds(distinctIds).stream()
+                .collect(Collectors.toMap(
+                        RecipeRatingStat::recipeId,
+                        stat -> stat,
+                        (existing, replacing) -> existing
+                ));
     }
 }

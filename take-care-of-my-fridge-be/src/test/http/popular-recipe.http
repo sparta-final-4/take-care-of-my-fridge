@@ -1,0 +1,64 @@
+### 1. 메인 화면 인기 레시피 목록 조회 (기본 size=6, 비로그인 가능)
+GET http://localhost:8080/api/recipes/popular
+
+> {%
+    client.test("인기 레시피 기본 조회 성공 (200 OK)", () => {
+        client.assert(response.status === 200, "상태 코드는 200이어야 합니다.");
+        client.assert(response.body.success === true, "success 필드는 true여야 합니다.");
+        client.assert(Array.isArray(response.body.data), "data 필드는 배열이어야 합니다.");
+    });
+
+    if (response.body && response.body.data && response.body.data.length > 0) {
+        const first = response.body.data[0];
+        client.test("응답 데이터 필드 검증", () => {
+            client.assert(first.recipeId !== undefined, "recipeId가 존재해야 합니다.");
+            client.assert(typeof first.recipeName === "string", "recipeName은 문자열이어야 합니다.");
+            client.assert(first.cookedMemberCount !== undefined, "cookedMemberCount가 존재해야 합니다.");
+            client.assert(first.reviewCount !== undefined, "reviewCount가 존재해야 합니다.");
+        });
+        client.log("1위 인기 레시피: " + first.recipeName + " (요리한 회원 수: " + first.cookedMemberCount + "명, 평점: " + first.averageRating + ")");
+    } else {
+        client.log("최근 30일간 요리 기록이 없어 빈 목록이 반환되었습니다.");
+    }
+%}
+
+### 2. 인기 레시피 조회 (size 지정: 10건)
+GET http://localhost:8080/api/recipes/popular?size=10
+
+> {%
+    client.test("size=10 지정 조회 성공 (200 OK)", () => {
+        client.assert(response.status === 200, "상태 코드는 200이어야 합니다.");
+        client.assert(response.body.success === true, "success 필드는 true여야 합니다.");
+        client.assert(response.body.data.length <= 10, "데이터 개수는 최대 10개 이하여야 합니다.");
+    });
+%}
+
+### 3. 인기 레시피 조회 (최대 허용 size=20)
+GET http://localhost:8080/api/recipes/popular?size=20
+
+> {%
+    client.test("최대 허용치 size=20 조회 성공 (200 OK)", () => {
+        client.assert(response.status === 200, "상태 코드는 200이어야 합니다.");
+        client.assert(response.body.data.length <= 20, "데이터 개수는 최대 20개 이하여야 합니다.");
+    });
+%}
+
+### 4. 실패 검증: size 최대치 초과 (size=21 -> 400 Bad Request)
+GET http://localhost:8080/api/recipes/popular?size=21
+
+> {%
+    client.test("size 초과 시 400 반환 확인", () => {
+        client.assert(response.status === 400, "size가 20을 초과하면 400이어야 합니다.");
+        client.assert(response.body.success === false, "success 필드는 false여야 합니다.");
+    });
+%}
+
+### 5. 실패 검증: size 1 미만 (size=0 -> 400 Bad Request)
+GET http://localhost:8080/api/recipes/popular?size=0
+
+> {%
+    client.test("size 1 미만 시 400 반환 확인", () => {
+        client.assert(response.status === 400, "size가 1 미만이면 400이어야 합니다.");
+        client.assert(response.body.success === false, "success 필드는 false여야 합니다.");
+    });
+%}
