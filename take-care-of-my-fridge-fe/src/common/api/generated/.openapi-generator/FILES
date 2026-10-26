@@ -27,6 +27,7 @@ configuration.ts
 index.ts
 models/add-cart-item-request.ts
 models/add-cart-item-response.ts
+models/admin-product-list-request.ts
 models/api-response-add-cart-item-response.ts
 models/api-response-cart-items-response.ts
 models/api-response-change-cart-item-quantity-response.ts

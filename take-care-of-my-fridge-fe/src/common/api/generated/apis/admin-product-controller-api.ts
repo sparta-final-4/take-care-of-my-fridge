@@ -23,6 +23,10 @@ import { DUMMY_BASE_URL, assertParamExists, setApiKeyToObject, setBasicAuthToObj
 // @ts-ignore
 import { BASE_PATH, COLLECTION_FORMATS, type RequestArgs, BaseAPI, RequiredError, operationServerMap } from '../base';
 // @ts-ignore
+import type { AdminProductListRequest } from '../models';
+// @ts-ignore
+import type { ApiResponsePageResponseProductListItemResponse } from '../models';
+// @ts-ignore
 import type { ApiResponseProductDetailResponse } from '../models';
 // @ts-ignore
 import type { ApiResponseVoid } from '../models';
@@ -90,6 +94,77 @@ export const AdminProductControllerApiAxiosParamCreator = function (configuratio
             const localVarRequestOptions = { method: 'DELETE', ...baseOptions, ...options};
             const localVarHeaderParameter = {} as any;
             const localVarQueryParameter = {} as any;
+
+            localVarHeaderParameter['Accept'] = '*/*';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @param {number} productId 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        getAdminProduct: async (productId: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'productId' is not null or undefined
+            assertParamExists('getAdminProduct', 'productId', productId)
+            const localVarPath = `/api/admin/products/{productId}`
+                .replace('{productId}', encodeURIComponent(String(productId)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            localVarHeaderParameter['Accept'] = '*/*';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @param {AdminProductListRequest} request 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        getAdminProducts: async (request: AdminProductListRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'request' is not null or undefined
+            assertParamExists('getAdminProducts', 'request', request)
+            const localVarPath = `/api/admin/products`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            if (request !== undefined) {
+                for (const [key, value] of Object.entries(request)) {
+                    localVarQueryParameter[key] = value;
+                }
+            }
 
             localVarHeaderParameter['Accept'] = '*/*';
 
@@ -176,6 +251,30 @@ export const AdminProductControllerApiFp = function(configuration?: Configuratio
         /**
          * 
          * @param {number} productId 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async getAdminProduct(productId: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ApiResponseProductDetailResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.getAdminProduct(productId, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['AdminProductControllerApi.getAdminProduct']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @param {AdminProductListRequest} request 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async getAdminProducts(request: AdminProductListRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ApiResponsePageResponseProductListItemResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.getAdminProducts(request, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['AdminProductControllerApi.getAdminProducts']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @param {number} productId 
          * @param {ProductUpdateRequest} productUpdateRequest 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
@@ -215,6 +314,24 @@ export const AdminProductControllerApiFactory = function (configuration?: Config
         },
         /**
          * 
+         * @param {AdminProductControllerApiGetAdminProductRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        getAdminProduct(requestParameters: AdminProductControllerApiGetAdminProductRequest, options?: RawAxiosRequestConfig): AxiosPromise<ApiResponseProductDetailResponse> {
+            return localVarFp.getAdminProduct(requestParameters.productId, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @param {AdminProductControllerApiGetAdminProductsRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        getAdminProducts(requestParameters: AdminProductControllerApiGetAdminProductsRequest, options?: RawAxiosRequestConfig): AxiosPromise<ApiResponsePageResponseProductListItemResponse> {
+            return localVarFp.getAdminProducts(requestParameters.request, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
          * @param {AdminProductControllerApiUpdateProductRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
@@ -247,6 +364,22 @@ export interface AdminProductControllerApiInterface {
 
     /**
      * 
+     * @param {AdminProductControllerApiGetAdminProductRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    getAdminProduct(requestParameters: AdminProductControllerApiGetAdminProductRequest, options?: RawAxiosRequestConfig): AxiosPromise<ApiResponseProductDetailResponse>;
+
+    /**
+     * 
+     * @param {AdminProductControllerApiGetAdminProductsRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    getAdminProducts(requestParameters: AdminProductControllerApiGetAdminProductsRequest, options?: RawAxiosRequestConfig): AxiosPromise<ApiResponsePageResponseProductListItemResponse>;
+
+    /**
+     * 
      * @param {AdminProductControllerApiUpdateProductRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
@@ -267,6 +400,20 @@ export interface AdminProductControllerApiCreateProductRequest {
  */
 export interface AdminProductControllerApiDeleteProductRequest {
     readonly productId: number
+}
+
+/**
+ * Request parameters for getAdminProduct operation in AdminProductControllerApi.
+ */
+export interface AdminProductControllerApiGetAdminProductRequest {
+    readonly productId: number
+}
+
+/**
+ * Request parameters for getAdminProducts operation in AdminProductControllerApi.
+ */
+export interface AdminProductControllerApiGetAdminProductsRequest {
+    readonly request: AdminProductListRequest
 }
 
 /**
@@ -300,6 +447,26 @@ export class AdminProductControllerApi extends BaseAPI implements AdminProductCo
      */
     public deleteProduct(requestParameters: AdminProductControllerApiDeleteProductRequest, options?: RawAxiosRequestConfig) {
         return AdminProductControllerApiFp(this.configuration).deleteProduct(requestParameters.productId, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @param {AdminProductControllerApiGetAdminProductRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public getAdminProduct(requestParameters: AdminProductControllerApiGetAdminProductRequest, options?: RawAxiosRequestConfig) {
+        return AdminProductControllerApiFp(this.configuration).getAdminProduct(requestParameters.productId, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @param {AdminProductControllerApiGetAdminProductsRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public getAdminProducts(requestParameters: AdminProductControllerApiGetAdminProductsRequest, options?: RawAxiosRequestConfig) {
+        return AdminProductControllerApiFp(this.configuration).getAdminProducts(requestParameters.request, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**

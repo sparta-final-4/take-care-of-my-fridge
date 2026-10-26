@@ -281,6 +281,34 @@
       }
     },
     "/api/admin/products": {
+      "get": {
+        "operationId": "getAdminProducts",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "request",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/AdminProductListRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePageResponseProductListItemResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "admin-product-controller"
+        ]
+      },
       "post": {
         "operationId": "createProduct",
         "requestBody": {
@@ -330,6 +358,35 @@
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "admin-product-controller"
+        ]
+      },
+      "get": {
+        "operationId": "getAdminProduct",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "productId",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseProductDetailResponse"
                 }
               }
             },
@@ -2187,6 +2244,42 @@
           "quantity": {
             "type": "integer",
             "format": "int32"
+          }
+        }
+      },
+      "AdminProductListRequest": {
+        "type": "object",
+        "properties": {
+          "keyword": {
+            "type": "string",
+            "maxLength": 50,
+            "minLength": 0
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 1
+          },
+          "size": {
+            "type": "integer",
+            "format": "int32",
+            "maximum": 100,
+            "minimum": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ON_SALE",
+              "SOLD_OUT",
+              "STOPPED"
+            ]
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "INGREDIENT",
+              "MEALKIT"
+            ]
           }
         }
       },
