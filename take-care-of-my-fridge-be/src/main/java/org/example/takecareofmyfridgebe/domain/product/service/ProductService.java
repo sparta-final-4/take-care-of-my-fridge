@@ -3,6 +3,7 @@ package org.example.takecareofmyfridgebe.domain.product.service;
 import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.Ingredient;
 import org.example.takecareofmyfridgebe.domain.ingredient.repository.IngredientRepository;
+import org.example.takecareofmyfridgebe.domain.product.dto.AdminProductListRequest;
 import org.example.takecareofmyfridgebe.domain.product.dto.ProductCreateRequest;
 import org.example.takecareofmyfridgebe.domain.product.dto.ProductDetailResponse;
 import org.example.takecareofmyfridgebe.domain.product.dto.ProductListItemResponse;
@@ -49,11 +50,32 @@ public class ProductService {
         return PageResponse.of(response);
     }
 
+    public PageResponse<ProductListItemResponse> getAdminProducts(AdminProductListRequest request) {
+        ProductListRequest condition = request.toProductListRequest();
+        PageRequest pageable = PageRequest.of(condition.page() - 1, condition.size());
+        List<ProductStatus> statuses = request.status() == null
+                ? List.of(ProductStatus.values()) : List.of(request.status());
+        return PageResponse.of(productRepository.findProductsByCondition(condition, statuses, pageable)
+                .map(ProductListItemResponse::from));
+    }
+
     // 판매 중지 상품은 존재하지 않는 상품과 같이 404로 응답
     public ProductDetailResponse getProduct(Long productId) {
         Product product = productRepository.findByIdAndStatusIn(productId, PUBLIC_STATUSES)
                 .orElseThrow(() -> new BusinessException(ErrorCode.PRODUCT_NOT_FOUND));
 
+        return toDetailResponse(product);
+    }
+
+    public ProductDetailResponse getAdminProduct(Long productId) {
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.PRODUCT_NOT_FOUND));
+
+        return toDetailResponse(product);
+    }
+
+    private ProductDetailResponse toDetailResponse(Product product) {
+        Long productId = product.getId();
         return switch (product.getProductType()) {
             case INGREDIENT -> ProductDetailResponse.ofIngredient(
                     product,

@@ -41,6 +41,15 @@
 
 공유 구조: content, pageNumber, pageSize, totalElements, totalPages, isLast. 요청 page와 응답 pageNumber는 1부터 시작하며, 서비스 내부의 Spring Page 번호는 0부터 시작합니다(2026-10-17 회원 목록 조회 구현).
 
+## 관리자 상품 조회
+
+| 기능 | Method / Path | 권한 | 요청 | 성공 응답 |
+|---|---|---|---|---|
+| 상품 목록 | GET /api/admin/products | ADMIN | keyword(상품명 일부), type(INGREDIENT/MEALKIT), status(ON_SALE/SOLD_OUT/STOPPED), page(기본 1), size(기본 20, 최대 100) | PageResponse<ProductListItemResponse> |
+| 상품 상세 | GET /api/admin/products/{productId} | ADMIN | productId | ProductDetailResponse, 없으면 PRODUCT_001 |
+
+관리자 목록에서 status를 생략하면 세 상태를 모두 조회합니다. 상세 조회는 판매 중지 상품도 반환합니다. 공개 `/api/products` 조회는 기존처럼 판매 중지 상품을 제외합니다.
+
 ## 필요한 API 기능 목록
 
 HTTP 메서드·경로·DTO 이름은 구현 전 합의합니다.

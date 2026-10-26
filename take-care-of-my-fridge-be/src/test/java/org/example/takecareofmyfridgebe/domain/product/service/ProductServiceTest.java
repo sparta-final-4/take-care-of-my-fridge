@@ -3,6 +3,7 @@ package org.example.takecareofmyfridgebe.domain.product.service;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.Ingredient;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.StorageType;
 import org.example.takecareofmyfridgebe.domain.ingredient.repository.IngredientRepository;
+import org.example.takecareofmyfridgebe.domain.product.dto.AdminProductListRequest;
 import org.example.takecareofmyfridgebe.domain.product.dto.ProductCreateRequest;
 import org.example.takecareofmyfridgebe.domain.product.dto.ProductDetailResponse;
 import org.example.takecareofmyfridgebe.domain.product.dto.ProductListItemResponse;
@@ -46,6 +47,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -113,6 +115,41 @@ class ProductServiceTest {
         assertThat(result.totalElements()).isEqualTo(21);
         assertThat(result.content()).containsExactly(new ProductListItemResponse(
                 5L, ProductType.INGREDIENT, "양파 1kg", null, 3900, ProductStatus.ON_SALE));
+    }
+
+    @Test
+    @DisplayName("관리자 목록은 판매 중지 상품을 포함하고 상태 필터와 페이지를 적용한다")
+    void getAdminProducts_includesStoppedAndFiltersStatus() {
+        when(productRepository.findProductsByCondition(any(ProductListRequest.class), anyCollection(), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        service.getAdminProducts(new AdminProductListRequest(" 양파 ", ProductType.INGREDIENT, null, 2, 10));
+        ArgumentCaptor<ProductListRequest> conditionCaptor = ArgumentCaptor.forClass(ProductListRequest.class);
+        verify(productRepository).findProductsByCondition(conditionCaptor.capture(), statusCaptor.capture(), eq(PageRequest.of(1, 10)));
+        assertThat(conditionCaptor.getValue().keyword()).isEqualTo("양파");
+        assertThat(conditionCaptor.getValue().type()).isEqualTo(ProductType.INGREDIENT);
+        assertThat(statusCaptor.getValue()).containsExactlyInAnyOrder(ProductStatus.ON_SALE, ProductStatus.SOLD_OUT, ProductStatus.STOPPED);
+
+        service.getAdminProducts(new AdminProductListRequest(null, null, ProductStatus.STOPPED, 1, 20));
+        verify(productRepository, times(2))
+                .findProductsByCondition(any(ProductListRequest.class), statusCaptor.capture(), any(Pageable.class));
+        assertThat(statusCaptor.getValue()).containsExactly(ProductStatus.STOPPED);
+    }
+
+    @Test
+    @DisplayName("관리자 상세는 판매 중지 상품도 조회한다")
+    void getAdminProduct_stopped() {
+        Product onion = ProductFixture.createProduct(5L, "양파 1kg", 3900);
+        onion.stop();
+        when(productRepository.findById(5L)).thenReturn(Optional.of(onion));
+        when(ingredientProductRepository.findByProductId(5L))
+                .thenReturn(Optional.of(ProductFixture.createIngredientDetail(onion, new BigDecimal("1000"), "g")));
+
+        ProductDetailResponse result = service.getAdminProduct(5L);
+
+        assertThat(result.status()).isEqualTo(ProductStatus.STOPPED);
+        assertThat(result.ingredient()).isNotNull();
+        verify(productRepository, never()).findByIdAndStatusIn(eq(5L), anyCollection());
     }
 
     private static ProductListRequest listRequest(ProductSort sort, int page) {
