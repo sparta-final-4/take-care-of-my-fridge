@@ -1,0 +1,151 @@
+.modalContent {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-height: 70vh;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sectionTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ant-color-text);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.required {
+  color: var(--ant-color-error);
+}
+
+.ingredientList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ingredientCard {
+  border: 1px solid var(--ant-color-border-secondary);
+  border-radius: 8px;
+  padding: 12px;
+  background-color: var(--ant-color-bg-container);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: border-color 0.2s;
+
+  &.unchecked {
+    opacity: 0.6;
+    background-color: var(--ant-color-fill-quaternary);
+  }
+}
+
+.ingredientHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.ingredientName {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.heldInfo {
+  font-size: 12px;
+  color: var(--ant-color-text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.expiredWarning {
+  color: var(--ant-color-warning);
+  background-color: var(--ant-color-warning-bg);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+}
+
+.quantityControls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.stepperGroup {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.numberInput {
+  width: 90px;
+}
+
+.unitText {
+  font-size: 13px;
+  color: var(--ant-color-text-secondary);
+  min-width: 20px;
+}
+
+.allTag {
+  font-weight: 600;
+  padding: 2px 8px;
+}
+
+.exceedNotice {
+  font-size: 12px;
+  color: var(--ant-color-warning-text);
+}
+
+.emptyNotice {
+  font-size: 12px;
+  color: var(--ant-color-error);
+}
+
+.missingSection {
+  background-color: var(--ant-color-fill-quaternary);
+  border-radius: 6px;
+  padding: 8px 12px;
+}
+
+.missingHeader {
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  user-select: none;
+  background: none;
+  border: none;
+  width: 100%;
+  padding: 0;
+  text-align: left;
+}
+
+.missingList {
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--ant-color-text-secondary);
+}
+
+.summaryAlert {
+  border-radius: 8px;
+}
+
+.footerActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 8px;
+}

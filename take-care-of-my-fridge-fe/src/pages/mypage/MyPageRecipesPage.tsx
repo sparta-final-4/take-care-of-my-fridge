@@ -1,7 +1,7 @@
 import { Button, Flex, Result, Spin } from 'antd';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { generatePath, useNavigate } from 'react-router';
+import { generatePath, useLocation, useNavigate } from 'react-router';
 
 import { ROUTES } from '@/app/paths';
 import {
@@ -21,12 +21,16 @@ const PAGE_SIZE = 5;
 
 export default function MyPageRecipesPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const queryClient = useQueryClient();
+
+  const locationState = location.state as { expandedRecipeId?: number } | null;
+  const initialExpandedId = locationState?.expandedRecipeId ?? null;
 
   const [page, setPage] = useState<number>(1);
   const [tab, setTab] = useState<CookingTabType>('ALL');
   const [sort, setSort] = useState<CookingSortType>('LATEST');
-  const [expandedRecipeId, setExpandedRecipeId] = useState<number | null>(null);
+  const [expandedRecipeId, setExpandedRecipeId] = useState<number | null>(initialExpandedId);
 
   // 후기 작성/수정 모달 상태
   const [reviewModalState, setReviewModalState] = useState<{

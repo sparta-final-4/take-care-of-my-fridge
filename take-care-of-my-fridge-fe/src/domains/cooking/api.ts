@@ -2,6 +2,8 @@ import {
   cookingLogApi,
   cookingStatsApi,
   myRecipeApi,
+  type CookingCompleteRequest,
+  type CookingCompleteResponse,
   type CookingLogResponse,
   type CookingLogSearchRequest,
   type CookingLogUpdateRequest,
@@ -18,6 +20,8 @@ export type CookingSortType = 'LATEST' | 'MOST_COOKED';
 export type CookingTabType = 'ALL' | 'UNREVIEWED' | 'REVIEWED';
 
 export type {
+  CookingCompleteRequest,
+  CookingCompleteResponse,
   CookingLogResponse,
   CookingLogSearchRequest,
   CookingLogUpdateRequest,
@@ -81,6 +85,19 @@ export async function updateCookingLog(
     cookingLogApi.updateCookingLog({
       cookingLogId,
       cookingLogUpdateRequest: request,
+    }),
+  );
+}
+
+/**
+ * 요리 완료 기록을 생성하고 냉장고 재료를 차감한다.
+ */
+export async function completeCooking(
+  request: CookingCompleteRequest,
+): Promise<CookingCompleteResponse> {
+  return unwrap(
+    cookingLogApi.completeCooking({
+      cookingCompleteRequest: request,
     }),
   );
 }
