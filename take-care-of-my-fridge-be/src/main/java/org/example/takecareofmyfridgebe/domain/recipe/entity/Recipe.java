@@ -165,7 +165,7 @@ public class Recipe extends BaseTimeEntity {
         this.ingredientsRaw = ingredientsRaw;
     }
 
-    // 수정은 의미 단위로 나눠 바꾼다. 출처(source, sourceId)와 후기 요약(tipSummary)은 바꾸지 않는다.
+    // 수정은 의미 단위로 나눠 바꾼다. 출처(source, sourceId)는 바꾸지 않고, 후기 요약은 RecipeService.updateTipSummary로만 바꾼다.
     public void changeBasicInfo(String name, String summary, String imageUrl, String tags, String tip) {
         this.name = name;
         this.summary = summary;

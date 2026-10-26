@@ -9,6 +9,7 @@ import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeDetailResponse;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeListItemResponse;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeListRequest;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeSummary;
+import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeUpdatedAtDto;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeUpdateRequest;
 import org.example.takecareofmyfridgebe.domain.recipe.entity.Recipe;
 import org.example.takecareofmyfridgebe.domain.recipe.entity.RecipeIngredient;
@@ -27,6 +28,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -187,6 +189,58 @@ public class RecipeService {
                 .collect(Collectors.toMap(
                         Recipe::getId,
                         recipe -> new RecipeSummary(recipe.getId(), recipe.getName(), recipe.getImageUrl(), recipe.getTipSummary()),
+                        (existing, replacing) -> existing
+                ));
+    }
+
+    /**
+     * 레시피의 후기 요약(tipSummary)을 변경한다.
+     * 요약이 기존과 같더라도 수정 시각(updated_at)이 갱신되어 새벽 재작업이 중복 실행되지 않도록
+     * 엔티티 수정 대신 직접 UPDATE 쿼리를 실행한다.
+     *
+     * @param recipeId 레시피 ID
+     * @param summary  변경할 후기 요약 내용
+     * @throws IllegalArgumentException 요약 내용이 null이거나 비어 있는 경우
+     * @throws BusinessException        레시피가 존재하지 않는 경우 (RECIPE_NOT_FOUND)
+     */
+    @Transactional
+    public void updateTipSummary(Long recipeId, String summary) {
+        if (summary == null || summary.isBlank()) {
+            throw new IllegalArgumentException("후기 요약은 비어 있을 수 없습니다.");
+        }
+
+        int updatedCount = recipeRepository.updateTipSummary(recipeId, summary, LocalDateTime.now());
+        if (updatedCount == 0) {
+            throw new BusinessException(ErrorCode.RECIPE_NOT_FOUND);
+        }
+    }
+
+    /**
+     * 레시피 ID 목록의 최근 수정 시각(updated_at)을 한 번의 쿼리로 조회한다.
+     * updated_at은 레시피 수정 때도 바뀌어서 요약 시각과 완전히 같지는 않다.
+     * 새벽 작업이 "다시 요약할 레시피"를 고를 때 사용한다.
+     *
+     * @param recipeIds 레시피 ID 목록
+     * @return 레시피 ID를 키로 하고 최근 수정 시각을 값으로 하는 Map
+     */
+    public Map<Long, LocalDateTime> findUpdatedAts(Collection<Long> recipeIds) {
+        if (recipeIds == null || recipeIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        List<Long> distinctIds = recipeIds.stream()
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+
+        if (distinctIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        return recipeRepository.findUpdatedAtsByIdIn(distinctIds).stream()
+                .collect(Collectors.toMap(
+                        RecipeUpdatedAtDto::id,
+                        RecipeUpdatedAtDto::updatedAt,
                         (existing, replacing) -> existing
                 ));
     }

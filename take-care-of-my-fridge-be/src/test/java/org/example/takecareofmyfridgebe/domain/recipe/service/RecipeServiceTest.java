@@ -13,9 +13,9 @@ import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeNutritionRequest
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeSort;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeStepRequest;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeSummary;
+import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeUpdatedAtDto;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeUpdateRequest;
 import org.example.takecareofmyfridgebe.domain.recipe.entity.Recipe;
-import org.example.takecareofmyfridgebe.domain.recipe.entity.RecipeIngredient;
 import org.example.takecareofmyfridgebe.domain.recipe.repository.RecipeIngredientRepository;
 import org.example.takecareofmyfridgebe.domain.recipe.repository.RecipeRepository;
 import org.example.takecareofmyfridgebe.domain.recipe.repository.RecipeStepRepository;
@@ -34,6 +34,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -43,9 +44,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
@@ -441,5 +444,77 @@ class RecipeServiceTest {
         assertEquals(1, summaries.size());
         assertEquals(new RecipeSummary(1L, "된장찌개", recipe1.getImageUrl(), recipe1.getTipSummary()), summaries.get(1L));
         verify(recipeRepository).findAllById(List.of(1L));
+    }
+
+    @Test
+    @DisplayName("후기 요약이 null이거나 공백이면 IllegalArgumentException이 발생한다")
+    void updateTipSummaryThrowsExceptionWhenSummaryIsBlank() {
+        assertThrows(IllegalArgumentException.class, () -> service.updateTipSummary(1L, null));
+        assertThrows(IllegalArgumentException.class, () -> service.updateTipSummary(1L, ""));
+        assertThrows(IllegalArgumentException.class, () -> service.updateTipSummary(1L, "   "));
+        verify(recipeRepository, never()).updateTipSummary(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 레시피의 후기 요약을 변경하려 하면 RECIPE_NOT_FOUND 예외가 발생한다")
+    void updateTipSummaryThrowsNotFoundWhenRecipeDoesNotExist() {
+        // Given
+        Long recipeId = 999L;
+        when(recipeRepository.updateTipSummary(eq(recipeId), any(), any()))
+                .thenReturn(0);
+
+        // When & Then
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> service.updateTipSummary(recipeId, "새로운 요약")
+        );
+        assertEquals(ErrorCode.RECIPE_NOT_FOUND, exception.getErrorCode());
+    }
+
+    @Test
+    @DisplayName("정상적인 요약 내용 전달 시 레시피의 tipSummary가 업데이트된다")
+    void updateTipSummaryUpdatesSuccessfully() {
+        // Given
+        Long recipeId = 1L;
+        String summary = "간장을 줄이고 마늘을 더 넣으면 맛있어요.";
+        when(recipeRepository.updateTipSummary(eq(recipeId), eq(summary), any(LocalDateTime.class)))
+                .thenReturn(1);
+
+        // When
+        service.updateTipSummary(recipeId, summary);
+
+        // Then
+        verify(recipeRepository).updateTipSummary(eq(recipeId), eq(summary), any(LocalDateTime.class));
+    }
+
+    @Test
+    @DisplayName("빈 ID 목록이나 null로 수정 시각을 조회하면 저장소 호출 없이 빈 Map을 반환한다")
+    void findUpdatedAtsReturnsEmptyMapWhenIdsEmptyOrNull() {
+        // When & Then
+        assertTrue(service.findUpdatedAts(List.of()).isEmpty());
+        assertTrue(service.findUpdatedAts(null).isEmpty());
+        verify(recipeRepository, never()).findUpdatedAtsByIdIn(any());
+    }
+
+    @Test
+    @DisplayName("레시피 ID 목록으로 최근 수정 시각을 조회하면 중복을 제거하고 ID를 키로 하는 Map을 반환한다")
+    void findUpdatedAtsHandlesDuplicatesAndReturnsMap() {
+        // Given
+        LocalDateTime time1 = LocalDateTime.of(2026, 10, 26, 12, 0);
+        LocalDateTime time2 = LocalDateTime.of(2026, 10, 25, 10, 0);
+        RecipeUpdatedAtDto dto1 = new RecipeUpdatedAtDto(1L, time1);
+        RecipeUpdatedAtDto dto2 = new RecipeUpdatedAtDto(2L, time2);
+
+        when(recipeRepository.findUpdatedAtsByIdIn(argThat(ids -> ids.size() == 2 && ids.containsAll(List.of(1L, 2L)))))
+                .thenReturn(List.of(dto1, dto2));
+
+        // When
+        Map<Long, LocalDateTime> result = service.findUpdatedAts(java.util.Arrays.asList(1L, 2L, 1L, null));
+
+        // Then
+        assertEquals(2, result.size());
+        assertEquals(time1, result.get(1L));
+        assertEquals(time2, result.get(2L));
+        verify(recipeRepository).findUpdatedAtsByIdIn(argThat(ids -> ids.size() == 2 && ids.containsAll(List.of(1L, 2L))));
     }
 }
