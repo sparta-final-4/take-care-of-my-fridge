@@ -160,7 +160,7 @@ public class PaymentFacade {
             };
         }
 
-        // TODO: 환불 도메인 구현 후 PAID 결제의 PG 취소·부분 취소를 환불 쪽과 동기화
+        // 결제 완료된 결제의 PG 취소·부분 취소는 환불 쪽(RefundFacade.syncWithPg)이 맞춘다
         if (pgPayment.isFailed() && payment.getStatus() == PaymentStatus.READY) {
             return paymentCommandService.fail(payment, FailReason.PG_FAILED, changedBy);
         }

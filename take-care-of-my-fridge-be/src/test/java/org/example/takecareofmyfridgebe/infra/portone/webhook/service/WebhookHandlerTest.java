@@ -5,6 +5,7 @@ import org.example.takecareofmyfridgebe.domain.payment.entity.Payment;
 import org.example.takecareofmyfridgebe.domain.payment.entity.PaymentChangedBy;
 import org.example.takecareofmyfridgebe.domain.payment.facade.PaymentFacade;
 import org.example.takecareofmyfridgebe.domain.payment.service.PaymentService;
+import org.example.takecareofmyfridgebe.domain.refund.facade.RefundFacade;
 import org.example.takecareofmyfridgebe.infra.portone.dto.PortOneWebhook;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -42,6 +43,9 @@ class WebhookHandlerTest {
     private PaymentFacade paymentFacade;
 
     @Mock
+    private RefundFacade refundFacade;
+
+    @Mock
     private WebhookEventService webhookEventService;
 
     @InjectMocks
@@ -74,12 +78,37 @@ class WebhookHandlerTest {
     @Test
     @DisplayName("처리 대상이 아닌 이벤트는 결제를 조회하지 않고 IGNORED로 기록한다")
     void handle_unhandledType_ignored() {
-        PortOneWebhook webhook = givenReceived("Transaction.PartialCancelled");
+        PortOneWebhook webhook = givenReceived("Transaction.Ready");
 
         webhookHandler.handle(WEBHOOK_ID, webhook, BODY);
 
         verify(webhookEventService).markIgnored(EVENT_ID, null);
-        verifyNoInteractions(paymentService, paymentFacade);
+        verifyNoInteractions(paymentService, paymentFacade, refundFacade);
+    }
+
+    @Test
+    @DisplayName("부분 취소 웹훅은 환불을 PG와 맞추고, 바뀐 것이 있으면 PROCESSED로 기록한다")
+    void handle_partialCancelled_syncsRefund() {
+        PortOneWebhook webhook = givenReceived("Transaction.PartialCancelled");
+        Payment payment = givenPayment();
+        given(paymentFacade.syncWithPg(payment, PaymentChangedBy.WEBHOOK)).willReturn(false);
+        given(refundFacade.syncWithPg(PORTONE_PAYMENT_ID, PaymentChangedBy.WEBHOOK, null)).willReturn(true);
+
+        webhookHandler.handle(WEBHOOK_ID, webhook, BODY);
+
+        verify(webhookEventService).markProcessed(EVENT_ID, PAYMENT_ID);
+    }
+
+    @Test
+    @DisplayName("결제 완료 웹훅은 환불 쪽을 부르지 않는다")
+    void handle_paid_doesNotSyncRefund() {
+        PortOneWebhook webhook = givenReceived("Transaction.Paid");
+        Payment payment = givenPayment();
+        given(paymentFacade.syncWithPg(payment, PaymentChangedBy.WEBHOOK)).willReturn(true);
+
+        webhookHandler.handle(WEBHOOK_ID, webhook, BODY);
+
+        verifyNoInteractions(refundFacade);
     }
 
     @Test
@@ -112,6 +141,7 @@ class WebhookHandlerTest {
         PortOneWebhook webhook = givenReceived("Transaction.Cancelled");
         Payment payment = givenPayment();
         given(paymentFacade.syncWithPg(payment, PaymentChangedBy.WEBHOOK)).willReturn(false);
+        given(refundFacade.syncWithPg(PORTONE_PAYMENT_ID, PaymentChangedBy.WEBHOOK, null)).willReturn(false);
 
         webhookHandler.handle(WEBHOOK_ID, webhook, BODY);
 
