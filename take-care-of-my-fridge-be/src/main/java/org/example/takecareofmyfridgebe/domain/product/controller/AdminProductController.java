@@ -1,5 +1,6 @@
 package org.example.takecareofmyfridgebe.domain.product.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.product.dto.AdminProductListRequest;
@@ -29,6 +30,8 @@ public class AdminProductController {
 
     private final ProductService productService;
 
+    // 공개 ProductController와 메서드 이름이 같아 생성 클라이언트 이름이 바뀌지 않도록 operationId를 따로 둔다.
+    @Operation(operationId = "getAdminProducts")
     @GetMapping
     public ResponseEntity<ApiResponse<PageResponse<ProductListItemResponse>>> getProducts(
             @Valid @ModelAttribute AdminProductListRequest request
@@ -36,6 +39,7 @@ public class AdminProductController {
         return ResponseEntity.ok(ApiResponse.ok(productService.getAdminProducts(request)));
     }
 
+    @Operation(operationId = "getAdminProduct")
     @GetMapping("/{productId}")
     public ResponseEntity<ApiResponse<ProductDetailResponse>> getProduct(@PathVariable Long productId) {
         return ResponseEntity.ok(ApiResponse.ok(productService.getAdminProduct(productId)));
