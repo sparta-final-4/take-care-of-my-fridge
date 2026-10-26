@@ -3967,6 +3967,9 @@
           "amount": {
             "type": "string"
           },
+          "basicSeasoning": {
+            "type": "boolean"
+          },
           "displayName": {
             "type": "string"
           },
@@ -3976,6 +3979,9 @@
           "ingredientId": {
             "type": "integer",
             "format": "int64"
+          },
+          "quantity": {
+            "type": "number"
           },
           "role": {
             "type": "string"

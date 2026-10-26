@@ -17,7 +17,7 @@ interface RecipeReviewSectionProps {
   recipeId: number;
 }
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 5;
 
 export function RecipeReviewSection({ recipeId }: RecipeReviewSectionProps) {
   const { message } = App.useApp();

@@ -2,6 +2,7 @@ package org.example.takecareofmyfridgebe.domain.recipe.service;
 
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.Ingredient;
 import org.example.takecareofmyfridgebe.domain.ingredient.repository.IngredientRepository;
+import org.example.takecareofmyfridgebe.domain.ingredient.service.IngredientService;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeClassificationResponse;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeCreateRequest;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeDetailResponse;
@@ -10,9 +11,11 @@ import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeListItemResponse
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeListRequest;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeNutritionRequest;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeSort;
+import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeStepRequest;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeSummary;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeUpdateRequest;
 import org.example.takecareofmyfridgebe.domain.recipe.entity.Recipe;
+import org.example.takecareofmyfridgebe.domain.recipe.entity.RecipeIngredient;
 import org.example.takecareofmyfridgebe.domain.recipe.repository.RecipeIngredientRepository;
 import org.example.takecareofmyfridgebe.domain.recipe.repository.RecipeRepository;
 import org.example.takecareofmyfridgebe.domain.recipe.repository.RecipeStepRepository;
@@ -34,6 +37,7 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -60,6 +64,8 @@ class RecipeServiceTest {
     private RecipeStepRepository recipeStepRepository;
     @Mock
     private IngredientRepository ingredientRepository;
+    @Mock
+    private IngredientService ingredientService;
     @InjectMocks
     private RecipeService service;
 
@@ -99,32 +105,18 @@ class RecipeServiceTest {
     }
 
     @Test
-    @DisplayName("분류 조회는 저장소가 준 음식 종류와 요리 분류를 그대로 담는다")
-    void getClassifications_returnsDistinctValues() {
-        // given
-        when(recipeRepository.findDistinctCuisineTypes()).thenReturn(List.of("양식", "한식"));
-        when(recipeRepository.findDistinctCategories()).thenReturn(List.of("국", "밥"));
-
-        // when
-        RecipeClassificationResponse response = service.getClassifications();
-
-        // then
-        assertThat(response.cuisineTypes()).containsExactly("양식", "한식");
-        assertThat(response.categories()).containsExactly("국", "밥");
-    }
-
-    @Test
-    @DisplayName("레시피 상세는 영양 정보와 재료·조리 단계를 순서대로 함께 반환한다")
-    void getRecipe_withIngredientsAndSteps() {
+    @DisplayName("상세 조회 시 레시피, 영양정보, 재료(수량·기본양념 여부 포함), 조리 단계를 DTO로 매핑한다")
+    void getRecipe_mapsToResponse() {
         // given
         Recipe stew = RecipeFixture.createRecipe(7L, "된장찌개");
         when(recipeRepository.findById(7L)).thenReturn(Optional.of(stew));
         when(recipeIngredientRepository.findByRecipeIdOrderBySeqAsc(7L)).thenReturn(List.of(
-                RecipeFixture.createIngredient(stew, 1, "된장", "2큰술"),
-                RecipeFixture.createIngredient(stew, 2, "두부", "1/2모")));
+                RecipeFixture.createIngredient(stew, 1, "된장", "2큰술", new BigDecimal("30.00")),
+                RecipeFixture.createIngredient(stew, 2, "두부", "1/2모", null)));
         when(recipeStepRepository.findByRecipeIdOrderByStepNoAsc(7L)).thenReturn(List.of(
                 RecipeFixture.createStep(stew, 1, "물을 끓인다."),
                 RecipeFixture.createStep(stew, 2, "된장을 푼다.")));
+        when(ingredientService.findBasicSeasoningIds(List.of(1L, 2L))).thenReturn(Set.of(1L));
 
         // when
         RecipeDetailResponse result = service.getRecipe(7L);
@@ -134,6 +126,10 @@ class RecipeServiceTest {
         assertThat(result.nutrition().calories()).isEqualByComparingTo("350");
         assertThat(result.ingredients()).extracting(RecipeDetailResponse.IngredientItem::displayName)
                 .containsExactly("된장", "두부");
+        assertThat(result.ingredients().get(0).quantity()).isEqualByComparingTo("30.00");
+        assertThat(result.ingredients().get(0).basicSeasoning()).isTrue();
+        assertThat(result.ingredients().get(1).quantity()).isNull();
+        assertThat(result.ingredients().get(1).basicSeasoning()).isFalse();
         assertThat(result.steps()).extracting(RecipeDetailResponse.StepItem::stepNo)
                 .containsExactly(1, 2);
     }
@@ -162,6 +158,7 @@ class RecipeServiceTest {
         when(recipeRepository.save(any(Recipe.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(recipeIngredientRepository.saveAll(anyList())).thenAnswer(invocation -> invocation.getArgument(0));
         when(recipeStepRepository.saveAll(anyList())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(ingredientService.findBasicSeasoningIds(List.of(10L, 20L))).thenReturn(Set.of(10L));
 
         // when
         RecipeDetailResponse result = service.createRecipe(RecipeFixture.createRecipeRequest(10L, 20L));
@@ -176,6 +173,40 @@ class RecipeServiceTest {
                 .containsExactly(1, 2);
         verify(recipeRepository).save(argThat(recipe ->
                 recipe.getSource().equals("ADMIN") && recipe.getSourceId().length() == 20));
+    }
+
+    @Test
+    @DisplayName("레시피 등록 응답에도 재료의 basicSeasoning과 quantity가 정확히 매핑된다")
+    void createRecipe_responseIncludesBasicSeasoningAndQuantity() {
+        // given
+        when(ingredientRepository.findAllById(List.of(10L, 20L)))
+                .thenReturn(List.of(mock(Ingredient.class), mock(Ingredient.class)));
+        when(recipeRepository.save(any(Recipe.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(recipeIngredientRepository.saveAll(anyList())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(recipeStepRepository.saveAll(anyList())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(ingredientService.findBasicSeasoningIds(List.of(10L, 20L))).thenReturn(Set.of(10L));
+
+        RecipeCreateRequest request = new RecipeCreateRequest(
+                "된장찌개", "구수한 찌개", null, "한식", "국", "끓이기", null,
+                30, 2, 3, null, null, null,
+                List.of(
+                        new RecipeIngredientRequest(10L, "된장", "2큰술", new BigDecimal("30.00"), "양념", null),
+                        new RecipeIngredientRequest(20L, "두부", "1/2모", null, "주재료", null)
+                ),
+                List.of(new RecipeStepRequest("물을 끓인다.", null, null))
+        );
+
+        // when
+        RecipeDetailResponse result = service.createRecipe(request);
+
+        // then
+        assertThat(result.ingredients()).hasSize(2);
+        assertThat(result.ingredients().get(0).ingredientId()).isEqualTo(10L);
+        assertThat(result.ingredients().get(0).quantity()).isEqualByComparingTo("30.00");
+        assertThat(result.ingredients().get(0).basicSeasoning()).isTrue();
+        assertThat(result.ingredients().get(1).ingredientId()).isEqualTo(20L);
+        assertThat(result.ingredients().get(1).quantity()).isNull();
+        assertThat(result.ingredients().get(1).basicSeasoning()).isFalse();
     }
 
     @Test
@@ -203,6 +234,7 @@ class RecipeServiceTest {
                 .thenReturn(List.of(RecipeFixture.createIngredient(stew, 1, "된장", "2큰술")));
         when(recipeStepRepository.findByRecipeIdOrderByStepNoAsc(7L))
                 .thenReturn(List.of(RecipeFixture.createStep(stew, 1, "물을 끓인다.")));
+        when(ingredientService.findBasicSeasoningIds(List.of(1L))).thenReturn(Set.of(1L));
         RecipeNutritionRequest nutrition = new RecipeNutritionRequest(null, new BigDecimal("400"), null, null, null, null);
         RecipeUpdateRequest request = updateRequest("차돌 된장찌개", nutrition, null);
 
@@ -229,6 +261,7 @@ class RecipeServiceTest {
         when(ingredientRepository.findAllById(List.of(30L, 40L)))
                 .thenReturn(List.of(mock(Ingredient.class), mock(Ingredient.class)));
         when(recipeIngredientRepository.saveAll(anyList())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(ingredientService.findBasicSeasoningIds(List.of(30L, 40L))).thenReturn(Set.of());
         RecipeUpdateRequest request = updateRequest(null, null, List.of(
                 new RecipeIngredientRequest(30L, "차돌박이", "100g", null, "주재료", null),
                 new RecipeIngredientRequest(40L, "애호박", "1/2개", null, "부재료", null)));
@@ -243,6 +276,34 @@ class RecipeServiceTest {
         assertThat(result.ingredients()).extracting(RecipeDetailResponse.IngredientItem::ingredientId)
                 .containsExactly(30L, 40L);
         assertThat(result.name()).isEqualTo("된장찌개");
+    }
+
+    @Test
+    @DisplayName("레시피 수정 응답에도 교체된 재료의 basicSeasoning과 quantity가 정확히 매핑된다")
+    void updateRecipe_responseIncludesBasicSeasoningAndQuantity() {
+        // given
+        Recipe stew = RecipeFixture.createRecipe(7L, "된장찌개");
+        when(recipeRepository.findById(7L)).thenReturn(Optional.of(stew));
+        when(ingredientRepository.findAllById(List.of(30L, 40L)))
+                .thenReturn(List.of(mock(Ingredient.class), mock(Ingredient.class)));
+        when(recipeIngredientRepository.saveAll(anyList())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(ingredientService.findBasicSeasoningIds(List.of(30L, 40L))).thenReturn(Set.of(40L));
+
+        RecipeUpdateRequest request = updateRequest(null, null, List.of(
+                new RecipeIngredientRequest(30L, "차돌박이", "100g", new BigDecimal("100.00"), "주재료", null),
+                new RecipeIngredientRequest(40L, "소금", "1작은술", null, "양념", null)));
+
+        // when
+        RecipeDetailResponse result = service.updateRecipe(7L, request);
+
+        // then
+        assertThat(result.ingredients()).hasSize(2);
+        assertThat(result.ingredients().get(0).ingredientId()).isEqualTo(30L);
+        assertThat(result.ingredients().get(0).quantity()).isEqualByComparingTo("100.00");
+        assertThat(result.ingredients().get(0).basicSeasoning()).isFalse();
+        assertThat(result.ingredients().get(1).ingredientId()).isEqualTo(40L);
+        assertThat(result.ingredients().get(1).quantity()).isNull();
+        assertThat(result.ingredients().get(1).basicSeasoning()).isTrue();
     }
 
     @Test

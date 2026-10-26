@@ -17,9 +17,11 @@
 
 export interface IngredientItem {
     'amount'?: string;
+    'basicSeasoning'?: boolean;
     'displayName'?: string;
     'groupName'?: string;
     'ingredientId'?: number;
+    'quantity'?: number;
     'role'?: string;
     'seq'?: number;
 }

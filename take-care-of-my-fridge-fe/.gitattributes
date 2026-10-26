@@ -1,2 +1,5 @@
 # openapi-generator 생성 결과: 커밋하지만 PR diff에서는 기본으로 접는다. 직접 수정 금지(pnpm oag:generate로 재생성).
 src/common/api/generated/** linguist-generated=true
+
+# openapi-generator 메타데이터 파일 줄바꿈 LF 고정 (Windows 생성 시 CRLF 방지)
+src/common/api/generated/.openapi-generator/* text eol=lf

@@ -3,6 +3,7 @@ package org.example.takecareofmyfridgebe.domain.ingredient.service;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.Ingredient;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.StorageType;
 import org.example.takecareofmyfridgebe.domain.ingredient.repository.IngredientRepository;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -69,6 +70,38 @@ class IngredientServiceTest {
         // When & Then
         assertTrue(ingredientService.getExcludedIngredientIds(null).isEmpty());
         assertTrue(ingredientService.getExcludedIngredientIds(Collections.emptyList()).isEmpty());
+    }
+
+    @Test
+    @DisplayName("기본 양념(isBasicSeasoning=true)인 재료만 Set에 포함된다")
+    void findBasicSeasoningIdsFiltersBasicSeasoningsOnly() {
+        // Given
+        Ingredient basicSeasoning = createIngredient(1L, "ING_SALT", "소금", true);
+        Ingredient customIngredient = createIngredient(2L, Ingredient.ING_CUSTOM, "직접입력재료", false);
+        Ingredient mealkitIngredient = createIngredient(3L, Ingredient.ING_MEALKIT, "밀키트", false);
+        Ingredient normalIngredient = createIngredient(4L, "ING_TOFU", "두부", false);
+
+        List<Long> requestedIds = List.of(1L, 2L, 3L, 4L);
+        when(ingredientRepository.findAllById(requestedIds))
+                .thenReturn(List.of(basicSeasoning, customIngredient, mealkitIngredient, normalIngredient));
+
+        // When
+        Set<Long> basicIds = ingredientService.findBasicSeasoningIds(requestedIds);
+
+        // Then
+        assertEquals(1, basicIds.size());
+        assertTrue(basicIds.contains(1L));
+        assertFalse(basicIds.contains(2L));
+        assertFalse(basicIds.contains(3L));
+        assertFalse(basicIds.contains(4L));
+    }
+
+    @Test
+    @DisplayName("기본 양념 조회 시 재료 ID 목록이 null이거나 비어있으면 빈 Set을 반환한다")
+    void findBasicSeasoningIdsReturnsEmptySetWhenInputIsNullOrEmpty() {
+        // When & Then
+        assertTrue(ingredientService.findBasicSeasoningIds(null).isEmpty());
+        assertTrue(ingredientService.findBasicSeasoningIds(Collections.emptyList()).isEmpty());
     }
 
     private Ingredient createIngredient(Long id, String code, String name, boolean basicSeasoning) {

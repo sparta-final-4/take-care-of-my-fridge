@@ -32,12 +32,17 @@ public class RecipeFixture {
     }
 
     public static RecipeIngredient createIngredient(Recipe recipe, int seq, String displayName, String amount) {
+        return createIngredient(recipe, seq, displayName, amount, null);
+    }
+
+    public static RecipeIngredient createIngredient(Recipe recipe, int seq, String displayName, String amount, BigDecimal quantity) {
         return RecipeIngredient.builder()
                 .recipe(recipe)
                 .ingredientId((long) seq)
                 .seq(seq)
                 .displayName(displayName)
                 .amount(amount)
+                .quantity(quantity)
                 .role("주재료")
                 .build();
     }

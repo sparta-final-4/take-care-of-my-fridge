@@ -1,12 +1,20 @@
 import { queryOptions, useMutation, useQueryClient } from '@tanstack/react-query';
 
 import type {
+  CookingCompleteRequest,
   CookingLogSearchRequest,
   CookingLogUpdateRequest,
   MyRecipeSearchRequest,
 } from '@/common/api/clients';
+import { fridgeQueries } from '@/domains/fridge/queries';
 
-import { getCookingLogs, getCookingStats, getMyRecipes, updateCookingLog } from './api';
+import {
+  completeCooking,
+  getCookingLogs,
+  getCookingStats,
+  getMyRecipes,
+  updateCookingLog,
+} from './api';
 
 export const cookingQueries = {
   all: ['cooking'] as const,
@@ -45,6 +53,22 @@ export function useUpdateCookingLog() {
       request: CookingLogUpdateRequest;
     }) => updateCookingLog(cookingLogId, request),
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: cookingQueries.all });
+    },
+  });
+}
+
+/**
+ * 요리 완료 생성 Mutation
+ * 성공 시 fridgeQueries.all, cookingQueries.all을 무효화하여
+ * 냉장고 재료 보유량, 요리 통계, 요리 기록, 후기 쓰기 가능 여부를 최신화한다.
+ */
+export function useCompleteCooking() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (request: CookingCompleteRequest) => completeCooking(request),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: fridgeQueries.all });
       queryClient.invalidateQueries({ queryKey: cookingQueries.all });
     },
   });
