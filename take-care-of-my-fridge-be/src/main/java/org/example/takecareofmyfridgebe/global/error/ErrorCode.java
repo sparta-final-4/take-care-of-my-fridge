@@ -72,6 +72,8 @@ public enum ErrorCode {
     SALE_EVENT_PRODUCT_DUPLICATED(HttpStatus.CONFLICT, "SALE_001", "이미 행사가 있는 상품입니다."),
     SALE_EVENT_NOT_FOUND(HttpStatus.NOT_FOUND, "SALE_002", "행사를 찾을 수 없습니다."),
     SALE_EVENT_NOT_EDITABLE(HttpStatus.CONFLICT, "SALE_003", "시작 전인 행사만 수정할 수 있습니다."),
+    SALE_EVENT_NOT_ENDABLE(HttpStatus.CONFLICT, "SALE_004", "진행 중인 할인 행사만 종료할 수 있습니다."),
+    SALE_EVENT_NOT_DELETABLE(HttpStatus.CONFLICT, "SALE_005", "시작 전인 할인 행사만 삭제할 수 있습니다."),
 
     // Payment
     PAYMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "PAYMENT_001", "결제 정보를 찾을 수 없습니다."),

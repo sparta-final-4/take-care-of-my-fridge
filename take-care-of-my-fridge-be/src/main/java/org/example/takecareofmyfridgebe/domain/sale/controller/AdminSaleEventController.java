@@ -15,11 +15,13 @@ import org.example.takecareofmyfridgebe.domain.sale.service.SaleEventCreateServi
 import org.example.takecareofmyfridgebe.domain.sale.service.SaleCandidateProductQueryService;
 import org.example.takecareofmyfridgebe.domain.sale.service.SaleEventDetailQueryService;
 import org.example.takecareofmyfridgebe.domain.sale.service.SaleEventListQueryService;
+import org.example.takecareofmyfridgebe.domain.sale.service.SaleEventTerminationService;
 import org.example.takecareofmyfridgebe.domain.sale.service.SaleEventUpdateService;
 import org.example.takecareofmyfridgebe.global.response.ApiResponse;
 import org.example.takecareofmyfridgebe.global.response.PageResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -39,6 +41,7 @@ public class AdminSaleEventController {
     private final SaleEventListQueryService saleEventListQueryService;
     private final SaleEventDetailQueryService saleEventDetailQueryService;
     private final SaleEventUpdateService saleEventUpdateService;
+    private final SaleEventTerminationService saleEventTerminationService;
 
     @PostMapping("/special")
     public ResponseEntity<ApiResponse<SaleEventsCreateResponse>> createSpecialSale(
@@ -85,6 +88,20 @@ public class AdminSaleEventController {
             @Valid @RequestBody SaleEventUpdateRequest request
     ) {
         saleEventUpdateService.update(saleEventId, request);
+        return ResponseEntity.ok(ApiResponse.ok());
+    }
+
+    // 진행 중인 할인 행사를 지금 닫는다. 종료 시각은 바꾸지 않는다.
+    @PatchMapping("/{saleEventId}/end")
+    public ResponseEntity<ApiResponse<Void>> endSaleEvent(@PathVariable Long saleEventId) {
+        saleEventTerminationService.end(saleEventId);
+        return ResponseEntity.ok(ApiResponse.ok());
+    }
+
+    // 시작 전인 할인 행사를 행사 항목까지 지운다.
+    @DeleteMapping("/{saleEventId}")
+    public ResponseEntity<ApiResponse<Void>> deleteSaleEvent(@PathVariable Long saleEventId) {
+        saleEventTerminationService.delete(saleEventId);
         return ResponseEntity.ok(ApiResponse.ok());
     }
 }

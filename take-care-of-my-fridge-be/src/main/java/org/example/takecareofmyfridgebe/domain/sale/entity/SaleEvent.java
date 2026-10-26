@@ -73,4 +73,19 @@ public class SaleEvent extends BaseTimeEntity {
     public boolean isEditable(LocalDateTime now) {
         return status == SaleEventStatus.SCHEDULED && startsAt.isAfter(now);
     }
+
+    // 상태 정리가 늦어도 시각으로 진행 중인지 본다. 종료로 닫은 할인 행사는 진행 중이 아니다.
+    public boolean isEndable(LocalDateTime now) {
+        return SaleEventStatus.OPEN.contains(status) && !startsAt.isAfter(now) && endsAt.isAfter(now);
+    }
+
+    // 시작 전인 할인 행사만 지운다. 시작 전의 기준은 수정과 같다.
+    public boolean isDeletable(LocalDateTime now) {
+        return isEditable(now);
+    }
+
+    // 진행 중인 할인 행사를 중간에 닫는다. 종료 시각은 등록한 값 그대로 둔다.
+    public void end() {
+        this.status = SaleEventStatus.ENDED;
+    }
 }
