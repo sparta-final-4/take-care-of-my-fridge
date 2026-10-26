@@ -8,6 +8,7 @@ import org.example.takecareofmyfridgebe.domain.payment.dto.PaymentApproveResult;
 import org.example.takecareofmyfridgebe.domain.payment.dto.PaymentApproveResult.Rejection;
 import org.example.takecareofmyfridgebe.domain.payment.entity.FailReason;
 import org.example.takecareofmyfridgebe.domain.payment.entity.Payment;
+import org.example.takecareofmyfridgebe.domain.payment.entity.PaymentChangedBy;
 import org.example.takecareofmyfridgebe.domain.payment.entity.PaymentStatus;
 import org.example.takecareofmyfridgebe.domain.payment.repository.PaymentRepository;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
@@ -50,6 +51,9 @@ class PaymentCommandServiceTest {
     @Mock
     private EntityManager entityManager;
 
+    @Mock
+    private PaymentHistoryRecorder paymentHistoryRecorder;
+
     @InjectMocks
     private PaymentCommandService paymentCommandService;
 
@@ -80,7 +84,7 @@ class PaymentCommandServiceTest {
     void approve_marksPaymentAndOrderPaid() {
         Payment payment = givenLockedPayment();
 
-        PaymentApproveResult result = paymentCommandService.approve(payment);
+        PaymentApproveResult result = paymentCommandService.approve(payment, PaymentChangedBy.USER);
 
         assertThat(result.isApproved()).isTrue();
         assertThat(payment.getStatus()).isEqualTo(PaymentStatus.PAID);
@@ -97,7 +101,7 @@ class PaymentCommandServiceTest {
         payment.complete(PAID_AT);
         payment.getOrder().markPaid(PAID_AT);
 
-        PaymentApproveResult result = paymentCommandService.approve(payment);
+        PaymentApproveResult result = paymentCommandService.approve(payment, PaymentChangedBy.USER);
 
         assertThat(result.isApproved()).isTrue();
         assertThat(result.response().status()).isEqualTo(PaymentStatus.PAID);
@@ -110,7 +114,7 @@ class PaymentCommandServiceTest {
         Payment payment = givenLockedPayment();
         payment.fail(FailReason.TIMEOUT);
 
-        PaymentApproveResult result = paymentCommandService.approve(payment);
+        PaymentApproveResult result = paymentCommandService.approve(payment, PaymentChangedBy.USER);
 
         assertThat(result.isApproved()).isFalse();
         assertThat(result.rejection()).isEqualTo(Rejection.PAYMENT_ALREADY_FAILED);
@@ -124,7 +128,7 @@ class PaymentCommandServiceTest {
         Payment payment = givenLockedPayment();
         payment.getOrder().markPaid(PAID_AT);
 
-        PaymentApproveResult result = paymentCommandService.approve(payment);
+        PaymentApproveResult result = paymentCommandService.approve(payment, PaymentChangedBy.USER);
 
         assertThat(result.rejection()).isEqualTo(Rejection.ORDER_NOT_PAYABLE);
         assertThat(payment.getStatus()).isEqualTo(PaymentStatus.FAILED);
@@ -138,7 +142,7 @@ class PaymentCommandServiceTest {
         Payment payment = givenLockedPayment();
         payment.getOrder().cancel();
 
-        PaymentApproveResult result = paymentCommandService.approve(payment);
+        PaymentApproveResult result = paymentCommandService.approve(payment, PaymentChangedBy.USER);
 
         assertThat(result.rejection()).isEqualTo(Rejection.ORDER_NOT_PAYABLE);
         assertThat(payment.getFailReason()).isEqualTo(FailReason.ORDER_NOT_PAYABLE);
@@ -153,7 +157,7 @@ class PaymentCommandServiceTest {
         given(paymentRepository.findWithOrderByPortonePaymentIdForUpdate(PORTONE_PAYMENT_ID))
                 .willReturn(Optional.empty());
 
-        assertThatThrownBy(() -> paymentCommandService.approve(payment))
+        assertThatThrownBy(() -> paymentCommandService.approve(payment, PaymentChangedBy.USER))
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode").isEqualTo(ErrorCode.PAYMENT_NOT_FOUND);
     }
@@ -165,7 +169,7 @@ class PaymentCommandServiceTest {
     void fail_marksPaymentFailedAndKeepsOrderPending() {
         Payment payment = givenLockedPayment();
 
-        boolean failed = paymentCommandService.fail(payment, FailReason.USER_CANCELLED);
+        boolean failed = paymentCommandService.fail(payment, FailReason.USER_CANCELLED, PaymentChangedBy.USER);
 
         assertThat(failed).isTrue();
         assertThat(payment.getStatus()).isEqualTo(PaymentStatus.FAILED);
@@ -180,7 +184,7 @@ class PaymentCommandServiceTest {
         payment.complete(PAID_AT);
         payment.getOrder().markPaid(PAID_AT);
 
-        boolean failed = paymentCommandService.fail(payment, FailReason.TIMEOUT);
+        boolean failed = paymentCommandService.fail(payment, FailReason.TIMEOUT, PaymentChangedBy.USER);
 
         assertThat(failed).isFalse();
         assertThat(payment.getStatus()).isEqualTo(PaymentStatus.PAID);
@@ -193,7 +197,7 @@ class PaymentCommandServiceTest {
     void locksOrderBeforePayment() {
         Payment payment = givenLockedPayment();
 
-        paymentCommandService.fail(payment, FailReason.USER_CANCELLED);
+        paymentCommandService.fail(payment, FailReason.USER_CANCELLED, PaymentChangedBy.USER);
 
         InOrder inOrder = inOrder(orderRepository, paymentRepository, entityManager);
         inOrder.verify(orderRepository).findByIdForUpdate(ORDER_ID);

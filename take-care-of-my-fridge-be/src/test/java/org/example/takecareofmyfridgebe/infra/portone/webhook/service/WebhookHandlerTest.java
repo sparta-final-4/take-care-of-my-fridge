@@ -2,6 +2,7 @@ package org.example.takecareofmyfridgebe.infra.portone.webhook.service;
 
 import org.example.takecareofmyfridgebe.domain.order.entity.Order;
 import org.example.takecareofmyfridgebe.domain.payment.entity.Payment;
+import org.example.takecareofmyfridgebe.domain.payment.entity.PaymentChangedBy;
 import org.example.takecareofmyfridgebe.domain.payment.facade.PaymentFacade;
 import org.example.takecareofmyfridgebe.domain.payment.service.PaymentService;
 import org.example.takecareofmyfridgebe.infra.portone.dto.PortOneWebhook;
@@ -98,7 +99,7 @@ class WebhookHandlerTest {
     void handle_synced_processed() {
         PortOneWebhook webhook = givenReceived("Transaction.Paid");
         Payment payment = givenPayment();
-        given(paymentFacade.syncWithPg(payment)).willReturn(true);
+        given(paymentFacade.syncWithPg(payment, PaymentChangedBy.WEBHOOK)).willReturn(true);
 
         webhookHandler.handle(WEBHOOK_ID, webhook, BODY);
 
@@ -110,7 +111,7 @@ class WebhookHandlerTest {
     void handle_notSynced_ignored() {
         PortOneWebhook webhook = givenReceived("Transaction.Cancelled");
         Payment payment = givenPayment();
-        given(paymentFacade.syncWithPg(payment)).willReturn(false);
+        given(paymentFacade.syncWithPg(payment, PaymentChangedBy.WEBHOOK)).willReturn(false);
 
         webhookHandler.handle(WEBHOOK_ID, webhook, BODY);
 
@@ -122,7 +123,7 @@ class WebhookHandlerTest {
     void handle_error_markedFailedAndRethrown() {
         PortOneWebhook webhook = givenReceived("Transaction.Paid");
         Payment payment = givenPayment();
-        given(paymentFacade.syncWithPg(payment)).willThrow(new IllegalStateException("PG 오류"));
+        given(paymentFacade.syncWithPg(payment, PaymentChangedBy.WEBHOOK)).willThrow(new IllegalStateException("PG 오류"));
 
         assertThatThrownBy(() -> webhookHandler.handle(WEBHOOK_ID, webhook, BODY))
                 .isInstanceOf(IllegalStateException.class);
@@ -162,7 +163,7 @@ class WebhookHandlerTest {
         Payment payment = givenPayment();
         IllegalStateException original = new IllegalStateException("PG 오류");
         IllegalStateException recordError = new IllegalStateException("DB 오류");
-        given(paymentFacade.syncWithPg(payment)).willThrow(original);
+        given(paymentFacade.syncWithPg(payment, PaymentChangedBy.WEBHOOK)).willThrow(original);
         willThrow(recordError).given(webhookEventService).markFailed(EVENT_ID, PAYMENT_ID, "PG 오류");
 
         assertThatThrownBy(() -> webhookHandler.handle(WEBHOOK_ID, webhook, BODY))

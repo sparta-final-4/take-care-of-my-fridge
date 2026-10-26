@@ -7,7 +7,9 @@ import org.example.takecareofmyfridgebe.domain.payment.dto.PaymentApproveResult;
 import org.example.takecareofmyfridgebe.domain.payment.dto.PaymentApproveResult.Rejection;
 import org.example.takecareofmyfridgebe.domain.payment.entity.FailReason;
 import org.example.takecareofmyfridgebe.domain.payment.entity.Payment;
+import org.example.takecareofmyfridgebe.domain.payment.entity.PaymentChangedBy;
 import org.example.takecareofmyfridgebe.domain.payment.entity.PaymentStatus;
+import org.example.takecareofmyfridgebe.domain.payment.repository.PaymentHistoryRepository;
 import org.example.takecareofmyfridgebe.domain.payment.repository.PaymentRepository;
 import org.example.takecareofmyfridgebe.global.config.JpaAuditingConfig;
 import org.example.takecareofmyfridgebe.global.config.QueryDslConfig;
@@ -47,7 +49,7 @@ import static org.assertj.core.api.Assertions.tuple;
 @Testcontainers
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({JpaAuditingConfig.class, QueryDslConfig.class, PaymentCommandService.class})
+@Import({JpaAuditingConfig.class, QueryDslConfig.class, PaymentCommandService.class, PaymentHistoryRecorder.class})
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class PaymentCommandServiceConcurrencyTest {
 
@@ -58,6 +60,7 @@ class PaymentCommandServiceConcurrencyTest {
     private final PaymentCommandService paymentCommandService;
     private final OrderRepository orderRepository;
     private final PaymentRepository paymentRepository;
+    private final PaymentHistoryRepository paymentHistoryRepository;
     private final TransactionTemplate transactionTemplate;
 
     @Autowired
@@ -65,15 +68,18 @@ class PaymentCommandServiceConcurrencyTest {
             PaymentCommandService paymentCommandService,
             OrderRepository orderRepository,
             PaymentRepository paymentRepository,
+            PaymentHistoryRepository paymentHistoryRepository,
             PlatformTransactionManager transactionManager) {
         this.paymentCommandService = paymentCommandService;
         this.orderRepository = orderRepository;
         this.paymentRepository = paymentRepository;
+        this.paymentHistoryRepository = paymentHistoryRepository;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
     }
 
     @AfterEach
     void cleanUp() {
+        paymentHistoryRepository.deleteAll();
         paymentRepository.deleteAll();
         orderRepository.deleteAll();
     }
@@ -86,8 +92,8 @@ class PaymentCommandServiceConcurrencyTest {
         Payment second = savePayment(order, "payment-b");
 
         List<PaymentApproveResult> results = runConcurrently(List.of(
-                () -> paymentCommandService.approve(first),
-                () -> paymentCommandService.approve(second)));
+                () -> paymentCommandService.approve(first, PaymentChangedBy.USER),
+                () -> paymentCommandService.approve(second, PaymentChangedBy.USER)));
 
         assertThat(results).filteredOn(PaymentApproveResult::isApproved).hasSize(1);
         assertThat(results).filteredOn(result -> !result.isApproved())
@@ -132,7 +138,7 @@ class PaymentCommandServiceConcurrencyTest {
         transactionTemplate.executeWithoutResult(status ->
                 orderRepository.findById(order.getId()).orElseThrow().cancel());
 
-        PaymentApproveResult result = paymentCommandService.approve(payment);
+        PaymentApproveResult result = paymentCommandService.approve(payment, PaymentChangedBy.USER);
 
         assertThat(result.rejection()).isEqualTo(Rejection.ORDER_NOT_PAYABLE);
         Payment saved = paymentRepository.findById(payment.getId()).orElseThrow();
@@ -147,7 +153,7 @@ class PaymentCommandServiceConcurrencyTest {
         Order order = saveOrder();
         Payment first = paymentCommandService.create(order.getId());
 
-        paymentCommandService.fail(first, FailReason.USER_CANCELLED);
+        paymentCommandService.fail(first, FailReason.USER_CANCELLED, PaymentChangedBy.USER);
         Payment second = paymentCommandService.create(order.getId());
 
         assertThat(second.getPortonePaymentId()).isNotEqualTo(first.getPortonePaymentId());

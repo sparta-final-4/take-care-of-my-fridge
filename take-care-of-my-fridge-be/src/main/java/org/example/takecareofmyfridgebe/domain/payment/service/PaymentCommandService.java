@@ -11,6 +11,7 @@ import org.example.takecareofmyfridgebe.domain.payment.dto.PaymentApproveResult.
 import org.example.takecareofmyfridgebe.domain.payment.dto.PaymentConfirmResponse;
 import org.example.takecareofmyfridgebe.domain.payment.entity.FailReason;
 import org.example.takecareofmyfridgebe.domain.payment.entity.Payment;
+import org.example.takecareofmyfridgebe.domain.payment.entity.PaymentChangedBy;
 import org.example.takecareofmyfridgebe.domain.payment.entity.PaymentStatus;
 import org.example.takecareofmyfridgebe.domain.payment.repository.PaymentRepository;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
@@ -22,6 +23,7 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 // 결제 상태를 바꾸고, 승인 시 주문을 결제 완료로 바꾼다. 외부 PG 호출은 하지 않는다.
+// 상태를 바꾼 트랜잭션 안에서 결제 이력도 남긴다.
 // 한 주문에 결제가 여러 건이므로 주문 → 결제 순서로 잠가 같은 주문의 요청을 하나씩 처리한다.
 @Slf4j
 @Service
@@ -34,6 +36,7 @@ public class PaymentCommandService {
     private final PaymentRepository paymentRepository;
     private final OrderRepository orderRepository;
     private final EntityManager entityManager;
+    private final PaymentHistoryRecorder paymentHistoryRecorder;
 
     // 주문에 새 결제를 만든다. 금액은 클라이언트 값이 아닌 주문 금액을 사용한다.
     // 한 주문의 결제 대기 건은 최대 한 건이다. 호출 전에 이전 결제 대기 건을 정리하므로, 여기서 남아 있으면
@@ -55,12 +58,14 @@ public class PaymentCommandService {
                 .amount(order.getTotalAmount())
                 .expiresAt(LocalDateTime.now().plusMinutes(PAYMENT_EXPIRE_MINUTES))
                 .build();
-        return paymentRepository.save(payment);
+        paymentRepository.save(payment);
+        paymentHistoryRecorder.recordReady(payment);
+        return payment;
     }
 
     // 승인하지 못한 결제는 PG에서 돈이 빠진 상태이므로, 호출한 쪽이 거절 결과를 보고 PG 결제를 취소한다
     @Transactional
-    public PaymentApproveResult approve(Payment target) {
+    public PaymentApproveResult approve(Payment target, PaymentChangedBy changedBy) {
         Payment payment = getForUpdate(target);
 
         // 확정 요청과 웹훅 중 먼저 처리한 쪽이 있으면 같은 결과를 돌려준다
@@ -75,19 +80,21 @@ public class PaymentCommandService {
             log.warn("결제할 수 없는 주문의 결제 완료: portonePaymentId={}, 주문 상태={}",
                     payment.getPortonePaymentId(), payment.getOrder().getStatus());
             payment.fail(FailReason.ORDER_NOT_PAYABLE);
+            paymentHistoryRecorder.recordFailed(payment, FailReason.ORDER_NOT_PAYABLE, changedBy);
             return PaymentApproveResult.rejected(Rejection.ORDER_NOT_PAYABLE);
         }
 
         LocalDateTime paidAt = LocalDateTime.now();
         payment.complete(paidAt);
         payment.getOrder().markPaid(paidAt);
+        paymentHistoryRecorder.recordPaid(payment, changedBy);
         return PaymentApproveResult.approved(PaymentConfirmResponse.from(payment));
     }
 
     // 결제 시도 하나만 실패 처리한다. 주문은 PENDING으로 남아 다시 결제할 수 있고, 주문 취소·재고 복구는 주문 쪽이 맡는다.
     // 실제로 실패 처리했으면 true, 다른 요청이 이미 처리해 그대로 뒀으면 false
     @Transactional
-    public boolean fail(Payment target, FailReason reason) {
+    public boolean fail(Payment target, FailReason reason, PaymentChangedBy changedBy) {
         Payment payment = getForUpdate(target);
 
         if (payment.getStatus() != PaymentStatus.READY) {
@@ -95,6 +102,7 @@ public class PaymentCommandService {
         }
 
         payment.fail(reason);
+        paymentHistoryRecorder.recordFailed(payment, reason, changedBy);
         return true;
     }
 

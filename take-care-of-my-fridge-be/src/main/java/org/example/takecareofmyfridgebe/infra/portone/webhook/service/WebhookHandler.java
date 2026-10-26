@@ -3,6 +3,7 @@ package org.example.takecareofmyfridgebe.infra.portone.webhook.service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.takecareofmyfridgebe.domain.payment.entity.Payment;
+import org.example.takecareofmyfridgebe.domain.payment.entity.PaymentChangedBy;
 import org.example.takecareofmyfridgebe.domain.payment.facade.PaymentFacade;
 import org.example.takecareofmyfridgebe.domain.payment.service.PaymentService;
 import org.example.takecareofmyfridgebe.infra.portone.dto.PortOneWebhook;
@@ -59,7 +60,7 @@ public class WebhookHandler {
             }
 
             paymentId = payment.get().getId();
-            if (paymentFacade.syncWithPg(payment.get())) {
+            if (paymentFacade.syncWithPg(payment.get(), PaymentChangedBy.WEBHOOK)) {
                 webhookEventService.markProcessed(eventId.get(), paymentId);
             } else {
                 webhookEventService.markIgnored(eventId.get(), paymentId);
