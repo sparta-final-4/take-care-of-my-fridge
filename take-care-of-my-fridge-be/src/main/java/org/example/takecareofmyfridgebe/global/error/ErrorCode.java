@@ -101,6 +101,7 @@ public enum ErrorCode {
     REFUND_ORDER_CONFIRMED(HttpStatus.CONFLICT, "REFUND_010", "구매 확정된 주문은 환불할 수 없습니다."),
     NON_REFUNDABLE_SALE_ITEM(HttpStatus.BAD_REQUEST, "REFUND_011", "특가·번개 드롭 상품은 환불할 수 없습니다."),
     REFUND_PG_REJECTED(HttpStatus.CONFLICT, "REFUND_012", "결제사에서 환불이 거절되었습니다. 잠시 후 다시 시도해 주세요."),
+    INVALID_REFUND_SUMMARY_REQUEST(HttpStatus.BAD_REQUEST, "REFUND_013", "환불 요약은 주문 1~50건까지 조회할 수 있습니다."),
 
     // Chat
     CHAT_ROOM_NOT_FOUND(HttpStatus.NOT_FOUND, "CHAT_001", "채팅방을 찾을 수 없습니다."),

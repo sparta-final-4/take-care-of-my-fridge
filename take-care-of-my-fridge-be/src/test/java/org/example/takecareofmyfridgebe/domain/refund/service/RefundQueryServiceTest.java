@@ -9,6 +9,8 @@ import org.example.takecareofmyfridgebe.domain.payment.entity.Payment;
 import org.example.takecareofmyfridgebe.domain.payment.service.PaymentHistoryRecorder;
 import org.example.takecareofmyfridgebe.domain.refund.dto.RefundHistoryItemResponse;
 import org.example.takecareofmyfridgebe.domain.refund.dto.RefundHistoryResponse;
+import org.example.takecareofmyfridgebe.domain.refund.dto.RefundSummaryResponse;
+import org.example.takecareofmyfridgebe.domain.refund.dto.RefundSummaryStatus;
 import org.example.takecareofmyfridgebe.domain.refund.dto.RefundableItemResponse;
 import org.example.takecareofmyfridgebe.domain.refund.entity.Refund;
 import org.example.takecareofmyfridgebe.domain.refund.entity.RefundItem;
@@ -29,6 +31,7 @@ import org.springframework.context.annotation.Import;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.stream.LongStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -222,6 +225,67 @@ class RefundQueryServiceTest extends MySqlContainerSupport {
     void history_otherMembersOrder() {
         assertError(() -> refundQueryService.getRefundHistory(OTHER_MEMBER_ID, order.getId()),
                 ErrorCode.ORDER_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("환불 요약: 완료된 환불이 없으면 NONE, 일부만 환불했으면 PARTIAL과 완료 금액을 요청한 주문 순서대로 돌려준다")
+    void summaries_noneAndPartial() {
+        Order other = order("20261023-000002");
+        orderItem(other, 10L, 1, 3000, SaleType.NONE);
+        pay(other);
+        complete(refund(itemA, 2));
+        flushAndClear();
+
+        assertThat(refundQueryService.getRefundSummaries(MEMBER_ID, List.of(other.getId(), order.getId())))
+                .extracting(RefundSummaryResponse::orderId, RefundSummaryResponse::refundStatus,
+                        RefundSummaryResponse::refundedAmount)
+                .containsExactly(
+                        tuple(other.getId(), RefundSummaryStatus.NONE, 0L),
+                        tuple(order.getId(), RefundSummaryStatus.PARTIAL, 6000L));
+    }
+
+    @Test
+    @DisplayName("환불 요약: 특가·번개 드롭을 뺀 환불 가능한 상품을 모두 환불했으면 FULL이다")
+    void summaries_full() {
+        complete(refund(itemA, 5));
+        complete(refund(itemB, 3));
+        flushAndClear();
+
+        assertThat(refundQueryService.getRefundSummaries(MEMBER_ID, List.of(order.getId())))
+                .extracting(RefundSummaryResponse::refundStatus, RefundSummaryResponse::refundedAmount)
+                .containsExactly(tuple(RefundSummaryStatus.FULL, 21000L));
+    }
+
+    @Test
+    @DisplayName("환불 요약: 진행 중 환불이 있으면 IN_PROGRESS이고 금액은 완료된 환불만 센다. 실패한 환불은 세지 않는다")
+    void summaries_inProgress() {
+        complete(refund(itemA, 1));
+        refund(itemB, 1).fail("PG 거절");
+        refund(itemA, 2);
+        flushAndClear();
+
+        assertThat(refundQueryService.getRefundSummaries(MEMBER_ID, List.of(order.getId())))
+                .extracting(RefundSummaryResponse::refundStatus, RefundSummaryResponse::refundedAmount)
+                .containsExactly(tuple(RefundSummaryStatus.IN_PROGRESS, 3000L));
+    }
+
+    @Test
+    @DisplayName("환불 요약: 다른 회원의 주문과 없는 주문은 빼고 돌려준다")
+    void summaries_otherMembersOrderExcluded() {
+        assertThat(refundQueryService.getRefundSummaries(OTHER_MEMBER_ID, List.of(order.getId(), 999_999L))).isEmpty();
+    }
+
+    @Test
+    @DisplayName("환불 요약: 주문 ID가 없거나 50건을 넘으면 거절한다")
+    void summaries_invalidSize() {
+        assertError(() -> refundQueryService.getRefundSummaries(MEMBER_ID, List.of()),
+                ErrorCode.INVALID_REFUND_SUMMARY_REQUEST);
+        assertError(() -> refundQueryService.getRefundSummaries(MEMBER_ID,
+                LongStream.rangeClosed(1, 51).boxed().toList()), ErrorCode.INVALID_REFUND_SUMMARY_REQUEST);
+    }
+
+    private void complete(Refund target) {
+        target.complete("cancellation-" + target.getId(), LocalDateTime.now());
     }
 
     private Order order(String orderNumber) {
