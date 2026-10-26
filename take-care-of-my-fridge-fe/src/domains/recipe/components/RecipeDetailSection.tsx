@@ -11,7 +11,6 @@ import { recipeQueries } from '@/domains/recipe/queries';
 import { RecipeReviewSection } from '@/domains/review/components/RecipeReviewSection';
 
 import { RecipeCookPanel } from './RecipeCookPanel';
-import { RecipeFailureNotice } from './RecipeFailureNotice';
 import { RecipeIngredientSection } from './RecipeIngredientSection';
 import { RecipeNutritionSection } from './RecipeNutritionSection';
 import { RecipeOverview } from './RecipeOverview';
@@ -62,6 +61,7 @@ export function RecipeDetailSection({ recipeId }: RecipeDetailSectionProps) {
         이전으로
       </Button>
       <div className={styles.row}>
+        {/* 왼쪽: 사진·이름 → 재료 → 조리 순서 → 영양 성분 */}
         <div className={styles.column}>
           <RecipeOverview recipe={recipe} fridgeMatch={fridgeMatch} />
           <RecipeIngredientSection
@@ -69,13 +69,14 @@ export function RecipeDetailSection({ recipeId }: RecipeDetailSectionProps) {
             fridgeMatch={fridgeMatch}
           />
           <RecipeStepSection steps={recipe.steps ?? []} tip={recipe.tip} />
-          <RecipeCookingStats recipeId={recipeId} />
-          <RecipeReviewSection recipeId={recipeId} />
           <RecipeNutritionSection nutrition={recipe.nutrition} />
         </div>
+
+        {/* 오른쪽: [내 냉장고 재료] + [요리 완료] → 요리 통계 → 후기 */}
         <div className={styles.column}>
           <RecipeCookPanel recipeId={recipeId} recipe={recipe} fridgeMatch={fridgeMatch} />
-          <RecipeFailureNotice recipeId={recipeId} />
+          <RecipeCookingStats recipeId={recipeId} />
+          <RecipeReviewSection recipeId={recipeId} />
         </div>
       </div>
     </div>

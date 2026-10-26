@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { Skeleton, Typography } from 'antd';
+import { Alert, Skeleton, Typography } from 'antd';
 
 import { SectionCard } from '@/common/components/SectionCard';
 import { cookingQueries } from '@/domains/cooking/queries';
@@ -38,6 +38,18 @@ export function RecipeCookingStats({ recipeId }: RecipeCookingStatsProps) {
     }
 
     const failRate = Math.round((failedCount / totalCount) * 100);
+
+    if (failRate >= 30) {
+      return (
+        <Alert
+          type="warning"
+          showIcon
+          title={`${totalCount}번 중 ${failedCount}번 실패했어요 (${failRate}%)`}
+          description="조리 순서와 팁을 한 번 더 확인해 주세요."
+        />
+      );
+    }
+
     return (
       <Typography.Text className={styles.text}>
         {totalCount}번 중 {failedCount}번 실패했어요 ({failRate}%)
