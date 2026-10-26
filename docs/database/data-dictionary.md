@@ -166,6 +166,41 @@
 - 가격·할인은 저장하지 않습니다. 조회할 때 상품의 현재 정가와 진행 중인 할인을 읽습니다.
 - 실행용 DDL 초안은 [cart.sql](cart.sql)에 있습니다.
 
+## orders — 주문
+
+- 결제 대기에서 시작해 결제 완료, 취소, 구매 확정으로 바뀝니다. 주문 한 건에 주문 상품 여러 건이 있습니다.
+- 제약 이름: UK `uk_orders_order_number`, `uk_orders_member_id_idempotency_key`. 인덱스 `idx_orders_member_id_status`(member_id, status), `idx_orders_status_created_at`(status, created_at), `idx_orders_status_paid_at`(status, paid_at).
+
+| 컬럼 | 타입 | NULL | 기본값 | 제약 | 의미 |
+|---|---|---|---|---|---|
+| order_number | VARCHAR(20) | 불가 | | UK | 주문번호. 밀리초 시각 17자리와 순번 3자리의 숫자 20자리(한국 시각) |
+| member_id | BIGINT | 불가 | | UK(member_id, idempotency_key), 인덱스 | 주문한 회원. 물리 FK 없이 회원 번호만 저장 |
+| idempotency_key | VARCHAR(64) | 허용 | NULL | UK(member_id, idempotency_key) | 주문하기 클릭마다 프론트가 만든 값. 같은 회원이 같은 값으로 다시 보내면 새 주문을 만들지 않음. 기존 주문은 NULL |
+| status | ENUM('PENDING','PAID','CANCELLED','CONFIRMED') | 불가 | 'PENDING' | 인덱스 | 결제 대기·결제 완료·취소·구매 확정 |
+| total_amount | BIGINT | 불가 | | | 결제할 금액(할인 후). 주문을 만들 때 확정 |
+| paid_at | DATETIME(6) | 허용 | NULL | | 결제 완료 시각. 결제 전에는 NULL |
+| confirmed_at | DATETIME(6) | 허용 | NULL | | 구매 확정 시각. 확정 전에는 NULL |
+
+## order_items — 주문 상품
+
+- 주문할 때의 상품 이름·이미지·가격을 복사해 저장합니다. 이후 상품이 바뀌어도 주문 화면은 이 값을 씁니다.
+- 제약 이름: UK `uk_order_items_sale_event_item_id_flash_drop_member_id`.
+
+| 컬럼 | 타입 | NULL | 기본값 | 제약 | 의미 |
+|---|---|---|---|---|---|
+| order_id | BIGINT | 불가 | | FK | 소속 주문 |
+| product_id | BIGINT | 불가 | | | 주문한 상품. 물리 FK 없이 상품 번호만 저장 |
+| product_name | VARCHAR(200) | 불가 | | | 주문 당시 상품 이름 |
+| product_image_url | VARCHAR(500) | 허용 | NULL | | 주문 당시 상품 이미지. 없으면 NULL |
+| quantity | INT | 불가 | | | 주문 수량 |
+| list_price | INT | 불가 | | | 주문 당시 정가(원) |
+| unit_price | INT | 불가 | | | 실제 단가(원). 할인 중이면 할인가, 아니면 정가 |
+| sale_type | ENUM('NONE','SPECIAL','FLASH_DROP') | 불가 | | | 주문 당시 할인 구분 |
+| sale_event_item_id | BIGINT | 허용 | NULL | | 할인으로 샀을 때의 행사 항목. 일반 상품은 NULL. 물리 FK 없음 |
+| flash_drop_member_id | BIGINT | 허용 | NULL | UK(sale_event_item_id, flash_drop_member_id) | 번개 드롭 1인 1개 확인용 회원. 번개 드롭 항목에만 값이 있고 주문을 취소하면 NULL |
+
+- 같은 행사 항목에 같은 회원은 한 번만 들어갈 수 있습니다(번개 드롭 1인 1개). NULL은 여러 건 가능합니다.
+
 ## 다른 도메인에 요청할 컬럼
 
 | 도메인 | 필요한 데이터 | 근거 |
