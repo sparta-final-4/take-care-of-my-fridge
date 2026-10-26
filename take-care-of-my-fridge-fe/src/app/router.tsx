@@ -78,6 +78,7 @@ export const router = createBrowserRouter([
             path: ROUTES.adminForecast,
             lazy: page(() => import('@/pages/admin/AdminForecastPage')),
           },
+          { path: ROUTES.adminDeals, lazy: page(() => import('@/pages/admin/AdminDealPage')) },
           {
             path: ROUTES.adminSaleEventNew,
             lazy: page(() => import('@/pages/admin/AdminSaleEventCreatePage')),

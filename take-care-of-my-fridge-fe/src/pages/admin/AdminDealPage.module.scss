@@ -1,0 +1,16 @@
+.container {
+  width: 100%;
+  max-width: 1200px;
+  margin: var(--ant-margin-xl) auto;
+  padding: 0 var(--ant-padding-lg);
+}
+
+.notice {
+  margin-bottom: var(--ant-margin-lg);
+}
+
+.heading {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+}

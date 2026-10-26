@@ -1,6 +1,7 @@
 import { axiosInstance } from './axiosInstance';
 import {
   AdminAuditControllerApi,
+  AdminDealAnalysisControllerApi,
   AdminForecastControllerApi,
   AdminMemberControllerApi,
   AdminProductControllerApi,
@@ -43,6 +44,11 @@ export const recipeApi = new RecipeControllerApi(undefined, basePath, axiosInsta
 export const recipeReviewApi = new RecipeReviewControllerApi(undefined, basePath, axiosInstance);
 
 export const adminAuditApi = new AdminAuditControllerApi(undefined, basePath, axiosInstance);
+export const adminDealAnalysisApi = new AdminDealAnalysisControllerApi(
+  undefined,
+  basePath,
+  axiosInstance,
+);
 export const adminForecastApi = new AdminForecastControllerApi(undefined, basePath, axiosInstance);
 export const adminMemberApi = new AdminMemberControllerApi(undefined, basePath, axiosInstance);
 export const adminProductApi = new AdminProductControllerApi(undefined, basePath, axiosInstance);
