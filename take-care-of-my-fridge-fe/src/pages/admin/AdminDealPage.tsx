@@ -4,6 +4,7 @@ import {
   App,
   Button,
   DatePicker,
+  Descriptions,
   Drawer,
   Empty,
   Form,
@@ -21,7 +22,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router';
 
 import { ROUTES } from '@/app/paths';
-import type { Candidate, DealEventRequestTypeEnum } from '@/common/api/clients';
+import type { Candidate, DealEventRequestTypeEnum, Excluded } from '@/common/api/clients';
 import { getErrorCode } from '@/common/api/errors';
 import { registerDealEvent, saveDealReview } from '@/domains/deal/api';
 import { dealQueries } from '@/domains/deal/queries';
@@ -39,6 +40,8 @@ interface EventFormValues {
 
 const money = (value?: number) =>
   value === undefined ? '-' : `${value.toLocaleString('ko-KR')}원`;
+const dateTime = (value?: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm') : '-');
+const dayLabels = { MON: '월', TUE: '화', WED: '수', THU: '목', FRI: '금', SAT: '토', SUN: '일' };
 
 export default function AdminDealPage() {
   const navigate = useNavigate();
@@ -50,14 +53,17 @@ export default function AdminDealPage() {
   const { data: analysis, error, isPending, isError, refetch } = useQuery(dealQueries.latest());
 
   const review = useMutation({
-    mutationFn: (candidateId: number) =>
+    mutationFn: ({
+      candidateId,
+      reviewStatus,
+    }: {
+      candidateId: number;
+      reviewStatus: 'SELECTED' | 'HELD';
+    }) =>
       saveDealReview(analysis!.analysisId!, {
-        reviews: [{ candidateId, reviewStatus: 'SELECTED' }],
+        reviews: [{ candidateId, reviewStatus }],
       }),
-    onSuccess: () => {
-      void message.success('행사 후보로 선택했습니다.');
-      return queryClient.invalidateQueries({ queryKey: dealQueries.all });
-    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: dealQueries.all }),
   });
 
   const registration = useMutation({
@@ -105,8 +111,24 @@ export default function AdminDealPage() {
         <Button onClick={() => navigate(ROUTES.adminSaleEventNew)}>행사 관리</Button>
       </Space>
       <Typography.Paragraph type="secondary">
-        {analysis.targetWeekStart} 주 · 추천 할인율 {analysis.discountRate}%
+        {analysis.targetWeekStart} 주 · {analysis.dayOfWeek ? dayLabels[analysis.dayOfWeek] : '-'}
+        요일 · 가상 할인율 {analysis.discountRate}% · 최소 재고{' '}
+        {analysis.minStock?.toLocaleString('ko-KR') ?? '-'}개
       </Typography.Paragraph>
+      <Descriptions bordered size="small" column={{ xs: 1, sm: 2 }} className={styles.notice}>
+        <Descriptions.Item label="모델 버전">{analysis.modelVersion ?? '-'}</Descriptions.Item>
+        <Descriptions.Item label="입력 데이터 기준">
+          {dateTime(analysis.dataCutoffAt)}
+        </Descriptions.Item>
+        <Descriptions.Item label="분석 시각">{dateTime(analysis.createdAt)}</Descriptions.Item>
+        <Descriptions.Item label="검토 저장 시각">
+          {dateTime(analysis.lastSavedAt)}
+        </Descriptions.Item>
+        <Descriptions.Item label="검토 현황">
+          선택 {analysis.reviewCounts?.selected ?? 0} · 보류 {analysis.reviewCounts?.held ?? 0} ·
+          미검토 {analysis.reviewCounts?.unreviewed ?? 0}
+        </Descriptions.Item>
+      </Descriptions>
       {analysis.syntheticData && (
         <Alert
           type="warning"
@@ -125,6 +147,16 @@ export default function AdminDealPage() {
           { title: '정가', dataIndex: 'regularPrice', render: money },
           { title: '추천 가격', dataIndex: 'discountPrice', render: money },
           { title: '재고', dataIndex: 'currentStock' },
+          {
+            title: '예상 판매 증가',
+            dataIndex: 'expectedIncrease',
+            render: (value?: number) => value?.toLocaleString('ko-KR') ?? '-',
+          },
+          {
+            title: '추천 이유',
+            dataIndex: 'candidateReason',
+            render: (value?: string) => value || '-',
+          },
           {
             title: '검토',
             dataIndex: 'reviewStatus',
@@ -156,9 +188,28 @@ export default function AdminDealPage() {
                   <Button
                     loading={review.isPending}
                     disabled={item.candidateId === undefined}
-                    onClick={() => review.mutate(item.candidateId!)}
+                    onClick={() =>
+                      review.mutate(
+                        { candidateId: item.candidateId!, reviewStatus: 'SELECTED' },
+                        { onSuccess: () => void message.success('행사 후보로 선택했습니다.') },
+                      )
+                    }
                   >
                     선택
+                  </Button>
+                )}
+                {item.eventRequestStatus === 'NONE' && item.reviewStatus !== 'HELD' && (
+                  <Button
+                    loading={review.isPending}
+                    disabled={item.candidateId === undefined}
+                    onClick={() =>
+                      review.mutate(
+                        { candidateId: item.candidateId!, reviewStatus: 'HELD' },
+                        { onSuccess: () => void message.success('후보를 보류했습니다.') },
+                      )
+                    }
+                  >
+                    보류
                   </Button>
                 )}
                 {item.eventRequestStatus === 'NONE' && item.reviewStatus === 'SELECTED' && (
@@ -176,6 +227,31 @@ export default function AdminDealPage() {
               </Space>
             ),
           },
+        ]}
+      />
+      <Typography.Title level={4} className={styles.excludedTitle}>
+        제외 상품
+      </Typography.Title>
+      <Table<Excluded>
+        rowKey={(item) => item.candidateId ?? item.productId ?? 0}
+        dataSource={analysis.excluded ?? []}
+        pagination={false}
+        scroll={{ x: 540 }}
+        locale={{ emptyText: '제외된 상품이 없습니다.' }}
+        columns={[
+          { title: '상품', dataIndex: 'productName' },
+          {
+            title: '제외 사유',
+            dataIndex: 'excludeReason',
+            render: (reason: Excluded['excludeReason']) =>
+              reason === 'TOP_SELLER_ON_DAY'
+                ? '해당 요일 상위 판매 상품'
+                : reason === 'LOW_STOCK'
+                  ? '재고 부족'
+                  : '-',
+          },
+          { title: '해당 요일 평균 판매', dataIndex: 'avgSalesOnDay' },
+          { title: '현재 재고', dataIndex: 'currentStock' },
         ]}
       />
       <Drawer
