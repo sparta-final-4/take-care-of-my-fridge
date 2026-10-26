@@ -9,19 +9,25 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import org.example.takecareofmyfridgebe.domain.auth.service.AuthSessionService;
 import org.example.takecareofmyfridgebe.domain.auth.service.JwtTokenService;
 import org.example.takecareofmyfridgebe.domain.deal.dto.DealAnalysisResponse;
 import org.example.takecareofmyfridgebe.domain.deal.dto.DealReviewRequest;
+import org.example.takecareofmyfridgebe.domain.deal.dto.DealEventRequest;
+import org.example.takecareofmyfridgebe.domain.deal.dto.DealEventResponse;
 import org.example.takecareofmyfridgebe.domain.deal.dto.DealReviewResponse;
 import org.example.takecareofmyfridgebe.domain.deal.entity.DealAnalysis;
 import org.example.takecareofmyfridgebe.domain.deal.entity.DealCandidate;
 import org.example.takecareofmyfridgebe.domain.deal.facade.DealReviewFacade;
+import org.example.takecareofmyfridgebe.domain.deal.facade.DealEventFacade;
+import org.example.takecareofmyfridgebe.domain.sale.entity.SaleEventType;
 import org.example.takecareofmyfridgebe.domain.deal.service.DealAnalysisReadService;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 import org.example.takecareofmyfridgebe.global.config.SecurityConfig;
@@ -49,10 +55,12 @@ class AdminDealAnalysisControllerTest {
     private DealAnalysisReadService service;
     @Autowired
     private DealReviewFacade reviewFacade;
+    @Autowired
+    private DealEventFacade eventFacade;
 
     @BeforeEach
     void resetMock() {
-        reset(service, reviewFacade);
+        reset(service, reviewFacade, eventFacade);
     }
 
     @Test
@@ -144,6 +152,32 @@ class AdminDealAnalysisControllerTest {
         verify(reviewFacade).save(7L, Member.Role.USER, 3L, reviews);
     }
 
+    @Test
+    void adminRegistersSelectedCandidate() throws Exception {
+        var request = new DealEventRequest(11L, SaleEventType.SPECIAL,
+                LocalDateTime.of(2026, 11, 1, 10, 0),
+                LocalDateTime.of(2026, 11, 1, 14, 0), null);
+        when(eventFacade.register(7L, Member.Role.ADMIN, 3L, request))
+                .thenReturn(new DealEventResponse(11L, 55L, DealCandidate.EventRequestStatus.APPROVED));
+
+        mvc.perform(post("/api/admin/deal-analyses/3/event-requests")
+                        .with(csrf()).with(authenticationFor(Member.Role.ADMIN))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"candidateId\":11,\"type\":\"SPECIAL\",\"startsAt\":\"2026-11-01T10:00:00\",\"endsAt\":\"2026-11-01T14:00:00\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.saleEventId").value(55));
+    }
+
+    @Test
+    void flashDropRequiresLimitedQuantity() throws Exception {
+        mvc.perform(post("/api/admin/deal-analyses/3/event-requests")
+                        .with(csrf()).with(authenticationFor(Member.Role.ADMIN))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"candidateId\":11,\"type\":\"FLASH_DROP\",\"startsAt\":\"2026-11-01T10:00:00\",\"endsAt\":\"2026-11-01T14:00:00\"}"))
+                .andExpect(status().isBadRequest());
+        verifyNoInteractions(eventFacade);
+    }
+
     private org.springframework.test.web.servlet.request.RequestPostProcessor authenticationFor(Member.Role role) {
         return authentication(new UsernamePasswordAuthenticationToken(
                 new AuthSessionService.AuthPrincipal(7L, 8L, role), null,
@@ -160,6 +194,11 @@ class AdminDealAnalysisControllerTest {
         @Bean
         DealReviewFacade dealReviewFacade() {
             return mock(DealReviewFacade.class);
+        }
+
+        @Bean
+        DealEventFacade dealEventFacade() {
+            return mock(DealEventFacade.class);
         }
 
         @Bean

@@ -119,9 +119,9 @@
 | expected_qty_discount | INT | 허용 | NULL | | 할인가일 때 예상 판매 수량. 후보만 |
 | expected_increase | INT | 허용 | NULL | | 예상 판매 증가량. 후보만 |
 | review_status | ENUM('UNREVIEWED','SELECTED','HELD') | 허용 | NULL | | 미검토·선택·보류. 후보만 |
-| event_request_status | ENUM('NONE','REQUESTED','APPROVED','REJECTED') | 불가 | 'NONE' | | 할인 행사 등록 요청 상태 |
+| event_request_status | ENUM('NONE','REQUESTED','APPROVED','REJECTED') | 불가 | 'NONE' | | 행사 등록 상태. 현재 직접 등록 성공 시 APPROVED |
 | event_requested_at | DATETIME(6) | 허용 | NULL | | 요청일시 |
-| promotion_id | BIGINT | 허용 | NULL | | 등록된 할인 행사 ID(FK 없음) |
+| promotion_id | BIGINT | 허용 | NULL | | 생성된 sale_events ID(FK 없음) |
 
 - 이 화면은 실제 상품 가격을 바꾸지 않습니다. 가격 변경은 할인 행사 등록 후 행사 쪽에서 일어납니다.
 

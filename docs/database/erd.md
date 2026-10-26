@@ -101,7 +101,7 @@ erDiagram
 - 회원과 후기: 닉네임·맛 선호 변경이 기존 후기 표시에 반영되어야 합니다.
 - 상품과 주문 상품: 현재 상품 정보와 주문 당시 스냅샷을 구분합니다.
 - 주문 상품과 환불: 누적 환불 수량·금액을 추적합니다.
-- 할인 후보와 행사 요청: deal_candidates.event_request_status로 요청·승인·반려를 추적합니다. 행사 쪽 계약은 Q-05에서 확정합니다.
+- 할인 후보와 행사 등록: 선택된 후보를 기존 행사 생성 서비스로 직접 등록합니다. 성공 시 deal_candidates.event_request_status를 APPROVED로 바꾸고 promotion_id에 생성된 sale_events ID를 기록합니다.
 - 예측 실행과 실적: 대상 주·입력 기준 시각·실적 확정 시각(confirmed_at)을 연결합니다.
 
 ## 확정 절차

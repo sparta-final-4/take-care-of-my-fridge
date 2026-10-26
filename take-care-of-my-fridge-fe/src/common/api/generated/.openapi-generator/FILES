@@ -35,6 +35,7 @@ models/api-response-cooking-log-response.ts
 models/api-response-cooking-stats-response.ts
 models/api-response-csrf-response.ts
 models/api-response-deal-analysis-response.ts
+models/api-response-deal-event-response.ts
 models/api-response-deal-review-response.ts
 models/api-response-email-availability-response.ts
 models/api-response-forecast-response.ts
@@ -90,6 +91,8 @@ models/cooking-stats-response.ts
 models/csrf-response.ts
 models/csrf-token.ts
 models/deal-analysis-response.ts
+models/deal-event-request.ts
+models/deal-event-response.ts
 models/deal-review-request.ts
 models/deal-review-response.ts
 models/email-availability-request.ts

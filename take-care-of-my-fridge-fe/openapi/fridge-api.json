@@ -86,6 +86,47 @@
         ]
       }
     },
+    "/api/admin/deal-analyses/{analysisId}/event-requests": {
+      "post": {
+        "operationId": "registerEvent",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "analysisId",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DealEventRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseDealEventResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "admin-deal-analysis-controller"
+        ]
+      }
+    },
     "/api/admin/deal-analyses/{analysisId}/reviews": {
       "put": {
         "operationId": "saveReviews",
@@ -2261,6 +2302,20 @@
           }
         }
       },
+      "ApiResponseDealEventResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/DealEventResponse"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorResponse"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
       "ApiResponseDealReviewResponse": {
         "type": "object",
         "properties": {
@@ -3342,6 +3397,69 @@
           "targetWeekStart": {
             "type": "string",
             "format": "date"
+          }
+        }
+      },
+      "DealEventRequest": {
+        "type": "object",
+        "properties": {
+          "candidateId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "endsAfterStarts": {
+            "type": "boolean"
+          },
+          "endsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "limitedQuantity": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 1
+          },
+          "limitedQuantityValid": {
+            "type": "boolean"
+          },
+          "startsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "SPECIAL",
+              "FLASH_DROP"
+            ]
+          }
+        },
+        "required": [
+          "candidateId",
+          "endsAt",
+          "startsAt",
+          "type"
+        ]
+      },
+      "DealEventResponse": {
+        "type": "object",
+        "properties": {
+          "candidateId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "eventRequestStatus": {
+            "type": "string",
+            "enum": [
+              "NONE",
+              "REQUESTED",
+              "APPROVED",
+              "REJECTED"
+            ]
+          },
+          "saleEventId": {
+            "type": "integer",
+            "format": "int64"
           }
         }
       },

@@ -25,7 +25,11 @@ import { BASE_PATH, COLLECTION_FORMATS, type RequestArgs, BaseAPI, RequiredError
 // @ts-ignore
 import type { ApiResponseDealAnalysisResponse } from '../models';
 // @ts-ignore
+import type { ApiResponseDealEventResponse } from '../models';
+// @ts-ignore
 import type { ApiResponseDealReviewResponse } from '../models';
+// @ts-ignore
+import type { DealEventRequest } from '../models';
 // @ts-ignore
 import type { DealReviewRequest } from '../models';
 /**
@@ -89,6 +93,44 @@ export const AdminDealAnalysisControllerApiAxiosParamCreator = function (configu
             setSearchParams(localVarUrlObj, localVarQueryParameter);
             let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
             localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @param {number} analysisId 
+         * @param {DealEventRequest} dealEventRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        registerEvent: async (analysisId: number, dealEventRequest: DealEventRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'analysisId' is not null or undefined
+            assertParamExists('registerEvent', 'analysisId', analysisId)
+            // verify required parameter 'dealEventRequest' is not null or undefined
+            assertParamExists('registerEvent', 'dealEventRequest', dealEventRequest)
+            const localVarPath = `/api/admin/deal-analyses/{analysisId}/event-requests`
+                .replace('{analysisId}', encodeURIComponent(String(analysisId)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = '*/*';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(dealEventRequest, localVarRequestOptions, configuration)
 
             return {
                 url: toPathString(localVarUrlObj),
@@ -168,6 +210,19 @@ export const AdminDealAnalysisControllerApiFp = function(configuration?: Configu
         /**
          * 
          * @param {number} analysisId 
+         * @param {DealEventRequest} dealEventRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async registerEvent(analysisId: number, dealEventRequest: DealEventRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ApiResponseDealEventResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.registerEvent(analysisId, dealEventRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['AdminDealAnalysisControllerApi.registerEvent']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @param {number} analysisId 
          * @param {DealReviewRequest} dealReviewRequest 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
@@ -206,6 +261,15 @@ export const AdminDealAnalysisControllerApiFactory = function (configuration?: C
         },
         /**
          * 
+         * @param {AdminDealAnalysisControllerApiRegisterEventRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        registerEvent(requestParameters: AdminDealAnalysisControllerApiRegisterEventRequest, options?: RawAxiosRequestConfig): AxiosPromise<ApiResponseDealEventResponse> {
+            return localVarFp.registerEvent(requestParameters.analysisId, requestParameters.dealEventRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
          * @param {AdminDealAnalysisControllerApiSaveReviewsRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
@@ -237,6 +301,14 @@ export interface AdminDealAnalysisControllerApiInterface {
 
     /**
      * 
+     * @param {AdminDealAnalysisControllerApiRegisterEventRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    registerEvent(requestParameters: AdminDealAnalysisControllerApiRegisterEventRequest, options?: RawAxiosRequestConfig): AxiosPromise<ApiResponseDealEventResponse>;
+
+    /**
+     * 
      * @param {AdminDealAnalysisControllerApiSaveReviewsRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
@@ -250,6 +322,15 @@ export interface AdminDealAnalysisControllerApiInterface {
  */
 export interface AdminDealAnalysisControllerApiGetByIdRequest {
     readonly analysisId: number
+}
+
+/**
+ * Request parameters for registerEvent operation in AdminDealAnalysisControllerApi.
+ */
+export interface AdminDealAnalysisControllerApiRegisterEventRequest {
+    readonly analysisId: number
+
+    readonly dealEventRequest: DealEventRequest
 }
 
 /**
@@ -282,6 +363,16 @@ export class AdminDealAnalysisControllerApi extends BaseAPI implements AdminDeal
      */
     public getLatest1(options?: RawAxiosRequestConfig) {
         return AdminDealAnalysisControllerApiFp(this.configuration).getLatest1(options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @param {AdminDealAnalysisControllerApiRegisterEventRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public registerEvent(requestParameters: AdminDealAnalysisControllerApiRegisterEventRequest, options?: RawAxiosRequestConfig) {
+        return AdminDealAnalysisControllerApiFp(this.configuration).registerEvent(requestParameters.analysisId, requestParameters.dealEventRequest, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**
