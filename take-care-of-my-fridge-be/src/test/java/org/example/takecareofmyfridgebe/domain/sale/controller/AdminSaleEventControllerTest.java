@@ -9,9 +9,11 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -34,6 +36,7 @@ import org.example.takecareofmyfridgebe.domain.sale.dto.SaleEventDetailResponse;
 import org.example.takecareofmyfridgebe.domain.sale.dto.SaleEventUpdateRequest;
 import org.example.takecareofmyfridgebe.domain.sale.service.SaleEventDetailQueryService;
 import org.example.takecareofmyfridgebe.domain.sale.service.SaleEventListQueryService;
+import org.example.takecareofmyfridgebe.domain.sale.service.SaleEventTerminationService;
 import org.example.takecareofmyfridgebe.domain.sale.service.SaleEventUpdateService;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -80,25 +83,28 @@ class AdminSaleEventControllerTest {
     private final SaleEventListQueryService saleEventListQueryService;
     private final SaleEventDetailQueryService saleEventDetailQueryService;
     private final SaleEventUpdateService saleEventUpdateService;
+    private final SaleEventTerminationService saleEventTerminationService;
 
     @Autowired
     AdminSaleEventControllerTest(MockMvc mvc, SaleEventCreateService saleEventCreateService,
                                  SaleCandidateProductQueryService saleCandidateProductQueryService,
                                  SaleEventListQueryService saleEventListQueryService,
                                  SaleEventDetailQueryService saleEventDetailQueryService,
-                                 SaleEventUpdateService saleEventUpdateService) {
+                                 SaleEventUpdateService saleEventUpdateService,
+                                 SaleEventTerminationService saleEventTerminationService) {
         this.mvc = mvc;
         this.saleEventCreateService = saleEventCreateService;
         this.saleCandidateProductQueryService = saleCandidateProductQueryService;
         this.saleEventListQueryService = saleEventListQueryService;
         this.saleEventDetailQueryService = saleEventDetailQueryService;
         this.saleEventUpdateService = saleEventUpdateService;
+        this.saleEventTerminationService = saleEventTerminationService;
     }
 
     @BeforeEach
     void resetMock() {
         reset(saleEventCreateService, saleCandidateProductQueryService, saleEventListQueryService,
-                saleEventDetailQueryService, saleEventUpdateService);
+                saleEventDetailQueryService, saleEventUpdateService, saleEventTerminationService);
     }
 
     @Test
@@ -391,6 +397,43 @@ class AdminSaleEventControllerTest {
                 .andExpect(status().isForbidden());
     }
 
+    @Test
+    @DisplayName("관리자가 할인 행사를 종료·삭제하면 200이고 서비스를 부르며, 일반 회원은 403이다")
+    void endAndDeleteSaleEvent_returns200() throws Exception {
+        mvc.perform(patch("/api/admin/sale-events/5/end").with(csrf()).with(loginAs(Member.Role.ADMIN)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+        mvc.perform(delete("/api/admin/sale-events/5").with(csrf()).with(loginAs(Member.Role.ADMIN)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+        verify(saleEventTerminationService).end(5L);
+        verify(saleEventTerminationService).delete(5L);
+
+        mvc.perform(patch("/api/admin/sale-events/5/end").with(csrf()).with(loginAs(Member.Role.USER)))
+                .andExpect(status().isForbidden());
+        mvc.perform(delete("/api/admin/sale-events/5").with(csrf()).with(loginAs(Member.Role.USER)))
+                .andExpect(status().isForbidden());
+        verifyNoMoreInteractions(saleEventTerminationService);
+    }
+
+    @Test
+    @DisplayName("종료·삭제할 수 없는 할인 행사는 409와 오류 코드, 없는 할인 행사는 404를 돌려준다")
+    void endAndDeleteSaleEvent_serviceErrors_mapToStatus() throws Exception {
+        doThrow(new BusinessException(ErrorCode.SALE_EVENT_NOT_ENDABLE)).when(saleEventTerminationService).end(5L);
+        doThrow(new BusinessException(ErrorCode.SALE_EVENT_NOT_DELETABLE)).when(saleEventTerminationService).delete(5L);
+        doThrow(new BusinessException(ErrorCode.SALE_EVENT_NOT_FOUND)).when(saleEventTerminationService).end(7L);
+
+        mvc.perform(patch("/api/admin/sale-events/5/end").with(csrf()).with(loginAs(Member.Role.ADMIN)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("SALE_004"));
+        mvc.perform(delete("/api/admin/sale-events/5").with(csrf()).with(loginAs(Member.Role.ADMIN)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("SALE_005"));
+        mvc.perform(patch("/api/admin/sale-events/7/end").with(csrf()).with(loginAs(Member.Role.ADMIN)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error.code").value("SALE_002"));
+    }
+
     private RequestPostProcessor loginAs(Member.Role role) {
         return authentication(new UsernamePasswordAuthenticationToken(
                 new AuthSessionService.AuthPrincipal(7L, 8L, role), null,
@@ -422,6 +465,11 @@ class AdminSaleEventControllerTest {
         @Bean
         SaleEventUpdateService saleEventUpdateService() {
             return mock(SaleEventUpdateService.class);
+        }
+
+        @Bean
+        SaleEventTerminationService saleEventTerminationService() {
+            return mock(SaleEventTerminationService.class);
         }
 
         @Bean
