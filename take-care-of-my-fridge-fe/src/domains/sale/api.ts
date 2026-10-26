@@ -54,3 +54,13 @@ export async function updateSaleEvent(
 ): Promise<void> {
   await unwrap(adminSaleEventApi.updateSaleEvent({ saleEventId, saleEventUpdateRequest: request }));
 }
+
+// 진행 중인 할인 행사를 지금 닫는다. 종료 시각은 바뀌지 않는다.
+export async function endSaleEvent(saleEventId: number): Promise<void> {
+  await unwrap(adminSaleEventApi.endSaleEvent({ saleEventId }));
+}
+
+// 시작 전인 할인 행사를 행사 항목까지 지운다.
+export async function deleteSaleEvent(saleEventId: number): Promise<void> {
+  await unwrap(adminSaleEventApi.deleteSaleEvent({ saleEventId }));
+}

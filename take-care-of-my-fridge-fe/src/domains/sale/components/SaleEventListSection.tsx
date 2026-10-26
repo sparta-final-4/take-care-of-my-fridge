@@ -1,6 +1,7 @@
 import { DeleteOutlined, EditOutlined, StopOutlined } from '@ant-design/icons';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  App,
   Button,
   DatePicker,
   Drawer,
@@ -21,7 +22,9 @@ import { useState } from 'react';
 import { useSearchParams } from 'react-router';
 
 import type { SaleEventListRequest, SaleEventListResponse } from '@/common/api/clients';
+import { getErrorMessage } from '@/common/api/errors';
 import { formatPrice } from '@/domains/cart/format';
+import { deleteSaleEvent, endSaleEvent } from '@/domains/sale/api';
 import { SaleEventEditPanel } from '@/domains/sale/components/SaleEventEditPanel';
 import { SALE_STATUS_LABELS, SALE_TYPE_LABELS } from '@/domains/sale/format';
 import { saleQueries } from '@/domains/sale/queries';
@@ -131,6 +134,8 @@ const isSortKey = (value: string | null): value is (typeof SORT_KEYS)[SortColumn
 // 행사 목록 탭. 조건은 주소 쿼리에 두어 새로고침해도 남는다.
 export function SaleEventListSection() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const { message, modal } = App.useApp();
+  const queryClient = useQueryClient();
   // 행 아래로 펼친 수정 칸의 행 키. 한 번에 하나만 펼친다.
   const [editing, setEditing] = useState<{ key: string; saleEventId: number } | null>(null);
   // 좁은 화면은 표가 가로로 스크롤돼 행 아래 칸이 한 화면에 들어오지 않아, 아래에서 올라오는 패널로 연다.
@@ -197,6 +202,26 @@ export function SaleEventListSection() {
       dir: column && order === 'ascend' ? 'ASC' : column ? 'DESC' : undefined,
     });
   };
+
+  // 성공하든 거절당하든 목록을 다시 읽는다. 거절은 보통 상태가 그 사이 바뀐 경우라 서버 메시지를 알린다.
+  const settle = useMutation({
+    mutationFn: (run: () => Promise<void>) => run(),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: saleQueries.all }),
+  });
+
+  const confirmSettle = (title: string, content: string, run: () => Promise<void>, done: string) =>
+    modal.confirm({
+      title,
+      content,
+      okText: title,
+      okButtonProps: { danger: true },
+      cancelText: '취소',
+      onOk: () =>
+        settle
+          .mutateAsync(run)
+          .then(() => void message.success(done))
+          .catch((error: unknown) => void message.error(getErrorMessage(error))),
+    });
 
   // 수정 칸이 열려 있는 행을 다시 누르면 닫는다.
   const toggleEditing = (row: EventRow) =>
@@ -316,7 +341,7 @@ export function SaleEventListSection() {
       title: '작업',
       key: 'actions',
       width: 100,
-      // 예정 행사는 수정·삭제, 진행 중 행사는 종료만 한다. 삭제·종료는 API가 붙기 전까지 누를 수 없다.
+      // 예정 할인 행사는 수정·삭제, 진행 중 할인 행사는 종료만 한다.
       render: (_: unknown, row: EventRow) => {
         if (row.status === 'SCHEDULED') {
           return (
@@ -337,10 +362,18 @@ export function SaleEventListSection() {
                 type="text"
                 className={`${styles.action} ${styles.delete}`}
                 danger
-                disabled
                 icon={<DeleteOutlined />}
                 aria-label="삭제"
-                title="삭제(준비 중)"
+                title="삭제"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  confirmSettle(
+                    '할인 행사 삭제',
+                    `예정된 ${row.productName} ${SALE_TYPE_LABELS[row.type]} 할인 행사를 삭제합니다. 삭제한 할인 행사는 되돌릴 수 없습니다.`,
+                    () => deleteSaleEvent(row.saleEventId),
+                    `${SALE_TYPE_LABELS[row.type]} 할인 행사를 삭제했습니다.`,
+                  );
+                }}
               />
             </Space>
           );
@@ -351,10 +384,17 @@ export function SaleEventListSection() {
               type="text"
               className={styles.action}
               danger
-              disabled
               icon={<StopOutlined />}
               aria-label="종료"
-              title="종료(준비 중)"
+              title="종료"
+              onClick={() =>
+                confirmSettle(
+                  '할인 행사 종료',
+                  `진행 중인 ${row.productName} ${SALE_TYPE_LABELS[row.type]} 할인 행사를 종료합니다. 종료한 할인 행사는 다시 진행할 수 없습니다.`,
+                  () => endSaleEvent(row.saleEventId),
+                  `${SALE_TYPE_LABELS[row.type]} 할인 행사를 종료했습니다.`,
+                )
+              }
             />
           );
         }
