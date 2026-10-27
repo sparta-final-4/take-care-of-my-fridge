@@ -2122,6 +2122,40 @@
         ]
       }
     },
+    "/api/refunds/summaries": {
+      "get": {
+        "operationId": "getRefundSummaries",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "orderIds",
+            "required": true,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "format": "int64"
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListRefundSummaryResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "refund-controller"
+        ]
+      }
+    },
     "/api/reviews": {
       "get": {
         "operationId": "getReviews",
@@ -2612,6 +2646,23 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/RefundHistoryResponse"
+            }
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorResponse"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ApiResponseListRefundSummaryResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RefundSummaryResponse"
             }
           },
           "error": {
@@ -6083,6 +6134,28 @@
               "COMPLETED",
               "FAILED"
             ]
+          }
+        }
+      },
+      "RefundSummaryResponse": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "refundStatus": {
+            "type": "string",
+            "enum": [
+              "NONE",
+              "IN_PROGRESS",
+              "PARTIAL",
+              "FULL"
+            ]
+          },
+          "refundedAmount": {
+            "type": "integer",
+            "format": "int64"
           }
         }
       },

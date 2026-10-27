@@ -46,6 +46,7 @@ models/api-response-fridge-item-take-out-response.ts
 models/api-response-list-fridge-item-response.ts
 models/api-response-list-popular-recipe-response.ts
 models/api-response-list-refund-history-response.ts
+models/api-response-list-refund-summary-response.ts
 models/api-response-list-refundable-item-response.ts
 models/api-response-my-info-response.ts
 models/api-response-my-recipe-list-response.ts
@@ -178,6 +179,7 @@ models/refund-create-request.ts
 models/refund-history-item-response.ts
 models/refund-history-response.ts
 models/refund-response.ts
+models/refund-summary-response.ts
 models/refundable-item-response.ts
 models/remove-cart-items-request.ts
 models/review-counts.ts
