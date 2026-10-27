@@ -16,8 +16,23 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderConfirmResponse;
 import org.example.takecareofmyfridgebe.domain.order.entity.Order;
+import org.example.takecareofmyfridgebe.domain.order.entity.OrderItem;
 import org.example.takecareofmyfridgebe.domain.order.entity.OrderStatus;
+import org.example.takecareofmyfridgebe.domain.order.entity.SaleType;
+import org.example.takecareofmyfridgebe.domain.order.repository.OrderItemRepository;
 import org.example.takecareofmyfridgebe.domain.order.repository.OrderRepository;
+import org.example.takecareofmyfridgebe.domain.payment.entity.Payment;
+import org.example.takecareofmyfridgebe.domain.payment.repository.PaymentRepository;
+import org.example.takecareofmyfridgebe.domain.payment.service.PaymentHistoryRecorder;
+import org.example.takecareofmyfridgebe.domain.refund.dto.RefundCreateRequest;
+import org.example.takecareofmyfridgebe.domain.refund.entity.Refund;
+import org.example.takecareofmyfridgebe.domain.refund.entity.RefundItem;
+import org.example.takecareofmyfridgebe.domain.refund.entity.RefundReasonType;
+import org.example.takecareofmyfridgebe.domain.refund.entity.RefundStatus;
+import org.example.takecareofmyfridgebe.domain.refund.repository.RefundItemRepository;
+import org.example.takecareofmyfridgebe.domain.refund.repository.RefundRepository;
+import org.example.takecareofmyfridgebe.domain.refund.service.RefundCommandService;
+import org.example.takecareofmyfridgebe.domain.refund.service.RefundQueryService;
 import org.example.takecareofmyfridgebe.global.config.JpaAuditingConfig;
 import org.example.takecareofmyfridgebe.global.config.QueryDslConfig;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
@@ -34,24 +49,47 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 // 테스트 자체 트랜잭션을 끄고(NOT_SUPPORTED) 서비스의 트랜잭션 경계로 DB에 반영되는지 확인한다.
-// 응답이 아니라 커밋된 주문 상태와 확정 시각을 다시 읽어 확인한다.
+// 응답이 아니라 커밋된 주문 상태, 확정 시각, 주문 상품의 확정 수량을 다시 읽어 확인한다.
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({JpaAuditingConfig.class, QueryDslConfig.class, OrderConfirmService.class, OrderReader.class})
+@Import({JpaAuditingConfig.class, QueryDslConfig.class, OrderConfirmService.class, OrderReader.class,
+    RefundQueryService.class, RefundCommandService.class, PaymentHistoryRecorder.class})
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class OrderConfirmServiceTransactionTest extends MySqlContainerSupport {
 
     private final OrderConfirmService orderConfirmService;
+    private final RefundCommandService refundCommandService;
     private final OrderRepository orderRepository;
+    private final OrderItemRepository orderItemRepository;
+    private final PaymentRepository paymentRepository;
+    private final RefundRepository refundRepository;
+    private final RefundItemRepository refundItemRepository;
 
     @Autowired
-    OrderConfirmServiceTransactionTest(OrderConfirmService orderConfirmService, OrderRepository orderRepository) {
+    OrderConfirmServiceTransactionTest(
+        OrderConfirmService orderConfirmService,
+        RefundCommandService refundCommandService,
+        OrderRepository orderRepository,
+        OrderItemRepository orderItemRepository,
+        PaymentRepository paymentRepository,
+        RefundRepository refundRepository,
+        RefundItemRepository refundItemRepository
+    ) {
         this.orderConfirmService = orderConfirmService;
+        this.refundCommandService = refundCommandService;
         this.orderRepository = orderRepository;
+        this.orderItemRepository = orderItemRepository;
+        this.paymentRepository = paymentRepository;
+        this.refundRepository = refundRepository;
+        this.refundItemRepository = refundItemRepository;
     }
 
     @AfterEach
     void cleanUp() {
+        refundItemRepository.deleteAll();
+        refundRepository.deleteAll();
+        paymentRepository.deleteAll();
+        orderItemRepository.deleteAll();
         orderRepository.deleteAll();
     }
 
@@ -67,6 +105,50 @@ class OrderConfirmServiceTransactionTest extends MySqlContainerSupport {
         assertThat(response.status()).isEqualTo(OrderStatus.CONFIRMED);
         assertThat(confirmed.getStatus()).isEqualTo(OrderStatus.CONFIRMED);
         assertThat(confirmed.getConfirmedAt()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("구매 확정하면 주문 수량에서 완료된 환불 수량만 빼서 확정 수량으로 남기고 실패한 환불은 빼지 않는다")
+    void confirm_withCompletedAndFailedRefunds_savesQuantityMinusCompleted() {
+        Order order = saveOrder(1L, OrderStatus.PAID);
+        OrderItem normal = saveItem(order, 5, SaleType.NONE);
+        OrderItem special = saveItem(order, 1, SaleType.SPECIAL);
+        Payment payment = savePayment(order);
+        saveRefund(payment, normal, 2, RefundStatus.COMPLETED);
+        saveRefund(payment, normal, 1, RefundStatus.FAILED);
+
+        orderConfirmService.confirm(1L, order.getId());
+
+        assertThat(reload(order).getStatus()).isEqualTo(OrderStatus.CONFIRMED);
+        assertThat(reload(normal).getConfirmedQuantity()).isEqualTo(3);
+        assertThat(reload(special).getConfirmedQuantity()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("환불이 없는 주문을 구매 확정하면 주문 수량이 그대로 확정 수량이다")
+    void confirm_withoutRefund_savesOrderQuantity() {
+        Order order = saveOrder(1L, OrderStatus.PAID);
+        OrderItem item = saveItem(order, 2, SaleType.NONE);
+
+        orderConfirmService.confirm(1L, order.getId());
+
+        assertThat(reload(item).getConfirmedQuantity()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("요청 상태 환불이 있는 주문은 환불이 진행 중이라고 거절하고 주문과 확정 수량은 그대로다")
+    void confirm_withRequestedRefund_rejects() {
+        Order order = saveOrder(1L, OrderStatus.PAID);
+        OrderItem item = saveItem(order, 3, SaleType.NONE);
+        saveRefund(savePayment(order), item, 1, RefundStatus.REQUESTED);
+
+        assertThatThrownBy(() -> orderConfirmService.confirm(1L, order.getId()))
+            .isInstanceOf(BusinessException.class)
+            .extracting("errorCode").isEqualTo(ErrorCode.ORDER_REFUND_IN_PROGRESS);
+        Order unchanged = reload(order);
+        assertThat(unchanged.getStatus()).isEqualTo(OrderStatus.PAID);
+        assertThat(unchanged.getConfirmedAt()).isNull();
+        assertThat(reload(item).getConfirmedQuantity()).isNull();
     }
 
     @Test
@@ -142,6 +224,52 @@ class OrderConfirmServiceTransactionTest extends MySqlContainerSupport {
         assertThat(confirmed.getConfirmedAt()).isNotNull();
     }
 
+    @Test
+    @DisplayName("구매 확정과 환불 신청이 동시에 와도 주문마다 하나만 성공하고 확정된 주문에는 요청·완료 환불이 없다")
+    void confirmAndRefundRequestConcurrently_onlyOneSucceedsPerOrder() throws Exception {
+        List<Order> orders = new ArrayList<>();
+        List<OrderItem> items = new ArrayList<>();
+        List<Callable<Void>> tasks = new ArrayList<>();
+        for (int i = 0; i < 10; i++) {
+            Order order = saveOrder(1L, OrderStatus.PAID);
+            OrderItem item = saveItem(order, 2, SaleType.NONE);
+            savePayment(order);
+            orders.add(order);
+            items.add(item);
+            tasks.add(() -> {
+                orderConfirmService.confirm(1L, order.getId());
+                return null;
+            });
+            tasks.add(() -> {
+                refundCommandService.request(1L, new RefundCreateRequest(order.getId(),
+                    List.of(new RefundCreateRequest.Item(item.getId(), 1)), RefundReasonType.CHANGE_OF_MIND, null));
+                return null;
+            });
+        }
+
+        List<Throwable> failures = runConcurrently(tasks);
+
+        assertThat(failures).hasSize(10)
+            .allSatisfy(failure -> assertThat(failure).isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isIn(ErrorCode.ORDER_REFUND_IN_PROGRESS, ErrorCode.REFUND_ORDER_CONFIRMED));
+        for (int i = 0; i < orders.size(); i++) {
+            Order order = reload(orders.get(i));
+            List<RefundStatus> refundStatuses = refundRepository.findByOrderIdOrderByIdDesc(order.getId()).stream()
+                .map(Refund::getStatus)
+                .toList();
+            Integer confirmedQuantity = reload(items.get(i)).getConfirmedQuantity();
+            if (order.getStatus() == OrderStatus.CONFIRMED) {
+                assertThat(refundStatuses).isEmpty();
+                assertThat(confirmedQuantity).isEqualTo(2);
+                continue;
+            }
+            assertThat(order.getStatus()).isEqualTo(OrderStatus.PAID);
+            assertThat(refundStatuses).containsExactly(RefundStatus.REQUESTED);
+            assertThat(confirmedQuantity).isNull();
+        }
+    }
+
     private List<Throwable> runConcurrently(List<Callable<Void>> tasks) throws Exception {
         ExecutorService executor = Executors.newFixedThreadPool(tasks.size());
         CountDownLatch start = new CountDownLatch(1);
@@ -184,7 +312,52 @@ class OrderConfirmServiceTransactionTest extends MySqlContainerSupport {
         return orderRepository.save(order);
     }
 
+    private OrderItem saveItem(Order order, int quantity, SaleType saleType) {
+        return orderItemRepository.save(OrderItem.builder()
+            .order(order)
+            .productId(1L)
+            .productName("대파")
+            .quantity(quantity)
+            .listPrice(1000)
+            .unitPrice(1000)
+            .saleType(saleType)
+            .build());
+    }
+
+    // 환불 신청이 결제 완료 결제를 찾으므로 주문마다 결제 완료 결제를 하나 둔다
+    private Payment savePayment(Order order) {
+        LocalDateTime paidAt = LocalDateTime.now();
+        Payment payment = Payment.builder()
+            .order(order)
+            .portonePaymentId("payment-" + order.getOrderNumber())
+            .amount(order.getTotalAmount())
+            .expiresAt(paidAt.plusMinutes(10))
+            .build();
+        payment.complete(paidAt);
+        return paymentRepository.save(payment);
+    }
+
+    private void saveRefund(Payment payment, OrderItem item, int quantity, RefundStatus status) {
+        Refund refund = Refund.builder()
+            .payment(payment)
+            .refundAmount((long) item.getUnitPrice() * quantity)
+            .reasonType(RefundReasonType.CHANGE_OF_MIND)
+            .build();
+        if (status == RefundStatus.COMPLETED) {
+            refund.complete("cancellation-" + UUID.randomUUID(), LocalDateTime.now());
+        }
+        if (status == RefundStatus.FAILED) {
+            refund.fail("PG 거절");
+        }
+        refundRepository.save(refund);
+        refundItemRepository.save(RefundItem.builder().refund(refund).orderItem(item).quantity(quantity).build());
+    }
+
     private Order reload(Order order) {
         return orderRepository.findById(order.getId()).orElseThrow();
+    }
+
+    private OrderItem reload(OrderItem item) {
+        return orderItemRepository.findById(item.getId()).orElseThrow();
     }
 }

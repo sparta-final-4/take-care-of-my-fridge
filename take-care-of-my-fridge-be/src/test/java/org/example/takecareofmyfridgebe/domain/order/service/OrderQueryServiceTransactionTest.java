@@ -6,7 +6,9 @@ import static org.assertj.core.api.Assertions.tuple;
 
 import jakarta.persistence.EntityManagerFactory;
 import java.time.LocalDateTime;
+import java.util.List;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderCheckoutResponse;
+import org.example.takecareofmyfridgebe.domain.order.dto.OrderDetailItemResponse;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderDetailResponse;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderItemResponse;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderListRequest;
@@ -143,25 +145,32 @@ class OrderQueryServiceTransactionTest extends MySqlContainerSupport {
         assertThat(response.discountAmount()).isEqualTo(1000L);
         assertThat(response.payAmount()).isEqualTo(7800L);
         assertThat(response.items())
-            .extracting(OrderItemResponse::productName, OrderItemResponse::listPrice, OrderItemResponse::unitPrice,
-                OrderItemResponse::lineAmount, OrderItemResponse::saleType)
+            .extracting(OrderDetailItemResponse::productName, OrderDetailItemResponse::listPrice,
+                OrderDetailItemResponse::unitPrice, OrderDetailItemResponse::lineAmount,
+                OrderDetailItemResponse::saleType, OrderDetailItemResponse::confirmedQuantity)
             .containsExactly(
-                tuple("대파", 2900, 2900, 5800L, SaleType.NONE),
-                tuple("두부", 3000, 2000, 2000L, SaleType.SPECIAL));
+                tuple("대파", 2900, 2900, 5800L, SaleType.NONE, null),
+                tuple("두부", 3000, 2000, 2000L, SaleType.SPECIAL, null));
     }
 
     @Test
-    @DisplayName("구매 확정된 주문은 구매 확정 시각을 같이 돌려준다")
-    void getDetail_confirmedOrder_returnsConfirmedAt() {
+    @DisplayName("구매 확정된 주문은 구매 확정 시각과 주문 상품별 확정 수량을 같이 돌려준다")
+    void getDetail_confirmedOrder_returnsConfirmedAtAndQuantities() {
         Order order = saveOrder(1L, "20261022143000123031");
         markPaid(order);
         confirm(order);
+        // 대파 2개 중 1개는 확정 전에 환불이 완료된 것으로 둔다
+        confirmQuantities(order, 1L);
         LocalDateTime savedConfirmedAt = orderRepository.findById(order.getId()).orElseThrow().getConfirmedAt();
 
         OrderDetailResponse response = orderQueryService.getDetail(1L, order.getId());
 
         assertThat(response.status()).isEqualTo(OrderStatus.CONFIRMED);
         assertThat(response.confirmedAt()).isEqualTo(savedConfirmedAt);
+        assertThat(response.items())
+            .extracting(OrderDetailItemResponse::productName, OrderDetailItemResponse::quantity,
+                OrderDetailItemResponse::confirmedQuantity)
+            .containsExactly(tuple("대파", 2, 1), tuple("두부", 1, 1));
     }
 
     @Test
@@ -266,6 +275,14 @@ class OrderQueryServiceTransactionTest extends MySqlContainerSupport {
         Order found = orderRepository.findById(order.getId()).orElseThrow();
         found.confirm(LocalDateTime.now());
         orderRepository.save(found);
+    }
+
+    // 대파에만 완료 환불 수량을 빼고 나머지 주문 상품은 주문 수량 그대로 확정 수량을 저장한다
+    private void confirmQuantities(Order order, long completedRefundOfFirstItem) {
+        List<OrderItem> items = orderItemRepository.findByOrderIdOrderByIdAsc(order.getId());
+        items.get(0).confirmQuantity(completedRefundOfFirstItem);
+        items.subList(1, items.size()).forEach(item -> item.confirmQuantity(0));
+        orderItemRepository.saveAll(items);
     }
 
     private void cancel(Order order) {
