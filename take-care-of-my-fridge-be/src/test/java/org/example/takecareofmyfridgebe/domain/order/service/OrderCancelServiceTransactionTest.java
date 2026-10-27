@@ -33,6 +33,7 @@ import org.example.takecareofmyfridgebe.domain.order.repository.OrderRepository;
 import org.example.takecareofmyfridgebe.domain.order.scheduler.OrderExpireScheduler;
 import org.example.takecareofmyfridgebe.domain.payment.entity.FailReason;
 import org.example.takecareofmyfridgebe.domain.payment.entity.Payment;
+import org.example.takecareofmyfridgebe.domain.payment.entity.PaymentStatus;
 import org.example.takecareofmyfridgebe.domain.payment.repository.PaymentHistoryRepository;
 import org.example.takecareofmyfridgebe.domain.payment.repository.PaymentRepository;
 import org.example.takecareofmyfridgebe.domain.payment.service.PaymentCommandService;
@@ -87,6 +88,7 @@ class OrderCancelServiceTransactionTest extends MySqlContainerSupport {
     private final SaleEventItemRepository saleEventItemRepository;
     private final OrderExpireScheduler orderExpireScheduler;
     private final PaymentCommandService paymentCommandService;
+    private final PaymentService paymentService;
     private final PaymentRepository paymentRepository;
     private final PaymentHistoryRepository paymentHistoryRepository;
     private final JdbcTemplate jdbcTemplate;
@@ -104,6 +106,7 @@ class OrderCancelServiceTransactionTest extends MySqlContainerSupport {
             SaleEventItemRepository saleEventItemRepository,
             OrderExpireScheduler orderExpireScheduler,
             PaymentCommandService paymentCommandService,
+            PaymentService paymentService,
             PaymentRepository paymentRepository,
             PaymentHistoryRepository paymentHistoryRepository,
             DataSource dataSource) {
@@ -118,6 +121,7 @@ class OrderCancelServiceTransactionTest extends MySqlContainerSupport {
         this.saleEventItemRepository = saleEventItemRepository;
         this.orderExpireScheduler = orderExpireScheduler;
         this.paymentCommandService = paymentCommandService;
+        this.paymentService = paymentService;
         this.paymentRepository = paymentRepository;
         this.paymentHistoryRepository = paymentHistoryRepository;
         this.jdbcTemplate = new JdbcTemplate(dataSource);
@@ -333,6 +337,102 @@ class OrderCancelServiceTransactionTest extends MySqlContainerSupport {
     }
 
     @Test
+    @DisplayName("결제가 모두 끝났고 마지막 결제가 10분 전보다 이른 결제 대기 주문만 골라 취소 상태로 남기고 재고를 되돌린다")
+    void cancelAbandoned_cancelsOnlyAbandonedOrders() {
+        Product greenOnion = saveProduct("대파", 3000, 0);
+        SaleEventItem saleEventItem = saveFlashDrop(greenOnion, 5);
+        Order abandoned = saveOrder(1L, OrderStatus.PENDING,
+            item(greenOnion, 2), flashDropItem(greenOnion, 1L).saleEventItemId(saleEventItem.getId()));
+        makeOld(saveFailedPayment(abandoned));
+        Order inProgress = saveOrder(2L, OrderStatus.PENDING, item(greenOnion, 1));
+        makeOld(saveReadyPayment(inProgress));
+        Order retried = saveOrder(3L, OrderStatus.PENDING, item(greenOnion, 1));
+        makeOld(saveFailedPayment(retried));
+        saveFailedPayment(retried);
+        Order withoutPayment = saveOrder(4L, OrderStatus.PENDING, item(greenOnion, 1));
+        makeOld(withoutPayment);
+        LocalDateTime lastPaymentBefore = LocalDateTime.now().minusMinutes(10);
+
+        List<Long> orderIds = paymentService.findAbandonedOrderIds(lastPaymentBefore, 0, 100);
+        orderIds.forEach(orderId -> orderCancelService.cancelAbandoned(orderId, lastPaymentBefore));
+        Stream.of(inProgress, retried, withoutPayment)
+            .forEach(order -> orderCancelService.cancelAbandoned(order.getId(), lastPaymentBefore));
+
+        assertThat(orderIds).containsExactly(abandoned.getId());
+        assertThat(statusOf(abandoned)).isEqualTo(OrderStatus.CANCELLED);
+        assertThat(orderItemRepository.findByOrderIdOrderByIdAsc(abandoned.getId()))
+            .hasSize(2)
+            .extracting(OrderItem::getFlashDropMemberId)
+            .containsOnlyNulls();
+        assertThat(paymentRepository.existsByOrderId(abandoned.getId())).isTrue();
+        assertThat(saleEventItemRepository.findById(saleEventItem.getId()).orElseThrow().getRemainingQuantity()).isEqualTo(5);
+        // 건너뛴 세 주문은 결제 대기 그대로이고, 취소한 주문의 3개만 돌아온다
+        assertThat(Stream.of(inProgress, retried, withoutPayment).map(this::statusOf)).containsOnly(OrderStatus.PENDING);
+        assertThat(stockOf(greenOnion)).isEqualTo(3);
+    }
+
+    @Test
+    @DisplayName("결제 정리와 결제하기가 동시에 오면 주문이 취소되고 새 결제가 없거나, 새 결제가 붙고 주문과 재고가 그대로다")
+    void cancelAbandoned_withConcurrentPaymentCreate_keepsStockConsistent() throws Exception {
+        for (int round = 0; round < 10; round++) {
+            Product greenOnion = saveProduct("대파" + round, 3000, 8);
+            Order order = saveOrder(1L, OrderStatus.PENDING, item(greenOnion, 2));
+            makeOld(saveFailedPayment(order));
+            LocalDateTime lastPaymentBefore = LocalDateTime.now().minusMinutes(10);
+
+            List<Throwable> failures = runConcurrently(List.of(
+                () -> {
+                    orderCancelService.cancelAbandoned(order.getId(), lastPaymentBefore);
+                    return null;
+                },
+                () -> {
+                    paymentCommandService.create(order.getId());
+                    return null;
+                }));
+
+            // 정리가 먼저 잠그면 결제하기는 결제할 수 없는 주문으로 거절되고, 결제하기가 먼저면 정리는 건너뛴다
+            boolean hasReady = paymentRepository.existsByOrderIdAndStatus(order.getId(), PaymentStatus.READY);
+            if (hasReady) {
+                assertThat(failures).isEmpty();
+                assertThat(statusOf(order)).isEqualTo(OrderStatus.PENDING);
+                assertThat(stockOf(greenOnion)).isEqualTo(8);
+                continue;
+            }
+            assertThat(failures).singleElement()
+                .extracting("errorCode").isEqualTo(ErrorCode.PAYMENT_ORDER_NOT_PAYABLE);
+            assertThat(statusOf(order)).isEqualTo(OrderStatus.CANCELLED);
+            assertThat(stockOf(greenOnion)).isEqualTo(10);
+        }
+    }
+
+    @Test
+    @DisplayName("결제 정리와 주문 취소가 동시에 와도 주문은 취소 상태로 남고 재고는 한 번만 돌아온다")
+    void cancelAbandoned_withConcurrentCancel_restoresStockOnce() throws Exception {
+        for (int round = 0; round < 10; round++) {
+            Product greenOnion = saveProduct("대파" + round, 3000, 8);
+            Order order = saveOrder(1L, OrderStatus.PENDING, item(greenOnion, 2));
+            makeOld(saveFailedPayment(order));
+            LocalDateTime lastPaymentBefore = LocalDateTime.now().minusMinutes(10);
+
+            List<Throwable> failures = runConcurrently(List.of(
+                () -> {
+                    orderCancelService.cancelAbandoned(order.getId(), lastPaymentBefore);
+                    return null;
+                },
+                () -> {
+                    orderCancelService.cancel(1L, order.getId());
+                    return null;
+                }));
+
+            // 주문 취소는 정리 전이면 결제 시도로, 정리 뒤면 취소된 주문으로 거절된다
+            assertThat(failures).singleElement()
+                .extracting("errorCode").isIn(ErrorCode.ORDER_PAYMENT_ATTEMPTED, ErrorCode.ORDER_CANCELLED);
+            assertThat(statusOf(order)).isEqualTo(OrderStatus.CANCELLED);
+            assertThat(stockOf(greenOnion)).isEqualTo(10);
+        }
+    }
+
+    @Test
     @DisplayName("취소와 다른 회원들의 주문하기가 같은 상품에 동시에 와도 재고가 어긋나지 않는다")
     void cancel_withConcurrentOrders_keepsStockConsistent() throws Exception {
         int members = 5;
@@ -437,7 +537,22 @@ class OrderCancelServiceTransactionTest extends MySqlContainerSupport {
             LocalDateTime.now().minusMinutes(10), order.getId());
     }
 
-    private void saveFailedPayment(Order order) {
+    // 결제를 만든 시각을 결제 만료 시간보다 이전으로 돌린다
+    private void makeOld(Payment payment) {
+        jdbcTemplate.update("update payments set created_at = ? where id = ?",
+            LocalDateTime.now().minusMinutes(20), payment.getId());
+    }
+
+    private Payment saveReadyPayment(Order order) {
+        return paymentRepository.save(Payment.builder()
+            .order(order)
+            .portonePaymentId("payment-" + UUID.randomUUID().toString().replace("-", ""))
+            .amount(order.getTotalAmount())
+            .expiresAt(LocalDateTime.now().plusMinutes(10))
+            .build());
+    }
+
+    private Payment saveFailedPayment(Order order) {
         Payment payment = Payment.builder()
             .order(order)
             .portonePaymentId("payment-" + UUID.randomUUID().toString().replace("-", ""))
@@ -445,7 +560,7 @@ class OrderCancelServiceTransactionTest extends MySqlContainerSupport {
             .expiresAt(LocalDateTime.now().plusMinutes(10))
             .build();
         payment.fail(FailReason.USER_CANCELLED);
-        paymentRepository.save(payment);
+        return paymentRepository.save(payment);
     }
 
     private void assertDeleted(Order order) {

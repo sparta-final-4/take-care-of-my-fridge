@@ -1,5 +1,6 @@
 package org.example.takecareofmyfridgebe.domain.payment.scheduler;
 
+import org.example.takecareofmyfridgebe.domain.order.service.OrderCancelService;
 import org.example.takecareofmyfridgebe.domain.payment.entity.Payment;
 import org.example.takecareofmyfridgebe.domain.payment.facade.PaymentFacade;
 import org.example.takecareofmyfridgebe.domain.payment.service.PaymentService;
@@ -30,6 +31,9 @@ class PaymentTimeoutSchedulerTest {
 
     @Mock
     private PaymentFacade paymentFacade;
+
+    @Mock
+    private OrderCancelService orderCancelService;
 
     @InjectMocks
     private PaymentTimeoutScheduler scheduler;
@@ -96,5 +100,18 @@ class PaymentTimeoutSchedulerTest {
         scheduler.retryCompensations();
 
         verify(paymentFacade).retryCompensation(second);
+    }
+
+    @Test
+    @DisplayName("결제 대기 주문 취소가 한 건 실패해도 나머지 주문은 계속 취소한다")
+    void cancelAbandonedOrders_oneFailure_othersStillProcessed() {
+        given(paymentService.findAbandonedOrderIds(any(), eq(0L), eq(PaymentTimeoutScheduler.BATCH_SIZE)))
+                .willReturn(List.of(1L, 2L, 3L));
+        willThrow(new IllegalStateException("DB 오류")).given(orderCancelService).cancelAbandoned(eq(2L), any());
+
+        scheduler.cancelAbandonedOrders();
+
+        verify(orderCancelService).cancelAbandoned(eq(1L), any());
+        verify(orderCancelService).cancelAbandoned(eq(3L), any());
     }
 }
