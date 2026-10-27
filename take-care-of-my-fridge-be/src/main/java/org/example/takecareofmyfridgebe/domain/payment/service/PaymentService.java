@@ -61,6 +61,11 @@ public class PaymentService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.PAYMENT_NOT_FOUND));
     }
 
+    // 결제 시도가 한 번이라도 있었는지 본다. 상태와 상관없이 결제 행이 있으면 true다
+    public boolean hasPayment(Long orderId) {
+        return paymentRepository.existsByOrderId(orderId);
+    }
+
     // 스케줄러가 만료 처리할 결제 대기 건을 afterId 다음부터 id 순으로 조회한다
     public List<Payment> findExpiredReady(LocalDateTime now, long afterId, int limit) {
         return paymentRepository.findExpired(PaymentStatus.READY, now, afterId, PageRequest.of(0, limit));

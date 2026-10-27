@@ -3,7 +3,6 @@ package org.example.takecareofmyfridgebe.domain.order.controller;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.auth.service.AuthSessionService;
-import org.example.takecareofmyfridgebe.domain.order.dto.OrderCancelResponse;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderCheckoutResponse;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderConfirmResponse;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderCreateRequest;
@@ -74,12 +73,13 @@ public class OrderController {
         return ResponseEntity.ok(ApiResponse.ok(orderQueryService.getCheckout(principal.memberId(), orderId)));
     }
 
-    // 주문 확인 화면의 취소하기. 이미 취소된 주문에도 같은 200 응답을 준다.
+    // 주문 확인 화면의 취소하기와 나가기. 결제를 시도하지 않은 주문을 지운다. 지운 주문에 다시 오면 404다.
     @PatchMapping("/{orderId}/cancel")
-    public ResponseEntity<ApiResponse<OrderCancelResponse>> cancelOrder(
+    public ResponseEntity<ApiResponse<Void>> cancelOrder(
             @AuthenticationPrincipal AuthSessionService.AuthPrincipal principal,
             @PathVariable Long orderId) {
-        return ResponseEntity.ok(ApiResponse.ok(orderCancelService.cancel(principal.memberId(), orderId)));
+        orderCancelService.cancel(principal.memberId(), orderId);
+        return ResponseEntity.ok(ApiResponse.ok());
     }
 
     // 주문 상세 화면의 구매 확정. 이미 구매 확정된 주문에도 같은 200 응답을 준다.
