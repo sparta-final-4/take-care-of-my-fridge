@@ -1,6 +1,5 @@
 import {
   orderApi,
-  type OrderCancelResponse,
   type OrderCheckoutResponse,
   type OrderConfirmResponse,
   type OrderCreateItemRequest,
@@ -33,9 +32,9 @@ export async function getOrderDetail(
   return unwrap(orderApi.getDetail({ orderId }, { signal }));
 }
 
-// 이미 취소된 주문에도 서버는 같은 성공 응답을 준다. 재고는 처음 취소할 때만 돌아간다.
-export async function cancelOrder(orderId: number): Promise<OrderCancelResponse> {
-  return unwrap(orderApi.cancelOrder({ orderId }));
+// 결제를 시도하지 않은 주문은 서버가 재고를 되돌리고 지운다. 지운 주문에 다시 보내면 ORDER_001이다.
+export async function cancelOrder(orderId: number): Promise<void> {
+  await orderApi.cancelOrder({ orderId });
 }
 
 // 이미 구매 확정된 주문에도 서버는 같은 성공 응답을 준다.

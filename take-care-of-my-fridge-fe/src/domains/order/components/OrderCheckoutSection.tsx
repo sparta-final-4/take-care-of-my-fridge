@@ -3,7 +3,7 @@ import { App, Button, Divider, Flex, Modal, Result, Skeleton, Tag, Typography } 
 import { useNavigate } from 'react-router';
 
 import { ROUTES } from '@/app/paths';
-import { getErrorCode } from '@/common/api/errors';
+import { getErrorCode, getErrorMessage } from '@/common/api/errors';
 import { useAuthStore } from '@/common/auth/authStore';
 import { formatPrice } from '@/domains/cart/format';
 import { useCancelOnLeave } from '@/domains/order/hooks/useCancelOnLeave';
@@ -39,7 +39,7 @@ export function OrderCheckoutSection({ orderId }: OrderCheckoutSectionProps) {
 
   // 결제 준비 후 PortOne 결제창을 띄우고, 결제창이 성공으로 끝나면 서버가 PG 결제를 확인한 뒤에만 성공으로 본다.
   // 결제창 실패·취소는 결제창 응답 그대로 돌려준다. 서버가 거절하면(만료·금액 불일치·결제할 수 없는 주문 등)
-  // 오류로 끝나 전역 알림이 서버 메시지를 띄운다.
+  // 오류로 끝나 서버 메시지를 띄운다. 지워진 주문(ORDER_001)만 따로 처리한다.
   const payMutation = useMutation({
     mutationFn: async (customer: PaymentCustomer) => {
       const payment = await preparePayment(orderId);
@@ -48,6 +48,7 @@ export function OrderCheckoutSection({ orderId }: OrderCheckoutSectionProps) {
       await confirmPayment(orderId, payment.portonePaymentId);
       return response;
     },
+    meta: { skipGlobalError: true },
   });
   // 결제사에 보낼 연락처는 회원 가입 때 받은 휴대폰 번호를 쓴다.
   const handlePay = () => {
@@ -68,6 +69,16 @@ export function OrderCheckoutSection({ orderId }: OrderCheckoutSectionProps) {
           // 결제를 마치고 떠나는 이동은 붙잡지 않는다. 붙잡으면 나가기 확인에서 방금 결제한 주문이 취소된다.
           allowLeave();
           navigate(ROUTES.home, { replace: true });
+        },
+        // 생성 5분이 지나 서버가 지운 주문이면 남은 주문이 없으므로 붙잡지 않고 장바구니로 보낸다
+        onError: (error) => {
+          if (getErrorCode(error) !== 'ORDER_001') {
+            message.error(getErrorMessage(error));
+            return;
+          }
+          message.info('주문 시간이 지났습니다. 다시 주문해 주세요.');
+          allowLeave();
+          navigate(ROUTES.cart);
         },
       },
     );
