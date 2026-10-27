@@ -3,7 +3,7 @@ import { Button, Checkbox, Flex, Tag, Typography } from 'antd';
 
 import type { RefundableItemResponse } from '@/common/api/clients';
 import { formatPrice, SALE_TYPE_LABELS } from '@/domains/cart/format';
-import { getRefundRowState } from '@/domains/refund/format';
+import { getOrderItemRefundState, getRefundRowState } from '@/domains/refund/format';
 
 import styles from './RefundItemRow.module.scss';
 
@@ -48,6 +48,7 @@ export function RefundItemHeader() {
 export function RefundItemRow({ item, listPrice, quantity, onChange }: RefundItemRowProps) {
   const name = item.productName ?? '';
   const state = getRefundRowState(item);
+  const refundState = getOrderItemRefundState(item);
   const refundable = state === 'refundable';
   const orderedQuantity = item.orderedQuantity ?? 0;
   const refundedQuantity = item.refundedQuantity ?? 0;
@@ -82,13 +83,12 @@ export function RefundItemRow({ item, listPrice, quantity, onChange }: RefundIte
         <Typography.Text strong title={name} className={styles.name}>
           {name}
         </Typography.Text>
-        {(saleType || refundedQuantity > 0) && (
+        {(saleType || refundState === 'partial' || refundState === 'full') && (
           <Flex gap="small" wrap>
             {saleType && <Tag className={styles.tag}>{SALE_TYPE_LABELS[saleType]}</Tag>}
-            {refundedQuantity > 0 && (
-              <Tag className={styles.tag}>
-                {refundedQuantity >= orderedQuantity ? '환불' : `부분 환불 ${refundedQuantity}개`}
-              </Tag>
+            {refundState === 'full' && <Tag className={styles.tag}>환불</Tag>}
+            {refundState === 'partial' && (
+              <Tag className={styles.tag}>부분 환불 {refundedQuantity}개</Tag>
             )}
           </Flex>
         )}

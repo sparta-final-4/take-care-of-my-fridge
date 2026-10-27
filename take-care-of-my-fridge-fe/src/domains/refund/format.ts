@@ -2,10 +2,12 @@ import type {
   RefundableItemResponse,
   RefundCreateRequest,
   RefundHistoryResponse,
+  RefundSummaryResponse,
 } from '@/common/api/clients';
 
 type RefundReasonType = RefundCreateRequest['reasonType'];
 type RefundStatus = NonNullable<RefundHistoryResponse['status']>;
+type RefundSummaryStatus = NonNullable<RefundSummaryResponse['refundStatus']>;
 
 // 환불 내역에 짧게 보여 주는 사유
 export const REFUND_REASON_LABELS: Record<RefundReasonType, string> = {
@@ -27,6 +29,14 @@ export const REFUND_STATUS_LABELS: Record<RefundStatus, string> = {
   REQUESTED: '환불 진행 중',
   COMPLETED: '환불 완료',
   FAILED: '환불 실패',
+};
+
+// 주문 목록의 환불 상태 태그. 환불이 없으면 태그를 붙이지 않는다.
+export const REFUND_SUMMARY_LABELS: Record<RefundSummaryStatus, string | undefined> = {
+  NONE: undefined,
+  IN_PROGRESS: '환불 진행 중',
+  PARTIAL: '부분 환불',
+  FULL: '환불 완료',
 };
 
 export type RefundRowState = 'refundable' | 'refunded' | 'saleBlocked';

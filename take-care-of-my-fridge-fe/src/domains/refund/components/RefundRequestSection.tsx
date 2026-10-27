@@ -21,7 +21,7 @@ import { useState } from 'react';
 import { generatePath, Link, useNavigate } from 'react-router';
 
 import { ROUTES } from '@/app/paths';
-import type { RefundCreateRequest } from '@/common/api/clients';
+import type { RefundableItemResponse, RefundCreateRequest } from '@/common/api/clients';
 import { getErrorCode } from '@/common/api/errors';
 import { formatPrice } from '@/domains/cart/format';
 import { orderQueries } from '@/domains/order/queries';
@@ -135,13 +135,20 @@ export function RefundRequestSection({ orderId }: RefundRequestSectionProps) {
   const refundableItems = items.filter((item) => getRefundRowState(item) === 'refundable');
   const blockedCount = items.filter((item) => getRefundRowState(item) === 'saleBlocked').length;
   const refundedCount = items.length - refundableItems.length - blockedCount;
-  const selectedItems = items.flatMap((item) => {
-    const quantity = quantities[item.orderItemId ?? 0];
+  // 신청이 거절된 뒤 다시 읽은 남은 수량보다 많이 골라 둔 수량은 남은 수량으로 줄이고, 남은 수량이 없으면 선택에서 뺀다.
+  const selectedQuantityOf = (item: RefundableItemResponse) => {
+    const selected = quantities[item.orderItemId ?? 0];
+    if (selected === undefined) return undefined;
+    const quantity = Math.min(selected, item.refundableQuantity ?? 0);
+    return quantity > 0 ? quantity : undefined;
+  };
+  const selectedItems = refundableItems.flatMap((item) => {
+    const quantity = selectedQuantityOf(item);
     return quantity === undefined ? [] : [{ item, quantity }];
   });
   const allSelected =
     refundableItems.length > 0 &&
-    refundableItems.every((item) => quantities[item.orderItemId ?? 0] !== undefined);
+    refundableItems.every((item) => selectedQuantityOf(item) !== undefined);
 
   const payAmount = order.payAmount ?? 0;
   const refundedAmount = sumRefundedAmount(items);
@@ -188,9 +195,12 @@ export function RefundRequestSection({ orderId }: RefundRequestSectionProps) {
       },
       {
         onSuccess: (result) => {
-          message.success(
-            result.status === 'COMPLETED' ? '환불이 완료되었습니다.' : '환불을 신청했습니다.',
-          );
+          if (result.status === 'COMPLETED') {
+            message.success('환불이 완료되었습니다.');
+          } else {
+            // 결제사 처리 결과를 아직 확정하지 못했다. 서버가 결제사와 맞춰 마무리하므로 접수만 알린다.
+            message.info('환불을 접수했습니다. 결제사 처리가 끝나면 환불 내역에 반영됩니다.');
+          }
           navigate(generatePath(ROUTES.mypageOrderRefunds, orderIdParam));
         },
         onError: () => setConfirmAsked(false),
@@ -241,7 +251,7 @@ export function RefundRequestSection({ orderId }: RefundRequestSectionProps) {
                 key={item.orderItemId}
                 item={item}
                 listPrice={listPrices.get(item.productId)}
-                quantity={quantities[item.orderItemId ?? 0]}
+                quantity={selectedQuantityOf(item)}
                 onChange={(quantity) => handleQuantityChange(item.orderItemId ?? 0, quantity)}
               />
             ))}

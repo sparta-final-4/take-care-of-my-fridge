@@ -25,6 +25,7 @@ interface RefundDetailSectionProps {
 
 // 한 주문의 환불을 모아 보여 준다. 주문번호·결제 금액은 주문 상세에서, 환불 상품·내역은 환불 내역에서 가져온다.
 // 환불 금액은 완료된 환불만 더한다. 진행 중인 환불은 따로 보여 준다.
+// 실패한 환불은 돈이 움직이지 않았으므로 보여 주지 않는다. 실패만 있으면 환불 내역이 없는 것으로 본다.
 export function RefundDetailSection({ orderId }: RefundDetailSectionProps) {
   const navigate = useNavigate();
   const validOrderId = Number.isSafeInteger(orderId) && orderId > 0;
@@ -65,7 +66,7 @@ export function RefundDetailSection({ orderId }: RefundDetailSectionProps) {
   }
 
   const order = orderQuery.data;
-  const history = historyQuery.data;
+  const history = historyQuery.data.filter((refund) => refund.status !== 'FAILED');
   const overallStatus = getOverallRefundStatus(history);
   const refundedItems = groupRefundedItems(history);
   const payAmount = order.payAmount ?? 0;
@@ -116,6 +117,7 @@ export function RefundDetailSection({ orderId }: RefundDetailSectionProps) {
                     quantity: item.quantity,
                     unitPrice: item.unitPrice,
                     lineAmount: item.amount,
+                    // 특가·번개 드롭은 환불할 수 없어 환불 상품은 늘 일반 상품이다. 환불 내역 응답에 판매 유형이 없어 고정한다
                     saleType: 'NONE',
                   }}
                 />
