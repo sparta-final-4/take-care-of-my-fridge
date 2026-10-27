@@ -2,7 +2,7 @@ import { keepPreviousData, queryOptions } from '@tanstack/react-query';
 
 import type { AdminProductListRequest, ProductListRequest } from '@/common/api/clients';
 
-import { getAdminProducts, getProduct, getProducts } from './api';
+import { getAdminProduct, getAdminProducts, getProduct, getProducts } from './api';
 
 export const productQueries = {
   all: ['products'] as const,
@@ -23,5 +23,10 @@ export const productQueries = {
       queryKey: [...productQueries.all, 'admin', 'list', request],
       queryFn: ({ signal }) => getAdminProducts(request, signal),
       placeholderData: keepPreviousData,
+    }),
+  adminDetail: (productId: number) =>
+    queryOptions({
+      queryKey: [...productQueries.all, 'admin', 'detail', productId],
+      queryFn: ({ signal }) => getAdminProduct(productId, signal),
     }),
 };
