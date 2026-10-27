@@ -88,15 +88,30 @@ class OrderItemRepositoryTest extends MySqlContainerSupport {
             new DailyProductSales(20L, DAY, 4));
     }
 
+    @Test
+    @DisplayName("확정 전에 환불이 완료된 수량은 확정 수량에서 빠져 판매량에 들어가지 않는다")
+    void findDailyProductSales_usesConfirmedQuantity() {
+        confirmedOrder(DAY.atTime(10, 0), 10L, 5, 2);
+        flushAndClear();
+
+        assertThat(find(TO))
+            .containsExactly(new DailyProductSales(10L, DAY, 3));
+    }
+
     private List<DailyProductSales> find(LocalDateTime asOf) {
         return orderItemRepository.findDailyProductSales(OrderStatus.CONFIRMED, FROM, TO, asOf);
     }
 
     private void confirmedOrder(LocalDateTime confirmedAt, Long productId, int quantity) {
+        confirmedOrder(confirmedAt, productId, quantity, 0);
+    }
+
+    // 구매 확정 서비스처럼 확정하면서 주문 수량에서 완료된 환불 수량을 뺀 확정 수량을 저장한다
+    private void confirmedOrder(LocalDateTime confirmedAt, Long productId, int quantity, long completedRefundQuantity) {
         Order order = persistOrder();
         order.markPaid(confirmedAt.minusHours(1));
         order.confirm(confirmedAt);
-        persistItem(order, productId, quantity);
+        persistItem(order, productId, quantity).confirmQuantity(completedRefundQuantity);
     }
 
     private Order persistOrder() {
@@ -110,8 +125,8 @@ class OrderItemRepositoryTest extends MySqlContainerSupport {
         return order;
     }
 
-    private void persistItem(Order order, Long productId, int quantity) {
-        entityManager.persist(OrderItem.builder()
+    private OrderItem persistItem(Order order, Long productId, int quantity) {
+        OrderItem item = OrderItem.builder()
             .order(order)
             .productId(productId)
             .productName("상품" + productId)
@@ -119,7 +134,9 @@ class OrderItemRepositoryTest extends MySqlContainerSupport {
             .listPrice(1000)
             .unitPrice(1000)
             .saleType(SaleType.NONE)
-            .build());
+            .build();
+        entityManager.persist(item);
+        return item;
     }
 
     private void flushAndClear() {
