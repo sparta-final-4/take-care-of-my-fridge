@@ -1,9 +1,15 @@
 package org.example.takecareofmyfridgebe.domain.order.service;
 
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderConfirmResponse;
 import org.example.takecareofmyfridgebe.domain.order.entity.Order;
+import org.example.takecareofmyfridgebe.domain.order.entity.OrderItem;
+import org.example.takecareofmyfridgebe.domain.refund.service.RefundQueryService;
+import org.example.takecareofmyfridgebe.global.error.BusinessException;
+import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -14,16 +20,29 @@ import org.springframework.transaction.annotation.Transactional;
 public class OrderConfirmService {
 
     private final OrderReader orderReader;
+    private final RefundQueryService refundQueryService;
 
     // 주문 행을 잠그고 상태를 확인하므로 같은 주문의 구매 확정이 동시에 와도 하나씩 순서대로 처리된다.
     // 결제 완료에서 구매 확정으로 바꾼 요청만 확정 시각을 남기고, 뒤에 온 요청은 이미 확정된 주문을 보고 같은 응답만 돌려준다.
+    // 환불 신청도 같은 주문 행을 잠그므로, 잠근 뒤 요청 상태 환불이 없으면 확정이 끝날 때까지 새 환불이 생기지 않는다.
     @Transactional
     public OrderConfirmResponse confirm(Long memberId, Long orderId) {
         Order order = orderReader.getOwnedOrderForUpdate(memberId, orderId);
         if (order.isConfirmed()) {
             return OrderConfirmResponse.from(order);
         }
+        if (refundQueryService.hasRequestedRefund(order.getId())) {
+            throw new BusinessException(ErrorCode.ORDER_REFUND_IN_PROGRESS);
+        }
         order.confirm(LocalDateTime.now());
+        confirmQuantities(orderReader.getOrderItems(order));
         return OrderConfirmResponse.from(order);
+    }
+
+    // 확정 수량은 주문 수량에서 완료된 환불 수량을 뺀 값이다. 할인 상품은 환불이 없어 주문 수량과 같다
+    private void confirmQuantities(List<OrderItem> items) {
+        Map<Long, Long> completedById = refundQueryService.getCompletedRefundQuantities(
+            items.stream().map(OrderItem::getId).toList());
+        items.forEach(item -> item.confirmQuantity(completedById.getOrDefault(item.getId(), 0L)));
     }
 }

@@ -159,6 +159,7 @@ erDiagram
         enum sale_type
         bigint sale_event_item_id "외부 참조"
         bigint flash_drop_member_id "외부 참조"
+        int confirmed_quantity
     }
 ```
 

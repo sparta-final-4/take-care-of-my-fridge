@@ -1,17 +1,5 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
-import {
-  App,
-  Button,
-  Divider,
-  Flex,
-  Form,
-  Input,
-  Modal,
-  Result,
-  Skeleton,
-  Tag,
-  Typography,
-} from 'antd';
+import { App, Button, Divider, Flex, Modal, Result, Skeleton, Tag, Typography } from 'antd';
 import { useNavigate } from 'react-router';
 
 import { ROUTES } from '@/app/paths';
@@ -20,7 +8,7 @@ import { useAuthStore } from '@/common/auth/authStore';
 import { formatPrice } from '@/domains/cart/format';
 import { useCancelOnLeave } from '@/domains/order/hooks/useCancelOnLeave';
 import { orderQueries } from '@/domains/order/queries';
-import { preparePayment } from '@/domains/payment/api';
+import { confirmPayment, preparePayment } from '@/domains/payment/api';
 import { openPaymentWindow, type PaymentCustomer } from '@/domains/payment/portone';
 
 import { OrderItemRow } from './OrderItemRow';
@@ -29,13 +17,6 @@ import styles from './OrderCheckoutSection.module.scss';
 interface OrderCheckoutSectionProps {
   orderId: number;
 }
-
-interface PayFormValues {
-  phoneNumber: string;
-}
-
-// 휴대폰 번호. 하이픈은 있어도 되고 결제사에는 숫자만 보낸다.
-const PHONE_PATTERN = /^01\d-?\d{3,4}-?\d{4}$/;
 
 // 결제 대기 주문만 그린다. 결제 완료·취소·없는 주문은 서버가 오류로 알려 주고 안내로 바꾼다.
 export function OrderCheckoutSection({ orderId }: OrderCheckoutSectionProps) {
@@ -56,18 +37,26 @@ export function OrderCheckoutSection({ orderId }: OrderCheckoutSectionProps) {
   const { message } = App.useApp();
   const member = useAuthStore((state) => state.member);
 
-  // 결제 준비 후 PortOne 결제창을 띄운다.
+  // 결제 준비 후 PortOne 결제창을 띄우고, 결제창이 성공으로 끝나면 서버가 PG 결제를 확인한 뒤에만 성공으로 본다.
+  // 결제창 실패·취소는 결제창 응답 그대로 돌려준다. 서버가 거절하면(만료·금액 불일치·결제할 수 없는 주문 등)
+  // 오류로 끝나 전역 알림이 서버 메시지를 띄운다.
   const payMutation = useMutation({
-    mutationFn: async (customer: PaymentCustomer) =>
-      openPaymentWindow(await preparePayment(orderId), customer),
+    mutationFn: async (customer: PaymentCustomer) => {
+      const payment = await preparePayment(orderId);
+      const response = await openPaymentWindow(payment, customer);
+      if (!response || response.code) return response;
+      await confirmPayment(orderId, payment.portonePaymentId);
+      return response;
+    },
   });
-  const handlePay = ({ phoneNumber }: PayFormValues) =>
+  // 결제사에 보낼 연락처는 회원 가입 때 받은 휴대폰 번호를 쓴다.
+  const handlePay = () => {
+    if (!member?.phone) {
+      message.warning('회원 정보에 휴대폰 번호가 없어 결제할 수 없습니다.');
+      return;
+    }
     payMutation.mutate(
-      {
-        fullName: member?.nickname ?? '',
-        phoneNumber: phoneNumber.replaceAll('-', ''),
-        email: member?.email ?? '',
-      },
+      { fullName: member.nickname ?? '', phoneNumber: member.phone, email: member.email ?? '' },
       {
         onSuccess: (response) => {
           if (!response) return;
@@ -82,6 +71,7 @@ export function OrderCheckoutSection({ orderId }: OrderCheckoutSectionProps) {
         },
       },
     );
+  };
 
   const goToCart = () => navigate(ROUTES.cart);
   const cartButton = (
@@ -173,33 +163,16 @@ export function OrderCheckoutSection({ orderId }: OrderCheckoutSectionProps) {
               {formatPrice(order.payAmount ?? 0)}
             </Typography.Text>
           </Flex>
-          <Form<PayFormValues>
-            layout="vertical"
-            requiredMark={false}
-            onFinish={handlePay}
+          <Button
+            type="primary"
+            size="large"
+            block
+            loading={payMutation.isPending}
+            onClick={handlePay}
             className={styles.pay}
           >
-            <Form.Item
-              label="연락처"
-              name="phoneNumber"
-              extra="결제 확인을 위해 결제사에만 전달됩니다."
-              rules={[
-                { required: true, message: '연락처를 입력해 주세요.' },
-                { pattern: PHONE_PATTERN, message: '휴대폰 번호를 정확히 입력해 주세요.' },
-              ]}
-            >
-              <Input inputMode="tel" autoComplete="tel" placeholder="01012345678" />
-            </Form.Item>
-            <Button
-              type="primary"
-              htmlType="submit"
-              size="large"
-              block
-              loading={payMutation.isPending}
-            >
-              결제하기
-            </Button>
-          </Form>
+            결제하기
+          </Button>
           <Button size="large" block onClick={askCancel} className={styles.cancel}>
             취소하기
           </Button>

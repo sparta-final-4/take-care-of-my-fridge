@@ -90,30 +90,6 @@
   white-space: nowrap;
 }
 
-// 환불 칸이 있으면 모바일은 상품 정보 오른쪽에, md부터는 금액 다음 칸에 둔다
-.withRefund {
-  grid-template-areas:
-    'thumb info refund'
-    'quantity price total';
-
-  @include from(md) {
-    grid-template-areas: 'thumb info quantity price total refund';
-    grid-template-columns:
-      auto minmax(0, 1fr)
-      $order-quantity-width $cart-total-min-width $cart-total-min-width $order-refund-width;
-  }
-}
-
-.refund {
-  grid-area: refund;
-  text-align: right;
-  white-space: nowrap;
-
-  @include from(md) {
-    text-align: center;
-  }
-}
-
 // 칸 너비가 ch 단위라 격자의 글자 크기·굵기를 행과 같게 두고, 굵기는 칸 글자에만 준다
 .head {
   display: none;

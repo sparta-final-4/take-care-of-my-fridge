@@ -19,6 +19,8 @@ import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -152,15 +154,23 @@ class PaymentFacadeTest {
         verifyNoInteractions(paymentGateway, paymentCommandService);
     }
 
-    @Test
-    @DisplayName("이미 FAILED면 ALREADY_PROCESSED_PAYMENT")
-    void confirm_alreadyFailed_throws() {
+    @ParameterizedTest(name = "{0}이면 {1}")
+    @CsvSource({
+            "TIMEOUT, PAYMENT_EXPIRED",
+            "AMOUNT_MISMATCH, PAYMENT_AMOUNT_MISMATCH",
+            "ORDER_NOT_PAYABLE, PAYMENT_ORDER_NOT_PAYABLE",
+            "PG_FAILED, ALREADY_PROCESSED_PAYMENT",
+            "USER_CANCELLED, ALREADY_PROCESSED_PAYMENT",
+            "SUPERSEDED, ALREADY_PROCESSED_PAYMENT"
+    })
+    @DisplayName("이미 FAILED면 PG 조회 없이 실패 이유에 맞는 오류로 거절한다(웹훅·스케줄러가 먼저 실패 처리한 경우)")
+    void confirm_alreadyFailed_throwsByFailReason(FailReason failReason, ErrorCode expected) {
         Payment payment = newPayment();
-        payment.fail(FailReason.TIMEOUT);
+        payment.fail(failReason);
 
         assertThatThrownBy(() -> confirm(MEMBER_ID))
                 .isInstanceOf(BusinessException.class)
-                .extracting("errorCode").isEqualTo(ErrorCode.ALREADY_PROCESSED_PAYMENT);
+                .extracting("errorCode").isEqualTo(expected);
         verifyNoInteractions(paymentGateway, paymentCommandService);
     }
 

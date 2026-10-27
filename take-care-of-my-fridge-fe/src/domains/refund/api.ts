@@ -24,7 +24,7 @@ export async function getRefundHistory(
   return unwrap(refundApi.getRefundHistory({ orderId }, { signal }));
 }
 
-// 서버가 PG 취소까지 끝낸 뒤 응답한다.
+// 서버가 PG 취소까지 끝낸 뒤 응답한다. PG 결과를 확정하지 못하면 REQUESTED로 오고 서버가 나중에 마무리한다.
 export async function requestRefund(request: RefundCreateRequest): Promise<RefundResponse> {
   return unwrap(refundApi.request({ refundCreateRequest: request }));
 }

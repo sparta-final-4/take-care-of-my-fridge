@@ -198,6 +198,7 @@
 | sale_type | ENUM('NONE','SPECIAL','FLASH_DROP') | 불가 | | | 주문 당시 할인 구분 |
 | sale_event_item_id | BIGINT | 허용 | NULL | | 할인으로 샀을 때의 행사 항목. 일반 상품은 NULL. 물리 FK 없음 |
 | flash_drop_member_id | BIGINT | 허용 | NULL | UK(sale_event_item_id, flash_drop_member_id) | 번개 드롭 1인 1개 확인용 회원. 번개 드롭 항목에만 값이 있고 주문을 취소하면 NULL |
+| confirmed_quantity | INT | 허용 | NULL | | 구매 확정 수량. 구매 확정 때 주문 수량에서 완료된 환불 수량을 뺀 값. 확정 전에는 NULL이고 확정 뒤에는 바뀌지 않음 |
 
 - 같은 행사 항목에 같은 회원은 한 번만 들어갈 수 있습니다(번개 드롭 1인 1개). NULL은 여러 건 가능합니다.
 

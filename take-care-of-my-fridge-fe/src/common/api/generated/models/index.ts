@@ -114,6 +114,7 @@ export * from './order-checkout-response';
 export * from './order-confirm-response';
 export * from './order-create-item-request';
 export * from './order-create-request';
+export * from './order-detail-item-response';
 export * from './order-detail-response';
 export * from './order-item-response';
 export * from './order-list-request';

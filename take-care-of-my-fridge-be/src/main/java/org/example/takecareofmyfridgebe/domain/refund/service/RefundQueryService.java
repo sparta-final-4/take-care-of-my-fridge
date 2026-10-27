@@ -35,7 +35,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-// 환불 화면에 필요한 조회. 주문을 잠그지 않으므로 신청 시점의 최종 검증은 RefundCommandService가 한다
+// 환불 화면과 구매 확정에 필요한 조회. 주문을 잠그지 않으므로 신청 시점의 최종 검증은 RefundCommandService가 한다
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -65,6 +65,18 @@ public class RefundQueryService {
                         refundedById.getOrDefault(item.getId(), 0L).intValue(),
                         RefundableOrderPolicy.isRefundableItem(item)))
                 .toList();
+    }
+
+    // 구매 확정 검증용. 실패한 환불은 진행 중으로 보지 않는다
+    public boolean hasRequestedRefund(Long orderId) {
+        return refundRepository.existsByOrderIdAndStatus(orderId, RefundStatus.REQUESTED);
+    }
+
+    // 구매 확정 수량 계산용. 완료된 환불만 주문 상품별로 합산하고, 환불이 없는 주문 상품은 결과에 없다
+    public Map<Long, Long> getCompletedRefundQuantities(List<Long> orderItemIds) {
+        return refundItemRepository
+                .findRefundedQuantitiesByOrderItemIds(orderItemIds, List.of(RefundStatus.COMPLETED)).stream()
+                .collect(Collectors.toMap(RefundedQuantity::orderItemId, RefundedQuantity::quantity));
     }
 
     // 환불 상세 화면. 주문의 환불을 상태와 관계없이 최신순으로 돌려준다. 구매 확정된 주문의 지난 환불도 보여 준다
