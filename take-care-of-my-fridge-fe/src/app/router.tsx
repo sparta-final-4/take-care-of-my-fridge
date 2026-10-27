@@ -88,6 +88,10 @@ export const router = createBrowserRouter([
           },
           { path: ROUTES.adminDeals, lazy: page(() => import('@/pages/admin/AdminDealPage')) },
           {
+            path: ROUTES.adminProducts,
+            lazy: page(() => import('@/pages/admin/AdminProductsPage')),
+          },
+          {
             path: ROUTES.adminProductNew,
             lazy: page(() => import('@/pages/admin/AdminProductCreatePage')),
           },
