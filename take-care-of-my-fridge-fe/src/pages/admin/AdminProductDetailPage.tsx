@@ -23,6 +23,11 @@ import styles from './AdminProductDetailPage.module.scss';
 const TYPE_LABELS = { INGREDIENT: '재료', MEALKIT: '밀키트' };
 const STATUS_LABELS = { ON_SALE: '판매 중', SOLD_OUT: '품절', STOPPED: '판매 중지' };
 const STORAGE_LABELS = { ROOM_TEMP: '상온', REFRIGERATED: '냉장', FROZEN: '냉동' };
+// 판매 중·품절은 서버가 재고로 정하므로 판매 여부만 고른다.
+const SALES_OPTIONS = [
+  { value: 'ON_SALE', label: '판매' },
+  { value: 'STOPPED', label: '판매 중지' },
+];
 
 function AdminProductDetail({ productId }: { productId: number }) {
   const { message } = App.useApp();
@@ -96,10 +101,22 @@ function AdminProductDetail({ productId }: { productId: number }) {
       <Form<ProductUpdateRequest>
         key={`${detail.price}-${detail.status}`}
         layout="vertical"
-        initialValues={{ price: detail.price, status: detail.status }}
+        initialValues={{
+          price: detail.price,
+          status: detail.status === 'STOPPED' ? 'STOPPED' : 'ON_SALE',
+        }}
         onFinish={(values) =>
           update.mutate(
-            { price: values.price, status: values.status },
+            {
+              price: values.price,
+              // 백엔드도 재고로 상태를 맞추지만(#303), 그 전에도 어긋나지 않게 재고로 정해 보낸다.
+              status:
+                values.status === 'STOPPED'
+                  ? 'STOPPED'
+                  : detail.stock === 0
+                    ? 'SOLD_OUT'
+                    : 'ON_SALE',
+            },
             { onSuccess: () => void message.success('상품 정보를 수정했습니다.') },
           )
         }
@@ -111,10 +128,17 @@ function AdminProductDetail({ productId }: { productId: number }) {
         >
           <InputNumber min={1} max={10000000} precision={0} className={styles.fullWidth} />
         </Form.Item>
-        <Form.Item name="status" label="판매 상태" rules={[{ required: true }]}>
-          <Select
-            options={Object.entries(STATUS_LABELS).map(([value, label]) => ({ value, label }))}
-          />
+        <Form.Item
+          name="status"
+          label="판매 여부"
+          rules={[{ required: true }]}
+          extra={
+            detail.stock === 0
+              ? '재고가 0이라 판매로 저장하면 품절로 표시됩니다.'
+              : '판매 중·품절은 재고에 따라 정해집니다.'
+          }
+        >
+          <Select options={SALES_OPTIONS} />
         </Form.Item>
         <Button type="primary" htmlType="submit" loading={update.isPending}>
           저장
