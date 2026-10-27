@@ -51,7 +51,6 @@ models/api-response-list-refundable-item-response.ts
 models/api-response-my-info-response.ts
 models/api-response-my-recipe-list-response.ts
 models/api-response-nickname-availability-response.ts
-models/api-response-order-cancel-response.ts
 models/api-response-order-checkout-response.ts
 models/api-response-order-confirm-response.ts
 models/api-response-order-detail-response.ts
@@ -137,7 +136,6 @@ models/my-recipe-summary-response.ts
 models/nickname-availability-request.ts
 models/nickname-availability-response.ts
 models/nutrition.ts
-models/order-cancel-response.ts
 models/order-checkout-response.ts
 models/order-confirm-response.ts
 models/order-create-item-request.ts

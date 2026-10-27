@@ -1662,7 +1662,7 @@
             "content": {
               "*/*": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiResponseOrderCancelResponse"
+                  "$ref": "#/components/schemas/ApiResponseVoid"
                 }
               }
             },
@@ -2723,20 +2723,6 @@
         "properties": {
           "data": {
             "$ref": "#/components/schemas/NicknameAvailabilityResponse"
-          },
-          "error": {
-            "$ref": "#/components/schemas/ErrorResponse"
-          },
-          "success": {
-            "type": "boolean"
-          }
-        }
-      },
-      "ApiResponseOrderCancelResponse": {
-        "type": "object",
-        "properties": {
-          "data": {
-            "$ref": "#/components/schemas/OrderCancelResponse"
           },
           "error": {
             "$ref": "#/components/schemas/ErrorResponse"
@@ -4622,24 +4608,6 @@
           },
           "weightG": {
             "type": "number"
-          }
-        }
-      },
-      "OrderCancelResponse": {
-        "type": "object",
-        "properties": {
-          "orderId": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "PENDING",
-              "PAID",
-              "CANCELLED",
-              "CONFIRMED"
-            ]
           }
         }
       },
