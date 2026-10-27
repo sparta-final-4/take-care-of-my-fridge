@@ -128,10 +128,15 @@ public class Product extends BaseTimeEntity {
         this.imageUrl = imageUrl;
     }
 
+    // 판매 중지가 아니면 판매 중·품절은 재고로 정한다(재고 0 = 품절). 요청한 상태가 재고와 어긋나도 재고를 따른다.
     public void changeSales(int price, int stock, ProductStatus status) {
         this.price = price;
         this.stock = stock;
-        this.status = status;
+        if (status == ProductStatus.STOPPED) {
+            this.status = ProductStatus.STOPPED;
+        } else {
+            this.status = stock == 0 ? ProductStatus.SOLD_OUT : ProductStatus.ON_SALE;
+        }
     }
 
     public void changeStorage(StorageType storage, int shelfDays) {

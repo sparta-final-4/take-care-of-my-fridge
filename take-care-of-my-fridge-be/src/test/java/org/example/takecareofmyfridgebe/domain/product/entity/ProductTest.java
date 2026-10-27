@@ -136,6 +136,32 @@ class ProductTest {
     }
 
     @Test
+    @DisplayName("판매 정보 수정에서 판매 중·품절은 요청 상태가 아니라 재고로 정한다")
+    void changeSales_derivesStatusFromStock() {
+        Product noStock = productWithStock(3);
+        Product restocked = product(0, ProductStatus.SOLD_OUT);
+
+        noStock.changeSales(3000, 0, ProductStatus.ON_SALE);
+        restocked.changeSales(3000, 5, ProductStatus.SOLD_OUT);
+
+        assertThat(noStock.getStatus()).isEqualTo(ProductStatus.SOLD_OUT);
+        assertThat(restocked.getStatus()).isEqualTo(ProductStatus.ON_SALE);
+    }
+
+    @Test
+    @DisplayName("판매 중지는 재고와 관계없이 그대로 저장하고, 판매를 재개하면 재고로 상태를 정한다")
+    void changeSales_keepsStoppedAndResumesByStock() {
+        Product stopping = productWithStock(5);
+        Product resuming = product(0, ProductStatus.STOPPED);
+
+        stopping.changeSales(3000, 5, ProductStatus.STOPPED);
+        resuming.changeSales(3000, 0, ProductStatus.ON_SALE);
+
+        assertThat(stopping.getStatus()).isEqualTo(ProductStatus.STOPPED);
+        assertThat(resuming.getStatus()).isEqualTo(ProductStatus.SOLD_OUT);
+    }
+
+    @Test
     @DisplayName("판매 중지 상품은 재고가 0이 되거나 되돌아와도 판매 중지 그대로다")
     void stockChange_keepsStopped() {
         Product product = product(1, ProductStatus.STOPPED);
