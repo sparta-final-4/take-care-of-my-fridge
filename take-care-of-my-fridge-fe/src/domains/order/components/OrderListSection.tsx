@@ -8,8 +8,6 @@ import { SectionCard } from '@/common/components/SectionCard';
 import { formatPrice } from '@/domains/cart/format';
 import { ORDER_STATUS_LABELS } from '@/domains/order/format';
 import { orderQueries } from '@/domains/order/queries';
-import { REFUND_SUMMARY_LABELS } from '@/domains/refund/format';
-import { refundQueries } from '@/domains/refund/queries';
 
 import styles from './OrderListSection.module.scss';
 
@@ -18,7 +16,6 @@ const PAGE_SIZE = 10;
 // 결제 대기·결제 완료·구매 확정 주문을 최신 주문부터 보여 준다. 취소된 주문은 서버가 보내지 않는다.
 // 결제 대기는 PG 결제 뒤 서버 확인을 기다리는 주문일 수 있어 보이기만 하고, 주문 확인 화면으로 들어가는 버튼은 두지 않는다.
 // 페이지는 URL 쿼리에 두어 새로고침·뒤로 가기에도 유지한다.
-// 결제 완료·구매 확정 주문은 환불 요약을 한 번에 읽어 주문 상태 옆에 환불 상태를 붙인다. 요약을 못 읽어도 목록은 그대로 보여 준다.
 export function OrderListSection() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -34,19 +31,6 @@ export function OrderListSection() {
   };
 
   const orders = data?.content ?? [];
-  const refundableOrderIds = orders
-    .filter((order) => order.status === 'PAID' || order.status === 'CONFIRMED')
-    .flatMap((order) => (order.orderId === undefined ? [] : [order.orderId]));
-  const { data: refundSummaries } = useQuery({
-    ...refundQueries.summaries(refundableOrderIds),
-    enabled: refundableOrderIds.length > 0,
-  });
-  const refundLabelByOrderId = new Map(
-    refundSummaries?.map((summary) => [
-      summary.orderId,
-      summary.refundStatus && REFUND_SUMMARY_LABELS[summary.refundStatus],
-    ]),
-  );
 
   return (
     <SectionCard title="내 주문 내역">
@@ -77,45 +61,39 @@ export function OrderListSection() {
                 상태
               </Typography.Text>
             </li>
-            {orders.map((order) => {
-              const refundLabel = refundLabelByOrderId.get(order.orderId);
-              return (
-                <li key={order.orderId} className={styles.row}>
-                  <Typography.Text strong className={styles.orderNumber}>
-                    {order.orderNumber}
-                  </Typography.Text>
-                  <Typography.Text type="secondary" className={styles.date}>
-                    {order.orderedAt ? dayjs(order.orderedAt).format('YYYY-MM-DD') : '-'}
-                  </Typography.Text>
-                  <Typography.Text strong className={styles.amount}>
-                    {formatPrice(order.payAmount ?? 0)}
-                  </Typography.Text>
-                  <Flex vertical align="center" gap="small" className={styles.status}>
-                    <Tag
-                      color={order.status === 'PAID' ? 'processing' : undefined}
-                      className={styles.tag}
-                    >
-                      {order.status && ORDER_STATUS_LABELS[order.status]}
-                    </Tag>
-                    {refundLabel && <Tag className={styles.tag}>{refundLabel}</Tag>}
-                  </Flex>
-                  {order.status !== 'PENDING' && (
-                    <Button
-                      className={styles.action}
-                      onClick={() =>
-                        navigate(
-                          generatePath(ROUTES.mypageOrderDetail, {
-                            orderId: String(order.orderId),
-                          }),
-                        )
-                      }
-                    >
-                      상세 보기
-                    </Button>
-                  )}
-                </li>
-              );
-            })}
+            {orders.map((order) => (
+              <li key={order.orderId} className={styles.row}>
+                <Typography.Text strong className={styles.orderNumber}>
+                  {order.orderNumber}
+                </Typography.Text>
+                <Typography.Text type="secondary" className={styles.date}>
+                  {order.orderedAt ? dayjs(order.orderedAt).format('YYYY-MM-DD') : '-'}
+                </Typography.Text>
+                <Typography.Text strong className={styles.amount}>
+                  {formatPrice(order.payAmount ?? 0)}
+                </Typography.Text>
+                <Tag
+                  color={order.status === 'PAID' ? 'processing' : undefined}
+                  className={styles.status}
+                >
+                  {order.status && ORDER_STATUS_LABELS[order.status]}
+                </Tag>
+                {order.status !== 'PENDING' && (
+                  <Button
+                    className={styles.action}
+                    onClick={() =>
+                      navigate(
+                        generatePath(ROUTES.mypageOrderDetail, {
+                          orderId: String(order.orderId),
+                        }),
+                      )
+                    }
+                  >
+                    상세 보기
+                  </Button>
+                )}
+              </li>
+            ))}
           </ul>
           <Pagination
             align="center"

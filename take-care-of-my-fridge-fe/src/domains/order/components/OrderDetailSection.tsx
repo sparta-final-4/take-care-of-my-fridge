@@ -11,7 +11,7 @@ import { formatPrice } from '@/domains/cart/format';
 import { confirmOrder } from '@/domains/order/api';
 import { ORDER_STATUS_LABELS } from '@/domains/order/format';
 import { orderQueries } from '@/domains/order/queries';
-import { getOrderItemRefundState, sumRefundAmountByStatus } from '@/domains/refund/format';
+import { sumRefundAmountByStatus } from '@/domains/refund/format';
 import { refundQueries } from '@/domains/refund/queries';
 
 import { OrderItemHeader, OrderItemRow } from './OrderItemRow';
@@ -22,7 +22,7 @@ interface OrderDetailSectionProps {
 }
 
 // 주문할 때 저장한 상품·금액을 보여 준다. 환불 내역은 환불 상세 화면이 보여 준다.
-// 결제 완료·구매 확정 주문은 상품별 환불 표시와 환불 금액을 더하고, 환불이 있으면 환불 상세로 가는 버튼을 둔다.
+// 결제 완료·구매 확정 주문은 환불 금액을 더하고, 환불이 있으면 환불 상세로 가는 버튼을 둔다.
 // 구매 확정·환불 카드는 결제 완료·구매 확정 주문에 보인다. 구매 확정된 주문은 버튼을 누르면 안 되는 이유를 알린다.
 // 결제 완료 주문의 환불 신청은 환불 신청 화면으로 이동하고, 환불할 수 있는 수량이 없으면 안내만 한다.
 export function OrderDetailSection({ orderId }: OrderDetailSectionProps) {
@@ -81,7 +81,6 @@ export function OrderDetailSection({ orderId }: OrderDetailSectionProps) {
 
   const isConfirmed = order.status === 'CONFIRMED';
   const refundedAmount = sumRefundAmountByStatus(refundHistory, 'COMPLETED');
-  const refundByProductId = new Map(refundableItems?.map((item) => [item.productId, item]));
   // 환불 가능 상품을 아직 못 읽었으면 막지 않고, 환불 신청 화면이 다시 확인한다
   const nothingToRefund =
     refundableItems !== undefined &&
@@ -135,27 +134,10 @@ export function OrderDetailSection({ orderId }: OrderDetailSectionProps) {
         {listButton}
       </Flex>
       <section className={`${styles.card} ${styles.list}`} aria-label="주문 상품">
-        <OrderItemHeader showRefund={hasRefundSection} />
-        {order.items?.map((item) => {
-          const refundItem = refundByProductId.get(item.productId);
-          const refundState = refundItem ? getOrderItemRefundState(refundItem) : 'none';
-          return (
-            <OrderItemRow
-              key={item.productId}
-              item={item}
-              showRefund={hasRefundSection}
-              refund={
-                refundState === 'saleBlocked' ? (
-                  <Typography.Text type="secondary">환불 불가</Typography.Text>
-                ) : refundState === 'none' ? null : (
-                  <Tag className={styles.tag}>
-                    {refundState === 'partial' ? '부분 환불' : '환불'}
-                  </Tag>
-                )
-              }
-            />
-          );
-        })}
+        <OrderItemHeader />
+        {order.items?.map((item) => (
+          <OrderItemRow key={item.productId} item={item} />
+        ))}
       </section>
       <div className={styles.bottom}>
         <section className={styles.card} aria-label="결제 금액">

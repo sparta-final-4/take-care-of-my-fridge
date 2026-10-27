@@ -1,6 +1,6 @@
 import { queryOptions } from '@tanstack/react-query';
 
-import { getRefundableItems, getRefundHistory, getRefundSummaries } from './api';
+import { getRefundableItems, getRefundHistory } from './api';
 
 export const refundQueries = {
   all: ['refunds'] as const,
@@ -13,10 +13,5 @@ export const refundQueries = {
     queryOptions({
       queryKey: [...refundQueries.all, 'history', orderId],
       queryFn: ({ signal }) => getRefundHistory(orderId, signal),
-    }),
-  summaries: (orderIds: number[]) =>
-    queryOptions({
-      queryKey: [...refundQueries.all, 'summaries', orderIds],
-      queryFn: ({ signal }) => getRefundSummaries(orderIds, signal),
     }),
 };

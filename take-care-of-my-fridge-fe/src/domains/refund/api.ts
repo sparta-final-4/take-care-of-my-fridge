@@ -4,7 +4,6 @@ import {
   type RefundCreateRequest,
   type RefundHistoryResponse,
   type RefundResponse,
-  type RefundSummaryResponse,
 } from '@/common/api/clients';
 import { unwrap } from '@/common/api/unwrap';
 
@@ -23,14 +22,6 @@ export async function getRefundHistory(
   signal?: AbortSignal,
 ): Promise<RefundHistoryResponse[]> {
   return unwrap(refundApi.getRefundHistory({ orderId }, { signal }));
-}
-
-// 주문별 환불 상태와 완료된 환불 금액. 회원 본인 주문만 요청한 순서대로 오고, 고유 주문 1~50건까지 받는다.
-export async function getRefundSummaries(
-  orderIds: number[],
-  signal?: AbortSignal,
-): Promise<RefundSummaryResponse[]> {
-  return unwrap(refundApi.getRefundSummaries({ orderIds }, { signal }));
 }
 
 // 서버가 PG 취소까지 끝낸 뒤 응답한다. PG 결과를 확정하지 못하면 REQUESTED로 오고 서버가 나중에 마무리한다.

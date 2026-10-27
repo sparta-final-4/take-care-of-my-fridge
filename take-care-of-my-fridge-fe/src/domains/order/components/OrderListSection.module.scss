@@ -54,14 +54,11 @@
 .status {
   grid-area: status;
   justify-self: end;
+  margin: 0;
 
   @include from(lg) {
     justify-self: center;
   }
-}
-
-.tag {
-  margin: 0;
 }
 
 .action {
