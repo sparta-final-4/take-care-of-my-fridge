@@ -75,6 +75,10 @@ public class OrderItem extends BaseTimeEntity {
     @Column(name = "flash_drop_member_id")
     private Long flashDropMemberId;
 
+    // 구매 확정 때 주문 수량에서 완료된 환불 수량을 뺀 값. 확정 전에는 null
+    @Column(name = "confirmed_quantity")
+    private Integer confirmedQuantity;
+
     @Builder
     private OrderItem(
         Order order,
@@ -103,5 +107,10 @@ public class OrderItem extends BaseTimeEntity {
     // 주문 취소 시 번개 드롭 1인 1개 기록을 비움
     public void releaseFlashDropMember() {
         this.flashDropMemberId = null;
+    }
+
+    // 구매 확정 뒤에는 환불할 수 없으므로 이 값은 다시 바뀌지 않는다
+    public void confirmQuantity(long completedRefundQuantity) {
+        this.confirmedQuantity = quantity - (int) completedRefundQuantity;
     }
 }
