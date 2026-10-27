@@ -16,7 +16,7 @@ public record OrderDetailResponse(
         long listPriceAmount,
         long discountAmount,
         long payAmount,
-        List<OrderItemResponse> items
+        List<OrderDetailItemResponse> items
 ) {
 
     public static OrderDetailResponse from(Order order, List<OrderItem> items) {
@@ -32,7 +32,7 @@ public record OrderDetailResponse(
                 listPriceAmount,
                 listPriceAmount - order.getTotalAmount(),
                 order.getTotalAmount(),
-                items.stream().map(OrderItemResponse::from).toList()
+                items.stream().map(OrderDetailItemResponse::from).toList()
         );
     }
 }
