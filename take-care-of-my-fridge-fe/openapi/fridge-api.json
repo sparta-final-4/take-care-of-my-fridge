@@ -4741,6 +4741,49 @@
           "items"
         ]
       },
+      "OrderDetailItemResponse": {
+        "type": "object",
+        "properties": {
+          "confirmedQuantity": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "lineAmount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "listPrice": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "productId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "productImageUrl": {
+            "type": "string"
+          },
+          "productName": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "saleType": {
+            "type": "string",
+            "enum": [
+              "NONE",
+              "SPECIAL",
+              "FLASH_DROP"
+            ]
+          },
+          "unitPrice": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
       "OrderDetailResponse": {
         "type": "object",
         "properties": {
@@ -4755,7 +4798,7 @@
           "items": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/OrderItemResponse"
+              "$ref": "#/components/schemas/OrderDetailItemResponse"
             }
           },
           "listPriceAmount": {

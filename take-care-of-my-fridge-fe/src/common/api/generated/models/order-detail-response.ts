@@ -16,12 +16,12 @@
 
 // May contain unused imports in some cases
 // @ts-ignore
-import type { OrderItemResponse } from './order-item-response';
+import type { OrderDetailItemResponse } from './order-detail-item-response';
 
 export interface OrderDetailResponse {
     'confirmedAt'?: string;
     'discountAmount'?: number;
-    'items'?: Array<OrderItemResponse>;
+    'items'?: Array<OrderDetailItemResponse>;
     'listPriceAmount'?: number;
     'orderId'?: number;
     'orderNumber'?: string;

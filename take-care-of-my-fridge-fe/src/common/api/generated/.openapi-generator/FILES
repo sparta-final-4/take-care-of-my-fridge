@@ -142,6 +142,7 @@ models/order-checkout-response.ts
 models/order-confirm-response.ts
 models/order-create-item-request.ts
 models/order-create-request.ts
+models/order-detail-item-response.ts
 models/order-detail-response.ts
 models/order-item-response.ts
 models/order-list-request.ts
