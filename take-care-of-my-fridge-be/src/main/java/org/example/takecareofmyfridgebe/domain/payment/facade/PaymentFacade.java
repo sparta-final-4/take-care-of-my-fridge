@@ -71,7 +71,7 @@ public class PaymentFacade {
             return PaymentConfirmResponse.from(payment);
         }
         if (payment.getStatus() == PaymentStatus.FAILED) {
-            throw new BusinessException(ErrorCode.ALREADY_PROCESSED_PAYMENT);
+            throw new BusinessException(errorCodeOf(payment.getFailReason()));
         }
 
         PaymentGatewayResponse pgPayment = paymentGateway.getPayment(payment.getPortonePaymentId())
@@ -235,6 +235,19 @@ public class PaymentFacade {
         return switch (rejection) {
             case PAYMENT_ALREADY_FAILED -> COMPENSATION_CANCEL_REASON;
             case ORDER_NOT_PAYABLE -> ORDER_NOT_PAYABLE_CANCEL_REASON;
+        };
+    }
+
+    // 웹훅·스케줄러가 confirm보다 먼저 실패 처리한 결제도 confirm이 직접 거절할 때와 같은 이유로 알린다
+    private ErrorCode errorCodeOf(FailReason failReason) {
+        if (failReason == null) {
+            return ErrorCode.ALREADY_PROCESSED_PAYMENT;
+        }
+        return switch (failReason) {
+            case TIMEOUT -> ErrorCode.PAYMENT_EXPIRED;
+            case AMOUNT_MISMATCH -> ErrorCode.PAYMENT_AMOUNT_MISMATCH;
+            case ORDER_NOT_PAYABLE -> ErrorCode.PAYMENT_ORDER_NOT_PAYABLE;
+            case PG_FAILED, USER_CANCELLED, SUPERSEDED -> ErrorCode.ALREADY_PROCESSED_PAYMENT;
         };
     }
 
