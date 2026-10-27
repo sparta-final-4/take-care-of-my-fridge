@@ -48,13 +48,16 @@ Q-01~Q-17에 의존하는 테스트는 기대값을 합의한 뒤 구현합니�
 | ORDER-01 | P0 | 여러 회원이 같은 상품을 동시에 주문 | 재고만큼만 성공, 나머지는 재고 부족으로 거절 | `OrderCreateServiceTransactionTest` |
 | ORDER-02 | P0 | 한 항목이라도 재고 부족·가격 불일치 | 모두 롤백, 다른 항목 재고도 그대로 | `OrderCreateServiceTransactionTest`, `OrderCreateServiceSaleTransactionTest` |
 | ORDER-03 | P0 | 같은 멱등 키로 반복·동시에 주문하기 | 주문 하나만 생기고 모두 같은 주문을 받음, 다른 상품이면 `ORDER_006` | `OrderCreateServiceTransactionTest` |
-| ORDER-04 | P0 | 같은 주문을 동시에 여러 번 취소 | 모두 취소 응답, 재고는 한 번만 복구 | `OrderCancelServiceTransactionTest` |
+| ORDER-04 | P0 | 같은 주문을 동시에 여러 번 취소 | 하나만 지우고 나머지는 404, 재고는 한 번만 복구 | `OrderCancelServiceTransactionTest` |
 | ORDER-05 | P0 | 결제 완료 주문 취소, 결제 대기 주문 구매 확정 | 409, 상태·재고 불변 | `OrderCancelServiceTransactionTest`, `OrderConfirmServiceTransactionTest` |
 | ORDER-06 | P0 | 타인 주문 조회·취소·확정 | 없는 주문과 같은 404, 상태 불변 | `OrderQueryServiceTransactionTest`, `OrderCancelServiceTransactionTest`, `OrderConfirmServiceTransactionTest` |
 | ORDER-07 | P0 | 한정 수량보다 많은 회원이 번개 드롭을 동시에 주문 | 한정 수량만큼만 성공, 남은 수량 0 | `OrderCreateServiceSaleTransactionTest` |
 | ORDER-08 | P0 | 번개 드롭을 이미 산 회원이 다시 주문, 취소 뒤 다시 주문 | 다시 주문은 `CART_003`, 취소하면 남은 수량이 돌아와 주문 가능 | `OrderCreateServiceSaleTransactionTest` |
 | ORDER-09 | P1 | 주문 목록 조회 | 결제 대기·결제 완료·구매 확정만 최신순, 취소 제외, 1부터 센 페이지 | `OrderQueryServiceTransactionTest` |
 | ORDER-10 | P1 | 주문번호 생성 | 20자리 숫자, 동시에 만들어도 안 겹침, 겹치면 `ORDER_005` | `OrderNumberGeneratorTest`, `OrderCreateServiceConstraintTest` |
+| ORDER-11 | P0 | 결제를 시도한 결제 대기 주문 취소, 취소하기와 결제하기 동시 | 결제 시도가 있으면 `ORDER_012`로 거절하고 주문·재고 불변. 동시면 하나만 성공하고 결제가 붙은 주문은 지워지지 않음 | `OrderCancelServiceTransactionTest` |
+| ORDER-12 | P0 | 주문 만료, 취소하기와 주문 만료 동시 | 생성 5분이 지난 결제 시도 없는 결제 대기 주문만 지움. 동시면 재고는 한 번만 복구 | `OrderCancelServiceTransactionTest`, `OrderExpireSchedulerTest` |
+| ORDER-13 | P0 | 결제 정리, 결제 정리와 결제하기·주문 취소 동시 | 진행 중 결제가 없고 마지막 결제 뒤 10분이 지난 결제 대기 주문만 취소 상태로 바꾸고 재고 복구, 결제 행 유지. 동시면 재고는 많아야 한 번 복구 | `OrderCancelServiceTransactionTest`, `PaymentTimeoutSchedulerTest` |
 
 ## 할인 행사 필수 시나리오
 
