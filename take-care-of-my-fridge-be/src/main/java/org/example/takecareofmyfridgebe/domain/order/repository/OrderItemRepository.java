@@ -17,10 +17,10 @@ public interface OrderItemRepository extends JpaRepository<OrderItem, Long> {
     // 이 회원이 이미 산(취소하지 않은) 번개 드롭인지 확인한다
     boolean existsBySaleEventItemIdAndFlashDropMemberId(Long saleEventItemId, Long flashDropMemberId);
 
-    // 구매 확정된 주문만, confirmedAt이 [from, to) 범위이고 asOf 이전인 것을 날짜·상품별로 합산
+    // 구매 확정된 주문만, confirmedAt이 [from, to) 범위이고 asOf 이전인 것의 확정 수량을 날짜·상품별로 합산
     @Query("""
         select new org.example.takecareofmyfridgebe.domain.order.dto.DailyProductSales(
-            oi.productId, cast(o.confirmedAt as LocalDate), sum(oi.quantity))
+            oi.productId, cast(o.confirmedAt as LocalDate), sum(oi.confirmedQuantity))
         from OrderItem oi join oi.order o
         where o.status = :status
           and o.confirmedAt >= :from and o.confirmedAt < :to
