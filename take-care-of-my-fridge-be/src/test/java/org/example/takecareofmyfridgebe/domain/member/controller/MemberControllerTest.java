@@ -142,7 +142,7 @@ class MemberControllerTest {
 
     @Test
     void loggedInMemberCanReadMyInfo() throws Exception {
-        when(memberService.getMyInfo(7L)).thenReturn(new MyInfoResponse(7L, "cook@example.com", "요리왕",
+        when(memberService.getMyInfo(7L)).thenReturn(new MyInfoResponse(7L, "cook@example.com", "요리왕", "01012345678",
                 Member.Role.USER, Member.Status.ACTIVE, List.of(Member.Taste.SWEET),
                 LocalDateTime.of(2026, 10, 13, 10, 12)));
 
@@ -154,6 +154,7 @@ class MemberControllerTest {
                 .andExpect(jsonPath("$.data.memberId").value(7))
                 .andExpect(jsonPath("$.data.email").value("cook@example.com"))
                 .andExpect(jsonPath("$.data.nickname").value("요리왕"))
+                .andExpect(jsonPath("$.data.phone").value("01012345678"))
                 .andExpect(jsonPath("$.data.role").value("USER"))
                 .andExpect(jsonPath("$.data.status").value("ACTIVE"))
                 .andExpect(jsonPath("$.data.tastes[0]").value("SWEET"))

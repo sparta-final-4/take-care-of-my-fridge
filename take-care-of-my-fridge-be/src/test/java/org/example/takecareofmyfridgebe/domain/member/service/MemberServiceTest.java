@@ -127,6 +127,7 @@ class MemberServiceTest {
                 .email("cook@example.com")
                 .passwordHash("{bcrypt}encoded")
                 .nickname("요리왕")
+                .phone("01012345678")
                 .tastes(Set.of(Member.Taste.SWEET))
                 .build();
         ReflectionTestUtils.setField(member, "id", 7L);
@@ -137,6 +138,7 @@ class MemberServiceTest {
         assertEquals(7L, response.memberId());
         assertEquals("cook@example.com", response.email());
         assertEquals("요리왕", response.nickname());
+        assertEquals("01012345678", response.phone());
         assertEquals(Member.Role.USER, response.role());
         assertEquals(Member.Status.ACTIVE, response.status());
         assertEquals(List.of(Member.Taste.SWEET), response.tastes());

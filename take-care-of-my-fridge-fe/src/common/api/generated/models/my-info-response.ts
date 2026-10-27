@@ -20,6 +20,7 @@ export interface MyInfoResponse {
     'email'?: string;
     'memberId'?: number;
     'nickname'?: string;
+    'phone'?: string;
     'role'?: MyInfoResponseRoleEnum;
     'status'?: MyInfoResponseStatusEnum;
     'tastes'?: Array<MyInfoResponseTastesEnum>;

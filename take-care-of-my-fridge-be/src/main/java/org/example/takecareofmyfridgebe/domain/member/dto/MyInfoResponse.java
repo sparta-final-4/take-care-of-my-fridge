@@ -10,6 +10,7 @@ public record MyInfoResponse(
         Long memberId,
         String email,
         String nickname,
+        String phone,
         Member.Role role,
         Member.Status status,
         List<Member.Taste> tastes,
@@ -18,7 +19,7 @@ public record MyInfoResponse(
 
     public static MyInfoResponse from(Member member) {
         return new MyInfoResponse(member.getId(), member.getEmail(), member.getNickname(),
-                member.getRole(), member.getStatus(),
+                member.getPhone(), member.getRole(), member.getStatus(),
                 member.getTastes().stream().map(MemberTaste::getTaste).toList(),
                 member.getCreatedAt());
     }

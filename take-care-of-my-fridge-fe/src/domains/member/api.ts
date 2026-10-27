@@ -7,6 +7,8 @@ export interface MyInfoResponse {
   memberId: number;
   email: string;
   nickname: string;
+  // 휴대폰 번호 없이 가입한 예전 회원은 null
+  phone: string | null;
   role: 'USER' | 'ADMIN';
   status: 'ACTIVE' | 'SUSPENDED';
   tastes: Array<'SALTY' | 'SWEET' | 'SPICY' | 'UMAMI' | 'MILD'>;

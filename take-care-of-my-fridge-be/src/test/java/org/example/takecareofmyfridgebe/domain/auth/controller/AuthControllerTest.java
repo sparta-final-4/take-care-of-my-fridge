@@ -60,7 +60,7 @@ class AuthControllerTest {
 
     @Test
     void anonymousLoginSetsHttpOnlyCookiesAndReturnsMember() throws Exception {
-        MyInfoResponse member = new MyInfoResponse(4L, "cook@example.com", "요리왕",
+        MyInfoResponse member = new MyInfoResponse(4L, "cook@example.com", "요리왕", "01012345678",
                 Member.Role.USER, Member.Status.ACTIVE, List.of(), null);
         when(loginService.login("cook@example.com", "password"))
                 .thenReturn(new LoginService.LoginResult(member, "access", "refresh"));
