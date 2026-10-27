@@ -1,4 +1,12 @@
 services:
+  forecast-worker:
+    build:
+      context: .
+      dockerfile: forecast_model/Dockerfile
+    restart: unless-stopped
+    volumes:
+      - forecast_models:/models
+
   mysql:
     image: mysql:8.4
     container_name: fridge-mysql
@@ -107,4 +115,5 @@ services:
       - kafka
 
 volumes:
+  forecast_models:
   kafka_data:
