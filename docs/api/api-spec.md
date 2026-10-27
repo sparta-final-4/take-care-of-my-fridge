@@ -290,9 +290,10 @@ HTTP 메서드·경로·DTO 이름은 구현 전 합의합니다.
 | 주문하기·주문 확인 조회 | OrderCheckoutResponse | orderId, orderNumber, status, orderedAt, listPriceAmount(정가 합), discountAmount(할인 금액), payAmount(결제할 금액), items |
 | 주문 취소 | OrderCancelResponse | orderId, status |
 | 주문 목록 | PageResponse<OrderSummaryResponse> | orderId, orderNumber, orderedAt, payAmount, status |
-| 주문 상세 | OrderDetailResponse | OrderCheckoutResponse의 필드, confirmedAt(구매 확정 시각, 확정 전 null) |
+| 주문 상세 | OrderDetailResponse | OrderCheckoutResponse의 필드, confirmedAt(구매 확정 시각, 확정 전 null). items는 OrderDetailItemResponse |
 | 구매 확정 | OrderConfirmResponse | orderId, status |
 | 주문 상품(items) | OrderItemResponse | productId, productName, productImageUrl, quantity, listPrice(주문 당시 정가), unitPrice(실제 단가), lineAmount(단가 × 수량), saleType(`NONE`·`SPECIAL`·`FLASH_DROP`) |
+| 주문 상세 상품(items) | OrderDetailItemResponse | OrderItemResponse의 필드, confirmedQuantity(확정 수량, 확정 전 null) |
 
 오류입니다. 401은 모든 기능에 공통입니다.
 
@@ -317,6 +318,7 @@ HTTP 메서드·경로·DTO 이름은 구현 전 합의합니다.
 | 구매 확정 | 404 | `ORDER_001` | 주문 없음 또는 타인 주문 |
 | 구매 확정 | 409 | `ORDER_009` | 결제 완료 전 |
 | 구매 확정 | 409 | `ORDER_008` | 취소된 주문 |
+| 구매 확정 | 409 | `ORDER_011` | 요청 상태 환불이 있음 |
 
 - 상태 값: `PENDING`(결제 대기), `PAID`(결제 완료), `CANCELLED`(취소), `CONFIRMED`(구매 확정).
 - **재고는 주문을 만들 때 줄임**: 주문하기에서 상품 재고를 빼고, 번개 드롭은 남은 수량도 뺍니다. 하나라도 실패하면 모두 롤백됩니다. 장바구니 항목은 주문하기에서 지우지 않습니다.
@@ -324,7 +326,8 @@ HTTP 메서드·경로·DTO 이름은 구현 전 합의합니다.
 - **중복 요청**: 같은 회원이 같은 `Idempotency-Key`로 다시 보내면 새 주문을 만들지 않고 처음 주문을 200으로 돌려줍니다. 상품·수량이 처음 요청과 다르면 `ORDER_006`입니다. 같은 회원의 주문하기는 장바구니 행을 잠가 하나씩 처리합니다.
 - **번개 드롭**: 1인 1개이고 이미 산 번개 드롭을 다시 주문하면 `CART_003`입니다. 남은 수량이 0이면 품절로 거절합니다.
 - **취소**: 결제 대기 주문만 취소할 수 있고, 상품 재고와 번개 드롭 남은 수량을 되돌린 뒤 번개 드롭 1인 1개 기록을 비웁니다. 이미 취소된 주문을 다시 취소하면 같은 200 응답을 주고 재고는 한 번만 돌아옵니다.
-- **구매 확정**: 결제 완료 주문만 확정하고 확정 시각을 남깁니다. 이미 확정된 주문을 다시 확정하면 같은 200 응답을 줍니다.
+- **구매 확정**: 결제 완료 주문만 확정하고 확정 시각을 남깁니다. 이미 확정된 주문을 다시 확정하면 같은 200 응답을 줍니다. 요청 상태 환불이 있으면 `ORDER_011`로 거절하고, 실패한 환불은 막지 않습니다.
+- **확정 수량**: 구매 확정 때 주문 상품마다 주문 수량에서 완료된 환불 수량을 뺀 값을 저장하고, 주문 상세의 `confirmedQuantity`로 보여 줍니다. 확정 뒤에는 환불할 수 없어 바뀌지 않습니다.
 - **목록**: 결제 대기·결제 완료·구매 확정 주문만 최신 주문부터 보여 주고 취소된 주문은 뺍니다. 페이지 번호는 1부터입니다.
 - **본인 소유 검증**: 타인의 주문도 없는 주문과 같은 404(`ORDER_001`)로 답합니다.
 - **주문 금액**: 주문 상품에 주문 당시 정가·단가·상품 이름·이미지를 저장하므로 상품이 바뀌어도 주문 화면의 금액은 바뀌지 않습니다.
