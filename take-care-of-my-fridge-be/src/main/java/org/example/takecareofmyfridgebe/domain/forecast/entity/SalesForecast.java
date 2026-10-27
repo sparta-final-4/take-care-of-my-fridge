@@ -66,4 +66,12 @@ public class SalesForecast extends BaseTimeEntity {
         this.actualRank = actualRank;
         this.actualQty = actualQty;
     }
+
+    public void confirmActual(Integer rank, int quantity) {
+        if (actualQty != null) {
+            throw new IllegalStateException("이미 실적이 확정된 상품입니다.");
+        }
+        this.actualRank = rank;
+        this.actualQty = quantity;
+    }
 }

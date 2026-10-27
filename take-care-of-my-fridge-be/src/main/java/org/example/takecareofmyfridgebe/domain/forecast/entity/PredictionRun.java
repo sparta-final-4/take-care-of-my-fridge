@@ -51,4 +51,11 @@ public class PredictionRun extends BaseTimeEntity {
         this.confirmedAt = confirmedAt;
         this.syntheticData = syntheticData;
     }
+
+    public void confirm(LocalDateTime confirmedAt) {
+        if (this.confirmedAt != null) {
+            throw new IllegalStateException("이미 실적이 확정된 예측입니다.");
+        }
+        this.confirmedAt = confirmedAt;
+    }
 }
