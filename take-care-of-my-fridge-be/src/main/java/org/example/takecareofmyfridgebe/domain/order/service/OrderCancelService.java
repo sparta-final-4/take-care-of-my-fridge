@@ -25,7 +25,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 // 주문 취소와 재고 되돌리기를 맡는다. 결제 전 주문의 재고를 되돌리는 곳은 이 클래스 하나뿐이다. 결제 후 환불은 환불 쪽이 되돌린다.
-// 결제를 시도하지 않은 결제 대기 주문은 재고를 되돌린 뒤 지운다. 결제를 시도한 주문은 결제 쪽이 정리한다.
+// 결제를 시도하지 않은 결제 대기 주문은 재고를 되돌린 뒤 지운다. 결제를 시도한 주문은 결제 쪽 스케줄러가 cancelAbandoned를 불러
+// 취소 상태로 남긴다.
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -38,7 +39,7 @@ public class OrderCancelService {
     private final SaleEventStockService saleEventStockService;
     private final PaymentService paymentService;
 
-    // 주문 행을 잠그고 확인하므로 같은 주문의 취소·결제하기·만료가 동시에 와도 하나씩 순서대로 처리된다.
+    // 주문 행을 잠그고 확인하므로 같은 주문의 취소·결제하기·주문 만료·결제 쪽 정리가 동시에 와도 하나씩 순서대로 처리된다.
     // 먼저 지운 요청 뒤에 온 요청은 주문을 찾지 못해 404를 받는다.
     // 잠금이 트랜잭션의 첫 조회라, 결제 행 확인은 잠금을 얻은 뒤의 커밋까지 본다.
     @Transactional
@@ -63,6 +64,22 @@ public class OrderCancelService {
             return;
         }
         delete(order);
+    }
+
+    // 결제를 시도했지만 끝내지 않은 주문을 취소 상태로 남기고 재고를 되돌린다. 결제 행이 주문을 참조해 지우지 않는다.
+    // 결제 쪽 스케줄러가 부른다. 고른 뒤 잠그기 전에 결제됐거나, 다시 결제를 시작했거나, 이미 취소된 주문은 건너뛴다.
+    @Transactional
+    public void cancelAbandoned(Long orderId, LocalDateTime lastPaymentBefore) {
+        Optional<Order> found = orderReader.findForUpdate(orderId);
+        if (found.isEmpty()) {
+            return;
+        }
+        Order order = found.get();
+        if (order.getStatus() != OrderStatus.PENDING || !paymentService.isAbandoned(orderId, lastPaymentBefore)) {
+            return;
+        }
+        order.cancel();
+        restoreStock(orderReader.getOrderItems(order));
     }
 
     // 주문 만료 스케줄러가 처리할 결제 대기 주문을 afterId 다음부터 id 순으로 조회한다.
