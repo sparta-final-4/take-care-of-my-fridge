@@ -73,10 +73,13 @@ app:
 # 결제
 portone:
   base-url: "https://api.portone.io"
-  api-secret: ${PORTONE_API_SECRET}
-  store-id: ${PORTONE_STORE_ID}
-  channel-key: ${PORTONE_CHANNEL_KEY}
-  webhook-secret: ${PORTONE_WEBHOOK_SECRET}
+  # CI 때문에 반드시 아래 값들이 존재해야만 기동됩니다
+  # 간단한 테스트용 빈 값으로 채운다
+  api-secret: ${PORTONE_API_SECRET:}
+  store-id: ${PORTONE_STORE_ID:}
+  channel-key: ${PORTONE_CHANNEL_KEY:}
+  # WebhookVerifier가 기동 시 whsec_ 뒤를 base64로 풀기 때문에 형식만 맞춘 임의 값("local-dummy-webhook-secret")
+  webhook-secret: ${PORTONE_WEBHOOK_SECRET:whsec_bG9jYWwtZHVtbXktd2ViaG9vay1zZWNyZXQ=}
 
 springdoc:
   writer-with-order-by-keys: true
