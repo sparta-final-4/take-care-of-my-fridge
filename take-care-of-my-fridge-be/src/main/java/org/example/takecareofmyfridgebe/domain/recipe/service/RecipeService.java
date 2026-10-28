@@ -74,7 +74,11 @@ public class RecipeService {
         Recipe recipe = recipeRepository.findById(recipeId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.RECIPE_NOT_FOUND));
 
-        return toDetailResponse(recipe);
+        return toDetailResponse(
+                recipe,
+                recipeIngredientRepository.findByRecipeIdOrderBySeqAsc(recipe.getId()),
+                recipeStepRepository.findByRecipeIdOrderByStepNoAsc(recipe.getId())
+        );
     }
 
     // 레시피, 재료, 조리 단계를 한 트랜잭션으로 저장한다.
@@ -103,14 +107,6 @@ public class RecipeService {
         request.applyTo(recipe);
 
         return toDetailResponse(recipe, updateIngredients(recipe, request), updateSteps(recipe, request));
-    }
-
-    private RecipeDetailResponse toDetailResponse(Recipe recipe) {
-        return toDetailResponse(
-                recipe,
-                recipeIngredientRepository.findByRecipeIdOrderBySeqAsc(recipe.getId()),
-                recipeStepRepository.findByRecipeIdOrderByStepNoAsc(recipe.getId())
-        );
     }
 
     private RecipeDetailResponse toDetailResponse(
