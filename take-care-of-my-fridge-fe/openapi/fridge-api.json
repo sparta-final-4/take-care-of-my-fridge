@@ -508,6 +508,26 @@
         ]
       }
     },
+    "/api/admin/review-summaries/run": {
+      "post": {
+        "operationId": "runReviewSummary",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseReviewSummaryResult"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "review-summary-admin-controller"
+        ]
+      }
+    },
     "/api/admin/sale-events": {
       "get": {
         "operationId": "getSaleEvents",
@@ -2284,6 +2304,36 @@
         ]
       }
     },
+    "/api/search/recipes": {
+      "get": {
+        "operationId": "searchRecipes",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "request",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/RecipeListRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePageResponseRecipeListItemResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "search-controller"
+        ]
+      }
+    },
     "/api/webhooks/portone": {
       "post": {
         "operationId": "handlePortOneWebhook",
@@ -3017,6 +3067,20 @@
         "properties": {
           "data": {
             "$ref": "#/components/schemas/ReviewResponse"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorResponse"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ApiResponseReviewSummaryResult": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ReviewSummaryResult"
           },
           "error": {
             "$ref": "#/components/schemas/ErrorResponse"
@@ -6394,6 +6458,31 @@
               "LATEST",
               "RATING"
             ]
+          }
+        }
+      },
+      "ReviewSummaryResult": {
+        "type": "object",
+        "properties": {
+          "elapsedMillis": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "failedCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "skippedCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "successCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "targetCount": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },
