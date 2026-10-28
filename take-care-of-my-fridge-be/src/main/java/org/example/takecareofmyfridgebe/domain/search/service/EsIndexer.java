@@ -65,18 +65,25 @@ public abstract class EsIndexer {
         String body = indexBody().toString();
         esClient.indices().create(c -> c.withJson(new StringReader(body)).index(newIndex));
 
-        // batchSize 단위로 bulk 색인
-        int batchSize = indexProperties().batchSize();
-        for (int start = 0; start < docs.size(); start += batchSize) {
-            bulk(newIndex, docs.subList(start, Math.min(start + batchSize, docs.size())));
-        }
-        esClient.indices().refresh(r -> r.index(newIndex));
+        long count;
+        try {
+            // batchSize 단위로 bulk 색인
+            int batchSize = indexProperties().batchSize();
+            for (int start = 0; start < docs.size(); start += batchSize) {
+                bulk(newIndex, docs.subList(start, Math.min(start + batchSize, docs.size())));
+            }
+            esClient.indices().refresh(r -> r.index(newIndex));
 
-        // 건수 확인. 틀리면 alias를 옮기지 않는다 (기존 검색은 그대로 유지)
-        long count = esClient.count(c -> c.index(newIndex)).count();
-        if (count != docs.size()) {
-            throw new IllegalStateException("[%s] 건수 불일치: 원본 %d / ES %d (새 인덱스 %s는 남겨둠)"
-                    .formatted(alias, docs.size(), count, newIndex));
+            // 건수 확인. 틀리면 alias를 옮기지 않는다 (기존 검색은 그대로 유지)
+            count = esClient.count(c -> c.index(newIndex)).count();
+            if (count != docs.size()) {
+                throw new IllegalStateException("[%s] 건수 불일치: 원본 %d / ES %d"
+                        .formatted(alias, docs.size(), count));
+            }
+        } catch (IOException | RuntimeException e) {
+            // alias를 옮기기 전이라 검색은 이전 인덱스로 계속된다. 재시도마다 쌓이지 않도록 실패한 새 인덱스는 지운다
+            deleteFailedIndex(alias, newIndex, e);
+            throw e;
         }
 
         // alias 전환 및 이전 인덱스 삭제
@@ -191,9 +198,25 @@ public abstract class EsIndexer {
             return u;
         });
 
+        // alias는 이미 새 인덱스를 가리키므로 이전 인덱스 삭제가 실패해도 재색인은 성공이다
         for (String old : oldIndices) {
-            esClient.indices().delete(d -> d.index(old));
-            log.info("[{}] 이전 인덱스 삭제: {}", alias, old);
+            try {
+                esClient.indices().delete(d -> d.index(old));
+                log.info("[{}] 이전 인덱스 삭제: {}", alias, old);
+            } catch (IOException | RuntimeException e) {
+                log.warn("[{}] 이전 인덱스 삭제 실패, 직접 지워야 함: {}", alias, old, e);
+            }
+        }
+    }
+
+    private void deleteFailedIndex(String alias, String newIndex, Exception cause) {
+        try {
+            esClient.indices().delete(d -> d.index(newIndex).ignoreUnavailable(true));
+            log.warn("[{}] 재색인 실패로 새 인덱스 삭제: {}", alias, newIndex);
+        } catch (IOException | RuntimeException e) {
+            // 원래 실패 원인을 덮지 않도록 삭제 실패는 원인 예외에 붙여 둔다
+            cause.addSuppressed(e);
+            log.warn("[{}] 실패한 새 인덱스 삭제도 실패, 직접 지워야 함: {}", alias, newIndex, e);
         }
     }
 
