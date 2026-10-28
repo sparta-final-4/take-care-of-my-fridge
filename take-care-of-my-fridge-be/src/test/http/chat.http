@@ -1,0 +1,111 @@
+### 1. 로그인
+POST http://localhost:8080/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "cookie@naver.com",
+  "password": "rkddkwlrnldudnj1!"
+}
+
+> {%
+    client.test("로그인 성공", () => {
+        client.assert(response.status === 200, "상태 코드는 200이어야 합니다.");
+    });
+
+    const setCookie = response.headers.valueOf("Set-Cookie");
+    if (setCookie) {
+        const match = /access_token=([^;]+)/.exec(setCookie);
+        if (match) {
+            client.global.set("accessToken", match[1]);
+            client.log("accessToken 저장 완료");
+        }
+    }
+%}
+
+### 2. CSRF 토큰 발급
+GET http://localhost:8080/api/auth/csrf
+Cookie: access_token={{accessToken}}
+
+> {%
+    client.test("CSRF 토큰 발급 성공", () => {
+        client.assert(response.status === 200, "상태 코드는 200이어야 합니다.");
+    });
+    client.global.set("csrfToken", response.body.data.token);
+    client.log("CSRF 토큰 저장 완료: " + response.body.data.token);
+%}
+
+### 3. 상담 세션 시작 (진행 중 세션이 없으면 신규 생성, 있으면 기존 세션 반환)
+POST http://localhost:8080/api/chat-sessions
+X-XSRF-TOKEN: {{csrfToken}}
+Cookie: access_token={{accessToken}}; XSRF-TOKEN={{csrfToken}}
+
+> {%
+    client.test("상담 세션 시작 성공", () => {
+        client.assert(response.status === 200, "상태 코드는 200이어야 합니다.");
+        client.assert(response.body.success === true, "성공 여부는 true여야 합니다.");
+        client.assert(response.body.data.status === "ACTIVE", "세션 상태는 ACTIVE여야 합니다.");
+    });
+    client.global.set("chatSessionId", response.body.data.id);
+    client.log("상담 세션 ID: " + response.body.data.id);
+%}
+
+### 4. 상담 세션 단건 조회
+GET http://localhost:8080/api/chat-sessions/{{chatSessionId}}
+Cookie: access_token={{accessToken}}
+
+> {%
+    client.test("상담 세션 단건 조회 성공", () => {
+        client.assert(response.status === 200, "상태 코드는 200이어야 합니다.");
+        client.assert(response.body.data.id == client.global.get("chatSessionId"), "조회된 세션 ID가 일치해야 합니다.");
+        client.assert(response.body.data.status === "ACTIVE", "세션 상태는 ACTIVE여야 합니다.");
+    });
+%}
+
+### 5. 상담 세션 종료 (COMPLETED)
+PATCH http://localhost:8080/api/chat-sessions/{{chatSessionId}}/complete
+X-XSRF-TOKEN: {{csrfToken}}
+Cookie: access_token={{accessToken}}; XSRF-TOKEN={{csrfToken}}
+
+> {%
+    client.test("상담 세션 종료 성공", () => {
+        client.assert(response.status === 200, "상태 코드는 200이어야 합니다.");
+        client.assert(response.body.data.status === "COMPLETED", "세션 상태는 COMPLETED여야 합니다.");
+    });
+%}
+
+### 6. 이미 종료된 세션 다시 종료 시도 (409 Conflict 예외)
+PATCH http://localhost:8080/api/chat-sessions/{{chatSessionId}}/complete
+X-XSRF-TOKEN: {{csrfToken}}
+Cookie: access_token={{accessToken}}; XSRF-TOKEN={{csrfToken}}
+
+> {%
+    client.test("이미 종료된 세션 종료 시도 실패 (409 Conflict)", () => {
+        client.assert(response.status === 409, "상태 코드는 409여야 합니다.");
+        client.assert(response.body.error.code === "CHAT_005", "에러 코드는 CHAT_005여야 합니다.");
+    });
+%}
+
+### 7. 종료 후 다시 세션 시작 시 새로운 세션 생성 확인
+POST http://localhost:8080/api/chat-sessions
+X-XSRF-TOKEN: {{csrfToken}}
+Cookie: access_token={{accessToken}}; XSRF-TOKEN={{csrfToken}}
+
+> {%
+    client.test("새로운 상담 세션 생성 성공", () => {
+        client.assert(response.status === 200, "상태 코드는 200이어야 합니다.");
+        client.assert(response.body.data.id != client.global.get("chatSessionId"), "새 세션 ID는 이전 세션 ID와 달라야 합니다.");
+        client.assert(response.body.data.status === "ACTIVE", "세션 상태는 ACTIVE여야 합니다.");
+    });
+    client.global.set("newChatSessionId", response.body.data.id);
+%}
+
+### 8. 테스트 종료를 위해 새로 생성한 세션도 종료 정리
+PATCH http://localhost:8080/api/chat-sessions/{{newChatSessionId}}/complete
+X-XSRF-TOKEN: {{csrfToken}}
+Cookie: access_token={{accessToken}}; XSRF-TOKEN={{csrfToken}}
+
+> {%
+    client.test("새 세션 종료 정리 완료", () => {
+        client.assert(response.status === 200, "상태 코드는 200이어야 합니다.");
+    });
+%}
