@@ -21,6 +21,7 @@ apis/product-controller-api.ts
 apis/recipe-controller-api.ts
 apis/recipe-review-controller-api.ts
 apis/refund-controller-api.ts
+apis/review-summary-admin-controller-api.ts
 apis/search-controller-api.ts
 apis/webhook-controller-api.ts
 base.ts
@@ -73,6 +74,7 @@ models/api-response-recipe-classification-response.ts
 models/api-response-recipe-detail-response.ts
 models/api-response-refund-response.ts
 models/api-response-review-response.ts
+models/api-response-review-summary-result.ts
 models/api-response-sale-event-detail-response.ts
 models/api-response-sale-events-create-response.ts
 models/api-response-sign-up-response.ts
@@ -188,6 +190,7 @@ models/review-counts.ts
 models/review-create-request.ts
 models/review-response.ts
 models/review-search-request.ts
+models/review-summary-result.ts
 models/review-update-request.ts
 models/review.ts
 models/sale-candidate-product-response.ts
