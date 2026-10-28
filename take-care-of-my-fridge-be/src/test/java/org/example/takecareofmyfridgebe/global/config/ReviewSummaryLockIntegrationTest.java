@@ -90,4 +90,34 @@ class ReviewSummaryLockIntegrationTest extends RedisContainerSupport {
         assertThat(secondResult.wasExecuted()).isFalse();
         assertThat(counter.get()).isEqualTo(1);
     }
+
+    @Test
+    @DisplayName("수동 실행처럼 lockAtLeastFor가 0이면 작업 완료 즉시 다시 잠금을 획득하여 실행할 수 있다")
+    void canAcquireLockImmediatelyWhenLockAtLeastForIsZero() throws Throwable {
+        LockConfiguration manualLockConfig = new LockConfiguration(
+                Instant.now(),
+                "reviewSummaryManualZeroLockTest",
+                Duration.ofMinutes(30),
+                Duration.ZERO
+        );
+
+        AtomicInteger counter = new AtomicInteger(0);
+
+        // 첫 번째 수동 실행 -> 성공
+        LockingTaskExecutor.TaskResult<Integer> firstResult = lockingTaskExecutor.executeWithLock(
+                counter::incrementAndGet,
+                manualLockConfig
+        );
+        assertThat(firstResult.wasExecuted()).isTrue();
+        assertThat(firstResult.getResult()).isEqualTo(1);
+
+        // 작업이 끝난 직후 두 번째 수동 실행 -> lockAtLeastFor가 0이므로 즉시 성공
+        LockingTaskExecutor.TaskResult<Integer> secondResult = lockingTaskExecutor.executeWithLock(
+                counter::incrementAndGet,
+                manualLockConfig
+        );
+        assertThat(secondResult.wasExecuted()).isTrue();
+        assertThat(secondResult.getResult()).isEqualTo(2);
+        assertThat(counter.get()).isEqualTo(2);
+    }
 }

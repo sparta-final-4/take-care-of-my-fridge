@@ -25,7 +25,11 @@ public class ReviewSummaryAdminController {
 
     private static final String LOCK_NAME = "reviewSummary";
     private static final Duration LOCK_AT_MOST_FOR = Duration.ofMinutes(30);
-    private static final Duration LOCK_AT_LEAST_FOR = Duration.ofMinutes(5);
+    /**
+     * 관리자 수동 실행은 작업이 끝나면 바로 다시 실행할 수 있도록 lockAtLeastFor를 0으로 설정한다.
+     * (정기 스케줄러는 중복 실행 방지를 위해 5분 유지)
+     */
+    private static final Duration LOCK_AT_LEAST_FOR = Duration.ZERO;
 
     private final ReviewSummaryFacade reviewSummaryFacade;
     private final LockingTaskExecutor lockingTaskExecutor;
@@ -57,9 +61,14 @@ public class ReviewSummaryAdminController {
             return ResponseEntity.ok(ApiResponse.ok(taskResult.getResult()));
         } catch (BusinessException e) {
             throw e;
-        } catch (Throwable t) {
-            log.error("관리자 후기 요약 작업 실행 중 예외 발생", t);
+        } catch (Exception e) {
+            log.error("관리자 후기 요약 작업 실행 중 예외 발생", e);
             throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR);
+        } catch (Throwable t) {
+            if (t instanceof Error error) {
+                throw error;
+            }
+            throw new RuntimeException(t);
         }
     }
 }

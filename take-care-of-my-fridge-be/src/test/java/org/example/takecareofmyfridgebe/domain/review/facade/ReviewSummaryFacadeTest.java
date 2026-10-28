@@ -15,6 +15,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.ai.chat.client.ChatClient;
 
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -137,8 +140,39 @@ class ReviewSummaryFacadeTest {
     }
 
     @Test
-    @DisplayName("AI 요약 결과가 150자를 초과하면 150자에서 자르고 저장한다")
-    void longSummaryIsTruncatedTo150Chars() {
+    @DisplayName("AI 요약 결과가 150자를 초과할 때 문장 끝(. ! ?)이 있으면 150자 안의 마지막 문장 경계에서 자르고 저장한다")
+    void longSummaryIsTruncatedAtLastSentenceBoundaryWithin150Chars() {
+        LocalDateTime now = LocalDateTime.now();
+        when(recipeReviewRepository.findSummaryCandidatesWithMinReviews()).thenReturn(List.of(
+                new RecipeReviewSummaryCandidate(10L, 5L, now)
+        ));
+        when(recipeService.findSummaries(anyCollection())).thenReturn(Collections.emptyMap());
+        when(recipeService.findUpdatedAts(anyCollection())).thenReturn(Collections.emptyMap());
+        when(recipeReviewRepository.findRecentReviewsByRecipeId(eq(10L), anyInt()))
+                .thenReturn(List.of(new RecipeReviewContentDto(5, "최고입니다")));
+
+        // sentence1(33자) + sentence2(41자) = 74자
+        String sentence1 = "약불로 뭉근하게 오래 끓이면 국물이 아주 깊고 진해져요. ";
+        String sentence2 = "소금은 처음부터 넣지 말고 마지막에 간을 맞추는 것이 핵심 팁이에요!";
+        // sentence3는 150자를 초과하게 만들어 주는 긴 문장 (문장 끝 부호 없음)
+        String sentence3 = " 그리고 뒤이어 나오는 설명은 백오십 자를 훨씬 넘어가게 만들어 주는 아주 길고 긴 텍스트이며 문장 부호가 전혀 들어가지 않은 상태입니다 그리고 계속해서 부호 없이 이어집니다";
+
+        String fullSummary = sentence1 + sentence2 + sentence3;
+        assertThat(fullSummary.length()).isGreaterThan(150);
+
+        mockChatClientReturn(fullSummary);
+
+        ReviewSummaryResult result = facade.runOnce();
+
+        assertThat(result.successCount()).isEqualTo(1);
+        // 150자 이내의 마지막 문장 끝인 sentence2의 '!'에서 잘려야 함
+        String expected = sentence1 + sentence2;
+        verify(recipeService).updateTipSummary(10L, expected);
+    }
+
+    @Test
+    @DisplayName("AI 요약 결과가 150자를 초과하고 150자 안에 문장 끝(. ! ?)이 없으면 150자에서 자르고 '…'를 붙여 저장한다")
+    void longSummaryWithoutSentenceBoundaryAppendsEllipsis() {
         LocalDateTime now = LocalDateTime.now();
         when(recipeReviewRepository.findSummaryCandidatesWithMinReviews()).thenReturn(List.of(
                 new RecipeReviewSummaryCandidate(10L, 5L, now)
@@ -154,7 +188,56 @@ class ReviewSummaryFacadeTest {
         ReviewSummaryResult result = facade.runOnce();
 
         assertThat(result.successCount()).isEqualTo(1);
-        verify(recipeService).updateTipSummary(10L, "가".repeat(150));
+        verify(recipeService).updateTipSummary(10L, "가".repeat(150) + "…");
+    }
+
+    @Test
+    @DisplayName("작업 시작 후 25분이 지나면 시간 초과로 남은 레시피는 건너뛰고 종료한다")
+    void timeBudgetExceededSkipsRemainingRecipes() {
+        LocalDateTime now = LocalDateTime.now();
+        // latestReviewUpdatedAt 최신순: 3L -> 2L -> 1L 순으로 정렬됨
+        when(recipeReviewRepository.findSummaryCandidatesWithMinReviews()).thenReturn(List.of(
+                new RecipeReviewSummaryCandidate(1L, 5L, now.plusMinutes(1)),
+                new RecipeReviewSummaryCandidate(2L, 5L, now.plusMinutes(2)),
+                new RecipeReviewSummaryCandidate(3L, 5L, now.plusMinutes(3))
+        ));
+        when(recipeService.findSummaries(anyCollection())).thenReturn(Collections.emptyMap());
+        when(recipeService.findUpdatedAts(anyCollection())).thenReturn(Collections.emptyMap());
+        when(recipeReviewRepository.findRecentReviewsByRecipeId(anyLong(), anyInt()))
+                .thenReturn(List.of(new RecipeReviewContentDto(5, "맛있어요")));
+
+        mockChatClientReturn("약불로 조리하면 맛있어요.");
+
+        // 첫 번째 레시피(3L) 처리 시점은 0분, 두 번째 레시피 진입 직전에는 25분 이상 경과한 시점 반환
+        Instant startInstant = Instant.parse("2026-10-28T00:00:00Z");
+        Instant timeoutInstant = startInstant.plus(Duration.ofMinutes(25));
+
+        Clock mockClock = mock(Clock.class);
+        when(mockClock.instant()).thenReturn(
+                startInstant,                 // runOnce() 진입 시 startTime 기록
+                startInstant.plusSeconds(30), // 첫 번째 레시피(3L) 진입 시 시간 체크 (25분 미만이므로 계속)
+                timeoutInstant,               // 두 번째 레시피(2L) 진입 전 시간 체크 (25분 도달 -> break)
+                timeoutInstant                // 전체 작업 소요시간 elapsedMillis 계산용
+        );
+
+        ReviewSummaryFacade facadeWithMockClock = new ReviewSummaryFacade(
+                recipeReviewRepository,
+                recipeService,
+                chatClient,
+                mockClock
+        );
+
+        ReviewSummaryResult result = facadeWithMockClock.runOnce();
+
+        // 총 3개 대상 중 1개 성공, 남은 2개는 시간 초과로 건너뜀
+        assertThat(result.targetCount()).isEqualTo(3);
+        assertThat(result.successCount()).isEqualTo(1);
+        assertThat(result.skippedCount()).isEqualTo(2);
+        assertThat(result.failedCount()).isEqualTo(0);
+
+        verify(recipeService, times(1)).updateTipSummary(eq(3L), anyString());
+        verify(recipeService, never()).updateTipSummary(eq(2L), anyString());
+        verify(recipeService, never()).updateTipSummary(eq(1L), anyString());
     }
 
     @Test

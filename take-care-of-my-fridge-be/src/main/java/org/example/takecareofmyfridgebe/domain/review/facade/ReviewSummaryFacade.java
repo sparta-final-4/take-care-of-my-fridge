@@ -8,9 +8,13 @@ import org.example.takecareofmyfridgebe.domain.review.dto.RecipeReviewSummaryCan
 import org.example.takecareofmyfridgebe.domain.review.dto.ReviewSummaryResult;
 import org.example.takecareofmyfridgebe.domain.review.repository.RecipeReviewRepository;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.Comparator;
@@ -23,20 +27,50 @@ public class ReviewSummaryFacade {
 
     private static final int MAX_TARGET_RECIPES = 100;
     private static final int REVIEWS_SAMPLE_SIZE = 50;
+
+    /**
+     * 프롬프트에서 AI에게 요청하는 목표 요약 길이(120자).
+     * AI가 조금 넘길 때 바로 자르지 않으려는 여유를 두기 위해 코드 상한(MAX_SUMMARY_LENGTH, 150자)보다 작게 설정한다.
+     */
+    private static final int TARGET_SUMMARY_LENGTH = 120;
+
+    /**
+     * 코드 레벨에서 강제하는 최대 요약 길이 상한(150자).
+     * AI가 목표 길이(TARGET_SUMMARY_LENGTH, 120자)를 약간 넘겨도 문맥을 유지할 수 있도록 여유를 두되,
+     * 150자를 넘으면 150자 안의 마지막 문장 끝(. ! ?)에서 자르고, 문장 끝이 없으면 150자에서 자르고 "…"를 붙인다.
+     */
     private static final int MAX_SUMMARY_LENGTH = 150;
+
+    /**
+     * 후기 요약 1회 실행 시 허용되는 최대 시간 예산(25분).
+     * lockAtMostFor(30분)보다 짧아야 함.
+     */
+    private static final Duration TIME_BUDGET = Duration.ofMinutes(25);
 
     private final RecipeReviewRepository recipeReviewRepository;
     private final RecipeService recipeService;
     private final ChatClient chatClient;
+    private final Clock clock;
 
+    @Autowired
     public ReviewSummaryFacade(
             RecipeReviewRepository recipeReviewRepository,
             RecipeService recipeService,
             @Qualifier("reviewSummaryChatClient") ChatClient chatClient
     ) {
+        this(recipeReviewRepository, recipeService, chatClient, Clock.systemDefaultZone());
+    }
+
+    public ReviewSummaryFacade(
+            RecipeReviewRepository recipeReviewRepository,
+            RecipeService recipeService,
+            @Qualifier("reviewSummaryChatClient") ChatClient chatClient,
+            Clock clock
+    ) {
         this.recipeReviewRepository = recipeReviewRepository;
         this.recipeService = recipeService;
         this.chatClient = chatClient;
+        this.clock = clock;
     }
 
     /**
@@ -46,7 +80,7 @@ public class ReviewSummaryFacade {
      * 저장은 RecipeService.updateTipSummary(@Transactional)에서 수행된다.
      */
     public ReviewSummaryResult runOnce() {
-        long startTime = System.currentTimeMillis();
+        Instant startTime = clock.instant();
 
         List<Long> targetRecipeIds = findTargetRecipeIds();
         int targetCount = targetRecipeIds.size();
@@ -57,7 +91,15 @@ public class ReviewSummaryFacade {
         int skippedCount = 0;
         int failedCount = 0;
 
-        for (Long recipeId : targetRecipeIds) {
+        for (int i = 0; i < targetRecipeIds.size(); i++) {
+            if (Duration.between(startTime, clock.instant()).compareTo(TIME_BUDGET) >= 0) {
+                int remainingCount = targetRecipeIds.size() - i;
+                log.info("시간 초과로 {}개는 다음 실행으로", remainingCount);
+                skippedCount += remainingCount;
+                break;
+            }
+
+            Long recipeId = targetRecipeIds.get(i);
             try {
                 List<RecipeReviewContentDto> reviews = fetchRecentReviews(recipeId);
                 if (reviews.isEmpty()) {
@@ -80,9 +122,7 @@ public class ReviewSummaryFacade {
                     continue;
                 }
 
-                String finalSummary = cleaned.length() > MAX_SUMMARY_LENGTH
-                        ? cleaned.substring(0, MAX_SUMMARY_LENGTH)
-                        : cleaned;
+                String finalSummary = truncateSummary(cleaned);
 
                 recipeService.updateTipSummary(recipeId, finalSummary);
                 successCount++;
@@ -98,7 +138,7 @@ public class ReviewSummaryFacade {
             }
         }
 
-        long elapsedMillis = System.currentTimeMillis() - startTime;
+        long elapsedMillis = Duration.between(startTime, clock.instant()).toMillis();
         log.info("후기 요약 작업 완료. 대상: {}, 성공: {}, 건너뜀: {}, 실패: {}, 소요시간: {}ms",
                 targetCount, successCount, skippedCount, failedCount, elapsedMillis);
 
@@ -185,6 +225,33 @@ public class ReviewSummaryFacade {
                 .user(userPrompt)
                 .call()
                 .content();
+    }
+
+    /**
+     * 요약 내용이 상한(MAX_SUMMARY_LENGTH, 150자)을 초과하는 경우:
+     * 1. 150자 안에서 마지막 문장 끝(. ! ?)을 찾아 그 문장 끝까지 자른다.
+     * 2. 150자 안에 문장 끝이 없다면 150자에서 자르고 "…"를 붙인다.
+     */
+    private String truncateSummary(String text) {
+        if (text.length() <= MAX_SUMMARY_LENGTH) {
+            return text;
+        }
+
+        String sub = text.substring(0, MAX_SUMMARY_LENGTH);
+        int lastPeriod = sub.lastIndexOf('.');
+        int lastExclamation = sub.lastIndexOf('!');
+        int lastQuestion = sub.lastIndexOf('?');
+
+        int lastSentenceEnd = Math.max(lastPeriod, Math.max(lastExclamation, lastQuestion));
+
+        if (lastSentenceEnd != -1) {
+            String candidate = sub.substring(0, lastSentenceEnd + 1).trim();
+            if (!candidate.isBlank()) {
+                return candidate;
+            }
+        }
+
+        return sub + "…";
     }
 
     /**

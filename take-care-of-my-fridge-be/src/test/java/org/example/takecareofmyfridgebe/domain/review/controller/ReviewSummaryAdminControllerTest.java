@@ -10,6 +10,7 @@ import org.example.takecareofmyfridgebe.domain.review.facade.ReviewSummaryFacade
 import org.example.takecareofmyfridgebe.global.config.SecurityConfig;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -18,9 +19,13 @@ import org.springframework.context.annotation.Import;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 
+import java.time.Duration;
 import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -38,6 +43,9 @@ class ReviewSummaryAdminControllerTest {
 
     @Autowired
     private MockMvc mvc;
+
+    @Autowired
+    private ReviewSummaryAdminController controller;
 
     @Autowired
     private LockingTaskExecutor lockingTaskExecutor;
@@ -106,6 +114,86 @@ class ReviewSummaryAdminControllerTest {
                 .andExpect(jsonPath("$.error.message").value("후기 요약이 이미 실행 중이에요."));
 
         verify(reviewSummaryFacade, never()).runOnce();
+    }
+
+    @Test
+    @DisplayName("수동 실행이 끝난 직후 다시 실행하면 200 OK를 반환하고 lockAtLeastFor는 0이다")
+    @SuppressWarnings("unchecked")
+    void canExecuteAgainImmediatelyAfterManualExecutionFinishes() throws Throwable {
+        ReviewSummaryResult dummyResult1 = new ReviewSummaryResult(5, 5, 0, 0, 500L);
+        ReviewSummaryResult dummyResult2 = new ReviewSummaryResult(3, 3, 0, 0, 300L);
+
+        LockingTaskExecutor.TaskResult<ReviewSummaryResult> firstTaskResult = mock(LockingTaskExecutor.TaskResult.class);
+        when(firstTaskResult.wasExecuted()).thenReturn(true);
+        when(firstTaskResult.getResult()).thenReturn(dummyResult1);
+
+        LockingTaskExecutor.TaskResult<ReviewSummaryResult> secondTaskResult = mock(LockingTaskExecutor.TaskResult.class);
+        when(secondTaskResult.wasExecuted()).thenReturn(true);
+        when(secondTaskResult.getResult()).thenReturn(dummyResult2);
+
+        ArgumentCaptor<LockConfiguration> lockConfigCaptor = ArgumentCaptor.forClass(LockConfiguration.class);
+
+        when(lockingTaskExecutor.executeWithLock(any(LockingTaskExecutor.TaskWithResult.class), lockConfigCaptor.capture()))
+                .thenReturn(firstTaskResult, secondTaskResult);
+
+        // 첫 번째 수동 실행 -> 200 OK
+        mvc.perform(post("/api/admin/review-summaries/run")
+                        .with(csrf())
+                        .with(authentication(authenticationFor(Member.Role.ADMIN))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.targetCount").value(5));
+
+        // 직후 다시 실행 -> 200 OK
+        mvc.perform(post("/api/admin/review-summaries/run")
+                        .with(csrf())
+                        .with(authentication(authenticationFor(Member.Role.ADMIN))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.targetCount").value(3));
+
+        List<LockConfiguration> configs = lockConfigCaptor.getAllValues();
+        assertThat(configs).hasSize(2);
+        assertThat(configs.get(0).getLockAtLeastFor()).isEqualTo(Duration.ZERO);
+        assertThat(configs.get(1).getLockAtLeastFor()).isEqualTo(Duration.ZERO);
+    }
+
+    @Test
+    @DisplayName("잠금 실행 중 RuntimeException이 발생하면 500 Internal Server Error를 반환한다")
+    @SuppressWarnings("unchecked")
+    void returns500WhenRuntimeExceptionOccurs() throws Throwable {
+        when(lockingTaskExecutor.executeWithLock(any(LockingTaskExecutor.TaskWithResult.class), any(LockConfiguration.class)))
+                .thenThrow(new RuntimeException("Redis 분산 락 통신 실패"));
+
+        mvc.perform(post("/api/admin/review-summaries/run")
+                        .with(csrf())
+                        .with(authentication(authenticationFor(Member.Role.ADMIN))))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("COMMON_002"));
+    }
+
+    @Test
+    @DisplayName("잠금 실행 중 Error가 발생하면 잡아서 500 응답으로 바꾸지 않고 그대로 던져진다")
+    @SuppressWarnings("unchecked")
+    void rethrowsErrorWhenErrorOccurs() throws Throwable {
+        OutOfMemoryError expectedError = new OutOfMemoryError("자바 힙 메모리 부족");
+        when(lockingTaskExecutor.executeWithLock(any(LockingTaskExecutor.TaskWithResult.class), any(LockConfiguration.class)))
+                .thenThrow(expectedError);
+
+        // 1. MockMvc 호출 시 Handler dispatch failed로 감싸져서 서블릿까지 Error가 그대로 전달되는지 확인
+        MvcResult mvcResult = mvc.perform(post("/api/admin/review-summaries/run")
+                        .with(csrf())
+                        .with(authentication(authenticationFor(Member.Role.ADMIN))))
+                .andReturn();
+
+        assertThat(mvcResult.getResolvedException())
+                .isNotNull()
+                .hasRootCause(expectedError);
+
+        // 2. 컨트롤러 메소드 직접 호출 시에도 잡히지 않고 Error가 그대로 던져지는지 확인
+        assertThatThrownBy(() -> controller.runReviewSummary())
+                .isSameAs(expectedError);
     }
 
     private UsernamePasswordAuthenticationToken authenticationFor(Member.Role role) {
