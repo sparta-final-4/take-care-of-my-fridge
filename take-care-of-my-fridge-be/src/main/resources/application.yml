@@ -66,6 +66,8 @@ app:
       recipe:
         alias: recipes
         index-settings: classpath:elasticsearch/recipes/recipes_index.json
+        synonyms: classpath:elasticsearch/recipes/ingredient_synonyms.json
+        extra-synonyms: classpath:elasticsearch/recipes/synonyms.txt
         batch-size: 500
     
 portone:
