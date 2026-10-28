@@ -1,0 +1,83 @@
+### 1. 관리자 로그인
+POST http://localhost:8080/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@naver.com",
+  "password": "rhdiddlrnldudnj1!"
+}
+
+> {%
+    client.test("관리자 로그인 성공", () => {
+        client.assert(response.status === 200, "상태 코드는 200이어야 합니다.");
+    });
+
+    const setCookie = response.headers.valueOf("Set-Cookie");
+    if (setCookie) {
+        const match = /access_token=([^;]+)/.exec(setCookie);
+        if (match) {
+            client.global.set("adminAccessToken", match[1]);
+            client.log("adminAccessToken 저장 완료");
+        }
+    }
+%}
+
+### 2. CSRF 토큰 발급
+GET http://localhost:8080/api/auth/csrf
+Cookie: access_token={{adminAccessToken}}
+
+> {%
+    client.test("CSRF 토큰 발급 성공", () => {
+        client.assert(response.status === 200, "상태 코드는 200이어야 합니다.");
+    });
+    client.global.set("csrfToken", response.body.data.token);
+    client.log("CSRF 토큰 저장 완료: " + response.body.data.token);
+%}
+
+### 3. 관리자 후기 요약 배치 즉시 실행
+POST http://localhost:8080/api/admin/review-summaries/run
+X-XSRF-TOKEN: {{csrfToken}}
+Cookie: access_token={{adminAccessToken}}; XSRF-TOKEN={{csrfToken}}
+
+> {%
+    client.test("후기 요약 배치 작업 실행 성공 (200 OK)", () => {
+        client.assert(response.status === 200, "상태 코드는 200이어야 합니다.");
+        client.assert(response.body.success === true, "success 필드는 true여야 합니다.");
+        client.assert(response.body.data !== undefined, "data 필드가 존재해야 합니다.");
+    });
+
+    if (response.body && response.body.data) {
+        const result = response.body.data;
+        client.test("요약 실행 결과 필드 검증", () => {
+            client.assert(typeof result.targetCount === "number", "targetCount는 숫자여야 합니다.");
+            client.assert(typeof result.successCount === "number", "successCount는 숫자여야 합니다.");
+            client.assert(typeof result.skippedCount === "number", "skippedCount는 숫자여야 합니다.");
+            client.assert(typeof result.failedCount === "number", "failedCount는 숫자여야 합니다.");
+            client.assert(typeof result.elapsedMillis === "number", "elapsedMillis는 숫자여야 합니다.");
+        });
+        client.log("요약 결과 -> 대상: " + result.targetCount + "건, 성공: " + result.successCount + "건, 건너뜀: " + result.skippedCount + "건, 실패: " + result.failedCount + "건, 소요시간: " + result.elapsedMillis + "ms");
+    }
+%}
+
+### 4. [동시성 검증] 분산 락 유지 중 중복 실행 시도 (409 Conflict)
+# 직전 실행 직후 락(최소 5분 유지)이 걸려있을 때 재요청하면 409가 반환됩니다.
+POST http://localhost:8080/api/admin/review-summaries/run
+X-XSRF-TOKEN: {{csrfToken}}
+Cookie: access_token={{adminAccessToken}}; XSRF-TOKEN={{csrfToken}}
+
+> {%
+    client.test("이미 실행 중(분산 락 획득 실패) 시 409 Conflict 반환", () => {
+        client.assert(response.status === 409, "이미 실행 중이거나 최소 락 유지 시간 내에는 409여야 합니다.");
+        client.assert(response.body.success === false, "success 필드는 false여야 합니다.");
+        client.assert(response.body.error.code === "REVIEW_004", "에러 코드는 REVIEW_004여야 합니다.");
+    });
+%}
+
+### 5. [권한 검증] 비인가 접근 차단 (비로그인 요청 시 401 또는 403)
+POST http://localhost:8080/api/admin/review-summaries/run
+
+> {%
+    client.test("비로그인 접근 차단 확인", () => {
+        client.assert(response.status === 401 || response.status === 403, "비로그인 접근 시 401 또는 403이어야 합니다.");
+    });
+%}

@@ -6,6 +6,32 @@
   gap: var(--ant-margin-md);
 }
 
+.summaryBox {
+  padding: var(--ant-padding-sm) var(--ant-padding-md);
+  background-color: var(--ant-color-fill-quaternary);
+  border: 1px solid var(--ant-color-border-secondary);
+  border-radius: var(--ant-border-radius);
+}
+
+.summaryHeader {
+  margin-bottom: var(--ant-margin-xxs);
+}
+
+.summaryTitle {
+  font-size: 14px;
+}
+
+.summaryNotice {
+  font-size: 12px;
+}
+
+.summaryContent {
+  margin-bottom: 0 !important;
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.6;
+}
+
 .noticeBox {
   padding: var(--ant-padding-sm) var(--ant-padding-md);
   background-color: var(--ant-color-bg-container-disabled);

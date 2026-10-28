@@ -76,7 +76,7 @@ export function RecipeDetailSection({ recipeId }: RecipeDetailSectionProps) {
         <div className={styles.column}>
           <RecipeCookPanel recipeId={recipeId} recipe={recipe} fridgeMatch={fridgeMatch} />
           <RecipeCookingStats recipeId={recipeId} />
-          <RecipeReviewSection recipeId={recipeId} />
+          <RecipeReviewSection recipeId={recipeId} tipSummary={recipe.tipSummary} />
         </div>
       </div>
     </div>

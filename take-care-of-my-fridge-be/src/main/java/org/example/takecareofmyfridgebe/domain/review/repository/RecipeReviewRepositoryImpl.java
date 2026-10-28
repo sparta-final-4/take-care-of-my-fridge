@@ -1,10 +1,13 @@
 package org.example.takecareofmyfridgebe.domain.review.repository;
 
 import com.querydsl.core.types.OrderSpecifier;
+import com.querydsl.core.types.Projections;
 import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.jpa.impl.JPAQuery;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import lombok.RequiredArgsConstructor;
+import org.example.takecareofmyfridgebe.domain.review.dto.RecipeReviewContentDto;
+import org.example.takecareofmyfridgebe.domain.review.dto.RecipeReviewSummaryCandidate;
 import org.example.takecareofmyfridgebe.domain.review.dto.ReviewSearchRequest;
 import org.example.takecareofmyfridgebe.domain.review.dto.ReviewSortType;
 import org.example.takecareofmyfridgebe.domain.review.entity.RecipeReview;
@@ -51,6 +54,36 @@ public class RecipeReviewRepositoryImpl implements RecipeReviewRepositoryCustom 
         long totalCount = total != null ? total : 0L;
 
         return new PageImpl<>(content, pageRequest, totalCount);
+    }
+
+    @Override
+    public List<RecipeReviewSummaryCandidate> findSummaryCandidatesWithMinReviews() {
+        return queryFactory
+                .select(Projections.constructor(
+                        RecipeReviewSummaryCandidate.class,
+                        recipeReview.recipeId,
+                        recipeReview.count(),
+                        recipeReview.updatedAt.max()
+                ))
+                .from(recipeReview)
+                .groupBy(recipeReview.recipeId)
+                .having(recipeReview.count().goe(5L))
+                .fetch();
+    }
+
+    @Override
+    public List<RecipeReviewContentDto> findRecentReviewsByRecipeId(Long recipeId, int limit) {
+        return queryFactory
+                .select(Projections.constructor(
+                        RecipeReviewContentDto.class,
+                        recipeReview.rating,
+                        recipeReview.content
+                ))
+                .from(recipeReview)
+                .where(recipeReview.recipeId.eq(recipeId))
+                .orderBy(recipeReview.updatedAt.desc())
+                .limit(limit)
+                .fetch();
     }
 
     private BooleanExpression buildPredicate(ReviewSearchRequest request, Long currentMemberId) {

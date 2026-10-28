@@ -78,6 +78,10 @@ dependencies {
 
     // Kafka
     implementation 'org.springframework.kafka:spring-kafka'
+
+    // ShedLock
+    implementation 'net.javacrumbs.shedlock:shedlock-spring:7.10.1'
+    implementation 'net.javacrumbs.shedlock:shedlock-provider-redis-spring:7.10.1'
 }
 
 tasks.named('test') {

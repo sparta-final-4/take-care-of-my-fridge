@@ -15,11 +15,12 @@ import styles from './RecipeReviewSection.module.scss';
 
 interface RecipeReviewSectionProps {
   recipeId: number;
+  tipSummary?: string | null;
 }
 
 const PAGE_SIZE = 5;
 
-export function RecipeReviewSection({ recipeId }: RecipeReviewSectionProps) {
+export function RecipeReviewSection({ recipeId, tipSummary }: RecipeReviewSectionProps) {
   const { message } = App.useApp();
   const queryClient = useQueryClient();
   const authStatus = useAuthStore((state) => state.status);
@@ -183,6 +184,22 @@ export function RecipeReviewSection({ recipeId }: RecipeReviewSectionProps) {
       }
     >
       <div className={styles.section}>
+        {tipSummary && tipSummary.trim().length > 0 && (
+          <div className={styles.summaryBox}>
+            <Flex justify="space-between" align="center" className={styles.summaryHeader}>
+              <Typography.Text strong className={styles.summaryTitle}>
+                💬 후기 요약
+              </Typography.Text>
+              <Typography.Text type="secondary" className={styles.summaryNotice}>
+                AI가 후기를 요약했어요
+              </Typography.Text>
+            </Flex>
+            <Typography.Paragraph className={styles.summaryContent}>
+              {tipSummary.trim()}
+            </Typography.Paragraph>
+          </div>
+        )}
+
         {renderWriteArea()}
 
         {isReviewsPending ? (
