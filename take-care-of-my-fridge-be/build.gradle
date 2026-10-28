@@ -19,13 +19,21 @@ repositories {
     mavenCentral()
 }
 
+ext['springAiVersion'] = '2.0.1'
+
+dependencyManagement {
+    imports {
+        mavenBom "org.springframework.ai:spring-ai-bom:${springAiVersion}"
+    }
+}
+
 dependencies {
+    implementation 'org.springframework.ai:spring-ai-starter-model-openai'
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     implementation 'org.springframework.boot:spring-boot-starter-security'
     implementation 'org.springframework.security:spring-security-oauth2-jose'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.springframework.boot:spring-boot-starter-webmvc'
-    implementation 'org.springframework.boot:spring-boot-starter-websocket'
     compileOnly 'org.projectlombok:lombok'
     runtimeOnly 'com.mysql:mysql-connector-j'
     annotationProcessor 'org.projectlombok:lombok'
@@ -74,6 +82,8 @@ dependencies {
 
 tasks.named('test') {
     useJUnitPlatform()
+
+    environment 'OPENAI_API_KEY', 'test-dummy-key'
 
     // 테스트 완료 후 JaCoCo 리포트 생성
     finalizedBy jacocoTestReport
