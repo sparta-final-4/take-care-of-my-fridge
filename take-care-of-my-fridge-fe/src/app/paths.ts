@@ -18,6 +18,7 @@ export const ROUTES = {
   recipeDetail: '/recipes/:recipeId',
   products: '/products',
   productDetail: '/products/:productId',
+  search: '/search',
   cart: '/cart',
   orderCheckout: '/orders/:orderId/checkout',
   adminMembers: '/admin/members',
