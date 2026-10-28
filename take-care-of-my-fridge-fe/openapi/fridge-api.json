@@ -2284,6 +2284,36 @@
         ]
       }
     },
+    "/api/search/recipes": {
+      "get": {
+        "operationId": "searchRecipes",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "request",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/RecipeListRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePageResponseRecipeListItemResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "search-controller"
+        ]
+      }
+    },
     "/api/webhooks/portone": {
       "post": {
         "operationId": "handlePortOneWebhook",

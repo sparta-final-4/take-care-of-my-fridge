@@ -21,6 +21,7 @@ apis/product-controller-api.ts
 apis/recipe-controller-api.ts
 apis/recipe-review-controller-api.ts
 apis/refund-controller-api.ts
+apis/search-controller-api.ts
 apis/webhook-controller-api.ts
 base.ts
 common.ts
