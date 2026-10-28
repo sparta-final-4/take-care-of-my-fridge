@@ -1,13 +1,17 @@
 package org.example.takecareofmyfridgebe.domain.recipe.repository;
 
 import com.querydsl.core.types.OrderSpecifier;
+import com.querydsl.core.types.Projections;
 import com.querydsl.core.types.dsl.BooleanExpression;
+import com.querydsl.core.types.dsl.NumberPath;
 import com.querydsl.core.types.dsl.StringPath;
 import com.querydsl.jpa.impl.JPAQuery;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import lombok.RequiredArgsConstructor;
+import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeIngredientNameDto;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeListRequest;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeSort;
+import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeStepTextDto;
 import org.example.takecareofmyfridgebe.domain.recipe.entity.Recipe;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -16,7 +20,10 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 
+import static org.example.takecareofmyfridgebe.domain.ingredient.entity.QIngredient.ingredient;
 import static org.example.takecareofmyfridgebe.domain.recipe.entity.QRecipe.recipe;
+import static org.example.takecareofmyfridgebe.domain.recipe.entity.QRecipeIngredient.recipeIngredient;
+import static org.example.takecareofmyfridgebe.domain.recipe.entity.QRecipeStep.recipeStep;
 
 @Repository
 @RequiredArgsConstructor
@@ -63,6 +70,34 @@ public class RecipeRepositoryImpl implements RecipeRepositoryCustom {
         return findDistinctValues(recipe.category);
     }
 
+    @Override
+    public List<RecipeIngredientNameDto> findIngredientNames(Long recipeId) {
+        return queryFactory
+                .select(Projections.constructor(RecipeIngredientNameDto.class,
+                        recipeIngredient.recipe.id,
+                        ingredient.name,
+                        recipeIngredient.role
+                ))
+                .from(recipeIngredient)
+                .join(ingredient).on(ingredient.id.eq(recipeIngredient.ingredientId))
+                .where(recipeIdEq(recipeIngredient.recipe.id, recipeId))
+                .orderBy(recipeIngredient.recipe.id.asc(), recipeIngredient.seq.asc())
+                .fetch();
+    }
+
+    @Override
+    public List<RecipeStepTextDto> findStepTexts(Long recipeId) {
+        return queryFactory
+                .select(Projections.constructor(RecipeStepTextDto.class,
+                        recipeStep.recipe.id,
+                        recipeStep.description
+                ))
+                .from(recipeStep)
+                .where(recipeIdEq(recipeStep.recipe.id, recipeId))
+                .orderBy(recipeStep.recipe.id.asc(), recipeStep.stepNo.asc())
+                .fetch();
+    }
+
     private List<String> findDistinctValues(StringPath column) {
         return queryFactory
                 .select(column)
@@ -95,6 +130,10 @@ public class RecipeRepositoryImpl implements RecipeRepositoryCustom {
 
     private BooleanExpression difficultyLoe(Integer maxDifficulty) {
         return maxDifficulty == null ? null : recipe.difficulty.loe(maxDifficulty);
+    }
+
+    private BooleanExpression recipeIdEq(NumberPath<Long> path, Long recipeId) {
+        return recipeId == null ? null : path.eq(recipeId);
     }
 
     // 같은 값끼리는 최신 레시피(id 내림차순)가 먼저 오도록 2차 정렬을 둔다.
