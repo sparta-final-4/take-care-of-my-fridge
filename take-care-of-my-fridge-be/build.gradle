@@ -82,12 +82,19 @@ dependencies {
     // ShedLock
     implementation 'net.javacrumbs.shedlock:shedlock-spring:7.10.1'
     implementation 'net.javacrumbs.shedlock:shedlock-provider-redis-spring:7.10.1'
+
+    // Elasticsearch
+    implementation 'org.springframework.boot:spring-boot-starter-data-elasticsearch'
 }
 
 tasks.named('test') {
     useJUnitPlatform()
 
     environment 'OPENAI_API_KEY', 'test-dummy-key'
+
+    // 앱 기본 검색 엔진은 elasticsearch다. 테스트가 로컬 ES를 읽거나 색인하지 않도록 mysql로 고정한다.
+    // ES 경로가 필요한 테스트는 @SpringBootTest(properties = "app.search.engine=elasticsearch")로 켜고 ES 호출은 목으로 막는다
+    systemProperty 'SEARCH_ENGINE', 'mysql'
 
     // 테스트 완료 후 JaCoCo 리포트 생성
     finalizedBy jacocoTestReport

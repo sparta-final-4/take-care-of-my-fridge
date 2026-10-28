@@ -23,7 +23,15 @@ spring:
       port: ${REDIS_PORT}
       password: ${REDIS_PASSWORD}
 
-app:
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
+
+  elasticsearch:
+    uris: ${ELASTICSEARCH_URL}
+    username: elastic
+    password: ${ELASTIC_PASSWORD}
+
+app:가
   auth:
     # application.yml 값과 무관하게 반드시 Parameter Store 값을 쓴다(없으면 기동 실패).
     jwt-secret: ${JWT_SECRET}

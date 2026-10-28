@@ -43,6 +43,10 @@ spring:
       timeout: 60s
       max-retries: 1
 
+  elasticsearch:
+    uris: ${ELASTICSEARCH_URL:http://localhost:9200}
+    connection-timeout: 2s
+    socket-timeout: 5s
 
 app:
   auth:
@@ -55,6 +59,14 @@ app:
   review-summary:
     cron: ${REVIEW_SUMMARY_CRON:0 0 4 * * *}
     enabled: ${REVIEW_SUMMARY_ENABLED:true}
+  search:
+    # 레시피 키워드 검색 엔진. mysql(기존 LIKE) | elasticsearch
+    engine: ${SEARCH_ENGINE:elasticsearch}
+    index-properties:
+      recipe:
+        alias: recipes
+        index-settings: classpath:elasticsearch/recipes/recipes_index.json
+        batch-size: 500
     
 portone:
   base-url: "https://api.portone.io"
