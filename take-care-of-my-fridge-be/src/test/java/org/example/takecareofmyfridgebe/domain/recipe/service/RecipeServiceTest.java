@@ -16,6 +16,7 @@ import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeSummary;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeUpdatedAtDto;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeUpdateRequest;
 import org.example.takecareofmyfridgebe.domain.recipe.entity.Recipe;
+import org.example.takecareofmyfridgebe.domain.recipe.event.RecipeChangedEvent;
 import org.example.takecareofmyfridgebe.domain.recipe.repository.RecipeIngredientRepository;
 import org.example.takecareofmyfridgebe.domain.recipe.repository.RecipeRepository;
 import org.example.takecareofmyfridgebe.domain.recipe.repository.RecipeStepRepository;
@@ -29,6 +30,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -69,6 +71,8 @@ class RecipeServiceTest {
     private IngredientRepository ingredientRepository;
     @Mock
     private IngredientService ingredientService;
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
     @InjectMocks
     private RecipeService service;
 
@@ -516,5 +520,67 @@ class RecipeServiceTest {
         assertEquals(time1, result.get(1L));
         assertEquals(time2, result.get(2L));
         verify(recipeRepository).findUpdatedAtsByIdIn(argThat(ids -> ids.size() == 2 && ids.containsAll(List.of(1L, 2L))));
+    }
+
+    @Test
+    @DisplayName("레시피를 등록하면 저장한 레시피 ID로 변경 이벤트를 발행한다")
+    void createRecipe_publishesChangedEvent() {
+        // given
+        Recipe saved = RecipeFixture.createRecipe(11L, "된장찌개");
+        when(ingredientRepository.findAllById(List.of(10L, 20L)))
+                .thenReturn(List.of(mock(Ingredient.class), mock(Ingredient.class)));
+        when(recipeRepository.save(any(Recipe.class))).thenReturn(saved);
+        when(recipeIngredientRepository.saveAll(anyList())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(recipeStepRepository.saveAll(anyList())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        // when
+        service.createRecipe(RecipeFixture.createRecipeRequest(10L, 20L));
+
+        // then
+        verify(eventPublisher).publishEvent(new RecipeChangedEvent(11L));
+    }
+
+    @Test
+    @DisplayName("레시피를 수정하면 그 레시피 ID로 변경 이벤트를 발행한다")
+    void updateRecipe_publishesChangedEvent() {
+        // given
+        Recipe stew = RecipeFixture.createRecipe(7L, "된장찌개");
+        when(recipeRepository.findById(7L)).thenReturn(Optional.of(stew));
+
+        // when
+        service.updateRecipe(7L, updateRequest("차돌 된장찌개", null, null));
+
+        // then
+        verify(eventPublisher).publishEvent(new RecipeChangedEvent(7L));
+    }
+
+    @Test
+    @DisplayName("없는 레시피를 수정하면 변경 이벤트를 발행하지 않는다")
+    void updateRecipe_notFoundDoesNotPublish() {
+        // given
+        when(recipeRepository.findById(99L)).thenReturn(Optional.empty());
+
+        // when & then
+        assertThrows(BusinessException.class, () -> service.updateRecipe(99L, updateRequest("이름", null, null)));
+        verify(eventPublisher, never()).publishEvent(any(Object.class));
+    }
+
+    @Test
+    @DisplayName("검색 결과 ID 순서대로 목록을 만들고, DB에 없는 ID는 빼며, 전체 건수는 검색 결과를 따른다")
+    void getRecipesByIds_keepsSearchOrder() {
+        // given
+        Recipe first = RecipeFixture.createRecipe(3L, "김치찌개");
+        Recipe second = RecipeFixture.createRecipe(1L, "김치볶음밥");
+        when(recipeRepository.findAllById(List.of(3L, 99L, 1L))).thenReturn(List.of(second, first));
+        RecipeListRequest request = new RecipeListRequest(null, "김치", null, null, null, null, 2, 3);
+
+        // when
+        PageResponse<RecipeListItemResponse> result = service.getRecipesByIds(List.of(3L, 99L, 1L), 8, request);
+
+        // then
+        assertThat(result.content()).extracting(RecipeListItemResponse::recipeId).containsExactly(3L, 1L);
+        assertEquals(8, result.totalElements());
+        assertEquals(2, result.pageNumber());
+        assertEquals(3, result.pageSize());
     }
 }
