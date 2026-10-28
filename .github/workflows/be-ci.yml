@@ -43,9 +43,11 @@ jobs:
         run: ./gradlew compileJava compileTestJava --console=plain
 
       # application.yml의 app.auth.jwt-secret이 ${JWT_SECRET}을 읽는다(32바이트 이상).
+      # portone.webhook-secret은 기동 시 base64로 풀리므로 형식만 맞춘 임의 값을 넣는다(실제 PortOne 호출 없음).
       - name: Build & Test
         run: |
           export JWT_SECRET="$(openssl rand -base64 48)"
+          export PORTONE_WEBHOOK_SECRET="whsec_$(openssl rand -base64 32)"
           ./gradlew test jacocoTestReport --console=plain
 
       # Jacoco 보고서 생성

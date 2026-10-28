@@ -28,3 +28,9 @@ app:
     # application.yml 값과 무관하게 반드시 Parameter Store 값을 쓴다(없으면 기동 실패).
     jwt-secret: ${JWT_SECRET}
     cookie-secure: true
+    
+portone:
+  api-secret: ${PORTONE_API_SECRET}
+  store-id: ${PORTONE_STORE_ID}
+  channel-key: ${PORTONE_CHANNEL_KEY}
+  webhook-secret: ${PORTONE_WEBHOOK_SECRET}
