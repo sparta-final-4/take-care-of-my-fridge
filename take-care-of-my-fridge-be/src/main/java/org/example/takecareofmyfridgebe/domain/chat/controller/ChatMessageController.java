@@ -34,7 +34,7 @@ public class ChatMessageController {
     /**
      * 상담 세션에 사용자 메시지를 전송하고 SSE 스트리밍으로 응답을 수신한다.
      */
-    @PostMapping(produces = "text/event-stream;charset=UTF-8")
+    @PostMapping(produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public ResponseEntity<Flux<ServerSentEvent<String>>> sendMessage(
             @AuthenticationPrincipal AuthPrincipal principal,
             @PathVariable Long sessionId,
@@ -49,7 +49,6 @@ public class ChatMessageController {
                 .contentType(new MediaType("text", "event-stream", StandardCharsets.UTF_8))
                 .header("X-Accel-Buffering", "no")
                 .body(stream);
-
     }
 
     /**
