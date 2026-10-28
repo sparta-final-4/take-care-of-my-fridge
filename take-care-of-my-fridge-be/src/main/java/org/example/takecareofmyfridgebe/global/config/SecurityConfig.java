@@ -48,7 +48,8 @@ public class SecurityConfig {
                                 "/api/auth/login", "/api/auth/refresh", "/api/auth/logout", "/api/auth/csrf",
                                 "/api/members/email-availability", "/api/members/nickname-availability",
                                 "/api/products", "/api/products/**",
-                                "/api/recipes", "/api/recipes/**"
+                                "/api/recipes", "/api/recipes/**",
+                                "/api/search", "/api/search/**"
                         ).permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/reviews").permitAll()
                         .requestMatchers(API_DOCS_PATHS).permitAll()
