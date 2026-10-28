@@ -1,7 +1,7 @@
 package org.example.takecareofmyfridgebe.domain.search.event;
 
 import org.example.takecareofmyfridgebe.domain.search.config.RecipeSearchProperties;
-import org.example.takecareofmyfridgebe.domain.search.service.EsIndexer;
+import org.example.takecareofmyfridgebe.infra.elasticsearch.index.EsIndexer;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 

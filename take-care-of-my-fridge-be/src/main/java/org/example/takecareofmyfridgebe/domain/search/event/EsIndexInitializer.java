@@ -3,7 +3,7 @@ package org.example.takecareofmyfridgebe.domain.search.event;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.takecareofmyfridgebe.domain.search.config.RecipeSearchProperties;
-import org.example.takecareofmyfridgebe.domain.search.service.EsIndexer;
+import org.example.takecareofmyfridgebe.infra.elasticsearch.index.EsIndexer;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;

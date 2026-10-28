@@ -1,4 +1,4 @@
-package org.example.takecareofmyfridgebe.domain.search.service;
+package org.example.takecareofmyfridgebe.infra.elasticsearch.index;
 
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import co.elastic.clients.elasticsearch.core.BulkResponse;
@@ -8,9 +8,9 @@ import co.elastic.clients.elasticsearch.indices.ElasticsearchIndicesClient;
 import co.elastic.clients.elasticsearch.indices.GetAliasResponse;
 import co.elastic.clients.transport.endpoints.BooleanResponse;
 import co.elastic.clients.util.ObjectBuilder;
-import org.example.takecareofmyfridgebe.domain.search.config.EsIndexProperties;
 import org.example.takecareofmyfridgebe.domain.search.config.RecipeSearchProperties.RecipeIndexProperties;
-import org.example.takecareofmyfridgebe.domain.search.dto.EsDocument;
+import org.example.takecareofmyfridgebe.infra.elasticsearch.config.EsIndexProperties;
+import org.example.takecareofmyfridgebe.infra.elasticsearch.dto.EsDocument;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

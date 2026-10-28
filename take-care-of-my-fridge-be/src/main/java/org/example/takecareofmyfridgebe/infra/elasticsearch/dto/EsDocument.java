@@ -1,4 +1,4 @@
-package org.example.takecareofmyfridgebe.domain.search.dto;
+package org.example.takecareofmyfridgebe.infra.elasticsearch.dto;
 
 import java.util.Map;
 

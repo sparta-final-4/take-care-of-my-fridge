@@ -1,7 +1,7 @@
-package org.example.takecareofmyfridgebe.domain.search.service;
+package org.example.takecareofmyfridgebe.infra.elasticsearch.index;
 
-import org.example.takecareofmyfridgebe.domain.search.config.EsIndexProperties;
 import org.example.takecareofmyfridgebe.domain.search.config.RecipeSearchProperties.RecipeIndexProperties;
+import org.example.takecareofmyfridgebe.infra.elasticsearch.config.EsIndexProperties;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.ClassPathResource;

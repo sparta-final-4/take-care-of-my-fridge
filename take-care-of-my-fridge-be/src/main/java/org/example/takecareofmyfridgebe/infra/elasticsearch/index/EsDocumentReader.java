@@ -1,6 +1,6 @@
-package org.example.takecareofmyfridgebe.domain.search.service;
+package org.example.takecareofmyfridgebe.infra.elasticsearch.index;
 
-import org.example.takecareofmyfridgebe.domain.search.dto.EsDocument;
+import org.example.takecareofmyfridgebe.infra.elasticsearch.dto.EsDocument;
 
 import java.util.List;
 import java.util.Optional;

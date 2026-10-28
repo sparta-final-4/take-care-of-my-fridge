@@ -7,7 +7,7 @@ import org.example.takecareofmyfridgebe.domain.recipe.entity.Recipe;
 import org.example.takecareofmyfridgebe.domain.recipe.entity.RecipeIngredient;
 import org.example.takecareofmyfridgebe.domain.recipe.entity.RecipeStep;
 import org.example.takecareofmyfridgebe.domain.recipe.service.RecipeIndexSourceService;
-import org.example.takecareofmyfridgebe.domain.search.dto.EsDocument;
+import org.example.takecareofmyfridgebe.infra.elasticsearch.dto.EsDocument;
 import org.example.takecareofmyfridgebe.global.config.JpaAuditingConfig;
 import org.example.takecareofmyfridgebe.global.config.QueryDslConfig;
 import org.example.takecareofmyfridgebe.support.MySqlContainerSupport;

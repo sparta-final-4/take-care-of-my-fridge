@@ -1,5 +1,6 @@
 package org.example.takecareofmyfridgebe.domain.search.config;
 
+import org.example.takecareofmyfridgebe.infra.elasticsearch.config.EsIndexProperties;
 import org.example.takecareofmyfridgebe.support.MySqlContainerSupport;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

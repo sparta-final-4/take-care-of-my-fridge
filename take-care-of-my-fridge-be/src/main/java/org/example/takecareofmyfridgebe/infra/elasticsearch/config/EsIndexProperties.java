@@ -1,4 +1,4 @@
-package org.example.takecareofmyfridgebe.domain.search.config;
+package org.example.takecareofmyfridgebe.infra.elasticsearch.config;
 
 import org.springframework.core.io.Resource;
 

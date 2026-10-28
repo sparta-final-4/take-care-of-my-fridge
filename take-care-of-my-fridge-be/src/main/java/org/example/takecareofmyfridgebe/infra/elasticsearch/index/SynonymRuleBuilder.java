@@ -1,7 +1,7 @@
-package org.example.takecareofmyfridgebe.domain.search.service;
+package org.example.takecareofmyfridgebe.infra.elasticsearch.index;
 
 import lombok.RequiredArgsConstructor;
-import org.example.takecareofmyfridgebe.domain.search.config.EsIndexProperties;
+import org.example.takecareofmyfridgebe.infra.elasticsearch.config.EsIndexProperties;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;

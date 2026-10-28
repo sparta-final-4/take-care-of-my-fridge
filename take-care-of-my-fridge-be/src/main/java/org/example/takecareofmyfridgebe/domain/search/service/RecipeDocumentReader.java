@@ -3,7 +3,8 @@ package org.example.takecareofmyfridgebe.domain.search.service;
 import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeIndexSource;
 import org.example.takecareofmyfridgebe.domain.recipe.service.RecipeIndexSourceService;
-import org.example.takecareofmyfridgebe.domain.search.dto.EsDocument;
+import org.example.takecareofmyfridgebe.infra.elasticsearch.dto.EsDocument;
+import org.example.takecareofmyfridgebe.infra.elasticsearch.index.EsDocumentReader;
 import org.springframework.stereotype.Component;
 
 import java.time.format.DateTimeFormatter;

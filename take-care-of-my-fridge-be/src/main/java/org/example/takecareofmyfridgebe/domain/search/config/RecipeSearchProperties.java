@@ -1,5 +1,6 @@
 package org.example.takecareofmyfridgebe.domain.search.config;
 
+import org.example.takecareofmyfridgebe.infra.elasticsearch.config.EsIndexProperties;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.core.io.Resource;
 

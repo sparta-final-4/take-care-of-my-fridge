@@ -1,12 +1,12 @@
-package org.example.takecareofmyfridgebe.domain.search.service;
+package org.example.takecareofmyfridgebe.infra.elasticsearch.index;
 
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import co.elastic.clients.elasticsearch._types.ElasticsearchException;
 import co.elastic.clients.elasticsearch.core.BulkResponse;
 import co.elastic.clients.elasticsearch.core.bulk.BulkResponseItem;
 import lombok.extern.slf4j.Slf4j;
-import org.example.takecareofmyfridgebe.domain.search.config.EsIndexProperties;
-import org.example.takecareofmyfridgebe.domain.search.dto.EsDocument;
+import org.example.takecareofmyfridgebe.infra.elasticsearch.config.EsIndexProperties;
+import org.example.takecareofmyfridgebe.infra.elasticsearch.dto.EsDocument;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ArrayNode;
