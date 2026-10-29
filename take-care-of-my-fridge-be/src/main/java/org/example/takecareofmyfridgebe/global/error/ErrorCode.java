@@ -36,6 +36,7 @@ public enum ErrorCode {
 
     // Deal analysis
     DEAL_ANALYSIS_NOT_FOUND(HttpStatus.NOT_FOUND, "D002", "할인 후보 분석 결과가 없습니다."),
+    DEAL_TRAINING_DATA_INSUFFICIENT(HttpStatus.UNPROCESSABLE_ENTITY, "D007", "실제 일반 특가 이력이 부족해 할인 효과를 학습할 수 없습니다."),
     DEAL_CANDIDATE_NOT_IN_ANALYSIS(HttpStatus.BAD_REQUEST, "D003", "이 분석의 할인 후보가 아닙니다."),
     DEAL_REVIEW_LOCKED(HttpStatus.CONFLICT, "D004", "이미 행사 요청한 후보는 검토 상태를 바꿀 수 없습니다."),
     DEAL_EVENT_NOT_AVAILABLE(HttpStatus.CONFLICT, "D005", "선택되지 않았거나 이미 행사에 등록된 후보입니다."),
