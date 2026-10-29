@@ -5,6 +5,7 @@ import { useState } from 'react';
 
 import { useAuthStore } from '@/common/auth/authStore';
 import { SectionCard } from '@/common/components/SectionCard';
+import { useChatModalStore } from '@/domains/chat/model/useChatModalStore';
 
 import type { FridgeItemCreateRequest, StorageType } from '../api';
 import { STORAGE_LABELS } from '../format';
@@ -27,6 +28,7 @@ export function IngredientInputSection() {
   const { message } = App.useApp();
   const isAuthenticated = useAuthStore((state) => state.status === 'authenticated');
   const createMutation = useCreateFridgeItems();
+  const openChat = useChatModalStore((state) => state.openChat);
 
   const [name, setName] = useState('');
   const [quantity, setQuantity] = useState('');
@@ -202,7 +204,9 @@ export function IngredientInputSection() {
         </Flex>
 
         <Flex justify="flex-end" wrap gap="small" className={styles.footerActions}>
-          <Button className={styles.actionButton}>AI 상담</Button>
+          <Button className={styles.actionButton} onClick={openChat}>
+            AI 상담
+          </Button>
           <Button
             type="primary"
             loading={createMutation.isPending}

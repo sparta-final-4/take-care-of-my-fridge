@@ -5,6 +5,7 @@ import { useNavigate, useSearchParams } from 'react-router';
 
 import { ROUTES } from '@/app/paths';
 import { SectionCard } from '@/common/components/SectionCard';
+import { useChatModalStore } from '@/domains/chat/model/useChatModalStore';
 
 import type { FridgeItemResponse, FridgeSortType, StorageType } from '../api';
 import { STORAGE_LABELS } from '../format';
@@ -38,6 +39,7 @@ function isStorageTab(value: string | null): value is StorageTab {
 }
 
 export function FridgeItemListSection() {
+  const openChat = useChatModalStore((state) => state.openChat);
   const { message } = App.useApp();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -216,7 +218,9 @@ export function FridgeItemListSection() {
               {checkedItems.map((item) => item.rawName).join(', ')}
             </Typography.Text>
             {/* TODO: AI 상담 기능이 생기면 선택한 재료로 추천을 요청한다. */}
-            <Button className={styles.selectionButton}>이 재료 위주로 AI 추천</Button>
+            <Button className={styles.selectionButton} onClick={openChat}>
+              이 재료 위주로 AI 추천
+            </Button>
           </Flex>
         )}
       </Flex>

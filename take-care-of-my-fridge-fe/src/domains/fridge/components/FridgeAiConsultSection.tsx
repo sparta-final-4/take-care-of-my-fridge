@@ -1,8 +1,7 @@
 import { Button, Flex, Tag, Typography } from 'antd';
-import { useNavigate } from 'react-router';
 
-import { ROUTES } from '@/app/paths';
 import { SectionCard } from '@/common/components/SectionCard';
+import { useChatModalStore } from '@/domains/chat/model/useChatModalStore';
 
 import { formatDDay } from '../format';
 import { useFridgeSort } from '../hooks/useFridgeSort';
@@ -10,7 +9,7 @@ import { useFridgeItems } from '../queries';
 import styles from './FridgeAiConsultSection.module.scss';
 
 export function FridgeAiConsultSection() {
-  const navigate = useNavigate();
+  const openChat = useChatModalStore((state) => state.openChat);
   const [sort] = useFridgeSort();
   const { data } = useFridgeItems(sort, true);
   const imminentItems = data?.filter((item) => item.status === 'IMMINENT') ?? [];
@@ -33,7 +32,7 @@ export function FridgeAiConsultSection() {
         <Typography.Text type="secondary" className={styles.hint}>
           목록에서 재료를 골라 추천받을 수도 있어요.
         </Typography.Text>
-        <Button type="primary" size="large" onClick={() => navigate(ROUTES.chat)} block>
+        <Button type="primary" size="large" onClick={openChat} block>
           AI 상담 시작하기
         </Button>
       </Flex>

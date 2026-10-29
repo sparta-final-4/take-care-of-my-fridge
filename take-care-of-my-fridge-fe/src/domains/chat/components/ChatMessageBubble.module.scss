@@ -1,0 +1,110 @@
+@use '@/styles/variables' as *;
+@use '@/styles/mixins' as *;
+
+.messageWrapper {
+  display: flex;
+  margin-bottom: 14px;
+  width: 100%;
+
+  &.user {
+    justify-content: flex-end;
+  }
+
+  &.assistant {
+    justify-content: flex-start;
+  }
+}
+
+.userContainer {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  max-width: 85%;
+  flex-direction: row-reverse;
+}
+
+.assistantContainer {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  max-width: 90%;
+}
+
+.avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background-color: var(--ant-color-primary-bg);
+  color: var(--ant-color-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.assistantContent {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  min-width: 0;
+}
+
+.bubble {
+  padding: 8px 12px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+
+  @include from(md) {
+    padding: 10px 14px;
+    font-size: 14px;
+  }
+}
+
+.userBubble {
+  background-color: var(--ant-color-primary);
+  color: #fff;
+  border-radius: 16px;
+  border-top-right-radius: 2px;
+}
+
+.assistantBubble {
+  background-color: var(--ant-color-bg-container);
+  color: var(--ant-color-text);
+  border: 1px solid var(--ant-color-border-secondary);
+  border-radius: 16px;
+  border-top-left-radius: 2px;
+}
+
+.time {
+  font-size: 10.5px;
+  color: var(--ant-color-text-tertiary);
+  flex-shrink: 0;
+  margin-bottom: 2px;
+  user-select: none;
+}
+
+.cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  background-color: var(--ant-color-primary);
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  animation: blink 1s step-end infinite;
+}
+
+@keyframes blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
