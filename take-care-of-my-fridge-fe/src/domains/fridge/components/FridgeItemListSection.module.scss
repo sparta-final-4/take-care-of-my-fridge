@@ -1,9 +1,11 @@
+@use '@/styles/variables' as *;
+
 .container {
   height: 100%;
 }
 
 .sortSelect {
-  min-width: 120px;
+  min-width: $fridge-sort-select-min-width;
 }
 
 // 탭이 많아 좁은 화면에서는 가로로 스크롤한다(페이지 전체 가로 스크롤 방지).
