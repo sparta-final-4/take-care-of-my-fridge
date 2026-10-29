@@ -30,6 +30,7 @@ export const AuditLogSearchRequestActionEnum = {
     ProductCreate: 'PRODUCT_CREATE',
     ProductDelete: 'PRODUCT_DELETE',
     PriceUpdate: 'PRICE_UPDATE',
+    DealAnalysis: 'DEAL_ANALYSIS',
     DealReview: 'DEAL_REVIEW',
     EventRequest: 'EVENT_REQUEST',
     RoleChange: 'ROLE_CHANGE',

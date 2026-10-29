@@ -28,7 +28,7 @@ import org.example.takecareofmyfridgebe.global.entity.BaseTimeEntity;
 public class AdminAuditLog extends BaseTimeEntity {
 
     public enum Action {
-        PRODUCT_CREATE, PRODUCT_DELETE, PRICE_UPDATE, DEAL_REVIEW, EVENT_REQUEST, ROLE_CHANGE
+        PRODUCT_CREATE, PRODUCT_DELETE, PRICE_UPDATE, DEAL_ANALYSIS, DEAL_REVIEW, EVENT_REQUEST, ROLE_CHANGE
     }
 
     public static final String TARGET_MEMBER = "Member";

@@ -3199,6 +3199,7 @@
               "PRODUCT_CREATE",
               "PRODUCT_DELETE",
               "PRICE_UPDATE",
+              "DEAL_ANALYSIS",
               "DEAL_REVIEW",
               "EVENT_REQUEST",
               "ROLE_CHANGE"
@@ -3260,6 +3261,7 @@
               "PRODUCT_CREATE",
               "PRODUCT_DELETE",
               "PRICE_UPDATE",
+              "DEAL_ANALYSIS",
               "DEAL_REVIEW",
               "EVENT_REQUEST",
               "ROLE_CHANGE"
