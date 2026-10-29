@@ -28,7 +28,7 @@
 ## 현재 코드에서 확인한 차이
 
 - `DealProductInputService.getProducts()`는 상품 ID·이름·정가·상태·재고를 함께 읽는다. 판매 가능 대상과 입력 기준 시각의 정책은 아직 협의 전이다.
-- 검색 도메인에는 레시피 검색만 있고 상품별 클릭·구매 집계 지표는 없다.
+- `DealClickInputService.getSameWeekdayClicks`는 검색 도메인의 상품별 클릭 기록을 직전 4주 같은 요일로 합친다. 구매 수의 정의는 미정이다.
 - `DealSalesInputService.getSameWeekdaySales`는 주문 도메인의 기준 시각·구매 확정 수량 조회를 사용해 직전 4주 같은 요일의 행을 읽는다. 평균과 0 처리 정책은 미정이다.
 - 할인율에 따른 예상 판매 수량 계산 모델은 아직 없다. 행사 등록은 기존 `DealEventService`에 연결돼 있다.
 
