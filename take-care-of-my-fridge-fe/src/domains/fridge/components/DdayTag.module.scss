@@ -1,0 +1,17 @@
+@use '@/styles/variables' as *;
+
+// 숫자 자릿수가 달라도 줄마다 태그 폭이 같도록 최소 너비를 두고, 숫자는 고정폭으로 맞춘다.
+.tag {
+  min-width: $dday-tag-min-width;
+  margin: 0;
+  font-size: var(--ant-font-size-sm);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  white-space: nowrap;
+}
+
+// D-4 이상: 태그 배경 없이 보조 글자색만 쓴다. 패딩은 그대로 둬서 색 있는 태그와 글자 위치를 맞춘다.
+.plain {
+  color: var(--ant-color-text-secondary);
+  background: transparent;
+}

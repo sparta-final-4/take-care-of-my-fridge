@@ -1,13 +1,13 @@
-import { RightOutlined, WarningFilled } from '@ant-design/icons';
-import { Button, Empty, Flex, Result, Skeleton, Tag, Typography } from 'antd';
+import { RightOutlined } from '@ant-design/icons';
+import { Button, Empty, Flex, Result, Skeleton, Typography } from 'antd';
 import { useNavigate } from 'react-router';
 
 import { ROUTES } from '@/app/paths';
 import { useAuthStore } from '@/common/auth/authStore';
 import { SectionCard } from '@/common/components/SectionCard';
 
-import { formatDDay } from '../format';
 import { useFridgeItems } from '../queries';
+import { DdayTag } from './DdayTag';
 import { IngredientTypeTag } from './IngredientTypeTag';
 import styles from './MyFridgeSection.module.scss';
 
@@ -59,14 +59,7 @@ export function MyFridgeSection() {
                 </Typography.Text>
                 <IngredientTypeTag type={item.ingredientType} />
               </Flex>
-              <Flex align="center" gap="xs">
-                {isImminent && (
-                  <WarningFilled className={styles.warningIcon} aria-label="소비기한 임박 경고" />
-                )}
-                <Tag className={isImminent ? styles.imminentBadge : styles.normalBadge}>
-                  {formatDDay(item.dDay)}
-                </Tag>
-              </Flex>
+              <DdayTag dDay={item.dDay} />
             </div>
           );
         })}

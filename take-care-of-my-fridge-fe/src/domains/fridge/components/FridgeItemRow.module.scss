@@ -67,27 +67,22 @@
 .actions {
   grid-area: actions;
   justify-content: flex-end;
-  gap: var(--ant-margin-xs);
+  gap: var(--ant-margin-xxs);
 }
 
-.imminentBadge,
-.normalBadge {
+// 모바일은 터치 영역 44px을 지키고, 한 줄로 펼쳐지는 xl부터 기본 컨트롤 높이로 줄인다.
+.iconButton {
+  min-width: $touch-target-size;
+  min-height: $touch-target-size;
+
+  @include from(xl) {
+    min-width: var(--ant-control-height);
+    min-height: var(--ant-control-height);
+  }
+}
+
+// 소비기한 태그는 칸 오른쪽에 붙인다.
+.badge {
   grid-area: badge;
-  min-width: 54px;
-  margin-inline-end: 0;
-  text-align: center;
-  border-radius: var(--ant-control-height);
-}
-
-.imminentBadge {
-  font-weight: var(--ant-font-weight-strong);
-  color: var(--ant-color-text-light-solid);
-  background: var(--ant-color-text);
-  border-color: var(--ant-color-text);
-}
-
-.normalBadge {
-  color: var(--ant-color-text);
-  background: var(--ant-color-bg-container);
-  border-color: var(--ant-color-border);
+  justify-self: end;
 }

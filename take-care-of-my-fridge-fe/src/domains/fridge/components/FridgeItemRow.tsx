@@ -1,8 +1,11 @@
-import { Button, Checkbox, Flex, Popconfirm, Tag, Typography } from 'antd';
+import { CheckCircleOutlined, DeleteOutlined, MoreOutlined } from '@ant-design/icons';
+import { Button, Checkbox, Dropdown, Flex, Popconfirm, Tooltip, Typography } from 'antd';
 import dayjs from 'dayjs';
+import { useState } from 'react';
 
 import type { FridgeItemResponse } from '../api';
-import { formatDDay, formatQuantity, STORAGE_LABELS, withObjectParticle } from '../format';
+import { formatQuantity, STORAGE_LABELS, withObjectParticle } from '../format';
+import { DdayTag } from './DdayTag';
 import { IngredientTypeTag } from './IngredientTypeTag';
 import styles from './FridgeItemRow.module.scss';
 
@@ -28,6 +31,7 @@ export function FridgeItemRow({
   onDelete,
 }: FridgeItemRowProps) {
   const isImminent = item.status !== 'NORMAL';
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   return (
     <div className={styles.row}>
@@ -56,16 +60,20 @@ export function FridgeItemRow({
           {STORAGE_LABELS[item.storage]}
         </Typography.Text>
       </div>
-      <Tag className={isImminent ? styles.imminentBadge : styles.normalBadge}>
-        {formatDDay(item.dDay)}
-      </Tag>
-      <Flex wrap className={styles.actions}>
-        <Button size="small" onClick={onEdit} disabled={removing}>
-          수정
-        </Button>
-        <Button size="small" onClick={onConsume} disabled={removing}>
-          먹었어요
-        </Button>
+      <div className={styles.badge}>
+        <DdayTag dDay={item.dDay} />
+      </div>
+      <Flex className={styles.actions}>
+        <Tooltip title="먹었어요">
+          <Button
+            type="text"
+            icon={<CheckCircleOutlined />}
+            aria-label={`${item.rawName} 먹었어요`}
+            onClick={onConsume}
+            disabled={removing}
+            className={styles.iconButton}
+          />
+        </Tooltip>
         <Popconfirm
           title={`${withObjectParticle(item.rawName)} 버릴까요?`}
           description="냉장고에서 빠지고 기록에 남아요."
@@ -75,21 +83,56 @@ export function FridgeItemRow({
           cancelButtonProps={{ disabled: removing }}
           onConfirm={onDiscard}
         >
-          <Button size="small" loading={removing} disabled={removing}>
-            버렸어요
-          </Button>
+          <Tooltip title="버렸어요">
+            <Button
+              type="text"
+              icon={<DeleteOutlined />}
+              aria-label={`${item.rawName} 버렸어요`}
+              loading={removing}
+              disabled={removing}
+              className={styles.iconButton}
+            />
+          </Tooltip>
         </Popconfirm>
+        {/* 메뉴의 삭제를 누르면 "⋯" 버튼 위에 확인창을 연다. 버튼을 눌러서는 열리지 않는다. */}
         <Popconfirm
+          open={deleteConfirmOpen}
+          onOpenChange={(open) => {
+            if (!open) setDeleteConfirmOpen(false);
+          }}
           title={`${withObjectParticle(item.rawName)} 삭제할까요?`}
           description="잘못 등록한 재료일 때 사용해요. 기록에 남지 않아요."
           okText="삭제"
           okButtonProps={{ danger: true, loading: removing, disabled: removing }}
           cancelButtonProps={{ disabled: removing }}
-          onConfirm={onDelete}
+          onCancel={() => setDeleteConfirmOpen(false)}
+          onConfirm={async () => {
+            await onDelete();
+            setDeleteConfirmOpen(false);
+          }}
         >
-          <Button size="small" danger loading={removing} disabled={removing}>
-            삭제
-          </Button>
+          <Dropdown
+            trigger={['click']}
+            disabled={removing}
+            menu={{
+              items: [
+                { key: 'edit', label: '수정' },
+                { key: 'delete', label: '삭제', danger: true },
+              ],
+              onClick: ({ key }) => {
+                if (key === 'edit') onEdit();
+                if (key === 'delete') setDeleteConfirmOpen(true);
+              },
+            }}
+          >
+            <Button
+              type="text"
+              icon={<MoreOutlined />}
+              aria-label={`${item.rawName} 더보기`}
+              disabled={removing}
+              className={styles.iconButton}
+            />
+          </Dropdown>
         </Popconfirm>
       </Flex>
     </div>

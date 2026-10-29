@@ -1,7 +1,11 @@
+@use '@/styles/variables' as *;
+
 .row {
   display: grid;
-  // 재료명 / 뺀 양 / 먹었어요·버렸어요 / 날짜. 좁아지면 재료명만 말줄임된다.
-  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  // 재료명 / 뺀 양 / 먹었어요·버렸어요·요리했어요 / 날짜. 재료명 칸만 늘고 줄며, 나머지는 고정 폭이라 줄마다 세로로 맞는다.
+  grid-template-columns:
+    minmax(0, 1fr) $fridge-log-quantity-width $fridge-log-tag-width
+    $fridge-log-date-width;
   align-items: center;
   gap: var(--ant-margin-sm);
   padding: var(--ant-padding-xs) var(--ant-padding-sm);
@@ -16,30 +20,22 @@
   white-space: nowrap;
 }
 
+// 태그 칸과 간격을 조금 더 둬서 수량이 재료명과 태그 사이 가운데쯤 오게 한다.
 .quantity {
+  margin-inline-end: var(--ant-margin-xs);
+  font-variant-numeric: tabular-nums;
+  text-align: end;
   white-space: nowrap;
 }
 
-.consumedBadge,
-.discardedBadge {
-  margin-inline-end: 0;
-  border-radius: var(--ant-control-height);
-}
-
-.consumedBadge {
-  color: var(--ant-color-text);
-  background: var(--ant-color-bg-container);
-  border-color: var(--ant-color-border);
-}
-
-.discardedBadge {
-  font-weight: var(--ant-font-weight-strong);
-  color: var(--ant-color-text-light-solid);
-  background: var(--ant-color-text);
-  border-color: var(--ant-color-text);
+// 태그 길이가 달라도 아이콘이 같은 위치에서 시작하도록 칸 왼쪽에 붙인다.
+.tag {
+  justify-self: start;
 }
 
 .date {
   font-size: var(--ant-font-size-sm);
+  font-variant-numeric: tabular-nums;
+  text-align: end;
   white-space: nowrap;
 }

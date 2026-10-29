@@ -1,10 +1,10 @@
-import { Button, Empty, Flex, Result, Skeleton, Tag, Typography } from 'antd';
-import dayjs from 'dayjs';
+import { Button, Empty, Flex, Result, Skeleton, Typography } from 'antd';
 
 import { SectionCard } from '@/common/components/SectionCard';
 
-import { formatQuantity } from '../format';
+import { formatLogDate, formatQuantity } from '../format';
 import { useFridgeLogs } from '../queries';
+import { FridgeLogActionTag } from './FridgeLogActionTag';
 import styles from './RecentFridgeLogSection.module.scss';
 
 const RECENT_SIZE = 4;
@@ -34,13 +34,11 @@ export function RecentFridgeLogSection() {
               {log.rawName}
             </Typography.Text>
             <Typography.Text className={styles.quantity}>{formatQuantity(log)}</Typography.Text>
-            <Tag
-              className={log.action === 'DISCARDED' ? styles.discardedBadge : styles.consumedBadge}
-            >
-              {log.action === 'DISCARDED' ? '버렸어요' : '먹었어요'}
-            </Tag>
+            <div className={styles.tag}>
+              <FridgeLogActionTag action={log.action} cookedByRecipe={log.cookedByRecipe} />
+            </div>
             <Typography.Text type="secondary" className={styles.date}>
-              {dayjs(log.createdAt).format('YYYY-MM-DD')}
+              {formatLogDate(log.createdAt)}
             </Typography.Text>
           </div>
         ))}

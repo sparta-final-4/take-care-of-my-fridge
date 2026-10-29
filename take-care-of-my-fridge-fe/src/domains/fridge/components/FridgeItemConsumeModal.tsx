@@ -65,8 +65,10 @@ export function FridgeItemConsumeModal({ item, onClose }: FridgeItemConsumeModal
         initialValues={{ quantity: item.quantity }}
         onFinish={handleFinish}
       >
+        {/* 아래 입력칸 초기값(실제 남은 양)과 숫자가 같도록 반올림하지 않는다. */}
         <Typography.Paragraph type="secondary">
-          남은 양: {formatQuantity(item)}
+          남은 양: {item.quantity}
+          {item.baseUnit ?? ''}
         </Typography.Paragraph>
         <Form.Item label="먹은 양">
           <Flex gap="small">

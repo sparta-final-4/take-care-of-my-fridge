@@ -35,32 +35,6 @@
   white-space: nowrap;
 }
 
-.warningIcon {
-  font-size: var(--ant-font-size-sm);
-  color: var(--ant-color-warning);
-}
-
-.imminentBadge {
-  min-width: 54px;
-  margin-inline-end: 0;
-  font-weight: var(--ant-font-weight-strong);
-  color: var(--ant-color-text-light-solid);
-  text-align: center;
-  background: var(--ant-color-text);
-  border-color: var(--ant-color-text);
-  border-radius: var(--ant-control-height);
-}
-
-.normalBadge {
-  min-width: 54px;
-  margin-inline-end: 0;
-  color: var(--ant-color-text);
-  text-align: center;
-  background: var(--ant-color-bg-container);
-  border-color: var(--ant-color-border);
-  border-radius: var(--ant-control-height);
-}
-
 .footer {
   margin-top: auto;
 }
