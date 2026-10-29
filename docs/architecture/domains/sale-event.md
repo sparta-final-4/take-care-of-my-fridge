@@ -20,7 +20,8 @@
 | 종료 | 시각상 진행 중인 행사만 종료합니다(`SALE_004`). 상태 갱신이 늦어 예정으로 남았어도 시작 시각이 지났으면 종료할 수 있고, 상태만 바꾸며 종료 시각은 그대로입니다 | `SaleEventTerminationService` | 구현 완료 |
 | 삭제 | 시작 전 행사만 지웁니다(`SALE_005`). 행사 항목도 함께 지웁니다 | `SaleEventTerminationService` | 구현 완료 |
 | 상태 갱신 | 1분마다 시작 시각이 지난 예정을 진행 중으로, 종료 시각이 지난 행사를 종료로 바꿉니다 | `SaleEventStatusService`, `SaleEventScheduler` | 구현 완료 |
-| 진행 중 조회 | 시각(시작 ≤ 지금 < 종료)으로 판단하고 종료로 닫은 행사는 뺍니다. 장바구니와 주문이 씁니다 | `SaleEventReader` | 구현 완료 |
+| 진행 중 조회 | 시각(시작 ≤ 지금 < 종료)으로 판단하고 종료로 닫은 행사는 뺍니다 | `SaleEventReader` |
+| 판매가 | 상품마다 단가, 할인, 품절 여부를 한 번에 돌려줍니다. 할인이 없는 상품도 정가로 들어 있습니다. 장바구니와 주문이 이 입구 하나만 씁니다 | `SaleEventReader.findSellingPrices`, `SellingPrice` | 구현 완료 |
 | 목록·후보 상품 | 목록은 상품마다 한 행이고 필터·정렬을 지원합니다. 후보 상품은 판매 중이고 재고가 있으며 열린 행사에 들지 않은 상품입니다 | `SaleEventListQueryService`, `SaleCandidateProductQueryService` | 구현 완료 |
 
 ## 상태와 전이
