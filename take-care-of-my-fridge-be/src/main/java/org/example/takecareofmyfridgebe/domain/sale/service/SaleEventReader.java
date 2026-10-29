@@ -16,7 +16,7 @@ import org.example.takecareofmyfridgebe.domain.sale.repository.SaleEventItemRepo
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-// 상품을 지금 얼마에, 어떤 상태로 파는지 답한다. 장바구니·주문하기가 같은 답을 쓰도록 입구를 하나로 둔다.
+// 상품을 지금 얼마에, 어떤 상태로 파는지 답한다. 상품 화면·장바구니·주문하기가 같은 답을 쓰도록 입구를 하나로 둔다.
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -29,6 +29,11 @@ public class SaleEventReader {
         Map<Long, ActiveSale> salesByProductId = findActiveSales(products.stream().map(Product::getId).toList());
         return products.stream()
                 .collect(Collectors.toMap(Product::getId, product -> SellingPrice.of(product, salesByProductId.get(product.getId()))));
+    }
+
+    // 상품 하나의 판매가
+    public SellingPrice findSellingPrice(Product product) {
+        return findSellingPrices(List.of(product)).get(product.getId());
     }
 
     // 상품 ID별 진행 중 할인을 한 번에 돌려준다. 할인이 없는 상품은 맵에 없다.

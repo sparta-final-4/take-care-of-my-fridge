@@ -5,9 +5,8 @@ import org.example.takecareofmyfridgebe.domain.ingredient.entity.Ingredient;
 import org.example.takecareofmyfridgebe.domain.ingredient.repository.IngredientRepository;
 import org.example.takecareofmyfridgebe.domain.product.dto.AdminProductListRequest;
 import org.example.takecareofmyfridgebe.domain.product.dto.ProductCreateRequest;
-import org.example.takecareofmyfridgebe.domain.product.dto.ProductDetailResponse;
+import org.example.takecareofmyfridgebe.domain.product.dto.ProductDetail;
 import org.example.takecareofmyfridgebe.domain.product.dto.ProductIndexSource;
-import org.example.takecareofmyfridgebe.domain.product.dto.ProductListItemResponse;
 import org.example.takecareofmyfridgebe.domain.product.dto.ProductListRequest;
 import org.example.takecareofmyfridgebe.domain.product.dto.ProductUpdateRequest;
 import org.example.takecareofmyfridgebe.domain.product.entity.IngredientProduct;
@@ -21,7 +20,6 @@ import org.example.takecareofmyfridgebe.domain.product.repository.MealkitProduct
 import org.example.takecareofmyfridgebe.domain.product.repository.ProductRepository;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
-import org.example.takecareofmyfridgebe.global.response.PageResponse;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -51,34 +49,25 @@ public class ProductService {
     private final ApplicationEventPublisher eventPublisher;
 
     // 정렬은 request.sort()로 저장소가 적용하므로 PageRequest에는 넣지 않는다.
-    public PageResponse<ProductListItemResponse> getProducts(ProductListRequest request) {
+    public Page<Product> getProducts(ProductListRequest request) {
         PageRequest pageable = PageRequest.of(request.page() - 1, request.size());
-
-        Page<ProductListItemResponse> response = productRepository.findProductsByCondition(request, PUBLIC_STATUSES, pageable)
-                .map(ProductListItemResponse::from);
-
-        return PageResponse.of(response);
+        return productRepository.findProductsByCondition(request, PUBLIC_STATUSES, pageable);
     }
 
     /**
-     * ES 검색이 고른 ID 순서대로 목록을 만든다. 가격·상태는 색인 값이 아니라 DB 값을 쓴다.
+     * ES 검색이 고른 ID 순서대로 상품을 돌려준다. 가격·상태는 색인 값이 아니라 DB 값을 쓴다.
      * <br>
-     * 색인이 늦어 판매 중지된 상품이 섞여 오면 빼고 보여 준다(전체 건수는 ES 값 그대로).
+     * 색인이 늦어 판매 중지된 상품이 섞여 오면 뺀다.
      */
-    public PageResponse<ProductListItemResponse> getProductsByIds(List<Long> productIds, long total, ProductListRequest request) {
+    public List<Product> getProductsByIds(List<Long> productIds) {
         Map<Long, Product> productsById = productRepository.findAllById(productIds).stream()
                 .collect(Collectors.toMap(Product::getId, Function.identity()));
 
-        List<ProductListItemResponse> content = productIds.stream()
+        return productIds.stream()
                 .map(productsById::get)
                 .filter(Objects::nonNull)
                 .filter(product -> PUBLIC_STATUSES.contains(product.getStatus()))
-                .map(ProductListItemResponse::from)
                 .toList();
-
-        // PageImpl은 받은 개수가 페이지 크기보다 적으면 전체 건수를 다시 계산하므로, 상품을 뺀 페이지에서도 ES 건수를 지키도록 직접 만든다
-        int totalPages = (int) Math.ceil((double) total / request.size());
-        return new PageResponse<>(content, request.page(), request.size(), total, totalPages, request.page() >= totalPages);
     }
 
     // 전체 재색인용. 판매 중지 상품도 넣고, 검색할 때 상태로 거른다
@@ -94,38 +83,37 @@ public class ProductService {
                 .map(ProductIndexSource::from);
     }
 
-    public PageResponse<ProductListItemResponse> getAdminProducts(AdminProductListRequest request) {
+    public Page<Product> getAdminProducts(AdminProductListRequest request) {
         ProductListRequest condition = request.toProductListRequest();
         PageRequest pageable = PageRequest.of(condition.page() - 1, condition.size());
         List<ProductStatus> statuses = request.status() == null
                 ? List.of(ProductStatus.values()) : List.of(request.status());
-        return PageResponse.of(productRepository.findProductsByCondition(condition, statuses, pageable)
-                .map(ProductListItemResponse::from));
+        return productRepository.findProductsByCondition(condition, statuses, pageable);
     }
 
     // 판매 중지 상품은 존재하지 않는 상품과 같이 404로 응답
-    public ProductDetailResponse getProduct(Long productId) {
+    public ProductDetail getProduct(Long productId) {
         Product product = productRepository.findByIdAndStatusIn(productId, PUBLIC_STATUSES)
                 .orElseThrow(() -> new BusinessException(ErrorCode.PRODUCT_NOT_FOUND));
 
-        return toDetailResponse(product);
+        return toDetail(product);
     }
 
-    public ProductDetailResponse getAdminProduct(Long productId) {
+    public ProductDetail getAdminProduct(Long productId) {
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.PRODUCT_NOT_FOUND));
 
-        return toDetailResponse(product);
+        return toDetail(product);
     }
 
-    private ProductDetailResponse toDetailResponse(Product product) {
+    private ProductDetail toDetail(Product product) {
         Long productId = product.getId();
         return switch (product.getProductType()) {
-            case INGREDIENT -> ProductDetailResponse.ofIngredient(
+            case INGREDIENT -> ProductDetail.ofIngredient(
                     product,
                     ingredientProductRepository.findByProductId(productId).orElse(null)
             );
-            case MEALKIT -> ProductDetailResponse.ofMealkit(
+            case MEALKIT -> ProductDetail.ofMealkit(
                     product,
                     mealkitProductRepository.findByProductId(productId).orElse(null)
             );
@@ -133,7 +121,7 @@ public class ProductService {
     }
 
     @Transactional
-    public ProductDetailResponse createProduct(ProductCreateRequest request) {
+    public ProductDetail createProduct(ProductCreateRequest request) {
         if (request.productType() == ProductType.INGREDIENT) {
             validateLinkableIngredient(request.ingredient().ingredientId());
         }
@@ -144,11 +132,11 @@ public class ProductService {
         eventPublisher.publishEvent(ProductChangedEvent.from(product.getId()));
 
         return switch (product.getProductType()) {
-            case INGREDIENT -> ProductDetailResponse.ofIngredient(
+            case INGREDIENT -> ProductDetail.ofIngredient(
                     product,
                     ingredientProductRepository.save(request.toIngredientProduct(product))
             );
-            case MEALKIT -> ProductDetailResponse.ofMealkit(
+            case MEALKIT -> ProductDetail.ofMealkit(
                     product,
                     mealkitProductRepository.save(request.toMealkitProduct(product))
             );
@@ -157,7 +145,7 @@ public class ProductService {
 
     // 관리자는 판매 중지 상품도 수정할 수 있다(판매 재개 포함).
     @Transactional
-    public ProductDetailResponse updateProduct(Long productId, ProductUpdateRequest request) {
+    public ProductDetail updateProduct(Long productId, ProductUpdateRequest request) {
         Product product = productRepository.findByIdForUpdate(productId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.PRODUCT_NOT_FOUND));
         if (request.hasDetailOtherThan(product.getProductType())) {
@@ -170,8 +158,8 @@ public class ProductService {
         eventPublisher.publishEvent(ProductChangedEvent.from(product.getId()));
 
         return switch (product.getProductType()) {
-            case INGREDIENT -> ProductDetailResponse.ofIngredient(product, updateIngredientDetail(productId, request));
-            case MEALKIT -> ProductDetailResponse.ofMealkit(product, updateMealkitDetail(productId, request));
+            case INGREDIENT -> ProductDetail.ofIngredient(product, updateIngredientDetail(productId, request));
+            case MEALKIT -> ProductDetail.ofMealkit(product, updateMealkitDetail(productId, request));
         };
     }
 

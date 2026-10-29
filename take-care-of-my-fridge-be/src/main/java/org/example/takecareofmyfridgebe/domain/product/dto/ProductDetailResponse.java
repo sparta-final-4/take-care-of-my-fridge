@@ -7,6 +7,8 @@ import org.example.takecareofmyfridgebe.domain.product.entity.MealkitProduct;
 import org.example.takecareofmyfridgebe.domain.product.entity.Product;
 import org.example.takecareofmyfridgebe.domain.product.entity.ProductStatus;
 import org.example.takecareofmyfridgebe.domain.product.entity.ProductType;
+import org.example.takecareofmyfridgebe.domain.sale.dto.SaleResponse;
+import org.example.takecareofmyfridgebe.domain.sale.dto.SellingPrice;
 
 import java.math.BigDecimal;
 
@@ -23,6 +25,10 @@ public record ProductDetailResponse(
         StorageType storage,
         int shelfDays,
         ProductStatus status,
+        // 진행 중 할인. 없으면 null
+        SaleResponse sale,
+        // 지금 보이는 가격으로 살 수 없으면 true. 상품 품절과 번개 드롭 남은 수량 0을 모두 포함한다
+        boolean soldOut,
         IngredientInfo ingredient,
         MealkitInfo mealkit
 ) {
@@ -44,15 +50,8 @@ public record ProductDetailResponse(
     }
 
     // 상세 행이 없으면(null) 해당 정보 없이 기본 정보만 반환
-    public static ProductDetailResponse ofIngredient(Product product, IngredientProduct ingredientProduct) {
-        return of(product, ingredientProduct == null ? null : IngredientInfo.from(ingredientProduct), null);
-    }
-
-    public static ProductDetailResponse ofMealkit(Product product, MealkitProduct mealkitProduct) {
-        return of(product, null, mealkitProduct == null ? null : MealkitInfo.from(mealkitProduct));
-    }
-
-    private static ProductDetailResponse of(Product product, IngredientInfo ingredient, MealkitInfo mealkit) {
+    public static ProductDetailResponse from(ProductDetail detail, SellingPrice price) {
+        Product product = detail.product();
         return ProductDetailResponse.builder()
                 .productId(product.getId())
                 .productType(product.getProductType())
@@ -64,8 +63,10 @@ public record ProductDetailResponse(
                 .storage(product.getStorage())
                 .shelfDays(product.getShelfDays())
                 .status(product.getStatus())
-                .ingredient(ingredient)
-                .mealkit(mealkit)
+                .sale(price.sale().map(SaleResponse::from).orElse(null))
+                .soldOut(price.soldOut())
+                .ingredient(detail.ingredient() == null ? null : IngredientInfo.from(detail.ingredient()))
+                .mealkit(detail.mealkit() == null ? null : MealkitInfo.from(detail.mealkit()))
                 .build();
     }
 }

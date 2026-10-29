@@ -100,14 +100,14 @@ public class CartService {
     }
 
     private boolean isFlashDrop(Product product) {
-        return saleEventReader.findSellingPrices(List.of(product)).get(product.getId()).isFlashDrop();
+        return saleEventReader.findSellingPrice(product).isFlashDrop();
     }
 
     private BusinessException purchaseLimitExceeded(Product product) {
         return new BusinessException(ErrorCode.PURCHASE_LIMIT_EXCEEDED, "구매 한도 초과 · " + product.getName());
     }
 
-    // 품절은 뒤의 재고 수량 확인에서 걸리므로 여기서는 판매 중지만 거른다
+    // 품절 상품은 재고가 0이라 담기와 수량 올리기가 뒤의 재고 수량 확인에서 걸린다. 여기서는 판매 중지만 거른다
     private Product findSellableProduct(Long productId) {
         Product product = productRepository.findById(productId)
             .orElseThrow(() -> new BusinessException(ErrorCode.PRODUCT_NOT_FOUND));

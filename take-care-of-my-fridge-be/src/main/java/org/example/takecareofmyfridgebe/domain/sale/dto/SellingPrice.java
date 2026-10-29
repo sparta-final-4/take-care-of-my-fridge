@@ -6,7 +6,7 @@ import org.example.takecareofmyfridgebe.domain.product.entity.ProductStatus;
 import org.example.takecareofmyfridgebe.domain.sale.entity.SaleEventType;
 
 // 상품 하나를 지금 얼마에 파는지, 품절인지 답하는 값 객체. ID 없이 조회할 때 만들고, 만든 뒤 바꾸지 않는다.
-// 단가·품절·가격 확인 규칙을 여기 모아 장바구니와 주문하기가 같은 판단을 쓰게 한다.
+// 단가·품절·가격 확인 규칙을 여기 모아 상품 화면, 장바구니, 주문하기가 같은 판단을 쓰게 한다.
 // 할인이 없으면 sale이 null이고, 그 분기는 이 클래스 안에서만 한다.
 public final class SellingPrice {
 

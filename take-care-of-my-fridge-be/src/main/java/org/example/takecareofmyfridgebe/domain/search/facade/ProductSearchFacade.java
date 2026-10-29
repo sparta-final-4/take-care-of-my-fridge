@@ -4,7 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.takecareofmyfridgebe.domain.product.dto.ProductListItemResponse;
 import org.example.takecareofmyfridgebe.domain.product.dto.ProductListRequest;
-import org.example.takecareofmyfridgebe.domain.product.service.ProductService;
+import org.example.takecareofmyfridgebe.domain.product.facade.ProductFacade;
 import org.example.takecareofmyfridgebe.domain.search.config.RecipeSearchProperties;
 import org.example.takecareofmyfridgebe.domain.search.dto.ProductSearchResult;
 import org.example.takecareofmyfridgebe.domain.search.service.ProductSearchService;
@@ -18,7 +18,7 @@ import java.io.IOException;
 @RequiredArgsConstructor
 public class ProductSearchFacade {
 
-    private final ProductService productService;
+    private final ProductFacade productFacade;
     private final ProductSearchService productSearchService;
     private final RecipeSearchProperties searchProperties;
 
@@ -28,7 +28,7 @@ public class ProductSearchFacade {
     public PageResponse<ProductListItemResponse> getProducts(ProductListRequest request) {
         if (request.keyword() == null || !searchProperties.useElasticSearch()) {
             // mysql 조회
-            return productService.getProducts(request);
+            return productFacade.getProducts(request);
         }
 
         ProductSearchResult result;
@@ -38,10 +38,10 @@ public class ProductSearchFacade {
         } catch (IOException | RuntimeException e) {
             // es 조회 실패 시 mysql 조회로 대체한다
             log.warn("ES 상품 검색 실패, MySQL 검색으로 대체: keyword={}", request.keyword(), e);
-            return productService.getProducts(request);
+            return productFacade.getProducts(request);
         }
 
-        return productService.getProductsByIds(result.productIds(), result.total(), request);
+        return productFacade.getProductsByIds(result.productIds(), result.total(), request);
     }
 
 }
