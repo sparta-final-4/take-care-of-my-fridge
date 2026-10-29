@@ -1,12 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import {
-  Button,
-  Descriptions,
-  Flex,
-  Result,
-  Spin,
-  Typography,
-} from 'antd';
+import { Button, Descriptions, Flex, Result, Spin, Typography } from 'antd';
 import { useNavigate, useParams } from 'react-router';
 
 import { ROUTES } from '@/app/paths';
@@ -79,7 +72,6 @@ function AdminProductDetail({ productId }: { productId: number }) {
           </Descriptions.Item>
         )}
       </Descriptions>
-
     </section>
   );
 }
