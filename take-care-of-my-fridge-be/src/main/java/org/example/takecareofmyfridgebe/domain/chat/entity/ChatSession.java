@@ -17,6 +17,7 @@ import org.example.takecareofmyfridgebe.global.entity.BaseTimeEntity;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 
 @Entity
@@ -80,6 +81,14 @@ public class ChatSession extends BaseTimeEntity {
 
     public boolean isCompleted() {
         return this.status == ChatSessionStatus.COMPLETED;
+    }
+
+    // 특정 기준 시점(now)과 타임아웃을 기준으로 만료 여부 판정
+    public boolean isExpired(Duration timeout, LocalDateTime now) {
+        if (!isActive()) {
+            return false;
+        }
+        return this.lastMessageAt.plus(timeout).isBefore(now);
     }
 
     private void validateActive() {

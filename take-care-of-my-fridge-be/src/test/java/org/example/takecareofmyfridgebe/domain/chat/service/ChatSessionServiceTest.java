@@ -1,11 +1,13 @@
 package org.example.takecareofmyfridgebe.domain.chat.service;
 
+import org.example.takecareofmyfridgebe.domain.chat.config.ChatProperties;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatSessionResponse;
 import org.example.takecareofmyfridgebe.domain.chat.entity.ChatSession;
 import org.example.takecareofmyfridgebe.domain.chat.entity.ChatSessionStatus;
 import org.example.takecareofmyfridgebe.domain.chat.repository.ChatSessionRepository;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -15,11 +17,14 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -31,8 +36,16 @@ class ChatSessionServiceTest {
     @Mock
     private ChatSessionRepository chatSessionRepository;
 
+    @Mock
+    private ChatProperties chatProperties;
+
     @InjectMocks
     private ChatSessionService chatSessionService;
+
+    @BeforeEach
+    void setUp() {
+        lenient().when(chatProperties.sessionTimeout()).thenReturn(Duration.ofMinutes(30));
+    }
 
     @Test
     @DisplayName("진행 중인 세션이 없으면 새로 만들어 반환한다")
@@ -69,6 +82,50 @@ class ChatSessionServiceTest {
         assertThat(response.id()).isEqualTo(50L);
         assertThat(response.status()).isEqualTo(ChatSessionStatus.ACTIVE);
         verify(chatSessionRepository, never()).save(any(ChatSession.class));
+    }
+
+    @Test
+    @DisplayName("진행 중인 세션이 30분 지난 경우 기존 세션을 만료시키고 새 세션을 만들어 반환한다")
+    void getOrCreateActiveSessionExpiresExistingAndCreatesNewWhenExpired() {
+        Long memberId = 1L;
+        Long expiredSessionId = 50L;
+        ChatSession expiredSession = ChatSession.builder().memberId(memberId).build();
+        ReflectionTestUtils.setField(expiredSession, "id", expiredSessionId);
+        ReflectionTestUtils.setField(expiredSession, "lastMessageAt", LocalDateTime.now().minusMinutes(35));
+
+        when(chatSessionRepository.findByMemberIdAndStatus(memberId, ChatSessionStatus.ACTIVE))
+                .thenReturn(Optional.of(expiredSession));
+        when(chatSessionRepository.findById(expiredSessionId))
+                .thenReturn(Optional.of(expiredSession));
+
+        when(chatSessionRepository.saveAndFlush(any(ChatSession.class))).thenAnswer(invocation -> {
+            ChatSession saved = invocation.getArgument(0);
+            if (saved.getId() == null) {
+                ReflectionTestUtils.setField(saved, "id", 200L);
+            }
+            return saved;
+        });
+
+        ChatSessionResponse response = chatSessionService.getOrCreateActiveSession(memberId);
+
+        assertThat(expiredSession.getStatus()).isEqualTo(ChatSessionStatus.EXPIRED);
+        assertThat(response.id()).isEqualTo(200L);
+        assertThat(response.status()).isEqualTo(ChatSessionStatus.ACTIVE);
+    }
+
+    @Test
+    @DisplayName("expireSession: ACTIVE 세션을 EXPIRED로 상태 변경하고 saveAndFlush를 호출한다")
+    void expireSessionMarksActiveSessionAsExpiredAndFlushes() {
+        Long sessionId = 10L;
+        ChatSession session = ChatSession.builder().memberId(1L).build();
+        ReflectionTestUtils.setField(session, "id", sessionId);
+
+        when(chatSessionRepository.findById(sessionId)).thenReturn(Optional.of(session));
+
+        chatSessionService.expireSession(sessionId);
+
+        assertThat(session.getStatus()).isEqualTo(ChatSessionStatus.EXPIRED);
+        verify(chatSessionRepository, times(1)).saveAndFlush(session);
     }
 
     @Test

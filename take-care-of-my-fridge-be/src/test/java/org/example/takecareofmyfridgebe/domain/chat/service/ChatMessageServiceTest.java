@@ -1,5 +1,6 @@
 package org.example.takecareofmyfridgebe.domain.chat.service;
 
+import org.example.takecareofmyfridgebe.domain.chat.config.ChatProperties;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageResponse;
 import org.example.takecareofmyfridgebe.domain.chat.entity.ChatMessage;
 import org.example.takecareofmyfridgebe.domain.chat.entity.ChatMessageRole;
@@ -18,6 +19,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -38,6 +40,12 @@ class ChatMessageServiceTest {
 
     @Mock
     private ChatMessageRepository chatMessageRepository;
+
+    @Mock
+    private ChatSessionService chatSessionService;
+
+    @Mock
+    private ChatProperties chatProperties;
 
     @InjectMocks
     private ChatMessageService chatMessageService;
@@ -140,6 +148,40 @@ class ChatMessageServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .extracting(e -> ((BusinessException) e).getErrorCode())
                 .isEqualTo(ErrorCode.CHAT_ROOM_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("validateSessionForSending: 30분 이내 활성 세션은 정상적으로 검증을 통과한다")
+    void validateSessionForSendingPassesWhenActiveAndNotExpired() {
+        Long memberId = 1L;
+        Long sessionId = 10L;
+        ChatSession session = ChatSession.builder().memberId(memberId).build();
+
+        when(chatSessionRepository.findByIdAndMemberId(sessionId, memberId)).thenReturn(Optional.of(session));
+        when(chatProperties.sessionTimeout()).thenReturn(Duration.ofMinutes(30));
+
+        chatMessageService.validateSessionForSending(memberId, sessionId);
+
+        verify(chatSessionService, never()).expireSession(any());
+    }
+
+    @Test
+    @DisplayName("validateSessionForSending: 마지막 대화로부터 30분이 지난 세션은 expireSession을 호출해 만료시키고 CHAT_SESSION_EXPIRED 예외를 던진다")
+    void validateSessionForSendingExpiresSessionAndThrows409WhenExpired() {
+        Long memberId = 1L;
+        Long sessionId = 10L;
+        ChatSession session = ChatSession.builder().memberId(memberId).build();
+        ReflectionTestUtils.setField(session, "lastMessageAt", LocalDateTime.now().minusMinutes(31));
+
+        when(chatSessionRepository.findByIdAndMemberId(sessionId, memberId)).thenReturn(Optional.of(session));
+        when(chatProperties.sessionTimeout()).thenReturn(Duration.ofMinutes(30));
+
+        assertThatThrownBy(() -> chatMessageService.validateSessionForSending(memberId, sessionId))
+                .isInstanceOf(BusinessException.class)
+                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isEqualTo(ErrorCode.CHAT_SESSION_EXPIRED);
+
+        verify(chatSessionService, times(1)).expireSession(sessionId);
     }
 
     @Test

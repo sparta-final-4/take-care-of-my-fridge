@@ -1,6 +1,7 @@
 package org.example.takecareofmyfridgebe.domain.chat.service;
 
 import lombok.RequiredArgsConstructor;
+import org.example.takecareofmyfridgebe.domain.chat.config.ChatProperties;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageResponse;
 import org.example.takecareofmyfridgebe.domain.chat.entity.ChatMessage;
 import org.example.takecareofmyfridgebe.domain.chat.entity.ChatMessageRole;
@@ -22,11 +23,14 @@ public class ChatMessageService {
 
     private final ChatSessionRepository chatSessionRepository;
     private final ChatMessageRepository chatMessageRepository;
+    private final ChatSessionService chatSessionService;
+    private final ChatProperties chatProperties;
 
     /**
      * 메시지 전송 전 세션을 검증한다.
      * 없거나 다른 회원의 세션이면 404(CHAT_ROOM_NOT_FOUND)를 던진다.
      * 이미 완료(COMPLETED)되었거나 만료(EXPIRED)된 끝난 세션이면 409(CHAT_ROOM_ALREADY_COMPLETED)를 던진다.
+     * 마지막 메시지로부터 30분(설정값)이 초과되었으면 세션을 만료 처리(독립 트랜잭션으로 DB 반영)한 뒤 409(CHAT_SESSION_EXPIRED)를 던진다.
      *
      * @param memberId  회원 ID
      * @param sessionId 세션 ID
@@ -37,6 +41,11 @@ public class ChatMessageService {
 
         if (!session.isActive()) {
             throw new BusinessException(ErrorCode.CHAT_ROOM_ALREADY_COMPLETED);
+        }
+
+        if (session.isExpired(chatProperties.sessionTimeout(), LocalDateTime.now())) {
+            chatSessionService.expireSession(sessionId);
+            throw new BusinessException(ErrorCode.CHAT_SESSION_EXPIRED);
         }
     }
 

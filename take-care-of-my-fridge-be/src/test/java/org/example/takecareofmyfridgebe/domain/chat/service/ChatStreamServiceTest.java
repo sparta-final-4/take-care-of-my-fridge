@@ -36,6 +36,9 @@ class ChatStreamServiceTest {
     private ChatMessageService chatMessageService;
 
     @Mock
+    private ChatDailyLimitService chatDailyLimitService;
+
+    @Mock
     private ChatReplyGenerator chatReplyGenerator;
 
     @Spy
@@ -87,6 +90,7 @@ class ChatStreamServiceTest {
 
         verify(chatMessageService, times(1))
                 .saveExchange(sessionId, userContent, "된장찌개 레시피");
+        verify(chatDailyLimitService, times(1)).checkAndIncrement(memberId);
     }
 
     @Test
@@ -167,5 +171,24 @@ class ChatStreamServiceTest {
                 .isEqualTo(ErrorCode.CHAT_ROOM_NOT_FOUND);
 
         verify(chatReplyGenerator, never()).generate(any(), any());
+        verify(chatDailyLimitService, never()).checkAndIncrement(any());
+    }
+
+    @Test
+    @DisplayName("하루 질문 한도 초과 시 스트림 생성 전 동기 429 CHAT_DAILY_LIMIT_EXCEEDED 예외를 던지고 답을 생성하지 않는다")
+    void streamMessageDailyLimitExceededThrowsSynchronously() {
+        Long memberId = 1L;
+        Long sessionId = 10L;
+
+        doThrow(new BusinessException(ErrorCode.CHAT_DAILY_LIMIT_EXCEEDED))
+                .when(chatDailyLimitService).checkAndIncrement(memberId);
+
+        assertThatThrownBy(() -> chatStreamService.streamMessage(memberId, sessionId, "안녕"))
+                .isInstanceOf(BusinessException.class)
+                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isEqualTo(ErrorCode.CHAT_DAILY_LIMIT_EXCEEDED);
+
+        verify(chatReplyGenerator, never()).generate(any(), any());
+        verify(chatMessageService, never()).saveExchange(any(), any(), any());
     }
 }

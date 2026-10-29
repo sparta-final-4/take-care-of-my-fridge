@@ -52,6 +52,9 @@ app:
   auth:
     jwt-secret: WavSy2onX+rGXL9EhdkwDNgkscczEziOL09OsXSj7jEy0XurFwGtpB36WShSTM3t
     cookie-secure: ${AUTH_COOKIE_SECURE:true}
+  chat:
+    daily-limit: 30
+    session-timeout: 30m
   llm:
     # 공식 가격 확인 필요 (USD / 1M tokens)
     input-per-1m: 0.15

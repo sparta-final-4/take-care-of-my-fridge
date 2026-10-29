@@ -125,6 +125,97 @@ class ChatMessageControllerTest {
     }
 
     @Test
+    @DisplayName("메시지 내용이 정확히 500자이면 정상 처리(200 OK SSE)된다")
+    void sendMessageContent500CharactersReturns200() throws Exception {
+        Long memberId = 1L;
+        Long sessionId = 10L;
+        String content500 = "a".repeat(500);
+
+        when(chatStreamService.streamMessage(eq(memberId), eq(sessionId), eq(content500)))
+                .thenReturn(Flux.empty());
+
+        mvc.perform(post("/api/chat-sessions/{sessionId}/messages", sessionId)
+                        .with(csrf())
+                        .with(authentication(authenticationFor(memberId)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"content\": \"" + content500 + "\"}"))
+                .andExpect(request().asyncStarted());
+    }
+
+    @Test
+    @DisplayName("메시지 내용이 501자 이상이면 400 Bad Request를 반환한다")
+    void sendMessageContent501CharactersReturns400() throws Exception {
+        Long memberId = 1L;
+        Long sessionId = 10L;
+        String content501 = "a".repeat(501);
+
+        mvc.perform(post("/api/chat-sessions/{sessionId}/messages", sessionId)
+                        .with(csrf())
+                        .with(authentication(authenticationFor(memberId)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"content\": \"" + content501 + "\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
+    @DisplayName("30분 지난 만료된 세션에 메시지 전송 시 409 Conflict (CHAT_006) JSON을 반환한다")
+    void sendMessageWhenSessionExpiredReturns409Json() throws Exception {
+        Long memberId = 1L;
+        Long sessionId = 10L;
+
+        when(chatStreamService.streamMessage(eq(memberId), eq(sessionId), eq("안녕하세요")))
+                .thenThrow(new BusinessException(ErrorCode.CHAT_SESSION_EXPIRED));
+
+        mvc.perform(post("/api/chat-sessions/{sessionId}/messages", sessionId)
+                        .with(csrf())
+                        .with(authentication(authenticationFor(memberId)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"content\": \"안녕하세요\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("CHAT_006"));
+    }
+
+    @Test
+    @DisplayName("하루 질문 한도(30회)를 초과한 회원이 메시지 전송 시 429 Too Many Requests (CHAT_007) JSON을 반환한다")
+    void sendMessageWhenDailyLimitExceededReturns429Json() throws Exception {
+        Long memberId = 1L;
+        Long sessionId = 10L;
+
+        when(chatStreamService.streamMessage(eq(memberId), eq(sessionId), eq("안녕하세요")))
+                .thenThrow(new BusinessException(ErrorCode.CHAT_DAILY_LIMIT_EXCEEDED));
+
+        mvc.perform(post("/api/chat-sessions/{sessionId}/messages", sessionId)
+                        .with(csrf())
+                        .with(authentication(authenticationFor(memberId)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"content\": \"안녕하세요\"}"))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("CHAT_007"));
+    }
+
+    @Test
+    @DisplayName("Redis 장애 등으로 상담 서비스 불가 시 503 Service Unavailable (CHAT_008) JSON을 반환한다")
+    void sendMessageWhenServiceUnavailableReturns503Json() throws Exception {
+        Long memberId = 1L;
+        Long sessionId = 10L;
+
+        when(chatStreamService.streamMessage(eq(memberId), eq(sessionId), eq("안녕하세요")))
+                .thenThrow(new BusinessException(ErrorCode.CHAT_SERVICE_UNAVAILABLE));
+
+        mvc.perform(post("/api/chat-sessions/{sessionId}/messages", sessionId)
+                        .with(csrf())
+                        .with(authentication(authenticationFor(memberId)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"content\": \"안녕하세요\"}"))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("CHAT_008"));
+    }
+
+    @Test
     @DisplayName("존재하지 않거나 타인의 세션에 메시지 전송 시 404 Not Found (CHAT_001) JSON을 반환한다")
     void sendMessageWhenSessionNotFoundReturns404Json() throws Exception {
         Long memberId = 1L;
