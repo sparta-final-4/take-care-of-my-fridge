@@ -26,6 +26,7 @@ import org.example.takecareofmyfridgebe.domain.deal.dto.DealReviewResponse;
 import org.example.takecareofmyfridgebe.domain.deal.entity.DealAnalysis;
 import org.example.takecareofmyfridgebe.domain.deal.entity.DealCandidate;
 import org.example.takecareofmyfridgebe.domain.deal.facade.DealReviewFacade;
+import org.example.takecareofmyfridgebe.domain.deal.facade.DealAnalysisExecutionFacade;
 import org.example.takecareofmyfridgebe.domain.deal.facade.DealEventFacade;
 import org.example.takecareofmyfridgebe.domain.sale.entity.SaleEventType;
 import org.example.takecareofmyfridgebe.domain.deal.service.DealAnalysisReadService;
@@ -56,13 +57,50 @@ class AdminDealAnalysisControllerTest {
     @Autowired
     private DealReviewFacade reviewFacade;
     @Autowired
+    private DealAnalysisExecutionFacade executionFacade;
+    @Autowired
     private DealEventFacade eventFacade;
 
     @BeforeEach
     void resetMock() {
-        reset(service, reviewFacade, eventFacade);
+        reset(service, reviewFacade, eventFacade, executionFacade);
     }
 
+    @Test
+    void adminRunsAnalysis() throws Exception {
+        when(executionFacade.run(7L, Member.Role.ADMIN, LocalDate.of(2030, 1, 7), DealAnalysis.Day.WED, 20))
+                .thenReturn(new DealAnalysisResponse(13L, LocalDate.of(2030, 1, 7),
+                        DealAnalysis.Day.WED, 20, 50, "model-v1", null, null, null, false,
+                        new DealAnalysisResponse.ReviewCounts(0, 0, 0), List.of(), List.of()));
+        mvc.perform(post("/api/admin/deal-analyses")
+                        .with(csrf()).with(authenticationFor(Member.Role.ADMIN))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"targetWeekStart\":\"2030-01-07\",\"dayOfWeek\":\"WED\",\"discountRate\":20}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.analysisId").value(13));
+    }
+
+    @Test
+    void userRunIsDeniedByFacade() throws Exception {
+        when(executionFacade.run(7L, Member.Role.USER, LocalDate.of(2030, 1, 7), DealAnalysis.Day.WED, 20))
+                .thenThrow(new BusinessException(ErrorCode.ADMIN_ACCESS_DENIED));
+        mvc.perform(post("/api/admin/deal-analyses")
+                        .with(csrf()).with(authenticationFor(Member.Role.USER))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"targetWeekStart\":\"2030-01-07\",\"dayOfWeek\":\"WED\",\"discountRate\":20}"))
+                .andExpect(status().isForbidden());
+        verify(executionFacade).run(7L, Member.Role.USER, LocalDate.of(2030, 1, 7), DealAnalysis.Day.WED, 20);
+    }
+
+    @Test
+    void rejectsInvalidRunRequest() throws Exception {
+        mvc.perform(post("/api/admin/deal-analyses")
+                        .with(csrf()).with(authenticationFor(Member.Role.ADMIN))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"targetWeekStart\":\"2030-01-07\",\"dayOfWeek\":\"WED\",\"discountRate\":0}"))
+                .andExpect(status().isBadRequest());
+        verifyNoInteractions(executionFacade);
+    }
     @Test
     void adminReadsAnalysis() throws Exception {
         when(service.getById(8L)).thenReturn(new DealAnalysisResponse(
@@ -196,6 +234,10 @@ class AdminDealAnalysisControllerTest {
             return mock(DealReviewFacade.class);
         }
 
+        @Bean
+        DealAnalysisExecutionFacade dealAnalysisExecutionFacade() {
+            return mock(DealAnalysisExecutionFacade.class);
+        }
         @Bean
         DealEventFacade dealEventFacade() {
             return mock(DealEventFacade.class);

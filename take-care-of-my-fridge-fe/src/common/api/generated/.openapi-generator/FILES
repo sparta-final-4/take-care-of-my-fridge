@@ -104,6 +104,7 @@ models/cooking-stats-response.ts
 models/csrf-response.ts
 models/csrf-token.ts
 models/deal-analysis-response.ts
+models/deal-analysis-run-request.ts
 models/deal-event-request.ts
 models/deal-event-response.ts
 models/deal-review-request.ts

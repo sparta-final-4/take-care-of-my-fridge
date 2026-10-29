@@ -35,6 +35,36 @@
         ]
       }
     },
+    "/api/admin/deal-analyses": {
+      "post": {
+        "operationId": "run",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DealAnalysisRunRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseDealAnalysisResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "admin-deal-analysis-controller"
+        ]
+      }
+    },
     "/api/admin/deal-analyses/latest": {
       "get": {
         "operationId": "getLatest_1",
@@ -4015,6 +4045,38 @@
             "format": "date"
           }
         }
+      },
+      "DealAnalysisRunRequest": {
+        "type": "object",
+        "properties": {
+          "dayOfWeek": {
+            "type": "string",
+            "enum": [
+              "MON",
+              "TUE",
+              "WED",
+              "THU",
+              "FRI",
+              "SAT",
+              "SUN"
+            ]
+          },
+          "discountRate": {
+            "type": "integer",
+            "format": "int32",
+            "maximum": 99,
+            "minimum": 1
+          },
+          "targetWeekStart": {
+            "type": "string",
+            "format": "date"
+          }
+        },
+        "required": [
+          "dayOfWeek",
+          "discountRate",
+          "targetWeekStart"
+        ]
       },
       "DealEventRequest": {
         "type": "object",

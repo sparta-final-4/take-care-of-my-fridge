@@ -73,6 +73,7 @@ export * from './cooking-stats-response';
 export * from './csrf-response';
 export * from './csrf-token';
 export * from './deal-analysis-response';
+export * from './deal-analysis-run-request';
 export * from './deal-event-request';
 export * from './deal-event-response';
 export * from './deal-review-request';

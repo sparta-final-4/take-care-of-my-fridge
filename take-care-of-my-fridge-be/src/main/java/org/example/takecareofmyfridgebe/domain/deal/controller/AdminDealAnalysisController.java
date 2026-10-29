@@ -4,11 +4,13 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.auth.service.AuthSessionService;
 import org.example.takecareofmyfridgebe.domain.deal.dto.DealAnalysisResponse;
+import org.example.takecareofmyfridgebe.domain.deal.dto.DealAnalysisRunRequest;
 import org.example.takecareofmyfridgebe.domain.deal.dto.DealEventRequest;
 import org.example.takecareofmyfridgebe.domain.deal.dto.DealEventResponse;
 import org.example.takecareofmyfridgebe.domain.deal.dto.DealReviewRequest;
 import org.example.takecareofmyfridgebe.domain.deal.dto.DealReviewResponse;
 import org.example.takecareofmyfridgebe.domain.deal.facade.DealReviewFacade;
+import org.example.takecareofmyfridgebe.domain.deal.facade.DealAnalysisExecutionFacade;
 import org.example.takecareofmyfridgebe.domain.deal.facade.DealEventFacade;
 import org.example.takecareofmyfridgebe.domain.deal.service.DealAnalysisReadService;
 import org.example.takecareofmyfridgebe.global.response.ApiResponse;
@@ -29,9 +31,18 @@ import org.springframework.web.bind.annotation.RestController;
 public class AdminDealAnalysisController {
 
     private final DealAnalysisReadService readService;
+    private final DealAnalysisExecutionFacade executionFacade;
     private final DealReviewFacade reviewFacade;
     private final DealEventFacade eventFacade;
 
+    @PostMapping
+    public ResponseEntity<ApiResponse<DealAnalysisResponse>> run(
+            @Valid @RequestBody DealAnalysisRunRequest request,
+            @AuthenticationPrincipal AuthSessionService.AuthPrincipal principal) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok(executionFacade.run(
+                principal.memberId(), principal.role(), request.targetWeekStart(),
+                request.dayOfWeek(), request.discountRate())));
+    }
     @GetMapping("/latest")
     public ResponseEntity<ApiResponse<DealAnalysisResponse>> getLatest(
             @AuthenticationPrincipal AuthSessionService.AuthPrincipal principal) {
