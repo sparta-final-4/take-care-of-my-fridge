@@ -1,8 +1,21 @@
-import { useQuery } from '@tanstack/react-query';
-import { Button, Descriptions, Flex, Result, Spin, Typography } from 'antd';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  App,
+  Button,
+  Descriptions,
+  Flex,
+  Form,
+  InputNumber,
+  Result,
+  Select,
+  Spin,
+  Typography,
+} from 'antd';
 import { useNavigate, useParams } from 'react-router';
 
 import { ROUTES } from '@/app/paths';
+import type { ProductUpdateRequest } from '@/common/api/clients';
+import { updateProduct } from '@/domains/product/api';
 import { productQueries } from '@/domains/product/queries';
 
 import styles from './AdminProductDetailPage.module.scss';
@@ -10,9 +23,21 @@ import styles from './AdminProductDetailPage.module.scss';
 const TYPE_LABELS = { INGREDIENT: '재료', MEALKIT: '밀키트' };
 const STATUS_LABELS = { ON_SALE: '판매 중', SOLD_OUT: '품절', STOPPED: '판매 중지' };
 const STORAGE_LABELS = { ROOM_TEMP: '상온', REFRIGERATED: '냉장', FROZEN: '냉동' };
+// 판매 중·품절은 서버가 재고로 정하므로 판매 여부만 고른다.
+const SALES_OPTIONS = [
+  { value: 'ON_SALE', label: '판매' },
+  { value: 'STOPPED', label: '판매 중지' },
+];
+
 function AdminProductDetail({ productId }: { productId: number }) {
+  const { message } = App.useApp();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { data, isPending, isError, refetch } = useQuery(productQueries.adminDetail(productId));
+  const update = useMutation({
+    mutationFn: (request: ProductUpdateRequest) => updateProduct(productId, request),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: productQueries.all }),
+  });
 
   if (isError) {
     return (
@@ -72,6 +97,53 @@ function AdminProductDetail({ productId }: { productId: number }) {
           </Descriptions.Item>
         )}
       </Descriptions>
+      <Typography.Title level={3}>판매 정보 수정</Typography.Title>
+      <Form<ProductUpdateRequest>
+        key={`${detail.price}-${detail.status}`}
+        layout="vertical"
+        initialValues={{
+          price: detail.price,
+          status: detail.status === 'STOPPED' ? 'STOPPED' : 'ON_SALE',
+        }}
+        onFinish={(values) =>
+          update.mutate(
+            {
+              price: values.price,
+              // 백엔드도 재고로 상태를 맞추지만(#303), 그 전에도 어긋나지 않게 재고로 정해 보낸다.
+              status:
+                values.status === 'STOPPED'
+                  ? 'STOPPED'
+                  : detail.stock === 0
+                    ? 'SOLD_OUT'
+                    : 'ON_SALE',
+            },
+            { onSuccess: () => void message.success('상품 정보를 수정했습니다.') },
+          )
+        }
+      >
+        <Form.Item
+          name="price"
+          label="정상가 (원)"
+          rules={[{ required: true, type: 'number', min: 1, max: 10000000 }]}
+        >
+          <InputNumber min={1} max={10000000} precision={0} className={styles.fullWidth} />
+        </Form.Item>
+        <Form.Item
+          name="status"
+          label="판매 여부"
+          rules={[{ required: true }]}
+          extra={
+            detail.stock === 0
+              ? '재고가 0이라 판매로 저장하면 품절로 표시됩니다.'
+              : '판매 중·품절은 재고에 따라 정해집니다.'
+          }
+        >
+          <Select options={SALES_OPTIONS} />
+        </Form.Item>
+        <Button type="primary" htmlType="submit" loading={update.isPending}>
+          저장
+        </Button>
+      </Form>
     </section>
   );
 }
