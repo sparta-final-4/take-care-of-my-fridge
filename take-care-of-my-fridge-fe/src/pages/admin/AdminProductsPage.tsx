@@ -12,7 +12,7 @@ import {
   Tag,
   Typography,
 } from 'antd';
-import { useNavigate, useSearchParams } from 'react-router';
+import { generatePath, useNavigate, useSearchParams } from 'react-router';
 
 import { ROUTES } from '@/app/paths';
 import type { AdminProductListRequest, ProductListItemResponse } from '@/common/api/clients';
@@ -124,7 +124,27 @@ export default function AdminProductsPage() {
           }}
           locale={{ emptyText: '조건에 맞는 상품이 없습니다.' }}
           columns={[
-            { title: '상품명', dataIndex: 'name', key: 'name' },
+            {
+              title: '상품명',
+              dataIndex: 'name',
+              key: 'name',
+              render: (value: string | undefined, product) => (
+                <Button
+                  type="link"
+                  disabled={product.productId === undefined}
+                  onClick={() => {
+                    if (product.productId === undefined) return;
+                    navigate(
+                      generatePath(ROUTES.adminProductDetail, {
+                        productId: String(product.productId),
+                      }),
+                    );
+                  }}
+                >
+                  {value ?? '-'}
+                </Button>
+              ),
+            },
             {
               title: '종류',
               dataIndex: 'productType',
