@@ -29,6 +29,7 @@ public interface SaleEventItemRepository extends JpaRepository<SaleEventItem, Lo
 
     // 진행 중인 행사의 상품. 상태가 아니라 시간(시작 ≤ 지금 < 종료)으로 판단하고, 종료로 닫은 행사만 뺀다.
     // 열기·닫기 스케줄러가 늦어도 시작·종료가 그 시각에 맞게 반영된다.
+    // 조건을 바꾸면 findAllActive도 같이 바꾼다.
     // 엔티티가 아니라 값으로 읽는다. 엔티티로 읽으면 영속성 컨텍스트에 남아, 뒤이은 잠금 조회가 최신 남은 수량 대신 이 시점의 값을 돌려준다.
     @Query("""
         select new org.example.takecareofmyfridgebe.domain.sale.dto.ActiveSale(
@@ -39,6 +40,18 @@ public interface SaleEventItemRepository extends JpaRepository<SaleEventItem, Lo
         """)
     List<ActiveSale> findActiveByProductIds(
         @Param("productIds") Collection<Long> productIds,
+        @Param("statuses") Collection<SaleEventStatus> statuses,
+        @Param("now") LocalDateTime now
+    );
+
+    // 진행 중인 행사의 상품 전부. 판단 기준은 findActiveByProductIds와 같다.
+    @Query("""
+        select new org.example.takecareofmyfridgebe.domain.sale.dto.ActiveSale(
+            i.productId, i.id, e.type, i.salePrice, i.discountRate, e.endsAt, i.remainingQuantity, i.limitedQuantity)
+        from SaleEventItem i join i.saleEvent e
+        where e.status in :statuses and e.startsAt <= :now and e.endsAt > :now
+        """)
+    List<ActiveSale> findAllActive(
         @Param("statuses") Collection<SaleEventStatus> statuses,
         @Param("now") LocalDateTime now
     );
