@@ -25,6 +25,7 @@ export const ROUTES = {
   adminAudit: '/admin/audit',
   adminForecast: '/admin/forecast',
   adminProducts: '/admin/products',
+  adminProductDetail: '/admin/products/:productId',
   adminProductNew: '/admin/products/new',
   adminDeals: '/admin/deals',
   adminSaleEventNew: '/admin/sale-events/new',
