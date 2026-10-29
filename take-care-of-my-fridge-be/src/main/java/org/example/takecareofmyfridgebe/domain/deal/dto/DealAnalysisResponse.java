@@ -25,8 +25,8 @@ public record DealAnalysisResponse(
     public static DealAnalysisResponse from(DealAnalysis analysis, List<DealCandidate> items) {
         List<Candidate> candidates = items.stream()
                 .filter(item -> !item.isExcluded())
-                .sorted(Comparator.comparing(DealCandidate::getExpectedIncrease,
-                        Comparator.nullsLast(Comparator.reverseOrder()))
+                .sorted(Comparator.<DealCandidate>comparingLong(item ->
+                        (long) item.getSearchClicks() - item.getPurchases()).reversed()
                         .thenComparing(DealCandidate::getId))
                 .map(Candidate::from).toList();
         List<Excluded> excluded = items.stream()

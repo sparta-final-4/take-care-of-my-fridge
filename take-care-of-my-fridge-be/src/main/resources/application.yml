@@ -60,7 +60,7 @@ app:
     cron: ${REVIEW_SUMMARY_CRON:0 0 4 * * *}
     enabled: ${REVIEW_SUMMARY_ENABLED:true}
   search:
-    # 레시피 키워드 검색 엔진. mysql(기존 LIKE) | elasticsearch
+    # 상단 통합 검색 엔진. mysql(기존 LIKE) | elasticsearch
     engine: ${SEARCH_ENGINE:elasticsearch}
     index-properties:
       recipe:
@@ -68,6 +68,10 @@ app:
         index-settings: classpath:elasticsearch/recipes/recipes_index.json
         synonyms: classpath:elasticsearch/recipes/ingredient_synonyms.json
         extra-synonyms: classpath:elasticsearch/recipes/synonyms.txt
+        batch-size: 500
+      product:
+        alias: products
+        index-settings: classpath:elasticsearch/products/products_index.json
         batch-size: 500
     
 # 결제

@@ -6,6 +6,7 @@ import {
   type ProductCreateRequest,
   type ProductDetailResponse,
   type ProductListRequest,
+  type ProductUpdateRequest,
 } from '@/common/api/clients';
 import { unwrap } from '@/common/api/unwrap';
 
@@ -36,4 +37,18 @@ export async function getAdminProducts(
 
 export async function deleteProduct(productId: number): Promise<void> {
   await unwrap(adminProductApi.deleteProduct({ productId }));
+}
+
+export async function getAdminProduct(
+  productId: number,
+  signal?: AbortSignal,
+): Promise<ProductDetailResponse> {
+  return unwrap(adminProductApi.getAdminProduct({ productId }, { signal }));
+}
+
+export async function updateProduct(
+  productId: number,
+  request: ProductUpdateRequest,
+): Promise<ProductDetailResponse> {
+  return unwrap(adminProductApi.updateProduct({ productId, productUpdateRequest: request }));
 }

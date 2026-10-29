@@ -140,13 +140,20 @@ export default function AdminDealPage() {
       <Table<Candidate>
         rowKey={(item) => item.candidateId ?? item.productId ?? 0}
         dataSource={analysis.candidates ?? []}
-        scroll={{ x: 820 }}
+        scroll={{ x: 1050 }}
         pagination={false}
         columns={[
           { title: '상품', dataIndex: 'productName' },
           { title: '정가', dataIndex: 'regularPrice', render: money },
           { title: '추천 가격', dataIndex: 'discountPrice', render: money },
           { title: '재고', dataIndex: 'currentStock' },
+          { title: '검색 클릭', dataIndex: 'searchClicks' },
+          { title: '순판매 수량', dataIndex: 'purchases' },
+          {
+            title: '클릭−순판매 차이',
+            render: (_, item) =>
+              ((item.searchClicks ?? 0) - (item.purchases ?? 0)).toLocaleString('ko-KR'),
+          },
           {
             title: '예상 판매 증가',
             dataIndex: 'expectedIncrease',

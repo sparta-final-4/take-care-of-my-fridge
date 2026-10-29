@@ -98,6 +98,24 @@ class OrderItemRepositoryTest extends MySqlContainerSupport {
             .containsExactly(new DailyProductSales(10L, DAY, 3));
     }
 
+    @Test
+    @DisplayName("평상시 기준선은 같은 날의 할인 행사 주문을 제외한다")
+    void findDailyRegularProductSales_excludesSaleOrders() {
+        confirmedOrder(DAY.atTime(10, 0), 10L, 3, 1);
+        Order saleOrder = persistOrder();
+        saleOrder.markPaid(DAY.atTime(10, 0));
+        saleOrder.confirm(DAY.atTime(11, 0));
+        OrderItem saleItem = OrderItem.builder()
+            .order(saleOrder).productId(10L).productName("특가 상품")
+            .quantity(5).listPrice(1000).unitPrice(900)
+            .saleType(SaleType.SPECIAL).saleEventItemId(10L).build();
+        entityManager.persist(saleItem);
+        saleItem.confirmQuantity(0);
+        flushAndClear();
+
+        assertThat(orderItemRepository.findDailyRegularProductSales(OrderStatus.CONFIRMED, FROM, TO, TO))
+            .containsExactly(new DailyProductSales(10L, DAY, 2));
+    }
     private List<DailyProductSales> find(LocalDateTime asOf) {
         return orderItemRepository.findDailyProductSales(OrderStatus.CONFIRMED, FROM, TO, asOf);
     }
