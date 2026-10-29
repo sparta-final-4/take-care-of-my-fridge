@@ -2304,6 +2304,36 @@
         ]
       }
     },
+    "/api/search/products": {
+      "get": {
+        "operationId": "searchProducts",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "request",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ProductListRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePageResponseProductListItemResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "search-controller"
+        ]
+      }
+    },
     "/api/search/recipes": {
       "get": {
         "operationId": "searchRecipes",
