@@ -1,14 +1,14 @@
 import { useQuery } from '@tanstack/react-query';
 import { Flex, Tag, Typography } from 'antd';
 
-import { recipeQueries } from '@/domains/recipe/queries';
+import { searchQueries } from '@/domains/search/queries';
 import { useSearchKeyword } from '@/domains/search/hooks/useSearchKeyword';
 
 import styles from './SearchSummarySection.module.scss';
 
 export function SearchSummarySection() {
   const { keyword, recipeRequest } = useSearchKeyword();
-  const { data } = useQuery({ ...recipeQueries.list(recipeRequest), enabled: Boolean(keyword) });
+  const { data } = useQuery({ ...searchQueries.recipes(recipeRequest), enabled: Boolean(keyword) });
   const recipeCount = data?.totalElements;
 
   return (

@@ -5,7 +5,7 @@ import { Link } from 'react-router';
 import { ROUTES } from '@/app/paths';
 import { SectionCard } from '@/common/components/SectionCard';
 import { RecipeCard } from '@/domains/recipe/components/RecipeCard';
-import { recipeQueries } from '@/domains/recipe/queries';
+import { searchQueries } from '@/domains/search/queries';
 import { SEARCH_RECIPE_PAGE_SIZE, useSearchKeyword } from '@/domains/search/hooks/useSearchKeyword';
 
 import styles from './SearchRecipeSection.module.scss';
@@ -13,7 +13,7 @@ import styles from './SearchRecipeSection.module.scss';
 export function SearchRecipeSection() {
   const { keyword, page, setPage, recipeRequest } = useSearchKeyword();
   const { data, isPending, isError, isPlaceholderData, refetch } = useQuery(
-    recipeQueries.list(recipeRequest),
+    searchQueries.recipes(recipeRequest),
   );
 
   const handleChangePage = (nextPage: number) => {
