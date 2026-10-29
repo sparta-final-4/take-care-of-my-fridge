@@ -7,6 +7,7 @@ import java.util.List;
 import org.example.takecareofmyfridgebe.domain.sale.dto.ActiveSale;
 import org.example.takecareofmyfridgebe.domain.sale.entity.SaleEventItem;
 import org.example.takecareofmyfridgebe.domain.sale.entity.SaleEventStatus;
+import org.example.takecareofmyfridgebe.domain.sale.entity.SaleEventType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -49,4 +50,13 @@ public interface SaleEventItemRepository extends JpaRepository<SaleEventItem, Lo
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select i from SaleEventItem i where i.id in :ids order by i.id")
     List<SaleEventItem> findAllByIdInForUpdate(@Param("ids") Collection<Long> ids);
+
+    // 할인 효과 학습은 종료된 일반 특가의 실제 주문 이력만 사용한다.
+    @Query("""
+        select i from SaleEventItem i join fetch i.saleEvent e
+        where e.type = :type and e.endsAt <= :endedBefore
+        order by i.id
+        """)
+    List<SaleEventItem> findFinishedForTraining(
+        @Param("type") SaleEventType type, @Param("endedBefore") LocalDateTime endedBefore);
 }

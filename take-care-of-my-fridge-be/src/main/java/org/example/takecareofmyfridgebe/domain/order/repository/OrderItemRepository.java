@@ -52,4 +52,25 @@ public interface OrderItemRepository extends JpaRepository<OrderItem, Long> {
         @Param("to") LocalDateTime to,
         @Param("asOf") LocalDateTime asOf
     );
+
+    // 행사 상품에 연결된 구매 확정 후 환불 차감 수량. 기준 시각 뒤의 확정은 제외한다.
+    @Query("""
+        select coalesce(sum(oi.confirmedQuantity), 0)
+        from OrderItem oi join oi.order o
+        where oi.saleEventItemId = :saleEventItemId and o.status = :status
+          and o.confirmedAt <= :asOf
+        """)
+    long sumConfirmedSaleQuantity(@Param("saleEventItemId") Long saleEventItemId,
+                                  @Param("status") OrderStatus status,
+                                  @Param("asOf") LocalDateTime asOf);
+
+    // 미확정 결제 주문이 남은 행사는 실제 판매 수량이 아직 완결되지 않았다.
+    @Query("""
+        select count(oi) from OrderItem oi join oi.order o
+        where oi.saleEventItemId = :saleEventItemId and o.status = :status
+          and o.paidAt <= :asOf
+        """)
+    long countUnconfirmedPaidSaleOrders(@Param("saleEventItemId") Long saleEventItemId,
+                                        @Param("status") OrderStatus status,
+                                        @Param("asOf") LocalDateTime asOf);
 }
