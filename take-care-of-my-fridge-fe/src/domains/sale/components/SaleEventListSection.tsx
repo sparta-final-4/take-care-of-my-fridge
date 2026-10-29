@@ -19,14 +19,15 @@ import type { TableColumnsType, TablePaginationConfig } from 'antd';
 import type { SorterResult } from 'antd/es/table/interface';
 import dayjs from 'dayjs';
 import { useState } from 'react';
-import { useSearchParams } from 'react-router';
+import { generatePath, Link, useSearchParams } from 'react-router';
 
+import { ROUTES } from '@/app/paths';
 import type { SaleEventListRequest, SaleEventListResponse } from '@/common/api/clients';
 import { getErrorMessage } from '@/common/api/errors';
 import { formatPrice } from '@/domains/cart/format';
 import { deleteSaleEvent, endSaleEvent } from '@/domains/sale/api';
 import { SaleEventEditPanel } from '@/domains/sale/components/SaleEventEditPanel';
-import { SALE_STATUS_LABELS, SALE_TYPE_LABELS } from '@/domains/sale/format';
+import { SALE_STATUS_LABELS, SALE_TYPE_COLORS, SALE_TYPE_LABELS } from '@/domains/sale/format';
 import { saleQueries } from '@/domains/sale/queries';
 
 import styles from './SaleEventListSection.module.scss';
@@ -41,8 +42,6 @@ const TIME_FORMAT = 'HH:mm';
 
 const STATUS_COLORS = { SCHEDULED: 'blue', ACTIVE: 'green', ENDED: 'default' } as const;
 // 상태와 색이 겹치지 않게 종류는 보라·주황 계열로 구분한다.
-const TYPE_COLORS = { SPECIAL: 'purple', FLASH_DROP: 'volcano' } as const;
-
 type Status = keyof typeof SALE_STATUS_LABELS;
 type Type = keyof typeof SALE_TYPE_LABELS;
 
@@ -238,6 +237,15 @@ export function SaleEventListSection() {
       ellipsis: true,
       sorter: true,
       sortOrder: sortOrderOf('productName'),
+      // 손님에게 할인이 어떻게 보이는지 확인하도록 손님용 상품 상세로 보낸다.
+      render: (value: string, row: EventRow) => (
+        <Link
+          to={generatePath(ROUTES.productDetail, { productId: String(row.productId) })}
+          title={value}
+        >
+          {value}
+        </Link>
+      ),
     },
     {
       title: '종류',
@@ -246,7 +254,7 @@ export function SaleEventListSection() {
       width: 90,
       sorter: true,
       sortOrder: sortOrderOf('type'),
-      render: (value: Type) => <Tag color={TYPE_COLORS[value]}>{SALE_TYPE_LABELS[value]}</Tag>,
+      render: (value: Type) => <Tag color={SALE_TYPE_COLORS[value]}>{SALE_TYPE_LABELS[value]}</Tag>,
     },
     {
       title: '상태',

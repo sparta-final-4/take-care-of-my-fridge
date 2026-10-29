@@ -22,6 +22,9 @@ import { formatPrice } from '@/domains/cart/format';
 import { STORAGE_LABELS } from '@/domains/fridge/format';
 import { PRODUCT_TYPE_LABELS } from '@/domains/product/format';
 import { productQueries } from '@/domains/product/queries';
+import { SaleInfo } from '@/domains/sale/components/SaleInfo';
+import { SalePrice } from '@/domains/sale/components/SalePrice';
+import { FLASH_DROP_PURCHASE_LIMIT } from '@/domains/sale/format';
 
 import styles from './ProductDetailSection.module.scss';
 
@@ -71,8 +74,11 @@ export function ProductDetailSection({ productId }: ProductDetailSectionProps) {
     shelfDays,
     ingredient,
     mealkit,
+    sale,
+    soldOut = false,
   } = product;
-  const soldOut = product.status === 'SOLD_OUT';
+  const unitPrice = sale?.salePrice ?? price;
+  const maxQuantity = sale?.type === 'FLASH_DROP' ? FLASH_DROP_PURCHASE_LIMIT : undefined;
 
   // 재료는 용량, 밀키트는 인분을 보여 준다. 상세 행이 없으면 줄을 뺀다.
   const amountItem = ingredient?.unitAmount
@@ -111,9 +117,14 @@ export function ProductDetailSection({ productId }: ProductDetailSectionProps) {
         <Typography.Title level={3} className={styles.name}>
           {name}
         </Typography.Title>
-        <Typography.Text strong className={styles.price}>
-          {price === undefined ? '-' : formatPrice(price)}
-        </Typography.Text>
+        {price === undefined ? (
+          <Typography.Text strong className={styles.price}>
+            -
+          </Typography.Text>
+        ) : (
+          <SalePrice listPrice={price} sale={sale} priceClassName={styles.price} />
+        )}
+        {sale && <SaleInfo sale={sale} />}
 
         {infoItems.length > 0 && <Descriptions column={1} size="small" items={infoItems} />}
         {product.description && (
@@ -129,6 +140,7 @@ export function ProductDetailSection({ productId }: ProductDetailSectionProps) {
             <Typography.Text id="product-quantity-label">수량</Typography.Text>
             <InputNumber
               min={1}
+              max={maxQuantity}
               precision={0}
               value={quantity}
               disabled={soldOut}
@@ -136,9 +148,9 @@ export function ProductDetailSection({ productId }: ProductDetailSectionProps) {
               aria-labelledby="product-quantity-label"
             />
           </Flex>
-          {price !== undefined && (
+          {unitPrice !== undefined && (
             <Typography.Text>
-              합계 <Typography.Text strong>{formatPrice(price * quantity)}</Typography.Text>
+              합계 <Typography.Text strong>{formatPrice(unitPrice * quantity)}</Typography.Text>
             </Typography.Text>
           )}
         </Flex>

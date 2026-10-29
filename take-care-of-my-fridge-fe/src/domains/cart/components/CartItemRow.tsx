@@ -1,14 +1,29 @@
 import { CloseOutlined, MinusOutlined, PlusOutlined } from '@ant-design/icons';
-import { Button, Checkbox, Flex, Tag, Typography } from 'antd';
+import { Button, Checkbox, Flex, Typography } from 'antd';
+import { generatePath, Link } from 'react-router';
 
+import { ROUTES } from '@/app/paths';
+import type { SaleResponse } from '@/common/api/clients';
 import { FadeImage } from '@/common/components/FadeImage';
 import type { CartItemResponse } from '@/domains/cart/api';
-import { SaleCountdown } from '@/domains/cart/components/SaleCountdown';
-import { formatPrice, SALE_TYPE_LABELS } from '@/domains/cart/format';
+import { formatPrice } from '@/domains/cart/format';
+import { SaleInfo } from '@/domains/sale/components/SaleInfo';
+import { SalePrice } from '@/domains/sale/components/SalePrice';
+import { FLASH_DROP_PURCHASE_LIMIT } from '@/domains/sale/format';
 import styles from './CartItemRow.module.scss';
 
-// 번개 드롭은 1인 1개라 수량을 올릴 수 없다.
-const FLASH_DROP_MAX_QUANTITY = 1;
+// 장바구니 응답은 할인 필드가 따로 와서, 상품 화면과 같은 할인 모양으로 묶어 같은 표시를 쓴다.
+const saleOf = (item: CartItemResponse): SaleResponse | undefined =>
+  item.saleType === null
+    ? undefined
+    : {
+        type: item.saleType,
+        salePrice: item.unitPrice,
+        discountRate: item.discountRate ?? undefined,
+        endsAt: item.saleEndsAt ?? undefined,
+        remainingQuantity: item.flashDropRemaining ?? undefined,
+        limitedQuantity: item.flashDropLimit ?? undefined,
+      };
 
 interface CartItemRowProps {
   item: CartItemResponse;
@@ -26,8 +41,9 @@ export function CartItemRow({
   onRemove,
 }: CartItemRowProps) {
   const { soldOut, quantity } = item;
-  const discounted = item.saleType !== null;
-  const canIncrease = !(item.saleType === 'FLASH_DROP' && quantity >= FLASH_DROP_MAX_QUANTITY);
+  const sale = saleOf(item);
+  const detailPath = generatePath(ROUTES.productDetail, { productId: String(item.productId) });
+  const canIncrease = !(item.saleType === 'FLASH_DROP' && quantity >= FLASH_DROP_PURCHASE_LIMIT);
 
   return (
     <div className={soldOut ? styles.rowSoldOut : styles.row}>
@@ -38,33 +54,23 @@ export function CartItemRow({
         aria-label={`${item.productName} 선택`}
         className={styles.check}
       />
-      <div className={styles.thumb}>
+      {/* 이미지와 이름이 같은 상세로 가므로 키보드 이동은 이름 링크 하나만 받는다. */}
+      <Link to={detailPath} tabIndex={-1} aria-hidden="true" className={styles.thumb}>
         {item.imageUrl ? (
-          <FadeImage src={item.imageUrl} alt={item.productName} className={styles.image} />
+          <FadeImage src={item.imageUrl} alt="" className={styles.image} />
         ) : (
-          <span className={styles.imagePlaceholder} aria-hidden="true" />
+          <span className={styles.imagePlaceholder} />
         )}
         {soldOut && <span className={styles.soldOutMark}>품절</span>}
-      </div>
+      </Link>
       <Flex vertical gap="small" className={styles.info}>
-        {item.saleType && <Tag className={styles.saleTag}>{SALE_TYPE_LABELS[item.saleType]}</Tag>}
-        <Typography.Text strong={!soldOut} title={item.productName} className={styles.name}>
-          {item.productName}
-        </Typography.Text>
-        <Flex align="baseline" gap="small" wrap>
-          {discounted && (
-            <Typography.Text delete type="secondary" className={styles.listPrice}>
-              {formatPrice(item.listPrice)}
-            </Typography.Text>
-          )}
-          <Typography.Text strong={!soldOut}>{formatPrice(item.unitPrice)}</Typography.Text>
-        </Flex>
-        {item.saleEndsAt && !soldOut && <SaleCountdown endsAt={item.saleEndsAt} />}
-        {item.flashDropRemaining !== null && !soldOut && (
-          <Typography.Text type="secondary">
-            재고 {item.flashDropRemaining} / {item.flashDropLimit}개
+        <Link to={detailPath} className={styles.nameLink}>
+          <Typography.Text strong={!soldOut} title={item.productName} className={styles.name}>
+            {item.productName}
           </Typography.Text>
-        )}
+        </Link>
+        <SalePrice listPrice={item.listPrice} sale={sale} />
+        {sale && <SaleInfo sale={sale} />}
       </Flex>
       <Flex align="center" className={styles.quantity}>
         <Button

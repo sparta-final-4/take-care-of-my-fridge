@@ -136,7 +136,7 @@ export function OrderDetailSection({ orderId }: OrderDetailSectionProps) {
       <section className={`${styles.card} ${styles.list}`} aria-label="주문 상품">
         <OrderItemHeader />
         {order.items?.map((item) => (
-          <OrderItemRow key={item.productId} item={item} />
+          <OrderItemRow key={item.productId} item={item} linkToProduct />
         ))}
       </section>
       <div className={styles.bottom}>

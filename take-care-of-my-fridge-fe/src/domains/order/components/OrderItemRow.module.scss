@@ -55,12 +55,31 @@
 .saleTag {
   align-self: flex-start;
   margin: 0;
+  font-size: var(--ant-font-size);
+  line-height: var(--ant-line-height);
 }
 
 .name {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+// 이름을 누르면 상품 상세로 간다. 글자색은 그대로 두고 올렸을 때만 밑줄을 긋는다.
+.nameLink {
+  display: block;
+  min-width: 0;
+  color: inherit;
+
+  &:hover {
+    color: inherit;
+    text-decoration: underline;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--ant-color-primary);
+    outline-offset: 2px;
+  }
 }
 
 .quantity {

@@ -74,6 +74,12 @@
   margin: 0;
 }
 
+.saleTag {
+  margin: 0;
+  font-size: var(--ant-font-size);
+  line-height: var(--ant-line-height);
+}
+
 .blockedTag {
   border-style: dashed;
 }

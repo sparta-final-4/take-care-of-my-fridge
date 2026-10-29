@@ -3,7 +3,8 @@ import { Button, Checkbox, Flex, Tag, Typography } from 'antd';
 
 import type { RefundableItemResponse } from '@/common/api/clients';
 import { FadeImage } from '@/common/components/FadeImage';
-import { formatPrice, SALE_TYPE_LABELS } from '@/domains/cart/format';
+import { formatPrice } from '@/domains/cart/format';
+import { SALE_TYPE_COLORS, SALE_TYPE_LABELS } from '@/domains/sale/format';
 import { getOrderItemRefundState, getRefundRowState } from '@/domains/refund/format';
 
 import styles from './RefundItemRow.module.scss';
@@ -86,7 +87,11 @@ export function RefundItemRow({ item, listPrice, quantity, onChange }: RefundIte
         </Typography.Text>
         {(saleType || refundState === 'partial' || refundState === 'full') && (
           <Flex gap="small" wrap>
-            {saleType && <Tag className={styles.tag}>{SALE_TYPE_LABELS[saleType]}</Tag>}
+            {saleType && (
+              <Tag color={SALE_TYPE_COLORS[saleType]} className={styles.saleTag}>
+                {SALE_TYPE_LABELS[saleType]}
+              </Tag>
+            )}
             {refundState === 'full' && <Tag className={styles.tag}>환불</Tag>}
             {refundState === 'partial' && (
               <Tag className={styles.tag}>부분 환불 {refundedQuantity}개</Tag>

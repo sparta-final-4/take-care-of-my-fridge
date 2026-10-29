@@ -1,12 +1,17 @@
 import { Flex, Tag, Typography } from 'antd';
+import { generatePath, Link } from 'react-router';
 
+import { ROUTES } from '@/app/paths';
 import type { OrderItemResponse } from '@/common/api/clients';
 import { FadeImage } from '@/common/components/FadeImage';
-import { formatPrice, SALE_TYPE_LABELS } from '@/domains/cart/format';
+import { formatPrice } from '@/domains/cart/format';
+import { SALE_TYPE_COLORS, SALE_TYPE_LABELS } from '@/domains/sale/format';
 import styles from './OrderItemRow.module.scss';
 
 interface OrderItemRowProps {
   item: OrderItemResponse;
+  // 주문 상세에서만 이미지·이름을 상품 상세로 연결한다. 결제 전 주문 확인 화면에서는 결제 흐름을 벗어나지 않게 연결하지 않는다.
+  linkToProduct?: boolean;
 }
 
 // 상품이 한 행으로 펼쳐지는 md부터 보인다. 상품 행과 같은 격자라 칸이 맞는다.
@@ -30,24 +35,48 @@ export function OrderItemHeader() {
 }
 
 // 가격은 주문할 때 저장한 값이다. 지금 상품 가격은 쓰지 않는다.
-export function OrderItemRow({ item }: OrderItemRowProps) {
+export function OrderItemRow({ item, linkToProduct = false }: OrderItemRowProps) {
   const name = item.productName ?? '';
   const saleType = item.saleType === 'NONE' ? undefined : item.saleType;
+  const detailPath =
+    linkToProduct && item.productId !== undefined
+      ? generatePath(ROUTES.productDetail, { productId: String(item.productId) })
+      : undefined;
+
+  const image = item.productImageUrl ? (
+    <FadeImage src={item.productImageUrl} alt={detailPath ? '' : name} className={styles.image} />
+  ) : (
+    <span className={styles.imagePlaceholder} aria-hidden="true" />
+  );
+  const nameText = (
+    <Typography.Text strong title={name} className={styles.name}>
+      {name}
+    </Typography.Text>
+  );
 
   return (
     <div className={styles.row}>
-      <div className={styles.thumb}>
-        {item.productImageUrl ? (
-          <FadeImage src={item.productImageUrl} alt={name} className={styles.image} />
-        ) : (
-          <span className={styles.imagePlaceholder} aria-hidden="true" />
-        )}
-      </div>
+      {/* 이미지와 이름이 같은 상세로 가므로 키보드 이동은 이름 링크 하나만 받는다. */}
+      {detailPath ? (
+        <Link to={detailPath} tabIndex={-1} aria-hidden="true" className={styles.thumb}>
+          {image}
+        </Link>
+      ) : (
+        <div className={styles.thumb}>{image}</div>
+      )}
       <Flex vertical gap="small" className={styles.info}>
-        {saleType && <Tag className={styles.saleTag}>{SALE_TYPE_LABELS[saleType]}</Tag>}
-        <Typography.Text strong title={name} className={styles.name}>
-          {name}
-        </Typography.Text>
+        {saleType && (
+          <Tag color={SALE_TYPE_COLORS[saleType]} className={styles.saleTag}>
+            {SALE_TYPE_LABELS[saleType]}
+          </Tag>
+        )}
+        {detailPath ? (
+          <Link to={detailPath} className={styles.nameLink}>
+            {nameText}
+          </Link>
+        ) : (
+          nameText
+        )}
       </Flex>
       <Typography.Text className={styles.quantity}>{item.quantity ?? 0}개</Typography.Text>
       <Flex vertical align="flex-end" className={styles.price}>

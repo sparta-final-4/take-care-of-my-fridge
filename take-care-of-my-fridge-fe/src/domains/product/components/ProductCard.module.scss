@@ -71,12 +71,42 @@
   background: var(--ant-color-bg-mask);
 }
 
+.saleTag {
+  margin: 0;
+  font-size: var(--ant-font-size);
+  line-height: var(--ant-line-height);
+}
+
+// 남은 시간과 번개 드롭 남은 수량. 폭이 좁으면 두 항목이 위아래로 나뉜다.
+.saleBand {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--ant-margin-xs);
+  justify-content: center;
+  padding: var(--ant-padding-xxs) var(--ant-padding-xs);
+  color: var(--ant-color-white);
+  font-size: var(--ant-font-size-sm);
+  background: var(--ant-color-bg-mask);
+}
+
+.saleBandItem {
+  white-space: nowrap;
+}
+
 .info {
   min-width: 0;
 }
 
-.typeTag {
+// 상품 종류 태그와 할인 구분 태그를 나란히 둔다.
+.tags {
   align-self: flex-start;
+}
+
+.typeTag {
   margin: 0;
 }
 
@@ -89,8 +119,13 @@
   -webkit-box-orient: vertical;
 }
 
+// 모바일은 카드가 두 개씩 놓여 좁으므로 할인율과 할인가가 나란히 들어가는 크기로 둔다.
 .price {
   font-size: var(--ant-font-size-lg);
+
+  @include from(md) {
+    font-size: var(--ant-font-size-xl);
+  }
 }
 
 // 모바일에서는 터치 영역을 44px 이상으로 둔다.
