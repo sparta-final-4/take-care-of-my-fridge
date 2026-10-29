@@ -232,6 +232,21 @@
 - 번개 드롭 1인 1개는 `order_items`의 UK(sale_event_item_id, flash_drop_member_id)가 막습니다.
 - 실행용 DDL 초안은 [sale-event.sql](sale-event.sql)에 있습니다.
 
+## search_click_histories — 검색 결과 상품 클릭 기록
+
+- 검색 결과에서 상품을 누를 때마다 한 건씩 쌓습니다. 수정·삭제하지 않습니다.
+- 클릭 시각은 공통 컬럼 `created_at`(서버 저장 시각, 한국 시각)입니다. 클라이언트 시각은 쓰지 않습니다.
+- 중복 클릭은 제거하지 않고 누른 만큼 기록합니다. 상품이 실제로 있는지는 확인하지 않습니다.
+- 제약 이름: 인덱스 `idx_search_click_histories_created_at_product_id`(created_at, product_id). 기간·기준 시각 범위의 상품별 클릭 수 집계용입니다.
+
+| 컬럼 | 타입 | NULL | 기본값 | 제약 | 의미 |
+|---|---|---|---|---|---|
+| product_id | BIGINT | 불가 | | 인덱스 | 클릭한 상품. 물리 FK 없이 상품 번호만 저장 |
+| member_id | BIGINT | 허용 | NULL | | 클릭한 회원. 비로그인 클릭은 NULL. 물리 FK 없음 |
+| keyword | VARCHAR(100) | 불가 | | | 클릭 당시 검색어(앞뒤 공백 제거) |
+
+- 실행용 DDL 초안은 [search.sql](search.sql)에 있습니다.
+
 ## 다른 도메인에 요청할 컬럼
 
 | 도메인 | 필요한 데이터 | 근거 |
