@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { App, Button } from 'antd';
+import { App } from 'antd';
 import { useLocation, useNavigate } from 'react-router';
 
 import { ROUTES } from '@/app/paths';
@@ -27,19 +27,7 @@ export function useAddToCart() {
     }
     mutate(
       { productId, quantity },
-      {
-        onSuccess: () =>
-          void message.success({
-            content: (
-              <>
-                장바구니에 담았습니다.
-                <Button type="link" size="small" onClick={() => navigate(ROUTES.cart)}>
-                  장바구니 보기
-                </Button>
-              </>
-            ),
-          }),
-      },
+      { onSuccess: () => void message.success('장바구니에 담았습니다.') },
     );
   };
 

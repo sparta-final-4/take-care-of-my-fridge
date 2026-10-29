@@ -20,7 +20,13 @@ export function App() {
 
   return (
     <ConfigProvider theme={theme} locale={koKR}>
-      <AntdApp>
+      {/* 알림 목록이 화면 폭 전체를 덮어 알림이 떠 있는 동안 같은 높이의 헤더 버튼이 눌리지 않으므로,
+          목록은 클릭을 통과시키고 알림 내용만 클릭을 받게 한다. */}
+      <AntdApp
+        message={{
+          styles: { listContent: { pointerEvents: 'none' }, wrapper: { pointerEvents: 'auto' } },
+        }}
+      >
         <FeedbackBridge />
         <QueryClientProvider client={queryClient}>
           <IdleLogout />

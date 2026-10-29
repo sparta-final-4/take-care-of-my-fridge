@@ -30,6 +30,7 @@ export function ProductListSection() {
   return (
     <SectionCard
       title={data ? `${label} ${totalElements.toLocaleString('ko-KR')}개` : label}
+      bracket={false}
       extra={
         <Segmented
           size="small"
