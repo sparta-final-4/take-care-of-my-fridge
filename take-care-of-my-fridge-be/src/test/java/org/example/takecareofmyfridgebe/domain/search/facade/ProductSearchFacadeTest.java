@@ -2,7 +2,7 @@ package org.example.takecareofmyfridgebe.domain.search.facade;
 
 import org.example.takecareofmyfridgebe.domain.product.dto.ProductListItemResponse;
 import org.example.takecareofmyfridgebe.domain.product.dto.ProductListRequest;
-import org.example.takecareofmyfridgebe.domain.product.service.ProductService;
+import org.example.takecareofmyfridgebe.domain.product.facade.ProductFacade;
 import org.example.takecareofmyfridgebe.domain.search.config.RecipeSearchProperties;
 import org.example.takecareofmyfridgebe.domain.search.dto.ProductSearchResult;
 import org.example.takecareofmyfridgebe.domain.search.service.ProductSearchService;
@@ -30,7 +30,7 @@ import static org.mockito.Mockito.when;
 class ProductSearchFacadeTest {
 
     @Mock
-    private ProductService productService;
+    private ProductFacade productFacade;
     @Mock
     private ProductSearchService productSearchService;
     @Mock
@@ -51,7 +51,7 @@ class ProductSearchFacadeTest {
         // Given
         ProductListRequest request = request("대파");
         when(searchProperties.useElasticSearch()).thenReturn(false);
-        when(productService.getProducts(request)).thenReturn(page);
+        when(productFacade.getProducts(request)).thenReturn(page);
 
         // When & Then
         assertSame(page, facade.getProducts(request));
@@ -63,7 +63,7 @@ class ProductSearchFacadeTest {
     void usesMySqlWithoutKeyword() throws IOException {
         // Given
         ProductListRequest request = request(null);
-        when(productService.getProducts(request)).thenReturn(page);
+        when(productFacade.getProducts(request)).thenReturn(page);
 
         // When & Then
         assertSame(page, facade.getProducts(request));
@@ -77,11 +77,11 @@ class ProductSearchFacadeTest {
         ProductListRequest request = request("대파");
         when(searchProperties.useElasticSearch()).thenReturn(true);
         when(productSearchService.search(request)).thenReturn(new ProductSearchResult(List.of(9L, 4L), 7));
-        when(productService.getProductsByIds(List.of(9L, 4L), 7, request)).thenReturn(page);
+        when(productFacade.getProductsByIds(List.of(9L, 4L), 7, request)).thenReturn(page);
 
         // When & Then
         assertSame(page, facade.getProducts(request));
-        verify(productService, never()).getProducts(any());
+        verify(productFacade, never()).getProducts(any());
     }
 
     @Test
@@ -91,10 +91,10 @@ class ProductSearchFacadeTest {
         ProductListRequest request = request("대파");
         when(searchProperties.useElasticSearch()).thenReturn(true);
         when(productSearchService.search(request)).thenThrow(new IOException("ES 연결 실패"));
-        when(productService.getProducts(request)).thenReturn(page);
+        when(productFacade.getProducts(request)).thenReturn(page);
 
         // When & Then
         assertSame(page, facade.getProducts(request));
-        verify(productService, never()).getProductsByIds(anyList(), anyLong(), any());
+        verify(productFacade, never()).getProductsByIds(anyList(), anyLong(), any());
     }
 }

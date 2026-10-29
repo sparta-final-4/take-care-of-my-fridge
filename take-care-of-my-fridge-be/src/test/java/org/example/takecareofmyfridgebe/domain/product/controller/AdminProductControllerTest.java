@@ -19,6 +19,7 @@ import org.example.takecareofmyfridgebe.domain.product.dto.AdminProductListReque
 import org.example.takecareofmyfridgebe.domain.product.dto.ProductListItemResponse;
 import org.example.takecareofmyfridgebe.domain.product.entity.ProductStatus;
 import org.example.takecareofmyfridgebe.domain.product.entity.ProductType;
+import org.example.takecareofmyfridgebe.domain.product.facade.ProductFacade;
 import org.example.takecareofmyfridgebe.domain.product.service.ProductService;
 import org.example.takecareofmyfridgebe.global.config.SecurityConfig;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
@@ -43,18 +44,20 @@ class AdminProductControllerTest {
     @Autowired
     private MockMvc mvc;
     @Autowired
+    private ProductFacade facade;
+    @Autowired
     private ProductService service;
 
     @BeforeEach
     void resetMock() {
-        reset(service);
+        reset(facade, service);
     }
 
     @Test
     void adminReadsProductsWithFilters() throws Exception {
-        when(service.getAdminProducts(any(AdminProductListRequest.class))).thenReturn(new PageResponse<>(
+        when(facade.getAdminProducts(any(AdminProductListRequest.class))).thenReturn(new PageResponse<>(
                 List.of(new ProductListItemResponse(5L, ProductType.INGREDIENT, "양파 1kg", null, 3900,
-                        ProductStatus.STOPPED)),
+                        ProductStatus.STOPPED, null, true)),
                 2, 10, 11, 2, true));
 
         mvc.perform(get("/api/admin/products")
@@ -64,7 +67,7 @@ class AdminProductControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.content[0].status").value("STOPPED"))
                 .andExpect(jsonPath("$.data.pageNumber").value(2));
-        verify(service).getAdminProducts(
+        verify(facade).getAdminProducts(
                 new AdminProductListRequest("양파", null, ProductStatus.STOPPED, 2, 10));
     }
 
@@ -74,12 +77,12 @@ class AdminProductControllerTest {
                         .with(authenticationFor(Member.Role.ADMIN)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error.code").value("C001"));
-        verifyNoInteractions(service);
+        verifyNoInteractions(facade, service);
     }
 
     @Test
     void missingProductReturnsProduct001() throws Exception {
-        when(service.getAdminProduct(9L)).thenThrow(new BusinessException(ErrorCode.PRODUCT_NOT_FOUND));
+        when(facade.getAdminProduct(9L)).thenThrow(new BusinessException(ErrorCode.PRODUCT_NOT_FOUND));
 
         mvc.perform(get("/api/admin/products/9")
                         .with(authenticationFor(Member.Role.ADMIN)))
@@ -96,7 +99,7 @@ class AdminProductControllerTest {
                 .andExpect(status().isForbidden());
         mvc.perform(get("/api/admin/products"))
                 .andExpect(status().isUnauthorized());
-        verifyNoInteractions(service);
+        verifyNoInteractions(facade, service);
     }
 
     private RequestPostProcessor authenticationFor(Member.Role role) {
@@ -107,6 +110,11 @@ class AdminProductControllerTest {
 
     @TestConfiguration
     static class TestConfig {
+        @Bean
+        ProductFacade productFacade() {
+            return mock(ProductFacade.class);
+        }
+
         @Bean
         ProductService productService() {
             return mock(ProductService.class);

@@ -5,8 +5,7 @@ import org.example.takecareofmyfridgebe.domain.ingredient.entity.StorageType;
 import org.example.takecareofmyfridgebe.domain.ingredient.repository.IngredientRepository;
 import org.example.takecareofmyfridgebe.domain.product.dto.AdminProductListRequest;
 import org.example.takecareofmyfridgebe.domain.product.dto.ProductCreateRequest;
-import org.example.takecareofmyfridgebe.domain.product.dto.ProductDetailResponse;
-import org.example.takecareofmyfridgebe.domain.product.dto.ProductListItemResponse;
+import org.example.takecareofmyfridgebe.domain.product.dto.ProductDetail;
 import org.example.takecareofmyfridgebe.domain.product.dto.ProductListRequest;
 import org.example.takecareofmyfridgebe.domain.product.dto.ProductSort;
 import org.example.takecareofmyfridgebe.domain.product.dto.ProductUpdateRequest;
@@ -24,7 +23,6 @@ import org.example.takecareofmyfridgebe.domain.product.repository.ProductReposit
 import org.example.takecareofmyfridgebe.dummy.ProductFixture;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
-import org.example.takecareofmyfridgebe.global.response.PageResponse;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -34,6 +32,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -104,21 +103,19 @@ class ProductServiceTest {
     }
 
     @Test
-    @DisplayName("조회한 상품을 목록 응답 DTO와 1부터 시작하는 페이지 정보로 변환한다")
-    void getProducts_mapsToResponse() {
+    @DisplayName("조회한 상품 페이지를 그대로 돌려준다")
+    void getProducts_returnsPage() {
         // given
         Product onion = ProductFixture.createProduct(5L, "양파 1kg", 3900);
         when(productRepository.findProductsByCondition(any(ProductListRequest.class), anyCollection(), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(onion), PageRequest.of(1, 20), 21));
 
         // when
-        PageResponse<ProductListItemResponse> result = service.getProducts(listRequest(ProductSort.LATEST, 2));
+        Page<Product> result = service.getProducts(listRequest(ProductSort.LATEST, 2));
 
         // then
-        assertThat(result.pageNumber()).isEqualTo(2);
-        assertThat(result.totalElements()).isEqualTo(21);
-        assertThat(result.content()).containsExactly(new ProductListItemResponse(
-                5L, ProductType.INGREDIENT, "양파 1kg", null, 3900, ProductStatus.ON_SALE));
+        assertThat(result.getTotalElements()).isEqualTo(21);
+        assertThat(result.getContent()).containsExactly(onion);
     }
 
     @Test
@@ -149,9 +146,9 @@ class ProductServiceTest {
         when(ingredientProductRepository.findByProductId(5L))
                 .thenReturn(Optional.of(ProductFixture.createIngredientDetail(onion, new BigDecimal("1000"), "g")));
 
-        ProductDetailResponse result = service.getAdminProduct(5L);
+        ProductDetail result = service.getAdminProduct(5L);
 
-        assertThat(result.status()).isEqualTo(ProductStatus.STOPPED);
+        assertThat(result.product().getStatus()).isEqualTo(ProductStatus.STOPPED);
         assertThat(result.ingredient()).isNotNull();
         verify(productRepository, never()).findByIdAndStatusIn(eq(5L), anyCollection());
     }
@@ -170,12 +167,13 @@ class ProductServiceTest {
                 .thenReturn(Optional.of(ProductFixture.createIngredientDetail(onion, new BigDecimal("1000"), "g")));
 
         // when
-        ProductDetailResponse result = service.getProduct(5L);
+        ProductDetail result = service.getProduct(5L);
 
         // then
-        assertThat(result.productId()).isEqualTo(5L);
-        assertThat(result.productType()).isEqualTo(ProductType.INGREDIENT);
-        assertThat(result.ingredient()).isEqualTo(new ProductDetailResponse.IngredientInfo(new BigDecimal("1000"), "g"));
+        assertThat(result.product().getId()).isEqualTo(5L);
+        assertThat(result.product().getProductType()).isEqualTo(ProductType.INGREDIENT);
+        assertThat(result.ingredient().getUnitAmount()).isEqualByComparingTo("1000");
+        assertThat(result.ingredient().getUnit()).isEqualTo("g");
         assertThat(result.mealkit()).isNull();
     }
 
@@ -189,11 +187,11 @@ class ProductServiceTest {
                 .thenReturn(Optional.of(ProductFixture.createMealkitDetail(stew, 2)));
 
         // when
-        ProductDetailResponse result = service.getProduct(7L);
+        ProductDetail result = service.getProduct(7L);
 
         // then
-        assertThat(result.productType()).isEqualTo(ProductType.MEALKIT);
-        assertThat(result.mealkit()).isEqualTo(new ProductDetailResponse.MealkitInfo(2));
+        assertThat(result.product().getProductType()).isEqualTo(ProductType.MEALKIT);
+        assertThat(result.mealkit().getServings()).isEqualTo(2);
         assertThat(result.ingredient()).isNull();
     }
 
@@ -224,13 +222,14 @@ class ProductServiceTest {
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
         // when
-        ProductDetailResponse result = service.createProduct(ProductFixture.createIngredientRequest(1L));
+        ProductDetail result = service.createProduct(ProductFixture.createIngredientRequest(1L));
 
         // then
-        assertThat(result.productType()).isEqualTo(ProductType.INGREDIENT);
-        assertThat(result.name()).isEqualTo("양파 1kg");
-        assertThat(result.status()).isEqualTo(ProductStatus.ON_SALE);
-        assertThat(result.ingredient()).isEqualTo(new ProductDetailResponse.IngredientInfo(new BigDecimal("1000"), "g"));
+        assertThat(result.product().getProductType()).isEqualTo(ProductType.INGREDIENT);
+        assertThat(result.product().getName()).isEqualTo("양파 1kg");
+        assertThat(result.product().getStatus()).isEqualTo(ProductStatus.ON_SALE);
+        assertThat(result.ingredient().getUnitAmount()).isEqualByComparingTo("1000");
+        assertThat(result.ingredient().getUnit()).isEqualTo("g");
         verify(mealkitProductRepository, never()).save(any());
     }
 
@@ -243,11 +242,11 @@ class ProductServiceTest {
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
         // when
-        ProductDetailResponse result = service.createProduct(ProductFixture.createMealkitRequest());
+        ProductDetail result = service.createProduct(ProductFixture.createMealkitRequest());
 
         // then
-        assertThat(result.productType()).isEqualTo(ProductType.MEALKIT);
-        assertThat(result.mealkit()).isEqualTo(new ProductDetailResponse.MealkitInfo(2));
+        assertThat(result.product().getProductType()).isEqualTo(ProductType.MEALKIT);
+        assertThat(result.mealkit().getServings()).isEqualTo(2);
         verify(ingredientProductRepository, never()).save(any());
         verify(eventPublisher).publishEvent(any(ProductChangedEvent.class));
     }
@@ -296,14 +295,15 @@ class ProductServiceTest {
                 ProductStatus.SOLD_OUT, new IngredientUpdate(null, null, "kg", null), null);
 
         // when
-        ProductDetailResponse result = service.updateProduct(5L, request);
+        ProductDetail result = service.updateProduct(5L, request);
 
         // then
-        assertThat(result.name()).isEqualTo("양파 1kg");
-        assertThat(result.price()).isEqualTo(4500);
-        assertThat(result.stock()).isZero();
-        assertThat(result.status()).isEqualTo(ProductStatus.SOLD_OUT);
-        assertThat(result.ingredient()).isEqualTo(new ProductDetailResponse.IngredientInfo(new BigDecimal("1000"), "kg"));
+        assertThat(result.product().getName()).isEqualTo("양파 1kg");
+        assertThat(result.product().getPrice()).isEqualTo(4500);
+        assertThat(result.product().getStock()).isZero();
+        assertThat(result.product().getStatus()).isEqualTo(ProductStatus.SOLD_OUT);
+        assertThat(result.ingredient().getUnitAmount()).isEqualByComparingTo("1000");
+        assertThat(result.ingredient().getUnit()).isEqualTo("kg");
         verify(ingredientRepository, never()).findById(any());
         verify(eventPublisher).publishEvent(new ProductChangedEvent(5L));
     }
@@ -393,7 +393,7 @@ class ProductServiceTest {
     }
 
     @Test
-    @DisplayName("ES가 고른 ID 순서대로 목록을 만들고, 그사이 판매 중지된 상품은 빼도 전체 건수는 ES 값을 유지한다")
+    @DisplayName("ES가 고른 ID 순서대로 상품을 돌려주고, 그사이 판매 중지된 상품은 뺀다")
     void getProductsByIds_keepsOrderAndSkipsStopped() {
         // given
         Product onion = ProductFixture.createProduct(5L, "양파 1kg", 3900);
@@ -403,15 +403,10 @@ class ProductServiceTest {
         when(productRepository.findAllById(List.of(9L, 4L, 5L))).thenReturn(List.of(onion, stopped, leek));
 
         // when
-        PageResponse<ProductListItemResponse> result =
-                service.getProductsByIds(List.of(9L, 4L, 5L), 30, new ProductListRequest(null, "파", null, null, null, 2, 3));
+        List<Product> result = service.getProductsByIds(List.of(9L, 4L, 5L));
 
         // then
-        assertThat(result.content()).extracting(ProductListItemResponse::productId).containsExactly(9L, 5L);
-        assertThat(result.totalElements()).isEqualTo(30);
-        assertThat(result.pageNumber()).isEqualTo(2);
-        assertThat(result.totalPages()).isEqualTo(10);
-        assertThat(result.isLast()).isFalse();
+        assertThat(result).extracting(Product::getId).containsExactly(9L, 5L);
     }
 
     @Test
