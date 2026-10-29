@@ -5,9 +5,47 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>냉장고를 부탁해</title>
+    <style>
+      /* 스크립트를 받는 동안 흰 화면 대신 보이는 로딩. React가 그리면 #root 내용과 함께 사라진다. */
+      .boot-loading {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        background: #f5f5f5; /* antd Layout 기본 배경(colorBgLayout) */
+      }
+      .boot-loading img {
+        width: 40px;
+        height: 40px;
+        opacity: 0;
+        /* 금방 뜨는 경우 깜빡이지 않게 잠시 뒤에 나타나 천천히 숨 쉬듯 움직인다. */
+        animation: boot-breathe 1.6s ease-in-out 0.3s infinite;
+      }
+      @keyframes boot-breathe {
+        0%,
+        100% {
+          opacity: 0.35;
+          transform: scale(0.94);
+        }
+        50% {
+          opacity: 1;
+          transform: scale(1);
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .boot-loading img {
+          animation: none;
+          opacity: 1;
+        }
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div class="boot-loading" role="status" aria-label="불러오는 중">
+        <img src="/favicon.svg" alt="" />
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

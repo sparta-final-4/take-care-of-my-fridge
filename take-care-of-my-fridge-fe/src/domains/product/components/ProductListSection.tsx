@@ -2,12 +2,12 @@ import { useQuery } from '@tanstack/react-query';
 import { Button, Col, Empty, Flex, Pagination, Result, Row, Segmented, Skeleton } from 'antd';
 
 import { SectionCard } from '@/common/components/SectionCard';
+import { SectionLoading } from '@/common/components/SectionLoading';
 import { useAddToCart } from '@/domains/cart/hooks/useAddToCart';
 import { PRODUCT_SORT_OPTIONS, useProductFilters } from '@/domains/product/hooks/useProductFilters';
 import { productQueries } from '@/domains/product/queries';
 
 import { ProductCard } from './ProductCard';
-import styles from './ProductListSection.module.scss';
 
 const PAGE_SIZE = 16;
 
@@ -55,27 +55,29 @@ export function ProductListSection() {
           {filtered && <Button onClick={reset}>초기화</Button>}
         </Empty>
       ) : (
-        <Flex vertical gap="large" className={isPlaceholderData ? styles.loading : undefined}>
-          <Row gutter={[16, 16]}>
-            {products.map((product) => (
-              <Col key={product.productId} xs={12} md={8} lg={6}>
-                <ProductCard
-                  product={product}
-                  pending={pendingProductId === product.productId}
-                  onAddToCart={addToCart}
-                />
-              </Col>
-            ))}
-          </Row>
-          <Pagination
-            align="center"
-            current={page}
-            pageSize={PAGE_SIZE}
-            total={totalElements}
-            showSizeChanger={false}
-            onChange={handleChangePage}
-          />
-        </Flex>
+        <SectionLoading loading={isPlaceholderData}>
+          <Flex vertical gap="large">
+            <Row gutter={[16, 16]}>
+              {products.map((product) => (
+                <Col key={product.productId} xs={12} md={8} lg={6}>
+                  <ProductCard
+                    product={product}
+                    pending={pendingProductId === product.productId}
+                    onAddToCart={addToCart}
+                  />
+                </Col>
+              ))}
+            </Row>
+            <Pagination
+              align="center"
+              current={page}
+              pageSize={PAGE_SIZE}
+              total={totalElements}
+              showSizeChanger={false}
+              onChange={handleChangePage}
+            />
+          </Flex>
+        </SectionLoading>
       )}
     </SectionCard>
   );

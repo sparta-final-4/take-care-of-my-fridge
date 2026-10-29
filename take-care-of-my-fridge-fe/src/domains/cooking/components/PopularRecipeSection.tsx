@@ -4,6 +4,7 @@ import { Button, Skeleton, Typography } from 'antd';
 import { generatePath, Link } from 'react-router';
 
 import { ROUTES } from '@/app/paths';
+import { FadeImage } from '@/common/components/FadeImage';
 import { SectionCard } from '@/common/components/SectionCard';
 import { cookingQueries } from '@/domains/cooking/queries';
 
@@ -87,7 +88,12 @@ export function PopularRecipeSection() {
 
                 <div className={styles.thumb}>
                   {recipe.imageUrl ? (
-                    <img src={recipe.imageUrl} alt={name} className={styles.image} loading="lazy" />
+                    <FadeImage
+                      src={recipe.imageUrl}
+                      alt={name}
+                      className={styles.image}
+                      loading="lazy"
+                    />
                   ) : (
                     <span className={styles.imagePlaceholder} aria-hidden="true">
                       <PictureOutlined style={{ fontSize: 20 }} />

@@ -1,6 +1,7 @@
 import { Flex, Tag, Typography } from 'antd';
 
 import type { RecipeDetailResponse } from '@/common/api/clients';
+import { FadeImage } from '@/common/components/FadeImage';
 import { formatRecipeMeta } from '@/domains/recipe/format';
 import type { RecipeFridgeMatch } from '@/domains/recipe/hooks/useRecipeFridgeMatch';
 
@@ -24,7 +25,7 @@ export function RecipeOverview({ recipe, fridgeMatch }: RecipeOverviewProps) {
     <section className={styles.card}>
       <div className={styles.thumb}>
         {imageUrl ? (
-          <img src={imageUrl} alt={name} className={styles.image} />
+          <FadeImage src={imageUrl} alt={name} className={styles.image} />
         ) : (
           <span className={styles.imagePlaceholder} aria-hidden="true" />
         )}

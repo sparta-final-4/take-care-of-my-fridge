@@ -4,11 +4,10 @@ import { Link } from 'react-router';
 
 import { ROUTES } from '@/app/paths';
 import { SectionCard } from '@/common/components/SectionCard';
+import { SectionLoading } from '@/common/components/SectionLoading';
 import { RecipeCard } from '@/domains/recipe/components/RecipeCard';
 import { searchQueries } from '@/domains/search/queries';
 import { SEARCH_RECIPE_PAGE_SIZE, useSearchKeyword } from '@/domains/search/hooks/useSearchKeyword';
-
-import styles from './SearchRecipeSection.module.scss';
 
 export function SearchRecipeSection() {
   const { keyword, page, setPage, recipeRequest } = useSearchKeyword();
@@ -48,23 +47,25 @@ export function SearchRecipeSection() {
           </Link>
         </Empty>
       ) : (
-        <Flex vertical gap="large" className={isPlaceholderData ? styles.loading : undefined}>
-          <Row gutter={[16, 16]}>
-            {recipes.map((recipe) => (
-              <Col key={recipe.recipeId} xs={12} md={8} lg={6}>
-                <RecipeCard recipe={recipe} />
-              </Col>
-            ))}
-          </Row>
-          <Pagination
-            align="center"
-            current={page}
-            pageSize={SEARCH_RECIPE_PAGE_SIZE}
-            total={totalElements}
-            showSizeChanger={false}
-            onChange={handleChangePage}
-          />
-        </Flex>
+        <SectionLoading loading={isPlaceholderData}>
+          <Flex vertical gap="large">
+            <Row gutter={[16, 16]}>
+              {recipes.map((recipe) => (
+                <Col key={recipe.recipeId} xs={12} md={8} lg={6}>
+                  <RecipeCard recipe={recipe} />
+                </Col>
+              ))}
+            </Row>
+            <Pagination
+              align="center"
+              current={page}
+              pageSize={SEARCH_RECIPE_PAGE_SIZE}
+              total={totalElements}
+              showSizeChanger={false}
+              onChange={handleChangePage}
+            />
+          </Flex>
+        </SectionLoading>
       )}
     </SectionCard>
   );

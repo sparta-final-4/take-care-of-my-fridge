@@ -16,6 +16,7 @@ import { useNavigate } from 'react-router';
 
 import { ROUTES } from '@/app/paths';
 import { isNotFound } from '@/common/api/errors';
+import { FadeImage } from '@/common/components/FadeImage';
 import { useAddToCart } from '@/domains/cart/hooks/useAddToCart';
 import { formatPrice } from '@/domains/cart/format';
 import { STORAGE_LABELS } from '@/domains/fridge/format';
@@ -91,7 +92,7 @@ export function ProductDetailSection({ productId }: ProductDetailSectionProps) {
     <div className={styles.layout}>
       <div className={styles.thumb}>
         {imageUrl ? (
-          <img src={imageUrl} alt={name} className={styles.image} />
+          <FadeImage src={imageUrl} alt={name} className={styles.image} />
         ) : (
           <span className={styles.imagePlaceholder} aria-hidden="true" />
         )}

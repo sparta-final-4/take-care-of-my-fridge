@@ -10,8 +10,16 @@
   max-width: $content-max-width;
   margin: 0 auto;
   padding: var(--ant-padding);
+  transition: opacity var(--ant-motion-duration-mid);
+  @include page-enter;
 
   @include from(md) {
     padding: var(--ant-padding-xl) var(--ant-padding-lg);
   }
+}
+
+// 다음 화면을 받는 동안 이전 화면을 흐리게 해 진행 중임을 알린다(짧은 이동에서는 바뀌지 않음).
+.pending {
+  opacity: 0.6;
+  transition-delay: 300ms;
 }

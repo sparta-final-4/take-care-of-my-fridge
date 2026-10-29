@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useIsMutating, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button, Divider, Flex, Typography } from 'antd';
 import { useRef } from 'react';
 import { generatePath, useNavigate } from 'react-router';
@@ -7,7 +7,7 @@ import { ROUTES } from '@/app/paths';
 import { getErrorCode, isOutcomeUnknown } from '@/common/api/errors';
 import type { CartItemResponse } from '@/domains/cart/api';
 import { formatPrice } from '@/domains/cart/format';
-import { cartQueries } from '@/domains/cart/queries';
+import { cartChangeMutationKey, cartQueries } from '@/domains/cart/queries';
 import { createOrder } from '@/domains/order/api';
 import styles from './CartSummary.module.scss';
 
@@ -37,6 +37,8 @@ export function CartSummary({ checkedItems }: CartSummaryProps) {
         idempotencyKey,
       ),
   });
+  // 주문은 서버에 저장된 수량으로 만들어진다. 화면에서 먼저 바꾼 수량이 서버에 반영되기 전에는 주문하지 않는다.
+  const cartChanging = useIsMutating({ mutationKey: cartChangeMutationKey }) > 0;
   // 주문 시도 하나에 멱등 키 하나. 응답을 받기 전에 다시 누르면 같은 키를 보내 주문이 둘 생기지 않게 한다.
   const attemptRef = useRef<{ request: string; idempotencyKey: string } | null>(null);
 
@@ -107,7 +109,7 @@ export function CartSummary({ checkedItems }: CartSummaryProps) {
         size="large"
         block
         disabled={checkedItems.length === 0}
-        loading={orderMutation.isPending}
+        loading={orderMutation.isPending || cartChanging}
         onClick={handleOrder}
         className={styles.order}
       >

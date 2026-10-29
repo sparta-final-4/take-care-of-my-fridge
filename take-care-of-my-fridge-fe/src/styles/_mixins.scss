@@ -7,3 +7,46 @@
     @content;
   }
 }
+
+// 화면이 바뀔 때 본문을 부드럽게 나타낸다. 움직임 줄이기 설정이면 생략한다.
+@mixin page-enter {
+  @media (prefers-reduced-motion: no-preference) {
+    animation: page-enter var(--ant-motion-duration-mid) var(--ant-motion-ease-out);
+  }
+
+  @keyframes page-enter {
+    from {
+      opacity: 0;
+      transform: translateY($page-enter-offset);
+    }
+  }
+}
+
+// 냉장고 로고 로딩. 금방 끝나는 로딩에서 깜빡이지 않도록 $delay 뒤에 나타나 숨 쉬듯 움직인다.
+@mixin breathing-logo($delay: 200ms) {
+  opacity: 0;
+  animation: breathing-logo 1.6s ease-in-out $delay infinite;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: breathing-logo-show 0s $delay forwards;
+  }
+
+  @keyframes breathing-logo {
+    0%,
+    100% {
+      opacity: 0.35;
+      transform: scale(0.94);
+    }
+
+    50% {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  @keyframes breathing-logo-show {
+    to {
+      opacity: 1;
+    }
+  }
+}

@@ -2,11 +2,11 @@ import { useQuery } from '@tanstack/react-query';
 import { Button, Col, Empty, Flex, Pagination, Result, Row, Segmented, Skeleton } from 'antd';
 
 import { SectionCard } from '@/common/components/SectionCard';
+import { SectionLoading } from '@/common/components/SectionLoading';
 import { RECIPE_SORT_OPTIONS, useRecipeFilters } from '@/domains/recipe/hooks/useRecipeFilters';
 import { recipeQueries } from '@/domains/recipe/queries';
 
 import { RecipeCard } from './RecipeCard';
-import styles from './RecipeListSection.module.scss';
 
 const PAGE_SIZE = 16;
 
@@ -57,23 +57,25 @@ export function RecipeListSection() {
           {filtered && <Button onClick={reset}>초기화</Button>}
         </Empty>
       ) : (
-        <Flex vertical gap="large" className={isPlaceholderData ? styles.loading : undefined}>
-          <Row gutter={[16, 16]}>
-            {recipes.map((recipe) => (
-              <Col key={recipe.recipeId} xs={12} md={8} lg={6}>
-                <RecipeCard recipe={recipe} />
-              </Col>
-            ))}
-          </Row>
-          <Pagination
-            align="center"
-            current={page}
-            pageSize={PAGE_SIZE}
-            total={totalElements}
-            showSizeChanger={false}
-            onChange={handleChangePage}
-          />
-        </Flex>
+        <SectionLoading loading={isPlaceholderData}>
+          <Flex vertical gap="large">
+            <Row gutter={[16, 16]}>
+              {recipes.map((recipe) => (
+                <Col key={recipe.recipeId} xs={12} md={8} lg={6}>
+                  <RecipeCard recipe={recipe} />
+                </Col>
+              ))}
+            </Row>
+            <Pagination
+              align="center"
+              current={page}
+              pageSize={PAGE_SIZE}
+              total={totalElements}
+              showSizeChanger={false}
+              onChange={handleChangePage}
+            />
+          </Flex>
+        </SectionLoading>
       )}
     </SectionCard>
   );

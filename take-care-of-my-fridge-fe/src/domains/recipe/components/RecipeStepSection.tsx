@@ -2,6 +2,7 @@ import { BulbOutlined } from '@ant-design/icons';
 import { Alert, Flex, Typography } from 'antd';
 
 import type { StepItem } from '@/common/api/clients';
+import { FadeImage } from '@/common/components/FadeImage';
 import { SectionCard } from '@/common/components/SectionCard';
 
 import styles from './RecipeStepSection.module.scss';
@@ -29,7 +30,7 @@ export function RecipeStepSection({ steps, tip }: RecipeStepSectionProps) {
                   </Typography.Text>
                 )}
                 {step.imageUrl && (
-                  <img
+                  <FadeImage
                     src={step.imageUrl}
                     alt={`${step.stepNo}단계`}
                     className={styles.image}

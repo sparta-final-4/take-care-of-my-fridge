@@ -1,0 +1,30 @@
+@use '@/styles/variables' as *;
+
+// 금방 끝나는 이동에서는 보이지 않도록 늦게 시작하고, 끝을 모르므로 90%까지만 천천히 차오른다.
+.bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: $navigation-progress-z-index;
+  width: 0;
+  height: $navigation-progress-height;
+  border-radius: 0 $navigation-progress-height $navigation-progress-height 0;
+  background: linear-gradient(to right, transparent, var(--ant-color-primary));
+  // 막대 끝이 은은하게 빛나 진행 방향이 보이게 한다.
+  box-shadow: 0 0 $navigation-progress-glow var(--ant-color-primary);
+  animation: progress 8s var(--ant-motion-ease-out) 150ms forwards;
+}
+
+@keyframes progress {
+  0% {
+    width: 0;
+  }
+
+  10% {
+    width: 40%;
+  }
+
+  100% {
+    width: 90%;
+  }
+}

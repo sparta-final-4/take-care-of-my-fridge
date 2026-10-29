@@ -1,7 +1,8 @@
-import { Button, Result, Spin } from 'antd';
+import { Button, Result } from 'antd';
 import { Navigate, Outlet, useLocation } from 'react-router';
 
 import { ROUTES } from '@/app/paths';
+import { RouteFallback } from '@/common/components/RouteFallback';
 
 import { useAuthStore } from './authStore';
 import { initSession } from './initialize';
@@ -12,7 +13,7 @@ export function RequireAuth({ admin = false }: { admin?: boolean }) {
   const reason = useAuthStore((state) => state.reason);
   const location = useLocation();
 
-  if (status === 'initializing') return <Spin fullscreen tip="로그인 상태를 확인하고 있습니다" />;
+  if (status === 'initializing') return <RouteFallback />;
   if (status === 'error') {
     return (
       <Result

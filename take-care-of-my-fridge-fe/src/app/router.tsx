@@ -3,7 +3,7 @@ import { createBrowserRouter, Navigate } from 'react-router';
 
 import { RouteErrorPage } from '@/common/components/RouteErrorPage';
 import { RequireAuth } from '@/common/auth/RequireAuth';
-import { MainLayout } from '@/layout/MainLayout';
+import { MainLayout, MainLayoutFallback } from '@/layout/MainLayout';
 import { MyPageLayout } from '@/layout/MyPageLayout';
 
 import { ROUTES } from './paths';
@@ -15,6 +15,7 @@ const page = (load: () => Promise<{ default: ComponentType }>) => async () => ({
 export const router = createBrowserRouter([
   {
     Component: MainLayout,
+    HydrateFallback: MainLayoutFallback,
     errorElement: <RouteErrorPage />,
     children: [
       { path: ROUTES.home, lazy: page(() => import('@/pages/MainPage')) },
@@ -38,6 +39,8 @@ export const router = createBrowserRouter([
           { path: ROUTES.fridge, lazy: page(() => import('@/pages/fridge/FridgePage')) },
           { path: ROUTES.account, lazy: page(() => import('@/pages/member/AccountPage')) },
           {
+            // MainLayout이 마이페이지 안의 이동을 구분할 때 쓴다.
+            id: 'mypage-layout',
             Component: MyPageLayout,
             children: [
               { path: ROUTES.mypage, element: <Navigate to={ROUTES.mypageRecipes} replace /> },
@@ -79,6 +82,7 @@ export const router = createBrowserRouter([
         ],
       },
       {
+        id: 'admin',
         element: <RequireAuth admin />,
         children: [
           { path: ROUTES.adminMembers, lazy: page(() => import('@/pages/admin/AdminMembersPage')) },
@@ -110,3 +114,32 @@ export const router = createBrowserRouter([
   },
   { path: '*', lazy: page(() => import('@/pages/NotFoundPage')) },
 ]);
+
+// requestIdleCallback이 없는 브라우저(Safari 일부)에서 첫 화면 뒤에 받기 시작하는 시점
+const PREFETCH_FALLBACK_DELAY_MS = 1000;
+
+// 첫 화면을 띄운 뒤 쉬는 시간에 사용자 화면 코드를 미리 받아, 메뉴 이동 때 기다리지 않게 한다.
+// 관리자 화면은 관리자만 쓰므로 미리 받지 않는다.
+function prefetchPages(routes: typeof router.routes) {
+  for (const route of routes) {
+    if (route.id === 'admin') continue;
+    if (typeof route.lazy === 'function') void route.lazy().catch(() => undefined);
+    if (route.children) prefetchPages(route.children);
+  }
+}
+
+function schedulePrefetch() {
+  const run = () => prefetchPages(router.routes);
+  if ('requestIdleCallback' in window) window.requestIdleCallback(run);
+  else setTimeout(run, PREFETCH_FALLBACK_DELAY_MS);
+}
+
+if (router.state.initialized) {
+  schedulePrefetch();
+} else {
+  const unsubscribe = router.subscribe((state) => {
+    if (!state.initialized) return;
+    unsubscribe();
+    schedulePrefetch();
+  });
+}

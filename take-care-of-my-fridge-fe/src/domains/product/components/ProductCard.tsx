@@ -4,6 +4,7 @@ import { generatePath, Link } from 'react-router';
 
 import { ROUTES } from '@/app/paths';
 import type { ProductListItemResponse } from '@/common/api/clients';
+import { FadeImage } from '@/common/components/FadeImage';
 import { formatPrice } from '@/domains/cart/format';
 import { PRODUCT_TYPE_LABELS } from '@/domains/product/format';
 
@@ -29,7 +30,7 @@ export function ProductCard({ product, pending, onAddToCart, wide = false }: Pro
       <Link to={detailPath} className={styles.link}>
         <div className={wide ? styles.thumbWide : styles.thumb}>
           {imageUrl ? (
-            <img src={imageUrl} alt={name} className={styles.image} loading="lazy" />
+            <FadeImage src={imageUrl} alt={name} className={styles.image} loading="lazy" />
           ) : (
             <span className={styles.imagePlaceholder} aria-hidden="true" />
           )}

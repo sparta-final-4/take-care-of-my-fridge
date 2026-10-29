@@ -11,6 +11,7 @@ import {
   InputNumber,
   Result,
   Select,
+  Skeleton,
   Space,
   Table,
   Tag,
@@ -84,7 +85,13 @@ export default function AdminDealPage() {
     },
   });
 
-  if (isPending) return <div className={styles.container}>할인 후보를 불러오고 있습니다.</div>;
+  if (isPending) {
+    return (
+      <div className={styles.container}>
+        <Skeleton active paragraph={{ rows: 8 }} />
+      </div>
+    );
+  }
   if (isError) {
     if (getErrorCode(error) === 'D002') {
       return (

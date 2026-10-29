@@ -3,6 +3,8 @@ import { DownOutlined, UpOutlined } from '@ant-design/icons';
 import { Button, Empty, Flex, Pagination, Select, Space, Tabs, Tag, Typography } from 'antd';
 import dayjs from 'dayjs';
 
+import { FadeImage } from '@/common/components/FadeImage';
+
 import type { CookingSortType, CookingTabType, MyRecipeResponse } from '../api';
 import { RecipeCookingHistorySection } from './RecipeCookingHistorySection';
 
@@ -93,7 +95,10 @@ export function MyRecipeListSection({
                           >
                             <div className={styles.thumbnail}>
                               {item.recipeImageUrl ? (
-                                <img src={item.recipeImageUrl} alt={item.recipeName ?? '레시피'} />
+                                <FadeImage
+                                  src={item.recipeImageUrl}
+                                  alt={item.recipeName ?? '레시피'}
+                                />
                               ) : (
                                 <span className={styles.placeholderImg}>[이미지]</span>
                               )}

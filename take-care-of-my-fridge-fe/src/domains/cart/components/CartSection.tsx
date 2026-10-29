@@ -2,8 +2,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { App, Button, Checkbox, Empty, Flex, Popconfirm, Result, Skeleton } from 'antd';
 import { useState } from 'react';
 
-import { changeCartItemQuantity, removeCartItems } from '@/domains/cart/api';
-import { cartQueries } from '@/domains/cart/queries';
+import { changeCartItemQuantity, removeCartItems, type CartItemResponse } from '@/domains/cart/api';
+import { cartChangeMutationKey, cartQueries } from '@/domains/cart/queries';
 
 import { CartItemRow } from './CartItemRow';
 import { CartSummary } from './CartSummary';
@@ -16,17 +16,42 @@ export function CartSection() {
   const { data: items, isPending, isError, refetch } = useQuery(cartQueries.items());
   // 체크를 해제한 줄만 기록한다. 새로 담은 줄과 품절이 풀린 줄은 처음부터 체크된다.
   const [uncheckedIds, setUncheckedIds] = useState<number[]>([]);
-  const [pendingIds, setPendingIds] = useState<number[]>([]);
 
-  const invalidateItems = () => queryClient.invalidateQueries({ queryKey: cartQueries.all });
+  // 수량 변경·삭제는 서버 응답을 기다리지 않고 화면부터 바꾼다(실패하면 서버 값으로 되돌린다).
+  // 주문·결제처럼 서버가 확정해야 하는 동작에는 쓰지 않는다.
+  const updateItems = (update: (items: CartItemResponse[]) => CartItemResponse[]) =>
+    queryClient.setQueryData(cartQueries.items().queryKey, (current) => current && update(current));
+  const startChange = async (update: (items: CartItemResponse[]) => CartItemResponse[]) => {
+    // 진행 중인 조회 결과가 바꾼 화면을 덮어쓰지 않게 멈춘다.
+    await queryClient.cancelQueries({ queryKey: cartQueries.all });
+    updateItems(update);
+  };
+  // 연달아 바꾼 변경이 모두 끝난 뒤에 한 번만 서버 값을 다시 읽는다.
+  // 중간에 다시 읽으면 화면 수량이 이전 값으로 돌아갔다가 다시 바뀐다. 실패했을 때도 여기서 서버 값으로 되돌린다.
+  const syncItems = () => {
+    if (queryClient.isMutating({ mutationKey: cartChangeMutationKey }) > 1) return;
+    return queryClient.invalidateQueries({ queryKey: cartQueries.all });
+  };
+  // 빠르게 여러 번 눌러도 요청이 누른 순서대로 처리되도록 한 줄로 보낸다. 마지막 수량이 서버에 남는다.
+  const changeScope = { id: cartChangeMutationKey.join('/') };
   const changeQuantityMutation = useMutation({
+    mutationKey: cartChangeMutationKey,
+    scope: changeScope,
     mutationFn: ({ cartItemId, quantity }: { cartItemId: number; quantity: number }) =>
       changeCartItemQuantity(cartItemId, { quantity }),
-    onSuccess: invalidateItems,
+    onMutate: ({ cartItemId, quantity }) =>
+      startChange((current) =>
+        current.map((item) => (item.cartItemId === cartItemId ? { ...item, quantity } : item)),
+      ),
+    onSettled: syncItems,
   });
   const removeMutation = useMutation({
+    mutationKey: cartChangeMutationKey,
+    scope: changeScope,
     mutationFn: removeCartItems,
-    onSuccess: invalidateItems,
+    onMutate: (cartItemIds) =>
+      startChange((current) => current.filter((item) => !cartItemIds.includes(item.cartItemId))),
+    onSettled: syncItems,
   });
 
   if (isPending) return <Skeleton active paragraph={{ rows: 6 }} />;
@@ -44,19 +69,6 @@ export function CartSection() {
   const checkedItems = orderableItems.filter((item) => !uncheckedIds.includes(item.cartItemId));
   const allChecked = orderableItems.length > 0 && checkedItems.length === orderableItems.length;
 
-  // 여러 줄을 연달아 바꿀 수 있어 진행 중인 줄을 모두 기록한다.
-  // 실패 알림은 MutationCache.onError가 서버 메시지로 띄우고, 수량은 다시 불러온 값을 따른다.
-  const runOnRows = async (cartItemIds: number[], request: () => Promise<unknown>) => {
-    setPendingIds((ids) => [...ids, ...cartItemIds]);
-    try {
-      await request();
-    } catch {
-      // 실패 알림은 MutationCache.onError가 띄운다.
-    } finally {
-      setPendingIds((ids) => ids.filter((id) => !cartItemIds.includes(id)));
-    }
-  };
-
   const handleCheck = (cartItemId: number, checked: boolean) => {
     setUncheckedIds((ids) =>
       checked ? ids.filter((id) => id !== cartItemId) : [...ids, cartItemId],
@@ -68,15 +80,13 @@ export function CartSection() {
   };
 
   const handleChangeQuantity = (cartItemId: number, quantity: number) =>
-    runOnRows([cartItemId], () => changeQuantityMutation.mutateAsync({ cartItemId, quantity }));
+    changeQuantityMutation.mutate({ cartItemId, quantity });
 
   // 성공 메시지는 호출 옵션에 둔다. 화면을 벗어나면 실행되지 않는다.
   const handleRemove = (cartItemIds: number[]) =>
-    runOnRows(cartItemIds, () =>
-      removeMutation.mutateAsync(cartItemIds, {
-        onSuccess: () => void message.success('삭제했습니다.'),
-      }),
-    );
+    removeMutation.mutate(cartItemIds, {
+      onSuccess: () => void message.success('삭제했습니다.'),
+    });
 
   if (items.length === 0) {
     return <Empty description="장바구니에 담은 상품이 없습니다." className={styles.empty} />;
@@ -123,7 +133,6 @@ export function CartSection() {
             key={item.cartItemId}
             item={item}
             checked={!item.soldOut && !uncheckedIds.includes(item.cartItemId)}
-            pending={pendingIds.includes(item.cartItemId)}
             onCheck={(checked) => handleCheck(item.cartItemId, checked)}
             onChangeQuantity={(quantity) => handleChangeQuantity(item.cartItemId, quantity)}
             onRemove={() => handleRemove([item.cartItemId])}

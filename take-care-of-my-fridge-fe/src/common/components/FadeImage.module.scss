@@ -1,0 +1,31 @@
+@use '@/styles/variables' as *;
+@use '@/styles/mixins' as *;
+
+// 받는 동안에는 사진 자리에 냉장고 로고 로딩을 보여 준다.
+// 사진은 상자 밖으로 밀어 두어, 받는 중인 사진이 위에서부터 끊겨 그려지는 모습이 보이지 않게 한다.
+.image {
+  background: url('/favicon.svg') center / auto min(40%, #{$loading-logo-size}) no-repeat;
+  object-position: -9999px -9999px;
+  @include breathing-logo;
+}
+
+// 이미 받아 둔 사진은 로고 없이 바로 보인다.
+.shown {
+  opacity: 1;
+  background: none;
+  object-position: 50% 50%;
+  animation: none;
+}
+
+// 받는 동안 로고를 보여 준 사진은 다 받으면 로고를 지우고 서서히 보여 준다.
+.appeared {
+  @media (prefers-reduced-motion: no-preference) {
+    animation: appear var(--ant-motion-duration-slow) var(--ant-motion-ease-out);
+  }
+}
+
+@keyframes appear {
+  from {
+    opacity: 0;
+  }
+}

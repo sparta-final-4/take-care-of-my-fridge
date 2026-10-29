@@ -2,6 +2,7 @@ import { CheckOutlined, LockOutlined, MinusOutlined, PlusOutlined } from '@ant-d
 import { Button, Checkbox, Flex, Tag, Typography } from 'antd';
 
 import type { RefundableItemResponse } from '@/common/api/clients';
+import { FadeImage } from '@/common/components/FadeImage';
 import { formatPrice, SALE_TYPE_LABELS } from '@/domains/cart/format';
 import { getOrderItemRefundState, getRefundRowState } from '@/domains/refund/format';
 
@@ -74,7 +75,7 @@ export function RefundItemRow({ item, listPrice, quantity, onChange }: RefundIte
       </span>
       <div className={styles.thumb}>
         {item.productImageUrl ? (
-          <img src={item.productImageUrl} alt={name} className={styles.image} />
+          <FadeImage src={item.productImageUrl} alt={name} className={styles.image} />
         ) : (
           <span className={styles.imagePlaceholder} aria-hidden="true" />
         )}

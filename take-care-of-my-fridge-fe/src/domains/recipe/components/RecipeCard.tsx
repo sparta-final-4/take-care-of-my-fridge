@@ -3,6 +3,7 @@ import { generatePath, Link } from 'react-router';
 
 import { ROUTES } from '@/app/paths';
 import type { RecipeListItemResponse } from '@/common/api/clients';
+import { FadeImage } from '@/common/components/FadeImage';
 import { formatRecipeMeta } from '@/domains/recipe/format';
 
 import styles from './RecipeCard.module.scss';
@@ -24,7 +25,7 @@ export function RecipeCard({ recipe }: RecipeCardProps) {
     >
       <div className={styles.thumb}>
         {imageUrl ? (
-          <img src={imageUrl} alt={name} className={styles.image} loading="lazy" />
+          <FadeImage src={imageUrl} alt={name} className={styles.image} loading="lazy" />
         ) : (
           <span className={styles.imagePlaceholder} aria-hidden="true" />
         )}

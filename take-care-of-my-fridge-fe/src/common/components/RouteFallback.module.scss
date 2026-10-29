@@ -1,0 +1,15 @@
+@use '@/styles/variables' as *;
+@use '@/styles/mixins' as *;
+
+.fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: $route-fallback-min-height;
+}
+
+.logo {
+  width: $loading-logo-size;
+  height: $loading-logo-size;
+  @include breathing-logo;
+}

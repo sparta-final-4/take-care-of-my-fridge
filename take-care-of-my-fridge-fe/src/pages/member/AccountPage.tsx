@@ -1,5 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { App, Button, Card, Checkbox, Form, Input, Result, Space, Spin, Typography } from 'antd';
+import {
+  App,
+  Button,
+  Card,
+  Checkbox,
+  Form,
+  Input,
+  Result,
+  Skeleton,
+  Space,
+  Typography,
+} from 'antd';
 import { isAxiosError } from 'axios';
 import dayjs from 'dayjs';
 import { useState } from 'react';
@@ -206,7 +217,7 @@ function AccountForms({ member }: { member: MyInfoResponse }) {
 export default function AccountPage() {
   const { data, isPending, isError, refetch } = useQuery(memberQueries.me());
 
-  if (isPending) return <Spin fullscreen tip="계정 정보를 불러오고 있습니다" />;
+  if (isPending) return <Skeleton active paragraph={{ rows: 8 }} />;
   if (isError) {
     return (
       <Result

@@ -1,0 +1,31 @@
+@use '@/styles/variables' as *;
+@use '@/styles/mixins' as *;
+
+.section {
+  position: relative;
+}
+
+// 금방 끝나는 로딩에서는 흐려지지 않도록 로고와 같은 시점에 흐려진다.
+.dimmed {
+  opacity: 0.4;
+  transition: opacity var(--ant-motion-duration-mid) 200ms;
+}
+
+// 로딩 중에는 이전 목록을 누르지 못하게 덮는다.
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+// 긴 목록에서도 화면 안에 보이도록 화면 높이 기준으로 고정한다.
+.logo {
+  position: sticky;
+  top: $section-loading-sticky-top;
+  width: $loading-logo-size;
+  height: $loading-logo-size;
+  margin-top: $loading-logo-size;
+  @include breathing-logo;
+}

@@ -5,6 +5,7 @@ import { Link } from 'react-router';
 
 import { ROUTES } from '@/app/paths';
 import { SectionCard } from '@/common/components/SectionCard';
+import { SectionLoading } from '@/common/components/SectionLoading';
 import { useAddToCart } from '@/domains/cart/hooks/useAddToCart';
 import { ProductCard } from '@/domains/product/components/ProductCard';
 import { recordSearchClick } from '@/domains/search/api';
@@ -13,8 +14,6 @@ import {
   useSearchKeyword,
 } from '@/domains/search/hooks/useSearchKeyword';
 import { searchQueries } from '@/domains/search/queries';
-
-import styles from './SearchProductSection.module.scss';
 
 export function SearchProductSection() {
   const { keyword, productPage, setProductPage, productRequest } = useSearchKeyword();
@@ -62,37 +61,39 @@ export function SearchProductSection() {
           </Link>
         </Empty>
       ) : (
-        <Flex vertical gap="large" className={isPlaceholderData ? styles.loading : undefined}>
-          <Row gutter={[16, 16]}>
-            {products.map((product) => (
-              <Col
-                key={product.productId}
-                xs={12}
-                md={8}
-                lg={6}
-                onClick={
-                  product.productId === undefined
-                    ? undefined
-                    : handleClickProduct(product.productId)
-                }
-              >
-                <ProductCard
-                  product={product}
-                  pending={pendingProductId === product.productId}
-                  onAddToCart={addToCart}
-                />
-              </Col>
-            ))}
-          </Row>
-          <Pagination
-            align="center"
-            current={productPage}
-            pageSize={SEARCH_PRODUCT_PAGE_SIZE}
-            total={totalElements}
-            showSizeChanger={false}
-            onChange={setProductPage}
-          />
-        </Flex>
+        <SectionLoading loading={isPlaceholderData}>
+          <Flex vertical gap="large">
+            <Row gutter={[16, 16]}>
+              {products.map((product) => (
+                <Col
+                  key={product.productId}
+                  xs={12}
+                  md={8}
+                  lg={6}
+                  onClick={
+                    product.productId === undefined
+                      ? undefined
+                      : handleClickProduct(product.productId)
+                  }
+                >
+                  <ProductCard
+                    product={product}
+                    pending={pendingProductId === product.productId}
+                    onAddToCart={addToCart}
+                  />
+                </Col>
+              ))}
+            </Row>
+            <Pagination
+              align="center"
+              current={productPage}
+              pageSize={SEARCH_PRODUCT_PAGE_SIZE}
+              total={totalElements}
+              showSizeChanger={false}
+              onChange={setProductPage}
+            />
+          </Flex>
+        </SectionLoading>
       )}
     </SectionCard>
   );

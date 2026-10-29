@@ -5,6 +5,7 @@ import { generatePath, useNavigate, useSearchParams } from 'react-router';
 
 import { ROUTES } from '@/app/paths';
 import { SectionCard } from '@/common/components/SectionCard';
+import { SectionLoading } from '@/common/components/SectionLoading';
 import { formatPrice } from '@/domains/cart/format';
 import { ORDER_STATUS_LABELS } from '@/domains/order/format';
 import { orderQueries } from '@/domains/order/queries';
@@ -45,65 +46,67 @@ export function OrderListSection() {
       ) : orders.length === 0 ? (
         <Empty description="주문 내역이 없습니다." />
       ) : (
-        <Flex vertical gap="large" className={isPlaceholderData ? styles.loading : undefined}>
-          <ul className={styles.list}>
-            <li className={`${styles.row} ${styles.head}`} aria-hidden="true">
-              <Typography.Text strong className={styles.orderNumber}>
-                주문번호
-              </Typography.Text>
-              <Typography.Text strong className={styles.date}>
-                주문일
-              </Typography.Text>
-              <Typography.Text strong className={styles.amount}>
-                결제 금액
-              </Typography.Text>
-              <Typography.Text strong className={styles.status}>
-                상태
-              </Typography.Text>
-            </li>
-            {orders.map((order) => (
-              <li key={order.orderId} className={styles.row}>
+        <SectionLoading loading={isPlaceholderData}>
+          <Flex vertical gap="large">
+            <ul className={styles.list}>
+              <li className={`${styles.row} ${styles.head}`} aria-hidden="true">
                 <Typography.Text strong className={styles.orderNumber}>
-                  {order.orderNumber}
+                  주문번호
                 </Typography.Text>
-                <Typography.Text type="secondary" className={styles.date}>
-                  {order.orderedAt ? dayjs(order.orderedAt).format('YYYY-MM-DD') : '-'}
+                <Typography.Text strong className={styles.date}>
+                  주문일
                 </Typography.Text>
                 <Typography.Text strong className={styles.amount}>
-                  {formatPrice(order.payAmount ?? 0)}
+                  결제 금액
                 </Typography.Text>
-                <Tag
-                  color={order.status === 'PAID' ? 'processing' : undefined}
-                  className={styles.status}
-                >
-                  {order.status && ORDER_STATUS_LABELS[order.status]}
-                </Tag>
-                {order.status !== 'PENDING' && (
-                  <Button
-                    className={styles.action}
-                    onClick={() =>
-                      navigate(
-                        generatePath(ROUTES.mypageOrderDetail, {
-                          orderId: String(order.orderId),
-                        }),
-                      )
-                    }
-                  >
-                    상세 보기
-                  </Button>
-                )}
+                <Typography.Text strong className={styles.status}>
+                  상태
+                </Typography.Text>
               </li>
-            ))}
-          </ul>
-          <Pagination
-            align="center"
-            current={page}
-            pageSize={PAGE_SIZE}
-            total={data?.totalElements ?? 0}
-            showSizeChanger={false}
-            onChange={handleChangePage}
-          />
-        </Flex>
+              {orders.map((order) => (
+                <li key={order.orderId} className={styles.row}>
+                  <Typography.Text strong className={styles.orderNumber}>
+                    {order.orderNumber}
+                  </Typography.Text>
+                  <Typography.Text type="secondary" className={styles.date}>
+                    {order.orderedAt ? dayjs(order.orderedAt).format('YYYY-MM-DD') : '-'}
+                  </Typography.Text>
+                  <Typography.Text strong className={styles.amount}>
+                    {formatPrice(order.payAmount ?? 0)}
+                  </Typography.Text>
+                  <Tag
+                    color={order.status === 'PAID' ? 'processing' : undefined}
+                    className={styles.status}
+                  >
+                    {order.status && ORDER_STATUS_LABELS[order.status]}
+                  </Tag>
+                  {order.status !== 'PENDING' && (
+                    <Button
+                      className={styles.action}
+                      onClick={() =>
+                        navigate(
+                          generatePath(ROUTES.mypageOrderDetail, {
+                            orderId: String(order.orderId),
+                          }),
+                        )
+                      }
+                    >
+                      상세 보기
+                    </Button>
+                  )}
+                </li>
+              ))}
+            </ul>
+            <Pagination
+              align="center"
+              current={page}
+              pageSize={PAGE_SIZE}
+              total={data?.totalElements ?? 0}
+              showSizeChanger={false}
+              onChange={handleChangePage}
+            />
+          </Flex>
+        </SectionLoading>
       )}
     </SectionCard>
   );

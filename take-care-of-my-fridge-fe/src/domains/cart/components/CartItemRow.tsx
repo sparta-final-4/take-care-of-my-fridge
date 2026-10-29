@@ -1,6 +1,7 @@
 import { CloseOutlined, MinusOutlined, PlusOutlined } from '@ant-design/icons';
 import { Button, Checkbox, Flex, Tag, Typography } from 'antd';
 
+import { FadeImage } from '@/common/components/FadeImage';
 import type { CartItemResponse } from '@/domains/cart/api';
 import { SaleCountdown } from '@/domains/cart/components/SaleCountdown';
 import { formatPrice, SALE_TYPE_LABELS } from '@/domains/cart/format';
@@ -12,7 +13,6 @@ const FLASH_DROP_MAX_QUANTITY = 1;
 interface CartItemRowProps {
   item: CartItemResponse;
   checked: boolean;
-  pending: boolean;
   onCheck: (checked: boolean) => void;
   onChangeQuantity: (quantity: number) => void;
   onRemove: () => void;
@@ -21,7 +21,6 @@ interface CartItemRowProps {
 export function CartItemRow({
   item,
   checked,
-  pending,
   onCheck,
   onChangeQuantity,
   onRemove,
@@ -41,7 +40,7 @@ export function CartItemRow({
       />
       <div className={styles.thumb}>
         {item.imageUrl ? (
-          <img src={item.imageUrl} alt={item.productName} className={styles.image} />
+          <FadeImage src={item.imageUrl} alt={item.productName} className={styles.image} />
         ) : (
           <span className={styles.imagePlaceholder} aria-hidden="true" />
         )}
@@ -71,7 +70,7 @@ export function CartItemRow({
         <Button
           icon={<MinusOutlined />}
           aria-label={`${item.productName} 수량 빼기`}
-          disabled={soldOut || pending || quantity <= 1}
+          disabled={soldOut || quantity <= 1}
           className={styles.touchButton}
           onClick={() => onChangeQuantity(quantity - 1)}
         />
@@ -81,7 +80,7 @@ export function CartItemRow({
         <Button
           icon={<PlusOutlined />}
           aria-label={`${item.productName} 수량 더하기`}
-          disabled={soldOut || pending || !canIncrease}
+          disabled={soldOut || !canIncrease}
           className={styles.touchButton}
           onClick={() => onChangeQuantity(quantity + 1)}
         />
@@ -93,7 +92,6 @@ export function CartItemRow({
         type="text"
         icon={<CloseOutlined />}
         aria-label={`${item.productName} 삭제`}
-        disabled={pending}
         onClick={onRemove}
         className={`${styles.remove} ${styles.touchButton}`}
       />

@@ -67,3 +67,16 @@ $recipe-step-image-max-width: 360px;
 
 // 모바일 터치 영역 최소 크기
 $touch-target-size: 44px;
+
+// 화면 전환 로딩
+$route-fallback-min-height: 240px;
+// 냉장고 로고 로딩 크기(화면·목록 로딩, 사진 로딩의 최대 크기)
+$loading-logo-size: 40px;
+// 목록 로딩 로고가 긴 목록에서도 화면 안에 보이도록 고정되는 위치
+$section-loading-sticky-top: 40vh;
+$navigation-progress-height: 3px;
+$navigation-progress-glow: 6px;
+// 고정 헤더·Drawer 위에 보이도록
+$navigation-progress-z-index: 2000;
+// 화면 진입 시 아래에서 올라오는 거리
+$page-enter-offset: 4px;

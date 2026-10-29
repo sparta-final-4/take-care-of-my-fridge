@@ -1,5 +1,5 @@
 import { Typography } from 'antd';
-import { NavLink, Outlet } from 'react-router';
+import { NavLink, Outlet, useMatches } from 'react-router';
 
 import { ROUTES } from '@/app/paths';
 
@@ -19,6 +19,9 @@ const MYPAGE_NAV_ITEMS: readonly MyPageNavItem[] = [
 ] as const;
 
 export function MyPageLayout() {
+  // 메뉴는 그대로 두고 본문만 다시 그려 진입 효과를 준다.
+  const pageKey = useMatches().at(-1)?.id;
+
   return (
     <div className={styles.container}>
       <aside className={styles.sidebar} aria-label="마이페이지 메뉴">
@@ -40,7 +43,7 @@ export function MyPageLayout() {
         </nav>
       </aside>
 
-      <main className={styles.content}>
+      <main key={pageKey} className={styles.content}>
         <Outlet />
       </main>
     </div>
