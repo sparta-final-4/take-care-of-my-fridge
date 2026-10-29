@@ -59,6 +59,23 @@ Q-01~Q-17에 의존하는 테스트는 기대값을 합의한 뒤 구현합니�
 | ORDER-12 | P0 | 주문 만료, 취소하기와 주문 만료 동시 | 생성 5분이 지난 결제 시도 없는 결제 대기 주문만 지움. 동시면 재고는 한 번만 복구 | `OrderCancelServiceTransactionTest`, `OrderExpireSchedulerTest` |
 | ORDER-13 | P0 | 결제 정리, 결제 정리와 결제하기·주문 취소 동시 | 진행 중 결제가 없고 마지막 결제 뒤 10분이 지난 결제 대기 주문만 취소 상태로 바꾸고 재고 복구, 결제 행 유지. 동시면 재고는 많아야 한 번 복구 | `OrderCancelServiceTransactionTest`, `PaymentTimeoutSchedulerTest` |
 
+## 환불 필수 시나리오
+
+| ID | 우선순위 | 조건·행동 | 기대 결과 | 대응 테스트 |
+|---|---|---|---|---|
+| REFUND-01 | P0 | 일반 상품 일부 수량 환불 | 단가 × 수량으로 요청 저장, PG 부분 취소 후 완료, 환불 수량만큼 재고 복구 | `RefundCommandServiceTest`, `RefundFacadeTest` |
+| REFUND-02 | P0 | 남은 수량까지 다시 신청, 넘게 신청 | 남은 수량까지는 성공, 넘으면 `REFUND_005` | `RefundCommandServiceTest` |
+| REFUND-03 | P0 | 구매 확정·결제 전 주문, 타인 주문 | `REFUND_010`·`REFUND_003`·`ORDER_001` | `RefundCommandServiceTest`, `RefundQueryServiceTest` |
+| REFUND-04 | P0 | 특가·번개 드롭 상품, 다른 주문의 상품, 같은 상품 중복 | `REFUND_011`·`REFUND_004`·`C001` | `RefundCommandServiceTest` |
+| REFUND-05 | P0 | 같은 주문에 진행 중 환불이 있는데 새 신청 | `REFUND_007` | `RefundCommandServiceTest` |
+| REFUND-06 | P0 | 이미 완료된 환불을 다시 완료 | 바꾸지 않고 현재 상태, 재고는 한 번만 복구 | `RefundCommandServiceTest`, `RefundTest` |
+| REFUND-07 | P0 | PG가 취소 거절(4xx) | 실패로 바꾸고 `REFUND_012`, 실패 수량은 다시 신청 가능 | `RefundFacadeTest`, `RefundCommandServiceTest` |
+| REFUND-08 | P0 | PG 결과 모름(타임아웃), PG 조회 실패, 완료 처리 실패 | 이번 금액만큼 취소됐으면 완료, 아니면 실패로 바꾸지 않고 요청 상태 응답 | `RefundFacadeTest` |
+| REFUND-09 | P0 | 같은 환불의 PG 취소 재요청 | 환불 ID로 만든 같은 UUID 멱등 키 | `RefundFacadeTest`, `PortOneClientTest` |
+| REFUND-10 | P0 | 10분 넘은 요청 상태 환불 정리 | PG 새 취소 금액이 환불 금액과 같으면 완료, 취소 안 됐으면 실패, 기준 시각 이후 신청은 기다림. 한 결제 실패해도 계속 | `RefundFacadeTest`, `RefundReconcileSchedulerTest` |
+| REFUND-11 | P1 | 환불 기록 없는 PG 취소(콘솔 취소), 금액이 맞지 않는 취소 | 결제 이력에만 남기고 재고 그대로, 맞지 않으면 바꾸지 않음 | `RefundFacadeTest` |
+| REFUND-12 | P1 | 환불 내역·요약·환불 가능 수량 조회 | 내역은 최신순, 요약은 `IN_PROGRESS` → `FULL` → `PARTIAL` → `NONE`, 1~50건. 실패한 환불 수량은 남은 수량에 다시 포함 | `RefundQueryServiceTest`, `RefundItemRepositoryTest`, `RefundControllerTest` |
+
 ## 할인 행사 필수 시나리오
 
 | ID | 우선순위 | 조건·행동 | 기대 결과 | 대응 테스트 |

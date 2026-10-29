@@ -335,6 +335,71 @@ HTTP 메서드·경로·DTO 이름은 구현 전 합의합니다.
 - **본인 소유 검증**: 타인의 주문도 없는 주문과 같은 404(`ORDER_001`)로 답합니다.
 - **주문 금액**: 주문 상품에 주문 당시 정가·단가·상품 이름·이미지를 저장하므로 상품이 바뀌어도 주문 화면의 금액은 바뀌지 않습니다.
 
+## 환불 API
+
+상태: **구현 완료** · 담당: 결제·환불 · 근거: 실제 백엔드 컨트롤러 및 서비스 구현
+
+경로는 prefix(/api)를 뺀 값입니다. 회원 번호는 로그인 정보에서만 읽고 요청에는 받지 않습니다. 환불 금액은 요청으로 받지 않고 주문 당시 단가 × 수량으로 계산합니다.
+
+| 기능 | Method / Path | 권한 | 성공 응답 |
+|---|---|---|---|
+| 환불 신청 | POST /refunds | 로그인 | 201(완료 또는 요청 상태) |
+| 환불 내역 | GET /refunds?orderId= | 로그인 | 200 |
+| 환불 요약 | GET /refunds/summaries?orderIds= | 로그인 | 200 |
+| 환불 가능 수량 | GET /refunds/refundable-items?orderId= | 로그인 | 200 |
+
+요청 값입니다.
+
+| 기능 | 위치 | 이름 | 설명 |
+|---|---|---|---|
+| 환불 신청 | Body | orderId | 환불할 주문. 필수 |
+| 환불 신청 | Body | items | 환불할 상품. 1개 이상, 같은 상품은 한 번만 |
+| 환불 신청 | Body | items[].orderItemId | 주문 상품 번호. 필수 |
+| 환불 신청 | Body | items[].quantity | 환불 수량. 1 이상 |
+| 환불 신청 | Body | reasonType | `CHANGE_OF_MIND`·`ORDER_MISTAKE`·`NO_LONGER_NEEDED`·`ETC`. 필수 |
+| 환불 신청 | Body | reasonDetail | 상세 사유. 500자 이하, 생략 가능 |
+| 환불 내역·환불 가능 수량 | Query | orderId | 대상 주문 |
+| 환불 요약 | Query | orderIds | 주문 번호 목록(쉼표 구분). 빈 값·중복을 뺀 고유 주문 1~50건 |
+
+응답 데이터입니다.
+
+| 기능 | 응답 | 필드 |
+|---|---|---|
+| 환불 신청 | RefundResponse | refundId, status(`COMPLETED`·`REQUESTED`), refundAmount, refundedAt(완료 전 null) |
+| 환불 내역 | List<RefundHistoryResponse> | refundId, status, reasonType, reasonDetail, refundAmount, requestedAt, refundedAt, items |
+| 환불 내역 상품(items) | RefundHistoryItemResponse | orderItemId, productName, productImageUrl, unitPrice, quantity, amount |
+| 환불 요약 | List<RefundSummaryResponse> | orderId, refundStatus(`NONE`·`IN_PROGRESS`·`PARTIAL`·`FULL`), refundedAmount(완료된 환불 금액 합) |
+| 환불 가능 수량 | List<RefundableItemResponse> | orderItemId, productId, productName, productImageUrl, unitPrice, orderedQuantity, refundedQuantity, refundableQuantity, saleType, refundable |
+
+오류입니다. 401은 모든 기능에 공통입니다.
+
+| 기능 | HTTP | 코드 | 조건 |
+|---|---|---|---|
+| 환불 신청 | 400 | `C001` | 값 누락·형식 오류, 수량 1 미만, 상세 사유 500자 초과, 같은 상품 중복 |
+| 환불 신청 | 404 | `ORDER_001` | 주문 없음 또는 타인 주문 |
+| 환불 신청 | 409 | `REFUND_010` | 구매 확정된 주문 |
+| 환불 신청 | 400 | `REFUND_003` | 결제 완료가 아닌 주문 |
+| 환불 신청 | 429 | `REFUND_007` | 같은 주문에 진행 중(요청 상태) 환불이 있음 |
+| 환불 신청 | 404 | `REFUND_004` | 그 주문의 상품이 아님 |
+| 환불 신청 | 400 | `REFUND_011` | 특가·번개 드롭 상품 |
+| 환불 신청 | 400 | `REFUND_005` | 남은 환불 가능 수량 초과 |
+| 환불 신청 | 409 | `REFUND_012` | PG가 취소를 거절함. 환불은 실패로 기록 |
+| 환불 내역 | 404 | `ORDER_001` | 주문 없음 또는 타인 주문 |
+| 환불 요약 | 400 | `REFUND_013` | 고유 주문이 없거나 50건 초과 |
+| 환불 가능 수량 | 404 | `ORDER_001` | 주문 없음 또는 타인 주문 |
+| 환불 가능 수량 | 409 | `REFUND_010` | 구매 확정된 주문 |
+| 환불 가능 수량 | 400 | `REFUND_003` | 결제 완료가 아닌 주문 |
+
+- 상태 값: `REQUESTED`(요청, PG 취소 대기), `COMPLETED`(완료), `FAILED`(실패).
+- **환불 신청**: 신청하면 바로 PG에서 환불 금액만큼 부분 취소합니다. 성공하면 완료(`COMPLETED`)로 응답하고 환불 수량만큼 재고를 되돌립니다. PG 결과를 확정하지 못하면 요청 상태(`REQUESTED`)로 201을 주고, 취소 웹훅이나 10분 뒤 환불 정리가 완료 또는 실패로 마무리합니다.
+- **환불 가능 조건**: 결제 완료 주문의 일반 상품만 환불합니다. 구매 확정 뒤에는 환불할 수 없습니다.
+- **수량**: 요청·완료 상태 환불 수량을 누적으로 보고 주문 수량을 넘지 않게 합니다. 실패한 환불 수량은 다시 신청할 수 있습니다.
+- **중복 신청**: 같은 주문에 진행 중 환불이 있으면 `REFUND_007`입니다. 같은 환불은 멱등 키로 PG에서 한 번만 취소됩니다.
+- **환불 내역**: 상태와 관계없이 최신 환불부터 돌려줍니다. 구매 확정된 주문의 지난 환불도 보여 줍니다. PG 오류 원문(실패 사유)은 응답에 넣지 않습니다.
+- **환불 요약**: 요청 상태 환불이 있으면 `IN_PROGRESS`, 환불 가능한 상품을 모두 환불했으면 `FULL`, 완료된 환불이 있으면 `PARTIAL`, 그 밖은 `NONE`입니다. 타인 주문과 없는 주문은 빼고 요청한 순서대로 돌려줍니다.
+- **환불 가능 수량**: 주문 상품 순서대로 돌려줍니다. 특가·번개 드롭 상품은 `refundable=false`, `refundableQuantity=0`입니다.
+- **본인 소유 검증**: 타인 주문은 없는 주문과 같은 404(`ORDER_001`)로 답합니다.
+
 ## 할인 행사 API
 
 상태: **구현 완료** · 담당: 장준혁 · 근거: 실제 백엔드 컨트롤러 및 서비스 구현

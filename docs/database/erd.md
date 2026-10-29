@@ -174,6 +174,57 @@ erDiagram
 | order_items.sale_event_item_id | 할인으로 샀을 때의 행사 항목 | 할인 행사 |
 | order_items.flash_drop_member_id | 번개 드롭 1인 1개 확인용 회원 | 회원 |
 
+## 환불 테이블 관계
+
+환불 테이블 2개입니다. 컬럼 정의는 [데이터 사전](data-dictionary.md#refunds--환불)에 있습니다.
+
+```mermaid
+erDiagram
+    payments ||--o{ refunds : "부분 환불"
+    refunds ||--|{ refund_items : "포함"
+    order_items ||--o{ refund_items : "환불 수량"
+
+    payments {
+        bigint id PK
+        bigint order_id FK
+        bigint amount
+        enum status
+    }
+    refunds {
+        bigint id PK
+        bigint payment_id FK
+        bigint refund_amount
+        enum reason_type
+        enum status
+        varchar portone_cancellation_id
+        datetime refunded_at
+    }
+    refund_items {
+        bigint id PK
+        bigint refund_id FK
+        bigint order_item_id FK
+        int quantity
+        int unit_price
+        bigint amount
+    }
+    order_items {
+        bigint id PK
+        bigint order_id FK
+        int quantity
+        int unit_price
+        enum sale_type
+    }
+```
+
+| 관계 | 의미 | 필수 여부 |
+|---|---|---|
+| payments 1 : N refunds | 결제 완료 결제 하나에 부분 환불 여러 건 | 환불에는 결제가 반드시 있음 |
+| refunds 1 : N refund_items | 환불 한 건에 상품 여러 개 | 환불 상품은 한 개 이상 |
+| order_items 1 : N refund_items | 주문 상품 하나를 여러 번 나눠 환불 | 환불 상품에는 주문 상품이 반드시 있음 |
+
+- 환불은 주문이 아니라 결제에 붙습니다. 한 주문의 결제 완료 결제는 한 건이라 주문별 환불은 그 결제를 거쳐 찾습니다.
+- 환불이 완료되면 결제 이력(`payment_histories.refund_id`)에 PG 취소가 남습니다.
+
 ## 할인 행사 테이블 관계
 
 할인 행사 테이블 2개입니다. 컬럼 정의는 [데이터 사전](data-dictionary.md#sale_events--할인-행사)에 있습니다.

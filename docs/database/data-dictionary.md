@@ -202,6 +202,42 @@
 
 - 같은 행사 항목에 같은 회원은 한 번만 들어갈 수 있습니다(번개 드롭 1인 1개). NULL은 여러 건 가능합니다.
 
+## refunds — 환불
+
+- 환불 신청 한 번에 한 건입니다. 한 결제에 부분 환불이 여러 건 생길 수 있고, 같은 주문에 요청 상태 환불은 한 건만 둡니다.
+- 요청에서 완료 또는 실패로 한 번만 바뀝니다. 실패한 환불은 지우지 않고 남기며, 그 수량은 다시 신청할 수 있습니다.
+- 제약 이름: 인덱스 `idx_refunds_refunded_at`(refunded_at). FK `fk_refunds_payment`.
+
+| 컬럼 | 타입 | NULL | 기본값 | 제약 | 의미 |
+|---|---|---|---|---|---|
+| payment_id | BIGINT | 불가 | | FK | 환불할 결제. 주문의 결제 완료 결제 |
+| refund_amount | BIGINT | 불가 | | | 환불 금액(원). 환불 상품 금액의 합 |
+| reason_type | ENUM('CHANGE_OF_MIND','ORDER_MISTAKE','NO_LONGER_NEEDED','ETC') | 불가 | | | 단순 변심·주문 실수·더 이상 필요 없음·기타. 설명 문구를 PG 취소 사유로 보냄 |
+| reason_detail | VARCHAR(500) | 허용 | NULL | | 상세 사유 |
+| status | ENUM('REQUESTED','COMPLETED','FAILED') | 불가 | | | 요청(PG 취소 대기)·완료·실패 |
+| portone_cancellation_id | VARCHAR(200) | 허용 | NULL | | PG 취소 건 ID. 완료 전이나 찾지 못하면 NULL |
+| fail_reason | VARCHAR(255) | 허용 | NULL | | 실패 사유(PG 오류 원문). 길면 255자에서 잘라 저장. 사용자에게 보여 주지 않음 |
+| refunded_at | DATETIME(6) | 허용 | NULL | 인덱스 | 환불 완료 시각. 정산 기준 시각. 완료 전에는 NULL |
+
+- `created_at`이 신청 시각입니다.
+- 실행용 DDL 초안은 [refund.sql](refund.sql)에 있습니다.
+
+## refund_items — 환불 상품
+
+- 환불 한 건에 포함된 주문 상품과 수량입니다. 단가는 주문 상품에서 복사합니다.
+- 제약 이름: UK `uk_refund_items_refund_id_order_item_id`. 인덱스 `idx_refund_items_order_item_id`(order_item_id). FK `fk_refund_items_refund`, `fk_refund_items_order_item`.
+
+| 컬럼 | 타입 | NULL | 기본값 | 제약 | 의미 |
+|---|---|---|---|---|---|
+| refund_id | BIGINT | 불가 | | FK, UK(refund_id, order_item_id) | 소속 환불 |
+| order_item_id | BIGINT | 불가 | | FK, UK(refund_id, order_item_id), 인덱스 | 환불할 주문 상품. 일반 상품만 |
+| quantity | INT | 불가 | | | 환불 수량(1 이상) |
+| unit_price | INT | 불가 | | | 주문 당시 단가(원) |
+| amount | BIGINT | 불가 | | | 환불 금액(원). 단가 × 수량 |
+
+- 상품별 누적 환불 수량은 요청·완료 상태 환불의 수량 합입니다. 이 값이 주문 수량을 넘지 않게 신청 때 확인합니다.
+- 한 환불에 같은 주문 상품은 한 번만 들어갑니다.
+
 ## sale_events — 할인 행사
 
 - 상품 하나에 대한 한 번의 할인 기간입니다. 등록하면 상품마다 한 건씩 만들어지고, 예정에서 진행 중, 종료로 바뀝니다.
