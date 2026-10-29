@@ -221,7 +221,7 @@ class CartServiceTransactionTest extends MySqlContainerSupport {
     @DisplayName("조회는 상품 이름·이미지·정가를 붙이고, 재고 0이나 판매 중지 상품은 품절로 표시한다")
     void getItems_includesProductInfoAndSoldOut() {
         Product onSale = saveProduct(5, ProductStatus.ON_SALE);
-        Product noStock = saveProduct(0, ProductStatus.ON_SALE);
+        Product noStock = saveProduct(0, ProductStatus.SOLD_OUT);
         Product stopped = saveProduct(5, ProductStatus.STOPPED);
         Cart cart = cartRepository.save(Cart.builder().memberId(1L).build());
         cartItemRepository.save(CartItem.builder().cart(cart).productId(onSale.getId()).quantity(1).build());

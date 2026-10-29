@@ -3,6 +3,7 @@ package org.example.takecareofmyfridgebe.domain.cart.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.AdditionalAnswers.returnsFirstArg;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
@@ -11,7 +12,6 @@ import static org.mockito.Mockito.verify;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import org.example.takecareofmyfridgebe.domain.cart.dto.AddCartItemRequest;
 import org.example.takecareofmyfridgebe.domain.cart.dto.AddCartItemResult;
@@ -28,17 +28,19 @@ import org.example.takecareofmyfridgebe.domain.product.entity.ProductType;
 import org.example.takecareofmyfridgebe.domain.product.repository.ProductRepository;
 import org.example.takecareofmyfridgebe.domain.sale.dto.ActiveSale;
 import org.example.takecareofmyfridgebe.domain.sale.entity.SaleEventType;
+import org.example.takecareofmyfridgebe.domain.sale.repository.SaleEventItemRepository;
 import org.example.takecareofmyfridgebe.domain.sale.service.SaleEventReader;
 import org.example.takecareofmyfridgebe.dummy.ProductFixture;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class CartServiceTest {
@@ -53,10 +55,16 @@ class CartServiceTest {
     private ProductRepository productRepository;
 
     @Mock
-    private SaleEventReader saleEventReader;
+    private SaleEventItemRepository saleEventItemRepository;
 
-    @InjectMocks
     private CartService cartService;
+
+    // 판매가 판단까지 실제로 거치도록 SaleEventReader는 진짜를 쓰고 그 아래 조회만 대신한다
+    @BeforeEach
+    void setUp() {
+        cartService = new CartService(cartRepository, cartItemRepository, productRepository,
+                new SaleEventReader(saleEventItemRepository));
+    }
 
     @Test
     @DisplayName("장바구니가 없으면 만들고 상품을 담는다")
@@ -135,9 +143,9 @@ class CartServiceTest {
                 ProductFixture.createProduct(10L, "대파", 3000),
                 ProductFixture.createProduct(20L, "두부", 3000),
                 ProductFixture.createProduct(30L, "우유", 4000)));
-        given(saleEventReader.findActiveSales(List.of(10L, 20L, 30L))).willReturn(Map.of(
-                20L, activeSale(20L, SaleEventType.SPECIAL, 2400, 20, null),
-                30L, activeSale(30L, SaleEventType.FLASH_DROP, 2000, 50, 0)));
+        given(saleEventItemRepository.findActiveByProductIds(eq(List.of(10L, 20L, 30L)), any(), any())).willReturn(List.of(
+                activeSale(20L, SaleEventType.SPECIAL, 2400, 20, null),
+                activeSale(30L, SaleEventType.FLASH_DROP, 2000, 50, 0)));
 
         CartItemsResponse result = cartService.getItems(1L);
 
@@ -163,8 +171,8 @@ class CartServiceTest {
         given(productRepository.findById(10L)).willReturn(Optional.of(productWithStock(10)));
         given(cartRepository.findByMemberId(1L)).willReturn(Optional.of(cart));
         given(cartItemRepository.findByCartAndProductId(cart, 10L)).willReturn(Optional.of(item));
-        given(saleEventReader.findActiveSales(List.of(10L)))
-                .willReturn(Map.of(10L, activeSale(10L, SaleEventType.FLASH_DROP, 500, 50, 5)));
+        given(saleEventItemRepository.findActiveByProductIds(eq(List.of(10L)), any(), any()))
+                .willReturn(List.of(activeSale(10L, SaleEventType.FLASH_DROP, 500, 50, 5)));
 
         assertThatThrownBy(() -> cartService.addItem(1L, new AddCartItemRequest(10L, 1)))
                 .isInstanceOf(BusinessException.class)
@@ -180,8 +188,8 @@ class CartServiceTest {
         CartItem item = CartItem.builder().cart(cart).productId(10L).quantity(1).build();
         given(cartItemRepository.findByIdAndCartMemberId(5L, 1L)).willReturn(Optional.of(item));
         given(productRepository.findById(10L)).willReturn(Optional.of(productWithStock(10)));
-        given(saleEventReader.findActiveSales(List.of(10L)))
-                .willReturn(Map.of(10L, activeSale(10L, SaleEventType.FLASH_DROP, 500, 50, 5)));
+        given(saleEventItemRepository.findActiveByProductIds(eq(List.of(10L)), any(), any()))
+                .willReturn(List.of(activeSale(10L, SaleEventType.FLASH_DROP, 500, 50, 5)));
 
         assertThatThrownBy(() -> cartService.changeQuantity(1L, 5L, new ChangeCartItemQuantityRequest(2)))
                 .isInstanceOf(BusinessException.class)
@@ -195,7 +203,7 @@ class CartServiceTest {
     }
 
     private Product productWithStock(int stock) {
-        return Product.builder()
+        Product product = Product.builder()
                 .productType(ProductType.INGREDIENT)
                 .name("대파")
                 .price(1000)
@@ -203,5 +211,7 @@ class CartServiceTest {
                 .storage(StorageType.REFRIGERATED)
                 .shelfDays(7)
                 .build();
+        ReflectionTestUtils.setField(product, "id", 10L);
+        return product;
     }
 }
