@@ -2,7 +2,7 @@ import * as PortOne from '@portone/browser-sdk/v2';
 
 import type { PaymentPrepareResponse } from './api';
 
-// KG이니시스 PC 결제창은 구매자 이름·연락처·이메일이 필수다.
+// 결제창에 넘기는 구매자 정보
 export interface PaymentCustomer {
   fullName: string;
   phoneNumber: string;
@@ -21,7 +21,8 @@ export async function openPaymentWindow(
     orderName: payment.orderName,
     totalAmount: payment.amount,
     currency: 'KRW',
-    payMethod: 'CARD',
+    // 카카오페이 채널
+    payMethod: 'EASY_PAY',
     customer,
   });
 }

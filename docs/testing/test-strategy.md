@@ -48,13 +48,33 @@ Q-01~Q-17에 의존하는 테스트는 기대값을 합의한 뒤 구현합니�
 | ORDER-01 | P0 | 여러 회원이 같은 상품을 동시에 주문 | 재고만큼만 성공, 나머지는 재고 부족으로 거절 | `OrderCreateServiceTransactionTest` |
 | ORDER-02 | P0 | 한 항목이라도 재고 부족·가격 불일치 | 모두 롤백, 다른 항목 재고도 그대로 | `OrderCreateServiceTransactionTest`, `OrderCreateServiceSaleTransactionTest` |
 | ORDER-03 | P0 | 같은 멱등 키로 반복·동시에 주문하기 | 주문 하나만 생기고 모두 같은 주문을 받음, 다른 상품이면 `ORDER_006` | `OrderCreateServiceTransactionTest` |
-| ORDER-04 | P0 | 같은 주문을 동시에 여러 번 취소 | 모두 취소 응답, 재고는 한 번만 복구 | `OrderCancelServiceTransactionTest` |
+| ORDER-04 | P0 | 같은 주문을 동시에 여러 번 취소 | 하나만 지우고 나머지는 404, 재고는 한 번만 복구 | `OrderCancelServiceTransactionTest` |
 | ORDER-05 | P0 | 결제 완료 주문 취소, 결제 대기 주문 구매 확정 | 409, 상태·재고 불변 | `OrderCancelServiceTransactionTest`, `OrderConfirmServiceTransactionTest` |
 | ORDER-06 | P0 | 타인 주문 조회·취소·확정 | 없는 주문과 같은 404, 상태 불변 | `OrderQueryServiceTransactionTest`, `OrderCancelServiceTransactionTest`, `OrderConfirmServiceTransactionTest` |
 | ORDER-07 | P0 | 한정 수량보다 많은 회원이 번개 드롭을 동시에 주문 | 한정 수량만큼만 성공, 남은 수량 0 | `OrderCreateServiceSaleTransactionTest` |
 | ORDER-08 | P0 | 번개 드롭을 이미 산 회원이 다시 주문, 취소 뒤 다시 주문 | 다시 주문은 `CART_003`, 취소하면 남은 수량이 돌아와 주문 가능 | `OrderCreateServiceSaleTransactionTest` |
 | ORDER-09 | P1 | 주문 목록 조회 | 결제 대기·결제 완료·구매 확정만 최신순, 취소 제외, 1부터 센 페이지 | `OrderQueryServiceTransactionTest` |
 | ORDER-10 | P1 | 주문번호 생성 | 20자리 숫자, 동시에 만들어도 안 겹침, 겹치면 `ORDER_005` | `OrderNumberGeneratorTest`, `OrderCreateServiceConstraintTest` |
+| ORDER-11 | P0 | 결제를 시도한 결제 대기 주문 취소, 취소하기와 결제하기 동시 | 결제 시도가 있으면 `ORDER_012`로 거절하고 주문·재고 불변. 동시면 하나만 성공하고 결제가 붙은 주문은 지워지지 않음 | `OrderCancelServiceTransactionTest` |
+| ORDER-12 | P0 | 주문 만료, 취소하기와 주문 만료 동시 | 생성 5분이 지난 결제 시도 없는 결제 대기 주문만 지움. 동시면 재고는 한 번만 복구 | `OrderCancelServiceTransactionTest`, `OrderExpireSchedulerTest` |
+| ORDER-13 | P0 | 결제 정리, 결제 정리와 결제하기·주문 취소 동시 | 진행 중 결제가 없고 마지막 결제 뒤 10분이 지난 결제 대기 주문만 취소 상태로 바꾸고 재고 복구, 결제 행 유지. 동시면 재고는 많아야 한 번 복구 | `OrderCancelServiceTransactionTest`, `PaymentTimeoutSchedulerTest` |
+
+## 환불 필수 시나리오
+
+| ID | 우선순위 | 조건·행동 | 기대 결과 | 대응 테스트 |
+|---|---|---|---|---|
+| REFUND-01 | P0 | 일반 상품 일부 수량 환불 | 단가 × 수량으로 요청 저장, PG 부분 취소 후 완료, 환불 수량만큼 재고 복구 | `RefundCommandServiceTest`, `RefundFacadeTest` |
+| REFUND-02 | P0 | 남은 수량까지 다시 신청, 넘게 신청 | 남은 수량까지는 성공, 넘으면 `REFUND_005` | `RefundCommandServiceTest` |
+| REFUND-03 | P0 | 구매 확정·결제 전 주문, 타인 주문 | `REFUND_010`·`REFUND_003`·`ORDER_001` | `RefundCommandServiceTest`, `RefundQueryServiceTest` |
+| REFUND-04 | P0 | 특가·번개 드롭 상품, 다른 주문의 상품, 같은 상품 중복 | `REFUND_011`·`REFUND_004`·`C001` | `RefundCommandServiceTest` |
+| REFUND-05 | P0 | 같은 주문에 진행 중 환불이 있는데 새 신청 | `REFUND_007` | `RefundCommandServiceTest` |
+| REFUND-06 | P0 | 이미 완료된 환불을 다시 완료 | 바꾸지 않고 현재 상태, 재고는 한 번만 복구 | `RefundCommandServiceTest`, `RefundTest` |
+| REFUND-07 | P0 | PG가 취소 거절(4xx) | 실패로 바꾸고 `REFUND_012`, 실패 수량은 다시 신청 가능 | `RefundFacadeTest`, `RefundCommandServiceTest` |
+| REFUND-08 | P0 | PG 결과 모름(타임아웃), PG 조회 실패, 완료 처리 실패 | 이번 금액만큼 취소됐으면 완료, 아니면 실패로 바꾸지 않고 요청 상태 응답 | `RefundFacadeTest` |
+| REFUND-09 | P0 | 같은 환불의 PG 취소 재요청 | 환불 ID로 만든 같은 UUID 멱등 키 | `RefundFacadeTest`, `PortOneClientTest` |
+| REFUND-10 | P0 | 10분 넘은 요청 상태 환불 정리 | PG 새 취소 금액이 환불 금액과 같으면 완료, 취소 안 됐으면 실패, 기준 시각 이후 신청은 기다림. 한 결제 실패해도 계속 | `RefundFacadeTest`, `RefundReconcileSchedulerTest` |
+| REFUND-11 | P1 | 환불 기록 없는 PG 취소(콘솔 취소), 금액이 맞지 않는 취소 | 결제 이력에만 남기고 재고 그대로, 맞지 않으면 바꾸지 않음 | `RefundFacadeTest` |
+| REFUND-12 | P1 | 환불 내역·요약·환불 가능 수량 조회 | 내역은 최신순, 요약은 `IN_PROGRESS` → `FULL` → `PARTIAL` → `NONE`, 1~50건. 실패한 환불 수량은 남은 수량에 다시 포함 | `RefundQueryServiceTest`, `RefundItemRepositoryTest`, `RefundControllerTest` |
 
 ## 할인 행사 필수 시나리오
 
@@ -72,6 +92,25 @@ Q-01~Q-17에 의존하는 테스트는 기대값을 합의한 뒤 구현합니�
 | SALE-10 | P1 | 권한·입력값 | 일반 회원 403, 비로그인 401, 잘못된 입력 400이고 서비스 호출 없음 | `AdminSaleEventControllerTest` |
 
 번개 드롭 동시 주문과 1인 1개는 ORDER-07·08에서 검증합니다.
+
+## 결제 필수 시나리오
+
+| ID | 우선순위 | 조건·행동 | 기대 결과 | 대응 테스트 |
+|---|---|---|---|---|
+| PAY-01 | P0 | PG 결제 완료, 금액 일치로 확정 | 결제·주문 결제 완료, 이력 `PAID` | `PaymentFacadeTest`, `PaymentCommandServiceTest` |
+| PAY-02 | P0 | PG 금액이 결제 금액과 다름 | `AMOUNT_MISMATCH` 실패 후 PG 전액 취소, `PAYMENT_002`. 다른 요청이 먼저 처리했으면 취소 안 함 | `PaymentFacadeTest` |
+| PAY-03 | P0 | 만료 시각 이후 PG 결제 완료 | `TIMEOUT` 실패 후 PG 취소, `PAYMENT_006`. 만료 시각과 같으면 승인 | `PaymentFacadeTest`, `PaymentTest` |
+| PAY-04 | P0 | 같은 주문의 결제 두 건을 동시에 승인 | 하나만 결제 완료, 나머지는 `ORDER_NOT_PAYABLE` 실패 후 PG 취소 | `PaymentCommandServiceConcurrencyTest` |
+| PAY-05 | P0 | 같은 주문의 결제 준비를 동시에 여러 번 | 결제 대기 한 건만 생성, 나머지 `PAYMENT_008` | `PaymentCommandServiceConcurrencyTest` |
+| PAY-06 | P0 | 결제를 읽은 뒤 주문이 취소됨 | 승인하지 않고 `ORDER_NOT_PAYABLE` 실패 | `PaymentCommandServiceConcurrencyTest` |
+| PAY-07 | P0 | 이미 결제 완료·실패한 결제를 다시 확정 | 완료면 PG 조회 없이 같은 응답, 실패면 실패 사유에 맞는 오류 | `PaymentFacadeTest` |
+| PAY-08 | P0 | 타인 결제 확정, 다른 주문의 결제 ID로 확정 | `ORDER_003`·`C001`, PG 조회 안 함 | `PaymentFacadeTest`, `PaymentControllerTest` |
+| PAY-09 | P0 | 남은 결제 대기 건이 있는 주문의 결제 준비 | PG 미결제면 `SUPERSEDED` 정리 후 새로 생성, PG 결제됨이면 승인하고 새 결제 안 만듦, PG 조회 실패면 생성 안 함 | `PaymentFacadeTest` |
+| PAY-10 | P0 | 웹훅 서명 불일치·헤더 없음·5분 경과 | 401, 기록 안 함 | `PortOneWebhookVerifierTest`, `WebhookControllerTest` |
+| PAY-11 | P0 | 같은 웹훅 재수신·동시 수신, 처리 중 오류 | 한 번만 처리. 오류면 `FAILED` 기록 후 오류 응답, 재전송 때 다시 처리 | `WebhookHandlerTest`, `WebhookEventServiceTest` |
+| PAY-12 | P0 | 실패 처리한 결제가 PG에서 결제됨, 보상 취소 실패 | 보상 취소, 실패하면 이력 `PAID`만 남아 5분 뒤 재시도. 다른 경로로 취소됐으면 기록만 | `PaymentFacadeTest`, `PaymentTimeoutSchedulerTest` |
+| PAY-13 | P1 | 만료 스케줄러 실행 | PG 미결제면 `TIMEOUT`, PG 결제됨이면 웹훅과 같은 규칙. 한 건 실패해도 나머지 처리, id 커서로 이어 읽음 | `PaymentFacadeTest`, `PaymentTimeoutSchedulerTest` |
+| PAY-14 | P1 | PG 취소 요청 타임아웃·4xx | 타임아웃은 같은 멱등 키로 3번까지, 4xx는 재시도 없이 `PAYMENT_009`. 이미 취소된 결제의 전액 취소는 성공 | `PortOneClientTest` |
 
 ## 다른 담당과 공동 검증
 

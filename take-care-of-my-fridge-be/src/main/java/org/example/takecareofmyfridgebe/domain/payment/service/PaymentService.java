@@ -61,6 +61,24 @@ public class PaymentService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.PAYMENT_NOT_FOUND));
     }
 
+    // 결제 시도가 한 번이라도 있었는지 본다. 상태와 상관없이 결제 행이 있으면 true다
+    public boolean hasPayment(Long orderId) {
+        return paymentRepository.existsByOrderId(orderId);
+    }
+
+    // 결제를 시도했지만 끝내지 않은 주문인지 본다. 결제가 있고, 진행 중 결제가 없고, 마지막 결제가 기준보다 이르면 true다
+    public boolean isAbandoned(Long orderId, LocalDateTime lastPaymentBefore) {
+        return paymentRepository.existsByOrderId(orderId)
+                && !paymentRepository.existsByOrderIdAndStatus(orderId, PaymentStatus.READY)
+                && !paymentRepository.existsByOrderIdAndCreatedAtGreaterThanEqual(orderId, lastPaymentBefore);
+    }
+
+    // 스케줄러가 취소할 결제 대기 주문을 afterId 다음부터 주문 id 순으로 조회한다
+    public List<Long> findAbandonedOrderIds(LocalDateTime lastPaymentBefore, long afterId, int limit) {
+        return paymentRepository.findAbandonedOrderIds(OrderStatus.PENDING, PaymentStatus.READY, lastPaymentBefore,
+                afterId, PageRequest.of(0, limit));
+    }
+
     // 스케줄러가 만료 처리할 결제 대기 건을 afterId 다음부터 id 순으로 조회한다
     public List<Payment> findExpiredReady(LocalDateTime now, long afterId, int limit) {
         return paymentRepository.findExpired(PaymentStatus.READY, now, afterId, PageRequest.of(0, limit));

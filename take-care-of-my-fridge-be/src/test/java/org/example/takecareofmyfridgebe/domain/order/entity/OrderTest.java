@@ -58,7 +58,7 @@ class OrderTest {
         Order order = newOrder();
         order.cancel();
 
-        assertThat(order.isCancelled()).isTrue();
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
         assertThatThrownBy(order::cancel)
             .isInstanceOf(BusinessException.class)
             .extracting("errorCode").isEqualTo(ErrorCode.ORDER_CANCELLED);

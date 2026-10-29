@@ -1,6 +1,7 @@
 package org.example.takecareofmyfridgebe.domain.payment.repository;
 
 import jakarta.persistence.LockModeType;
+import org.example.takecareofmyfridgebe.domain.order.entity.OrderStatus;
 import org.example.takecareofmyfridgebe.domain.payment.entity.Payment;
 import org.example.takecareofmyfridgebe.domain.payment.entity.PaymentEventType;
 import org.example.takecareofmyfridgebe.domain.payment.entity.PaymentStatus;
@@ -18,6 +19,25 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
 
     @Query("select p from Payment p join fetch p.order where p.portonePaymentId = :portonePaymentId")
     Optional<Payment> findWithOrderByPortonePaymentId(@Param("portonePaymentId") String portonePaymentId);
+
+    boolean existsByOrderId(Long orderId);
+
+    boolean existsByOrderIdAndStatus(Long orderId, PaymentStatus status);
+
+    boolean existsByOrderIdAndCreatedAtGreaterThanEqual(Long orderId, LocalDateTime createdAt);
+
+    // 진행 중 결제가 없고 마지막 결제가 기준보다 이른 주문을 주문 id 순으로 나눠 읽는다
+    @Query("""
+        select p.order.id from Payment p
+        where p.order.status = :orderStatus and p.order.id > :afterId
+        group by p.order.id
+        having sum(case when p.status = :ready then 1 else 0 end) = 0 and max(p.createdAt) < :lastPaymentBefore
+        order by p.order.id
+        """)
+    List<Long> findAbandonedOrderIds(@Param("orderStatus") OrderStatus orderStatus,
+                                     @Param("ready") PaymentStatus ready,
+                                     @Param("lastPaymentBefore") LocalDateTime lastPaymentBefore,
+                                     @Param("afterId") long afterId, Pageable pageable);
 
     @Query("select p from Payment p where p.order.id = :orderId and p.status = :status order by p.id")
     List<Payment> findByOrderIdAndStatus(@Param("orderId") Long orderId, @Param("status") PaymentStatus status);

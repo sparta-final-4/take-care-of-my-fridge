@@ -47,6 +47,10 @@ spring:
       timeout: 60s
       max-retries: 1
 
+  elasticsearch:
+    uris: ${ELASTICSEARCH_URL:http://localhost:9200}
+    connection-timeout: 2s
+    socket-timeout: 5s
 
 app:
   auth:
@@ -62,13 +66,31 @@ app:
   review-summary:
     cron: ${REVIEW_SUMMARY_CRON:0 0 4 * * *}
     enabled: ${REVIEW_SUMMARY_ENABLED:true}
+  search:
+    # 상단 통합 검색 엔진. mysql(기존 LIKE) | elasticsearch
+    engine: ${SEARCH_ENGINE:elasticsearch}
+    index-properties:
+      recipe:
+        alias: recipes
+        index-settings: classpath:elasticsearch/recipes/recipes_index.json
+        synonyms: classpath:elasticsearch/recipes/ingredient_synonyms.json
+        extra-synonyms: classpath:elasticsearch/recipes/synonyms.txt
+        batch-size: 500
+      product:
+        alias: products
+        index-settings: classpath:elasticsearch/products/products_index.json
+        batch-size: 500
     
+# 결제
 portone:
   base-url: "https://api.portone.io"
-  api-secret: "kwjfvYDdq35AIOKiqtX81g36AHgGowto4Af3YGwruD8BPpBvAmB3qoHePuGZlPohtJw1IjJJdIjKjzHW"
-  store-id: "store-6d7d9fe2-1e1d-47d3-96a9-6ceb3873df88"
-  channel-key: "channel-key-d45e37ea-9034-495a-b691-c223dbf16f12"
-  webhook-secret: "whsec_IJTPyu6yKJ/p6noqNdbveluR7P8AeVSJCoYRVpSGgXg="
+  # CI 때문에 반드시 아래 값들이 존재해야만 기동됩니다
+  # 간단한 테스트용 빈 값으로 채운다
+  api-secret: ${PORTONE_API_SECRET:}
+  store-id: ${PORTONE_STORE_ID:}
+  channel-key: ${PORTONE_CHANNEL_KEY:}
+  # WebhookVerifier가 기동 시 whsec_ 뒤를 base64로 풀기 때문에 형식만 맞춘 임의 값("local-dummy-webhook-secret")
+  webhook-secret: ${PORTONE_WEBHOOK_SECRET:whsec_bG9jYWwtZHVtbXktd2ViaG9vay1zZWNyZXQ=}
 
 springdoc:
   writer-with-order-by-keys: true

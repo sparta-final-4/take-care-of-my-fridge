@@ -2,7 +2,7 @@ import { MenuOutlined, SearchOutlined } from '@ant-design/icons';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Badge, Button, Drawer, Flex, Grid, Input, Layout, Typography } from 'antd';
 import { useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router';
 
 import { ROUTES } from '@/app/paths';
 import { useAuthStore } from '@/common/auth/authStore';
@@ -22,9 +22,15 @@ const NAV_ITEMS = [
   { key: 'mypage', label: '마이페이지' },
 ] as const;
 
+// 백엔드 검색어 길이 제한(RecipeListRequest.keyword)
+const SEARCH_KEYWORD_MAX_LENGTH = 50;
+
 export function Header() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
+  const [searchParams] = useSearchParams();
+  // 검색 화면에서는 현재 검색어를 입력칸에 보여 주고, 다른 화면으로 가면 비운다.
+  const currentKeyword = pathname === ROUTES.search ? (searchParams.get('keyword') ?? '') : '';
   const status = useAuthStore((state) => state.status);
   const role = useAuthStore((state) => state.member?.role);
   const nickname = useAuthStore((state) => state.member?.nickname);
@@ -46,6 +52,12 @@ export function Header() {
     if (key === 'products') navigate(ROUTES.products);
     if (key === 'cart') navigate(ROUTES.cart);
     if (key === 'mypage') navigate(status === 'authenticated' ? ROUTES.mypage : ROUTES.login);
+  };
+  // 상단 검색은 레시피·상품 등을 함께 찾는 통합 검색이라 별도 검색 화면으로 보낸다.
+  const handleSearch = (value: string) => {
+    const keyword = value.trim();
+    if (!keyword) return;
+    navigate(`${ROUTES.search}?${new URLSearchParams({ keyword })}`);
   };
   const isCurrent = (key: (typeof NAV_ITEMS)[number]['key']) =>
     (key === 'fridge' && pathname === ROUTES.fridge) ||
@@ -78,9 +90,14 @@ export function Header() {
 
         <div className={styles.searchWrapper}>
           <Input
+            key={currentKeyword}
+            defaultValue={currentKeyword}
             prefix={<SearchOutlined />}
             placeholder="재료나 요리를 검색해 보세요"
             aria-label="재료나 요리 검색"
+            maxLength={SEARCH_KEYWORD_MAX_LENGTH}
+            enterKeyHint="search"
+            onPressEnter={(event) => handleSearch(event.currentTarget.value)}
             className={styles.searchInput}
           />
         </div>
@@ -153,9 +170,18 @@ export function Header() {
       >
         <Flex vertical gap="middle">
           <Input
+            key={currentKeyword}
+            defaultValue={currentKeyword}
             prefix={<SearchOutlined />}
             placeholder="재료나 요리를 검색해 보세요"
             aria-label="모바일 재료나 요리 검색"
+            maxLength={SEARCH_KEYWORD_MAX_LENGTH}
+            enterKeyHint="search"
+            onPressEnter={(event) => {
+              if (!event.currentTarget.value.trim()) return;
+              handleCloseDrawer();
+              handleSearch(event.currentTarget.value);
+            }}
           />
           <Flex vertical gap="xs" role="navigation" aria-label="모바일 메뉴">
             {NAV_ITEMS.map((item) => (

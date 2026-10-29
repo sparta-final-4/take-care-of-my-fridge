@@ -24,6 +24,7 @@ apis/recipe-controller-api.ts
 apis/recipe-review-controller-api.ts
 apis/refund-controller-api.ts
 apis/review-summary-admin-controller-api.ts
+apis/search-controller-api.ts
 apis/webhook-controller-api.ts
 base.ts
 common.ts
@@ -56,7 +57,6 @@ models/api-response-list-refundable-item-response.ts
 models/api-response-my-info-response.ts
 models/api-response-my-recipe-list-response.ts
 models/api-response-nickname-availability-response.ts
-models/api-response-order-cancel-response.ts
 models/api-response-order-checkout-response.ts
 models/api-response-order-confirm-response.ts
 models/api-response-order-detail-response.ts
@@ -146,7 +146,6 @@ models/my-recipe-summary-response.ts
 models/nickname-availability-request.ts
 models/nickname-availability-response.ts
 models/nutrition.ts
-models/order-cancel-response.ts
 models/order-checkout-response.ts
 models/order-confirm-response.ts
 models/order-create-item-request.ts
@@ -208,6 +207,7 @@ models/sale-event-list-request.ts
 models/sale-event-list-response.ts
 models/sale-event-update-request.ts
 models/sale-events-create-response.ts
+models/search-click-request.ts
 models/sign-up-request.ts
 models/sign-up-response.ts
 models/special-sale-create-request.ts

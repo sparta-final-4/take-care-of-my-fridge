@@ -1,0 +1,29 @@
+@use '@/styles/mixins' as *;
+
+// 레시피·재료 목록 화면과 구분되도록 검색어를 크게 보여 주는 머리 영역
+.summary {
+  padding: var(--ant-padding-lg);
+  background: var(--ant-color-bg-container);
+  border: 1px solid var(--ant-color-border);
+  border-radius: var(--ant-border-radius-lg);
+
+  @include from(md) {
+    padding: var(--ant-padding-lg) var(--ant-padding-xl);
+  }
+}
+
+.title {
+  margin: 0;
+  word-break: break-all;
+}
+
+.keyword {
+  color: var(--ant-color-primary);
+}
+
+.countTag {
+  margin: 0;
+  padding: var(--ant-padding-xxs) var(--ant-padding-sm);
+  font-size: var(--ant-font-size);
+  border-radius: var(--ant-border-radius-lg);
+}

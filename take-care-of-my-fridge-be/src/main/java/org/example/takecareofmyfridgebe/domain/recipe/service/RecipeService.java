@@ -14,6 +14,7 @@ import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeUpdateRequest;
 import org.example.takecareofmyfridgebe.domain.recipe.entity.Recipe;
 import org.example.takecareofmyfridgebe.domain.recipe.entity.RecipeIngredient;
 import org.example.takecareofmyfridgebe.domain.recipe.entity.RecipeStep;
+import org.example.takecareofmyfridgebe.domain.recipe.event.RecipeChangedEvent;
 import org.example.takecareofmyfridgebe.domain.recipe.repository.RecipeIngredientRepository;
 import org.example.takecareofmyfridgebe.domain.recipe.repository.RecipeRepository;
 import org.example.takecareofmyfridgebe.domain.recipe.repository.RecipeStepRepository;
@@ -23,7 +24,9 @@ import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 import org.example.takecareofmyfridgebe.global.response.PageResponse;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,6 +39,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
@@ -50,6 +54,7 @@ public class RecipeService {
     private final RecipeStepRepository recipeStepRepository;
     private final IngredientRepository ingredientRepository;
     private final IngredientService ingredientService;
+    private final ApplicationEventPublisher eventPublisher;
 
     // 정렬은 request.sort()로 저장소가 적용하므로 PageRequest에는 넣지 않는다.
     public PageResponse<RecipeListItemResponse> getRecipes(RecipeListRequest request) {
@@ -91,6 +96,9 @@ public class RecipeService {
         List<RecipeIngredient> ingredients = recipeIngredientRepository.saveAll(request.toIngredients(recipe));
         List<RecipeStep> steps = recipeStepRepository.saveAll(request.toSteps(recipe));
 
+        // 단건 인덱싱 위한 이벤트 발행
+        eventPublisher.publishEvent(RecipeChangedEvent.from(recipe.getId()));
+
         return toDetailResponse(recipe, ingredients, steps);
     }
 
@@ -106,7 +114,12 @@ public class RecipeService {
 
         request.applyTo(recipe);
 
-        return toDetailResponse(recipe, updateIngredients(recipe, request), updateSteps(recipe, request));
+        RecipeDetailResponse response = toDetailResponse(recipe, updateIngredients(recipe, request), updateSteps(recipe, request));
+
+        // 단건 인덱싱 위한 이벤트 발행
+        eventPublisher.publishEvent(RecipeChangedEvent.from(recipe.getId()));
+
+        return response;
     }
 
     private RecipeDetailResponse toDetailResponse(
@@ -149,6 +162,21 @@ public class RecipeService {
     // (source, source_id)가 유니크라서 관리자 등록 레시피에도 겹치지 않는 원본 코드가 필요하다. 컬럼 길이(20자)에 맞춘다.
     private static String newSourceId() {
         return UUID.randomUUID().toString().replace("-", "").substring(0, 20);
+    }
+
+
+    public PageResponse<RecipeListItemResponse> getRecipesByIds(List<Long> recipeIds, long total, RecipeListRequest request) {
+        Map<Long, Recipe> recipesById = recipeRepository.findAllById(recipeIds).stream()
+                .collect(Collectors.toMap(Recipe::getId, Function.identity()));
+
+        List<RecipeListItemResponse> content = recipeIds.stream()
+                .map(recipesById::get)
+                .filter(Objects::nonNull)
+                .map(RecipeListItemResponse::from)
+                .toList();
+
+        PageRequest pageable = PageRequest.of(request.page() - 1, request.size());
+        return PageResponse.of(new PageImpl<>(content, pageable, total));
     }
 
     /**

@@ -6,6 +6,7 @@ import org.example.takecareofmyfridgebe.domain.ingredient.repository.IngredientR
 import org.example.takecareofmyfridgebe.domain.product.dto.AdminProductListRequest;
 import org.example.takecareofmyfridgebe.domain.product.dto.ProductCreateRequest;
 import org.example.takecareofmyfridgebe.domain.product.dto.ProductDetailResponse;
+import org.example.takecareofmyfridgebe.domain.product.dto.ProductIndexSource;
 import org.example.takecareofmyfridgebe.domain.product.dto.ProductListItemResponse;
 import org.example.takecareofmyfridgebe.domain.product.dto.ProductListRequest;
 import org.example.takecareofmyfridgebe.domain.product.dto.ProductUpdateRequest;
@@ -14,18 +15,26 @@ import org.example.takecareofmyfridgebe.domain.product.entity.MealkitProduct;
 import org.example.takecareofmyfridgebe.domain.product.entity.Product;
 import org.example.takecareofmyfridgebe.domain.product.entity.ProductStatus;
 import org.example.takecareofmyfridgebe.domain.product.entity.ProductType;
+import org.example.takecareofmyfridgebe.domain.product.event.ProductChangedEvent;
 import org.example.takecareofmyfridgebe.domain.product.repository.IngredientProductRepository;
 import org.example.takecareofmyfridgebe.domain.product.repository.MealkitProductRepository;
 import org.example.takecareofmyfridgebe.domain.product.repository.ProductRepository;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 import org.example.takecareofmyfridgebe.global.response.PageResponse;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -39,6 +48,7 @@ public class ProductService {
     private final IngredientProductRepository ingredientProductRepository;
     private final MealkitProductRepository mealkitProductRepository;
     private final IngredientRepository ingredientRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     // 정렬은 request.sort()로 저장소가 적용하므로 PageRequest에는 넣지 않는다.
     public PageResponse<ProductListItemResponse> getProducts(ProductListRequest request) {
@@ -48,6 +58,40 @@ public class ProductService {
                 .map(ProductListItemResponse::from);
 
         return PageResponse.of(response);
+    }
+
+    /**
+     * ES 검색이 고른 ID 순서대로 목록을 만든다. 가격·상태는 색인 값이 아니라 DB 값을 쓴다.
+     * <br>
+     * 색인이 늦어 판매 중지된 상품이 섞여 오면 빼고 보여 준다(전체 건수는 ES 값 그대로).
+     */
+    public PageResponse<ProductListItemResponse> getProductsByIds(List<Long> productIds, long total, ProductListRequest request) {
+        Map<Long, Product> productsById = productRepository.findAllById(productIds).stream()
+                .collect(Collectors.toMap(Product::getId, Function.identity()));
+
+        List<ProductListItemResponse> content = productIds.stream()
+                .map(productsById::get)
+                .filter(Objects::nonNull)
+                .filter(product -> PUBLIC_STATUSES.contains(product.getStatus()))
+                .map(ProductListItemResponse::from)
+                .toList();
+
+        // PageImpl은 받은 개수가 페이지 크기보다 적으면 전체 건수를 다시 계산하므로, 상품을 뺀 페이지에서도 ES 건수를 지키도록 직접 만든다
+        int totalPages = (int) Math.ceil((double) total / request.size());
+        return new PageResponse<>(content, request.page(), request.size(), total, totalPages, request.page() >= totalPages);
+    }
+
+    // 전체 재색인용. 판매 중지 상품도 넣고, 검색할 때 상태로 거른다
+    public List<ProductIndexSource> findIndexSources() {
+        return productRepository.findAll(Sort.by("id")).stream()
+                .map(ProductIndexSource::from)
+                .toList();
+    }
+
+    // 단건 색인용
+    public Optional<ProductIndexSource> findIndexSource(long productId) {
+        return productRepository.findById(productId)
+                .map(ProductIndexSource::from);
     }
 
     public PageResponse<ProductListItemResponse> getAdminProducts(AdminProductListRequest request) {
@@ -88,7 +132,6 @@ public class ProductService {
         };
     }
 
-    // TODO: ElasticSearch 에 인덱싱 과정 추가 필수...
     @Transactional
     public ProductDetailResponse createProduct(ProductCreateRequest request) {
         if (request.productType() == ProductType.INGREDIENT) {
@@ -96,6 +139,9 @@ public class ProductService {
         }
 
         Product product = productRepository.save(request.toProduct());
+
+        // 단건 인덱싱 위한 이벤트 발행
+        eventPublisher.publishEvent(ProductChangedEvent.from(product.getId()));
 
         return switch (product.getProductType()) {
             case INGREDIENT -> ProductDetailResponse.ofIngredient(
@@ -120,6 +166,9 @@ public class ProductService {
 
         request.applyTo(product);
 
+        // 단건 인덱싱 위한 이벤트 발행
+        eventPublisher.publishEvent(ProductChangedEvent.from(product.getId()));
+
         return switch (product.getProductType()) {
             case INGREDIENT -> ProductDetailResponse.ofIngredient(product, updateIngredientDetail(productId, request));
             case MEALKIT -> ProductDetailResponse.ofMealkit(product, updateMealkitDetail(productId, request));
@@ -133,6 +182,9 @@ public class ProductService {
         Product product = productRepository.findByIdForUpdate(productId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.PRODUCT_NOT_FOUND));
         product.stop();
+
+        // 단건 인덱싱 위한 이벤트 발행
+        eventPublisher.publishEvent(ProductChangedEvent.from(product.getId()));
     }
 
     private IngredientProduct updateIngredientDetail(Long productId, ProductUpdateRequest request) {

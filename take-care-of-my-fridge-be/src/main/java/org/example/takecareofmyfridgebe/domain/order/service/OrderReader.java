@@ -1,6 +1,7 @@
 package org.example.takecareofmyfridgebe.domain.order.service;
 
 import java.util.List;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.order.entity.Order;
 import org.example.takecareofmyfridgebe.domain.order.entity.OrderItem;
@@ -31,6 +32,11 @@ public class OrderReader {
     public Order getOwnedOrderForUpdate(Long memberId, Long orderId) {
         return orderRepository.findByIdAndMemberIdForUpdate(orderId, memberId)
             .orElseThrow(() -> new BusinessException(ErrorCode.ORDER_NOT_FOUND));
+    }
+
+    // 회원 확인 없이 주문 행을 잠그고 찾는다. 스케줄러처럼 로그인한 회원이 없는 곳에서 쓴다
+    public Optional<Order> findForUpdate(Long orderId) {
+        return orderRepository.findByIdForUpdate(orderId);
     }
 
     public List<OrderItem> getOrderItems(Order order) {

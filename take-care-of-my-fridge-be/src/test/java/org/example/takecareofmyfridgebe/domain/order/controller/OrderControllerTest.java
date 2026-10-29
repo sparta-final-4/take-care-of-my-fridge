@@ -3,8 +3,10 @@ package org.example.takecareofmyfridgebe.domain.order.controller;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
@@ -22,7 +24,6 @@ import java.util.stream.IntStream;
 import org.example.takecareofmyfridgebe.domain.auth.service.AuthSessionService;
 import org.example.takecareofmyfridgebe.domain.auth.service.JwtTokenService;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
-import org.example.takecareofmyfridgebe.domain.order.dto.OrderCancelResponse;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderCheckoutResponse;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderConfirmResponse;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderCreateResult;
@@ -80,22 +81,21 @@ class OrderControllerTest {
     }
 
     @Test
-    @DisplayName("주문 취소는 로그인한 회원 번호와 주문 번호로 서비스를 부르고 200이다")
+    @DisplayName("주문 취소는 로그인한 회원 번호와 주문 번호로 서비스를 부르고 데이터 없이 200이다")
     void cancelOrder_returns200() throws Exception {
-        when(orderCancelService.cancel(7L, 5001L)).thenReturn(new OrderCancelResponse(5001L, OrderStatus.CANCELLED));
-
         mvc.perform(patch("/api/orders/5001/cancel")
                         .with(csrf())
                         .with(loginAsMember7()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.orderId").value(5001))
-                .andExpect(jsonPath("$.data.status").value("CANCELLED"));
+                .andExpect(jsonPath("$.data").doesNotExist());
+
+        verify(orderCancelService).cancel(7L, 5001L);
     }
 
     @Test
     @DisplayName("결제가 끝난 주문을 취소하면 409다")
     void cancelOrder_paidOrder_returns409() throws Exception {
-        when(orderCancelService.cancel(7L, 5001L)).thenThrow(new BusinessException(ErrorCode.ORDER_ALREADY_PAID));
+        doThrow(new BusinessException(ErrorCode.ORDER_ALREADY_PAID)).when(orderCancelService).cancel(7L, 5001L);
 
         mvc.perform(patch("/api/orders/5001/cancel")
                         .with(csrf())

@@ -31,7 +31,8 @@ import java.util.UUID;
 public class PaymentCommandService {
 
     private static final String PORTONE_PAYMENT_ID_PREFIX = "payment-";
-    private static final long PAYMENT_EXPIRE_MINUTES = 10;
+    // 결제 시도가 끝난 결제 대기 주문을 취소하는 기준도 이 시간을 쓴다
+    public static final long PAYMENT_EXPIRE_MINUTES = 10;
 
     private final PaymentRepository paymentRepository;
     private final OrderRepository orderRepository;
@@ -75,7 +76,7 @@ public class PaymentCommandService {
         if (payment.getStatus() == PaymentStatus.FAILED) {
             return PaymentApproveResult.rejected(Rejection.PAYMENT_ALREADY_FAILED);
         }
-        // 같은 주문의 다른 결제가 먼저 결제 완료됐거나 주문이 취소·만료됐다
+        // 같은 주문의 다른 결제가 먼저 결제 완료됐거나 주문이 취소됐다
         if (payment.getOrder().getStatus() != OrderStatus.PENDING) {
             log.warn("결제할 수 없는 주문의 결제 완료: portonePaymentId={}, 주문 상태={}",
                     payment.getPortonePaymentId(), payment.getOrder().getStatus());
@@ -91,7 +92,8 @@ public class PaymentCommandService {
         return PaymentApproveResult.approved(PaymentConfirmResponse.from(payment));
     }
 
-    // 결제 시도 하나만 실패 처리한다. 주문은 PENDING으로 남아 다시 결제할 수 있고, 주문 취소·재고 복구는 주문 쪽이 맡는다.
+    // 결제 시도 하나만 실패 처리한다. 주문은 PENDING으로 남아 다시 결제할 수 있다. 마지막 결제 뒤 결제 만료 시간이 지나면
+    // 결제 쪽 스케줄러가 주문 쪽 메서드로 주문을 취소하고 재고를 되돌린다.
     // 실제로 실패 처리했으면 true, 다른 요청이 이미 처리해 그대로 뒀으면 false
     @Transactional
     public boolean fail(Payment target, FailReason reason, PaymentChangedBy changedBy) {

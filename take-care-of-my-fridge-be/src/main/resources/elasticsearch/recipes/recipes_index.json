@@ -1,0 +1,102 @@
+{
+  "settings": {
+    "number_of_shards": 1,
+    "number_of_replicas": 0,
+    "analysis": {
+      "tokenizer": {
+        "nori_mixed": {
+          "type": "nori_tokenizer",
+          "decompound_mode": "mixed",
+          "discard_punctuation": true
+        },
+        "nori_discard": {
+          "type": "nori_tokenizer",
+          "decompound_mode": "discard",
+          "discard_punctuation": true
+        },
+        "edge_1_20": {
+          "type": "edge_ngram",
+          "min_gram": 1,
+          "max_gram": 20,
+          "token_chars": ["letter", "digit"]
+        }
+      },
+      "filter": {
+        "recipe_synonyms": {
+          "type": "synonym_graph",
+          "lenient": true,
+          "synonyms": []
+        }
+      },
+      "analyzer": {
+        "korean": {
+          "type": "custom",
+          "tokenizer": "nori_mixed",
+          "filter": ["nori_part_of_speech", "nori_readingform", "lowercase"]
+        },
+        "korean_search": {
+          "type": "custom",
+          "tokenizer": "nori_discard",
+          "filter": ["nori_part_of_speech", "nori_readingform", "lowercase", "recipe_synonyms"]
+        },
+        "autocomplete": {
+          "type": "custom",
+          "tokenizer": "edge_1_20",
+          "filter": ["lowercase"]
+        },
+        "autocomplete_search": {
+          "type": "custom",
+          "tokenizer": "whitespace",
+          "filter": ["lowercase"]
+        }
+      }
+    }
+  },
+  "mappings": {
+    "dynamic": "strict",
+    "properties": {
+      "id":                       { "type": "long" },
+      "source":                   { "type": "keyword" },
+      "source_id":                { "type": "keyword" },
+      "name": {
+        "type": "text",
+        "analyzer": "korean",
+        "search_analyzer": "korean_search",
+        "fields": {
+          "keyword":      { "type": "keyword" },
+          "autocomplete": { "type": "text", "analyzer": "autocomplete", "search_analyzer": "autocomplete_search" }
+        }
+      },
+      "summary":                  { "type": "text", "analyzer": "korean", "search_analyzer": "korean_search" },
+      "cuisine_type":             { "type": "keyword" },
+      "category":                 { "type": "keyword" },
+      "cook_method":              { "type": "keyword" },
+      "main_ingredient_category": { "type": "keyword" },
+      "cook_time_min":            { "type": "integer" },
+      "servings":                 { "type": "integer" },
+      "difficulty":               { "type": "byte" },
+      "difficulty_label":         { "type": "keyword" },
+      "price_won":                { "type": "integer" },
+      "weight_g":                 { "type": "float" },
+      "calories":                 { "type": "float" },
+      "carbs_g":                  { "type": "float" },
+      "protein_g":                { "type": "float" },
+      "fat_g":                    { "type": "float" },
+      "sodium_mg":                { "type": "float" },
+      "tags":                     { "type": "keyword" },
+      "tip":                      { "type": "text", "analyzer": "korean", "search_analyzer": "korean_search" },
+      "image_url":                { "type": "keyword", "index": false },
+      "ingredients": {
+        "type": "keyword",
+        "fields": {
+          "text": { "type": "text", "analyzer": "korean", "search_analyzer": "korean_search" }
+        }
+      },
+      "main_ingredients":         { "type": "keyword" },
+      "ingredient_count":         { "type": "short" },
+      "steps_text":               { "type": "text", "analyzer": "korean", "search_analyzer": "korean_search" },
+      "step_count":               { "type": "short" },
+      "created_at":               { "type": "date", "format": "yyyy-MM-dd HH:mm:ss.SSSSSS||yyyy-MM-dd HH:mm:ss||strict_date_optional_time" }
+    }
+  }
+}

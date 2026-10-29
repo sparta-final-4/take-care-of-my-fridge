@@ -31,6 +31,7 @@ export const router = createBrowserRouter([
         path: ROUTES.productDetail,
         lazy: page(() => import('@/pages/product/ProductDetailPage')),
       },
+      { path: ROUTES.search, lazy: page(() => import('@/pages/search/SearchPage')) },
       {
         Component: RequireAuth,
         children: [
@@ -94,6 +95,10 @@ export const router = createBrowserRouter([
           {
             path: ROUTES.adminProductNew,
             lazy: page(() => import('@/pages/admin/AdminProductCreatePage')),
+          },
+          {
+            path: ROUTES.adminProductDetail,
+            lazy: page(() => import('@/pages/admin/AdminProductDetailPage')),
           },
           {
             path: ROUTES.adminSaleEventNew,

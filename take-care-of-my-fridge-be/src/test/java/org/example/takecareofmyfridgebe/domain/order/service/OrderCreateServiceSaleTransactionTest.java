@@ -29,6 +29,7 @@ import org.example.takecareofmyfridgebe.domain.order.entity.OrderStatus;
 import org.example.takecareofmyfridgebe.domain.order.entity.SaleType;
 import org.example.takecareofmyfridgebe.domain.order.repository.OrderItemRepository;
 import org.example.takecareofmyfridgebe.domain.order.repository.OrderRepository;
+import org.example.takecareofmyfridgebe.domain.payment.service.PaymentService;
 import org.example.takecareofmyfridgebe.domain.product.entity.Product;
 import org.example.takecareofmyfridgebe.domain.product.entity.ProductType;
 import org.example.takecareofmyfridgebe.domain.product.repository.ProductRepository;
@@ -60,7 +61,7 @@ import org.springframework.transaction.annotation.Transactional;
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({JpaAuditingConfig.class, QueryDslConfig.class, OrderCreateService.class, OrderCancelService.class,
     OrderNumberGenerator.class, OrderReader.class, SaleEventReader.class,
-    SaleEventStockService.class})
+    SaleEventStockService.class, PaymentService.class})
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class OrderCreateServiceSaleTransactionTest extends MySqlContainerSupport {
 
@@ -231,7 +232,7 @@ class OrderCreateServiceSaleTransactionTest extends MySqlContainerSupport {
 
         assertThat(remainingOf(flashDrop)).isEqualTo(3);
         assertThat(stockOf(milk)).isEqualTo(10);
-        assertThat(orderItemRepository.findAll().get(0).getFlashDropMemberId()).isNull();
+        assertThat(orderItemRepository.findAll()).isEmpty();
         order(7L, "key-3", line(item, 2000, SaleEventType.FLASH_DROP));
         assertThat(remainingOf(flashDrop)).isEqualTo(2);
     }

@@ -1837,7 +1837,7 @@
             "content": {
               "*/*": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiResponseOrderCancelResponse"
+                  "$ref": "#/components/schemas/ApiResponseVoid"
                 }
               }
             },
@@ -2459,6 +2459,96 @@
         ]
       }
     },
+    "/api/search/clicks": {
+      "post": {
+        "operationId": "recordClick",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchClickRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "search-controller"
+        ]
+      }
+    },
+    "/api/search/products": {
+      "get": {
+        "operationId": "searchProducts",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "request",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ProductListRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePageResponseProductListItemResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "search-controller"
+        ]
+      }
+    },
+    "/api/search/recipes": {
+      "get": {
+        "operationId": "searchRecipes",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "request",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/RecipeListRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePageResponseRecipeListItemResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "search-controller"
+        ]
+      }
+    },
     "/api/webhooks/portone": {
       "post": {
         "operationId": "handlePortOneWebhook",
@@ -2929,20 +3019,6 @@
         "properties": {
           "data": {
             "$ref": "#/components/schemas/NicknameAvailabilityResponse"
-          },
-          "error": {
-            "$ref": "#/components/schemas/ErrorResponse"
-          },
-          "success": {
-            "type": "boolean"
-          }
-        }
-      },
-      "ApiResponseOrderCancelResponse": {
-        "type": "object",
-        "properties": {
-          "data": {
-            "$ref": "#/components/schemas/OrderCancelResponse"
           },
           "error": {
             "$ref": "#/components/schemas/ErrorResponse"
@@ -4907,24 +4983,6 @@
           },
           "weightG": {
             "type": "number"
-          }
-        }
-      },
-      "OrderCancelResponse": {
-        "type": "object",
-        "properties": {
-          "orderId": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "PENDING",
-              "PAID",
-              "CANCELLED",
-              "CONFIRMED"
-            ]
           }
         }
       },
@@ -7065,6 +7123,24 @@
             }
           }
         }
+      },
+      "SearchClickRequest": {
+        "type": "object",
+        "properties": {
+          "keyword": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 0
+          },
+          "productId": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "required": [
+          "keyword",
+          "productId"
+        ]
       },
       "ServerSentEventString": {},
       "SignUpRequest": {
