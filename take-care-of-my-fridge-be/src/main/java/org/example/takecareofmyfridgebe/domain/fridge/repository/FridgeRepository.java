@@ -33,10 +33,4 @@ public interface FridgeRepository extends JpaRepository<Fridge, Long>, FridgeRep
             @Param("memberId") Long memberId,
             @Param("ingredientId") Long ingredientId
     );
-
-    @Query("select f.rawName from Fridge f where f.id = :fridgeId and f.memberId = :memberId")
-    Optional<String> findRawNameByIdAndMemberId(
-            @Param("fridgeId") Long fridgeId,
-            @Param("memberId") Long memberId
-    );
 }

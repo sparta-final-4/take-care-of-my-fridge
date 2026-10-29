@@ -15,11 +15,15 @@ export type FridgeRemoveReason = 'CONSUMED' | 'DISCARDED' | 'WRONG_ENTRY';
 // FridgeItemAction.java
 export type FridgeItemAction = 'CONSUMED' | 'DISCARDED';
 
+// IngredientType.java
+export type IngredientType = 'NORMAL' | 'CUSTOM' | 'MEALKIT';
+
 // FridgeItemResponse.java와 필드·enum을 맞춘다. 숫자(BigDecimal)는 number로 직렬화된다.
 export interface FridgeItemResponse {
   id: number;
   ingredientId: number | null;
   ingredientName: string | null;
+  ingredientType: IngredientType;
   baseUnit: string | null;
   rawName: string;
   quantity: number;

@@ -3,6 +3,7 @@ import dayjs from 'dayjs';
 
 import type { FridgeItemResponse } from '../api';
 import { formatDDay, formatQuantity, STORAGE_LABELS, withObjectParticle } from '../format';
+import { IngredientTypeTag } from './IngredientTypeTag';
 import styles from './FridgeItemRow.module.scss';
 
 interface FridgeItemRowProps {
@@ -36,9 +37,16 @@ export function FridgeItemRow({
         aria-label={`${item.rawName} 선택`}
         className={styles.check}
       />
-      <Typography.Text strong={checked || isImminent} title={item.rawName} className={styles.name}>
-        {item.rawName}
-      </Typography.Text>
+      <div className={styles.nameWrapper}>
+        <Typography.Text
+          strong={checked || isImminent}
+          title={item.rawName}
+          className={styles.name}
+        >
+          {item.rawName}
+        </Typography.Text>
+        <IngredientTypeTag type={item.ingredientType} />
+      </div>
       <div className={styles.meta}>
         <Typography.Text className={styles.metaText}>{formatQuantity(item)}</Typography.Text>
         <Typography.Text className={styles.date}>

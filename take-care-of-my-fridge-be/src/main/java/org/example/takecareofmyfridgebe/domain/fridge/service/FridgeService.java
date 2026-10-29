@@ -9,6 +9,7 @@ import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemResponse;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemTakeOutRequest;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemTakeOutResponse;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemUpdateRequest;
+import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeNameInfo;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeRemoveReason;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeSortType;
 import org.example.takecareofmyfridgebe.domain.fridge.entity.Fridge;
@@ -314,16 +315,18 @@ public class FridgeService {
     }
 
     /**
-     * 냉장고 재료 ID와 회원 ID로 본인 소유 재료의 rawName만 조회한다.
+     * 냉장고 재료 ID와 회원 ID로 본인 소유 재료의 rawName과 밀키트 여부만 조회한다.
+     * 지연 로딩되는 ingredient를 트랜잭션 안에서 확인해 Facade로 엔티티를 넘기지 않는다.
      * 존재하지 않거나 다른 회원의 재료이면 404(FRIDGE_ITEM_NOT_FOUND)로 통일한다.
      *
      * @param memberId 요청한 회원 ID
      * @param fridgeId 조회할 냉장고 재료 ID
-     * @return 저장된 재료 원문 이름(rawName)
+     * @return 저장된 재료 원문 이름(rawName)과 밀키트 여부
      */
-    public String getRawName(Long memberId, Long fridgeId) {
-        return fridgeRepository.findRawNameByIdAndMemberId(fridgeId, memberId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.FRIDGE_ITEM_NOT_FOUND));
+    public FridgeNameInfo getNameInfo(Long memberId, Long fridgeId) {
+        Fridge fridge = getFridgeEntity(memberId, fridgeId);
+        Ingredient ingredient = fridge.getIngredient();
+        return new FridgeNameInfo(fridge.getRawName(), ingredient != null && ingredient.isMealkit());
     }
 
     /**

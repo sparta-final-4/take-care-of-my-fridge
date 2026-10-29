@@ -3,6 +3,7 @@ package org.example.takecareofmyfridgebe.domain.fridge.facade;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemCreateRequest;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemResponse;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemUpdateRequest;
+import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeNameInfo;
 import org.example.takecareofmyfridgebe.domain.fridge.entity.Fridge;
 import org.example.takecareofmyfridgebe.domain.fridge.entity.FridgeSource;
 import org.example.takecareofmyfridgebe.domain.fridge.service.FridgeService;
@@ -144,7 +145,7 @@ class FridgeFacadeTest {
         );
         FridgeItemResponse expectedResponse = mock(FridgeItemResponse.class);
 
-        when(fridgeService.getRawName(7L, 100L)).thenReturn("국산 두부 300g");
+        when(fridgeService.getNameInfo(7L, 100L)).thenReturn(new FridgeNameInfo("국산 두부 300g", false));
         when(fridgeService.updateItem(7L, 100L, null, request)).thenReturn(expectedResponse);
 
         // When: 동일한 rawName으로 수정 요청
@@ -181,7 +182,7 @@ class FridgeFacadeTest {
         );
         FridgeItemResponse expectedResponse = mock(FridgeItemResponse.class);
 
-        when(fridgeService.getRawName(7L, 100L)).thenReturn("두부");
+        when(fridgeService.getNameInfo(7L, 100L)).thenReturn(new FridgeNameInfo("두부", false));
         when(ingredientMatcher.match("[특가] 신라면 5개입")).thenReturn(newIngredient);
         when(fridgeService.updateItem(7L, 100L, newIngredient, request)).thenReturn(expectedResponse);
 
@@ -192,5 +193,33 @@ class FridgeFacadeTest {
         assertSame(expectedResponse, actual);
         verify(ingredientMatcher).match("[특가] 신라면 5개입");
         verify(fridgeService).updateItem(7L, 100L, newIngredient, request);
+    }
+
+    /**
+     * 기존 재료가 밀키트(ING_MEALKIT)이면 rawName이 바뀌어도
+     * IngredientMatcher.match를 호출하지 않고 ingredient를 null(밀키트 유지)로
+     * FridgeService.updateItem에 전달하는지 검증한다.
+     */
+    @Test
+    void updateItemKeepsMealkitWhenRawNameIsChanged() {
+        // Given: 기존 rawName이 "밀푀유나베 밀키트"인 밀키트 재료를 다른 이름으로 수정하는 상황
+        FridgeItemUpdateRequest request = new FridgeItemUpdateRequest(
+                "밀푀유나베 밀키트 2인분",
+                new BigDecimal("1"),
+                StorageType.REFRIGERATED,
+                LocalDate.now().plusDays(3)
+        );
+        FridgeItemResponse expectedResponse = mock(FridgeItemResponse.class);
+
+        when(fridgeService.getNameInfo(7L, 200L)).thenReturn(new FridgeNameInfo("밀푀유나베 밀키트", true));
+        when(fridgeService.updateItem(7L, 200L, null, request)).thenReturn(expectedResponse);
+
+        // When
+        FridgeItemResponse actual = fridgeFacade.updateItem(7L, 200L, request);
+
+        // Then: 매핑을 호출하지 않고 null(기존 밀키트 유지)을 전달
+        assertSame(expectedResponse, actual);
+        verifyNoInteractions(ingredientMatcher);
+        verify(fridgeService).updateItem(7L, 200L, null, request);
     }
 }

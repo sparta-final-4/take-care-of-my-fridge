@@ -8,6 +8,7 @@ import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemResponse;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemTakeOutRequest;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemTakeOutResponse;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemUpdateRequest;
+import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeNameInfo;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeRemoveReason;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeSortType;
 import org.example.takecareofmyfridgebe.domain.fridge.entity.Fridge;
@@ -339,18 +340,51 @@ class FridgeServiceTest {
     }
 
     /**
-     * rawName 비교용 조회에서 존재하지 않거나 다른 회원의 fridgeId이면
+     * 재매핑 비교용 조회가 저장된 rawName과 밀키트(ING_MEALKIT) 여부를 함께 반환하는지 검증한다.
+     */
+    @Test
+    void getNameInfoReturnsRawNameAndMealkitFlag() {
+        // Given: 밀키트 재료로 매핑된 냉장고 재료
+        Ingredient mealkit = Ingredient.builder()
+                .ingredientCode(Ingredient.ING_MEALKIT)
+                .name("밀키트")
+                .baseUnit("개")
+                .defaultStorage(StorageType.REFRIGERATED)
+                .defaultShelfDays(3)
+                .basicSeasoning(false)
+                .build();
+        Fridge fridge = Fridge.builder()
+                .memberId(7L)
+                .ingredient(mealkit)
+                .rawName("밀푀유나베 밀키트")
+                .quantity(new BigDecimal("1"))
+                .storage(StorageType.REFRIGERATED)
+                .expirationDate(LocalDate.now().plusDays(3))
+                .source(FridgeSource.MANUAL)
+                .build();
+        when(fridgeRepository.findByIdAndMemberId(200L, 7L)).thenReturn(Optional.of(fridge));
+
+        // When
+        FridgeNameInfo nameInfo = fridgeService.getNameInfo(7L, 200L);
+
+        // Then
+        assertEquals("밀푀유나베 밀키트", nameInfo.rawName());
+        assertTrue(nameInfo.mealkit());
+    }
+
+    /**
+     * 재매핑 비교용 조회에서 존재하지 않거나 다른 회원의 fridgeId이면
      * BusinessException(ErrorCode.FRIDGE_ITEM_NOT_FOUND) 예외가 발생하는지 검증한다.
      */
     @Test
-    void getRawNameThrowsNotFoundWhenOwnedByAnotherMemberOrMissing() {
+    void getNameInfoThrowsNotFoundWhenOwnedByAnotherMemberOrMissing() {
         // Given
-        when(fridgeRepository.findRawNameByIdAndMemberId(999L, 7L)).thenReturn(Optional.empty());
+        when(fridgeRepository.findByIdAndMemberId(999L, 7L)).thenReturn(Optional.empty());
 
         // When & Then
         BusinessException exception = assertThrows(
                 BusinessException.class,
-                () -> fridgeService.getRawName(7L, 999L)
+                () -> fridgeService.getNameInfo(7L, 999L)
         );
         assertEquals(ErrorCode.FRIDGE_ITEM_NOT_FOUND, exception.getErrorCode());
     }

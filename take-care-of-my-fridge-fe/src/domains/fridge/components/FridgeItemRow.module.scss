@@ -27,8 +27,15 @@
   grid-area: check;
 }
 
-.name {
+.nameWrapper {
   grid-area: name;
+  display: flex;
+  align-items: center;
+  gap: var(--ant-margin-xs);
+  min-width: 0;
+}
+
+.name {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

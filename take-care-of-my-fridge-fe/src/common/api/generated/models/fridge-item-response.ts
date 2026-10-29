@@ -25,6 +25,7 @@ export interface FridgeItemResponse {
     'imminent'?: boolean;
     'ingredientId'?: number;
     'ingredientName'?: string;
+    'ingredientType'?: FridgeItemResponseIngredientTypeEnum;
     'orderItemId'?: number;
     'quantity'?: number;
     'rawName'?: string;
@@ -34,6 +35,13 @@ export interface FridgeItemResponse {
     'updatedAt'?: string;
 }
 
+export const FridgeItemResponseIngredientTypeEnum = {
+    Normal: 'NORMAL',
+    Custom: 'CUSTOM',
+    Mealkit: 'MEALKIT',
+} as const;
+
+export type FridgeItemResponseIngredientTypeEnum = typeof FridgeItemResponseIngredientTypeEnum[keyof typeof FridgeItemResponseIngredientTypeEnum];
 export const FridgeItemResponseSourceEnum = {
     Manual: 'MANUAL',
     Commerce: 'COMMERCE',

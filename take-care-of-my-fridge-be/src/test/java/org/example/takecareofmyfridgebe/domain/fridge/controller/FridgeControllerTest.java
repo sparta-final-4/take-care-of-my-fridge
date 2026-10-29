@@ -16,6 +16,7 @@ import org.example.takecareofmyfridgebe.domain.fridge.entity.FridgeItemStatus;
 import org.example.takecareofmyfridgebe.domain.fridge.entity.FridgeSource;
 import org.example.takecareofmyfridgebe.domain.fridge.facade.FridgeFacade;
 import org.example.takecareofmyfridgebe.domain.fridge.service.FridgeService;
+import org.example.takecareofmyfridgebe.domain.ingredient.entity.IngredientType;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.StorageType;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 import org.example.takecareofmyfridgebe.global.config.SecurityConfig;
@@ -119,6 +120,7 @@ class FridgeControllerTest {
                 false,
                 2L,
                 FridgeItemStatus.IMMINENT,
+                IngredientType.NORMAL,
                 LocalDateTime.of(2026, 10, 18, 12, 0),
                 LocalDateTime.of(2026, 10, 18, 12, 0)
         );
@@ -238,6 +240,7 @@ class FridgeControllerTest {
                 false,
                 5L,
                 FridgeItemStatus.NORMAL,
+                IngredientType.NORMAL,
                 LocalDateTime.of(2026, 10, 19, 11, 0),
                 LocalDateTime.of(2026, 10, 19, 11, 0)
         );
@@ -339,6 +342,7 @@ class FridgeControllerTest {
                 false,
                 1L,
                 FridgeItemStatus.IMMINENT,
+                IngredientType.NORMAL,
                 LocalDateTime.of(2026, 10, 18, 10, 0),
                 LocalDateTime.of(2026, 10, 19, 14, 0)
         );

@@ -24,6 +24,11 @@
   border-radius: var(--ant-border-radius);
 }
 
+.itemNameWrapper {
+  min-width: 0;
+  flex: 1;
+}
+
 .itemName {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -58,9 +63,4 @@
 
 .footer {
   margin-top: auto;
-  padding-top: var(--ant-padding-xxs);
-}
-
-.shortcutButton {
-  font-weight: var(--ant-font-weight-strong);
 }

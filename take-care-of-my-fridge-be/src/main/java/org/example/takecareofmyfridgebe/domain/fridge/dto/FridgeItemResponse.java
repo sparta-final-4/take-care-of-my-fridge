@@ -4,6 +4,7 @@ import org.example.takecareofmyfridgebe.domain.fridge.entity.Fridge;
 import org.example.takecareofmyfridgebe.domain.fridge.entity.FridgeItemStatus;
 import org.example.takecareofmyfridgebe.domain.fridge.entity.FridgeSource;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.Ingredient;
+import org.example.takecareofmyfridgebe.domain.ingredient.entity.IngredientType;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.StorageType;
 
 import java.math.BigDecimal;
@@ -28,6 +29,7 @@ public record FridgeItemResponse(
         // 오늘 기준 소비기한까지 남은 일수 (오늘이면 0, 지났으면 음수)
         long dDay,
         FridgeItemStatus status,
+        IngredientType ingredientType,
         LocalDateTime createdAt,
         LocalDateTime updatedAt
 ) {
@@ -36,6 +38,16 @@ public record FridgeItemResponse(
         Ingredient ingredient = fridge.getIngredient();
         long dDay = FridgeItemStatus.dDayOf(fridge.getExpirationDate(), today);
         FridgeItemStatus status = FridgeItemStatus.of(dDay);
+
+        IngredientType ingredientType = IngredientType.NORMAL;
+        if (ingredient != null) {
+            if (ingredient.isCustom()) {
+                ingredientType = IngredientType.CUSTOM;
+            } else if (ingredient.isMealkit()) {
+                ingredientType = IngredientType.MEALKIT;
+            }
+        }
+
         return new FridgeItemResponse(
                 fridge.getId(),
                 ingredient != null ? ingredient.getId() : null,
@@ -51,6 +63,7 @@ public record FridgeItemResponse(
                 status == FridgeItemStatus.EXPIRED,
                 dDay,
                 status,
+                ingredientType,
                 fridge.getCreatedAt(),
                 fridge.getUpdatedAt()
         );

@@ -8,6 +8,7 @@ import { SectionCard } from '@/common/components/SectionCard';
 
 import { formatDDay } from '../format';
 import { useFridgeItems } from '../queries';
+import { IngredientTypeTag } from './IngredientTypeTag';
 import styles from './MyFridgeSection.module.scss';
 
 const SUMMARY_SIZE = 5;
@@ -52,9 +53,12 @@ export function MyFridgeSection() {
 
           return (
             <div key={item.id} className={styles.itemRow}>
-              <Typography.Text strong={isImminent} className={styles.itemName}>
-                {item.rawName}
-              </Typography.Text>
+              <Flex align="center" gap="xs" className={styles.itemNameWrapper}>
+                <Typography.Text strong={isImminent} className={styles.itemName}>
+                  {item.rawName}
+                </Typography.Text>
+                <IngredientTypeTag type={item.ingredientType} />
+              </Flex>
               <Flex align="center" gap="xs">
                 {isImminent && (
                   <WarningFilled className={styles.warningIcon} aria-label="소비기한 임박 경고" />

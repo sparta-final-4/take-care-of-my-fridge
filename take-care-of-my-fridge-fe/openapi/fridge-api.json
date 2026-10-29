@@ -4396,6 +4396,14 @@
           "ingredientName": {
             "type": "string"
           },
+          "ingredientType": {
+            "type": "string",
+            "enum": [
+              "NORMAL",
+              "CUSTOM",
+              "MEALKIT"
+            ]
+          },
           "orderItemId": {
             "type": "integer",
             "format": "int64"
