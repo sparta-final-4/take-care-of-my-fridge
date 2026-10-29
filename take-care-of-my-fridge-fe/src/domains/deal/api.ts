@@ -1,6 +1,7 @@
 import {
   adminDealAnalysisApi,
   type DealAnalysisResponse,
+  type DealAnalysisRunRequest,
   type DealEventRequest,
   type DealEventResponse,
   type DealReviewRequest,
@@ -11,6 +12,11 @@ export async function getLatestDealAnalysis(signal?: AbortSignal): Promise<DealA
   return unwrap(adminDealAnalysisApi.getLatest1({ signal }));
 }
 
+export async function runDealAnalysis(
+  request: DealAnalysisRunRequest,
+): Promise<DealAnalysisResponse> {
+  return unwrap(adminDealAnalysisApi.run({ dealAnalysisRunRequest: request }));
+}
 export async function saveDealReview(
   analysisId: number,
   request: DealReviewRequest,

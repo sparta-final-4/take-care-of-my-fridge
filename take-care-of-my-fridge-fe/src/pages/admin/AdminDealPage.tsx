@@ -23,15 +23,25 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router';
 
 import { ROUTES } from '@/app/paths';
-import type { Candidate, DealEventRequestTypeEnum, Excluded } from '@/common/api/clients';
+import type {
+  Candidate,
+  DealAnalysisRunRequestDayOfWeekEnum,
+  DealEventRequestTypeEnum,
+  Excluded,
+} from '@/common/api/clients';
 import { getErrorCode } from '@/common/api/errors';
-import { registerDealEvent, saveDealReview } from '@/domains/deal/api';
+import { registerDealEvent, runDealAnalysis, saveDealReview } from '@/domains/deal/api';
 import { dealQueries } from '@/domains/deal/queries';
 import { DATE_TIME_FORMAT, REQUEST_TIME_FORMAT } from '@/domains/sale/format';
 import { saleQueries } from '@/domains/sale/queries';
 
 import styles from './AdminDealPage.module.scss';
 
+interface AnalysisFormValues {
+  targetWeekStart: Dayjs;
+  dayOfWeek: DealAnalysisRunRequestDayOfWeekEnum;
+  discountRate: number;
+}
 interface EventFormValues {
   type: DealEventRequestTypeEnum;
   startsAt: Dayjs;
@@ -49,6 +59,7 @@ export default function AdminDealPage() {
   const { message } = App.useApp();
   const queryClient = useQueryClient();
   const [form] = Form.useForm<EventFormValues>();
+  const [analysisForm] = Form.useForm<AnalysisFormValues>();
   const [candidate, setCandidate] = useState<Candidate | null>(null);
   const type = Form.useWatch('type', form);
   const { data: analysis, error, isPending, isError, refetch } = useQuery(dealQueries.latest());
@@ -85,9 +96,59 @@ export default function AdminDealPage() {
     },
   });
 
+  const runAnalysis = useMutation({
+    mutationFn: (values: AnalysisFormValues) =>
+      runDealAnalysis({
+        targetWeekStart: values.targetWeekStart.format('YYYY-MM-DD'),
+        dayOfWeek: values.dayOfWeek,
+        discountRate: values.discountRate,
+      }),
+    onSuccess: () => {
+      void message.success('할인 후보 분석을 완료했습니다.');
+      return queryClient.invalidateQueries({ queryKey: dealQueries.all });
+    },
+    onError: (error) =>
+      void message.error(
+        getErrorCode(error) === 'D007'
+          ? '일반 특가 이력이 부족해 분석할 수 없습니다.'
+          : '할인 후보 분석을 실행하지 못했습니다.',
+      ),
+  });
+  const runControls = (
+    <Form<AnalysisFormValues>
+      form={analysisForm}
+      layout="inline"
+      initialValues={{
+        targetWeekStart: dayjs().day(1).add(1, 'week'),
+        dayOfWeek: 'MON',
+        discountRate: 20,
+      }}
+      onFinish={(values) => runAnalysis.mutate(values)}
+      className={styles.notice}
+    >
+      <Form.Item name="targetWeekStart" label="목표 주 월요일" rules={[{ required: true }]}>
+        <DatePicker disabledDate={(date) => date.day() !== 1} />
+      </Form.Item>
+      <Form.Item name="dayOfWeek" label="요일" rules={[{ required: true }]}>
+        <Select
+          style={{ width: 90 }}
+          options={Object.entries(dayLabels).map(([value, label]) => ({ value, label }))}
+        />
+      </Form.Item>
+      <Form.Item name="discountRate" label="할인율" rules={[{ required: true }]}>
+        <InputNumber min={1} max={99} suffix="%" />
+      </Form.Item>
+      <Form.Item>
+        <Button type="primary" htmlType="submit" loading={runAnalysis.isPending}>
+          분석 실행
+        </Button>
+      </Form.Item>
+    </Form>
+  );
   if (isPending) {
     return (
       <div className={styles.container}>
+        {runControls}
         <Skeleton active paragraph={{ rows: 8 }} />
       </div>
     );
@@ -96,6 +157,7 @@ export default function AdminDealPage() {
     if (getErrorCode(error) === 'D002') {
       return (
         <div className={styles.container}>
+          {runControls}
           <Empty description="아직 할인 후보 분석 결과가 없습니다." />
         </div>
       );
@@ -117,9 +179,10 @@ export default function AdminDealPage() {
         <Typography.Title level={2}>할인 후보</Typography.Title>
         <Button onClick={() => navigate(ROUTES.adminSaleEventNew)}>행사 관리</Button>
       </Space>
+      {runControls}
       <Typography.Paragraph type="secondary">
         {analysis.targetWeekStart} 주 · {analysis.dayOfWeek ? dayLabels[analysis.dayOfWeek] : '-'}
-        요일 · 가상 할인율 {analysis.discountRate}% · 최소 재고{' '}
+        요일 · 분석 할인율 {analysis.discountRate}% · 최소 재고{' '}
         {analysis.minStock?.toLocaleString('ko-KR') ?? '-'}개
       </Typography.Paragraph>
       <Descriptions bordered size="small" column={{ xs: 1, sm: 2 }} className={styles.notice}>
