@@ -1,5 +1,6 @@
 package org.example.takecareofmyfridgebe.global.config;
 
+import jakarta.servlet.DispatcherType;
 import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.auth.service.AuthSessionService;
 import org.example.takecareofmyfridgebe.domain.auth.service.JwtTokenService;
@@ -41,6 +42,7 @@ public class SecurityConfig {
                                 || (request.getContextPath() + "/api/auth/login").equals(request.getRequestURI())
                                 || (request.getContextPath() + "/api/webhooks/portone").equals(request.getRequestURI()))))
                 .authorizeHttpRequests(auth -> auth
+                        .dispatcherTypeMatchers(DispatcherType.ASYNC, DispatcherType.ERROR).permitAll()
                         .requestMatchers(HttpMethod.POST,
                                 "/api/members", "/api/webhooks/portone"
                         ).permitAll()

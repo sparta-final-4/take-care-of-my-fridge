@@ -73,11 +73,11 @@ class ChatStreamServiceTest {
 
         assertThat(events).isNotNull().hasSize(4);
         assertThat(events.get(0).event()).isEqualTo("message");
-        assertThat(events.get(0).data()).isEqualTo("된장");
+        assertThat(events.get(0).data()).isEqualTo("{\"text\":\"된장\"}");
         assertThat(events.get(1).event()).isEqualTo("message");
-        assertThat(events.get(1).data()).isEqualTo("찌개");
+        assertThat(events.get(1).data()).isEqualTo("{\"text\":\"찌개\"}");
         assertThat(events.get(2).event()).isEqualTo("message");
-        assertThat(events.get(2).data()).isEqualTo(" 레시피");
+        assertThat(events.get(2).data()).isEqualTo("{\"text\":\" 레시피\"}");
 
         assertThat(events.get(3).event()).isEqualTo("done");
         assertThat(events.get(3).data()).contains("\"userMessageId\":100");
@@ -151,7 +151,7 @@ class ChatStreamServiceTest {
         ServerSentEvent<String> firstEvent = stream.take(1).blockLast();
 
         assertThat(firstEvent).isNotNull();
-        assertThat(firstEvent.data()).isEqualTo("조각1");
+        assertThat(firstEvent.data()).isEqualTo("{\"text\":\"조각1\"}");
 
         verify(chatMessageService, never()).saveExchange(any(), any(), any());
     }
@@ -190,5 +190,31 @@ class ChatStreamServiceTest {
 
         verify(chatReplyGenerator, never()).generate(any(), any());
         verify(chatMessageService, never()).saveExchange(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("공백으로 시작하는 답변 조각(\" 계란\")이 JSON 안에 그대로 유지된다")
+    void streamMessagePreservesLeadingSpaceInJson() {
+        Long memberId = 1L;
+        Long sessionId = 10L;
+        String userContent = "재료 뭐 있어?";
+
+        when(chatReplyGenerator.generate(sessionId, userContent))
+                .thenReturn(Flux.just(" 계란", " 양파 "));
+
+        when(chatMessageService.saveExchange(eq(sessionId), eq(userContent), eq(" 계란 양파 ")))
+                .thenReturn(List.of(
+                        new ChatMessageResponse(100L, 1, ChatMessageRole.USER, userContent, LocalDateTime.now()),
+                        new ChatMessageResponse(101L, 2, ChatMessageRole.ASSISTANT, " 계란 양파 ", LocalDateTime.now())
+                ));
+
+        Flux<ServerSentEvent<String>> stream = chatStreamService.streamMessage(memberId, sessionId, userContent);
+        List<ServerSentEvent<String>> events = stream.collectList().block();
+
+        assertThat(events).isNotNull().hasSize(3);
+        assertThat(events.get(0).event()).isEqualTo("message");
+        assertThat(events.get(0).data()).isEqualTo("{\"text\":\" 계란\"}");
+        assertThat(events.get(1).event()).isEqualTo("message");
+        assertThat(events.get(1).data()).isEqualTo("{\"text\":\" 양파 \"}");
     }
 }

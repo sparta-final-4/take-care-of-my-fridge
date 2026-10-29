@@ -1,5 +1,16 @@
-import { Empty } from 'antd';
+import { Button, Empty } from 'antd';
+import { useNavigate } from 'react-router';
+
+import { ROUTES } from '@/app/paths';
 
 export default function MyPageChatsPage() {
-  return <Empty description="AI 상담 내역 준비 중입니다" />;
+  const navigate = useNavigate();
+
+  return (
+    <Empty description="AI 상담 내역 목록 기능은 준비 중입니다.">
+      <Button type="primary" onClick={() => navigate(ROUTES.chat)}>
+        AI 상담 바로가기
+      </Button>
+    </Empty>
+  );
 }

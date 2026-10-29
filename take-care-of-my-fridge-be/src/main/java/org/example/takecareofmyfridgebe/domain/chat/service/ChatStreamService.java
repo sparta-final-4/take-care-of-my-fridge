@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatDoneEventResponse;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatErrorEventResponse;
+import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageEventResponse;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageResponse;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
@@ -50,7 +51,7 @@ public class ChatStreamService {
                 .doOnNext(accumulated::append)
                 .map(chunk -> ServerSentEvent.<String>builder()
                         .event("message")
-                        .data(chunk)
+                        .data(toJson(new ChatMessageEventResponse(chunk)))
                         .build());
 
         // 4. 스트림 정상 완료 시 DB 저장 후 종료 이벤트 (event: done)

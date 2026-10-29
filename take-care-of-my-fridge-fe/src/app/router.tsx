@@ -18,6 +18,7 @@ export const router = createBrowserRouter([
     errorElement: <RouteErrorPage />,
     children: [
       { path: ROUTES.home, lazy: page(() => import('@/pages/MainPage')) },
+      { path: ROUTES.chat, lazy: page(() => import('@/pages/chat/ChatPage')) },
       { path: ROUTES.login, lazy: page(() => import('@/pages/auth/LoginPage')) },
       { path: ROUTES.signup, lazy: page(() => import('@/pages/auth/SignUpPage')) },
       { path: ROUTES.signupComplete, lazy: page(() => import('@/pages/auth/SignUpCompletePage')) },

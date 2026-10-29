@@ -1,5 +1,6 @@
 package org.example.takecareofmyfridgebe.domain.chat.service;
 
+import org.example.takecareofmyfridgebe.domain.chat.config.ChatProperties;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageResponse;
 import org.example.takecareofmyfridgebe.domain.chat.entity.ChatMessageRole;
 import org.example.takecareofmyfridgebe.domain.chat.entity.ChatSession;
@@ -14,6 +15,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.context.annotation.Import;
@@ -29,6 +31,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
+@EnableConfigurationProperties(ChatProperties.class)
 @Import({JpaAuditingConfig.class, QueryDslConfig.class, ChatMessageService.class, ChatSessionService.class})
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class ChatMessageRepositoryAndServiceTest extends MySqlContainerSupport {

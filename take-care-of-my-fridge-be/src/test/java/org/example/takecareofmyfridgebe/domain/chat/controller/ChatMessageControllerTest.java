@@ -83,7 +83,7 @@ class ChatMessageControllerTest {
         String userContent = "된장찌개 레시피 알려줘";
 
         Flux<ServerSentEvent<String>> mockStream = Flux.just(
-                ServerSentEvent.<String>builder().event("message").data("된장").build(),
+                ServerSentEvent.<String>builder().event("message").data("{\"text\":\"된장\"}").build(),
                 ServerSentEvent.<String>builder().event("done").data("{\"userMessageId\":100,\"assistantMessageId\":101}").build()
         );
 
@@ -103,7 +103,7 @@ class ChatMessageControllerTest {
                 .andExpect(status().isOk());
 
         String responseContent = mvcResult.getResponse().getContentAsString(StandardCharsets.UTF_8);
-        assertThat(responseContent).contains("event:message\ndata:된장");
+        assertThat(responseContent).contains("event:message\ndata:{\"text\":\"된장\"}");
         assertThat(responseContent).contains("event:done\ndata:{\"userMessageId\":100,\"assistantMessageId\":101}");
 
         verify(chatStreamService).streamMessage(memberId, sessionId, userContent);

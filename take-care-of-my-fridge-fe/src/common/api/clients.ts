@@ -8,6 +8,8 @@ import {
   AdminSaleEventControllerApi,
   AuthControllerApi,
   CartControllerApi,
+  ChatMessageControllerApi,
+  ChatSessionControllerApi,
   CookingLogControllerApi,
   CookingStatsControllerApi,
   CsrfControllerApi,
@@ -32,6 +34,8 @@ const basePath = import.meta.env.VITE_API_BASE_URL ?? '';
 
 export const authApi = new AuthControllerApi(undefined, basePath, axiosInstance);
 export const cartApi = new CartControllerApi(undefined, basePath, axiosInstance);
+export const chatMessageApi = new ChatMessageControllerApi(undefined, basePath, axiosInstance);
+export const chatSessionApi = new ChatSessionControllerApi(undefined, basePath, axiosInstance);
 export const cookingLogApi = new CookingLogControllerApi(undefined, basePath, axiosInstance);
 export const cookingStatsApi = new CookingStatsControllerApi(undefined, basePath, axiosInstance);
 export const csrfApi = new CsrfControllerApi(undefined, basePath, axiosInstance);
