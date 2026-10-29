@@ -2489,6 +2489,26 @@
         ]
       }
     },
+    "/api/sales/popular": {
+      "get": {
+        "operationId": "getPopularSales",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListPopularSaleResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "sale-controller"
+        ]
+      }
+    },
     "/api/search/clicks": {
       "post": {
         "operationId": "recordClick",
@@ -2955,6 +2975,23 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/PopularRecipeResponse"
+            }
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorResponse"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ApiResponseListPopularSaleResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PopularSaleResponse"
             }
           },
           "error": {
@@ -5762,6 +5799,28 @@
           },
           "tipSummary": {
             "type": "string"
+          }
+        }
+      },
+      "PopularSaleResponse": {
+        "type": "object",
+        "properties": {
+          "imageUrl": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "price": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "productId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "sale": {
+            "$ref": "#/components/schemas/SaleResponse"
           }
         }
       },
