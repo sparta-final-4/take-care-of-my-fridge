@@ -50,6 +50,18 @@
 
 관리자 목록에서 status를 생략하면 세 상태를 모두 조회합니다. 상세 조회는 판매 중지 상품도 반환합니다. 공개 `/api/products` 조회는 기존처럼 판매 중지 상품을 제외합니다.
 
+## 상품 할인·품절 필드
+
+상품 목록·상세(`/api/products`), 통합 검색의 상품 결과, 관리자 상품 목록·상세·등록·수정 응답(`ProductListItemResponse`, `ProductDetailResponse`)에 아래 두 필드가 있습니다. 기존 `price`(정가)와 `status`(상품 상태)는 그대로입니다.
+
+| 필드 | 설명 |
+|---|---|
+| sale | 진행 중인 할인(`SaleResponse`). 없으면 null |
+| soldOut | 지금 보이는 가격으로 살 수 없으면 true |
+
+- `SaleResponse`: type(`SPECIAL`·`FLASH_DROP`), salePrice(할인가), discountRate(할인율), endsAt(종료 시각, +09:00 포함), remainingQuantity(번개 드롭 남은 수량), limitedQuantity(번개 드롭 한정 수량). 특가는 remainingQuantity·limitedQuantity가 null입니다.
+- **품절**: 상품이 품절·판매 중지 상태이거나 번개 드롭 남은 수량이 0이면 `soldOut=true`입니다. 번개 드롭이 다 팔려도 `status`는 판매 중으로 남습니다. 장바구니의 `soldOut`과 같은 기준입니다.
+
 ## 필요한 API 기능 목록
 
 HTTP 메서드·경로·DTO 이름은 구현 전 합의합니다.
