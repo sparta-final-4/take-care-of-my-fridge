@@ -4,6 +4,7 @@ import {
   type PageResponseRecipeListItemResponse,
   type ProductListRequest,
   type RecipeListRequest,
+  type SearchClickRequest,
 } from '@/common/api/clients';
 import { unwrap } from '@/common/api/unwrap';
 
@@ -20,4 +21,9 @@ export async function searchProducts(
   signal?: AbortSignal,
 ): Promise<PageResponseProductListItemResponse> {
   return unwrap(searchApi.searchProducts({ request }, { signal }));
+}
+
+// 통합 검색 결과에서 상품을 눌러 상세로 갈 때 남기는 클릭 기록(할인 분석의 검색 클릭 수). 비로그인도 기록한다.
+export async function recordSearchClick(request: SearchClickRequest): Promise<void> {
+  await unwrap(searchApi.recordClick({ searchClickRequest: request }));
 }

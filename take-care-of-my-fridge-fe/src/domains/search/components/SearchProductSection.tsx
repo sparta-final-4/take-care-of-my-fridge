@@ -1,11 +1,13 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { Button, Col, Empty, Flex, Pagination, Result, Row, Skeleton } from 'antd';
+import type { MouseEvent } from 'react';
 import { Link } from 'react-router';
 
 import { ROUTES } from '@/app/paths';
 import { SectionCard } from '@/common/components/SectionCard';
 import { useAddToCart } from '@/domains/cart/hooks/useAddToCart';
 import { ProductCard } from '@/domains/product/components/ProductCard';
+import { recordSearchClick } from '@/domains/search/api';
 import {
   SEARCH_PRODUCT_PAGE_SIZE,
   useSearchKeyword,
@@ -20,6 +22,18 @@ export function SearchProductSection() {
     searchQueries.products(productRequest),
   );
   const { addToCart, pendingProductId } = useAddToCart();
+  const { mutate: recordClick } = useMutation({
+    mutationFn: recordSearchClick,
+    // 클릭 기록은 사용자가 모르게 남긴다. 실패해도 알리지 않고 상세 이동은 그대로 한다.
+    meta: { skipGlobalError: true },
+  });
+
+  // 카드의 상세 링크를 누를 때만 기록한다. 장바구니 담기 버튼은 링크 밖이라 세지 않는다.
+  const handleClickProduct = (productId: number) => (event: MouseEvent<HTMLElement>) => {
+    const link = event.target instanceof Element ? event.target.closest('a') : null;
+    if (!link || !event.currentTarget.contains(link)) return;
+    recordClick({ productId, keyword });
+  };
 
   const totalElements = data?.totalElements ?? 0;
   const products = data?.content ?? [];
@@ -51,7 +65,17 @@ export function SearchProductSection() {
         <Flex vertical gap="large" className={isPlaceholderData ? styles.loading : undefined}>
           <Row gutter={[16, 16]}>
             {products.map((product) => (
-              <Col key={product.productId} xs={12} md={8} lg={6}>
+              <Col
+                key={product.productId}
+                xs={12}
+                md={8}
+                lg={6}
+                onClick={
+                  product.productId === undefined
+                    ? undefined
+                    : handleClickProduct(product.productId)
+                }
+              >
                 <ProductCard
                   product={product}
                   pending={pendingProductId === product.productId}
