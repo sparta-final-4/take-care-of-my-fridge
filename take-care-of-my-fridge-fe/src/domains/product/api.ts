@@ -37,3 +37,10 @@ export async function getAdminProducts(
 export async function deleteProduct(productId: number): Promise<void> {
   await unwrap(adminProductApi.deleteProduct({ productId }));
 }
+
+export async function getAdminProduct(
+  productId: number,
+  signal?: AbortSignal,
+): Promise<ProductDetailResponse> {
+  return unwrap(adminProductApi.getAdminProduct({ productId }, { signal }));
+}
