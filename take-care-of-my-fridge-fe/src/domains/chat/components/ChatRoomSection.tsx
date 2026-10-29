@@ -1,9 +1,4 @@
-import {
-  CloseOutlined,
-  DownOutlined,
-  RobotOutlined,
-  SendOutlined,
-} from '@ant-design/icons';
+import { CloseOutlined, DownOutlined, RobotOutlined, SendOutlined } from '@ant-design/icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { App, Button, Flex, Input, type InputRef, Result, Spin, Typography } from 'antd';
 import { type KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';

@@ -34,12 +34,15 @@ describe('streamMessage', () => {
       json: vi.fn().mockResolvedValue(mockJson),
     };
 
-    vi.stubGlobal('fetch', vi.fn().mockImplementation(async (url: string) => {
-      if (url.includes('/api/auth/csrf')) {
-        return { ok: true, status: 200, headers: { get: () => 'application/json' } };
-      }
-      return mockResponse;
-    }));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation(async (url: string) => {
+        if (url.includes('/api/auth/csrf')) {
+          return { ok: true, status: 200, headers: { get: () => 'application/json' } };
+        }
+        return mockResponse;
+      }),
+    );
 
     const onChunk = vi.fn();
     const onDone = vi.fn();
@@ -84,12 +87,15 @@ describe('streamMessage', () => {
       body: stream,
     };
 
-    vi.stubGlobal('fetch', vi.fn().mockImplementation(async (url: string) => {
-      if (url.includes('/api/auth/csrf')) {
-        return { ok: true, status: 200, headers: { get: () => 'application/json' } };
-      }
-      return mockResponse;
-    }));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation(async (url: string) => {
+        if (url.includes('/api/auth/csrf')) {
+          return { ok: true, status: 200, headers: { get: () => 'application/json' } };
+        }
+        return mockResponse;
+      }),
+    );
 
     const onChunk = vi.fn();
     const onDone = vi.fn();
@@ -129,12 +135,15 @@ describe('streamMessage', () => {
       body: stream,
     };
 
-    vi.stubGlobal('fetch', vi.fn().mockImplementation(async (url: string) => {
-      if (url.includes('/api/auth/csrf')) {
-        return { ok: true, status: 200, headers: { get: () => 'application/json' } };
-      }
-      return mockResponse;
-    }));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation(async (url: string) => {
+        if (url.includes('/api/auth/csrf')) {
+          return { ok: true, status: 200, headers: { get: () => 'application/json' } };
+        }
+        return mockResponse;
+      }),
+    );
 
     const onChunk = vi.fn();
     const onDone = vi.fn();
@@ -171,12 +180,15 @@ describe('streamMessage', () => {
       body: stream,
     };
 
-    vi.stubGlobal('fetch', vi.fn().mockImplementation(async (url: string) => {
-      if (url.includes('/api/auth/csrf')) {
-        return { ok: true, status: 200, headers: { get: () => 'application/json' } };
-      }
-      return mockResponse;
-    }));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation(async (url: string) => {
+        if (url.includes('/api/auth/csrf')) {
+          return { ok: true, status: 200, headers: { get: () => 'application/json' } };
+        }
+        return mockResponse;
+      }),
+    );
 
     const onChunk = vi.fn();
     const onDone = vi.fn();
@@ -220,8 +232,7 @@ describe('streamMessage', () => {
     };
 
     const sseData =
-      'event:message\ndata:{"text":"성공"}\n\n' +
-      'event:done\ndata:{"userMessageId":1}\n\n';
+      'event:message\ndata:{"text":"성공"}\n\n' + 'event:done\ndata:{"userMessageId":1}\n\n';
 
     const encoder = new TextEncoder();
     const stream = new ReadableStream({
@@ -295,12 +306,15 @@ describe('streamMessage', () => {
       json: vi.fn().mockResolvedValue({ error: { code: 'A003', message: '인증이 필요합니다.' } }),
     };
 
-    vi.stubGlobal('fetch', vi.fn().mockImplementation(async (url: string) => {
-      if (url.includes('/api/auth/csrf')) {
-        return { ok: true, status: 200, headers: { get: () => 'application/json' } };
-      }
-      return mock401Response;
-    }));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation(async (url: string) => {
+        if (url.includes('/api/auth/csrf')) {
+          return { ok: true, status: 200, headers: { get: () => 'application/json' } };
+        }
+        return mock401Response;
+      }),
+    );
     vi.mocked(refresh).mockRejectedValue(new Error('Refresh failed'));
 
     const onChunk = vi.fn();
