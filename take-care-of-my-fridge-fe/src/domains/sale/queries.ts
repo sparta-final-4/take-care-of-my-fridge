@@ -2,7 +2,7 @@ import { keepPreviousData, queryOptions } from '@tanstack/react-query';
 
 import type { SaleCandidateProductsRequest, SaleEventListRequest } from '@/common/api/clients';
 
-import { getSaleCandidateProducts, getSaleEvent, getSaleEvents } from './api';
+import { getPopularSales, getSaleCandidateProducts, getSaleEvent, getSaleEvents } from './api';
 
 export const saleQueries = {
   all: ['sale'] as const,
@@ -26,5 +26,10 @@ export const saleQueries = {
     queryOptions({
       queryKey: [...saleQueries.all, 'event', saleEventId],
       queryFn: ({ signal }) => getSaleEvent(saleEventId, signal),
+    }),
+  popular: () =>
+    queryOptions({
+      queryKey: [...saleQueries.all, 'popular'],
+      queryFn: ({ signal }) => getPopularSales(signal),
     }),
 };

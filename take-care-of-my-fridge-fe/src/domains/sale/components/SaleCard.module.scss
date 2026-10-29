@@ -1,0 +1,72 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ant-margin-xxs);
+  height: 100%;
+  padding: var(--ant-padding-xs);
+  color: inherit;
+  background: var(--ant-color-bg-container);
+  border: 1px solid var(--ant-color-border-secondary);
+  border-radius: var(--ant-border-radius-lg);
+  transition: box-shadow var(--ant-motion-duration-mid);
+
+  &:hover {
+    color: inherit;
+    box-shadow: var(--ant-box-shadow-tertiary);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--ant-color-primary);
+    outline-offset: 2px;
+  }
+}
+
+.thumb {
+  aspect-ratio: 1;
+  overflow: hidden;
+  background: var(--ant-color-fill-tertiary);
+  border-radius: var(--ant-border-radius);
+}
+
+.image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.imagePlaceholder {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+// 할인 구분 태그가 이미지에 붙지 않게 띄운다.
+.saleHead {
+  margin-top: var(--ant-margin-xxs);
+}
+
+// 남은 시간과 번개 드롭 남은 수량
+.saleInfo {
+  color: var(--ant-color-text-secondary);
+  font-size: var(--ant-font-size-sm);
+  white-space: nowrap;
+}
+
+.typeTag {
+  margin: 0;
+}
+
+// 상품명은 두 줄까지 보여 준다. 한 줄 이름 아래에 빈 줄을 두지 않는다.
+.name {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+// 옆 카드 이름이 두 줄이어도 가격은 카드 아래에 붙여 줄을 맞춘다.
+.price {
+  display: flex;
+  flex-direction: column;
+  margin-top: auto;
+}

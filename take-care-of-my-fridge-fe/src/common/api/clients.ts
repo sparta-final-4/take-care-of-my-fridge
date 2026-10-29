@@ -23,6 +23,7 @@ import {
   RecipeControllerApi,
   RecipeReviewControllerApi,
   RefundControllerApi,
+  SaleControllerApi,
   SearchControllerApi,
 } from './generated';
 
@@ -51,6 +52,7 @@ export const productApi = new ProductControllerApi(undefined, basePath, axiosIns
 export const recipeApi = new RecipeControllerApi(undefined, basePath, axiosInstance);
 export const recipeReviewApi = new RecipeReviewControllerApi(undefined, basePath, axiosInstance);
 export const refundApi = new RefundControllerApi(undefined, basePath, axiosInstance);
+export const saleApi = new SaleControllerApi(undefined, basePath, axiosInstance);
 export const searchApi = new SearchControllerApi(undefined, basePath, axiosInstance);
 
 export const adminAuditApi = new AdminAuditControllerApi(undefined, basePath, axiosInstance);
