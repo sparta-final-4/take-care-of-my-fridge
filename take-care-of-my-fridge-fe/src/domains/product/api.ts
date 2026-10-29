@@ -6,6 +6,7 @@ import {
   type ProductCreateRequest,
   type ProductDetailResponse,
   type ProductListRequest,
+  type ProductUpdateRequest,
 } from '@/common/api/clients';
 import { unwrap } from '@/common/api/unwrap';
 
@@ -43,4 +44,11 @@ export async function getAdminProduct(
   signal?: AbortSignal,
 ): Promise<ProductDetailResponse> {
   return unwrap(adminProductApi.getAdminProduct({ productId }, { signal }));
+}
+
+export async function updateProduct(
+  productId: number,
+  request: ProductUpdateRequest,
+): Promise<ProductDetailResponse> {
+  return unwrap(adminProductApi.updateProduct({ productId, productUpdateRequest: request }));
 }
