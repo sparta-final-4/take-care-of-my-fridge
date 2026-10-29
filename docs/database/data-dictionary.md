@@ -111,7 +111,7 @@
 | current_stock | INT | 불가 | 0 | | 분석 당시 재고(개) |
 | avg_sales_on_day | INT | 불가 | 0 | | 해당 요일 평균 판매량 |
 | search_clicks | INT | 불가 | 0 | | 최근 4주 같은 요일 검색 클릭 수 |
-| purchases | INT | 불가 | 0 | | 최근 4주 같은 요일 구매 수 |
+| purchases | INT | 불가 | 0 | | 최근 4주 같은 요일 구매 확정 후 환불을 뺀 상품 수량 |
 | is_excluded | BOOLEAN | 불가 | FALSE | | TRUE면 제외된 상품 |
 | exclude_reason | ENUM('TOP_SELLER_ON_DAY','LOW_STOCK') | 허용 | NULL | | 평소 그 요일 판매 상위 / 재고 50개 미만. 제외 상품만 |
 | candidate_reason | VARCHAR(255) | 허용 | NULL | | 후보 사유(예: 검색 클릭 대비 구매 적음). 후보만 |
