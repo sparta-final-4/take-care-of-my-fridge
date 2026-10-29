@@ -107,8 +107,12 @@ export function FridgeItemRow({
           cancelButtonProps={{ disabled: removing }}
           onCancel={() => setDeleteConfirmOpen(false)}
           onConfirm={async () => {
-            await onDelete();
-            setDeleteConfirmOpen(false);
+            // 삭제가 실패해 예외가 나도 확인창이 열린 채 남지 않게 닫는다.
+            try {
+              await onDelete();
+            } finally {
+              setDeleteConfirmOpen(false);
+            }
           }}
         >
           <Dropdown

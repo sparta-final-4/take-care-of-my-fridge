@@ -39,6 +39,12 @@ describe('formatQuantity', () => {
     expect(formatQuantity({ quantity: 2, baseUnit: '개' })).toBe('2개');
     expect(formatQuantity({ quantity: 1.25, baseUnit: null })).toBe('1.3');
   });
+
+  it('반올림하면 0이 되는 작은 값은 원래 값을 보여준다', () => {
+    expect(formatQuantity({ quantity: 0.04, baseUnit: '개' })).toBe('0.04개');
+    expect(formatQuantity({ quantity: 0.01, baseUnit: '개' })).toBe('0.01개');
+    expect(formatQuantity({ quantity: 0.05, baseUnit: '개' })).toBe('0.1개');
+  });
 });
 
 describe('formatLogDate', () => {

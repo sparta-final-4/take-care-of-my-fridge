@@ -36,8 +36,11 @@ export function withObjectParticle(name: string) {
 }
 
 // 수량은 소수점 첫째 자리까지만 보여준다 (0.33개 → 0.3개, 2.00개 → 2개).
+// 0.04처럼 반올림하면 0이 되는 작은 값은 0개로 보이지 않도록 원래 값을 그대로 쓴다.
 export function formatQuantity(item: Pick<FridgeItemResponse, 'quantity' | 'baseUnit'>) {
-  return `${Math.round(item.quantity * 10) / 10}${item.baseUnit ?? ''}`;
+  const rounded = Math.round(item.quantity * 10) / 10;
+  const display = rounded === 0 && item.quantity > 0 ? item.quantity : rounded;
+  return `${display}${item.baseUnit ?? ''}`;
 }
 
 // 최근 기록 날짜. 오늘·어제는 말로, 그 외는 MM.DD, 올해가 아니면 YY.MM.DD
