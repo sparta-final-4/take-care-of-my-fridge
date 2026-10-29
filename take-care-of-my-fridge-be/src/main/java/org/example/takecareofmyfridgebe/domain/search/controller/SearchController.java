@@ -2,14 +2,23 @@ package org.example.takecareofmyfridgebe.domain.search.controller;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.example.takecareofmyfridgebe.domain.auth.service.AuthSessionService;
+import org.example.takecareofmyfridgebe.domain.product.dto.ProductListItemResponse;
+import org.example.takecareofmyfridgebe.domain.product.dto.ProductListRequest;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeListItemResponse;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeListRequest;
+import org.example.takecareofmyfridgebe.domain.search.dto.SearchClickRequest;
+import org.example.takecareofmyfridgebe.domain.search.facade.ProductSearchFacade;
 import org.example.takecareofmyfridgebe.domain.search.facade.RecipeSearchFacade;
+import org.example.takecareofmyfridgebe.domain.search.service.SearchClickHistoryService;
 import org.example.takecareofmyfridgebe.global.response.ApiResponse;
 import org.example.takecareofmyfridgebe.global.response.PageResponse;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -19,6 +28,8 @@ import org.springframework.web.bind.annotation.RestController;
 public class SearchController {
 
     private final RecipeSearchFacade recipeSearchFacade;
+    private final ProductSearchFacade productSearchFacade;
+    private final SearchClickHistoryService searchClickHistoryService;
 
     @GetMapping("/recipes")
     public ResponseEntity<ApiResponse<PageResponse<RecipeListItemResponse>>> searchRecipes(
@@ -26,5 +37,22 @@ public class SearchController {
     ) {
         PageResponse<RecipeListItemResponse> recipes = recipeSearchFacade.getRecipes(request);
         return ResponseEntity.ok(ApiResponse.ok(recipes));
+    }
+
+    @GetMapping("/products")
+    public ResponseEntity<ApiResponse<PageResponse<ProductListItemResponse>>> searchProducts(
+            @Valid @ModelAttribute ProductListRequest request
+    ) {
+        PageResponse<ProductListItemResponse> products = productSearchFacade.getProducts(request);
+        return ResponseEntity.ok(ApiResponse.ok(products));
+    }
+
+    @PostMapping("/clicks")
+    public ResponseEntity<ApiResponse<Void>> recordClick(
+            @AuthenticationPrincipal AuthSessionService.AuthPrincipal principal,
+            @Valid @RequestBody SearchClickRequest request
+    ) {
+        searchClickHistoryService.record(request, principal == null ? null : principal.memberId());
+        return ResponseEntity.ok(ApiResponse.ok());
     }
 }

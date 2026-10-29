@@ -1,0 +1,50 @@
+{
+  "settings": {
+    "number_of_shards": 1,
+    "number_of_replicas": 0,
+    "analysis": {
+      "tokenizer": {
+        "nori_mixed": {
+          "type": "nori_tokenizer",
+          "decompound_mode": "mixed",
+          "discard_punctuation": true
+        },
+        "nori_discard": {
+          "type": "nori_tokenizer",
+          "decompound_mode": "discard",
+          "discard_punctuation": true
+        }
+      },
+      "analyzer": {
+        "korean": {
+          "type": "custom",
+          "tokenizer": "nori_mixed",
+          "filter": ["nori_part_of_speech", "nori_readingform", "lowercase"]
+        },
+        "korean_search": {
+          "type": "custom",
+          "tokenizer": "nori_discard",
+          "filter": ["nori_part_of_speech", "nori_readingform", "lowercase"]
+        }
+      }
+    }
+  },
+  "mappings": {
+    "dynamic": "strict",
+    "properties": {
+      "id":           { "type": "long" },
+      "product_type": { "type": "keyword" },
+      "name": {
+        "type": "text",
+        "analyzer": "korean",
+        "search_analyzer": "korean_search",
+        "fields": {
+          "keyword": { "type": "keyword" }
+        }
+      },
+      "description":  { "type": "text", "analyzer": "korean", "search_analyzer": "korean_search" },
+      "price":        { "type": "integer" },
+      "status":       { "type": "keyword" }
+    }
+  }
+}

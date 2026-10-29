@@ -15,6 +15,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SpringBootTest
@@ -50,5 +51,17 @@ class RecipeSearchPropertiesTest extends MySqlContainerSupport {
         assertTrue(recipe.indexSettings().exists(), "recipes_index.json");
         assertTrue(recipe.synonyms().exists(), "ingredient_synonyms.json");
         assertTrue(recipe.extraSynonyms().exists(), "synonyms.txt");
+    }
+
+    @Test
+    @DisplayName("상품 인덱스 설정이 바인딩되고 동의어 파일은 없다")
+    void bindsProductIndexProperties() {
+        EsIndexProperties product = properties.indexProperties().product();
+
+        assertEquals("products", product.alias());
+        assertEquals(500, product.batchSize());
+        assertTrue(product.indexSettings().exists(), "products_index.json");
+        assertNull(product.synonyms());
+        assertNull(product.extraSynonyms());
     }
 }

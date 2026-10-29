@@ -111,7 +111,7 @@
 | current_stock | INT | 불가 | 0 | | 분석 당시 재고(개) |
 | avg_sales_on_day | INT | 불가 | 0 | | 해당 요일 평균 판매량 |
 | search_clicks | INT | 불가 | 0 | | 최근 4주 같은 요일 검색 클릭 수 |
-| purchases | INT | 불가 | 0 | | 최근 4주 같은 요일 구매 수 |
+| purchases | INT | 불가 | 0 | | 최근 4주 같은 요일 구매 확정 후 환불을 뺀 상품 수량 |
 | is_excluded | BOOLEAN | 불가 | FALSE | | TRUE면 제외된 상품 |
 | exclude_reason | ENUM('TOP_SELLER_ON_DAY','LOW_STOCK') | 허용 | NULL | | 평소 그 요일 판매 상위 / 재고 50개 미만. 제외 상품만 |
 | candidate_reason | VARCHAR(255) | 허용 | NULL | | 후보 사유(예: 검색 클릭 대비 구매 적음). 후보만 |
@@ -202,6 +202,42 @@
 
 - 같은 행사 항목에 같은 회원은 한 번만 들어갈 수 있습니다(번개 드롭 1인 1개). NULL은 여러 건 가능합니다.
 
+## refunds — 환불
+
+- 환불 신청 한 번에 한 건입니다. 한 결제에 부분 환불이 여러 건 생길 수 있고, 같은 주문에 요청 상태 환불은 한 건만 둡니다.
+- 요청에서 완료 또는 실패로 한 번만 바뀝니다. 실패한 환불은 지우지 않고 남기며, 그 수량은 다시 신청할 수 있습니다.
+- 제약 이름: 인덱스 `idx_refunds_refunded_at`(refunded_at). FK `fk_refunds_payment`.
+
+| 컬럼 | 타입 | NULL | 기본값 | 제약 | 의미 |
+|---|---|---|---|---|---|
+| payment_id | BIGINT | 불가 | | FK | 환불할 결제. 주문의 결제 완료 결제 |
+| refund_amount | BIGINT | 불가 | | | 환불 금액(원). 환불 상품 금액의 합 |
+| reason_type | ENUM('CHANGE_OF_MIND','ORDER_MISTAKE','NO_LONGER_NEEDED','ETC') | 불가 | | | 단순 변심·주문 실수·더 이상 필요 없음·기타. 설명 문구를 PG 취소 사유로 보냄 |
+| reason_detail | VARCHAR(500) | 허용 | NULL | | 상세 사유 |
+| status | ENUM('REQUESTED','COMPLETED','FAILED') | 불가 | | | 요청(PG 취소 대기)·완료·실패 |
+| portone_cancellation_id | VARCHAR(200) | 허용 | NULL | | PG 취소 건 ID. 완료 전이나 찾지 못하면 NULL |
+| fail_reason | VARCHAR(255) | 허용 | NULL | | 실패 사유(PG 오류 원문). 길면 255자에서 잘라 저장. 사용자에게 보여 주지 않음 |
+| refunded_at | DATETIME(6) | 허용 | NULL | 인덱스 | 환불 완료 시각. 정산 기준 시각. 완료 전에는 NULL |
+
+- `created_at`이 신청 시각입니다.
+- 실행용 DDL 초안은 [refund.sql](refund.sql)에 있습니다.
+
+## refund_items — 환불 상품
+
+- 환불 한 건에 포함된 주문 상품과 수량입니다. 단가는 주문 상품에서 복사합니다.
+- 제약 이름: UK `uk_refund_items_refund_id_order_item_id`. 인덱스 `idx_refund_items_order_item_id`(order_item_id). FK `fk_refund_items_refund`, `fk_refund_items_order_item`.
+
+| 컬럼 | 타입 | NULL | 기본값 | 제약 | 의미 |
+|---|---|---|---|---|---|
+| refund_id | BIGINT | 불가 | | FK, UK(refund_id, order_item_id) | 소속 환불 |
+| order_item_id | BIGINT | 불가 | | FK, UK(refund_id, order_item_id), 인덱스 | 환불할 주문 상품. 일반 상품만 |
+| quantity | INT | 불가 | | | 환불 수량(1 이상) |
+| unit_price | INT | 불가 | | | 주문 당시 단가(원) |
+| amount | BIGINT | 불가 | | | 환불 금액(원). 단가 × 수량 |
+
+- 상품별 누적 환불 수량은 요청·완료 상태 환불의 수량 합입니다. 이 값이 주문 수량을 넘지 않게 신청 때 확인합니다.
+- 한 환불에 같은 주문 상품은 한 번만 들어갑니다.
+
 ## sale_events — 할인 행사
 
 - 상품 하나에 대한 한 번의 할인 기간입니다. 등록하면 상품마다 한 건씩 만들어지고, 예정에서 진행 중, 종료로 바뀝니다.
@@ -231,6 +267,74 @@
 
 - 번개 드롭 1인 1개는 `order_items`의 UK(sale_event_item_id, flash_drop_member_id)가 막습니다.
 - 실행용 DDL 초안은 [sale-event.sql](sale-event.sql)에 있습니다.
+
+## payments — 결제
+
+- 결제하기를 누를 때마다 한 건씩 만듭니다. 한 주문에 결제가 여러 건 있을 수 있고(재결제), 결제 완료는 주문 잠금으로 한 건만 남습니다.
+- 상태는 결제 대기·결제 완료·실패만 갖습니다. 결제 완료 뒤의 취소(환불·보상 취소)는 결제 이력과 환불 도메인에 남깁니다.
+- 제약 이름: UK `uk_payments_portone_payment_id`. 인덱스 `idx_payments_status_expires_at`(status, expires_at). FK `fk_payments_order`.
+
+| 컬럼 | 타입 | NULL | 기본값 | 제약 | 의미 |
+|---|---|---|---|---|---|
+| order_id | BIGINT | 불가 | | FK | 결제할 주문 |
+| portone_payment_id | VARCHAR(100) | 불가 | | UK | PortOne 결제 ID. 서버가 `payment-` + 하이픈 없는 UUID로 만든 40자. PortOne 결제의 멱등 키 역할 |
+| amount | BIGINT | 불가 | | | 결제 금액(원). 클라이언트 값이 아니라 주문 금액(`orders.total_amount`) |
+| status | ENUM('READY','PAID','FAILED') | 불가 | | 인덱스 | 결제 대기·결제 완료·실패 |
+| paid_at | DATETIME(6) | 허용 | NULL | | 결제 완료 시각(서버가 승인한 시각). 결제 완료 전에는 NULL |
+| expires_at | DATETIME(6) | 불가 | | 인덱스 | 결제 대기 만료 시각. 생성 10분 뒤. 이 시각 이후 PG에서 결제되면 받지 않고 취소 |
+| fail_reason | ENUM('PG_FAILED','USER_CANCELLED','AMOUNT_MISMATCH','TIMEOUT','ORDER_NOT_PAYABLE','SUPERSEDED') | 허용 | NULL | | 실패 사유. PG 실패·결제창 닫기·금액 불일치·만료·결제할 수 없는 주문·새 결제로 정리. 실패가 아니면 NULL |
+
+- 실행용 DDL 초안은 [payment.sql](payment.sql)에 있습니다.
+
+## payment_histories — 결제 이력
+
+- 결제 한 건에 일어난 사건을 시간순으로 추가만 합니다. 수정·삭제하지 않습니다.
+- 결제 상태 변경과 같은 트랜잭션에서 남기므로 상태 변경이 롤백되면 이력도 남지 않습니다.
+- 제약 이름: 인덱스 `idx_payment_histories_payment_id`(payment_id, created_at), `idx_payment_histories_refund_id`(refund_id). FK `fk_payment_histories_payment`.
+
+| 컬럼 | 타입 | NULL | 기본값 | 제약 | 의미 |
+|---|---|---|---|---|---|
+| payment_id | BIGINT | 불가 | | FK, 인덱스 | 대상 결제 |
+| event_type | ENUM('READY','PAID','FAILED','PARTIAL_CANCELLED','CANCELLED') | 불가 | | | 결제 시도 생성·PG 결제됨·실패·PG 부분 취소·PG 전액 취소. 받지 않은 결제가 PG에서 결제되면 `PAID`를 남겨 보상 취소 대상으로 표시 |
+| amount | BIGINT | 허용 | NULL | | 이번 사건 금액(원). 실패는 돈이 움직이지 않아 NULL |
+| cancelled_amount | BIGINT | 불가 | | | 사건 직후 누적 취소 금액(원) |
+| refund_id | BIGINT | 허용 | NULL | 인덱스 | 환불로 생긴 취소면 환불 ID. 보상 취소·콘솔 취소는 NULL. 물리 FK 없음 |
+| pg_cancellation_id | VARCHAR(200) | 허용 | NULL | | PG 취소 건 ID. 환불 쪽이 PG 취소 목록과 맞춰 볼 때 씀 |
+| changed_by | ENUM('USER','WEBHOOK','SCHEDULER') | 불가 | | | 사건을 일으킨 주체 |
+| reason | VARCHAR(255) | 허용 | NULL | | 사유. 길면 255자에서 잘라 저장 |
+
+- `created_at`이 사건 시각입니다.
+- 결제 상태와 사건 종류는 다릅니다. 결제는 `FAILED`인데 이력에 `PAID`가 있고 `CANCELLED`가 없으면 보상 취소가 끝나지 않은 결제로 보고 스케줄러가 다시 취소합니다.
+
+## webhook_events — PortOne 웹훅 수신 기록
+
+- 서명 검증을 통과한 웹훅만 저장합니다. 결제 처리와 다른 트랜잭션에서 저장해 처리가 실패해도 기록이 남습니다.
+- 제약 이름: UK `uk_webhook_events_webhook_id`. FK `fk_webhook_events_payment`.
+
+| 컬럼 | 타입 | NULL | 기본값 | 제약 | 의미 |
+|---|---|---|---|---|---|
+| payment_id | BIGINT | 허용 | NULL | FK | 매칭된 결제. 결제를 못 찾았거나 처리 대상이 아닌 웹훅은 NULL |
+| webhook_id | VARCHAR(200) | 불가 | | UK | PortOne `webhook-id` 헤더. 같은 웹훅을 한 번만 처리 |
+| event_type | VARCHAR(50) | 불가 | | | 웹훅 type 원문(예: `Transaction.Paid`). SDK가 모르는 type도 그대로 저장 |
+| process_status | ENUM('RECEIVED','PROCESSED','FAILED','IGNORED') | 불가 | | | 수신 후 처리 중·상태 반영·처리 실패·바꿀 것 없음. `RECEIVED`·`FAILED`는 재전송 때 다시 처리 |
+| raw_payload | TEXT | 불가 | | | 웹훅 본문 원문 |
+| fail_reason | VARCHAR(500) | 허용 | NULL | | 처리 실패 사유. 길면 500자에서 잘라 저장 |
+| processed_at | DATETIME(6) | 허용 | NULL | | 처리 완료 시각(`PROCESSED`·`IGNORED`) |
+
+## search_click_histories — 검색 결과 상품 클릭 기록
+
+- 검색 결과에서 상품을 누를 때마다 한 건씩 쌓습니다. 수정·삭제하지 않습니다.
+- 클릭 시각은 공통 컬럼 `created_at`(서버 저장 시각, 한국 시각)입니다. 클라이언트 시각은 쓰지 않습니다.
+- 중복 클릭은 제거하지 않고 누른 만큼 기록합니다. 상품이 실제로 있는지는 확인하지 않습니다.
+- 제약 이름: 인덱스 `idx_search_click_histories_created_at_product_id`(created_at, product_id). 기간·기준 시각 범위의 상품별 클릭 수 집계용입니다.
+
+| 컬럼 | 타입 | NULL | 기본값 | 제약 | 의미 |
+|---|---|---|---|---|---|
+| product_id | BIGINT | 불가 | | 인덱스 | 클릭한 상품. 물리 FK 없이 상품 번호만 저장 |
+| member_id | BIGINT | 허용 | NULL | | 클릭한 회원. 비로그인 클릭은 NULL. 물리 FK 없음 |
+| keyword | VARCHAR(100) | 불가 | | | 클릭 당시 검색어(앞뒤 공백 제거) |
+
+- 실행용 DDL 초안은 [search.sql](search.sql)에 있습니다.
 
 ## 다른 도메인에 요청할 컬럼
 

@@ -1,6 +1,7 @@
 package org.example.takecareofmyfridgebe.domain.search.event;
 
 import org.example.takecareofmyfridgebe.domain.recipe.event.RecipeChangedEvent;
+import org.example.takecareofmyfridgebe.domain.search.service.ProductIndexer;
 import org.example.takecareofmyfridgebe.domain.search.service.RecipeIndexer;
 import org.example.takecareofmyfridgebe.support.MySqlContainerSupport;
 import org.junit.jupiter.api.DisplayName;
@@ -17,12 +18,16 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
-// 실제 트랜잭션에서 커밋된 변경만 색인하는지 확인한다. ES 호출은 RecipeIndexer를 목으로 바꿔 막는다
+// 실제 트랜잭션에서 커밋된 변경만 색인하는지 확인한다. ES 호출은 색인기를 모두 목으로 바꿔 막는다
+// (기동 시 EsIndexInitializer가 모든 색인기를 돌리므로, 하나라도 빠지면 로컬 ES에 빈 인덱스가 생긴다)
 @SpringBootTest(properties = "app.search.engine=elasticsearch")
 class RecipeIndexEventListenerIntegrationTest extends MySqlContainerSupport {
 
     @MockitoBean
     private RecipeIndexer recipeIndexer;
+
+    @MockitoBean
+    private ProductIndexer productIndexer;
 
     @Autowired
     private ApplicationEventPublisher eventPublisher;

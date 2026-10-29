@@ -11,10 +11,20 @@ public record RecipeSearchProperties(
 ) {
 
     public record IndexProperties(
-            RecipeIndexProperties recipe
+            RecipeIndexProperties recipe,
+            ProductIndexProperties product
     ) {}
 
     public record RecipeIndexProperties(
+            String alias,
+            Resource indexSettings,
+            Resource synonyms,
+            Resource extraSynonyms,
+            int batchSize
+    ) implements EsIndexProperties {}
+
+    // 상품 인덱스는 동의어 필터가 없어 synonyms, extraSynonyms를 비워 둔다
+    public record ProductIndexProperties(
             String alias,
             Resource indexSettings,
             Resource synonyms,

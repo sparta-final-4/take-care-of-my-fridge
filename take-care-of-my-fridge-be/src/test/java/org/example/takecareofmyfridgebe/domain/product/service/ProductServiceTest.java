@@ -17,6 +17,7 @@ import org.example.takecareofmyfridgebe.domain.product.entity.MealkitProduct;
 import org.example.takecareofmyfridgebe.domain.product.entity.Product;
 import org.example.takecareofmyfridgebe.domain.product.entity.ProductStatus;
 import org.example.takecareofmyfridgebe.domain.product.entity.ProductType;
+import org.example.takecareofmyfridgebe.domain.product.event.ProductChangedEvent;
 import org.example.takecareofmyfridgebe.domain.product.repository.IngredientProductRepository;
 import org.example.takecareofmyfridgebe.domain.product.repository.MealkitProductRepository;
 import org.example.takecareofmyfridgebe.domain.product.repository.ProductRepository;
@@ -32,6 +33,7 @@ import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -62,6 +64,8 @@ class ProductServiceTest {
     private MealkitProductRepository mealkitProductRepository;
     @Mock
     private IngredientRepository ingredientRepository;
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
     @InjectMocks
     private ProductService service;
     @Captor
@@ -245,6 +249,7 @@ class ProductServiceTest {
         assertThat(result.productType()).isEqualTo(ProductType.MEALKIT);
         assertThat(result.mealkit()).isEqualTo(new ProductDetailResponse.MealkitInfo(2));
         verify(ingredientProductRepository, never()).save(any());
+        verify(eventPublisher).publishEvent(any(ProductChangedEvent.class));
     }
 
     @Test
@@ -300,6 +305,7 @@ class ProductServiceTest {
         assertThat(result.status()).isEqualTo(ProductStatus.SOLD_OUT);
         assertThat(result.ingredient()).isEqualTo(new ProductDetailResponse.IngredientInfo(new BigDecimal("1000"), "kg"));
         verify(ingredientRepository, never()).findById(any());
+        verify(eventPublisher).publishEvent(new ProductChangedEvent(5L));
     }
 
     @Test
@@ -383,6 +389,29 @@ class ProductServiceTest {
         // then
         assertThat(onion.getStatus()).isEqualTo(ProductStatus.STOPPED);
         verify(productRepository, never()).delete(any());
+        verify(eventPublisher).publishEvent(new ProductChangedEvent(5L));
+    }
+
+    @Test
+    @DisplayName("ES가 고른 ID 순서대로 목록을 만들고, 그사이 판매 중지된 상품은 빼도 전체 건수는 ES 값을 유지한다")
+    void getProductsByIds_keepsOrderAndSkipsStopped() {
+        // given
+        Product onion = ProductFixture.createProduct(5L, "양파 1kg", 3900);
+        Product leek = ProductFixture.createProduct(9L, "대파 1단", 2900);
+        Product stopped = ProductFixture.createProduct(4L, "쪽파 1단", 3500);
+        stopped.stop();
+        when(productRepository.findAllById(List.of(9L, 4L, 5L))).thenReturn(List.of(onion, stopped, leek));
+
+        // when
+        PageResponse<ProductListItemResponse> result =
+                service.getProductsByIds(List.of(9L, 4L, 5L), 30, new ProductListRequest(null, "파", null, null, null, 2, 3));
+
+        // then
+        assertThat(result.content()).extracting(ProductListItemResponse::productId).containsExactly(9L, 5L);
+        assertThat(result.totalElements()).isEqualTo(30);
+        assertThat(result.pageNumber()).isEqualTo(2);
+        assertThat(result.totalPages()).isEqualTo(10);
+        assertThat(result.isLast()).isFalse();
     }
 
     @Test

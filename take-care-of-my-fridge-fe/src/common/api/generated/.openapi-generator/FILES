@@ -200,6 +200,7 @@ models/sale-event-list-request.ts
 models/sale-event-list-response.ts
 models/sale-event-update-request.ts
 models/sale-events-create-response.ts
+models/search-click-request.ts
 models/sign-up-request.ts
 models/sign-up-response.ts
 models/special-sale-create-request.ts
