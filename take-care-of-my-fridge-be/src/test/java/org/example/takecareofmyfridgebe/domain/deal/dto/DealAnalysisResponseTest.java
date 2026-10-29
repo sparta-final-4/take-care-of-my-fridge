@@ -13,7 +13,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 class DealAnalysisResponseTest {
 
     @Test
-    void separatesExcludedAndOrdersCandidatesByExpectedIncrease() {
+    void separatesExcludedAndOrdersCandidatesByClickPurchaseGap() {
         DealAnalysis analysis = DealAnalysis.builder()
                 .targetWeekStart(LocalDate.of(2026, 10, 26))
                 .dayOfWeek(DealAnalysis.Day.WED).discountRate(30).minStock(50)
@@ -24,6 +24,10 @@ class DealAnalysisResponseTest {
         DealCandidate smaller = candidate(analysis, 11L, 4L, false, 12);
         DealCandidate larger = candidate(analysis, 12L, 5L, false, 20);
         DealCandidate excluded = candidate(analysis, 13L, 6L, true, null);
+        ReflectionTestUtils.setField(smaller, "searchClicks", 50);
+        ReflectionTestUtils.setField(smaller, "purchases", 20);
+        ReflectionTestUtils.setField(larger, "searchClicks", 20);
+        ReflectionTestUtils.setField(larger, "purchases", 10);
 
         DealAnalysisResponse response = DealAnalysisResponse.from(
                 analysis, List.of(smaller, excluded, larger));
@@ -33,7 +37,7 @@ class DealAnalysisResponseTest {
         assertThat(response.reviewCounts()).isEqualTo(
                 new DealAnalysisResponse.ReviewCounts(0, 0, 2));
         assertThat(response.candidates()).extracting(DealAnalysisResponse.Candidate::candidateId)
-                .containsExactly(12L, 11L);
+                .containsExactly(11L, 12L);
         assertThat(response.excluded()).extracting(DealAnalysisResponse.Excluded::candidateId)
                 .containsExactly(13L);
     }
