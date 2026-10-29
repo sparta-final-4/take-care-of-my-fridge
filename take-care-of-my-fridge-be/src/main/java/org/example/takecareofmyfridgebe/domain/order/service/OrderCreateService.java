@@ -22,8 +22,8 @@ import org.example.takecareofmyfridgebe.domain.order.repository.OrderRepository;
 import org.example.takecareofmyfridgebe.domain.product.entity.Product;
 import org.example.takecareofmyfridgebe.domain.product.entity.ProductStatus;
 import org.example.takecareofmyfridgebe.domain.product.repository.ProductRepository;
-import org.example.takecareofmyfridgebe.domain.sale.dto.ActiveSale;
 import org.example.takecareofmyfridgebe.domain.sale.dto.FlashDropQuantity;
+import org.example.takecareofmyfridgebe.domain.sale.dto.SellingPrice;
 import org.example.takecareofmyfridgebe.domain.sale.entity.SaleEvent;
 import org.example.takecareofmyfridgebe.domain.sale.entity.SaleEventType;
 import org.example.takecareofmyfridgebe.domain.sale.service.SaleEventStockService;
@@ -87,26 +87,25 @@ public class OrderCreateService {
         cartItems.forEach(item -> validateSellable(productsById.get(item.getProductId())));
 
         // 진행 중 할인은 상품 행을 잠근 뒤 읽는다. 장바구니에서 본 단가·할인 구분과 하나라도 다르면 재고를 잡기 전에 거절한다.
-        Map<Long, ActiveSale> salesByProductId = saleEventReader.findActiveSales(productIds);
+        Map<Long, SellingPrice> pricesByProductId = saleEventReader.findSellingPrices(List.copyOf(productsById.values()));
         Map<Long, OrderCreateItemRequest> requestedByCartItemId = request.items().stream()
             .collect(Collectors.toMap(OrderCreateItemRequest::cartItemId, Function.identity(), (first, second) -> first));
         cartItems.forEach(item -> validatePrice(
             productsById.get(item.getProductId()),
-            salesByProductId.get(item.getProductId()),
+            pricesByProductId.get(item.getProductId()),
             requestedByCartItemId.get(item.getId())));
 
         cartItems.forEach(item -> productsById.get(item.getProductId()).decreaseStock(item.getQuantity()));
-        decreaseFlashDropRemaining(memberId, cartItems, productsById, salesByProductId);
+        decreaseFlashDropRemaining(memberId, cartItems, productsById, pricesByProductId);
 
         long totalAmount = cartItems.stream()
-            .mapToLong(item -> (long) unitPrice(productsById.get(item.getProductId()), salesByProductId.get(item.getProductId()))
-                * item.getQuantity())
+            .mapToLong(item -> (long) pricesByProductId.get(item.getProductId()).unitPrice() * item.getQuantity())
             .sum();
         Order order = saveOrder(memberId, idempotencyKey, totalAmount);
 
         List<OrderItem> orderItems = cartItems.stream()
             .map(item -> toOrderItem(order, memberId, productsById.get(item.getProductId()),
-                salesByProductId.get(item.getProductId()), item.getQuantity()))
+                pricesByProductId.get(item.getProductId()), item.getQuantity()))
             .toList();
         orderItemRepository.saveAll(orderItems);
         return new OrderCreateResult(OrderCheckoutResponse.from(order, orderItems), true);
@@ -170,16 +169,12 @@ public class OrderCreateService {
         return "";
     }
 
-    private int unitPrice(Product product, ActiveSale sale) {
-        return sale == null ? product.getPrice() : sale.salePrice();
-    }
-
     // 보낸 단가나 할인 구분이 주문 시점 값과 다르면 오르든 내리든 거절한다. 문구는 할인 구분 비교로 고른다.
-    private void validatePrice(Product product, ActiveSale sale, OrderCreateItemRequest requested) {
-        SaleEventType currentType = sale == null ? null : sale.type();
-        if (requested.saleType() == currentType && requested.unitPrice() == unitPrice(product, sale)) {
+    private void validatePrice(Product product, SellingPrice price, OrderCreateItemRequest requested) {
+        if (price.matches(requested.unitPrice(), requested.saleType())) {
             return;
         }
+        SaleEventType currentType = price.saleType();
         String reason = "가격 변경";
         if (requested.saleType() == null && currentType != null) {
             reason = "할인 시작";
@@ -191,47 +186,43 @@ public class OrderCreateService {
 
     // 번개 드롭은 1인 1개이고 남은 수량이 있어야 한다. 남은 수량 차감은 상품 행을 잠근 뒤 한다.
     private void decreaseFlashDropRemaining(
-        Long memberId, List<CartItem> cartItems, Map<Long, Product> productsById, Map<Long, ActiveSale> salesByProductId
+        Long memberId, List<CartItem> cartItems, Map<Long, Product> productsById, Map<Long, SellingPrice> pricesByProductId
     ) {
         List<CartItem> flashDropItems = cartItems.stream()
-            .filter(item -> isFlashDrop(salesByProductId.get(item.getProductId())))
+            .filter(item -> pricesByProductId.get(item.getProductId()).isFlashDrop())
             .toList();
         if (flashDropItems.isEmpty()) {
             return;
         }
         flashDropItems.forEach(item -> validateFlashDropLimit(
-            memberId, item, productsById.get(item.getProductId()), salesByProductId.get(item.getProductId())));
+            memberId, item, productsById.get(item.getProductId()), pricesByProductId.get(item.getProductId())));
 
         saleEventStockService.decreaseRemaining(flashDropItems.stream()
-            .map(item -> new FlashDropQuantity(salesByProductId.get(item.getProductId()).saleEventItemId(),
+            .map(item -> new FlashDropQuantity(pricesByProductId.get(item.getProductId()).saleEventItemId(),
                 item.getQuantity(), productsById.get(item.getProductId()).getName()))
             .toList());
     }
 
     // 이미 산 번개 드롭을 장바구니에 담은 경우는 여기서 막는다. 같은 회원의 주문하기는 장바구니 잠금으로 하나씩 처리된다.
-    private void validateFlashDropLimit(Long memberId, CartItem item, Product product, ActiveSale sale) {
-        boolean bought = orderItemRepository.existsBySaleEventItemIdAndFlashDropMemberId(sale.saleEventItemId(), memberId);
+    private void validateFlashDropLimit(Long memberId, CartItem item, Product product, SellingPrice price) {
+        boolean bought = orderItemRepository.existsBySaleEventItemIdAndFlashDropMemberId(price.saleEventItemId(), memberId);
         if (item.getQuantity() > SaleEvent.FLASH_DROP_PURCHASE_LIMIT || bought) {
             throw new BusinessException(ErrorCode.PURCHASE_LIMIT_EXCEEDED, "구매 한도 초과 · " + product.getName());
         }
     }
 
-    private boolean isFlashDrop(ActiveSale sale) {
-        return sale != null && sale.type() == SaleEventType.FLASH_DROP;
-    }
-
-    private OrderItem toOrderItem(Order order, Long memberId, Product product, ActiveSale sale, int quantity) {
+    private OrderItem toOrderItem(Order order, Long memberId, Product product, SellingPrice price, int quantity) {
         return OrderItem.builder()
             .order(order)
             .productId(product.getId())
             .productName(product.getName())
             .productImageUrl(product.getImageUrl())
             .quantity(quantity)
-            .listPrice(product.getPrice())
-            .unitPrice(unitPrice(product, sale))
-            .saleType(SaleType.from(sale == null ? null : sale.type()))
-            .saleEventItemId(sale == null ? null : sale.saleEventItemId())
-            .flashDropMemberId(isFlashDrop(sale) ? memberId : null)
+            .listPrice(price.listPrice())
+            .unitPrice(price.unitPrice())
+            .saleType(SaleType.from(price.saleType()))
+            .saleEventItemId(price.saleEventItemId())
+            .flashDropMemberId(price.isFlashDrop() ? memberId : null)
             .build();
     }
 }

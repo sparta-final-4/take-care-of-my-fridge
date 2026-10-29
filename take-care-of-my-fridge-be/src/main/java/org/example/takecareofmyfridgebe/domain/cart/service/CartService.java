@@ -20,9 +20,7 @@ import org.example.takecareofmyfridgebe.domain.cart.repository.CartRepository;
 import org.example.takecareofmyfridgebe.domain.product.entity.Product;
 import org.example.takecareofmyfridgebe.domain.product.entity.ProductStatus;
 import org.example.takecareofmyfridgebe.domain.product.repository.ProductRepository;
-import org.example.takecareofmyfridgebe.domain.sale.dto.ActiveSale;
 import org.example.takecareofmyfridgebe.domain.sale.entity.SaleEvent;
-import org.example.takecareofmyfridgebe.domain.sale.entity.SaleEventType;
 import org.example.takecareofmyfridgebe.domain.sale.service.SaleEventReader;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
@@ -49,7 +47,7 @@ public class CartService {
         Optional<CartItem> existing = cartItemRepository.findByCartAndProductId(cart, request.productId());
         int currentQuantity = existing.map(CartItem::getQuantity).orElse(0);
         // 번개 드롭은 합친 수량이 1을 넘을 수 없다
-        if (isFlashDrop(request.productId()) && request.quantity() > SaleEvent.FLASH_DROP_PURCHASE_LIMIT - currentQuantity) {
+        if (isFlashDrop(product) && request.quantity() > SaleEvent.FLASH_DROP_PURCHASE_LIMIT - currentQuantity) {
             throw purchaseLimitExceeded(product);
         }
         // 기존 수량 + 요청 수량은 int를 넘칠 수 있어 재고 쪽에서 뺀다
@@ -71,9 +69,10 @@ public class CartService {
         List<CartItem> items = cartItemRepository.findByCartMemberIdOrderByIdAsc(memberId);
         // 줄마다 상품을 따로 읽지 않고 한 번에 읽는다
         List<Long> productIds = items.stream().map(CartItem::getProductId).toList();
-        Map<Long, Product> productsById = productRepository.findAllById(productIds).stream()
+        List<Product> products = productRepository.findAllById(productIds);
+        Map<Long, Product> productsById = products.stream()
             .collect(Collectors.toMap(Product::getId, Function.identity()));
-        return CartItemsResponse.from(items, productsById, saleEventReader.findActiveSales(productIds));
+        return CartItemsResponse.from(items, productsById, saleEventReader.findSellingPrices(products));
     }
 
     @Transactional
@@ -81,7 +80,7 @@ public class CartService {
         CartItem item = cartItemRepository.findByIdAndCartMemberId(cartItemId, memberId)
             .orElseThrow(() -> new BusinessException(ErrorCode.CART_ITEM_NOT_FOUND));
         Product product = findSellableProduct(item.getProductId());
-        if (request.quantity() > SaleEvent.FLASH_DROP_PURCHASE_LIMIT && isFlashDrop(item.getProductId())) {
+        if (request.quantity() > SaleEvent.FLASH_DROP_PURCHASE_LIMIT && isFlashDrop(product)) {
             throw purchaseLimitExceeded(product);
         }
 
@@ -100,16 +99,15 @@ public class CartService {
         cartItemRepository.deleteAllByIdsAndMemberId(request.cartItemIds(), memberId);
     }
 
-    private boolean isFlashDrop(Long productId) {
-        ActiveSale sale = saleEventReader.findActiveSales(List.of(productId)).get(productId);
-        return sale != null && sale.type() == SaleEventType.FLASH_DROP;
+    private boolean isFlashDrop(Product product) {
+        return saleEventReader.findSellingPrices(List.of(product)).get(product.getId()).isFlashDrop();
     }
 
     private BusinessException purchaseLimitExceeded(Product product) {
         return new BusinessException(ErrorCode.PURCHASE_LIMIT_EXCEEDED, "구매 한도 초과 · " + product.getName());
     }
 
-    // 품절은 상태값이 아니라 재고 숫자로 판단하므로 판매 중지만 거른다
+    // 품절은 뒤의 재고 수량 확인에서 걸리므로 여기서는 판매 중지만 거른다
     private Product findSellableProduct(Long productId) {
         Product product = productRepository.findById(productId)
             .orElseThrow(() -> new BusinessException(ErrorCode.PRODUCT_NOT_FOUND));

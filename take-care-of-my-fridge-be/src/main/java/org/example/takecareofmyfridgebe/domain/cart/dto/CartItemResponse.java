@@ -1,11 +1,12 @@
 package org.example.takecareofmyfridgebe.domain.cart.dto;
 
 import java.time.OffsetDateTime;
+import java.util.Optional;
 import lombok.Builder;
 import org.example.takecareofmyfridgebe.domain.cart.entity.CartItem;
 import org.example.takecareofmyfridgebe.domain.product.entity.Product;
-import org.example.takecareofmyfridgebe.domain.product.entity.ProductStatus;
 import org.example.takecareofmyfridgebe.domain.sale.dto.ActiveSale;
+import org.example.takecareofmyfridgebe.domain.sale.dto.SellingPrice;
 import org.example.takecareofmyfridgebe.domain.sale.entity.SaleEvent;
 import org.example.takecareofmyfridgebe.domain.sale.entity.SaleEventType;
 
@@ -28,28 +29,23 @@ public record CartItemResponse(
         boolean soldOut
 ) {
 
-    // sale은 진행 중인 할인이고 없으면 null이다. 번개 드롭은 남은 수량이 0이면 그 항목만 품절로 본다.
-    public static CartItemResponse from(CartItem item, Product product, ActiveSale sale) {
-        boolean flashDrop = sale != null && sale.type() == SaleEventType.FLASH_DROP;
+    // 판단은 price가 끝낸 상태로 받는다.
+    public static CartItemResponse from(CartItem item, Product product, SellingPrice price) {
+        Optional<ActiveSale> flashDrop = price.sale().filter(ActiveSale::isFlashDrop);
         return CartItemResponse.builder()
                 .cartItemId(item.getId())
                 .productId(item.getProductId())
                 .productName(product.getName())
                 .imageUrl(product.getImageUrl())
                 .quantity(item.getQuantity())
-                .listPrice(product.getPrice())
-                .unitPrice(sale == null ? product.getPrice() : sale.salePrice())
-                .saleType(sale == null ? null : sale.type())
-                .discountRate(sale == null ? null : sale.discountRate())
-                .flashDropRemaining(flashDrop ? sale.remainingQuantity() : null)
-                .flashDropLimit(flashDrop ? sale.limitedQuantity() : null)
-                .saleEndsAt(sale == null ? null : sale.endsAt().atZone(SaleEvent.ZONE).toOffsetDateTime())
-                .soldOut(isUnavailable(product) || (flashDrop && sale.remainingQuantity() == 0))
+                .listPrice(price.listPrice())
+                .unitPrice(price.unitPrice())
+                .saleType(price.saleType())
+                .discountRate(price.sale().map(ActiveSale::discountRate).orElse(null))
+                .flashDropRemaining(flashDrop.map(ActiveSale::remainingQuantity).orElse(null))
+                .flashDropLimit(flashDrop.map(ActiveSale::limitedQuantity).orElse(null))
+                .saleEndsAt(price.sale().map(active -> active.endsAt().atZone(SaleEvent.ZONE).toOffsetDateTime()).orElse(null))
+                .soldOut(price.soldOut())
                 .build();
-    }
-
-    // 판매 중지 상품도 품절과 같이 체크·주문에서 빠지도록 soldOut으로 표시한다
-    private static boolean isUnavailable(Product product) {
-        return product.getStock() == 0 || product.getStatus() == ProductStatus.STOPPED;
     }
 }
