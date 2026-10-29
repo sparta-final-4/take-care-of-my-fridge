@@ -209,6 +209,60 @@ erDiagram
 |---|---|---|
 | sale_event_items.product_id | 할인 상품 | 상품 |
 
+## 결제 테이블 관계
+
+결제 테이블 3개입니다. 컬럼 정의는 [데이터 사전](data-dictionary.md#payments--결제)에 있습니다.
+
+```mermaid
+erDiagram
+    orders ||--o{ payments : "결제 시도"
+    payments ||--o{ payment_histories : "이력"
+    payments |o--o{ webhook_events : "웹훅"
+
+    orders {
+        bigint id PK
+        enum status
+        bigint total_amount
+    }
+    payments {
+        bigint id PK
+        bigint order_id FK
+        varchar portone_payment_id UK
+        bigint amount
+        enum status
+        datetime expires_at
+        enum fail_reason
+    }
+    payment_histories {
+        bigint id PK
+        bigint payment_id FK
+        enum event_type
+        bigint amount
+        bigint cancelled_amount
+        bigint refund_id "외부 참조"
+        enum changed_by
+    }
+    webhook_events {
+        bigint id PK
+        bigint payment_id FK
+        varchar webhook_id UK
+        varchar event_type
+        enum process_status
+    }
+```
+
+| 관계 | 의미 | 필수 여부 |
+|---|---|---|
+| orders 1 : N payments | 주문 하나에 결제 시도 여러 건(재결제). 결제 완료는 한 건만 | 결제에는 주문이 반드시 있음 |
+| payments 1 : N payment_histories | 결제 하나에 사건 여러 건 | 이력에는 결제가 반드시 있음 |
+| payments 1 : N webhook_events | 결제 하나에 웹훅 여러 건 | 결제를 못 찾은 웹훅은 결제 없음 |
+
+| 컬럼 | 가리키는 대상 | 소유 도메인 |
+|---|---|---|
+| payment_histories.refund_id | 취소를 일으킨 환불 | 환불 |
+
+- 결제가 붙은 주문은 지우지 않습니다. 결제를 시도한 결제 대기 주문은 정리될 때 취소 상태로 남습니다.
+
 ## 확정 절차
 
 담당자·도메인 정책 확인 → 데이터 사전 → 관계 필수성·삭제 정책 → 키·인덱스 → 마이그레이션 검토. [DB 규칙](../conventions/database.md)의 미결정 항목(Q-06, Q-07)을 먼저 해결합니다.

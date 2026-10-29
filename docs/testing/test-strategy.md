@@ -76,6 +76,25 @@ Q-01~Q-17에 의존하는 테스트는 기대값을 합의한 뒤 구현합니�
 
 번개 드롭 동시 주문과 1인 1개는 ORDER-07·08에서 검증합니다.
 
+## 결제 필수 시나리오
+
+| ID | 우선순위 | 조건·행동 | 기대 결과 | 대응 테스트 |
+|---|---|---|---|---|
+| PAY-01 | P0 | PG 결제 완료, 금액 일치로 확정 | 결제·주문 결제 완료, 이력 `PAID` | `PaymentFacadeTest`, `PaymentCommandServiceTest` |
+| PAY-02 | P0 | PG 금액이 결제 금액과 다름 | `AMOUNT_MISMATCH` 실패 후 PG 전액 취소, `PAYMENT_002`. 다른 요청이 먼저 처리했으면 취소 안 함 | `PaymentFacadeTest` |
+| PAY-03 | P0 | 만료 시각 이후 PG 결제 완료 | `TIMEOUT` 실패 후 PG 취소, `PAYMENT_006`. 만료 시각과 같으면 승인 | `PaymentFacadeTest`, `PaymentTest` |
+| PAY-04 | P0 | 같은 주문의 결제 두 건을 동시에 승인 | 하나만 결제 완료, 나머지는 `ORDER_NOT_PAYABLE` 실패 후 PG 취소 | `PaymentCommandServiceConcurrencyTest` |
+| PAY-05 | P0 | 같은 주문의 결제 준비를 동시에 여러 번 | 결제 대기 한 건만 생성, 나머지 `PAYMENT_008` | `PaymentCommandServiceConcurrencyTest` |
+| PAY-06 | P0 | 결제를 읽은 뒤 주문이 취소됨 | 승인하지 않고 `ORDER_NOT_PAYABLE` 실패 | `PaymentCommandServiceConcurrencyTest` |
+| PAY-07 | P0 | 이미 결제 완료·실패한 결제를 다시 확정 | 완료면 PG 조회 없이 같은 응답, 실패면 실패 사유에 맞는 오류 | `PaymentFacadeTest` |
+| PAY-08 | P0 | 타인 결제 확정, 다른 주문의 결제 ID로 확정 | `ORDER_003`·`C001`, PG 조회 안 함 | `PaymentFacadeTest`, `PaymentControllerTest` |
+| PAY-09 | P0 | 남은 결제 대기 건이 있는 주문의 결제 준비 | PG 미결제면 `SUPERSEDED` 정리 후 새로 생성, PG 결제됨이면 승인하고 새 결제 안 만듦, PG 조회 실패면 생성 안 함 | `PaymentFacadeTest` |
+| PAY-10 | P0 | 웹훅 서명 불일치·헤더 없음·5분 경과 | 401, 기록 안 함 | `PortOneWebhookVerifierTest`, `WebhookControllerTest` |
+| PAY-11 | P0 | 같은 웹훅 재수신·동시 수신, 처리 중 오류 | 한 번만 처리. 오류면 `FAILED` 기록 후 오류 응답, 재전송 때 다시 처리 | `WebhookHandlerTest`, `WebhookEventServiceTest` |
+| PAY-12 | P0 | 실패 처리한 결제가 PG에서 결제됨, 보상 취소 실패 | 보상 취소, 실패하면 이력 `PAID`만 남아 5분 뒤 재시도. 다른 경로로 취소됐으면 기록만 | `PaymentFacadeTest`, `PaymentTimeoutSchedulerTest` |
+| PAY-13 | P1 | 만료 스케줄러 실행 | PG 미결제면 `TIMEOUT`, PG 결제됨이면 웹훅과 같은 규칙. 한 건 실패해도 나머지 처리, id 커서로 이어 읽음 | `PaymentFacadeTest`, `PaymentTimeoutSchedulerTest` |
+| PAY-14 | P1 | PG 취소 요청 타임아웃·4xx | 타임아웃은 같은 멱등 키로 3번까지, 4xx는 재시도 없이 `PAYMENT_009`. 이미 취소된 결제의 전액 취소는 성공 | `PortOneClientTest` |
+
 ## 다른 담당과 공동 검증
 
 - 요리 기록과 재료 차감의 일관성.
