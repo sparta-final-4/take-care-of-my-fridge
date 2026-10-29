@@ -175,6 +175,7 @@ export * from './sale-event-list-request';
 export * from './sale-event-list-response';
 export * from './sale-event-update-request';
 export * from './sale-events-create-response';
+export * from './sale-response';
 export * from './search-click-request';
 export * from './sign-up-request';
 export * from './sign-up-response';

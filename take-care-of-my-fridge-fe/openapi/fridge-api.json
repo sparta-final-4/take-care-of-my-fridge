@@ -5798,9 +5798,15 @@
               "MEALKIT"
             ]
           },
+          "sale": {
+            "$ref": "#/components/schemas/SaleResponse"
+          },
           "shelfDays": {
             "type": "integer",
             "format": "int32"
+          },
+          "soldOut": {
+            "type": "boolean"
           },
           "status": {
             "type": "string",
@@ -5847,6 +5853,12 @@
               "INGREDIENT",
               "MEALKIT"
             ]
+          },
+          "sale": {
+            "$ref": "#/components/schemas/SaleResponse"
+          },
+          "soldOut": {
+            "type": "boolean"
           },
           "status": {
             "type": "string",
@@ -7123,6 +7135,38 @@
               "type": "integer",
               "format": "int64"
             }
+          }
+        }
+      },
+      "SaleResponse": {
+        "type": "object",
+        "properties": {
+          "discountRate": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "endsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "limitedQuantity": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "remainingQuantity": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "salePrice": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "SPECIAL",
+              "FLASH_DROP"
+            ]
           }
         }
       },

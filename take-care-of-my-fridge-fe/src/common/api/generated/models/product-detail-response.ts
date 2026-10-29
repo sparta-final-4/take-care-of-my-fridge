@@ -20,6 +20,9 @@ import type { IngredientInfo } from './ingredient-info';
 // May contain unused imports in some cases
 // @ts-ignore
 import type { MealkitInfo } from './mealkit-info';
+// May contain unused imports in some cases
+// @ts-ignore
+import type { SaleResponse } from './sale-response';
 
 export interface ProductDetailResponse {
     'description'?: string;
@@ -30,7 +33,9 @@ export interface ProductDetailResponse {
     'price'?: number;
     'productId'?: number;
     'productType'?: ProductDetailResponseProductTypeEnum;
+    'sale'?: SaleResponse;
     'shelfDays'?: number;
+    'soldOut'?: boolean;
     'status'?: ProductDetailResponseStatusEnum;
     'stock'?: number;
     'storage'?: ProductDetailResponseStorageEnum;

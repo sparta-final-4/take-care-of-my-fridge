@@ -14,6 +14,9 @@
  */
 
 
+// May contain unused imports in some cases
+// @ts-ignore
+import type { SaleResponse } from './sale-response';
 
 export interface ProductListItemResponse {
     'imageUrl'?: string;
@@ -21,6 +24,8 @@ export interface ProductListItemResponse {
     'price'?: number;
     'productId'?: number;
     'productType'?: ProductListItemResponseProductTypeEnum;
+    'sale'?: SaleResponse;
+    'soldOut'?: boolean;
     'status'?: ProductListItemResponseStatusEnum;
 }
 
