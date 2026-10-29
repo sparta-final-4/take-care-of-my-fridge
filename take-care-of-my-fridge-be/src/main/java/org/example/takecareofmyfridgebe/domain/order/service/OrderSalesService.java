@@ -23,6 +23,14 @@ public class OrderSalesService {
     // asOf 이후에 확정된 주문은 빼서, 같은 asOf로 다시 조회하면 같은 결과가 나온다.
     // 확정 수량은 확정 전에 완료된 환불을 이미 뺀 값이고 확정 뒤에는 환불이 없으므로, 환불을 따로 빼지 않아도 순판매 수량이다.
     @Transactional(readOnly = true)
+    public List<DailyProductSales> getDailyRegularProductSales(LocalDate from, LocalDate to, LocalDateTime asOf) {
+        if (from == null || to == null || asOf == null || from.isAfter(to)) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+        return orderItemRepository.findDailyRegularProductSales(
+            OrderStatus.CONFIRMED, from.atStartOfDay(), to.plusDays(1).atStartOfDay(), asOf);
+    }
+    @Transactional(readOnly = true)
     public List<DailyProductSales> getDailyProductSales(LocalDate from, LocalDate to, LocalDateTime asOf) {
         if (from == null || to == null || asOf == null || from.isAfter(to)) {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
