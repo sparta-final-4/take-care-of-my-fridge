@@ -39,5 +39,15 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
                                     @Param("createdBefore") LocalDateTime createdBefore,
                                     @Param("afterId") long afterId, Pageable pageable);
 
+    // 한 주문 처리 실패가 뒤의 주문을 막지 않도록 ID 커서로 결제 후 7일 지난 건을 읽는다.
+    @Query("""
+        select o from Order o
+        where o.status = :status and o.paidAt <= :paidBefore and o.id > :afterId
+        order by o.id
+        """)
+    List<Order> findPaidBefore(@Param("status") OrderStatus status,
+                               @Param("paidBefore") LocalDateTime paidBefore,
+                               @Param("afterId") long afterId, Pageable pageable);
+
     Page<Order> findByMemberIdAndStatusIn(Long memberId, Collection<OrderStatus> statuses, Pageable pageable);
 }
