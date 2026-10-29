@@ -2,8 +2,12 @@ package org.example.takecareofmyfridgebe.domain.search.controller;
 
 import org.example.takecareofmyfridgebe.domain.auth.service.AuthSessionService;
 import org.example.takecareofmyfridgebe.domain.auth.service.JwtTokenService;
+import org.example.takecareofmyfridgebe.domain.product.dto.ProductListItemResponse;
+import org.example.takecareofmyfridgebe.domain.product.dto.ProductListRequest;
+import org.example.takecareofmyfridgebe.domain.product.entity.ProductType;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeListItemResponse;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeListRequest;
+import org.example.takecareofmyfridgebe.domain.search.facade.ProductSearchFacade;
 import org.example.takecareofmyfridgebe.domain.search.facade.RecipeSearchFacade;
 import org.example.takecareofmyfridgebe.global.config.SecurityConfig;
 import org.example.takecareofmyfridgebe.global.error.GlobalExceptionHandler;
@@ -41,9 +45,12 @@ class SearchControllerTest {
     @Autowired
     private RecipeSearchFacade recipeSearchFacade;
 
+    @Autowired
+    private ProductSearchFacade productSearchFacade;
+
     @BeforeEach
     void resetMock() {
-        reset(recipeSearchFacade);
+        reset(recipeSearchFacade, productSearchFacade);
     }
 
     @Test
@@ -74,11 +81,45 @@ class SearchControllerTest {
                 .andExpect(status().isBadRequest());
     }
 
+    @Test
+    @DisplayName("비로그인 상태에서 상품을 검색하면 200 OK와 검색 결과 페이지를 반환한다")
+    void searchProductsUnauthenticatedReturnsOk() throws Exception {
+        // Given
+        PageResponse<ProductListItemResponse> page = new PageResponse<>(List.of(), 1, 20, 0, 0, true);
+        when(productSearchFacade.getProducts(any(ProductListRequest.class))).thenReturn(page);
+
+        // When & Then
+        mvc.perform(get("/api/search/products").param("keyword", "대파").param("type", "INGREDIENT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.content").isArray())
+                .andExpect(jsonPath("$.data.pageNumber").value(1));
+
+        ArgumentCaptor<ProductListRequest> captor = ArgumentCaptor.forClass(ProductListRequest.class);
+        verify(productSearchFacade).getProducts(captor.capture());
+        assertEquals("대파", captor.getValue().keyword());
+        assertEquals(ProductType.INGREDIENT, captor.getValue().type());
+    }
+
+    @Test
+    @DisplayName("상품 검색의 가격 범위가 뒤집혀 있으면 400 Bad Request를 반환한다")
+    void searchProductsInvalidPriceRangeReturnsBadRequest() throws Exception {
+        // When & Then
+        mvc.perform(get("/api/search/products").param("keyword", "대파")
+                        .param("minPrice", "5000").param("maxPrice", "1000"))
+                .andExpect(status().isBadRequest());
+    }
+
     @TestConfiguration
     static class TestConfig {
         @Bean
         RecipeSearchFacade recipeSearchFacade() {
             return mock(RecipeSearchFacade.class);
+        }
+
+        @Bean
+        ProductSearchFacade productSearchFacade() {
+            return mock(ProductSearchFacade.class);
         }
 
         @Bean

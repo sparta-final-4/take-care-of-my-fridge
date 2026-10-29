@@ -2,8 +2,11 @@ package org.example.takecareofmyfridgebe.domain.search.controller;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.example.takecareofmyfridgebe.domain.product.dto.ProductListItemResponse;
+import org.example.takecareofmyfridgebe.domain.product.dto.ProductListRequest;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeListItemResponse;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeListRequest;
+import org.example.takecareofmyfridgebe.domain.search.facade.ProductSearchFacade;
 import org.example.takecareofmyfridgebe.domain.search.facade.RecipeSearchFacade;
 import org.example.takecareofmyfridgebe.global.response.ApiResponse;
 import org.example.takecareofmyfridgebe.global.response.PageResponse;
@@ -19,6 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class SearchController {
 
     private final RecipeSearchFacade recipeSearchFacade;
+    private final ProductSearchFacade productSearchFacade;
 
     @GetMapping("/recipes")
     public ResponseEntity<ApiResponse<PageResponse<RecipeListItemResponse>>> searchRecipes(
@@ -26,5 +30,13 @@ public class SearchController {
     ) {
         PageResponse<RecipeListItemResponse> recipes = recipeSearchFacade.getRecipes(request);
         return ResponseEntity.ok(ApiResponse.ok(recipes));
+    }
+
+    @GetMapping("/products")
+    public ResponseEntity<ApiResponse<PageResponse<ProductListItemResponse>>> searchProducts(
+            @Valid @ModelAttribute ProductListRequest request
+    ) {
+        PageResponse<ProductListItemResponse> products = productSearchFacade.getProducts(request);
+        return ResponseEntity.ok(ApiResponse.ok(products));
     }
 }
