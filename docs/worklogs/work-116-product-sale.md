@@ -60,6 +60,7 @@ flowchart LR
 | 명령·시나리오 | 실행 환경·조건 | 통과/실패/미실행 | 근거 |
 |---|---|---|---|
 | `sh ./gradlew test --tests '*ProductServiceTest' --tests '*AdminProductControllerTest' --tests '*ProductSearchFacadeTest' --tests '*SearchControllerTest' --tests '*CartServiceTest' --tests '*CartServiceTransactionTest' --tests '*SaleEventLifecycleTransactionTest'` | 로컬(맥), MySQL 컨테이너 | 통과 | 각 클래스 실패·오류·건너뜀 없음 |
+| `sh ./gradlew test --tests '*ProductFacadeTest'` | 로컬(맥), 목 | 통과 | 할인 없음·특가·번개 드롭 남은 수량 0·품절 상태 상품의 `sale`·`soldOut`, 목록의 할인 조회가 한 번만 나가고 빈 페이지면 나가지 않음, 페이지 정보와 검색 결과의 ES 전체 건수, 수정 뒤에 판매가를 읽는 순서 |
 | `pnpm lint && pnpm format:check && pnpm typecheck && pnpm build && pnpm test` | 로컬(맥) | 통과 | 모두 성공 |
 | 상품 응답 | 로컬 서버, 할인 없음·특가·번개 드롭·번개 드롭 남은 수량 0·할인 중 품절 상품 | 통과 | 할인 없음은 `sale` null. 번개 드롭 남은 수량 0은 `status`가 판매 중인 채 `soldOut` true |
 | 상품 목록·상세 화면 | 1440·768·375px, 위와 같은 상품과 비율·밝기가 다른 이미지 | 통과 | 같은 행의 카드 높이가 같고 가로 스크롤 없음. 띠·품절 표시가 사진 위에서 읽힘 |
@@ -67,4 +68,4 @@ flowchart LR
 
 ## 연결과 남은 작업
 
-- 상품 퍼사드 테스트(목록 DTO 변환, 페이지 정보, ES 전체 건수 유지, 판매가 연결)를 추가한다.
+- 상품 퍼사드 테스트: #376
