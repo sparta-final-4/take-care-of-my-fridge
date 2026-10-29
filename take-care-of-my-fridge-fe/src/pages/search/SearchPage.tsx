@@ -1,5 +1,6 @@
 import { Empty } from 'antd';
 
+import { SearchProductSection } from '@/domains/search/components/SearchProductSection';
 import { SearchRecipeSection } from '@/domains/search/components/SearchRecipeSection';
 import { SearchSummarySection } from '@/domains/search/components/SearchSummarySection';
 import { useSearchKeyword } from '@/domains/search/hooks/useSearchKeyword';
@@ -13,7 +14,10 @@ export default function SearchPage() {
     <div className={styles.page}>
       <SearchSummarySection />
       {keyword ? (
-        <SearchRecipeSection />
+        <>
+          <SearchRecipeSection />
+          <SearchProductSection />
+        </>
       ) : (
         <Empty description="상단 검색창에 재료나 요리 이름을 입력해 주세요." />
       )}
