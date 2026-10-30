@@ -21,7 +21,8 @@ export function SearchRecipeSection() {
 
   const handleChangePage = (nextPage: number) => {
     setPage(nextPage);
-    window.scrollTo({ top: 0 });
+    // 화면 맨 위가 아니라 레시피 섹션 상단으로 올린다.
+    document.getElementById(SEARCH_SECTION_IDS.recipes)?.scrollIntoView();
   };
 
   const totalElements = data?.totalElements ?? 0;
