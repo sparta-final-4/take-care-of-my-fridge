@@ -7,6 +7,7 @@ import java.time.LocalDate;
 import java.time.temporal.TemporalAdjusters;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.example.takecareofmyfridgebe.domain.forecast.service.ForecastPredictionService;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -20,7 +21,9 @@ public class ForecastPredictionScheduler {
 
     private final ForecastPredictionService predictionService;
 
+    // 서버가 여러 대여도 한 서버만 워커를 호출한다. 워커 응답 대기(최대 5분)보다 길게 잠근다.
     @Scheduled(cron = "0 0 * * * *", zone = "Asia/Seoul")
+    @SchedulerLock(name = "forecastPrediction", lockAtMostFor = "30m", lockAtLeastFor = "5m")
     public void predictDueWeek() {
         LocalDateTime now = LocalDateTime.now(ZONE);
         LocalDate targetWeek = now.toLocalDate().with(TemporalAdjusters.nextOrSame(DayOfWeek.MONDAY));

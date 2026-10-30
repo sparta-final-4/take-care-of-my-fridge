@@ -47,12 +47,7 @@ public class DealAnalysisExecutionService {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
         }
         DayOfWeek dayOfWeek = DayOfWeek.of(day.ordinal() + 1);
-        DealDiscountModel model;
-        try {
-            model = DealDiscountModel.train(observationService.getObservations(asOf));
-        } catch (IllegalStateException e) {
-            throw new BusinessException(ErrorCode.DEAL_TRAINING_DATA_INSUFFICIENT);
-        }
+        DealDiscountModel model = DealDiscountModel.train(observationService.getObservations(asOf));
         Member actor = memberRepository.findById(actorId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
         List<DealProductInput> products = productInputService.getProducts();

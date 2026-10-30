@@ -3,6 +3,8 @@ import {
   type FlashDropCreateRequest,
   type PageResponseSaleCandidateProductResponse,
   type PageResponseSaleEventListResponse,
+  type PopularSaleResponse,
+  saleApi,
   type SaleCandidateProductsRequest,
   type SaleEventDetailResponse,
   type SaleEventListRequest,
@@ -63,4 +65,9 @@ export async function endSaleEvent(saleEventId: number): Promise<void> {
 // 시작 전인 할인 행사를 행사 항목까지 지운다.
 export async function deleteSaleEvent(saleEventId: number): Promise<void> {
   await unwrap(adminSaleEventApi.deleteSaleEvent({ saleEventId }));
+}
+
+// 메인 화면 특가. 최근 검색 클릭이 많은 순으로 최대 6개이고, 지금 살 수 없는 상품은 서버가 뺀다.
+export async function getPopularSales(signal?: AbortSignal): Promise<PopularSaleResponse[]> {
+  return unwrap(saleApi.getPopularSales({ signal }));
 }

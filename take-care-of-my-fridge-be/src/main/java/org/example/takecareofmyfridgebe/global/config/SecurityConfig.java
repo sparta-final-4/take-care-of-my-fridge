@@ -54,6 +54,7 @@ public class SecurityConfig {
                                 "/api/search", "/api/search/**"
                         ).permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/reviews").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/sales/popular").permitAll()
                         .requestMatchers(API_DOCS_PATHS).permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/admin/members/*/promotion").authenticated()
                         .requestMatchers(HttpMethod.PUT, "/api/admin/deal-analyses/*/reviews").authenticated()

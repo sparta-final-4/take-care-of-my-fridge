@@ -1,6 +1,8 @@
 package org.example.takecareofmyfridgebe.domain.deal.service;
 
 import java.util.List;
+import org.example.takecareofmyfridgebe.global.error.BusinessException;
+import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 
 public final class DealDiscountModel {
 
@@ -14,14 +16,14 @@ public final class DealDiscountModel {
     public static DealDiscountModel train(List<Observation> observations) {
         if (observations == null || observations.size() < 3
                 || observations.stream().map(Observation::discountRate).distinct().count() < 2) {
-            throw new IllegalStateException("할인 효과를 학습할 행사 이력이 부족합니다.");
+            throw new BusinessException(ErrorCode.DEAL_TRAINING_DATA_INSUFFICIENT);
         }
         double numerator = 0;
         double denominator = 0;
         for (Observation observation : observations) {
             if (observation.discountRate() < 1 || observation.discountRate() > 99
                     || observation.expectedRegularQuantity() <= 0 || observation.actualDiscountedQuantity() < 0) {
-                throw new IllegalArgumentException("할인 행사 학습 자료가 올바르지 않습니다.");
+                throw new BusinessException(ErrorCode.DEAL_MODEL_INPUT_INVALID);
             }
             double exposure = observation.expectedRegularQuantity() * observation.discountRate() / 100.0;
             numerator += exposure * (observation.actualDiscountedQuantity()
@@ -30,14 +32,14 @@ public final class DealDiscountModel {
         }
         double learnedElasticity = numerator / denominator;
         if (!Double.isFinite(learnedElasticity)) {
-            throw new IllegalStateException("할인 효과를 학습할 행사 이력이 부족합니다.");
+            throw new BusinessException(ErrorCode.DEAL_TRAINING_DATA_INSUFFICIENT);
         }
         return new DealDiscountModel(learnedElasticity);
     }
 
     public Estimate estimate(int regularQuantity, int discountRate, int currentStock) {
         if (regularQuantity < 0 || discountRate < 1 || discountRate > 99 || currentStock < 0) {
-            throw new IllegalArgumentException("할인 예측 입력이 올바르지 않습니다.");
+            throw new BusinessException(ErrorCode.DEAL_MODEL_INPUT_INVALID);
         }
         int expectedRegular = Math.min(regularQuantity, currentStock);
         double predicted = regularQuantity * (1 + elasticity * discountRate / 100.0);

@@ -1,0 +1,51 @@
+@use '@/styles/variables' as *;
+@use '@/styles/mixins' as *;
+
+// 모바일에서는 화살표 터치 영역을 44px 이상으로 둔다.
+.arrow {
+  min-width: $touch-target-size;
+  min-height: $touch-target-size;
+
+  @include from(md) {
+    min-width: auto;
+    min-height: auto;
+  }
+}
+
+.state {
+  padding: var(--ant-padding-lg) 0;
+  margin: 0;
+}
+
+.viewport {
+  overflow: hidden;
+  // 가로 끌기는 넘기기에 쓰고, 세로로 미는 손가락은 그대로 화면 스크롤이 되게 한다.
+  touch-action: pan-y;
+  user-select: none;
+}
+
+// 페이지를 가로로 이어 두고 한 페이지 폭만큼 옮긴다.
+.track {
+  display: flex;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+
+  @media (prefers-reduced-motion: no-preference) {
+    transition: transform var(--ant-motion-duration-slow) var(--ant-motion-ease-in-out);
+  }
+}
+
+// 끝의 복제본에서 처음으로 자리를 바꿀 때는 움직이지 않는다.
+.instant {
+  transition: none;
+}
+
+// 페이지 하나에 카드 2장. 마지막 페이지가 1장이어도 카드 폭은 같다.
+.page {
+  display: grid;
+  flex: 0 0 100%;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--ant-margin-xs);
+  min-width: 0;
+}
