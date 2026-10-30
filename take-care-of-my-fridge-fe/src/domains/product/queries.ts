@@ -4,6 +4,9 @@ import type { AdminProductListRequest, ProductListRequest } from '@/common/api/c
 
 import { getAdminProduct, getAdminProducts, getProduct, getProducts } from './api';
 
+// 이미지 업로드 중에는 상품 저장 버튼을 막는다(useIsMutating).
+export const productImageUploadKey = ['products', 'image-upload'] as const;
+
 export const productQueries = {
   all: ['products'] as const,
   list: (request: ProductListRequest) =>

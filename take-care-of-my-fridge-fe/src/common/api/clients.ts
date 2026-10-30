@@ -3,6 +3,7 @@ import {
   AdminAuditControllerApi,
   AdminDealAnalysisControllerApi,
   AdminForecastControllerApi,
+  AdminImageControllerApi,
   AdminMemberControllerApi,
   AdminProductControllerApi,
   AdminSaleEventControllerApi,
@@ -63,6 +64,7 @@ export const adminDealAnalysisApi = new AdminDealAnalysisControllerApi(
   axiosInstance,
 );
 export const adminForecastApi = new AdminForecastControllerApi(undefined, basePath, axiosInstance);
+export const adminImageApi = new AdminImageControllerApi(undefined, basePath, axiosInstance);
 export const adminMemberApi = new AdminMemberControllerApi(undefined, basePath, axiosInstance);
 export const adminProductApi = new AdminProductControllerApi(undefined, basePath, axiosInstance);
 export const adminReviewSummaryApi = new ReviewSummaryAdminControllerApi(

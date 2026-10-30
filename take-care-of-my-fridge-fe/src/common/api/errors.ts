@@ -36,6 +36,16 @@ export function isNotFound(error: unknown) {
   return isAxiosError(error) && error.response?.status === 404;
 }
 
+// 상품 이미지 업로드. S3 PUT(fetch) 실패는 axios 오류가 아니라 일반 Error로 온다.
+export function getImageUploadErrorMessage(error: unknown) {
+  // IMAGE_001(503): 버킷 설정이 없는 환경(로컬). 5xx 공통 문구 대신 URL 직접 입력을 안내한다.
+  if (getErrorCode(error) === 'IMAGE_001') {
+    return '이 환경에서는 이미지 업로드를 쓸 수 없습니다. 이미지 URL을 직접 입력해 주세요.';
+  }
+  if (isAxiosError(error)) return getErrorMessage(error);
+  return '이미지를 올리지 못했습니다. 잠시 후 다시 시도해 주세요.';
+}
+
 export function getErrorMessage(error: unknown) {
   if (!isAxiosError(error)) return DEFAULT_MESSAGE;
 

@@ -1,9 +1,10 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useIsMutating, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Alert, App, Button, Form, Input, InputNumber, Select, Typography } from 'antd';
 
 import type { ProductCreateRequest } from '@/common/api/clients';
 import { createProduct } from '@/domains/product/api';
-import { productQueries } from '@/domains/product/queries';
+import { ProductImageUpload } from '@/domains/product/components/ProductImageUpload';
+import { productImageUploadKey, productQueries } from '@/domains/product/queries';
 
 import styles from './AdminProductCreatePage.module.scss';
 
@@ -16,6 +17,7 @@ export default function AdminProductCreatePage() {
     mutationFn: createProduct,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: productQueries.all }),
   });
+  const uploadingImage = useIsMutating({ mutationKey: productImageUploadKey }) > 0;
 
   const handleFinish = (values: ProductCreateRequest) => {
     const request: ProductCreateRequest = {
@@ -43,7 +45,7 @@ export default function AdminProductCreatePage() {
     <section className={styles.container}>
       <Typography.Title level={2}>상품 등록</Typography.Title>
       <Typography.Paragraph type="secondary">
-        이미지 URL과 권장 보관 일수는 현재 상품 API 기준으로 입력합니다.
+        이미지는 파일(JPG·PNG·WEBP, 5MB 이하)로 올리거나 URL을 직접 입력합니다.
       </Typography.Paragraph>
       <Form<ProductCreateRequest>
         form={form}
@@ -69,8 +71,8 @@ export default function AdminProductCreatePage() {
         <Form.Item name="description" label="설명" rules={[{ max: 2000 }]}>
           <Input.TextArea maxLength={2000} rows={4} showCount />
         </Form.Item>
-        <Form.Item name="imageUrl" label="이미지 URL" rules={[{ type: 'url', max: 500 }]}>
-          <Input maxLength={500} placeholder="https://" />
+        <Form.Item name="imageUrl" label="이미지" rules={[{ type: 'url', max: 500 }]}>
+          <ProductImageUpload />
         </Form.Item>
         <Form.Item
           name="price"
@@ -154,7 +156,12 @@ export default function AdminProductCreatePage() {
             <InputNumber min={1} precision={0} className={styles.fullWidth} />
           </Form.Item>
         )}
-        <Button type="primary" htmlType="submit" loading={creation.isPending}>
+        <Button
+          type="primary"
+          htmlType="submit"
+          loading={creation.isPending}
+          disabled={uploadingImage}
+        >
           상품 등록
         </Button>
       </Form>
