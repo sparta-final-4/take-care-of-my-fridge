@@ -11,6 +11,7 @@ CREATE TABLE sale_events (
     starts_at  DATETIME(6) NOT NULL COMMENT '시작 시각',
     ends_at    DATETIME(6) NOT NULL COMMENT '종료 시각(중간에 종료해도 바뀌지 않음)',
     status     ENUM('SCHEDULED','ACTIVE','ENDED') NOT NULL COMMENT '예정·진행 중·종료',
+    ended_at   DATETIME(6) NULL COMMENT '중간에 종료한 시각(끝까지 연 행사는 NULL)',
     created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '생성일시',
     updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '수정일시',
     PRIMARY KEY (id),

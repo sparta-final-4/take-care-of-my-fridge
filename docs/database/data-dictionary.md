@@ -249,6 +249,7 @@
 | starts_at | DATETIME(6) | 불가 | | 인덱스 | 시작 시각(한국 시각) |
 | ends_at | DATETIME(6) | 불가 | | 인덱스 | 종료 시각. 중간에 종료해도 바뀌지 않음 |
 | status | ENUM('SCHEDULED','ACTIVE','ENDED') | 불가 | | 인덱스 | 예정·진행 중·종료 |
+| ended_at | DATETIME(6) | 가능 | NULL | | 중간에 종료한 시각. 등록한 종료 시각까지 연 행사는 NULL. 할인 효과 학습은 이 시각까지만 판매한 것으로 본다 |
 
 ## sale_event_items — 할인 행사 항목
 

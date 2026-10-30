@@ -239,6 +239,7 @@ erDiagram
         datetime starts_at
         datetime ends_at
         enum status
+        datetime ended_at
     }
     sale_event_items {
         bigint id PK
