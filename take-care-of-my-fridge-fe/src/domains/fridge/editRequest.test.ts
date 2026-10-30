@@ -1,7 +1,7 @@
 import dayjs from 'dayjs';
 import { describe, expect, it } from 'vitest';
 
-import { buildFridgeItemUpdateRequest } from './editRequest';
+import { buildFridgeItemUpdateRequest, hasFridgeItemChanges } from './editRequest';
 
 const item = {
   rawName: '찌개용 두부',
@@ -54,5 +54,31 @@ describe('buildFridgeItemUpdateRequest', () => {
     expect(
       buildFridgeItemUpdateRequest(item, { ...unchanged, quantity: null, expirationDate: null }),
     ).toEqual({});
+  });
+});
+
+describe('hasFridgeItemChanges', () => {
+  it('그대로면 false다', () => {
+    expect(hasFridgeItemChanges(item, unchanged)).toBe(false);
+  });
+
+  it('폼이 아직 값을 주지 않은 첫 렌더(빈 객체)는 false다', () => {
+    expect(hasFridgeItemChanges(item, {})).toBe(false);
+  });
+
+  it('이름에 공백만 추가하면 false다', () => {
+    expect(hasFridgeItemChanges(item, { ...unchanged, rawName: '  찌개용 두부 ' })).toBe(false);
+  });
+
+  it.each([
+    ['이름', { rawName: '' }],
+    ['수량', { quantity: null }],
+    ['소비기한', { expirationDate: null }],
+  ])('%s 칸을 비우면 true다', (_, cleared) => {
+    expect(hasFridgeItemChanges(item, { ...unchanged, ...cleared })).toBe(true);
+  });
+
+  it('값을 바꾸면 true다', () => {
+    expect(hasFridgeItemChanges(item, { ...unchanged, storage: 'FROZEN' })).toBe(true);
   });
 });

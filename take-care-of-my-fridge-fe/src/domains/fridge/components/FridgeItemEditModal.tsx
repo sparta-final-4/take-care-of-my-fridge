@@ -2,7 +2,11 @@ import { App, DatePicker, Form, Input, InputNumber, Modal, Select } from 'antd';
 import dayjs from 'dayjs';
 
 import type { FridgeItemResponse, StorageType } from '../api';
-import { buildFridgeItemUpdateRequest, type EditFormValues } from '../editRequest';
+import {
+  buildFridgeItemUpdateRequest,
+  hasFridgeItemChanges,
+  type EditFormValues,
+} from '../editRequest';
 import { STORAGE_LABELS } from '../format';
 import { useUpdateFridgeItem } from '../queries';
 import styles from './FridgeItemEditModal.module.scss';
@@ -24,10 +28,9 @@ export function FridgeItemEditModal({ item, onClose }: FridgeItemEditModalProps)
   const { message } = App.useApp();
   const [form] = Form.useForm<EditFormValues>();
   const updateMutation = useUpdateFridgeItem();
-  // 바뀐 칸이 없으면 저장 버튼을 막는다. 첫 렌더에서는 값이 아직 없어 막힌 상태로 시작한다.
+  // 처음 값과 다른 칸이 없으면 저장 버튼을 막는다. 비운 칸은 바뀐 것으로 보아 버튼이 켜지고, 누르면 검증 안내가 나온다.
   const watchedValues = Form.useWatch((values: Partial<EditFormValues>) => values, form);
-  const hasChanges =
-    Object.keys(buildFridgeItemUpdateRequest(item, watchedValues ?? {})).length > 0;
+  const hasChanges = hasFridgeItemChanges(item, watchedValues ?? {});
 
   const handleFinish = (values: EditFormValues) => {
     updateMutation.mutate(
