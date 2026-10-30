@@ -23,9 +23,13 @@ import { DUMMY_BASE_URL, assertParamExists, setApiKeyToObject, setBasicAuthToObj
 // @ts-ignore
 import { BASE_PATH, COLLECTION_FORMATS, type RequestArgs, BaseAPI, RequiredError, operationServerMap } from '../base';
 // @ts-ignore
+import type { ApiResponsePageResponseSettlementPaymentResponse } from '../models';
+// @ts-ignore
 import type { ApiResponseSettlementResponse } from '../models';
 // @ts-ignore
 import type { ApiResponseTodaySalesResponse } from '../models';
+// @ts-ignore
+import type { SettlementPaymentSearchRequest } from '../models';
 // @ts-ignore
 import type { SettlementSearchRequest } from '../models';
 /**
@@ -33,6 +37,44 @@ import type { SettlementSearchRequest } from '../models';
  */
 export const SettlementControllerApiAxiosParamCreator = function (configuration?: Configuration) {
     return {
+        /**
+         * 
+         * @param {SettlementPaymentSearchRequest} request 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        getPayments: async (request: SettlementPaymentSearchRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'request' is not null or undefined
+            assertParamExists('getPayments', 'request', request)
+            const localVarPath = `/api/admin/settlements/payments`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            if (request !== undefined) {
+                for (const [key, value] of Object.entries(request)) {
+                    localVarQueryParameter[key] = value;
+                }
+            }
+
+            localVarHeaderParameter['Accept'] = '*/*';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
         /**
          * 
          * @param {SettlementSearchRequest} request 
@@ -111,6 +153,18 @@ export const SettlementControllerApiFp = function(configuration?: Configuration)
     return {
         /**
          * 
+         * @param {SettlementPaymentSearchRequest} request 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async getPayments(request: SettlementPaymentSearchRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ApiResponsePageResponseSettlementPaymentResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.getPayments(request, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['SettlementControllerApi.getPayments']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
          * @param {SettlementSearchRequest} request 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
@@ -143,6 +197,15 @@ export const SettlementControllerApiFactory = function (configuration?: Configur
     return {
         /**
          * 
+         * @param {SettlementControllerApiGetPaymentsRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        getPayments(requestParameters: SettlementControllerApiGetPaymentsRequest, options?: RawAxiosRequestConfig): AxiosPromise<ApiResponsePageResponseSettlementPaymentResponse> {
+            return localVarFp.getPayments(requestParameters.request, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
          * @param {SettlementControllerApiGetSettlementRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
@@ -167,6 +230,14 @@ export const SettlementControllerApiFactory = function (configuration?: Configur
 export interface SettlementControllerApiInterface {
     /**
      * 
+     * @param {SettlementControllerApiGetPaymentsRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    getPayments(requestParameters: SettlementControllerApiGetPaymentsRequest, options?: RawAxiosRequestConfig): AxiosPromise<ApiResponsePageResponseSettlementPaymentResponse>;
+
+    /**
+     * 
      * @param {SettlementControllerApiGetSettlementRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
@@ -183,6 +254,13 @@ export interface SettlementControllerApiInterface {
 }
 
 /**
+ * Request parameters for getPayments operation in SettlementControllerApi.
+ */
+export interface SettlementControllerApiGetPaymentsRequest {
+    readonly request: SettlementPaymentSearchRequest
+}
+
+/**
  * Request parameters for getSettlement operation in SettlementControllerApi.
  */
 export interface SettlementControllerApiGetSettlementRequest {
@@ -193,6 +271,16 @@ export interface SettlementControllerApiGetSettlementRequest {
  * SettlementControllerApi - object-oriented interface
  */
 export class SettlementControllerApi extends BaseAPI implements SettlementControllerApiInterface {
+    /**
+     * 
+     * @param {SettlementControllerApiGetPaymentsRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public getPayments(requestParameters: SettlementControllerApiGetPaymentsRequest, options?: RawAxiosRequestConfig) {
+        return SettlementControllerApiFp(this.configuration).getPayments(requestParameters.request, options).then((request) => request(this.axios, this.basePath));
+    }
+
     /**
      * 
      * @param {SettlementControllerApiGetSettlementRequest} requestParameters Request parameters.

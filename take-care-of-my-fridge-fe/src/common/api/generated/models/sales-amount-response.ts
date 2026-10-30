@@ -20,5 +20,6 @@ export interface SalesAmountResponse {
     'paidAmount'?: number;
     'paidCount'?: number;
     'refundedAmount'?: number;
+    'refundedCount'?: number;
 }
 

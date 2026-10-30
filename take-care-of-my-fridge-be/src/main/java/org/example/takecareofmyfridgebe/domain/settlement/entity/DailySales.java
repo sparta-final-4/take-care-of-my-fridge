@@ -40,7 +40,7 @@ public class DailySales extends BaseTimeEntity {
     @Column(name = "paid_count", nullable = false)
     private int paidCount;
 
-    // 환불·콘솔 취소 건수. 부분 취소도 한 건으로 센다
+    // 환불·콘솔 취소 건수. 결제 수가 아니라 취소 이력 한 건을 1건으로 센다(같은 결제를 두 번 부분 환불하면 2건)
     @Column(name = "refunded_count", nullable = false)
     private int refundedCount;
 

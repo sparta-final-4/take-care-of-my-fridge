@@ -77,6 +77,7 @@ models/api-response-page-response-recipe-list-item-response.ts
 models/api-response-page-response-review-response.ts
 models/api-response-page-response-sale-candidate-product-response.ts
 models/api-response-page-response-sale-event-list-response.ts
+models/api-response-page-response-settlement-payment-response.ts
 models/api-response-payment-confirm-response.ts
 models/api-response-payment-prepare-response.ts
 models/api-response-product-detail-response.ts
@@ -182,6 +183,7 @@ models/page-response-recipe-list-item-response.ts
 models/page-response-review-response.ts
 models/page-response-sale-candidate-product-response.ts
 models/page-response-sale-event-list-response.ts
+models/page-response-settlement-payment-response.ts
 models/payment-confirm-request.ts
 models/payment-confirm-response.ts
 models/payment-prepare-response.ts
@@ -229,6 +231,8 @@ models/sale-events-create-response.ts
 models/sale-response.ts
 models/sales-amount-response.ts
 models/search-click-request.ts
+models/settlement-payment-response.ts
+models/settlement-payment-search-request.ts
 models/settlement-period-response.ts
 models/settlement-response.ts
 models/settlement-search-request.ts

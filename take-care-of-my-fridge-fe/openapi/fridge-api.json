@@ -868,6 +868,36 @@
         ]
       }
     },
+    "/api/admin/settlements/payments": {
+      "get": {
+        "operationId": "getPayments",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "request",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/SettlementPaymentSearchRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePageResponseSettlementPaymentResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "settlement-controller"
+        ]
+      }
+    },
     "/api/admin/settlements/today": {
       "get": {
         "operationId": "getTodaySales",
@@ -3465,6 +3495,20 @@
           }
         }
       },
+      "ApiResponsePageResponseSettlementPaymentResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/PageResponseSettlementPaymentResponse"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorResponse"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
       "ApiResponsePaymentConfirmResponse": {
         "type": "object",
         "properties": {
@@ -6007,6 +6051,36 @@
           }
         }
       },
+      "PageResponseSettlementPaymentResponse": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SettlementPaymentResponse"
+            }
+          },
+          "isLast": {
+            "type": "boolean"
+          },
+          "pageNumber": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalElements": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "totalPages": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
       "PaymentConfirmRequest": {
         "type": "object",
         "properties": {
@@ -7699,6 +7773,10 @@
           "refundedAmount": {
             "type": "integer",
             "format": "int64"
+          },
+          "refundedCount": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },
@@ -7721,6 +7799,75 @@
         ]
       },
       "ServerSentEventString": {},
+      "SettlementPaymentResponse": {
+        "type": "object",
+        "properties": {
+          "buyerName": {
+            "type": "string"
+          },
+          "netAmount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "orderNumber": {
+            "type": "string"
+          },
+          "paidAmount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "paidAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "paymentId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "refundedAmount": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "SettlementPaymentSearchRequest": {
+        "type": "object",
+        "properties": {
+          "endDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "endNotAfterToday": {
+            "type": "boolean"
+          },
+          "endNotBeforeStart": {
+            "type": "boolean"
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32",
+            "maximum": 10000,
+            "minimum": 1
+          },
+          "size": {
+            "type": "integer",
+            "format": "int32",
+            "maximum": 100,
+            "minimum": 1
+          },
+          "startDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "withinMaxPeriod": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "endDate",
+          "startDate"
+        ]
+      },
       "SettlementPeriodResponse": {
         "type": "object",
         "properties": {
@@ -7743,6 +7890,10 @@
           "refundedAmount": {
             "type": "integer",
             "format": "int64"
+          },
+          "refundedCount": {
+            "type": "integer",
+            "format": "int32"
           },
           "startDate": {
             "type": "string",

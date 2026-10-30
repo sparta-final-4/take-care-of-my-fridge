@@ -15,7 +15,8 @@ import java.time.LocalDateTime;
 public interface SalesHistoryRepository extends Repository<PaymentHistory, Long> {
 
     // from 이상 to 미만의 매출. 결제 완료(PAID)된 결제의 결제 금액·건수와 부분·전액 취소(환불·콘솔 취소) 금액.
-    // 결제 상태가 PAID인 결제만 세어 받지 않은 결제(실패 처리 후 PG 승인)와 그 보상 취소는 빠진다
+    // 결제 상태가 PAID인 결제만 세어 받지 않은 결제(실패 처리 후 PG 승인)와 그 보상 취소는 빠진다.
+    // 환불 건수는 부분·전액 취소 이력 한 건마다 1이다
     @Query("""
         select new org.example.takecareofmyfridgebe.domain.settlement.dto.DailySalesSum(
             coalesce(sum(case when h.eventType = org.example.takecareofmyfridgebe.domain.payment.entity.PaymentEventType.PAID

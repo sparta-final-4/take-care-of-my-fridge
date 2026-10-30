@@ -1,6 +1,12 @@
-import { queryOptions } from '@tanstack/react-query';
+import { keepPreviousData, queryOptions } from '@tanstack/react-query';
 
-import { getSettlement, getTodaySales, type SettlementSearch } from './api';
+import {
+  getSettlement,
+  getSettlementPayments,
+  getTodaySales,
+  type SettlementPaymentSearch,
+  type SettlementSearch,
+} from './api';
 
 export const settlementQueries = {
   all: ['settlement'] as const,
@@ -11,6 +17,20 @@ export const settlementQueries = {
       // 기간을 바꾸는 동안 이전 결과를 유지한다. 단위가 바뀌면 행 기간 표기가 달라서 유지하지 않는다
       placeholderData: (previous, previousQuery) =>
         previousQuery?.queryKey[2] === search.unit ? previous : undefined,
+    }),
+  payments: (search: SettlementPaymentSearch) =>
+    queryOptions({
+      queryKey: [
+        ...settlementQueries.all,
+        'payments',
+        search.startDate,
+        search.endDate,
+        search.page,
+        search.size,
+      ],
+      queryFn: ({ signal }) => getSettlementPayments(search, signal),
+      // 페이지·기간을 바꾸는 동안 이전 목록을 유지한다
+      placeholderData: keepPreviousData,
     }),
   today: () =>
     queryOptions({

@@ -21,6 +21,7 @@ export interface SettlementPeriodResponse {
     'paidAmount'?: number;
     'paidCount'?: number;
     'refundedAmount'?: number;
+    'refundedCount'?: number;
     'startDate'?: string;
 }
 
