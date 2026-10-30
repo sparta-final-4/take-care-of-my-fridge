@@ -19,10 +19,12 @@ import org.example.takecareofmyfridgebe.domain.sale.dto.SpecialSaleCreateRequest
 import org.example.takecareofmyfridgebe.domain.sale.dto.SpecialSaleItemRequest;
 import org.example.takecareofmyfridgebe.domain.sale.entity.SaleEvent;
 import org.example.takecareofmyfridgebe.domain.sale.entity.SaleEventStatus;
+import org.example.takecareofmyfridgebe.domain.sale.event.FlashDropNotificationEvent;
 import org.example.takecareofmyfridgebe.domain.sale.repository.SaleEventItemRepository;
 import org.example.takecareofmyfridgebe.domain.sale.repository.SaleEventRepository;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,6 +37,7 @@ public class SaleEventCreateService {
     private final SaleEventRepository saleEventRepository;
     private final SaleEventItemRepository saleEventItemRepository;
     private final ProductRepository productRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public SaleEventsCreateResponse createSpecialSale(SpecialSaleCreateRequest request) {
@@ -68,6 +71,9 @@ public class SaleEventCreateService {
             saleEventItemRepository.save(item.toSaleEventItem(saleEvent, productsById.get(item.productId()).getPrice()));
             saleEvents.add(saleEvent);
         }
+        // 실제 발행은 커밋 뒤에 한다
+        eventPublisher.publishEvent(FlashDropNotificationEvent.created(
+                saleEvents.stream().map(SaleEvent::getId).toList()));
         return SaleEventsCreateResponse.from(saleEvents);
     }
 

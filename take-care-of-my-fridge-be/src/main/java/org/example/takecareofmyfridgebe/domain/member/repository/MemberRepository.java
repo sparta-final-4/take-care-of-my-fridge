@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
 import java.util.Optional;
 
 public interface MemberRepository extends JpaRepository<Member, Long>, JpaSpecificationExecutor<Member> {
@@ -27,4 +28,7 @@ public interface MemberRepository extends JpaRepository<Member, Long>, JpaSpecif
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select m from Member m where m.id = :id")
     Optional<Member> findByIdForUpdate(@Param("id") Long id);
+
+    @Query("select m.id from Member m where m.role = :role and m.status = :status")
+    List<Long> findIdsByRoleAndStatus(@Param("role") Member.Role role, @Param("status") Member.Status status);
 }
