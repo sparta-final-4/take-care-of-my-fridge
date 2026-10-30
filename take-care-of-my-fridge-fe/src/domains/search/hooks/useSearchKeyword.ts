@@ -5,6 +5,12 @@ import type { ProductListRequest, RecipeListRequest } from '@/common/api/clients
 export const SEARCH_RECIPE_PAGE_SIZE = 8;
 export const SEARCH_PRODUCT_PAGE_SIZE = 16;
 
+// 요약의 개수 링크가 스크롤해 갈 결과 섹션
+export const SEARCH_SECTION_IDS = {
+  recipes: 'search-recipes',
+  products: 'search-products',
+} as const;
+
 // 상단 통합 검색의 검색어와 결과 종류별 페이지. 레시피는 page, 상품은 productPage로 따로 넘긴다.
 export function useSearchKeyword() {
   const [searchParams, setSearchParams] = useSearchParams();

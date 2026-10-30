@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { Flex, Tag, Typography } from 'antd';
+import type { MouseEvent, ReactNode } from 'react';
 
-import { useSearchKeyword } from '@/domains/search/hooks/useSearchKeyword';
+import { SEARCH_SECTION_IDS, useSearchKeyword } from '@/domains/search/hooks/useSearchKeyword';
 import { searchQueries } from '@/domains/search/queries';
 
 import styles from './SearchSummarySection.module.scss';
@@ -34,12 +35,35 @@ export function SearchSummarySection() {
         </Typography.Title>
         {keyword && (
           <Flex wrap gap="small">
-            <Tag className={styles.countTag}>레시피 {formatCount(recipeCount)}</Tag>
-            <Tag className={styles.countTag}>재료·밀키트 {formatCount(productCount)}</Tag>
+            <SectionLink sectionId={SEARCH_SECTION_IDS.recipes}>
+              레시피 {formatCount(recipeCount)}
+            </SectionLink>
+            <SectionLink sectionId={SEARCH_SECTION_IDS.products}>
+              재료·밀키트 {formatCount(productCount)}
+            </SectionLink>
           </Flex>
         )}
       </Flex>
     </section>
+  );
+}
+
+interface SectionLinkProps {
+  sectionId: string;
+  children: ReactNode;
+}
+
+// 주소에 #을 남기지 않고 해당 결과 섹션으로 스크롤한다.
+function SectionLink({ sectionId, children }: SectionLinkProps) {
+  const handleClick = (event: MouseEvent<HTMLAnchorElement>) => {
+    event.preventDefault();
+    document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  return (
+    <a href={`#${sectionId}`} onClick={handleClick} className={styles.countLink}>
+      <Tag className={styles.countTag}>{children}</Tag>
+    </a>
   );
 }
 
