@@ -1,8 +1,6 @@
 package org.example.takecareofmyfridgebe.domain.settlement.service;
 
 import lombok.RequiredArgsConstructor;
-import org.example.takecareofmyfridgebe.domain.payment.entity.PaymentEventType;
-import org.example.takecareofmyfridgebe.domain.payment.entity.PaymentStatus;
 import org.example.takecareofmyfridgebe.domain.settlement.dto.DailySalesSum;
 import org.example.takecareofmyfridgebe.domain.settlement.entity.DailySales;
 import org.example.takecareofmyfridgebe.domain.settlement.repository.DailySalesRepository;
@@ -12,16 +10,11 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class SettlementCommandService {
-
-    private static final List<PaymentEventType> CANCEL_EVENTS =
-            List.of(PaymentEventType.PARTIAL_CANCELLED, PaymentEventType.CANCELLED);
 
     private final SalesHistoryRepository salesHistoryRepository;
     private final DailySalesRepository dailySalesRepository;
@@ -31,8 +24,8 @@ public class SettlementCommandService {
     // 조회(readOnly 트랜잭션) 중에 불려도 저장되고, 충돌로 롤백돼도 호출한 쪽 트랜잭션을 망치지 않도록 새 트랜잭션에서 실행한다
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void aggregate(LocalDate salesDate) {
-        DailySalesSum sum = salesHistoryRepository.sumBetween(PaymentStatus.PAID, PaymentEventType.PAID,
-                CANCEL_EVENTS, salesDate.atStartOfDay(), salesDate.plusDays(1).atStartOfDay());
+        DailySalesSum sum = salesHistoryRepository.sumSalesBetween(salesDate.atStartOfDay(),
+                salesDate.plusDays(1).atStartOfDay());
         int paidCount = Math.toIntExact(sum.paidCount());
 
         dailySalesRepository.findBySalesDate(salesDate).ifPresentOrElse(

@@ -1,7 +1,5 @@
 package org.example.takecareofmyfridgebe.domain.settlement.service;
 
-import org.example.takecareofmyfridgebe.domain.payment.entity.PaymentEventType;
-import org.example.takecareofmyfridgebe.domain.payment.entity.PaymentStatus;
 import org.example.takecareofmyfridgebe.domain.settlement.dto.DailySalesSum;
 import org.example.takecareofmyfridgebe.domain.settlement.entity.DailySales;
 import org.example.takecareofmyfridgebe.domain.settlement.repository.DailySalesRepository;
@@ -17,7 +15,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -44,9 +41,7 @@ class SettlementCommandServiceTest {
 
     @BeforeEach
     void setUp() {
-        given(salesHistoryRepository.sumBetween(PaymentStatus.PAID, PaymentEventType.PAID,
-                List.of(PaymentEventType.PARTIAL_CANCELLED, PaymentEventType.CANCELLED), FROM, TO))
-                .willReturn(new DailySalesSum(50000L, 3L, 70000L));
+        given(salesHistoryRepository.sumSalesBetween(FROM, TO)).willReturn(new DailySalesSum(50000L, 3L, 70000L));
     }
 
     @Test

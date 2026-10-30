@@ -7,7 +7,6 @@ import org.example.takecareofmyfridgebe.domain.payment.entity.Payment;
 import org.example.takecareofmyfridgebe.domain.payment.entity.PaymentChangedBy;
 import org.example.takecareofmyfridgebe.domain.payment.entity.PaymentEventType;
 import org.example.takecareofmyfridgebe.domain.payment.entity.PaymentHistory;
-import org.example.takecareofmyfridgebe.domain.payment.entity.PaymentStatus;
 import org.example.takecareofmyfridgebe.domain.settlement.dto.DailySalesSum;
 import org.example.takecareofmyfridgebe.global.config.JpaAuditingConfig;
 import org.example.takecareofmyfridgebe.global.config.QueryDslConfig;
@@ -21,7 +20,6 @@ import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabas
 import org.springframework.context.annotation.Import;
 
 import java.time.LocalDateTime;
-import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -32,8 +30,6 @@ class SalesHistoryRepositoryTest extends MySqlContainerSupport {
 
     private static final LocalDateTime FROM = LocalDateTime.of(2026, 10, 28, 0, 0);
     private static final LocalDateTime TO = LocalDateTime.of(2026, 10, 29, 0, 0);
-    private static final List<PaymentEventType> CANCEL_EVENTS =
-            List.of(PaymentEventType.PARTIAL_CANCELLED, PaymentEventType.CANCELLED);
 
     private final SalesHistoryRepository salesHistoryRepository;
     private final EntityManager entityManager;
@@ -102,7 +98,7 @@ class SalesHistoryRepositoryTest extends MySqlContainerSupport {
     }
 
     private DailySalesSum sum() {
-        return salesHistoryRepository.sumBetween(PaymentStatus.PAID, PaymentEventType.PAID, CANCEL_EVENTS, FROM, TO);
+        return salesHistoryRepository.sumSalesBetween(FROM, TO);
     }
 
     private Payment paidPayment(long amount) {
