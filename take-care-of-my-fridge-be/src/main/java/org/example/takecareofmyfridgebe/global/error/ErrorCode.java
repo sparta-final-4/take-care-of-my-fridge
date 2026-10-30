@@ -53,6 +53,10 @@ public enum ErrorCode {
     // 상품은 있는데 타입별 상세 행(ingredient_products, mealkit_products)이 없는 서버 데이터 불일치
     PRODUCT_DETAIL_MISSING(HttpStatus.INTERNAL_SERVER_ERROR, "PRODUCT_007", "상품 상세 정보가 올바르지 않습니다."),
 
+    // Image upload
+    IMAGE_UPLOAD_DISABLED(HttpStatus.SERVICE_UNAVAILABLE, "IMAGE_001", "이 환경에서는 이미지 업로드를 쓸 수 없습니다. 이미지 URL을 직접 입력해 주세요."),
+    INVALID_IMAGE_TYPE(HttpStatus.BAD_REQUEST, "IMAGE_002", "JPG, PNG, WEBP 이미지만 올릴 수 있습니다."),
+
     // Cart
     CART_ITEM_NOT_FOUND(HttpStatus.NOT_FOUND, "CART_001", "장바구니 상품을 찾을 수 없습니다."),
     CART_QUANTITY_EXCEEDS_STOCK(HttpStatus.CONFLICT, "CART_002", "재고보다 많이 담을 수 없습니다."),
