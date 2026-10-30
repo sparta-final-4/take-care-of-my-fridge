@@ -121,11 +121,12 @@ Q-01~Q-17에 의존하는 테스트는 기대값을 합의한 뒤 구현합니�
 
 | ID | 우선순위 | 조건·행동 | 기대 결과 | 대응 테스트 |
 |---|---|---|---|---|
-| NOTI-01 | P0 | 알림 요청 받기, 같은 회원에게 같은 중복 방지 키가 두 번 | 메시지 내용 그대로 안 읽은 알림 하나 저장. 두 번 와도 하나만 남고 DLT로 가지 않음. 회원이 다르면 회원마다 저장 | `NotificationRequestedConsumerTest` |
+| NOTI-01 | P0 | 알림 요청 받기, 같은 회원에게 같은 중복 방지 키가 두 번 | 메시지 내용 그대로 안 읽은 알림 하나 저장. 두 번 와도 하나만 남고 DLT로 가지 않음. 회원이 다르면 회원마다 저장. 지운 알림과 같은 키가 다시 와도 늘지 않고 지운 상태 유지 | `NotificationRequestedConsumerTest` |
 | NOTI-02 | P1 | 내 알림 목록, 더 보기 | 최신순 5개와 다음 여부. 마지막 알림 ID 다음부터 겹치지 않게 받음. 다른 회원 알림은 섞이지 않음 | `NotificationServiceTransactionTest` |
 | NOTI-03 | P1 | 안 읽은 알림 수 | 읽은 알림과 다른 회원 알림을 빼고 셈 | `NotificationServiceTransactionTest` |
 | NOTI-04 | P0 | 전부 읽음 | 마지막 알림 ID 이하의 내 알림만 읽음. 그 뒤 도착한 알림과 다른 회원 알림은 안 읽음 그대로 | `NotificationServiceTransactionTest` |
-| NOTI-05 | P1 | 잘못된 기준·마지막 알림 ID, 비로그인 | 400 `C001`, 비로그인은 세 API 모두 401 | `NotificationControllerTest` |
+| NOTI-05 | P1 | 잘못된 기준·마지막 알림 ID, 비로그인 | 400 `C001`, 비로그인은 다섯 API 모두 401 | `NotificationControllerTest` |
+| NOTI-06 | P0 | 알림 지우기, 모두 지우기 | 지운 알림은 행이 남고 지운 시각이 채워지며 목록·안 읽은 수에서 빠짐. 다른 회원 알림 ID로 지우면 그대로. 모두 지우기는 내 알림만 | `NotificationServiceTransactionTest` |
 
 ## 다른 담당과 공동 검증
 

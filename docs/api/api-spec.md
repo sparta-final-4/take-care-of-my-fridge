@@ -559,6 +559,8 @@ HTTP 메서드·경로·DTO 이름은 구현 전 합의합니다.
 | 내 알림 목록 | GET /notifications | 로그인 | 200 |
 | 안 읽은 알림 수 | GET /notifications/unread-count | 로그인 | 200 |
 | 전부 읽음 | PATCH /notifications/read-all | 로그인 | 200 |
+| 알림 지우기 | DELETE /notifications/{notificationId} | 로그인 | 200 |
+| 모두 지우기 | DELETE /notifications | 로그인 | 200 |
 
 요청 값입니다.
 
@@ -566,6 +568,7 @@ HTTP 메서드·경로·DTO 이름은 구현 전 합의합니다.
 |---|---|---|---|
 | 내 알림 목록 | Query | beforeId | 이 ID보다 오래된 알림부터 받습니다. 1 이상, 생략하면 가장 최신부터 |
 | 전부 읽음 | Body | lastNotificationId | 화면이 받은 가장 최신 알림 ID. 1 이상, 필수 |
+| 알림 지우기 | Path | notificationId | 지울 알림 ID |
 
 응답 데이터입니다.
 
@@ -574,6 +577,7 @@ HTTP 메서드·경로·DTO 이름은 구현 전 합의합니다.
 | 내 알림 목록 | NotificationListResponse | notifications(최신순), hasNext |
 | 안 읽은 알림 수 | UnreadNotificationCountResponse | unreadCount |
 | 전부 읽음 | 공통 성공 응답 | 없음 |
+| 알림 지우기, 모두 지우기 | 공통 성공 응답 | 없음 |
 
 오류입니다. 401은 모든 기능에 공통입니다.
 
@@ -581,6 +585,7 @@ HTTP 메서드·경로·DTO 이름은 구현 전 합의합니다.
 |---|---|---|---|
 | 내 알림 목록 | 400 | 공통 | beforeId가 1 미만이거나 숫자가 아님 |
 | 전부 읽음 | 400 | 공통 | lastNotificationId가 없거나 1 미만 |
+| 알림 지우기 | 400 | 공통 | notificationId가 숫자가 아님 |
 
 알림 항목(`NotificationResponse`): notificationId, notificationType(`EXPIRATION`·`FLASH_DROP`·`COMMERCE_STOCKED`), content(문구), linkUrl(누르면 이동할 화면 경로), read(읽음 여부), createdAt(만든 시각).
 
@@ -588,6 +593,8 @@ HTTP 메서드·경로·DTO 이름은 구현 전 합의합니다.
 - **더 보기**: 화면의 마지막 알림 ID를 beforeId로 보냅니다. 목록을 연 사이 새 알림이 와도 다음 알림이 밀리거나 겹치지 않습니다. `hasNext`가 false면 더 받을 알림이 없습니다.
 - **전부 읽음**: 종 아이콘을 열 때 부릅니다. lastNotificationId 이하의 안 읽은 알림을 한 번에 읽음으로 바꾸고, 그 뒤 도착한 알림은 안 읽음으로 남습니다. 받은 알림이 없으면 부르지 않습니다. 같은 요청을 두 번 보내도 결과가 같습니다.
 - **배지**: 전부 읽음 뒤에는 안 읽은 알림 수를 다시 불러옵니다. 화면 이동·탭 복귀·새로고침 때도 다시 불러옵니다.
+- **알림 지우기**: 지운 알림은 목록과 안 읽은 알림 수에서 빠집니다. 없는 알림, 다른 회원의 알림, 이미 지운 알림이면 아무것도 바꾸지 않고 200입니다.
+- **모두 지우기**: 내 알림을 전부 지웁니다. 화면이 받지 않은 알림, 목록을 받은 뒤 도착한 알림도 함께 지워집니다.
 - **본인 소유 검증**: 다른 회원의 알림 ID를 보내도 내 알림만 조회·변경되고 오류는 없습니다.
 
 ## 엔드포인트 작성 템플릿

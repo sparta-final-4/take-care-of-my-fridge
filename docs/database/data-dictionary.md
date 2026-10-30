@@ -340,7 +340,7 @@
 ## notifications — 알림
 
 - 회원 한 명에게 보이는 알림 하나입니다. 다른 도메인이 보낸 알림 요청(`notification-requested`)을 받아 저장합니다.
-- 수정은 읽음 여부만 바뀝니다. 지우지 않습니다.
+- 수정은 읽음 여부와 지운 시각만 바뀝니다. 회원이 지워도 행은 남깁니다.
 - 같은 회원에게 같은 중복 방지 키는 하나만 저장합니다. 같은 요청이 두 번 와도 알림은 하나입니다.
 - 제약 이름: UK `uk_notifications_member_id_dedupe_key`(member_id, dedupe_key). 회원별 목록·안 읽은 수 조회도 이 인덱스의 앞부분(member_id)을 씁니다.
 
@@ -352,9 +352,11 @@
 | link_url | VARCHAR(500) | 불가 | | | 누르면 이동할 화면 경로(예: `/products/{상품 ID}`) |
 | dedupe_key | VARCHAR(150) | 불가 | | UK(member_id, dedupe_key) | 보낸 도메인이 정한 중복 방지 키 |
 | is_read | BOOLEAN | 불가 | FALSE | | 읽음 여부 |
+| deleted_at | DATETIME(6) | 가능 | | | 회원이 지운 시각. 값이 있으면 목록과 안 읽은 알림 수에서 뺍니다 |
 
 - 목록 순서와 "더 보기" 기준은 id입니다. 클수록 나중에 저장된 알림입니다.
-- 전부 읽음은 일괄 UPDATE라 updated_at이 바뀌지 않습니다.
+- 지운 알림도 중복 방지 키를 가지고 있어, 같은 알림 요청이 다시 와도 새로 저장되지 않습니다.
+- 전부 읽음과 모두 지우기는 일괄 UPDATE라 updated_at이 바뀌지 않습니다.
 - 실행용 DDL 초안은 [notification.sql](notification.sql)에 있습니다.
 
 ## 다른 도메인에 요청할 컬럼

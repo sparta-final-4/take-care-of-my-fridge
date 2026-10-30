@@ -275,6 +275,7 @@ erDiagram
         varchar link_url
         varchar dedupe_key
         boolean is_read
+        datetime deleted_at
     }
 ```
 

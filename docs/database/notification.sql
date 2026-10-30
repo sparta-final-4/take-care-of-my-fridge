@@ -13,6 +13,7 @@ CREATE TABLE notifications (
     link_url          VARCHAR(500) NOT NULL COMMENT '누르면 이동할 화면 경로',
     dedupe_key        VARCHAR(150) NOT NULL COMMENT '중복 방지 키(같은 회원에게 하나)',
     is_read           BOOLEAN      NOT NULL DEFAULT FALSE COMMENT '읽음 여부',
+    deleted_at        DATETIME(6)  NULL COMMENT '회원이 지운 시각(행은 남겨 같은 알림 요청이 다시 와도 되살아나지 않게 함)',
     created_at        DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '생성일시',
     updated_at        DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '수정일시',
     PRIMARY KEY (id),
