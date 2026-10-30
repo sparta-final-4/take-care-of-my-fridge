@@ -77,7 +77,7 @@ HTTP 메서드·경로·DTO 이름은 구현 전 합의합니다.
 | 분석 | 예측·실제 판매량·기준선 조회 | ADMIN, 버전·시점·가상 데이터 표시 |
 | 할인 후보 | 분석 조회·검토 저장·행사 등록 | ADMIN, 선택한 후보만 기존 행사 생성 기능으로 등록 |
 
-할인 후보 분석 실행: `POST /api/admin/deal-analyses`. 요청은 `targetWeekStart`(월요일), `dayOfWeek`(MON~SUN), `discountRate`(1~99)이며 대상일은 오늘 이후다. 실제 일반 특가 이력이 부족하면 D007(422)로 중단한다.
+할인 후보 분석 실행: `POST /api/admin/deal-analyses`. 요청은 `targetWeekStart`(월요일), `dayOfWeek`(MON~SUN), `discountRate`(1~99)이며 대상일은 오늘 이후다. 실제 일반 특가 이력이 부족하면 D007(422)로 중단한다. 학습·예측 자료 값이 올바르지 않으면 D008(500)로 중단한다.
 할인 후보 행사 등록: `POST /api/admin/deal-analyses/{analysisId}/event-requests`.
 요청은 `candidateId`, 행사 종류(`SPECIAL` 또는 `FLASH_DROP`), `startsAt`, `endsAt`, 번개 드롭일 때 `limitedQuantity`를 받습니다.
 할인율은 분석 결과의 `discountRate`를 사용합니다. 선택된 후보 중 가상 데이터가 아닌 결과만 등록할 수 있으며,
