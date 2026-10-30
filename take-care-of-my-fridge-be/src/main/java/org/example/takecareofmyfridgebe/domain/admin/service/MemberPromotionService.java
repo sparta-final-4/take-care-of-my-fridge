@@ -2,7 +2,6 @@ package org.example.takecareofmyfridgebe.domain.admin.service;
 
 import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.admin.entity.AdminAuditLog;
-import org.example.takecareofmyfridgebe.domain.admin.repository.AdminAuditLogRepository;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 import org.example.takecareofmyfridgebe.domain.member.repository.MemberRepository;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
@@ -17,12 +16,10 @@ import java.util.Map;
 public class MemberPromotionService {
 
     private final MemberRepository memberRepository;
-    private final AdminAuditLogRepository auditLogRepository;
+    private final AdminAuditLogService auditLogService;
 
     @Transactional
     public void promote(Long actorId, Long targetId) {
-        Member actor = memberRepository.findById(actorId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
         Member target = memberRepository.findByIdForUpdate(targetId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
         if (target.getStatus() == Member.Status.SUSPENDED) {
@@ -32,14 +29,7 @@ public class MemberPromotionService {
             throw new BusinessException(ErrorCode.ALREADY_ADMIN);
         }
         target.promoteToAdmin();
-        auditLogRepository.save(AdminAuditLog.builder()
-                .member(actor)
-                .action(AdminAuditLog.Action.ROLE_CHANGE)
-                .targetType(AdminAuditLog.TARGET_MEMBER)
-                .targetId(targetId)
-                .result(AdminAuditLog.Result.SUCCESS)
-                .beforeValue(Map.of("role", "USER"))
-                .afterValue(Map.of("role", "ADMIN"))
-                .build());
+        auditLogService.record(actorId, AdminAuditLog.Action.ROLE_CHANGE, AdminAuditLog.TARGET_MEMBER,
+                targetId, AdminAuditLog.Result.SUCCESS, Map.of("role", "USER"), Map.of("role", "ADMIN"));
     }
 }
