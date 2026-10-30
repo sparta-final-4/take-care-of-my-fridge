@@ -11,6 +11,7 @@ import { ProductCard } from '@/domains/product/components/ProductCard';
 import { recordSearchClick } from '@/domains/search/api';
 import {
   SEARCH_PRODUCT_PAGE_SIZE,
+  SEARCH_SECTION_IDS,
   useSearchKeyword,
 } from '@/domains/search/hooks/useSearchKeyword';
 import { searchQueries } from '@/domains/search/queries';
@@ -39,6 +40,7 @@ export function SearchProductSection() {
 
   return (
     <SectionCard
+      id={SEARCH_SECTION_IDS.products}
       title={data ? `재료·밀키트 ${totalElements.toLocaleString('ko-KR')}` : '재료·밀키트'}
     >
       {isPending ? (

@@ -1,3 +1,5 @@
+@use '@/styles/variables' as *;
+
 .card {
   display: flex;
   flex-direction: column;
@@ -7,6 +9,8 @@
   background: var(--ant-color-bg-container);
   border: 1px solid var(--ant-color-border);
   border-radius: var(--ant-border-radius-lg);
+  // 스크롤로 이동했을 때 고정 헤더에 가리지 않게 한다.
+  scroll-margin-top: calc(#{$header-height} + var(--ant-margin));
 }
 
 .header {
