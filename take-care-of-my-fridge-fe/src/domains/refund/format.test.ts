@@ -7,6 +7,7 @@ import {
   getOverallRefundStatus,
   getRefundRowState,
   groupRefundedItems,
+  isFullyRefunded,
   sumRefundAmountByStatus,
   sumRefundedAmount,
 } from './format';
@@ -152,5 +153,39 @@ describe('getOverallRefundStatus', () => {
   it('실패만 있으면 실패, 없으면 상태가 없다', () => {
     expect(getOverallRefundStatus([refund({ status: 'FAILED' })])).toBe('FAILED');
     expect(getOverallRefundStatus([])).toBeUndefined();
+  });
+});
+
+describe('isFullyRefunded', () => {
+  const orderItems = [
+    item({ orderItemId: 1, orderedQuantity: 2 }),
+    item({ orderItemId: 2, orderedQuantity: 1 }),
+  ];
+
+  it('모든 주문 상품을 완료된 환불이 주문 수량만큼 채우면 전부 환불이다', () => {
+    const history = [
+      refund({ status: 'COMPLETED', items: [{ orderItemId: 1, quantity: 1 }] }),
+      refund({
+        status: 'COMPLETED',
+        items: [
+          { orderItemId: 1, quantity: 1 },
+          { orderItemId: 2, quantity: 1 },
+        ],
+      }),
+    ];
+    expect(isFullyRefunded(orderItems, history)).toBe(true);
+  });
+
+  it('진행 중이거나 실패한 환불은 세지 않는다', () => {
+    const history = [
+      refund({ status: 'COMPLETED', items: [{ orderItemId: 1, quantity: 2 }] }),
+      refund({ status: 'REQUESTED', items: [{ orderItemId: 2, quantity: 1 }] }),
+      refund({ status: 'FAILED', items: [{ orderItemId: 2, quantity: 1 }] }),
+    ];
+    expect(isFullyRefunded(orderItems, history)).toBe(false);
+  });
+
+  it('주문 상품을 아직 모르면 전부 환불이 아니다', () => {
+    expect(isFullyRefunded([], [])).toBe(false);
   });
 });

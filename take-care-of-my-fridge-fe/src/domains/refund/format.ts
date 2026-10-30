@@ -89,6 +89,26 @@ export function groupRefundedItems(history: RefundHistoryResponse[]): RefundedIt
   return [...grouped.values()];
 }
 
+// 구매 확정 버튼용. 서버와 같은 기준으로, 모든 주문 상품을 완료된 환불이 주문 수량만큼 채웠으면 전부 환불이다.
+// 진행 중인 환불은 세지 않는다. 특가·번개 드롭 상품은 환불 이력이 없으므로 이런 상품이 있으면 전부 환불이 아니다
+export function isFullyRefunded(
+  orderItems: RefundableItemResponse[],
+  history: RefundHistoryResponse[],
+): boolean {
+  if (orderItems.length === 0) return false;
+  const completed = new Map<number, number>();
+  history
+    .filter((refund) => refund.status === 'COMPLETED')
+    .flatMap((refund) => refund.items ?? [])
+    .forEach((item) => {
+      const orderItemId = item.orderItemId ?? 0;
+      completed.set(orderItemId, (completed.get(orderItemId) ?? 0) + (item.quantity ?? 0));
+    });
+  return orderItems.every(
+    (item) => (completed.get(item.orderItemId ?? 0) ?? 0) >= (item.orderedQuantity ?? 0),
+  );
+}
+
 // 주문 전체의 환불 상태. 진행 중인 환불이 하나라도 있으면 진행 중, 완료가 있으면 완료로 본다.
 export function getOverallRefundStatus(history: RefundHistoryResponse[]): RefundStatus | undefined {
   if (history.some((refund) => refund.status === 'REQUESTED')) return 'REQUESTED';

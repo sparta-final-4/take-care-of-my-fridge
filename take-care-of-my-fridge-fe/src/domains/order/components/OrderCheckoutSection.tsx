@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { App, Button, Divider, Flex, Modal, Result, Skeleton, Tag, Typography } from 'antd';
 import { useNavigate } from 'react-router';
 
@@ -6,6 +6,7 @@ import { ROUTES } from '@/app/paths';
 import { getErrorCode, getErrorMessage } from '@/common/api/errors';
 import { useAuthStore } from '@/common/auth/authStore';
 import { formatPrice } from '@/domains/cart/format';
+import { cartQueries } from '@/domains/cart/queries';
 import { useCancelOnLeave } from '@/domains/order/hooks/useCancelOnLeave';
 import { orderQueries } from '@/domains/order/queries';
 import { confirmPayment, preparePayment } from '@/domains/payment/api';
@@ -35,6 +36,7 @@ export function OrderCheckoutSection({ orderId }: OrderCheckoutSectionProps) {
   const { isLeaving, isConfirmOpen, isCancelling, askCancel, confirm, close, allowLeave } =
     useCancelOnLeave(orderId, isSuccess);
   const { message } = App.useApp();
+  const queryClient = useQueryClient();
   const member = useAuthStore((state) => state.member);
 
   // 결제 준비 후 PortOne 결제창을 띄우고, 결제창이 성공으로 끝나면 서버가 PG 결제를 확인한 뒤에만 성공으로 본다.
@@ -66,6 +68,8 @@ export function OrderCheckoutSection({ orderId }: OrderCheckoutSectionProps) {
             return;
           }
           message.success('결제 성공!');
+          // 서버가 결제한 상품을 장바구니에서 지웠으므로 헤더 개수와 장바구니를 다시 불러온다
+          void queryClient.invalidateQueries({ queryKey: cartQueries.all });
           // 결제를 마치고 떠나는 이동은 붙잡지 않는다. 붙잡으면 나가기 확인에서 방금 결제한 주문이 취소된다.
           allowLeave();
           navigate(ROUTES.home, { replace: true });
