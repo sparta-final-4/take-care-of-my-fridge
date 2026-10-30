@@ -1749,6 +1749,86 @@
         ]
       }
     },
+    "/api/notifications": {
+      "get": {
+        "operationId": "getMyNotifications",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "request",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/NotificationListRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseNotificationListResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "notification-controller"
+        ]
+      }
+    },
+    "/api/notifications/read-all": {
+      "patch": {
+        "operationId": "readAll",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReadAllNotificationsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "notification-controller"
+        ]
+      }
+    },
+    "/api/notifications/unread-count": {
+      "get": {
+        "operationId": "getUnreadCount",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseUnreadNotificationCountResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "notification-controller"
+        ]
+      }
+    },
     "/api/orders": {
       "get": {
         "operationId": "getMyOrders",
@@ -3095,6 +3175,20 @@
           }
         }
       },
+      "ApiResponseNotificationListResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/NotificationListResponse"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorResponse"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
       "ApiResponseOrderCheckoutResponse": {
         "type": "object",
         "properties": {
@@ -3422,6 +3516,20 @@
         "properties": {
           "data": {
             "$ref": "#/components/schemas/SignUpResponse"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorResponse"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ApiResponseUnreadNotificationCountResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/UnreadNotificationCountResponse"
           },
           "error": {
             "$ref": "#/components/schemas/ErrorResponse"
@@ -5072,6 +5180,59 @@
           }
         }
       },
+      "NotificationListRequest": {
+        "type": "object",
+        "properties": {
+          "beforeId": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "NotificationListResponse": {
+        "type": "object",
+        "properties": {
+          "hasNext": {
+            "type": "boolean"
+          },
+          "notifications": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NotificationResponse"
+            }
+          }
+        }
+      },
+      "NotificationResponse": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "linkUrl": {
+            "type": "string"
+          },
+          "notificationId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "notificationType": {
+            "type": "string",
+            "enum": [
+              "EXPIRATION",
+              "FLASH_DROP",
+              "COMMERCE_STOCKED"
+            ]
+          },
+          "read": {
+            "type": "boolean"
+          }
+        }
+      },
       "Nutrition": {
         "type": "object",
         "properties": {
@@ -6104,6 +6265,18 @@
             ]
           }
         }
+      },
+      "ReadAllNotificationsRequest": {
+        "type": "object",
+        "properties": {
+          "lastNotificationId": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "required": [
+          "lastNotificationId"
+        ]
       },
       "RecipeClassificationResponse": {
         "type": "object",
@@ -7531,6 +7704,15 @@
           "top10MatchCount": {
             "type": "integer",
             "format": "int32"
+          }
+        }
+      },
+      "UnreadNotificationCountResponse": {
+        "type": "object",
+        "properties": {
+          "unreadCount": {
+            "type": "integer",
+            "format": "int64"
           }
         }
       },
