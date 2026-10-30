@@ -1,0 +1,44 @@
+@use '@/styles/variables' as *;
+@use '@/styles/mixins' as *;
+
+.container {
+  width: 100%;
+  max-width: $content-max-width;
+  margin: var(--ant-margin-xl) auto;
+  padding: 0 var(--ant-padding-lg);
+  word-break: keep-all;
+}
+
+.header {
+  margin-bottom: var(--ant-margin-lg);
+}
+
+.title {
+  margin: 0;
+}
+
+.description {
+  display: block;
+  margin-top: var(--ant-margin-xxs);
+}
+
+.today,
+.controls,
+.summary,
+.chartCard {
+  margin-bottom: var(--ant-margin-lg);
+}
+
+// 모바일에서는 기간 선택이 한 줄을 다 쓴다
+.rangePicker {
+  width: 100%;
+
+  @include from(sm) {
+    width: auto;
+  }
+}
+
+.loading {
+  padding: var(--ant-padding-xl) 0;
+  text-align: center;
+}

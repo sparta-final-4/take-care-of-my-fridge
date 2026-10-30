@@ -838,6 +838,56 @@
         ]
       }
     },
+    "/api/admin/settlements": {
+      "get": {
+        "operationId": "getSettlement",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "request",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/SettlementSearchRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseSettlementResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "settlement-controller"
+        ]
+      }
+    },
+    "/api/admin/settlements/today": {
+      "get": {
+        "operationId": "getTodaySales",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseTodaySalesResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "settlement-controller"
+        ]
+      }
+    },
     "/api/auth/csrf": {
       "get": {
         "operationId": "csrf",
@@ -3555,11 +3605,39 @@
           }
         }
       },
+      "ApiResponseSettlementResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/SettlementResponse"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorResponse"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
       "ApiResponseSignUpResponse": {
         "type": "object",
         "properties": {
           "data": {
             "$ref": "#/components/schemas/SignUpResponse"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorResponse"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ApiResponseTodaySalesResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/TodaySalesResponse"
           },
           "error": {
             "$ref": "#/components/schemas/ErrorResponse"
@@ -7608,6 +7686,27 @@
           }
         }
       },
+      "SalesAmountResponse": {
+        "type": "object",
+        "properties": {
+          "netAmount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "paidAmount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "paidCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "refundedAmount": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
       "SearchClickRequest": {
         "type": "object",
         "properties": {
@@ -7627,6 +7726,84 @@
         ]
       },
       "ServerSentEventString": {},
+      "SettlementPeriodResponse": {
+        "type": "object",
+        "properties": {
+          "endDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "netAmount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "paidAmount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "paidCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "refundedAmount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "startDate": {
+            "type": "string",
+            "format": "date"
+          }
+        }
+      },
+      "SettlementResponse": {
+        "type": "object",
+        "properties": {
+          "periods": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SettlementPeriodResponse"
+            }
+          },
+          "summary": {
+            "$ref": "#/components/schemas/SalesAmountResponse"
+          }
+        }
+      },
+      "SettlementSearchRequest": {
+        "type": "object",
+        "properties": {
+          "endDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "endNotAfterToday": {
+            "type": "boolean"
+          },
+          "endNotBeforeStart": {
+            "type": "boolean"
+          },
+          "startDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "DAY",
+              "WEEK",
+              "MONTH"
+            ]
+          },
+          "withinMaxPeriod": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "endDate",
+          "startDate",
+          "unit"
+        ]
+      },
       "SignUpRequest": {
         "type": "object",
         "properties": {
@@ -7777,6 +7954,18 @@
           "top10MatchCount": {
             "type": "integer",
             "format": "int32"
+          }
+        }
+      },
+      "TodaySalesResponse": {
+        "type": "object",
+        "properties": {
+          "sales": {
+            "$ref": "#/components/schemas/SalesAmountResponse"
+          },
+          "salesDate": {
+            "type": "string",
+            "format": "date"
           }
         }
       },
