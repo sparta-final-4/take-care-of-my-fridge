@@ -35,7 +35,7 @@ Q-01~Q-17에 의존하는 테스트는 기대값을 합의한 뒤 구현합니�
 | ID | 우선순위 | 조건·행동 | 기대 결과 | 대응 테스트 |
 |---|---|---|---|---|
 | CART-01 | P0 | 재고를 넘는 수량 담기·올리기(기존 수량과 합산, int 넘침 포함) | 거절, 수량 불변, 처음 담다 실패하면 장바구니도 남지 않음 | `CartServiceTransactionTest` |
-| CART-02 | P0 | 번개 드롭 상품을 이미 담았는데 더 담기·수량 2로 바꾸기 | `CART_003`으로 거절, 수량 불변 | `CartServiceTest` |
+| CART-02 | P0 | 번개 드롭 상품을 이미 담았는데 더 담기·수량 2로 바꾸기, 담은 뒤 번개 드롭이 된 3개를 2로 내리기 | 더 담기·올리기는 `CART_003`으로 거절하고 수량 불변, 내리기는 반영 | `CartServiceTest`, `CartServiceTransactionTest` |
 | CART-03 | P0 | 타인 항목의 수량 변경·삭제 | 변경은 404, 삭제는 내 항목만 지움 | `CartServiceTransactionTest`, `CartItemRepositoryTest` |
 | CART-04 | P0 | 담은 뒤 재고가 줄거나 상품이 판매 중지 | 내리기만 허용, 올리기·판매 중지 변경 거절, 조회는 품절 표시 | `CartServiceTransactionTest` |
 | CART-05 | P1 | 진행 중 할인이 있는 상품 조회 | 항목마다 할인가·구분·종료 시각, 번개 드롭 남은 수량 0이면 그 항목만 품절 | `CartServiceTest` |
@@ -58,6 +58,7 @@ Q-01~Q-17에 의존하는 테스트는 기대값을 합의한 뒤 구현합니�
 | ORDER-11 | P0 | 결제를 시도한 결제 대기 주문 취소, 취소하기와 결제하기 동시 | 결제 시도가 있으면 `ORDER_012`로 거절하고 주문·재고 불변. 동시면 하나만 성공하고 결제가 붙은 주문은 지워지지 않음 | `OrderCancelServiceTransactionTest` |
 | ORDER-12 | P0 | 주문 만료, 취소하기와 주문 만료 동시 | 생성 5분이 지난 결제 시도 없는 결제 대기 주문만 지움. 동시면 재고는 한 번만 복구 | `OrderCancelServiceTransactionTest`, `OrderExpireSchedulerTest` |
 | ORDER-13 | P0 | 결제 정리, 결제 정리와 결제하기·주문 취소 동시 | 진행 중 결제가 없고 마지막 결제 뒤 10분이 지난 결제 대기 주문만 취소 상태로 바꾸고 재고 복구, 결제 행 유지. 동시면 재고는 많아야 한 번 복구 | `OrderCancelServiceTransactionTest`, `PaymentTimeoutSchedulerTest` |
+| ORDER-14 | P0 | 구매 확정, 다시 확정, 환불 진행 중 거절, 같은 주문 동시 확정 | 구매 확정으로 바뀐 커밋에서만 이벤트가 한 번 나가고 확정 수량이 남은 상품만 실림. 다시 확정·거절이면 안 나가고, 동시면 한 번만. `purchase-confirmed` 토픽에 주문 ID 키로 도착 | `OrderConfirmServiceTransactionTest`, `OrderConfirmedEventListenerTest` |
 
 ## 환불 필수 시나리오
 

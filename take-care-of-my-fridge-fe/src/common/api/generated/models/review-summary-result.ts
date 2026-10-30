@@ -14,12 +14,19 @@
  */
 
 
+// May contain unused imports in some cases
+// @ts-ignore
+import type { ReviewSummaryItem } from './review-summary-item';
 
 export interface ReviewSummaryResult {
     'elapsedMillis'?: number;
     'failedCount'?: number;
+    'items'?: Array<ReviewSummaryItem>;
     'skippedCount'?: number;
     'successCount'?: number;
     'targetCount'?: number;
+    'totalCostUsd'?: number;
+    'totalInputTokens'?: number;
+    'totalOutputTokens'?: number;
 }
 

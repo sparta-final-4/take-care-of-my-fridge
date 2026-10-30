@@ -137,6 +137,9 @@ export function Header() {
               <Button type="text" onClick={() => navigate(ROUTES.adminSaleEventNew)}>
                 할인 행사
               </Button>
+              <Button type="text" onClick={() => navigate(ROUTES.adminReviewSummary)}>
+                후기 요약
+              </Button>
             </>
           )}
           {screens.lg && status === 'authenticated' && (
@@ -260,6 +263,18 @@ export function Header() {
                 }}
               >
                 할인 행사
+              </Button>
+            )}
+            {role === 'ADMIN' && (
+              <Button
+                type="text"
+                block
+                onClick={() => {
+                  handleCloseDrawer();
+                  navigate(ROUTES.adminReviewSummary);
+                }}
+              >
+                후기 요약
               </Button>
             )}
             {status === 'authenticated' && (

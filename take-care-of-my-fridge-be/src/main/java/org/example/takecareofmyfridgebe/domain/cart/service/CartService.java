@@ -80,12 +80,12 @@ public class CartService {
         CartItem item = cartItemRepository.findByIdAndCartMemberId(cartItemId, memberId)
             .orElseThrow(() -> new BusinessException(ErrorCode.CART_ITEM_NOT_FOUND));
         Product product = findSellableProduct(item.getProductId());
-        if (request.quantity() > SaleEvent.FLASH_DROP_PURCHASE_LIMIT && isFlashDrop(product)) {
+
+        // 담아 둔 뒤 번개 드롭으로 바뀌었거나 재고가 줄었어도 수량을 내리는 것은 막지 않는다
+        int quantity = request.quantity();
+        if (quantity > SaleEvent.FLASH_DROP_PURCHASE_LIMIT && quantity > item.getQuantity() && isFlashDrop(product)) {
             throw purchaseLimitExceeded(product);
         }
-
-        // 담아 둔 뒤 재고가 줄었어도 수량을 내리는 것은 막지 않는다
-        int quantity = request.quantity();
         if (quantity > product.getStock() && quantity > item.getQuantity()) {
             throw new BusinessException(ErrorCode.CART_QUANTITY_EXCEEDS_STOCK);
         }

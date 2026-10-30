@@ -199,6 +199,7 @@ models/review-counts.ts
 models/review-create-request.ts
 models/review-response.ts
 models/review-search-request.ts
+models/review-summary-item.ts
 models/review-summary-result.ts
 models/review-update-request.ts
 models/review.ts

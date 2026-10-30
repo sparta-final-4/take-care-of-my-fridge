@@ -92,3 +92,10 @@ $navigation-progress-glow: 6px;
 $navigation-progress-z-index: 2000;
 // 화면 진입 시 아래에서 올라오는 거리
 $page-enter-offset: 4px;
+
+// 관리자 후기 요약 표의 요약 칸. 한 줄 말줄임이 되도록 최대 너비를 고정
+$review-summary-text-max-width: 320px;
+
+// 관리자 후기 요약 안내 칸. 제목 15px(antd 기본 14px와 16px 사이), 설명 줄 간격
+$review-summary-guide-title-size: 15px;
+$review-summary-guide-line-height: 1.6;

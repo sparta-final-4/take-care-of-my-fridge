@@ -7,9 +7,11 @@ import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderConfirmResponse;
 import org.example.takecareofmyfridgebe.domain.order.entity.Order;
 import org.example.takecareofmyfridgebe.domain.order.entity.OrderItem;
+import org.example.takecareofmyfridgebe.domain.order.event.OrderConfirmedEvent;
 import org.example.takecareofmyfridgebe.domain.refund.service.RefundQueryService;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,6 +23,7 @@ public class OrderConfirmService {
 
     private final OrderReader orderReader;
     private final RefundQueryService refundQueryService;
+    private final ApplicationEventPublisher eventPublisher;
 
     // 주문 행을 잠그고 상태를 확인하므로 같은 주문의 구매 확정이 동시에 와도 하나씩 순서대로 처리된다.
     // 결제 완료에서 구매 확정으로 바꾼 요청만 확정 시각을 남기고, 뒤에 온 요청은 이미 확정된 주문을 보고 같은 응답만 돌려준다.
@@ -35,7 +38,11 @@ public class OrderConfirmService {
             throw new BusinessException(ErrorCode.ORDER_REFUND_IN_PROGRESS);
         }
         order.confirm(LocalDateTime.now());
-        confirmQuantities(orderReader.getOrderItems(order));
+        List<OrderItem> items = orderReader.getOrderItems(order);
+        confirmQuantities(items);
+        // 이미 확정된 주문은 위에서 돌려보내므로 처음 확정한 요청만 여기서 발행한다. 실제 발행은 커밋 뒤에 한다.
+        // 상품이 모두 환불된 주문도 확정마다 한 번 발행하며, 이때 실린 상품 목록은 비어 있다
+        eventPublisher.publishEvent(OrderConfirmedEvent.of(order, items));
         return OrderConfirmResponse.from(order);
     }
 

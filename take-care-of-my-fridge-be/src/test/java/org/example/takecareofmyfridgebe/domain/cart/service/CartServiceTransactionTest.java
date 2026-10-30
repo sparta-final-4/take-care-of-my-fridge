@@ -3,7 +3,9 @@ package org.example.takecareofmyfridgebe.domain.cart.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.time.LocalDateTime;
 import java.util.List;
+import javax.sql.DataSource;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.example.takecareofmyfridgebe.domain.cart.dto.AddCartItemRequest;
 import org.example.takecareofmyfridgebe.domain.cart.dto.CartItemResponse;
@@ -19,6 +21,11 @@ import org.example.takecareofmyfridgebe.domain.product.entity.Product;
 import org.example.takecareofmyfridgebe.domain.product.entity.ProductStatus;
 import org.example.takecareofmyfridgebe.domain.product.entity.ProductType;
 import org.example.takecareofmyfridgebe.domain.product.repository.ProductRepository;
+import org.example.takecareofmyfridgebe.domain.sale.entity.SaleEvent;
+import org.example.takecareofmyfridgebe.domain.sale.entity.SaleEventItem;
+import org.example.takecareofmyfridgebe.domain.sale.entity.SaleEventType;
+import org.example.takecareofmyfridgebe.domain.sale.repository.SaleEventItemRepository;
+import org.example.takecareofmyfridgebe.domain.sale.repository.SaleEventRepository;
 import org.example.takecareofmyfridgebe.domain.sale.service.SaleEventReader;
 import org.example.takecareofmyfridgebe.global.config.JpaAuditingConfig;
 import org.example.takecareofmyfridgebe.global.config.QueryDslConfig;
@@ -32,6 +39,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.context.annotation.Import;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -47,23 +55,34 @@ class CartServiceTransactionTest extends MySqlContainerSupport {
     private final CartRepository cartRepository;
     private final CartItemRepository cartItemRepository;
     private final ProductRepository productRepository;
+    private final SaleEventRepository saleEventRepository;
+    private final SaleEventItemRepository saleEventItemRepository;
+    private final JdbcTemplate jdbcTemplate;
 
     @Autowired
     CartServiceTransactionTest(
             CartService cartService,
             CartRepository cartRepository,
             CartItemRepository cartItemRepository,
-            ProductRepository productRepository) {
+            ProductRepository productRepository,
+            SaleEventRepository saleEventRepository,
+            SaleEventItemRepository saleEventItemRepository,
+            DataSource dataSource) {
         this.cartService = cartService;
         this.cartRepository = cartRepository;
         this.cartItemRepository = cartItemRepository;
         this.productRepository = productRepository;
+        this.saleEventRepository = saleEventRepository;
+        this.saleEventItemRepository = saleEventItemRepository;
+        this.jdbcTemplate = new JdbcTemplate(dataSource);
     }
 
     @AfterEach
     void cleanUp() {
         cartItemRepository.deleteAll();
         cartRepository.deleteAll();
+        saleEventItemRepository.deleteAll();
+        saleEventRepository.deleteAll();
         productRepository.deleteAll();
     }
 
@@ -207,6 +226,19 @@ class CartServiceTransactionTest extends MySqlContainerSupport {
     }
 
     @Test
+    @DisplayName("담아 둔 뒤 번개 드롭으로 바뀌었어도 수량을 내리는 것은 반영된다")
+    void changeQuantity_allowsDecreaseAfterFlashDropStarts() {
+        Product product = saveProduct(10, ProductStatus.ON_SALE);
+        Cart cart = cartRepository.save(Cart.builder().memberId(1L).build());
+        CartItem item = cartItemRepository.save(CartItem.builder().cart(cart).productId(product.getId()).quantity(3).build());
+        saveActiveFlashDrop(product);
+
+        cartService.changeQuantity(1L, item.getId(), new ChangeCartItemQuantityRequest(2));
+
+        assertThat(cartItemRepository.findById(item.getId()).orElseThrow().getQuantity()).isEqualTo(2);
+    }
+
+    @Test
     @DisplayName("판매 중지된 상품의 줄은 수량을 바꿀 수 없다")
     void changeQuantity_rejectsStoppedProduct() {
         Product product = saveProduct(10, ProductStatus.STOPPED);
@@ -293,6 +325,16 @@ class CartServiceTransactionTest extends MySqlContainerSupport {
                 .shelfDays(7)
                 .status(status)
                 .build());
+    }
+
+    private void saveActiveFlashDrop(Product product) {
+        LocalDateTime now = LocalDateTime.now(SaleEvent.ZONE);
+        SaleEvent event = saleEventRepository.save(SaleEvent.builder()
+                .type(SaleEventType.FLASH_DROP).startsAt(now.minusHours(1)).endsAt(now.plusHours(1)).build());
+        jdbcTemplate.update("update sale_events set status = 'ACTIVE' where id = ?", event.getId());
+        saleEventItemRepository.save(SaleEventItem.builder()
+                .saleEvent(event).productId(product.getId()).listPrice(product.getPrice())
+                .discountRate(50).limitedQuantity(5).build());
     }
 
     private void assertErrorCode(ThrowingCallable call, ErrorCode errorCode) {

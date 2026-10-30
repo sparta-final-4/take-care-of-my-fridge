@@ -6883,6 +6883,51 @@
           }
         }
       },
+      "ReviewSummaryItem": {
+        "type": "object",
+        "properties": {
+          "costUsd": {
+            "type": "number",
+            "format": "double"
+          },
+          "inputTokens": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "newSummary": {
+            "type": "string"
+          },
+          "outputTokens": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "previousSummary": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "recipeId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "recipeName": {
+            "type": "string"
+          },
+          "reviewCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "SUCCESS",
+              "SKIPPED",
+              "FAILED"
+            ]
+          }
+        }
+      },
       "ReviewSummaryResult": {
         "type": "object",
         "properties": {
@@ -6893,6 +6938,12 @@
           "failedCount": {
             "type": "integer",
             "format": "int32"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewSummaryItem"
+            }
           },
           "skippedCount": {
             "type": "integer",
@@ -6905,6 +6956,18 @@
           "targetCount": {
             "type": "integer",
             "format": "int32"
+          },
+          "totalCostUsd": {
+            "type": "number",
+            "format": "double"
+          },
+          "totalInputTokens": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "totalOutputTokens": {
+            "type": "integer",
+            "format": "int64"
           }
         }
       },

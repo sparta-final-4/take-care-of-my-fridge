@@ -76,7 +76,7 @@ class ReviewSummaryAdminControllerTest {
     @DisplayName("관리자(ADMIN)가 실행 요청 시 200 OK와 작업 결과를 반환한다")
     @SuppressWarnings("unchecked")
     void adminRequestReturns200WithResult() throws Throwable {
-        ReviewSummaryResult dummyResult = new ReviewSummaryResult(10, 8, 1, 1, 1200L);
+        ReviewSummaryResult dummyResult = new ReviewSummaryResult(10, 8, 1, 1, 1200L, 0L, 0L, 0.0, List.of());
         LockingTaskExecutor.TaskResult<ReviewSummaryResult> taskResult = mock(LockingTaskExecutor.TaskResult.class);
         when(taskResult.wasExecuted()).thenReturn(true);
         when(taskResult.getResult()).thenReturn(dummyResult);
@@ -113,15 +113,15 @@ class ReviewSummaryAdminControllerTest {
                 .andExpect(jsonPath("$.error.code").value("REVIEW_004"))
                 .andExpect(jsonPath("$.error.message").value("후기 요약이 이미 실행 중이에요."));
 
-        verify(reviewSummaryFacade, never()).runOnce();
+        verify(reviewSummaryFacade, never()).runOnce(any());
     }
 
     @Test
     @DisplayName("수동 실행이 끝난 직후 다시 실행하면 200 OK를 반환하고 lockAtLeastFor는 0이다")
     @SuppressWarnings("unchecked")
     void canExecuteAgainImmediatelyAfterManualExecutionFinishes() throws Throwable {
-        ReviewSummaryResult dummyResult1 = new ReviewSummaryResult(5, 5, 0, 0, 500L);
-        ReviewSummaryResult dummyResult2 = new ReviewSummaryResult(3, 3, 0, 0, 300L);
+        ReviewSummaryResult dummyResult1 = new ReviewSummaryResult(5, 5, 0, 0, 500L, 0L, 0L, 0.0, List.of());
+        ReviewSummaryResult dummyResult2 = new ReviewSummaryResult(3, 3, 0, 0, 300L, 0L, 0L, 0.0, List.of());
 
         LockingTaskExecutor.TaskResult<ReviewSummaryResult> firstTaskResult = mock(LockingTaskExecutor.TaskResult.class);
         when(firstTaskResult.wasExecuted()).thenReturn(true);

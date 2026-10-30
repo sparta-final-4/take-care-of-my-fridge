@@ -167,6 +167,7 @@ export * from './review-counts';
 export * from './review-create-request';
 export * from './review-response';
 export * from './review-search-request';
+export * from './review-summary-item';
 export * from './review-summary-result';
 export * from './review-update-request';
 export * from './sale-candidate-product-response';

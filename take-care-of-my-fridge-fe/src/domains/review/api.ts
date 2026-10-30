@@ -1,8 +1,11 @@
 import {
+  adminReviewSummaryApi,
   recipeReviewApi,
   type PageResponseReviewResponse,
   type ReviewCreateRequest,
   type ReviewResponse,
+  type ReviewSummaryItem,
+  type ReviewSummaryResult,
   type ReviewSearchRequest,
   type ReviewUpdateRequest,
 } from '@/common/api/clients';
@@ -11,6 +14,8 @@ import { unwrap } from '@/common/api/unwrap';
 export type {
   ReviewCreateRequest,
   ReviewResponse,
+  ReviewSummaryItem,
+  ReviewSummaryResult,
   ReviewSearchRequest,
   ReviewUpdateRequest,
   PageResponseReviewResponse,
@@ -48,4 +53,14 @@ export async function updateReview(
  */
 export async function deleteReview(reviewId: number): Promise<void> {
   return unwrap(recipeReviewApi.deleteReview({ reviewId }));
+}
+
+// 관리자 실행은 백엔드가 20초에서 끊고 응답하므로(CloudFront 30초 안), 기본 10초보다 넉넉히 기다린다.
+const REVIEW_SUMMARY_RUN_TIMEOUT_MS = 40_000;
+
+/**
+ * 관리자가 후기 요약 작업을 바로 실행한다. 결과는 저장되지 않고 이 응답으로만 온다.
+ */
+export async function runReviewSummary(): Promise<ReviewSummaryResult> {
+  return unwrap(adminReviewSummaryApi.runReviewSummary({ timeout: REVIEW_SUMMARY_RUN_TIMEOUT_MS }));
 }

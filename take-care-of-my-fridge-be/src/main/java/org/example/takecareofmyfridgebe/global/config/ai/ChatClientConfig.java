@@ -1,7 +1,6 @@
 package org.example.takecareofmyfridgebe.global.config.ai;
 
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -16,12 +15,11 @@ public class ChatClientConfig {
     @Bean("reviewSummaryChatClient")
     public ChatClient reviewSummaryChatClient(
             ChatClient.Builder builder,
-            @Value("${app.llm.input-per-1m}") double inputPer1m,
-            @Value("${app.llm.output-per-1m}") double outputPer1m
+            LlmCostCalculator llmCostCalculator
     ) {
         return builder
                 .defaultSystem("너는 레시피 후기를 요약하는 어시스턴트야. 후기에 있는 내용만 쓰고 지어내지 않는다.")
-                .defaultAdvisors(new CostAdvisor(inputPer1m, outputPer1m, 100))
+                .defaultAdvisors(new CostAdvisor(llmCostCalculator, 100))
                 .build();
     }
 }

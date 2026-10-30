@@ -5,9 +5,15 @@ import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeSummary;
 import org.example.takecareofmyfridgebe.domain.recipe.service.RecipeService;
 import org.example.takecareofmyfridgebe.domain.review.dto.RecipeReviewContentDto;
 import org.example.takecareofmyfridgebe.domain.review.dto.RecipeReviewSummaryCandidate;
+import org.example.takecareofmyfridgebe.domain.review.dto.ReviewSummaryItem;
+import org.example.takecareofmyfridgebe.domain.review.dto.ReviewSummaryItemStatus;
 import org.example.takecareofmyfridgebe.domain.review.dto.ReviewSummaryResult;
 import org.example.takecareofmyfridgebe.domain.review.repository.RecipeReviewRepository;
+import org.example.takecareofmyfridgebe.global.config.ai.LlmCost;
+import org.example.takecareofmyfridgebe.global.config.ai.LlmCostCalculator;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.chat.model.Generation;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
@@ -16,6 +22,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
@@ -41,35 +48,40 @@ public class ReviewSummaryFacade {
      */
     private static final int MAX_SUMMARY_LENGTH = 150;
 
-    /**
-     * 후기 요약 1회 실행 시 허용되는 최대 시간 예산(25분).
-     * lockAtMostFor(30분)보다 짧아야 함.
-     */
-    private static final Duration TIME_BUDGET = Duration.ofMinutes(25);
+    // 결과 items의 건너뜀·실패 이유
+    private static final String REASON_NO_REVIEWS = "요약할 후기가 없음";
+    private static final String REASON_BLANK_SUMMARY = "요약이 비어 있음";
+    private static final String REASON_RATE_LIMITED = "OpenAI 429";
+    private static final String REASON_ABORTED_BY_RATE_LIMIT = "429로 중단";
+    private static final String REASON_TIME_BUDGET = "시간 초과로 다음 실행";
 
     private final RecipeReviewRepository recipeReviewRepository;
     private final RecipeService recipeService;
     private final ChatClient chatClient;
+    private final LlmCostCalculator costCalculator;
     private final Clock clock;
 
     @Autowired
     public ReviewSummaryFacade(
             RecipeReviewRepository recipeReviewRepository,
             RecipeService recipeService,
-            @Qualifier("reviewSummaryChatClient") ChatClient chatClient
+            @Qualifier("reviewSummaryChatClient") ChatClient chatClient,
+            LlmCostCalculator costCalculator
     ) {
-        this(recipeReviewRepository, recipeService, chatClient, Clock.systemDefaultZone());
+        this(recipeReviewRepository, recipeService, chatClient, costCalculator, Clock.systemDefaultZone());
     }
 
     public ReviewSummaryFacade(
             RecipeReviewRepository recipeReviewRepository,
             RecipeService recipeService,
             @Qualifier("reviewSummaryChatClient") ChatClient chatClient,
+            LlmCostCalculator costCalculator,
             Clock clock
     ) {
         this.recipeReviewRepository = recipeReviewRepository;
         this.recipeService = recipeService;
         this.chatClient = chatClient;
+        this.costCalculator = costCalculator;
         this.clock = clock;
     }
 
@@ -78,71 +90,97 @@ public class ReviewSummaryFacade {
      * 조회가 단건 실행이므로 별도 트랜잭션 래핑 없이 바로 호출하며,
      * AI 호출은 DB 커넥션을 점유하지 않도록 반드시 트랜잭션 밖에서 실행한다.
      * 저장은 RecipeService.updateTipSummary(@Transactional)에서 수행된다.
+     * timeBudget이 지나면 남은 레시피는 다음 실행으로 넘기고(SKIPPED),
+     * 429가 나면 그 레시피는 FAILED, 남은 레시피는 SKIPPED로 남기고 멈춘다.
      */
-    public ReviewSummaryResult runOnce() {
+    public ReviewSummaryResult runOnce(Duration timeBudget) {
         Instant startTime = clock.instant();
 
-        List<Long> targetRecipeIds = findTargetRecipeIds();
-        int targetCount = targetRecipeIds.size();
+        List<Target> targets = findTargets();
 
-        log.info("후기 요약 새벽 작업을 시작합니다. 대상 레시피 수: {}", targetCount);
+        log.info("후기 요약 작업을 시작합니다. 대상 레시피 수: {}, 시간 예산: {}", targets.size(), timeBudget);
 
-        int successCount = 0;
-        int skippedCount = 0;
-        int failedCount = 0;
+        List<ReviewSummaryItem> items = new ArrayList<>();
 
-        for (int i = 0; i < targetRecipeIds.size(); i++) {
-            if (Duration.between(startTime, clock.instant()).compareTo(TIME_BUDGET) >= 0) {
-                int remainingCount = targetRecipeIds.size() - i;
-                log.info("시간 초과로 {}개는 다음 실행으로", remainingCount);
-                skippedCount += remainingCount;
+        for (int i = 0; i < targets.size(); i++) {
+            if (Duration.between(startTime, clock.instant()).compareTo(timeBudget) >= 0) {
+                log.info("시간 초과로 {}개는 다음 실행으로", targets.size() - i);
+                skipRemaining(targets, i, REASON_TIME_BUDGET, items);
                 break;
             }
 
-            Long recipeId = targetRecipeIds.get(i);
+            Target target = targets.get(i);
+            Long recipeId = target.recipeId();
+            Integer reviewCount = null;
             try {
                 List<RecipeReviewContentDto> reviews = fetchRecentReviews(recipeId);
+                reviewCount = reviews.size();
                 if (reviews.isEmpty()) {
                     log.info("요약 대상 후기가 없어 건너뜁니다. recipeId={}", recipeId);
-                    skippedCount++;
+                    items.add(target.item(ReviewSummaryItemStatus.SKIPPED, REASON_NO_REVIEWS, reviewCount, null, null));
                     continue;
                 }
 
-                String summary = generateSummaryWithAi(reviews);
+                AiSummary aiSummary = generateSummaryWithAi(reviews);
+                String summary = aiSummary.text();
                 if (summary == null || summary.isBlank()) {
                     log.info("생성된 요약이 비어 있어 저장을 건너뜁니다. recipeId={}", recipeId);
-                    skippedCount++;
+                    items.add(target.item(ReviewSummaryItemStatus.SKIPPED, REASON_BLANK_SUMMARY, reviewCount,
+                            aiSummary.cost(), null));
                     continue;
                 }
 
                 String cleaned = stripQuotes(summary);
                 if (cleaned.isBlank()) {
                     log.info("따옴표 제거 후 요약이 비어 있어 저장을 건너뜁니다. recipeId={}", recipeId);
-                    skippedCount++;
+                    items.add(target.item(ReviewSummaryItemStatus.SKIPPED, REASON_BLANK_SUMMARY, reviewCount,
+                            aiSummary.cost(), null));
                     continue;
                 }
 
                 String finalSummary = truncateSummary(cleaned);
 
                 recipeService.updateTipSummary(recipeId, finalSummary);
-                successCount++;
+                items.add(target.item(ReviewSummaryItemStatus.SUCCESS, null, reviewCount, aiSummary.cost(),
+                        finalSummary));
             } catch (Exception e) {
                 if (isRateLimitException(e)) {
                     log.warn("OpenAI API 한도 초과(429)가 발생하여 남은 레시피 요약을 중단하고 종료합니다. recipeId={}, error={}",
                             recipeId, e.getMessage(), e);
-                    failedCount++;
+                    items.add(target.item(ReviewSummaryItemStatus.FAILED, REASON_RATE_LIMITED, reviewCount, null, null));
+                    skipRemaining(targets, i + 1, REASON_ABORTED_BY_RATE_LIMIT, items);
                     break;
                 }
                 log.warn("레시피 후기 요약 처리 실패. recipeId={}, cause={}", recipeId, e.getMessage(), e);
-                failedCount++;
+                items.add(target.item(ReviewSummaryItemStatus.FAILED, firstLine(e), reviewCount, null, null));
             }
         }
 
         long elapsedMillis = Duration.between(startTime, clock.instant()).toMillis();
-        log.info("후기 요약 작업 완료. 대상: {}, 성공: {}, 건너뜀: {}, 실패: {}, 소요시간: {}ms",
-                targetCount, successCount, skippedCount, failedCount, elapsedMillis);
+        ReviewSummaryResult result = ReviewSummaryResult.of(items, elapsedMillis);
+        log.info("후기 요약 작업 완료. 대상: {}, 성공: {}, 건너뜀: {}, 실패: {}, 입력 토큰: {}, 출력 토큰: {}, 비용: ${}, 소요시간: {}ms",
+                result.targetCount(), result.successCount(), result.skippedCount(), result.failedCount(),
+                result.totalInputTokens(), result.totalOutputTokens(),
+                String.format("%.6f", result.totalCostUsd()), elapsedMillis);
 
-        return new ReviewSummaryResult(targetCount, successCount, skippedCount, failedCount, elapsedMillis);
+        return result;
+    }
+
+    private void skipRemaining(List<Target> targets, int fromIndex, String reason, List<ReviewSummaryItem> items) {
+        for (Target target : targets.subList(fromIndex, targets.size())) {
+            items.add(target.item(ReviewSummaryItemStatus.SKIPPED, reason, null, null, null));
+        }
+    }
+
+    /**
+     * 예외 메시지의 첫 줄. 메시지가 없으면 예외 이름.
+     */
+    private String firstLine(Exception e) {
+        String message = e.getMessage();
+        if (message == null || message.isBlank()) {
+            return e.getClass().getSimpleName();
+        }
+        return message.strip().lines().findFirst().orElse(message);
     }
 
     /**
@@ -150,8 +188,9 @@ public class ReviewSummaryFacade {
      * 1. 후기 5개 이상
      * 2. tipSummary가 없거나 가장 최근 후기 수정시각 > 레시피 updated_at
      * 3. 가장 최근 후기 시각 최신순 최대 100개
+     * 결과에 쓰도록 레시피 이름과 기존 요약을 같이 돌려준다.
      */
-    private List<Long> findTargetRecipeIds() {
+    private List<Target> findTargets() {
         List<RecipeReviewSummaryCandidate> candidates = recipeReviewRepository.findSummaryCandidatesWithMinReviews();
         if (candidates == null || candidates.isEmpty()) {
             return Collections.emptyList();
@@ -181,7 +220,7 @@ public class ReviewSummaryFacade {
                 .sorted(Comparator.comparing(RecipeReviewSummaryCandidate::latestReviewUpdatedAt,
                         Comparator.nullsLast(Comparator.naturalOrder())).reversed())
                 .limit(MAX_TARGET_RECIPES)
-                .map(RecipeReviewSummaryCandidate::recipeId)
+                .map(candidate -> new Target(candidate.recipeId(), summaries.get(candidate.recipeId())))
                 .toList();
     }
 
@@ -196,9 +235,9 @@ public class ReviewSummaryFacade {
     }
 
     /**
-     * OpenAI 호출 (비트랜잭션)
+     * OpenAI 호출 (비트랜잭션). 요약 글자와 토큰 사용량·비용을 같이 돌려준다.
      */
-    private String generateSummaryWithAi(List<RecipeReviewContentDto> reviews) {
+    private AiSummary generateSummaryWithAi(List<RecipeReviewContentDto> reviews) {
         StringBuilder reviewsText = new StringBuilder();
         for (RecipeReviewContentDto review : reviews) {
             reviewsText.append("- 별점: ").append(review.rating())
@@ -221,10 +260,15 @@ public class ReviewSummaryFacade {
                 6. 요약 문장만 쓰고 따옴표나 앞뒤 설명은 붙이지 마세요.
                 """.formatted(reviewsText.toString());
 
-        return chatClient.prompt()
+        ChatResponse chatResponse = chatClient.prompt()
                 .user(userPrompt)
                 .call()
-                .content();
+                .chatResponse();
+
+        // chatResponse·getResult()·getText()는 null일 수 있다(빈 응답). 결과는 "요약이 비어 있음"으로 건너뛴다.
+        Generation generation = chatResponse == null ? null : chatResponse.getResult();
+        String text = generation == null ? null : generation.getOutput().getText();
+        return new AiSummary(text, costCalculator.calculate(chatResponse).orElse(null));
     }
 
     /**
@@ -288,5 +332,33 @@ public class ReviewSummaryFacade {
             current = current.getCause();
         }
         return false;
+    }
+
+    private record AiSummary(String text, LlmCost cost) {
+    }
+
+    /**
+     * 요약 대상 레시피. summary는 레시피 이름과 기존 요약이며, 조회되지 않았으면 null이다.
+     */
+    private record Target(Long recipeId, RecipeSummary summary) {
+
+        ReviewSummaryItem item(
+                ReviewSummaryItemStatus status,
+                String reason,
+                Integer reviewCount,
+                LlmCost cost,
+                String newSummary
+        ) {
+            return ReviewSummaryItem.of(
+                    recipeId,
+                    summary == null ? null : summary.name(),
+                    summary == null ? null : summary.tipSummary(),
+                    status,
+                    reason,
+                    reviewCount,
+                    cost,
+                    newSummary
+            );
+        }
     }
 }
