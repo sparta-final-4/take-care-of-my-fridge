@@ -35,6 +35,12 @@ export function SearchProductSection() {
     recordClick({ productId, keyword });
   };
 
+  // 페이지를 넘기면 상품 섹션 상단으로 올려 새 목록의 첫 줄부터 보이게 한다.
+  const handleChangePage = (nextPage: number) => {
+    setProductPage(nextPage);
+    document.getElementById(SEARCH_SECTION_IDS.products)?.scrollIntoView();
+  };
+
   const totalElements = data?.totalElements ?? 0;
   const products = data?.content ?? [];
 
@@ -87,7 +93,7 @@ export function SearchProductSection() {
               pageSize={SEARCH_PRODUCT_PAGE_SIZE}
               total={totalElements}
               showSizeChanger={false}
-              onChange={setProductPage}
+              onChange={handleChangePage}
             />
           </Flex>
         </SectionLoading>
