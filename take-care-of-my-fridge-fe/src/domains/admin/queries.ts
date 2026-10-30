@@ -1,11 +1,8 @@
 import { queryOptions } from '@tanstack/react-query';
 
-import {
-  getAuditLogs,
-  getMembers,
-  type AuditLogSearchRequest,
-  type MemberListRequest,
-} from './api';
+import type { AuditLogSearchRequest, MemberListRequest } from '@/common/api/clients';
+
+import { getAuditLogs, getMembers } from './api';
 
 export const adminQueries = {
   all: ['admin'] as const,

@@ -15,7 +15,13 @@ import dayjs from 'dayjs';
 import { useState } from 'react';
 import { useSearchParams } from 'react-router';
 
-import { type AuditLogResponse, type AuditLogSearchRequest } from '@/domains/admin/api';
+import {
+  AuditLogResponseActionEnum,
+  AuditLogResponseResultEnum,
+  type AuditLogResponse,
+  type AuditLogResponseActorRoleEnum,
+  type AuditLogSearchRequest,
+} from '@/common/api/clients';
 import { getErrorMessage } from '@/common/api/errors';
 import { ACTION_LABELS, RESULT_LABELS } from '@/domains/admin/labels';
 import { adminQueries } from '@/domains/admin/queries';
@@ -24,16 +30,8 @@ import { ROLE_LABELS } from '@/domains/member/labels';
 import styles from './AdminAuditPage.module.scss';
 
 const PAGE_SIZE = 20;
-const actions: AuditLogResponse['action'][] = [
-  'PRODUCT_CREATE',
-  'PRODUCT_DELETE',
-  'PRICE_UPDATE',
-  'DEAL_REVIEW',
-  'EVENT_REQUEST',
-  'ROLE_CHANGE',
-];
-
-const results: AuditLogResponse['result'][] = ['SUCCESS', 'FAILED', 'DENIED'];
+const actions = Object.values(AuditLogResponseActionEnum);
+const results = Object.values(AuditLogResponseResultEnum);
 
 type Filters = Omit<AuditLogSearchRequest, 'page' | 'size'>;
 
@@ -183,13 +181,13 @@ export default function AdminAuditPage() {
               title: '역할',
               dataIndex: 'actorRole',
               key: 'actorRole',
-              render: (value: AuditLogResponse['actorRole']) => ROLE_LABELS[value],
+              render: (value?: AuditLogResponseActorRoleEnum) => (value ? ROLE_LABELS[value] : '-'),
             },
             {
               title: '작업',
               dataIndex: 'action',
               key: 'action',
-              render: (value: AuditLogResponse['action']) => ACTION_LABELS[value],
+              render: (value?: AuditLogResponseActionEnum) => (value ? ACTION_LABELS[value] : '-'),
             },
             {
               title: '대상',
@@ -200,11 +198,16 @@ export default function AdminAuditPage() {
               title: '결과',
               dataIndex: 'result',
               key: 'result',
-              render: (value: AuditLogResponse['result']) => (
-                <Tag color={value === 'SUCCESS' ? 'green' : value === 'FAILED' ? 'orange' : 'red'}>
-                  {RESULT_LABELS[value]}
-                </Tag>
-              ),
+              render: (value?: AuditLogResponseResultEnum) =>
+                value ? (
+                  <Tag
+                    color={value === 'SUCCESS' ? 'green' : value === 'FAILED' ? 'orange' : 'red'}
+                  >
+                    {RESULT_LABELS[value]}
+                  </Tag>
+                ) : (
+                  '-'
+                ),
             },
           ]}
         />
