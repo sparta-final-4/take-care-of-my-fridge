@@ -1,105 +1,125 @@
 package org.example.takecareofmyfridgebe.domain.order.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.Clock;
 import java.time.Instant;
-import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import org.example.takecareofmyfridgebe.global.config.RedisConfig;
+import org.example.takecareofmyfridgebe.global.error.BusinessException;
+import org.example.takecareofmyfridgebe.global.error.ErrorCode;
+import org.example.takecareofmyfridgebe.support.RedisContainerSupport;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
+import org.springframework.boot.data.redis.autoconfigure.DataRedisAutoConfiguration;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
+import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
+import org.springframework.data.redis.core.StringRedisTemplate;
 
-class OrderNumberGeneratorTest {
+// 생성기 두 개를 서버 두 대로 보고 같은 Redis를 쓰게 해, 같은 밀리초에 만든 번호가 겹치지 않는지 Redis 상태까지 확인한다.
+@SpringBootTest(classes = RedisConfig.class)
+@ImportAutoConfiguration(DataRedisAutoConfiguration.class)
+class OrderNumberGeneratorTest extends RedisContainerSupport {
 
-    private final OrderNumberGenerator generator = new OrderNumberGenerator();
+    // UTC 05:30:00.123 = 한국 시각 14:30:00.123
+    private static final Instant NOW = Instant.parse("2026-10-30T05:30:00.123Z");
+    private static final String KEY = "order:number-seq:20261030143000123";
 
-    @Test
-    @DisplayName("밀리초 시각 17자리와 순번 3자리로 20자리 숫자를 만든다")
-    void next_returnsTwentyDigits() {
-        assertThat(generator.next()).matches("\\d{20}");
+    private final StringRedisTemplate stringRedisTemplate;
+
+    @Autowired
+    OrderNumberGeneratorTest(StringRedisTemplate stringRedisTemplate) {
+        this.stringRedisTemplate = stringRedisTemplate;
+    }
+
+    @AfterEach
+    void cleanUp() {
+        Set<String> keys = stringRedisTemplate.keys("order:number-seq:*");
+        if (!keys.isEmpty()) {
+            stringRedisTemplate.delete(keys);
+        }
     }
 
     @Test
-    @DisplayName("연달아 만든 번호는 계속 커진다")
-    void next_increases() {
-        // 같은 밀리초 순번은 3자리까지라, 한 밀리초 안에 다 만들어져도 넘치지 않게 999개만 만든다
-        List<String> numbers = IntStream.range(0, 999).mapToObj(i -> generator.next()).toList();
-
-        assertThat(numbers).isSorted().doesNotHaveDuplicates();
-    }
-
-    @Test
-    @DisplayName("여러 스레드가 동시에 만들어도 번호가 겹치지 않는다")
-    void next_concurrently_noDuplicates() throws InterruptedException {
-        int threads = 20;
-        int perThread = 1_000;
+    @DisplayName("두 서버가 같은 밀리초에 동시에 번호를 만들어도 겹치지 않는다")
+    void next_twoServersSameMillis_noDuplicates() throws InterruptedException {
+        List<OrderNumberGenerator> servers = List.of(fixedAt(NOW), fixedAt(NOW));
+        int perServer = 500;
         Set<String> numbers = ConcurrentHashMap.newKeySet();
-        ExecutorService executor = Executors.newFixedThreadPool(threads);
+        ExecutorService executor = Executors.newFixedThreadPool(servers.size());
+        CountDownLatch start = new CountDownLatch(1);
 
-        IntStream.range(0, threads).forEach(t -> executor.submit(() ->
-            IntStream.range(0, perThread).forEach(i -> numbers.add(generator.next()))));
+        servers.forEach(server -> executor.submit(() -> {
+            start.await();
+            IntStream.range(0, perServer).forEach(i -> numbers.add(server.next()));
+            return null;
+        }));
+        start.countDown();
         executor.shutdown();
         assertThat(executor.awaitTermination(10, TimeUnit.SECONDS)).isTrue();
 
-        assertThat(numbers).hasSize(threads * perThread);
+        Set<String> expected = IntStream.range(0, 1_000)
+            .mapToObj(sequence -> "20261030143000123" + String.format("%03d", sequence))
+            .collect(Collectors.toSet());
+        assertThat(numbers).isEqualTo(expected);
+        assertThat(stringRedisTemplate.opsForValue().get(KEY)).isEqualTo("1000");
     }
 
     @Test
-    @DisplayName("같은 밀리초에 1000개를 넘으면 다음 밀리초 번호로 넘어가 20자리를 지킨다")
-    void next_sequenceOverflow_movesToNextMillis() {
-        Instant now = Instant.parse("2026-10-21T05:30:00.123Z");
-        OrderNumberGenerator fixed = new OrderNumberGenerator(Clock.fixed(now, ZoneOffset.UTC));
-
-        List<String> numbers = IntStream.range(0, 1_001).mapToObj(i -> fixed.next()).toList();
-
-        assertThat(numbers).allMatch(n -> n.length() == 20).isSorted().doesNotHaveDuplicates();
-        assertThat(numbers.get(999)).isEqualTo("20261021143000123999");
-        assertThat(numbers.get(1_000)).isEqualTo("20261021143000124000");
-    }
-
-    @Test
-    @DisplayName("시계가 뒤로 가도 번호는 계속 커진다")
-    void next_clockGoesBack_keepsIncreasing() {
-        AtomicLong millis = new AtomicLong(Instant.parse("2026-10-21T05:30:00Z").toEpochMilli());
-        OrderNumberGenerator generator = new OrderNumberGenerator(new Clock() {
-            @Override
-            public ZoneId getZone() {
-                return ZoneOffset.UTC;
-            }
-
-            @Override
-            public Clock withZone(ZoneId zone) {
-                return this;
-            }
-
-            @Override
-            public Instant instant() {
-                return Instant.ofEpochMilli(millis.get());
-            }
-        });
-
-        String before = generator.next();
-        millis.addAndGet(-5_000);
-        String after = generator.next();
-
-        assertThat(after).isGreaterThan(before);
-    }
-
-    @Test
-    @DisplayName("번호의 시각은 서버 시간대와 관계없이 한국 시각이다")
-    void next_usesSeoulTime() {
+    @DisplayName("번호는 한국 시각 17자리와 순번 3자리이고, 순번 키에는 만료 시간이 걸린다")
+    void next_formatAndKeyTtl() {
         Instant utcMidnight = Instant.parse("2026-10-21T00:00:00Z");
 
-        String number = new OrderNumberGenerator(Clock.fixed(utcMidnight, ZoneOffset.UTC)).next();
+        String number = fixedAt(utcMidnight).next();
 
-        assertThat(number).startsWith("20261021090000000");
+        assertThat(number).isEqualTo("20261021090000000000");
+        assertThat(stringRedisTemplate.getExpire("order:number-seq:20261021090000000", TimeUnit.SECONDS))
+            .isBetween(1L, 60L);
+    }
+
+    @Test
+    @DisplayName("같은 밀리초에 1000개를 넘으면 다시 주문하게 거절한다")
+    void next_sequenceOverflow_rejects() {
+        OrderNumberGenerator generator = fixedAt(NOW);
+        IntStream.range(0, 1_000).forEach(i -> generator.next());
+
+        assertThatThrownBy(generator::next)
+            .isInstanceOf(BusinessException.class)
+            .extracting("errorCode").isEqualTo(ErrorCode.ORDER_NUMBER_CONFLICT);
+    }
+
+    @Test
+    @DisplayName("Redis에 연결할 수 없으면 503으로 거절한다")
+    void next_redisUnavailable_rejects() {
+        LettuceConnectionFactory unreachable = new LettuceConnectionFactory(new RedisStandaloneConfiguration("localhost", 1));
+        unreachable.afterPropertiesSet();
+        unreachable.start();
+        OrderNumberGenerator generator = new OrderNumberGenerator(new StringRedisTemplate(unreachable), Clock.fixed(NOW, ZoneOffset.UTC));
+
+        try {
+            assertThatThrownBy(generator::next)
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode").isEqualTo(ErrorCode.ORDER_NUMBER_UNAVAILABLE);
+        } finally {
+            unreachable.destroy();
+        }
+    }
+
+    private OrderNumberGenerator fixedAt(Instant instant) {
+        return new OrderNumberGenerator(stringRedisTemplate, Clock.fixed(instant, ZoneOffset.UTC));
     }
 }

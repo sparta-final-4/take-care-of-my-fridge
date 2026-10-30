@@ -3,6 +3,7 @@ package org.example.takecareofmyfridgebe.domain.order.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
+import static org.mockito.BDDMockito.given;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -14,6 +15,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.IntStream;
 import javax.sql.DataSource;
 import org.example.takecareofmyfridgebe.domain.cart.entity.Cart;
@@ -46,6 +48,7 @@ import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 import org.example.takecareofmyfridgebe.support.MySqlContainerSupport;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -53,6 +56,7 @@ import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -60,10 +64,16 @@ import org.springframework.transaction.annotation.Transactional;
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({JpaAuditingConfig.class, QueryDslConfig.class, OrderCreateService.class, OrderCancelService.class,
-    OrderNumberGenerator.class, OrderReader.class, SaleEventReader.class,
+    OrderReader.class, SaleEventReader.class,
     SaleEventStockService.class, PaymentService.class})
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class OrderCreateServiceSaleTransactionTest extends MySqlContainerSupport {
+
+    // 이 테스트는 재고와 롤백을 본다. 번호 생성은 OrderNumberGeneratorTest가 맡으므로 매번 다른 번호를 돌려주는 가짜로 바꾼다.
+    private static final AtomicLong ORDER_NUMBER_SEQUENCE = new AtomicLong();
+
+    @MockitoBean
+    private OrderNumberGenerator orderNumberGenerator;
 
     private static final LocalDateTime NOW = LocalDateTime.now(SaleEvent.ZONE);
 
@@ -100,6 +110,11 @@ class OrderCreateServiceSaleTransactionTest extends MySqlContainerSupport {
         this.saleEventRepository = saleEventRepository;
         this.saleEventItemRepository = saleEventItemRepository;
         this.jdbcTemplate = new JdbcTemplate(dataSource);
+    }
+
+    @BeforeEach
+    void stubOrderNumberGenerator() {
+        given(orderNumberGenerator.next()).willAnswer(invocation -> String.format("%020d", ORDER_NUMBER_SEQUENCE.incrementAndGet()));
     }
 
     @AfterEach
