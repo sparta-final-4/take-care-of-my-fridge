@@ -4614,7 +4614,8 @@
           "rawName": {
             "type": "string",
             "maxLength": 200,
-            "minLength": 0
+            "minLength": 0,
+            "pattern": "(?s).*\\S.*"
           },
           "storage": {
             "type": "string",
@@ -4624,13 +4625,7 @@
               "ROOM_TEMP"
             ]
           }
-        },
-        "required": [
-          "expirationDate",
-          "quantity",
-          "rawName",
-          "storage"
-        ]
+        }
       },
       "IngredientDeductionResponse": {
         "type": "object",

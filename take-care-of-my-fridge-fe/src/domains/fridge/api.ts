@@ -49,12 +49,12 @@ export interface FridgeItemCreateRequest {
   }>;
 }
 
-// FridgeItemUpdateRequest.java. 모든 필드가 필수다.
+// FridgeItemUpdateRequest.java. 바뀐 칸만 보내는 부분 수정이라 모든 필드가 선택이다(보내지 않은 칸은 그대로).
 export interface FridgeItemUpdateRequest {
-  rawName: string;
-  quantity: number;
-  storage: StorageType;
-  expirationDate: string;
+  rawName?: string;
+  quantity?: number;
+  storage?: StorageType;
+  expirationDate?: string;
 }
 
 // FridgeItemTakeOutRequest.java. quantity가 null이면 남은 양 전부를 뺀다.

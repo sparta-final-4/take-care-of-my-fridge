@@ -16,10 +16,10 @@
 
 
 export interface FridgeItemUpdateRequest {
-    'expirationDate': string;
-    'quantity': number;
-    'rawName': string;
-    'storage': FridgeItemUpdateRequestStorageEnum;
+    'expirationDate'?: string;
+    'quantity'?: number;
+    'rawName'?: string;
+    'storage'?: FridgeItemUpdateRequestStorageEnum;
 }
 
 export const FridgeItemUpdateRequestStorageEnum = {

@@ -1,7 +1,8 @@
 import { App, DatePicker, Form, Input, InputNumber, Modal, Select } from 'antd';
-import dayjs, { type Dayjs } from 'dayjs';
+import dayjs from 'dayjs';
 
 import type { FridgeItemResponse, StorageType } from '../api';
+import { buildFridgeItemUpdateRequest, type EditFormValues } from '../editRequest';
 import { STORAGE_LABELS } from '../format';
 import { useUpdateFridgeItem } from '../queries';
 import styles from './FridgeItemEditModal.module.scss';
@@ -14,13 +15,6 @@ const STORAGE_OPTIONS = (Object.keys(STORAGE_LABELS) as StorageType[]).map((valu
   label: STORAGE_LABELS[value],
 }));
 
-interface EditFormValues {
-  rawName: string;
-  quantity: number;
-  storage: StorageType;
-  expirationDate: Dayjs;
-}
-
 interface FridgeItemEditModalProps {
   item: FridgeItemResponse;
   onClose: () => void;
@@ -30,18 +24,14 @@ export function FridgeItemEditModal({ item, onClose }: FridgeItemEditModalProps)
   const { message } = App.useApp();
   const [form] = Form.useForm<EditFormValues>();
   const updateMutation = useUpdateFridgeItem();
+  // 바뀐 칸이 없으면 저장 버튼을 막는다. 첫 렌더에서는 값이 아직 없어 막힌 상태로 시작한다.
+  const watchedValues = Form.useWatch((values: Partial<EditFormValues>) => values, form);
+  const hasChanges =
+    Object.keys(buildFridgeItemUpdateRequest(item, watchedValues ?? {})).length > 0;
 
   const handleFinish = (values: EditFormValues) => {
     updateMutation.mutate(
-      {
-        fridgeId: item.id,
-        request: {
-          rawName: values.rawName.trim(),
-          quantity: values.quantity,
-          storage: values.storage,
-          expirationDate: values.expirationDate.format('YYYY-MM-DD'),
-        },
-      },
+      { fridgeId: item.id, request: buildFridgeItemUpdateRequest(item, values) },
       {
         onSuccess: () => {
           void message.success('재료를 수정했습니다.');
@@ -57,6 +47,7 @@ export function FridgeItemEditModal({ item, onClose }: FridgeItemEditModalProps)
       title="재료 수정"
       okText="저장"
       cancelText="취소"
+      okButtonProps={{ disabled: !hasChanges }}
       confirmLoading={updateMutation.isPending}
       onOk={form.submit}
       onCancel={onClose}
