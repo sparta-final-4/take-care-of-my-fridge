@@ -9,6 +9,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -56,6 +57,10 @@ public class Notification extends BaseTimeEntity {
     @Column(name = "is_read", nullable = false)
     private boolean read;
 
+    // 지운 알림도 행을 남겨, 같은 중복 방지 키의 요청이 다시 와도 되살아나지 않게 한다
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+
     @Builder
     private Notification(
         Long memberId,
@@ -77,6 +82,10 @@ public class Notification extends BaseTimeEntity {
     // 알림 읽음 처리 (이미 읽은 경우에도 에러 없이 유지)
     public void markRead() {
         this.read = true;
+    }
+
+    public void delete() {
+        this.deletedAt = LocalDateTime.now();
     }
 
     // 배치·Kafka 경로 생성 시 필수 값(회원 ID, 알림 유형, 내용, 이동 링크, 중복 방지 키) 검증

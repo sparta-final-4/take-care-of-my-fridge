@@ -1,5 +1,6 @@
 package org.example.takecareofmyfridgebe.domain.notification.service;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.notification.dto.NotificationListRequest;
@@ -31,11 +32,23 @@ public class NotificationService {
     }
 
     public UnreadNotificationCountResponse getUnreadCount(Long memberId) {
-        return new UnreadNotificationCountResponse(notificationRepository.countByMemberIdAndReadFalse(memberId));
+        return new UnreadNotificationCountResponse(notificationRepository.countByMemberIdAndReadFalseAndDeletedAtIsNull(memberId));
     }
 
     @Transactional
     public void readAll(Long memberId, ReadAllNotificationsRequest request) {
         notificationRepository.markAllReadUpTo(memberId, request.lastNotificationId());
+    }
+
+    // 없거나 남의 것이거나 이미 지운 알림이면 아무것도 바꾸지 않는다
+    @Transactional
+    public void delete(Long memberId, Long notificationId) {
+        notificationRepository.findByIdAndMemberIdAndDeletedAtIsNull(notificationId, memberId)
+                .ifPresent(Notification::delete);
+    }
+
+    @Transactional
+    public void deleteAll(Long memberId) {
+        notificationRepository.markAllDeleted(memberId, LocalDateTime.now());
     }
 }

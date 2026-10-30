@@ -1,6 +1,8 @@
 package org.example.takecareofmyfridgebe.domain.notification.repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import org.example.takecareofmyfridgebe.domain.notification.entity.Notification;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -13,13 +15,15 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     // beforeId가 없으면 가장 최신부터, 있으면 그보다 오래된 알림부터 읽는다.
     @Query("""
         select n from Notification n
-        where n.memberId = :memberId and (:beforeId is null or n.id < :beforeId)
+        where n.memberId = :memberId and n.deletedAt is null and (:beforeId is null or n.id < :beforeId)
         order by n.id desc
         """)
     List<Notification> findLatestByMemberId(@Param("memberId") Long memberId,
                                             @Param("beforeId") Long beforeId, Pageable pageable);
 
-    long countByMemberIdAndReadFalse(Long memberId);
+    long countByMemberIdAndReadFalseAndDeletedAtIsNull(Long memberId);
+
+    Optional<Notification> findByIdAndMemberIdAndDeletedAtIsNull(Long id, Long memberId);
 
     // lastNotificationId 이하의 안 읽은 알림을 한 번에 읽음으로 바꾼다.
     @Modifying(flushAutomatically = true, clearAutomatically = true)
@@ -29,4 +33,11 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
         """)
     int markAllReadUpTo(@Param("memberId") Long memberId,
                         @Param("lastNotificationId") Long lastNotificationId);
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+        update Notification n set n.deletedAt = :deletedAt
+        where n.memberId = :memberId and n.deletedAt is null
+        """)
+    int markAllDeleted(@Param("memberId") Long memberId, @Param("deletedAt") LocalDateTime deletedAt);
 }
