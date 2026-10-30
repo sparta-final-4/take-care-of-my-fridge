@@ -8,6 +8,8 @@ $breakpoints: (
 
 $content-max-width: 1200px;
 $header-height: 64px;
+// 관리자 헤더 로그아웃 버튼의 닉네임 최대 너비(xl 1200px에서 관리자 메뉴와 한 줄에 들어가는 너비)
+$header-nickname-max-width: 96px;
 
 // YYYY-MM-DD(10자)가 잘리지 않는 너비
 $date-min-width: 10ch;

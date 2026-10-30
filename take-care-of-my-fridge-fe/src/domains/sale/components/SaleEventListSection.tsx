@@ -241,6 +241,8 @@ export function SaleEventListSection() {
       render: (value: string, row: EventRow) => (
         <Link
           to={generatePath(ROUTES.productDetail, { productId: String(row.productId) })}
+          target="_blank"
+          rel="noopener noreferrer"
           title={value}
         >
           {value}

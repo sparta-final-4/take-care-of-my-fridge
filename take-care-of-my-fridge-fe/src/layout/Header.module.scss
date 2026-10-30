@@ -91,8 +91,30 @@
   }
 }
 
+// 관리자 메뉴: 7개라 lg에서는 한 줄에 들어가지 않아 xl부터 펼친다(그보다 좁으면 Drawer)
+.adminNav {
+  display: none;
+  align-items: center;
+  gap: var(--ant-margin-xxs);
+  margin-left: auto;
+
+  @include from(xl) {
+    display: flex;
+  }
+}
+
 .navButton {
   min-height: 44px;
+}
+
+// 관리자 로그아웃 버튼의 닉네임: 길면 말줄임(닉네임은 30자까지)
+.nickname {
+  display: inline-block;
+  max-width: $header-nickname-max-width;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
 }
 
 // 현재 위치 메뉴: 굵게 + 밑줄
@@ -125,4 +147,10 @@
 
 .drawerNavInner {
   width: 100%;
+}
+
+// Drawer 계정 영역의 닉네임: 버튼 글자와 같은 위치에서 시작하도록 버튼 안쪽 여백만큼 띄운다
+.drawerNickname {
+  padding-inline: var(--ant-padding-content-horizontal);
+  font-size: var(--ant-font-size-sm);
 }
