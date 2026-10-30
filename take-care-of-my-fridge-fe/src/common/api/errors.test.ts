@@ -1,7 +1,7 @@
 import { AxiosError, AxiosHeaders } from 'axios';
 import { describe, expect, it } from 'vitest';
 
-import { getErrorCode, getErrorMessage } from './errors';
+import { getErrorCode, getErrorMessage, getImageUploadErrorMessage } from './errors';
 
 function responseError(status: number, data: unknown) {
   const config = { headers: new AxiosHeaders() };
@@ -46,6 +46,34 @@ describe('getErrorMessage', () => {
   it('axios 오류가 아니면 기본 안내를 쓴다', () => {
     expect(getErrorMessage(new Error('boom'))).toBe(
       '요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.',
+    );
+  });
+});
+
+describe('getImageUploadErrorMessage', () => {
+  it('IMAGE_001(503)은 서버 오류 대신 URL 직접 입력을 안내한다', () => {
+    const error = responseError(503, {
+      success: false,
+      data: null,
+      error: { code: 'IMAGE_001', message: '업로드 비활성' },
+    });
+    expect(getImageUploadErrorMessage(error)).toBe(
+      '이 환경에서는 이미지 업로드를 쓸 수 없습니다. 이미지 URL을 직접 입력해 주세요.',
+    );
+  });
+
+  it('그 외 API 오류는 공통 메시지를 쓴다', () => {
+    const error = responseError(400, {
+      success: false,
+      data: null,
+      error: { code: 'IMAGE_002', message: 'JPG, PNG, WEBP 이미지만 올릴 수 있습니다.' },
+    });
+    expect(getImageUploadErrorMessage(error)).toBe('JPG, PNG, WEBP 이미지만 올릴 수 있습니다.');
+  });
+
+  it('S3 PUT 실패(일반 Error)는 업로드 실패를 안내한다', () => {
+    expect(getImageUploadErrorMessage(new Error('image upload failed: 403'))).toBe(
+      '이미지를 올리지 못했습니다. 잠시 후 다시 시도해 주세요.',
     );
   });
 });

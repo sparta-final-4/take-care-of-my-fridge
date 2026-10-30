@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useIsMutating, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   App,
   Button,
@@ -16,7 +16,8 @@ import { useNavigate, useParams } from 'react-router';
 import { ROUTES } from '@/app/paths';
 import type { ProductUpdateRequest } from '@/common/api/clients';
 import { updateProduct } from '@/domains/product/api';
-import { productQueries } from '@/domains/product/queries';
+import { ProductImageUpload } from '@/domains/product/components/ProductImageUpload';
+import { productImageUploadKey, productQueries } from '@/domains/product/queries';
 
 import styles from './AdminProductDetailPage.module.scss';
 
@@ -38,6 +39,7 @@ function AdminProductDetail({ productId }: { productId: number }) {
     mutationFn: (request: ProductUpdateRequest) => updateProduct(productId, request),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: productQueries.all }),
   });
+  const uploadingImage = useIsMutating({ mutationKey: productImageUploadKey }) > 0;
 
   if (isError) {
     return (
@@ -97,17 +99,20 @@ function AdminProductDetail({ productId }: { productId: number }) {
           </Descriptions.Item>
         )}
       </Descriptions>
-      <Typography.Title level={3}>판매 정보 수정</Typography.Title>
+      <Typography.Title level={3}>상품 정보 수정</Typography.Title>
       <Form<ProductUpdateRequest>
-        key={`${detail.price}-${detail.status}`}
+        key={`${detail.price}-${detail.status}-${detail.imageUrl}`}
         layout="vertical"
         initialValues={{
+          imageUrl: detail.imageUrl ?? '',
           price: detail.price,
           status: detail.status === 'STOPPED' ? 'STOPPED' : 'ON_SALE',
         }}
         onFinish={(values) =>
           update.mutate(
             {
+              // 빈 문자열을 보내면 백엔드가 이미지를 비운다.
+              imageUrl: values.imageUrl ?? '',
               price: values.price,
               // 백엔드도 재고로 상태를 맞추지만(#303), 그 전에도 어긋나지 않게 재고로 정해 보낸다.
               status:
@@ -121,6 +126,9 @@ function AdminProductDetail({ productId }: { productId: number }) {
           )
         }
       >
+        <Form.Item name="imageUrl" label="이미지" rules={[{ type: 'url', max: 500 }]}>
+          <ProductImageUpload />
+        </Form.Item>
         <Form.Item
           name="price"
           label="정상가 (원)"
@@ -140,7 +148,12 @@ function AdminProductDetail({ productId }: { productId: number }) {
         >
           <Select options={SALES_OPTIONS} />
         </Form.Item>
-        <Button type="primary" htmlType="submit" loading={update.isPending}>
+        <Button
+          type="primary"
+          htmlType="submit"
+          loading={update.isPending}
+          disabled={uploadingImage}
+        >
           저장
         </Button>
       </Form>
