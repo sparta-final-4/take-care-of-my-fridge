@@ -94,6 +94,7 @@ Q-01~Q-17에 의존하는 테스트는 기대값을 합의한 뒤 구현합니�
 | SALE-11 | P1 | 클릭 수 기반 할인 상품 순위 | 최근 검색 클릭 순, 클릭이 같으면 할인율·상품 ID 순, 클릭 기록이 없으면 0, 품절·번개 드롭 소진 제외, 최대 6개 | `PopularSaleServiceTest` |
 | SALE-12 | P1 | 진행 중 할인 전부 조회 | 시작 시각이 지난 예정 행사는 포함, 시작 전·종료 시각이 지난·종료로 닫은 행사는 빠짐 | `SaleEventItemRepositoryTest` |
 | SALE-13 | P1 | 클릭 수 기반 할인 상품 공개 경로 | 비로그인 200, 다른 할인 경로는 비로그인 401 | `SaleControllerTest` |
+| SALE-14 | P1 | 번개 드롭 등록, 특가 등록, 상태 갱신으로 번개 드롭 시작 | 번개 드롭 등록·시작 때만 이벤트를 내고 `ACTIVE`인 `USER` 회원마다 메시지를 만듦. 관리자·정지 회원, 특가, 시작 전 번개 드롭은 빠짐 | `FlashDropNotificationTransactionTest` |
 
 번개 드롭 동시 주문과 1인 1개는 ORDER-07·08에서 검증합니다.
 
@@ -115,6 +116,16 @@ Q-01~Q-17에 의존하는 테스트는 기대값을 합의한 뒤 구현합니�
 | PAY-12 | P0 | 실패 처리한 결제가 PG에서 결제됨, 보상 취소 실패 | 보상 취소, 실패하면 이력 `PAID`만 남아 5분 뒤 재시도. 다른 경로로 취소됐으면 기록만 | `PaymentFacadeTest`, `PaymentTimeoutSchedulerTest` |
 | PAY-13 | P1 | 만료 스케줄러 실행 | PG 미결제면 `TIMEOUT`, PG 결제됨이면 웹훅과 같은 규칙. 한 건 실패해도 나머지 처리, id 커서로 이어 읽음 | `PaymentFacadeTest`, `PaymentTimeoutSchedulerTest` |
 | PAY-14 | P1 | PG 취소 요청 타임아웃·4xx | 타임아웃은 같은 멱등 키로 3번까지, 4xx는 재시도 없이 `PAYMENT_009`. 이미 취소된 결제의 전액 취소는 성공 | `PortOneClientTest` |
+
+## 알림 필수 시나리오
+
+| ID | 우선순위 | 조건·행동 | 기대 결과 | 대응 테스트 |
+|---|---|---|---|---|
+| NOTI-01 | P0 | 알림 요청 받기, 같은 회원에게 같은 중복 방지 키가 두 번 | 메시지 내용 그대로 안 읽은 알림 하나 저장. 두 번 와도 하나만 남고 DLT로 가지 않음. 회원이 다르면 회원마다 저장 | `NotificationRequestedConsumerTest` |
+| NOTI-02 | P1 | 내 알림 목록, 더 보기 | 최신순 5개와 다음 여부. 마지막 알림 ID 다음부터 겹치지 않게 받음. 다른 회원 알림은 섞이지 않음 | `NotificationServiceTransactionTest` |
+| NOTI-03 | P1 | 안 읽은 알림 수 | 읽은 알림과 다른 회원 알림을 빼고 셈 | `NotificationServiceTransactionTest` |
+| NOTI-04 | P0 | 전부 읽음 | 마지막 알림 ID 이하의 내 알림만 읽음. 그 뒤 도착한 알림과 다른 회원 알림은 안 읽음 그대로 | `NotificationServiceTransactionTest` |
+| NOTI-05 | P1 | 잘못된 기준·마지막 알림 ID, 비로그인 | 400 `C001`, 비로그인은 세 API 모두 401 | `NotificationControllerTest` |
 
 ## 다른 담당과 공동 검증
 

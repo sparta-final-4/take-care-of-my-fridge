@@ -547,6 +547,48 @@ HTTP 메서드·경로·DTO 이름은 구현 전 합의합니다.
 - **웹훅**: `Transaction.Paid`·`Failed`·`Cancelled`·`PartialCancelled`만 처리하고 나머지는 기록만 합니다. 본문 값을 믿지 않고 PG를 다시 조회해 상태를 맞춥니다. 취소·부분 취소 웹훅은 환불 쪽에도 넘깁니다. 같은 `webhook-id`가 다시 오면 처리가 끝난 경우 200만 돌려줍니다.
 - **본인 소유 검증**: 타인의 주문·결제는 403(`ORDER_003`)으로 답하고 PG를 조회하지 않습니다.
 
+## 알림 API
+
+상태: **구현 완료** · 담당: 장준혁 · 근거: 실제 백엔드 컨트롤러 및 서비스 구현
+
+경로는 prefix(/api)를 뺀 값입니다. 회원 번호는 로그인 정보에서만 읽고 요청에는 받지 않습니다.
+
+| 기능 | Method / Path | 권한 | 성공 응답 |
+|---|---|---|---|
+| 내 알림 목록 | GET /notifications | 로그인 | 200 |
+| 안 읽은 알림 수 | GET /notifications/unread-count | 로그인 | 200 |
+| 전부 읽음 | PATCH /notifications/read-all | 로그인 | 200 |
+
+요청 값입니다.
+
+| 기능 | 위치 | 이름 | 설명 |
+|---|---|---|---|
+| 내 알림 목록 | Query | beforeId | 이 ID보다 오래된 알림부터 받습니다. 1 이상, 생략하면 가장 최신부터 |
+| 전부 읽음 | Body | lastNotificationId | 화면이 받은 가장 최신 알림 ID. 1 이상, 필수 |
+
+응답 데이터입니다.
+
+| 기능 | 응답 | 필드 |
+|---|---|---|
+| 내 알림 목록 | NotificationListResponse | notifications(최신순), hasNext |
+| 안 읽은 알림 수 | UnreadNotificationCountResponse | unreadCount |
+| 전부 읽음 | 공통 성공 응답 | 없음 |
+
+오류입니다. 401은 모든 기능에 공통입니다.
+
+| 기능 | HTTP | 코드 | 조건 |
+|---|---|---|---|
+| 내 알림 목록 | 400 | 공통 | beforeId가 1 미만이거나 숫자가 아님 |
+| 전부 읽음 | 400 | 공통 | lastNotificationId가 없거나 1 미만 |
+
+알림 항목(`NotificationResponse`): notificationId, notificationType(`EXPIRATION`·`FLASH_DROP`·`COMMERCE_STOCKED`), content(문구), linkUrl(누르면 이동할 화면 경로), read(읽음 여부), createdAt(만든 시각).
+
+- **목록 크기**: 한 번에 5개입니다. 크기는 요청으로 받지 않습니다.
+- **더 보기**: 화면의 마지막 알림 ID를 beforeId로 보냅니다. 목록을 연 사이 새 알림이 와도 다음 알림이 밀리거나 겹치지 않습니다. `hasNext`가 false면 더 받을 알림이 없습니다.
+- **전부 읽음**: 종 아이콘을 열 때 부릅니다. lastNotificationId 이하의 안 읽은 알림을 한 번에 읽음으로 바꾸고, 그 뒤 도착한 알림은 안 읽음으로 남습니다. 받은 알림이 없으면 부르지 않습니다. 같은 요청을 두 번 보내도 결과가 같습니다.
+- **배지**: 전부 읽음 뒤에는 안 읽은 알림 수를 다시 불러옵니다. 화면 이동·새로고침 때도 다시 불러옵니다.
+- **본인 소유 검증**: 다른 회원의 알림 ID를 보내도 내 알림만 조회·변경되고 오류는 없습니다.
+
 ## 엔드포인트 작성 템플릿
 
 ### <기능명>

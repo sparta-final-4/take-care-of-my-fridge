@@ -260,6 +260,27 @@ erDiagram
 |---|---|---|
 | sale_event_items.product_id | 할인 상품 | 상품 |
 
+## 알림 테이블 관계
+
+알림 테이블 1개입니다. 같은 도메인 안의 관계는 없습니다. 컬럼 정의는 [데이터 사전](data-dictionary.md#notifications--알림)에 있습니다.
+
+```mermaid
+erDiagram
+    notifications {
+        bigint id PK
+        bigint member_id "외부 참조"
+        enum notification_type
+        varchar content
+        varchar link_url
+        varchar dedupe_key
+        boolean is_read
+    }
+```
+
+| 컬럼 | 가리키는 대상 | 소유 도메인 |
+|---|---|---|
+| notifications.member_id | 알림을 받는 회원 | 회원 |
+
 ## 결제 테이블 관계
 
 결제 테이블 3개입니다. 컬럼 정의는 [데이터 사전](data-dictionary.md#payments--결제)에 있습니다.
