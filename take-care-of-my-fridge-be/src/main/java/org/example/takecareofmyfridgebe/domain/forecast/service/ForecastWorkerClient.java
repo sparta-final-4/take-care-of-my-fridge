@@ -4,6 +4,7 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.client.BufferingClientHttpRequestFactory;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -17,7 +18,9 @@ public class ForecastWorkerClient {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(Duration.ofSeconds(5));
         factory.setReadTimeout(Duration.ofMinutes(5));
-        this.client = RestClient.builder().baseUrl(workerUrl).requestFactory(factory).build();
+        // 워커는 Content-Length로 본문 크기를 확인하므로, 본문을 모아 길이를 붙여 보낸다(기본은 길이 없는 chunked 전송).
+        this.client = RestClient.builder().baseUrl(workerUrl)
+                .requestFactory(new BufferingClientHttpRequestFactory(factory)).build();
     }
 
     public Result predict(LocalDate weekStart, List<Sample> samples, List<ProductHistory> products) {

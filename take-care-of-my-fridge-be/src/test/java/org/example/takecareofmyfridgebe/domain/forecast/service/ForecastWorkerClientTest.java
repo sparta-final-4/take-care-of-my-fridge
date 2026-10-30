@@ -18,7 +18,9 @@ class ForecastWorkerClientTest {
     void sendsDateAndHistoryAsJsonAndReadsPredictions() throws IOException {
         HttpServer server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
         AtomicReference<String> received = new AtomicReference<>();
+        AtomicReference<String> contentLength = new AtomicReference<>();
         server.createContext("/predict", exchange -> {
+            contentLength.set(exchange.getRequestHeaders().getFirst("Content-Length"));
             received.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
             byte[] response = "{\"modelVersion\":\"weekly-mlp-v1\",\"predictions\":[{\"productId\":1,\"quantity\":9}] }"
                     .getBytes(StandardCharsets.UTF_8);
@@ -35,6 +37,8 @@ class ForecastWorkerClientTest {
                     List.of(new ForecastWorkerClient.Sample(List.of(1L, 2L), 3)),
                     List.of(new ForecastWorkerClient.ProductHistory(1L, List.of(4L, 5L))));
 
+            // 워커는 Content-Length가 없으면 본문 크기 오류로 거절한다
+            assertThat(contentLength.get()).isEqualTo(String.valueOf(received.get().getBytes(StandardCharsets.UTF_8).length));
             assertThat(received.get()).contains("\"weekStart\":\"2026-10-26\"");
             assertThat(received.get()).contains("\"productId\":1");
             assertThat(result.modelVersion()).isEqualTo("weekly-mlp-v1");
