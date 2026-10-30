@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import jakarta.persistence.EntityManager;
 import java.time.LocalDateTime;
+import java.util.List;
+import org.example.takecareofmyfridgebe.domain.order.dto.SaleEventItemQuantity;
 import org.example.takecareofmyfridgebe.domain.order.entity.Order;
 import org.example.takecareofmyfridgebe.domain.order.entity.OrderItem;
 import org.example.takecareofmyfridgebe.domain.order.entity.OrderStatus;
@@ -36,22 +38,25 @@ class DealSaleHistoryQueriesTest extends MySqlContainerSupport {
         LocalDateTime start = LocalDateTime.of(2026, 9, 1, 0, 0);
         LocalDateTime end = start.plusDays(1);
         SaleEventItem special = eventItem(SaleEventType.SPECIAL, 1L, start, end);
+        SaleEventItem other = eventItem(SaleEventType.SPECIAL, 3L, start, end);
         eventItem(SaleEventType.FLASH_DROP, 2L, start, end);
         orderItem(special, "20260901-000001", start.plusHours(2), end.plusDays(1), 2);
         orderItem(special, "20260901-000002", start.plusHours(3), null, 3);
+        orderItem(other, "20260901-000003", start.plusHours(4), end.plusDays(1), 4);
         entityManager.flush();
         entityManager.clear();
 
         assertThat(saleEventItemRepository.findFinishedForTraining(SaleEventType.SPECIAL, end.minusSeconds(1)))
                 .isEmpty();
         assertThat(saleEventItemRepository.findFinishedForTraining(SaleEventType.SPECIAL, end))
-                .extracting(SaleEventItem::getProductId).containsExactly(1L);
-        assertThat(orderItemRepository.sumConfirmedSaleQuantity(
-                special.getId(), OrderStatus.CONFIRMED, end.plusDays(2))).isEqualTo(2);
-        assertThat(orderItemRepository.sumConfirmedSaleQuantity(
-                special.getId(), OrderStatus.CONFIRMED, end)).isZero();
-        assertThat(orderItemRepository.countUnconfirmedPaidSaleOrders(
-                special.getId(), OrderStatus.PAID, end.plusDays(2))).isEqualTo(1);
+                .extracting(SaleEventItem::getProductId).containsExactly(1L, 3L);
+        List<Long> ids = List.of(special.getId(), other.getId());
+        assertThat(orderItemRepository.sumConfirmedSaleQuantities(ids, OrderStatus.CONFIRMED, end.plusDays(2)))
+                .containsExactlyInAnyOrder(new SaleEventItemQuantity(special.getId(), 2),
+                        new SaleEventItemQuantity(other.getId(), 4));
+        assertThat(orderItemRepository.sumConfirmedSaleQuantities(ids, OrderStatus.CONFIRMED, end)).isEmpty();
+        assertThat(orderItemRepository.findSaleEventItemIdsWithUnconfirmedPaidOrders(
+                ids, OrderStatus.PAID, end.plusDays(2))).containsExactly(special.getId());
     }
 
     private SaleEventItem eventItem(SaleEventType type, Long productId,
