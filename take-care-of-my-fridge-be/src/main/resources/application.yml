@@ -56,6 +56,11 @@ app:
   auth:
     jwt-secret: WavSy2onX+rGXL9EhdkwDNgkscczEziOL09OsXSj7jEy0XurFwGtpB36WShSTM3t
     cookie-secure: ${AUTH_COOKIE_SECURE:true}
+  # 상품 이미지 업로드(S3 Presigned PUT). bucket 이 비어 있으면(로컬) 업로드 API 가 IMAGE_001 을 돌려준다.
+  image:
+    bucket: ${IMAGE_BUCKET:}
+    key-prefix: ${IMAGE_KEY_PREFIX:local}
+    public-base-url: ${IMAGE_PUBLIC_BASE_URL:}
   chat:
     daily-limit: 30
     session-timeout: 30m

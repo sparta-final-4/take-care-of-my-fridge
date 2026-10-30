@@ -36,6 +36,11 @@ app:
     # application.yml 값과 무관하게 반드시 Parameter Store 값을 쓴다(없으면 기동 실패).
     jwt-secret: ${JWT_SECRET}
     cookie-secure: true
+  # imhungry-infra 가 /imhungry/<APP_ENV>/IMAGE_* 로 넣는다(없으면 기동 실패).
+  image:
+    bucket: ${IMAGE_BUCKET}
+    key-prefix: ${IMAGE_KEY_PREFIX}
+    public-base-url: ${IMAGE_PUBLIC_BASE_URL}
     
 portone:
   api-secret: ${PORTONE_API_SECRET}
