@@ -6,7 +6,8 @@ import { Link, useNavigate } from 'react-router';
 
 import { ROUTES } from '@/app/paths';
 import { getErrorCode, getErrorMessage } from '@/common/api/errors';
-import { signUp, type SignUpRequest } from '@/domains/member/api';
+import type { SignUpRequest } from '@/common/api/clients';
+import { signUp } from '@/domains/member/api';
 import { TASTE_OPTIONS } from '@/domains/member/labels';
 import { memberQueries } from '@/domains/member/queries';
 

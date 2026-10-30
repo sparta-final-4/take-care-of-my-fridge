@@ -1,24 +1,14 @@
-import { axiosInstance } from '@/common/api/axiosInstance';
-import type { ApiResponse } from '@/common/api/types';
-import type { MyInfoResponse } from '@/domains/member/api';
+import { authApi, type LoginRequest, type MyInfoResponse } from '@/common/api/clients';
+import { unwrap } from '@/common/api/unwrap';
 
-export interface LoginRequest {
-  email: string;
-  password: string;
+export async function login(request: LoginRequest): Promise<MyInfoResponse> {
+  return unwrap(authApi.login({ loginRequest: request }));
 }
 
-export async function login(request: LoginRequest) {
-  const { data } = await axiosInstance.post<ApiResponse<MyInfoResponse>>(
-    '/api/auth/login',
-    request,
-  );
-  return data.data;
+export async function refresh(): Promise<void> {
+  await unwrap(authApi.refresh());
 }
 
-export async function refresh() {
-  await axiosInstance.post('/api/auth/refresh');
-}
-
-export async function logout() {
-  await axiosInstance.post('/api/auth/logout');
+export async function logout(): Promise<void> {
+  await unwrap(authApi.logout());
 }

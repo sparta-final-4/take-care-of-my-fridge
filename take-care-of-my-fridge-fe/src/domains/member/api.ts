@@ -1,81 +1,43 @@
-import { axiosInstance } from '@/common/api/axiosInstance';
-import type { ApiResponse } from '@/common/api/types';
+import {
+  memberApi,
+  type ChangePasswordRequest,
+  type ChangeTastesRequest,
+  type MyInfoResponse,
+  type SignUpRequest,
+  type SignUpResponse,
+} from '@/common/api/clients';
+import { unwrap } from '@/common/api/unwrap';
 
-// MyInfoResponse.java와 필드·enum을 맞춘다.
-export interface MyInfoResponse {
-  memberId: number;
-  email: string;
-  nickname: string;
-  // 휴대폰 번호 없이 가입한 예전 회원은 null
-  phone: string | null;
-  role: 'USER' | 'ADMIN';
-  status: 'ACTIVE' | 'SUSPENDED';
-  tastes: Array<'SALTY' | 'SWEET' | 'SPICY' | 'UMAMI' | 'MILD'>;
-  createdAt: string;
-}
-
-export async function getMyInfo(signal?: AbortSignal) {
-  const { data } = await axiosInstance.get<ApiResponse<MyInfoResponse>>('/api/members/me', {
-    signal,
-  });
-  return data.data;
-}
-
-export interface SignUpRequest {
-  email: string;
-  password: string;
-  nickname: string;
-  phone: string;
-  tastes: MyInfoResponse['tastes'];
-}
-
-export interface SignUpResponse {
-  memberId: number;
-}
-
-// EmailAvailabilityResponse.java, NicknameAvailabilityResponse.java
-export interface EmailAvailabilityResponse {
-  available: boolean;
-}
-
-export interface NicknameAvailabilityResponse {
-  available: boolean;
+export async function getMyInfo(signal?: AbortSignal): Promise<MyInfoResponse> {
+  return unwrap(memberApi.getMyInfo({ signal }));
 }
 
 export async function checkEmailAvailability(email: string, signal?: AbortSignal) {
-  const { data } = await axiosInstance.get<ApiResponse<EmailAvailabilityResponse>>(
-    '/api/members/email-availability',
-    { params: { email }, signal },
+  const { available } = await unwrap(
+    memberApi.checkEmailAvailability({ request: { email } }, { signal }),
   );
-  return data.data.available;
+  return available ?? false;
 }
 
 export async function checkNicknameAvailability(nickname: string, signal?: AbortSignal) {
-  const { data } = await axiosInstance.get<ApiResponse<NicknameAvailabilityResponse>>(
-    '/api/members/nickname-availability',
-    { params: { nickname }, signal },
+  const { available } = await unwrap(
+    memberApi.checkNicknameAvailability({ request: { nickname } }, { signal }),
   );
-  return data.data.available;
+  return available ?? false;
 }
 
-export async function signUp(request: SignUpRequest) {
-  const { data } = await axiosInstance.post<ApiResponse<SignUpResponse>>('/api/members', request);
-  return data.data;
+export async function signUp(request: SignUpRequest): Promise<SignUpResponse> {
+  return unwrap(memberApi.signUp({ signUpRequest: request }));
 }
 
-export async function changeNickname(nickname: string) {
-  await axiosInstance.patch('/api/members/me/nickname', { nickname });
+export async function changeNickname(nickname: string): Promise<void> {
+  await unwrap(memberApi.changeNickname({ changeNicknameRequest: { nickname } }));
 }
 
-export async function changeTastes(tastes: MyInfoResponse['tastes']) {
-  await axiosInstance.put('/api/members/me/tastes', { tastes });
+export async function changeTastes(tastes: ChangeTastesRequest['tastes']): Promise<void> {
+  await unwrap(memberApi.changeTastes({ changeTastesRequest: { tastes } }));
 }
 
-export interface ChangePasswordRequest {
-  currentPassword: string;
-  newPassword: string;
-}
-
-export async function changePassword(request: ChangePasswordRequest) {
-  await axiosInstance.patch('/api/members/me/password', request);
+export async function changePassword(request: ChangePasswordRequest): Promise<void> {
+  await unwrap(memberApi.changePassword({ changePasswordRequest: request }));
 }
