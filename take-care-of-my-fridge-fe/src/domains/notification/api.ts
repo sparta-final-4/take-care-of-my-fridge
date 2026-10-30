@@ -23,3 +23,13 @@ export async function getUnreadNotificationCount(
 export async function readAllNotifications(lastNotificationId: number) {
   return unwrap(notificationApi.readAll({ readAllNotificationsRequest: { lastNotificationId } }));
 }
+
+// 없거나 이미 지운 알림이어도 성공으로 끝난다.
+export async function deleteNotification(notificationId: number) {
+  return unwrap(notificationApi.deleteNotification({ notificationId }));
+}
+
+// 화면에 보이지 않은, 목록을 받은 뒤 도착한 알림까지 내 알림을 전부 지운다.
+export async function deleteAllNotifications() {
+  return unwrap(notificationApi.deleteAll());
+}

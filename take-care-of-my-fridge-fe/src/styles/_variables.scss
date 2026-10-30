@@ -105,8 +105,9 @@ $settlement-chart-height: 240px;
 $settlement-chart-height-md: 320px;
 
 // 헤더 알림 목록 너비(md 이상). 그보다 좁으면 화면 폭을 채운다.
-$notification-popover-width: 360px;
-// 더 보기로 알림이 쌓여도 목록 안에서만 스크롤
-$notification-list-max-height: 60vh;
+$notification-popover-width: 320px;
+// 더 보기로 알림이 쌓여도 목록 안에서만 스크롤. 좁은 화면은 알림 창이 화면을 다 덮지 않게 낮춘다
+$notification-list-max-height: 40vh;
+$notification-list-max-height-md: 60vh;
 // 새 알림 점 칸. 읽은 알림도 문구가 같은 위치에서 시작하도록 고정
 $notification-dot-width: 8px;

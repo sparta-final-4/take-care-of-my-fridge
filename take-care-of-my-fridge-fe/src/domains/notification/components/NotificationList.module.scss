@@ -16,10 +16,21 @@
   padding: 0;
   overflow-y: auto;
   list-style: none;
+
+  @include from(md) {
+    max-height: $notification-list-max-height-md;
+  }
+}
+
+.row {
+  display: flex;
+  align-items: center;
 }
 
 .item {
   display: flex;
+  flex: 1;
+  min-width: 0;
   gap: var(--ant-margin-xs);
   align-items: baseline;
   min-height: $touch-target-size;
@@ -32,6 +43,12 @@
   }
 }
 
+.delete {
+  flex: none;
+  width: $touch-target-size;
+  height: $touch-target-size;
+}
+
 .dot {
   flex: none;
   width: $notification-dot-width;
@@ -42,6 +59,9 @@
   flex-direction: column;
   gap: var(--ant-margin-xxs);
   min-width: 0;
+  // 한글도 띄어쓰기 자리에서만 줄을 바꿔 "20개 한정"이 갈라지지 않게 한다. 띄어쓰기 없이 긴 문구만 칸 안에서 자른다
+  overflow-wrap: break-word;
+  word-break: keep-all;
 }
 
 .time {

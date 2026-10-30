@@ -9,6 +9,7 @@ import { useAuthStore } from '@/common/auth/authStore';
 
 import { notificationQueries } from '../queries';
 import { NotificationList } from './NotificationList';
+import { NotificationTitle } from './NotificationTitle';
 
 export function NotificationBell() {
   const navigate = useNavigate();
@@ -54,7 +55,7 @@ export function NotificationBell() {
       placement="bottomRight"
       // 좁은 화면에서는 종 오른쪽의 메뉴 버튼 때문에 목록이 화면 왼쪽으로 넘친다. 화면 안으로 밀어 넣는다.
       align={{ overflow: { adjustY: true, shiftX: true } }}
-      title="알림"
+      title={<NotificationTitle />}
       content={<NotificationList onNavigate={() => setOpen(false)} />}
       destroyOnHidden
     >
