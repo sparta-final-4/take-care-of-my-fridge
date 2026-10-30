@@ -2,6 +2,7 @@ package org.example.takecareofmyfridgebe.domain.notification.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.IntStream;
 import org.example.takecareofmyfridgebe.domain.notification.dto.NotificationListRequest;
@@ -116,6 +117,42 @@ class NotificationServiceTransactionTest extends MySqlContainerSupport {
         assertThat(isRead(others)).isFalse();
     }
 
+    @Test
+    @DisplayName("알림을 지우면 행은 남고 지운 시각이 채워지며, 목록과 안 읽은 수에서 빠진다")
+    void delete_hidesFromListAndUnreadCount() {
+        List<Notification> mine = saveNotifications(MEMBER, 2);
+
+        notificationService.delete(MEMBER, mine.get(0).getId());
+
+        assertThat(deletedAtOf(mine.get(0))).isNotNull();
+        assertThat(deletedAtOf(mine.get(1))).isNull();
+        assertThat(idsOf(notificationService.getMyNotifications(MEMBER, new NotificationListRequest(null))))
+                .containsExactly(mine.get(1).getId());
+        assertThat(notificationService.getUnreadCount(MEMBER).unreadCount()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("다른 회원의 알림 ID로 지우면 그 알림은 그대로다")
+    void delete_ignoresOthersNotification() {
+        Notification others = saveNotifications(OTHER_MEMBER, 1).get(0);
+
+        notificationService.delete(MEMBER, others.getId());
+
+        assertThat(deletedAtOf(others)).isNull();
+    }
+
+    @Test
+    @DisplayName("모두 지우기는 내 알림만 전부 지우고 다른 회원 알림은 그대로 둔다")
+    void deleteAll_deletesOnlyMine() {
+        List<Notification> mine = saveNotifications(MEMBER, 3);
+        Notification others = saveNotifications(OTHER_MEMBER, 1).get(0);
+
+        notificationService.deleteAll(MEMBER);
+
+        assertThat(mine).allSatisfy(notification -> assertThat(deletedAtOf(notification)).isNotNull());
+        assertThat(deletedAtOf(others)).isNull();
+    }
+
     private List<Notification> saveNotifications(Long memberId, int count) {
         return IntStream.range(0, count)
                 .mapToObj(i -> notificationRepository.save(Notification.builder()
@@ -132,6 +169,10 @@ class NotificationServiceTransactionTest extends MySqlContainerSupport {
         return response.notifications().stream()
                 .map(NotificationResponse::notificationId)
                 .toList();
+    }
+
+    private LocalDateTime deletedAtOf(Notification notification) {
+        return notificationRepository.findById(notification.getId()).orElseThrow().getDeletedAt();
     }
 
     private boolean isRead(Notification notification) {

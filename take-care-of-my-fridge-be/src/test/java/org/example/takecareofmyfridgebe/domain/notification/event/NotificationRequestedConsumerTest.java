@@ -98,6 +98,24 @@ class NotificationRequestedConsumerTest extends MySqlContainerSupport {
         assertThat(waitForNotifications(9004L, 1)).hasSize(1);
     }
 
+    @Test
+    @DisplayName("지운 알림과 같은 중복 방지 키가 다시 와도 알림이 늘지 않고 지운 상태로 남는다")
+    void consume_afterDelete_staysDeleted() throws InterruptedException {
+        NotificationRequestedMessage message = message(9005L, "flash-drop:42:open");
+        send(message);
+        Notification deleted = waitForNotifications(9005L, 1).get(0);
+        deleted.delete();
+        notificationRepository.save(deleted);
+
+        send(message);
+        // 파티션이 하나라 뒤에 보낸 메시지가 저장되면 다시 보낸 메시지는 처리가 끝난 것이다
+        send(message(9005L, "flash-drop:42:announce"));
+
+        List<Notification> saved = waitForNotifications(9005L, 2);
+        assertThat(saved).hasSize(2);
+        assertThat(notificationRepository.findById(deleted.getId()).orElseThrow().getDeletedAt()).isNotNull();
+    }
+
     private NotificationRequestedMessage message(Long memberId, String dedupeKey) {
         return new NotificationRequestedMessage(
                 memberId, NotificationType.FLASH_DROP, "번개 드롭이 시작됐습니다", "/products/1", dedupeKey);

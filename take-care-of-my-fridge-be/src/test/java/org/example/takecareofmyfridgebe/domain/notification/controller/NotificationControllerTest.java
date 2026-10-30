@@ -5,6 +5,7 @@ import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -101,7 +102,7 @@ class NotificationControllerTest {
     }
 
     @Test
-    @DisplayName("로그인하지 않으면 세 API 모두 401이다")
+    @DisplayName("로그인하지 않으면 다섯 API 모두 401이다")
     void rejectsAnonymous() throws Exception {
         mvc.perform(get("/api/notifications"))
                 .andExpect(status().isUnauthorized());
@@ -111,6 +112,10 @@ class NotificationControllerTest {
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"lastNotificationId\":1}"))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(delete("/api/notifications/1").with(csrf()))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(delete("/api/notifications").with(csrf()))
                 .andExpect(status().isUnauthorized());
 
         verifyNoInteractions(notificationService);
