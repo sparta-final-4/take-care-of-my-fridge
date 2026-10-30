@@ -1,6 +1,10 @@
 import { useSearchParams } from 'react-router';
 
-import type { ProductListRequest, ProductListRequestSortEnum } from '@/common/api/clients';
+import type {
+  ProductListRequest,
+  ProductListRequestSortEnum,
+  ProductListRequestTypeEnum,
+} from '@/common/api/clients';
 import { PRICE_RANGES, type PriceRangeKey } from '@/domains/product/format';
 
 export const PRODUCT_SORT_OPTIONS: Array<{ value: ProductListRequestSortEnum; label: string }> = [
@@ -9,11 +13,14 @@ export const PRODUCT_SORT_OPTIONS: Array<{ value: ProductListRequestSortEnum; la
   { value: 'PRICE_DESC', label: '높은 가격순' },
 ];
 
-// 검색어·가격대·정렬·페이지는 URL 쿼리에 두어 새로고침·뒤로 가기에도 유지한다.
+// 검색어·종류·가격대·정렬·페이지는 URL 쿼리에 두어 새로고침·뒤로 가기에도 유지한다.
 // 기본값은 URL에서 지워 주소를 짧게 둔다.
 export function useProductFilters() {
   const [searchParams, setSearchParams] = useSearchParams();
   const keyword = searchParams.get('q')?.trim() ?? '';
+  const typeParam = searchParams.get('type');
+  const type: ProductListRequestTypeEnum | undefined =
+    typeParam === 'INGREDIENT' || typeParam === 'MEALKIT' ? typeParam : undefined;
   const priceRange = PRICE_RANGES.find((range) => range.key === searchParams.get('price'));
   const sort =
     PRODUCT_SORT_OPTIONS.find((option) => option.value === searchParams.get('sort'))?.value ??
@@ -32,6 +39,8 @@ export function useProductFilters() {
 
   // 조건이 바뀌면 결과가 달라지므로 첫 페이지로 돌아간다.
   const setKeyword = (value: string) => update({ q: value.trim() || undefined, page: undefined });
+  const setType = (value: ProductListRequestTypeEnum | undefined) =>
+    update({ type: value, page: undefined });
   const setPriceRange = (key: PriceRangeKey | undefined) => update({ price: key, page: undefined });
   const setSort = (value: ProductListRequestSortEnum) =>
     update({ sort: value === 'LATEST' ? undefined : value, page: undefined });
@@ -42,18 +51,21 @@ export function useProductFilters() {
     sort,
     page,
     keyword: keyword || undefined,
+    type,
     minPrice: priceRange && 'minPrice' in priceRange ? priceRange.minPrice : undefined,
     maxPrice: priceRange && 'maxPrice' in priceRange ? priceRange.maxPrice : undefined,
   };
 
   return {
     keyword,
+    type,
     priceRangeKey: priceRange?.key,
     sort,
     page,
     request,
-    filtered: Boolean(keyword || priceRange),
+    filtered: Boolean(keyword || type || priceRange),
     setKeyword,
+    setType,
     setPriceRange,
     setSort,
     setPage,

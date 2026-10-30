@@ -1,13 +1,15 @@
 import { Flex, Input, Tag, Typography } from 'antd';
 
 import { SectionCard } from '@/common/components/SectionCard';
-import { PRICE_RANGES } from '@/domains/product/format';
+import { PRICE_RANGES, PRODUCT_TYPE_LABELS } from '@/domains/product/format';
 import { useProductFilters } from '@/domains/product/hooks/useProductFilters';
 
 import styles from './ProductSearchSection.module.scss';
 
+const PRODUCT_TYPES = ['INGREDIENT', 'MEALKIT'] as const;
+
 export function ProductSearchSection() {
-  const { keyword, priceRangeKey, setKeyword, setPriceRange } = useProductFilters();
+  const { keyword, type, priceRangeKey, setKeyword, setType, setPriceRange } = useProductFilters();
 
   return (
     <SectionCard title="어떤 재료가 필요하세요?" bracket={false}>
@@ -24,6 +26,21 @@ export function ProductSearchSection() {
           maxLength={50}
           onSearch={setKeyword}
         />
+        <Flex align="center" gap="small" wrap>
+          <Typography.Text type="secondary" className={styles.label}>
+            종류
+          </Typography.Text>
+          {PRODUCT_TYPES.map((value) => (
+            <Tag.CheckableTag
+              key={value}
+              checked={type === value}
+              onChange={(checked) => setType(checked ? value : undefined)}
+              className={styles.chip}
+            >
+              {PRODUCT_TYPE_LABELS[value]}
+            </Tag.CheckableTag>
+          ))}
+        </Flex>
         <Flex align="center" gap="small" wrap>
           <Typography.Text type="secondary" className={styles.label}>
             가격대
