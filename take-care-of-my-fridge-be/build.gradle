@@ -63,6 +63,8 @@ dependencies {
     // AWS Parameter Store
     implementation platform('io.awspring.cloud:spring-cloud-aws-dependencies:4.1.1')
     implementation 'io.awspring.cloud:spring-cloud-aws-starter-parameter-store'
+    // 상품 이미지 Presigned PUT URL (같은 BOM)
+    implementation 'io.awspring.cloud:spring-cloud-aws-starter-s3'
 
     // PortOne (웹훅 서명 검증)
     implementation 'io.portone:server-sdk:0.24.0'
