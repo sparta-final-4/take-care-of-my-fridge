@@ -37,11 +37,13 @@ public class OrderConfirmService {
         if (refundQueryService.hasRequestedRefund(order.getId())) {
             throw new BusinessException(ErrorCode.ORDER_REFUND_IN_PROGRESS);
         }
+        if (refundQueryService.isFullyRefunded(order)) {
+            throw new BusinessException(ErrorCode.ORDER_FULLY_REFUNDED);
+        }
         order.confirm(LocalDateTime.now());
         List<OrderItem> items = orderReader.getOrderItems(order);
         confirmQuantities(items);
-        // 이미 확정된 주문은 위에서 돌려보내므로 처음 확정한 요청만 여기서 발행한다. 실제 발행은 커밋 뒤에 한다.
-        // 상품이 모두 환불된 주문도 확정마다 한 번 발행하며, 이때 실린 상품 목록은 비어 있다
+        // 이미 확정된 주문은 위에서 돌려보내므로 처음 확정한 요청만 여기서 발행한다. 실제 발행은 커밋 뒤에 한다
         eventPublisher.publishEvent(OrderConfirmedEvent.of(order, items));
         return OrderConfirmResponse.from(order);
     }

@@ -300,6 +300,36 @@ class RefundQueryServiceTest extends MySqlContainerSupport {
                 .containsExactly(order.getId());
     }
 
+    @Test
+    @DisplayName("전부 환불: 모든 주문 상품을 완료된 환불이 주문 수량만큼 채웠을 때만 true다")
+    void fullyRefunded_onlyWhenEveryItemCompleted() {
+        Order normal = order("20261023-000004");
+        OrderItem first = orderItem(normal, 10L, 2, 3000, SaleType.NONE);
+        OrderItem second = orderItem(normal, 20L, 1, 2000, SaleType.NONE);
+        Payment normalPayment = pay(normal);
+        refund(normalPayment, first, 2).complete("cancellation-1", LocalDateTime.now());
+        Refund requested = refund(normalPayment, second, 1);
+        flushAndClear();
+
+        // 요청 상태 환불은 아직 환불된 것이 아니다
+        assertThat(refundQueryService.isFullyRefunded(normal)).isFalse();
+
+        entityManager.find(Refund.class, requested.getId()).complete("cancellation-2", LocalDateTime.now());
+        flushAndClear();
+
+        assertThat(refundQueryService.isFullyRefunded(normal)).isTrue();
+    }
+
+    @Test
+    @DisplayName("전부 환불: 환불할 수 없는 특가·번개 드롭 상품이 있으면 나머지를 모두 환불해도 false다")
+    void fullyRefunded_falseWithSaleItems() {
+        refund(itemA, 5).complete("cancellation-1", LocalDateTime.now());
+        refund(itemB, 3).complete("cancellation-2", LocalDateTime.now());
+        flushAndClear();
+
+        assertThat(refundQueryService.isFullyRefunded(order)).isFalse();
+    }
+
     private void complete(Refund target) {
         target.complete("cancellation-" + target.getId(), LocalDateTime.now());
     }

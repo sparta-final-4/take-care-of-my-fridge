@@ -10,6 +10,7 @@ import org.example.takecareofmyfridgebe.domain.payment.entity.FailReason;
 import org.example.takecareofmyfridgebe.domain.payment.entity.Payment;
 import org.example.takecareofmyfridgebe.domain.payment.entity.PaymentChangedBy;
 import org.example.takecareofmyfridgebe.domain.payment.entity.PaymentStatus;
+import org.example.takecareofmyfridgebe.domain.payment.event.PaymentCompletedEvent;
 import org.example.takecareofmyfridgebe.domain.payment.repository.PaymentRepository;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
@@ -20,6 +21,7 @@ import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
@@ -53,6 +55,9 @@ class PaymentCommandServiceTest {
 
     @Mock
     private PaymentHistoryRecorder paymentHistoryRecorder;
+
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
 
     @InjectMocks
     private PaymentCommandService paymentCommandService;
@@ -92,6 +97,7 @@ class PaymentCommandServiceTest {
         assertThat(payment.getOrder().getStatus()).isEqualTo(OrderStatus.PAID);
         assertThat(payment.getOrder().getPaidAt()).isEqualTo(payment.getPaidAt());
         assertThat(result.response().status()).isEqualTo(PaymentStatus.PAID);
+        verify(eventPublisher).publishEvent(new PaymentCompletedEvent(ORDER_ID, 1L));
     }
 
     @Test

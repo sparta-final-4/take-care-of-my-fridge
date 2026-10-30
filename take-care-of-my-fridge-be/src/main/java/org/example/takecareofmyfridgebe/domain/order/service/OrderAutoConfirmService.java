@@ -35,6 +35,9 @@ public class OrderAutoConfirmService {
                 } catch (BusinessException e) {
                     if (e.getErrorCode() == ErrorCode.ORDER_REFUND_IN_PROGRESS) {
                         log.info("환불 요청 중인 주문 자동 확정 보류: orderId={}", order.getId());
+                    } else if (e.getErrorCode() == ErrorCode.ORDER_FULLY_REFUNDED) {
+                        // 결제 완료로 남아 다음 실행에서도 다시 조회되지만 확정하지 않는다
+                        log.info("전부 환불된 주문 자동 확정 제외: orderId={}", order.getId());
                     } else {
                         log.error("주문 자동 확정 실패, 다음 실행에서 재시도: orderId={}", order.getId(), e);
                     }

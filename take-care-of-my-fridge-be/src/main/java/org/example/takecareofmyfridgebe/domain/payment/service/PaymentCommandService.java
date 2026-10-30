@@ -13,9 +13,11 @@ import org.example.takecareofmyfridgebe.domain.payment.entity.FailReason;
 import org.example.takecareofmyfridgebe.domain.payment.entity.Payment;
 import org.example.takecareofmyfridgebe.domain.payment.entity.PaymentChangedBy;
 import org.example.takecareofmyfridgebe.domain.payment.entity.PaymentStatus;
+import org.example.takecareofmyfridgebe.domain.payment.event.PaymentCompletedEvent;
 import org.example.takecareofmyfridgebe.domain.payment.repository.PaymentRepository;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,6 +40,7 @@ public class PaymentCommandService {
     private final OrderRepository orderRepository;
     private final EntityManager entityManager;
     private final PaymentHistoryRecorder paymentHistoryRecorder;
+    private final ApplicationEventPublisher eventPublisher;
 
     // 주문에 새 결제를 만든다. 금액은 클라이언트 값이 아닌 주문 금액을 사용한다.
     // 한 주문의 결제 대기 건은 최대 한 건이다. 호출 전에 이전 결제 대기 건을 정리하므로, 여기서 남아 있으면
@@ -89,6 +92,9 @@ public class PaymentCommandService {
         payment.complete(paidAt);
         payment.getOrder().markPaid(paidAt);
         paymentHistoryRecorder.recordPaid(payment, changedBy);
+        // 이미 결제 완료된 결제는 위에서 돌려보내므로 처음 승인한 요청만 발행한다. 장바구니 삭제는 커밋 뒤에 한다
+        Order order = payment.getOrder();
+        eventPublisher.publishEvent(new PaymentCompletedEvent(order.getId(), order.getMemberId()));
         return PaymentApproveResult.approved(PaymentConfirmResponse.from(payment));
     }
 

@@ -162,6 +162,26 @@ class OrderConfirmServiceTransactionTest extends MySqlContainerSupport {
     }
 
     @Test
+    @DisplayName("모든 상품이 완료된 환불로 전부 환불된 주문은 거절하고 주문과 확정 수량은 그대로이며 이벤트도 보내지 않는다")
+    void confirm_fullyRefunded_rejects() {
+        Order order = saveOrder(1L, OrderStatus.PAID);
+        OrderItem first = saveItem(order, 2, SaleType.NONE);
+        OrderItem second = saveItem(order, 1, SaleType.NONE);
+        Payment payment = savePayment(order);
+        saveRefund(payment, first, 2, RefundStatus.COMPLETED);
+        saveRefund(payment, second, 1, RefundStatus.COMPLETED);
+
+        assertThatThrownBy(() -> orderConfirmService.confirm(1L, order.getId()))
+            .isInstanceOf(BusinessException.class)
+            .extracting("errorCode").isEqualTo(ErrorCode.ORDER_FULLY_REFUNDED);
+        Order unchanged = reload(order);
+        assertThat(unchanged.getStatus()).isEqualTo(OrderStatus.PAID);
+        assertThat(unchanged.getConfirmedAt()).isNull();
+        assertThat(reload(first).getConfirmedQuantity()).isNull();
+        assertThat(committedEvents.events).isEmpty();
+    }
+
+    @Test
     @DisplayName("이미 구매 확정된 주문을 다시 확정하면 같은 응답을 주고 확정 시각은 그대로다")
     void confirm_confirmedOrder_returnsSameAndKeepsConfirmedAt() {
         Order order = saveOrder(1L, OrderStatus.PAID);

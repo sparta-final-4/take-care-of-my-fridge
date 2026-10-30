@@ -42,6 +42,21 @@ class OrderAutoConfirmServiceTest {
     }
 
     @Test
+    void skipsFullyRefundedAndContinuesWithNextOrder() {
+        Order first = order(1L, 10L);
+        Order second = order(2L, 20L);
+        when(orderRepository.findPaidBefore(eq(OrderStatus.PAID), eq(cutoff), eq(0L), any(Pageable.class)))
+                .thenReturn(List.of(first, second));
+        doThrow(new BusinessException(ErrorCode.ORDER_FULLY_REFUNDED))
+                .when(confirmService).confirm(10L, 1L);
+
+        service.confirmDue(cutoff);
+
+        verify(confirmService).confirm(10L, 1L);
+        verify(confirmService).confirm(20L, 2L);
+    }
+
+    @Test
     void readsNextBatchAfterLastProcessedId() {
         List<Order> firstBatch = LongStream.rangeClosed(1, OrderAutoConfirmService.BATCH_SIZE)
                 .mapToObj(id -> order(id, 10L)).toList();

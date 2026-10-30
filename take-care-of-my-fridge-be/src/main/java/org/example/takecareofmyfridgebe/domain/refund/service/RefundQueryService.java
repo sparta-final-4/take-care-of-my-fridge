@@ -72,6 +72,16 @@ public class RefundQueryService {
         return refundRepository.existsByOrderIdAndStatus(orderId, RefundStatus.REQUESTED);
     }
 
+    // 구매 확정 검증용. 모든 주문 상품을 완료된 환불이 주문 수량만큼 채웠으면 true다.
+    // 특가·번개 드롭 상품은 환불할 수 없으므로 이런 상품이 있는 주문은 false다
+    public boolean isFullyRefunded(Order order) {
+        List<OrderItem> orderItems = orderReader.getOrderItems(order);
+        Map<Long, Long> completedById = getCompletedRefundQuantities(
+                orderItems.stream().map(OrderItem::getId).toList());
+        return !orderItems.isEmpty() && orderItems.stream()
+                .allMatch(item -> completedById.getOrDefault(item.getId(), 0L) >= item.getQuantity());
+    }
+
     // 구매 확정 수량 계산용. 완료된 환불만 주문 상품별로 합산하고, 환불이 없는 주문 상품은 결과에 없다
     public Map<Long, Long> getCompletedRefundQuantities(List<Long> orderItemIds) {
         return refundItemRepository

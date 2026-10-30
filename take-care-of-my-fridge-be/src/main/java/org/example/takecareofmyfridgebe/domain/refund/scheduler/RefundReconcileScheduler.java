@@ -2,6 +2,7 @@ package org.example.takecareofmyfridgebe.domain.refund.scheduler;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.example.takecareofmyfridgebe.domain.payment.entity.PaymentChangedBy;
 import org.example.takecareofmyfridgebe.domain.refund.facade.RefundFacade;
 import org.example.takecareofmyfridgebe.domain.refund.service.RefundQueryService;
@@ -23,8 +24,9 @@ public class RefundReconcileScheduler {
     private final RefundQueryService refundQueryService;
     private final RefundFacade refundFacade;
 
-    // 이전 실행이 끝나고 5분 뒤 다시 실행해 실행끼리 겹치지 않는다
+    // 이전 실행이 끝나고 5분 뒤 다시 실행해 실행끼리 겹치지 않는다. 서버가 여러 대여도 잠금을 잡은 한 대만 실행한다
     @Scheduled(fixedDelay = 300_000, initialDelay = 180_000)
+    @SchedulerLock(name = "refundReconcile", lockAtMostFor = "30m", lockAtLeastFor = "1m")
     public void reconcileStaleRefunds() {
         LocalDateTime staleBefore = LocalDateTime.now().minusMinutes(STALE_MINUTES);
         for (String portonePaymentId : refundQueryService.findPaymentsWithRequestedBefore(staleBefore)) {

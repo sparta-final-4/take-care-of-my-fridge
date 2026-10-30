@@ -1,5 +1,6 @@
 package org.example.takecareofmyfridgebe.domain.refund.scheduler;
 
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.example.takecareofmyfridgebe.domain.payment.entity.PaymentChangedBy;
 import org.example.takecareofmyfridgebe.domain.refund.facade.RefundFacade;
 import org.example.takecareofmyfridgebe.domain.refund.service.RefundQueryService;
@@ -32,6 +33,16 @@ class RefundReconcileSchedulerTest {
 
     @InjectMocks
     private RefundReconcileScheduler scheduler;
+
+    @Test
+    @DisplayName("서버가 여러 대여도 한 대만 실행하도록 서버 간 잠금을 건다")
+    void locksAcrossServers() throws NoSuchMethodException {
+        SchedulerLock lock = RefundReconcileScheduler.class.getMethod("reconcileStaleRefunds")
+                .getAnnotation(SchedulerLock.class);
+
+        assertThat(lock).isNotNull();
+        assertThat(lock.name()).isEqualTo("refundReconcile");
+    }
 
     @Test
     @DisplayName("10분 넘게 요청 상태인 환불의 결제를 같은 기준 시각으로 PG와 맞춘다")

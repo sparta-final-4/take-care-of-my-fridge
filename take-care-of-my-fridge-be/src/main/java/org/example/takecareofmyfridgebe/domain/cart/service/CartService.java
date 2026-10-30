@@ -25,6 +25,7 @@ import org.example.takecareofmyfridgebe.domain.sale.service.SaleEventReader;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -97,6 +98,13 @@ public class CartService {
     @Transactional
     public void removeItems(Long memberId, RemoveCartItemsRequest request) {
         cartItemRepository.deleteAllByIdsAndMemberId(request.cartItemIds(), memberId);
+    }
+
+    // 결제한 주문의 상품을 장바구니에서 줄째 지운다. 주문 뒤 수량을 바꿨어도 같은 상품 줄이면 지운다.
+    // 결제 완료가 커밋된 뒤 불리므로 끝난 결제 트랜잭션에 합류하지 않도록 새 트랜잭션을 연다
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void removePaidItems(Long memberId, Long orderId) {
+        cartItemRepository.deleteAllOrderedByMemberId(orderId, memberId);
     }
 
     private boolean isFlashDrop(Product product) {
