@@ -21,7 +21,7 @@ export function TodayMealkitSection() {
   if (!isPending && mealkits.length === 0) return null;
 
   return (
-    <SectionCard title="오늘의 밀키트">
+    <SectionCard title="오늘의 밀키트" bracket={false}>
       {isPending ? (
         <Skeleton active paragraph={{ rows: 4 }} />
       ) : (

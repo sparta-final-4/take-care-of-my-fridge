@@ -77,7 +77,7 @@ HTTP 메서드·경로·DTO 이름은 구현 전 합의합니다.
 | 분석 | 예측·실제 판매량·기준선 조회 | ADMIN, 버전·시점·가상 데이터 표시 |
 | 할인 후보 | 분석 조회·검토 저장·행사 등록 | ADMIN, 선택한 후보만 기존 행사 생성 기능으로 등록 |
 
-할인 후보 분석 실행: `POST /api/admin/deal-analyses`. 요청은 `targetWeekStart`(월요일), `dayOfWeek`(MON~SUN), `discountRate`(1~99)이며 대상일은 오늘 이후다. 실제 일반 특가 이력이 부족하면 D007(422)로 중단한다.
+할인 후보 분석 실행: `POST /api/admin/deal-analyses`. 요청은 `targetWeekStart`(월요일), `dayOfWeek`(MON~SUN), `discountRate`(1~99)이며 대상일은 오늘 이후다. 실제 일반 특가 이력이 부족하면 D007(422)로 중단한다. 학습·예측 자료 값이 올바르지 않으면 D008(500)로 중단한다.
 할인 후보 행사 등록: `POST /api/admin/deal-analyses/{analysisId}/event-requests`.
 요청은 `candidateId`, 행사 종류(`SPECIAL` 또는 `FLASH_DROP`), `startsAt`, `endsAt`, 번개 드롭일 때 `limitedQuantity`를 받습니다.
 할인율은 분석 결과의 `discountRate`를 사용합니다. 선택된 후보 중 가상 데이터가 아닌 결과만 등록할 수 있으며,
@@ -413,6 +413,19 @@ HTTP 메서드·경로·DTO 이름은 구현 전 합의합니다.
 - **환불 요약**: 요청 상태 환불이 있으면 `IN_PROGRESS`, 환불 가능한 상품을 모두 환불했으면 `FULL`, 완료된 환불이 있으면 `PARTIAL`, 그 밖은 `NONE`입니다. 타인 주문과 없는 주문은 빼고 요청한 순서대로 돌려줍니다.
 - **환불 가능 수량**: 주문 상품 순서대로 돌려줍니다. 특가·번개 드롭 상품은 `refundable=false`, `refundableQuantity=0`입니다.
 - **본인 소유 검증**: 타인 주문은 없는 주문과 같은 404(`ORDER_001`)로 답합니다.
+
+## 클릭 수 기반 할인 상품 API
+
+상태: **구현 완료** · 담당: 장준혁 · 근거: 실제 백엔드 컨트롤러 및 서비스 구현
+
+| 기능 | Method / Path | 성공 응답 |
+|---|---|---|
+| 클릭 수 기반 할인 상품 | GET /sales/popular | 200, `List<PopularSaleResponse>` |
+
+- 메인 화면 할인 섹션이 씁니다. 로그인하지 않아도 부를 수 있고, 요청 값은 없습니다.
+- `PopularSaleResponse`: productId, name, imageUrl, price(정가), sale(`SaleResponse`).
+- **대상**: 진행 중인 특가·번개 드롭 상품입니다. 품절·판매 중지·번개 드롭 남은 수량 0인 상품은 뺍니다.
+- **순서**: 오늘을 포함한 최근 7일 검색 결과 클릭이 많은 순입니다. 클릭이 같으면 할인율이 높은 순, 그것도 같으면 상품 ID 순입니다. 최대 6개입니다.
 
 ## 할인 행사 API
 

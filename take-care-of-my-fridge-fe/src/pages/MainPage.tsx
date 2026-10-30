@@ -4,6 +4,7 @@ import { SectionCard } from '@/common/components/SectionCard';
 import { PopularRecipeSection } from '@/domains/cooking/components/PopularRecipeSection';
 import { IngredientInputSection } from '@/domains/fridge/components/IngredientInputSection';
 import { MyFridgeSection } from '@/domains/fridge/components/MyFridgeSection';
+import { PopularSaleSection } from '@/domains/sale/components/PopularSaleSection';
 
 import styles from './MainPage.module.scss';
 
@@ -27,20 +28,12 @@ export default function MainPage() {
         </div>
         <div className={styles.rightStack}>
           <div className={styles.rightStackItem}>
-            <SectionCard title="특가 상품">
-              <Typography.Text type="secondary">준비 중</Typography.Text>
-            </SectionCard>
+            <PopularSaleSection />
           </div>
           <div className={styles.rightStackItem}>
             <PopularRecipeSection />
           </div>
         </div>
-      </div>
-
-      <div className={styles.fullRow}>
-        <SectionCard title="오늘의 밀키트 큐레이션">
-          <Typography.Text type="secondary">준비 중</Typography.Text>
-        </SectionCard>
       </div>
     </div>
   );

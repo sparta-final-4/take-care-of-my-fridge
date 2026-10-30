@@ -41,6 +41,7 @@ public enum ErrorCode {
     DEAL_REVIEW_LOCKED(HttpStatus.CONFLICT, "D004", "이미 행사 요청한 후보는 검토 상태를 바꿀 수 없습니다."),
     DEAL_EVENT_NOT_AVAILABLE(HttpStatus.CONFLICT, "D005", "선택되지 않았거나 이미 행사에 등록된 후보입니다."),
     DEAL_SYNTHETIC_ANALYSIS(HttpStatus.CONFLICT, "D006", "가상 데이터 분석 결과로는 행사를 등록할 수 없습니다."),
+    DEAL_MODEL_INPUT_INVALID(HttpStatus.INTERNAL_SERVER_ERROR, "D008", "할인 효과 계산 자료가 올바르지 않습니다."),
 
     // Product
     PRODUCT_NOT_FOUND(HttpStatus.NOT_FOUND, "PRODUCT_001", "상품을 찾을 수 없습니다."),

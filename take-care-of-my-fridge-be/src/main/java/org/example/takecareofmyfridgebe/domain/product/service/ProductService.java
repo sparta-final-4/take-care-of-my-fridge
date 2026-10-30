@@ -55,9 +55,9 @@ public class ProductService {
     }
 
     /**
-     * ES 검색이 고른 ID 순서대로 상품을 돌려준다. 가격·상태는 색인 값이 아니라 DB 값을 쓴다.
+     * 받은 ID 순서대로 공개 상품을 돌려준다. 없는 상품과 판매 중지 상품은 뺀다.
      * <br>
-     * 색인이 늦어 판매 중지된 상품이 섞여 오면 뺀다.
+     * 검색 결과(ES가 고른 ID, 색인이 늦어 판매 중지 상품이 섞여 올 수 있음)와 인기 특가가 쓴다. 가격·상태는 DB 값이다.
      */
     public List<Product> getProductsByIds(List<Long> productIds) {
         Map<Long, Product> productsById = productRepository.findAllById(productIds).stream()
