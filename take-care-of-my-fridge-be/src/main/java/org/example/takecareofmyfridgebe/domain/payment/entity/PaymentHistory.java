@@ -24,7 +24,8 @@ import org.example.takecareofmyfridgebe.global.entity.BaseTimeEntity;
 @Table(name = "payment_histories",
         indexes = {
                 @Index(name = "idx_payment_histories_payment_id", columnList = "payment_id, created_at"),
-                @Index(name = "idx_payment_histories_refund_id", columnList = "refund_id")
+                @Index(name = "idx_payment_histories_refund_id", columnList = "refund_id"),
+                @Index(name = "idx_payment_histories_created_at", columnList = "created_at")
         })
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
