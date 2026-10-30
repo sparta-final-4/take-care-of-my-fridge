@@ -91,7 +91,7 @@ public class Fridge extends BaseTimeEntity {
         this.source = resolvedSource;
     }
 
-    // 재료 정보(표준 재료, 표시명, 수량, 보관방식, 소비기한) 수정
+    // 재료 정보(표준 재료, 표시명, 수량, 보관방식, 소비기한) 부분 수정. null인 칸은 바꾸지 않는다.
     public void update(
         Ingredient ingredient,
         String rawName,
@@ -99,12 +99,22 @@ public class Fridge extends BaseTimeEntity {
         StorageType storage,
         LocalDate expirationDate
     ) {
-        validatePositiveQuantity(quantity);
-        this.ingredient = ingredient;
-        this.rawName = rawName;
-        this.quantity = quantity;
-        this.storage = storage;
-        this.expirationDate = expirationDate;
+        if (quantity != null) {
+            validatePositiveQuantity(quantity);
+            this.quantity = quantity;
+        }
+        if (ingredient != null) {
+            this.ingredient = ingredient;
+        }
+        if (rawName != null) {
+            this.rawName = rawName;
+        }
+        if (storage != null) {
+            this.storage = storage;
+        }
+        if (expirationDate != null) {
+            this.expirationDate = expirationDate;
+        }
     }
 
     // 재료 수량 차감 (잔여량이 0.05 미만이면 0으로 보정, 음수 방지)

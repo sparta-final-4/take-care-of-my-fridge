@@ -103,12 +103,14 @@ public class FridgeService {
     }
 
     /**
-     * 본인 소유의 냉장고 재료 정보를 더티 체킹으로 수정한다.
+     * 본인 소유의 냉장고 재료 정보를 더티 체킹으로 부분 수정한다. 요청에서 null인 칸은 바꾸지 않는다.
+     * 차감·소비와 겹쳐 수량을 덮어쓰지 않도록 잠금 조회하며, 기다리는 사이 재료가 지워졌으면 404가 된다.
+     * 모든 칸이 null이면 바뀌는 것 없이 현재 값을 돌려준다.
      *
      * @param memberId   요청한 회원 ID
      * @param fridgeId   수정할 냉장고 재료 ID
      * @param ingredient 새로 매핑된 표준 재료 엔티티 (null이면 기존 재료 유지)
-     * @param request    수정할 재료 정보 (rawName, quantity, storage, expirationDate)
+     * @param request    수정할 재료 정보 (rawName, quantity, storage, expirationDate, 모두 선택)
      * @return 수정된 냉장고 재료 응답
      */
     @Transactional
@@ -118,9 +120,9 @@ public class FridgeService {
             Ingredient ingredient,
             FridgeItemUpdateRequest request
     ) {
-        Fridge fridge = getFridgeEntity(memberId, fridgeId);
+        Fridge fridge = getFridgeEntityForUpdate(memberId, fridgeId);
         fridge.update(
-                ingredient != null ? ingredient : fridge.getIngredient(),
+                ingredient,
                 request.rawName(),
                 request.quantity(),
                 request.storage(),

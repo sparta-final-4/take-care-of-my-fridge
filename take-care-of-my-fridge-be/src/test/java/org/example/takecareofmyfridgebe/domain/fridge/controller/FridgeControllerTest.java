@@ -407,28 +407,22 @@ class FridgeControllerTest {
     }
 
     /**
-     * 재료 수정 요청 검증 실패 케이스:
-     * 1) quantity가 0 또는 음수이거나 null일 때
-     * 2) rawName이 빈 문자열/공백이거나 null일 때
-     * 3) storage가 null일 때
-     * 4) expirationDate가 null일 때
+     * 재료 수정 요청 검증 실패 케이스 (부분 수정이라 null인 칸은 허용):
+     * 1) quantity를 보냈는데 0 또는 음수일 때
+     * 2) rawName을 보냈는데 빈 문자열이거나 공백만일 때
      * 모두 FridgeFacade를 호출하지 않고 400 Bad Request(C001)를 반환하는지 검증한다.
      */
     @Test
     void updateItemRejectsInvalidRequestsWithBadRequest() throws Exception {
         List<String> invalidBodies = List.of(
                 // quantity 0
-                "{\"rawName\":\"두부\",\"quantity\":0,\"storage\":\"REFRIGERATED\",\"expirationDate\":\"2026-10-20\"}",
+                "{\"quantity\":0}",
                 // quantity 음수
-                "{\"rawName\":\"두부\",\"quantity\":-1,\"storage\":\"REFRIGERATED\",\"expirationDate\":\"2026-10-20\"}",
-                // quantity null
-                "{\"rawName\":\"두부\",\"quantity\":null,\"storage\":\"REFRIGERATED\",\"expirationDate\":\"2026-10-20\"}",
-                // rawName 빈 값
-                "{\"rawName\":\"   \",\"quantity\":1,\"storage\":\"REFRIGERATED\",\"expirationDate\":\"2026-10-20\"}",
-                // storage null
-                "{\"rawName\":\"두부\",\"quantity\":1,\"storage\":null,\"expirationDate\":\"2026-10-20\"}",
-                // expirationDate null
-                "{\"rawName\":\"두부\",\"quantity\":1,\"storage\":\"REFRIGERATED\",\"expirationDate\":null}"
+                "{\"rawName\":\"두부\",\"quantity\":-1}",
+                // rawName 빈 문자열
+                "{\"rawName\":\"\"}",
+                // rawName 공백만
+                "{\"rawName\":\"   \",\"expirationDate\":\"2026-10-20\"}"
         );
 
         for (String body : invalidBodies) {

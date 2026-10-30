@@ -263,7 +263,7 @@ class FridgeServiceTest {
                 .build();
         ReflectionTestUtils.setField(fridge, "id", 100L);
 
-        when(fridgeRepository.findByIdAndMemberId(100L, 7L)).thenReturn(Optional.of(fridge));
+        when(fridgeRepository.findForUpdateByIdAndMemberId(100L, 7L)).thenReturn(Optional.of(fridge));
 
         FridgeItemUpdateRequest request = new FridgeItemUpdateRequest(
                 "비비고 썰은배추김치(500g)",
@@ -319,7 +319,7 @@ class FridgeServiceTest {
                 .build();
         ReflectionTestUtils.setField(fridge, "id", 100L);
 
-        when(fridgeRepository.findByIdAndMemberId(100L, 7L)).thenReturn(Optional.of(fridge));
+        when(fridgeRepository.findForUpdateByIdAndMemberId(100L, 7L)).thenReturn(Optional.of(fridge));
 
         FridgeItemUpdateRequest request = new FridgeItemUpdateRequest(
                 "찌개용 두부",
@@ -337,6 +337,98 @@ class FridgeServiceTest {
         assertEquals(new BigDecimal("2.00"), response.quantity());
         assertEquals(StorageType.FROZEN, response.storage());
         assertEquals(today.plusDays(10), response.expirationDate());
+    }
+
+    private Fridge tofuInFridge(LocalDate expirationDate) {
+        Ingredient tofu = Ingredient.builder()
+                .ingredientCode("ING_TOFU")
+                .name("두부")
+                .baseUnit("모")
+                .defaultStorage(StorageType.REFRIGERATED)
+                .defaultShelfDays(5)
+                .basicSeasoning(false)
+                .build();
+        ReflectionTestUtils.setField(tofu, "id", 10L);
+
+        Fridge fridge = Fridge.builder()
+                .memberId(7L)
+                .ingredient(tofu)
+                .rawName("찌개용 두부")
+                .quantity(new BigDecimal("1.00"))
+                .storage(StorageType.REFRIGERATED)
+                .expirationDate(expirationDate)
+                .source(FridgeSource.MANUAL)
+                .build();
+        ReflectionTestUtils.setField(fridge, "id", 100L);
+        return fridge;
+    }
+
+    /**
+     * 소비기한만 보내면 수량·이름·보관방식은 DB 값 그대로 유지되는지 검증한다.
+     * (수정 창을 열어 둔 사이 요리로 차감된 수량을 화면의 옛 값으로 덮어쓰지 않는다)
+     */
+    @Test
+    void updateItemWithOnlyExpirationDateKeepsQuantity() {
+        LocalDate today = LocalDate.now();
+        Fridge fridge = tofuInFridge(today.plusDays(3));
+        when(fridgeRepository.findForUpdateByIdAndMemberId(100L, 7L)).thenReturn(Optional.of(fridge));
+
+        FridgeItemResponse response = fridgeService.updateItem(
+                7L, 100L, null, new FridgeItemUpdateRequest(null, null, null, today.plusDays(10)));
+
+        assertEquals(new BigDecimal("1.00"), response.quantity());
+        assertEquals("찌개용 두부", response.rawName());
+        assertEquals(StorageType.REFRIGERATED, response.storage());
+        assertEquals(today.plusDays(10), response.expirationDate());
+    }
+
+    /**
+     * 수량을 보내면 그 값으로 바뀌고, 보내지 않은 칸은 그대로인지 검증한다.
+     */
+    @Test
+    void updateItemWithQuantityChangesOnlyQuantity() {
+        LocalDate today = LocalDate.now();
+        Fridge fridge = tofuInFridge(today.plusDays(3));
+        when(fridgeRepository.findForUpdateByIdAndMemberId(100L, 7L)).thenReturn(Optional.of(fridge));
+
+        FridgeItemResponse response = fridgeService.updateItem(
+                7L, 100L, null, new FridgeItemUpdateRequest(null, new BigDecimal("3.50"), null, null));
+
+        assertEquals(new BigDecimal("3.50"), response.quantity());
+        assertEquals(today.plusDays(3), response.expirationDate());
+    }
+
+    /**
+     * 모든 칸이 null이면 아무것도 바뀌지 않고 현재 값을 그대로 반환하는지 검증한다.
+     */
+    @Test
+    void updateItemWithAllNullFieldsReturnsCurrentValues() {
+        LocalDate today = LocalDate.now();
+        Fridge fridge = tofuInFridge(today.plusDays(3));
+        when(fridgeRepository.findForUpdateByIdAndMemberId(100L, 7L)).thenReturn(Optional.of(fridge));
+
+        FridgeItemResponse response = fridgeService.updateItem(
+                7L, 100L, null, new FridgeItemUpdateRequest(null, null, null, null));
+
+        assertEquals(10L, response.ingredientId());
+        assertEquals("찌개용 두부", response.rawName());
+        assertEquals(new BigDecimal("1.00"), response.quantity());
+        assertEquals(StorageType.REFRIGERATED, response.storage());
+        assertEquals(today.plusDays(3), response.expirationDate());
+    }
+
+    /**
+     * 잠금 조회 결과가 없으면(차감으로 이미 지워졌거나 남의 재료) 404(FRIDGE_ITEM_NOT_FOUND)인지 검증한다.
+     */
+    @Test
+    void updateItemThrowsNotFoundWhenItemWasDeleted() {
+        when(fridgeRepository.findForUpdateByIdAndMemberId(100L, 7L)).thenReturn(Optional.empty());
+
+        BusinessException exception = assertThrows(BusinessException.class, () -> fridgeService.updateItem(
+                7L, 100L, null, new FridgeItemUpdateRequest(null, new BigDecimal("2"), null, null)));
+
+        assertEquals(ErrorCode.FRIDGE_ITEM_NOT_FOUND, exception.getErrorCode());
+        verify(fridgeRepository, never()).findByIdAndMemberId(any(), any());
     }
 
     /**

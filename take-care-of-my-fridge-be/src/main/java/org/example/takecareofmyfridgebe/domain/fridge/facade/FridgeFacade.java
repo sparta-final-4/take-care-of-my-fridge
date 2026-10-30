@@ -75,10 +75,11 @@ public class FridgeFacade {
         // 이름 변경 여부만 확인하는 비교용 조회 (재매핑을 트랜잭션 밖에서 하기 위해 분리)
         FridgeNameInfo current = fridgeService.getNameInfo(memberId, fridgeId);
 
-        // 밀키트이거나 이름이 같으면 null을 넘겨 FridgeService.updateItem에서 기존 재료를 유지한다.
-        Ingredient ingredient = current.mealkit() || current.rawName().equals(request.rawName())
-                ? null
-                : ingredientMatcher.match(request.rawName());
+        // 밀키트이거나, 이름을 안 보냈거나, 같은 이름이면 null을 넘겨 FridgeService.updateItem에서 기존 재료를 유지한다.
+        boolean keepIngredient = current.mealkit()
+                || request.rawName() == null
+                || current.rawName().equals(request.rawName());
+        Ingredient ingredient = keepIngredient ? null : ingredientMatcher.match(request.rawName());
 
         return fridgeService.updateItem(memberId, fridgeId, ingredient, request);
     }

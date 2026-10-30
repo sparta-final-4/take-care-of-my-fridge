@@ -158,6 +158,30 @@ class FridgeFacadeTest {
     }
 
     /**
+     * 이름(rawName)을 보내지 않은 부분 수정이면 IngredientMatcher.match를 호출하지 않고
+     * ingredient를 null(기존 재료 유지)로 전달하는지 검증한다.
+     */
+    @Test
+    void updateItemDoesNotCallMatcherWhenRawNameIsNotSent() {
+        FridgeItemUpdateRequest request = new FridgeItemUpdateRequest(
+                null,
+                null,
+                null,
+                LocalDate.of(2026, 11, 5)
+        );
+        FridgeItemResponse expectedResponse = mock(FridgeItemResponse.class);
+
+        when(fridgeService.getNameInfo(7L, 100L)).thenReturn(new FridgeNameInfo("국산 두부 300g", false));
+        when(fridgeService.updateItem(7L, 100L, null, request)).thenReturn(expectedResponse);
+
+        FridgeItemResponse actual = fridgeFacade.updateItem(7L, 100L, request);
+
+        assertSame(expectedResponse, actual);
+        verifyNoInteractions(ingredientMatcher);
+        verify(fridgeService).updateItem(7L, 100L, null, request);
+    }
+
+    /**
      * 재료 수정 시 요청한 rawName이 기존 재료의 rawName과 다르면
      * IngredientMatcher.match를 호출해 새로 매핑된 표준 재료(ingredient)를
      * FridgeService.updateItem으로 전달하는지 검증한다.
