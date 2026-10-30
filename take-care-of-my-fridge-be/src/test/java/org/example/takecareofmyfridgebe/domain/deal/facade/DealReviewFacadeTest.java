@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 import java.time.LocalDateTime;
 import java.util.List;
 import org.example.takecareofmyfridgebe.domain.admin.entity.AdminAuditLog;
+import org.example.takecareofmyfridgebe.domain.admin.facade.AdminActionGuard;
 import org.example.takecareofmyfridgebe.domain.admin.service.AdminAuditLogService;
 import org.example.takecareofmyfridgebe.domain.deal.dto.DealAnalysisResponse;
 import org.example.takecareofmyfridgebe.domain.deal.dto.DealReviewRequest;
@@ -25,7 +26,7 @@ class DealReviewFacadeTest {
 
     private final DealReviewService service = mock(DealReviewService.class);
     private final AdminAuditLogService audit = mock(AdminAuditLogService.class);
-    private final DealReviewFacade facade = new DealReviewFacade(service, audit);
+    private final DealReviewFacade facade = new DealReviewFacade(service, new AdminActionGuard(audit));
     private final List<DealReviewRequest.Review> reviews = List.of(
             new DealReviewRequest.Review(11L, DealCandidate.ReviewStatus.SELECTED));
 
