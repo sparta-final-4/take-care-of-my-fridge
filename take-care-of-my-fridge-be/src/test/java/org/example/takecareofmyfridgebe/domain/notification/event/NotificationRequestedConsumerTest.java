@@ -18,20 +18,27 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.boot.testcontainers.context.ImportTestcontainers;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 
 // 실제 토픽에 보낸 알림 요청이 알림 테이블에 어떻게 남는지 DB를 다시 읽어 확인한다.
 // 컨테이너는 다른 테스트와 공유하므로 테스트마다 다른 회원 ID를 쓴다
 @SpringBootTest
-@ImportTestcontainers(KafkaContainerSupport.class)
 @Import(NotificationRequestedConsumerTest.DltConsumerConfig.class)
 class NotificationRequestedConsumerTest extends MySqlContainerSupport {
 
     private static final long WAIT_MILLIS = 15_000;
+
+    // MySQL은 상속으로 받으므로 Kafka는 주소만 넣는다.
+    // @ImportTestcontainers로 가져오면 이 컨텍스트가 닫힐 때 공유 Kafka 컨테이너가 멈춰 다른 테스트가 실패한다
+    @DynamicPropertySource
+    static void kafkaProperties(DynamicPropertyRegistry registry) {
+        registry.add("spring.kafka.bootstrap-servers", KafkaContainerSupport::bootstrapServers);
+    }
 
     private final KafkaTemplate<String, Object> kafkaTemplate;
     private final NotificationRepository notificationRepository;

@@ -22,4 +22,12 @@ public abstract class KafkaContainerSupport {
     static void kafkaProperties(DynamicPropertyRegistry registry) {
         registry.add("spring.kafka.bootstrap-servers", KAFKA::getBootstrapServers);
     }
+
+    /**
+     * 다른 베이스 클래스(예: MySQL)를 상속해 이 클래스를 상속할 수 없는 테스트가 주소만 쓸 때 부른다.
+     * {@code @ImportTestcontainers}로 가져오면 그 컨텍스트가 닫힐 때 공유 컨테이너가 멈춘다.
+     */
+    public static String bootstrapServers() {
+        return KAFKA.getBootstrapServers();
+    }
 }
