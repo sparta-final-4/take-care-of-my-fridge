@@ -1,6 +1,5 @@
 import { axiosInstance } from '@/common/api/axiosInstance';
 import type { ApiResponse } from '@/common/api/types';
-import { csrfHeaders } from '@/domains/auth/api';
 
 // MyInfoResponse.java와 필드·enum을 맞춘다.
 export interface MyInfoResponse {
@@ -65,15 +64,11 @@ export async function signUp(request: SignUpRequest) {
 }
 
 export async function changeNickname(nickname: string) {
-  await axiosInstance.patch(
-    '/api/members/me/nickname',
-    { nickname },
-    { headers: await csrfHeaders() },
-  );
+  await axiosInstance.patch('/api/members/me/nickname', { nickname });
 }
 
 export async function changeTastes(tastes: MyInfoResponse['tastes']) {
-  await axiosInstance.put('/api/members/me/tastes', { tastes }, { headers: await csrfHeaders() });
+  await axiosInstance.put('/api/members/me/tastes', { tastes });
 }
 
 export interface ChangePasswordRequest {
@@ -82,5 +77,5 @@ export interface ChangePasswordRequest {
 }
 
 export async function changePassword(request: ChangePasswordRequest) {
-  await axiosInstance.patch('/api/members/me/password', request, { headers: await csrfHeaders() });
+  await axiosInstance.patch('/api/members/me/password', request);
 }

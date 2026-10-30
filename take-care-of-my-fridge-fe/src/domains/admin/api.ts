@@ -1,6 +1,5 @@
 import { axiosInstance } from '@/common/api/axiosInstance';
 import type { ApiResponse, PageResponse } from '@/common/api/types';
-import { csrfHeaders } from '@/domains/auth/api';
 import type { MyInfoResponse } from '@/domains/member/api';
 
 export interface MemberListRequest {
@@ -30,13 +29,7 @@ export async function getMembers(request: MemberListRequest, signal?: AbortSigna
 }
 
 export async function promoteMember(memberId: number) {
-  await axiosInstance.post(
-    `/api/admin/members/${encodeURIComponent(memberId)}/promotion`,
-    undefined,
-    {
-      headers: await csrfHeaders(),
-    },
-  );
+  await axiosInstance.post(`/api/admin/members/${encodeURIComponent(memberId)}/promotion`);
 }
 
 export interface AuditLogSearchRequest {
