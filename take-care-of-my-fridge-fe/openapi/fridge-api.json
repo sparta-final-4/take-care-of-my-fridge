@@ -1857,6 +1857,24 @@
         "tags": [
           "notification-controller"
         ]
+      },
+      "delete": {
+        "operationId": "deleteAll",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "notification-controller"
+        ]
       }
     },
     "/api/notifications/read-all": {
@@ -1898,6 +1916,37 @@
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponseUnreadNotificationCountResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "notification-controller"
+        ]
+      }
+    },
+    "/api/notifications/{notificationId}": {
+      "delete": {
+        "operationId": "deleteNotification",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "notificationId",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseVoid"
                 }
               }
             },
