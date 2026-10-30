@@ -1,10 +1,13 @@
 package org.example.takecareofmyfridgebe.domain.forecast.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -85,5 +88,40 @@ class ForecastPredictionServiceTest {
         service.generate(week, cutoff);
 
         verifyNoInteractions(worker, saver);
+    }
+    @Test
+    void savesWhateverModelVersionWorkerReports() {
+        LocalDate week = LocalDate.of(2026, 10, 26);
+        var result = new ForecastWorkerClient.Result("weekly-mlp-v2",
+                List.of(new ForecastWorkerClient.Prediction(1L, 9)));
+        givenOneProductWithSales(week, result);
+
+        service.generate(week, week.minusDays(1).atTime(18, 0));
+
+        verify(saver).save(eq(week), any(), eq(result), anyMap(), anyMap());
+    }
+
+    @Test
+    void rejectsBlankOrTooLongModelVersion() {
+        LocalDate week = LocalDate.of(2026, 10, 26);
+        for (String version : new String[] {null, " ", "v".repeat(51)}) {
+            givenOneProductWithSales(week, new ForecastWorkerClient.Result(version,
+                    List.of(new ForecastWorkerClient.Prediction(1L, 9))));
+
+            assertThatThrownBy(() -> service.generate(week, week.minusDays(1).atTime(18, 0)))
+                    .isInstanceOf(IllegalStateException.class);
+        }
+        verify(saver, never()).save(any(), any(), any(), anyMap(), anyMap());
+    }
+
+    private void givenOneProductWithSales(LocalDate week, ForecastWorkerClient.Result result) {
+        Product product = mock(Product.class);
+        when(product.getId()).thenReturn(1L);
+        when(product.getStatus()).thenReturn(ProductStatus.ON_SALE);
+        when(products.findAll()).thenReturn(List.of(product));
+        when(runs.findByTargetWeekStart(week)).thenReturn(Optional.empty());
+        when(sales.getDailySales(any(), any(), any()))
+                .thenReturn(List.of(new DailyNetSales(1L, week.minusDays(1), 4)));
+        when(worker.predict(eq(week), anyList(), anyList())).thenReturn(result);
     }
 }
