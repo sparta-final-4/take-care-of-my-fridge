@@ -209,6 +209,7 @@ export function Header() {
               <Button
                 type="text"
                 block
+                className={styles.drawerNavButton}
                 onClick={() => {
                   handleCloseDrawer();
                   navigate(ROUTES.adminMembers);
@@ -221,6 +222,7 @@ export function Header() {
               <Button
                 type="text"
                 block
+                className={styles.drawerNavButton}
                 onClick={() => {
                   handleCloseDrawer();
                   navigate(ROUTES.adminAudit);
@@ -233,6 +235,7 @@ export function Header() {
               <Button
                 type="text"
                 block
+                className={styles.drawerNavButton}
                 onClick={() => {
                   handleCloseDrawer();
                   navigate(ROUTES.adminForecast);
@@ -245,6 +248,7 @@ export function Header() {
               <Button
                 type="text"
                 block
+                className={styles.drawerNavButton}
                 onClick={() => {
                   handleCloseDrawer();
                   navigate(ROUTES.adminProducts);
@@ -257,6 +261,7 @@ export function Header() {
               <Button
                 type="text"
                 block
+                className={styles.drawerNavButton}
                 onClick={() => {
                   handleCloseDrawer();
                   navigate(ROUTES.adminSaleEventNew);
@@ -269,6 +274,7 @@ export function Header() {
               <Button
                 type="text"
                 block
+                className={styles.drawerNavButton}
                 onClick={() => {
                   handleCloseDrawer();
                   navigate(ROUTES.adminReviewSummary);
