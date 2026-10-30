@@ -75,6 +75,7 @@ public enum ErrorCode {
     ORDER_PRICE_CHANGED(HttpStatus.CONFLICT, "ORDER_010", "가격이 바뀌었습니다."),
     ORDER_REFUND_IN_PROGRESS(HttpStatus.CONFLICT, "ORDER_011", "환불이 진행 중인 주문은 구매 확정할 수 없습니다."),
     ORDER_PAYMENT_ATTEMPTED(HttpStatus.CONFLICT, "ORDER_012", "결제를 시도한 주문은 취소할 수 없습니다."),
+    ORDER_NUMBER_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "ORDER_013", "잠시 후 다시 주문해 주세요."),
 
     // Sale event
     SALE_EVENT_PRODUCT_DUPLICATED(HttpStatus.CONFLICT, "SALE_001", "이미 행사가 있는 상품입니다."),

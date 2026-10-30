@@ -141,7 +141,7 @@ public class OrderCreateService {
         }
     }
 
-    // 주문번호가 겹치거나(시계가 뒤로 간 채 재시작한 경우 등, 드묾) 같은 멱등 키가 동시에 저장되면(장바구니 잠금이 있으면 생기지 않음)
+    // 주문번호가 겹치거나(시계가 순번 키 만료 시간보다 크게 뒤로 간 경우 등, 드묾) 같은 멱등 키가 동시에 저장되면(장바구니 잠금이 있으면 생기지 않음)
     // 이 주문은 롤백하고 다시 주문하게 한다. 그 밖의 제약 위반은 원인을 가리지 않도록 그대로 던진다.
     private Order saveOrder(Long memberId, String idempotencyKey, long totalAmount) {
         Order order = Order.builder()
