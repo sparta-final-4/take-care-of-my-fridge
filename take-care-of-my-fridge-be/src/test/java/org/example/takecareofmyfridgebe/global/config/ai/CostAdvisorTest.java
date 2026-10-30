@@ -6,6 +6,7 @@ import org.springframework.ai.chat.client.ChatClientRequest;
 import org.springframework.ai.chat.client.ChatClientResponse;
 import org.springframework.ai.chat.client.advisor.api.AdvisorChain;
 import org.springframework.ai.chat.metadata.ChatResponseMetadata;
+import org.springframework.ai.chat.metadata.EmptyUsage;
 import org.springframework.ai.chat.metadata.Usage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
@@ -20,7 +21,7 @@ class CostAdvisorTest {
     private final double inputPer1m = 0.15;
     private final double outputPer1m = 0.60;
     private final int order = 100;
-    private final CostAdvisor costAdvisor = new CostAdvisor(inputPer1m, outputPer1m, order);
+    private final CostAdvisor costAdvisor = new CostAdvisor(new LlmCostCalculator(inputPer1m, outputPer1m), order);
 
     @Test
     @DisplayName("before는 전달받은 ChatClientRequest를 그대로 반환한다")
@@ -62,8 +63,8 @@ class CostAdvisorTest {
     }
 
     @Test
-    @DisplayName("after는 Usage가 null이면 계산 없이 응답을 그대로 반환한다")
-    void afterPassesThroughWhenUsageNull() {
+    @DisplayName("after는 사용량이 없으면(EmptyUsage) 계산 없이 응답을 그대로 반환한다")
+    void afterPassesThroughWhenUsageEmpty() {
         // Given
         ChatClientResponse response = mock(ChatClientResponse.class);
         AdvisorChain chain = mock(AdvisorChain.class);
@@ -72,7 +73,7 @@ class CostAdvisorTest {
 
         when(response.chatResponse()).thenReturn(chatResponse);
         when(chatResponse.getMetadata()).thenReturn(metadata);
-        when(metadata.getUsage()).thenReturn(null);
+        when(metadata.getUsage()).thenReturn(new EmptyUsage());
 
         // When
         ChatClientResponse result = costAdvisor.after(response, chain);

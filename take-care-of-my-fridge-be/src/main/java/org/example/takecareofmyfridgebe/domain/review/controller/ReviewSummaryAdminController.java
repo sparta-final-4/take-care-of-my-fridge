@@ -30,6 +30,12 @@ public class ReviewSummaryAdminController {
      * (정기 스케줄러는 중복 실행 방지를 위해 5분 유지)
      */
     private static final Duration LOCK_AT_LEAST_FOR = Duration.ZERO;
+    /**
+     * 관리자 실행의 시간 예산(20초). 예산은 레시피를 새로 시작하기 전에만 확인하므로, 마지막 AI 호출(보통 수 초)까지
+     * CloudFront 기본 응답 대기 시간(30초) 안에 끝나도록 여유를 두고,
+     * 남은 레시피는 결과에 SKIPPED(시간 초과로 다음 실행)로 돌려준다. 다시 실행하면 이어서 요약한다.
+     */
+    private static final Duration TIME_BUDGET = Duration.ofSeconds(20);
 
     private final ReviewSummaryFacade reviewSummaryFacade;
     private final LockingTaskExecutor lockingTaskExecutor;
@@ -50,7 +56,7 @@ public class ReviewSummaryAdminController {
 
         try {
             LockingTaskExecutor.TaskResult<ReviewSummaryResult> taskResult = lockingTaskExecutor.executeWithLock(
-                    (LockingTaskExecutor.TaskWithResult<ReviewSummaryResult>) reviewSummaryFacade::runOnce,
+                    (LockingTaskExecutor.TaskWithResult<ReviewSummaryResult>) () -> reviewSummaryFacade.runOnce(TIME_BUDGET),
                     lockConfiguration
             );
 

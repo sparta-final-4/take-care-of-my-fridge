@@ -8,11 +8,18 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import java.time.Duration;
+
 @Slf4j
 @Component
 @RequiredArgsConstructor
 @ConditionalOnProperty(name = "app.review-summary.enabled", havingValue = "true", matchIfMissing = true)
 public class ReviewSummaryScheduler {
+
+    /**
+     * 새벽 실행의 시간 예산(25분). lockAtMostFor(30분)보다 짧아야 한다.
+     */
+    private static final Duration TIME_BUDGET = Duration.ofMinutes(25);
 
     private final ReviewSummaryFacade reviewSummaryFacade;
 
@@ -29,7 +36,7 @@ public class ReviewSummaryScheduler {
     )
     public void runScheduledReviewSummary() {
         log.info("[ShedLock] 락 획득 성공! 레시피 후기 요약 새벽 작업을 시작합니다.");
-        reviewSummaryFacade.runOnce();
+        reviewSummaryFacade.runOnce(TIME_BUDGET);
         log.info("[ShedLock] 레시피 후기 요약 새벽 작업 완료!");
     }
 }

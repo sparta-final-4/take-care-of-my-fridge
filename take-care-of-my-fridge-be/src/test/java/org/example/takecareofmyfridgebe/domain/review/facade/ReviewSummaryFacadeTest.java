@@ -13,7 +13,15 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.example.takecareofmyfridgebe.domain.review.dto.ReviewSummaryItem;
+import org.example.takecareofmyfridgebe.domain.review.dto.ReviewSummaryItemStatus;
+import org.example.takecareofmyfridgebe.global.config.ai.LlmCostCalculator;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.metadata.ChatResponseMetadata;
+import org.springframework.ai.chat.metadata.DefaultUsage;
+import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.chat.model.Generation;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -25,6 +33,8 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
+import static org.assertj.core.api.Assertions.within;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -38,6 +48,12 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class ReviewSummaryFacadeTest {
+
+    private static final Duration SCHEDULED_BUDGET = Duration.ofMinutes(25);
+    private static final Duration ADMIN_BUDGET = Duration.ofSeconds(20);
+
+    // 100만 토큰당 입력 $0.15, 출력 $0.60
+    private final LlmCostCalculator costCalculator = new LlmCostCalculator(0.15, 0.60);
 
     @Mock
     private RecipeReviewRepository recipeReviewRepository;
@@ -61,15 +77,27 @@ class ReviewSummaryFacadeTest {
         facade = new ReviewSummaryFacade(
                 recipeReviewRepository,
                 recipeService,
-                chatClient
+                chatClient,
+                costCalculator
         );
     }
 
     private void mockChatClientReturn(String content) {
+        mockChatClientCall();
+        when(responseSpec.chatResponse()).thenReturn(chatResponse(content, 100, 20));
+    }
+
+    private void mockChatClientCall() {
         when(chatClient.prompt()).thenReturn(requestSpec);
         when(requestSpec.user(anyString())).thenReturn(requestSpec);
         when(requestSpec.call()).thenReturn(responseSpec);
-        when(responseSpec.content()).thenReturn(content);
+    }
+
+    private ChatResponse chatResponse(String content, int inputTokens, int outputTokens) {
+        return new ChatResponse(
+                List.of(new Generation(new AssistantMessage(content))),
+                ChatResponseMetadata.builder().usage(new DefaultUsage(inputTokens, outputTokens)).build()
+        );
     }
 
     @Test
@@ -109,7 +137,7 @@ class ReviewSummaryFacadeTest {
         when(recipeReviewRepository.findRecentReviewsByRecipeId(anyLong(), anyInt()))
                 .thenReturn(List.of(new RecipeReviewContentDto(5, "정말 맛있어요")));
 
-        ReviewSummaryResult result = facade.runOnce();
+        ReviewSummaryResult result = facade.runOnce(SCHEDULED_BUDGET);
 
         assertThat(result.targetCount()).isEqualTo(100);
         assertThat(result.successCount()).isEqualTo(100);
@@ -130,7 +158,7 @@ class ReviewSummaryFacadeTest {
 
         mockChatClientReturn("   ");
 
-        ReviewSummaryResult result = facade.runOnce();
+        ReviewSummaryResult result = facade.runOnce(SCHEDULED_BUDGET);
 
         assertThat(result.targetCount()).isEqualTo(1);
         assertThat(result.successCount()).isEqualTo(0);
@@ -162,7 +190,7 @@ class ReviewSummaryFacadeTest {
 
         mockChatClientReturn(fullSummary);
 
-        ReviewSummaryResult result = facade.runOnce();
+        ReviewSummaryResult result = facade.runOnce(SCHEDULED_BUDGET);
 
         assertThat(result.successCount()).isEqualTo(1);
         // 150자 이내의 마지막 문장 끝인 sentence2의 '!'에서 잘려야 함
@@ -185,7 +213,7 @@ class ReviewSummaryFacadeTest {
         String longSummary = "가".repeat(200);
         mockChatClientReturn(longSummary);
 
-        ReviewSummaryResult result = facade.runOnce();
+        ReviewSummaryResult result = facade.runOnce(SCHEDULED_BUDGET);
 
         assertThat(result.successCount()).isEqualTo(1);
         verify(recipeService).updateTipSummary(10L, "가".repeat(150) + "…");
@@ -224,10 +252,11 @@ class ReviewSummaryFacadeTest {
                 recipeReviewRepository,
                 recipeService,
                 chatClient,
+                costCalculator,
                 mockClock
         );
 
-        ReviewSummaryResult result = facadeWithMockClock.runOnce();
+        ReviewSummaryResult result = facadeWithMockClock.runOnce(SCHEDULED_BUDGET);
 
         // 총 3개 대상 중 1개 성공, 남은 2개는 시간 초과로 건너뜀
         assertThat(result.targetCount()).isEqualTo(3);
@@ -259,11 +288,11 @@ class ReviewSummaryFacadeTest {
         when(chatClient.prompt()).thenReturn(requestSpec);
         when(requestSpec.user(anyString())).thenReturn(requestSpec);
         when(requestSpec.call()).thenReturn(responseSpec);
-        when(responseSpec.content())
+        when(responseSpec.chatResponse())
                 .thenThrow(new RuntimeException("OpenAI 일시적 네트워크 오류"))
-                .thenReturn("약불로 조리하면 타지 않고 부드러워져요.");
+                .thenReturn(chatResponse("약불로 조리하면 타지 않고 부드러워져요.", 100, 20));
 
-        ReviewSummaryResult result = facade.runOnce();
+        ReviewSummaryResult result = facade.runOnce(SCHEDULED_BUDGET);
 
         assertThat(result.targetCount()).isEqualTo(2);
         assertThat(result.failedCount()).isEqualTo(1);
@@ -290,13 +319,26 @@ class ReviewSummaryFacadeTest {
         when(requestSpec.user(anyString())).thenReturn(requestSpec);
         when(requestSpec.call()).thenReturn(responseSpec);
 
-        when(responseSpec.content()).thenThrow(new RuntimeException("429 Too Many Requests: Rate limit reached"));
+        when(responseSpec.chatResponse()).thenThrow(new RuntimeException("429 Too Many Requests: Rate limit reached"));
 
-        ReviewSummaryResult result = facade.runOnce();
+        ReviewSummaryResult result = facade.runOnce(SCHEDULED_BUDGET);
 
+        // 429가 난 레시피(3L)는 FAILED, 남은 2L·1L은 SKIPPED(429로 중단) → 대상 = 성공 + 건너뜀 + 실패
         assertThat(result.targetCount()).isEqualTo(3);
         assertThat(result.failedCount()).isEqualTo(1);
+        assertThat(result.skippedCount()).isEqualTo(2);
         assertThat(result.successCount()).isEqualTo(0);
+        assertThat(result.successCount() + result.skippedCount() + result.failedCount())
+                .isEqualTo(result.targetCount());
+        assertThat(result.items())
+                .extracting(ReviewSummaryItem::recipeId, ReviewSummaryItem::status, ReviewSummaryItem::reason)
+                .containsExactly(
+                        tuple(3L, ReviewSummaryItemStatus.FAILED, "OpenAI 429"),
+                        tuple(2L, ReviewSummaryItemStatus.SKIPPED, "429로 중단"),
+                        tuple(1L, ReviewSummaryItemStatus.SKIPPED, "429로 중단")
+                );
+        assertThat(result.totalInputTokens()).isZero();
+        assertThat(result.totalCostUsd()).isZero();
         verify(recipeReviewRepository, times(1)).findRecentReviewsByRecipeId(anyLong(), anyInt());
         verify(recipeService, never()).updateTipSummary(anyLong(), anyString());
     }
@@ -321,9 +363,9 @@ class ReviewSummaryFacadeTest {
         ArgumentCaptor<String> promptCaptor = ArgumentCaptor.forClass(String.class);
         when(requestSpec.user(promptCaptor.capture())).thenReturn(requestSpec);
         when(requestSpec.call()).thenReturn(responseSpec);
-        when(responseSpec.content()).thenReturn("약불에 오래 끓이면 깊은 맛이 나요.");
+        when(responseSpec.chatResponse()).thenReturn(chatResponse("약불에 오래 끓이면 깊은 맛이 나요.", 100, 20));
 
-        ReviewSummaryResult result = facade.runOnce();
+        ReviewSummaryResult result = facade.runOnce(SCHEDULED_BUDGET);
 
         assertThat(result.successCount()).isEqualTo(1);
         String capturedPrompt = promptCaptor.getValue();
@@ -349,7 +391,7 @@ class ReviewSummaryFacadeTest {
 
         mockChatClientReturn("\"약불로 뭉근하게 끓이면 국물이 진해져요.\"");
 
-        ReviewSummaryResult result = facade.runOnce();
+        ReviewSummaryResult result = facade.runOnce(SCHEDULED_BUDGET);
 
         assertThat(result.successCount()).isEqualTo(1);
         verify(recipeService).updateTipSummary(1L, "약불로 뭉근하게 끓이면 국물이 진해져요.");
@@ -369,7 +411,7 @@ class ReviewSummaryFacadeTest {
 
         mockChatClientReturn(" “약불로 조리하고 '소금'으로 간을 맞춰요.” ");
 
-        ReviewSummaryResult result = facade.runOnce();
+        ReviewSummaryResult result = facade.runOnce(SCHEDULED_BUDGET);
 
         assertThat(result.successCount()).isEqualTo(1);
         // 앞뒤 “ ”는 제거되지만 문장 내부의 '소금'은 유지됨
@@ -390,11 +432,137 @@ class ReviewSummaryFacadeTest {
 
         mockChatClientReturn(" \"\" ");
 
-        ReviewSummaryResult result = facade.runOnce();
+        ReviewSummaryResult result = facade.runOnce(SCHEDULED_BUDGET);
 
         assertThat(result.targetCount()).isEqualTo(1);
         assertThat(result.skippedCount()).isEqualTo(1);
         assertThat(result.successCount()).isEqualTo(0);
         verify(recipeService, never()).updateTipSummary(anyLong(), anyString());
+    }
+
+    @Test
+    @DisplayName("성공·건너뜀·실패가 레시피별 items에 들어가고, 사용량이 있는 호출만 토큰·비용 합계에 더한다")
+    void itemsAndTotalsReflectEachOutcome() {
+        LocalDateTime now = LocalDateTime.now();
+        // latestReviewUpdatedAt 최신순: 4L -> 3L -> 2L -> 1L
+        when(recipeReviewRepository.findSummaryCandidatesWithMinReviews()).thenReturn(List.of(
+                new RecipeReviewSummaryCandidate(1L, 5L, now.plusMinutes(1)),
+                new RecipeReviewSummaryCandidate(2L, 5L, now.plusMinutes(2)),
+                new RecipeReviewSummaryCandidate(3L, 5L, now.plusMinutes(3)),
+                new RecipeReviewSummaryCandidate(4L, 5L, now.plusMinutes(4))
+        ));
+        when(recipeService.findSummaries(anyCollection())).thenReturn(Map.of(
+                3L, new RecipeSummary(3L, "김치찌개", "img", "이전 요약이에요.")
+        ));
+        // 3L은 기존 요약 이후 후기가 바뀌어 대상이 된다
+        when(recipeService.findUpdatedAts(anyCollection())).thenReturn(Map.of(3L, now.minusDays(1)));
+
+        when(recipeReviewRepository.findRecentReviewsByRecipeId(eq(4L), anyInt())).thenReturn(List.of());
+        when(recipeReviewRepository.findRecentReviewsByRecipeId(eq(3L), anyInt())).thenReturn(List.of(
+                new RecipeReviewContentDto(5, "김치를 먼저 볶으니 맛있어요"),
+                new RecipeReviewContentDto(4, "돼지고기를 넣으면 좋아요")
+        ));
+        when(recipeReviewRepository.findRecentReviewsByRecipeId(eq(2L), anyInt()))
+                .thenReturn(List.of(new RecipeReviewContentDto(5, "굿")));
+        when(recipeReviewRepository.findRecentReviewsByRecipeId(eq(1L), anyInt()))
+                .thenReturn(List.of(new RecipeReviewContentDto(5, "좋아요")));
+
+        mockChatClientCall();
+        when(responseSpec.chatResponse())
+                .thenReturn(
+                        chatResponse("김치를 먼저 볶으면 맛이 깊어져요.", 100, 20),
+                        chatResponse("   ", 50, 10)
+                )
+                .thenThrow(new RuntimeException("OpenAI 연결 실패\n상세 스택"));
+
+        ReviewSummaryResult result = facade.runOnce(SCHEDULED_BUDGET);
+
+        assertThat(result.targetCount()).isEqualTo(4);
+        assertThat(result.successCount()).isEqualTo(1);
+        assertThat(result.skippedCount()).isEqualTo(2);
+        assertThat(result.failedCount()).isEqualTo(1);
+
+        assertThat(result.items())
+                .extracting(
+                        ReviewSummaryItem::recipeId,
+                        ReviewSummaryItem::status,
+                        ReviewSummaryItem::reason,
+                        ReviewSummaryItem::reviewCount,
+                        ReviewSummaryItem::inputTokens,
+                        ReviewSummaryItem::outputTokens
+                )
+                .containsExactly(
+                        tuple(4L, ReviewSummaryItemStatus.SKIPPED, "요약할 후기가 없음", 0, null, null),
+                        tuple(3L, ReviewSummaryItemStatus.SUCCESS, null, 2, 100, 20),
+                        tuple(2L, ReviewSummaryItemStatus.SKIPPED, "요약이 비어 있음", 1, 50, 10),
+                        tuple(1L, ReviewSummaryItemStatus.FAILED, "OpenAI 연결 실패", 1, null, null)
+                );
+
+        ReviewSummaryItem success = result.items().get(1);
+        assertThat(success.recipeName()).isEqualTo("김치찌개");
+        assertThat(success.previousSummary()).isEqualTo("이전 요약이에요.");
+        assertThat(success.newSummary()).isEqualTo("김치를 먼저 볶으면 맛이 깊어져요.");
+        // (100 × 0.15 + 20 × 0.60) / 1,000,000
+        assertThat(success.costUsd()).isCloseTo(0.000027, within(1e-12));
+        assertThat(result.items().get(2).newSummary()).isNull();
+        assertThat(result.items().get(3).costUsd()).isNull();
+
+        // 요약이 비어 건너뛴 호출(50/10)도 합계에 포함
+        assertThat(result.totalInputTokens()).isEqualTo(150);
+        assertThat(result.totalOutputTokens()).isEqualTo(30);
+        // (150 × 0.15 + 30 × 0.60) / 1,000,000
+        assertThat(result.totalCostUsd()).isCloseTo(0.0000405, within(1e-12));
+    }
+
+    @Test
+    @DisplayName("관리자 실행 예산(20초)이 지나면 남은 레시피는 SKIPPED(시간 초과로 다음 실행)로 items에 들어간다")
+    void adminBudgetExceededAddsRemainingAsSkippedItems() {
+        LocalDateTime now = LocalDateTime.now();
+        when(recipeReviewRepository.findSummaryCandidatesWithMinReviews()).thenReturn(List.of(
+                new RecipeReviewSummaryCandidate(1L, 5L, now.plusMinutes(1)),
+                new RecipeReviewSummaryCandidate(2L, 5L, now.plusMinutes(2)),
+                new RecipeReviewSummaryCandidate(3L, 5L, now.plusMinutes(3))
+        ));
+        when(recipeService.findSummaries(anyCollection())).thenReturn(Collections.emptyMap());
+        when(recipeService.findUpdatedAts(anyCollection())).thenReturn(Collections.emptyMap());
+        when(recipeReviewRepository.findRecentReviewsByRecipeId(anyLong(), anyInt()))
+                .thenReturn(List.of(new RecipeReviewContentDto(5, "맛있어요")));
+        mockChatClientReturn("약불로 조리하면 맛있어요.");
+
+        Instant startInstant = Instant.parse("2026-10-30T00:00:00Z");
+        Clock mockClock = mock(Clock.class);
+        when(mockClock.instant()).thenReturn(
+                startInstant,                  // startTime
+                startInstant.plusSeconds(10),  // 첫 번째 레시피(3L) 진입 (20초 미만 → 계속)
+                startInstant.plusSeconds(20),  // 두 번째 레시피(2L) 진입 (20초 도달 → 중단)
+                startInstant.plusSeconds(20)   // elapsedMillis
+        );
+        ReviewSummaryFacade facadeWithMockClock = new ReviewSummaryFacade(
+                recipeReviewRepository,
+                recipeService,
+                chatClient,
+                costCalculator,
+                mockClock
+        );
+
+        ReviewSummaryResult result = facadeWithMockClock.runOnce(ADMIN_BUDGET);
+
+        assertThat(result.targetCount()).isEqualTo(3);
+        assertThat(result.successCount()).isEqualTo(1);
+        assertThat(result.skippedCount()).isEqualTo(2);
+        assertThat(result.elapsedMillis()).isEqualTo(20_000L);
+        assertThat(result.items())
+                .extracting(
+                        ReviewSummaryItem::recipeId,
+                        ReviewSummaryItem::status,
+                        ReviewSummaryItem::reason,
+                        ReviewSummaryItem::reviewCount
+                )
+                .containsExactly(
+                        tuple(3L, ReviewSummaryItemStatus.SUCCESS, null, 1),
+                        tuple(2L, ReviewSummaryItemStatus.SKIPPED, "시간 초과로 다음 실행", null),
+                        tuple(1L, ReviewSummaryItemStatus.SKIPPED, "시간 초과로 다음 실행", null)
+                );
+        verify(recipeService, never()).updateTipSummary(eq(2L), anyString());
     }
 }
