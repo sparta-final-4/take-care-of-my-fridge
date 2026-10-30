@@ -2,6 +2,7 @@ api.ts
 apis/admin-audit-controller-api.ts
 apis/admin-deal-analysis-controller-api.ts
 apis/admin-forecast-controller-api.ts
+apis/admin-image-controller-api.ts
 apis/admin-member-controller-api.ts
 apis/admin-product-controller-api.ts
 apis/admin-recipe-controller-api.ts
@@ -50,6 +51,7 @@ models/api-response-email-availability-response.ts
 models/api-response-forecast-response.ts
 models/api-response-fridge-item-response.ts
 models/api-response-fridge-item-take-out-response.ts
+models/api-response-image-upload-url-response.ts
 models/api-response-list-chat-message-response.ts
 models/api-response-list-fridge-item-response.ts
 models/api-response-list-popular-recipe-response.ts
@@ -129,6 +131,8 @@ models/fridge-item-search-request.ts
 models/fridge-item-take-out-request.ts
 models/fridge-item-take-out-response.ts
 models/fridge-item-update-request.ts
+models/image-upload-url-request.ts
+models/image-upload-url-response.ts
 models/index.ts
 models/ingredient-deduction-response.ts
 models/ingredient-detail.ts
