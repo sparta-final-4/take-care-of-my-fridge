@@ -10,15 +10,16 @@ import static org.mockito.Mockito.when;
 
 import java.time.LocalDate;
 import org.example.takecareofmyfridgebe.domain.admin.entity.AdminAuditLog;
+import org.example.takecareofmyfridgebe.domain.admin.facade.AdminActionGuard;
 import org.example.takecareofmyfridgebe.domain.admin.service.AdminAuditLogService;
 import org.example.takecareofmyfridgebe.domain.deal.entity.DealAnalysis;
 import org.example.takecareofmyfridgebe.domain.deal.service.DealAnalysisExecutionService;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -27,7 +28,12 @@ class DealAnalysisExecutionFacadeTest {
 
     @Mock private DealAnalysisExecutionService executionService;
     @Mock private AdminAuditLogService auditLogService;
-    @InjectMocks private DealAnalysisExecutionFacade facade;
+    private DealAnalysisExecutionFacade facade;
+
+    @BeforeEach
+    void setUp() {
+        facade = new DealAnalysisExecutionFacade(executionService, new AdminActionGuard(auditLogService));
+    }
 
     @Test
     void deniesUserAndRecordsDenial() {

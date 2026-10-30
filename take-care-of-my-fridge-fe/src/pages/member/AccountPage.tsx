@@ -17,13 +17,12 @@ import { useState } from 'react';
 
 import { useAuthStore } from '@/common/auth/authStore';
 import { getErrorCode, getErrorMessage, isUnauthorized } from '@/common/api/errors';
-import {
-  changeNickname,
-  changePassword,
-  changeTastes,
-  type ChangePasswordRequest,
-  type MyInfoResponse,
-} from '@/domains/member/api';
+import type {
+  ChangePasswordRequest,
+  MyInfoResponse,
+  MyInfoResponseTastesEnum,
+} from '@/common/api/clients';
+import { changeNickname, changePassword, changeTastes } from '@/domains/member/api';
 import { ROLE_LABELS, TASTE_OPTIONS } from '@/domains/member/labels';
 import { memberQueries } from '@/domains/member/queries';
 
@@ -36,7 +35,7 @@ function AccountForms({ member }: { member: MyInfoResponse }) {
   const [passwordForm] = Form.useForm<ChangePasswordRequest & { confirm: string }>();
   const [checkedNickname, setCheckedNickname] = useState<string>();
   const [checking, setChecking] = useState(false);
-  const [tastes, setTastes] = useState(member.tastes);
+  const [tastes, setTastes] = useState(member.tastes ?? []);
 
   const saved = async () => {
     await queryClient.invalidateQueries({ queryKey: memberQueries.me().queryKey });
@@ -79,7 +78,9 @@ function AccountForms({ member }: { member: MyInfoResponse }) {
         <Typography.Paragraph>
           가입일: {dayjs(member.createdAt).format('YYYY-MM-DD')}
         </Typography.Paragraph>
-        <Typography.Paragraph>역할: {ROLE_LABELS[member.role]}</Typography.Paragraph>
+        <Typography.Paragraph>
+          역할: {member.role ? ROLE_LABELS[member.role] : '-'}
+        </Typography.Paragraph>
       </Card>
       <Card title="닉네임 변경">
         <Form
@@ -128,7 +129,7 @@ function AccountForms({ member }: { member: MyInfoResponse }) {
         <Checkbox.Group
           options={TASTE_OPTIONS}
           value={tastes}
-          onChange={(values) => setTastes(values as MyInfoResponse['tastes'])}
+          onChange={(values) => setTastes(values as MyInfoResponseTastesEnum[])}
         />
         <div className={styles.cardAction}>
           <Button

@@ -41,6 +41,10 @@ app:
     bucket: ${IMAGE_BUCKET}
     key-prefix: ${IMAGE_KEY_PREFIX}
     public-base-url: ${IMAGE_PUBLIC_BASE_URL}
+
+# 배포 compose에서는 같은 네트워크의 forecast-worker 컨테이너로 붙는다(기존 코드 기본값과 같다).
+forecast:
+  worker-url: ${FORECAST_WORKER_URL:http://forecast-worker:8091}
     
 portone:
   api-secret: ${PORTONE_API_SECRET}

@@ -103,6 +103,8 @@ export default function AdminDealPage() {
         dayOfWeek: values.dayOfWeek,
         discountRate: values.discountRate,
       }),
+    // 실패 문구를 아래 onError에서 직접 띄우므로 전역 알림은 끈다.
+    meta: { skipGlobalError: true },
     onSuccess: () => {
       void message.success('할인 후보 분석을 완료했습니다.');
       return queryClient.invalidateQueries({ queryKey: dealQueries.all });

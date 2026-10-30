@@ -27,14 +27,17 @@ public class SettlementCommandService {
         DailySalesSum sum = salesHistoryRepository.sumSalesBetween(salesDate.atStartOfDay(),
                 salesDate.plusDays(1).atStartOfDay());
         int paidCount = Math.toIntExact(sum.paidCount());
+        int refundedCount = Math.toIntExact(sum.refundedCount());
 
         dailySalesRepository.findBySalesDate(salesDate).ifPresentOrElse(
-                dailySales -> dailySales.reaggregate(sum.paidAmount(), sum.refundedAmount(), paidCount),
+                dailySales -> dailySales.reaggregate(sum.paidAmount(), sum.refundedAmount(), paidCount,
+                        refundedCount),
                 () -> dailySalesRepository.saveAndFlush(DailySales.builder()
                         .salesDate(salesDate)
                         .paidAmount(sum.paidAmount())
                         .refundedAmount(sum.refundedAmount())
                         .paidCount(paidCount)
+                        .refundedCount(refundedCount)
                         .build()));
     }
 }

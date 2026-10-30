@@ -41,7 +41,7 @@ class SettlementCommandServiceTest {
 
     @BeforeEach
     void setUp() {
-        given(salesHistoryRepository.sumSalesBetween(FROM, TO)).willReturn(new DailySalesSum(50000L, 3L, 70000L));
+        given(salesHistoryRepository.sumSalesBetween(FROM, TO)).willReturn(new DailySalesSum(50000L, 3L, 70000L, 2L));
     }
 
     @Test
@@ -58,6 +58,7 @@ class SettlementCommandServiceTest {
         assertThat(saved.getPaidAmount()).isEqualTo(50000L);
         assertThat(saved.getRefundedAmount()).isEqualTo(70000L);
         assertThat(saved.getPaidCount()).isEqualTo(3);
+        assertThat(saved.getRefundedCount()).isEqualTo(2);
         assertThat(saved.getNetAmount()).isEqualTo(-20000L);
     }
 
@@ -73,6 +74,7 @@ class SettlementCommandServiceTest {
         assertThat(existing.getPaidAmount()).isEqualTo(50000L);
         assertThat(existing.getRefundedAmount()).isEqualTo(70000L);
         assertThat(existing.getPaidCount()).isEqualTo(3);
+        assertThat(existing.getRefundedCount()).isEqualTo(2);
         verify(dailySalesRepository, never()).saveAndFlush(any());
     }
 }

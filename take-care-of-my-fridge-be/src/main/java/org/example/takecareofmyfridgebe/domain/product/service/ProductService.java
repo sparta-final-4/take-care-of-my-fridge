@@ -27,6 +27,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -104,6 +105,29 @@ public class ProductService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.PRODUCT_NOT_FOUND));
 
         return toDetail(product);
+    }
+
+    /**
+     * 구매 확정된 상품을 냉장고에 넣을 때 쓴다. 산 뒤에 판매 중지된 상품도 넣어야 해서 상태로 거르지 않는다.
+     * 상품과 종류별 상세를 한 번에 조회하고, 없는 상품은 뺀다. 상세 행이 없으면 상세는 null이다.
+     */
+    public List<ProductDetail> getProductDetailsByIds(Collection<Long> productIds) {
+        if (productIds.isEmpty()) {
+            return List.of();
+        }
+        Map<Long, IngredientProduct> ingredientsByProductId = ingredientProductRepository.findByProductIdIn(productIds)
+                .stream()
+                .collect(Collectors.toMap(detail -> detail.getProduct().getId(), Function.identity()));
+        Map<Long, MealkitProduct> mealkitsByProductId = mealkitProductRepository.findByProductIdIn(productIds)
+                .stream()
+                .collect(Collectors.toMap(detail -> detail.getProduct().getId(), Function.identity()));
+
+        return productRepository.findAllById(productIds).stream()
+                .map(product -> switch (product.getProductType()) {
+                    case INGREDIENT -> ProductDetail.ofIngredient(product, ingredientsByProductId.get(product.getId()));
+                    case MEALKIT -> ProductDetail.ofMealkit(product, mealkitsByProductId.get(product.getId()));
+                })
+                .toList();
     }
 
     private ProductDetail toDetail(Product product) {

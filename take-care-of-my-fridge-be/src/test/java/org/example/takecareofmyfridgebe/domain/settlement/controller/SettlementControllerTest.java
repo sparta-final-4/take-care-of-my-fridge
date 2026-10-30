@@ -5,6 +5,8 @@ import org.example.takecareofmyfridgebe.domain.auth.service.JwtTokenService;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 import org.example.takecareofmyfridgebe.domain.settlement.dto.SalesAmountResponse;
 import org.example.takecareofmyfridgebe.domain.settlement.dto.SalesPeriodUnit;
+import org.example.takecareofmyfridgebe.domain.settlement.dto.SettlementPaymentResponse;
+import org.example.takecareofmyfridgebe.domain.settlement.dto.SettlementPaymentSearchRequest;
 import org.example.takecareofmyfridgebe.domain.settlement.dto.SettlementPeriodResponse;
 import org.example.takecareofmyfridgebe.domain.settlement.dto.SettlementResponse;
 import org.example.takecareofmyfridgebe.domain.settlement.dto.SettlementSearchRequest;
@@ -12,6 +14,7 @@ import org.example.takecareofmyfridgebe.domain.settlement.dto.TodaySalesResponse
 import org.example.takecareofmyfridgebe.domain.settlement.facade.SettlementQueryFacade;
 import org.example.takecareofmyfridgebe.global.config.SecurityConfig;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
+import org.example.takecareofmyfridgebe.global.response.PageResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -61,7 +64,7 @@ class SettlementControllerTest {
     void adminGetsSettlement() throws Exception {
         LocalDate start = TODAY.minusDays(1);
         SettlementSearchRequest request = new SettlementSearchRequest(SalesPeriodUnit.DAY, start, TODAY);
-        SalesAmountResponse sales = SalesAmountResponse.of(30000, 10000, 2);
+        SalesAmountResponse sales = SalesAmountResponse.of(30000, 10000, 2, 1);
         when(settlementQueryFacade.getSettlement(request)).thenReturn(new SettlementResponse(sales,
                 List.of(SettlementPeriodResponse.of(start, start, sales))));
 
@@ -125,12 +128,49 @@ class SettlementControllerTest {
     @DisplayName("관리자는 오늘 지금까지의 매출을 조회한다")
     void adminGetsTodaySales() throws Exception {
         when(settlementQueryFacade.getTodaySales())
-                .thenReturn(new TodaySalesResponse(TODAY, SalesAmountResponse.of(5000, 0, 1)));
+                .thenReturn(new TodaySalesResponse(TODAY, SalesAmountResponse.of(5000, 0, 1, 0)));
 
         mvc.perform(get("/api/admin/settlements/today").with(authenticationFor(Member.Role.ADMIN)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.salesDate").value(TODAY.toString()))
                 .andExpect(jsonPath("$.data.sales.paidAmount").value(5000));
+    }
+
+    @Test
+    @DisplayName("관리자는 기간 안의 결제를 한 건씩 페이지로 조회한다")
+    void adminGetsPayments() throws Exception {
+        SettlementPaymentSearchRequest request = new SettlementPaymentSearchRequest(TODAY, TODAY, 2, 10);
+        SettlementPaymentResponse payment = new SettlementPaymentResponse(41L, TODAY.atTime(13, 12),
+                "20261030-000001", "구매자", 12000L, 3000L, 9000L);
+        when(settlementQueryFacade.getPayments(request))
+                .thenReturn(new PageResponse<>(List.of(payment), 2, 10, 11, 2, true));
+
+        mvc.perform(get("/api/admin/settlements/payments")
+                        .param("startDate", TODAY.toString())
+                        .param("endDate", TODAY.toString())
+                        .param("page", "2")
+                        .param("size", "10")
+                        .with(authenticationFor(Member.Role.ADMIN)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content[0].orderNumber").value("20261030-000001"))
+                .andExpect(jsonPath("$.data.content[0].buyerName").value("구매자"))
+                .andExpect(jsonPath("$.data.content[0].netAmount").value(9000))
+                .andExpect(jsonPath("$.data.totalElements").value(11));
+
+        verify(settlementQueryFacade).getPayments(request);
+    }
+
+    @Test
+    @DisplayName("결제 건별 조회도 정산 조회와 같은 기간 규칙으로 막는다")
+    void paymentsOverThreeMonths_returnsBadRequest() throws Exception {
+        mvc.perform(get("/api/admin/settlements/payments")
+                        .param("startDate", TODAY.minusMonths(3).toString())
+                        .param("endDate", TODAY.toString())
+                        .with(authenticationFor(Member.Role.ADMIN)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.message").value("조회 기간은 최대 3개월입니다."));
+
+        verifyNoInteractions(settlementQueryFacade);
     }
 
     private RequestPostProcessor authenticationFor(Member.Role role) {

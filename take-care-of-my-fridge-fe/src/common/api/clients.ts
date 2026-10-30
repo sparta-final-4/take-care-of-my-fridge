@@ -27,6 +27,7 @@ import {
   ReviewSummaryAdminControllerApi,
   SaleControllerApi,
   SearchControllerApi,
+  SettlementControllerApi,
 } from './generated';
 
 // 생성된 API 클래스의 인스턴스는 여기서만 만든다. 도메인 api.ts에서만 import한다.
@@ -77,5 +78,6 @@ export const adminSaleEventApi = new AdminSaleEventControllerApi(
   basePath,
   axiosInstance,
 );
+export const adminSettlementApi = new SettlementControllerApi(undefined, basePath, axiosInstance);
 
 export * from './generated/models';

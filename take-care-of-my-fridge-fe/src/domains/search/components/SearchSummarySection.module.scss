@@ -1,3 +1,4 @@
+@use '@/styles/variables' as *;
 @use '@/styles/mixins' as *;
 
 // 레시피·재료 목록 화면과 구분되도록 검색어를 크게 보여 주는 머리 영역
@@ -19,6 +20,23 @@
 
 .keyword {
   color: var(--ant-color-primary);
+}
+
+// 모바일에서는 누르기 쉬운 높이로 키운다.
+.countLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: $touch-target-size;
+  border-radius: var(--ant-border-radius-lg);
+
+  @include from(md) {
+    min-height: auto;
+  }
+
+  &:hover .countTag {
+    color: var(--ant-color-primary);
+    border-color: var(--ant-color-primary);
+  }
 }
 
 .countTag {

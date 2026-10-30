@@ -1,6 +1,7 @@
 package org.example.takecareofmyfridgebe.domain.order.repository;
 
 import org.example.takecareofmyfridgebe.domain.order.dto.DailyProductSales;
+import org.example.takecareofmyfridgebe.domain.order.dto.SaleEventItemQuantity;
 import org.example.takecareofmyfridgebe.domain.order.entity.OrderItem;
 import org.example.takecareofmyfridgebe.domain.order.entity.OrderStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -8,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 
 public interface OrderItemRepository extends JpaRepository<OrderItem, Long> {
@@ -53,24 +55,28 @@ public interface OrderItemRepository extends JpaRepository<OrderItem, Long> {
         @Param("asOf") LocalDateTime asOf
     );
 
-    // 행사 상품에 연결된 구매 확정 후 환불 차감 수량. 기준 시각 뒤의 확정은 제외한다.
+    // 행사 상품별 구매 확정 후 환불 차감 수량. 기준 시각 뒤의 확정은 제외한다.
     @Query("""
-        select coalesce(sum(oi.confirmedQuantity), 0)
+        select new org.example.takecareofmyfridgebe.domain.order.dto.SaleEventItemQuantity(
+            oi.saleEventItemId, coalesce(sum(oi.confirmedQuantity), 0))
         from OrderItem oi join oi.order o
-        where oi.saleEventItemId = :saleEventItemId and o.status = :status
+        where oi.saleEventItemId in :saleEventItemIds and o.status = :status
           and o.confirmedAt <= :asOf
+        group by oi.saleEventItemId
         """)
-    long sumConfirmedSaleQuantity(@Param("saleEventItemId") Long saleEventItemId,
-                                  @Param("status") OrderStatus status,
-                                  @Param("asOf") LocalDateTime asOf);
+    List<SaleEventItemQuantity> sumConfirmedSaleQuantities(
+        @Param("saleEventItemIds") Collection<Long> saleEventItemIds,
+        @Param("status") OrderStatus status,
+        @Param("asOf") LocalDateTime asOf);
 
-    // 미확정 결제 주문이 남은 행사는 실제 판매 수량이 아직 완결되지 않았다.
+    // 미확정 결제 주문이 남은 행사 상품. 이런 행사는 실제 판매 수량이 아직 완결되지 않았다.
     @Query("""
-        select count(oi) from OrderItem oi join oi.order o
-        where oi.saleEventItemId = :saleEventItemId and o.status = :status
+        select distinct oi.saleEventItemId from OrderItem oi join oi.order o
+        where oi.saleEventItemId in :saleEventItemIds and o.status = :status
           and o.paidAt <= :asOf
         """)
-    long countUnconfirmedPaidSaleOrders(@Param("saleEventItemId") Long saleEventItemId,
-                                        @Param("status") OrderStatus status,
-                                        @Param("asOf") LocalDateTime asOf);
+    List<Long> findSaleEventItemIdsWithUnconfirmedPaidOrders(
+        @Param("saleEventItemIds") Collection<Long> saleEventItemIds,
+        @Param("status") OrderStatus status,
+        @Param("asOf") LocalDateTime asOf);
 }

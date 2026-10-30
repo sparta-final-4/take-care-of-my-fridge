@@ -7,7 +7,11 @@ import { SectionCard } from '@/common/components/SectionCard';
 import { SectionLoading } from '@/common/components/SectionLoading';
 import { RecipeCard } from '@/domains/recipe/components/RecipeCard';
 import { searchQueries } from '@/domains/search/queries';
-import { SEARCH_RECIPE_PAGE_SIZE, useSearchKeyword } from '@/domains/search/hooks/useSearchKeyword';
+import {
+  SEARCH_RECIPE_PAGE_SIZE,
+  SEARCH_SECTION_IDS,
+  useSearchKeyword,
+} from '@/domains/search/hooks/useSearchKeyword';
 
 export function SearchRecipeSection() {
   const { keyword, page, setPage, recipeRequest } = useSearchKeyword();
@@ -17,14 +21,18 @@ export function SearchRecipeSection() {
 
   const handleChangePage = (nextPage: number) => {
     setPage(nextPage);
-    window.scrollTo({ top: 0 });
+    // 화면 맨 위가 아니라 레시피 섹션 상단으로 올린다.
+    document.getElementById(SEARCH_SECTION_IDS.recipes)?.scrollIntoView();
   };
 
   const totalElements = data?.totalElements ?? 0;
   const recipes = data?.content ?? [];
 
   return (
-    <SectionCard title={data ? `레시피 ${totalElements.toLocaleString('ko-KR')}` : '레시피'}>
+    <SectionCard
+      id={SEARCH_SECTION_IDS.recipes}
+      title={data ? `레시피 ${totalElements.toLocaleString('ko-KR')}` : '레시피'}
+    >
       {isPending ? (
         <Skeleton active paragraph={{ rows: 6 }} />
       ) : isError ? (

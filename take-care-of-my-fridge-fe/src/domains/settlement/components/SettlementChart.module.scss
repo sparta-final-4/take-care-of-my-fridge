@@ -1,0 +1,11 @@
+@use '@/styles/variables' as *;
+@use '@/styles/mixins' as *;
+
+.chart {
+  width: 100%;
+  height: $settlement-chart-height;
+
+  @include from(md) {
+    height: $settlement-chart-height-md;
+  }
+}

@@ -5,10 +5,14 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.order.dto.DailyProductSales;
+import org.example.takecareofmyfridgebe.domain.order.dto.SaleEventItemQuantity;
 import org.example.takecareofmyfridgebe.domain.order.entity.OrderStatus;
 import org.example.takecareofmyfridgebe.domain.order.repository.OrderItemRepository;
 import org.example.takecareofmyfridgebe.domain.order.service.OrderSalesService;
@@ -29,18 +33,29 @@ public class DealTrainingObservationService {
     private final OrderSalesService orderSalesService;
 
     public List<DealDiscountModel.Observation> getObservations(LocalDateTime asOf) {
+        List<SaleEventItem> items = saleEventItemRepository.findFinishedForTraining(
+                SaleEventType.SPECIAL, asOf.minusDays(7));
+        if (items.isEmpty()) {
+            return List.of();
+        }
+        // 행사 상품마다 쿼리를 보내지 않도록 주문 집계를 한 번에 읽는다.
+        List<Long> itemIds = items.stream().map(SaleEventItem::getId).toList();
+        Set<Long> unfinishedItemIds = new HashSet<>(orderItemRepository
+                .findSaleEventItemIdsWithUnconfirmedPaidOrders(itemIds, OrderStatus.PAID, asOf));
+        Map<Long, Long> soldQuantities = orderItemRepository
+                .sumConfirmedSaleQuantities(itemIds, OrderStatus.CONFIRMED, asOf).stream()
+                .collect(Collectors.toMap(SaleEventItemQuantity::saleEventItemId, SaleEventItemQuantity::quantity));
         Map<Long, List<DailyProductSales>> regularSalesByEvent = new HashMap<>();
-        return saleEventItemRepository.findFinishedForTraining(SaleEventType.SPECIAL, asOf.minusDays(7))
-                .stream()
-                .filter(item -> orderItemRepository.countUnconfirmedPaidSaleOrders(
-                        item.getId(), OrderStatus.PAID, asOf) == 0)
-                .map(item -> observation(item, asOf, regularSalesByEvent))
+        return items.stream()
+                .filter(item -> !unfinishedItemIds.contains(item.getId()))
+                .map(item -> observation(item, asOf, regularSalesByEvent,
+                        soldQuantities.getOrDefault(item.getId(), 0L)))
                 .filter(observation -> observation.expectedRegularQuantity() > 0)
                 .toList();
     }
 
     private DealDiscountModel.Observation observation(SaleEventItem item, LocalDateTime asOf,
-            Map<Long, List<DailyProductSales>> regularSalesByEvent) {
+            Map<Long, List<DailyProductSales>> regularSalesByEvent, long actualQuantity) {
         SaleEvent event = item.getSaleEvent();
         List<DailyProductSales> regularSales = regularSalesByEvent.computeIfAbsent(event.getId(), id ->
                 orderSalesService.getDailyRegularProductSales(
@@ -63,8 +78,6 @@ public class DealTrainingObservationService {
             double fraction = Duration.between(from, to).toSeconds() / 86400.0;
             regularQuantity += quantityByWeekday.getOrDefault(day.getDayOfWeek(), 0L) / 4.0 * fraction;
         }
-        long actualQuantity = orderItemRepository.sumConfirmedSaleQuantity(
-                item.getId(), OrderStatus.CONFIRMED, asOf);
         return new DealDiscountModel.Observation(item.getDiscountRate(), regularQuantity, actualQuantity);
     }
 }

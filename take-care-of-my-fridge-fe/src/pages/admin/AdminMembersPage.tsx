@@ -4,10 +4,12 @@ import dayjs from 'dayjs';
 import { useSearchParams } from 'react-router';
 
 import {
-  promoteMember,
   type MemberListRequest,
   type MemberSummaryResponse,
-} from '@/domains/admin/api';
+  type MemberSummaryResponseRoleEnum,
+  type MemberSummaryResponseStatusEnum,
+} from '@/common/api/clients';
+import { promoteMember } from '@/domains/admin/api';
 import { adminQueries } from '@/domains/admin/queries';
 import { ROLE_LABELS, STATUS_LABELS } from '@/domains/member/labels';
 
@@ -44,6 +46,8 @@ export default function AdminMembersPage() {
   });
 
   const confirmPromotion = (member: MemberSummaryResponse) => {
+    const { memberId } = member;
+    if (memberId === undefined) return;
     modal.confirm({
       title: '관리자로 승격하시겠습니까?',
       content: `${member.nickname} (${member.email}) 회원에게 관리자 권한을 부여합니다.`,
@@ -51,7 +55,7 @@ export default function AdminMembersPage() {
       cancelText: '취소',
       onOk: () =>
         new Promise<void>((resolve, reject) => {
-          promotion.mutate(member.memberId, {
+          promotion.mutate(memberId, {
             onSuccess: () => {
               void message.success('관리자로 승격했습니다.');
               resolve();
@@ -115,15 +119,19 @@ export default function AdminMembersPage() {
               title: '역할',
               dataIndex: 'role',
               key: 'role',
-              render: (value: MemberSummaryResponse['role']) => (
-                <Tag color={value === 'ADMIN' ? 'purple' : 'default'}>{ROLE_LABELS[value]}</Tag>
-              ),
+              render: (value?: MemberSummaryResponseRoleEnum) =>
+                value ? (
+                  <Tag color={value === 'ADMIN' ? 'purple' : 'default'}>{ROLE_LABELS[value]}</Tag>
+                ) : (
+                  '-'
+                ),
             },
             {
               title: '상태',
               dataIndex: 'status',
               key: 'status',
-              render: (value: MemberSummaryResponse['status']) => STATUS_LABELS[value],
+              render: (value?: MemberSummaryResponseStatusEnum) =>
+                value ? STATUS_LABELS[value] : '-',
             },
             {
               title: '가입일',

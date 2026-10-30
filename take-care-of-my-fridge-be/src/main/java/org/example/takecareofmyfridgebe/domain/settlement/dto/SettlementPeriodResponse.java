@@ -10,10 +10,11 @@ public record SettlementPeriodResponse(
         long paidAmount,
         long refundedAmount,
         long netAmount,
-        int paidCount
+        int paidCount,
+        int refundedCount
 ) {
     public static SettlementPeriodResponse of(LocalDate startDate, LocalDate endDate, SalesAmountResponse sales) {
         return new SettlementPeriodResponse(startDate, endDate, sales.paidAmount(), sales.refundedAmount(),
-                sales.netAmount(), sales.paidCount());
+                sales.netAmount(), sales.paidCount(), sales.refundedCount());
     }
 }

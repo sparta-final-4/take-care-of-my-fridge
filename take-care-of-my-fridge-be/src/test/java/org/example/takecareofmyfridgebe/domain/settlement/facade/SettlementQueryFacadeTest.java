@@ -2,11 +2,14 @@ package org.example.takecareofmyfridgebe.domain.settlement.facade;
 
 import org.example.takecareofmyfridgebe.domain.settlement.dto.SalesAmountResponse;
 import org.example.takecareofmyfridgebe.domain.settlement.dto.SalesPeriodUnit;
+import org.example.takecareofmyfridgebe.domain.settlement.dto.SettlementPaymentResponse;
+import org.example.takecareofmyfridgebe.domain.settlement.dto.SettlementPaymentSearchRequest;
 import org.example.takecareofmyfridgebe.domain.settlement.dto.SettlementPeriodResponse;
 import org.example.takecareofmyfridgebe.domain.settlement.dto.SettlementResponse;
 import org.example.takecareofmyfridgebe.domain.settlement.dto.SettlementSearchRequest;
 import org.example.takecareofmyfridgebe.domain.settlement.entity.DailySales;
 import org.example.takecareofmyfridgebe.domain.settlement.service.SettlementQueryService;
+import org.example.takecareofmyfridgebe.global.response.PageResponse;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -61,7 +64,7 @@ class SettlementQueryFacadeTest {
         order.verify(settlementQueryService).getDailySales(start, end);
         assertThat(response.periods()).extracting(SettlementPeriodResponse::startDate)
                 .containsExactly(date(10, 1), date(10, 2), date(10, 3));
-        assertThat(response.summary()).isEqualTo(SalesAmountResponse.of(6000, 0, 3));
+        assertThat(response.summary()).isEqualTo(SalesAmountResponse.of(6000, 0, 3, 0));
         verify(settlementQueryService, never()).getSales(any(), any());
     }
 
@@ -72,26 +75,26 @@ class SettlementQueryFacadeTest {
         given(settlementQueryService.findMissingDates(start, YESTERDAY)).willReturn(List.of());
         given(settlementQueryService.getDailySales(start, YESTERDAY))
                 .willReturn(List.of(daily(10, 28, 1000), daily(10, 29, 2000)));
-        given(settlementQueryService.getSales(TODAY.atStartOfDay(), NOW)).willReturn(SalesAmountResponse.of(500, 800, 1));
+        given(settlementQueryService.getSales(TODAY.atStartOfDay(), NOW)).willReturn(SalesAmountResponse.of(500, 800, 1, 1));
 
         SettlementResponse response = settlementQueryFacade.getSettlement(request(SalesPeriodUnit.DAY, start, TODAY), NOW);
 
         assertThat(response.periods()).containsExactly(
-                SettlementPeriodResponse.of(date(10, 28), date(10, 28), SalesAmountResponse.of(1000, 0, 1)),
-                SettlementPeriodResponse.of(date(10, 29), date(10, 29), SalesAmountResponse.of(2000, 0, 1)),
-                SettlementPeriodResponse.of(TODAY, TODAY, SalesAmountResponse.of(500, 800, 1)));
-        assertThat(response.summary()).isEqualTo(SalesAmountResponse.of(3500, 800, 3));
+                SettlementPeriodResponse.of(date(10, 28), date(10, 28), SalesAmountResponse.of(1000, 0, 1, 0)),
+                SettlementPeriodResponse.of(date(10, 29), date(10, 29), SalesAmountResponse.of(2000, 0, 1, 0)),
+                SettlementPeriodResponse.of(TODAY, TODAY, SalesAmountResponse.of(500, 800, 1, 1)));
+        assertThat(response.summary()).isEqualTo(SalesAmountResponse.of(3500, 800, 3, 1));
     }
 
     @Test
     @DisplayName("오늘만 조회하면 daily_sales는 보지 않고 지금까지의 매출만 센다")
     void getSettlement_onlyToday_skipsDailySales() {
-        given(settlementQueryService.getSales(TODAY.atStartOfDay(), NOW)).willReturn(SalesAmountResponse.of(500, 0, 1));
+        given(settlementQueryService.getSales(TODAY.atStartOfDay(), NOW)).willReturn(SalesAmountResponse.of(500, 0, 1, 0));
 
         SettlementResponse response = settlementQueryFacade.getSettlement(request(SalesPeriodUnit.DAY, TODAY, TODAY), NOW);
 
         assertThat(response.periods()).containsExactly(
-                SettlementPeriodResponse.of(TODAY, TODAY, SalesAmountResponse.of(500, 0, 1)));
+                SettlementPeriodResponse.of(TODAY, TODAY, SalesAmountResponse.of(500, 0, 1, 0)));
         verify(settlementQueryService, never()).findMissingDates(any(), any());
         verify(settlementQueryService, never()).getDailySales(any(), any());
         verifyNoInteractions(settlementFacade);
@@ -111,9 +114,9 @@ class SettlementQueryFacadeTest {
         SettlementResponse response = settlementQueryFacade.getSettlement(request(SalesPeriodUnit.WEEK, start, end), NOW);
 
         assertThat(response.periods()).containsExactly(
-                SettlementPeriodResponse.of(date(10, 7), date(10, 11), SalesAmountResponse.of(5000, 0, 5)),
-                SettlementPeriodResponse.of(date(10, 12), date(10, 14), SalesAmountResponse.of(3000, 0, 3)));
-        assertThat(response.summary()).isEqualTo(SalesAmountResponse.of(8000, 0, 8));
+                SettlementPeriodResponse.of(date(10, 7), date(10, 11), SalesAmountResponse.of(5000, 0, 5, 0)),
+                SettlementPeriodResponse.of(date(10, 12), date(10, 14), SalesAmountResponse.of(3000, 0, 3, 0)));
+        assertThat(response.summary()).isEqualTo(SalesAmountResponse.of(8000, 0, 8, 0));
     }
 
     @Test
@@ -123,14 +126,26 @@ class SettlementQueryFacadeTest {
         given(settlementQueryService.findMissingDates(start, YESTERDAY)).willReturn(List.of());
         given(settlementQueryService.getDailySales(start, YESTERDAY))
                 .willReturn(List.of(daily(9, 29, 1000), daily(9, 30, 2000), daily(10, 1, 4000), daily(10, 29, 8000)));
-        given(settlementQueryService.getSales(TODAY.atStartOfDay(), NOW)).willReturn(SalesAmountResponse.of(500, 300, 1));
+        given(settlementQueryService.getSales(TODAY.atStartOfDay(), NOW)).willReturn(SalesAmountResponse.of(500, 300, 1, 1));
 
         SettlementResponse response = settlementQueryFacade.getSettlement(request(SalesPeriodUnit.MONTH, start, TODAY), NOW);
 
         assertThat(response.periods()).containsExactly(
-                SettlementPeriodResponse.of(date(9, 15), date(9, 30), SalesAmountResponse.of(3000, 0, 2)),
-                SettlementPeriodResponse.of(date(10, 1), TODAY, SalesAmountResponse.of(12500, 300, 3)));
-        assertThat(response.summary()).isEqualTo(SalesAmountResponse.of(15500, 300, 5));
+                SettlementPeriodResponse.of(date(9, 15), date(9, 30), SalesAmountResponse.of(3000, 0, 2, 0)),
+                SettlementPeriodResponse.of(date(10, 1), TODAY, SalesAmountResponse.of(12500, 300, 3, 1)));
+        assertThat(response.summary()).isEqualTo(SalesAmountResponse.of(15500, 300, 5, 1));
+    }
+
+    @Test
+    @DisplayName("결제 건별 조회는 시작일 0시부터 종료일 다음 날 0시 전까지를 읽는다")
+    void getPayments_usesWholeDays() {
+        PageResponse<SettlementPaymentResponse> page = new PageResponse<>(List.of(), 1, 20, 0, 0, true);
+        given(settlementQueryService.getPayments(date(10, 1).atStartOfDay(), TODAY.plusDays(1).atStartOfDay(), 1, 20))
+                .willReturn(page);
+
+        assertThat(settlementQueryFacade.getPayments(new SettlementPaymentSearchRequest(date(10, 1), TODAY, null, null)))
+                .isSameAs(page);
+        verifyNoInteractions(settlementFacade);
     }
 
     private SettlementSearchRequest request(SalesPeriodUnit unit, LocalDate start, LocalDate end) {

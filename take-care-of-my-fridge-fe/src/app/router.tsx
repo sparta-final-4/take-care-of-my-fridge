@@ -112,6 +112,10 @@ export const router = createBrowserRouter([
             path: ROUTES.adminReviewSummary,
             lazy: page(() => import('@/pages/admin/AdminReviewSummaryPage')),
           },
+          {
+            path: ROUTES.adminSettlements,
+            lazy: page(() => import('@/pages/admin/AdminSettlementPage')),
+          },
         ],
       },
     ],
