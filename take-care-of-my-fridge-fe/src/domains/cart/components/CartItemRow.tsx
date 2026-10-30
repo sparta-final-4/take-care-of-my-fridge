@@ -1,5 +1,6 @@
 import { CloseOutlined, MinusOutlined, PlusOutlined } from '@ant-design/icons';
-import { Button, Checkbox, Flex, Typography } from 'antd';
+import { Button, Checkbox, Flex, InputNumber, Space, Typography } from 'antd';
+import { useState } from 'react';
 import { generatePath, Link } from 'react-router';
 
 import { ROUTES } from '@/app/paths';
@@ -43,7 +44,24 @@ export function CartItemRow({
   const { soldOut, quantity } = item;
   const sale = saleOf(item);
   const detailPath = generatePath(ROUTES.productDetail, { productId: String(item.productId) });
-  const canIncrease = !(item.saleType === 'FLASH_DROP' && quantity >= FLASH_DROP_PURCHASE_LIMIT);
+  const maxQuantity = item.saleType === 'FLASH_DROP' ? FLASH_DROP_PURCHASE_LIMIT : undefined;
+  const canIncrease = maxQuantity === undefined || quantity < maxQuantity;
+  const [draft, setDraft] = useState<number | null>(quantity);
+  const [syncedQuantity, setSyncedQuantity] = useState(quantity);
+  // 변경이 반영되거나 실패해서 수량이 바뀌면 입력칸도 그 값으로 맞춘다.
+  if (quantity !== syncedQuantity) {
+    setSyncedQuantity(quantity);
+    setDraft(quantity);
+  }
+
+  // 입력칸은 칸을 벗어날 때 한 번만 보낸다. 비우거나 그대로면 원래 수량으로 되돌린다.
+  const commitDraft = () => {
+    if (draft === null || draft === quantity) {
+      setDraft(quantity);
+      return;
+    }
+    onChangeQuantity(draft);
+  };
 
   return (
     <div className={soldOut ? styles.rowSoldOut : styles.row}>
@@ -72,25 +90,35 @@ export function CartItemRow({
         <SalePrice listPrice={item.listPrice} sale={sale} />
         {sale && <SaleInfo sale={sale} />}
       </Flex>
-      <Flex align="center" className={styles.quantity}>
+      <Space.Compact className={styles.quantity}>
         <Button
           icon={<MinusOutlined />}
           aria-label={`${item.productName} 수량 빼기`}
           disabled={soldOut || quantity <= 1}
-          className={styles.touchButton}
+          className={styles.stepButton}
           onClick={() => onChangeQuantity(quantity - 1)}
         />
-        <span className={styles.quantityValue} aria-label={`${item.productName} 수량`}>
-          {quantity}
-        </span>
+        <InputNumber
+          min={1}
+          max={maxQuantity}
+          precision={0}
+          controls={false}
+          value={draft}
+          disabled={soldOut}
+          aria-label={`${item.productName} 수량`}
+          className={styles.quantityInput}
+          onChange={setDraft}
+          onBlur={commitDraft}
+          onPressEnter={(event) => event.currentTarget.blur()}
+        />
         <Button
           icon={<PlusOutlined />}
           aria-label={`${item.productName} 수량 더하기`}
           disabled={soldOut || !canIncrease}
-          className={styles.touchButton}
+          className={styles.stepButton}
           onClick={() => onChangeQuantity(quantity + 1)}
         />
-      </Flex>
+      </Space.Compact>
       <Typography.Text strong className={styles.total}>
         {soldOut ? '-' : formatPrice(item.unitPrice * quantity)}
       </Typography.Text>

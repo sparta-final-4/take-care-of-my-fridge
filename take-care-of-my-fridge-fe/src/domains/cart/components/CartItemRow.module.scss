@@ -94,10 +94,30 @@
   grid-area: quantity;
 }
 
-.quantityValue {
-  min-width: $cart-quantity-min-width;
-  text-align: center;
-  font-variant-numeric: tabular-nums;
+.quantityInput {
+  width: calc($cart-quantity-min-width + var(--ant-padding-sm) * 2);
+
+  :global(.ant-input-number-input) {
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+// 모바일에서는 보이는 크기를 입력칸 높이에 맞춰 두고, 누르는 영역만 넓힌다.
+.stepButton {
+  position: relative;
+
+  &::after {
+    position: absolute;
+    inset: calc(($touch-target-size - var(--ant-control-height)) / -2);
+    content: '';
+  }
+
+  @include from(md) {
+    &::after {
+      content: none;
+    }
+  }
 }
 
 .total {
