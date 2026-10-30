@@ -4,7 +4,7 @@ import { useRef } from 'react';
 import { generatePath, useNavigate } from 'react-router';
 
 import { ROUTES } from '@/app/paths';
-import { getErrorCode, isOutcomeUnknown } from '@/common/api/errors';
+import { isOutcomeUnknown } from '@/common/api/errors';
 import type { CartItemResponse } from '@/domains/cart/api';
 import { formatPrice } from '@/domains/cart/format';
 import { cartChangeMutationKey, cartQueries } from '@/domains/cart/queries';
@@ -67,12 +67,12 @@ export function CartSummary({ checkedItems }: CartSummaryProps) {
           navigate(generatePath(ROUTES.orderCheckout, { orderId: String(orderId) }));
         },
         // 서버가 답한 실패는 끝난 시도다. 응답이 없거나 5xx면 주문이 만들어졌을 수 있어 키를 남긴다.
-        // 가격이 바뀌었으면(실패 알림은 서버 메시지) 장바구니를 다시 읽어 새 가격을 보여 준다. 다시 눌러야 주문된다.
+        // 가격 변경, 품절, 구매 한도 초과, 판매 중지처럼 화면의 장바구니가 서버와 달라 거절됐을 수 있으므로
+        // 장바구니를 다시 읽어 지금 상태를 보여 준다(실패 알림은 서버 메시지). 다시 눌러야 주문된다.
         onError: (error) => {
-          if (!isOutcomeUnknown(error)) attemptRef.current = null;
-          if (getErrorCode(error) === 'ORDER_010') {
-            void queryClient.invalidateQueries({ queryKey: cartQueries.all });
-          }
+          if (isOutcomeUnknown(error)) return;
+          attemptRef.current = null;
+          void queryClient.invalidateQueries({ queryKey: cartQueries.all });
         },
       },
     );

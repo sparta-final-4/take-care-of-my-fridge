@@ -4,6 +4,9 @@ services:
       context: .
       dockerfile: forecast_model/Dockerfile
     restart: unless-stopped
+    # 로컬에서 실행한 백엔드가 localhost:8091로 붙는다.
+    ports:
+      - "8091:8091"
     volumes:
       - forecast_models:/models
 

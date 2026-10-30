@@ -99,3 +99,7 @@ portone:
 
 springdoc:
   writer-with-order-by-keys: true
+
+# 주간 판매 예측 워커(forecast_model). 로컬은 루트 docker-compose가 8091 포트를 연다.
+forecast:
+  worker-url: ${FORECAST_WORKER_URL:http://localhost:8091}

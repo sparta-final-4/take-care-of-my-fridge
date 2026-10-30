@@ -2,7 +2,6 @@ import { axiosInstance } from '@/common/api/axiosInstance';
 import { cartApi, type AddCartItemRequest, type AddCartItemResponse } from '@/common/api/clients';
 import type { ApiResponse } from '@/common/api/types';
 import { unwrap } from '@/common/api/unwrap';
-import { csrfHeaders } from '@/domains/auth/api';
 
 // CartItemResponse.java와 필드·enum을 맞춘다. 할인 중이 아니면 saleType·discountRate는 null이다.
 export interface CartItemResponse {
@@ -55,7 +54,6 @@ export async function changeCartItemQuantity(
   const { data } = await axiosInstance.patch<ApiResponse<ChangeCartItemQuantityResponse>>(
     `/api/cart-items/${encodeURIComponent(cartItemId)}`,
     request,
-    { headers: await csrfHeaders() },
   );
   return data.data;
 }
@@ -64,6 +62,5 @@ export async function changeCartItemQuantity(
 export async function removeCartItems(cartItemIds: number[]) {
   await axiosInstance.delete('/api/cart-items', {
     params: { cartItemIds: cartItemIds.join(',') },
-    headers: await csrfHeaders(),
   });
 }
