@@ -2,9 +2,12 @@ package org.example.takecareofmyfridgebe.domain.settlement.service;
 
 import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.settlement.dto.SalesAmountResponse;
+import org.example.takecareofmyfridgebe.domain.settlement.dto.SettlementPaymentResponse;
 import org.example.takecareofmyfridgebe.domain.settlement.entity.DailySales;
 import org.example.takecareofmyfridgebe.domain.settlement.repository.DailySalesRepository;
 import org.example.takecareofmyfridgebe.domain.settlement.repository.SalesHistoryRepository;
+import org.example.takecareofmyfridgebe.global.response.PageResponse;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,5 +40,12 @@ public class SettlementQueryService {
     // 아직 끝나지 않은 날의 from부터 to 전까지 매출. 저장하지 않고 결제 이력으로 바로 센다
     public SalesAmountResponse getSales(LocalDateTime from, LocalDateTime to) {
         return SalesAmountResponse.from(salesHistoryRepository.sumSalesBetween(from, to));
+    }
+
+    // from 이상 to 미만에 결제·환불이 있었던 결제를 한 건씩. page는 1부터 센다
+    public PageResponse<SettlementPaymentResponse> getPayments(LocalDateTime from, LocalDateTime to, int page,
+                                                               int size) {
+        return PageResponse.of(salesHistoryRepository.findPaymentSalesBetween(from, to, PageRequest.of(page - 1, size))
+                .map(SettlementPaymentResponse::from));
     }
 }

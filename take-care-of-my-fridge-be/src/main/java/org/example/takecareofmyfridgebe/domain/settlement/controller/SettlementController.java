@@ -2,11 +2,14 @@ package org.example.takecareofmyfridgebe.domain.settlement.controller;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.example.takecareofmyfridgebe.domain.settlement.dto.SettlementPaymentResponse;
+import org.example.takecareofmyfridgebe.domain.settlement.dto.SettlementPaymentSearchRequest;
 import org.example.takecareofmyfridgebe.domain.settlement.dto.SettlementResponse;
 import org.example.takecareofmyfridgebe.domain.settlement.dto.SettlementSearchRequest;
 import org.example.takecareofmyfridgebe.domain.settlement.dto.TodaySalesResponse;
 import org.example.takecareofmyfridgebe.domain.settlement.facade.SettlementQueryFacade;
 import org.example.takecareofmyfridgebe.global.response.ApiResponse;
+import org.example.takecareofmyfridgebe.global.response.PageResponse;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
@@ -25,6 +28,13 @@ public class SettlementController {
     public ResponseEntity<ApiResponse<SettlementResponse>> getSettlement(
             @Valid @ModelAttribute SettlementSearchRequest request) {
         return ResponseEntity.ok(ApiResponse.ok(settlementQueryFacade.getSettlement(request)));
+    }
+
+    // 결제 한 건씩. 금액은 조회 기간 안에서 일어난 결제·환불만 세므로 모든 행을 더하면 정산 조회 합계와 같다
+    @GetMapping("/payments")
+    public ResponseEntity<ApiResponse<PageResponse<SettlementPaymentResponse>>> getPayments(
+            @Valid @ModelAttribute SettlementPaymentSearchRequest request) {
+        return ResponseEntity.ok(ApiResponse.ok(settlementQueryFacade.getPayments(request)));
     }
 
     @GetMapping("/today")
