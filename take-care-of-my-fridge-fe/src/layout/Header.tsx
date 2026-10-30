@@ -140,6 +140,9 @@ export function Header() {
               <Button type="text" onClick={() => navigate(ROUTES.adminReviewSummary)}>
                 후기 요약
               </Button>
+              <Button type="text" onClick={() => navigate(ROUTES.adminSettlements)}>
+                정산
+              </Button>
             </>
           )}
           {screens.lg && status === 'authenticated' && (
@@ -275,6 +278,18 @@ export function Header() {
                 }}
               >
                 후기 요약
+              </Button>
+            )}
+            {role === 'ADMIN' && (
+              <Button
+                type="text"
+                block
+                onClick={() => {
+                  handleCloseDrawer();
+                  navigate(ROUTES.adminSettlements);
+                }}
+              >
+                정산
               </Button>
             )}
             {status === 'authenticated' && (

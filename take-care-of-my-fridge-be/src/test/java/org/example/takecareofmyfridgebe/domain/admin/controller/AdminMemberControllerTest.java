@@ -1,6 +1,7 @@
 package org.example.takecareofmyfridgebe.domain.admin.controller;
 
 import org.example.takecareofmyfridgebe.domain.admin.dto.MemberSummaryResponse;
+import org.example.takecareofmyfridgebe.domain.admin.facade.AdminActionGuard;
 import org.example.takecareofmyfridgebe.domain.admin.facade.MemberPromotionFacade;
 import org.example.takecareofmyfridgebe.domain.admin.service.MemberListService;
 import org.example.takecareofmyfridgebe.domain.admin.service.MemberPromotionService;
@@ -41,7 +42,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(AdminMemberController.class)
-@Import({SecurityConfig.class, MemberPromotionFacade.class, AdminMemberControllerTest.TestConfig.class})
+@Import({SecurityConfig.class, MemberPromotionFacade.class, AdminActionGuard.class, AdminMemberControllerTest.TestConfig.class})
 class AdminMemberControllerTest {
 
     @Autowired

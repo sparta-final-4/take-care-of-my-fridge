@@ -16,21 +16,21 @@
 
 // May contain unused imports in some cases
 // @ts-ignore
-import type { Item } from './item';
+import type { ForecastItem } from './forecast-item';
 // May contain unused imports in some cases
 // @ts-ignore
-import type { Summary } from './summary';
+import type { ForecastSummary } from './forecast-summary';
 
 export interface ForecastResponse {
     'confirmed'?: boolean;
     'confirmedAt'?: string;
     'createdAt'?: string;
     'dataCutoffAt'?: string;
-    'items'?: Array<Item>;
+    'items'?: Array<ForecastItem>;
     'modelVersion'?: string;
     'nextWeekStart'?: string;
     'previousWeekStart'?: string;
-    'summary'?: Summary;
+    'summary'?: ForecastSummary;
     'syntheticData'?: boolean;
     'weekEnd'?: string;
     'weekStart'?: string;

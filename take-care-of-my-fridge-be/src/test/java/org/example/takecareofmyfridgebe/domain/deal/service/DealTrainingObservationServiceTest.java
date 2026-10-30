@@ -9,6 +9,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import org.example.takecareofmyfridgebe.domain.order.dto.DailyProductSales;
+import org.example.takecareofmyfridgebe.domain.order.dto.SaleEventItemQuantity;
 import org.example.takecareofmyfridgebe.domain.order.entity.OrderStatus;
 import org.example.takecareofmyfridgebe.domain.order.repository.OrderItemRepository;
 import org.example.takecareofmyfridgebe.domain.order.service.OrderSalesService;
@@ -45,12 +46,12 @@ class DealTrainingObservationServiceTest {
                 .willReturn(List.of(
                         sale(2026, 9, 30), sale(2026, 10, 7),
                         sale(2026, 10, 14), sale(2026, 10, 21)));
-        given(orderItemRepository.sumConfirmedSaleQuantity(2L, OrderStatus.CONFIRMED, AS_OF))
-                .willReturn(5L);
+        given(orderItemRepository.sumConfirmedSaleQuantities(List.of(2L), OrderStatus.CONFIRMED, AS_OF))
+                .willReturn(List.of(new SaleEventItemQuantity(2L, 5L)));
 
         assertThat(service.getObservations(AS_OF))
                 .containsExactly(new DealDiscountModel.Observation(20, 2.0, 5.0));
-        verify(orderItemRepository).countUnconfirmedPaidSaleOrders(2L, OrderStatus.PAID, AS_OF);
+        verify(orderItemRepository).findSaleEventItemIdsWithUnconfirmedPaidOrders(List.of(2L), OrderStatus.PAID, AS_OF);
     }
 
     @Test
@@ -58,8 +59,8 @@ class DealTrainingObservationServiceTest {
         SaleEventItem item = item();
         given(saleEventItemRepository.findFinishedForTraining(SaleEventType.SPECIAL, AS_OF.minusDays(7)))
                 .willReturn(List.of(item));
-        given(orderItemRepository.countUnconfirmedPaidSaleOrders(2L, OrderStatus.PAID, AS_OF))
-                .willReturn(1L);
+        given(orderItemRepository.findSaleEventItemIdsWithUnconfirmedPaidOrders(List.of(2L), OrderStatus.PAID, AS_OF))
+                .willReturn(List.of(2L));
 
         assertThat(service.getObservations(AS_OF)).isEmpty();
         verifyNoInteractions(orderSalesService);
@@ -76,8 +77,8 @@ class DealTrainingObservationServiceTest {
                 .willReturn(List.of(
                         sale(2026, 9, 30), sale(2026, 10, 7),
                         sale(2026, 10, 14), sale(2026, 10, 21)));
-        given(orderItemRepository.sumConfirmedSaleQuantity(2L, OrderStatus.CONFIRMED, AS_OF))
-                .willReturn(1L);
+        given(orderItemRepository.sumConfirmedSaleQuantities(List.of(2L), OrderStatus.CONFIRMED, AS_OF))
+                .willReturn(List.of(new SaleEventItemQuantity(2L, 1L)));
 
         // 12시간 행사를 3시간 만에 닫았으므로 정상 판매 기대량은 하루 4개의 3/24다
         assertThat(service.getObservations(AS_OF))

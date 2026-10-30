@@ -7,18 +7,22 @@ public record SalesAmountResponse(
         long paidAmount,
         long refundedAmount,
         long netAmount,
-        int paidCount
+        int paidCount,
+        int refundedCount
 ) {
-    public static SalesAmountResponse of(long paidAmount, long refundedAmount, int paidCount) {
-        return new SalesAmountResponse(paidAmount, refundedAmount, paidAmount - refundedAmount, paidCount);
+    public static SalesAmountResponse of(long paidAmount, long refundedAmount, int paidCount, int refundedCount) {
+        return new SalesAmountResponse(paidAmount, refundedAmount, paidAmount - refundedAmount, paidCount,
+                refundedCount);
     }
 
     public static SalesAmountResponse from(DailySales dailySales) {
-        return of(dailySales.getPaidAmount(), dailySales.getRefundedAmount(), dailySales.getPaidCount());
+        return of(dailySales.getPaidAmount(), dailySales.getRefundedAmount(), dailySales.getPaidCount(),
+                dailySales.getRefundedCount());
     }
 
     // 아직 저장하지 않은 날(오늘)의 매출을 결제 이력 합계로 바로 만든다
     public static SalesAmountResponse from(DailySalesSum sum) {
-        return of(sum.paidAmount(), sum.refundedAmount(), Math.toIntExact(sum.paidCount()));
+        return of(sum.paidAmount(), sum.refundedAmount(), Math.toIntExact(sum.paidCount()),
+                Math.toIntExact(sum.refundedCount()));
     }
 }

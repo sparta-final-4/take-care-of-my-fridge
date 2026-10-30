@@ -1,3 +1,4 @@
+import { ReloadOutlined } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
 import { Button, Flex, Input, Tag, Typography } from 'antd';
 import { useState } from 'react';
@@ -32,6 +33,8 @@ export function RecipeSearchSection() {
     setCuisineType,
     setCategory,
     setCookTime,
+    filtered,
+    reset,
   } = useRecipeFilters();
   // 분류를 못 받아 오면 해당 칩 줄만 비워 두고 검색, 조리 시간 필터는 그대로 쓴다.
   const { data: classifications } = useQuery(recipeQueries.classifications());
@@ -85,9 +88,16 @@ export function RecipeSearchSection() {
     <SectionCard
       title="무엇을 찾고 있나요?"
       extra={
-        <Typography.Text type="secondary" className={styles.hint}>
-          조건을 고르면 아래 목록이 바로 바뀌어요
-        </Typography.Text>
+        // 조건을 하나라도 고르면 안내 문구 대신 초기화 버튼을 보여 준다.
+        filtered ? (
+          <Button type="link" icon={<ReloadOutlined />} onClick={reset} className={styles.reset}>
+            초기화
+          </Button>
+        ) : (
+          <Typography.Text type="secondary" className={styles.hint}>
+            조건을 고르면 아래 목록이 바로 바뀌어요
+          </Typography.Text>
+        )
       }
     >
       <Flex vertical gap="middle">

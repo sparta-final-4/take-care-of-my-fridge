@@ -8,7 +8,7 @@ from forecast_model.model import WINDOW_DAYS
 
 def _normalize(histories):
     if histories.ndim != 2 or histories.shape[0] == 0 or histories.shape[1] != WINDOW_DAYS:
-        raise ValueError("histories must have 28 daily quantities per row")
+        raise ValueError(f"histories must have {WINDOW_DAYS} daily quantities per row")
     if not torch.isfinite(histories).all() or (histories < 0).any():
         raise ValueError("daily quantities must be finite and nonnegative")
     scale = histories.mean(dim=1).clamp(min=1.0)

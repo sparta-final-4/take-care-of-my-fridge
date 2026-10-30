@@ -1,16 +1,30 @@
-import { Flex, Input, Tag, Typography } from 'antd';
+import { ReloadOutlined } from '@ant-design/icons';
+import { Button, Flex, Input, Tag, Typography } from 'antd';
 
 import { SectionCard } from '@/common/components/SectionCard';
-import { PRICE_RANGES } from '@/domains/product/format';
+import { PRICE_RANGES, PRODUCT_TYPE_LABELS } from '@/domains/product/format';
 import { useProductFilters } from '@/domains/product/hooks/useProductFilters';
 
 import styles from './ProductSearchSection.module.scss';
 
+const PRODUCT_TYPES = ['INGREDIENT', 'MEALKIT'] as const;
+
 export function ProductSearchSection() {
-  const { keyword, priceRangeKey, setKeyword, setPriceRange } = useProductFilters();
+  const { keyword, type, priceRangeKey, filtered, setKeyword, setType, setPriceRange, reset } =
+    useProductFilters();
 
   return (
-    <SectionCard title="어떤 재료가 필요하세요?" bracket={false}>
+    <SectionCard
+      title="어떤 재료가 필요하세요?"
+      bracket={false}
+      extra={
+        filtered && (
+          <Button type="link" icon={<ReloadOutlined />} onClick={reset} className={styles.reset}>
+            초기화
+          </Button>
+        )
+      }
+    >
       <Flex vertical gap="middle">
         {/* 입력값은 검색을 누를 때만 URL에 반영한다. 뒤로 가기로 검색어가 바뀌면 key로 입력칸을 다시 채운다. */}
         <Input.Search
@@ -24,6 +38,21 @@ export function ProductSearchSection() {
           maxLength={50}
           onSearch={setKeyword}
         />
+        <Flex align="center" gap="small" wrap>
+          <Typography.Text type="secondary" className={styles.label}>
+            종류
+          </Typography.Text>
+          {PRODUCT_TYPES.map((value) => (
+            <Tag.CheckableTag
+              key={value}
+              checked={type === value}
+              onChange={(checked) => setType(checked ? value : undefined)}
+              className={styles.chip}
+            >
+              {PRODUCT_TYPE_LABELS[value]}
+            </Tag.CheckableTag>
+          ))}
+        </Flex>
         <Flex align="center" gap="small" wrap>
           <Typography.Text type="secondary" className={styles.label}>
             가격대

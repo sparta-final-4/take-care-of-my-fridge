@@ -44,5 +44,6 @@ export * from './apis/refund-controller-api';
 export * from './apis/review-summary-admin-controller-api';
 export * from './apis/sale-controller-api';
 export * from './apis/search-controller-api';
+export * from './apis/settlement-controller-api';
 export * from './apis/webhook-controller-api';
 

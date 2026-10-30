@@ -13,6 +13,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -56,6 +57,25 @@ class AdminAuditLogServiceTest {
         assertEquals("Member", log.getTargetType());
         assertEquals(12L, log.getTargetId());
         assertEquals(AdminAuditLog.Result.SUCCESS, log.getResult());
+    }
+
+    @Test
+    void recordsBeforeAndAfterValues() {
+        Member actor = Member.builder()
+                .email("admin@example.com")
+                .passwordHash("hash")
+                .nickname("관리자")
+                .role(Member.Role.ADMIN)
+                .build();
+        when(memberRepository.findById(7L)).thenReturn(Optional.of(actor));
+
+        service.record(7L, AdminAuditLog.Action.ROLE_CHANGE, AdminAuditLog.TARGET_MEMBER, 12L,
+                AdminAuditLog.Result.SUCCESS, Map.of("role", "USER"), Map.of("role", "ADMIN"));
+
+        ArgumentCaptor<AdminAuditLog> captor = ArgumentCaptor.forClass(AdminAuditLog.class);
+        verify(auditLogRepository).save(captor.capture());
+        assertEquals(Map.of("role", "USER"), captor.getValue().getBeforeValue());
+        assertEquals(Map.of("role", "ADMIN"), captor.getValue().getAfterValue());
     }
 
     @Test

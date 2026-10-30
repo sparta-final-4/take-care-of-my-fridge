@@ -9,7 +9,7 @@ from forecast_model.training import _normalize
 def predict(model, history):
     history = torch.as_tensor(history, dtype=torch.float32)
     if history.shape != (WINDOW_DAYS,):
-        raise ValueError("history must contain 28 daily quantities")
+        raise ValueError(f"history must contain {WINDOW_DAYS} daily quantities")
     normalized, scale = _normalize(history.unsqueeze(0))
     model.eval()
     with torch.no_grad():

@@ -40,20 +40,26 @@ public class DailySales extends BaseTimeEntity {
     @Column(name = "paid_count", nullable = false)
     private int paidCount;
 
+    // 환불·콘솔 취소 건수. 부분 취소도 한 건으로 센다
+    @Column(name = "refunded_count", nullable = false)
+    private int refundedCount;
+
     @Builder
-    private DailySales(LocalDate salesDate, long paidAmount, long refundedAmount, int paidCount) {
+    private DailySales(LocalDate salesDate, long paidAmount, long refundedAmount, int paidCount, int refundedCount) {
         this.salesDate = salesDate;
         this.paidAmount = paidAmount;
         this.refundedAmount = refundedAmount;
         this.paidCount = paidCount;
+        this.refundedCount = refundedCount;
     }
 
     // 이미 집계한 날을 다시 집계하면 새로 계산한 합계로 바꾼다.
     // 스케줄러가 매번 그날 결제·환불을 처음부터 다시 세므로 몇 번 돌려도 결과가 같다
-    public void reaggregate(long paidAmount, long refundedAmount, int paidCount) {
+    public void reaggregate(long paidAmount, long refundedAmount, int paidCount, int refundedCount) {
         this.paidAmount = paidAmount;
         this.refundedAmount = refundedAmount;
         this.paidCount = paidCount;
+        this.refundedCount = refundedCount;
     }
 
     public long getNetAmount() {

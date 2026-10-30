@@ -14,13 +14,15 @@
  */
 
 
+// May contain unused imports in some cases
+// @ts-ignore
+import type { SalesAmountResponse } from './sales-amount-response';
+// May contain unused imports in some cases
+// @ts-ignore
+import type { SettlementPeriodResponse } from './settlement-period-response';
 
-export interface Summary {
-    'baselineMeanAbsoluteError'?: number;
-    'baselineTop10MatchCount'?: number;
-    'droppedCount'?: number;
-    'enteredCount'?: number;
-    'meanAbsoluteError'?: number;
-    'top10MatchCount'?: number;
+export interface SettlementResponse {
+    'periods'?: Array<SettlementPeriodResponse>;
+    'summary'?: SalesAmountResponse;
 }
 

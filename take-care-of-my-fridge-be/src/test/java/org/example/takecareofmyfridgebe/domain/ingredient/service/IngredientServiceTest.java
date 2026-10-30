@@ -3,6 +3,8 @@ package org.example.takecareofmyfridgebe.domain.ingredient.service;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.Ingredient;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.StorageType;
 import org.example.takecareofmyfridgebe.domain.ingredient.repository.IngredientRepository;
+import org.example.takecareofmyfridgebe.global.error.BusinessException;
+import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -13,10 +15,14 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
 
@@ -102,6 +108,37 @@ class IngredientServiceTest {
         // When & Then
         assertTrue(ingredientService.findBasicSeasoningIds(null).isEmpty());
         assertTrue(ingredientService.findBasicSeasoningIds(Collections.emptyList()).isEmpty());
+    }
+
+    @Test
+    @DisplayName("재료 ID 목록으로 재료를 한 번에 조회해 ID를 키로 돌려주고, 비어 있으면 조회하지 않는다")
+    void getIngredientsByIdsReturnsMapById() {
+        // Given
+        Ingredient onion = createIngredient(4L, "ING_ONION", "양파", false);
+        Ingredient tofu = createIngredient(5L, "ING_TOFU", "두부", false);
+        when(ingredientRepository.findAllById(Set.of(4L, 5L))).thenReturn(List.of(onion, tofu));
+
+        // When
+        Map<Long, Ingredient> result = ingredientService.getIngredientsByIds(Set.of(4L, 5L));
+
+        // Then
+        assertEquals(Map.of(4L, onion, 5L, tofu), result);
+        assertTrue(ingredientService.getIngredientsByIds(Collections.emptySet()).isEmpty());
+    }
+
+    @Test
+    @DisplayName("밀키트용 기본 재료(ING_MEALKIT)를 조회하고, 없으면 MEALKIT_INGREDIENT_NOT_CONFIGURED 예외를 던진다")
+    void getMealkitIngredientReturnsOrThrows() {
+        // Given
+        Ingredient mealkit = createIngredient(3L, Ingredient.ING_MEALKIT, "밀키트", false);
+        when(ingredientRepository.findByIngredientCode(Ingredient.ING_MEALKIT))
+                .thenReturn(Optional.of(mealkit))
+                .thenReturn(Optional.empty());
+
+        // When & Then
+        assertSame(mealkit, ingredientService.getMealkitIngredient());
+        BusinessException exception = assertThrows(BusinessException.class, ingredientService::getMealkitIngredient);
+        assertEquals(ErrorCode.MEALKIT_INGREDIENT_NOT_CONFIGURED, exception.getErrorCode());
     }
 
     private Ingredient createIngredient(Long id, String code, String name, boolean basicSeasoning) {

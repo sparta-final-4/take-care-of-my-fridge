@@ -3,11 +3,14 @@ package org.example.takecareofmyfridgebe.domain.settlement.facade;
 import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.settlement.dto.SalesAmountResponse;
 import org.example.takecareofmyfridgebe.domain.settlement.dto.SalesPeriodUnit;
+import org.example.takecareofmyfridgebe.domain.settlement.dto.SettlementPaymentResponse;
+import org.example.takecareofmyfridgebe.domain.settlement.dto.SettlementPaymentSearchRequest;
 import org.example.takecareofmyfridgebe.domain.settlement.dto.SettlementPeriodResponse;
 import org.example.takecareofmyfridgebe.domain.settlement.dto.SettlementResponse;
 import org.example.takecareofmyfridgebe.domain.settlement.dto.SettlementSearchRequest;
 import org.example.takecareofmyfridgebe.domain.settlement.dto.TodaySalesResponse;
 import org.example.takecareofmyfridgebe.domain.settlement.service.SettlementQueryService;
+import org.example.takecareofmyfridgebe.global.response.PageResponse;
 import org.springframework.stereotype.Component;
 
 import java.time.DayOfWeek;
@@ -53,6 +56,12 @@ public class SettlementQueryFacade {
         return group(request.unit(), startDate, endDate, days);
     }
 
+    // 건별 조회는 결제 이력을 바로 읽으므로 빈 날 집계가 필요 없다. 오늘이 들어 있으면 지금까지의 결제·환불이 나온다
+    public PageResponse<SettlementPaymentResponse> getPayments(SettlementPaymentSearchRequest request) {
+        return settlementQueryService.getPayments(request.startDate().atStartOfDay(),
+                request.endDate().plusDays(1).atStartOfDay(), request.page(), request.size());
+    }
+
     public TodaySalesResponse getTodaySales() {
         LocalDateTime now = LocalDateTime.now(ZONE);
         LocalDate today = now.toLocalDate();
@@ -96,12 +105,14 @@ public class SettlementQueryFacade {
         long paidAmount = 0;
         long refundedAmount = 0;
         int paidCount = 0;
+        int refundedCount = 0;
         for (SalesAmountResponse sale : sales) {
             paidAmount += sale.paidAmount();
             refundedAmount += sale.refundedAmount();
             paidCount += sale.paidCount();
+            refundedCount += sale.refundedCount();
         }
-        return SalesAmountResponse.of(paidAmount, refundedAmount, paidCount);
+        return SalesAmountResponse.of(paidAmount, refundedAmount, paidCount, refundedCount);
     }
 
     private LocalDate max(LocalDate a, LocalDate b) {

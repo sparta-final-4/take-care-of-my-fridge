@@ -11,6 +11,7 @@ import { ProductCard } from '@/domains/product/components/ProductCard';
 import { recordSearchClick } from '@/domains/search/api';
 import {
   SEARCH_PRODUCT_PAGE_SIZE,
+  SEARCH_SECTION_IDS,
   useSearchKeyword,
 } from '@/domains/search/hooks/useSearchKeyword';
 import { searchQueries } from '@/domains/search/queries';
@@ -34,11 +35,18 @@ export function SearchProductSection() {
     recordClick({ productId, keyword });
   };
 
+  // 페이지를 넘기면 상품 섹션 상단으로 올려 새 목록의 첫 줄부터 보이게 한다.
+  const handleChangePage = (nextPage: number) => {
+    setProductPage(nextPage);
+    document.getElementById(SEARCH_SECTION_IDS.products)?.scrollIntoView();
+  };
+
   const totalElements = data?.totalElements ?? 0;
   const products = data?.content ?? [];
 
   return (
     <SectionCard
+      id={SEARCH_SECTION_IDS.products}
       title={data ? `재료·밀키트 ${totalElements.toLocaleString('ko-KR')}` : '재료·밀키트'}
     >
       {isPending ? (
@@ -85,7 +93,7 @@ export function SearchProductSection() {
               pageSize={SEARCH_PRODUCT_PAGE_SIZE}
               total={totalElements}
               showSizeChanger={false}
-              onChange={setProductPage}
+              onChange={handleChangePage}
             />
           </Flex>
         </SectionLoading>

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-import type { MyInfoResponse } from '@/domains/member/api';
+import type { MyInfoResponse } from '@/common/api/clients';
 
 type Status = 'initializing' | 'authenticated' | 'anonymous' | 'error';
 

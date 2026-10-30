@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { App, Button, Flex, Tag, Typography } from 'antd';
 import dayjs from 'dayjs';
 import { useState } from 'react';
-import { useNavigate } from 'react-router';
+import { useLocation, useNavigate } from 'react-router';
 
 import { ROUTES } from '@/app/paths';
 import type { RecipeDetailResponse } from '@/common/api/clients';
@@ -25,6 +25,7 @@ interface RecipeCookPanelProps {
 
 export function RecipeCookPanel({ recipeId, recipe, fridgeMatch }: RecipeCookPanelProps) {
   const navigate = useNavigate();
+  const location = useLocation();
   const { modal } = App.useApp();
   const authenticated = useAuthStore((state) => state.status) === 'authenticated';
   const ingredients = recipe.ingredients ?? [];
@@ -61,7 +62,11 @@ export function RecipeCookPanel({ recipeId, recipe, fridgeMatch }: RecipeCookPan
         content: '요리 완료 기록은 로그인 후 이용할 수 있어요. 로그인 화면으로 이동할까요?',
         okText: '로그인하기',
         cancelText: '취소',
-        onOk: () => navigate(ROUTES.login),
+        // 로그인 후 이 레시피로 돌아온다.
+        onOk: () => {
+          const redirect = `${location.pathname}${location.search}`;
+          navigate(`${ROUTES.login}?${new URLSearchParams({ redirect })}`);
+        },
       });
       return;
     }

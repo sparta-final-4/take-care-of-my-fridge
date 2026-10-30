@@ -5,12 +5,13 @@ import { Link, useNavigate, useSearchParams } from 'react-router';
 
 import { ROUTES } from '@/app/paths';
 import { getErrorCode, getErrorMessage } from '@/common/api/errors';
+import type { LoginRequest, MyInfoResponse } from '@/common/api/clients';
 import { setSession } from '@/common/auth/session';
-import { login, type LoginRequest } from '@/domains/auth/api';
+import { login } from '@/domains/auth/api';
 
 import styles from './LoginPage.module.scss';
 
-function safeRedirect(value: string | null, role: 'USER' | 'ADMIN') {
+function safeRedirect(value: string | null, role: MyInfoResponse['role']) {
   const fallback = role === 'ADMIN' ? ROUTES.adminMembers : ROUTES.home;
   if (!value) return fallback;
   const url = new URL(value, window.location.origin);
