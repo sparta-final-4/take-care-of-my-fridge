@@ -2,8 +2,8 @@ import { useSearchParams } from 'react-router';
 
 import type { ProductListRequest, RecipeListRequest } from '@/common/api/clients';
 
-export const SEARCH_RECIPE_PAGE_SIZE = 16;
-export const SEARCH_PRODUCT_PAGE_SIZE = 8;
+export const SEARCH_RECIPE_PAGE_SIZE = 8;
+export const SEARCH_PRODUCT_PAGE_SIZE = 16;
 
 // 상단 통합 검색의 검색어와 결과 종류별 페이지. 레시피는 page, 상품은 productPage로 따로 넘긴다.
 export function useSearchKeyword() {
