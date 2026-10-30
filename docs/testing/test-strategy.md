@@ -58,6 +58,7 @@ Q-01~Q-17에 의존하는 테스트는 기대값을 합의한 뒤 구현합니�
 | ORDER-11 | P0 | 결제를 시도한 결제 대기 주문 취소, 취소하기와 결제하기 동시 | 결제 시도가 있으면 `ORDER_012`로 거절하고 주문·재고 불변. 동시면 하나만 성공하고 결제가 붙은 주문은 지워지지 않음 | `OrderCancelServiceTransactionTest` |
 | ORDER-12 | P0 | 주문 만료, 취소하기와 주문 만료 동시 | 생성 5분이 지난 결제 시도 없는 결제 대기 주문만 지움. 동시면 재고는 한 번만 복구 | `OrderCancelServiceTransactionTest`, `OrderExpireSchedulerTest` |
 | ORDER-13 | P0 | 결제 정리, 결제 정리와 결제하기·주문 취소 동시 | 진행 중 결제가 없고 마지막 결제 뒤 10분이 지난 결제 대기 주문만 취소 상태로 바꾸고 재고 복구, 결제 행 유지. 동시면 재고는 많아야 한 번 복구 | `OrderCancelServiceTransactionTest`, `PaymentTimeoutSchedulerTest` |
+| ORDER-14 | P0 | 구매 확정, 다시 확정, 환불 진행 중 거절, 같은 주문 동시 확정 | 구매 확정으로 바뀐 커밋에서만 이벤트가 한 번 나가고 확정 수량이 남은 상품만 실림. 다시 확정·거절이면 안 나가고, 동시면 한 번만. `purchase-confirmed` 토픽에 주문 ID 키로 도착 | `OrderConfirmServiceTransactionTest`, `OrderConfirmedEventListenerTest` |
 
 ## 환불 필수 시나리오
 
