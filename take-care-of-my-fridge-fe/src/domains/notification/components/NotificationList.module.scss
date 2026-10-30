@@ -1,0 +1,49 @@
+@use '@/styles/variables' as *;
+@use '@/styles/mixins' as *;
+
+// 좁은 화면에서는 팝오버 안쪽 여백만 빼고 화면 폭을 꽉 채운다.
+.panel {
+  width: calc(100vw - 2 * var(--ant-padding-sm));
+
+  @include from(md) {
+    width: $notification-popover-width;
+  }
+}
+
+.list {
+  max-height: $notification-list-max-height;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.item {
+  display: flex;
+  gap: var(--ant-margin-xs);
+  align-items: baseline;
+  min-height: $touch-target-size;
+  padding: var(--ant-padding-xs);
+  border-radius: var(--ant-border-radius);
+
+  &:hover,
+  &:focus-visible {
+    background: var(--ant-color-fill-tertiary);
+  }
+}
+
+.dot {
+  flex: none;
+  width: $notification-dot-width;
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ant-margin-xxs);
+  min-width: 0;
+}
+
+.time {
+  font-size: var(--ant-font-size-sm);
+}
