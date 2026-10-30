@@ -1,3 +1,4 @@
+import { PlusOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   App,
@@ -68,8 +69,16 @@ export default function AdminProductsPage() {
   return (
     <section className={styles.container}>
       <Flex align="center" justify="space-between" wrap gap="middle" className={styles.heading}>
-        <Typography.Title level={2}>상품 관리</Typography.Title>
-        <Button type="primary" onClick={() => navigate(ROUTES.adminProductNew)}>
+        <Typography.Title level={2} className={styles.headingTitle}>
+          상품 관리
+        </Typography.Title>
+        <Button
+          type="primary"
+          size="large"
+          icon={<PlusOutlined />}
+          className={styles.pageAction}
+          onClick={() => navigate(ROUTES.adminProductNew)}
+        >
           상품 등록
         </Button>
       </Flex>

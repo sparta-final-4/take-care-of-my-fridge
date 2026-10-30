@@ -1,6 +1,27 @@
+@use '@/styles/mixins' as *;
+
 .container {
   width: 100%;
   max-width: 1200px;
   margin: var(--ant-margin-xl) auto;
   padding: 0 var(--ant-padding-lg);
+}
+
+.heading {
+  margin-bottom: var(--ant-margin-lg);
+}
+
+.headingTitle {
+  margin: 0 !important;
+}
+
+.pageAction {
+  width: 100%;
+  min-height: 44px;
+  font-weight: 600;
+
+  @include from(sm) {
+    width: auto;
+    min-width: 160px;
+  }
 }
