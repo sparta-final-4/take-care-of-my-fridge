@@ -40,11 +40,6 @@ export function SearchProductSection() {
   return (
     <SectionCard
       title={data ? `재료·밀키트 ${totalElements.toLocaleString('ko-KR')}` : '재료·밀키트'}
-      extra={
-        <Link to={`${ROUTES.products}?${new URLSearchParams({ q: keyword })}`}>
-          상품 화면에서 조건 더 고르기 &gt;
-        </Link>
-      }
     >
       {isPending ? (
         <Skeleton active paragraph={{ rows: 4 }} />

@@ -24,14 +24,7 @@ export function SearchRecipeSection() {
   const recipes = data?.content ?? [];
 
   return (
-    <SectionCard
-      title={data ? `레시피 ${totalElements.toLocaleString('ko-KR')}` : '레시피'}
-      extra={
-        <Link to={`${ROUTES.recipes}?${new URLSearchParams({ q: keyword })}`}>
-          레시피 화면에서 조건 더 고르기 &gt;
-        </Link>
-      }
-    >
+    <SectionCard title={data ? `레시피 ${totalElements.toLocaleString('ko-KR')}` : '레시피'}>
       {isPending ? (
         <Skeleton active paragraph={{ rows: 6 }} />
       ) : isError ? (
