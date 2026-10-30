@@ -12,7 +12,7 @@ import {
   Typography,
 } from 'antd';
 import { useState } from 'react';
-import { useNavigate } from 'react-router';
+import { useLocation, useNavigate } from 'react-router';
 
 import { ROUTES } from '@/app/paths';
 import { isNotFound } from '@/common/api/errors';
@@ -34,6 +34,7 @@ interface ProductDetailSectionProps {
 
 export function ProductDetailSection({ productId }: ProductDetailSectionProps) {
   const navigate = useNavigate();
+  const location = useLocation();
   const {
     data: product,
     isPending,
@@ -44,7 +45,10 @@ export function ProductDetailSection({ productId }: ProductDetailSectionProps) {
   const { addToCart, pendingProductId } = useAddToCart();
   const [quantity, setQuantity] = useState(1);
 
-  const handleGoList = () => navigate(ROUTES.products);
+  // 앱 안에서 이동해 왔으면 이전 화면(검색·필터가 남은 목록, 통합검색 등)으로 돌아간다.
+  // 주소로 바로 들어와 앱 안의 이전 화면이 없으면(location.key === 'default') 목록으로 간다.
+  const handleGoList = () =>
+    location.key === 'default' ? navigate(ROUTES.products) : navigate(-1);
 
   if (isPending) return <Skeleton active paragraph={{ rows: 8 }} />;
   if (isError) {
