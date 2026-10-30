@@ -249,6 +249,36 @@
         ]
       }
     },
+    "/api/admin/images/presign": {
+      "post": {
+        "operationId": "createProductImageUploadUrl",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImageUploadUrlRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseImageUploadUrlResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "admin-image-controller"
+        ]
+      }
+    },
     "/api/admin/members": {
       "get": {
         "operationId": "getMembers",
@@ -3014,6 +3044,20 @@
           }
         }
       },
+      "ApiResponseImageUploadUrlResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ImageUploadUrlResponse"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorResponse"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
       "ApiResponseListChatMessageResponse": {
         "type": "object",
         "properties": {
@@ -4739,6 +4783,35 @@
           "rawName",
           "storage"
         ]
+      },
+      "ImageUploadUrlRequest": {
+        "type": "object",
+        "properties": {
+          "contentType": {
+            "type": "string",
+            "minLength": 1
+          },
+          "fileSize": {
+            "type": "integer",
+            "format": "int64",
+            "maximum": 5242880
+          }
+        },
+        "required": [
+          "contentType",
+          "fileSize"
+        ]
+      },
+      "ImageUploadUrlResponse": {
+        "type": "object",
+        "properties": {
+          "imageUrl": {
+            "type": "string"
+          },
+          "uploadUrl": {
+            "type": "string"
+          }
+        }
       },
       "IngredientDeductionResponse": {
         "type": "object",
