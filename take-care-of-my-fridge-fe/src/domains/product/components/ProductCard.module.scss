@@ -110,10 +110,9 @@
   margin: 0;
 }
 
-// 상품명은 두 줄까지 보여 주고 높이를 맞춘다.
+// 상품명은 두 줄까지 보여 준다. 한 줄 이름 아래에 빈 줄을 두지 않는다.
 .name {
   display: -webkit-box;
-  min-height: calc(var(--ant-line-height) * var(--ant-font-size) * 2);
   overflow: hidden;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;

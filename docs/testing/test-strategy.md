@@ -58,6 +58,7 @@ Q-01~Q-17에 의존하는 테스트는 기대값을 합의한 뒤 구현합니�
 | ORDER-11 | P0 | 결제를 시도한 결제 대기 주문 취소, 취소하기와 결제하기 동시 | 결제 시도가 있으면 `ORDER_012`로 거절하고 주문·재고 불변. 동시면 하나만 성공하고 결제가 붙은 주문은 지워지지 않음 | `OrderCancelServiceTransactionTest` |
 | ORDER-12 | P0 | 주문 만료, 취소하기와 주문 만료 동시 | 생성 5분이 지난 결제 시도 없는 결제 대기 주문만 지움. 동시면 재고는 한 번만 복구 | `OrderCancelServiceTransactionTest`, `OrderExpireSchedulerTest` |
 | ORDER-13 | P0 | 결제 정리, 결제 정리와 결제하기·주문 취소 동시 | 진행 중 결제가 없고 마지막 결제 뒤 10분이 지난 결제 대기 주문만 취소 상태로 바꾸고 재고 복구, 결제 행 유지. 동시면 재고는 많아야 한 번 복구 | `OrderCancelServiceTransactionTest`, `PaymentTimeoutSchedulerTest` |
+| ORDER-14 | P0 | 구매 확정, 다시 확정, 환불 진행 중 거절, 같은 주문 동시 확정 | 구매 확정으로 바뀐 커밋에서만 이벤트가 한 번 나가고 확정 수량이 남은 상품만 실림. 다시 확정·거절이면 안 나가고, 동시면 한 번만. `purchase-confirmed` 토픽에 주문 ID 키로 도착 | `OrderConfirmServiceTransactionTest`, `OrderConfirmedEventListenerTest` |
 
 ## 환불 필수 시나리오
 
@@ -90,6 +91,9 @@ Q-01~Q-17에 의존하는 테스트는 기대값을 합의한 뒤 구현합니�
 | SALE-08 | P1 | 목록 조회 | 상품마다 한 행, 종료는 등록 당시 정가·나머지는 현재 정가, 필터·정렬·판매량 | `SaleEventListQueryServiceTest` |
 | SALE-09 | P1 | 상세 조회, 후보 상품 조회 | 상세는 시각과 행사 항목, 없는 행사는 404. 후보는 판매 중·재고 있음·예정/진행 행사 없는 상품만 | `SaleEventDetailQueryServiceTest`, `SaleCandidateProductQueryServiceTest` |
 | SALE-10 | P1 | 권한·입력값 | 일반 회원 403, 비로그인 401, 잘못된 입력 400이고 서비스 호출 없음 | `AdminSaleEventControllerTest` |
+| SALE-11 | P1 | 클릭 수 기반 할인 상품 순위 | 최근 검색 클릭 순, 클릭이 같으면 할인율·상품 ID 순, 클릭 기록이 없으면 0, 품절·번개 드롭 소진 제외, 최대 6개 | `PopularSaleServiceTest` |
+| SALE-12 | P1 | 진행 중 할인 전부 조회 | 시작 시각이 지난 예정 행사는 포함, 시작 전·종료 시각이 지난·종료로 닫은 행사는 빠짐 | `SaleEventItemRepositoryTest` |
+| SALE-13 | P1 | 클릭 수 기반 할인 상품 공개 경로 | 비로그인 200, 다른 할인 경로는 비로그인 401 | `SaleControllerTest` |
 
 번개 드롭 동시 주문과 1인 1개는 ORDER-07·08에서 검증합니다.
 

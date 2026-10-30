@@ -10,7 +10,7 @@ export function ProductSearchSection() {
   const { keyword, priceRangeKey, setKeyword, setPriceRange } = useProductFilters();
 
   return (
-    <SectionCard title="어떤 재료가 필요하세요?">
+    <SectionCard title="어떤 재료가 필요하세요?" bracket={false}>
       <Flex vertical gap="middle">
         {/* 입력값은 검색을 누를 때만 URL에 반영한다. 뒤로 가기로 검색어가 바뀌면 key로 입력칸을 다시 채운다. */}
         <Input.Search

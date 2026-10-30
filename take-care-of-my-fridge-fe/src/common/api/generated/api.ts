@@ -40,6 +40,7 @@ export * from './apis/recipe-controller-api';
 export * from './apis/recipe-review-controller-api';
 export * from './apis/refund-controller-api';
 export * from './apis/review-summary-admin-controller-api';
+export * from './apis/sale-controller-api';
 export * from './apis/search-controller-api';
 export * from './apis/webhook-controller-api';
 

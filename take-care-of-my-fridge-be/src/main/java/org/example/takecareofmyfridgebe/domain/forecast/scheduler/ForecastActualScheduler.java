@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.example.takecareofmyfridgebe.domain.forecast.service.ForecastActualService;
 import org.example.takecareofmyfridgebe.domain.forecast.repository.PredictionRunRepository;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -20,7 +21,9 @@ public class ForecastActualScheduler {
     private final ForecastActualService actualService;
     private final PredictionRunRepository runRepository;
 
+    // 서버가 여러 대여도 한 서버만 실적을 확정한다.
     @Scheduled(cron = "0 0 * * * *", zone = "Asia/Seoul")
+    @SchedulerLock(name = "forecastActual", lockAtMostFor = "30m", lockAtLeastFor = "5m")
     public void confirmDueWeeks() {
         LocalDateTime now = LocalDateTime.now(ZONE);
         LocalDate latestCompletedWeek = now.toLocalDate().minusWeeks(1);
