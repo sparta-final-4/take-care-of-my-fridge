@@ -23,10 +23,11 @@ public class SaleEventTerminationService {
     @Transactional
     public void end(Long saleEventId) {
         SaleEvent saleEvent = findForUpdate(saleEventId);
-        if (!saleEvent.isEndable(LocalDateTime.now(SaleEvent.ZONE))) {
+        LocalDateTime now = LocalDateTime.now(SaleEvent.ZONE);
+        if (!saleEvent.isEndable(now)) {
             throw new BusinessException(ErrorCode.SALE_EVENT_NOT_ENDABLE);
         }
-        saleEvent.end();
+        saleEvent.end(now);
     }
 
     @Transactional

@@ -77,16 +77,19 @@ class SaleEventTerminationServiceTransactionTest extends MySqlContainerSupport {
     }
 
     @Test
-    @DisplayName("진행 중인 할인 행사를 종료하면 상태만 종료로 바뀌고 종료 시각과 행사 항목은 그대로다")
+    @DisplayName("진행 중인 할인 행사를 종료하면 상태가 종료로 바뀌고 닫은 시각이 남으며, 종료 시각과 행사 항목은 그대로다")
     void end_active_keepsEndsAt() {
         Product tofu = saveProduct("두부");
         SaleEvent event = saveEvent(SaleEventStatus.ACTIVE, minutesFromNow(-60), minutesFromNow(60), tofu);
 
+        LocalDateTime before = LocalDateTime.now(ZONE).withNano(0);
         saleEventTerminationService.end(event.getId());
 
         SaleEvent saved = saleEventRepository.findById(event.getId()).orElseThrow();
         assertThat(saved.getStatus()).isEqualTo(SaleEventStatus.ENDED);
         assertThat(saved.getEndsAt()).isEqualTo(event.getEndsAt());
+        assertThat(saved.getEndedAt()).isAfterOrEqualTo(before).isBefore(saved.getEndsAt());
+        assertThat(saved.actualEndsAt()).isEqualTo(saved.getEndedAt());
         assertThat(saleEventItemRepository.findAll()).hasSize(1);
     }
 

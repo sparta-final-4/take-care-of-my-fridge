@@ -55,6 +55,10 @@ public class SaleEvent extends BaseTimeEntity {
     @Column(name = "status", nullable = false)
     private SaleEventStatus status;
 
+    // 진행 중에 중간에 닫은 시각. 등록한 종료 시각까지 연 행사는 비어 있다.
+    @Column(name = "ended_at")
+    private LocalDateTime endedAt;
+
     @Builder
     private SaleEvent(SaleEventType type, LocalDateTime startsAt, LocalDateTime endsAt) {
         this.type = type;
@@ -84,8 +88,14 @@ public class SaleEvent extends BaseTimeEntity {
         return isEditable(now);
     }
 
-    // 진행 중인 할인 행사를 중간에 닫는다. 종료 시각은 등록한 값 그대로 둔다.
-    public void end() {
+    // 진행 중인 할인 행사를 중간에 닫는다. 종료 시각은 등록한 값 그대로 두고, 닫은 시각을 따로 남긴다.
+    public void end(LocalDateTime endedAt) {
         this.status = SaleEventStatus.ENDED;
+        this.endedAt = endedAt;
+    }
+
+    // 실제로 판매가 끝난 시각. 중간에 닫았으면 닫은 시각, 아니면 등록한 종료 시각이다.
+    public LocalDateTime actualEndsAt() {
+        return endedAt != null && endedAt.isBefore(endsAt) ? endedAt : endsAt;
     }
 }

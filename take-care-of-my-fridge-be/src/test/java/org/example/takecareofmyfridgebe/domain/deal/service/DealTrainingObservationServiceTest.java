@@ -65,6 +65,25 @@ class DealTrainingObservationServiceTest {
         verifyNoInteractions(orderSalesService);
     }
 
+    @Test
+    void countsRegularSalesOnlyUntilEventWasEndedEarly() {
+        SaleEventItem item = item();
+        item.getSaleEvent().end(START.plusHours(3));
+        given(saleEventItemRepository.findFinishedForTraining(SaleEventType.SPECIAL, AS_OF.minusDays(7)))
+                .willReturn(List.of(item));
+        given(orderSalesService.getDailyRegularProductSales(
+                LocalDate.of(2026, 9, 30), LocalDate.of(2026, 10, 27), AS_OF))
+                .willReturn(List.of(
+                        sale(2026, 9, 30), sale(2026, 10, 7),
+                        sale(2026, 10, 14), sale(2026, 10, 21)));
+        given(orderItemRepository.sumConfirmedSaleQuantity(2L, OrderStatus.CONFIRMED, AS_OF))
+                .willReturn(1L);
+
+        // 12시간 행사를 3시간 만에 닫았으므로 정상 판매 기대량은 하루 4개의 3/24다
+        assertThat(service.getObservations(AS_OF))
+                .containsExactly(new DealDiscountModel.Observation(20, 0.5, 1.0));
+    }
+
     private SaleEventItem item() {
         SaleEvent event = SaleEvent.builder()
                 .type(SaleEventType.SPECIAL).startsAt(START).endsAt(END).build();

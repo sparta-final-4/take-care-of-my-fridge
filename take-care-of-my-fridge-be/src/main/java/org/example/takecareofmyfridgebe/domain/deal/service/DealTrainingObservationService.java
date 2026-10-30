@@ -51,13 +51,15 @@ public class DealTrainingObservationService {
                 .filter(sale -> sale.productId().equals(item.getProductId()))
                 .forEach(sale -> quantityByWeekday.merge(
                         sale.salesDate().getDayOfWeek(), sale.quantity(), Long::sum));
+        // 중간에 닫은 행사는 닫은 시각까지만 판매했으므로, 정상 판매 기대량도 그 시각까지만 센다.
+        LocalDateTime endsAt = event.actualEndsAt();
         double regularQuantity = 0;
         for (LocalDate day = event.getStartsAt().toLocalDate();
-                !day.isAfter(event.getEndsAt().minusNanos(1).toLocalDate()); day = day.plusDays(1)) {
+                !day.isAfter(endsAt.minusNanos(1).toLocalDate()); day = day.plusDays(1)) {
             LocalDateTime from = event.getStartsAt().isAfter(day.atStartOfDay())
                     ? event.getStartsAt() : day.atStartOfDay();
-            LocalDateTime to = event.getEndsAt().isBefore(day.plusDays(1).atStartOfDay())
-                    ? event.getEndsAt() : day.plusDays(1).atStartOfDay();
+            LocalDateTime to = endsAt.isBefore(day.plusDays(1).atStartOfDay())
+                    ? endsAt : day.plusDays(1).atStartOfDay();
             double fraction = Duration.between(from, to).toSeconds() / 86400.0;
             regularQuantity += quantityByWeekday.getOrDefault(day.getDayOfWeek(), 0L) / 4.0 * fraction;
         }
