@@ -1,0 +1,81 @@
+@use '@/styles/variables' as *;
+
+.container {
+  width: 100%;
+  max-width: $content-max-width;
+  margin: var(--ant-margin-xl) auto;
+  padding: 0 var(--ant-padding-lg);
+  // 한글이 단어 중간에서 끊기지 않게. 너무 긴 영문·숫자만 칸 안에서 줄바꿈한다.
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+
+.header {
+  margin-bottom: var(--ant-margin-lg);
+}
+
+.title {
+  margin: 0;
+}
+
+.description {
+  display: block;
+  margin-top: var(--ant-margin-xxs);
+  font-size: var(--ant-font-size);
+}
+
+.guide,
+.summary,
+.notice {
+  margin-bottom: var(--ant-margin-lg);
+}
+
+.guideItem {
+  height: 100%;
+}
+
+.guideIcon {
+  color: var(--ant-color-primary);
+  font-size: $review-summary-guide-title-size;
+  line-height: $review-summary-guide-line-height;
+}
+
+.guideTitle {
+  color: var(--ant-color-text);
+  font-size: $review-summary-guide-title-size;
+  font-weight: var(--ant-font-weight-strong);
+  line-height: $review-summary-guide-line-height;
+}
+
+.guideText {
+  margin: var(--ant-margin-xxs) 0 0;
+  color: var(--ant-color-text-secondary);
+  font-size: var(--ant-font-size);
+  line-height: $review-summary-guide-line-height;
+}
+
+// 실행 전·실행 중 안내. 큰 빈 그림 없이 결과 칸 가운데에 작게 둔다.
+.state {
+  display: block;
+  padding: var(--ant-padding-md) 0;
+  text-align: center;
+}
+
+.loading {
+  padding: var(--ant-padding-md) 0;
+}
+
+.emptyHint {
+  font-size: var(--ant-font-size-sm);
+}
+
+.summaryText {
+  display: block;
+  max-width: $review-summary-text-max-width;
+}
+
+.compareText {
+  margin-top: var(--ant-margin-xxs);
+  margin-bottom: 0;
+  white-space: pre-wrap;
+}

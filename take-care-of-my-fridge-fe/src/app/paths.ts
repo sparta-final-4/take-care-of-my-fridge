@@ -29,4 +29,5 @@ export const ROUTES = {
   adminProductNew: '/admin/products/new',
   adminDeals: '/admin/deals',
   adminSaleEventNew: '/admin/sale-events/new',
+  adminReviewSummary: '/admin/review-summary',
 } as const;
