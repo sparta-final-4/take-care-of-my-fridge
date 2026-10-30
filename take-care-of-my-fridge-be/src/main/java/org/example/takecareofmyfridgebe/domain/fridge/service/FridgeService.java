@@ -13,8 +13,10 @@ import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeNameInfo;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeRemoveReason;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeSortType;
 import org.example.takecareofmyfridgebe.domain.fridge.entity.Fridge;
+import org.example.takecareofmyfridgebe.domain.fridge.entity.FridgeCommerceHistory;
 import org.example.takecareofmyfridgebe.domain.fridge.entity.FridgeItemAction;
 import org.example.takecareofmyfridgebe.domain.fridge.entity.FridgeItemLog;
+import org.example.takecareofmyfridgebe.domain.fridge.repository.FridgeCommerceHistoryRepository;
 import org.example.takecareofmyfridgebe.domain.fridge.repository.FridgeItemLogRepository;
 import org.example.takecareofmyfridgebe.domain.fridge.repository.FridgeRepository;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.Ingredient;
@@ -31,9 +33,11 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -42,6 +46,7 @@ public class FridgeService {
 
     private final FridgeRepository fridgeRepository;
     private final FridgeItemLogRepository fridgeItemLogRepository;
+    private final FridgeCommerceHistoryRepository fridgeCommerceHistoryRepository;
     private final IngredientService ingredientService;
 
     /**
@@ -129,6 +134,39 @@ public class FridgeService {
                 request.expirationDate()
         );
         return FridgeItemResponse.from(fridge, LocalDate.now());
+    }
+
+    /**
+     * 주문 상품 ID 중 이미 냉장고에 입고된 것을 조회한다. 같은 구매 확정 메시지를 다시 받았을 때 걸러 내는 데 쓴다.
+     *
+     * @param orderItemIds 확인할 주문 상품 ID 컬렉션
+     * @return 입고 이력이 있는 주문 상품 ID Set
+     */
+    public Set<Long> getStockedOrderItemIds(Collection<Long> orderItemIds) {
+        if (orderItemIds.isEmpty()) {
+            return Set.of();
+        }
+        return fridgeCommerceHistoryRepository.findByOrderItemIdIn(orderItemIds).stream()
+                .map(FridgeCommerceHistory::getOrderItemId)
+                .collect(Collectors.toSet());
+    }
+
+    /**
+     * 구매 확정된 주문 상품을 냉장고에 넣고 주문 상품마다 입고 이력을 남긴다.
+     * 주문 한 건을 한 트랜잭션으로 저장해 일부만 들어가지 않게 한다.
+     * 이력의 주문 상품 유니크 제약이 중복 입고의 마지막 방어선이며, 이력을 먼저 저장해 중복이면 냉장고 행을 넣기 전에 실패한다.
+     *
+     * @param items 입고할 냉장고 재료 엔티티 목록 (source=COMMERCE, orderItemId 포함)
+     */
+    @Transactional
+    public void stockCommerceItems(List<Fridge> items) {
+        fridgeCommerceHistoryRepository.saveAll(items.stream()
+                .map(item -> FridgeCommerceHistory.builder()
+                        .memberId(item.getMemberId())
+                        .orderItemId(item.getOrderItemId())
+                        .build())
+                .toList());
+        fridgeRepository.saveAll(items);
     }
 
     /**

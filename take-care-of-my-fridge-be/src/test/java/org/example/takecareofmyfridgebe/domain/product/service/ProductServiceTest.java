@@ -153,6 +153,33 @@ class ProductServiceTest {
         verify(productRepository, never()).findByIdAndStatusIn(eq(5L), anyCollection());
     }
 
+    @Test
+    @DisplayName("구매한 상품 상세 조회는 판매 중지 상품도 포함하고 종류별 상세를 붙이며, 상세 행이 없으면 null로 둔다")
+    void getProductDetailsByIds_includesStoppedAndAttachesDetails() {
+        // given
+        Product onion = ProductFixture.createProduct(5L, "양파 1kg", 3900);
+        onion.stop();
+        Product mealkit = ProductFixture.createMealkitProduct(6L, "된장찌개 밀키트", 12900);
+        Product unlinked = ProductFixture.createProduct(7L, "대파", 2500);
+        List<Long> ids = List.of(5L, 6L, 7L);
+        when(productRepository.findAllById(ids)).thenReturn(List.of(onion, mealkit, unlinked));
+        when(ingredientProductRepository.findByProductIdIn(ids))
+                .thenReturn(List.of(ProductFixture.createIngredientDetail(onion, new BigDecimal("1000"), "g")));
+        when(mealkitProductRepository.findByProductIdIn(ids))
+                .thenReturn(List.of(ProductFixture.createMealkitDetail(mealkit, 2)));
+
+        // when
+        List<ProductDetail> result = service.getProductDetailsByIds(ids);
+
+        // then
+        assertThat(result).extracting(detail -> detail.product().getId()).containsExactly(5L, 6L, 7L);
+        assertThat(result.get(0).product().getStatus()).isEqualTo(ProductStatus.STOPPED);
+        assertThat(result.get(0).ingredient()).isNotNull();
+        assertThat(result.get(1).mealkit().getServings()).isEqualTo(2);
+        assertThat(result.get(2).ingredient()).isNull();
+        verify(productRepository, never()).findByIdAndStatusIn(any(), anyCollection());
+    }
+
     private static ProductListRequest listRequest(ProductSort sort, int page) {
         return new ProductListRequest(sort, null, null, null, null, page, 20);
     }

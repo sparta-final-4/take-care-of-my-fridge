@@ -46,7 +46,7 @@ class OrderConfirmedEventListenerTest extends KafkaContainerSupport {
 
         listener.onOrderConfirmed(event);
 
-        ConsumerRecord<String, String> record = testConsumer.records.poll(10, TimeUnit.SECONDS);
+        ConsumerRecord<String, String> record = pollByKey("100", 10);
         assertThat(record).isNotNull();
         assertThat(record.key()).isEqualTo("100");
         JsonNode body = JsonMapper.builder().build().readTree(record.value());
@@ -60,6 +60,18 @@ class OrderConfirmedEventListenerTest extends KafkaContainerSupport {
         assertThat(items.get(0).get("productName").asString()).isEqualTo("대파");
         assertThat(items.get(0).get("confirmedQuantity").asInt()).isEqualTo(2);
         assertThat(items.get(1).get("orderItemId").asLong()).isEqualTo(12L);
+    }
+
+    // 공유 Kafka 컨테이너의 같은 토픽에 다른 테스트(냉장고 입고 컨슈머 테스트)가 보낸 구매 확정도 있어 이 테스트의 키만 본다
+    private ConsumerRecord<String, String> pollByKey(String key, long seconds) throws InterruptedException {
+        long deadline = System.currentTimeMillis() + seconds * 1000;
+        while (System.currentTimeMillis() < deadline) {
+            ConsumerRecord<String, String> record = testConsumer.records.poll(200, TimeUnit.MILLISECONDS);
+            if (record != null && key.equals(record.key())) {
+                return record;
+            }
+        }
+        return null;
     }
 
     @TestConfiguration

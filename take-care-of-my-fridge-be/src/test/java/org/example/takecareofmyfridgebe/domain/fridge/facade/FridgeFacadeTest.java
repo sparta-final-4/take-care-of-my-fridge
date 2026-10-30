@@ -6,26 +6,40 @@ import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemUpdateReques
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeNameInfo;
 import org.example.takecareofmyfridgebe.domain.fridge.entity.Fridge;
 import org.example.takecareofmyfridgebe.domain.fridge.entity.FridgeSource;
+import org.example.takecareofmyfridgebe.domain.fridge.event.PurchaseConfirmedMessage;
 import org.example.takecareofmyfridgebe.domain.fridge.service.FridgeService;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.Ingredient;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.StorageType;
 import org.example.takecareofmyfridgebe.domain.ingredient.service.IngredientMatcher;
+import org.example.takecareofmyfridgebe.domain.ingredient.service.IngredientService;
+import org.example.takecareofmyfridgebe.domain.product.dto.ProductDetail;
+import org.example.takecareofmyfridgebe.domain.product.entity.IngredientProduct;
+import org.example.takecareofmyfridgebe.domain.product.entity.Product;
+import org.example.takecareofmyfridgebe.domain.product.service.ProductService;
+import org.example.takecareofmyfridgebe.dummy.ProductFixture;
+import org.example.takecareofmyfridgebe.global.error.BusinessException;
+import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -34,12 +48,21 @@ import static org.mockito.Mockito.when;
  * FridgeFacade 단위 테스트.
  * 재료 등록 및 수정 시 IngredientMatcher 매핑 호출 여부, 보관방식·소비기한 권장값 계산,
  * 그리고 사용자 입력 원문(rawName) 보존 여부를 검증한다.
+ * 구매 확정 입고 시 상품 종류별 재료·수량·보관방식·소비기한 계산과 중복·빈 메시지 처리도 검증한다.
  */
 @ExtendWith(MockitoExtension.class)
 class FridgeFacadeTest {
 
+    private static final LocalDateTime CONFIRMED_AT = LocalDateTime.of(2026, 10, 30, 14, 30);
+
     @Mock
     private IngredientMatcher ingredientMatcher;
+
+    @Mock
+    private IngredientService ingredientService;
+
+    @Mock
+    private ProductService productService;
 
     @Mock
     private FridgeService fridgeService;
@@ -245,5 +268,207 @@ class FridgeFacadeTest {
         assertSame(expectedResponse, actual);
         verifyNoInteractions(ingredientMatcher);
         verify(fridgeService).updateItem(7L, 200L, null, request);
+    }
+
+    /**
+     * 재료 상품 2개를 받으면 냉장고 2줄을 만든다.
+     * 수량은 확정 수량 × 상품 1개의 기본 단위 수량, 보관방식은 상품 보관 방법, 소비기한은 구매 확정일 + 권장 보관 일수이고,
+     * 표시 이름은 상품명, 출처는 COMMERCE와 주문 상품 ID다.
+     */
+    @Test
+    @SuppressWarnings("unchecked")
+    void stockPurchasedItemsStocksIngredientProducts() {
+        // Given: 양파 상품(1개 = 기본 단위 5)과 두부 상품(1개 = 기본 단위 1)
+        Product onionProduct = ProductFixture.createProduct(1L, "양파 1kg", 3900);
+        Product tofuProduct = ProductFixture.createProduct(2L, "국산 두부", 2000);
+        Ingredient onion = ingredientWithId(10L, "ING_ONION", "양파");
+        Ingredient tofu = ingredientWithId(11L, "ING_TOFU", "두부");
+        PurchaseConfirmedMessage message = message(List.of(
+                new PurchaseConfirmedMessage.Item(101L, 1L, "양파 1kg", 2),
+                new PurchaseConfirmedMessage.Item(102L, 2L, "국산 두부", 3)
+        ));
+
+        when(fridgeService.getStockedOrderItemIds(List.of(101L, 102L))).thenReturn(Set.of());
+        when(productService.getProductDetailsByIds(List.of(1L, 2L))).thenReturn(List.of(
+                ProductDetail.ofIngredient(onionProduct, ingredientLink(onionProduct, 10L, "5")),
+                ProductDetail.ofIngredient(tofuProduct, ingredientLink(tofuProduct, 11L, "1"))
+        ));
+        when(ingredientService.getIngredientsByIds(Set.of(10L, 11L))).thenReturn(Map.of(10L, onion, 11L, tofu));
+
+        // When
+        fridgeFacade.stockPurchasedItems(message);
+
+        // Then
+        ArgumentCaptor<List<Fridge>> captor = ArgumentCaptor.forClass(List.class);
+        verify(fridgeService).stockCommerceItems(captor.capture());
+        List<Fridge> fridges = captor.getValue();
+        assertEquals(2, fridges.size());
+
+        Fridge onionFridge = fridges.get(0);
+        assertSame(onion, onionFridge.getIngredient());
+        assertEquals(0, new BigDecimal("10").compareTo(onionFridge.getQuantity()));
+        assertEquals(StorageType.ROOM_TEMP, onionFridge.getStorage());
+        assertEquals(LocalDate.of(2026, 11, 13), onionFridge.getExpirationDate());
+        assertEquals("양파 1kg", onionFridge.getRawName());
+        assertEquals(FridgeSource.COMMERCE, onionFridge.getSource());
+        assertEquals(101L, onionFridge.getOrderItemId());
+        assertEquals(7L, onionFridge.getMemberId());
+
+        Fridge tofuFridge = fridges.get(1);
+        assertSame(tofu, tofuFridge.getIngredient());
+        assertEquals(0, new BigDecimal("3").compareTo(tofuFridge.getQuantity()));
+        assertEquals(102L, tofuFridge.getOrderItemId());
+        // 밀키트가 없으면 밀키트용 기본 재료를 조회하지 않는다
+        verify(ingredientService, never()).getMealkitIngredient();
+    }
+
+    /**
+     * 밀키트 상품은 밀키트용 기본 재료(ING_MEALKIT)로, 확정 수량(개수) 그대로 넣는다.
+     */
+    @Test
+    @SuppressWarnings("unchecked")
+    void stockPurchasedItemsStocksMealkitAsCount() {
+        // Given
+        Product mealkitProduct = ProductFixture.createMealkitProduct(3L, "된장찌개 밀키트", 12900);
+        Ingredient mealkit = ingredientWithId(1150L, Ingredient.ING_MEALKIT, "밀키트");
+        PurchaseConfirmedMessage message = message(List.of(
+                new PurchaseConfirmedMessage.Item(103L, 3L, "된장찌개 밀키트", 2)
+        ));
+
+        when(fridgeService.getStockedOrderItemIds(List.of(103L))).thenReturn(Set.of());
+        when(productService.getProductDetailsByIds(List.of(3L))).thenReturn(List.of(
+                ProductDetail.ofMealkit(mealkitProduct, ProductFixture.createMealkitDetail(mealkitProduct, 2))
+        ));
+        when(ingredientService.getIngredientsByIds(Set.of())).thenReturn(Map.of());
+        when(ingredientService.getMealkitIngredient()).thenReturn(mealkit);
+
+        // When
+        fridgeFacade.stockPurchasedItems(message);
+
+        // Then
+        ArgumentCaptor<List<Fridge>> captor = ArgumentCaptor.forClass(List.class);
+        verify(fridgeService).stockCommerceItems(captor.capture());
+        Fridge fridge = captor.getValue().get(0);
+        assertSame(mealkit, fridge.getIngredient());
+        assertEquals(0, new BigDecimal("2").compareTo(fridge.getQuantity()));
+        assertEquals("된장찌개 밀키트", fridge.getRawName());
+        assertEquals(LocalDate.of(2026, 11, 13), fridge.getExpirationDate());
+        assertEquals(FridgeSource.COMMERCE, fridge.getSource());
+    }
+
+    /**
+     * 재료 상품에 연결된 재료가 없으면 PRODUCT_DETAIL_MISSING 예외를 던지고 아무것도 넣지 않는다.
+     * 주문 한 건을 한 번에 저장하므로 함께 온 정상 상품도 넣지 않는다.
+     */
+    @Test
+    void stockPurchasedItemsThrowsWhenIngredientLinkIsMissing() {
+        // Given: 양파 상품은 연결이 있고, 대파 상품은 상세 행이 없음
+        Product onionProduct = ProductFixture.createProduct(1L, "양파 1kg", 3900);
+        Product greenOnionProduct = ProductFixture.createProduct(4L, "대파", 2500);
+        Ingredient onion = ingredientWithId(10L, "ING_ONION", "양파");
+        PurchaseConfirmedMessage message = message(List.of(
+                new PurchaseConfirmedMessage.Item(101L, 1L, "양파 1kg", 1),
+                new PurchaseConfirmedMessage.Item(104L, 4L, "대파", 1)
+        ));
+
+        when(fridgeService.getStockedOrderItemIds(List.of(101L, 104L))).thenReturn(Set.of());
+        when(productService.getProductDetailsByIds(List.of(1L, 4L))).thenReturn(List.of(
+                ProductDetail.ofIngredient(onionProduct, ingredientLink(onionProduct, 10L, "5")),
+                ProductDetail.ofIngredient(greenOnionProduct, null)
+        ));
+        when(ingredientService.getIngredientsByIds(Set.of(10L))).thenReturn(Map.of(10L, onion));
+
+        // When & Then
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> fridgeFacade.stockPurchasedItems(message));
+        assertEquals(ErrorCode.PRODUCT_DETAIL_MISSING, exception.getErrorCode());
+        verify(fridgeService, never()).stockCommerceItems(anyList());
+    }
+
+    /**
+     * 모두 환불된 주문처럼 items가 비어 있으면 아무것도 조회·저장하지 않는다.
+     */
+    @Test
+    void stockPurchasedItemsDoesNothingWhenItemsAreEmpty() {
+        // When
+        fridgeFacade.stockPurchasedItems(message(List.of()));
+
+        // Then
+        verifyNoInteractions(fridgeService, productService, ingredientService);
+    }
+
+    /**
+     * 이미 입고 이력이 있는 주문 상품은 걸러 내고 남은 상품만 넣는다.
+     */
+    @Test
+    @SuppressWarnings("unchecked")
+    void stockPurchasedItemsSkipsAlreadyStockedOrderItems() {
+        // Given: 101은 이미 입고됨
+        Product tofuProduct = ProductFixture.createProduct(2L, "국산 두부", 2000);
+        Ingredient tofu = ingredientWithId(11L, "ING_TOFU", "두부");
+        PurchaseConfirmedMessage message = message(List.of(
+                new PurchaseConfirmedMessage.Item(101L, 1L, "양파 1kg", 2),
+                new PurchaseConfirmedMessage.Item(102L, 2L, "국산 두부", 1)
+        ));
+
+        when(fridgeService.getStockedOrderItemIds(List.of(101L, 102L))).thenReturn(Set.of(101L));
+        when(productService.getProductDetailsByIds(List.of(2L))).thenReturn(List.of(
+                ProductDetail.ofIngredient(tofuProduct, ingredientLink(tofuProduct, 11L, "1"))
+        ));
+        when(ingredientService.getIngredientsByIds(Set.of(11L))).thenReturn(Map.of(11L, tofu));
+
+        // When
+        fridgeFacade.stockPurchasedItems(message);
+
+        // Then
+        ArgumentCaptor<List<Fridge>> captor = ArgumentCaptor.forClass(List.class);
+        verify(fridgeService).stockCommerceItems(captor.capture());
+        assertEquals(List.of(102L), captor.getValue().stream().map(Fridge::getOrderItemId).toList());
+    }
+
+    /**
+     * 같은 메시지를 다시 받아 모든 주문 상품이 이미 입고됐으면 상품을 조회하지 않고 끝낸다.
+     */
+    @Test
+    void stockPurchasedItemsDoesNothingWhenAllOrderItemsAreStocked() {
+        // Given
+        PurchaseConfirmedMessage message = message(List.of(
+                new PurchaseConfirmedMessage.Item(101L, 1L, "양파 1kg", 2)
+        ));
+        when(fridgeService.getStockedOrderItemIds(List.of(101L))).thenReturn(Set.of(101L));
+
+        // When
+        fridgeFacade.stockPurchasedItems(message);
+
+        // Then
+        verifyNoInteractions(productService, ingredientService);
+        verify(fridgeService, never()).stockCommerceItems(anyList());
+    }
+
+    private static PurchaseConfirmedMessage message(List<PurchaseConfirmedMessage.Item> items) {
+        return new PurchaseConfirmedMessage(500L, 7L, CONFIRMED_AT, items);
+    }
+
+    private static IngredientProduct ingredientLink(Product product, Long ingredientId, String baseQuantity) {
+        return IngredientProduct.builder()
+                .product(product)
+                .ingredientId(ingredientId)
+                .unitAmount(BigDecimal.ONE)
+                .unit("개")
+                .baseQuantity(new BigDecimal(baseQuantity))
+                .build();
+    }
+
+    private static Ingredient ingredientWithId(Long id, String code, String name) {
+        Ingredient ingredient = Ingredient.builder()
+                .ingredientCode(code)
+                .name(name)
+                .baseUnit("개")
+                .defaultStorage(StorageType.REFRIGERATED)
+                .defaultShelfDays(7)
+                .basicSeasoning(false)
+                .build();
+        ReflectionTestUtils.setField(ingredient, "id", id);
+        return ingredient;
     }
 }

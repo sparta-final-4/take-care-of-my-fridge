@@ -138,6 +138,7 @@ public enum ErrorCode {
     // Ingredient
     CUSTOM_INGREDIENT_NOT_CONFIGURED(HttpStatus.INTERNAL_SERVER_ERROR, "INGREDIENT_001", "직접 입력용 기본 재료가 설정되어 있지 않습니다."),
     INGREDIENT_NOT_FOUND(HttpStatus.NOT_FOUND, "INGREDIENT_002", "재료를 찾을 수 없습니다."),
+    MEALKIT_INGREDIENT_NOT_CONFIGURED(HttpStatus.INTERNAL_SERVER_ERROR, "INGREDIENT_003", "밀키트용 기본 재료가 설정되어 있지 않습니다."),
 
     // Fridge
     FRIDGE_ITEM_NOT_FOUND(HttpStatus.NOT_FOUND, "FRIDGE_001", "냉장고 재료를 찾을 수 없습니다."),
