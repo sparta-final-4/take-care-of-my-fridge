@@ -9,6 +9,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -19,6 +20,7 @@ import org.example.takecareofmyfridgebe.domain.order.entity.Order;
 import org.example.takecareofmyfridgebe.domain.order.entity.OrderItem;
 import org.example.takecareofmyfridgebe.domain.order.entity.OrderStatus;
 import org.example.takecareofmyfridgebe.domain.order.entity.SaleType;
+import org.example.takecareofmyfridgebe.domain.order.event.OrderConfirmedEvent;
 import org.example.takecareofmyfridgebe.domain.order.repository.OrderItemRepository;
 import org.example.takecareofmyfridgebe.domain.order.repository.OrderRepository;
 import org.example.takecareofmyfridgebe.domain.payment.entity.Payment;
@@ -47,13 +49,17 @@ import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabas
 import org.springframework.context.annotation.Import;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 
 // 테스트 자체 트랜잭션을 끄고(NOT_SUPPORTED) 서비스의 트랜잭션 경계로 DB에 반영되는지 확인한다.
 // 응답이 아니라 커밋된 주문 상태, 확정 시각, 주문 상품의 확정 수량을 다시 읽어 확인한다.
+// 구매 확정 이벤트는 커밋 뒤에 받은 것만 모아 몇 번, 무엇이 나갔는지 확인한다.
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({JpaAuditingConfig.class, QueryDslConfig.class, OrderConfirmService.class, OrderReader.class,
-    RefundQueryService.class, RefundCommandService.class, PaymentHistoryRecorder.class})
+    RefundQueryService.class, RefundCommandService.class, PaymentHistoryRecorder.class,
+    OrderConfirmServiceTransactionTest.CommittedEvents.class})
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class OrderConfirmServiceTransactionTest extends MySqlContainerSupport {
 
@@ -64,6 +70,7 @@ class OrderConfirmServiceTransactionTest extends MySqlContainerSupport {
     private final PaymentRepository paymentRepository;
     private final RefundRepository refundRepository;
     private final RefundItemRepository refundItemRepository;
+    private final CommittedEvents committedEvents;
 
     @Autowired
     OrderConfirmServiceTransactionTest(
@@ -73,7 +80,8 @@ class OrderConfirmServiceTransactionTest extends MySqlContainerSupport {
         OrderItemRepository orderItemRepository,
         PaymentRepository paymentRepository,
         RefundRepository refundRepository,
-        RefundItemRepository refundItemRepository
+        RefundItemRepository refundItemRepository,
+        CommittedEvents committedEvents
     ) {
         this.orderConfirmService = orderConfirmService;
         this.refundCommandService = refundCommandService;
@@ -82,6 +90,7 @@ class OrderConfirmServiceTransactionTest extends MySqlContainerSupport {
         this.paymentRepository = paymentRepository;
         this.refundRepository = refundRepository;
         this.refundItemRepository = refundItemRepository;
+        this.committedEvents = committedEvents;
     }
 
     @AfterEach
@@ -91,6 +100,7 @@ class OrderConfirmServiceTransactionTest extends MySqlContainerSupport {
         paymentRepository.deleteAll();
         orderItemRepository.deleteAll();
         orderRepository.deleteAll();
+        committedEvents.events.clear();
     }
 
     @Test
@@ -270,6 +280,66 @@ class OrderConfirmServiceTransactionTest extends MySqlContainerSupport {
         }
     }
 
+    @Test
+    @DisplayName("결제 완료 주문을 구매 확정하면 커밋 뒤 구매 확정 이벤트가 한 번 나가고 확정 수량이 남은 상품만 싣는다")
+    void confirm_paidOrder_publishesEventWithRemainingItems() {
+        Order order = saveOrder(1L, OrderStatus.PAID);
+        OrderItem remaining = saveItem(order, 3, SaleType.NONE);
+        OrderItem allRefunded = saveItem(order, 2, SaleType.NONE);
+        saveRefund(savePayment(order), allRefunded, 2, RefundStatus.COMPLETED);
+
+        orderConfirmService.confirm(1L, order.getId());
+
+        assertThat(committedEvents.events).hasSize(1);
+        OrderConfirmedEvent event = committedEvents.events.get(0);
+        assertThat(event.orderId()).isEqualTo(order.getId());
+        assertThat(event.memberId()).isEqualTo(1L);
+        assertThat(event.confirmedAt()).isNotNull();
+        assertThat(event.items()).containsExactly(
+            new OrderConfirmedEvent.Item(remaining.getId(), 1L, "대파", 3));
+    }
+
+    @Test
+    @DisplayName("이미 구매 확정된 주문을 다시 확정하면 구매 확정 이벤트를 다시 보내지 않는다")
+    void confirm_confirmedOrder_doesNotPublishAgain() {
+        Order order = saveOrder(1L, OrderStatus.PAID);
+        saveItem(order, 1, SaleType.NONE);
+        orderConfirmService.confirm(1L, order.getId());
+
+        orderConfirmService.confirm(1L, order.getId());
+
+        assertThat(committedEvents.events).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("요청 상태 환불이 있어 거절된 주문은 구매 확정 이벤트를 보내지 않는다")
+    void confirm_withRequestedRefund_doesNotPublish() {
+        Order order = saveOrder(1L, OrderStatus.PAID);
+        OrderItem item = saveItem(order, 3, SaleType.NONE);
+        saveRefund(savePayment(order), item, 1, RefundStatus.REQUESTED);
+
+        assertThatThrownBy(() -> orderConfirmService.confirm(1L, order.getId()))
+            .isInstanceOf(BusinessException.class);
+
+        assertThat(committedEvents.events).isEmpty();
+    }
+
+    @Test
+    @DisplayName("같은 주문을 동시에 10번 확정해도 구매 확정 이벤트는 한 번만 나간다")
+    void confirm_sameOrderConcurrently_publishesOnce() throws Exception {
+        Order order = saveOrder(1L, OrderStatus.PAID);
+        saveItem(order, 1, SaleType.NONE);
+
+        List<Throwable> failures = runConcurrently(Collections.nCopies(10, () -> {
+            orderConfirmService.confirm(1L, order.getId());
+            return null;
+        }));
+
+        assertThat(failures).isEmpty();
+        assertThat(committedEvents.events).hasSize(1);
+        assertThat(committedEvents.events.get(0).orderId()).isEqualTo(order.getId());
+    }
+
     private List<Throwable> runConcurrently(List<Callable<Void>> tasks) throws Exception {
         ExecutorService executor = Executors.newFixedThreadPool(tasks.size());
         CountDownLatch start = new CountDownLatch(1);
@@ -359,5 +429,16 @@ class OrderConfirmServiceTransactionTest extends MySqlContainerSupport {
 
     private OrderItem reload(OrderItem item) {
         return orderItemRepository.findById(item.getId()).orElseThrow();
+    }
+
+    // 실제 발행 리스너와 같은 시점(커밋 뒤)에 받아 둔다. 동시 확정 테스트는 여러 스레드에서 들어오므로 스레드 안전한 목록을 쓴다
+    static class CommittedEvents {
+
+        final List<OrderConfirmedEvent> events = new CopyOnWriteArrayList<>();
+
+        @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+        void onOrderConfirmed(OrderConfirmedEvent event) {
+            events.add(event);
+        }
     }
 }
