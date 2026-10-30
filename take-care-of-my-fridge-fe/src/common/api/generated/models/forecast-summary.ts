@@ -15,7 +15,7 @@
 
 
 
-export interface Summary {
+export interface ForecastSummary {
     'baselineMeanAbsoluteError'?: number;
     'baselineTop10MatchCount'?: number;
     'droppedCount'?: number;

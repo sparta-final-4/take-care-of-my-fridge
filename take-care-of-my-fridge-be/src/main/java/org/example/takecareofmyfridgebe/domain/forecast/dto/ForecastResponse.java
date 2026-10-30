@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Stream;
+import io.swagger.v3.oas.annotations.media.Schema;
 import org.example.takecareofmyfridgebe.domain.forecast.entity.PredictionRun;
 import org.example.takecareofmyfridgebe.domain.forecast.entity.SalesForecast;
 
@@ -102,6 +103,8 @@ public record ForecastResponse(
         return Math.round(value * 10) / 10.0;
     }
 
+    // 다른 DTO의 중첩 record(Summary·Item)와 OpenAPI 스키마 이름이 겹치지 않게 이름을 따로 붙인다.
+    @Schema(name = "ForecastSummary")
     public record Summary(
             int top10MatchCount,
             int baselineTop10MatchCount,
@@ -111,6 +114,7 @@ public record ForecastResponse(
             int droppedCount
     ) {}
 
+    @Schema(name = "ForecastItem")
     public record Item(
             Long productId,
             String productName,

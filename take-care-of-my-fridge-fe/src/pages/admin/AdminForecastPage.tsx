@@ -22,13 +22,13 @@ import dayjs from 'dayjs';
 import { useSearchParams } from 'react-router';
 
 import { getErrorCode } from '@/common/api/errors';
-import type { ForecastItem } from '@/domains/forecast/api';
+import type { ForecastItem } from '@/common/api/clients';
 import { forecastQueries } from '@/domains/forecast/queries';
 
 import styles from './AdminForecastPage.module.scss';
 
 const numberOrDash = (value: number | null) => value?.toLocaleString('ko-KR') ?? '-';
-const dateTime = (value: string | null) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm') : '-');
+const dateTime = (value?: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm') : '-');
 
 // URL에 직접 넣은 값은 월요일 날짜(YYYY-MM-DD)일 때만 쓰고, 나머지는 최신 주로 본다.
 function toWeekStart(value: string | null) {
@@ -131,7 +131,7 @@ export default function AdminForecastPage() {
             <Table<ForecastItem>
               rowKey="productId"
               pagination={false}
-              dataSource={data.items.filter((item) => item.predictedRank !== null)}
+              dataSource={data.items?.filter((item) => item.predictedRank != null)}
               locale={{ emptyText: '예상 상품이 없습니다.' }}
               scroll={{ x: 'max-content' }}
               columns={[

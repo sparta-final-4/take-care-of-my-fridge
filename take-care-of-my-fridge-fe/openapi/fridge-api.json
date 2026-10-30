@@ -4555,6 +4555,54 @@
           "productId"
         ]
       },
+      "ForecastItem": {
+        "type": "object",
+        "properties": {
+          "actualQty": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "actualRank": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "baselineQty": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "predictedQty": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "predictedRank": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "productId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "productName": {
+            "type": "string"
+          },
+          "qtyError": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "rankChange": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "MATCHED",
+              "DROPPED",
+              "ENTERED"
+            ]
+          }
+        }
+      },
       "ForecastResponse": {
         "type": "object",
         "properties": {
@@ -4576,7 +4624,7 @@
           "items": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/Item"
+              "$ref": "#/components/schemas/ForecastItem"
             }
           },
           "modelVersion": {
@@ -4591,7 +4639,7 @@
             "format": "date"
           },
           "summary": {
-            "$ref": "#/components/schemas/Summary"
+            "$ref": "#/components/schemas/ForecastSummary"
           },
           "syntheticData": {
             "type": "boolean"
@@ -4603,6 +4651,35 @@
           "weekStart": {
             "type": "string",
             "format": "date"
+          }
+        }
+      },
+      "ForecastSummary": {
+        "type": "object",
+        "properties": {
+          "baselineMeanAbsoluteError": {
+            "type": "number",
+            "format": "double"
+          },
+          "baselineTop10MatchCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "droppedCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "enteredCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "meanAbsoluteError": {
+            "type": "number",
+            "format": "double"
+          },
+          "top10MatchCount": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },
@@ -7920,35 +7997,6 @@
           },
           "tip": {
             "type": "string"
-          }
-        }
-      },
-      "Summary": {
-        "type": "object",
-        "properties": {
-          "baselineMeanAbsoluteError": {
-            "type": "number",
-            "format": "double"
-          },
-          "baselineTop10MatchCount": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "droppedCount": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "enteredCount": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "meanAbsoluteError": {
-            "type": "number",
-            "format": "double"
-          },
-          "top10MatchCount": {
-            "type": "integer",
-            "format": "int32"
           }
         }
       },
