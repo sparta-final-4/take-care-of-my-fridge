@@ -43,7 +43,10 @@ export function CartItemRow({
   const { soldOut, quantity } = item;
   const sale = saleOf(item);
   const detailPath = generatePath(ROUTES.productDetail, { productId: String(item.productId) });
-  const canIncrease = !(item.saleType === 'FLASH_DROP' && quantity >= FLASH_DROP_PURCHASE_LIMIT);
+  const flashDrop = item.saleType === 'FLASH_DROP';
+  const canIncrease = !(flashDrop && quantity >= FLASH_DROP_PURCHASE_LIMIT);
+  // 담아 둔 뒤 번개 드롭으로 바뀌었으면 한 번에 구매 한도까지 내린다.
+  const decreasedQuantity = flashDrop ? FLASH_DROP_PURCHASE_LIMIT : quantity - 1;
 
   return (
     <div className={soldOut ? styles.rowSoldOut : styles.row}>
@@ -78,7 +81,7 @@ export function CartItemRow({
           aria-label={`${item.productName} 수량 빼기`}
           disabled={soldOut || quantity <= 1}
           className={styles.touchButton}
-          onClick={() => onChangeQuantity(quantity - 1)}
+          onClick={() => onChangeQuantity(decreasedQuantity)}
         />
         <span className={styles.quantityValue} aria-label={`${item.productName} 수량`}>
           {quantity}
