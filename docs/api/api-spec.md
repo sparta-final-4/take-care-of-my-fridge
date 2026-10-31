@@ -558,6 +558,7 @@ HTTP 메서드·경로·DTO 이름은 구현 전 합의합니다.
 |---|---|---|---|
 | 내 알림 목록 | GET /notifications | 로그인 | 200 |
 | 안 읽은 알림 수 | GET /notifications/unread-count | 로그인 | 200 |
+| 실시간 알림 스트림 | GET /notifications/stream | 로그인 | 200 (text/event-stream) |
 | 전부 읽음 | PATCH /notifications/read-all | 로그인 | 200 |
 | 알림 지우기 | DELETE /notifications/{notificationId} | 로그인 | 200 |
 | 모두 지우기 | DELETE /notifications | 로그인 | 200 |
@@ -576,6 +577,7 @@ HTTP 메서드·경로·DTO 이름은 구현 전 합의합니다.
 |---|---|---|
 | 내 알림 목록 | NotificationListResponse | notifications(최신순), hasNext |
 | 안 읽은 알림 수 | UnreadNotificationCountResponse | unreadCount |
+| 실시간 알림 스트림 | SSE 이벤트 `notification` | 내용 없는 새 알림 신호(`refresh`). 화면이 목록·안 읽은 수 API로 직접 받아갑니다. 공통 응답으로 감싸지 않음 |
 | 전부 읽음 | 공통 성공 응답 | 없음 |
 | 알림 지우기, 모두 지우기 | 공통 성공 응답 | 없음 |
 
