@@ -2,6 +2,7 @@ package org.example.takecareofmyfridgebe.domain.notification.event;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.example.takecareofmyfridgebe.domain.notification.push.NotificationPushPublisher;
 import org.example.takecareofmyfridgebe.domain.notification.service.NotificationCreateService;
 import org.example.takecareofmyfridgebe.global.config.KafkaTopics;
 import org.hibernate.exception.ConstraintViolationException;
@@ -21,11 +22,13 @@ public class NotificationRequestedConsumer {
     private static final String DEDUPE_KEY_UNIQUE = "uk_notifications_member_id_dedupe_key";
 
     private final NotificationCreateService notificationCreateService;
+    private final NotificationPushPublisher notificationPushPublisher;
 
     @KafkaListener(topics = KafkaTopics.NOTIFICATION_REQUESTED, groupId = "notification")
     public void consume(NotificationRequestedMessage message) {
         try {
             notificationCreateService.create(message);
+            notificationPushPublisher.publish(message.memberId());
         } catch (DataIntegrityViolationException e) {
             if (!constraintName(e).contains(DEDUPE_KEY_UNIQUE)) {
                 throw e;

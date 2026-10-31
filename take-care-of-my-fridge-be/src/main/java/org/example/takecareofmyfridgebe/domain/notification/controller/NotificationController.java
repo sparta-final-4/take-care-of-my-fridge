@@ -9,6 +9,8 @@ import org.example.takecareofmyfridgebe.domain.notification.dto.ReadAllNotificat
 import org.example.takecareofmyfridgebe.domain.notification.dto.UnreadNotificationCountResponse;
 import org.example.takecareofmyfridgebe.domain.notification.service.NotificationService;
 import org.example.takecareofmyfridgebe.global.response.ApiResponse;
+import org.example.takecareofmyfridgebe.global.sse.SseConnectionRegistry;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -19,6 +21,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @RestController
 @RequestMapping("/api/notifications")
@@ -26,12 +29,20 @@ import org.springframework.web.bind.annotation.RestController;
 public class NotificationController {
 
     private final NotificationService notificationService;
+    private final SseConnectionRegistry sseConnectionRegistry;
 
     @GetMapping
     public ResponseEntity<ApiResponse<NotificationListResponse>> getMyNotifications(
             @AuthenticationPrincipal AuthSessionService.AuthPrincipal principal,
             @Valid @ModelAttribute NotificationListRequest request) {
         return ResponseEntity.ok(ApiResponse.ok(notificationService.getMyNotifications(principal.memberId(), request)));
+    }
+
+    // 새 알림이 있다는 신호만 흘려보낸다. 내용은 화면이 위 조회 API로 받아간다.
+    // 연결을 오래 쥐는 응답이라 ApiResponse로 감싸지 않는다
+    @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter stream(@AuthenticationPrincipal AuthSessionService.AuthPrincipal principal) {
+        return sseConnectionRegistry.subscribe(principal.memberId());
     }
 
     @GetMapping("/unread-count")

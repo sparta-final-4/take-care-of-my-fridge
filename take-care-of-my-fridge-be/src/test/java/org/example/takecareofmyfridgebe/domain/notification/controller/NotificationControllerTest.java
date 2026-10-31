@@ -1,7 +1,9 @@
 package org.example.takecareofmyfridgebe.domain.notification.controller;
 
+import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -9,6 +11,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.util.List;
@@ -17,6 +20,7 @@ import org.example.takecareofmyfridgebe.domain.auth.service.JwtTokenService;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 import org.example.takecareofmyfridgebe.domain.notification.service.NotificationService;
 import org.example.takecareofmyfridgebe.global.config.SecurityConfig;
+import org.example.takecareofmyfridgebe.global.sse.SseConnectionRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -30,6 +34,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @WebMvcTest(NotificationController.class)
 @Import({SecurityConfig.class, NotificationControllerTest.TestConfig.class})
@@ -37,16 +42,19 @@ class NotificationControllerTest {
 
     private final MockMvc mvc;
     private final NotificationService notificationService;
+    private final SseConnectionRegistry sseConnectionRegistry;
 
     @Autowired
-    NotificationControllerTest(MockMvc mvc, NotificationService notificationService) {
+    NotificationControllerTest(MockMvc mvc, NotificationService notificationService,
+                               SseConnectionRegistry sseConnectionRegistry) {
         this.mvc = mvc;
         this.notificationService = notificationService;
+        this.sseConnectionRegistry = sseConnectionRegistry;
     }
 
     @BeforeEach
     void resetMock() {
-        reset(notificationService);
+        reset(notificationService, sseConnectionRegistry);
     }
 
     @Test
@@ -102,6 +110,28 @@ class NotificationControllerTest {
     }
 
     @Test
+    @DisplayName("알림 스트림은 로그인한 회원 번호로 연결한다")
+    void stream_subscribesWithMemberId() throws Exception {
+        given(sseConnectionRegistry.subscribe(7L)).willReturn(new SseEmitter());
+
+        mvc.perform(get("/api/notifications/stream")
+                        .accept(MediaType.TEXT_EVENT_STREAM)
+                        .with(loginAsMember7()))
+                .andExpect(request().asyncStarted());
+
+        verify(sseConnectionRegistry).subscribe(7L);
+    }
+
+    @Test
+    @DisplayName("로그인하지 않으면 알림 스트림은 401이고 연결하지 않는다")
+    void stream_rejectsAnonymous() throws Exception {
+        mvc.perform(get("/api/notifications/stream").accept(MediaType.TEXT_EVENT_STREAM))
+                .andExpect(status().isUnauthorized());
+
+        verifyNoInteractions(sseConnectionRegistry);
+    }
+
+    @Test
     @DisplayName("로그인하지 않으면 다섯 API 모두 401이다")
     void rejectsAnonymous() throws Exception {
         mvc.perform(get("/api/notifications"))
@@ -133,6 +163,11 @@ class NotificationControllerTest {
         @Bean
         NotificationService notificationService() {
             return mock(NotificationService.class);
+        }
+
+        @Bean
+        SseConnectionRegistry sseConnectionRegistry() {
+            return mock(SseConnectionRegistry.class);
         }
 
         @Bean
