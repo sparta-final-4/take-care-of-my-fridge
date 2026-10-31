@@ -5019,23 +5019,12 @@
       "FridgeItemSearchRequest": {
         "type": "object",
         "properties": {
-          "imminentOnly": {
-            "type": "boolean"
-          },
           "sort": {
             "type": "string",
             "enum": [
               "EXPIRATION",
               "CREATED",
               "NAME"
-            ]
-          },
-          "storage": {
-            "type": "string",
-            "enum": [
-              "REFRIGERATED",
-              "FROZEN",
-              "ROOM_TEMP"
             ]
           }
         }
