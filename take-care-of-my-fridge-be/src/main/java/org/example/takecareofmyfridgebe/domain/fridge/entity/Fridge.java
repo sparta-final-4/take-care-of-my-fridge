@@ -101,6 +101,7 @@ public class Fridge extends BaseTimeEntity {
     ) {
         if (quantity != null) {
             validatePositiveQuantity(quantity);
+            validateMealkitQuantity(quantity);
             this.quantity = quantity;
         }
         if (ingredient != null) {
@@ -131,6 +132,14 @@ public class Fridge extends BaseTimeEntity {
     // 잔여 수량 모두 소진(0) 여부 확인
     public boolean isEmpty() {
         return this.quantity.compareTo(BigDecimal.ZERO) == 0;
+    }
+
+    // 밀키트는 개수 단위라 정수 수량만 허용 (null은 "전부"라 검사하지 않음)
+    // 밀키트는 이름을 바꿔도 재매핑하지 않으므로 현재 재료로 판단한다.
+    public void validateMealkitQuantity(BigDecimal quantity) {
+        if (quantity != null && ingredient.isMealkit() && quantity.stripTrailingZeros().scale() > 0) {
+            throw new BusinessException(ErrorCode.FRIDGE_MEALKIT_QUANTITY_NOT_INTEGER);
+        }
     }
 
     // 수량은 0보다 커야 함

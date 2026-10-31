@@ -7,7 +7,7 @@ import {
   hasFridgeItemChanges,
   type EditFormValues,
 } from '../editRequest';
-import { STORAGE_LABELS } from '../format';
+import { getStep, STORAGE_LABELS } from '../format';
 import { useUpdateFridgeItem } from '../queries';
 import styles from './FridgeItemEditModal.module.scss';
 
@@ -28,6 +28,8 @@ export function FridgeItemEditModal({ item, onClose }: FridgeItemEditModalProps)
   const { message } = App.useApp();
   const [form] = Form.useForm<EditFormValues>();
   const updateMutation = useUpdateFridgeItem();
+  // 밀키트는 개수 단위라 정수로만 수정한다(서버도 소수면 FRIDGE_005로 거절).
+  const isMealkit = item.ingredientType === 'MEALKIT';
   // 처음 값과 다른 칸이 없으면 저장 버튼을 막는다. 비운 칸은 바뀐 것으로 보아 버튼이 켜지고, 누르면 검증 안내가 나온다.
   const watchedValues = Form.useWatch((values: Partial<EditFormValues>) => values, form);
   const hasChanges = hasFridgeItemChanges(item, watchedValues ?? {});
@@ -86,8 +88,9 @@ export function FridgeItemEditModal({ item, onClose }: FridgeItemEditModalProps)
           ]}
         >
           <InputNumber
-            min={0}
-            step={1}
+            min={isMealkit ? 1 : 0}
+            step={isMealkit ? 1 : getStep(item.baseUnit)}
+            precision={isMealkit ? 0 : undefined}
             suffix={item.baseUnit ?? undefined}
             className={styles.fullWidth}
           />

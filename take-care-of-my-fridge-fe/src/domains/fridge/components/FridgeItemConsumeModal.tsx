@@ -1,7 +1,7 @@
 import { App, Button, Flex, Form, InputNumber, Modal, Typography } from 'antd';
 
 import type { FridgeItemResponse } from '../api';
-import { formatQuantity, withObjectParticle } from '../format';
+import { formatQuantity, getStep, withObjectParticle } from '../format';
 import { useTakeOutFridgeItem } from '../queries';
 import styles from './FridgeItemConsumeModal.module.scss';
 
@@ -21,10 +21,21 @@ export function FridgeItemConsumeModal({ item, onClose }: FridgeItemConsumeModal
   const { message } = App.useApp();
   const [form] = Form.useForm<ConsumeFormValues>();
   const takeOutMutation = useTakeOutFridgeItem();
+  // 밀키트는 개수 단위라 1개씩만 뺀다(서버도 소수면 FRIDGE_005로 거절).
+  const isMealkit = item.ingredientType === 'MEALKIT';
 
   const handleFillAll = () => form.setFieldValue('quantity', item.quantity);
 
-  // 남은 양 전부면 quantity를 빼고 보낸다. 남은 양보다 커도 막지 않고 보내면 서버가 전부 사용으로 처리한다.
+  // 입력칸은 max로 가진 양을 넘지 못하게 하지만(+ 버튼 비활성화, 벗어나거나 Enter 시 가진 양으로 맞춤) 조용히 바뀌므로,
+  // 맞추기 전에 직접 입력한 글자를 읽어 넘었으면 안내한다.
+  const warnIfOverRemaining = (text: string) => {
+    const typed = Number(text);
+    if (item.quantity !== undefined && Number.isFinite(typed) && typed > item.quantity) {
+      void message.warning(`가진 양(${formatQuantity(item)})보다 많이 뺄 수 없어요`);
+    }
+  };
+
+  // 남은 양 전부면 quantity를 빼고 보낸다(서버가 전부 사용으로 처리).
   const handleFinish = ({ quantity }: ConsumeFormValues) => {
     takeOutMutation.mutate(
       {
@@ -87,8 +98,12 @@ export function FridgeItemConsumeModal({ item, onClose }: FridgeItemConsumeModal
               ]}
             >
               <InputNumber
-                min={0}
-                step={0.5}
+                min={isMealkit ? 1 : 0}
+                max={item.quantity}
+                step={isMealkit ? 1 : getStep(item.baseUnit)}
+                precision={isMealkit ? 0 : undefined}
+                onBlur={(event) => warnIfOverRemaining(event.target.value)}
+                onPressEnter={(event) => warnIfOverRemaining(event.currentTarget.value)}
                 suffix={item.baseUnit || undefined}
                 aria-label="먹은 양"
                 className={styles.quantityInput}

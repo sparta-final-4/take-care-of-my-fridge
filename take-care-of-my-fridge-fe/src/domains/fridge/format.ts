@@ -44,6 +44,38 @@ export function formatQuantity(item: Pick<FridgeItemResponse, 'quantity' | 'base
   return `${display}${item.baseUnit ?? ''}`;
 }
 
+// 수량 입력 증감 단위. 세는 단위(개·모 등)는 0.5, g·ml은 10, 그 밖에는 0.5.
+// 냉장고 먹었어요·수정 팝업과 요리 완료 팝업이 같이 쓴다. 밀키트 정수 처리는 각 팝업에서 한다.
+const COUNT_UNITS = new Set([
+  '개',
+  '모',
+  '대',
+  '장',
+  '마리',
+  '쪽',
+  '알',
+  '캔',
+  '병',
+  '팩',
+  '봉',
+  '줌',
+  '뿌리',
+  '토막',
+  '줄',
+  '조각',
+  '포기',
+  '공기',
+  '접시',
+]);
+
+export function getStep(unit?: string | null): number {
+  if (!unit) return 0.5;
+  const clean = unit.trim().toLowerCase();
+  if (COUNT_UNITS.has(clean)) return 0.5;
+  if (clean.includes('g') || clean.includes('ml')) return 10;
+  return 0.5;
+}
+
 // 최근 기록 날짜. 오늘·어제는 말로, 그 외는 MM.DD, 올해가 아니면 YY.MM.DD
 export function formatLogDate(value: string, now: Dayjs = dayjs()) {
   const date = dayjs(value);

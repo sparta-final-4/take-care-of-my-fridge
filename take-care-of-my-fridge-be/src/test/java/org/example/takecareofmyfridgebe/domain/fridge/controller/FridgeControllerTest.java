@@ -591,6 +591,30 @@ class FridgeControllerTest {
     }
 
     /**
+     * 밀키트를 소수 수량으로 빼려고 해 서비스가 FRIDGE_MEALKIT_QUANTITY_NOT_INTEGER를 던지면
+     * 400 Bad Request(FRIDGE_005) 응답을 반환하는지 검증한다.
+     */
+    @Test
+    void takeOutItemReturnsBadRequestWhenMealkitQuantityIsNotInteger() throws Exception {
+        // Given
+        when(fridgeService.takeOutItem(eq(7L), eq(100L), any(FridgeItemTakeOutRequest.class)))
+                .thenThrow(new BusinessException(ErrorCode.FRIDGE_MEALKIT_QUANTITY_NOT_INTEGER));
+
+        // When & Then
+        mvc.perform(post("/api/fridge/items/100/take-out")
+                        .with(csrf())
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                new AuthSessionService.AuthPrincipal(7L, 8L, Member.Role.USER), null,
+                                List.of(new SimpleGrantedAuthority("ROLE_USER")))))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"action\":\"CONSUMED\",\"quantity\":0.5}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code")
+                        .value(ErrorCode.FRIDGE_MEALKIT_QUANTITY_NOT_INTEGER.getCode()));
+    }
+
+    /**
      * 쿼리 파라미터 없이 기록을 조회하면:
      * 1) 토큰의 회원 ID(7L)와 기본값(action·from·to = null, page = 1, size = 20)으로 서비스를 호출하는지
      * 2) PageResponse와 FridgeItemLogResponse 필드가 규격대로 직렬화되는지 검증한다.
