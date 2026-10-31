@@ -40,23 +40,18 @@ public class FridgeController {
     private final FridgeService fridgeService;
 
     /**
-     * 로그인한 회원 본인의 냉장고 재료 전체 목록을 조건(보관방식, 정렬, 임박 여부)으로 조회한다.
+     * 로그인한 회원 본인의 냉장고 재료 전체 목록을 정렬 기준으로 조회한다.
      *
      * @param principal 인증된 요청자의 회원 정보 — 토큰에서 추출한 회원 ID 소유의 재료만 조회 대상
-     * @param request   조회 필터 및 정렬 조건 (storage, sort, imminentOnly)
-     * @return 조건에 맞는 냉장고 재료 목록
+     * @param request   정렬 조건 (sort)
+     * @return 회원의 냉장고 재료 목록
      */
     @GetMapping("/items")
     public ResponseEntity<ApiResponse<List<FridgeItemResponse>>> getItems(
             @AuthenticationPrincipal AuthPrincipal principal,
             @Valid @ModelAttribute FridgeItemSearchRequest request
     ) {
-        List<FridgeItemResponse> response = fridgeService.getItems(
-                principal.memberId(),
-                request.storage(),
-                request.sort(),
-                request.imminentOnly()
-        );
+        List<FridgeItemResponse> response = fridgeService.getItems(principal.memberId(), request.sort());
         return ResponseEntity.ok(ApiResponse.ok(response));
     }
 

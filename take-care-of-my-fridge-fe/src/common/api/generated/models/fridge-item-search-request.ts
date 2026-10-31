@@ -16,9 +16,7 @@
 
 
 export interface FridgeItemSearchRequest {
-    'imminentOnly'?: boolean;
     'sort'?: FridgeItemSearchRequestSortEnum;
-    'storage'?: FridgeItemSearchRequestStorageEnum;
 }
 
 export const FridgeItemSearchRequestSortEnum = {
@@ -28,12 +26,5 @@ export const FridgeItemSearchRequestSortEnum = {
 } as const;
 
 export type FridgeItemSearchRequestSortEnum = typeof FridgeItemSearchRequestSortEnum[keyof typeof FridgeItemSearchRequestSortEnum];
-export const FridgeItemSearchRequestStorageEnum = {
-    Refrigerated: 'REFRIGERATED',
-    Frozen: 'FROZEN',
-    RoomTemp: 'ROOM_TEMP',
-} as const;
-
-export type FridgeItemSearchRequestStorageEnum = typeof FridgeItemSearchRequestStorageEnum[keyof typeof FridgeItemSearchRequestStorageEnum];
 
 

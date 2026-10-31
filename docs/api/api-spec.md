@@ -144,7 +144,7 @@ HTTP 메서드·경로·DTO 이름은 구현 전 합의합니다.
 
 | 기능 | Method / Path | 권한 | 요청 | 성공 응답 | 주요 오류 |
 |---|---|---|---|---|---|
-| 냉장고 재료 목록 조회 | GET /fridge/items | 로그인 | Query: storage, sort, imminentOnly | 200, `List<FridgeItemResponse>` | 400 정렬/보관방식 오류, 401 |
+| 냉장고 재료 목록 조회 | GET /fridge/items | 로그인 | Query: sort (EXPIRATION 기본, CREATED 최신 등록순, NAME) | 200, `List<FridgeItemResponse>` (회원 재료 전체, 탭 구분은 프론트) | 400 정렬 오류, 401 |
 | 냉장고 재료 이력 조회 | GET /fridge/logs | 로그인 | Query: action, from, to, page, size | 200, `PageResponse<FridgeItemLogResponse>` | 400 from>to 또는 page/size 오류, 401 |
 | 냉장고 재료 일괄 등록 | POST /fridge/items | 로그인 | Body: `items`: `[{ rawName, quantity, storage?, expirationDate? }]` (1~20개) | 200, `List<FridgeItemResponse>` | 400 수량<=0 또는 누락, 401 |
 | 냉장고 재료 정보 수정 | PATCH /fridge/items/{fridgeId} | 로그인 | Path: fridgeId<br>Body: rawName, quantity, storage, expirationDate | 200, `FridgeItemResponse` | 400 검증 오류, 401, 404 재료 없음/타인 재료 |
