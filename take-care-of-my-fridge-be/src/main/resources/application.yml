@@ -44,6 +44,12 @@ spring:
         options:
           model: gpt-4o-mini
           temperature: 0.3
+      embedding:
+        model: text-embedding-3-small
+        dimensions: 1536
+        # 검색 요청 안에서 불리므로 짧게 둔다. 실패하면 벡터 폴백만 0건이 된다
+        timeout: 3s
+        max-retries: 0
       timeout: 60s
       max-retries: 1
 
@@ -85,6 +91,14 @@ app:
         alias: products
         index-settings: classpath:elasticsearch/products/products_index.json
         batch-size: 500
+    # 키워드 검색 결과가 0건일 때만 쓰는 벡터 검색. 임베딩을 넣어 재색인한 뒤 켠다
+    vector:
+      enabled: ${SEARCH_VECTOR_ENABLED:false}
+      dimensions: 1536
+      k: 20
+      num-candidates: 100
+      min-similarity: 0.5
+      batch-size: 100
     
 # 결제
 portone:

@@ -34,7 +34,8 @@ class RecipeSearchServiceTest {
     private final ElasticsearchClient esClient = mock(ElasticsearchClient.class);
     private final RecipeSearchProperties properties = new RecipeSearchProperties(
             SearchEngine.ELASTICSEARCH,
-            new IndexProperties(new RecipeIndexProperties("recipes", null, null, null, 500), null));
+            new IndexProperties(new RecipeIndexProperties("recipes", null, null, null, 500), null),
+            null);
     private final RecipeSearchService service = new RecipeSearchService(esClient, properties);
 
     @Test

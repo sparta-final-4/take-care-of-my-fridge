@@ -7,7 +7,8 @@ import org.springframework.core.io.Resource;
 @ConfigurationProperties(prefix = "app.search")
 public record RecipeSearchProperties(
         SearchEngine engine,
-        IndexProperties indexProperties
+        IndexProperties indexProperties,
+        VectorProperties vector
 ) {
 
     public record IndexProperties(
@@ -32,12 +33,27 @@ public record RecipeSearchProperties(
             int batchSize
     ) implements EsIndexProperties {}
 
+    // 검색어가 글자로 맞지 않아 0건일 때 쓰는 벡터 검색 설정
+    public record VectorProperties(
+            boolean enabled,
+            int dimensions,
+            int k,
+            int numCandidates,
+            float minSimilarity,
+            int batchSize
+    ) {}
+
     public boolean useElasticSearch() {
         return engine == SearchEngine.ELASTICSEARCH;
     }
 
     public boolean useMySQL() {
         return engine == SearchEngine.MYSQL;
+    }
+
+    // 벡터 검색은 ES 검색 위에서만 동작한다
+    public boolean useVector() {
+        return useElasticSearch() && vector != null && vector.enabled();
     }
 
 }
