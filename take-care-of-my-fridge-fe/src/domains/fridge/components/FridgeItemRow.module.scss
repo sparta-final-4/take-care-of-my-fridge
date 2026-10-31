@@ -23,6 +23,19 @@
   }
 }
 
+// 메인에서 방금 등록한 재료.
+.highlighted {
+  background: var(--ant-color-primary-bg);
+  border-color: var(--ant-color-primary-border);
+}
+
+// 재료 종류 태그(IngredientTypeTag)와 같은 크기
+.newTag {
+  margin: 0;
+  font-size: var(--ant-font-size-sm);
+  white-space: nowrap;
+}
+
 .check {
   grid-area: check;
 }

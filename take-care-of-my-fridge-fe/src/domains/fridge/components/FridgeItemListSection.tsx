@@ -1,7 +1,7 @@
 import { CheckOutlined } from '@ant-design/icons';
 import { App, Button, Empty, Flex, Result, Segmented, Select, Skeleton, Typography } from 'antd';
 import { useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router';
+import { useLocation, useNavigate, useSearchParams } from 'react-router';
 
 import { ROUTES } from '@/app/paths';
 import { SectionCard } from '@/common/components/SectionCard';
@@ -11,6 +11,7 @@ import type { FridgeItemResponse, FridgeSortType } from '../api';
 import { FRIDGE_TABS, isFridgeTab, matchesFridgeTab, type FridgeTab } from '../filter';
 import { STORAGE_LABELS } from '../format';
 import { useFridgeSort } from '../hooks/useFridgeSort';
+import { readNewFridgeIds } from '../newItems';
 import { useFridgeItems, useRemoveFridgeItem, useTakeOutFridgeItem } from '../queries';
 import { FridgeItemConsumeModal } from './FridgeItemConsumeModal';
 import { FridgeItemEditModal } from './FridgeItemEditModal';
@@ -36,7 +37,7 @@ const EMPTY_TAB_MESSAGES: Record<FridgeTab, string> = {
 
 const SORT_OPTIONS: Array<{ value: FridgeSortType; label: string }> = [
   { value: 'EXPIRATION', label: '임박순' },
-  { value: 'CREATED', label: '등록순' },
+  { value: 'CREATED', label: '최신 등록순' },
   { value: 'NAME', label: '이름순' },
 ];
 
@@ -52,6 +53,7 @@ export function FridgeItemListSection() {
   const openChat = useChatModalStore((state) => state.openChat);
   const { message } = App.useApp();
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const [sort, setSort] = useFridgeSort();
   const { data, isPending, isError, refetch } = useFridgeItems(sort, true);
@@ -65,6 +67,8 @@ export function FridgeItemListSection() {
   // 기존 링크가 그대로 열리도록 키는 storage로 두고 밀키트·기본 양념 탭 값만 더했다.
   const storageParam = searchParams.get('storage');
   const storage: FridgeTab = isFridgeTab(storageParam) ? storageParam : 'ALL';
+  // 메인에서 등록하고 넘어왔을 때만 있다. 정렬·탭을 바꾸면 state 없이 이동해 사라진다.
+  const newFridgeIds = readNewFridgeIds(location.state);
 
   const handleStorageChange = (next: FridgeTab) => {
     setSearchParams(
@@ -125,6 +129,7 @@ export function FridgeItemListSection() {
             item={item}
             checked={checkedIds.includes(fridgeId)}
             removing={removingIds.includes(fridgeId)}
+            highlighted={newFridgeIds.includes(fridgeId)}
             onCheck={(checked) => handleCheck(fridgeId, checked)}
             onEdit={() => setEditingItem(item)}
             onConsume={() => setConsumingItem(item)}

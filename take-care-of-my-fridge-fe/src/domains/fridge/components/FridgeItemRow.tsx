@@ -1,5 +1,5 @@
 import { CheckCircleOutlined, DeleteOutlined, MoreOutlined } from '@ant-design/icons';
-import { Button, Checkbox, Dropdown, Flex, Popconfirm, Tooltip, Typography } from 'antd';
+import { Button, Checkbox, Dropdown, Flex, Popconfirm, Tag, Tooltip, Typography } from 'antd';
 import dayjs from 'dayjs';
 import { useState } from 'react';
 
@@ -13,6 +13,8 @@ interface FridgeItemRowProps {
   item: FridgeItemResponse;
   checked: boolean;
   removing: boolean;
+  // 메인에서 방금 등록한 재료
+  highlighted: boolean;
   onCheck: (checked: boolean) => void;
   onEdit: () => void;
   onConsume: () => void;
@@ -24,6 +26,7 @@ export function FridgeItemRow({
   item,
   checked,
   removing,
+  highlighted,
   onCheck,
   onEdit,
   onConsume,
@@ -34,7 +37,7 @@ export function FridgeItemRow({
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   return (
-    <div className={styles.row}>
+    <div className={highlighted ? `${styles.row} ${styles.highlighted}` : styles.row}>
       <Checkbox
         checked={checked}
         onChange={(event) => onCheck(event.target.checked)}
@@ -50,6 +53,11 @@ export function FridgeItemRow({
           {item.rawName}
         </Typography.Text>
         <IngredientTypeTag type={item.ingredientType} />
+        {highlighted && (
+          <Tag bordered={false} color="blue" className={styles.newTag}>
+            NEW
+          </Tag>
+        )}
       </div>
       <div className={styles.meta}>
         <Typography.Text className={styles.metaText}>{formatQuantity(item)}</Typography.Text>
