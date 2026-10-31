@@ -1,6 +1,7 @@
 package org.example.takecareofmyfridgebe.domain.ingredient.service;
 
 import lombok.RequiredArgsConstructor;
+import org.example.takecareofmyfridgebe.domain.ingredient.dto.IngredientIndexSource;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.Ingredient;
 import org.example.takecareofmyfridgebe.domain.ingredient.repository.IngredientRepository;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
@@ -10,7 +11,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collection;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -77,6 +80,27 @@ public class IngredientService {
     public Ingredient getMealkitIngredient() {
         return ingredientRepository.findByIngredientCode(Ingredient.ING_MEALKIT)
                 .orElseThrow(() -> new BusinessException(ErrorCode.MEALKIT_INGREDIENT_NOT_CONFIGURED));
+    }
+
+    /**
+     * ES 재료 색인용 전체 조회. 직접 입력(ING_CUSTOM)과 밀키트(ING_MEALKIT)는 이름 정제 대상이 아니므로 뺀다.
+     */
+    public List<IngredientIndexSource> findIndexSources() {
+        return ingredientRepository.findAll().stream()
+                .filter(this::isIndexTarget)
+                .map(IngredientIndexSource::from)
+                .toList();
+    }
+
+    // 단건 색인용: 없거나 색인 대상이 아니면 빈 Optional
+    public Optional<IngredientIndexSource> findIndexSource(Long ingredientId) {
+        return ingredientRepository.findById(ingredientId)
+                .filter(this::isIndexTarget)
+                .map(IngredientIndexSource::from);
+    }
+
+    private boolean isIndexTarget(Ingredient ingredient) {
+        return !ingredient.isCustom() && !ingredient.isMealkit();
     }
 
     private boolean isExcludedFromCookingDeduction(Ingredient ingredient) {

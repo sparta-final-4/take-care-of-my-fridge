@@ -46,7 +46,7 @@ class RecipeSearchServiceTest {
     private RecipeSearchService service(boolean vectorEnabled) {
         RecipeSearchProperties properties = new RecipeSearchProperties(
                 SearchEngine.ELASTICSEARCH,
-                new IndexProperties(new RecipeIndexProperties("recipes", null, null, null, 500, false), null),
+                new IndexProperties(new RecipeIndexProperties("recipes", null, null, null, 500, false), null, null),
                 new VectorProperties(vectorEnabled, 3, 20, 100, 0.5f, 100));
         return new RecipeSearchService(esClient, properties, embedder);
     }

@@ -1,6 +1,7 @@
 package org.example.takecareofmyfridgebe.domain.search.event;
 
 import org.example.takecareofmyfridgebe.domain.recipe.event.RecipeChangedEvent;
+import org.example.takecareofmyfridgebe.domain.search.service.IngredientIndexer;
 import org.example.takecareofmyfridgebe.domain.search.service.ProductIndexer;
 import org.example.takecareofmyfridgebe.domain.search.service.RecipeIndexer;
 import org.example.takecareofmyfridgebe.support.MySqlContainerSupport;
@@ -28,6 +29,9 @@ class RecipeIndexEventListenerIntegrationTest extends MySqlContainerSupport {
 
     @MockitoBean
     private ProductIndexer productIndexer;
+
+    @MockitoBean
+    private IngredientIndexer ingredientIndexer;
 
     @Autowired
     private ApplicationEventPublisher eventPublisher;

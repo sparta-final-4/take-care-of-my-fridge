@@ -1,0 +1,23 @@
+{
+  "settings": {
+    "number_of_shards": 1,
+    "number_of_replicas": 0,
+    "analysis": {
+      "normalizer": {
+        "lowercase_normalizer": {
+          "type": "custom",
+          "filter": ["lowercase"]
+        }
+      }
+    }
+  },
+  "mappings": {
+    "dynamic": "strict",
+    "properties": {
+      "id":        { "type": "long" },
+      "name":      { "type": "keyword" },
+      "aliases":   { "type": "keyword", "normalizer": "lowercase_normalizer" },
+      "embedding": { "type": "dense_vector", "dims": 1536, "similarity": "cosine" }
+    }
+  }
+}

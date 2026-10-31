@@ -67,6 +67,22 @@ class RecipeSearchPropertiesTest extends MySqlContainerSupport {
     }
 
     @Test
+    @DisplayName("재료 인덱스 설정과 별칭 사전 파일이 바인딩된다")
+    void bindsIngredientIndexProperties() {
+        RecipeSearchProperties.IngredientIndexProperties ingredient = properties.indexProperties().ingredient();
+
+        assertEquals("ingredients", ingredient.alias());
+        assertTrue(ingredient.indexSettings().exists(), "ingredients_index.json");
+        assertNull(ingredient.synonyms());
+        assertNull(ingredient.extraSynonyms());
+        assertEquals(2, ingredient.aliasDictionaries().size());
+        assertTrue(ingredient.aliasDictionaries().stream().allMatch(resource -> resource.exists()));
+        assertTrue(ingredient.embeddingEnabled());
+        assertFalse(ingredient.autoMatchByVector());
+        assertEquals(0.85f, ingredient.minSimilarity());
+    }
+
+    @Test
     @DisplayName("벡터 검색 설정이 바인딩되고 기본값은 꺼져 있다")
     void bindsVectorProperties() {
         RecipeSearchProperties.VectorProperties vector = properties.vector();

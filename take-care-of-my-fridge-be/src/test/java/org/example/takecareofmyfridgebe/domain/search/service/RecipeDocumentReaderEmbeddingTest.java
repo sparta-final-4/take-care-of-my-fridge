@@ -31,7 +31,7 @@ class RecipeDocumentReaderEmbeddingTest {
     private RecipeDocumentReader reader(boolean embedding) {
         RecipeSearchProperties properties = new RecipeSearchProperties(
                 SearchEngine.ELASTICSEARCH,
-                new IndexProperties(new RecipeIndexProperties("recipes", null, null, null, 500, embedding), null),
+                new IndexProperties(new RecipeIndexProperties("recipes", null, null, null, 500, embedding), null, null),
                 null);
         return new RecipeDocumentReader(recipeIndexSourceService, embedder, properties);
     }

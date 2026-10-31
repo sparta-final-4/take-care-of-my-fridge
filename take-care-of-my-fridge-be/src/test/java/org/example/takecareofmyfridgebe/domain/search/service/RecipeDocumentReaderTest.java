@@ -45,7 +45,7 @@ class RecipeDocumentReaderTest extends MySqlContainerSupport {
         RecipeSearchProperties recipeSearchProperties() {
             return new RecipeSearchProperties(
                     SearchEngine.ELASTICSEARCH,
-                    new IndexProperties(new RecipeIndexProperties("recipes", null, null, null, 500, false), null),
+                    new IndexProperties(new RecipeIndexProperties("recipes", null, null, null, 500, false), null, null),
                     null);
         }
     }
