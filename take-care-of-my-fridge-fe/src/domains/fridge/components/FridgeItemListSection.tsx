@@ -7,7 +7,8 @@ import { ROUTES } from '@/app/paths';
 import { SectionCard } from '@/common/components/SectionCard';
 import { useChatModalStore } from '@/domains/chat/model/useChatModalStore';
 
-import type { FridgeItemResponse, FridgeSortType, StorageType } from '../api';
+import type { FridgeItemResponse, FridgeSortType } from '../api';
+import { FRIDGE_TABS, isFridgeTab, matchesFridgeTab, type FridgeTab } from '../filter';
 import { STORAGE_LABELS } from '../format';
 import { useFridgeSort } from '../hooks/useFridgeSort';
 import { useFridgeItems, useRemoveFridgeItem, useTakeOutFridgeItem } from '../queries';
@@ -16,9 +17,22 @@ import { FridgeItemEditModal } from './FridgeItemEditModal';
 import { FridgeItemRow } from './FridgeItemRow';
 import styles from './FridgeItemListSection.module.scss';
 
-type StorageTab = StorageType | 'ALL';
+const TAB_LABELS: Record<FridgeTab, string> = {
+  ALL: '전체',
+  ...STORAGE_LABELS,
+  MEALKIT: '밀키트',
+  BASIC_SEASONING: '기본 양념',
+};
 
-const STORAGE_TABS: StorageTab[] = ['ALL', 'REFRIGERATED', 'FROZEN', 'ROOM_TEMP'];
+// 전체 탭은 목록에 기본 양념만 있을 때 비어 보인다.
+const EMPTY_TAB_MESSAGES: Record<FridgeTab, string> = {
+  ALL: '기본 양념 말고는 재료가 없어요',
+  REFRIGERATED: `${STORAGE_LABELS.REFRIGERATED} 보관 재료가 없어요`,
+  FROZEN: `${STORAGE_LABELS.FROZEN} 보관 재료가 없어요`,
+  ROOM_TEMP: `${STORAGE_LABELS.ROOM_TEMP} 보관 재료가 없어요`,
+  MEALKIT: '밀키트가 없어요',
+  BASIC_SEASONING: '기본 양념이 없어요',
+};
 
 const SORT_OPTIONS: Array<{ value: FridgeSortType; label: string }> = [
   { value: 'EXPIRATION', label: '임박순' },
@@ -34,10 +48,6 @@ const EXPIRATION_GROUPS: Array<{ label: string; match: (item: FridgeItemResponse
   { label: '여유 있음', match: (item) => item.status === 'NORMAL' },
 ];
 
-function isStorageTab(value: string | null): value is StorageTab {
-  return STORAGE_TABS.some((tab) => tab === value);
-}
-
 export function FridgeItemListSection() {
   const openChat = useChatModalStore((state) => state.openChat);
   const { message } = App.useApp();
@@ -52,10 +62,11 @@ export function FridgeItemListSection() {
   const [editingItem, setEditingItem] = useState<FridgeItemResponse>();
   const [consumingItem, setConsumingItem] = useState<FridgeItemResponse>();
 
+  // 기존 링크가 그대로 열리도록 키는 storage로 두고 밀키트·기본 양념 탭 값만 더했다.
   const storageParam = searchParams.get('storage');
-  const storage: StorageTab = isStorageTab(storageParam) ? storageParam : 'ALL';
+  const storage: FridgeTab = isFridgeTab(storageParam) ? storageParam : 'ALL';
 
-  const handleStorageChange = (next: StorageTab) => {
+  const handleStorageChange = (next: FridgeTab) => {
     setSearchParams(
       (params) => {
         if (next === 'ALL') params.delete('storage');
@@ -147,13 +158,10 @@ export function FridgeItemListSection() {
       );
     }
 
-    const visibleItems = storage === 'ALL' ? data : data.filter((item) => item.storage === storage);
+    const visibleItems = data.filter((item) => matchesFridgeTab(item, storage));
     if (visibleItems.length === 0) {
       return (
-        <Empty
-          image={Empty.PRESENTED_IMAGE_SIMPLE}
-          description={`${STORAGE_LABELS[storage as StorageType]} 보관 재료가 없어요`}
-        />
+        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={EMPTY_TAB_MESSAGES[storage]} />
       );
     }
     if (sort !== 'EXPIRATION') return renderRows(visibleItems);
@@ -177,10 +185,8 @@ export function FridgeItemListSection() {
     );
   };
 
-  const countOf = (tab: StorageTab) =>
-    tab === 'ALL'
-      ? (data?.length ?? 0)
-      : (data?.filter((item) => item.storage === tab).length ?? 0);
+  const countOf = (tab: FridgeTab) =>
+    data?.filter((item) => matchesFridgeTab(item, tab)).length ?? 0;
   const checkedItems = data?.filter((item) => checkedIds.includes(item.id ?? 0)) ?? [];
 
   return (
@@ -197,12 +203,12 @@ export function FridgeItemListSection() {
       }
     >
       <Flex vertical gap="middle" className={styles.container}>
-        <Segmented<StorageTab>
+        <Segmented<FridgeTab>
           value={storage}
           onChange={handleStorageChange}
-          options={STORAGE_TABS.map((tab) => ({
+          options={FRIDGE_TABS.map((tab) => ({
             value: tab,
-            label: `${tab === 'ALL' ? '전체' : STORAGE_LABELS[tab]} ${countOf(tab)}`,
+            label: `${TAB_LABELS[tab]} ${countOf(tab)}`,
           }))}
           className={styles.storageTabs}
         />

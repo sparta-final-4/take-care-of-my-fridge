@@ -6,6 +6,7 @@ import { ROUTES } from '@/app/paths';
 import { useAuthStore } from '@/common/auth/authStore';
 import { SectionCard } from '@/common/components/SectionCard';
 
+import { withoutBasicSeasoning } from '../filter';
 import { useFridgeItems } from '../queries';
 import { DdayTag } from './DdayTag';
 import { IngredientTypeTag } from './IngredientTypeTag';
@@ -17,10 +18,17 @@ export function MyFridgeSection() {
   const navigate = useNavigate();
   const authStatus = useAuthStore((state) => state.status);
   const isAuthenticated = authStatus === 'authenticated';
-  const { data, isPending, isError, refetch } = useFridgeItems('EXPIRATION', isAuthenticated);
+  const {
+    data: allItems,
+    isPending,
+    isError,
+    refetch,
+  } = useFridgeItems('EXPIRATION', isAuthenticated);
+  // 임박 재료 위주로 보여 주는 곳이라 기본 양념은 뺀다.
+  const data = withoutBasicSeasoning(allItems ?? []);
 
-  const imminentCount = data?.filter((item) => item.status === 'IMMINENT').length ?? 0;
-  const expiredCount = data?.filter((item) => item.status === 'EXPIRED').length ?? 0;
+  const imminentCount = data.filter((item) => item.status === 'IMMINENT').length;
+  const expiredCount = data.filter((item) => item.status === 'EXPIRED').length;
 
   const renderBody = () => {
     if (authStatus === 'initializing') return <Skeleton active paragraph={{ rows: 4 }} />;

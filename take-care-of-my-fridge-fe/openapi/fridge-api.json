@@ -4937,6 +4937,9 @@
           "baseUnit": {
             "type": "string"
           },
+          "basicSeasoning": {
+            "type": "boolean"
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time"

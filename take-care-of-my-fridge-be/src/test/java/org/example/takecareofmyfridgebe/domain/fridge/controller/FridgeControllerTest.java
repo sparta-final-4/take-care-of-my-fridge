@@ -121,6 +121,7 @@ class FridgeControllerTest {
                 2L,
                 FridgeItemStatus.IMMINENT,
                 IngredientType.NORMAL,
+                false,
                 LocalDateTime.of(2026, 10, 18, 12, 0),
                 LocalDateTime.of(2026, 10, 18, 12, 0)
         );
@@ -150,7 +151,8 @@ class FridgeControllerTest {
                 .andExpect(jsonPath("$.data[0].imminent").value(true))
                 .andExpect(jsonPath("$.data[0].dDay").value(2))
                 .andExpect(jsonPath("$.data[0].status").value("IMMINENT"))
-                .andExpect(jsonPath("$.data[0].expired").value(false));
+                .andExpect(jsonPath("$.data[0].expired").value(false))
+                .andExpect(jsonPath("$.data[0].basicSeasoning").value(false));
 
         // 토큰에서 꺼낸 7L과 기본값들이 서비스에 전달되었는지 검증
         verify(fridgeService).getItems(7L, null, FridgeSortType.EXPIRATION, false);
@@ -241,6 +243,7 @@ class FridgeControllerTest {
                 5L,
                 FridgeItemStatus.NORMAL,
                 IngredientType.NORMAL,
+                false,
                 LocalDateTime.of(2026, 10, 19, 11, 0),
                 LocalDateTime.of(2026, 10, 19, 11, 0)
         );
@@ -343,6 +346,7 @@ class FridgeControllerTest {
                 1L,
                 FridgeItemStatus.IMMINENT,
                 IngredientType.NORMAL,
+                false,
                 LocalDateTime.of(2026, 10, 18, 10, 0),
                 LocalDateTime.of(2026, 10, 19, 14, 0)
         );
