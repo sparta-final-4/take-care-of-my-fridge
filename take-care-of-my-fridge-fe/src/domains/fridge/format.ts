@@ -38,8 +38,9 @@ export function withObjectParticle(name: string) {
 // 수량은 소수점 첫째 자리까지만 보여준다 (0.33개 → 0.3개, 2.00개 → 2개).
 // 0.04처럼 반올림하면 0이 되는 작은 값은 0개로 보이지 않도록 원래 값을 그대로 쓴다.
 export function formatQuantity(item: Pick<FridgeItemResponse, 'quantity' | 'baseUnit'>) {
-  const rounded = Math.round(item.quantity * 10) / 10;
-  const display = rounded === 0 && item.quantity > 0 ? item.quantity : rounded;
+  const quantity = item.quantity ?? 0;
+  const rounded = Math.round(quantity * 10) / 10;
+  const display = rounded === 0 && quantity > 0 ? quantity : rounded;
   return `${display}${item.baseUnit ?? ''}`;
 }
 

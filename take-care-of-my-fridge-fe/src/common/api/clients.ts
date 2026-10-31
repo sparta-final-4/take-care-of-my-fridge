@@ -83,3 +83,5 @@ export const adminSaleEventApi = new AdminSaleEventControllerApi(
 export const adminSettlementApi = new SettlementControllerApi(undefined, basePath, axiosInstance);
 
 export * from './generated/models';
+// 쿼리 파라미터 enum은 models가 아니라 apis 파일에 생성된다.
+export { RemoveItemReasonEnum } from './generated/apis/fridge-controller-api';

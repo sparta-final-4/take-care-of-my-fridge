@@ -23,22 +23,28 @@ export function RecentFridgeLogSection() {
         />
       );
     }
-    if (data.content.length === 0) {
+    const logs = data.content ?? [];
+    if (logs.length === 0) {
       return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="최근 기록이 없어요" />;
     }
     return (
       <Flex vertical gap="xs">
-        {data.content.map((log) => (
+        {logs.map((log) => (
           <div key={log.id} className={styles.row}>
             <Typography.Text strong title={log.rawName} className={styles.name}>
               {log.rawName}
             </Typography.Text>
             <Typography.Text className={styles.quantity}>{formatQuantity(log)}</Typography.Text>
             <div className={styles.tag}>
-              <FridgeLogActionTag action={log.action} cookedByRecipe={log.cookedByRecipe} />
+              {log.action && (
+                <FridgeLogActionTag
+                  action={log.action}
+                  cookedByRecipe={log.cookedByRecipe ?? false}
+                />
+              )}
             </div>
             <Typography.Text type="secondary" className={styles.date}>
-              {formatLogDate(log.createdAt)}
+              {log.createdAt && formatLogDate(log.createdAt)}
             </Typography.Text>
           </div>
         ))}

@@ -24,12 +24,13 @@ export function FridgeItemConsumeModal({ item, onClose }: FridgeItemConsumeModal
 
   const handleFillAll = () => form.setFieldValue('quantity', item.quantity);
 
-  // 남은 양 전부면 null로 보낸다. 남은 양보다 커도 막지 않고 보내면 서버가 전부 사용으로 처리한다.
+  // 남은 양 전부면 quantity를 빼고 보낸다. 남은 양보다 커도 막지 않고 보내면 서버가 전부 사용으로 처리한다.
   const handleFinish = ({ quantity }: ConsumeFormValues) => {
     takeOutMutation.mutate(
       {
-        fridgeId: item.id,
-        request: { action: 'CONSUMED', quantity: quantity === item.quantity ? null : quantity },
+        fridgeId: item.id ?? 0,
+        request:
+          quantity === item.quantity ? { action: 'CONSUMED' } : { action: 'CONSUMED', quantity },
       },
       {
         onSuccess: (result) => {
@@ -49,7 +50,7 @@ export function FridgeItemConsumeModal({ item, onClose }: FridgeItemConsumeModal
       open
       width={MODAL_WIDTH}
       centered
-      title={`${withObjectParticle(item.rawName)} 얼마나 먹었나요?`}
+      title={`${withObjectParticle(item.rawName ?? '')} 얼마나 먹었나요?`}
       okText="먹었어요"
       cancelText="취소"
       confirmLoading={takeOutMutation.isPending}

@@ -129,6 +129,7 @@ models/flash-drop-item-request.ts
 models/forecast-item.ts
 models/forecast-response.ts
 models/forecast-summary.ts
+models/fridge-item-create-item.ts
 models/fridge-item-create-request.ts
 models/fridge-item-log-response.ts
 models/fridge-item-log-search-request.ts

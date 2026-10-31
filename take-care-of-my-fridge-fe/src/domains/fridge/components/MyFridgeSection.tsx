@@ -59,7 +59,7 @@ export function MyFridgeSection() {
                 </Typography.Text>
                 <IngredientTypeTag type={item.ingredientType} />
               </Flex>
-              <DdayTag dDay={item.dDay} />
+              {item.dDay !== undefined && <DdayTag dDay={item.dDay} />}
             </div>
           );
         })}

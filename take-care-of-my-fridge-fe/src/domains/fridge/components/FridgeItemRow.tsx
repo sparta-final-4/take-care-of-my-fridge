@@ -57,12 +57,10 @@ export function FridgeItemRow({
           {dayjs(item.expirationDate).format('YYYY-MM-DD')}
         </Typography.Text>
         <Typography.Text type="secondary" className={styles.metaText}>
-          {STORAGE_LABELS[item.storage]}
+          {item.storage && STORAGE_LABELS[item.storage]}
         </Typography.Text>
       </div>
-      <div className={styles.badge}>
-        <DdayTag dDay={item.dDay} />
-      </div>
+      <div className={styles.badge}>{item.dDay !== undefined && <DdayTag dDay={item.dDay} />}</div>
       <Flex className={styles.actions}>
         <Tooltip title="먹었어요">
           <Button
@@ -75,7 +73,7 @@ export function FridgeItemRow({
           />
         </Tooltip>
         <Popconfirm
-          title={`${withObjectParticle(item.rawName)} 버릴까요?`}
+          title={`${withObjectParticle(item.rawName ?? '')} 버릴까요?`}
           description="냉장고에서 빠지고 기록에 남아요."
           okText="버렸어요"
           cancelText="취소"
@@ -100,7 +98,7 @@ export function FridgeItemRow({
           onOpenChange={(open) => {
             if (!open) setDeleteConfirmOpen(false);
           }}
-          title={`${withObjectParticle(item.rawName)} 삭제할까요?`}
+          title={`${withObjectParticle(item.rawName ?? '')} 삭제할까요?`}
           description="잘못 등록한 재료일 때 사용해요. 기록에 남지 않아요."
           okText="삭제"
           okButtonProps={{ danger: true, loading: removing, disabled: removing }}

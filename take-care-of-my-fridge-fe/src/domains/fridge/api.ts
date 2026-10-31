@@ -1,140 +1,80 @@
-import { axiosInstance } from '@/common/api/axiosInstance';
-import type { ApiResponse, PageResponse } from '@/common/api/types';
+import {
+  fridgeApi,
+  type FridgeItemCreateRequest,
+  type FridgeItemLogResponse,
+  type FridgeItemLogSearchRequest,
+  type FridgeItemResponse,
+  type FridgeItemResponseIngredientTypeEnum,
+  type FridgeItemResponseStatusEnum,
+  type FridgeItemResponseStorageEnum,
+  type FridgeItemSearchRequestSortEnum,
+  type FridgeItemTakeOutRequest,
+  type FridgeItemTakeOutRequestActionEnum,
+  type FridgeItemTakeOutResponse,
+  type FridgeItemUpdateRequest,
+  type PageResponseFridgeItemLogResponse,
+  type RemoveItemReasonEnum,
+} from '@/common/api/clients';
+import { unwrap } from '@/common/api/unwrap';
 
-export type StorageType = 'REFRIGERATED' | 'FROZEN' | 'ROOM_TEMP';
+// 생성 enum은 모델마다 따로 나오지만 값이 같아 화면에서 쓰는 이름으로 하나씩만 둔다.
+export type StorageType = FridgeItemResponseStorageEnum;
+export type FridgeSortType = FridgeItemSearchRequestSortEnum;
+export type FridgeItemStatus = FridgeItemResponseStatusEnum;
+export type FridgeRemoveReason = RemoveItemReasonEnum;
+export type FridgeItemAction = FridgeItemTakeOutRequestActionEnum;
+export type IngredientType = FridgeItemResponseIngredientTypeEnum;
 
-export type FridgeSortType = 'EXPIRATION' | 'CREATED' | 'NAME';
+// storage·expirationDate를 비우면 서버가 재료 기준값으로 채운다.
+// 수정은 바뀐 칸만 보내는 부분 수정이라 모든 필드가 선택이다(보내지 않은 칸은 그대로).
+// 꺼내기에서 quantity를 빼면 남은 양 전부를 뺀다.
+// dDay는 서버 기준 소비기한까지 남은 일수다(오늘 0, 지나면 음수).
+export type {
+  FridgeItemCreateRequest,
+  FridgeItemLogResponse,
+  FridgeItemLogSearchRequest,
+  FridgeItemResponse,
+  FridgeItemTakeOutRequest,
+  FridgeItemTakeOutResponse,
+  FridgeItemUpdateRequest,
+  PageResponseFridgeItemLogResponse,
+};
 
-// FridgeItemStatus.java
-export type FridgeItemStatus = 'EXPIRED' | 'IMMINENT' | 'NORMAL';
-
-// FridgeRemoveReason.java
-export type FridgeRemoveReason = 'CONSUMED' | 'DISCARDED' | 'WRONG_ENTRY';
-
-// FridgeItemAction.java
-export type FridgeItemAction = 'CONSUMED' | 'DISCARDED';
-
-// IngredientType.java
-export type IngredientType = 'NORMAL' | 'CUSTOM' | 'MEALKIT';
-
-// FridgeItemResponse.java와 필드·enum을 맞춘다. 숫자(BigDecimal)는 number로 직렬화된다.
-export interface FridgeItemResponse {
-  id: number;
-  ingredientId: number | null;
-  ingredientName: string | null;
-  ingredientType: IngredientType;
-  baseUnit: string | null;
-  rawName: string;
-  quantity: number;
-  storage: StorageType;
-  expirationDate: string;
-  source: 'MANUAL' | 'COMMERCE';
-  orderItemId: number | null;
-  imminent: boolean;
-  expired: boolean;
-  // 서버 기준 소비기한까지 남은 일수 (오늘 0, 지나면 음수)
-  dDay: number;
-  status: FridgeItemStatus;
-  createdAt: string;
-  updatedAt: string;
+// page는 1부터, size 기본 20·최대 100. 비운 조건은 빠진다.
+export async function getFridgeItemLogs(
+  request: FridgeItemLogSearchRequest,
+  signal?: AbortSignal,
+): Promise<PageResponseFridgeItemLogResponse> {
+  return unwrap(fridgeApi.getLogs({ request }, { signal }));
 }
 
-// FridgeItemCreateRequest.java. storage·expirationDate를 비우면 서버가 재료 기준값으로 채운다.
-export interface FridgeItemCreateRequest {
-  items: Array<{
-    rawName: string;
-    quantity: number;
-    storage?: StorageType;
-    expirationDate?: string;
-  }>;
+export async function getFridgeItems(
+  sort: FridgeSortType,
+  signal?: AbortSignal,
+): Promise<FridgeItemResponse[]> {
+  return unwrap(fridgeApi.getItems({ request: { sort } }, { signal }));
 }
 
-// FridgeItemUpdateRequest.java. 바뀐 칸만 보내는 부분 수정이라 모든 필드가 선택이다(보내지 않은 칸은 그대로).
-export interface FridgeItemUpdateRequest {
-  rawName?: string;
-  quantity?: number;
-  storage?: StorageType;
-  expirationDate?: string;
+export async function createFridgeItems(
+  request: FridgeItemCreateRequest,
+): Promise<FridgeItemResponse[]> {
+  return unwrap(fridgeApi.createItems({ fridgeItemCreateRequest: request }));
 }
 
-// FridgeItemTakeOutRequest.java. quantity가 null이면 남은 양 전부를 뺀다.
-export interface FridgeItemTakeOutRequest {
-  action: FridgeItemAction;
-  quantity: number | null;
+export async function updateFridgeItem(
+  fridgeId: number,
+  request: FridgeItemUpdateRequest,
+): Promise<FridgeItemResponse> {
+  return unwrap(fridgeApi.updateItem({ fridgeId, fridgeItemUpdateRequest: request }));
 }
 
-// FridgeItemTakeOutResponse.java
-export interface FridgeItemTakeOutResponse {
-  fridgeId: number;
-  removed: boolean;
-  remainingQuantity: number;
-}
-
-// FridgeItemLogSearchRequest.java. 비운 조건은 빠진다. page는 1부터, size 기본 20·최대 100.
-export interface FridgeItemLogSearchRequest {
-  action?: FridgeItemAction;
-  from?: string;
-  to?: string;
-  page?: number;
-  size?: number;
-}
-
-// FridgeItemLogResponse.java
-export interface FridgeItemLogResponse {
-  id: number;
-  ingredientId: number | null;
-  ingredientName: string | null;
-  baseUnit: string | null;
-  rawName: string;
-  // 냉장고에서 실제로 뺀 양
-  quantity: number;
-  action: FridgeItemAction;
-  cookedByRecipe: boolean;
-  createdAt: string;
-}
-
-export async function getFridgeItemLogs(params: FridgeItemLogSearchRequest, signal?: AbortSignal) {
-  const { data } = await axiosInstance.get<ApiResponse<PageResponse<FridgeItemLogResponse>>>(
-    '/api/fridge/logs',
-    { params, signal },
-  );
-  return data.data;
-}
-
-export async function getFridgeItems(sort: FridgeSortType, signal?: AbortSignal) {
-  const { data } = await axiosInstance.get<ApiResponse<FridgeItemResponse[]>>('/api/fridge/items', {
-    params: { sort },
-    signal,
-  });
-  return data.data;
-}
-
-export async function createFridgeItems(request: FridgeItemCreateRequest) {
-  const { data } = await axiosInstance.post<ApiResponse<FridgeItemResponse[]>>(
-    '/api/fridge/items',
-    request,
-  );
-  return data.data;
-}
-
-export async function updateFridgeItem(fridgeId: number, request: FridgeItemUpdateRequest) {
-  const { data } = await axiosInstance.patch<ApiResponse<FridgeItemResponse>>(
-    `/api/fridge/items/${encodeURIComponent(fridgeId)}`,
-    request,
-  );
-  return data.data;
-}
-
-export async function takeOutFridgeItem(fridgeId: number, request: FridgeItemTakeOutRequest) {
-  const { data } = await axiosInstance.post<ApiResponse<FridgeItemTakeOutResponse>>(
-    `/api/fridge/items/${encodeURIComponent(fridgeId)}/take-out`,
-    request,
-  );
-  return data.data;
+export async function takeOutFridgeItem(
+  fridgeId: number,
+  request: FridgeItemTakeOutRequest,
+): Promise<FridgeItemTakeOutResponse> {
+  return unwrap(fridgeApi.takeOutItem({ fridgeId, fridgeItemTakeOutRequest: request }));
 }
 
 export async function removeFridgeItem(fridgeId: number, reason: FridgeRemoveReason) {
-  await axiosInstance.delete(`/api/fridge/items/${encodeURIComponent(fridgeId)}`, {
-    params: { reason },
-  });
+  await fridgeApi.removeItem({ fridgeId, reason });
 }

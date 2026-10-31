@@ -30,7 +30,7 @@ const SORT_OPTIONS: Array<{ value: FridgeSortType; label: string }> = [
 const EXPIRATION_GROUPS: Array<{ label: string; match: (item: FridgeItemResponse) => boolean }> = [
   { label: '기한 지남', match: (item) => item.status === 'EXPIRED' },
   { label: '오늘까지', match: (item) => item.status === 'IMMINENT' && item.dDay === 0 },
-  { label: '3일 이내', match: (item) => item.status === 'IMMINENT' && item.dDay > 0 },
+  { label: '3일 이내', match: (item) => item.status === 'IMMINENT' && (item.dDay ?? 0) > 0 },
   { label: '여유 있음', match: (item) => item.status === 'NORMAL' },
 ];
 
@@ -92,7 +92,8 @@ export function FridgeItemListSection() {
   const handleDiscard = (fridgeId: number) =>
     removeRow(
       fridgeId,
-      takeOutMutation.mutateAsync({ fridgeId, request: { action: 'DISCARDED', quantity: null } }),
+      // quantity를 빼고 보내면 남은 양 전부를 뺀다.
+      takeOutMutation.mutateAsync({ fridgeId, request: { action: 'DISCARDED' } }),
       '버렸어요',
     );
 
@@ -105,19 +106,22 @@ export function FridgeItemListSection() {
 
   const renderRows = (items: FridgeItemResponse[]) => (
     <Flex vertical gap="xs">
-      {items.map((item) => (
-        <FridgeItemRow
-          key={item.id}
-          item={item}
-          checked={checkedIds.includes(item.id)}
-          removing={removingIds.includes(item.id)}
-          onCheck={(checked) => handleCheck(item.id, checked)}
-          onEdit={() => setEditingItem(item)}
-          onConsume={() => setConsumingItem(item)}
-          onDiscard={() => handleDiscard(item.id)}
-          onDelete={() => handleDelete(item.id)}
-        />
-      ))}
+      {items.map((item) => {
+        const fridgeId = item.id ?? 0;
+        return (
+          <FridgeItemRow
+            key={fridgeId}
+            item={item}
+            checked={checkedIds.includes(fridgeId)}
+            removing={removingIds.includes(fridgeId)}
+            onCheck={(checked) => handleCheck(fridgeId, checked)}
+            onEdit={() => setEditingItem(item)}
+            onConsume={() => setConsumingItem(item)}
+            onDiscard={() => handleDiscard(fridgeId)}
+            onDelete={() => handleDelete(fridgeId)}
+          />
+        );
+      })}
     </Flex>
   );
 
@@ -177,7 +181,7 @@ export function FridgeItemListSection() {
     tab === 'ALL'
       ? (data?.length ?? 0)
       : (data?.filter((item) => item.storage === tab).length ?? 0);
-  const checkedItems = data?.filter((item) => checkedIds.includes(item.id)) ?? [];
+  const checkedItems = data?.filter((item) => checkedIds.includes(item.id ?? 0)) ?? [];
 
   return (
     <SectionCard

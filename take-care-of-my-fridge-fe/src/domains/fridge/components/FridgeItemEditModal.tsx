@@ -34,7 +34,7 @@ export function FridgeItemEditModal({ item, onClose }: FridgeItemEditModalProps)
 
   const handleFinish = (values: EditFormValues) => {
     updateMutation.mutate(
-      { fridgeId: item.id, request: buildFridgeItemUpdateRequest(item, values) },
+      { fridgeId: item.id ?? 0, request: buildFridgeItemUpdateRequest(item, values) },
       {
         onSuccess: () => {
           void message.success('재료를 수정했습니다.');

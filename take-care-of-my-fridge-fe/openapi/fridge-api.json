@@ -4816,13 +4816,42 @@
           }
         }
       },
+      "FridgeItemCreateItem": {
+        "type": "object",
+        "properties": {
+          "expirationDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "quantity": {
+            "type": "number"
+          },
+          "rawName": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 0
+          },
+          "storage": {
+            "type": "string",
+            "enum": [
+              "REFRIGERATED",
+              "FROZEN",
+              "ROOM_TEMP"
+            ]
+          }
+        },
+        "required": [
+          "quantity",
+          "rawName"
+        ]
+      },
       "FridgeItemCreateRequest": {
         "type": "object",
         "properties": {
           "items": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/Item"
+              "$ref": "#/components/schemas/FridgeItemCreateItem"
             },
             "maxItems": 20,
             "minItems": 0

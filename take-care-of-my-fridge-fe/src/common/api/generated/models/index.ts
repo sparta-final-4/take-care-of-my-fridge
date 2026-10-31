@@ -94,6 +94,7 @@ export * from './flash-drop-item-request';
 export * from './forecast-item';
 export * from './forecast-response';
 export * from './forecast-summary';
+export * from './fridge-item-create-item';
 export * from './fridge-item-create-request';
 export * from './fridge-item-log-response';
 export * from './fridge-item-log-search-request';
