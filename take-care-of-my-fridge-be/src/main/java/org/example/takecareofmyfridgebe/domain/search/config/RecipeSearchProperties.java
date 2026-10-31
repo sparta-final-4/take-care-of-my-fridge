@@ -16,12 +16,17 @@ public record RecipeSearchProperties(
             ProductIndexProperties product
     ) {}
 
+    /**
+     * embeddingEnabled: 색인할 때 레시피 임베딩을 넣을지. 벡터 검색(vector.enabled)과 따로 켠다.
+     * 임베딩을 다 채운 뒤에 검색을 켜야 하므로 둘을 나눈다.
+     */
     public record RecipeIndexProperties(
             String alias,
             Resource indexSettings,
             Resource synonyms,
             Resource extraSynonyms,
-            int batchSize
+            int batchSize,
+            boolean embeddingEnabled
     ) implements EsIndexProperties {}
 
     // 상품 인덱스는 동의어 필터가 없어 synonyms, extraSynonyms를 비워 둔다

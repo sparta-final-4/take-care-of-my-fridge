@@ -7,6 +7,10 @@ import org.example.takecareofmyfridgebe.domain.recipe.entity.Recipe;
 import org.example.takecareofmyfridgebe.domain.recipe.entity.RecipeIngredient;
 import org.example.takecareofmyfridgebe.domain.recipe.entity.RecipeStep;
 import org.example.takecareofmyfridgebe.domain.recipe.service.RecipeIndexSourceService;
+import org.example.takecareofmyfridgebe.domain.search.config.RecipeSearchProperties;
+import org.example.takecareofmyfridgebe.domain.search.config.RecipeSearchProperties.IndexProperties;
+import org.example.takecareofmyfridgebe.domain.search.config.RecipeSearchProperties.RecipeIndexProperties;
+import org.example.takecareofmyfridgebe.domain.search.config.SearchEngine;
 import org.example.takecareofmyfridgebe.infra.elasticsearch.dto.EsDocument;
 import org.example.takecareofmyfridgebe.global.config.JpaAuditingConfig;
 import org.example.takecareofmyfridgebe.global.config.QueryDslConfig;
@@ -16,7 +20,10 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.util.List;
 import java.util.Map;
@@ -27,8 +34,24 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({JpaAuditingConfig.class, QueryDslConfig.class, RecipeIndexSourceService.class, RecipeDocumentReader.class})
+@Import({JpaAuditingConfig.class, QueryDslConfig.class, RecipeIndexSourceService.class, RecipeDocumentReader.class,
+        RecipeDocumentReaderTest.EmbeddingDisabled.class})
 class RecipeDocumentReaderTest extends MySqlContainerSupport {
+
+    // 임베딩은 RecipeDocumentReaderEmbeddingTest에서 본다. 여기서는 DB에서 읽은 필드만 확인한다
+    @TestConfiguration
+    static class EmbeddingDisabled {
+        @Bean
+        RecipeSearchProperties recipeSearchProperties() {
+            return new RecipeSearchProperties(
+                    SearchEngine.ELASTICSEARCH,
+                    new IndexProperties(new RecipeIndexProperties("recipes", null, null, null, 500, false), null),
+                    null);
+        }
+    }
+
+    @MockitoBean
+    private RecipeEmbedder recipeEmbedder;
 
     @Autowired
     private RecipeDocumentReader recipeDocumentReader;

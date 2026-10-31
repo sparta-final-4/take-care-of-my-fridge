@@ -58,7 +58,7 @@ class EsIndexerTest {
                 new ClassPathResource("elasticsearch/recipes/recipes_index.json"),
                 new ClassPathResource("elasticsearch/recipes/ingredient_synonyms.json"),
                 new ClassPathResource("elasticsearch/recipes/synonyms.txt"),
-                500);
+                500, false);
 
         // When
         ObjectNode body = indexerOf(recipeIndex).indexBody();
@@ -85,7 +85,7 @@ class EsIndexerTest {
                 new ByteArrayResource(settings.getBytes(StandardCharsets.UTF_8)),
                 null,
                 new ByteArrayResource("노트북, 랩탑".getBytes(StandardCharsets.UTF_8)),
-                500);
+                500, false);
 
         // When
         ObjectNode body = indexerOf(productIndex).indexBody();
@@ -103,7 +103,7 @@ class EsIndexerTest {
                 {"settings": {"number_of_shards": 1}, "mappings": {"dynamic": "strict"}}
                 """;
         EsIndexProperties plainIndex = new RecipeIndexProperties(
-                "plain", new ByteArrayResource(settings.getBytes(StandardCharsets.UTF_8)), null, null, 500);
+                "plain", new ByteArrayResource(settings.getBytes(StandardCharsets.UTF_8)), null, null, 500, false);
 
         // When
         ObjectNode body = indexerOf(plainIndex).indexBody();

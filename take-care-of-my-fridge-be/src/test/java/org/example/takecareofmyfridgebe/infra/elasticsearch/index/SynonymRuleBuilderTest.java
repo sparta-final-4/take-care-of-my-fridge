@@ -24,7 +24,7 @@ class SynonymRuleBuilderTest {
             new ClassPathResource("elasticsearch/recipes/recipes_index.json"),
             new ClassPathResource("elasticsearch/recipes/ingredient_synonyms.json"),
             new ClassPathResource("elasticsearch/recipes/synonyms.txt"),
-            500);
+            500, false);
 
     // "달걀, 계란, 삶은계란" → [달걀, 계란, 삶은계란]
     private List<String> ruleOf(List<String> rules, String name) {
@@ -74,7 +74,7 @@ class SynonymRuleBuilderTest {
     void emptyWhenNoSynonymFiles() throws IOException {
         // Given
         EsIndexProperties noSynonyms = new RecipeIndexProperties(
-                "products", new ClassPathResource("elasticsearch/recipes/recipes_index.json"), null, null, 500);
+                "products", new ClassPathResource("elasticsearch/recipes/recipes_index.json"), null, null, 500, false);
 
         // When
         List<String> rules = builder.build(noSynonyms);

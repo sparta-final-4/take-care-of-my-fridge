@@ -41,7 +41,7 @@ class EsIndexerReindexTest {
     private final ElasticsearchIndicesClient indices = mock(ElasticsearchIndicesClient.class);
     private final EsDocumentReader reader = mock(EsDocumentReader.class);
     private final EsIndexProperties index = new RecipeIndexProperties(
-            "recipes", new ByteArrayResource("{\"settings\": {}}".getBytes(StandardCharsets.UTF_8)), null, null, 500);
+            "recipes", new ByteArrayResource("{\"settings\": {}}".getBytes(StandardCharsets.UTF_8)), null, null, 500, false);
 
     private final EsIndexer indexer = new EsIndexer(esClient, new SynonymRuleBuilder(JsonMapper.builder().build())) {
         @Override

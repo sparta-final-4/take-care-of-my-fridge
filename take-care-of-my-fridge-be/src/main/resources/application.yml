@@ -87,6 +87,8 @@ app:
         synonyms: classpath:elasticsearch/recipes/ingredient_synonyms.json
         extra-synonyms: classpath:elasticsearch/recipes/synonyms.txt
         batch-size: 500
+        # 색인할 때 레시피 임베딩을 넣을지. 기존 인덱스에는 embedding 필드가 없어(strict) 켜면 바로 재색인해야 한다
+        embedding-enabled: ${RECIPE_EMBEDDING_ENABLED:false}
       product:
         alias: products
         index-settings: classpath:elasticsearch/products/products_index.json
