@@ -67,6 +67,11 @@ app:
     bucket: ${IMAGE_BUCKET:}
     key-prefix: ${IMAGE_KEY_PREFIX:local}
     public-base-url: ${IMAGE_PUBLIC_BASE_URL:}
+  # 서버 → 브라우저 SSE 연결. 연결 유지 시간, 하트비트 주기, 회원당 동시 연결 한도
+  sse:
+    timeout: 30m
+    heartbeat-interval: 30s
+    max-connections-per-member: 5
   chat:
     daily-limit: 30
     session-timeout: 30m
