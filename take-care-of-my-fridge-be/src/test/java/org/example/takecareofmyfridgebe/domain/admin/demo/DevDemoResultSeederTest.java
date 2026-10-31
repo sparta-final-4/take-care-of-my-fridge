@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import org.example.takecareofmyfridgebe.domain.deal.repository.DealAnalysisRepository;
 import org.example.takecareofmyfridgebe.domain.deal.repository.DealCandidateRepository;
 import org.example.takecareofmyfridgebe.domain.forecast.entity.PredictionRun;
+import org.example.takecareofmyfridgebe.domain.forecast.entity.SalesForecast;
 import org.example.takecareofmyfridgebe.domain.forecast.repository.PredictionRunRepository;
 import org.example.takecareofmyfridgebe.domain.forecast.repository.SalesForecastRepository;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.StorageType;
@@ -25,6 +26,8 @@ import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.TestPropertySource;
+
+import java.util.List;
 
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
@@ -74,5 +77,24 @@ class DevDemoResultSeederTest extends MySqlContainerSupport {
         assertThat(analyses.findTopBySyntheticDataTrueOrderByCreatedAtDescIdDesc())
                 .contains(analysis);
         assertThat(candidates.findByDealAnalysisIdOrderByIdAsc(analysis.getId())).hasSize(4);
+    }
+
+    // 판매 중인 상품이 10개를 넘으면 실제 순위가 없는 상품(10번째, 12번째)이 생긴다
+    @Test
+    void leavesActualRankEmptyWhenMoreThanTenProducts() {
+        for (int i = 0; i < 12; i++) {
+            products.save(Product.builder().productType(ProductType.INGREDIENT)
+                    .name("시연 상품 " + i).price(1000 + i * 500).stock(80)
+                    .storage(StorageType.ROOM_TEMP).shelfDays(7)
+                    .status(ProductStatus.ON_SALE).build());
+        }
+
+        seeder.run(new DefaultApplicationArguments(new String[0]));
+
+        PredictionRun demo = runs.findFirstByModelVersion("demo-preview-v1").orElseThrow();
+        List<Integer> actualRanks = forecasts.findByPredictionRunIdOrderByProductIdAsc(demo.getId()).stream()
+                .map(SalesForecast::getActualRank)
+                .toList();
+        assertThat(actualRanks).containsExactly(1, 2, 3, 4, 5, 6, 7, 8, 9, null, 10, null);
     }
 }

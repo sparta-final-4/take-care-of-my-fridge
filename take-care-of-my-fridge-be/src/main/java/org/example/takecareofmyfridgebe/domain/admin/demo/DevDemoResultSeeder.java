@@ -85,11 +85,19 @@ public class DevDemoResultSeeder implements ApplicationRunner {
                     .predictedRank(i < 10 ? i + 1 : null)
                     .predictedQty(i < 10 ? 34 - i * 2 : null)
                     .baselineQty(22 - i)
-                    .actualRank(i < 9 ? i + 1 : i == 10 ? 10 : null)
+                    .actualRank(actualRank(i))
                     .actualQty(32 - i * 2)
                     .build());
         }
         salesForecastRepository.saveAll(forecasts);
+    }
+
+    // 실제 순위: 1~9위는 예측과 같고, 10번째 상품은 순위 밖, 11번째 상품이 10위다
+    private Integer actualRank(int index) {
+        if (index < 9) {
+            return index + 1;
+        }
+        return index == 10 ? 10 : null;
     }
 
     private void seedDeal(Member admin, List<Product> products) {
