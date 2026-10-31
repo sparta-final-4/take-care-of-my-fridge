@@ -32,6 +32,8 @@ import type { ApiResponseVoid } from '../models';
 import type { NotificationListRequest } from '../models';
 // @ts-ignore
 import type { ReadAllNotificationsRequest } from '../models';
+// @ts-ignore
+import type { SseEmitter } from '../models';
 /**
  * NotificationControllerApi - axios parameter creator
  */
@@ -200,6 +202,35 @@ export const NotificationControllerApiAxiosParamCreator = function (configuratio
                 options: localVarRequestOptions,
             };
         },
+        /**
+         * 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        stream: async (options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/api/notifications/stream`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            localVarHeaderParameter['Accept'] = 'text/event-stream';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
     }
 };
 
@@ -267,6 +298,17 @@ export const NotificationControllerApiFp = function(configuration?: Configuratio
             const localVarOperationServerBasePath = operationServerMap['NotificationControllerApi.readAll']?.[localVarOperationServerIndex]?.url;
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
+        /**
+         * 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async stream(options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<SseEmitter>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.stream(options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['NotificationControllerApi.stream']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
     }
 };
 
@@ -319,6 +361,14 @@ export const NotificationControllerApiFactory = function (configuration?: Config
         readAll(requestParameters: NotificationControllerApiReadAllRequest, options?: RawAxiosRequestConfig): AxiosPromise<ApiResponseVoid> {
             return localVarFp.readAll(requestParameters.readAllNotificationsRequest, options).then((request) => request(axios, basePath));
         },
+        /**
+         * 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        stream(options?: RawAxiosRequestConfig): AxiosPromise<SseEmitter> {
+            return localVarFp.stream(options).then((request) => request(axios, basePath));
+        },
     };
 };
 
@@ -363,6 +413,13 @@ export interface NotificationControllerApiInterface {
      * @throws {RequiredError}
      */
     readAll(requestParameters: NotificationControllerApiReadAllRequest, options?: RawAxiosRequestConfig): AxiosPromise<ApiResponseVoid>;
+
+    /**
+     * 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    stream(options?: RawAxiosRequestConfig): AxiosPromise<SseEmitter>;
 
 }
 
@@ -437,6 +494,15 @@ export class NotificationControllerApi extends BaseAPI implements NotificationCo
      */
     public readAll(requestParameters: NotificationControllerApiReadAllRequest, options?: RawAxiosRequestConfig) {
         return NotificationControllerApiFp(this.configuration).readAll(requestParameters.readAllNotificationsRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public stream(options?: RawAxiosRequestConfig) {
+        return NotificationControllerApiFp(this.configuration).stream(options).then((request) => request(this.axios, this.basePath));
     }
 }
 

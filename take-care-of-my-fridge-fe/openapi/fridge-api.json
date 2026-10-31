@@ -1977,6 +1977,26 @@
         ]
       }
     },
+    "/api/notifications/stream": {
+      "get": {
+        "operationId": "stream",
+        "responses": {
+          "200": {
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "$ref": "#/components/schemas/SseEmitter"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "notification-controller"
+        ]
+      }
+    },
     "/api/notifications/unread-count": {
       "get": {
         "operationId": "getUnreadCount",
@@ -8221,6 +8241,15 @@
           "discountRate",
           "productId"
         ]
+      },
+      "SseEmitter": {
+        "type": "object",
+        "properties": {
+          "timeout": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
       },
       "StepItem": {
         "type": "object",

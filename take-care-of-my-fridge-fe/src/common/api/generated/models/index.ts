@@ -206,6 +206,7 @@ export * from './sign-up-request';
 export * from './sign-up-response';
 export * from './special-sale-create-request';
 export * from './special-sale-item-request';
+export * from './sse-emitter';
 export * from './step-item';
 export * from './today-sales-response';
 export * from './unread-notification-count-response';
