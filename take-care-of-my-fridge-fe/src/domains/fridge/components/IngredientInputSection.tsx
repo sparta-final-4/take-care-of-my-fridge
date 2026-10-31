@@ -2,7 +2,9 @@ import { CalendarOutlined, CloseOutlined, PlusOutlined } from '@ant-design/icons
 import { App, Button, DatePicker, Divider, Flex, Input, Select, Typography } from 'antd';
 import type { Dayjs } from 'dayjs';
 import { useState } from 'react';
+import { createSearchParams, useNavigate } from 'react-router';
 
+import { ROUTES } from '@/app/paths';
 import { useAuthStore } from '@/common/auth/authStore';
 import { SectionCard } from '@/common/components/SectionCard';
 import { useChatModalStore } from '@/domains/chat/model/useChatModalStore';
@@ -10,6 +12,7 @@ import { useChatModalStore } from '@/domains/chat/model/useChatModalStore';
 import type { FridgeItemCreateRequest, StorageType } from '../api';
 import { STORAGE_LABELS } from '../format';
 import { MOCK_QUICK_CHIPS } from '../mocks';
+import { getNewItemsView, type NewFridgeItemsState } from '../newItems';
 import { useCreateFridgeItems } from '../queries';
 import styles from './IngredientInputSection.module.scss';
 
@@ -26,6 +29,7 @@ type StagedItem = FridgeItemCreateRequest['items'][number] & { key: string };
 
 export function IngredientInputSection() {
   const { message } = App.useApp();
+  const navigate = useNavigate();
   const isAuthenticated = useAuthStore((state) => state.status === 'authenticated');
   const createMutation = useCreateFridgeItems();
   const openChat = useChatModalStore((state) => state.openChat);
@@ -94,9 +98,19 @@ export function IngredientInputSection() {
     createMutation.mutate(
       { items },
       {
-        onSuccess: () => {
+        onSuccess: (createdItems) => {
           setStagedItems([]);
-          void message.success('냉장고에 저장했습니다.');
+          const { ids, tab, hiddenSeasoningCount } = getNewItemsView(createdItems);
+          void message.success(
+            hiddenSeasoningCount > 0
+              ? `냉장고에 저장했습니다. 기본 양념 ${hiddenSeasoningCount}개는 기본 양념 탭에 있어요.`
+              : '냉장고에 저장했습니다.',
+          );
+          // 등록 직후에만 최신 등록순으로 열고 방금 넣은 재료를 강조한다.
+          const search = createSearchParams({ sort: 'CREATED' });
+          if (tab !== 'ALL') search.set('storage', tab);
+          const state: NewFridgeItemsState = { newFridgeIds: ids };
+          navigate({ pathname: ROUTES.fridge, search: search.toString() }, { state });
         },
       },
     );
