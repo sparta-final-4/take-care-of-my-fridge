@@ -73,7 +73,7 @@ class RecipeSearchPropertiesTest extends MySqlContainerSupport {
 
         assertFalse(vector.enabled());
         assertEquals(1536, vector.dimensions());
-        assertEquals(20, vector.k());
+        assertEquals(10, vector.k());
         assertEquals(100, vector.numCandidates());
         assertEquals(0.5f, vector.minSimilarity());
         assertEquals(100, vector.batchSize());

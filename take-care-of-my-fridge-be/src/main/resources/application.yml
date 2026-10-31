@@ -97,7 +97,8 @@ app:
     vector:
       enabled: ${SEARCH_VECTOR_ENABLED:false}
       dimensions: 1536
-      k: 20
+      # 근거: docs/testing/recipe-vector-fallback-evaluation.md. 0.5 아래는 오답이 빠르게 늘고, 11위부터는 대부분 오답이다
+      k: 10
       num-candidates: 100
       min-similarity: 0.5
       batch-size: 100
