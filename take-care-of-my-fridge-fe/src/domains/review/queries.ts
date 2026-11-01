@@ -1,4 +1,11 @@
-import { queryOptions, useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  infiniteQueryOptions,
+  queryOptions,
+  useMutation,
+  useQueryClient,
+} from '@tanstack/react-query';
+
+import type { ReviewSearchRequestSortEnum } from '@/common/api/clients';
 
 import {
   createReview,
@@ -12,6 +19,18 @@ import {
 export const reviewQueries = {
   all: ['reviews'] as const,
   lists: () => [...reviewQueries.all, 'list'] as const,
+  // 레시피 상세 후기 목록. 더 보기를 누르면 다음 페이지를 이어 받는다.
+  infiniteList: (request: { recipeId: number; sort: ReviewSearchRequestSortEnum; size: number }) =>
+    infiniteQueryOptions({
+      queryKey: [...reviewQueries.lists(), request],
+      queryFn: ({ pageParam, signal }) => getReviews({ ...request, page: pageParam }, signal),
+      initialPageParam: 1,
+      getNextPageParam: (lastPage) => {
+        const isLast = lastPage.isLast ?? true;
+        const pageNumber = lastPage.pageNumber ?? 1;
+        return isLast ? undefined : pageNumber + 1;
+      },
+    }),
   myReview: (recipeId: number) =>
     queryOptions({
       queryKey: [...reviewQueries.all, 'my', recipeId],
