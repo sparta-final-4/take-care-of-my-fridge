@@ -75,7 +75,7 @@ public class OrderService {
     private OrderCreateResult toExistingResult(Order order, List<Long> cartItemIds, List<CartItem> cartItems) {
         List<OrderItem> orderItems = orderReader.getOrderItems(order);
         OrderCreateResult result = new OrderCreateResult(OrderCheckoutResponse.from(order, orderItems), false);
-        // 결제 완료나 사용자 삭제로 장바구니 항목이 일부 사라졌으면 비교할 수 없으므로 처음 주문을 그대로 돌려준다
+        // 결제 완료나 사용자 삭제로 장바구니 항목이 일부 사라졌으면 비교할 수 없으므로 처음 주문을 그대로 돌려준다.
         if (cartItems.size() != cartItemIds.size()) {
             return result;
         }
@@ -90,22 +90,7 @@ public class OrderService {
         return result;
     }
 
-    private OrderItem toOrderItem(Order order, Long memberId, Product product, SellingPrice price, int quantity) {
-        return OrderItem.builder()
-            .order(order)
-            .productId(product.getId())
-            .productName(product.getName())
-            .productImageUrl(product.getImageUrl())
-            .quantity(quantity)
-            .listPrice(price.listPrice())
-            .unitPrice(price.unitPrice())
-            .saleType(SaleType.from(price.saleType()))
-            .saleEventItemId(price.saleEventItemId())
-            .flashDropMemberId(price.isFlashDrop() ? memberId : null)
-            .build();
-    }
-
-    // 주문번호가 겹치거나(시계가 순번 키 만료 시간보다 크게 뒤로 간 경우 등, 드묾) 같은 멱등 키가 동시에 저장되면(장바구니 잠금이 있으면 생기지 않음)
+    // 주문번호가 겹치거나(시계가 순번 키 만료 시간보다 크게 뒤로 간 경우 등, 드묾) 같은 멱등 키가 동시에 저장되면(장바구니 잠금이 있으면 생기지 않음).
     // 이 주문은 롤백하고 다시 주문하게 한다. 그 밖의 제약 위반은 원인을 가리지 않도록 그대로 던진다.
     private Order saveOrder(Long memberId, String idempotencyKey, long totalAmount) {
         Order order = Order.builder()
@@ -131,5 +116,20 @@ public class OrderService {
             return cause.getConstraintName();
         }
         return "";
+    }
+
+    private OrderItem toOrderItem(Order order, Long memberId, Product product, SellingPrice price, int quantity) {
+        return OrderItem.builder()
+            .order(order)
+            .productId(product.getId())
+            .productName(product.getName())
+            .productImageUrl(product.getImageUrl())
+            .quantity(quantity)
+            .listPrice(price.listPrice())
+            .unitPrice(price.unitPrice())
+            .saleType(SaleType.from(price.saleType()))
+            .saleEventItemId(price.saleEventItemId())
+            .flashDropMemberId(price.isFlashDrop() ? memberId : null)
+            .build();
     }
 }

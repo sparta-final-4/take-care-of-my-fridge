@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 // 주문 상태를 바꾼다. 구매 확정, 결제를 시도한 주문의 취소, 결제 전 주문의 삭제.
+// 사용자 요청(취소·구매 확정)과 스케줄러(만료·자동 확정)의 상태 변경을 모두 맡는다.
 // 주문 행 잠금, 결제·환불 확인, 재고 되돌리기는 OrderFacade가 하고, 이 서비스는 그 트랜잭션 안에서 불린다.
 @Service
 @RequiredArgsConstructor

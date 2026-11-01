@@ -22,7 +22,7 @@ public class OrderReader {
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
 
-    // 남의 주문도 없는 주문과 똑같이 404로 답해, 주문 번호가 있는지 드러내지 않는다
+    // 남의 주문도 없는 주문과 똑같이 404로 답해, 주문 번호가 있는지 드러내지 않는다.
     public Order getOwnedOrder(Long memberId, Long orderId) {
         return orderRepository.findByIdAndMemberId(orderId, memberId)
             .orElseThrow(() -> new BusinessException(ErrorCode.ORDER_NOT_FOUND));
@@ -34,7 +34,7 @@ public class OrderReader {
             .orElseThrow(() -> new BusinessException(ErrorCode.ORDER_NOT_FOUND));
     }
 
-    // 회원 확인 없이 주문 행을 잠그고 찾는다. 스케줄러처럼 로그인한 회원이 없는 곳에서 쓴다
+    // 회원 확인 없이 주문 행을 잠그고 찾는다. 스케줄러처럼 로그인한 회원이 없는 곳에서 쓴다.
     public Optional<Order> findForUpdate(Long orderId) {
         return orderRepository.findByIdForUpdate(orderId);
     }

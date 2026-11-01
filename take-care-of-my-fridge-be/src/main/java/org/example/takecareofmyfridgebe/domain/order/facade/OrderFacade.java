@@ -58,7 +58,7 @@ public class OrderFacade {
 
     // 장바구니 항목은 결제 완료 때 지우므로 여기서는 건드리지 않는다.
     @Transactional
-    public OrderCreateResult createOrder(Long memberId, String idempotencyKey, OrderCreateRequest request) {
+    public OrderCreateResult create(Long memberId, String idempotencyKey, OrderCreateRequest request) {
         validateIdempotencyKey(idempotencyKey);
 
         // 같은 회원의 주문하기를 하나씩 순서대로 처리해, 같은 멱등 키로 동시에 온 요청이 주문을 둘 만들지 않게 한다. 다른 회원끼리는 기다리지 않는다.
@@ -76,8 +76,8 @@ public class OrderFacade {
             throw new BusinessException(ErrorCode.CART_ITEM_NOT_FOUND);
         }
 
-        // 상품 행을 잠근 뒤 읽으므로 아래 재고 확인과 차감 사이에 다른 주문이 끼어들지 못한다
-        Map<Long, Product> productsById = getProductsForUpdate(cartItems.stream().map(CartItem::getProductId).toList());
+        // 상품 행을 잠근 뒤 읽으므로 아래 재고 확인과 차감 사이에 다른 주문이 끼어들지 못한다.
+        Map<Long, Product> productsById = findProductsForUpdate(cartItems.stream().map(CartItem::getProductId).toList());
         cartItems.forEach(item -> validateSellable(productsById.get(item.getProductId())));
 
         // 진행 중 할인은 상품 행을 잠근 뒤 읽는다. 장바구니에서 본 단가·할인 구분과 하나라도 다르면 재고를 잡기 전에 거절한다.
@@ -160,8 +160,8 @@ public class OrderFacade {
         return orderStatusService.confirm(order, items, completedRefundQuantities);
     }
 
-    // 주문하기와 재고 되돌리기가 같은 순서(상품 ID 순)로 상품 행을 잠가 서로 섞이지 않게 한다
-    private Map<Long, Product> getProductsForUpdate(List<Long> productIds) {
+    // 주문하기와 재고 되돌리기가 같은 순서(상품 ID 순)로 상품 행을 잠가 서로 섞이지 않게 한다.
+    private Map<Long, Product> findProductsForUpdate(List<Long> productIds) {
         return productRepository.findAllByIdInForUpdate(productIds).stream()
             .collect(Collectors.toMap(Product::getId, Function.identity()));
     }
@@ -227,7 +227,7 @@ public class OrderFacade {
     // 결제 전 주문의 재고를 되돌리는 곳은 여기 하나뿐이다. 결제 후 환불은 환불 쪽이 되돌린다.
     // 번개 드롭 남은 수량은 주문하기와 같은 순서(상품 행 다음 남은 수량 행)로 잠근다.
     private void restoreStock(List<OrderItem> orderItems) {
-        Map<Long, Product> productsById = getProductsForUpdate(orderItems.stream().map(OrderItem::getProductId).toList());
+        Map<Long, Product> productsById = findProductsForUpdate(orderItems.stream().map(OrderItem::getProductId).toList());
         orderItems.forEach(item -> productsById.get(item.getProductId()).increaseStock(item.getQuantity()));
 
         List<OrderItem> flashDropItems = orderItems.stream()

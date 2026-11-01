@@ -41,6 +41,7 @@ public class CartService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.CART_ITEM_NOT_FOUND));
     }
 
+    // 주문하기가 고른 장바구니 항목. 남의 항목이거나 없는 ID는 빠진다.
     public List<CartItem> getItems(Long memberId, Collection<Long> cartItemIds) {
         return cartItemRepository.findByIdInAndCartMemberId(cartItemIds, memberId);
     }

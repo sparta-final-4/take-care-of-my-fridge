@@ -35,7 +35,7 @@ public class OrderController {
     private final OrderQueryService orderQueryService;
     private final OrderFacade orderFacade;
 
-    // 내 주문 내역 화면
+    // 내 주문 내역 화면.
     @GetMapping
     public ResponseEntity<ApiResponse<PageResponse<OrderSummaryResponse>>> getMyOrders(
             @AuthenticationPrincipal AuthSessionService.AuthPrincipal principal,
@@ -43,7 +43,7 @@ public class OrderController {
         return ResponseEntity.ok(ApiResponse.ok(orderQueryService.getMyOrders(principal.memberId(), request)));
     }
 
-    // 주문 상세 화면
+    // 주문 상세 화면.
     @GetMapping("/{orderId}")
     public ResponseEntity<ApiResponse<OrderDetailResponse>> getDetail(
             @AuthenticationPrincipal AuthSessionService.AuthPrincipal principal,
@@ -51,7 +51,7 @@ public class OrderController {
         return ResponseEntity.ok(ApiResponse.ok(orderQueryService.getDetail(principal.memberId(), orderId)));
     }
 
-    // 주문 확인 화면(결제 대기 주문)
+    // 주문 확인 화면(결제 대기 주문).
     @GetMapping("/{orderId}/checkout")
     public ResponseEntity<ApiResponse<OrderCheckoutResponse>> getCheckout(
             @AuthenticationPrincipal AuthSessionService.AuthPrincipal principal,
@@ -59,12 +59,13 @@ public class OrderController {
         return ResponseEntity.ok(ApiResponse.ok(orderQueryService.getCheckout(principal.memberId(), orderId)));
     }
 
+    // 장바구니 화면의 주문하기. 같은 Idempotency-Key로 다시 오면 처음 주문을 200으로 돌려준다.
     @PostMapping
     public ResponseEntity<ApiResponse<OrderCheckoutResponse>> createOrder(
             @AuthenticationPrincipal AuthSessionService.AuthPrincipal principal,
             @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
             @Valid @RequestBody OrderCreateRequest request) {
-        OrderCreateResult result = orderFacade.createOrder(principal.memberId(), idempotencyKey, request);
+        OrderCreateResult result = orderFacade.create(principal.memberId(), idempotencyKey, request);
         HttpStatus status = result.created() ? HttpStatus.CREATED : HttpStatus.OK;
         return ResponseEntity.status(status).body(ApiResponse.ok(result.response()));
     }

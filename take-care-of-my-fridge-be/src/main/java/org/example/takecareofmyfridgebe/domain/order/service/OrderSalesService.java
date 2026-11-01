@@ -13,6 +13,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
+// 판매 예측(deal)이 쓰는 날짜·상품별 판매량 조회.
 @Service
 @RequiredArgsConstructor
 public class OrderSalesService {
