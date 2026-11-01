@@ -87,8 +87,9 @@ app:
         synonyms: classpath:elasticsearch/recipes/ingredient_synonyms.json
         extra-synonyms: classpath:elasticsearch/recipes/synonyms.txt
         batch-size: 500
-        # 색인할 때 레시피 임베딩을 넣을지. 기존 인덱스에는 embedding 필드가 없어(strict) 켜면 바로 재색인해야 한다
-        embedding-enabled: ${RECIPE_EMBEDDING_ENABLED:false}
+        # 색인할 때 레시피 임베딩을 넣을지. 벡터 검색(vector.enabled)이 쓸 벡터를 여기서 넣는다
+        # embedding 필드가 없는 예전 인덱스(strict)에서는 단건 색인이 실패하므로, 켤 때 인덱스를 지우고 재시작해 재색인한다
+        embedding-enabled: ${RECIPE_EMBEDDING_ENABLED:true}
       product:
         alias: products
         index-settings: classpath:elasticsearch/products/products_index.json

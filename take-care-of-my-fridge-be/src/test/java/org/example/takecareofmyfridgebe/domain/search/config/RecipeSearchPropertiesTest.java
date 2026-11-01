@@ -51,7 +51,7 @@ class RecipeSearchPropertiesTest extends MySqlContainerSupport {
         assertTrue(recipe.indexSettings().exists(), "recipes_index.json");
         assertTrue(recipe.synonyms().exists(), "ingredient_synonyms.json");
         assertTrue(recipe.extraSynonyms().exists(), "synonyms.txt");
-        assertFalse(properties.indexProperties().recipe().embeddingEnabled(), "임베딩은 기본 꺼짐");
+        assertTrue(properties.indexProperties().recipe().embeddingEnabled(), "임베딩은 기본 켜짐");
     }
 
     @Test
