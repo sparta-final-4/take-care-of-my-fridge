@@ -44,7 +44,11 @@ public class OrderService {
         Long memberId, String idempotencyKey, List<Long> cartItemIds, List<CartItem> cartItems
     ) {
         return orderRepository.findByMemberIdAndIdempotencyKey(memberId, idempotencyKey)
-                .map(order -> toExistingResult(order, cartItemIds, cartItems));
+                .map(order -> {
+                    List<OrderItem> orderItems = orderReader.getOrderItems(order);
+                    validateSameRequest(orderItems, cartItemIds, cartItems);
+                    return toExistingResult(order, orderItems);
+                });
     }
 
     // 이 회원이 이 번개 드롭을 이미 샀는지 본다. 1인 1개 기록은 주문 상품 행에 남는다.
@@ -72,14 +76,11 @@ public class OrderService {
     }
 
     // 장바구니에는 같은 상품이 한 항목뿐이라 상품·수량이 같으면 같은 요청이다.
-    private OrderCreateResult toExistingResult(Order order, List<Long> cartItemIds, List<CartItem> cartItems) {
-        List<OrderItem> orderItems = orderReader.getOrderItems(order);
-        OrderCreateResult result = new OrderCreateResult(OrderCheckoutResponse.from(order, orderItems), false);
-        // 결제 완료나 사용자 삭제로 장바구니 항목이 일부 사라졌으면 비교할 수 없으므로 처음 주문을 그대로 돌려준다.
+    // 결제 완료나 사용자 삭제로 장바구니 항목이 일부 사라졌으면 비교할 수 없으므로 처음 주문을 그대로 돌려준다.
+    private void validateSameRequest(List<OrderItem> orderItems, List<Long> cartItemIds, List<CartItem> cartItems) {
         if (cartItems.size() != cartItemIds.size()) {
-            return result;
+            return;
         }
-
         Map<Long, Integer> ordered = orderItems.stream()
                 .collect(Collectors.toMap(OrderItem::getProductId, OrderItem::getQuantity));
         Map<Long, Integer> requested = cartItems.stream()
@@ -87,7 +88,10 @@ public class OrderService {
         if (!ordered.equals(requested)) {
             throw new BusinessException(ErrorCode.ORDER_IDEMPOTENCY_KEY_REUSED);
         }
-        return result;
+    }
+
+    private OrderCreateResult toExistingResult(Order order, List<OrderItem> orderItems) {
+        return new OrderCreateResult(OrderCheckoutResponse.from(order, orderItems), false);
     }
 
     // 주문번호가 겹치거나(시계가 순번 키 만료 시간보다 크게 뒤로 간 경우 등, 드묾) 같은 멱등 키가 동시에 저장되면(장바구니 잠금이 있으면 생기지 않음).

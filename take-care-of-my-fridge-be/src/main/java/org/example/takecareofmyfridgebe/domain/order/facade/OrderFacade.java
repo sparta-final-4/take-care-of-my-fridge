@@ -99,7 +99,7 @@ public class OrderFacade {
             throw new BusinessException(ErrorCode.PRODUCT_NOT_FOUND);
         }
         if (product.getStatus() == ProductStatus.STOPPED) {
-            throw new BusinessException(ErrorCode.PRODUCT_NOT_ON_SALE);
+            throw new BusinessException(ErrorCode.PRODUCT_NOT_ON_SALE, "판매 중지 · " + product.getName());
         }
     }
 
