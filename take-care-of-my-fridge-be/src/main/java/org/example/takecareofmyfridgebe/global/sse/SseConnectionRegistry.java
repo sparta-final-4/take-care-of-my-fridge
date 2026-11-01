@@ -1,5 +1,6 @@
 package org.example.takecareofmyfridgebe.global.sse;
 
+import jakarta.annotation.PostConstruct;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -9,7 +10,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.takecareofmyfridgebe.global.config.SseProperties;
-import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.scheduling.TaskScheduler;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -21,6 +22,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 public class SseConnectionRegistry {
 
     private final SseProperties sseProperties;
+    private final TaskScheduler taskScheduler;
     private final Map<Long, List<SseEmitter>> emitters = new ConcurrentHashMap<>();
 
     public SseEmitter subscribe(Long memberId) {
@@ -55,7 +57,11 @@ public class SseConnectionRegistry {
     }
 
     // 프록시나 브라우저가 조용한 연결을 끊지 않도록 주기적으로 주석을 보낸다
-    @Scheduled(fixedDelayString = "${app.sse.heartbeat-interval:30s}")
+    @PostConstruct
+    void scheduleHeartbeat() {
+        taskScheduler.scheduleWithFixedDelay(this::heartbeat, sseProperties.heartbeatInterval());
+    }
+
     void heartbeat() {
         emitters.forEach((memberId, targets) -> targets.forEach(emitter ->
                 send(memberId, emitter, SseEmitter.event().comment("heartbeat"))));
