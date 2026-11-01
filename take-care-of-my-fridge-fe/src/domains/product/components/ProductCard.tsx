@@ -4,7 +4,7 @@ import { generatePath, Link } from 'react-router';
 
 import { ROUTES } from '@/app/paths';
 import type { ProductListItemResponse } from '@/common/api/clients';
-import { FadeImage } from '@/common/components/FadeImage';
+import { FallbackImage } from '@/common/components/FallbackImage';
 import { PRODUCT_TYPE_LABELS } from '@/domains/product/format';
 import { SaleCountdown } from '@/domains/sale/components/SaleCountdown';
 import { SalePrice } from '@/domains/sale/components/SalePrice';
@@ -30,11 +30,13 @@ export function ProductCard({ product, pending, onAddToCart, wide = false }: Pro
     <article className={styles.card}>
       <Link to={detailPath} className={styles.link}>
         <div className={wide ? styles.thumbWide : styles.thumb}>
-          {imageUrl ? (
-            <FadeImage src={imageUrl} alt={name} className={styles.image} loading="lazy" />
-          ) : (
-            <span className={styles.imagePlaceholder} aria-hidden="true" />
-          )}
+          <FallbackImage
+            src={imageUrl}
+            alt={name}
+            kind="product"
+            className={styles.image}
+            loading="lazy"
+          />
           {soldOut && <span className={styles.soldOutMark}>품절</span>}
           {/* 남은 시간·수량은 이미지 위에 올려, 할인 상품과 일반 상품의 카드 높이를 같게 둔다. */}
           {sale?.endsAt && (

@@ -1,4 +1,4 @@
-import { Button, Empty, Flex, Result, Skeleton, Typography } from 'antd';
+import { Button, Empty, Result, Skeleton, Typography } from 'antd';
 
 import { SectionCard } from '@/common/components/SectionCard';
 
@@ -28,10 +28,10 @@ export function RecentFridgeLogSection() {
       return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="최근 기록이 없어요" />;
     }
     return (
-      <Flex vertical gap="xs">
+      <div className={styles.list}>
         {logs.map((log) => (
           <div key={log.id} className={styles.row}>
-            <Typography.Text strong title={log.rawName} className={styles.name}>
+            <Typography.Text title={log.rawName} className={styles.name}>
               {log.rawName}
             </Typography.Text>
             <Typography.Text className={styles.quantity}>{formatQuantity(log)}</Typography.Text>
@@ -48,7 +48,7 @@ export function RecentFridgeLogSection() {
             </Typography.Text>
           </div>
         ))}
-      </Flex>
+      </div>
     );
   };
 

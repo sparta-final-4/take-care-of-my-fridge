@@ -1,17 +1,22 @@
-@use '@/styles/variables' as *;
+// 재료명 / 뺀 양 / 먹었어요·버렸어요·요리했어요 / 날짜.
+// 목록 전체를 한 격자로 두고(subgrid) 오른쪽 칸은 가장 긴 내용에 맞춰, 재료명이 남는 폭을 다 쓰게 한다.
+.list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+}
 
 .row {
   display: grid;
-  // 재료명 / 뺀 양 / 먹었어요·버렸어요·요리했어요 / 날짜. 재료명 칸만 늘고 줄며, 나머지는 고정 폭이라 줄마다 세로로 맞는다.
-  grid-template-columns:
-    minmax(0, 1fr) $fridge-log-quantity-width $fridge-log-tag-width
-    $fridge-log-date-width;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
   align-items: center;
-  gap: var(--ant-margin-sm);
-  padding: var(--ant-padding-xs) var(--ant-padding-sm);
-  background: var(--ant-color-bg-container);
-  border: 1px solid var(--ant-color-border);
-  border-radius: var(--ant-border-radius);
+  column-gap: var(--ant-margin-sm);
+  padding: var(--ant-padding-xs) 0;
+
+  // 줄 사이에만 얇은 구분선을 둔다(마지막 줄 아래는 없음).
+  & + & {
+    border-top: 1px solid var(--ant-color-border-secondary);
+  }
 }
 
 .name {
@@ -20,9 +25,7 @@
   white-space: nowrap;
 }
 
-// 태그 칸과 간격을 조금 더 둬서 수량이 재료명과 태그 사이 가운데쯤 오게 한다.
 .quantity {
-  margin-inline-end: var(--ant-margin-xs);
   font-variant-numeric: tabular-nums;
   text-align: end;
   white-space: nowrap;

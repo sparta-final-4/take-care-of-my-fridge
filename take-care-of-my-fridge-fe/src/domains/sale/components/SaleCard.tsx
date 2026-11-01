@@ -4,7 +4,7 @@ import { generatePath, Link } from 'react-router';
 
 import { ROUTES } from '@/app/paths';
 import type { PopularSaleResponse } from '@/common/api/clients';
-import { FadeImage } from '@/common/components/FadeImage';
+import { FallbackImage } from '@/common/components/FallbackImage';
 import { formatPrice } from '@/domains/cart/format';
 import { SALE_TYPE_COLORS, SALE_TYPE_LABELS } from '@/domains/sale/format';
 
@@ -26,11 +26,13 @@ export function SaleCard({ sale: popular }: SaleCardProps) {
       className={styles.card}
     >
       <div className={styles.thumb}>
-        {imageUrl ? (
-          <FadeImage src={imageUrl} alt={name} className={styles.image} loading="lazy" />
-        ) : (
-          <span className={styles.imagePlaceholder} aria-hidden="true" />
-        )}
+        <FallbackImage
+          src={imageUrl}
+          alt={name}
+          kind="product"
+          className={styles.image}
+          loading="lazy"
+        />
       </div>
       {/* 카드가 작아 이미지 위에 올리면 사진을 가려, 남은 수량은 할인 구분 옆에, 남은 시간은 그 아래 한 줄에 둔다.
           특가와 번개 드롭 카드의 줄 수가 같아진다. */}

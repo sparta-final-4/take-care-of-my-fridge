@@ -1,4 +1,13 @@
+@use '@/styles/variables' as *;
+
 .preview {
   object-fit: cover;
+  border-radius: var(--ant-border-radius);
+}
+
+// 이미지를 불러오지 못했을 때 미리보기와 같은 자리에 보여 주는 기본 이미지
+.previewFallback {
+  width: $product-image-preview-size;
+  height: $product-image-preview-size;
   border-radius: var(--ant-border-radius);
 }

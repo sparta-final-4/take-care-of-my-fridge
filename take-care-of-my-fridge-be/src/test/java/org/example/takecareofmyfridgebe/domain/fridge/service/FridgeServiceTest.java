@@ -49,7 +49,6 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
@@ -125,21 +124,11 @@ class FridgeServiceTest {
                 .build();
         ReflectionTestUtils.setField(expiredFridge, "id", 2L);
 
-        when(fridgeRepository.findItemsByCondition(
-                eq(7L),
-                eq(StorageType.REFRIGERATED),
-                eq(FridgeSortType.EXPIRATION),
-                eq(false),
-                any(LocalDate.class)
-        )).thenReturn(List.of(imminentFridge, expiredFridge));
+        when(fridgeRepository.findItemsByCondition(7L, FridgeSortType.EXPIRATION))
+                .thenReturn(List.of(imminentFridge, expiredFridge));
 
         // When: 서비스 조회 실행
-        List<FridgeItemResponse> result = fridgeService.getItems(
-                7L,
-                StorageType.REFRIGERATED,
-                FridgeSortType.EXPIRATION,
-                false
-        );
+        List<FridgeItemResponse> result = fridgeService.getItems(7L, FridgeSortType.EXPIRATION);
 
         // Then: 첫 번째 재료(임박)와 두 번째 재료(만료)의 응답 DTO 필드 및 계산값 검증
         assertEquals(2, result.size());
@@ -167,13 +156,7 @@ class FridgeServiceTest {
         assertFalse(second.imminent());
         assertTrue(second.expired());
 
-        verify(fridgeRepository).findItemsByCondition(
-                eq(7L),
-                eq(StorageType.REFRIGERATED),
-                eq(FridgeSortType.EXPIRATION),
-                eq(false),
-                any(LocalDate.class)
-        );
+        verify(fridgeRepository).findItemsByCondition(7L, FridgeSortType.EXPIRATION);
     }
 
     /**

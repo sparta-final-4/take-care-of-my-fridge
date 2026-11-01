@@ -1,27 +1,39 @@
-.container {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  gap: var(--ant-margin-sm);
-}
-
 .summaryText {
   font-size: var(--ant-font-size-sm);
 }
 
-.itemList {
-  flex: 1;
+.imminentCount {
+  color: var(--ant-color-warning);
 }
 
+.moreLink {
+  font-size: var(--ant-font-size-sm);
+  color: var(--ant-color-text-secondary);
+  text-decoration: none;
+  transition: color var(--ant-motion-duration-mid);
+
+  &:hover {
+    color: var(--ant-color-primary);
+  }
+}
+
+.itemList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+// 줄 사이에만 얇은 구분선을 둔다(마지막 줄 아래는 없음).
 .itemRow {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--ant-margin-xs);
-  padding: var(--ant-padding-xxs) var(--ant-padding-sm);
-  background: var(--ant-color-bg-container);
-  border: 1px solid var(--ant-color-border);
-  border-radius: var(--ant-border-radius);
+  padding: var(--ant-padding-xxs) 0;
+
+  & + & {
+    border-top: 1px solid var(--ant-color-border-secondary);
+  }
 }
 
 .itemNameWrapper {
@@ -29,12 +41,16 @@
   flex: 1;
 }
 
+// 이름이 길면 이름만 줄이고 수량·태그·D-day는 항상 보이게 한다.
 .itemName {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.footer {
-  margin-top: auto;
+.itemQuantity {
+  flex-shrink: 0;
+  font-size: var(--ant-font-size-sm);
+  white-space: nowrap;
 }
