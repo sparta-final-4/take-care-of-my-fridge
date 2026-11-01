@@ -127,7 +127,8 @@ Q-01~Q-17에 의존하는 테스트는 기대값을 합의한 뒤 구현합니�
 | NOTI-04 | P0 | 전부 읽음 | 마지막 알림 ID 이하의 내 알림만 읽음. 그 뒤 도착한 알림과 다른 회원 알림은 안 읽음 그대로 | `NotificationServiceTransactionTest` |
 | NOTI-05 | P1 | 잘못된 기준·마지막 알림 ID, 비로그인 | 400 `C001`, 비로그인은 모든 알림 API(스트림 포함) 401 | `NotificationControllerTest` |
 | NOTI-06 | P0 | 알림 지우기, 모두 지우기 | 지운 알림은 행이 남고 지운 시각이 채워지며 목록·안 읽은 수에서 빠짐. 다른 회원 알림 ID로 지우면 그대로. 모두 지우기는 내 알림만 | `NotificationServiceTransactionTest` |
-| NOTI-07 | P1 | 알림 스트림 연결, 회원당 연결 한도 | 스트림은 로그인한 회원 번호로 연결하고 비로그인은 401. 한도를 넘기면 가장 오래된 연결부터 정리돼 한도만큼만 남고, 한도는 회원마다 따로 셈. 연결이 없는 회원에게 보내도 오류 없음 | `NotificationControllerTest`, `SseConnectionRegistryTest` |
+| NOTI-07 | P1 | 알림 스트림 연결, 회원당 연결 한도 | 스트림은 로그인한 회원 번호로 연결하고 비로그인은 401. 한도를 넘기면 가장 오래된 연결부터 정리돼 한도만큼만 남고, 한도는 회원마다 따로 셈. 연결이 없는 회원에게 보내도 오류 없음. 하트비트는 설정한 주기로 등록 | `NotificationControllerTest`, `SseConnectionRegistryTest` |
+| NOTI-08 | P0 | 알림 신호의 서버 간 전달 | 한 서버가 Redis 채널로 발행한 신호를 구독 중인 서버 둘이 모두 받음. 발행한 회원 번호로만 전달. 깨진 메시지가 와도 구독이 유지됨 | `NotificationPushRedisTest` |
 
 ## 다른 담당과 공동 검증
 
