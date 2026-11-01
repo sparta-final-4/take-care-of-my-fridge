@@ -5,7 +5,6 @@ import { completeSession, getMessages, startSession } from './api';
 export const chatQueries = {
   all: () => ['chat'] as const,
   activeSession: () => ['chat', 'activeSession'] as const,
-  session: (sessionId: number) => ['chat', 'session', sessionId] as const,
   messages: (sessionId: number) => ['chat', 'messages', sessionId] as const,
 
   activeSessionQuery: () =>
@@ -35,9 +34,6 @@ export function useStartChatSession() {
     mutationFn: () => startSession(),
     onSuccess: (session) => {
       queryClient.setQueryData(chatQueries.activeSession(), session);
-      if (session.id) {
-        queryClient.setQueryData(chatQueries.session(session.id), session);
-      }
     },
   });
 }
@@ -52,7 +48,6 @@ export function useCompleteChatSession() {
     onSuccess: (session) => {
       queryClient.setQueryData(chatQueries.activeSession(), session);
       if (session.id) {
-        queryClient.setQueryData(chatQueries.session(session.id), session);
         queryClient.invalidateQueries({ queryKey: chatQueries.messages(session.id) });
       }
     },
