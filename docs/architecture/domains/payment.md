@@ -131,7 +131,7 @@ sequenceDiagram
 |---|---|---|---|
 | 주문 | 주문 행 잠금(`findByIdForUpdate`), 주문을 결제 완료로 바꿈(`markPaid`), 주문 상품 이름(주문명) | 결제 준비·승인 때, 결제 → 주문 | 구현 완료 |
 | 주문 | 결제 행 여부(`hasPayment`), 정리할 주문인지(`isAbandoned`) | 주문 취소·만료·결제 정리 때, 주문 → 결제 | 구현 완료 |
-| 주문 | 결제를 시도한 결제 대기 주문 취소(`OrderCancelService.cancelAbandoned`) | 1분마다, 결제 스케줄러 → 주문 | 구현 완료 |
+| 주문 | 결제를 시도한 결제 대기 주문 취소(`OrderStatusFacade.cancelAbandoned`) | 1분마다, 결제 스케줄러 → 주문 | 구현 완료 |
 | 환불 | PG 취소 기록(`recordCancellation`), 환불이 아닌 취소 금액 합, PG 취소 건 ID 목록 | 환불 완료·PG 대조 때, 환불 → 결제 | 구현 완료 |
 | 환불 | 취소·부분 취소 웹훅 전달(`RefundFacade.syncWithPg`) | 웹훅 수신 때, 웹훅 → 환불 | 구현 완료 |
 | PortOne | 결제 조회, 결제 취소(멱등 키), 웹훅 | 외부 API | 구현 완료 |

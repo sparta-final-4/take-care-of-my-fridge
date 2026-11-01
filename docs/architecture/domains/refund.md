@@ -24,7 +24,7 @@
 | PG와 맞추기 | PG 누적 취소 금액 − 우리가 기록한 취소 금액이 진행 중 환불 금액과 같으면 완료, 0이면 아직 취소 안 됨, 그 밖은 로그만 남깁니다. 환불 기록 없는 PG 취소(콘솔 취소)는 결제 이력에만 남기고 재고는 건드리지 않습니다 | `RefundFacade.syncWithPg` | 구현 완료 |
 | 환불 정리 | 5분마다 10분 넘게 요청 상태인 환불을 PG와 맞춥니다. PG에서 취소되지 않았으면 실패로 바꿉니다 | `RefundReconcileScheduler` | 구현 완료 |
 | 취소 웹훅 | `Transaction.Cancelled`·`PartialCancelled` 웹훅을 받으면 PG와 맞춥니다. API로 이미 완료한 환불의 웹훅은 바꿀 것이 없어 `IGNORED`입니다 | `WebhookHandler` | 구현 완료 |
-| 구매 확정과 순서 | 환불 신청과 구매 확정은 같은 주문 행을 잠가 하나씩 처리합니다. 구매 확정은 요청 상태 환불이 있으면 거절합니다(`ORDER_011`) | `RefundCommandService.request`, `OrderConfirmService` | 구현 완료 |
+| 구매 확정과 순서 | 환불 신청과 구매 확정은 같은 주문 행을 잠가 하나씩 처리합니다. 구매 확정은 요청 상태 환불이 있으면 거절합니다(`ORDER_011`) | `RefundCommandService.request`, `OrderStatusFacade` | 구현 완료 |
 | 조회 | 환불 가능 수량, 주문별 환불 내역(상태와 관계없이 최신순), 주문별 환불 요약(1~50건) | `RefundQueryService` | 구현 완료 |
 
 ## 상태와 전이

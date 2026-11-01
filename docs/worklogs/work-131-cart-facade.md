@@ -17,11 +17,13 @@
 ## 구현 결과
 
 - `CartFacade`(새로 만듦): 담기, 조회, 수량 변경에서 상품과 판매가를 읽어 서비스에 넘기거나 응답에 붙인다.
-- `CartProductReader`(새로 만듦): 상품 읽기와 판매 중지 검사를 한 곳에 모은다. 상품 없음(`PRODUCT_NOT_FOUND`)과 판매 중지(`PRODUCT_NOT_ON_SALE`)의 구분은 그대로다.
+- 상품 읽기와 판매 중지 검사: `CartFacade`가 상품 서비스(`ProductService`)로 상품을 읽고 판매 중지를 거른다. 상품 없음(`PRODUCT_NOT_FOUND`)과 판매 중지(`PRODUCT_NOT_ON_SALE`)의 구분은 그대로다.
+- 오류 문구: 판매 중지와 재고 초과에도 구매 한도 초과처럼 상품 이름을 붙였다(`판매 중지 · 상품명`, `재고 초과 · 상품명`). 주문·할인 행사와 같은 형식이다.
 - `CartQuantityLimit`(새로 만듦): 상품 이름, 재고, 번개 드롭 여부를 서비스에 넘기는 값이다.
 - `CartService`: 상품 저장소와 판매가 조회 의존을 없앴다. 번개 드롭 한도와 재고 검사는 `validateQuantity` 하나로 모았고, 수량을 내릴 때 막지 않는 규칙과 `int` 넘침 방지는 그대로 유지한다. 합산은 `long`으로 한다.
 - `CartController`: 담기, 조회, 수량 변경은 `CartFacade`를, 삭제는 합칠 것이 없어 `CartService`를 바로 부른다.
-- `CartItemResponse`: `saleType`, `discountRate`, `flashDropRemaining`, `flashDropLimit`, `saleEndsAt`을 없애고 `sale`(`SaleResponse`, 할인이 없으면 null) 하나로 바꿨다. `listPrice`, `unitPrice`, `soldOut`은 그대로다. 생성 클라이언트(oag)와 프론트는 주문·할인 행사 정리가 끝난 뒤 한꺼번에 맞춘다.
+- `CartItemResponse`: `saleType`, `discountRate`, `flashDropRemaining`, `flashDropLimit`, `saleEndsAt`을 없애고 `sale`(`SaleResponse`, 할인이 없으면 null) 하나로 바꿨다. `listPrice`, `unitPrice`, `soldOut`은 그대로다. 생성 클라이언트(oag)와 프론트는 WORK-FE-CART-SALE에서 맞췄다.
+- `PaymentCompletedEventListener`: 결제 완료 리스너 이름을 팀의 리스너 이름(`…EventListener`)에 맞췄다.
 - DB 변경 없음.
 - 문서: 장바구니 도메인 문서의 구현 근거와 구현 방향, API 명세의 조회 응답, 테스트 전략(CART-02, CART-05)의 테스트 이름을 갱신했다.
 
@@ -31,6 +33,6 @@
 - `CartServiceTest`: 장바구니·항목 저장, 수량 더하기, 번개 드롭 한도 거절, 재고 초과 거절, 재고가 줄어도 내리기 허용
 - `CartFacadeTest`(새로 만듦): 조회 순서, 빈 장바구니, 진행 중 할인 반영과 품절 표시, 번개 드롭 담기 거절, 판매 중지·없는 상품의 오류 구분
 - `CartControllerTest`: 삭제는 서비스, 나머지는 퍼사드를 부르도록 조정
-- `CartServiceTransactionTest`, `PaymentCompletedCartListenerTest`: 새 구조에 맞춰 조정
+- `CartServiceTransactionTest`, `PaymentCompletedEventListenerTest`: 새 구조에 맞춰 조정
 
 </details>
