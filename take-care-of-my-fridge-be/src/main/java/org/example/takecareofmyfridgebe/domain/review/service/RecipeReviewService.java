@@ -21,6 +21,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -165,7 +166,7 @@ public class RecipeReviewService {
      * @param recipeIds 레시피 ID 목록
      * @return 레시피 ID를 키로 하는 별점 통계 맵
      */
-    public Map<Long, RecipeRatingStat> findRatingStats(java.util.Collection<Long> recipeIds) {
+    public Map<Long, RecipeRatingStat> findRatingStats(Collection<Long> recipeIds) {
         if (recipeIds == null || recipeIds.isEmpty()) {
             return Collections.emptyMap();
         }

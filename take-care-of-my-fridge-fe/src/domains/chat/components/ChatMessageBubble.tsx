@@ -1,7 +1,7 @@
 import { RobotOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 
-import type { ChatMessageResponse } from '@/common/api/generated/models';
+import type { ChatMessageResponse } from '@/common/api/clients';
 
 import styles from './ChatMessageBubble.module.scss';
 
