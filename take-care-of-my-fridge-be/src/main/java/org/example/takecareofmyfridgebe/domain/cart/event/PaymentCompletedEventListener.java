@@ -12,7 +12,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class PaymentCompletedListener {
+public class PaymentCompletedEventListener {
 
     private final CartService cartService;
 
