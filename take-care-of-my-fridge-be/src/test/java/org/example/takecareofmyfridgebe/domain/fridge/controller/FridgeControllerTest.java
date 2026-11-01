@@ -121,6 +121,7 @@ class FridgeControllerTest {
                 2L,
                 FridgeItemStatus.IMMINENT,
                 IngredientType.NORMAL,
+                false,
                 LocalDateTime.of(2026, 10, 18, 12, 0),
                 LocalDateTime.of(2026, 10, 18, 12, 0)
         );
@@ -150,7 +151,8 @@ class FridgeControllerTest {
                 .andExpect(jsonPath("$.data[0].imminent").value(true))
                 .andExpect(jsonPath("$.data[0].dDay").value(2))
                 .andExpect(jsonPath("$.data[0].status").value("IMMINENT"))
-                .andExpect(jsonPath("$.data[0].expired").value(false));
+                .andExpect(jsonPath("$.data[0].expired").value(false))
+                .andExpect(jsonPath("$.data[0].basicSeasoning").value(false));
 
         // 토큰에서 꺼낸 7L과 기본값들이 서비스에 전달되었는지 검증
         verify(fridgeService).getItems(7L, null, FridgeSortType.EXPIRATION, false);
@@ -241,6 +243,7 @@ class FridgeControllerTest {
                 5L,
                 FridgeItemStatus.NORMAL,
                 IngredientType.NORMAL,
+                false,
                 LocalDateTime.of(2026, 10, 19, 11, 0),
                 LocalDateTime.of(2026, 10, 19, 11, 0)
         );
@@ -343,6 +346,7 @@ class FridgeControllerTest {
                 1L,
                 FridgeItemStatus.IMMINENT,
                 IngredientType.NORMAL,
+                false,
                 LocalDateTime.of(2026, 10, 18, 10, 0),
                 LocalDateTime.of(2026, 10, 19, 14, 0)
         );
@@ -588,6 +592,30 @@ class FridgeControllerTest {
         }
 
         verifyNoInteractions(fridgeService);
+    }
+
+    /**
+     * 밀키트를 소수 수량으로 빼려고 해 서비스가 FRIDGE_MEALKIT_QUANTITY_NOT_INTEGER를 던지면
+     * 400 Bad Request(FRIDGE_005) 응답을 반환하는지 검증한다.
+     */
+    @Test
+    void takeOutItemReturnsBadRequestWhenMealkitQuantityIsNotInteger() throws Exception {
+        // Given
+        when(fridgeService.takeOutItem(eq(7L), eq(100L), any(FridgeItemTakeOutRequest.class)))
+                .thenThrow(new BusinessException(ErrorCode.FRIDGE_MEALKIT_QUANTITY_NOT_INTEGER));
+
+        // When & Then
+        mvc.perform(post("/api/fridge/items/100/take-out")
+                        .with(csrf())
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                new AuthSessionService.AuthPrincipal(7L, 8L, Member.Role.USER), null,
+                                List.of(new SimpleGrantedAuthority("ROLE_USER")))))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"action\":\"CONSUMED\",\"quantity\":0.5}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code")
+                        .value(ErrorCode.FRIDGE_MEALKIT_QUANTITY_NOT_INTEGER.getCode()));
     }
 
     /**

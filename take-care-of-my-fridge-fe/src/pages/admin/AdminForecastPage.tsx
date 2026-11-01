@@ -46,9 +46,15 @@ export default function AdminForecastPage() {
   const demoAvailable = import.meta.env.DEV || window.location.hostname === 'dev.imhungry.click';
   const demo = demoAvailable && searchParams.get('demo') === '1';
   const activeTab = searchParams.get('tab') === 'result' ? 'result' : 'forecast';
-  const { data, error, isPending, isError, isPlaceholderData, refetch } = useQuery(
-    forecastQueries.detail(weekStart, demo),
-  );
+  const {
+    data: fetchedData,
+    error,
+    isPending,
+    isError,
+    isPlaceholderData,
+    refetch,
+  } = useQuery(forecastQueries.detail(weekStart, demo));
+  const data = !demo && fetchedData?.syntheticData ? undefined : fetchedData;
 
   const updateParams = (key: 'weekStart' | 'tab' | 'demo', value?: string) => {
     const next = new URLSearchParams(searchParams);
@@ -70,10 +76,15 @@ export default function AdminForecastPage() {
           disabledDate={(date) => date.day() !== 1}
           onChange={(date) => updateParams('weekStart', date?.format('YYYY-MM-DD'))}
         />
-        <Button onClick={() => updateParams('weekStart')}>최신 주</Button>
+        <Button
+          type={!demo && !weekStart ? 'primary' : 'default'}
+          onClick={() => updateParams('weekStart')}
+        >
+          최신 주
+        </Button>
         {demoAvailable && (
           <Button type={demo ? 'primary' : 'default'} onClick={() => updateParams('demo', '1')}>
-            시연 결과
+            임의 테스트 결과
           </Button>
         )}
         <Button
@@ -94,9 +105,17 @@ export default function AdminForecastPage() {
         <div className={styles.loading}>
           <Spin tip="판매 예측을 불러오고 있습니다" />
         </div>
-      ) : isError ? (
-        getErrorCode(error) === 'F001' ? (
-          <Empty description="해당 주의 판매 예측이 없습니다." />
+      ) : isError || !data ? (
+        !isError || getErrorCode(error) === 'F001' ? (
+          <Empty
+            description={
+              demo
+                ? '시연 예측이 없습니다.'
+                : weekStart
+                  ? '해당 주의 실제 판매 예측이 없습니다.'
+                  : '실제 판매 예측이 아직 없습니다.'
+            }
+          />
         ) : (
           <Result
             status="error"
@@ -153,7 +172,7 @@ export default function AdminForecastPage() {
                   render: numberOrDash,
                 },
                 {
-                  title: '기준선 수량',
+                  title: '지난주 수량',
                   dataIndex: 'baselineQty',
                   key: 'baselineQty',
                   render: (value: number) => value.toLocaleString('ko-KR'),
@@ -177,7 +196,7 @@ export default function AdminForecastPage() {
                 <Col xs={12} md={8} lg={4}>
                   <Card size="small">
                     <Statistic
-                      title="기준선 TOP 10 일치"
+                      title="지난주 TOP 10 일치"
                       value={data.summary.baselineTop10MatchCount}
                       suffix="개"
                     />
@@ -195,7 +214,7 @@ export default function AdminForecastPage() {
                 <Col xs={12} md={8} lg={4}>
                   <Card size="small">
                     <Statistic
-                      title="기준선 MAE"
+                      title="지난주 수량 MAE"
                       value={data.summary.baselineMeanAbsoluteError}
                       precision={1}
                     />
@@ -244,7 +263,7 @@ export default function AdminForecastPage() {
                   },
                   { title: '실적', dataIndex: 'actualQty', key: 'actualQty', render: numberOrDash },
                   {
-                    title: '기준선',
+                    title: '지난주 수량',
                     dataIndex: 'baselineQty',
                     key: 'baselineQty',
                     render: (value: number) => value.toLocaleString('ko-KR'),

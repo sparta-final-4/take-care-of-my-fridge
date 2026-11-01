@@ -22,7 +22,7 @@ export function FridgeAiConsultSection() {
           <Flex wrap gap="xs">
             {imminentItems.map((item) => (
               <Tag key={item.id} className={styles.chip}>
-                {item.rawName} {formatDDay(item.dDay)}
+                {item.rawName} {item.dDay !== undefined && formatDDay(item.dDay)}
               </Tag>
             ))}
           </Flex>

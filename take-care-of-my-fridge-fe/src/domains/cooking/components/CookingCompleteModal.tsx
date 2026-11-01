@@ -22,6 +22,7 @@ import type { CookingCompleteRequestResultEnum, IngredientItem } from '@/common/
 import { getErrorMessage } from '@/common/api/errors';
 import { useAuthStore } from '@/common/auth/authStore';
 import type { FridgeItemResponse } from '@/domains/fridge/api';
+import { getStep } from '@/domains/fridge/format';
 import { useCompleteCooking } from '@/domains/cooking/queries';
 import { fridgeQueries } from '@/domains/fridge/queries';
 
@@ -50,36 +51,6 @@ interface HeldItemState {
 interface MissingItem {
   ingredientId: number;
   displayName: string;
-}
-
-const COUNT_UNITS = new Set([
-  '개',
-  '모',
-  '대',
-  '장',
-  '마리',
-  '쪽',
-  '알',
-  '캔',
-  '병',
-  '팩',
-  '봉',
-  '줌',
-  '뿌리',
-  '토막',
-  '줄',
-  '조각',
-  '포기',
-  '공기',
-  '접시',
-]);
-
-function getStep(unit?: string | null): number {
-  if (!unit) return 0.5;
-  const clean = unit.trim().toLowerCase();
-  if (COUNT_UNITS.has(clean)) return 0.5;
-  if (clean.includes('g') || clean.includes('ml')) return 10;
-  return 0.5;
 }
 
 interface ModalBodyProps {

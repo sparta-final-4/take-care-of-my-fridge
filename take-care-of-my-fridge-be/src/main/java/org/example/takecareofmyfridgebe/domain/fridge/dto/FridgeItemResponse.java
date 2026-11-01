@@ -30,6 +30,8 @@ public record FridgeItemResponse(
         long dDay,
         FridgeItemStatus status,
         IngredientType ingredientType,
+        // 기본 양념(재료의 is_basic_seasoning). 냉장고 목록의 기본 양념 탭과 개수 제외에 쓴다.
+        boolean basicSeasoning,
         LocalDateTime createdAt,
         LocalDateTime updatedAt
 ) {
@@ -64,6 +66,7 @@ public record FridgeItemResponse(
                 dDay,
                 status,
                 ingredientType,
+                ingredient != null && ingredient.isBasicSeasoning(),
                 fridge.getCreatedAt(),
                 fridge.getUpdatedAt()
         );
