@@ -7,7 +7,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.example.takecareofmyfridgebe.domain.order.entity.Order;
-import org.example.takecareofmyfridgebe.domain.order.facade.OrderFacade;
+import org.example.takecareofmyfridgebe.domain.order.facade.OrderStatusFacade;
 import org.example.takecareofmyfridgebe.domain.order.service.OrderStatusService;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
@@ -25,7 +25,7 @@ public class OrderAutoConfirmScheduler {
     private static final ZoneId ZONE = ZoneId.of("Asia/Seoul");
 
     private final OrderStatusService orderStatusService;
-    private final OrderFacade orderFacade;
+    private final OrderStatusFacade orderStatusFacade;
 
     // 서버가 여러 대여도 한 서버만 실행한다. 주문 행 잠금 덕에 함께 돌아도 결과는 같고, 같은 주문을 두 번 처리하는 일만 막는다.
     @Scheduled(cron = "0 0 * * * *", zone = "Asia/Seoul")
@@ -49,7 +49,7 @@ public class OrderAutoConfirmScheduler {
 
     private void confirm(Order order) {
         try {
-            orderFacade.confirm(order.getMemberId(), order.getId());
+            orderStatusFacade.confirm(order.getMemberId(), order.getId());
         } catch (BusinessException e) {
             if (e.getErrorCode() == ErrorCode.ORDER_REFUND_IN_PROGRESS) {
                 log.info("환불 요청 중인 주문 자동 확정 보류: orderId={}", order.getId());

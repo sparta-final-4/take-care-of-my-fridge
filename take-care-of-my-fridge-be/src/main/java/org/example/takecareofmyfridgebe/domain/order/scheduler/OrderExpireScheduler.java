@@ -5,7 +5,7 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
-import org.example.takecareofmyfridgebe.domain.order.facade.OrderFacade;
+import org.example.takecareofmyfridgebe.domain.order.facade.OrderStatusFacade;
 import org.example.takecareofmyfridgebe.domain.order.service.OrderStatusService;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -21,7 +21,7 @@ public class OrderExpireScheduler {
     static final long EXPIRE_MINUTES = 5;
 
     private final OrderStatusService orderStatusService;
-    private final OrderFacade orderFacade;
+    private final OrderStatusFacade orderStatusFacade;
 
     // 이전 실행이 끝나고 1분 뒤 다시 실행해 실행끼리 겹치지 않는다. 기동 직후에는 1분 기다린다.
     // 서버가 여러 대여도 한 서버만 실행한다. 주문 행 잠금 덕에 함께 돌아도 결과는 같고, 같은 주문을 두 번 처리하는 일만 막는다.
@@ -43,7 +43,7 @@ public class OrderExpireScheduler {
     // 한 건이 실패해도 나머지는 계속 처리한다. 실패한 건은 결제 대기로 남아 다음 실행에서 다시 시도한다.
     private void expire(Long orderId) {
         try {
-            orderFacade.expire(orderId);
+            orderStatusFacade.expire(orderId);
         } catch (RuntimeException e) {
             log.error("주문 만료 처리 실패, 다음 실행에서 재시도: orderId={}", orderId, e);
         }

@@ -11,6 +11,7 @@ import org.example.takecareofmyfridgebe.domain.order.dto.OrderDetailResponse;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderListRequest;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderSummaryResponse;
 import org.example.takecareofmyfridgebe.domain.order.facade.OrderFacade;
+import org.example.takecareofmyfridgebe.domain.order.facade.OrderStatusFacade;
 import org.example.takecareofmyfridgebe.domain.order.service.OrderQueryService;
 import org.example.takecareofmyfridgebe.global.response.ApiResponse;
 import org.example.takecareofmyfridgebe.global.response.PageResponse;
@@ -34,6 +35,7 @@ public class OrderController {
 
     private final OrderQueryService orderQueryService;
     private final OrderFacade orderFacade;
+    private final OrderStatusFacade orderStatusFacade;
 
     // 내 주문 내역 화면.
     @GetMapping
@@ -75,7 +77,7 @@ public class OrderController {
     public ResponseEntity<ApiResponse<Void>> cancelOrder(
             @AuthenticationPrincipal AuthSessionService.AuthPrincipal principal,
             @PathVariable Long orderId) {
-        orderFacade.cancel(principal.memberId(), orderId);
+        orderStatusFacade.cancel(principal.memberId(), orderId);
         return ResponseEntity.ok(ApiResponse.ok());
     }
 
@@ -84,6 +86,6 @@ public class OrderController {
     public ResponseEntity<ApiResponse<OrderConfirmResponse>> confirmOrder(
             @AuthenticationPrincipal AuthSessionService.AuthPrincipal principal,
             @PathVariable Long orderId) {
-        return ResponseEntity.ok(ApiResponse.ok(orderFacade.confirm(principal.memberId(), orderId)));
+        return ResponseEntity.ok(ApiResponse.ok(orderStatusFacade.confirm(principal.memberId(), orderId)));
     }
 }
