@@ -10,8 +10,9 @@ import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 import org.example.takecareofmyfridgebe.domain.member.repository.MemberRepository;
 import org.example.takecareofmyfridgebe.domain.notification.entity.NotificationType;
 import org.example.takecareofmyfridgebe.domain.notification.event.NotificationRequestedMessage;
+import org.example.takecareofmyfridgebe.domain.product.dto.ProductDetail;
 import org.example.takecareofmyfridgebe.domain.product.entity.Product;
-import org.example.takecareofmyfridgebe.domain.product.repository.ProductRepository;
+import org.example.takecareofmyfridgebe.domain.product.service.ProductService;
 import org.example.takecareofmyfridgebe.domain.sale.entity.SaleEventItem;
 import org.example.takecareofmyfridgebe.domain.sale.event.FlashDropNotificationEvent;
 import org.example.takecareofmyfridgebe.domain.sale.event.FlashDropNotificationEvent.Moment;
@@ -30,7 +31,7 @@ public class FlashDropNotificationReader {
     private static final DateTimeFormatter STARTS_AT_FORMAT = DateTimeFormatter.ofPattern("M월 d일 HH:mm");
 
     private final SaleEventItemRepository saleEventItemRepository;
-    private final ProductRepository productRepository;
+    private final ProductService productService;
     private final MemberRepository memberRepository;
 
     public List<NotificationRequestedMessage> read(FlashDropNotificationEvent event) {
@@ -38,7 +39,9 @@ public class FlashDropNotificationReader {
         Set<Long> productIds = items.stream()
                 .map(SaleEventItem::getProductId)
                 .collect(Collectors.toSet());
-        Map<Long, String> productNames = productRepository.findAllById(productIds).stream()
+        // 판매 중지된 상품도 이름이 필요해 상태로 거르지 않는 조회를 쓴다
+        Map<Long, String> productNames = productService.getProductDetailsByIds(productIds).stream()
+                .map(ProductDetail::product)
                 .collect(Collectors.toMap(Product::getId, Product::getName));
         List<Long> memberIds = memberRepository.findIdsByRoleAndStatus(Member.Role.USER, Member.Status.ACTIVE);
 
