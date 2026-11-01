@@ -35,7 +35,7 @@ public class OrderReader {
     }
 
     // 회원 확인 없이 주문 행을 잠그고 찾는다. 스케줄러처럼 로그인한 회원이 없는 곳에서 쓴다.
-    public Optional<Order> findForUpdate(Long orderId) {
+    public Optional<Order> findOrderForUpdate(Long orderId) {
         return orderRepository.findByIdForUpdate(orderId);
     }
 

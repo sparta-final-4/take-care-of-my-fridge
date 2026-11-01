@@ -108,6 +108,10 @@ public class Order extends BaseTimeEntity {
         this.status = OrderStatus.CANCELLED;
     }
 
+    public boolean isPending() {
+        return status == OrderStatus.PENDING;
+    }
+
     public boolean isConfirmed() {
         return status == OrderStatus.CONFIRMED;
     }

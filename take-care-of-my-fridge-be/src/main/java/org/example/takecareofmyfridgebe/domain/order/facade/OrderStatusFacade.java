@@ -10,7 +10,6 @@ import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderConfirmResponse;
 import org.example.takecareofmyfridgebe.domain.order.entity.Order;
 import org.example.takecareofmyfridgebe.domain.order.entity.OrderItem;
-import org.example.takecareofmyfridgebe.domain.order.entity.OrderStatus;
 import org.example.takecareofmyfridgebe.domain.order.entity.SaleType;
 import org.example.takecareofmyfridgebe.domain.order.service.OrderReader;
 import org.example.takecareofmyfridgebe.domain.order.service.OrderStatusService;
@@ -57,12 +56,12 @@ public class OrderStatusFacade {
     // 결제 쪽 스케줄러가 부른다. 고른 뒤 잠그기 전에 결제됐거나, 다시 결제를 시작했거나, 이미 취소된 주문은 건너뛴다.
     @Transactional
     public void cancelAbandoned(Long orderId, LocalDateTime lastPaymentBefore) {
-        Optional<Order> found = orderReader.findForUpdate(orderId);
+        Optional<Order> found = orderReader.findOrderForUpdate(orderId);
         if (found.isEmpty()) {
             return;
         }
         Order order = found.get();
-        if (order.getStatus() != OrderStatus.PENDING || !paymentService.isAbandoned(orderId, lastPaymentBefore)) {
+        if (!order.isPending() || !paymentService.isAbandoned(orderId, lastPaymentBefore)) {
             return;
         }
         List<OrderItem> items = orderReader.getOrderItems(order);
@@ -73,12 +72,12 @@ public class OrderStatusFacade {
     // 주문 만료 스케줄러가 부른다. 고른 뒤 잠그기 전에 지워졌거나, 결제됐거나, 결제가 붙은 주문은 건너뛴다.
     @Transactional
     public void expire(Long orderId) {
-        Optional<Order> found = orderReader.findForUpdate(orderId);
+        Optional<Order> found = orderReader.findOrderForUpdate(orderId);
         if (found.isEmpty()) {
             return;
         }
         Order order = found.get();
-        if (order.getStatus() != OrderStatus.PENDING || paymentService.hasPayment(orderId)) {
+        if (!order.isPending() || paymentService.hasPayment(orderId)) {
             return;
         }
         List<OrderItem> items = orderReader.getOrderItems(order);
