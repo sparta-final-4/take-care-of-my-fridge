@@ -17,6 +17,7 @@ public class SaleController {
 
     private final SaleEventFacade saleEventFacade;
 
+    // 메인 화면의 인기 특가.
     @GetMapping("/popular")
     public ResponseEntity<ApiResponse<List<PopularSaleResponse>>> getPopularSales() {
         List<PopularSaleResponse> sales = saleEventFacade.getPopularSales();

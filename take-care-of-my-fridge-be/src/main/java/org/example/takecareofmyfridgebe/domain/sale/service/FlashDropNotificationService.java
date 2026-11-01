@@ -24,7 +24,7 @@ public class FlashDropNotificationService {
                 .toList();
     }
 
-    // 같은 행사·상품의 같은 시점 알림은 한 회원에게 한 번만 남도록 중복 방지 키를 붙인다
+    // 같은 행사·상품의 같은 시점 알림은 한 회원에게 한 번만 남도록 중복 방지 키를 붙인다.
     private NotificationRequestedMessage toMessage(Moment moment, SaleEventItem item, String productName, Long memberId) {
         String content = switch (moment) {
             case CREATED -> "%s %d%% 번개 드롭 · %s 시작 · %d개 한정".formatted(

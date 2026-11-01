@@ -59,19 +59,21 @@ public class AdminSaleEventController {
         return ResponseEntity.ok(ApiResponse.ok(saleEventQueryService.getCandidates(request)));
     }
 
+    // 등록 화면의 특가 등록. 고른 상품마다 행사를 하나씩 만든다.
     @PostMapping("/special")
     public ResponseEntity<ApiResponse<SaleEventsCreateResponse>> createSpecialSale(
             @Valid @RequestBody SpecialSaleCreateRequest request
     ) {
-        SaleEventsCreateResponse response = saleEventService.createSpecialSale(request);
+        SaleEventsCreateResponse response = adminSaleEventFacade.createSpecialSale(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok(response));
     }
 
+    // 등록 화면의 번개 드롭 등록. 고른 상품마다 행사를 하나씩 만들고, 커밋 뒤 등록 알림을 보낸다.
     @PostMapping("/flash-drop")
     public ResponseEntity<ApiResponse<SaleEventsCreateResponse>> createFlashDrop(
             @Valid @RequestBody FlashDropCreateRequest request
     ) {
-        SaleEventsCreateResponse response = saleEventService.createFlashDrop(request);
+        SaleEventsCreateResponse response = adminSaleEventFacade.createFlashDrop(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok(response));
     }
 
@@ -81,7 +83,7 @@ public class AdminSaleEventController {
             @PathVariable Long saleEventId,
             @Valid @RequestBody SaleEventUpdateRequest request
     ) {
-        saleEventService.update(saleEventId, request);
+        adminSaleEventFacade.update(saleEventId, request);
         return ResponseEntity.ok(ApiResponse.ok());
     }
 

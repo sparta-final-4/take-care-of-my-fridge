@@ -2,7 +2,6 @@ package org.example.takecareofmyfridgebe.domain.sale.service;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -10,10 +9,8 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
-import org.example.takecareofmyfridgebe.domain.product.dto.ProductDetail;
 import org.example.takecareofmyfridgebe.domain.product.entity.Product;
 import org.example.takecareofmyfridgebe.domain.product.entity.ProductStatus;
-import org.example.takecareofmyfridgebe.domain.product.service.ProductService;
 import org.example.takecareofmyfridgebe.domain.sale.dto.FlashDropCreateRequest;
 import org.example.takecareofmyfridgebe.domain.sale.dto.FlashDropItemRequest;
 import org.example.takecareofmyfridgebe.domain.sale.dto.SaleEventItemUpdateRequest;
@@ -35,6 +32,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 // 관리자가 하는 할인 행사 쓰기. 등록, 시작 전 수정, 진행 중 종료, 시작 전 삭제를 한곳에서 한다.
+// 등록·수정에 쓸 상품은 AdminSaleEventFacade가 읽어 넘긴다.
 // 수정·종료·삭제는 행사 행을 잠근 뒤 상태를 확인하므로, 상태 정리가 같은 행사를 바꾸려 하면 이 요청이 끝날 때까지 기다린다.
 @Service
 @RequiredArgsConstructor
@@ -43,13 +41,12 @@ public class SaleEventService {
 
     private final SaleEventRepository saleEventRepository;
     private final SaleEventItemRepository saleEventItemRepository;
-    private final ProductService productService;
     private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
-    public SaleEventsCreateResponse createSpecialSale(SpecialSaleCreateRequest request) {
+    public SaleEventsCreateResponse createSpecialSale(SpecialSaleCreateRequest request, List<Product> products) {
         validateStartsAt(request.startsAt());
-        Map<Long, Product> productsById = getAvailableProducts(request.productIds());
+        Map<Long, Product> productsById = getAvailableProducts(request.productIds(), products);
 
         // 상품마다 행사를 따로 만든다. 같은 기간을 한 번에 입력해도 시각 수정·삭제·종료는 상품 하나씩 한다.
         List<SaleEvent> saleEvents = new ArrayList<>();
@@ -62,9 +59,9 @@ public class SaleEventService {
     }
 
     @Transactional
-    public SaleEventsCreateResponse createFlashDrop(FlashDropCreateRequest request) {
+    public SaleEventsCreateResponse createFlashDrop(FlashDropCreateRequest request, List<Product> products) {
         validateStartsAt(request.startsAt());
-        Map<Long, Product> productsById = getAvailableProducts(request.productIds());
+        Map<Long, Product> productsById = getAvailableProducts(request.productIds(), products);
         validateFlashDropQuantities(request.items(), productsById);
 
         List<SaleEvent> saleEvents = new ArrayList<>();
@@ -73,7 +70,7 @@ public class SaleEventService {
             saleEventItemRepository.save(item.toSaleEventItem(saleEvent, productsById.get(item.productId()).getPrice()));
             saleEvents.add(saleEvent);
         }
-        // 실제 발행은 커밋 뒤에 한다
+        // 실제 발행은 커밋 뒤에 한다.
         eventPublisher.publishEvent(FlashDropNotificationEvent.created(
                 saleEvents.stream().map(SaleEvent::getId).toList()));
         return SaleEventsCreateResponse.from(saleEvents);
@@ -82,8 +79,8 @@ public class SaleEventService {
     // 시작 전인 행사의 시각과 상품 값을 한 번에 고친다. 정가는 상품의 지금 정가로 다시 읽는다.
     // 한 트랜잭션이라 어느 항목이 거절되면 아무것도 바뀌지 않는다.
     @Transactional
-    public void update(Long saleEventId, SaleEventUpdateRequest request) {
-        SaleEvent saleEvent = getForUpdate(saleEventId);
+    public void update(Long saleEventId, SaleEventUpdateRequest request, List<Product> products) {
+        SaleEvent saleEvent = getSaleEventForUpdate(saleEventId);
         LocalDateTime now = LocalDateTime.now(SaleEvent.ZONE);
         if (!saleEvent.isEditable(now)) {
             throw new BusinessException(ErrorCode.SALE_EVENT_NOT_EDITABLE);
@@ -94,7 +91,7 @@ public class SaleEventService {
         Map<Long, SaleEventItemUpdateRequest> requestsByProductId = request.items().stream()
                 .collect(Collectors.toMap(SaleEventItemUpdateRequest::productId, Function.identity()));
         validateSameProducts(items, requestsByProductId);
-        Map<Long, Product> productsById = getProducts(requestsByProductId.keySet()).stream()
+        Map<Long, Product> productsById = products.stream()
                 .collect(Collectors.toMap(Product::getId, Function.identity()));
 
         for (SaleEventItem item : items) {
@@ -108,7 +105,7 @@ public class SaleEventService {
 
     @Transactional
     public void end(Long saleEventId) {
-        SaleEvent saleEvent = getForUpdate(saleEventId);
+        SaleEvent saleEvent = getSaleEventForUpdate(saleEventId);
         LocalDateTime now = LocalDateTime.now(SaleEvent.ZONE);
         if (!saleEvent.isEndable(now)) {
             throw new BusinessException(ErrorCode.SALE_EVENT_NOT_ENDABLE);
@@ -118,7 +115,7 @@ public class SaleEventService {
 
     @Transactional
     public void delete(Long saleEventId) {
-        SaleEvent saleEvent = getForUpdate(saleEventId);
+        SaleEvent saleEvent = getSaleEventForUpdate(saleEventId);
         if (!saleEvent.isDeletable(LocalDateTime.now(SaleEvent.ZONE))) {
             throw new BusinessException(ErrorCode.SALE_EVENT_NOT_DELETABLE);
         }
@@ -126,14 +123,8 @@ public class SaleEventService {
         saleEventRepository.delete(saleEvent);
     }
 
-    private SaleEvent getForUpdate(Long saleEventId) {
-        return saleEventRepository.findByIdForUpdate(saleEventId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.SALE_EVENT_NOT_FOUND));
-    }
-
-    // 등록할 수 있는 상품만 모아 돌려준다. 없는 상품, 판매 중이 아닌 상품, 이미 행사가 있는 상품은 거절한다.
-    private Map<Long, Product> getAvailableProducts(List<Long> productIds) {
-        List<Product> products = getProducts(productIds);
+    // 퍼사드가 읽어 온 상품 중 등록할 수 있는 상품만 모아 돌려준다. 없는 상품, 판매 중이 아닌 상품, 이미 행사가 있는 상품은 거절한다.
+    private Map<Long, Product> getAvailableProducts(List<Long> productIds, List<Product> products) {
         if (products.size() != productIds.size()) {
             throw new BusinessException(ErrorCode.PRODUCT_NOT_FOUND);
         }
@@ -158,11 +149,9 @@ public class SaleEventService {
         return products.stream().collect(Collectors.toMap(Product::getId, Function.identity()));
     }
 
-    // 판매 중지 상품도 상태를 보고 거절해야 해서 상태로 거르지 않는 조회를 쓴다
-    private List<Product> getProducts(Collection<Long> productIds) {
-        return productService.getProductDetailsByIds(productIds).stream()
-                .map(ProductDetail::product)
-                .toList();
+    private SaleEvent getSaleEventForUpdate(Long saleEventId) {
+        return saleEventRepository.findByIdForUpdate(saleEventId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.SALE_EVENT_NOT_FOUND));
     }
 
     private void validateStartsAt(LocalDateTime startsAt) {

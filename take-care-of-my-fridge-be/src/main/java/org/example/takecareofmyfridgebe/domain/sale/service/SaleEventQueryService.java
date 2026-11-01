@@ -42,7 +42,7 @@ public class SaleEventQueryService {
         return saleEventItemRepository.findBySaleEventIdOrderById(saleEventId);
     }
 
-    // 알림 문구에 행사 시작 시각이 들어가서 행사를 함께 읽는다
+    // 알림 문구에 행사 시작 시각이 들어가서 행사를 함께 읽는다.
     public List<SaleEventItem> getItemsWithSaleEvent(Collection<Long> saleEventIds) {
         return saleEventItemRepository.findAllWithSaleEventBySaleEventIdIn(saleEventIds);
     }

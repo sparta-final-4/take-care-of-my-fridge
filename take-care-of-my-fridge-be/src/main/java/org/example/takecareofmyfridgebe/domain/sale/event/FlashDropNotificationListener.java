@@ -12,7 +12,7 @@ import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
 // 번개 드롭 등록·시작이 커밋된 뒤 받는 사람마다 알림 요청을 발행한다.
-// 행사는 이미 저장됐으므로 발행이 실패해도 되돌리지 않고 행사 ID를 남긴다
+// 행사는 이미 저장됐으므로 발행이 실패해도 되돌리지 않고 행사 ID를 남긴다.
 @Slf4j
 @Component
 @RequiredArgsConstructor
