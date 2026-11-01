@@ -154,6 +154,7 @@ export * from './page-response-settlement-payment-response';
 export * from './payment-confirm-request';
 export * from './payment-confirm-response';
 export * from './payment-prepare-response';
+export * from './popular-recipe-request';
 export * from './popular-recipe-response';
 export * from './popular-sale-response';
 export * from './product-create-request';

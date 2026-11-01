@@ -2448,12 +2448,10 @@
         "parameters": [
           {
             "in": "query",
-            "name": "size",
-            "required": false,
+            "name": "request",
+            "required": true,
             "schema": {
-              "type": "integer",
-              "format": "int32",
-              "default": 6
+              "$ref": "#/components/schemas/PopularRecipeRequest"
             }
           }
         ],
@@ -6357,6 +6355,17 @@
           },
           "portonePaymentId": {
             "type": "string"
+          }
+        }
+      },
+      "PopularRecipeRequest": {
+        "type": "object",
+        "properties": {
+          "size": {
+            "type": "integer",
+            "format": "int32",
+            "maximum": 20,
+            "minimum": 1
           }
         }
       },

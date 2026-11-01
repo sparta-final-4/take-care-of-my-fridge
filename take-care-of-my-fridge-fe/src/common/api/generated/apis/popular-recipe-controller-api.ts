@@ -24,6 +24,8 @@ import { DUMMY_BASE_URL, assertParamExists, setApiKeyToObject, setBasicAuthToObj
 import { BASE_PATH, COLLECTION_FORMATS, type RequestArgs, BaseAPI, RequiredError, operationServerMap } from '../base';
 // @ts-ignore
 import type { ApiResponseListPopularRecipeResponse } from '../models';
+// @ts-ignore
+import type { PopularRecipeRequest } from '../models';
 /**
  * PopularRecipeControllerApi - axios parameter creator
  */
@@ -31,11 +33,13 @@ export const PopularRecipeControllerApiAxiosParamCreator = function (configurati
     return {
         /**
          * 
-         * @param {number} [size] 
+         * @param {PopularRecipeRequest} request 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        getPopularRecipes: async (size?: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+        getPopularRecipes: async (request: PopularRecipeRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'request' is not null or undefined
+            assertParamExists('getPopularRecipes', 'request', request)
             const localVarPath = `/api/recipes/popular`;
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
@@ -48,8 +52,10 @@ export const PopularRecipeControllerApiAxiosParamCreator = function (configurati
             const localVarHeaderParameter = {} as any;
             const localVarQueryParameter = {} as any;
 
-            if (size !== undefined) {
-                localVarQueryParameter['size'] = size;
+            if (request !== undefined) {
+                for (const [key, value] of Object.entries(request)) {
+                    localVarQueryParameter[key] = value;
+                }
             }
 
             localVarHeaderParameter['Accept'] = '*/*';
@@ -74,12 +80,12 @@ export const PopularRecipeControllerApiFp = function(configuration?: Configurati
     return {
         /**
          * 
-         * @param {number} [size] 
+         * @param {PopularRecipeRequest} request 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async getPopularRecipes(size?: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ApiResponseListPopularRecipeResponse>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.getPopularRecipes(size, options);
+        async getPopularRecipes(request: PopularRecipeRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ApiResponseListPopularRecipeResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.getPopularRecipes(request, options);
             const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
             const localVarOperationServerBasePath = operationServerMap['PopularRecipeControllerApi.getPopularRecipes']?.[localVarOperationServerIndex]?.url;
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
@@ -99,8 +105,8 @@ export const PopularRecipeControllerApiFactory = function (configuration?: Confi
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        getPopularRecipes(requestParameters: PopularRecipeControllerApiGetPopularRecipesRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<ApiResponseListPopularRecipeResponse> {
-            return localVarFp.getPopularRecipes(requestParameters.size, options).then((request) => request(axios, basePath));
+        getPopularRecipes(requestParameters: PopularRecipeControllerApiGetPopularRecipesRequest, options?: RawAxiosRequestConfig): AxiosPromise<ApiResponseListPopularRecipeResponse> {
+            return localVarFp.getPopularRecipes(requestParameters.request, options).then((request) => request(axios, basePath));
         },
     };
 };
@@ -115,7 +121,7 @@ export interface PopularRecipeControllerApiInterface {
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      */
-    getPopularRecipes(requestParameters?: PopularRecipeControllerApiGetPopularRecipesRequest, options?: RawAxiosRequestConfig): AxiosPromise<ApiResponseListPopularRecipeResponse>;
+    getPopularRecipes(requestParameters: PopularRecipeControllerApiGetPopularRecipesRequest, options?: RawAxiosRequestConfig): AxiosPromise<ApiResponseListPopularRecipeResponse>;
 
 }
 
@@ -123,7 +129,7 @@ export interface PopularRecipeControllerApiInterface {
  * Request parameters for getPopularRecipes operation in PopularRecipeControllerApi.
  */
 export interface PopularRecipeControllerApiGetPopularRecipesRequest {
-    readonly size?: number
+    readonly request: PopularRecipeRequest
 }
 
 /**
@@ -136,8 +142,8 @@ export class PopularRecipeControllerApi extends BaseAPI implements PopularRecipe
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      */
-    public getPopularRecipes(requestParameters: PopularRecipeControllerApiGetPopularRecipesRequest = {}, options?: RawAxiosRequestConfig) {
-        return PopularRecipeControllerApiFp(this.configuration).getPopularRecipes(requestParameters.size, options).then((request) => request(this.axios, this.basePath));
+    public getPopularRecipes(requestParameters: PopularRecipeControllerApiGetPopularRecipesRequest, options?: RawAxiosRequestConfig) {
+        return PopularRecipeControllerApiFp(this.configuration).getPopularRecipes(requestParameters.request, options).then((request) => request(this.axios, this.basePath));
     }
 }
 

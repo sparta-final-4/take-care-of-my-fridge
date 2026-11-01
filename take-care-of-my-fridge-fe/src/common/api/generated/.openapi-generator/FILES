@@ -190,6 +190,7 @@ models/page-response-settlement-payment-response.ts
 models/payment-confirm-request.ts
 models/payment-confirm-response.ts
 models/payment-prepare-response.ts
+models/popular-recipe-request.ts
 models/popular-recipe-response.ts
 models/popular-sale-response.ts
 models/product-create-request.ts
