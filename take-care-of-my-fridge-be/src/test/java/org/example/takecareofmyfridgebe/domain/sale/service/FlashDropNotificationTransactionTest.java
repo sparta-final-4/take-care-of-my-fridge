@@ -21,6 +21,7 @@ import org.example.takecareofmyfridgebe.domain.sale.dto.FlashDropItemRequest;
 import org.example.takecareofmyfridgebe.domain.sale.dto.SaleEventsCreateResponse;
 import org.example.takecareofmyfridgebe.domain.sale.dto.SpecialSaleCreateRequest;
 import org.example.takecareofmyfridgebe.domain.sale.dto.SpecialSaleItemRequest;
+import org.example.takecareofmyfridgebe.domain.sale.facade.AdminSaleEventFacade;
 import org.example.takecareofmyfridgebe.domain.sale.entity.SaleEvent;
 import org.example.takecareofmyfridgebe.domain.sale.entity.SaleEventItem;
 import org.example.takecareofmyfridgebe.domain.sale.entity.SaleEventStatus;
@@ -49,7 +50,8 @@ import org.springframework.transaction.annotation.Transactional;
 // 커밋된 행사·회원을 다시 읽어 알림 요청을 만들고, Kafka 발행 리스너는 띄우지 않는다.
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({JpaAuditingConfig.class, QueryDslConfig.class, SaleEventService.class, SaleProductReader.class, SaleEventStatusService.class, FlashDropNotificationReader.class, ProductService.class})
+@Import({JpaAuditingConfig.class, QueryDslConfig.class, SaleEventService.class, SaleEventStatusService.class, SaleEventQueryService.class,
+        FlashDropNotificationService.class, AdminSaleEventFacade.class, ProductService.class})
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @RecordApplicationEvents
 class FlashDropNotificationTransactionTest extends MySqlContainerSupport {
@@ -59,7 +61,7 @@ class FlashDropNotificationTransactionTest extends MySqlContainerSupport {
 
     private final SaleEventService saleEventService;
     private final SaleEventStatusService saleEventStatusService;
-    private final FlashDropNotificationReader flashDropNotificationReader;
+    private final AdminSaleEventFacade adminSaleEventFacade;
     private final SaleEventRepository saleEventRepository;
     private final SaleEventItemRepository saleEventItemRepository;
     private final ProductRepository productRepository;
@@ -70,7 +72,7 @@ class FlashDropNotificationTransactionTest extends MySqlContainerSupport {
     FlashDropNotificationTransactionTest(
             SaleEventService saleEventService,
             SaleEventStatusService saleEventStatusService,
-            FlashDropNotificationReader flashDropNotificationReader,
+            AdminSaleEventFacade adminSaleEventFacade,
             SaleEventRepository saleEventRepository,
             SaleEventItemRepository saleEventItemRepository,
             ProductRepository productRepository,
@@ -78,7 +80,7 @@ class FlashDropNotificationTransactionTest extends MySqlContainerSupport {
             DataSource dataSource) {
         this.saleEventService = saleEventService;
         this.saleEventStatusService = saleEventStatusService;
-        this.flashDropNotificationReader = flashDropNotificationReader;
+        this.adminSaleEventFacade = adminSaleEventFacade;
         this.saleEventRepository = saleEventRepository;
         this.saleEventItemRepository = saleEventItemRepository;
         this.productRepository = productRepository;
@@ -116,7 +118,7 @@ class FlashDropNotificationTransactionTest extends MySqlContainerSupport {
         String content = "두부 50%% 번개 드롭 · %d월 %d일 18:00 시작 · 10개 한정"
                 .formatted(startsAt.getMonthValue(), startsAt.getDayOfMonth());
         String dedupeKey = "FLASH_DROP_CREATED:%d:%d".formatted(saleEventId, tofu.getId());
-        assertThat(flashDropNotificationReader.read(published.get(0)))
+        assertThat(adminSaleEventFacade.getFlashDropNotifications(published.get(0)))
                 .extracting(NotificationRequestedMessage::memberId, NotificationRequestedMessage::notificationType,
                         NotificationRequestedMessage::content, NotificationRequestedMessage::linkUrl,
                         NotificationRequestedMessage::dedupeKey)
@@ -152,7 +154,7 @@ class FlashDropNotificationTransactionTest extends MySqlContainerSupport {
 
         List<FlashDropNotificationEvent> published = events.stream(FlashDropNotificationEvent.class).toList();
         assertThat(published).containsExactly(FlashDropNotificationEvent.started(List.of(dueFlashDrop.getId())));
-        assertThat(flashDropNotificationReader.read(published.get(0)))
+        assertThat(adminSaleEventFacade.getFlashDropNotifications(published.get(0)))
                 .extracting(NotificationRequestedMessage::memberId, NotificationRequestedMessage::content,
                         NotificationRequestedMessage::dedupeKey)
                 .containsExactly(tuple(user.getId(), "두부 50% 번개 드롭 시작 · 10개 한정",

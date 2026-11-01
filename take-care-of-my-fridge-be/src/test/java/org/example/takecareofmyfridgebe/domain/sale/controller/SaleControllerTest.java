@@ -15,7 +15,7 @@ import org.example.takecareofmyfridgebe.domain.auth.service.JwtTokenService;
 import org.example.takecareofmyfridgebe.domain.sale.dto.PopularSaleResponse;
 import org.example.takecareofmyfridgebe.domain.sale.dto.SaleResponse;
 import org.example.takecareofmyfridgebe.domain.sale.entity.SaleEventType;
-import org.example.takecareofmyfridgebe.domain.sale.facade.PopularSaleFacade;
+import org.example.takecareofmyfridgebe.domain.sale.facade.SaleEventFacade;
 import org.example.takecareofmyfridgebe.global.config.SecurityConfig;
 import org.example.takecareofmyfridgebe.global.error.GlobalExceptionHandler;
 import org.junit.jupiter.api.BeforeEach;
@@ -36,11 +36,11 @@ class SaleControllerTest {
     private MockMvc mvc;
 
     @Autowired
-    private PopularSaleFacade popularSaleFacade;
+    private SaleEventFacade saleEventFacade;
 
     @BeforeEach
     void resetMock() {
-        reset(popularSaleFacade);
+        reset(saleEventFacade);
     }
 
     @Test
@@ -49,7 +49,7 @@ class SaleControllerTest {
         // given
         SaleResponse sale = new SaleResponse(SaleEventType.SPECIAL, 1600, 20,
                 OffsetDateTime.of(2026, 11, 1, 18, 0, 0, 0, ZoneOffset.ofHours(9)), null, null);
-        when(popularSaleFacade.getPopularSales())
+        when(saleEventFacade.getPopularSales())
                 .thenReturn(List.of(new PopularSaleResponse(1L, "두부", "https://img.test/tofu.png", 2000, sale)));
 
         // when & then
@@ -73,8 +73,8 @@ class SaleControllerTest {
     @TestConfiguration
     static class TestConfig {
         @Bean
-        PopularSaleFacade popularSaleFacade() {
-            return mock(PopularSaleFacade.class);
+        SaleEventFacade saleEventFacade() {
+            return mock(SaleEventFacade.class);
         }
 
         @Bean

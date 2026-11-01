@@ -16,7 +16,7 @@ import org.example.takecareofmyfridgebe.domain.product.repository.ProductReposit
 import org.example.takecareofmyfridgebe.domain.product.service.ProductService;
 import org.example.takecareofmyfridgebe.domain.sale.service.SaleEventQueryService;
 import org.example.takecareofmyfridgebe.domain.sale.service.SaleEventService;
-import org.example.takecareofmyfridgebe.domain.sale.service.SaleProductReader;
+import org.example.takecareofmyfridgebe.domain.sale.service.FlashDropNotificationService;
 import org.example.takecareofmyfridgebe.domain.sale.dto.FlashDropCreateRequest;
 import org.example.takecareofmyfridgebe.domain.sale.dto.FlashDropItemRequest;
 import org.example.takecareofmyfridgebe.domain.sale.dto.SaleEventDetailResponse;
@@ -46,30 +46,30 @@ import org.springframework.transaction.annotation.Transactional;
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({JpaAuditingConfig.class, QueryDslConfig.class, SaleEventService.class,
-        SaleProductReader.class, SaleEventQueryService.class, SaleEventFacade.class, ProductService.class})
+        SaleEventQueryService.class, FlashDropNotificationService.class, AdminSaleEventFacade.class, ProductService.class})
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
-class SaleEventFacadeTest extends MySqlContainerSupport {
+class AdminAdminSaleEventFacadeTest extends MySqlContainerSupport {
 
     private static final LocalDateTime TOMORROW =
             LocalDateTime.now(ZoneId.of("Asia/Seoul")).plusDays(1).withNano(0);
 
     private final SaleEventService saleEventService;
-    private final SaleEventFacade saleEventFacade;
+    private final AdminSaleEventFacade adminSaleEventFacade;
     private final SaleEventRepository saleEventRepository;
     private final SaleEventItemRepository saleEventItemRepository;
     private final ProductRepository productRepository;
     private final JdbcTemplate jdbcTemplate;
 
     @Autowired
-    SaleEventFacadeTest(
+    AdminAdminSaleEventFacadeTest(
             SaleEventService saleEventService,
-            SaleEventFacade saleEventFacade,
+            AdminSaleEventFacade adminSaleEventFacade,
             SaleEventRepository saleEventRepository,
             SaleEventItemRepository saleEventItemRepository,
             ProductRepository productRepository,
             DataSource dataSource) {
         this.saleEventService = saleEventService;
-        this.saleEventFacade = saleEventFacade;
+        this.adminSaleEventFacade = adminSaleEventFacade;
         this.saleEventRepository = saleEventRepository;
         this.saleEventItemRepository = saleEventItemRepository;
         this.productRepository = productRepository;
@@ -98,7 +98,7 @@ class SaleEventFacadeTest extends MySqlContainerSupport {
         Long eventId = event.getId();
         jdbcTemplate.update("update products set price = 4000 where id = ?", greenOnion.getId());
 
-        SaleEventDetailResponse response = saleEventFacade.getSaleEvent(eventId);
+        SaleEventDetailResponse response = adminSaleEventFacade.getSaleEvent(eventId);
 
         assertThat(response.type()).isEqualTo(SaleEventType.SPECIAL);
         assertThat(response.status()).isEqualTo(SaleEventStatus.SCHEDULED);
@@ -121,7 +121,7 @@ class SaleEventFacadeTest extends MySqlContainerSupport {
         jdbcTemplate.update("update sale_events set status = ? where id = ?", SaleEventStatus.ENDED.name(), eventId);
         jdbcTemplate.update("update products set price = 4000 where id = ?", tofu.getId());
 
-        SaleEventDetailResponse response = saleEventFacade.getSaleEvent(eventId);
+        SaleEventDetailResponse response = adminSaleEventFacade.getSaleEvent(eventId);
 
         assertThat(response.items())
                 .extracting(SaleEventDetailResponse.SaleEventDetailItem::listPrice, SaleEventDetailResponse.SaleEventDetailItem::limitedQuantity,
@@ -132,7 +132,7 @@ class SaleEventFacadeTest extends MySqlContainerSupport {
     @Test
     @DisplayName("없는 행사는 404로 거절한다")
     void getSaleEvent_missing_rejects() {
-        assertThatThrownBy(() -> saleEventFacade.getSaleEvent(999L))
+        assertThatThrownBy(() -> adminSaleEventFacade.getSaleEvent(999L))
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode").isEqualTo(ErrorCode.SALE_EVENT_NOT_FOUND);
     }

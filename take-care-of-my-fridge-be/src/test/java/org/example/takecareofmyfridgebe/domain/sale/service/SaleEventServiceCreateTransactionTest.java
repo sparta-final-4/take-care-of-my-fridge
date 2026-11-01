@@ -21,6 +21,7 @@ import org.example.takecareofmyfridgebe.domain.product.entity.Product;
 import org.example.takecareofmyfridgebe.domain.product.entity.ProductStatus;
 import org.example.takecareofmyfridgebe.domain.product.entity.ProductType;
 import org.example.takecareofmyfridgebe.domain.product.repository.ProductRepository;
+import org.example.takecareofmyfridgebe.domain.product.service.ProductService;
 import org.example.takecareofmyfridgebe.domain.sale.dto.FlashDropCreateRequest;
 import org.example.takecareofmyfridgebe.domain.sale.dto.FlashDropItemRequest;
 import org.example.takecareofmyfridgebe.domain.sale.dto.SaleEventsCreateResponse;
@@ -52,7 +53,7 @@ import org.springframework.transaction.annotation.Transactional;
 // 응답이 아니라 커밋된 행사와 행사 상품을 다시 읽어 확인한다.
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({JpaAuditingConfig.class, QueryDslConfig.class, SaleEventService.class, SaleProductReader.class})
+@Import({JpaAuditingConfig.class, QueryDslConfig.class, SaleEventService.class, ProductService.class})
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class SaleEventServiceCreateTransactionTest extends MySqlContainerSupport {
 

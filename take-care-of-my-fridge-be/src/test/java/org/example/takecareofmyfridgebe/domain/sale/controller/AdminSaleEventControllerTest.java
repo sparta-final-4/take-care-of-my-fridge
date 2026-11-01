@@ -34,7 +34,7 @@ import org.example.takecareofmyfridgebe.domain.sale.entity.SaleEventStatus;
 import org.example.takecareofmyfridgebe.domain.sale.entity.SaleEventType;
 import org.example.takecareofmyfridgebe.domain.sale.dto.SaleEventDetailResponse;
 import org.example.takecareofmyfridgebe.domain.sale.dto.SaleEventUpdateRequest;
-import org.example.takecareofmyfridgebe.domain.sale.facade.SaleEventFacade;
+import org.example.takecareofmyfridgebe.domain.sale.facade.AdminSaleEventFacade;
 import org.example.takecareofmyfridgebe.domain.sale.service.SaleEventQueryService;
 import org.example.takecareofmyfridgebe.domain.sale.service.SaleEventService;
 import java.time.LocalDate;
@@ -75,23 +75,23 @@ class AdminSaleEventControllerTest {
             """;
 
     private final MockMvc mvc;
-    private final SaleEventFacade saleEventFacade;
+    private final AdminSaleEventFacade adminSaleEventFacade;
     private final SaleEventQueryService saleEventQueryService;
     private final SaleEventService saleEventService;
 
     @Autowired
-    AdminSaleEventControllerTest(MockMvc mvc, SaleEventFacade saleEventFacade,
+    AdminSaleEventControllerTest(MockMvc mvc, AdminSaleEventFacade adminSaleEventFacade,
                                  SaleEventQueryService saleEventQueryService,
                                  SaleEventService saleEventService) {
         this.mvc = mvc;
-        this.saleEventFacade = saleEventFacade;
+        this.adminSaleEventFacade = adminSaleEventFacade;
         this.saleEventQueryService = saleEventQueryService;
         this.saleEventService = saleEventService;
     }
 
     @BeforeEach
     void resetMock() {
-        reset(saleEventFacade, saleEventQueryService, saleEventService);
+        reset(adminSaleEventFacade, saleEventQueryService, saleEventService);
     }
 
     @Test
@@ -366,11 +366,11 @@ class AdminSaleEventControllerTest {
     @Test
     @DisplayName("관리자가 행사 하나를 조회하면 시각과 행사 항목을 돌려주고, 없는 행사는 404, 일반 회원은 403이다")
     void getSaleEvent_returns200() throws Exception {
-        when(saleEventFacade.getSaleEvent(5L)).thenReturn(new SaleEventDetailResponse(
+        when(adminSaleEventFacade.getSaleEvent(5L)).thenReturn(new SaleEventDetailResponse(
                 5L, SaleEventType.FLASH_DROP, SaleEventStatus.SCHEDULED,
                 LocalDateTime.of(2099, 10, 1, 18, 0), LocalDateTime.of(2099, 10, 1, 20, 0),
                 List.of(new SaleEventDetailResponse.SaleEventDetailItem(3L, "대파", 3000, 1500, 50, 10, 10))));
-        when(saleEventFacade.getSaleEvent(6L))
+        when(adminSaleEventFacade.getSaleEvent(6L))
                 .thenThrow(new BusinessException(ErrorCode.SALE_EVENT_NOT_FOUND));
 
         mvc.perform(get("/api/admin/sale-events/5").with(loginAs(Member.Role.ADMIN)))
@@ -430,8 +430,8 @@ class AdminSaleEventControllerTest {
     @TestConfiguration
     static class TestConfig {
         @Bean
-        SaleEventFacade saleEventFacade() {
-            return mock(SaleEventFacade.class);
+        AdminSaleEventFacade adminSaleEventFacade() {
+            return mock(AdminSaleEventFacade.class);
         }
 
         @Bean
