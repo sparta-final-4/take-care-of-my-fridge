@@ -34,12 +34,6 @@
   object-fit: cover;
 }
 
-.imagePlaceholder {
-  display: block;
-  width: 100%;
-  height: 100%;
-}
-
 // 할인 구분 태그가 이미지에 붙지 않게 띄운다.
 .saleHead {
   margin-top: var(--ant-margin-xxs);

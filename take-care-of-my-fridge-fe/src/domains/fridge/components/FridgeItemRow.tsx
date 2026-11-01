@@ -1,6 +1,5 @@
 import { CheckCircleOutlined, DeleteOutlined, MoreOutlined } from '@ant-design/icons';
-import { Button, Checkbox, Dropdown, Flex, Popconfirm, Tooltip, Typography } from 'antd';
-import dayjs from 'dayjs';
+import { Button, Checkbox, Dropdown, Flex, Popconfirm, Tag, Tooltip, Typography } from 'antd';
 import { useState } from 'react';
 
 import type { FridgeItemResponse } from '../api';
@@ -13,6 +12,8 @@ interface FridgeItemRowProps {
   item: FridgeItemResponse;
   checked: boolean;
   removing: boolean;
+  // 메인에서 방금 등록한 재료
+  highlighted: boolean;
   onCheck: (checked: boolean) => void;
   onEdit: () => void;
   onConsume: () => void;
@@ -24,17 +25,17 @@ export function FridgeItemRow({
   item,
   checked,
   removing,
+  highlighted,
   onCheck,
   onEdit,
   onConsume,
   onDiscard,
   onDelete,
 }: FridgeItemRowProps) {
-  const isImminent = item.status !== 'NORMAL';
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   return (
-    <div className={styles.row}>
+    <div className={highlighted ? `${styles.row} ${styles.highlighted}` : styles.row}>
       <Checkbox
         checked={checked}
         onChange={(event) => onCheck(event.target.checked)}
@@ -42,25 +43,25 @@ export function FridgeItemRow({
         className={styles.check}
       />
       <div className={styles.nameWrapper}>
-        <Typography.Text
-          strong={checked || isImminent}
-          title={item.rawName}
-          className={styles.name}
-        >
+        <Typography.Text title={item.rawName} className={styles.name}>
           {item.rawName}
         </Typography.Text>
         <IngredientTypeTag type={item.ingredientType} />
+        {highlighted && (
+          <Tag bordered={false} color="blue" className={styles.newTag}>
+            NEW
+          </Tag>
+        )}
       </div>
-      <div className={styles.meta}>
-        <Typography.Text className={styles.metaText}>{formatQuantity(item)}</Typography.Text>
-        <Typography.Text className={styles.date}>
-          {dayjs(item.expirationDate).format('YYYY-MM-DD')}
-        </Typography.Text>
-        <Typography.Text type="secondary" className={styles.metaText}>
-          {item.storage && STORAGE_LABELS[item.storage]}
-        </Typography.Text>
+      <Typography.Text className={styles.quantity}>{formatQuantity(item)}</Typography.Text>
+      <Typography.Text type="secondary" className={styles.storage}>
+        {item.storage && STORAGE_LABELS[item.storage]}
+      </Typography.Text>
+      <div className={styles.badge}>
+        {item.dDay !== undefined && (
+          <DdayTag dDay={item.dDay} expirationDate={item.expirationDate} />
+        )}
       </div>
-      <div className={styles.badge}>{item.dDay !== undefined && <DdayTag dDay={item.dDay} />}</div>
       <Flex className={styles.actions}>
         <Tooltip title="먹었어요">
           <Button

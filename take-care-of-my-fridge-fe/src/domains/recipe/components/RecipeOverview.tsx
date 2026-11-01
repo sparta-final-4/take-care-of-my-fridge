@@ -1,7 +1,7 @@
 import { Flex, Tag, Typography } from 'antd';
 
 import type { RecipeDetailResponse } from '@/common/api/clients';
-import { FadeImage } from '@/common/components/FadeImage';
+import { FallbackImage } from '@/common/components/FallbackImage';
 import { formatRecipeMeta } from '@/domains/recipe/format';
 import type { RecipeFridgeMatch } from '@/domains/recipe/hooks/useRecipeFridgeMatch';
 
@@ -24,11 +24,7 @@ export function RecipeOverview({ recipe, fridgeMatch }: RecipeOverviewProps) {
   return (
     <section className={styles.card}>
       <div className={styles.thumb}>
-        {imageUrl ? (
-          <FadeImage src={imageUrl} alt={name} className={styles.image} />
-        ) : (
-          <span className={styles.imagePlaceholder} aria-hidden="true" />
-        )}
+        <FallbackImage src={imageUrl} alt={name} kind="recipe" className={styles.image} />
       </div>
       <Flex vertical gap="small">
         <Typography.Title level={3} className={styles.name}>

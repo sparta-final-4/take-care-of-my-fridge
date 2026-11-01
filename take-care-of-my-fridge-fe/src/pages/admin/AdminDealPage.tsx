@@ -162,11 +162,18 @@ export default function AdminDealPage() {
       {demo ? '최근 분석 보기' : '임의 할인 이벤트 추천 보기'}
     </Button>
   );
+  const heading = (
+    <Space className={styles.heading}>
+      <Typography.Title level={2}>할인 후보</Typography.Title>
+      {demoToggle}
+      <Button onClick={() => navigate(ROUTES.adminSaleEventNew)}>행사 관리</Button>
+    </Space>
+  );
 
   if (isPending) {
     return (
       <div className={styles.container}>
-        {demoToggle}
+        {heading}
         {runControls}
         <Skeleton active paragraph={{ rows: 8 }} />
       </div>
@@ -176,7 +183,7 @@ export default function AdminDealPage() {
     if (getErrorCode(error) === 'D002') {
       return (
         <div className={styles.container}>
-          {demoToggle}
+          {heading}
           {runControls}
           <Empty
             description={
@@ -188,6 +195,7 @@ export default function AdminDealPage() {
     }
     return (
       <div className={styles.container}>
+        {heading}
         <Result
           status="error"
           title="할인 후보를 불러오지 못했습니다"
@@ -199,11 +207,7 @@ export default function AdminDealPage() {
 
   return (
     <section className={styles.container}>
-      <Space className={styles.heading}>
-        <Typography.Title level={2}>할인 후보</Typography.Title>
-        {demoToggle}
-        <Button onClick={() => navigate(ROUTES.adminSaleEventNew)}>행사 관리</Button>
-      </Space>
+      {heading}
       {runControls}
       <Typography.Paragraph type="secondary">
         {analysis.targetWeekStart} 주 · {analysis.dayOfWeek ? dayLabels[analysis.dayOfWeek] : '-'}

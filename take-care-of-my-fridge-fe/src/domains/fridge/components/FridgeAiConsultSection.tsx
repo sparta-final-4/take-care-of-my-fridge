@@ -3,7 +3,8 @@ import { Button, Flex, Tag, Typography } from 'antd';
 import { SectionCard } from '@/common/components/SectionCard';
 import { useChatModalStore } from '@/domains/chat/model/useChatModalStore';
 
-import { formatDDay } from '../format';
+import { withoutBasicSeasoning } from '../filter';
+import { formatDDayLabel } from '../format';
 import { useFridgeSort } from '../hooks/useFridgeSort';
 import { useFridgeItems } from '../queries';
 import styles from './FridgeAiConsultSection.module.scss';
@@ -12,7 +13,10 @@ export function FridgeAiConsultSection() {
   const openChat = useChatModalStore((state) => state.openChat);
   const [sort] = useFridgeSort();
   const { data } = useFridgeItems(sort, true);
-  const imminentItems = data?.filter((item) => item.status === 'IMMINENT') ?? [];
+  // 밀키트·기본 양념은 메뉴 재료로 쓰지 않으므로 칩에서 뺀다.
+  const imminentItems = withoutBasicSeasoning(data ?? []).filter(
+    (item) => item.status === 'IMMINENT' && item.ingredientType !== 'MEALKIT',
+  );
 
   return (
     <SectionCard title="AI 냉장고 상담">
@@ -22,7 +26,7 @@ export function FridgeAiConsultSection() {
           <Flex wrap gap="xs">
             {imminentItems.map((item) => (
               <Tag key={item.id} className={styles.chip}>
-                {item.rawName} {item.dDay !== undefined && formatDDay(item.dDay)}
+                {item.rawName} {item.dDay !== undefined && formatDDayLabel(item.dDay)}
               </Tag>
             ))}
           </Flex>

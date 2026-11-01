@@ -59,6 +59,12 @@
   flex: 1;
 }
 
+// 추가한 재료가 없을 때 빈 칸 가운데에 연하게 안내한다.
+.stagedEmpty {
+  margin: auto;
+  font-size: var(--ant-font-size-sm);
+}
+
 .stagedItem {
   display: grid;
   grid-template-columns: minmax(0, 1.4fr) minmax(0, 0.8fr) minmax(0, 1.2fr) minmax(0, 0.8fr) auto;

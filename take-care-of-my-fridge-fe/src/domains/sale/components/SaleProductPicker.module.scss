@@ -8,8 +8,7 @@
   width: $sale-type-filter-width;
 }
 
-.thumb,
-.thumbPlaceholder {
+.thumb {
   flex: none;
   width: $sale-thumb-size;
   height: $sale-thumb-size;
@@ -18,10 +17,6 @@
 
 .thumb {
   object-fit: cover;
-}
-
-.thumbPlaceholder {
-  background: var(--ant-color-fill-tertiary);
 }
 
 .row {

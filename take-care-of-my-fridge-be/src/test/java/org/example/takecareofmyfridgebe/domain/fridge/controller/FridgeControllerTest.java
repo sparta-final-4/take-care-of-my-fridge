@@ -97,9 +97,9 @@ class FridgeControllerTest {
     }
 
     /**
-     * 쿼리 파라미터(storage, sort, imminentOnly)를 빈 문자열로 보내고 임의의 memberId 파라미터를 함께 보냈을 때:
+     * 정렬(sort)을 빈 문자열로 보내고 임의의 memberId 파라미터를 함께 보냈을 때:
      * 1) 회원 ID는 요청 파라미터(999)가 아닌 인증 토큰(7L)에서만 꺼내는지
-     * 2) 빈 파라미터들이 기본값(storage=null, sort=EXPIRATION, imminentOnly=false)으로 보정되는지
+     * 2) 빈 정렬이 기본값(EXPIRATION)으로 보정되는지
      * 3) 응답 JSON 필드가 규격대로 직렬화되는지 검증한다.
      */
     @Test
@@ -125,14 +125,12 @@ class FridgeControllerTest {
                 LocalDateTime.of(2026, 10, 18, 12, 0),
                 LocalDateTime.of(2026, 10, 18, 12, 0)
         );
-        when(fridgeService.getItems(7L, null, FridgeSortType.EXPIRATION, false))
+        when(fridgeService.getItems(7L, FridgeSortType.EXPIRATION))
                 .thenReturn(List.of(item));
 
-        // When & Then: 빈 쿼리 파라미터 및 위조된 memberId(999)를 담아 7번 회원으로 인증 요청
+        // When & Then: 빈 정렬 파라미터 및 위조된 memberId(999)를 담아 7번 회원으로 인증 요청
         mvc.perform(get("/api/fridge/items")
-                        .param("storage", "")
                         .param("sort", "")
-                        .param("imminentOnly", "")
                         .param("memberId", "999")
                         .with(authentication(new UsernamePasswordAuthenticationToken(
                                 new AuthSessionService.AuthPrincipal(7L, 8L, Member.Role.USER), null,
@@ -154,18 +152,18 @@ class FridgeControllerTest {
                 .andExpect(jsonPath("$.data[0].expired").value(false))
                 .andExpect(jsonPath("$.data[0].basicSeasoning").value(false));
 
-        // 토큰에서 꺼낸 7L과 기본값들이 서비스에 전달되었는지 검증
-        verify(fridgeService).getItems(7L, null, FridgeSortType.EXPIRATION, false);
+        // 토큰에서 꺼낸 7L과 기본 정렬이 서비스에 전달되었는지 검증
+        verify(fridgeService).getItems(7L, FridgeSortType.EXPIRATION);
     }
 
     /**
-     * 보관방식(FROZEN), 정렬(NAME), 임박 필터(true) 조건을 모두 지정해 요청했을 때
-     * 해당 조건들이 그대로 FridgeService에 전달되는지 검증한다.
+     * 정렬(NAME)을 지정해 요청했을 때 그대로 FridgeService에 전달되고,
+     * 지금은 받지 않는 storage·imminentOnly 파라미터는 무시되는지 검증한다.
      */
     @Test
-    void getItemsWithFiltersPassesParametersToService() throws Exception {
+    void getItemsWithSortPassesSortToServiceAndIgnoresRemovedFilters() throws Exception {
         // Given
-        when(fridgeService.getItems(7L, StorageType.FROZEN, FridgeSortType.NAME, true))
+        when(fridgeService.getItems(7L, FridgeSortType.NAME))
                 .thenReturn(List.of());
 
         // When & Then
@@ -180,25 +178,7 @@ class FridgeControllerTest {
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data").isEmpty());
 
-        verify(fridgeService).getItems(7L, StorageType.FROZEN, FridgeSortType.NAME, true);
-    }
-
-    /**
-     * 정의되지 않은 보관방식(storage) 값을 전달하면
-     * 바인딩 단계에서 거절되어 400 Bad Request(C001)를 반환하는지 검증한다.
-     */
-    @Test
-    void getItemsWithInvalidStorageReturnsBadRequest() throws Exception {
-        mvc.perform(get("/api/fridge/items")
-                        .param("storage", "INVALID_STORAGE")
-                        .with(authentication(new UsernamePasswordAuthenticationToken(
-                                new AuthSessionService.AuthPrincipal(7L, 8L, Member.Role.USER), null,
-                                List.of(new SimpleGrantedAuthority("ROLE_USER"))))))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.error.code").value(ErrorCode.INVALID_INPUT_VALUE.getCode()));
-
-        verifyNoInteractions(fridgeService);
+        verify(fridgeService).getItems(7L, FridgeSortType.NAME);
     }
 
     /**

@@ -3,7 +3,7 @@ import { DownOutlined, UpOutlined } from '@ant-design/icons';
 import { Button, Empty, Flex, Pagination, Select, Space, Tabs, Tag, Typography } from 'antd';
 import dayjs from 'dayjs';
 
-import { FadeImage } from '@/common/components/FadeImage';
+import { FallbackImage } from '@/common/components/FallbackImage';
 
 import type { CookingSortType, CookingTabType, MyRecipeResponse } from '../api';
 import { RecipeCookingHistorySection } from './RecipeCookingHistorySection';
@@ -94,14 +94,12 @@ export function MyRecipeListSection({
                             aria-label={`${item.recipeName ?? '레시피'} 상세 보기`}
                           >
                             <div className={styles.thumbnail}>
-                              {item.recipeImageUrl ? (
-                                <FadeImage
-                                  src={item.recipeImageUrl}
-                                  alt={item.recipeName ?? '레시피'}
-                                />
-                              ) : (
-                                <span className={styles.placeholderImg}>[이미지]</span>
-                              )}
+                              <FallbackImage
+                                src={item.recipeImageUrl}
+                                alt={item.recipeName ?? '레시피'}
+                                kind="recipe"
+                                size="small"
+                              />
                             </div>
                           </button>
                           <div className={styles.recipeInfo}>
