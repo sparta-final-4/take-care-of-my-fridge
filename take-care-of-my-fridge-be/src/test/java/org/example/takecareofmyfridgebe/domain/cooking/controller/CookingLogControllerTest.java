@@ -38,6 +38,7 @@ import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
@@ -181,6 +182,36 @@ class CookingLogControllerTest {
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.cookingLogId").value(100L))
                 .andExpect(jsonPath("$.data.deductions[0].ingredientId").value(3L));
+    }
+
+    /**
+     * 사용 재료에 quantity 키가 없으면 null로 받아 전부 차감 요청으로 넘기는지 검증한다.
+     * 프론트는 [전부]를 고르면 quantity 키를 빼고 보낸다.
+     */
+    @Test
+    void completeCookingWithoutQuantityPassesNullQuantity() throws Exception {
+        when(cookingFacade.completeCooking(eq(7L), any(CookingCompleteRequest.class)))
+                .thenReturn(new CookingCompleteResponse(100L, List.of()));
+
+        mvc.perform(post("/api/cooking-logs")
+                        .with(authentication(auth(7L)))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "recipeId": 12,
+                                  "result": "SUCCESS",
+                                  "usedIngredients": [
+                                    { "ingredientId": 3 }
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isOk());
+
+        verify(cookingFacade).completeCooking(eq(7L), argThat(request ->
+                request.usedIngredients().size() == 1
+                        && request.usedIngredients().get(0).ingredientId().equals(3L)
+                        && request.usedIngredients().get(0).quantity() == null));
     }
 
     /**
