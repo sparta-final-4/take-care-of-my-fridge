@@ -114,7 +114,7 @@ app:
         min-similarity: 0.85
     # 키워드 검색 결과가 0건일 때만 쓰는 벡터 검색. 임베딩을 넣어 재색인한 뒤 켠다
     vector:
-      enabled: ${SEARCH_VECTOR_ENABLED:false}
+      enabled: ${SEARCH_VECTOR_ENABLED:true}
       dimensions: 1536
       # 근거: docs/testing/recipe-vector-fallback-evaluation.md. 0.5 아래는 오답이 빠르게 늘고, 11위부터는 대부분 오답이다
       k: 10

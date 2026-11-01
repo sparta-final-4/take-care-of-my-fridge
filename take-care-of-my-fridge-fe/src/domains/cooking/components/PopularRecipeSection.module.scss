@@ -48,7 +48,7 @@
   justify-content: center;
   width: 24px;
   font-size: var(--ant-font-size-lg);
-  font-weight: 700;
+  font-weight: var(--ant-font-weight-strong);
   color: var(--ant-color-text-tertiary);
   flex-shrink: 0;
 
@@ -105,7 +105,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: var(--ant-font-size-xs);
+  font-size: var(--ant-font-size-sm);
   line-height: 1.4;
   color: var(--ant-color-text-tertiary);
 }

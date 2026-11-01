@@ -36,13 +36,13 @@
 
 .guideIcon {
   color: var(--ant-color-primary);
-  font-size: $review-summary-guide-title-size;
+  font-size: var(--ant-font-size-lg);
   line-height: $review-summary-guide-line-height;
 }
 
 .guideTitle {
   color: var(--ant-color-text);
-  font-size: $review-summary-guide-title-size;
+  font-size: var(--ant-font-size-lg);
   font-weight: var(--ant-font-weight-strong);
   line-height: $review-summary-guide-line-height;
 }

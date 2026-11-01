@@ -52,12 +52,12 @@ export default function LoginPage() {
         냉장고에 남은 재료와 나에게 맞는 메뉴를 확인해 보세요.
       </Typography.Paragraph>
       {errorMessage && (
-        <Alert type="error" message={errorMessage} showIcon className={styles.error} />
+        <Alert type="error" title={errorMessage} showIcon className={styles.error} />
       )}
       {!errorMessage && sessionReason && (
         <Alert
           type="warning"
-          message={
+          title={
             sessionReason === 'suspended'
               ? '계정 이용이 제한되어 로그인이 해제되었습니다.'
               : '로그인이 만료되었습니다. 다시 로그인해 주세요.'

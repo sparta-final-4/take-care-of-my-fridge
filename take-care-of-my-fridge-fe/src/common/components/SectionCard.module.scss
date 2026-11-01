@@ -26,6 +26,11 @@
   font-size: var(--ant-font-size-lg);
 }
 
+// 크기·굵기는 Title level 3을 따르고, 머리 줄 간격은 .header가 정한다.
+:global(.ant-typography).pageTitle {
+  margin: 0;
+}
+
 .extra {
   display: flex;
   align-items: center;

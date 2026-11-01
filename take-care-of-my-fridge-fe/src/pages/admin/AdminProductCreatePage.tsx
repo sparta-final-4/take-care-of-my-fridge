@@ -110,7 +110,7 @@ export default function AdminProductCreatePage() {
             <Alert
               type="info"
               showIcon
-              message="연결할 재료의 ID를 입력해 주세요."
+              title="연결할 재료의 ID를 입력해 주세요."
               className={styles.notice}
             />
             <Form.Item

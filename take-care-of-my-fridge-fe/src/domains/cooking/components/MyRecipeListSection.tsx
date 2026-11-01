@@ -1,6 +1,6 @@
-import { Fragment } from 'react';
-import { DownOutlined, UpOutlined } from '@ant-design/icons';
-import { Button, Empty, Flex, Pagination, Select, Space, Tabs, Tag, Typography } from 'antd';
+import { Fragment, type MouseEvent } from 'react';
+import { DownOutlined, EditOutlined, UpOutlined } from '@ant-design/icons';
+import { Button, Empty, Flex, Pagination, Select, Tabs, Tag, Tooltip, Typography } from 'antd';
 import dayjs from 'dayjs';
 
 import { FallbackImage } from '@/common/components/FallbackImage';
@@ -16,6 +16,9 @@ export interface MyRecipeListSectionProps {
   unreviewedCount: number;
   reviewedCount: number;
   totalCookCount: number;
+  consumedIngredientCount: number;
+  // 요리 기록이 없으면 없다. 요약 줄에서 이 항목만 뺀다.
+  mostCookedRecipe?: { name: string; cookCount: number };
   currentTab: CookingTabType;
   currentSort: CookingSortType;
   expandedRecipeId: number | null;
@@ -36,6 +39,8 @@ export function MyRecipeListSection({
   unreviewedCount,
   reviewedCount,
   totalCookCount,
+  consumedIngredientCount,
+  mostCookedRecipe,
   currentTab,
   currentSort,
   expandedRecipeId,
@@ -70,20 +75,25 @@ export function MyRecipeListSection({
                   마지막 요리
                 </th>
                 <th scope="col" className={styles.thReview}>
-                  내 후기
+                  내 별점
                 </th>
-                <th scope="col" className={styles.thActions} aria-label="액션" />
               </tr>
             </thead>
             <tbody>
               {recipes.map((item) => {
                 const recipeId = item.recipeId ?? 0;
                 const isExpanded = expandedRecipeId === recipeId;
-                const hasReview = Boolean(item.review);
+
+                // 줄의 빈 곳을 눌러도 펼치기/접기. 사진·이름·[후기 쓰기]·요리 횟수 버튼은 각자 동작만 한다.
+                // 키보드는 요리 횟수 버튼으로 같은 동작을 할 수 있다.
+                const handleRowClick = (event: MouseEvent<HTMLTableRowElement>) => {
+                  if (event.target instanceof Element && event.target.closest('button, a')) return;
+                  onToggleExpand(recipeId);
+                };
 
                 return (
                   <Fragment key={recipeId}>
-                    <tr className={styles.dataRow}>
+                    <tr className={styles.dataRow} onClick={handleRowClick}>
                       {/* 레시피 정보 (이미지, 배지, 이름) */}
                       <td className={styles.tdRecipe}>
                         <div className={styles.recipeCell}>
@@ -145,51 +155,32 @@ export function MyRecipeListSection({
                         </Typography.Text>
                       </td>
 
-                      {/* 내 후기 (별점 또는 미작성 배지) */}
+                      {/* 내 별점: 쓴 줄은 별점만(수정은 펼친 영역에서), 안 쓴 줄은 [후기 쓰기] */}
                       <td className={styles.tdReview}>
-                        {hasReview && item.review ? (
-                          <span className={styles.ratingText}>★ {item.review.rating ?? 0}</span>
+                        {item.review ? (
+                          <span className={styles.ratingText}>
+                            <span className={styles.ratingStar} aria-hidden="true">
+                              ★
+                            </span>{' '}
+                            {item.review.rating ?? 0}
+                          </span>
                         ) : (
-                          <Tag className={styles.unreviewedTag}>미작성</Tag>
-                        )}
-                      </td>
-
-                      {/* 버튼들: [레시피 보기], [후기 쓰기 / 후기 수정] */}
-                      <td className={styles.tdActions}>
-                        <Space size="small">
                           <Button
-                            type="default"
-                            size="middle"
-                            onClick={() => onViewRecipe(recipeId)}
+                            color="primary"
+                            variant="outlined"
+                            size="small"
+                            onClick={() => onOpenReviewModal(item)}
                           >
-                            레시피 보기
+                            후기 쓰기
                           </Button>
-                          {hasReview ? (
-                            <Button
-                              type="default"
-                              size="middle"
-                              onClick={() => onOpenReviewModal(item)}
-                            >
-                              후기 수정
-                            </Button>
-                          ) : (
-                            <Button
-                              color="default"
-                              variant="solid"
-                              size="middle"
-                              onClick={() => onOpenReviewModal(item)}
-                            >
-                              후기 쓰기
-                            </Button>
-                          )}
-                        </Space>
+                        )}
                       </td>
                     </tr>
 
                     {/* 아코디언 펼침 내용: 내 후기 + 요리 기록 */}
                     {isExpanded && (
                       <tr className={styles.expandedRow}>
-                        <td colSpan={5} className={styles.expandedCell}>
+                        <td colSpan={4} className={styles.expandedCell}>
                           <div className={styles.expandedPanel}>
                             {/* 내 후기 영역 */}
                             {item.review ? (
@@ -198,19 +189,41 @@ export function MyRecipeListSection({
                                   내 후기
                                 </Typography.Text>
                                 <div className={styles.detailReviewContent}>
-                                  <Flex align="center" gap="small" className={styles.reviewHeader}>
+                                  {/* 별점 · 내용 · 연필 · "MM.DD 수정됨"을 한 줄로 붙여 둔다(넘치면 다음 줄로). */}
+                                  <Flex
+                                    align="center"
+                                    gap="small"
+                                    wrap="wrap"
+                                    className={styles.reviewHeader}
+                                  >
                                     <span className={styles.ratingText}>
-                                      ★ {item.review.rating ?? 0}
+                                      <span className={styles.ratingStar} aria-hidden="true">
+                                        ★
+                                      </span>{' '}
+                                      {item.review.rating ?? 0}
                                     </span>
                                     <Typography.Text className={styles.reviewText}>
                                       &ldquo;{item.review.content}&rdquo;
                                     </Typography.Text>
+                                    {/* 요리 기록 수정 연필과 같은 모양 */}
+                                    <Tooltip title="후기 수정">
+                                      <Button
+                                        type="text"
+                                        size="small"
+                                        icon={<EditOutlined />}
+                                        aria-label={`${item.recipeName ?? '레시피'} 후기 수정`}
+                                        onClick={() => onOpenReviewModal(item)}
+                                      />
+                                    </Tooltip>
+                                    {item.review.updatedAt && (
+                                      <Typography.Text
+                                        type="secondary"
+                                        className={styles.reviewDate}
+                                      >
+                                        {dayjs(item.review.updatedAt).format('MM.DD')} 수정됨
+                                      </Typography.Text>
+                                    )}
                                   </Flex>
-                                  {item.review.updatedAt && (
-                                    <Typography.Text type="secondary" className={styles.reviewDate}>
-                                      {dayjs(item.review.updatedAt).format('MM.DD')} 수정됨
-                                    </Typography.Text>
-                                  )}
                                 </div>
                               </div>
                             ) : null}
@@ -272,18 +285,25 @@ export function MyRecipeListSection({
     },
   ];
 
+  // 가장 많이 만든 레시피는 이름만 값으로 두고 횟수는 덧붙임(" · 5회")으로 뺀다. 요리 기록이 없으면 '-'로 칸 자리를 지킨다.
+  const stats: { label: string; value: string; suffix?: string }[] = [
+    { label: '요리한 레시피', value: `${allCount}개` },
+    { label: '요리 완료', value: `${totalCookCount}번` },
+    { label: '요리에 쓴 재료', value: `${consumedIngredientCount}종` },
+    {
+      label: '가장 많이 만든 레시피',
+      value: mostCookedRecipe?.name ?? '-',
+      suffix: mostCookedRecipe ? `· ${mostCookedRecipe.cookCount}회` : undefined,
+    },
+  ];
+
   return (
     <section className={styles.section} aria-label="내 레시피 관리">
-      {/* 상단 헤더: 제목 및 요약 정보, 정렬 */}
+      {/* 상단 헤더: 제목, 정렬 */}
       <div className={styles.header}>
-        <div>
-          <Typography.Title level={4} className={styles.title}>
-            내 레시피 관리
-          </Typography.Title>
-          <Typography.Text type="secondary" className={styles.subtitle}>
-            요리 완료한 레시피 {allCount}개 · 총 {totalCookCount}번 요리
-          </Typography.Text>
-        </div>
+        <Typography.Title level={3} className={styles.title}>
+          내 레시피 관리
+        </Typography.Title>
         <Select<CookingSortType>
           value={currentSort}
           onChange={onSortChange}
@@ -295,13 +315,28 @@ export function MyRecipeListSection({
         />
       </div>
 
+      {/* 요약 칸: 설명(위, 12 회색) → 값(아래, 16 / 600) */}
+      <dl className={styles.stats}>
+        {stats.map((stat) => (
+          <div key={stat.label} className={styles.statItem}>
+            <dt className={styles.statLabel}>{stat.label}</dt>
+            <dd className={styles.statValue}>
+              <span className={styles.statMain} title={stat.value}>
+                {stat.value}
+              </span>
+              {stat.suffix && <span className={styles.statSuffix}>{stat.suffix}</span>}
+            </dd>
+          </div>
+        ))}
+      </dl>
+
       {/* 탭 및 목록 컨텐츠 */}
       <Tabs
         activeKey={currentTab}
         onChange={(key) => onTabChange(key as CookingTabType)}
         items={tabItems}
         className={styles.tabs}
-        destroyInactiveTabPane
+        destroyOnHidden
       />
     </section>
   );

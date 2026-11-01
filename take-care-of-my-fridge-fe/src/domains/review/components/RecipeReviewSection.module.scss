@@ -18,11 +18,11 @@
 }
 
 .summaryTitle {
-  font-size: 14px;
+  font-size: var(--ant-font-size-lg);
 }
 
 .summaryNotice {
-  font-size: 12px;
+  font-size: var(--ant-font-size-sm);
 }
 
 .summaryContent {
@@ -52,7 +52,7 @@
 
 .myReviewBadge {
   color: var(--ant-color-primary-text);
-  font-size: 13px;
+  font-size: var(--ant-font-size-sm);
 }
 
 .reviewItem {

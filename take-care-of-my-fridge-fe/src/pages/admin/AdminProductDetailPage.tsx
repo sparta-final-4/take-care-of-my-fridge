@@ -51,7 +51,7 @@ function AdminProductDetail({ productId }: { productId: number }) {
     );
   }
 
-  if (isPending || !data) return <Spin tip="상품 정보를 불러오고 있습니다" />;
+  if (isPending || !data) return <Spin description="상품 정보를 불러오고 있습니다" />;
 
   const detail = data;
   return (

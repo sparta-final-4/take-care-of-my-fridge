@@ -103,13 +103,13 @@ export default function SignUpPage() {
         계정을 만들고 냉장고를 시작해 보세요.
       </Typography.Paragraph>
       {availabilityError && (
-        <Alert type="error" message={availabilityError} className={styles.error} />
+        <Alert type="error" title={availabilityError} className={styles.error} />
       )}
       {signupMutation.error &&
         !['M001', 'M002', 'M009'].includes(getErrorCode(signupMutation.error) ?? '') && (
           <Alert
             type="error"
-            message={getErrorMessage(signupMutation.error)}
+            title={getErrorMessage(signupMutation.error)}
             className={styles.error}
           />
         )}

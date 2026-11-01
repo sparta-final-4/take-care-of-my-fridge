@@ -232,7 +232,7 @@ export default function AdminDealPage() {
         <Alert
           type="warning"
           showIcon
-          message={
+          title={
             demoAvailable
               ? '시연용 수치이며 모델 결과가 아닙니다. 등록하면 dev 상품에 실제 할인이 적용됩니다.'
               : '가상 데이터 분석 결과는 행사에 등록할 수 없습니다.'
@@ -339,7 +339,7 @@ export default function AdminDealPage() {
           },
         ]}
       />
-      <Typography.Title level={4} className={styles.excludedTitle}>
+      <Typography.Title level={5} className={styles.excludedTitle}>
         제외 상품
       </Typography.Title>
       <Table<Excluded>
@@ -372,7 +372,7 @@ export default function AdminDealPage() {
           form.resetFields();
         }}
         destroyOnHidden
-        width="min(440px, 100vw)"
+        size="min(440px, 100vw)"
       >
         <Typography.Paragraph>
           추천 할인율 {analysis.discountRate}% · 분석 당시 예상 할인가{' '}

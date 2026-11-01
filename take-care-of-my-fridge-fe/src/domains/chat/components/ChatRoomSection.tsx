@@ -310,7 +310,7 @@ export function ChatRoomSection({
           )}
         </header>
         <Flex justify="center" align="center" style={{ flex: 1 }}>
-          <Spin size="default" tip="상담 세션을 불러오는 중..." />
+          <Spin size="default" description="상담 세션을 불러오는 중..." />
         </Flex>
       </div>
     );
@@ -360,7 +360,7 @@ export function ChatRoomSection({
             <Button
               type="link"
               size="small"
-              style={{ padding: 0, height: 'auto', fontSize: 11.5 }}
+              style={{ padding: 0, height: 'auto', fontSize: 'var(--ant-font-size-sm)' }}
               onClick={handleStartNewSession}
               loading={startSessionMutation.isPending}
             >
@@ -380,7 +380,7 @@ export function ChatRoomSection({
         <div ref={containerRef} onScroll={handleScroll} className={styles.messageArea}>
           {isMessagesLoading ? (
             <Flex justify="center" align="center" style={{ flex: 1 }}>
-              <Spin tip="대화 기록을 불러오는 중..." />
+              <Spin description="대화 기록을 불러오는 중..." />
             </Flex>
           ) : messagesData && messagesData.length > 0 ? (
             messagesData.map((msg) => (

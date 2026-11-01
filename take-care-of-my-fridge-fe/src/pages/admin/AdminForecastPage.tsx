@@ -103,7 +103,7 @@ export default function AdminForecastPage() {
 
       {isPending ? (
         <div className={styles.loading}>
-          <Spin tip="판매 예측을 불러오고 있습니다" />
+          <Spin description="판매 예측을 불러오고 있습니다" />
         </div>
       ) : isError || !data ? (
         !isError || getErrorCode(error) === 'F001' ? (
@@ -124,15 +124,15 @@ export default function AdminForecastPage() {
           />
         )
       ) : (
-        <Spin spinning={isPlaceholderData} tip="판매 예측을 불러오고 있습니다">
-          <Typography.Title level={4}>
+        <Spin spinning={isPlaceholderData} description="판매 예측을 불러오고 있습니다">
+          <Typography.Title level={5}>
             {data.weekStart} ~ {data.weekEnd}
           </Typography.Title>
           {data.syntheticData && (
             <Alert
               type="warning"
               showIcon
-              message="시연용 예측·실적 수치입니다. 실제 모델의 예측 결과가 아닙니다."
+              title="시연용 예측·실적 수치입니다. 실제 모델의 예측 결과가 아닙니다."
               className={styles.notice}
             />
           )}

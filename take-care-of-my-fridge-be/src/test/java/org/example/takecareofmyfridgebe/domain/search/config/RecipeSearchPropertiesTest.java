@@ -83,16 +83,17 @@ class RecipeSearchPropertiesTest extends MySqlContainerSupport {
     }
 
     @Test
-    @DisplayName("벡터 검색 설정이 바인딩되고 기본값은 꺼져 있다")
+    @DisplayName("벡터 검색 설정이 바인딩되고 기본값은 켜져 있다")
     void bindsVectorProperties() {
         RecipeSearchProperties.VectorProperties vector = properties.vector();
 
-        assertFalse(vector.enabled());
+        assertTrue(vector.enabled());
         assertEquals(1536, vector.dimensions());
         assertEquals(10, vector.k());
         assertEquals(100, vector.numCandidates());
         assertEquals(0.5f, vector.minSimilarity());
         assertEquals(100, vector.batchSize());
+        // 테스트는 MySQL 검색이라 벡터 검색을 켜도 쓰지 않는다
         assertFalse(properties.useVector());
     }
 }

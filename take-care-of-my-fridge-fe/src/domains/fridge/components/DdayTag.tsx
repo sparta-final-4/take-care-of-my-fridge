@@ -14,7 +14,7 @@ export function DdayTag({ dDay, expirationDate }: DdayTagProps) {
   const color = ddayTagColor(dDay);
   const tag = (
     <Tag
-      bordered={false}
+      variant="filled"
       color={color}
       className={color ? styles.tag : `${styles.tag} ${styles.plain}`}
     >

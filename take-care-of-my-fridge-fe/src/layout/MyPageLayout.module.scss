@@ -1,6 +1,7 @@
 @use '@/styles/variables' as *;
 @use '@/styles/mixins' as *;
 
+// 왼쪽 메뉴 카드와 오른쪽 내용 카드는 둘 다 맨 위에서 시작해 윗선이 맞는다.
 .container {
   display: flex;
   flex-direction: column;
@@ -14,82 +15,80 @@
   }
 }
 
+// md부터 스크롤해도 고정 헤더 바로 아래에 붙어 따라온다.
 .sidebar {
-  border: 1px solid var(--ant-color-border-secondary);
-  border-radius: var(--ant-border-radius-lg);
-  background-color: var(--ant-color-bg-container);
-  padding: var(--ant-padding);
-
   @include from(md) {
-    width: 220px;
+    position: sticky;
+    top: calc(#{$header-height} + var(--ant-margin));
+    width: $mypage-sidebar-width;
     flex-shrink: 0;
-    padding: var(--ant-padding-lg);
   }
 }
 
-.title {
-  margin: 0 0 var(--ant-margin-sm) !important;
-  font-size: var(--ant-font-size-lg) !important;
-  font-weight: 700 !important;
-  color: var(--ant-color-text-heading);
-
-  @include from(md) {
-    margin-bottom: var(--ant-margin-lg) !important;
-  }
-}
-
+// 모바일은 가로 한 줄(넘치면 가로 스크롤), md부터 세로 목록.
+// 항목 안쪽 여백만큼 바깥으로 빼서 아이콘이 카드 제목과 같은 선에서 시작한다.
 .nav {
   display: flex;
+  margin: 0 calc(-1 * var(--ant-padding-sm));
   flex-direction: row;
-  gap: var(--ant-margin-xs);
+  gap: var(--ant-margin-xxs);
   overflow-x: auto;
   white-space: nowrap;
   -webkit-overflow-scrolling: touch;
-  padding-bottom: 2px;
 
   @include from(md) {
     flex-direction: column;
-    gap: var(--ant-margin-sm);
     overflow-x: visible;
     white-space: normal;
-    padding-bottom: 0;
   }
 }
 
+// 알약 모양. 모서리를 높이만큼 둥글게 해 높이와 상관없이 양끝이 반원이 된다.
 .navItem {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ant-margin-xs);
   flex-shrink: 0;
-  padding: 8px 14px;
-  border-radius: var(--ant-border-radius);
-  border: 1px solid var(--ant-color-border);
-  background-color: var(--ant-color-bg-container);
-  color: var(--ant-color-text);
+  min-height: $touch-target-size;
+  padding: 0 var(--ant-padding-sm);
+  border-radius: $touch-target-size;
+  color: var(--ant-color-text-secondary);
   font-size: var(--ant-font-size);
-  font-weight: 500;
-  text-align: center;
   text-decoration: none;
-  transition: all 0.2s ease-in-out;
+  transition:
+    color var(--ant-motion-duration-mid),
+    background-color var(--ant-motion-duration-mid);
 
   &:hover {
     color: var(--ant-color-text);
-    border-color: var(--ant-color-text-secondary);
+    background-color: var(--ant-color-fill-tertiary);
+  }
+
+  &:focus-visible {
+    outline: var(--ant-line-width-focus) solid var(--ant-color-primary-border);
+    outline-offset: calc(-1 * var(--ant-line-width-focus));
   }
 
   @include from(md) {
-    display: block;
+    display: flex;
     width: 100%;
-    padding: 12px 16px;
+    min-height: $mypage-nav-item-height;
   }
 }
 
+.navIcon {
+  display: inline-flex;
+  font-size: var(--ant-font-size);
+}
+
 .navItemActive {
-  background-color: #1f1f1f;
-  color: #ffffff;
-  border-color: #1f1f1f;
+  background-color: var(--ant-color-primary-bg);
+  color: var(--ant-color-primary);
+  font-weight: var(--ant-font-weight-strong);
 
   &:hover {
-    color: #ffffff;
-    border-color: #1f1f1f;
+    color: var(--ant-color-primary);
+    background-color: var(--ant-color-primary-bg-hover);
   }
 }
 

@@ -1,5 +1,5 @@
 @use '@/styles/variables' as *;
 
 .text {
-  font-size: 15px;
+  font-size: var(--ant-font-size);
 }

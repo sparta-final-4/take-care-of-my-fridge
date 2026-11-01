@@ -14,7 +14,7 @@ interface FridgeLogActionTagProps {
 export function FridgeLogActionTag({ action, cookedByRecipe }: FridgeLogActionTagProps) {
   if (cookedByRecipe) {
     return (
-      <Tag bordered={false} color="processing" icon={<FireOutlined />} className={styles.tag}>
+      <Tag variant="filled" color="processing" icon={<FireOutlined />} className={styles.tag}>
         요리했어요
       </Tag>
     );
@@ -22,14 +22,14 @@ export function FridgeLogActionTag({ action, cookedByRecipe }: FridgeLogActionTa
 
   if (action === 'DISCARDED') {
     return (
-      <Tag bordered={false} color="default" icon={<DeleteOutlined />} className={styles.tag}>
+      <Tag variant="filled" color="default" icon={<DeleteOutlined />} className={styles.tag}>
         버렸어요
       </Tag>
     );
   }
 
   return (
-    <Tag bordered={false} color="success" icon={<CheckCircleOutlined />} className={styles.tag}>
+    <Tag variant="filled" color="success" icon={<CheckCircleOutlined />} className={styles.tag}>
       먹었어요
     </Tag>
   );

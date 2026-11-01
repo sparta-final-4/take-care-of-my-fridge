@@ -8,6 +8,10 @@ $breakpoints: (
 
 $content-max-width: 1200px;
 $header-height: 64px;
+
+// 마이페이지 왼쪽 메뉴. 메뉴 한 줄 높이(md 이상, 모바일은 터치 영역 크기)
+$mypage-sidebar-width: 220px;
+$mypage-nav-item-height: 40px;
 // 관리자 헤더 로그아웃 버튼의 닉네임 최대 너비(xl 1200px에서 관리자 메뉴와 한 줄에 들어가는 너비)
 $header-nickname-max-width: 96px;
 
@@ -15,13 +19,14 @@ $header-nickname-max-width: 96px;
 $date-min-width: 10ch;
 
 // 레시피 관리 고정 치수
-$recipe-thumb-size: 54px;
+$recipe-thumb-size: 56px;
 $recipe-sort-select-width: 130px;
+// 내 레시피 관리 표. 좁은 화면에서는 이보다 줄이지 않고 가로 스크롤한다(레시피 이름 칸이 최소한 남는 너비).
+$recipe-table-min-width: 520px;
 $history-date-width: 44px;
 
-// 12px(var(--ant-font-size-sm)) 미만의 소형 텍스트/아이콘 치수
+// 12px(var(--ant-font-size-sm))보다 작은 아이콘 치수. 글자는 antd 단계(12 / 14 / 16 / 20 / 24 / 30)만 쓴다.
 $font-size-2xs: 10px;
-$font-size-xs: 11px;
 
 // 장바구니 줄
 $cart-thumb-size: 72px;
@@ -96,8 +101,7 @@ $page-enter-offset: 4px;
 // 관리자 후기 요약 표의 요약 칸. 한 줄 말줄임이 되도록 최대 너비를 고정
 $review-summary-text-max-width: 320px;
 
-// 관리자 후기 요약 안내 칸. 제목 15px(antd 기본 14px와 16px 사이), 설명 줄 간격
-$review-summary-guide-title-size: 15px;
+// 관리자 후기 요약 안내 칸 설명 줄 간격
 $review-summary-guide-line-height: 1.6;
 
 // 정산 차트 높이

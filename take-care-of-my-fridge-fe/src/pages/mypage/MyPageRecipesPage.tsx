@@ -11,7 +11,6 @@ import {
 } from '@/common/api/clients';
 import type { CookingSortType, CookingTabType } from '@/domains/cooking/api';
 import { cookingQueries } from '@/domains/cooking/queries';
-import { MyCookingSummaryCards } from '@/domains/cooking/components/MyCookingSummaryCards';
 import { MyRecipeListSection } from '@/domains/cooking/components/MyRecipeListSection';
 import { ReviewModal, type InitialReviewData } from '@/domains/review/components/ReviewModal';
 
@@ -131,7 +130,7 @@ export default function MyPageRecipesPage() {
     setReviewModalState((prev) => ({ ...prev, open: false }));
   };
 
-  // [레시피 보기] 및 레시피 이름 클릭 시 레시피 상세 화면으로 이동
+  // 레시피 사진·이름 클릭 시 레시피 상세 화면으로 이동
   const handleViewRecipe = (recipeId: number) => {
     navigate(generatePath(ROUTES.recipeDetail, { recipeId: String(recipeId) }));
   };
@@ -156,13 +155,15 @@ export default function MyPageRecipesPage() {
     );
   }
 
-  // 하단 지금까지 요리 기록 카드용 요약 데이터 (전체 데이터 기준)
-  const bottomSummary = {
-    completedCookCount: totalCookCount,
-    consumedIngredientCount: Number(summary?.consumedIngredientCount ?? 0),
-    mostCookedRecipeName: summary?.mostCookedRecipe?.recipeName || '-',
-    mostCookedRecipeCount: Number(summary?.mostCookedRecipe?.cookCount ?? 0),
-  };
+  // 제목 아래 요약 줄용 (전체 데이터 기준). 가장 많이 만든 레시피가 없으면 그 항목만 뺀다.
+  const consumedIngredientCount = Number(summary?.consumedIngredientCount ?? 0);
+  const mostCookedRecipeName = summary?.mostCookedRecipe?.recipeName;
+  const mostCookedRecipe = mostCookedRecipeName
+    ? {
+        name: mostCookedRecipeName,
+        cookCount: Number(summary?.mostCookedRecipe?.cookCount ?? 0),
+      }
+    : undefined;
 
   return (
     <div className={styles.container}>
@@ -173,6 +174,8 @@ export default function MyPageRecipesPage() {
         unreviewedCount={unreviewedCount}
         reviewedCount={reviewedCount}
         totalCookCount={totalCookCount}
+        consumedIngredientCount={consumedIngredientCount}
+        mostCookedRecipe={mostCookedRecipe}
         currentTab={tab}
         currentSort={sort}
         expandedRecipeId={expandedRecipeId}
@@ -187,14 +190,7 @@ export default function MyPageRecipesPage() {
         onViewRecipe={handleViewRecipe}
       />
 
-      {/* 2. 하단 지금까지 요리 기록 & 후기 유도 카드 */}
-      <MyCookingSummaryCards
-        summary={bottomSummary}
-        unreviewedCount={unreviewedCount}
-        onGoToUnreviewed={() => handleTabChange('UNREVIEWED')}
-      />
-
-      {/* 3. 후기 쓰기/수정 모달 (저장 성공 시 cookingQueries.all 무효화) */}
+      {/* 2. 후기 쓰기/수정 모달 (저장 성공 시 cookingQueries.all 무효화) */}
       <ReviewModal
         open={reviewModalState.open}
         recipeId={reviewModalState.recipeId}

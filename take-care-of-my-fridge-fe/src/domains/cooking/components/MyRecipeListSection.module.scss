@@ -14,27 +14,82 @@
 .header {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: var(--ant-margin-lg);
+  align-items: center;
+  gap: var(--ant-margin-sm);
+  margin-bottom: var(--ant-margin);
 
+  // 크기·굵기는 Title level 3(마이페이지 화면 제목 24px / 600)을 따른다.
   :global(.ant-typography).title {
-    margin: 0 0 var(--ant-margin-xxs);
-    font-size: var(--ant-font-size-xl);
-    font-weight: var(--ant-font-weight-strong);
+    margin: 0;
   }
 }
 
-.subtitle {
+// 요약 칸. 모바일 2칸 × 2줄, md부터 4칸 한 줄
+.stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--ant-margin-sm);
+  margin: 0 0 var(--ant-margin-lg);
+
+  @include from(md) {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+// 읽는 순서는 설명 → 값, 보이는 순서는 값 → 설명
+.statItem {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ant-margin-xxs);
+  min-width: 0;
+  padding: var(--ant-padding-sm) var(--ant-padding);
+  border-radius: var(--ant-border-radius);
+  background: var(--ant-color-bg-layout);
+}
+
+.statLabel {
   font-size: var(--ant-font-size-sm);
+  color: var(--ant-color-text-secondary);
+}
+
+// 값(16 / 600) 뒤에 덧붙임(" · 5회", 14 회색)이 오면 덧붙임은 그대로 두고 값만 말줄임한다.
+.statValue {
+  display: flex;
+  align-items: baseline;
+  gap: var(--ant-margin-xxs);
+  min-width: 0;
+  margin: 0;
+  white-space: nowrap;
+}
+
+.statMain {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: var(--ant-font-size-lg);
+  font-weight: var(--ant-font-weight-strong);
+  color: var(--ant-color-text);
+}
+
+.statSuffix {
+  flex-shrink: 0;
+  font-size: var(--ant-font-size);
+  color: var(--ant-color-text-secondary);
 }
 
 .sortSelect {
+  flex-shrink: 0;
   width: $recipe-sort-select-width;
 }
 
 /* 탭 */
 .tabs {
   margin-bottom: var(--ant-margin-md);
+
+  // antd는 선택된 탭도 400이라, 선택된 탭만 600으로 올린다(색은 antd 기본 브랜드색).
+  :global(.ant-tabs-tab-active .ant-tabs-tab-btn) {
+    font-weight: var(--ant-font-weight-strong);
+  }
 }
 
 .tabCount {
@@ -55,23 +110,25 @@
 
 .table {
   width: 100%;
-  min-width: 680px;
+  min-width: $recipe-table-min-width;
+  table-layout: fixed;
   border-collapse: collapse;
 
   thead tr {
     border-bottom: 1px solid var(--ant-color-border-secondary);
   }
 
+  // 이 화면 표 머리는 내용(14)과 구분되게 12 / 400 회색. th 기본 굵게를 풀어 준다.
   th {
     padding: var(--ant-padding-xs) var(--ant-padding-sm);
     font-size: var(--ant-font-size-sm);
-    font-weight: var(--ant-font-weight-strong);
+    font-weight: normal;
     color: var(--ant-color-text-secondary);
     text-align: left;
   }
 
   td {
-    padding: var(--ant-padding-sm);
+    padding: var(--ant-padding-xxs) var(--ant-padding-sm);
     vertical-align: middle;
   }
 
@@ -80,41 +137,45 @@
   }
 }
 
+// 레시피 45%, 나머지 세 칸이 남은 폭을 똑같이 나눈다. 고정 레이아웃이라 긴 이름이 표를 넓히지 않고 말줄임된다.
 .thRecipe,
 .tdRecipe {
-  width: 32%;
+  width: 45%;
 }
 
 .thCookCount,
-.tdCookCount {
-  width: 14%;
+.tdCookCount,
+.thLastCooked,
+.tdLastCooked,
+.thReview,
+.tdReview {
+  width: calc(55% / 3);
+  white-space: nowrap;
 }
 
-.thLastCooked,
+// 숫자·날짜·후기는 가운데 정렬(`.table th`의 왼쪽 정렬보다 우선)
+.table .thCookCount,
+.table .thLastCooked,
+.table .thReview,
+.table .tdCookCount,
+.table .tdLastCooked,
+.table .tdReview {
+  text-align: center;
+}
+
 .tdLastCooked {
-  width: 14%;
   font-size: var(--ant-font-size);
 }
 
-.thReview,
-.tdReview {
-  width: 14%;
-}
-
-.thActions,
-.tdActions {
-  width: 26%;
-  text-align: right;
-}
-
-.tdActions {
-  :global(.ant-space) {
-    justify-content: flex-end;
-  }
-}
-
+// 줄 어디를 눌러도 펼치기/접기
 .dataRow {
   border-bottom: 1px solid var(--ant-color-border-secondary);
+  cursor: pointer;
+  transition: background-color var(--ant-motion-duration-mid);
+
+  &:hover {
+    background-color: var(--ant-color-fill-quaternary);
+  }
 }
 
 .expandedRow {
@@ -162,7 +223,7 @@
 .aiTag {
   width: fit-content;
   margin: 0;
-  font-size: $font-size-xs;
+  font-size: var(--ant-font-size-sm);
   line-height: var(--ant-line-height);
   padding: 0 var(--ant-padding-xxs);
   border-radius: var(--ant-border-radius-sm);
@@ -185,7 +246,6 @@
   text-align: left;
   cursor: pointer;
   font-size: var(--ant-font-size);
-  font-weight: var(--ant-font-weight-strong);
   color: var(--ant-color-text);
   white-space: nowrap;
   overflow: hidden;
@@ -221,18 +281,11 @@
 
 .ratingText {
   font-size: var(--ant-font-size);
-  font-weight: var(--ant-font-weight-strong);
   color: var(--ant-color-text);
 }
 
-.unreviewedTag {
-  margin: 0;
-  padding: 2px var(--ant-padding-xs);
-  border-radius: var(--ant-control-height);
-  font-size: var(--ant-font-size-sm);
-  background: var(--ant-color-fill-secondary);
-  border: 1px solid var(--ant-color-border);
-  color: var(--ant-color-text-secondary);
+.ratingStar {
+  color: var(--ant-color-warning);
 }
 
 /* 펼쳐진 서브 패널 */
@@ -254,7 +307,6 @@
 
 .detailLabel {
   font-size: var(--ant-font-size-sm);
-  font-weight: var(--ant-font-weight-strong);
 }
 
 .detailReviewContent {
@@ -265,10 +317,12 @@
   gap: var(--ant-margin-xs);
 }
 
+// 내 후기 줄과 요리 기록 줄(.historyItem)은 같은 글자 크기(14)·간격(8)
 .reviewHeader {
   display: flex;
   align-items: center;
   gap: var(--ant-margin-xs);
+  font-size: var(--ant-font-size);
 }
 
 .reviewText {
@@ -295,48 +349,41 @@
 .historyItem {
   display: flex;
   align-items: center;
-  gap: var(--ant-margin-sm);
-  font-size: var(--ant-font-size-sm);
+  gap: var(--ant-margin-xs);
+  font-size: var(--ant-font-size);
 }
 
+// 날짜(회색)·메모(기본 글자색)는 부모에게 물려받지 않고 직접 14px로 둔다(내 후기 줄 .reviewText와 같은 값).
 .historyDate {
-  color: var(--ant-color-text-secondary);
+  flex-shrink: 0;
   width: $history-date-width;
-}
-
-.successTag {
-  margin: 0;
-  border-radius: var(--ant-control-height);
-  padding: 0 var(--ant-padding-xs);
-  background: var(--ant-color-text);
-  color: var(--ant-color-text-light-solid);
-  border: none;
-  font-size: $font-size-xs;
-}
-
-.failedTag {
-  margin: 0;
-  border-radius: var(--ant-control-height);
-  padding: 0 var(--ant-padding-xs);
-  background: var(--ant-color-bg-container);
-  border: 1px solid var(--ant-color-border);
+  font-size: var(--ant-font-size);
   color: var(--ant-color-text-secondary);
-  font-size: $font-size-xs;
+}
+
+// 색은 antd Tag(green/red, filled)가 정한다. 여기서는 줄 안 여백만 맞춘다.
+.historyResultTag {
+  margin: 0;
+}
+
+// 메모와 수정 버튼을 붙여 두고, 남는 폭은 비운다.
+.historyMemoLine {
+  flex: 1;
+  min-width: 0;
 }
 
 .historyMemo {
+  min-width: 0;
+  font-size: var(--ant-font-size);
   color: var(--ant-color-text);
-  flex: 1;
+  overflow-wrap: anywhere;
 }
 
-.historyEditButton {
-  padding: 0;
-  height: auto;
-  font-size: var(--ant-font-size-sm);
-  color: var(--ant-color-text-secondary);
+.historyMemoEmpty {
+  font-size: var(--ant-font-size);
 
-  &:hover {
-    color: var(--ant-color-primary);
+  &:global(.ant-typography) {
+    color: var(--ant-color-text-tertiary);
   }
 }
 
