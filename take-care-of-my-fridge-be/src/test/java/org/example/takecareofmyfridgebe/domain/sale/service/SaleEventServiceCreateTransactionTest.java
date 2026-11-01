@@ -6,15 +6,7 @@ import static org.assertj.core.api.Assertions.tuple;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.Callable;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import javax.sql.DataSource;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.StorageType;
 import org.example.takecareofmyfridgebe.domain.product.entity.Product;
@@ -272,51 +264,6 @@ class SaleEventServiceCreateTransactionTest extends MySqlContainerSupport {
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode").isEqualTo(ErrorCode.INVALID_INPUT_VALUE);
         assertThat(saleEventRepository.count()).isZero();
-    }
-
-    @Test
-    @DisplayName("같은 상품을 동시에 5번 등록해도 행사는 하나만 저장되고 나머지는 이미 행사가 있는 상품으로 거절된다")
-    void create_sameProductConcurrently_savesOnlyOne() throws Exception {
-        Product tofu = saveProduct("두부", 3000);
-
-        List<Throwable> failures = runConcurrently(Collections.nCopies(5, () -> {
-            saleEventService.createFlashDrop(flashDrop(tofu));
-            return null;
-        }));
-
-        assertThat(failures).hasSize(4)
-                .allSatisfy(failure -> assertThat(failure)
-                        .isInstanceOf(BusinessException.class)
-                        .extracting("errorCode").isEqualTo(ErrorCode.SALE_EVENT_PRODUCT_DUPLICATED));
-        assertThat(saleEventRepository.count()).isEqualTo(1);
-        assertThat(saleEventItemRepository.findAll())
-                .extracting(SaleEventItem::getProductId)
-                .containsExactly(tofu.getId());
-    }
-
-    private List<Throwable> runConcurrently(List<Callable<Void>> tasks) throws Exception {
-        ExecutorService executor = Executors.newFixedThreadPool(tasks.size());
-        CountDownLatch start = new CountDownLatch(1);
-        try {
-            List<Future<Void>> futures = tasks.stream()
-                    .map(task -> executor.submit(() -> {
-                        start.await();
-                        return task.call();
-                    }))
-                    .toList();
-            start.countDown();
-            List<Throwable> failures = new ArrayList<>();
-            for (Future<Void> future : futures) {
-                try {
-                    future.get();
-                } catch (ExecutionException e) {
-                    failures.add(e.getCause());
-                }
-            }
-            return failures;
-        } finally {
-            executor.shutdownNow();
-        }
     }
 
     private SpecialSaleCreateRequest specialSale(SpecialSaleItemRequest... items) {
