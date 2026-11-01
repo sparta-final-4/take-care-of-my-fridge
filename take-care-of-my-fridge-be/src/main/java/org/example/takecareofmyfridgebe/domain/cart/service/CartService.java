@@ -37,13 +37,13 @@ public class CartService {
     // 수량을 바꿀 장바구니 항목. 퍼사드가 상품 ID를 알아 상품 한도를 읽는 데 쓴다.
     public CartItem getItem(Long memberId, Long cartItemId) {
         return cartItemRepository.findByIdAndCartMemberId(cartItemId, memberId)
-            .orElseThrow(() -> new BusinessException(ErrorCode.CART_ITEM_NOT_FOUND));
+                .orElseThrow(() -> new BusinessException(ErrorCode.CART_ITEM_NOT_FOUND));
     }
 
     @Transactional
     public AddCartItemResult addItem(Long memberId, AddCartItemRequest request, CartQuantityLimit limit) {
         Cart cart = cartRepository.findByMemberId(memberId)
-            .orElseGet(() -> cartRepository.save(Cart.builder().memberId(memberId).build()));
+                .orElseGet(() -> cartRepository.save(Cart.builder().memberId(memberId).build()));
 
         Optional<CartItem> existing = cartItemRepository.findByCartAndProductId(cart, request.productId());
         // 기존 수량 + 요청 수량은 int를 넘칠 수 있어 long으로 더한다.
