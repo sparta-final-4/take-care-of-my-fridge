@@ -86,7 +86,10 @@ class NotificationPushRedisTest extends RedisContainerSupport {
         container.start();
 
         SseConnectionRegistry registry = spy(new SseConnectionRegistry(sseProperties, mock(TaskScheduler.class)));
-        new NotificationPushSubscriber(container, registry, jsonMapper).subscribe();
+        NotificationPushSubscriber subscriber =
+                new NotificationPushSubscriber(container, registry, jsonMapper, mock(TaskScheduler.class));
+        subscriber.start();
+        subscriber.subscribe();
         return registry;
     }
 }
