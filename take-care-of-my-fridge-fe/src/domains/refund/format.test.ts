@@ -77,6 +77,14 @@ describe('getOrderItemRefundState', () => {
       ),
     ).toBe('saleBlocked');
   });
+
+  it('특가·번개 드롭도 환불한 수량이 있으면 환불 표시가 먼저다', () => {
+    expect(
+      getOrderItemRefundState(
+        item({ saleType: 'FLASH_DROP', orderedQuantity: 1, refundedQuantity: 1 }),
+      ),
+    ).toBe('full');
+  });
 });
 
 describe('sumRefundedAmount', () => {

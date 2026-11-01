@@ -1,10 +1,10 @@
-import { PictureOutlined, StarFilled } from '@ant-design/icons';
+import { StarFilled } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
 import { Button, Skeleton, Typography } from 'antd';
 import { generatePath, Link } from 'react-router';
 
 import { ROUTES } from '@/app/paths';
-import { FadeImage } from '@/common/components/FadeImage';
+import { FallbackImage } from '@/common/components/FallbackImage';
 import { SectionCard } from '@/common/components/SectionCard';
 import { cookingQueries } from '@/domains/cooking/queries';
 
@@ -87,18 +87,14 @@ export function PopularRecipeSection() {
                 <span className={`${styles.rank} ${isTopRank ? styles.topRank : ''}`}>{rank}</span>
 
                 <div className={styles.thumb}>
-                  {recipe.imageUrl ? (
-                    <FadeImage
-                      src={recipe.imageUrl}
-                      alt={name}
-                      className={styles.image}
-                      loading="lazy"
-                    />
-                  ) : (
-                    <span className={styles.imagePlaceholder} aria-hidden="true">
-                      <PictureOutlined style={{ fontSize: 20 }} />
-                    </span>
-                  )}
+                  <FallbackImage
+                    src={recipe.imageUrl}
+                    alt={name}
+                    kind="recipe"
+                    size="small"
+                    className={styles.image}
+                    loading="lazy"
+                  />
                 </div>
 
                 <div className={styles.info}>

@@ -16,7 +16,7 @@ import { useLocation, useNavigate } from 'react-router';
 
 import { ROUTES } from '@/app/paths';
 import { isNotFound } from '@/common/api/errors';
-import { FadeImage } from '@/common/components/FadeImage';
+import { FallbackImage } from '@/common/components/FallbackImage';
 import { useAddToCart } from '@/domains/cart/hooks/useAddToCart';
 import { formatPrice } from '@/domains/cart/format';
 import { STORAGE_LABELS } from '@/domains/fridge/format';
@@ -101,11 +101,7 @@ export function ProductDetailSection({ productId }: ProductDetailSectionProps) {
   return (
     <div className={styles.layout}>
       <div className={styles.thumb}>
-        {imageUrl ? (
-          <FadeImage src={imageUrl} alt={name} className={styles.image} />
-        ) : (
-          <span className={styles.imagePlaceholder} aria-hidden="true" />
-        )}
+        <FallbackImage src={imageUrl} alt={name} kind="product" className={styles.image} />
         {soldOut && <span className={styles.soldOutMark}>품절</span>}
       </div>
 
