@@ -25,9 +25,8 @@ $recipe-sort-select-width: 130px;
 $recipe-table-min-width: 520px;
 $history-date-width: 44px;
 
-// 12px(var(--ant-font-size-sm)) 미만의 소형 텍스트/아이콘 치수
+// 12px(var(--ant-font-size-sm))보다 작은 아이콘 치수. 글자는 antd 단계(12 / 14 / 16 / 20 / 24 / 30)만 쓴다.
 $font-size-2xs: 10px;
-$font-size-xs: 11px;
 
 // 장바구니 줄
 $cart-thumb-size: 72px;
@@ -102,8 +101,7 @@ $page-enter-offset: 4px;
 // 관리자 후기 요약 표의 요약 칸. 한 줄 말줄임이 되도록 최대 너비를 고정
 $review-summary-text-max-width: 320px;
 
-// 관리자 후기 요약 안내 칸. 제목 15px(antd 기본 14px와 16px 사이), 설명 줄 간격
-$review-summary-guide-title-size: 15px;
+// 관리자 후기 요약 안내 칸 설명 줄 간격
 $review-summary-guide-line-height: 1.6;
 
 // 정산 차트 높이

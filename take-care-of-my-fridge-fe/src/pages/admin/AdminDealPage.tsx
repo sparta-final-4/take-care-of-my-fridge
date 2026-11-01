@@ -339,7 +339,7 @@ export default function AdminDealPage() {
           },
         ]}
       />
-      <Typography.Title level={4} className={styles.excludedTitle}>
+      <Typography.Title level={5} className={styles.excludedTitle}>
         제외 상품
       </Typography.Title>
       <Table<Excluded>

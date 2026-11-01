@@ -14,8 +14,8 @@
 }
 
 .sectionTitle {
-  font-size: 14px;
-  font-weight: 600;
+  font-size: var(--ant-font-size-lg);
+  font-weight: var(--ant-font-weight-strong);
   color: var(--ant-color-text);
   display: flex;
   align-items: center;
@@ -55,12 +55,12 @@
 }
 
 .ingredientName {
-  font-weight: 600;
-  font-size: 14px;
+  font-weight: var(--ant-font-weight-strong);
+  font-size: var(--ant-font-size);
 }
 
 .heldInfo {
-  font-size: 12px;
+  font-size: var(--ant-font-size-sm);
   color: var(--ant-color-text-secondary);
   display: flex;
   align-items: center;
@@ -73,7 +73,7 @@
   background-color: var(--ant-color-warning-bg);
   padding: 1px 6px;
   border-radius: 4px;
-  font-size: 11px;
+  font-size: var(--ant-font-size-sm);
 }
 
 .quantityControls {
@@ -94,23 +94,23 @@
 }
 
 .unitText {
-  font-size: 13px;
+  font-size: var(--ant-font-size);
   color: var(--ant-color-text-secondary);
   min-width: 20px;
 }
 
 .allTag {
-  font-weight: 600;
+  font-weight: var(--ant-font-weight-strong);
   padding: 2px 8px;
 }
 
 .exceedNotice {
-  font-size: 12px;
+  font-size: var(--ant-font-size-sm);
   color: var(--ant-color-warning-text);
 }
 
 .emptyNotice {
-  font-size: 12px;
+  font-size: var(--ant-font-size-sm);
   color: var(--ant-color-error);
 }
 
@@ -135,7 +135,7 @@
 
 .missingList {
   margin-top: 8px;
-  font-size: 13px;
+  font-size: var(--ant-font-size-sm);
   color: var(--ant-color-text-secondary);
 }
 

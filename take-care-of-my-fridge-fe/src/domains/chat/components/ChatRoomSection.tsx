@@ -360,7 +360,7 @@ export function ChatRoomSection({
             <Button
               type="link"
               size="small"
-              style={{ padding: 0, height: 'auto', fontSize: 11.5 }}
+              style={{ padding: 0, height: 'auto', fontSize: 'var(--ant-font-size-sm)' }}
               onClick={handleStartNewSession}
               loading={startSessionMutation.isPending}
             >

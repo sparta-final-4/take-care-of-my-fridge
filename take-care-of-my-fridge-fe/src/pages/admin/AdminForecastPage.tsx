@@ -125,7 +125,7 @@ export default function AdminForecastPage() {
         )
       ) : (
         <Spin spinning={isPlaceholderData} tip="판매 예측을 불러오고 있습니다">
-          <Typography.Title level={4}>
+          <Typography.Title level={5}>
             {data.weekStart} ~ {data.weekEnd}
           </Typography.Title>
           {data.syntheticData && (

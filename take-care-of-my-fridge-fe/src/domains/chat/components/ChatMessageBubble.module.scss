@@ -39,7 +39,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
+  font-size: var(--ant-font-size);
   flex-shrink: 0;
   margin-top: 2px;
 }
@@ -53,7 +53,7 @@
 
 .bubble {
   padding: 8px 12px;
-  font-size: 13.5px;
+  font-size: var(--ant-font-size);
   line-height: 1.5;
   white-space: pre-wrap;
   word-break: keep-all;
@@ -62,7 +62,7 @@
 
   @include from(md) {
     padding: 10px 14px;
-    font-size: 14px;
+    font-size: var(--ant-font-size);
   }
 }
 
@@ -82,7 +82,7 @@
 }
 
 .time {
-  font-size: 10.5px;
+  font-size: var(--ant-font-size-sm);
   color: var(--ant-color-text-tertiary);
   flex-shrink: 0;
   margin-bottom: 2px;

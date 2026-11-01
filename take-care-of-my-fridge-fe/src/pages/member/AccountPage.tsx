@@ -215,7 +215,12 @@ function AccountForms({ member }: { member: MyInfoResponse }) {
   );
 }
 
-export default function AccountPage() {
+interface AccountPageProps {
+  // 마이페이지 "내 정보 수정"에서 볼 때 마이페이지 화면 제목(Title level 3, 24px)으로 보인다.
+  inMyPage?: boolean;
+}
+
+export default function AccountPage({ inMyPage = false }: AccountPageProps) {
   const { data, isPending, isError, refetch } = useQuery(memberQueries.me());
 
   if (isPending) return <Skeleton active paragraph={{ rows: 8 }} />;
@@ -230,7 +235,11 @@ export default function AccountPage() {
   }
   return (
     <section className={styles.container}>
-      <Typography.Title level={2}>내 계정</Typography.Title>
+      {inMyPage ? (
+        <Typography.Title level={3}>내 정보 수정</Typography.Title>
+      ) : (
+        <Typography.Title level={2}>내 계정</Typography.Title>
+      )}
       <AccountForms member={data} />
     </section>
   );
