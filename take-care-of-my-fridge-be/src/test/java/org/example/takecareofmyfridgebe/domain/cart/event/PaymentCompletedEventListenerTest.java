@@ -34,9 +34,9 @@ import org.springframework.transaction.support.TransactionTemplate;
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({JpaAuditingConfig.class, QueryDslConfig.class, CartService.class,
-        PaymentCompletedCartListener.class})
+        PaymentCompletedEventListener.class})
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
-class PaymentCompletedCartListenerTest extends MySqlContainerSupport {
+class PaymentCompletedEventListenerTest extends MySqlContainerSupport {
 
     private final CartRepository cartRepository;
     private final CartItemRepository cartItemRepository;
@@ -46,7 +46,7 @@ class PaymentCompletedCartListenerTest extends MySqlContainerSupport {
     private final TransactionTemplate transactionTemplate;
 
     @Autowired
-    PaymentCompletedCartListenerTest(
+    PaymentCompletedEventListenerTest(
             CartRepository cartRepository,
             CartItemRepository cartItemRepository,
             OrderRepository orderRepository,

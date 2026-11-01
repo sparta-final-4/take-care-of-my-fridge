@@ -119,7 +119,7 @@ class CartServiceTest {
         CartItem item = CartItem.builder().cart(cart).productId(10L).quantity(1).build();
         given(cartItemRepository.findByIdAndCartMemberId(5L, 1L)).willReturn(Optional.of(item));
 
-        assertThatThrownBy(() -> cartService.changeQuantity(1L, 5L, new ChangeCartItemQuantityRequest(2), productId -> FLASH_DROP))
+        assertThatThrownBy(() -> cartService.changeQuantity(1L, 5L, new ChangeCartItemQuantityRequest(2), FLASH_DROP))
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode").isEqualTo(ErrorCode.PURCHASE_LIMIT_EXCEEDED);
         assertThat(item.getQuantity()).isEqualTo(1);
@@ -132,7 +132,7 @@ class CartServiceTest {
         CartItem item = CartItem.builder().cart(cart).productId(10L).quantity(5).build();
         given(cartItemRepository.findByIdAndCartMemberId(5L, 1L)).willReturn(Optional.of(item));
 
-        cartService.changeQuantity(1L, 5L, new ChangeCartItemQuantityRequest(3), productId -> new CartQuantityLimit("대파", 2, false));
+        cartService.changeQuantity(1L, 5L, new ChangeCartItemQuantityRequest(3), new CartQuantityLimit("대파", 2, false));
 
         assertThat(item.getQuantity()).isEqualTo(3);
     }
