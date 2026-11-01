@@ -34,12 +34,12 @@ public final class SellingPrice {
         return sale == null ? listPrice : sale.salePrice();
     }
 
-    // 할인이 없으면 null
+    // 할인이 없으면 null.
     public SaleEventType saleType() {
         return sale == null ? null : sale.type();
     }
 
-    // 할인이 없으면 null
+    // 할인이 없으면 null.
     public Long saleEventItemId() {
         return sale == null ? null : sale.saleEventItemId();
     }

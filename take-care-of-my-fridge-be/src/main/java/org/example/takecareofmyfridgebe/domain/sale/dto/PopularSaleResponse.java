@@ -5,7 +5,7 @@ public record PopularSaleResponse(
         Long productId,
         String name,
         String imageUrl,
-        // 정가(원)
+        // 정가(원).
         int price,
         SaleResponse sale
 ) {

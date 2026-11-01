@@ -38,7 +38,7 @@ public class SaleEventItem extends BaseTimeEntity {
     @JoinColumn(name = "sale_event_id", nullable = false)
     private SaleEvent saleEvent;
 
-    // 타 도메인(Product)과의 결합도를 낮추기 위해 연관관계 대신 ID로만 참조
+    // 타 도메인(Product)과의 결합도를 낮추기 위해 연관관계 대신 ID로만 참조.
     @Column(name = "product_id", nullable = false)
     private Long productId;
 
@@ -46,19 +46,19 @@ public class SaleEventItem extends BaseTimeEntity {
     @Column(name = "list_price", nullable = false)
     private int listPrice;
 
-    // 할인가 (번개 드롭은 번개 드롭가)
+    // 할인가 (번개 드롭은 번개 드롭가).
     @Column(name = "sale_price", nullable = false)
     private int salePrice;
 
-    // 할인율(%, 정가 대비). 관리자가 입력하고 서버가 이 값으로 할인가를 계산해 저장
+    // 할인율(%, 정가 대비). 관리자가 입력하고 서버가 이 값으로 할인가를 계산해 저장.
     @Column(name = "discount_rate", nullable = false)
     private int discountRate;
 
-    // 한정 수량 (번개 드롭만, 특가는 null)
+    // 한정 수량 (번개 드롭만, 특가는 null).
     @Column(name = "limited_quantity")
     private Integer limitedQuantity;
 
-    // 남은 수량 (번개 드롭만, 특가는 null)
+    // 남은 수량 (번개 드롭만, 특가는 null).
     @Column(name = "remaining_quantity")
     private Integer remainingQuantity;
 
