@@ -5,7 +5,7 @@ import { generatePath, useNavigate } from 'react-router';
 
 import { ROUTES } from '@/app/paths';
 import { getErrorCode } from '@/common/api/errors';
-import { FadeImage } from '@/common/components/FadeImage';
+import { FallbackImage } from '@/common/components/FallbackImage';
 import { formatPrice } from '@/domains/cart/format';
 import { OrderItemHeader, OrderItemRow } from '@/domains/order/components/OrderItemRow';
 import { orderQueries } from '@/domains/order/queries';
@@ -173,15 +173,13 @@ export function RefundDetailSection({ orderId }: RefundDetailSectionProps) {
                         className={styles.history}
                       >
                         <div className={styles.thumb}>
-                          {item.productImageUrl ? (
-                            <FadeImage
-                              src={item.productImageUrl}
-                              alt={name}
-                              className={styles.image}
-                            />
-                          ) : (
-                            <span className={styles.imagePlaceholder} aria-hidden="true" />
-                          )}
+                          <FallbackImage
+                            src={item.productImageUrl}
+                            alt={name}
+                            kind="product"
+                            size="small"
+                            className={styles.image}
+                          />
                         </div>
                         <Flex vertical className={styles.historyInfo}>
                           <Typography.Text strong title={name} className={styles.name}>

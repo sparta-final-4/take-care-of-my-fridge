@@ -111,3 +111,9 @@ $notification-list-max-height: 40vh;
 $notification-list-max-height-md: 60vh;
 // 새 알림 점 칸. 읽은 알림도 문구가 같은 위치에서 시작하도록 고정
 $notification-dot-width: 8px;
+
+// 이미지가 없거나 깨졌을 때 보여 주는 기본 이미지(FallbackImage) 아이콘. 상자 크기에 비례하되 이 범위 안에서
+$fallback-icon-min-size: 16px;
+$fallback-icon-max-size: 48px;
+// 관리자 상품 이미지 업로드 미리보기 크기(ProductImageUpload의 PREVIEW_SIZE와 같은 값)
+$product-image-preview-size: 160px;

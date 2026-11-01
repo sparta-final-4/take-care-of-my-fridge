@@ -2,7 +2,7 @@ import { CheckOutlined, LockOutlined, MinusOutlined, PlusOutlined } from '@ant-d
 import { Button, Checkbox, Flex, Tag, Typography } from 'antd';
 
 import type { RefundableItemResponse } from '@/common/api/clients';
-import { FadeImage } from '@/common/components/FadeImage';
+import { FallbackImage } from '@/common/components/FallbackImage';
 import { formatPrice } from '@/domains/cart/format';
 import { SALE_TYPE_COLORS, SALE_TYPE_LABELS } from '@/domains/sale/format';
 import { getOrderItemRefundState, getRefundRowState } from '@/domains/refund/format';
@@ -75,11 +75,13 @@ export function RefundItemRow({ item, listPrice, quantity, onChange }: RefundIte
         )}
       </span>
       <div className={styles.thumb}>
-        {item.productImageUrl ? (
-          <FadeImage src={item.productImageUrl} alt={name} className={styles.image} />
-        ) : (
-          <span className={styles.imagePlaceholder} aria-hidden="true" />
-        )}
+        <FallbackImage
+          src={item.productImageUrl}
+          alt={name}
+          kind="product"
+          size="small"
+          className={styles.image}
+        />
       </div>
       <Flex vertical gap="small" className={styles.info}>
         <Typography.Text strong title={name} className={styles.name}>
