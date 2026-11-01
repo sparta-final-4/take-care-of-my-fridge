@@ -10,8 +10,7 @@ import org.example.takecareofmyfridgebe.domain.order.dto.OrderCreateResult;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderDetailResponse;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderListRequest;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderSummaryResponse;
-import org.example.takecareofmyfridgebe.domain.order.service.OrderStatusService;
-import org.example.takecareofmyfridgebe.domain.order.service.OrderCreateService;
+import org.example.takecareofmyfridgebe.domain.order.facade.OrderFacade;
 import org.example.takecareofmyfridgebe.domain.order.service.OrderQueryService;
 import org.example.takecareofmyfridgebe.global.response.ApiResponse;
 import org.example.takecareofmyfridgebe.global.response.PageResponse;
@@ -33,19 +32,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class OrderController {
 
-    private final OrderCreateService orderCreateService;
     private final OrderQueryService orderQueryService;
-    private final OrderStatusService orderStatusService;
-
-    @PostMapping
-    public ResponseEntity<ApiResponse<OrderCheckoutResponse>> createOrder(
-            @AuthenticationPrincipal AuthSessionService.AuthPrincipal principal,
-            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
-            @Valid @RequestBody OrderCreateRequest request) {
-        OrderCreateResult result = orderCreateService.createOrder(principal.memberId(), idempotencyKey, request);
-        HttpStatus status = result.created() ? HttpStatus.CREATED : HttpStatus.OK;
-        return ResponseEntity.status(status).body(ApiResponse.ok(result.response()));
-    }
+    private final OrderFacade orderFacade;
 
     // 내 주문 내역 화면
     @GetMapping
@@ -71,12 +59,22 @@ public class OrderController {
         return ResponseEntity.ok(ApiResponse.ok(orderQueryService.getCheckout(principal.memberId(), orderId)));
     }
 
+    @PostMapping
+    public ResponseEntity<ApiResponse<OrderCheckoutResponse>> createOrder(
+            @AuthenticationPrincipal AuthSessionService.AuthPrincipal principal,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
+            @Valid @RequestBody OrderCreateRequest request) {
+        OrderCreateResult result = orderFacade.createOrder(principal.memberId(), idempotencyKey, request);
+        HttpStatus status = result.created() ? HttpStatus.CREATED : HttpStatus.OK;
+        return ResponseEntity.status(status).body(ApiResponse.ok(result.response()));
+    }
+
     // 주문 확인 화면의 취소하기와 나가기. 결제를 시도하지 않은 주문을 지운다. 지운 주문에 다시 오면 404다.
     @PatchMapping("/{orderId}/cancel")
     public ResponseEntity<ApiResponse<Void>> cancelOrder(
             @AuthenticationPrincipal AuthSessionService.AuthPrincipal principal,
             @PathVariable Long orderId) {
-        orderStatusService.cancel(principal.memberId(), orderId);
+        orderFacade.cancel(principal.memberId(), orderId);
         return ResponseEntity.ok(ApiResponse.ok());
     }
 
@@ -85,6 +83,6 @@ public class OrderController {
     public ResponseEntity<ApiResponse<OrderConfirmResponse>> confirmOrder(
             @AuthenticationPrincipal AuthSessionService.AuthPrincipal principal,
             @PathVariable Long orderId) {
-        return ResponseEntity.ok(ApiResponse.ok(orderStatusService.confirm(principal.memberId(), orderId)));
+        return ResponseEntity.ok(ApiResponse.ok(orderFacade.confirm(principal.memberId(), orderId)));
     }
 }
