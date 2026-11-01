@@ -12,9 +12,13 @@ import org.example.takecareofmyfridgebe.domain.cart.dto.CartQuantityLimit;
 import org.example.takecareofmyfridgebe.domain.cart.dto.ChangeCartItemQuantityRequest;
 import org.example.takecareofmyfridgebe.domain.cart.dto.ChangeCartItemQuantityResponse;
 import org.example.takecareofmyfridgebe.domain.cart.entity.CartItem;
-import org.example.takecareofmyfridgebe.domain.cart.service.CartProductReader;
 import org.example.takecareofmyfridgebe.domain.cart.service.CartService;
+import org.example.takecareofmyfridgebe.domain.product.dto.ProductDetail;
 import org.example.takecareofmyfridgebe.domain.product.entity.Product;
+import org.example.takecareofmyfridgebe.domain.product.entity.ProductStatus;
+import org.example.takecareofmyfridgebe.domain.product.service.ProductService;
+import org.example.takecareofmyfridgebe.global.error.BusinessException;
+import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 import org.example.takecareofmyfridgebe.domain.sale.dto.SellingPrice;
 import org.example.takecareofmyfridgebe.domain.sale.service.SaleEventReader;
 import org.springframework.stereotype.Component;
@@ -26,13 +30,16 @@ import org.springframework.stereotype.Component;
 public class CartFacade {
 
     private final CartService cartService;
-    private final CartProductReader cartProductReader;
+    private final ProductService productService;
     private final SaleEventReader saleEventReader;
 
     public CartItemsResponse getItems(Long memberId) {
         List<CartItem> items = cartService.getItems(memberId);
         List<Long> productIds = items.stream().map(CartItem::getProductId).toList();
-        List<Product> products = cartProductReader.findAllByIds(productIds);
+        // 담아 둔 뒤 판매 중지된 상품도 목록에 보여야 해서 상태로 거르지 않는 조회를 쓴다
+        List<Product> products = productService.getProductDetailsByIds(productIds).stream()
+                .map(ProductDetail::product)
+                .toList();
         Map<Long, Product> productsById = products.stream().collect(Collectors.toMap(Product::getId, Function.identity()));
         return CartItemsResponse.from(items, productsById, saleEventReader.findSellingPrices(products));
     }
@@ -46,7 +53,11 @@ public class CartFacade {
     }
 
     private CartQuantityLimit getQuantityLimit(long productId) {
-        Product product = cartProductReader.getSellableProduct(productId);
+        // 품절 상품은 재고가 0이라 담기와 수량 올리기가 뒤의 재고 수량 확인에서 걸린다. 여기서는 판매 중지만 거른다
+        Product product = productService.getAdminProduct(productId).product();
+        if (product.getStatus() == ProductStatus.STOPPED) {
+            throw new BusinessException(ErrorCode.PRODUCT_NOT_ON_SALE);
+        }
         SellingPrice price = saleEventReader.findSellingPrice(product);
         return new CartQuantityLimit(product.getName(), product.getStock(), price.isFlashDrop());
     }
