@@ -123,11 +123,16 @@ jobs:
           INSTANCE_ID: ${{ steps.ec2.outputs.instance_id }}
           IMAGE: ${{ steps.meta.outputs.image }}
         run: |
+          DEPLOY_COMMAND="sudo /opt/app/deploy.sh ${IMAGE}"
+          if [ "$ENV_NAME" = "dev" ]; then
+            # 실행 중인 컨테이너의 이미지는 유지하고 이 저장소의 미사용 이미지로 공간을 확보한다.
+            DEPLOY_COMMAND="sudo docker image prune -af --filter label=org.opencontainers.image.source=https://github.com/${{ github.repository }} && ${DEPLOY_COMMAND}"
+          fi
           CMD_ID=$(aws ssm send-command \
             --instance-ids "$INSTANCE_ID" \
             --document-name AWS-RunShellScript \
             --comment "deploy ${ENV_NAME} ${{ github.sha }}" \
-            --parameters "commands=[\"sudo /opt/app/deploy.sh ${IMAGE}\"]" \
+            --parameters "commands=[\"${DEPLOY_COMMAND}\"]" \
             --timeout-seconds 600 \
             --query 'Command.CommandId' --output text)
           echo "SSM Command ID: $CMD_ID"

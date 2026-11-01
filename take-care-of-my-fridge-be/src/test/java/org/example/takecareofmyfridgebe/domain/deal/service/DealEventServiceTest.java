@@ -28,6 +28,7 @@ import org.example.takecareofmyfridgebe.domain.sale.service.SaleEventCreateServi
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 import org.junit.jupiter.api.Test;
+import org.springframework.core.env.Environment;
 import org.springframework.test.util.ReflectionTestUtils;
 
 class DealEventServiceTest {
@@ -36,7 +37,8 @@ class DealEventServiceTest {
     private final DealCandidateRepository candidates = mock(DealCandidateRepository.class);
     private final SaleEventCreateService sales = mock(SaleEventCreateService.class);
     private final AdminAuditLogService audit = mock(AdminAuditLogService.class);
-    private final DealEventService service = new DealEventService(analyses, candidates, sales, audit);
+    private final Environment environment = mock(Environment.class);
+    private final DealEventService service = new DealEventService(analyses, candidates, sales, audit, environment);
     private final LocalDateTime startsAt = LocalDateTime.of(2026, 11, 1, 10, 0);
     private final LocalDateTime endsAt = startsAt.plusHours(4);
 
@@ -101,6 +103,7 @@ class DealEventServiceTest {
 
     @Test
     void syntheticAnalysisCannotCreateRealSale() {
+        when(environment.getProperty("APP_ENV")).thenReturn("main");
         DealAnalysis analysis = DealAnalysis.builder().syntheticData(true).build();
         when(analyses.findByIdForUpdate(3L)).thenReturn(Optional.of(analysis));
 
@@ -109,6 +112,29 @@ class DealEventServiceTest {
                 .isInstanceOfSatisfying(BusinessException.class,
                         error -> assertThat(error.getErrorCode()).isEqualTo(ErrorCode.DEAL_SYNTHETIC_ANALYSIS));
         verifyNoInteractions(sales, audit);
+    }
+
+    @Test
+    void devSyntheticAnalysisCanCreateRealSale() {
+        when(environment.getProperty("APP_ENV")).thenReturn("dev");
+        DealAnalysis analysis = DealAnalysis.builder().discountRate(30).syntheticData(true).build();
+        ReflectionTestUtils.setField(analysis, "id", 3L);
+        DealCandidate candidate = DealCandidate.builder()
+                .dealAnalysis(analysis).productId(21L).build();
+        ReflectionTestUtils.setField(candidate, "id", 11L);
+        candidate.review(DealCandidate.ReviewStatus.SELECTED);
+        when(analyses.findByIdForUpdate(3L)).thenReturn(Optional.of(analysis));
+        when(candidates.findById(11L)).thenReturn(Optional.of(candidate));
+        when(sales.createSpecialSale(any(SpecialSaleCreateRequest.class)))
+                .thenReturn(new SaleEventsCreateResponse(List.of(55L)));
+
+        var response = service.register(7L, 3L,
+                new DealEventRequest(11L, SaleEventType.SPECIAL, startsAt, endsAt, null));
+
+        assertThat(response.saleEventId()).isEqualTo(55L);
+        assertThat(candidate.getEventRequestStatus()).isEqualTo(DealCandidate.EventRequestStatus.APPROVED);
+        verify(sales).createSpecialSale(new SpecialSaleCreateRequest(startsAt, endsAt,
+                List.of(new SpecialSaleItemRequest(21L, 30))));
     }
 
     private DealCandidate selectedCandidate() {

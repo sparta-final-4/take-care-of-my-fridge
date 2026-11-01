@@ -214,6 +214,8 @@ public class FridgeService {
         // 같은 재료를 동시에 사용할 때 수량을 덮어쓰지 않도록 잠금.
         // 뒤 요청은 앞 요청이 커밋될 때까지 기다린 뒤 남은 양 기준으로 처리되고, 앞 요청이 지웠으면 404가 된다.
         Fridge fridge = getFridgeEntityForUpdate(memberId, fridgeId);
+        // 남은 양보다 큰 수량은 전부 빼기로 바뀌므로 차감 전에 요청 수량으로 검사한다.
+        fridge.validateMealkitQuantity(request.quantity());
         deductAndLog(fridge, request.quantity(), request.action(), null);
         return FridgeItemTakeOutResponse.from(fridge);
     }

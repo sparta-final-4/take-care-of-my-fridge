@@ -33,17 +33,22 @@ class ForecastReadRepositoryTest extends MySqlContainerSupport {
         saveRun(LocalDate.of(2026, 10, 5));
         PredictionRun middle = saveRun(LocalDate.of(2026, 10, 19));
         saveRun(LocalDate.of(2026, 11, 2));
+        saveRun(LocalDate.of(2026, 10, 26), true);
+        saveRun(LocalDate.of(2026, 11, 9), true);
         entityManager.flush();
         entityManager.clear();
 
-        assertThat(runRepository.findTopByOrderByTargetWeekStartDesc()).get()
+        assertThat(runRepository.findTopBySyntheticDataFalseOrderByTargetWeekStartDesc()).get()
                 .extracting(PredictionRun::getTargetWeekStart).isEqualTo(LocalDate.of(2026, 11, 2));
-        assertThat(runRepository.findByTargetWeekStart(LocalDate.of(2026, 10, 19)))
+        assertThat(runRepository.findByTargetWeekStartAndSyntheticDataFalse(LocalDate.of(2026, 11, 9))).isEmpty();
+        assertThat(runRepository.findTopBySyntheticDataTrueOrderByTargetWeekStartDesc()).get()
+                .extracting(PredictionRun::getTargetWeekStart).isEqualTo(LocalDate.of(2026, 11, 9));
+        assertThat(runRepository.findByTargetWeekStartAndSyntheticDataFalse(LocalDate.of(2026, 10, 19)))
                 .get().extracting(PredictionRun::getId).isEqualTo(middle.getId());
-        assertThat(runRepository.findTopByTargetWeekStartLessThanOrderByTargetWeekStartDesc(
+        assertThat(runRepository.findTopBySyntheticDataFalseAndTargetWeekStartLessThanOrderByTargetWeekStartDesc(
                 LocalDate.of(2026, 10, 19))).get()
                 .extracting(PredictionRun::getTargetWeekStart).isEqualTo(LocalDate.of(2026, 10, 5));
-        assertThat(runRepository.findTopByTargetWeekStartGreaterThanOrderByTargetWeekStartAsc(
+        assertThat(runRepository.findTopBySyntheticDataFalseAndTargetWeekStartGreaterThanOrderByTargetWeekStartAsc(
                 LocalDate.of(2026, 10, 19))).get()
                 .extracting(PredictionRun::getTargetWeekStart).isEqualTo(LocalDate.of(2026, 11, 2));
     }
@@ -66,9 +71,13 @@ class ForecastReadRepositoryTest extends MySqlContainerSupport {
     }
 
     private PredictionRun saveRun(LocalDate weekStart) {
+        return saveRun(weekStart, false);
+    }
+
+    private PredictionRun saveRun(LocalDate weekStart, boolean synthetic) {
         return runRepository.save(PredictionRun.builder()
                 .targetWeekStart(weekStart).modelVersion("weekly-mlp-v1")
                 .dataCutoffAt(LocalDateTime.of(2026, 10, 4, 18, 0))
-                .syntheticData(true).build());
+                .syntheticData(synthetic).build());
     }
 }

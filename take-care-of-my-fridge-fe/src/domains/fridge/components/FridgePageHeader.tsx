@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router';
 
 import { ROUTES } from '@/app/paths';
 
+import { withoutBasicSeasoning } from '../filter';
 import { useFridgeSort } from '../hooks/useFridgeSort';
 import { useFridgeItems } from '../queries';
 import styles from './FridgePageHeader.module.scss';
@@ -11,7 +12,9 @@ import styles from './FridgePageHeader.module.scss';
 export function FridgePageHeader() {
   const navigate = useNavigate();
   const [sort] = useFridgeSort();
-  const { data } = useFridgeItems(sort, true);
+  const { data: allItems } = useFridgeItems(sort, true);
+  // 요약 카드와 같은 기준으로 기본 양념은 빼고 센다.
+  const data = allItems && withoutBasicSeasoning(allItems);
   const imminentCount = data?.filter((item) => item.status === 'IMMINENT').length ?? 0;
   const expiredCount = data?.filter((item) => item.status === 'EXPIRED').length ?? 0;
 

@@ -17,6 +17,7 @@
 
 export interface FridgeItemResponse {
     'baseUnit'?: string;
+    'basicSeasoning'?: boolean;
     'createdAt'?: string;
     'dDay'?: number;
     'expirationDate'?: string;

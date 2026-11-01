@@ -159,7 +159,7 @@ export default function AdminDealPage() {
   );
   const demoToggle = demoAvailable && (
     <Button onClick={() => setSearchParams(demo ? {} : { demo: '1' })}>
-      {demo ? '최근 분석 보기' : '시연 결과 보기'}
+      {demo ? '최근 분석 보기' : '임의 할인 이벤트 추천 보기'}
     </Button>
   );
 
@@ -228,7 +228,11 @@ export default function AdminDealPage() {
         <Alert
           type="warning"
           showIcon
-          message="시연용 할인 수치입니다. 실제 할인 효과 모델의 계산 결과가 아니며 행사에 등록할 수 없습니다."
+          message={
+            demoAvailable
+              ? '시연용 수치이며 모델 결과가 아닙니다. 등록하면 dev 상품에 실제 할인이 적용됩니다.'
+              : '가상 데이터 분석 결과는 행사에 등록할 수 없습니다.'
+          }
           className={styles.notice}
         />
       )}
@@ -317,7 +321,7 @@ export default function AdminDealPage() {
                 {item.eventRequestStatus === 'NONE' && item.reviewStatus === 'SELECTED' && (
                   <Button
                     type="primary"
-                    disabled={analysis.syntheticData}
+                    disabled={analysis.syntheticData && !demoAvailable}
                     onClick={() => {
                       form.setFieldsValue({ type: 'SPECIAL' });
                       setCandidate(item);

@@ -5,7 +5,7 @@ import { useAuthStore } from '@/common/auth/authStore';
 import type { FridgeItemResponse } from '@/domains/fridge/api';
 import { fridgeQueries } from '@/domains/fridge/queries';
 
-type MatchedFridgeItem = Pick<FridgeItemResponse, 'dDay' | 'status'>;
+type MatchedFridgeItem = Required<Pick<FridgeItemResponse, 'dDay' | 'status'>>;
 
 // 레시피 재료를 내 냉장고와 ingredientId로 맞춰 본다. 로그인하지 않았으면 냉장고를 조회하지 않는다.
 // 기한 지난 줄(EXPIRED)은 보유로 치지 않고, 남은 줄 중 가장 임박한 줄의 D-day·상태를 쓴다.
@@ -19,7 +19,14 @@ export function useRecipeFridgeMatch(ingredients: IngredientItem[]) {
 
   const nearestByIngredient = new Map<number, MatchedFridgeItem>();
   fridgeItems?.forEach((item) => {
-    if (item.ingredientId === null || item.status === 'EXPIRED') return;
+    if (
+      item.ingredientId == null ||
+      item.dDay == null ||
+      item.status == null ||
+      item.status === 'EXPIRED'
+    ) {
+      return;
+    }
     const prev = nearestByIngredient.get(item.ingredientId);
     if (prev === undefined || item.dDay < prev.dDay) {
       nearestByIngredient.set(item.ingredientId, { dDay: item.dDay, status: item.status });

@@ -397,7 +397,7 @@
   "createdAt": "2026-10-04T22:00:00",
   "confirmed": true,
   "confirmedAt": "2026-10-12T06:00:00",
-  "syntheticData": true,
+  "syntheticData": false,
   "previousWeekStart": "2026-09-28",
   "nextWeekStart": "2026-10-12",
   "summary": {
@@ -428,7 +428,7 @@
 | 필드 | 설명 |
 |---|---|
 | confirmed | false면 실제 판매량이 아직 없음(A-04). `summary`와 `actual*`, `rankChange`, `qtyError`, `status`는 null |
-| previousWeekStart / nextWeekStart | 예측이 있는 이전·다음 주. 없으면 null(화면의 ‹ › 버튼 비활성) |
+| previousWeekStart / nextWeekStart | 실제 예측이 있는 이전·다음 주. 없으면 null(화면의 ‹ › 버튼 비활성) |
 | summary.meanAbsoluteError | 예상 TOP 10 상품의 \|예상 − 실제\| 평균 |
 | summary.baselineMeanAbsoluteError | 같은 예상 TOP 10 상품의 \|기준선 − 실제\| 평균. 실제 판매량이 비어 있으면 0으로 계산 |
 | items | 예상 TOP 10(예상 순위순) + 실제 TOP 10에 새로 든 상품(뒤쪽, `predictedRank` null) |
@@ -448,11 +448,11 @@
 | **권한** | ADMIN |
 | **화면** | A-04 첫 진입 |
 
-**성공 응답** `200`: [5-1](#5-1-주간-예측-조회)과 같은 형식으로 가장 최근 대상 주를 돌려줍니다.
+**성공 응답** `200`: [5-1](#5-1-주간-예측-조회)과 같은 형식으로 가상 데이터를 제외한 가장 최근 대상 주를 돌려줍니다. 특정 주 조회도 실제 예측만 반환합니다.
 
 **오류**: 404 F001 예측이 하나도 없음
 
-- dev 시연 결과: `GET /admin/forecasts/demo`는 `syntheticData=true`인 저장 결과를 조회합니다. 없으면 404 F001입니다. 실제 예측 배치의 대상 주와 겹치지 않는 지난 주차에 저장합니다.
+- dev 시연 결과: `GET /admin/forecasts/demo`는 `syntheticData=true`인 저장 결과를 조회합니다. 없으면 404 F001입니다. 실제 예측 배치의 대상 주와 겹치지 않는 지난 주차에 저장합니다. 시연 응답의 이전·다음 주는 null입니다.
 
 ---
 
@@ -587,30 +587,32 @@
 |---|---|
 | **Method / Path** | `POST /admin/deal-analyses/{analysisId}/event-requests` |
 | **권한** | ADMIN |
-| **화면** | A-06 "선택 상품 이벤트 등록 요청" |
+| **화면** | A-06에서 선택한 후보의 행사 등록 |
 
-**요청 본문**: 없음. `SELECTED`이고 아직 요청하지 않은 후보 전체를 요청합니다.
-
-**성공 응답** `200`
+**요청 본문**
 
 ```json
 {
-  "requestedCount": 1,
-  "requestedAt": "2026-10-13T14:35:00",
-  "candidates": [ { "candidateId": 9001, "eventRequestStatus": "REQUESTED" } ]
+  "candidateId": 9001,
+  "type": "SPECIAL",
+  "startsAt": "2026-11-02T10:00:00",
+  "endsAt": "2026-11-02T14:00:00"
 }
 ```
 
-**오류**
+- `type`은 `SPECIAL` 또는 `FLASH_DROP`입니다. 번개 드롭은 1 이상인 `limitedQuantity`가 필요합니다.
+- 시작 시각은 현재 이후, 종료 시각은 시작 시각 이후여야 합니다.
+- `SELECTED`이고 아직 행사에 등록되지 않은 후보 한 건을 기존 행사 생성 서비스로 등록합니다. 성공하면 행사 ID와 `APPROVED` 상태를 저장합니다.
+- dev에서는 `syntheticData=true`인 시연 후보도 실제 dev 행사로 등록할 수 있습니다. main에서는 계속 거부합니다. dev 등록은 상품의 할인 표시와 번개 드롭 알림에 영향을 줍니다.
 
-| HTTP | 코드 | 조건 |
-|---|---|---|
-| 400 | D005 | 요청할 선택 후보가 없음 |
-| 404 | D002 | 분석 없음 |
-| 503 | D006 | 할인 행사 쪽 요청 실패. 상태는 바뀌지 않음 |
+**성공 응답** `201`
 
-- 요청 전에 현재 검토 상태를 함께 저장합니다.
-- 행사 쪽 결과(등록·반려)는 할인 행사 담당이 알려 줘야 `APPROVED`·`REJECTED`로 바뀝니다. 전달 방식(API 호출·이벤트)은 Q-05에서 정합니다.
+```json
+{ "candidateId": 9001, "saleEventId": 501, "eventRequestStatus": "APPROVED" }
+```
+
+**오류**: 400 C001·D003 · 404 D002 · 409 D005(미선택·이미 등록), D006(main에서 가상 분석), SALE_001(상품에 기존 행사) 등. 행사 생성에 실패하면 후보 상태는 바뀌지 않습니다.
+
 - 작업 이력에 `EVENT_REQUEST`로 남습니다.
 
 ---
