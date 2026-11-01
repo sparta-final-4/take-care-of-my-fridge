@@ -11,7 +11,7 @@ import org.example.takecareofmyfridgebe.domain.sale.dto.SaleEventsCreateResponse
 import org.example.takecareofmyfridgebe.domain.sale.dto.SaleCandidateProductResponse;
 import org.example.takecareofmyfridgebe.domain.sale.dto.SaleCandidateProductsRequest;
 import org.example.takecareofmyfridgebe.domain.sale.dto.SpecialSaleCreateRequest;
-import org.example.takecareofmyfridgebe.domain.sale.facade.SaleEventFacade;
+import org.example.takecareofmyfridgebe.domain.sale.facade.AdminSaleEventFacade;
 import org.example.takecareofmyfridgebe.domain.sale.service.SaleEventQueryService;
 import org.example.takecareofmyfridgebe.domain.sale.service.SaleEventService;
 import org.example.takecareofmyfridgebe.global.response.ApiResponse;
@@ -33,7 +33,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class AdminSaleEventController {
 
-    private final SaleEventFacade saleEventFacade;
+    private final AdminSaleEventFacade adminSaleEventFacade;
     private final SaleEventQueryService saleEventQueryService;
     private final SaleEventService saleEventService;
 
@@ -48,7 +48,7 @@ public class AdminSaleEventController {
     // 행사 수정 화면에 보여 줄 행사 하나와 그 상품들.
     @GetMapping("/{saleEventId}")
     public ResponseEntity<ApiResponse<SaleEventDetailResponse>> getSaleEvent(@PathVariable Long saleEventId) {
-        return ResponseEntity.ok(ApiResponse.ok(saleEventFacade.getSaleEvent(saleEventId)));
+        return ResponseEntity.ok(ApiResponse.ok(adminSaleEventFacade.getSaleEvent(saleEventId)));
     }
 
     // 등록 화면의 상품 표. 판매 중이고 재고가 있으며 예정·진행 중인 행사에 들지 않은 상품만 준다.
