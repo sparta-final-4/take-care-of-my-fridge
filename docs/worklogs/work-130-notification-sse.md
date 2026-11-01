@@ -18,6 +18,7 @@
 - 서버 → 브라우저 SSE 연결 관리는 알림 전용이 아니라 `global/sse`의 `SseConnectionRegistry`로 뒀다. 회원마다 연결 목록을 들고, 연결 직후 신호, 30초 하트비트, 회원당 연결 한도를 맡는다. 한도를 넘으면 새 연결을 넣기 전에 가장 오래된 연결을 목록에서 먼저 빼고 닫는다. 서버 간 전달은 이 클래스가 하지 않는다.
 - 연결 유지 시간(30분), 하트비트 주기(30초), 회원당 연결 한도(5개)는 `application.yml`의 `app.sse.*`로 뺐고 모두 `SseProperties`가 읽는다. 하트비트는 `@Scheduled`가 아니라 `TaskScheduler`에 `SseProperties`의 주기로 등록한다.
 - 소비자가 알림을 저장하면 Redis 채널 `notification:push`로 회원 ID만 발행한다. 알림 내용은 싣지 않아, 로그아웃 뒤 남은 연결로도 내용이 새지 않는다. 발행이 실패해도 알림은 이미 저장돼 있어 다시 던지지 않고 로그만 남긴다.
+- Redis에 닿지 않아도 서버가 떠야 하므로 구독은 서버가 뜬 뒤에 시작한다. 구독기가 스프링 생명주기를 따라 시작 1초 뒤 Redis 리스너 컨테이너가 돌고 있는지 확인하고 구독하며, 정지할 때 구독을 풀고(테스트 컨텍스트 재사용 때 다시 시작해도 접속 실패가 나지 않게), 실패하면 5초마다 다시 시도한다. 처음에는 시작 단계에서 구독했다가 Redis가 없는 CI에서 앱이 뜨지 않아(백엔드 테스트·drift 실패) 이렇게 바꿨다.
 - 모든 서버가 이 채널을 구독하고, 이 서버에 그 회원의 SSE 연결이 있을 때만 `notification` 이벤트(내용 없는 `refresh` 신호)로 내보낸다.
 - `GET /api/notifications/stream`: 로그인한 회원의 SSE 연결. 연결을 오래 쥐는 응답이라 `ApiResponse`로 감싸지 않는다.
 - 프론트는 로그인한 동안 `EventSource`로 연결하고, 신호가 오면 안 읽은 수와 열려 있는 목록을 기존 조회 API로 다시 불러온다. 끊기면 브라우저가 다시 연결하고, 다시 연결되면 한 번 다시 불러와 끊긴 사이 놓친 알림을 메운다.
@@ -32,6 +33,7 @@
 | `NotificationRequestedConsumerTest` | 로컬(Testcontainers) | 통과 | 발행기를 붙인 뒤에도 저장·중복 건너뛰기 동작 |
 | eslint·prettier (알림 도메인) | 로컬 | 통과 | 지적 없음 |
 | `NotificationRequestedConsumerPushTest`, `NotificationPushPublisherTest` | 로컬 | 통과 | 새로 저장했을 때만 신호 발행, 중복·저장 실패 때는 발행하지 않음(저장 실패는 다시 던져 DLT 경로), Redis 발행 실패는 던지지 않음 |
+| `NotificationPushSubscriberTest`, `NotificationPushSubscriberStartupTest`, 백엔드 전체 테스트(Redis 접속 불가 조건) | 로컬 | 통과 | 시작 시 구독하지 않고 나중에 시도, 실패하면 등록을 지우고 재시도, 정지하면 구독 해제, Redis 없이 서버가 뜸. 전체 1242개 통과 |
 | `NotificationPushRedisTest` | 로컬(Testcontainers Redis) | 통과 | 서버 둘이 같은 신호를 모두 받음, 회원 번호 전달, 깨진 메시지 뒤에도 구독 유지 |
 | 서버 2대(8080·8081)에서 Redis `PUBLISH` | 로컬 서버 2대 | 통과 | 구독자 2, 8081 스트림에 `notification`/`refresh` 도착 |
 | 번개 드롭 등록 → 화면 즉시 반영, 서버 2대 | 로컬 서버 2대, 브라우저 2개 | 통과 | 8081이 알림 4건 저장, 8080에 붙은 화면 배지가 새로고침 없이 올라감 |

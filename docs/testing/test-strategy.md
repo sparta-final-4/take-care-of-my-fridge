@@ -128,7 +128,7 @@ Q-01~Q-17에 의존하는 테스트는 기대값을 합의한 뒤 구현합니�
 | NOTI-05 | P1 | 잘못된 기준·마지막 알림 ID, 비로그인 | 400 `C001`, 비로그인은 모든 알림 API(스트림 포함) 401 | `NotificationControllerTest` |
 | NOTI-06 | P0 | 알림 지우기, 모두 지우기 | 지운 알림은 행이 남고 지운 시각이 채워지며 목록·안 읽은 수에서 빠짐. 다른 회원 알림 ID로 지우면 그대로. 모두 지우기는 내 알림만 | `NotificationServiceTransactionTest` |
 | NOTI-07 | P1 | 알림 스트림 연결, 회원당 연결 한도 | 스트림은 로그인한 회원 번호로 연결하고 비로그인은 401. 한도를 넘기면 한도만큼만 남고, 한도는 회원마다 따로 셈. 연결이 없는 회원에게 보내도 오류 없음. 하트비트는 설정한 주기로 등록 | `NotificationControllerTest`, `SseConnectionRegistryTest` |
-| NOTI-08 | P0 | 알림 신호의 서버 간 전달 | 한 서버가 Redis 채널로 발행한 신호를 구독 중인 서버 둘이 모두 받음. 발행한 회원 번호로만 전달. 깨진 메시지가 와도 구독이 유지됨 | `NotificationPushRedisTest` |
+| NOTI-08 | P0 | 알림 신호의 서버 간 전달 | 한 서버가 Redis 채널로 발행한 신호를 구독 중인 서버 둘이 모두 받음. 발행한 회원 번호로만 전달. 깨진 메시지가 와도 구독이 유지됨. Redis에 연결할 수 없어도 서버가 뜨고, 구독은 서버가 뜬 뒤에 시작하며 실패하면 다시 시도하고 정지하면 풀림 | `NotificationPushRedisTest`, `NotificationPushSubscriberTest`, `NotificationPushSubscriberStartupTest` |
 | NOTI-09 | P0 | 알림 저장 결과에 따른 실시간 신호 | 새로 저장했을 때만 그 회원에게 신호를 한 번 발행. 중복으로 건너뛰면 오류 없이 끝나고 발행하지 않음. 중복 키가 아닌 제약 위반과 그 밖의 저장 실패는 다시 던지고(재시도·DLT) 발행하지 않음. Redis 발행이 실패해도 예외를 던지지 않음 | `NotificationRequestedConsumerPushTest`, `NotificationPushPublisherTest` |
 
 ## 다른 담당과 공동 검증
