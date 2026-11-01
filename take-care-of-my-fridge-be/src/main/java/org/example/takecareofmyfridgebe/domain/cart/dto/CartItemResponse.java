@@ -15,7 +15,7 @@ public record CartItemResponse(
         int quantity,
         int listPrice,
         int unitPrice,
-        // 진행 중인 할인. 상품 목록·상세와 같은 모양이다. 할인이 없으면 null
+        // 진행 중인 할인. 상품 목록·상세와 같은 모양이다. 할인이 없으면 null.
         SaleResponse sale,
         boolean soldOut
 ) {

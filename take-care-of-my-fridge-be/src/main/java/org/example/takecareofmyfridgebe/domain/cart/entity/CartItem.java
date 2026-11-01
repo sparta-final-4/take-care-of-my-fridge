@@ -39,7 +39,7 @@ public class CartItem extends BaseTimeEntity {
     @JoinColumn(name = "cart_id", nullable = false)
     private Cart cart;
 
-    // 타 도메인(Product)과의 결합도를 낮추기 위해 연관관계 대신 ID로만 참조
+    // 타 도메인(Product)과의 결합도를 낮추기 위해 연관관계 대신 ID로만 참조.
     @Column(name = "product_id", nullable = false)
     private Long productId;
 
@@ -53,7 +53,7 @@ public class CartItem extends BaseTimeEntity {
         this.quantity = quantity;
     }
 
-    // 담긴 수량 변경
+    // 담긴 수량 변경.
     public void changeQuantity(int quantity) {
         this.quantity = quantity;
     }

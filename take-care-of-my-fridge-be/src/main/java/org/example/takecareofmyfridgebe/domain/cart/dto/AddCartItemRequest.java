@@ -13,7 +13,7 @@ public record AddCartItemRequest(
         Integer quantity
 ) {
 
-    // 수량을 생략하면 1개를 담는다
+    // 수량을 생략하면 1개를 담는다.
     public AddCartItemRequest {
         quantity = quantity == null ? 1 : quantity;
     }
