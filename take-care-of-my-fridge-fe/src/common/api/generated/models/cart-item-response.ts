@@ -14,28 +14,19 @@
  */
 
 
+// May contain unused imports in some cases
+// @ts-ignore
+import type { SaleResponse } from './sale-response';
 
 export interface CartItemResponse {
     'cartItemId'?: number;
-    'discountRate'?: number;
-    'flashDropLimit'?: number;
-    'flashDropRemaining'?: number;
     'imageUrl'?: string;
     'listPrice'?: number;
     'productId'?: number;
     'productName'?: string;
     'quantity'?: number;
-    'saleEndsAt'?: string;
-    'saleType'?: CartItemResponseSaleTypeEnum;
+    'sale'?: SaleResponse;
     'soldOut'?: boolean;
     'unitPrice'?: number;
 }
-
-export const CartItemResponseSaleTypeEnum = {
-    Special: 'SPECIAL',
-    FlashDrop: 'FLASH_DROP',
-} as const;
-
-export type CartItemResponseSaleTypeEnum = typeof CartItemResponseSaleTypeEnum[keyof typeof CartItemResponseSaleTypeEnum];
-
 
