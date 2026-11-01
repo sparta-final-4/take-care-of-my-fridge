@@ -11,7 +11,11 @@ import { formatPrice } from '@/domains/cart/format';
 import { confirmOrder } from '@/domains/order/api';
 import { ORDER_STATUS_LABELS } from '@/domains/order/format';
 import { orderQueries } from '@/domains/order/queries';
-import { isFullyRefunded, sumRefundAmountByStatus } from '@/domains/refund/format';
+import {
+  getOrderItemRefundState,
+  isFullyRefunded,
+  sumRefundAmountByStatus,
+} from '@/domains/refund/format';
 import { refundQueries } from '@/domains/refund/queries';
 
 import { OrderItemHeader, OrderItemRow } from './OrderItemRow';
@@ -140,9 +144,18 @@ export function OrderDetailSection({ orderId }: OrderDetailSectionProps) {
       </Flex>
       <section className={`${styles.card} ${styles.list}`} aria-label="주문 상품">
         <OrderItemHeader />
-        {order.items?.map((item) => (
-          <OrderItemRow key={item.productId} item={item} linkToProduct />
-        ))}
+        {order.items?.map((item) => {
+          // 환불 정보를 못 읽었으면 태그 없이 보인다. 상세 상품에는 주문 상품 번호가 없어 상품 번호로 짝을 짓는다.
+          const refundable = refundableItems?.find((other) => other.productId === item.productId);
+          return (
+            <OrderItemRow
+              key={item.productId}
+              item={item}
+              linkToProduct
+              refundState={refundable && getOrderItemRefundState(refundable)}
+            />
+          );
+        })}
       </section>
       <div className={styles.bottom}>
         <section className={styles.card} aria-label="결제 금액">
