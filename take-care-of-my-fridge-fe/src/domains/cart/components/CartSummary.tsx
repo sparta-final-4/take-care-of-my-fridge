@@ -28,11 +28,11 @@ export function CartSummary({ checkedItems }: CartSummaryProps) {
       idempotencyKey: string;
     }) =>
       createOrder(
-        items.map(({ cartItemId, unitPrice, saleType }) => ({
+        items.map(({ cartItemId, unitPrice, sale }) => ({
           cartItemId,
           unitPrice,
-          // 할인이 없으면 null이지만 생성 타입은 생략으로 받는다. 서버는 생략을 null로 읽는다.
-          saleType: saleType ?? undefined,
+          // 할인이 없으면 생략한다. 서버는 생략을 null로 읽는다.
+          saleType: sale?.type,
         })),
         idempotencyKey,
       ),
@@ -52,7 +52,7 @@ export function CartSummary({ checkedItems }: CartSummaryProps) {
   const handleOrder = () => {
     // 체크한 항목, 수량, 가격이 바뀌면 다른 주문이므로 새 키를 만든다. 같은 키로 보내면 서버가 거절한다.
     const request = checkedItems
-      .map((item) => `${item.cartItemId}:${item.quantity}:${item.unitPrice}:${item.saleType}`)
+      .map((item) => `${item.cartItemId}:${item.quantity}:${item.unitPrice}:${item.sale?.type}`)
       .join(',');
     if (attemptRef.current?.request !== request) {
       attemptRef.current = { request, idempotencyKey: crypto.randomUUID() };
