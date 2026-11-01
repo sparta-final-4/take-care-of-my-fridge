@@ -10,8 +10,7 @@ import org.example.takecareofmyfridgebe.domain.order.dto.OrderCreateResult;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderDetailResponse;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderListRequest;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderSummaryResponse;
-import org.example.takecareofmyfridgebe.domain.order.service.OrderCancelService;
-import org.example.takecareofmyfridgebe.domain.order.service.OrderConfirmService;
+import org.example.takecareofmyfridgebe.domain.order.service.OrderStatusService;
 import org.example.takecareofmyfridgebe.domain.order.service.OrderCreateService;
 import org.example.takecareofmyfridgebe.domain.order.service.OrderQueryService;
 import org.example.takecareofmyfridgebe.global.response.ApiResponse;
@@ -36,8 +35,7 @@ public class OrderController {
 
     private final OrderCreateService orderCreateService;
     private final OrderQueryService orderQueryService;
-    private final OrderCancelService orderCancelService;
-    private final OrderConfirmService orderConfirmService;
+    private final OrderStatusService orderStatusService;
 
     @PostMapping
     public ResponseEntity<ApiResponse<OrderCheckoutResponse>> createOrder(
@@ -78,7 +76,7 @@ public class OrderController {
     public ResponseEntity<ApiResponse<Void>> cancelOrder(
             @AuthenticationPrincipal AuthSessionService.AuthPrincipal principal,
             @PathVariable Long orderId) {
-        orderCancelService.cancel(principal.memberId(), orderId);
+        orderStatusService.cancel(principal.memberId(), orderId);
         return ResponseEntity.ok(ApiResponse.ok());
     }
 
@@ -87,6 +85,6 @@ public class OrderController {
     public ResponseEntity<ApiResponse<OrderConfirmResponse>> confirmOrder(
             @AuthenticationPrincipal AuthSessionService.AuthPrincipal principal,
             @PathVariable Long orderId) {
-        return ResponseEntity.ok(ApiResponse.ok(orderConfirmService.confirm(principal.memberId(), orderId)));
+        return ResponseEntity.ok(ApiResponse.ok(orderStatusService.confirm(principal.memberId(), orderId)));
     }
 }

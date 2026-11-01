@@ -2,7 +2,7 @@ package org.example.takecareofmyfridgebe.domain.payment.scheduler;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.example.takecareofmyfridgebe.domain.order.service.OrderCancelService;
+import org.example.takecareofmyfridgebe.domain.order.service.OrderStatusService;
 import org.example.takecareofmyfridgebe.domain.payment.entity.Payment;
 import org.example.takecareofmyfridgebe.domain.payment.facade.PaymentFacade;
 import org.example.takecareofmyfridgebe.domain.payment.service.PaymentCommandService;
@@ -25,7 +25,7 @@ public class PaymentTimeoutScheduler {
 
     private final PaymentService paymentService;
     private final PaymentFacade paymentFacade;
-    private final OrderCancelService orderCancelService;
+    private final OrderStatusService orderStatusService;
 
     // 이전 실행이 끝나고 1분 뒤 다시 실행해 실행끼리 겹치지 않는다. 기동 직후에는 1분 기다린다
     @Scheduled(fixedDelay = 60_000, initialDelay = 60_000)
@@ -84,7 +84,7 @@ public class PaymentTimeoutScheduler {
     // 한 건이 실패해도 나머지는 계속 처리한다. 실패한 건은 결제 대기로 남아 다음 실행에서 다시 시도한다
     private void cancelAbandoned(Long orderId, LocalDateTime lastPaymentBefore) {
         try {
-            orderCancelService.cancelAbandoned(orderId, lastPaymentBefore);
+            orderStatusService.cancelAbandoned(orderId, lastPaymentBefore);
         } catch (RuntimeException e) {
             log.error("결제 대기 주문 취소 실패, 다음 실행에서 재시도: orderId={}", orderId, e);
         }

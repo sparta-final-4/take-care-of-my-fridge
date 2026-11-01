@@ -1,5 +1,6 @@
 package org.example.takecareofmyfridgebe.domain.cart.service;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
@@ -38,6 +39,17 @@ public class CartService {
     public CartItem getItem(Long memberId, Long cartItemId) {
         return cartItemRepository.findByIdAndCartMemberId(cartItemId, memberId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.CART_ITEM_NOT_FOUND));
+    }
+
+    public List<CartItem> getItems(Long memberId, Collection<Long> cartItemIds) {
+        return cartItemRepository.findByIdInAndCartMemberId(cartItemIds, memberId);
+    }
+
+    // 주문하기가 같은 회원의 요청을 하나씩 순서대로 처리하려고 장바구니 행을 잠근다. 호출하는 쪽의 쓰기 트랜잭션 안에서 부른다.
+    @Transactional
+    public Cart getCartForUpdate(Long memberId) {
+        return cartRepository.findByMemberIdForUpdate(memberId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.CART_ITEM_NOT_FOUND));
     }
 
     @Transactional
