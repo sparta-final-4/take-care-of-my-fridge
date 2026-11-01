@@ -52,26 +52,26 @@ import org.springframework.transaction.annotation.Transactional;
 // 응답이 아니라 커밋된 행사와 행사 상품을 다시 읽어 확인한다.
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({JpaAuditingConfig.class, QueryDslConfig.class, SaleEventCreateService.class})
+@Import({JpaAuditingConfig.class, QueryDslConfig.class, SaleEventService.class, SaleProductReader.class})
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
-class SaleEventCreateServiceTransactionTest extends MySqlContainerSupport {
+class SaleEventServiceCreateTransactionTest extends MySqlContainerSupport {
 
     private static final LocalDateTime TOMORROW = LocalDateTime.now(ZoneId.of("Asia/Seoul")).plusDays(1);
 
-    private final SaleEventCreateService saleEventCreateService;
+    private final SaleEventService saleEventService;
     private final SaleEventRepository saleEventRepository;
     private final SaleEventItemRepository saleEventItemRepository;
     private final ProductRepository productRepository;
     private final JdbcTemplate jdbcTemplate;
 
     @Autowired
-    SaleEventCreateServiceTransactionTest(
-            SaleEventCreateService saleEventCreateService,
+    SaleEventServiceCreateTransactionTest(
+            SaleEventService saleEventService,
             SaleEventRepository saleEventRepository,
             SaleEventItemRepository saleEventItemRepository,
             ProductRepository productRepository,
             DataSource dataSource) {
-        this.saleEventCreateService = saleEventCreateService;
+        this.saleEventService = saleEventService;
         this.saleEventRepository = saleEventRepository;
         this.saleEventItemRepository = saleEventItemRepository;
         this.productRepository = productRepository;
@@ -91,7 +91,7 @@ class SaleEventCreateServiceTransactionTest extends MySqlContainerSupport {
         Product greenOnion = saveProduct("대파", 3000);
         Product tofu = saveProduct("두부", 1999);
 
-        SaleEventsCreateResponse response = saleEventCreateService.createSpecialSale(
+        SaleEventsCreateResponse response = saleEventService.createSpecialSale(
                 specialSale(item(greenOnion, 20), item(tofu, 15)));
 
         assertThat(response.saleEventIds()).hasSize(2);
@@ -115,7 +115,7 @@ class SaleEventCreateServiceTransactionTest extends MySqlContainerSupport {
     void createFlashDrop_savesLimitedQuantity() {
         Product tofu = saveProduct("두부", 3000);
 
-        SaleEventsCreateResponse response = saleEventCreateService.createFlashDrop(flashDrop(tofu));
+        SaleEventsCreateResponse response = saleEventService.createFlashDrop(flashDrop(tofu));
 
         SaleEvent saved = saleEventRepository.findById(response.saleEventIds().get(0)).orElseThrow();
         assertThat(saved.getType()).isEqualTo(SaleEventType.FLASH_DROP);
@@ -133,7 +133,7 @@ class SaleEventCreateServiceTransactionTest extends MySqlContainerSupport {
         Product tofu = saveProduct("두부", 3000);
         Product greenOnion = saveProduct("대파", 2000);
 
-        SaleEventsCreateResponse response = saleEventCreateService.createFlashDrop(new FlashDropCreateRequest(
+        SaleEventsCreateResponse response = saleEventService.createFlashDrop(new FlashDropCreateRequest(
                 TOMORROW, TOMORROW.plusHours(2),
                 List.of(new FlashDropItemRequest(tofu.getId(), 50, 10), new FlashDropItemRequest(greenOnion.getId(), 30, 4))));
 
@@ -156,7 +156,7 @@ class SaleEventCreateServiceTransactionTest extends MySqlContainerSupport {
         Product tofu = saveProduct("두부", 3000);
         Product greenOnion = saveProduct("대파", 2000);
 
-        assertThatThrownBy(() -> saleEventCreateService.createFlashDrop(new FlashDropCreateRequest(
+        assertThatThrownBy(() -> saleEventService.createFlashDrop(new FlashDropCreateRequest(
                 TOMORROW, TOMORROW.plusHours(2),
                 List.of(new FlashDropItemRequest(tofu.getId(), 50, 10), new FlashDropItemRequest(greenOnion.getId(), 30, 11)))))
                 .isInstanceOf(BusinessException.class)
@@ -169,12 +169,12 @@ class SaleEventCreateServiceTransactionTest extends MySqlContainerSupport {
     @DisplayName("종료 시각이 지난 행사는 상태 정리가 늦어도 같은 상품의 새 행사를 막지 않는다")
     void create_productInOverdueEvent_allowed() {
         Product tofu = saveProduct("두부", 3000);
-        Long overdueEventId = saleEventCreateService.createFlashDrop(flashDrop(tofu)).saleEventIds().get(0);
+        Long overdueEventId = saleEventService.createFlashDrop(flashDrop(tofu)).saleEventIds().get(0);
         changeStatus(overdueEventId, SaleEventStatus.ACTIVE);
         jdbcTemplate.update("update sale_events set ends_at = ? where id = ?",
                 LocalDateTime.now(ZoneId.of("Asia/Seoul")).minusMinutes(1), overdueEventId);
 
-        saleEventCreateService.createFlashDrop(flashDrop(tofu));
+        saleEventService.createFlashDrop(flashDrop(tofu));
 
         assertThat(saleEventRepository.count()).isEqualTo(2);
     }
@@ -186,7 +186,7 @@ class SaleEventCreateServiceTransactionTest extends MySqlContainerSupport {
         FlashDropCreateRequest request = new FlashDropCreateRequest(TOMORROW, TOMORROW.plusHours(2),
                 List.of(new FlashDropItemRequest(tofu.getId(), 50, 11)));
 
-        assertThatThrownBy(() -> saleEventCreateService.createFlashDrop(request))
+        assertThatThrownBy(() -> saleEventService.createFlashDrop(request))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("한정 수량이 재고보다 많습니다 · 두부")
                 .extracting("errorCode").isEqualTo(ErrorCode.INVALID_INPUT_VALUE);
@@ -199,15 +199,15 @@ class SaleEventCreateServiceTransactionTest extends MySqlContainerSupport {
     void create_productInOpenEvent_rejects() {
         Product greenOnion = saveProduct("대파", 3000);
         Product tofu = saveProduct("두부", 3000);
-        saleEventCreateService.createSpecialSale(specialSale(item(greenOnion, 20)));
-        Long activeEventId = saleEventCreateService.createFlashDrop(flashDrop(tofu)).saleEventIds().get(0);
+        saleEventService.createSpecialSale(specialSale(item(greenOnion, 20)));
+        Long activeEventId = saleEventService.createFlashDrop(flashDrop(tofu)).saleEventIds().get(0);
         changeStatus(activeEventId, SaleEventStatus.ACTIVE);
 
-        assertThatThrownBy(() -> saleEventCreateService.createFlashDrop(flashDrop(greenOnion)))
+        assertThatThrownBy(() -> saleEventService.createFlashDrop(flashDrop(greenOnion)))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("이미 행사가 있는 상품 · 대파")
                 .extracting("errorCode").isEqualTo(ErrorCode.SALE_EVENT_PRODUCT_DUPLICATED);
-        assertThatThrownBy(() -> saleEventCreateService.createSpecialSale(specialSale(item(tofu, 10))))
+        assertThatThrownBy(() -> saleEventService.createSpecialSale(specialSale(item(tofu, 10))))
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode").isEqualTo(ErrorCode.SALE_EVENT_PRODUCT_DUPLICATED);
         assertThat(saleEventRepository.count()).isEqualTo(2);
@@ -218,10 +218,10 @@ class SaleEventCreateServiceTransactionTest extends MySqlContainerSupport {
     @DisplayName("종료된 행사에 들었던 상품은 새 행사에 다시 넣을 수 있다")
     void create_productInEndedEvent_saves() {
         Product greenOnion = saveProduct("대파", 3000);
-        Long endedEventId = saleEventCreateService.createSpecialSale(specialSale(item(greenOnion, 20))).saleEventIds().get(0);
+        Long endedEventId = saleEventService.createSpecialSale(specialSale(item(greenOnion, 20))).saleEventIds().get(0);
         changeStatus(endedEventId, SaleEventStatus.ENDED);
 
-        saleEventCreateService.createFlashDrop(flashDrop(greenOnion));
+        saleEventService.createFlashDrop(flashDrop(greenOnion));
 
         assertThat(saleEventRepository.count()).isEqualTo(2);
         assertThat(saleEventItemRepository.count()).isEqualTo(2);
@@ -234,12 +234,12 @@ class SaleEventCreateServiceTransactionTest extends MySqlContainerSupport {
         Product soldOut = saveProduct("두부", 3000, ProductStatus.SOLD_OUT);
         Product stopped = saveProduct("양파", 3000, ProductStatus.STOPPED);
 
-        assertThatThrownBy(() -> saleEventCreateService.createSpecialSale(
+        assertThatThrownBy(() -> saleEventService.createSpecialSale(
                 specialSale(item(greenOnion, 20), item(soldOut, 20))))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("품절 · 두부")
                 .extracting("errorCode").isEqualTo(ErrorCode.PRODUCT_NOT_ON_SALE);
-        assertThatThrownBy(() -> saleEventCreateService.createFlashDrop(flashDrop(stopped)))
+        assertThatThrownBy(() -> saleEventService.createFlashDrop(flashDrop(stopped)))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("판매 중지 · 양파")
                 .extracting("errorCode").isEqualTo(ErrorCode.PRODUCT_NOT_ON_SALE);
@@ -252,7 +252,7 @@ class SaleEventCreateServiceTransactionTest extends MySqlContainerSupport {
     void create_missingProduct_rejects() {
         Product greenOnion = saveProduct("대파", 3000);
 
-        assertThatThrownBy(() -> saleEventCreateService.createSpecialSale(specialSale(
+        assertThatThrownBy(() -> saleEventService.createSpecialSale(specialSale(
                 item(greenOnion, 20), new SpecialSaleItemRequest(greenOnion.getId() + 1000, 20))))
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode").isEqualTo(ErrorCode.PRODUCT_NOT_FOUND);
@@ -265,7 +265,7 @@ class SaleEventCreateServiceTransactionTest extends MySqlContainerSupport {
         Product greenOnion = saveProduct("대파", 3000);
         LocalDateTime past = LocalDateTime.now(ZoneId.of("Asia/Seoul")).minusMinutes(1);
 
-        assertThatThrownBy(() -> saleEventCreateService.createFlashDrop(
+        assertThatThrownBy(() -> saleEventService.createFlashDrop(
                 new FlashDropCreateRequest(past, past.plusHours(2),
                         List.of(new FlashDropItemRequest(greenOnion.getId(), 50, 10)))))
                 .isInstanceOf(BusinessException.class)
@@ -279,7 +279,7 @@ class SaleEventCreateServiceTransactionTest extends MySqlContainerSupport {
         Product tofu = saveProduct("두부", 3000);
 
         List<Throwable> failures = runConcurrently(Collections.nCopies(5, () -> {
-            saleEventCreateService.createFlashDrop(flashDrop(tofu));
+            saleEventService.createFlashDrop(flashDrop(tofu));
             return null;
         }));
 

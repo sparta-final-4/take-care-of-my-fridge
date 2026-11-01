@@ -40,29 +40,29 @@ import org.springframework.transaction.annotation.Transactional;
 // 응답이 아니라 커밋된 할인 행사와 행사 항목을 다시 읽어 확인한다.
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({JpaAuditingConfig.class, QueryDslConfig.class, SaleEventTerminationService.class, SaleCandidateProductQueryService.class})
+@Import({JpaAuditingConfig.class, QueryDslConfig.class, SaleEventService.class, SaleProductReader.class, SaleEventQueryService.class})
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
-class SaleEventTerminationServiceTransactionTest extends MySqlContainerSupport {
+class SaleEventServiceTerminationTransactionTest extends MySqlContainerSupport {
 
     private static final ZoneId ZONE = ZoneId.of("Asia/Seoul");
 
-    private final SaleEventTerminationService saleEventTerminationService;
-    private final SaleCandidateProductQueryService saleCandidateProductQueryService;
+    private final SaleEventService saleEventService;
+    private final SaleEventQueryService saleEventQueryService;
     private final SaleEventRepository saleEventRepository;
     private final SaleEventItemRepository saleEventItemRepository;
     private final ProductRepository productRepository;
     private final JdbcTemplate jdbcTemplate;
 
     @Autowired
-    SaleEventTerminationServiceTransactionTest(
-            SaleEventTerminationService saleEventTerminationService,
-            SaleCandidateProductQueryService saleCandidateProductQueryService,
+    SaleEventServiceTerminationTransactionTest(
+            SaleEventService saleEventService,
+            SaleEventQueryService saleEventQueryService,
             SaleEventRepository saleEventRepository,
             SaleEventItemRepository saleEventItemRepository,
             ProductRepository productRepository,
             DataSource dataSource) {
-        this.saleEventTerminationService = saleEventTerminationService;
-        this.saleCandidateProductQueryService = saleCandidateProductQueryService;
+        this.saleEventService = saleEventService;
+        this.saleEventQueryService = saleEventQueryService;
         this.saleEventRepository = saleEventRepository;
         this.saleEventItemRepository = saleEventItemRepository;
         this.productRepository = productRepository;
@@ -83,7 +83,7 @@ class SaleEventTerminationServiceTransactionTest extends MySqlContainerSupport {
         SaleEvent event = saveEvent(SaleEventStatus.ACTIVE, minutesFromNow(-60), minutesFromNow(60), tofu);
 
         LocalDateTime before = LocalDateTime.now(ZONE).withNano(0);
-        saleEventTerminationService.end(event.getId());
+        saleEventService.end(event.getId());
 
         SaleEvent saved = saleEventRepository.findById(event.getId()).orElseThrow();
         assertThat(saved.getStatus()).isEqualTo(SaleEventStatus.ENDED);
@@ -103,7 +103,7 @@ class SaleEventTerminationServiceTransactionTest extends MySqlContainerSupport {
         assertThat(saleEventItemRepository.findActiveByProductIds(productIds, SaleEventStatus.OPEN, now)).hasSize(1);
         assertThat(candidateProductIds()).isEmpty();
 
-        saleEventTerminationService.end(event.getId());
+        saleEventService.end(event.getId());
 
         assertThat(saleEventItemRepository.findActiveByProductIds(productIds, SaleEventStatus.OPEN, now)).isEmpty();
         assertThat(candidateProductIds()).containsExactly(tofu.getId());
@@ -115,7 +115,7 @@ class SaleEventTerminationServiceTransactionTest extends MySqlContainerSupport {
         Product tofu = saveProduct("두부");
         SaleEvent event = saveEvent(SaleEventStatus.SCHEDULED, minutesFromNow(-1), minutesFromNow(60), tofu);
 
-        saleEventTerminationService.end(event.getId());
+        saleEventService.end(event.getId());
 
         assertThat(saleEventRepository.findById(event.getId()).orElseThrow().getStatus())
                 .isEqualTo(SaleEventStatus.ENDED);
@@ -133,7 +133,7 @@ class SaleEventTerminationServiceTransactionTest extends MySqlContainerSupport {
         SaleEvent overdue = saveEvent(SaleEventStatus.ACTIVE, minutesFromNow(-120), minutesFromNow(-1), onion);
 
         for (SaleEvent event : new SaleEvent[] {scheduled, ended, overdue}) {
-            assertThatThrownBy(() -> saleEventTerminationService.end(event.getId()))
+            assertThatThrownBy(() -> saleEventService.end(event.getId()))
                     .isInstanceOf(BusinessException.class)
                     .extracting("errorCode").isEqualTo(ErrorCode.SALE_EVENT_NOT_ENDABLE);
         }
@@ -146,10 +146,10 @@ class SaleEventTerminationServiceTransactionTest extends MySqlContainerSupport {
     @Test
     @DisplayName("없는 할인 행사는 종료·삭제 모두 404로 거절한다")
     void missing_rejects() {
-        assertThatThrownBy(() -> saleEventTerminationService.end(999L))
+        assertThatThrownBy(() -> saleEventService.end(999L))
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode").isEqualTo(ErrorCode.SALE_EVENT_NOT_FOUND);
-        assertThatThrownBy(() -> saleEventTerminationService.delete(999L))
+        assertThatThrownBy(() -> saleEventService.delete(999L))
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode").isEqualTo(ErrorCode.SALE_EVENT_NOT_FOUND);
     }
@@ -163,7 +163,7 @@ class SaleEventTerminationServiceTransactionTest extends MySqlContainerSupport {
         SaleEvent target = saveEvent(SaleEventStatus.SCHEDULED, minutesFromNow(60), minutesFromNow(120), greenOnion, tofu);
         SaleEvent other = saveEvent(SaleEventStatus.SCHEDULED, minutesFromNow(60), minutesFromNow(120), onion);
 
-        saleEventTerminationService.delete(target.getId());
+        saleEventService.delete(target.getId());
 
         assertThat(saleEventRepository.findAll()).extracting(SaleEvent::getId).containsExactly(other.getId());
         assertThat(saleEventItemRepository.findAll()).extracting(SaleEventItem::getProductId)
@@ -182,7 +182,7 @@ class SaleEventTerminationServiceTransactionTest extends MySqlContainerSupport {
         SaleEvent overdue = saveEvent(SaleEventStatus.SCHEDULED, minutesFromNow(-1), minutesFromNow(60), onion);
 
         for (SaleEvent event : new SaleEvent[] {active, ended, overdue}) {
-            assertThatThrownBy(() -> saleEventTerminationService.delete(event.getId()))
+            assertThatThrownBy(() -> saleEventService.delete(event.getId()))
                     .isInstanceOf(BusinessException.class)
                     .extracting("errorCode").isEqualTo(ErrorCode.SALE_EVENT_NOT_DELETABLE);
         }
@@ -191,7 +191,7 @@ class SaleEventTerminationServiceTransactionTest extends MySqlContainerSupport {
     }
 
     private List<Long> candidateProductIds() {
-        return saleCandidateProductQueryService.getCandidates(new SaleCandidateProductsRequest(null, null, null, null))
+        return saleEventQueryService.getCandidates(new SaleCandidateProductsRequest(null, null, null, null))
                 .content().stream().map(SaleCandidateProductResponse::productId).toList();
     }
 

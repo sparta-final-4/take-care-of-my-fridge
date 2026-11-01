@@ -44,30 +44,27 @@ import org.springframework.transaction.annotation.Transactional;
 // 응답이 아니라 커밋된 행사와 행사 상품을 다시 읽어 확인한다.
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({JpaAuditingConfig.class, QueryDslConfig.class, SaleEventCreateService.class, SaleEventUpdateService.class})
+@Import({JpaAuditingConfig.class, QueryDslConfig.class, SaleEventService.class, SaleProductReader.class})
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
-class SaleEventUpdateServiceTransactionTest extends MySqlContainerSupport {
+class SaleEventServiceUpdateTransactionTest extends MySqlContainerSupport {
 
     private static final LocalDateTime TOMORROW =
             LocalDateTime.now(ZoneId.of("Asia/Seoul")).plusDays(1).withNano(0);
 
-    private final SaleEventCreateService saleEventCreateService;
-    private final SaleEventUpdateService saleEventUpdateService;
+    private final SaleEventService saleEventService;
     private final SaleEventRepository saleEventRepository;
     private final SaleEventItemRepository saleEventItemRepository;
     private final ProductRepository productRepository;
     private final JdbcTemplate jdbcTemplate;
 
     @Autowired
-    SaleEventUpdateServiceTransactionTest(
-            SaleEventCreateService saleEventCreateService,
-            SaleEventUpdateService saleEventUpdateService,
+    SaleEventServiceUpdateTransactionTest(
+            SaleEventService saleEventService,
             SaleEventRepository saleEventRepository,
             SaleEventItemRepository saleEventItemRepository,
             ProductRepository productRepository,
             DataSource dataSource) {
-        this.saleEventCreateService = saleEventCreateService;
-        this.saleEventUpdateService = saleEventUpdateService;
+        this.saleEventService = saleEventService;
         this.saleEventRepository = saleEventRepository;
         this.saleEventItemRepository = saleEventItemRepository;
         this.productRepository = productRepository;
@@ -89,7 +86,7 @@ class SaleEventUpdateServiceTransactionTest extends MySqlContainerSupport {
         Long eventId = saveSpecialEvent(greenOnion, tofu);
         jdbcTemplate.update("update products set price = 4000 where id = ?", greenOnion.getId());
 
-        saleEventUpdateService.update(eventId, new SaleEventUpdateRequest(
+        saleEventService.update(eventId, new SaleEventUpdateRequest(
                 TOMORROW.plusDays(2), TOMORROW.plusDays(9),
                 List.of(item(greenOnion, 30, null), item(tofu, 10, null))));
 
@@ -109,9 +106,9 @@ class SaleEventUpdateServiceTransactionTest extends MySqlContainerSupport {
     @DisplayName("번개 드롭의 시각·할인율·한정 수량을 고치면 남은 수량도 한정 수량과 같게 맞춰진다")
     void update_flashDrop_resetsRemaining() {
         Product tofu = saveProduct("두부", 3000);
-        Long eventId = saleEventCreateService.createFlashDrop(flashDrop(tofu)).saleEventIds().get(0);
+        Long eventId = saleEventService.createFlashDrop(flashDrop(tofu)).saleEventIds().get(0);
 
-        saleEventUpdateService.update(eventId, new SaleEventUpdateRequest(
+        saleEventService.update(eventId, new SaleEventUpdateRequest(
                 TOMORROW.plusHours(5), TOMORROW.plusHours(7), List.of(item(tofu, 40, 4))));
 
         SaleEvent saved = saleEventRepository.findById(eventId).orElseThrow();
@@ -142,7 +139,7 @@ class SaleEventUpdateServiceTransactionTest extends MySqlContainerSupport {
         Map<Long, Product> productByEventId = Map.of(activeId, greenOnion, endedId, tofu, overdueId, onion);
 
         productByEventId.forEach((eventId, product) ->
-                assertThatThrownBy(() -> saleEventUpdateService.update(eventId,
+                assertThatThrownBy(() -> saleEventService.update(eventId,
                         new SaleEventUpdateRequest(TOMORROW.plusDays(3), TOMORROW.plusDays(4),
                                 List.of(item(product, 50, null)))))
                         .isInstanceOf(BusinessException.class)
@@ -162,7 +159,7 @@ class SaleEventUpdateServiceTransactionTest extends MySqlContainerSupport {
         Long eventId = saveSpecialEvent(greenOnion, tofu);
 
         // 특가는 한정 수량을 받지 않으므로 두 번째 항목이 거절된다
-        assertThatThrownBy(() -> saleEventUpdateService.update(eventId, new SaleEventUpdateRequest(
+        assertThatThrownBy(() -> saleEventService.update(eventId, new SaleEventUpdateRequest(
                 TOMORROW.plusDays(2), TOMORROW.plusDays(9),
                 List.of(item(greenOnion, 50, null), item(tofu, 50, 5)))))
                 .isInstanceOf(BusinessException.class)
@@ -178,9 +175,9 @@ class SaleEventUpdateServiceTransactionTest extends MySqlContainerSupport {
     @DisplayName("한정 수량이 재고보다 많으면 거절하고 값은 그대로다")
     void update_limitedQuantityOverStock_rejects() {
         Product tofu = saveProduct("두부", 3000);
-        Long eventId = saleEventCreateService.createFlashDrop(flashDrop(tofu)).saleEventIds().get(0);
+        Long eventId = saleEventService.createFlashDrop(flashDrop(tofu)).saleEventIds().get(0);
 
-        assertThatThrownBy(() -> saleEventUpdateService.update(eventId, new SaleEventUpdateRequest(
+        assertThatThrownBy(() -> saleEventService.update(eventId, new SaleEventUpdateRequest(
                 TOMORROW, TOMORROW.plusHours(2), List.of(item(tofu, 10, 11)))))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("한정 수량이 재고보다 많습니다 · 두부")
@@ -195,9 +192,9 @@ class SaleEventUpdateServiceTransactionTest extends MySqlContainerSupport {
     @DisplayName("번개 드롭에 한정 수량이 없으면 거절한다")
     void update_flashDropWithoutLimitedQuantity_rejects() {
         Product tofu = saveProduct("두부", 3000);
-        Long eventId = saleEventCreateService.createFlashDrop(flashDrop(tofu)).saleEventIds().get(0);
+        Long eventId = saleEventService.createFlashDrop(flashDrop(tofu)).saleEventIds().get(0);
 
-        assertThatThrownBy(() -> saleEventUpdateService.update(eventId, new SaleEventUpdateRequest(
+        assertThatThrownBy(() -> saleEventService.update(eventId, new SaleEventUpdateRequest(
                 TOMORROW, TOMORROW.plusHours(2), List.of(item(tofu, 10, null)))))
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode").isEqualTo(ErrorCode.INVALID_INPUT_VALUE);
@@ -216,7 +213,7 @@ class SaleEventUpdateServiceTransactionTest extends MySqlContainerSupport {
         for (List<SaleEventItemUpdateRequest> items : List.of(
                 List.of(item(greenOnion, 50, null)),
                 List.of(item(greenOnion, 50, null), item(onion, 50, null)))) {
-            assertThatThrownBy(() -> saleEventUpdateService.update(eventId,
+            assertThatThrownBy(() -> saleEventService.update(eventId,
                     new SaleEventUpdateRequest(TOMORROW, TOMORROW.plusDays(7), items)))
                     .isInstanceOf(BusinessException.class)
                     .extracting("errorCode").isEqualTo(ErrorCode.INVALID_INPUT_VALUE);
@@ -232,7 +229,7 @@ class SaleEventUpdateServiceTransactionTest extends MySqlContainerSupport {
         Long eventId = saveSpecialEvent(greenOnion);
         LocalDateTime past = LocalDateTime.now(ZoneId.of("Asia/Seoul")).minusMinutes(1);
 
-        assertThatThrownBy(() -> saleEventUpdateService.update(eventId, new SaleEventUpdateRequest(
+        assertThatThrownBy(() -> saleEventService.update(eventId, new SaleEventUpdateRequest(
                 past, past.plusHours(2), List.of(item(greenOnion, 50, null)))))
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode").isEqualTo(ErrorCode.INVALID_INPUT_VALUE);
@@ -242,7 +239,7 @@ class SaleEventUpdateServiceTransactionTest extends MySqlContainerSupport {
     @Test
     @DisplayName("없는 행사는 404로 거절한다")
     void update_missing_rejects() {
-        assertThatThrownBy(() -> saleEventUpdateService.update(999L, new SaleEventUpdateRequest(
+        assertThatThrownBy(() -> saleEventService.update(999L, new SaleEventUpdateRequest(
                 TOMORROW, TOMORROW.plusDays(1), List.of(new SaleEventItemUpdateRequest(1L, 10, null)))))
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode").isEqualTo(ErrorCode.SALE_EVENT_NOT_FOUND);

@@ -46,11 +46,11 @@ import org.springframework.transaction.annotation.Transactional;
 // 행사 목록의 상태·종류·시작일·종료일 조건을 DB 값으로 확인한다.
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({JpaAuditingConfig.class, QueryDslConfig.class, SaleEventListQueryService.class})
+@Import({JpaAuditingConfig.class, QueryDslConfig.class, SaleEventQueryService.class})
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
-class SaleEventListQueryServiceTest extends MySqlContainerSupport {
+class SaleEventQueryServiceListTest extends MySqlContainerSupport {
 
-    private final SaleEventListQueryService saleEventListQueryService;
+    private final SaleEventQueryService saleEventQueryService;
     private final SaleEventRepository saleEventRepository;
     private final SaleEventItemRepository saleEventItemRepository;
     private final ProductRepository productRepository;
@@ -63,15 +63,15 @@ class SaleEventListQueryServiceTest extends MySqlContainerSupport {
     private SaleEvent endedSpecial;
 
     @Autowired
-    SaleEventListQueryServiceTest(
-            SaleEventListQueryService saleEventListQueryService,
+    SaleEventQueryServiceListTest(
+            SaleEventQueryService saleEventQueryService,
             SaleEventRepository saleEventRepository,
             SaleEventItemRepository saleEventItemRepository,
             ProductRepository productRepository,
             OrderRepository orderRepository,
             OrderItemRepository orderItemRepository,
             DataSource dataSource) {
-        this.saleEventListQueryService = saleEventListQueryService;
+        this.saleEventQueryService = saleEventQueryService;
         this.saleEventRepository = saleEventRepository;
         this.saleEventItemRepository = saleEventItemRepository;
         this.productRepository = productRepository;
@@ -182,12 +182,12 @@ class SaleEventListQueryServiceTest extends MySqlContainerSupport {
     }
 
     private List<SaleEventListResponse> rows(SaleEventListSort sort, Sort.Direction direction) {
-        return saleEventListQueryService.getSaleEvents(
+        return saleEventQueryService.getSaleEvents(
                 new SaleEventListRequest(null, null, null, null, null, null, null, sort, direction, null, null)).content();
     }
 
     private List<Long> sorted(SaleEventListSort sort, Sort.Direction direction) {
-        return saleEventListQueryService.getSaleEvents(
+        return saleEventQueryService.getSaleEvents(
                         new SaleEventListRequest(null, null, null, null, null, null, null, sort, direction, null, null))
                 .content().stream().map(SaleEventListResponse::saleEventId).distinct().toList();
     }
@@ -199,7 +199,7 @@ class SaleEventListQueryServiceTest extends MySqlContainerSupport {
 
     private List<SaleEventListResponse> query(SaleEventStatus status, SaleEventType type, LocalDate startFrom,
                                               LocalDate startTo, LocalDate endFrom, LocalDate endTo) {
-        return saleEventListQueryService.getSaleEvents(
+        return saleEventQueryService.getSaleEvents(
                 new SaleEventListRequest(status, type, null, startFrom, startTo, endFrom, endTo, null, null, null, null)).content();
     }
 

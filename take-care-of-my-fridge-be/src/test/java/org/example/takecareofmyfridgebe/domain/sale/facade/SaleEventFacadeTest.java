@@ -1,4 +1,4 @@
-package org.example.takecareofmyfridgebe.domain.sale.service;
+package org.example.takecareofmyfridgebe.domain.sale.facade;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -13,6 +13,10 @@ import org.example.takecareofmyfridgebe.domain.product.entity.Product;
 import org.example.takecareofmyfridgebe.domain.product.entity.ProductStatus;
 import org.example.takecareofmyfridgebe.domain.product.entity.ProductType;
 import org.example.takecareofmyfridgebe.domain.product.repository.ProductRepository;
+import org.example.takecareofmyfridgebe.domain.product.service.ProductService;
+import org.example.takecareofmyfridgebe.domain.sale.service.SaleEventQueryService;
+import org.example.takecareofmyfridgebe.domain.sale.service.SaleEventService;
+import org.example.takecareofmyfridgebe.domain.sale.service.SaleProductReader;
 import org.example.takecareofmyfridgebe.domain.sale.dto.FlashDropCreateRequest;
 import org.example.takecareofmyfridgebe.domain.sale.dto.FlashDropItemRequest;
 import org.example.takecareofmyfridgebe.domain.sale.dto.SaleEventDetailResponse;
@@ -41,31 +45,31 @@ import org.springframework.transaction.annotation.Transactional;
 // 행사 수정 화면에 보여 줄 행사 하나와 행사 항목을 DB 값으로 확인한다.
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({JpaAuditingConfig.class, QueryDslConfig.class, SaleEventCreateService.class,
-        SaleEventDetailQueryService.class})
+@Import({JpaAuditingConfig.class, QueryDslConfig.class, SaleEventService.class,
+        SaleProductReader.class, SaleEventQueryService.class, SaleEventFacade.class, ProductService.class})
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
-class SaleEventDetailQueryServiceTest extends MySqlContainerSupport {
+class SaleEventFacadeTest extends MySqlContainerSupport {
 
     private static final LocalDateTime TOMORROW =
             LocalDateTime.now(ZoneId.of("Asia/Seoul")).plusDays(1).withNano(0);
 
-    private final SaleEventCreateService saleEventCreateService;
-    private final SaleEventDetailQueryService saleEventDetailQueryService;
+    private final SaleEventService saleEventService;
+    private final SaleEventFacade saleEventFacade;
     private final SaleEventRepository saleEventRepository;
     private final SaleEventItemRepository saleEventItemRepository;
     private final ProductRepository productRepository;
     private final JdbcTemplate jdbcTemplate;
 
     @Autowired
-    SaleEventDetailQueryServiceTest(
-            SaleEventCreateService saleEventCreateService,
-            SaleEventDetailQueryService saleEventDetailQueryService,
+    SaleEventFacadeTest(
+            SaleEventService saleEventService,
+            SaleEventFacade saleEventFacade,
             SaleEventRepository saleEventRepository,
             SaleEventItemRepository saleEventItemRepository,
             ProductRepository productRepository,
             DataSource dataSource) {
-        this.saleEventCreateService = saleEventCreateService;
-        this.saleEventDetailQueryService = saleEventDetailQueryService;
+        this.saleEventService = saleEventService;
+        this.saleEventFacade = saleEventFacade;
         this.saleEventRepository = saleEventRepository;
         this.saleEventItemRepository = saleEventItemRepository;
         this.productRepository = productRepository;
@@ -94,7 +98,7 @@ class SaleEventDetailQueryServiceTest extends MySqlContainerSupport {
         Long eventId = event.getId();
         jdbcTemplate.update("update products set price = 4000 where id = ?", greenOnion.getId());
 
-        SaleEventDetailResponse response = saleEventDetailQueryService.getSaleEvent(eventId);
+        SaleEventDetailResponse response = saleEventFacade.getSaleEvent(eventId);
 
         assertThat(response.type()).isEqualTo(SaleEventType.SPECIAL);
         assertThat(response.status()).isEqualTo(SaleEventStatus.SCHEDULED);
@@ -111,13 +115,13 @@ class SaleEventDetailQueryServiceTest extends MySqlContainerSupport {
     @DisplayName("종료된 번개 드롭의 정가는 등록 당시 정가이고 한정·남은 수량을 함께 준다")
     void getSaleEvent_endedFlashDrop_returnsStoredListPrice() {
         Product tofu = saveProduct("두부", 3000);
-        Long eventId = saleEventCreateService.createFlashDrop(
+        Long eventId = saleEventService.createFlashDrop(
                 new FlashDropCreateRequest(TOMORROW, TOMORROW.plusHours(2),
                         List.of(new FlashDropItemRequest(tofu.getId(), 50, 10)))).saleEventIds().get(0);
         jdbcTemplate.update("update sale_events set status = ? where id = ?", SaleEventStatus.ENDED.name(), eventId);
         jdbcTemplate.update("update products set price = 4000 where id = ?", tofu.getId());
 
-        SaleEventDetailResponse response = saleEventDetailQueryService.getSaleEvent(eventId);
+        SaleEventDetailResponse response = saleEventFacade.getSaleEvent(eventId);
 
         assertThat(response.items())
                 .extracting(SaleEventDetailResponse.SaleEventDetailItem::listPrice, SaleEventDetailResponse.SaleEventDetailItem::limitedQuantity,
@@ -128,7 +132,7 @@ class SaleEventDetailQueryServiceTest extends MySqlContainerSupport {
     @Test
     @DisplayName("없는 행사는 404로 거절한다")
     void getSaleEvent_missing_rejects() {
-        assertThatThrownBy(() -> saleEventDetailQueryService.getSaleEvent(999L))
+        assertThatThrownBy(() -> saleEventFacade.getSaleEvent(999L))
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode").isEqualTo(ErrorCode.SALE_EVENT_NOT_FOUND);
     }
