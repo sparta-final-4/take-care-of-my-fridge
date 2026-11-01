@@ -16,9 +16,13 @@ import org.example.takecareofmyfridgebe.domain.cart.entity.CartItem;
 import org.example.takecareofmyfridgebe.domain.cart.repository.CartItemRepository;
 import org.example.takecareofmyfridgebe.domain.cart.repository.CartRepository;
 import org.example.takecareofmyfridgebe.domain.cart.dto.AddCartItemRequest;
-import org.example.takecareofmyfridgebe.domain.cart.service.CartProductReader;
 import org.example.takecareofmyfridgebe.domain.cart.service.CartService;
+import org.example.takecareofmyfridgebe.domain.ingredient.repository.IngredientRepository;
+import org.example.takecareofmyfridgebe.domain.product.repository.IngredientProductRepository;
+import org.example.takecareofmyfridgebe.domain.product.repository.MealkitProductRepository;
 import org.example.takecareofmyfridgebe.domain.product.repository.ProductRepository;
+import org.example.takecareofmyfridgebe.domain.product.service.ProductService;
+import org.springframework.context.ApplicationEventPublisher;
 import org.example.takecareofmyfridgebe.domain.sale.dto.ActiveSale;
 import org.example.takecareofmyfridgebe.domain.sale.entity.SaleEventType;
 import org.example.takecareofmyfridgebe.domain.sale.repository.SaleEventItemRepository;
@@ -52,15 +56,29 @@ class CartFacadeTest {
     private ProductRepository productRepository;
 
     @Mock
+    private IngredientProductRepository ingredientProductRepository;
+
+    @Mock
+    private MealkitProductRepository mealkitProductRepository;
+
+    @Mock
+    private IngredientRepository ingredientRepository;
+
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
+    @Mock
     private SaleEventItemRepository saleEventItemRepository;
 
     private CartFacade cartFacade;
 
-    // 판매가 판단까지 실제로 거치도록 SaleEventReader와 서비스는 진짜를 쓰고 그 아래 조회만 대신한다
+    // 판매가 판단까지 실제로 거치도록 SaleEventReader와 서비스는 진짜를 쓰고 그 아래 조회만 대신한다.
+    // 상품 서비스도 진짜를 쓰고 저장소만 대신한다
     @BeforeEach
     void setUp() {
         cartFacade = new CartFacade(new CartService(cartRepository, cartItemRepository),
-                new CartProductReader(productRepository), new SaleEventReader(saleEventItemRepository));
+                new ProductService(productRepository, ingredientProductRepository,
+                        mealkitProductRepository, ingredientRepository, eventPublisher), new SaleEventReader(saleEventItemRepository));
     }
 
     @Test
