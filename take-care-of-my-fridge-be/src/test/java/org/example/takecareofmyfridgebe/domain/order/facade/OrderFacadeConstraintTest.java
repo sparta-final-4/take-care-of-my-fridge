@@ -1,4 +1,4 @@
-package org.example.takecareofmyfridgebe.domain.order.service;
+package org.example.takecareofmyfridgebe.domain.order.facade;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -9,11 +9,15 @@ import org.example.takecareofmyfridgebe.domain.cart.entity.Cart;
 import org.example.takecareofmyfridgebe.domain.cart.entity.CartItem;
 import org.example.takecareofmyfridgebe.domain.cart.repository.CartItemRepository;
 import org.example.takecareofmyfridgebe.domain.cart.repository.CartRepository;
+import org.example.takecareofmyfridgebe.domain.cart.service.CartService;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.StorageType;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderCreateItemRequest;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderCreateRequest;
 import org.example.takecareofmyfridgebe.domain.order.repository.OrderItemRepository;
 import org.example.takecareofmyfridgebe.domain.order.repository.OrderRepository;
+import org.example.takecareofmyfridgebe.domain.order.service.OrderNumberGenerator;
+import org.example.takecareofmyfridgebe.domain.order.service.OrderReader;
+import org.example.takecareofmyfridgebe.domain.order.service.OrderService;
 import org.example.takecareofmyfridgebe.domain.product.entity.Product;
 import org.example.takecareofmyfridgebe.domain.product.entity.ProductType;
 import org.example.takecareofmyfridgebe.domain.product.repository.ProductRepository;
@@ -38,15 +42,15 @@ import org.springframework.transaction.annotation.Transactional;
 // 주문번호 생성기를 대신해 같은 번호를 두 번 내게 하고, 유니크 위반이 409로 바뀌며 롤백되는지 DB 상태로 확인한다.
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({JpaAuditingConfig.class, QueryDslConfig.class, OrderCreateService.class, OrderReader.class,
-    SaleEventReader.class, SaleEventStockService.class})
+@Import({JpaAuditingConfig.class, QueryDslConfig.class, OrderFacade.class, OrderReader.class,
+    SaleEventReader.class, SaleEventStockService.class, OrderService.class, CartService.class})
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
-class OrderCreateServiceConstraintTest extends MySqlContainerSupport {
+class OrderFacadeConstraintTest extends MySqlContainerSupport {
 
     @MockitoBean
     private OrderNumberGenerator orderNumberGenerator;
 
-    private final OrderCreateService orderCreateService;
+    private final OrderFacade orderFacade;
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final CartRepository cartRepository;
@@ -54,14 +58,14 @@ class OrderCreateServiceConstraintTest extends MySqlContainerSupport {
     private final ProductRepository productRepository;
 
     @Autowired
-    OrderCreateServiceConstraintTest(
-            OrderCreateService orderCreateService,
+    OrderFacadeConstraintTest(
+            OrderFacade orderFacade,
             OrderRepository orderRepository,
             OrderItemRepository orderItemRepository,
             CartRepository cartRepository,
             CartItemRepository cartItemRepository,
             ProductRepository productRepository) {
-        this.orderCreateService = orderCreateService;
+        this.orderFacade = orderFacade;
         this.orderRepository = orderRepository;
         this.orderItemRepository = orderItemRepository;
         this.cartRepository = cartRepository;
@@ -87,9 +91,9 @@ class OrderCreateServiceConstraintTest extends MySqlContainerSupport {
             .storage(StorageType.REFRIGERATED).shelfDays(7).build());
         CartItem itemOfMember1 = saveCartItem(1L, greenOnion);
         CartItem itemOfMember2 = saveCartItem(2L, greenOnion);
-        orderCreateService.createOrder(1L, "key-1", new OrderCreateRequest(List.of(new OrderCreateItemRequest(itemOfMember1.getId(), 3000, null))));
+        orderFacade.create(1L, "key-1", new OrderCreateRequest(List.of(new OrderCreateItemRequest(itemOfMember1.getId(), 3000, null))));
 
-        assertThatThrownBy(() -> orderCreateService.createOrder(2L, "key-2", new OrderCreateRequest(List.of(new OrderCreateItemRequest(itemOfMember2.getId(), 3000, null)))))
+        assertThatThrownBy(() -> orderFacade.create(2L, "key-2", new OrderCreateRequest(List.of(new OrderCreateItemRequest(itemOfMember2.getId(), 3000, null)))))
             .isInstanceOf(BusinessException.class)
             .extracting("errorCode").isEqualTo(ErrorCode.ORDER_NUMBER_CONFLICT);
         assertThat(orderRepository.count()).isEqualTo(1);

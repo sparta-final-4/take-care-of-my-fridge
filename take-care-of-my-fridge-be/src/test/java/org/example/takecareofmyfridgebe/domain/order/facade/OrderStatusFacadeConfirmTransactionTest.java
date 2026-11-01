@@ -1,4 +1,4 @@
-package org.example.takecareofmyfridgebe.domain.order.service;
+package org.example.takecareofmyfridgebe.domain.order.facade;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -23,9 +23,12 @@ import org.example.takecareofmyfridgebe.domain.order.entity.SaleType;
 import org.example.takecareofmyfridgebe.domain.order.event.OrderConfirmedEvent;
 import org.example.takecareofmyfridgebe.domain.order.repository.OrderItemRepository;
 import org.example.takecareofmyfridgebe.domain.order.repository.OrderRepository;
+import org.example.takecareofmyfridgebe.domain.order.service.OrderReader;
+import org.example.takecareofmyfridgebe.domain.order.service.OrderStatusService;
 import org.example.takecareofmyfridgebe.domain.payment.entity.Payment;
 import org.example.takecareofmyfridgebe.domain.payment.repository.PaymentRepository;
 import org.example.takecareofmyfridgebe.domain.payment.service.PaymentHistoryRecorder;
+import org.example.takecareofmyfridgebe.domain.payment.service.PaymentService;
 import org.example.takecareofmyfridgebe.domain.refund.dto.RefundCreateRequest;
 import org.example.takecareofmyfridgebe.domain.refund.entity.Refund;
 import org.example.takecareofmyfridgebe.domain.refund.entity.RefundItem;
@@ -35,6 +38,7 @@ import org.example.takecareofmyfridgebe.domain.refund.repository.RefundItemRepos
 import org.example.takecareofmyfridgebe.domain.refund.repository.RefundRepository;
 import org.example.takecareofmyfridgebe.domain.refund.service.RefundCommandService;
 import org.example.takecareofmyfridgebe.domain.refund.service.RefundQueryService;
+import org.example.takecareofmyfridgebe.domain.sale.service.SaleEventStockService;
 import org.example.takecareofmyfridgebe.global.config.JpaAuditingConfig;
 import org.example.takecareofmyfridgebe.global.config.QueryDslConfig;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
@@ -57,13 +61,14 @@ import org.springframework.transaction.event.TransactionalEventListener;
 // 구매 확정 이벤트는 커밋 뒤에 받은 것만 모아 몇 번, 무엇이 나갔는지 확인한다.
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({JpaAuditingConfig.class, QueryDslConfig.class, OrderConfirmService.class, OrderReader.class,
+@Import({JpaAuditingConfig.class, QueryDslConfig.class, OrderStatusFacade.class, OrderReader.class,
     RefundQueryService.class, RefundCommandService.class, PaymentHistoryRecorder.class,
-    OrderConfirmServiceTransactionTest.CommittedEvents.class})
+    OrderStatusFacadeConfirmTransactionTest.CommittedEvents.class, OrderStatusService.class,
+    SaleEventStockService.class, PaymentService.class})
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
-class OrderConfirmServiceTransactionTest extends MySqlContainerSupport {
+class OrderStatusFacadeConfirmTransactionTest extends MySqlContainerSupport {
 
-    private final OrderConfirmService orderConfirmService;
+    private final OrderStatusFacade orderStatusFacade;
     private final RefundCommandService refundCommandService;
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
@@ -73,8 +78,8 @@ class OrderConfirmServiceTransactionTest extends MySqlContainerSupport {
     private final CommittedEvents committedEvents;
 
     @Autowired
-    OrderConfirmServiceTransactionTest(
-        OrderConfirmService orderConfirmService,
+    OrderStatusFacadeConfirmTransactionTest(
+        OrderStatusFacade orderStatusFacade,
         RefundCommandService refundCommandService,
         OrderRepository orderRepository,
         OrderItemRepository orderItemRepository,
@@ -83,7 +88,7 @@ class OrderConfirmServiceTransactionTest extends MySqlContainerSupport {
         RefundItemRepository refundItemRepository,
         CommittedEvents committedEvents
     ) {
-        this.orderConfirmService = orderConfirmService;
+        this.orderStatusFacade = orderStatusFacade;
         this.refundCommandService = refundCommandService;
         this.orderRepository = orderRepository;
         this.orderItemRepository = orderItemRepository;
@@ -108,7 +113,7 @@ class OrderConfirmServiceTransactionTest extends MySqlContainerSupport {
     void confirm_paidOrder_confirms() {
         Order order = saveOrder(1L, OrderStatus.PAID);
 
-        OrderConfirmResponse response = orderConfirmService.confirm(1L, order.getId());
+        OrderConfirmResponse response = orderStatusFacade.confirm(1L, order.getId());
 
         Order confirmed = reload(order);
         assertThat(response.orderId()).isEqualTo(order.getId());
@@ -127,7 +132,7 @@ class OrderConfirmServiceTransactionTest extends MySqlContainerSupport {
         saveRefund(payment, normal, 2, RefundStatus.COMPLETED);
         saveRefund(payment, normal, 1, RefundStatus.FAILED);
 
-        orderConfirmService.confirm(1L, order.getId());
+        orderStatusFacade.confirm(1L, order.getId());
 
         assertThat(reload(order).getStatus()).isEqualTo(OrderStatus.CONFIRMED);
         assertThat(reload(normal).getConfirmedQuantity()).isEqualTo(3);
@@ -140,7 +145,7 @@ class OrderConfirmServiceTransactionTest extends MySqlContainerSupport {
         Order order = saveOrder(1L, OrderStatus.PAID);
         OrderItem item = saveItem(order, 2, SaleType.NONE);
 
-        orderConfirmService.confirm(1L, order.getId());
+        orderStatusFacade.confirm(1L, order.getId());
 
         assertThat(reload(item).getConfirmedQuantity()).isEqualTo(2);
     }
@@ -152,7 +157,7 @@ class OrderConfirmServiceTransactionTest extends MySqlContainerSupport {
         OrderItem item = saveItem(order, 3, SaleType.NONE);
         saveRefund(savePayment(order), item, 1, RefundStatus.REQUESTED);
 
-        assertThatThrownBy(() -> orderConfirmService.confirm(1L, order.getId()))
+        assertThatThrownBy(() -> orderStatusFacade.confirm(1L, order.getId()))
             .isInstanceOf(BusinessException.class)
             .extracting("errorCode").isEqualTo(ErrorCode.ORDER_REFUND_IN_PROGRESS);
         Order unchanged = reload(order);
@@ -171,7 +176,7 @@ class OrderConfirmServiceTransactionTest extends MySqlContainerSupport {
         saveRefund(payment, first, 2, RefundStatus.COMPLETED);
         saveRefund(payment, second, 1, RefundStatus.COMPLETED);
 
-        assertThatThrownBy(() -> orderConfirmService.confirm(1L, order.getId()))
+        assertThatThrownBy(() -> orderStatusFacade.confirm(1L, order.getId()))
             .isInstanceOf(BusinessException.class)
             .extracting("errorCode").isEqualTo(ErrorCode.ORDER_FULLY_REFUNDED);
         Order unchanged = reload(order);
@@ -185,10 +190,10 @@ class OrderConfirmServiceTransactionTest extends MySqlContainerSupport {
     @DisplayName("이미 구매 확정된 주문을 다시 확정하면 같은 응답을 주고 확정 시각은 그대로다")
     void confirm_confirmedOrder_returnsSameAndKeepsConfirmedAt() {
         Order order = saveOrder(1L, OrderStatus.PAID);
-        orderConfirmService.confirm(1L, order.getId());
+        orderStatusFacade.confirm(1L, order.getId());
         LocalDateTime firstConfirmedAt = reload(order).getConfirmedAt();
 
-        OrderConfirmResponse response = orderConfirmService.confirm(1L, order.getId());
+        OrderConfirmResponse response = orderStatusFacade.confirm(1L, order.getId());
 
         assertThat(response.status()).isEqualTo(OrderStatus.CONFIRMED);
         assertThat(reload(order).getConfirmedAt()).isEqualTo(firstConfirmedAt);
@@ -199,7 +204,7 @@ class OrderConfirmServiceTransactionTest extends MySqlContainerSupport {
     void confirm_pendingOrder_rejects() {
         Order order = saveOrder(1L, OrderStatus.PENDING);
 
-        assertThatThrownBy(() -> orderConfirmService.confirm(1L, order.getId()))
+        assertThatThrownBy(() -> orderStatusFacade.confirm(1L, order.getId()))
             .isInstanceOf(BusinessException.class)
             .extracting("errorCode").isEqualTo(ErrorCode.ORDER_NOT_PAID);
         Order unchanged = reload(order);
@@ -212,7 +217,7 @@ class OrderConfirmServiceTransactionTest extends MySqlContainerSupport {
     void confirm_cancelledOrder_rejects() {
         Order order = saveOrder(1L, OrderStatus.CANCELLED);
 
-        assertThatThrownBy(() -> orderConfirmService.confirm(1L, order.getId()))
+        assertThatThrownBy(() -> orderStatusFacade.confirm(1L, order.getId()))
             .isInstanceOf(BusinessException.class)
             .extracting("errorCode").isEqualTo(ErrorCode.ORDER_CANCELLED);
         Order unchanged = reload(order);
@@ -225,10 +230,10 @@ class OrderConfirmServiceTransactionTest extends MySqlContainerSupport {
     void confirm_othersOrder_returnsNotFound() {
         Order othersOrder = saveOrder(2L, OrderStatus.PAID);
 
-        assertThatThrownBy(() -> orderConfirmService.confirm(1L, othersOrder.getId()))
+        assertThatThrownBy(() -> orderStatusFacade.confirm(1L, othersOrder.getId()))
             .isInstanceOf(BusinessException.class)
             .extracting("errorCode").isEqualTo(ErrorCode.ORDER_NOT_FOUND);
-        assertThatThrownBy(() -> orderConfirmService.confirm(1L, othersOrder.getId() + 1000))
+        assertThatThrownBy(() -> orderStatusFacade.confirm(1L, othersOrder.getId() + 1000))
             .isInstanceOf(BusinessException.class)
             .extracting("errorCode").isEqualTo(ErrorCode.ORDER_NOT_FOUND);
         Order unchanged = reload(othersOrder);
@@ -243,7 +248,7 @@ class OrderConfirmServiceTransactionTest extends MySqlContainerSupport {
         List<OrderStatus> responses = Collections.synchronizedList(new ArrayList<>());
 
         List<Throwable> failures = runConcurrently(Collections.nCopies(10, () -> {
-            responses.add(orderConfirmService.confirm(1L, order.getId()).status());
+            responses.add(orderStatusFacade.confirm(1L, order.getId()).status());
             return null;
         }));
 
@@ -267,7 +272,7 @@ class OrderConfirmServiceTransactionTest extends MySqlContainerSupport {
             orders.add(order);
             items.add(item);
             tasks.add(() -> {
-                orderConfirmService.confirm(1L, order.getId());
+                orderStatusFacade.confirm(1L, order.getId());
                 return null;
             });
             tasks.add(() -> {
@@ -308,7 +313,7 @@ class OrderConfirmServiceTransactionTest extends MySqlContainerSupport {
         OrderItem allRefunded = saveItem(order, 2, SaleType.NONE);
         saveRefund(savePayment(order), allRefunded, 2, RefundStatus.COMPLETED);
 
-        orderConfirmService.confirm(1L, order.getId());
+        orderStatusFacade.confirm(1L, order.getId());
 
         assertThat(committedEvents.events).hasSize(1);
         OrderConfirmedEvent event = committedEvents.events.get(0);
@@ -324,9 +329,9 @@ class OrderConfirmServiceTransactionTest extends MySqlContainerSupport {
     void confirm_confirmedOrder_doesNotPublishAgain() {
         Order order = saveOrder(1L, OrderStatus.PAID);
         saveItem(order, 1, SaleType.NONE);
-        orderConfirmService.confirm(1L, order.getId());
+        orderStatusFacade.confirm(1L, order.getId());
 
-        orderConfirmService.confirm(1L, order.getId());
+        orderStatusFacade.confirm(1L, order.getId());
 
         assertThat(committedEvents.events).hasSize(1);
     }
@@ -338,7 +343,7 @@ class OrderConfirmServiceTransactionTest extends MySqlContainerSupport {
         OrderItem item = saveItem(order, 3, SaleType.NONE);
         saveRefund(savePayment(order), item, 1, RefundStatus.REQUESTED);
 
-        assertThatThrownBy(() -> orderConfirmService.confirm(1L, order.getId()))
+        assertThatThrownBy(() -> orderStatusFacade.confirm(1L, order.getId()))
             .isInstanceOf(BusinessException.class);
 
         assertThat(committedEvents.events).isEmpty();
@@ -351,7 +356,7 @@ class OrderConfirmServiceTransactionTest extends MySqlContainerSupport {
         saveItem(order, 1, SaleType.NONE);
 
         List<Throwable> failures = runConcurrently(Collections.nCopies(10, () -> {
-            orderConfirmService.confirm(1L, order.getId());
+            orderStatusFacade.confirm(1L, order.getId());
             return null;
         }));
 

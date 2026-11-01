@@ -1,4 +1,4 @@
-package org.example.takecareofmyfridgebe.domain.order.service;
+package org.example.takecareofmyfridgebe.domain.order.facade;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -23,6 +23,7 @@ import org.example.takecareofmyfridgebe.domain.cart.entity.Cart;
 import org.example.takecareofmyfridgebe.domain.cart.entity.CartItem;
 import org.example.takecareofmyfridgebe.domain.cart.repository.CartItemRepository;
 import org.example.takecareofmyfridgebe.domain.cart.repository.CartRepository;
+import org.example.takecareofmyfridgebe.domain.cart.service.CartService;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.StorageType;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderCreateItemRequest;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderCreateRequest;
@@ -33,6 +34,10 @@ import org.example.takecareofmyfridgebe.domain.order.entity.SaleType;
 import org.example.takecareofmyfridgebe.domain.order.repository.OrderItemRepository;
 import org.example.takecareofmyfridgebe.domain.order.repository.OrderRepository;
 import org.example.takecareofmyfridgebe.domain.order.scheduler.OrderExpireScheduler;
+import org.example.takecareofmyfridgebe.domain.order.service.OrderNumberGenerator;
+import org.example.takecareofmyfridgebe.domain.order.service.OrderReader;
+import org.example.takecareofmyfridgebe.domain.order.service.OrderService;
+import org.example.takecareofmyfridgebe.domain.order.service.OrderStatusService;
 import org.example.takecareofmyfridgebe.domain.payment.entity.FailReason;
 import org.example.takecareofmyfridgebe.domain.payment.entity.Payment;
 import org.example.takecareofmyfridgebe.domain.payment.entity.PaymentStatus;
@@ -45,6 +50,7 @@ import org.example.takecareofmyfridgebe.domain.product.entity.Product;
 import org.example.takecareofmyfridgebe.domain.product.entity.ProductStatus;
 import org.example.takecareofmyfridgebe.domain.product.entity.ProductType;
 import org.example.takecareofmyfridgebe.domain.product.repository.ProductRepository;
+import org.example.takecareofmyfridgebe.domain.refund.service.RefundQueryService;
 import org.example.takecareofmyfridgebe.domain.sale.entity.SaleEvent;
 import org.example.takecareofmyfridgebe.domain.sale.entity.SaleEventItem;
 import org.example.takecareofmyfridgebe.domain.sale.entity.SaleEventType;
@@ -74,12 +80,12 @@ import org.springframework.transaction.annotation.Transactional;
 // 응답이 아니라 커밋된 주문 상태와 재고를 다시 읽어 확인한다.
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({JpaAuditingConfig.class, QueryDslConfig.class, OrderCancelService.class, OrderCreateService.class,
-    OrderReader.class, SaleEventReader.class,
-    SaleEventStockService.class, PaymentService.class, PaymentCommandService.class, PaymentHistoryRecorder.class,
-    OrderExpireScheduler.class})
+@Import({JpaAuditingConfig.class, QueryDslConfig.class, OrderStatusFacade.class, OrderFacade.class,
+    OrderReader.class, SaleEventReader.class, SaleEventStockService.class, PaymentService.class,
+    PaymentCommandService.class, PaymentHistoryRecorder.class, OrderExpireScheduler.class, OrderService.class,
+    CartService.class, OrderStatusService.class, RefundQueryService.class})
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
-class OrderCancelServiceTransactionTest extends MySqlContainerSupport {
+class OrderStatusFacadeCancelTransactionTest extends MySqlContainerSupport {
 
     // 이 테스트는 재고와 롤백을 본다. 번호 생성은 OrderNumberGeneratorTest가 맡으므로 매번 다른 번호를 돌려주는 가짜로 바꾼다.
     private static final AtomicLong ORDER_NUMBER_SEQUENCE = new AtomicLong();
@@ -87,8 +93,8 @@ class OrderCancelServiceTransactionTest extends MySqlContainerSupport {
     @MockitoBean
     private OrderNumberGenerator orderNumberGenerator;
 
-    private final OrderCancelService orderCancelService;
-    private final OrderCreateService orderCreateService;
+    private final OrderStatusFacade orderStatusFacade;
+    private final OrderFacade orderFacade;
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final CartRepository cartRepository;
@@ -104,9 +110,9 @@ class OrderCancelServiceTransactionTest extends MySqlContainerSupport {
     private final JdbcTemplate jdbcTemplate;
 
     @Autowired
-    OrderCancelServiceTransactionTest(
-            OrderCancelService orderCancelService,
-            OrderCreateService orderCreateService,
+    OrderStatusFacadeCancelTransactionTest(
+            OrderStatusFacade orderStatusFacade,
+            OrderFacade orderFacade,
             OrderRepository orderRepository,
             OrderItemRepository orderItemRepository,
             CartRepository cartRepository,
@@ -120,8 +126,8 @@ class OrderCancelServiceTransactionTest extends MySqlContainerSupport {
             PaymentRepository paymentRepository,
             PaymentHistoryRepository paymentHistoryRepository,
             DataSource dataSource) {
-        this.orderCancelService = orderCancelService;
-        this.orderCreateService = orderCreateService;
+        this.orderStatusFacade = orderStatusFacade;
+        this.orderFacade = orderFacade;
         this.orderRepository = orderRepository;
         this.orderItemRepository = orderItemRepository;
         this.cartRepository = cartRepository;
@@ -162,7 +168,7 @@ class OrderCancelServiceTransactionTest extends MySqlContainerSupport {
         Product tofu = saveProduct("두부", 2000, 4);
         Order order = saveOrder(1L, OrderStatus.PENDING, item(greenOnion, 2), item(tofu, 1));
 
-        orderCancelService.cancel(1L, order.getId());
+        orderStatusFacade.cancel(1L, order.getId());
 
         assertDeleted(order);
         assertThat(stockOf(greenOnion)).isEqualTo(10);
@@ -175,7 +181,7 @@ class OrderCancelServiceTransactionTest extends MySqlContainerSupport {
         Product greenOnion = saveProduct("대파", 3000, 0, ProductStatus.SOLD_OUT);
         Order order = saveOrder(1L, OrderStatus.PENDING, item(greenOnion, 2));
 
-        orderCancelService.cancel(1L, order.getId());
+        orderStatusFacade.cancel(1L, order.getId());
 
         Product restored = productRepository.findById(greenOnion.getId()).orElseThrow();
         assertThat(restored.getStock()).isEqualTo(2);
@@ -189,7 +195,7 @@ class OrderCancelServiceTransactionTest extends MySqlContainerSupport {
         SaleEventItem saleEventItem = saveFlashDrop(greenOnion, 5);
         Order order = saveOrder(1L, OrderStatus.PENDING, flashDropItem(greenOnion, 1L).saleEventItemId(saleEventItem.getId()));
 
-        orderCancelService.cancel(1L, order.getId());
+        orderStatusFacade.cancel(1L, order.getId());
 
         assertDeleted(order);
         assertThat(orderItemRepository.existsBySaleEventItemIdAndFlashDropMemberId(saleEventItem.getId(), 1L)).isFalse();
@@ -202,9 +208,9 @@ class OrderCancelServiceTransactionTest extends MySqlContainerSupport {
     void cancel_deletedOrder_returnsNotFound() {
         Product greenOnion = saveProduct("대파", 3000, 8);
         Order order = saveOrder(1L, OrderStatus.PENDING, item(greenOnion, 2));
-        orderCancelService.cancel(1L, order.getId());
+        orderStatusFacade.cancel(1L, order.getId());
 
-        assertThatThrownBy(() -> orderCancelService.cancel(1L, order.getId()))
+        assertThatThrownBy(() -> orderStatusFacade.cancel(1L, order.getId()))
             .isInstanceOf(BusinessException.class)
             .extracting("errorCode").isEqualTo(ErrorCode.ORDER_NOT_FOUND);
         assertThat(stockOf(greenOnion)).isEqualTo(10);
@@ -217,7 +223,7 @@ class OrderCancelServiceTransactionTest extends MySqlContainerSupport {
         Order order = saveOrder(1L, OrderStatus.PENDING, item(greenOnion, 2));
         saveFailedPayment(order);
 
-        assertThatThrownBy(() -> orderCancelService.cancel(1L, order.getId()))
+        assertThatThrownBy(() -> orderStatusFacade.cancel(1L, order.getId()))
             .isInstanceOf(BusinessException.class)
             .extracting("errorCode").isEqualTo(ErrorCode.ORDER_PAYMENT_ATTEMPTED);
         assertThat(statusOf(order)).isEqualTo(OrderStatus.PENDING);
@@ -231,7 +237,7 @@ class OrderCancelServiceTransactionTest extends MySqlContainerSupport {
         Product greenOnion = saveProduct("대파", 3000, 8);
         Order order = saveOrder(1L, OrderStatus.PAID, item(greenOnion, 2));
 
-        assertThatThrownBy(() -> orderCancelService.cancel(1L, order.getId()))
+        assertThatThrownBy(() -> orderStatusFacade.cancel(1L, order.getId()))
             .isInstanceOf(BusinessException.class)
             .extracting("errorCode").isEqualTo(ErrorCode.ORDER_ALREADY_PAID);
         assertThat(statusOf(order)).isEqualTo(OrderStatus.PAID);
@@ -244,10 +250,10 @@ class OrderCancelServiceTransactionTest extends MySqlContainerSupport {
         Product greenOnion = saveProduct("대파", 3000, 8);
         Order othersOrder = saveOrder(2L, OrderStatus.PENDING, item(greenOnion, 2));
 
-        assertThatThrownBy(() -> orderCancelService.cancel(1L, othersOrder.getId()))
+        assertThatThrownBy(() -> orderStatusFacade.cancel(1L, othersOrder.getId()))
             .isInstanceOf(BusinessException.class)
             .extracting("errorCode").isEqualTo(ErrorCode.ORDER_NOT_FOUND);
-        assertThatThrownBy(() -> orderCancelService.cancel(1L, othersOrder.getId() + 1000))
+        assertThatThrownBy(() -> orderStatusFacade.cancel(1L, othersOrder.getId() + 1000))
             .isInstanceOf(BusinessException.class)
             .extracting("errorCode").isEqualTo(ErrorCode.ORDER_NOT_FOUND);
         assertThat(statusOf(othersOrder)).isEqualTo(OrderStatus.PENDING);
@@ -261,7 +267,7 @@ class OrderCancelServiceTransactionTest extends MySqlContainerSupport {
         Order order = saveOrder(1L, OrderStatus.PENDING, item(greenOnion, 2));
 
         List<Throwable> failures = runConcurrently(Collections.nCopies(5, () -> {
-            orderCancelService.cancel(1L, order.getId());
+            orderStatusFacade.cancel(1L, order.getId());
             return null;
         }));
 
@@ -281,7 +287,7 @@ class OrderCancelServiceTransactionTest extends MySqlContainerSupport {
 
             List<Throwable> failures = runConcurrently(List.of(
                 () -> {
-                    orderCancelService.cancel(1L, order.getId());
+                    orderStatusFacade.cancel(1L, order.getId());
                     return null;
                 },
                 () -> {
@@ -315,11 +321,11 @@ class OrderCancelServiceTransactionTest extends MySqlContainerSupport {
 
             List<Throwable> failures = runConcurrently(List.of(
                 () -> {
-                    orderCancelService.cancel(1L, order.getId());
+                    orderStatusFacade.cancel(1L, order.getId());
                     return null;
                 },
                 () -> {
-                    orderCancelService.expire(order.getId());
+                    orderStatusFacade.expire(order.getId());
                     return null;
                 }));
 
@@ -369,9 +375,9 @@ class OrderCancelServiceTransactionTest extends MySqlContainerSupport {
         LocalDateTime lastPaymentBefore = LocalDateTime.now().minusMinutes(10);
 
         List<Long> orderIds = paymentService.findAbandonedOrderIds(lastPaymentBefore, 0, 100);
-        orderIds.forEach(orderId -> orderCancelService.cancelAbandoned(orderId, lastPaymentBefore));
+        orderIds.forEach(orderId -> orderStatusFacade.cancelAbandoned(orderId, lastPaymentBefore));
         Stream.of(inProgress, retried, withoutPayment)
-            .forEach(order -> orderCancelService.cancelAbandoned(order.getId(), lastPaymentBefore));
+            .forEach(order -> orderStatusFacade.cancelAbandoned(order.getId(), lastPaymentBefore));
 
         assertThat(orderIds).containsExactly(abandoned.getId());
         assertThat(statusOf(abandoned)).isEqualTo(OrderStatus.CANCELLED);
@@ -397,7 +403,7 @@ class OrderCancelServiceTransactionTest extends MySqlContainerSupport {
 
             List<Throwable> failures = runConcurrently(List.of(
                 () -> {
-                    orderCancelService.cancelAbandoned(order.getId(), lastPaymentBefore);
+                    orderStatusFacade.cancelAbandoned(order.getId(), lastPaymentBefore);
                     return null;
                 },
                 () -> {
@@ -431,11 +437,11 @@ class OrderCancelServiceTransactionTest extends MySqlContainerSupport {
 
             List<Throwable> failures = runConcurrently(List.of(
                 () -> {
-                    orderCancelService.cancelAbandoned(order.getId(), lastPaymentBefore);
+                    orderStatusFacade.cancelAbandoned(order.getId(), lastPaymentBefore);
                     return null;
                 },
                 () -> {
-                    orderCancelService.cancel(1L, order.getId());
+                    orderStatusFacade.cancel(1L, order.getId());
                     return null;
                 }));
 
@@ -458,11 +464,11 @@ class OrderCancelServiceTransactionTest extends MySqlContainerSupport {
             .toList();
 
         Stream<Callable<Void>> cancel = Stream.of(() -> {
-            orderCancelService.cancel(1L, cancelledOrderId);
+            orderStatusFacade.cancel(1L, cancelledOrderId);
             return null;
         });
         Stream<Callable<Void>> orders = items.stream().map(item -> () -> {
-            orderCreateService.createOrder(item.getCart().getMemberId(), UUID.randomUUID().toString(),
+            orderFacade.create(item.getCart().getMemberId(), UUID.randomUUID().toString(),
                 new OrderCreateRequest(List.of(new OrderCreateItemRequest(item.getId(), 3000, null))));
             return null;
         });
@@ -501,7 +507,7 @@ class OrderCancelServiceTransactionTest extends MySqlContainerSupport {
 
     private Long createOrder(Long memberId, Product product, int quantity) {
         CartItem item = saveCartItem(saveCart(memberId), product, quantity);
-        return orderCreateService.createOrder(memberId, UUID.randomUUID().toString(),
+        return orderFacade.create(memberId, UUID.randomUUID().toString(),
             new OrderCreateRequest(List.of(new OrderCreateItemRequest(item.getId(), product.getPrice(), null)))).response().orderId();
     }
 
