@@ -193,6 +193,11 @@ export function IngredientInputSection() {
         <Divider className={styles.divider} />
 
         <Flex vertical gap="xs" className={styles.stagedList}>
+          {stagedItems.length === 0 && (
+            <Typography.Text type="secondary" className={styles.stagedEmpty}>
+              추가한 재료가 여기에 보여요
+            </Typography.Text>
+          )}
           {stagedItems.map((item) => (
             <div key={item.key} className={styles.stagedItem}>
               <Typography.Text strong className={styles.stagedName}>

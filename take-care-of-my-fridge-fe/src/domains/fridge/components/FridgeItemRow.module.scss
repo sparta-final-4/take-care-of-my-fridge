@@ -1,32 +1,33 @@
 @use '@/styles/variables' as *;
 @use '@/styles/mixins' as *;
 
-// 모바일: 이름·배지 / 수량·소비기한·보관 / 버튼 3줄, xl부터 한 줄
-// 이름 칸만 줄어들며 말줄임되고, 수량·소비기한·보관은 잘리지 않는다.
+// 모바일: 체크·이름·수량·소비기한 / 버튼 2줄(보관 칸은 숨김), md부터 한 줄
+// 체크 / 이름(남는 폭, 말줄임)+태그 / 수량 / 보관 / 소비기한 / 버튼
 .row {
   display: grid;
   grid-template-areas:
-    'check name badge'
-    'check meta meta'
-    'actions actions actions';
-  grid-template-columns: auto minmax(0, 1fr) auto;
+    'check name quantity badge'
+    'actions actions actions actions';
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
   align-items: center;
-  gap: var(--ant-margin-xs) var(--ant-margin-sm);
-  padding: var(--ant-padding-sm);
-  background: var(--ant-color-bg-container);
-  border: 1px solid var(--ant-color-border);
+  gap: var(--ant-margin-xxs) var(--ant-margin-sm);
+  padding: var(--ant-padding-xxs) var(--ant-padding-xs);
   border-radius: var(--ant-border-radius);
 
-  @include from(xl) {
-    grid-template-areas: 'check name meta badge actions';
-    grid-template-columns: auto minmax(0, 1fr) auto auto auto;
+  // 줄 사이에만 얇은 구분선을 둔다(마지막 줄 아래는 없음).
+  & + & {
+    border-top: 1px solid var(--ant-color-border-secondary);
+  }
+
+  @include from(md) {
+    grid-template-areas: 'check name quantity storage badge actions';
+    grid-template-columns: auto minmax(0, 1fr) $fridge-item-quantity-width auto auto auto;
   }
 }
 
 // 메인에서 방금 등록한 재료.
 .highlighted {
   background: var(--ant-color-primary-bg);
-  border-color: var(--ant-color-primary-border);
 }
 
 // 재료 종류 태그(IngredientTypeTag)와 같은 크기
@@ -54,27 +55,21 @@
   white-space: nowrap;
 }
 
-.meta {
-  display: flex;
-  flex-wrap: wrap;
-  grid-area: meta;
-  align-items: center;
-  gap: var(--ant-margin-xs) var(--ant-margin);
-
-  @include from(xl) {
-    flex-wrap: nowrap;
-  }
-}
-
-.metaText {
-  white-space: nowrap;
-}
-
-.date {
-  flex-shrink: 0;
-  min-width: $date-min-width;
+.quantity {
+  grid-area: quantity;
   font-variant-numeric: tabular-nums;
+  text-align: end;
   white-space: nowrap;
+}
+
+.storage {
+  display: none;
+  grid-area: storage;
+  white-space: nowrap;
+
+  @include from(md) {
+    display: inline;
+  }
 }
 
 .actions {

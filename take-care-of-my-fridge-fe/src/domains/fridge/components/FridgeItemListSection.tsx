@@ -120,7 +120,7 @@ export function FridgeItemListSection() {
     );
 
   const renderRows = (items: FridgeItemResponse[]) => (
-    <Flex vertical gap="xs">
+    <div>
       {items.map((item) => {
         const fridgeId = item.id ?? 0;
         return (
@@ -138,7 +138,7 @@ export function FridgeItemListSection() {
           />
         );
       })}
-    </Flex>
+    </div>
   );
 
   const renderBody = () => {

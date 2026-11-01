@@ -20,9 +20,13 @@ export function FridgeSummarySection() {
     size: 1,
   });
 
-  const stats = [
+  const stats: Array<{ label: string; value?: number; note?: string; warning?: boolean }> = [
     { label: '전체 재료', value: items?.length, note: '기본 양념 제외' },
-    { label: '임박 재료', value: items?.filter((item) => item.status === 'IMMINENT').length },
+    {
+      label: '임박 재료',
+      value: items?.filter((item) => item.status === 'IMMINENT').length,
+      warning: true,
+    },
     { label: '이번 달 버린 재료', value: discardedLogs?.totalElements },
   ];
 
@@ -31,7 +35,11 @@ export function FridgeSummarySection() {
       <div className={styles.stats}>
         {stats.map((stat) => (
           <div key={stat.label} className={styles.stat}>
-            <Typography.Text strong className={styles.value}>
+            <Typography.Text
+              strong
+              type={stat.warning ? 'warning' : undefined}
+              className={styles.value}
+            >
               {stat.value ?? '-'}
             </Typography.Text>
             <Typography.Text type="secondary" className={styles.label}>

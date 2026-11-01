@@ -1,12 +1,12 @@
-import { RightOutlined } from '@ant-design/icons';
 import { Button, Empty, Flex, Result, Skeleton, Typography } from 'antd';
-import { useNavigate } from 'react-router';
+import { Link } from 'react-router';
 
 import { ROUTES } from '@/app/paths';
 import { useAuthStore } from '@/common/auth/authStore';
 import { SectionCard } from '@/common/components/SectionCard';
 
 import { withoutBasicSeasoning } from '../filter';
+import { formatQuantity } from '../format';
 import { useFridgeItems } from '../queries';
 import { DdayTag } from './DdayTag';
 import { IngredientTypeTag } from './IngredientTypeTag';
@@ -15,7 +15,6 @@ import styles from './MyFridgeSection.module.scss';
 const SUMMARY_SIZE = 5;
 
 export function MyFridgeSection() {
-  const navigate = useNavigate();
   const authStatus = useAuthStore((state) => state.status);
   const isAuthenticated = authStatus === 'authenticated';
   const {
@@ -28,7 +27,6 @@ export function MyFridgeSection() {
   const data = withoutBasicSeasoning(allItems ?? []);
 
   const imminentCount = data.filter((item) => item.status === 'IMMINENT').length;
-  const expiredCount = data.filter((item) => item.status === 'EXPIRED').length;
 
   const renderBody = () => {
     if (authStatus === 'initializing') return <Skeleton active paragraph={{ rows: 4 }} />;
@@ -55,23 +53,20 @@ export function MyFridgeSection() {
     }
 
     return (
-      <Flex vertical gap="xs" className={styles.itemList}>
-        {data.slice(0, SUMMARY_SIZE).map((item) => {
-          const isImminent = item.status !== 'NORMAL';
-
-          return (
-            <div key={item.id} className={styles.itemRow}>
-              <Flex align="center" gap="xs" className={styles.itemNameWrapper}>
-                <Typography.Text strong={isImminent} className={styles.itemName}>
-                  {item.rawName}
-                </Typography.Text>
-                <IngredientTypeTag type={item.ingredientType} />
-              </Flex>
-              {item.dDay !== undefined && <DdayTag dDay={item.dDay} />}
-            </div>
-          );
-        })}
-      </Flex>
+      <ul className={styles.itemList}>
+        {data.slice(0, SUMMARY_SIZE).map((item) => (
+          <li key={item.id} className={styles.itemRow}>
+            <Flex align="center" gap="xs" className={styles.itemNameWrapper}>
+              <Typography.Text className={styles.itemName}>{item.rawName}</Typography.Text>
+              <Typography.Text type="secondary" className={styles.itemQuantity}>
+                {formatQuantity(item)}
+              </Typography.Text>
+              <IngredientTypeTag type={item.ingredientType} />
+            </Flex>
+            {item.dDay !== undefined && <DdayTag dDay={item.dDay} />}
+          </li>
+        ))}
+      </ul>
     );
   };
 
@@ -79,28 +74,22 @@ export function MyFridgeSection() {
     <SectionCard
       title="내 냉장고"
       extra={
-        data && (
+        <Flex align="center" gap="small">
           <Typography.Text type="secondary" className={styles.summaryText}>
-            {data.length}개 · 임박 {imminentCount}
-            {expiredCount > 0 && ` · 기한 지남 ${expiredCount}`}
+            {imminentCount > 0 && (
+              <>
+                임박 <span className={styles.imminentCount}>{imminentCount}</span> ·{' '}
+              </>
+            )}
+            전체 {data.length}
           </Typography.Text>
-        )
+          <Link to={ROUTES.fridge} className={styles.moreLink}>
+            전체 보기 &gt;
+          </Link>
+        </Flex>
       }
     >
-      <div className={styles.container}>
-        {renderBody()}
-
-        <Flex justify="flex-end" className={styles.footer}>
-          <Button
-            shape="round"
-            size="small"
-            onClick={() => navigate(ROUTES.fridge)}
-            className={styles.shortcutButton}
-          >
-            내 냉장고 바로가기 <RightOutlined />
-          </Button>
-        </Flex>
-      </div>
+      {renderBody()}
     </SectionCard>
   );
 }

@@ -70,10 +70,8 @@ $dday-tag-min-width: 4.5em;
 $fridge-sort-select-min-width: 120px;
 $fridge-input-action-min-width: 120px;
 
-// 냉장고 최근 기록 줄. 수량("0.3개", "12.5개"), 가장 긴 태그("요리했어요" + 아이콘), 날짜("25.12.31")가 줄마다 같은 칸에 오도록 고정
-$fridge-log-quantity-width: 64px;
-$fridge-log-tag-width: 7em;
-$fridge-log-date-width: 4.5em;
+// 냉장고 재료 목록 수량 칸. "0.3개", "12.5개", "1000ml"이 줄마다 같은 칸에 오른쪽 정렬되도록 고정
+$fridge-item-quantity-width: 64px;
 
 // 레시피 조리 순서
 $recipe-step-number-size: 24px;
