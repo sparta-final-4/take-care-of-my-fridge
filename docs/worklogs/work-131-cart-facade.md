@@ -27,6 +27,68 @@
 - DB 변경 없음.
 - 문서: 장바구니 도메인 문서의 구현 근거와 구현 방향, API 명세의 조회 응답, 테스트 전략(CART-02, CART-05)의 테스트 이름을 갱신했다.
 
+## 구조 변경 전후
+
+그림은 타 도메인 값이 필요한 기능(담기·조회·수량 변경)만 그린다. 삭제와 결제 완료 뒤 장바구니 정리는 서비스를 바로 부른다. 빨간 상자는 타 도메인을 읽는 서비스, 초록 상자는 자기 도메인만 다루는 서비스, 회색 상자는 타 도메인이다. 점선은 타 도메인 Repository 접근, 실선은 타 도메인 서비스 호출이다.
+
+### 변경 전
+
+```mermaid
+flowchart TB
+    subgraph 진입
+        C[CartController]
+    end
+    subgraph 서비스
+        S[CartService]
+    end
+    subgraph 타 도메인
+        P[상품]
+        SA[할인 행사]
+    end
+    C -->|담기·조회·수량 변경| S
+    S -.->|Repository 접근| P
+    S --> SA
+    classDef bad fill:#fde2e2,stroke:#d33;
+    classDef other fill:#eee,stroke:#999;
+    class S bad
+    class P,SA other
+```
+
+### 변경 후
+
+```mermaid
+flowchart TB
+    subgraph 진입
+        C[CartController]
+    end
+    subgraph 퍼사드
+        F[CartFacade]
+    end
+    subgraph 서비스
+        S[CartService]
+    end
+    subgraph 타 도메인
+        P[상품]
+        SA[할인 행사]
+    end
+    C -->|담기·조회·수량 변경| F
+    F --> S
+    F --> P
+    F --> SA
+    classDef good fill:#e2f0e2,stroke:#393;
+    classDef other fill:#eee,stroke:#999;
+    class S good
+    class P,SA other
+```
+
+### 타 도메인 의존 전후
+
+| 클래스 | 변경 전 | 변경 후 |
+|---|---|---|
+| `CartService` | 상품 `ProductRepository`, 할인 행사 `SaleEventReader` | 없음 |
+| `CartFacade` (새 클래스) | | 상품 `ProductService`, 할인 행사 `SaleEventReader` |
+| 타 도메인 Repository 접근 | 1곳 (`ProductRepository`) | 0곳 |
+
 <details>
 <summary>테스트 목록</summary>
 
