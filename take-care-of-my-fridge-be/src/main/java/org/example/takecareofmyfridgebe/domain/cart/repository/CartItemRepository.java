@@ -14,24 +14,24 @@ public interface CartItemRepository extends JpaRepository<CartItem, Long> {
 
     Optional<CartItem> findByCartAndProductId(Cart cart, Long productId);
 
-    // 담은 순서(id 오름차순)로 회원의 모든 줄을 읽는다. 장바구니가 없으면 빈 목록이다.
+    // 담은 순서(id 오름차순)로 회원의 모든 장바구니 항목을 읽는다. 장바구니가 없으면 빈 목록이다.
     List<CartItem> findByCartMemberIdOrderByIdAsc(Long memberId);
 
-    // 내 장바구니의 줄만 읽는다. 남의 줄이거나 없는 줄이면 비어 있다.
+    // 내 장바구니 항목만 읽는다. 남의 항목이거나 없는 항목이면 비어 있다.
     Optional<CartItem> findByIdAndCartMemberId(Long id, Long memberId);
 
-    // 내 장바구니의 줄만 한 번에 지운다. 남의 줄이거나 없는 번호는 지워지지 않고 오류도 아니다.
+    // 내 장바구니 항목만 한 번에 지운다. 남의 항목이거나 없는 ID는 지워지지 않고 오류도 아니다.
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("delete from CartItem ci where ci.id in :ids "
             + "and ci.cart.id in (select c.id from Cart c where c.memberId = :memberId)")
     void deleteAllByIdsAndMemberId(@Param("ids") List<Long> ids, @Param("memberId") Long memberId);
 
-    // 주문한 상품과 같은 상품의 줄을 내 장바구니에서 한 번에 지운다
+    // 주문한 상품과 같은 상품의 항목을 내 장바구니에서 한 번에 지운다.
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("delete from CartItem ci where ci.cart.id in (select c.id from Cart c where c.memberId = :memberId) "
             + "and ci.productId in (select oi.productId from OrderItem oi where oi.order.id = :orderId)")
     void deleteAllOrderedByMemberId(@Param("orderId") Long orderId, @Param("memberId") Long memberId);
 
-    // 내 장바구니 항목만 읽는다. 남의 항목이거나 없는 번호는 결과에서 빠진다.
+    // 내 장바구니 항목만 읽는다. 남의 항목이거나 없는 ID는 결과에서 빠진다.
     List<CartItem> findByIdInAndCartMemberId(Collection<Long> ids, Long memberId);
 }

@@ -34,12 +34,14 @@ public class CartController {
     private final CartFacade cartFacade;
     private final CartService cartService;
 
+    // 장바구니 화면.
     @GetMapping
     public ResponseEntity<ApiResponse<CartItemsResponse>> getItems(
             @AuthenticationPrincipal AuthSessionService.AuthPrincipal principal) {
         return ResponseEntity.ok(ApiResponse.ok(cartFacade.getItems(principal.memberId())));
     }
 
+    // 상품 목록·상세 화면의 장바구니 담기. 이미 담긴 상품이면 수량을 더한다.
     @PostMapping
     public ResponseEntity<ApiResponse<AddCartItemResponse>> addItem(
             @AuthenticationPrincipal AuthSessionService.AuthPrincipal principal,
@@ -49,6 +51,7 @@ public class CartController {
         return ResponseEntity.status(status).body(ApiResponse.ok(result.response()));
     }
 
+    // 장바구니 화면의 수량 변경.
     @PatchMapping("/{cartItemId}")
     public ResponseEntity<ApiResponse<ChangeCartItemQuantityResponse>> changeQuantity(
             @AuthenticationPrincipal AuthSessionService.AuthPrincipal principal,
@@ -57,6 +60,7 @@ public class CartController {
         return ResponseEntity.ok(ApiResponse.ok(cartFacade.changeQuantity(principal.memberId(), cartItemId, request)));
     }
 
+    // 장바구니 화면의 선택 삭제.
     @DeleteMapping
     public ResponseEntity<ApiResponse<Void>> removeItems(
             @AuthenticationPrincipal AuthSessionService.AuthPrincipal principal,
