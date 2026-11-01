@@ -6,7 +6,7 @@
 
 - 장바구니 서비스가 다른 도메인(상품, 할인 행사)을 직접 읽지 않고 장바구니 일만 하게 한다.
 - 컨트롤러가 퍼사드를 거치는 다른 도메인과 같은 구조로 맞춘다.
-- API 응답, 오류 코드, 화면 동작은 바뀌지 않는다.
+- 오류 코드와 화면 동작은 바뀌지 않는다. 장바구니 조회 응답의 할인 정보만 상품 응답과 같은 `sale` 객체로 통일한다.
 
 ## 근거와 범위
 
@@ -21,8 +21,9 @@
 - `CartQuantityLimit`(새로 만듦): 상품 이름, 재고, 번개 드롭 여부를 서비스에 넘기는 값이다.
 - `CartService`: 상품 저장소와 판매가 조회 의존을 없앴다. 번개 드롭 한도와 재고 검사는 `validateQuantity` 하나로 모았고, 수량을 내릴 때 막지 않는 규칙과 `int` 넘침 방지는 그대로 유지한다. 합산은 `long`으로 한다.
 - `CartController`: 담기, 조회, 수량 변경은 `CartFacade`를, 삭제는 합칠 것이 없어 `CartService`를 바로 부른다.
-- API·DB 변경 없음. 프론트·생성 클라이언트 변경 없음.
-- 문서: 장바구니 도메인 문서의 구현 근거와 구현 방향, 테스트 전략(CART-02, CART-05)의 테스트 이름을 갱신했다.
+- `CartItemResponse`: `saleType`, `discountRate`, `flashDropRemaining`, `flashDropLimit`, `saleEndsAt`을 없애고 `sale`(`SaleResponse`, 할인이 없으면 null) 하나로 바꿨다. `listPrice`, `unitPrice`, `soldOut`은 그대로다. 생성 클라이언트(oag)와 프론트는 주문·할인 행사 정리가 끝난 뒤 한꺼번에 맞춘다.
+- DB 변경 없음.
+- 문서: 장바구니 도메인 문서의 구현 근거와 구현 방향, API 명세의 조회 응답, 테스트 전략(CART-02, CART-05)의 테스트 이름을 갱신했다.
 
 <details>
 <summary>테스트 목록</summary>
