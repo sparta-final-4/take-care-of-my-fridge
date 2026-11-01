@@ -26,6 +26,18 @@
   }
 }
 
+// 확정 수량이 0인(전부 환불된) 상품은 흐리게 보인다
+.rowEmpty {
+  @extend .row;
+
+  color: var(--ant-color-text-tertiary);
+
+  .thumb,
+  .name {
+    opacity: 0.5;
+  }
+}
+
 .thumb {
   grid-area: thumb;
   width: $cart-thumb-size;
@@ -53,10 +65,21 @@
 }
 
 .saleTag {
-  align-self: flex-start;
+  flex: none;
   margin: 0;
   font-size: var(--ant-font-size);
   line-height: var(--ant-line-height);
+}
+
+.refundTag {
+  flex: none;
+  margin: 0;
+  font-size: var(--ant-font-size);
+  line-height: var(--ant-line-height);
+}
+
+.nameLine {
+  min-width: 0;
 }
 
 .name {
