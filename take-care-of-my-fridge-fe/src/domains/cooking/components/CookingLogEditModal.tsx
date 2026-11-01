@@ -1,5 +1,4 @@
 import { App, Form, Input, Modal, Radio, Typography } from 'antd';
-import { useEffect } from 'react';
 
 import type { CookingLogResponse, CookingLogUpdateRequestResultEnum } from '@/common/api/clients';
 import { useUpdateCookingLog } from '../queries';
@@ -20,14 +19,12 @@ export function CookingLogEditModal({ open, log, onClose }: CookingLogEditModalP
   const [form] = Form.useForm<FormValues>();
   const updateMutation = useUpdateCookingLog();
 
-  useEffect(() => {
-    if (open && log) {
-      form.setFieldsValue({
-        result: log.result ?? 'SUCCESS',
-        memo: log.memo ?? '',
-      });
-    }
-  }, [open, log, form]);
+  // 팝업 내용은 열린 다음 렌더에서야 마운트되므로, 열릴 때 effect로 setFieldsValue를 하면 폼이 아직 없다.
+  // 폼이 마운트될 때 초기값으로 넣고, 기록이 바뀌면 key로 새 폼을 만든다. 닫으면 destroyOnHidden으로 폼이 사라진다.
+  const initialValues: Partial<FormValues> = {
+    result: log?.result ?? 'SUCCESS',
+    memo: log?.memo ?? '',
+  };
 
   const handleSubmit = async () => {
     if (!log?.id) return;
@@ -62,13 +59,19 @@ export function CookingLogEditModal({ open, log, onClose }: CookingLogEditModalP
       confirmLoading={updateMutation.isPending}
       onOk={handleSubmit}
       onCancel={onClose}
-      destroyOnClose
+      destroyOnHidden
     >
       <div style={{ marginBottom: 16 }}>
         <Typography.Text type="secondary">결과와 메모만 바꿀 수 있어요</Typography.Text>
       </div>
 
-      <Form form={form} layout="vertical" preserve={false}>
+      <Form
+        key={log?.id ?? 'none'}
+        form={form}
+        layout="vertical"
+        preserve={false}
+        initialValues={initialValues}
+      >
         <Form.Item
           name="result"
           label="요리 결과"
