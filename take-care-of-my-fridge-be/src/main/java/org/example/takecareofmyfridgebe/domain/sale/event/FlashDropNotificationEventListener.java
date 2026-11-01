@@ -16,7 +16,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class FlashDropNotificationListener {
+public class FlashDropNotificationEventListener {
 
     private final AdminSaleEventFacade adminSaleEventFacade;
     private final KafkaTemplate<String, Object> kafkaTemplate;
