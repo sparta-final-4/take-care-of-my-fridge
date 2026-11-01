@@ -3,6 +3,7 @@ package org.example.takecareofmyfridgebe.domain.notification.push;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
@@ -21,6 +22,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.listener.RedisMessageListenerContainer;
+import org.springframework.scheduling.TaskScheduler;
 import tools.jackson.databind.json.JsonMapper;
 
 // 진짜 Redis에 서버 두 대 몫의 구독기를 붙여, 한 서버가 발행한 신호가 두 서버 모두에 닿는지 본다.
@@ -34,7 +36,7 @@ class NotificationPushRedisTest extends RedisContainerSupport {
     private final StringRedisTemplate stringRedisTemplate;
     private final RedisConnectionFactory connectionFactory;
     private final JsonMapper jsonMapper = JsonMapper.builder().build();
-    private final SseProperties sseProperties = new SseProperties(Duration.ofMinutes(30), 5);
+    private final SseProperties sseProperties = new SseProperties(Duration.ofMinutes(30), Duration.ofSeconds(30), 5);
 
     @Autowired
     NotificationPushRedisTest(StringRedisTemplate stringRedisTemplate, RedisConnectionFactory connectionFactory) {
@@ -83,7 +85,7 @@ class NotificationPushRedisTest extends RedisContainerSupport {
         container.afterPropertiesSet();
         container.start();
 
-        SseConnectionRegistry registry = spy(new SseConnectionRegistry(sseProperties));
+        SseConnectionRegistry registry = spy(new SseConnectionRegistry(sseProperties, mock(TaskScheduler.class)));
         new NotificationPushSubscriber(container, registry, jsonMapper).subscribe();
         return registry;
     }

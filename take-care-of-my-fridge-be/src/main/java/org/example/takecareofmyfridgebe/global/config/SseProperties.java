@@ -8,6 +8,8 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 public record SseProperties(
         @DefaultValue("30m")
         Duration timeout,
+        @DefaultValue("30s")
+        Duration heartbeatInterval,
         @DefaultValue("5")
         int maxConnectionsPerMember
 ) {
