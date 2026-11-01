@@ -5,10 +5,9 @@ import { type KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState }
 import { useNavigate } from 'react-router';
 
 import { ROUTES } from '@/app/paths';
-import { getErrorCode } from '@/common/api/errors';
+import { getChatErrorInfo, getErrorCode, type ChatErrorInfo } from '@/common/api/errors';
 import { useAuthStore } from '@/common/auth/authStore';
 import { streamMessage } from '../api';
-import { getChatErrorInfo, type ChatErrorInfo } from '../errors';
 import { chatQueries, useCompleteChatSession, useStartChatSession } from '../queries';
 import { ChatMessageBubble } from './ChatMessageBubble';
 import styles from './ChatRoomSection.module.scss';
