@@ -30,10 +30,10 @@ class ForecastReadServiceTest {
     void readsRequestedWeekAndExistingNeighborWeeks() {
         LocalDate week = LocalDate.of(2026, 10, 19);
         PredictionRun current = run(3L, week);
-        when(runs.findByTargetWeekStart(week)).thenReturn(Optional.of(current));
-        when(runs.findTopByTargetWeekStartLessThanOrderByTargetWeekStartDesc(week))
+        when(runs.findByTargetWeekStartAndSyntheticDataFalse(week)).thenReturn(Optional.of(current));
+        when(runs.findTopBySyntheticDataFalseAndTargetWeekStartLessThanOrderByTargetWeekStartDesc(week))
                 .thenReturn(Optional.of(run(2L, week.minusWeeks(2))));
-        when(runs.findTopByTargetWeekStartGreaterThanOrderByTargetWeekStartAsc(week))
+        when(runs.findTopBySyntheticDataFalseAndTargetWeekStartGreaterThanOrderByTargetWeekStartAsc(week))
                 .thenReturn(Optional.of(run(4L, week.plusWeeks(2))));
         when(forecasts.findByPredictionRunIdOrderByProductIdAsc(3L)).thenReturn(List.of());
 
@@ -55,7 +55,7 @@ class ForecastReadServiceTest {
     @Test
     void missingWeekReturnsF001() {
         LocalDate week = LocalDate.of(2026, 10, 19);
-        when(runs.findByTargetWeekStart(week)).thenReturn(Optional.empty());
+        when(runs.findByTargetWeekStartAndSyntheticDataFalse(week)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.getByWeek(week))
                 .isInstanceOfSatisfying(BusinessException.class,
@@ -68,18 +68,18 @@ class ForecastReadServiceTest {
     void latestUsesMostRecentTargetWeek() {
         LocalDate latest = LocalDate.of(2026, 11, 2);
         PredictionRun run = run(8L, latest);
-        when(runs.findTopByOrderByTargetWeekStartDesc()).thenReturn(Optional.of(run));
+        when(runs.findTopBySyntheticDataFalseOrderByTargetWeekStartDesc()).thenReturn(Optional.of(run));
         when(forecasts.findByPredictionRunIdOrderByProductIdAsc(8L)).thenReturn(List.of());
 
         var response = service.getLatest();
 
         assertThat(response.weekStart()).isEqualTo(latest);
-        verify(runs, never()).findByTargetWeekStart(latest);
+        verify(runs, never()).findByTargetWeekStartAndSyntheticDataFalse(latest);
     }
 
     @Test
     void latestReturnsF001WhenNoForecastExists() {
-        when(runs.findTopByOrderByTargetWeekStartDesc()).thenReturn(Optional.empty());
+        when(runs.findTopBySyntheticDataFalseOrderByTargetWeekStartDesc()).thenReturn(Optional.empty());
 
         assertThatThrownBy(service::getLatest)
                 .isInstanceOfSatisfying(BusinessException.class,
@@ -87,6 +87,22 @@ class ForecastReadServiceTest {
                                 .isEqualTo(ErrorCode.FORECAST_NOT_FOUND));
         verifyNoInteractions(forecasts);
     }
+    @Test
+    void demoUsesSyntheticRunWithoutRealWeekNavigation() {
+        LocalDate week = LocalDate.of(2026, 10, 12);
+        PredictionRun demo = PredictionRun.builder().targetWeekStart(week)
+                .modelVersion("demo-preview-v1").syntheticData(true).build();
+        ReflectionTestUtils.setField(demo, "id", 9L);
+        when(runs.findTopBySyntheticDataTrueOrderByTargetWeekStartDesc()).thenReturn(Optional.of(demo));
+        when(forecasts.findByPredictionRunIdOrderByProductIdAsc(9L)).thenReturn(List.of());
+
+        var response = service.getDemo();
+
+        assertThat(response.syntheticData()).isTrue();
+        assertThat(response.previousWeekStart()).isNull();
+        assertThat(response.nextWeekStart()).isNull();
+    }
+
     private PredictionRun run(Long id, LocalDate week) {
         PredictionRun run = PredictionRun.builder().targetWeekStart(week)
                 .modelVersion("weekly-mlp-v1")

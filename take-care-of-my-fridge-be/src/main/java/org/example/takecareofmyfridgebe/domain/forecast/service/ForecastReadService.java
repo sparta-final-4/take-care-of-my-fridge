@@ -21,7 +21,7 @@ public class ForecastReadService {
     private final SalesForecastRepository forecastRepository;
 
     public ForecastResponse getLatest() {
-        PredictionRun run = runRepository.findTopByOrderByTargetWeekStartDesc()
+        PredictionRun run = runRepository.findTopBySyntheticDataFalseOrderByTargetWeekStartDesc()
                 .orElseThrow(() -> new BusinessException(ErrorCode.FORECAST_NOT_FOUND));
         return toResponse(run);
     }
@@ -36,19 +36,23 @@ public class ForecastReadService {
         if (weekStart.getDayOfWeek() != DayOfWeek.MONDAY) {
             throw new IllegalArgumentException("weekStart는 월요일이어야 합니다.");
         }
-        PredictionRun run = runRepository.findByTargetWeekStart(weekStart)
+        PredictionRun run = runRepository.findByTargetWeekStartAndSyntheticDataFalse(weekStart)
                 .orElseThrow(() -> new BusinessException(ErrorCode.FORECAST_NOT_FOUND));
         return toResponse(run);
     }
 
     private ForecastResponse toResponse(PredictionRun run) {
         LocalDate weekStart = run.getTargetWeekStart();
-        LocalDate previous = runRepository
-                .findTopByTargetWeekStartLessThanOrderByTargetWeekStartDesc(weekStart)
-                .map(PredictionRun::getTargetWeekStart).orElse(null);
-        LocalDate next = runRepository
-                .findTopByTargetWeekStartGreaterThanOrderByTargetWeekStartAsc(weekStart)
-                .map(PredictionRun::getTargetWeekStart).orElse(null);
+        LocalDate previous = null;
+        LocalDate next = null;
+        if (!run.isSyntheticData()) {
+            previous = runRepository
+                    .findTopBySyntheticDataFalseAndTargetWeekStartLessThanOrderByTargetWeekStartDesc(weekStart)
+                    .map(PredictionRun::getTargetWeekStart).orElse(null);
+            next = runRepository
+                    .findTopBySyntheticDataFalseAndTargetWeekStartGreaterThanOrderByTargetWeekStartAsc(weekStart)
+                    .map(PredictionRun::getTargetWeekStart).orElse(null);
+        }
         return ForecastResponse.from(run,
                 forecastRepository.findByPredictionRunIdOrderByProductIdAsc(run.getId()),
                 previous, next);

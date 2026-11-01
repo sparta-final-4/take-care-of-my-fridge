@@ -19,6 +19,7 @@ import org.example.takecareofmyfridgebe.domain.sale.entity.SaleEventType;
 import org.example.takecareofmyfridgebe.domain.sale.service.SaleEventCreateService;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
+import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,12 +31,13 @@ public class DealEventService {
     private final DealCandidateRepository candidateRepository;
     private final SaleEventCreateService saleEventCreateService;
     private final AdminAuditLogService auditLogService;
+    private final Environment environment;
 
     @Transactional
     public DealEventResponse register(Long actorId, Long analysisId, DealEventRequest request) {
         DealAnalysis analysis = analysisRepository.findByIdForUpdate(analysisId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.DEAL_ANALYSIS_NOT_FOUND));
-        if (analysis.isSyntheticData()) {
+        if (analysis.isSyntheticData() && !"dev".equals(environment.getProperty("APP_ENV"))) {
             throw new BusinessException(ErrorCode.DEAL_SYNTHETIC_ANALYSIS);
         }
         DealCandidate candidate = candidateRepository.findById(request.candidateId())

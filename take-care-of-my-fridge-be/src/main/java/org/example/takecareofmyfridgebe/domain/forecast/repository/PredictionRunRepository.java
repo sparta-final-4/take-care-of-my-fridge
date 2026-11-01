@@ -13,6 +13,7 @@ import org.springframework.data.repository.query.Param;
 public interface PredictionRunRepository extends JpaRepository<PredictionRun, Long> {
 
     Optional<PredictionRun> findByTargetWeekStart(LocalDate targetWeekStart);
+    Optional<PredictionRun> findByTargetWeekStartAndSyntheticDataFalse(LocalDate targetWeekStart);
     Optional<PredictionRun> findFirstByModelVersion(String modelVersion);
     Optional<PredictionRun> findTopBySyntheticDataTrueOrderByTargetWeekStartDesc();
 
@@ -20,11 +21,11 @@ public interface PredictionRunRepository extends JpaRepository<PredictionRun, Lo
     @Query("select r from PredictionRun r where r.targetWeekStart = :weekStart")
     Optional<PredictionRun> findByTargetWeekStartForUpdate(@Param("weekStart") LocalDate weekStart);
 
-    Optional<PredictionRun> findTopByOrderByTargetWeekStartDesc();
+    Optional<PredictionRun> findTopBySyntheticDataFalseOrderByTargetWeekStartDesc();
 
-    Optional<PredictionRun> findTopByTargetWeekStartLessThanOrderByTargetWeekStartDesc(LocalDate targetWeekStart);
+    Optional<PredictionRun> findTopBySyntheticDataFalseAndTargetWeekStartLessThanOrderByTargetWeekStartDesc(LocalDate targetWeekStart);
 
-    Optional<PredictionRun> findTopByTargetWeekStartGreaterThanOrderByTargetWeekStartAsc(LocalDate targetWeekStart);
+    Optional<PredictionRun> findTopBySyntheticDataFalseAndTargetWeekStartGreaterThanOrderByTargetWeekStartAsc(LocalDate targetWeekStart);
 
     List<PredictionRun> findByConfirmedAtIsNullAndTargetWeekStartLessThanEqualOrderByTargetWeekStartAsc(
             LocalDate latestCompletedWeek);
