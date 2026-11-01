@@ -62,7 +62,8 @@ public class SaleEventService {
     public SaleEventsCreateResponse createFlashDrop(FlashDropCreateRequest request, List<Product> products) {
         validateStartsAt(request.startsAt());
         Map<Long, Product> productsById = getAvailableProducts(request.productIds(), products);
-        validateFlashDropQuantities(request.items(), productsById);
+        request.items().forEach(item -> validateLimitedQuantity(
+                SaleEventType.FLASH_DROP, item.limitedQuantity(), productsById.get(item.productId())));
 
         List<SaleEvent> saleEvents = new ArrayList<>();
         for (FlashDropItemRequest item : request.items()) {
@@ -160,24 +161,6 @@ public class SaleEventService {
         }
     }
 
-    private void validateFlashDropQuantities(List<FlashDropItemRequest> items, Map<Long, Product> productsById) {
-        for (FlashDropItemRequest item : items) {
-            Product product = productsById.get(item.productId());
-            if (item.limitedQuantity() > product.getStock()) {
-                throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "한정 수량이 재고보다 많습니다 · " + product.getName());
-            }
-        }
-    }
-
-    // 상품을 넣거나 빼지 않으므로 행사에 든 상품과 보낸 상품이 정확히 같아야 한다.
-    private void validateSameProducts(List<SaleEventItem> items, Map<Long, SaleEventItemUpdateRequest> requests) {
-        boolean same = items.size() == requests.size()
-                && items.stream().allMatch(item -> requests.containsKey(item.getProductId()));
-        if (!same) {
-            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "행사에 든 상품과 보낸 상품이 다릅니다.");
-        }
-    }
-
     private void validateLimitedQuantity(SaleEventType type, Integer limitedQuantity, Product product) {
         if (type == SaleEventType.FLASH_DROP && limitedQuantity == null) {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "번개 드롭은 한정 수량이 필수입니다.");
@@ -187,6 +170,15 @@ public class SaleEventService {
         }
         if (limitedQuantity != null && limitedQuantity > product.getStock()) {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "한정 수량이 재고보다 많습니다 · " + product.getName());
+        }
+    }
+
+    // 상품을 넣거나 빼지 않으므로 행사에 든 상품과 보낸 상품이 정확히 같아야 한다.
+    private void validateSameProducts(List<SaleEventItem> items, Map<Long, SaleEventItemUpdateRequest> requests) {
+        boolean same = items.size() == requests.size()
+                && items.stream().allMatch(item -> requests.containsKey(item.getProductId()));
+        if (!same) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "행사에 든 상품과 보낸 상품이 다릅니다.");
         }
     }
 
