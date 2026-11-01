@@ -18,6 +18,9 @@ import org.example.takecareofmyfridgebe.global.entity.BaseTimeEntity;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 
+/**
+ * AI 상담 답변에 붙는 레시피·상품 추천. 아직 쓰는 곳이 없으며 AI 상담 추천 단계에서 사용 예정이다.
+ */
 @Entity
 @Table(
     name = "chat_recommendations",

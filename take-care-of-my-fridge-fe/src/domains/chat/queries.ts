@@ -1,6 +1,6 @@
 import { queryOptions, useMutation, useQueryClient } from '@tanstack/react-query';
 
-import { completeSession, getMessages, getSession, startSession } from './api';
+import { completeSession, getMessages, startSession } from './api';
 
 export const chatQueries = {
   all: () => ['chat'] as const,
@@ -16,13 +16,6 @@ export const chatQueries = {
       refetchOnWindowFocus: false,
       refetchOnReconnect: false,
       retry: false,
-    }),
-
-  sessionQuery: (sessionId: number) =>
-    queryOptions({
-      queryKey: chatQueries.session(sessionId),
-      queryFn: ({ signal }) => getSession(sessionId, signal),
-      enabled: sessionId > 0,
     }),
 
   messagesQuery: (sessionId: number) =>

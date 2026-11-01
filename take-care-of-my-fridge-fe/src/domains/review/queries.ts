@@ -6,18 +6,12 @@ import {
   getReviews,
   updateReview,
   type ReviewCreateRequest,
-  type ReviewSearchRequest,
   type ReviewUpdateRequest,
 } from './api';
 
 export const reviewQueries = {
   all: ['reviews'] as const,
   lists: () => [...reviewQueries.all, 'list'] as const,
-  list: (request: ReviewSearchRequest) =>
-    queryOptions({
-      queryKey: [...reviewQueries.lists(), request],
-      queryFn: ({ signal }) => getReviews(request, signal),
-    }),
   myReview: (recipeId: number) =>
     queryOptions({
       queryKey: [...reviewQueries.all, 'my', recipeId],
