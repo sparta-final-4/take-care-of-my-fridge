@@ -12,7 +12,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class OrderConfirmedListener {
+public class OrderConfirmedEventListener {
 
     private final KafkaTemplate<String, Object> kafkaTemplate;
 
