@@ -10,6 +10,7 @@ import org.example.takecareofmyfridgebe.domain.cart.dto.CartItemsResponse;
 import org.example.takecareofmyfridgebe.domain.cart.dto.ChangeCartItemQuantityRequest;
 import org.example.takecareofmyfridgebe.domain.cart.dto.ChangeCartItemQuantityResponse;
 import org.example.takecareofmyfridgebe.domain.cart.dto.RemoveCartItemsRequest;
+import org.example.takecareofmyfridgebe.domain.cart.facade.CartFacade;
 import org.example.takecareofmyfridgebe.domain.cart.service.CartService;
 import org.example.takecareofmyfridgebe.global.response.ApiResponse;
 import org.springframework.http.HttpStatus;
@@ -30,13 +31,14 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class CartController {
 
+    private final CartFacade cartFacade;
     private final CartService cartService;
 
     @PostMapping
     public ResponseEntity<ApiResponse<AddCartItemResponse>> addItem(
             @AuthenticationPrincipal AuthSessionService.AuthPrincipal principal,
             @Valid @RequestBody AddCartItemRequest request) {
-        AddCartItemResult result = cartService.addItem(principal.memberId(), request);
+        AddCartItemResult result = cartFacade.addItem(principal.memberId(), request);
         HttpStatus status = result.created() ? HttpStatus.CREATED : HttpStatus.OK;
         return ResponseEntity.status(status).body(ApiResponse.ok(result.response()));
     }
@@ -44,7 +46,7 @@ public class CartController {
     @GetMapping
     public ResponseEntity<ApiResponse<CartItemsResponse>> getItems(
             @AuthenticationPrincipal AuthSessionService.AuthPrincipal principal) {
-        return ResponseEntity.ok(ApiResponse.ok(cartService.getItems(principal.memberId())));
+        return ResponseEntity.ok(ApiResponse.ok(cartFacade.getItems(principal.memberId())));
     }
 
     @PatchMapping("/{cartItemId}")
@@ -52,7 +54,7 @@ public class CartController {
             @AuthenticationPrincipal AuthSessionService.AuthPrincipal principal,
             @PathVariable Long cartItemId,
             @Valid @RequestBody ChangeCartItemQuantityRequest request) {
-        return ResponseEntity.ok(ApiResponse.ok(cartService.changeQuantity(principal.memberId(), cartItemId, request)));
+        return ResponseEntity.ok(ApiResponse.ok(cartFacade.changeQuantity(principal.memberId(), cartItemId, request)));
     }
 
     @DeleteMapping
