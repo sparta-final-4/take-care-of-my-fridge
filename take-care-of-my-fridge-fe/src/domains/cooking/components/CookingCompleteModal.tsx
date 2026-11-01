@@ -439,7 +439,7 @@ function CookingCompleteModalBody({
           type="info"
           showIcon
           className={styles.summaryAlert}
-          message={summaryText}
+          title={summaryText}
           description="요리 기록은 삭제할 수 없어요."
         />
       </div>
@@ -483,13 +483,13 @@ export function CookingCompleteModal(props: CookingCompleteModalProps) {
       title={`${recipeName} 요리 완료`}
       width={520}
       footer={null}
-      destroyOnClose
+      destroyOnHidden
     >
       {open && (
         <>
           {isLoading && (
             <Flex justify="center" align="center" style={{ minHeight: 200 }}>
-              <Spin tip="냉장고 재료를 불러오는 중..." />
+              <Spin description="냉장고 재료를 불러오는 중..." />
             </Flex>
           )}
 

@@ -48,7 +48,7 @@ export function FridgeItemRow({
         </Typography.Text>
         <IngredientTypeTag type={item.ingredientType} />
         {highlighted && (
-          <Tag bordered={false} color="blue" className={styles.newTag}>
+          <Tag variant="filled" color="blue" className={styles.newTag}>
             NEW
           </Tag>
         )}

@@ -12,7 +12,7 @@ export function IngredientTypeTag({ type }: IngredientTypeTagProps) {
   if (type === 'CUSTOM') {
     return (
       <Tooltip title="재료 사전에 없는 이름이라 레시피 추천과 요리 완료 차감에 쓰이지 않아요">
-        <Tag bordered={false} color="default" className={styles.tag}>
+        <Tag variant="filled" color="default" className={styles.tag}>
           기타
         </Tag>
       </Tooltip>
@@ -22,7 +22,7 @@ export function IngredientTypeTag({ type }: IngredientTypeTagProps) {
   if (type === 'MEALKIT') {
     return (
       <Tooltip title="밀키트는 요리 완료 때 차감되지 않아요">
-        <Tag bordered={false} color="purple" className={styles.tag}>
+        <Tag variant="filled" color="purple" className={styles.tag}>
           밀키트
         </Tag>
       </Tooltip>

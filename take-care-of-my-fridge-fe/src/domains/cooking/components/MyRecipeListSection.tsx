@@ -336,7 +336,7 @@ export function MyRecipeListSection({
         onChange={(key) => onTabChange(key as CookingTabType)}
         items={tabItems}
         className={styles.tabs}
-        destroyInactiveTabPane
+        destroyOnHidden
       />
     </section>
   );
