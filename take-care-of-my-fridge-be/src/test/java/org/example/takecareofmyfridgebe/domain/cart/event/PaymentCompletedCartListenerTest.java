@@ -14,7 +14,6 @@ import org.example.takecareofmyfridgebe.domain.order.entity.SaleType;
 import org.example.takecareofmyfridgebe.domain.order.repository.OrderItemRepository;
 import org.example.takecareofmyfridgebe.domain.order.repository.OrderRepository;
 import org.example.takecareofmyfridgebe.domain.payment.event.PaymentCompletedEvent;
-import org.example.takecareofmyfridgebe.domain.sale.service.SaleEventReader;
 import org.example.takecareofmyfridgebe.global.config.JpaAuditingConfig;
 import org.example.takecareofmyfridgebe.global.config.QueryDslConfig;
 import org.example.takecareofmyfridgebe.support.MySqlContainerSupport;
@@ -34,7 +33,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 // 결제 완료 트랜잭션이 커밋된 뒤 리스너가 새 트랜잭션으로 장바구니를 지우는지 실제 DB로 확인한다
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({JpaAuditingConfig.class, QueryDslConfig.class, CartService.class, SaleEventReader.class,
+@Import({JpaAuditingConfig.class, QueryDslConfig.class, CartService.class,
         PaymentCompletedCartListener.class})
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class PaymentCompletedCartListenerTest extends MySqlContainerSupport {
