@@ -10,7 +10,6 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.product.entity.Product;
-import org.example.takecareofmyfridgebe.domain.product.entity.ProductStatus;
 import org.example.takecareofmyfridgebe.domain.sale.dto.FlashDropCreateRequest;
 import org.example.takecareofmyfridgebe.domain.sale.dto.FlashDropItemRequest;
 import org.example.takecareofmyfridgebe.domain.sale.dto.SaleEventItemUpdateRequest;
@@ -124,18 +123,9 @@ public class SaleEventService {
         saleEventRepository.delete(saleEvent);
     }
 
-    // 퍼사드가 읽어 온 상품 중 등록할 수 있는 상품만 모아 돌려준다. 없는 상품, 판매 중이 아닌 상품, 이미 행사가 있는 상품은 거절한다.
+    // 이미 열린 행사가 있는 상품은 거절하고, 상품을 ID로 찾을 수 있게 모아 돌려준다.
+    // 없는 상품과 판매 중이 아닌 상품은 퍼사드가 먼저 거른다.
     private Map<Long, Product> getAvailableProducts(List<Long> productIds, List<Product> products) {
-        if (products.size() != productIds.size()) {
-            throw new BusinessException(ErrorCode.PRODUCT_NOT_FOUND);
-        }
-        products.stream()
-                .filter(product -> product.getStatus() != ProductStatus.ON_SALE)
-                .findFirst()
-                .ifPresent(product -> {
-                    throw new BusinessException(ErrorCode.PRODUCT_NOT_ON_SALE, toNotOnSaleMessage(product));
-                });
-
         Set<Long> productIdsInSale = new HashSet<>(
                 saleEventItemRepository.findProductIdsInOpenSaleEvent(
                         productIds, SaleEventStatus.OPEN, LocalDateTime.now(SaleEvent.ZONE)));
@@ -180,10 +170,5 @@ public class SaleEventService {
         if (!same) {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "행사에 든 상품과 보낸 상품이 다릅니다.");
         }
-    }
-
-    private String toNotOnSaleMessage(Product product) {
-        String reason = product.getStatus() == ProductStatus.SOLD_OUT ? "품절" : "판매 중지";
-        return reason + " · " + product.getName();
     }
 }

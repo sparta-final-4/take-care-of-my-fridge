@@ -11,6 +11,7 @@ import org.example.takecareofmyfridgebe.domain.member.repository.MemberRepositor
 import org.example.takecareofmyfridgebe.domain.notification.event.NotificationRequestedMessage;
 import org.example.takecareofmyfridgebe.domain.product.dto.ProductDetail;
 import org.example.takecareofmyfridgebe.domain.product.entity.Product;
+import org.example.takecareofmyfridgebe.domain.product.entity.ProductStatus;
 import org.example.takecareofmyfridgebe.domain.product.service.ProductService;
 import org.example.takecareofmyfridgebe.domain.sale.dto.FlashDropCreateRequest;
 import org.example.takecareofmyfridgebe.domain.sale.dto.SaleEventDetailResponse;
@@ -24,10 +25,13 @@ import org.example.takecareofmyfridgebe.domain.sale.event.FlashDropNotificationE
 import org.example.takecareofmyfridgebe.domain.sale.service.FlashDropNotificationService;
 import org.example.takecareofmyfridgebe.domain.sale.service.SaleEventQueryService;
 import org.example.takecareofmyfridgebe.domain.sale.service.SaleEventService;
+import org.example.takecareofmyfridgebe.global.error.BusinessException;
+import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 import org.springframework.stereotype.Component;
 
 // 관리자 행사 화면과 번개 드롭 알림에 다른 도메인 값을 붙인다. 행사는 할인 서비스에서, 상품은 상품 서비스에서 읽는다.
-// 등록·수정은 상품을 여기서 읽어 SaleEventService에 넘긴다. 상품 행을 잠그지 않으므로 상품 읽기는 쓰기 트랜잭션 밖에서 한다.
+// 등록·수정은 상품을 여기서 읽어 SaleEventService에 넘긴다. 등록은 없는 상품과 판매 중이 아닌 상품을 여기서 거른다.
+// 상품 행을 잠그지 않으므로 상품 읽기는 쓰기 트랜잭션 밖에서 한다.
 // 알림 받을 회원 ID는 MemberService에 맞는 메서드가 없어 MemberRepository를 직접 쓴다.
 // 목록·후보 상품 조회와 종료·삭제는 합칠 것이 없어 컨트롤러가 서비스를 바로 부른다.
 @Component
@@ -62,11 +66,15 @@ public class AdminSaleEventFacade {
     }
 
     public SaleEventsCreateResponse createSpecialSale(SpecialSaleCreateRequest request) {
-        return saleEventService.createSpecialSale(request, findProducts(request.productIds()));
+        List<Product> products = findProducts(request.productIds());
+        validateAvailable(request.productIds(), products);
+        return saleEventService.createSpecialSale(request, products);
     }
 
     public SaleEventsCreateResponse createFlashDrop(FlashDropCreateRequest request) {
-        return saleEventService.createFlashDrop(request, findProducts(request.productIds()));
+        List<Product> products = findProducts(request.productIds());
+        validateAvailable(request.productIds(), products);
+        return saleEventService.createFlashDrop(request, products);
     }
 
     public void update(Long saleEventId, SaleEventUpdateRequest request) {
@@ -79,5 +87,23 @@ public class AdminSaleEventFacade {
         return productService.getProductDetailsByIds(productIds).stream()
                 .map(ProductDetail::product)
                 .toList();
+    }
+
+    // 없는 상품과 판매 중이 아닌 상품은 행사에 넣을 수 없다.
+    private void validateAvailable(List<Long> productIds, List<Product> products) {
+        if (products.size() != productIds.size()) {
+            throw new BusinessException(ErrorCode.PRODUCT_NOT_FOUND);
+        }
+        products.stream()
+                .filter(product -> product.getStatus() != ProductStatus.ON_SALE)
+                .findFirst()
+                .ifPresent(product -> {
+                    throw new BusinessException(ErrorCode.PRODUCT_NOT_ON_SALE, toNotOnSaleMessage(product));
+                });
+    }
+
+    private String toNotOnSaleMessage(Product product) {
+        String reason = product.getStatus() == ProductStatus.SOLD_OUT ? "품절" : "판매 중지";
+        return reason + " · " + product.getName();
     }
 }
