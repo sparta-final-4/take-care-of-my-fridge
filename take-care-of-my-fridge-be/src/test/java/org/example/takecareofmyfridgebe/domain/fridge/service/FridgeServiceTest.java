@@ -32,6 +32,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.http.HttpStatus;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
@@ -711,6 +712,103 @@ class FridgeServiceTest {
     }
 
     /**
+     * 밀키트를 소수 수량(0.5)으로 빼면 FRIDGE_MEALKIT_QUANTITY_NOT_INTEGER(400)이 발생하고
+     * 남은 양·이력·삭제 모두 바뀌지 않는지 검증한다.
+     * 남은 양(2)보다 큰 소수(2.5)도 전부 빼기로 넘어가지 않고 같은 예외가 나는지 함께 확인한다.
+     */
+    @Test
+    void takeOutItemRejectsFractionalQuantityForMealkit() {
+        for (String requested : new String[]{"0.5", "2.5"}) {
+            // Given: 남은 양 2개인 밀키트
+            Fridge fridge = mealkitWithQuantity("2");
+            when(fridgeRepository.findForUpdateByIdAndMemberId(100L, 7L)).thenReturn(Optional.of(fridge));
+
+            // When & Then
+            BusinessException exception = assertThrows(
+                    BusinessException.class,
+                    () -> fridgeService.takeOutItem(7L, 100L,
+                            new FridgeItemTakeOutRequest(FridgeItemAction.CONSUMED, new BigDecimal(requested)))
+            );
+            assertEquals(ErrorCode.FRIDGE_MEALKIT_QUANTITY_NOT_INTEGER, exception.getErrorCode());
+            assertEquals(HttpStatus.BAD_REQUEST, exception.getErrorCode().getStatus());
+            assertEquals(0, new BigDecimal("2").compareTo(fridge.getQuantity()));
+            verifyNoInteractions(fridgeItemLogRepository);
+            verify(fridgeRepository, never()).delete(any(Fridge.class));
+        }
+    }
+
+    /**
+     * 밀키트를 정수 수량(1, 소수점 표기 1.00 포함)으로 빼면 정상 차감되고,
+     * 수량 없이(null) 빼면 전부 빼기로 처리되는지 검증한다.
+     */
+    @Test
+    void takeOutItemAllowsIntegerOrNullQuantityForMealkit() {
+        for (String requested : new String[]{"1", "1.00"}) {
+            // Given
+            Fridge fridge = mealkitWithQuantity("2");
+            when(fridgeRepository.findForUpdateByIdAndMemberId(100L, 7L)).thenReturn(Optional.of(fridge));
+
+            // When
+            FridgeItemTakeOutResponse response = fridgeService.takeOutItem(7L, 100L,
+                    new FridgeItemTakeOutRequest(FridgeItemAction.CONSUMED, new BigDecimal(requested)));
+
+            // Then: 1개 남음
+            assertFalse(response.removed());
+            assertEquals(0, BigDecimal.ONE.compareTo(response.remainingQuantity()));
+        }
+
+        // 수량 없이 빼면 전부
+        Fridge fridge = mealkitWithQuantity("2");
+        when(fridgeRepository.findForUpdateByIdAndMemberId(100L, 7L)).thenReturn(Optional.of(fridge));
+        FridgeItemTakeOutResponse response = fridgeService.takeOutItem(
+                7L, 100L, new FridgeItemTakeOutRequest(FridgeItemAction.DISCARDED, null));
+        assertTrue(response.removed());
+    }
+
+    /**
+     * 밀키트가 아닌 재료는 지금처럼 소수 수량(0.5)으로 뺄 수 있는지 검증한다.
+     */
+    @Test
+    void takeOutItemAllowsFractionalQuantityForNormalIngredient() {
+        // Given: 남은 양 3.00인 두부
+        Fridge fridge = fridgeWithQuantity("3.00");
+        when(fridgeRepository.findForUpdateByIdAndMemberId(100L, 7L)).thenReturn(Optional.of(fridge));
+
+        // When
+        FridgeItemTakeOutResponse response = fridgeService.takeOutItem(
+                7L, 100L, new FridgeItemTakeOutRequest(FridgeItemAction.CONSUMED, new BigDecimal("0.5")));
+
+        // Then
+        assertFalse(response.removed());
+        assertEquals(0, new BigDecimal("2.50").compareTo(response.remainingQuantity()));
+    }
+
+    /**
+     * 밀키트 수량을 소수(1.5)로 수정하면 FRIDGE_MEALKIT_QUANTITY_NOT_INTEGER(400)이 발생하고 수량이 그대로이며,
+     * 정수(3)로 수정하면 정상 반영되는지 검증한다.
+     */
+    @Test
+    void updateItemAllowsOnlyIntegerQuantityForMealkit() {
+        // Given
+        Fridge fridge = mealkitWithQuantity("2");
+        when(fridgeRepository.findForUpdateByIdAndMemberId(100L, 7L)).thenReturn(Optional.of(fridge));
+
+        // When & Then: 소수는 거절
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> fridgeService.updateItem(7L, 100L, null,
+                        new FridgeItemUpdateRequest(null, new BigDecimal("1.5"), null, null))
+        );
+        assertEquals(ErrorCode.FRIDGE_MEALKIT_QUANTITY_NOT_INTEGER, exception.getErrorCode());
+        assertEquals(0, new BigDecimal("2").compareTo(fridge.getQuantity()));
+
+        // When & Then: 정수는 반영
+        FridgeItemResponse response = fridgeService.updateItem(7L, 100L, null,
+                new FridgeItemUpdateRequest(null, new BigDecimal("3"), null, null));
+        assertEquals(0, new BigDecimal("3").compareTo(response.quantity()));
+    }
+
+    /**
      * 기록 조회 시:
      * 1) 조건(action, from, to)과 1부터 시작하는 page를 0부터 시작하는 PageRequest로 바꿔 Repository에 넘기는지
      * 2) 기록이 FridgeItemLogResponse로 변환되고(cookingLogId가 있으면 cookedByRecipe = true) 페이지 번호가 다시 1부터인지 검증한다.
@@ -839,10 +937,19 @@ class FridgeServiceTest {
 
     // 7번 회원이 보유한 100번 재료(두부)
     private static Fridge fridgeWithQuantity(String quantity) {
+        return fridgeWithQuantity("ING_TOFU", "두부", "모", quantity);
+    }
+
+    // 7번 회원이 보유한 100번 밀키트
+    private static Fridge mealkitWithQuantity(String quantity) {
+        return fridgeWithQuantity(Ingredient.ING_MEALKIT, "밀키트", "개", quantity);
+    }
+
+    private static Fridge fridgeWithQuantity(String ingredientCode, String name, String baseUnit, String quantity) {
         Ingredient ingredient = Ingredient.builder()
-                .ingredientCode("ING_TOFU")
-                .name("두부")
-                .baseUnit("모")
+                .ingredientCode(ingredientCode)
+                .name(name)
+                .baseUnit(baseUnit)
                 .defaultStorage(StorageType.REFRIGERATED)
                 .defaultShelfDays(5)
                 .basicSeasoning(false)
@@ -851,7 +958,7 @@ class FridgeServiceTest {
         Fridge fridge = Fridge.builder()
                 .memberId(7L)
                 .ingredient(ingredient)
-                .rawName("두부")
+                .rawName(name)
                 .quantity(new BigDecimal(quantity))
                 .storage(StorageType.REFRIGERATED)
                 .expirationDate(LocalDate.now().plusDays(2))

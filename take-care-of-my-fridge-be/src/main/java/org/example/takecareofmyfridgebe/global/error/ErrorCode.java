@@ -147,6 +147,7 @@ public enum ErrorCode {
     INVALID_FRIDGE_QUANTITY(HttpStatus.BAD_REQUEST, "FRIDGE_002", "수량은 0보다 커야 합니다."),
     INVALID_FRIDGE_ORDER_ITEM(HttpStatus.INTERNAL_SERVER_ERROR, "FRIDGE_003", "입고 출처와 주문 상품 정보가 일치하지 않습니다."),
     INVALID_FRIDGE_LOG(HttpStatus.INTERNAL_SERVER_ERROR, "FRIDGE_004", "유효하지 않은 냉장고 재료 이력입니다."),
+    FRIDGE_MEALKIT_QUANTITY_NOT_INTEGER(HttpStatus.BAD_REQUEST, "FRIDGE_005", "밀키트 수량은 1개 단위로 입력해 주세요."),
 
     // Cooking
     COOKING_LOG_NOT_FOUND(HttpStatus.NOT_FOUND, "COOKING_001", "요리 기록을 찾을 수 없습니다.")

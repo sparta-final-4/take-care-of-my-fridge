@@ -6,8 +6,23 @@ import {
   formatDDayLabel,
   formatLogDate,
   formatQuantity,
+  getStep,
   withObjectParticle,
 } from './format';
+
+describe('getStep', () => {
+  it.each(['개', '모', '마리', '캔', '접시', ' 개 '])('세는 단위 "%s"는 0.5', (unit) => {
+    expect(getStep(unit)).toBe(0.5);
+  });
+
+  it.each(['g', 'kg', 'ml', 'ML', ' g '])('무게·부피 단위 "%s"는 10', (unit) => {
+    expect(getStep(unit)).toBe(10);
+  });
+
+  it.each([null, undefined, '', '큰술', '컵'])('단위가 없거나 그 밖의 단위(%s)는 0.5', (unit) => {
+    expect(getStep(unit)).toBe(0.5);
+  });
+});
 
 describe('withObjectParticle', () => {
   it('받침이 있으면 을, 없으면 를을 붙인다', () => {
@@ -37,7 +52,7 @@ describe('formatQuantity', () => {
   it('소수점 첫째 자리까지만 보여준다', () => {
     expect(formatQuantity({ quantity: 0.33, baseUnit: '개' })).toBe('0.3개');
     expect(formatQuantity({ quantity: 2, baseUnit: '개' })).toBe('2개');
-    expect(formatQuantity({ quantity: 1.25, baseUnit: null })).toBe('1.3');
+    expect(formatQuantity({ quantity: 1.25 })).toBe('1.3');
   });
 
   it('반올림하면 0이 되는 작은 값은 원래 값을 보여준다', () => {

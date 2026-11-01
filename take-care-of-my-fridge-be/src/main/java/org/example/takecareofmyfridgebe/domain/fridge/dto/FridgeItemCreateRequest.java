@@ -1,5 +1,6 @@
 package org.example.takecareofmyfridgebe.domain.fridge.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
@@ -20,6 +21,8 @@ public record FridgeItemCreateRequest(
         @Size(max = 20, message = "한 번에 최대 20개까지만 등록할 수 있습니다.")
         List<@Valid @NotNull(message = "재료 항목은 비어 있을 수 없습니다.") Item> items
 ) {
+    // 다른 DTO의 중첩 record(Item)와 OpenAPI 스키마 이름이 겹치지 않게 이름을 따로 붙인다.
+    @Schema(name = "FridgeItemCreateItem")
     public record Item(
             @NotBlank(message = "재료 이름을 입력해 주세요.")
             @Size(max = 200, message = "재료 이름은 200자 이하여야 합니다.")

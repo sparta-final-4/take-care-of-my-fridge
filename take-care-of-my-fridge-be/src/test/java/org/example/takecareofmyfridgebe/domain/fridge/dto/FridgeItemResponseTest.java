@@ -128,4 +128,31 @@ class FridgeItemResponseTest {
         FridgeItemResponse response = FridgeItemResponse.from(fridgeWithIngredient(mealkit), TODAY);
         assertEquals(IngredientType.MEALKIT, response.ingredientType());
     }
+
+    @Test
+    @DisplayName("기본 양념 재료(is_basic_seasoning = true)는 basicSeasoning이 true다")
+    void fromWithBasicSeasoningIngredientReturnsBasicSeasoningTrue() {
+        Ingredient soySauce = Ingredient.builder()
+                .ingredientCode("ING_SOY_SAUCE")
+                .name("간장")
+                .basicSeasoning(true)
+                .build();
+
+        FridgeItemResponse response = FridgeItemResponse.from(fridgeWithIngredient(soySauce), TODAY);
+        assertTrue(response.basicSeasoning());
+        assertEquals(IngredientType.NORMAL, response.ingredientType());
+    }
+
+    @Test
+    @DisplayName("기본 양념이 아닌 재료와 재료가 없는 냉장고 재료는 basicSeasoning이 false다")
+    void fromWithoutBasicSeasoningReturnsBasicSeasoningFalse() {
+        Ingredient tofu = Ingredient.builder()
+                .ingredientCode("ING_TOFU")
+                .name("두부")
+                .basicSeasoning(false)
+                .build();
+
+        assertFalse(FridgeItemResponse.from(fridgeWithIngredient(tofu), TODAY).basicSeasoning());
+        assertFalse(FridgeItemResponse.from(fridgeExpiringOn(TODAY), TODAY).basicSeasoning());
+    }
 }
