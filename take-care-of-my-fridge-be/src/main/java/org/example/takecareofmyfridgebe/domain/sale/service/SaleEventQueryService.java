@@ -1,5 +1,6 @@
 package org.example.takecareofmyfridgebe.domain.sale.service;
 
+import java.util.Collection;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.sale.dto.SaleCandidateProductResponse;
@@ -39,6 +40,11 @@ public class SaleEventQueryService {
 
     public List<SaleEventItem> getSaleEventItems(Long saleEventId) {
         return saleEventItemRepository.findBySaleEventIdOrderById(saleEventId);
+    }
+
+    // 알림 문구에 행사 시작 시각이 들어가서 행사를 함께 읽는다
+    public List<SaleEventItem> getItemsWithSaleEvent(Collection<Long> saleEventIds) {
+        return saleEventItemRepository.findAllWithSaleEventBySaleEventIdIn(saleEventIds);
     }
 
     public PageResponse<SaleCandidateProductResponse> getCandidates(SaleCandidateProductsRequest request) {

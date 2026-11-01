@@ -4,7 +4,7 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.takecareofmyfridgebe.domain.notification.event.NotificationRequestedMessage;
-import org.example.takecareofmyfridgebe.domain.sale.service.FlashDropNotificationReader;
+import org.example.takecareofmyfridgebe.domain.sale.facade.SaleEventFacade;
 import org.example.takecareofmyfridgebe.global.config.KafkaTopics;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
@@ -18,13 +18,13 @@ import org.springframework.transaction.event.TransactionalEventListener;
 @RequiredArgsConstructor
 public class FlashDropNotificationListener {
 
-    private final FlashDropNotificationReader flashDropNotificationReader;
+    private final SaleEventFacade saleEventFacade;
     private final KafkaTemplate<String, Object> kafkaTemplate;
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onFlashDropNotification(FlashDropNotificationEvent event) {
         try {
-            List<NotificationRequestedMessage> messages = flashDropNotificationReader.read(event);
+            List<NotificationRequestedMessage> messages = saleEventFacade.getFlashDropNotifications(event);
             messages.forEach(message -> send(event, message));
         } catch (RuntimeException e) {
             log.error("번개 드롭 알림 요청 발행 실패: moment={}, saleEventIds={}", event.moment(), event.saleEventIds(), e);
