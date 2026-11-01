@@ -69,11 +69,11 @@ public class OrderFacade {
         // 진행 중 할인은 상품 행을 잠근 뒤 읽는다. 장바구니에서 본 단가·할인 구분과 하나라도 다르면 재고를 잡기 전에 거절한다.
         Map<Long, SellingPrice> pricesByProductId = saleEventReader.findSellingPrices(List.copyOf(productsById.values()));
         Map<Long, OrderCreateItemRequest> requestedByCartItemId = request.items().stream()
-            .collect(Collectors.toMap(OrderCreateItemRequest::cartItemId, Function.identity(), (first, second) -> first));
+                .collect(Collectors.toMap(OrderCreateItemRequest::cartItemId, Function.identity(), (first, second) -> first));
         cartItems.forEach(item -> validatePrice(
-            productsById.get(item.getProductId()),
-            pricesByProductId.get(item.getProductId()),
-            requestedByCartItemId.get(item.getId())));
+                productsById.get(item.getProductId()),
+                pricesByProductId.get(item.getProductId()),
+                requestedByCartItemId.get(item.getId())));
 
         cartItems.forEach(item -> productsById.get(item.getProductId()).decreaseStock(item.getQuantity()));
         decreaseFlashDropRemaining(memberId, cartItems, productsById, pricesByProductId);
@@ -84,7 +84,7 @@ public class OrderFacade {
     // 재고 되돌리기(OrderStatusFacade)와 같은 순서(상품 ID 순)로 상품 행을 잠가 서로 섞이지 않게 한다.
     private Map<Long, Product> findProductsForUpdate(List<Long> productIds) {
         return productRepository.findAllByIdInForUpdate(productIds).stream()
-            .collect(Collectors.toMap(Product::getId, Function.identity()));
+                .collect(Collectors.toMap(Product::getId, Function.identity()));
     }
 
     private void validateIdempotencyKey(String idempotencyKey) {
@@ -131,17 +131,17 @@ public class OrderFacade {
         Long memberId, List<CartItem> cartItems, Map<Long, Product> productsById, Map<Long, SellingPrice> pricesByProductId
     ) {
         List<CartItem> flashDropItems = cartItems.stream()
-            .filter(item -> pricesByProductId.get(item.getProductId()).isFlashDrop())
-            .toList();
+                .filter(item -> pricesByProductId.get(item.getProductId()).isFlashDrop())
+                .toList();
         if (flashDropItems.isEmpty()) {
             return;
         }
         flashDropItems.forEach(item -> validateFlashDropLimit(
-            memberId, item, productsById.get(item.getProductId()), pricesByProductId.get(item.getProductId())));
+                memberId, item, productsById.get(item.getProductId()), pricesByProductId.get(item.getProductId())));
 
         saleEventStockService.decreaseRemaining(flashDropItems.stream()
-            .map(item -> new FlashDropQuantity(pricesByProductId.get(item.getProductId()).saleEventItemId(),
-                item.getQuantity(), productsById.get(item.getProductId()).getName()))
-            .toList());
+                .map(item -> new FlashDropQuantity(pricesByProductId.get(item.getProductId()).saleEventItemId(),
+                        item.getQuantity(), productsById.get(item.getProductId()).getName()))
+                .toList());
     }
 }

@@ -101,14 +101,14 @@ public class OrderStatusFacade {
         }
         List<OrderItem> items = orderReader.getOrderItems(order);
         Map<Long, Long> completedRefundQuantities = refundQueryService.getCompletedRefundQuantities(
-            items.stream().map(OrderItem::getId).toList());
+                items.stream().map(OrderItem::getId).toList());
         return orderStatusService.confirm(order, items, completedRefundQuantities);
     }
 
     // 주문하기(OrderFacade)와 같은 순서(상품 ID 순)로 상품 행을 잠가 서로 섞이지 않게 한다.
     private Map<Long, Product> findProductsForUpdate(List<Long> productIds) {
         return productRepository.findAllByIdInForUpdate(productIds).stream()
-            .collect(Collectors.toMap(Product::getId, Function.identity()));
+                .collect(Collectors.toMap(Product::getId, Function.identity()));
     }
 
     // 결제 전 주문의 재고를 되돌리는 곳은 여기 하나뿐이다. 결제 후 환불은 환불 쪽이 되돌린다.
@@ -118,13 +118,13 @@ public class OrderStatusFacade {
         orderItems.forEach(item -> productsById.get(item.getProductId()).increaseStock(item.getQuantity()));
 
         List<OrderItem> flashDropItems = orderItems.stream()
-            .filter(item -> item.getSaleType() == SaleType.FLASH_DROP)
-            .toList();
+                .filter(item -> item.getSaleType() == SaleType.FLASH_DROP)
+                .toList();
         if (flashDropItems.isEmpty()) {
             return;
         }
         saleEventStockService.increaseRemaining(flashDropItems.stream()
-            .map(item -> new FlashDropQuantity(item.getSaleEventItemId(), item.getQuantity(), item.getProductName()))
-            .toList());
+                .map(item -> new FlashDropQuantity(item.getSaleEventItemId(), item.getQuantity(), item.getProductName()))
+                .toList());
     }
 }

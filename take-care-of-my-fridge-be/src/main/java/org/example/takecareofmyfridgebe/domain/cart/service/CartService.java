@@ -50,7 +50,7 @@ public class CartService {
     @Transactional
     public Cart getCartForUpdate(Long memberId) {
         return cartRepository.findByMemberIdForUpdate(memberId)
-            .orElseThrow(() -> new BusinessException(ErrorCode.CART_ITEM_NOT_FOUND));
+                .orElseThrow(() -> new BusinessException(ErrorCode.CART_ITEM_NOT_FOUND));
     }
 
     @Transactional

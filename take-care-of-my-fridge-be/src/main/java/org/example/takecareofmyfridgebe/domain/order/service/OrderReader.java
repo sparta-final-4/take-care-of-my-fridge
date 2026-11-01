@@ -25,13 +25,13 @@ public class OrderReader {
     // 남의 주문도 없는 주문과 똑같이 404로 답해, 주문 번호가 있는지 드러내지 않는다.
     public Order getOwnedOrder(Long memberId, Long orderId) {
         return orderRepository.findByIdAndMemberId(orderId, memberId)
-            .orElseThrow(() -> new BusinessException(ErrorCode.ORDER_NOT_FOUND));
+                .orElseThrow(() -> new BusinessException(ErrorCode.ORDER_NOT_FOUND));
     }
 
     // 상태를 바꾸기 전에 주문 행을 잠그고 찾는다. 잠금은 부르는 서비스의 트랜잭션이 끝날 때 풀린다.
     public Order getOwnedOrderForUpdate(Long memberId, Long orderId) {
         return orderRepository.findByIdAndMemberIdForUpdate(orderId, memberId)
-            .orElseThrow(() -> new BusinessException(ErrorCode.ORDER_NOT_FOUND));
+                .orElseThrow(() -> new BusinessException(ErrorCode.ORDER_NOT_FOUND));
     }
 
     // 회원 확인 없이 주문 행을 잠그고 찾는다. 스케줄러처럼 로그인한 회원이 없는 곳에서 쓴다.

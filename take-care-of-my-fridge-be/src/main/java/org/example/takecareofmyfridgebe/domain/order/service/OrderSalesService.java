@@ -27,13 +27,13 @@ public class OrderSalesService {
     public List<DailyProductSales> getDailyRegularProductSales(LocalDate from, LocalDate to, LocalDateTime asOf) {
         validatePeriod(from, to, asOf);
         return orderItemRepository.findDailyRegularProductSales(
-            OrderStatus.CONFIRMED, from.atStartOfDay(), to.plusDays(1).atStartOfDay(), asOf);
+                OrderStatus.CONFIRMED, from.atStartOfDay(), to.plusDays(1).atStartOfDay(), asOf);
     }
 
     public List<DailyProductSales> getDailyProductSales(LocalDate from, LocalDate to, LocalDateTime asOf) {
         validatePeriod(from, to, asOf);
         return orderItemRepository.findDailyProductSales(
-            OrderStatus.CONFIRMED, from.atStartOfDay(), to.plusDays(1).atStartOfDay(), asOf);
+                OrderStatus.CONFIRMED, from.atStartOfDay(), to.plusDays(1).atStartOfDay(), asOf);
     }
 
     private void validatePeriod(LocalDate from, LocalDate to, LocalDateTime asOf) {

@@ -44,7 +44,7 @@ public class OrderService {
         Long memberId, String idempotencyKey, List<Long> cartItemIds, List<CartItem> cartItems
     ) {
         return orderRepository.findByMemberIdAndIdempotencyKey(memberId, idempotencyKey)
-            .map(order -> toExistingResult(order, cartItemIds, cartItems));
+                .map(order -> toExistingResult(order, cartItemIds, cartItems));
     }
 
     // 이 회원이 이 번개 드롭을 이미 샀는지 본다. 1인 1개 기록은 주문 상품 행에 남는다.
@@ -59,14 +59,14 @@ public class OrderService {
         Map<Long, Product> productsById, Map<Long, SellingPrice> pricesByProductId
     ) {
         long totalAmount = cartItems.stream()
-            .mapToLong(item -> (long) pricesByProductId.get(item.getProductId()).unitPrice() * item.getQuantity())
-            .sum();
+                .mapToLong(item -> (long) pricesByProductId.get(item.getProductId()).unitPrice() * item.getQuantity())
+                .sum();
         Order order = saveOrder(memberId, idempotencyKey, totalAmount);
 
         List<OrderItem> orderItems = cartItems.stream()
-            .map(item -> toOrderItem(order, memberId, productsById.get(item.getProductId()),
-                pricesByProductId.get(item.getProductId()), item.getQuantity()))
-            .toList();
+                .map(item -> toOrderItem(order, memberId, productsById.get(item.getProductId()),
+                        pricesByProductId.get(item.getProductId()), item.getQuantity()))
+                .toList();
         orderItemRepository.saveAll(orderItems);
         return new OrderCreateResult(OrderCheckoutResponse.from(order, orderItems), true);
     }
@@ -81,9 +81,9 @@ public class OrderService {
         }
 
         Map<Long, Integer> ordered = orderItems.stream()
-            .collect(Collectors.toMap(OrderItem::getProductId, OrderItem::getQuantity));
+                .collect(Collectors.toMap(OrderItem::getProductId, OrderItem::getQuantity));
         Map<Long, Integer> requested = cartItems.stream()
-            .collect(Collectors.toMap(CartItem::getProductId, CartItem::getQuantity));
+                .collect(Collectors.toMap(CartItem::getProductId, CartItem::getQuantity));
         if (!ordered.equals(requested)) {
             throw new BusinessException(ErrorCode.ORDER_IDEMPOTENCY_KEY_REUSED);
         }
@@ -94,11 +94,11 @@ public class OrderService {
     // 이 주문은 롤백하고 다시 주문하게 한다. 그 밖의 제약 위반은 원인을 가리지 않도록 그대로 던진다.
     private Order saveOrder(Long memberId, String idempotencyKey, long totalAmount) {
         Order order = Order.builder()
-            .orderNumber(orderNumberGenerator.next())
-            .memberId(memberId)
-            .idempotencyKey(idempotencyKey)
-            .totalAmount(totalAmount)
-            .build();
+                .orderNumber(orderNumberGenerator.next())
+                .memberId(memberId)
+                .idempotencyKey(idempotencyKey)
+                .totalAmount(totalAmount)
+                .build();
         try {
             return orderRepository.save(order);
         } catch (DataIntegrityViolationException e) {
@@ -120,16 +120,16 @@ public class OrderService {
 
     private OrderItem toOrderItem(Order order, Long memberId, Product product, SellingPrice price, int quantity) {
         return OrderItem.builder()
-            .order(order)
-            .productId(product.getId())
-            .productName(product.getName())
-            .productImageUrl(product.getImageUrl())
-            .quantity(quantity)
-            .listPrice(price.listPrice())
-            .unitPrice(price.unitPrice())
-            .saleType(SaleType.from(price.saleType()))
-            .saleEventItemId(price.saleEventItemId())
-            .flashDropMemberId(price.isFlashDrop() ? memberId : null)
-            .build();
+                .order(order)
+                .productId(product.getId())
+                .productName(product.getName())
+                .productImageUrl(product.getImageUrl())
+                .quantity(quantity)
+                .listPrice(price.listPrice())
+                .unitPrice(price.unitPrice())
+                .saleType(SaleType.from(price.saleType()))
+                .saleEventItemId(price.saleEventItemId())
+                .flashDropMemberId(price.isFlashDrop() ? memberId : null)
+                .build();
     }
 }
