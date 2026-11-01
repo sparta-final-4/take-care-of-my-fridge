@@ -30,6 +30,10 @@ public class CartService {
     private final CartRepository cartRepository;
     private final CartItemRepository cartItemRepository;
 
+    public List<CartItem> getItems(Long memberId) {
+        return cartItemRepository.findByCartMemberIdOrderByIdAsc(memberId);
+    }
+
     @Transactional
     public AddCartItemResult addItem(Long memberId, AddCartItemRequest request, CartQuantityLimit limit) {
         Cart cart = cartRepository.findByMemberId(memberId)
@@ -48,10 +52,6 @@ public class CartService {
         CartItem item = existing.get();
         item.changeQuantity((int) total);
         return new AddCartItemResult(AddCartItemResponse.from(item), false);
-    }
-
-    public List<CartItem> getItems(Long memberId) {
-        return cartItemRepository.findByCartMemberIdOrderByIdAsc(memberId);
     }
 
     // 상품 한도는 줄을 찾아 상품 번호를 안 뒤에 퍼사드가 읽어 주므로 상품 번호로 받는 함수로 받는다

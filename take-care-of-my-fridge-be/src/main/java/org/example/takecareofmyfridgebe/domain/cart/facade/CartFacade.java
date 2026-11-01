@@ -29,10 +29,6 @@ public class CartFacade {
     private final CartProductReader cartProductReader;
     private final SaleEventReader saleEventReader;
 
-    public AddCartItemResult addItem(Long memberId, AddCartItemRequest request) {
-        return cartService.addItem(memberId, request, limitOf(request.productId()));
-    }
-
     public CartItemsResponse getItems(Long memberId) {
         List<CartItem> items = cartService.getItems(memberId);
         List<Long> productIds = items.stream().map(CartItem::getProductId).toList();
@@ -41,11 +37,15 @@ public class CartFacade {
         return CartItemsResponse.from(items, productsById, saleEventReader.findSellingPrices(products));
     }
 
-    public ChangeCartItemQuantityResponse changeQuantity(Long memberId, Long cartItemId, ChangeCartItemQuantityRequest request) {
-        return cartService.changeQuantity(memberId, cartItemId, request, this::limitOf);
+    public AddCartItemResult addItem(Long memberId, AddCartItemRequest request) {
+        return cartService.addItem(memberId, request, getQuantityLimit(request.productId()));
     }
 
-    private CartQuantityLimit limitOf(long productId) {
+    public ChangeCartItemQuantityResponse changeQuantity(Long memberId, Long cartItemId, ChangeCartItemQuantityRequest request) {
+        return cartService.changeQuantity(memberId, cartItemId, request, this::getQuantityLimit);
+    }
+
+    private CartQuantityLimit getQuantityLimit(long productId) {
         Product product = cartProductReader.getSellableProduct(productId);
         SellingPrice price = saleEventReader.findSellingPrice(product);
         return new CartQuantityLimit(product.getName(), product.getStock(), price.isFlashDrop());

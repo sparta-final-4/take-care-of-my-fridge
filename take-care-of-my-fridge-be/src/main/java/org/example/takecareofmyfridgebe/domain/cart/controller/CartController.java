@@ -34,6 +34,12 @@ public class CartController {
     private final CartFacade cartFacade;
     private final CartService cartService;
 
+    @GetMapping
+    public ResponseEntity<ApiResponse<CartItemsResponse>> getItems(
+            @AuthenticationPrincipal AuthSessionService.AuthPrincipal principal) {
+        return ResponseEntity.ok(ApiResponse.ok(cartFacade.getItems(principal.memberId())));
+    }
+
     @PostMapping
     public ResponseEntity<ApiResponse<AddCartItemResponse>> addItem(
             @AuthenticationPrincipal AuthSessionService.AuthPrincipal principal,
@@ -41,12 +47,6 @@ public class CartController {
         AddCartItemResult result = cartFacade.addItem(principal.memberId(), request);
         HttpStatus status = result.created() ? HttpStatus.CREATED : HttpStatus.OK;
         return ResponseEntity.status(status).body(ApiResponse.ok(result.response()));
-    }
-
-    @GetMapping
-    public ResponseEntity<ApiResponse<CartItemsResponse>> getItems(
-            @AuthenticationPrincipal AuthSessionService.AuthPrincipal principal) {
-        return ResponseEntity.ok(ApiResponse.ok(cartFacade.getItems(principal.memberId())));
     }
 
     @PatchMapping("/{cartItemId}")
