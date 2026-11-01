@@ -274,9 +274,7 @@ class CartServiceTransactionTest extends MySqlContainerSupport {
             assertThat(item.imageUrl()).isEqualTo("https://example.com/green-onion.png");
             assertThat(item.listPrice()).isEqualTo(1000);
             assertThat(item.unitPrice()).isEqualTo(1000);
-            assertThat(item.saleType()).isNull();
-            assertThat(item.discountRate()).isNull();
-            assertThat(item.flashDropRemaining()).isNull();
+            assertThat(item.sale()).isNull();
         });
     }
 

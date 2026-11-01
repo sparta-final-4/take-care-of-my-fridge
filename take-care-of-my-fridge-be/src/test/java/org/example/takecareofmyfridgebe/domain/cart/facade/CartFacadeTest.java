@@ -109,15 +109,22 @@ class CartFacadeTest {
 
         assertThat(result.items()).extracting(CartItemResponse::unitPrice).containsExactly(3000, 2400, 2000);
         assertThat(result.items()).extracting(CartItemResponse::listPrice).containsExactly(3000, 3000, 4000);
-        assertThat(result.items()).extracting(CartItemResponse::saleType)
-                .containsExactly(null, SaleEventType.SPECIAL, SaleEventType.FLASH_DROP);
-        assertThat(result.items()).extracting(CartItemResponse::discountRate).containsExactly(null, 20, 50);
-        assertThat(result.items()).extracting(CartItemResponse::flashDropRemaining).containsExactly(null, null, 0);
-        assertThat(result.items()).extracting(CartItemResponse::flashDropLimit).containsExactly(null, null, 10);
-        assertThat(result.items()).extracting(CartItemResponse::saleEndsAt)
-                .satisfiesExactly(ends -> assertThat(ends).isNull(),
-                        ends -> assertThat(ends.getOffset()).isEqualTo(ZoneOffset.of("+09:00")),
-                        ends -> assertThat(ends.getOffset()).isEqualTo(ZoneOffset.of("+09:00")));
+        assertThat(result.items()).extracting(CartItemResponse::sale).satisfiesExactly(
+                sale -> assertThat(sale).isNull(),
+                sale -> {
+                    assertThat(sale.type()).isEqualTo(SaleEventType.SPECIAL);
+                    assertThat(sale.discountRate()).isEqualTo(20);
+                    assertThat(sale.remainingQuantity()).isNull();
+                    assertThat(sale.limitedQuantity()).isNull();
+                    assertThat(sale.endsAt().getOffset()).isEqualTo(ZoneOffset.of("+09:00"));
+                },
+                sale -> {
+                    assertThat(sale.type()).isEqualTo(SaleEventType.FLASH_DROP);
+                    assertThat(sale.discountRate()).isEqualTo(50);
+                    assertThat(sale.remainingQuantity()).isEqualTo(0);
+                    assertThat(sale.limitedQuantity()).isEqualTo(10);
+                    assertThat(sale.endsAt().getOffset()).isEqualTo(ZoneOffset.of("+09:00"));
+                });
         assertThat(result.items()).extracting(CartItemResponse::soldOut).containsExactly(false, false, true);
     }
 
