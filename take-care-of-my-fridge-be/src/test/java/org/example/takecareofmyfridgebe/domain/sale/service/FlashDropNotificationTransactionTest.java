@@ -59,7 +59,6 @@ class FlashDropNotificationTransactionTest extends MySqlContainerSupport {
     private static final LocalDateTime NOW = LocalDateTime.now(SaleEvent.ZONE);
     private static final LocalDateTime TOMORROW = NOW.plusDays(1);
 
-    private final SaleEventService saleEventService;
     private final SaleEventStatusService saleEventStatusService;
     private final AdminSaleEventFacade adminSaleEventFacade;
     private final SaleEventRepository saleEventRepository;
@@ -70,7 +69,6 @@ class FlashDropNotificationTransactionTest extends MySqlContainerSupport {
 
     @Autowired
     FlashDropNotificationTransactionTest(
-            SaleEventService saleEventService,
             SaleEventStatusService saleEventStatusService,
             AdminSaleEventFacade adminSaleEventFacade,
             SaleEventRepository saleEventRepository,
@@ -78,7 +76,6 @@ class FlashDropNotificationTransactionTest extends MySqlContainerSupport {
             ProductRepository productRepository,
             MemberRepository memberRepository,
             DataSource dataSource) {
-        this.saleEventService = saleEventService;
         this.saleEventStatusService = saleEventStatusService;
         this.adminSaleEventFacade = adminSaleEventFacade;
         this.saleEventRepository = saleEventRepository;
@@ -109,7 +106,7 @@ class FlashDropNotificationTransactionTest extends MySqlContainerSupport {
         Product tofu = saveProduct("두부", 3000);
         LocalDateTime startsAt = LocalDateTime.of(TOMORROW.getYear(), TOMORROW.getMonth(), TOMORROW.getDayOfMonth(), 18, 0);
 
-        SaleEventsCreateResponse response = saleEventService.createFlashDrop(new FlashDropCreateRequest(
+        SaleEventsCreateResponse response = adminSaleEventFacade.createFlashDrop(new FlashDropCreateRequest(
                 startsAt, startsAt.plusHours(2), List.of(new FlashDropItemRequest(tofu.getId(), 50, 10))));
 
         List<FlashDropNotificationEvent> published = events.stream(FlashDropNotificationEvent.class).toList();
@@ -133,7 +130,7 @@ class FlashDropNotificationTransactionTest extends MySqlContainerSupport {
         saveMember("user1");
         Product tofu = saveProduct("두부", 3000);
 
-        saleEventService.createSpecialSale(new SpecialSaleCreateRequest(
+        adminSaleEventFacade.createSpecialSale(new SpecialSaleCreateRequest(
                 TOMORROW, TOMORROW.plusDays(7), List.of(new SpecialSaleItemRequest(tofu.getId(), 20))));
 
         assertThat(events.stream(FlashDropNotificationEvent.class)).isEmpty();

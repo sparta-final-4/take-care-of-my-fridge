@@ -24,7 +24,7 @@ import org.example.takecareofmyfridgebe.domain.sale.dto.FlashDropItemRequest;
 import org.example.takecareofmyfridgebe.domain.sale.dto.SpecialSaleCreateRequest;
 import org.example.takecareofmyfridgebe.domain.sale.dto.SpecialSaleItemRequest;
 import org.example.takecareofmyfridgebe.domain.sale.entity.SaleEventType;
-import org.example.takecareofmyfridgebe.domain.sale.service.SaleEventService;
+import org.example.takecareofmyfridgebe.domain.sale.facade.AdminSaleEventFacade;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 import org.junit.jupiter.api.Test;
@@ -35,7 +35,7 @@ class DealEventServiceTest {
 
     private final DealAnalysisRepository analyses = mock(DealAnalysisRepository.class);
     private final DealCandidateRepository candidates = mock(DealCandidateRepository.class);
-    private final SaleEventService sales = mock(SaleEventService.class);
+    private final AdminSaleEventFacade sales = mock(AdminSaleEventFacade.class);
     private final AdminAuditLogService audit = mock(AdminAuditLogService.class);
     private final Environment environment = mock(Environment.class);
     private final DealEventService service = new DealEventService(analyses, candidates, sales, audit, environment);

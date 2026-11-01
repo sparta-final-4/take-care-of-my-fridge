@@ -48,12 +48,11 @@ import org.springframework.transaction.annotation.Transactional;
 @Import({JpaAuditingConfig.class, QueryDslConfig.class, SaleEventService.class,
         SaleEventQueryService.class, FlashDropNotificationService.class, AdminSaleEventFacade.class, ProductService.class})
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
-class AdminAdminSaleEventFacadeTest extends MySqlContainerSupport {
+class AdminSaleEventFacadeTest extends MySqlContainerSupport {
 
     private static final LocalDateTime TOMORROW =
             LocalDateTime.now(ZoneId.of("Asia/Seoul")).plusDays(1).withNano(0);
 
-    private final SaleEventService saleEventService;
     private final AdminSaleEventFacade adminSaleEventFacade;
     private final SaleEventRepository saleEventRepository;
     private final SaleEventItemRepository saleEventItemRepository;
@@ -61,14 +60,12 @@ class AdminAdminSaleEventFacadeTest extends MySqlContainerSupport {
     private final JdbcTemplate jdbcTemplate;
 
     @Autowired
-    AdminAdminSaleEventFacadeTest(
-            SaleEventService saleEventService,
+    AdminSaleEventFacadeTest(
             AdminSaleEventFacade adminSaleEventFacade,
             SaleEventRepository saleEventRepository,
             SaleEventItemRepository saleEventItemRepository,
             ProductRepository productRepository,
             DataSource dataSource) {
-        this.saleEventService = saleEventService;
         this.adminSaleEventFacade = adminSaleEventFacade;
         this.saleEventRepository = saleEventRepository;
         this.saleEventItemRepository = saleEventItemRepository;
@@ -115,7 +112,7 @@ class AdminAdminSaleEventFacadeTest extends MySqlContainerSupport {
     @DisplayName("종료된 번개 드롭의 정가는 등록 당시 정가이고 한정·남은 수량을 함께 준다")
     void getSaleEvent_endedFlashDrop_returnsStoredListPrice() {
         Product tofu = saveProduct("두부", 3000);
-        Long eventId = saleEventService.createFlashDrop(
+        Long eventId = adminSaleEventFacade.createFlashDrop(
                 new FlashDropCreateRequest(TOMORROW, TOMORROW.plusHours(2),
                         List.of(new FlashDropItemRequest(tofu.getId(), 50, 10)))).saleEventIds().get(0);
         jdbcTemplate.update("update sale_events set status = ? where id = ?", SaleEventStatus.ENDED.name(), eventId);

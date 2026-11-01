@@ -97,7 +97,7 @@ class AdminSaleEventControllerTest {
     @Test
     @DisplayName("관리자가 특가를 등록하면 201과 상품마다 만든 행사 번호를 돌려준다")
     void createSpecialSale_returns201() throws Exception {
-        when(saleEventService.createSpecialSale(any(SpecialSaleCreateRequest.class)))
+        when(adminSaleEventFacade.createSpecialSale(any(SpecialSaleCreateRequest.class)))
                 .thenReturn(new SaleEventsCreateResponse(List.of(7L, 8L)));
 
         mvc.perform(post("/api/admin/sale-events/special")
@@ -111,7 +111,7 @@ class AdminSaleEventControllerTest {
     @Test
     @DisplayName("관리자가 번개 드롭을 등록하면 201과 상품마다 만든 행사 번호를 돌려준다")
     void createFlashDrop_returns201() throws Exception {
-        when(saleEventService.createFlashDrop(any(FlashDropCreateRequest.class)))
+        when(adminSaleEventFacade.createFlashDrop(any(FlashDropCreateRequest.class)))
                 .thenReturn(new SaleEventsCreateResponse(List.of(8L, 9L)));
 
         mvc.perform(post("/api/admin/sale-events/flash-drop")
@@ -125,7 +125,7 @@ class AdminSaleEventControllerTest {
     @Test
     @DisplayName("이미 행사가 있는 상품이면 409와 SALE_001을 돌려준다")
     void createFlashDrop_duplicated_returns409() throws Exception {
-        when(saleEventService.createFlashDrop(any(FlashDropCreateRequest.class)))
+        when(adminSaleEventFacade.createFlashDrop(any(FlashDropCreateRequest.class)))
                 .thenThrow(new BusinessException(ErrorCode.SALE_EVENT_PRODUCT_DUPLICATED, "이미 행사가 있는 상품 · 두부"));
 
         mvc.perform(post("/api/admin/sale-events/flash-drop")
@@ -167,7 +167,7 @@ class AdminSaleEventControllerTest {
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.error.code").value("C001"));
         }
-        verifyNoInteractions(saleEventService);
+        verifyNoInteractions(adminSaleEventFacade);
     }
 
     @Test
@@ -206,7 +206,7 @@ class AdminSaleEventControllerTest {
                             .contentType(MediaType.APPLICATION_JSON).content(body))
                     .andExpect(status().isBadRequest());
         }
-        verifyNoInteractions(saleEventService);
+        verifyNoInteractions(adminSaleEventFacade);
     }
 
     @Test
@@ -220,7 +220,7 @@ class AdminSaleEventControllerTest {
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON).content(FLASH_DROP_BODY))
                 .andExpect(status().isUnauthorized());
-        verifyNoInteractions(saleEventService);
+        verifyNoInteractions(adminSaleEventFacade);
     }
 
     @Test
@@ -314,7 +314,7 @@ class AdminSaleEventControllerTest {
                 .andExpect(jsonPath("$.success").value(true));
 
         ArgumentCaptor<SaleEventUpdateRequest> captor = ArgumentCaptor.forClass(SaleEventUpdateRequest.class);
-        verify(saleEventService).update(eq(5L), captor.capture());
+        verify(adminSaleEventFacade).update(eq(5L), captor.capture());
         assertThat(captor.getValue().startsAt()).isEqualTo(LocalDateTime.of(2099, 10, 20, 0, 0));
         assertThat(captor.getValue().items()).extracting("productId", "discountRate")
                 .containsExactly(tuple(102L, 30),
@@ -342,16 +342,16 @@ class AdminSaleEventControllerTest {
         mvc.perform(patch("/api/admin/sale-events/5").with(csrf()).with(loginAs(Member.Role.USER))
                         .contentType(MediaType.APPLICATION_JSON).content(UPDATE_BODY))
                 .andExpect(status().isForbidden());
-        verifyNoInteractions(saleEventService);
+        verifyNoInteractions(adminSaleEventFacade);
     }
 
     @Test
     @DisplayName("시작한 행사나 없는 행사는 서비스의 오류 코드대로 409와 404를 돌려준다")
     void updateSaleEvent_serviceErrors_mapToStatus() throws Exception {
         doThrow(new BusinessException(ErrorCode.SALE_EVENT_NOT_EDITABLE))
-                .when(saleEventService).update(eq(5L), any());
+                .when(adminSaleEventFacade).update(eq(5L), any());
         doThrow(new BusinessException(ErrorCode.SALE_EVENT_NOT_FOUND))
-                .when(saleEventService).update(eq(6L), any());
+                .when(adminSaleEventFacade).update(eq(6L), any());
 
         mvc.perform(patch("/api/admin/sale-events/5").with(csrf()).with(loginAs(Member.Role.ADMIN))
                         .contentType(MediaType.APPLICATION_JSON).content(UPDATE_BODY))
