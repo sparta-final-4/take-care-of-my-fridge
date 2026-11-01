@@ -213,28 +213,6 @@ export function RecipeReviewSection({ recipeId, tipSummary }: RecipeReviewSectio
                     </Flex>
                     <Rate disabled value={review.rating} />
                   </Flex>
-
-                  {review.mine && review.id != null && (
-                    <Flex gap="small">
-                      <Button type="link" size="small" onClick={() => handleOpenEdit(review)}>
-                        수정
-                      </Button>
-                      <Popconfirm
-                        title="후기 삭제"
-                        description="작성한 후기를 삭제하시겠습니까?"
-                        onConfirm={() => {
-                          if (review.id != null) handleDelete(review.id);
-                        }}
-                        okText="삭제"
-                        cancelText="취소"
-                        okButtonProps={{ danger: true }}
-                      >
-                        <Button type="link" danger size="small" loading={deleteMutation.isPending}>
-                          삭제
-                        </Button>
-                      </Popconfirm>
-                    </Flex>
-                  )}
                 </Flex>
 
                 <Typography.Paragraph className={styles.content}>
