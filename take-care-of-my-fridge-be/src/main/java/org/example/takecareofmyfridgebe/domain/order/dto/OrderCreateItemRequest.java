@@ -11,7 +11,7 @@ public record OrderCreateItemRequest(
         @NotNull(message = "장바구니에서 본 단가가 필요합니다.")
         Integer unitPrice,
 
-        // 할인이 없었으면 null
+        // 할인이 없었으면 null.
         SaleEventType saleType
 ) {
 }

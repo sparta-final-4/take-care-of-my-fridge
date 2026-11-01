@@ -48,15 +48,15 @@ public class Order extends BaseTimeEntity {
     @Column(name = "id", nullable = false)
     private Long id;
 
-    // 날짜 + 일련번호 (예: 20261013-000123)
+    // 날짜 + 일련번호 (예: 20261013-000123).
     @Column(name = "order_number", nullable = false, length = 20)
     private String orderNumber;
 
-    // 타 도메인(Member)과의 결합도를 낮추기 위해 연관관계 대신 ID로만 참조
+    // 타 도메인(Member)과의 결합도를 낮추기 위해 연관관계 대신 ID로만 참조.
     @Column(name = "member_id", nullable = false)
     private Long memberId;
 
-    // 주문하기 클릭마다 프론트가 만든 값. 같은 값으로 다시 오면 새 주문을 만들지 않는다 (기존 주문은 null)
+    // 주문하기 클릭마다 프론트가 만든 값. 같은 값으로 다시 오면 새 주문을 만들지 않는다 (기존 주문은 null).
     @Column(name = "idempotency_key", length = 64)
     private String idempotencyKey;
 
@@ -67,11 +67,11 @@ public class Order extends BaseTimeEntity {
     @Column(name = "total_amount", nullable = false)
     private long totalAmount;
 
-    // 결제 완료 일시 (구매 확정 스케줄러 기준, 결제 전에는 null)
+    // 결제 완료 일시 (구매 확정 스케줄러 기준, 결제 전에는 null).
     @Column(name = "paid_at")
     private LocalDateTime paidAt;
 
-    // 구매 확정 일시 (확정 전에는 null)
+    // 구매 확정 일시 (확정 전에는 null).
     @Column(name = "confirmed_at")
     private LocalDateTime confirmedAt;
 
