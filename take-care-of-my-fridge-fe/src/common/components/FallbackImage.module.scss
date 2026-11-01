@@ -1,0 +1,31 @@
+@use '@/styles/variables' as *;
+
+// 크기는 기본으로 부모를 채우되, 자리마다 넘긴 className(고정 크기 등)이 항상 이기도록 우선순위를 0으로 둔다.
+:where(.fallback) {
+  width: 100%;
+  height: 100%;
+}
+
+// 아이콘이 상자 크기에 비례하도록 이 상자를 크기 기준(container)으로 쓴다.
+.fallback {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ant-margin-xxs);
+  overflow: hidden;
+  color: var(--ant-color-text-quaternary);
+  background: var(--ant-color-fill-tertiary);
+  container-type: size;
+}
+
+.icon {
+  display: flex;
+  font-size: clamp(#{$fallback-icon-min-size}, 30cqmin, #{$fallback-icon-max-size});
+}
+
+.caption {
+  font-size: var(--ant-font-size-sm);
+  color: var(--ant-color-text-tertiary);
+  white-space: nowrap;
+}

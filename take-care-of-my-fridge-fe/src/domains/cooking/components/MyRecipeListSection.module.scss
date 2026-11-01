@@ -135,8 +135,6 @@
   height: $recipe-thumb-size;
   border-radius: var(--ant-border-radius);
   background: var(--ant-color-fill-secondary);
-  color: var(--ant-color-text-tertiary);
-  font-size: $font-size-xs;
   flex-shrink: 0;
   overflow: hidden;
 
@@ -152,10 +150,6 @@
   background: transparent;
   padding: 0;
   cursor: pointer;
-}
-
-.placeholderImg {
-  color: var(--ant-color-text-quaternary);
 }
 
 .recipeInfo {

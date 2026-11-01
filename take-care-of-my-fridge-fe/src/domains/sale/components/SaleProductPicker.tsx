@@ -7,7 +7,7 @@ import type {
   SaleCandidateProductResponse,
   SaleCandidateProductsRequest,
 } from '@/common/api/clients';
-import { FadeImage } from '@/common/components/FadeImage';
+import { FallbackImage } from '@/common/components/FallbackImage';
 import { formatPrice } from '@/domains/cart/format';
 import { PRODUCT_TYPE_LABELS } from '@/domains/product/format';
 import { MAX_DISCOUNT_RATE, MIN_DISCOUNT_RATE, salePriceOf } from '@/domains/sale/format';
@@ -109,11 +109,14 @@ export function SaleProductPicker({
       key: 'name',
       render: (_, row) => (
         <Flex align="center" gap="small">
-          {row.imageUrl ? (
-            <FadeImage src={row.imageUrl} alt={row.name} className={styles.thumb} loading="lazy" />
-          ) : (
-            <span className={styles.thumbPlaceholder} aria-hidden="true" />
-          )}
+          <FallbackImage
+            src={row.imageUrl}
+            alt={row.name}
+            kind="product"
+            size="small"
+            className={styles.thumb}
+            loading="lazy"
+          />
           <Typography.Text>{row.name}</Typography.Text>
         </Flex>
       ),

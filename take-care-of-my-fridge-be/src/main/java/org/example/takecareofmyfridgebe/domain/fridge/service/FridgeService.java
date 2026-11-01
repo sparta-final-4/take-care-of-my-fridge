@@ -20,7 +20,6 @@ import org.example.takecareofmyfridgebe.domain.fridge.repository.FridgeCommerceH
 import org.example.takecareofmyfridgebe.domain.fridge.repository.FridgeItemLogRepository;
 import org.example.takecareofmyfridgebe.domain.fridge.repository.FridgeRepository;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.Ingredient;
-import org.example.takecareofmyfridgebe.domain.ingredient.entity.StorageType;
 import org.example.takecareofmyfridgebe.domain.ingredient.service.IngredientService;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
@@ -50,22 +49,15 @@ public class FridgeService {
     private final IngredientService ingredientService;
 
     /**
-     * 로그인한 회원의 냉장고 재료 목록을 보관방식, 정렬 기준, 소비기한 임박 여부 조건으로 조회한다.
+     * 로그인한 회원의 냉장고 재료 전체 목록을 정렬 기준으로 조회한다.
      *
-     * @param memberId     조회 대상 회원 ID
-     * @param storage      보관방식 필터 (null이면 전체 조회)
-     * @param sort         정렬 기준 (EXPIRATION, CREATED, NAME)
-     * @param imminentOnly 소비기한 임박(오늘 ~ 오늘+IMMINENT_DAYS) 재료만 조회할지 여부
-     * @return 조건에 맞는 냉장고 재료 응답 목록
+     * @param memberId 조회 대상 회원 ID
+     * @param sort     정렬 기준 (EXPIRATION, CREATED, NAME)
+     * @return 회원의 냉장고 재료 응답 목록
      */
-    public List<FridgeItemResponse> getItems(
-            Long memberId,
-            StorageType storage,
-            FridgeSortType sort,
-            boolean imminentOnly
-    ) {
+    public List<FridgeItemResponse> getItems(Long memberId, FridgeSortType sort) {
         LocalDate today = LocalDate.now();
-        return fridgeRepository.findItemsByCondition(memberId, storage, sort, imminentOnly, today)
+        return fridgeRepository.findItemsByCondition(memberId, sort)
                 .stream()
                 .map(fridge -> FridgeItemResponse.from(fridge, today))
                 .toList();

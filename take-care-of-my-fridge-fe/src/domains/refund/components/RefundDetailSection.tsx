@@ -1,11 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
-import { Button, Divider, Empty, Flex, Result, Skeleton, Tag, Typography } from 'antd';
+import { Button, Empty, Flex, Result, Skeleton, Tag, Typography } from 'antd';
 import dayjs from 'dayjs';
 import { generatePath, useNavigate } from 'react-router';
 
 import { ROUTES } from '@/app/paths';
 import { getErrorCode } from '@/common/api/errors';
-import { FadeImage } from '@/common/components/FadeImage';
+import { FallbackImage } from '@/common/components/FallbackImage';
 import { formatPrice } from '@/domains/cart/format';
 import { OrderItemHeader, OrderItemRow } from '@/domains/order/components/OrderItemRow';
 import { orderQueries } from '@/domains/order/queries';
@@ -70,7 +70,6 @@ export function RefundDetailSection({ orderId }: RefundDetailSectionProps) {
   const history = historyQuery.data.filter((refund) => refund.status !== 'FAILED');
   const overallStatus = getOverallRefundStatus(history);
   const refundedItems = groupRefundedItems(history);
-  const payAmount = order.payAmount ?? 0;
   const completedAmount = sumRefundAmountByStatus(history, 'COMPLETED');
   const requestedAmount = sumRefundAmountByStatus(history, 'REQUESTED');
 
@@ -126,34 +125,24 @@ export function RefundDetailSection({ orderId }: RefundDetailSectionProps) {
             </section>
           )}
           <div className={styles.bottom}>
-            <section className={styles.card} aria-label="결제·환불 금액">
+            <section className={styles.card} aria-label="환불 금액">
               <Typography.Text strong className={styles.cardTitle}>
-                결제·환불 금액
+                환불 금액
               </Typography.Text>
-              <Flex vertical gap="small" className={styles.rows}>
-                <AmountRow label="상품 금액" amount={formatPrice(order.listPriceAmount ?? 0)} />
-                <AmountRow
-                  label="할인 금액"
-                  amount={
-                    order.discountAmount ? `-${formatPrice(order.discountAmount)}` : formatPrice(0)
-                  }
-                />
-                <AmountRow label="결제 금액" amount={formatPrice(payAmount)} />
-                <AmountRow
-                  label="환불 금액"
-                  amount={completedAmount ? `-${formatPrice(completedAmount)}` : formatPrice(0)}
-                />
-                {requestedAmount > 0 && (
-                  <AmountRow label="환불 진행 중 금액" amount={formatPrice(requestedAmount)} />
-                )}
-              </Flex>
-              <Divider className={styles.divider} />
-              <Flex justify="space-between" align="baseline">
-                <Typography.Text strong>최종 결제 금액</Typography.Text>
+              <Flex justify="space-between" align="baseline" className={styles.rows}>
+                <Typography.Text strong>환불 금액</Typography.Text>
                 <Typography.Text strong className={styles.total}>
-                  {formatPrice(Math.max(0, payAmount - completedAmount))}
+                  {formatPrice(completedAmount)}
                 </Typography.Text>
               </Flex>
+              {requestedAmount > 0 && (
+                <Flex justify="space-between" gap="middle" className={styles.rows}>
+                  <Typography.Text type="secondary">환불 진행 중 금액</Typography.Text>
+                  <Typography.Text className={styles.amount}>
+                    {formatPrice(requestedAmount)}
+                  </Typography.Text>
+                </Flex>
+              )}
               <Typography.Paragraph type="secondary" className={styles.notice}>
                 환불 금액은 결제한 수단으로 돌려드려요.
               </Typography.Paragraph>
@@ -173,15 +162,13 @@ export function RefundDetailSection({ orderId }: RefundDetailSectionProps) {
                         className={styles.history}
                       >
                         <div className={styles.thumb}>
-                          {item.productImageUrl ? (
-                            <FadeImage
-                              src={item.productImageUrl}
-                              alt={name}
-                              className={styles.image}
-                            />
-                          ) : (
-                            <span className={styles.imagePlaceholder} aria-hidden="true" />
-                          )}
+                          <FallbackImage
+                            src={item.productImageUrl}
+                            alt={name}
+                            kind="product"
+                            size="small"
+                            className={styles.image}
+                          />
                         </div>
                         <Flex vertical className={styles.historyInfo}>
                           <Typography.Text strong title={name} className={styles.name}>
@@ -221,19 +208,5 @@ export function RefundDetailSection({ orderId }: RefundDetailSectionProps) {
         </>
       )}
     </div>
-  );
-}
-
-interface AmountRowProps {
-  label: string;
-  amount: string;
-}
-
-function AmountRow({ label, amount }: AmountRowProps) {
-  return (
-    <Flex justify="space-between" gap="middle">
-      <Typography.Text type="secondary">{label}</Typography.Text>
-      <Typography.Text className={styles.amount}>{amount}</Typography.Text>
-    </Flex>
   );
 }

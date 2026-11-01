@@ -5,7 +5,7 @@ import { generatePath, Link } from 'react-router';
 
 import { ROUTES } from '@/app/paths';
 import type { SaleResponse } from '@/common/api/clients';
-import { FadeImage } from '@/common/components/FadeImage';
+import { FallbackImage } from '@/common/components/FallbackImage';
 import type { CartItemResponse } from '@/domains/cart/api';
 import { formatPrice } from '@/domains/cart/format';
 import { SaleInfo } from '@/domains/sale/components/SaleInfo';
@@ -76,11 +76,13 @@ export function CartItemRow({
       />
       {/* 이미지와 이름이 같은 상세로 가므로 키보드 이동은 이름 링크 하나만 받는다. */}
       <Link to={detailPath} tabIndex={-1} aria-hidden="true" className={styles.thumb}>
-        {item.imageUrl ? (
-          <FadeImage src={item.imageUrl} alt="" className={styles.image} />
-        ) : (
-          <span className={styles.imagePlaceholder} />
-        )}
+        <FallbackImage
+          src={item.imageUrl}
+          alt=""
+          kind="product"
+          size="small"
+          className={styles.image}
+        />
         {soldOut && <span className={styles.soldOutMark}>품절</span>}
       </Link>
       <Flex vertical gap="small" className={styles.info}>

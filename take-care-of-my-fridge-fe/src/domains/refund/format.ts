@@ -40,10 +40,12 @@ export function getRefundRowState(item: RefundableItemResponse): RefundRowState 
 export type OrderItemRefundState = 'none' | 'partial' | 'full' | 'saleBlocked';
 
 // 주문 상세 상품 행의 환불 표시. 진행 중인 환불 수량도 환불한 수량으로 센다.
+// 특가·번개 드롭도 환불한 수량이 있으면 환불 표시가 먼저다.
 export function getOrderItemRefundState(item: RefundableItemResponse): OrderItemRefundState {
-  if (item.saleType === 'SPECIAL' || item.saleType === 'FLASH_DROP') return 'saleBlocked';
   const refunded = item.refundedQuantity ?? 0;
-  if (refunded === 0) return 'none';
+  if (refunded === 0) {
+    return item.saleType === 'SPECIAL' || item.saleType === 'FLASH_DROP' ? 'saleBlocked' : 'none';
+  }
   return refunded < (item.orderedQuantity ?? 0) ? 'partial' : 'full';
 }
 
