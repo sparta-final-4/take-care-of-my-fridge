@@ -112,6 +112,6 @@ sequenceDiagram
 | 할인 행사 | 번개 드롭 등록·시작 알림 요청(`notification-requested`) | 번개 드롭 등록·시작 커밋 뒤, 할인 행사 → 알림 | 구현 완료 |
 
 ## 검증과 증거
-- 필수 시나리오: [test-strategy.md](../../testing/test-strategy.md#알림-필수-시나리오)의 NOTI-01~08.
+- 필수 시나리오: [test-strategy.md](../../testing/test-strategy.md#알림-필수-시나리오)의 NOTI-01~09.
 - 관련 작업 기록: WORK-122 (알림 요청 받아 저장), WORK-123 (내 알림 목록·안 읽은 수·전부 읽음 API), WORK-125 (헤더 종 아이콘 알림), WORK-128 (알림 지우기), WORK-130 (알림 실시간 전달).
 - 미결정 사항: 지운 알림과 오래된 알림의 행을 아예 지울지와 그 기간.

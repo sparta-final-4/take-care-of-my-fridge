@@ -31,6 +31,7 @@
 | `NotificationControllerTest` | 로컬 | 통과 | 스트림 연결 시 로그인 회원 번호 전달, 비로그인 401 |
 | `NotificationRequestedConsumerTest` | 로컬(Testcontainers) | 통과 | 발행기를 붙인 뒤에도 저장·중복 건너뛰기 동작 |
 | eslint·prettier (알림 도메인) | 로컬 | 통과 | 지적 없음 |
+| `NotificationRequestedConsumerPushTest`, `NotificationPushPublisherTest` | 로컬 | 통과 | 새로 저장했을 때만 신호 발행, 중복·저장 실패 때는 발행하지 않음(저장 실패는 다시 던져 DLT 경로), Redis 발행 실패는 던지지 않음 |
 | `NotificationPushRedisTest` | 로컬(Testcontainers Redis) | 통과 | 서버 둘이 같은 신호를 모두 받음, 회원 번호 전달, 깨진 메시지 뒤에도 구독 유지 |
 | 서버 2대(8080·8081)에서 Redis `PUBLISH` | 로컬 서버 2대 | 통과 | 구독자 2, 8081 스트림에 `notification`/`refresh` 도착 |
 | 번개 드롭 등록 → 화면 즉시 반영, 서버 2대 | 로컬 서버 2대, 브라우저 2개 | 통과 | 8081이 알림 4건 저장, 8080에 붙은 화면 배지가 새로고침 없이 올라감 |
