@@ -7,7 +7,7 @@ import { ROUTES } from '@/app/paths';
 import { SectionCard } from '@/common/components/SectionCard';
 import { SectionLoading } from '@/common/components/SectionLoading';
 import { formatPrice } from '@/domains/cart/format';
-import { ORDER_STATUS_LABELS } from '@/domains/order/format';
+import { ORDER_STATUS_COLORS, ORDER_STATUS_LABELS } from '@/domains/order/format';
 import { orderQueries } from '@/domains/order/queries';
 
 import styles from './OrderListSection.module.scss';
@@ -75,7 +75,7 @@ export function OrderListSection() {
                     {formatPrice(order.payAmount ?? 0)}
                   </Typography.Text>
                   <Tag
-                    color={order.status === 'PAID' ? 'processing' : undefined}
+                    color={order.status && ORDER_STATUS_COLORS[order.status]}
                     className={styles.status}
                   >
                     {order.status && ORDER_STATUS_LABELS[order.status]}
