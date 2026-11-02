@@ -6,6 +6,7 @@ import org.example.takecareofmyfridgebe.domain.chat.entity.ChatMessage;
 import org.example.takecareofmyfridgebe.domain.chat.entity.ChatMessageRole;
 import org.example.takecareofmyfridgebe.domain.chat.entity.ChatSession;
 import org.example.takecareofmyfridgebe.domain.chat.entity.ChatSessionStatus;
+import org.example.takecareofmyfridgebe.domain.chat.event.ChatSessionChangedEvent;
 import org.example.takecareofmyfridgebe.domain.chat.repository.ChatMessageRepository;
 import org.example.takecareofmyfridgebe.domain.chat.repository.ChatSessionRepository;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
@@ -17,6 +18,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Duration;
@@ -46,6 +48,9 @@ class ChatMessageServiceTest {
 
     @Mock
     private ChatProperties chatProperties;
+
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
 
     @InjectMocks
     private ChatMessageService chatMessageService;
@@ -135,6 +140,23 @@ class ChatMessageServiceTest {
 
         // 메시지 저장이 전혀 호출되지 않았는지 검증
         verify(chatMessageRepository, never()).save(any());
+        verify(eventPublisher, never()).publishEvent(any(Object.class));
+    }
+
+    @Test
+    @DisplayName("saveExchange: 답을 저장하면 상담 바뀜 이벤트를 ACTIVE로 발행한다")
+    void saveExchangePublishesActiveChange() {
+        Long sessionId = 10L;
+        ChatSession session = ChatSession.builder().memberId(1L).build();
+        ReflectionTestUtils.setField(session, "id", sessionId);
+
+        when(chatSessionRepository.findById(sessionId)).thenReturn(Optional.of(session));
+        when(chatMessageRepository.findMaxSequenceBySessionId(sessionId)).thenReturn(Optional.empty());
+        when(chatMessageRepository.save(any(ChatMessage.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        chatMessageService.saveExchange(sessionId, "질문", "답");
+
+        verify(eventPublisher).publishEvent(new ChatSessionChangedEvent(1L, sessionId, ChatSessionStatus.ACTIVE));
     }
 
     @Test

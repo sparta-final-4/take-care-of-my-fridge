@@ -6,10 +6,12 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageResponse;
 import org.example.takecareofmyfridgebe.domain.chat.entity.ChatMessage;
 import org.example.takecareofmyfridgebe.domain.chat.entity.ChatMessageRole;
 import org.example.takecareofmyfridgebe.domain.chat.entity.ChatSession;
+import org.example.takecareofmyfridgebe.domain.chat.event.ChatSessionChangedEvent;
 import org.example.takecareofmyfridgebe.domain.chat.repository.ChatMessageRepository;
 import org.example.takecareofmyfridgebe.domain.chat.repository.ChatSessionRepository;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,6 +27,7 @@ public class ChatMessageService {
     private final ChatMessageRepository chatMessageRepository;
     private final ChatSessionService chatSessionService;
     private final ChatProperties chatProperties;
+    private final ApplicationEventPublisher eventPublisher;
 
     /**
      * 메시지 전송 전 세션을 검증한다.
@@ -52,6 +55,7 @@ public class ChatMessageService {
     /**
      * 사용자 메시지와 AI 답변 메시지 쌍을 단일 트랜잭션 내에서 순차적으로 저장하고 세션의 lastMessageAt을 갱신한다.
      * sequence는 uk_chat_messages_chat_session_id_sequence 인덱스를 활용해 현재 세션의 마지막 sequence + 1부터 채번된다.
+     * 저장 뒤 상담 변경(ACTIVE) 이벤트를 발행해, 커밋되면 다른 창이 메시지 기록을 다시 받게 한다.
      *
      * @param sessionId        세션 ID
      * @param userContent      사용자 메시지 내용
@@ -90,6 +94,7 @@ public class ChatMessageService {
 
         ChatMessage savedUser = chatMessageRepository.save(userMessage);
         ChatMessage savedAssistant = chatMessageRepository.save(assistantMessage);
+        eventPublisher.publishEvent(ChatSessionChangedEvent.from(session));
 
         return List.of(ChatMessageResponse.from(savedUser), ChatMessageResponse.from(savedAssistant));
     }

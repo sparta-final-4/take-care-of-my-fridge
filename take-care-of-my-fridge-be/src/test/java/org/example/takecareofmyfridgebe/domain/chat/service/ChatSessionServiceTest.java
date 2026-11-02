@@ -4,6 +4,7 @@ import org.example.takecareofmyfridgebe.domain.chat.config.ChatProperties;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatSessionResponse;
 import org.example.takecareofmyfridgebe.domain.chat.entity.ChatSession;
 import org.example.takecareofmyfridgebe.domain.chat.entity.ChatSessionStatus;
+import org.example.takecareofmyfridgebe.domain.chat.event.ChatSessionChangedEvent;
 import org.example.takecareofmyfridgebe.domain.chat.repository.ChatSessionRepository;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
@@ -13,7 +14,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.InOrder;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -24,6 +27,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -38,6 +42,9 @@ class ChatSessionServiceTest {
 
     @Mock
     private ChatProperties chatProperties;
+
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
 
     @InjectMocks
     private ChatSessionService chatSessionService;
@@ -298,5 +305,131 @@ class ChatSessionServiceTest {
         assertThatThrownBy(() -> chatSessionService.getOrCreateActiveSession(memberId))
                 .isInstanceOf(DataIntegrityViolationException.class)
                 .hasMessageContaining("foreign key constraint fails");
+        verify(eventPublisher, never()).publishEvent(any(Object.class));
+    }
+
+    @Test
+    @DisplayName("상담 바뀜 이벤트: 새 상담을 만들면 ACTIVE로 발행한다")
+    void publishesActiveWhenNewSessionCreated() {
+        Long memberId = 1L;
+        when(chatSessionRepository.findByMemberIdAndStatus(memberId, ChatSessionStatus.ACTIVE))
+                .thenReturn(Optional.empty());
+        when(chatSessionRepository.saveAndFlush(any(ChatSession.class))).thenAnswer(invocation -> {
+            ChatSession saved = invocation.getArgument(0);
+            ReflectionTestUtils.setField(saved, "id", 100L);
+            return saved;
+        });
+
+        chatSessionService.getOrCreateActiveSession(memberId);
+
+        verify(eventPublisher).publishEvent(new ChatSessionChangedEvent(memberId, 100L, ChatSessionStatus.ACTIVE));
+    }
+
+    @Test
+    @DisplayName("상담 바뀜 이벤트: 진행 중 상담을 그대로 돌려줄 때는 발행하지 않는다")
+    void doesNotPublishWhenExistingSessionReturned() {
+        Long memberId = 1L;
+        ChatSession existingSession = ChatSession.builder().memberId(memberId).build();
+        ReflectionTestUtils.setField(existingSession, "id", 50L);
+        when(chatSessionRepository.findByMemberIdAndStatus(memberId, ChatSessionStatus.ACTIVE))
+                .thenReturn(Optional.of(existingSession));
+
+        chatSessionService.getOrCreateActiveSession(memberId);
+
+        verify(eventPublisher, never()).publishEvent(any(Object.class));
+    }
+
+    @Test
+    @DisplayName("상담 바뀜 이벤트: 저장 경합으로 다른 요청이 만든 상담을 돌려줄 때는 발행하지 않는다")
+    void doesNotPublishWhenDuplicateKeyReturnsOtherSession() {
+        Long memberId = 1L;
+        ChatSession existingSession = ChatSession.builder().memberId(memberId).build();
+        ReflectionTestUtils.setField(existingSession, "id", 77L);
+        when(chatSessionRepository.findByMemberIdAndStatus(memberId, ChatSessionStatus.ACTIVE))
+                .thenReturn(Optional.empty())
+                .thenReturn(Optional.of(existingSession));
+        when(chatSessionRepository.saveAndFlush(any(ChatSession.class)))
+                .thenThrow(new DataIntegrityViolationException("Duplicate entry '1' for key 'uk_chat_sessions_active_member_id'"));
+
+        chatSessionService.getOrCreateActiveSession(memberId);
+
+        verify(eventPublisher, never()).publishEvent(any(Object.class));
+    }
+
+    @Test
+    @DisplayName("상담 바뀜 이벤트: 시간이 지난 상담을 만료시키고 새로 만들면 EXPIRED, ACTIVE 순으로 발행한다")
+    void publishesExpiredThenActiveWhenExpiredSessionReplaced() {
+        Long memberId = 1L;
+        ChatSession expiredSession = ChatSession.builder().memberId(memberId).build();
+        ReflectionTestUtils.setField(expiredSession, "id", 50L);
+        ReflectionTestUtils.setField(expiredSession, "lastMessageAt", LocalDateTime.now().minusMinutes(35));
+        when(chatSessionRepository.findByMemberIdAndStatus(memberId, ChatSessionStatus.ACTIVE))
+                .thenReturn(Optional.of(expiredSession));
+        when(chatSessionRepository.findById(50L)).thenReturn(Optional.of(expiredSession));
+        when(chatSessionRepository.saveAndFlush(any(ChatSession.class))).thenAnswer(invocation -> {
+            ChatSession saved = invocation.getArgument(0);
+            if (saved.getId() == null) {
+                ReflectionTestUtils.setField(saved, "id", 200L);
+            }
+            return saved;
+        });
+
+        chatSessionService.getOrCreateActiveSession(memberId);
+
+        InOrder order = inOrder(eventPublisher);
+        order.verify(eventPublisher).publishEvent(new ChatSessionChangedEvent(memberId, 50L, ChatSessionStatus.EXPIRED));
+        order.verify(eventPublisher).publishEvent(new ChatSessionChangedEvent(memberId, 200L, ChatSessionStatus.ACTIVE));
+    }
+
+    @Test
+    @DisplayName("상담 바뀜 이벤트: 실제로 만료시켰을 때만 EXPIRED로 발행하고, 이미 끝난 상담이면 발행하지 않는다")
+    void expireSessionPublishesOnlyWhenActuallyExpired() {
+        ChatSession active = ChatSession.builder().memberId(1L).build();
+        ReflectionTestUtils.setField(active, "id", 10L);
+        ChatSession completed = ChatSession.builder().memberId(1L).build();
+        ReflectionTestUtils.setField(completed, "id", 11L);
+        completed.complete();
+        when(chatSessionRepository.findById(10L)).thenReturn(Optional.of(active));
+        when(chatSessionRepository.findById(11L)).thenReturn(Optional.of(completed));
+
+        chatSessionService.expireSession(10L);
+        chatSessionService.expireSession(11L);
+        chatSessionService.expireSession(12L);
+
+        verify(eventPublisher, times(1)).publishEvent(any(Object.class));
+        verify(eventPublisher).publishEvent(new ChatSessionChangedEvent(1L, 10L, ChatSessionStatus.EXPIRED));
+    }
+
+    @Test
+    @DisplayName("상담 바뀜 이벤트: 상담을 종료하면 COMPLETED로 발행하고, 종료에 실패하면 발행하지 않는다")
+    void completeSessionPublishesCompleted() {
+        ChatSession session = ChatSession.builder().memberId(1L).build();
+        ReflectionTestUtils.setField(session, "id", 10L);
+        when(chatSessionRepository.findByIdAndMemberId(10L, 1L)).thenReturn(Optional.of(session));
+
+        chatSessionService.completeSession(1L, 10L);
+        assertThatThrownBy(() -> chatSessionService.completeSession(1L, 10L))
+                .isInstanceOf(BusinessException.class);
+
+        verify(eventPublisher, times(1)).publishEvent(any(Object.class));
+        verify(eventPublisher).publishEvent(new ChatSessionChangedEvent(1L, 10L, ChatSessionStatus.COMPLETED));
+    }
+
+    @Test
+    @DisplayName("상담 바뀜 이벤트: 요리 완료로 진행 중 상담을 끝내면 COMPLETED로 발행하고, 이미 만료된 상담은 발행하지 않는다")
+    void completeSessionFromCookingPublishesOnlyWhenCompleted() {
+        ChatSession active = ChatSession.builder().memberId(1L).build();
+        ReflectionTestUtils.setField(active, "id", 10L);
+        ChatSession expired = ChatSession.builder().memberId(1L).build();
+        ReflectionTestUtils.setField(expired, "id", 11L);
+        expired.expire();
+        when(chatSessionRepository.findByIdAndMemberId(10L, 1L)).thenReturn(Optional.of(active));
+        when(chatSessionRepository.findByIdAndMemberId(11L, 1L)).thenReturn(Optional.of(expired));
+
+        chatSessionService.completeSessionFromCooking(1L, 10L);
+        chatSessionService.completeSessionFromCooking(1L, 11L);
+
+        verify(eventPublisher, times(1)).publishEvent(any(Object.class));
+        verify(eventPublisher).publishEvent(new ChatSessionChangedEvent(1L, 10L, ChatSessionStatus.COMPLETED));
     }
 }
