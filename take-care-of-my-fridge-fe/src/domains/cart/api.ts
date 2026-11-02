@@ -1,9 +1,15 @@
 import { axiosInstance } from '@/common/api/axiosInstance';
-import { cartApi, type AddCartItemRequest, type AddCartItemResponse } from '@/common/api/clients';
+import {
+  cartApi,
+  type AddCartItemRequest,
+  type AddCartItemResponse,
+  type SaleResponse,
+} from '@/common/api/clients';
 import type { ApiResponse } from '@/common/api/types';
 import { unwrap } from '@/common/api/unwrap';
 
-// CartItemResponse.java와 필드·enum을 맞춘다. 할인 중이 아니면 saleType·discountRate는 null이다.
+// CartItemResponse.java와 필드를 맞춘다. 할인 중이 아니면 sale은 null이다.
+// sale은 상품 목록·상세와 같은 모양이라 같은 할인 표시를 그대로 쓴다.
 export interface CartItemResponse {
   cartItemId: number;
   productId: number;
@@ -12,13 +18,7 @@ export interface CartItemResponse {
   quantity: number;
   listPrice: number;
   unitPrice: number;
-  saleType: 'SPECIAL' | 'FLASH_DROP' | null;
-  discountRate: number | null;
-  flashDropRemaining: number | null;
-  // 번개 드롭 한정 수량(총 판매 수량)
-  flashDropLimit: number | null;
-  // 진행 중인 할인의 종료 시각. 남은 시간은 이 값으로 화면이 계산한다.
-  saleEndsAt: string | null;
+  sale: SaleResponse | null;
   soldOut: boolean;
 }
 

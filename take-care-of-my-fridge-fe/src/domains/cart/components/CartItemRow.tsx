@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { generatePath, Link } from 'react-router';
 
 import { ROUTES } from '@/app/paths';
-import type { SaleResponse } from '@/common/api/clients';
 import { FallbackImage } from '@/common/components/FallbackImage';
 import type { CartItemResponse } from '@/domains/cart/api';
 import { formatPrice } from '@/domains/cart/format';
@@ -12,19 +11,6 @@ import { SaleInfo } from '@/domains/sale/components/SaleInfo';
 import { SalePrice } from '@/domains/sale/components/SalePrice';
 import { FLASH_DROP_PURCHASE_LIMIT } from '@/domains/sale/format';
 import styles from './CartItemRow.module.scss';
-
-// 장바구니 응답은 할인 필드가 따로 와서, 상품 화면과 같은 할인 모양으로 묶어 같은 표시를 쓴다.
-const saleOf = (item: CartItemResponse): SaleResponse | undefined =>
-  item.saleType === null
-    ? undefined
-    : {
-        type: item.saleType,
-        salePrice: item.unitPrice,
-        discountRate: item.discountRate ?? undefined,
-        endsAt: item.saleEndsAt ?? undefined,
-        remainingQuantity: item.flashDropRemaining ?? undefined,
-        limitedQuantity: item.flashDropLimit ?? undefined,
-      };
 
 interface CartItemRowProps {
   item: CartItemResponse;
@@ -42,9 +28,9 @@ export function CartItemRow({
   onRemove,
 }: CartItemRowProps) {
   const { soldOut, quantity } = item;
-  const sale = saleOf(item);
+  const sale = item.sale ?? undefined;
   const detailPath = generatePath(ROUTES.productDetail, { productId: String(item.productId) });
-  const maxQuantity = item.saleType === 'FLASH_DROP' ? FLASH_DROP_PURCHASE_LIMIT : undefined;
+  const maxQuantity = item.sale?.type === 'FLASH_DROP' ? FLASH_DROP_PURCHASE_LIMIT : undefined;
   const canIncrease = maxQuantity === undefined || quantity < maxQuantity;
   // 담아 둔 뒤 번개 드롭으로 바뀌었으면 한 번에 구매 한도까지 내린다.
   const decreasedQuantity = maxQuantity ?? quantity - 1;
