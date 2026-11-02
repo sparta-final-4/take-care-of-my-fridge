@@ -4014,18 +4014,6 @@
             "type": "integer",
             "format": "int64"
           },
-          "discountRate": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "flashDropLimit": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "flashDropRemaining": {
-            "type": "integer",
-            "format": "int32"
-          },
           "imageUrl": {
             "type": "string"
           },
@@ -4044,16 +4032,8 @@
             "type": "integer",
             "format": "int32"
           },
-          "saleEndsAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "saleType": {
-            "type": "string",
-            "enum": [
-              "SPECIAL",
-              "FLASH_DROP"
-            ]
+          "sale": {
+            "$ref": "#/components/schemas/SaleResponse"
           },
           "soldOut": {
             "type": "boolean"
