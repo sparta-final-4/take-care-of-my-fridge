@@ -21,7 +21,7 @@ import {
 import dayjs from 'dayjs';
 import { useSearchParams } from 'react-router';
 
-import { getErrorCode } from '@/common/api/errors';
+import { getErrorCode, getErrorMessage } from '@/common/api/errors';
 import type { ForecastItem } from '@/common/api/clients';
 import { forecastQueries } from '@/domains/forecast/queries';
 
@@ -109,11 +109,15 @@ export default function AdminForecastPage() {
         !isError || getErrorCode(error) === 'F001' ? (
           <Empty
             description={
-              demo
-                ? '시연 예측이 없습니다.'
-                : weekStart
-                  ? '해당 주의 실제 판매 예측이 없습니다.'
-                  : '실제 판매 예측이 아직 없습니다.'
+              demo ? (
+                '시연 예측이 없습니다.'
+              ) : isError ? (
+                <span className={styles.diagnostics}>{getErrorMessage(error)}</span>
+              ) : weekStart ? (
+                '해당 주의 실제 판매 예측이 없습니다.'
+              ) : (
+                '실제 판매 예측이 아직 없습니다.'
+              )
             }
           />
         ) : (

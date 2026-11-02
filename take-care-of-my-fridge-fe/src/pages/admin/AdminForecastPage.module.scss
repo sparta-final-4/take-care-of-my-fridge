@@ -19,3 +19,9 @@
 .summary {
   margin-bottom: var(--ant-margin-lg);
 }
+
+.diagnostics {
+  display: inline-block;
+  text-align: left;
+  white-space: pre-line;
+}
