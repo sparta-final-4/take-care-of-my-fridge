@@ -9,11 +9,13 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.ChatSessionResponse;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatSessionSummaryResponse;
 import org.example.takecareofmyfridgebe.domain.chat.entity.ChatSession;
 import org.example.takecareofmyfridgebe.domain.chat.entity.ChatSessionStatus;
+import org.example.takecareofmyfridgebe.domain.chat.event.ChatSessionChangedEvent;
 import org.example.takecareofmyfridgebe.domain.chat.repository.ChatMessageRepository;
 import org.example.takecareofmyfridgebe.domain.chat.repository.ChatSessionRepository;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 import org.example.takecareofmyfridgebe.global.response.PageResponse;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -34,6 +36,7 @@ public class ChatSessionService {
     private final ChatSessionRepository chatSessionRepository;
     private final ChatMessageRepository chatMessageRepository;
     private final ChatProperties chatProperties;
+    private final ApplicationEventPublisher eventPublisher;
 
     /**
      * 회원의 진행 중(ACTIVE) 상담 세션을 조회하거나, 없으면 신규 생성하여 반환한다.
@@ -41,6 +44,7 @@ public class ChatSessionService {
      * (member_id, status) 복합 인덱스를 활용해 조회한다.
      * 저장 중 uk_chat_sessions_active_member_id 유니크 제약 위반이 발생하면,
      * 동시 요청에 의해 먼저 세션이 생성된 경우이므로 다시 진행 중 세션을 조회하여 반환한다.
+     * 새로 만들었을 때만 상담 변경(ACTIVE) 이벤트를 발행한다. 트랜잭션이 없으므로 리스너가 바로 받는다.
      *
      * @param memberId 회원 ID
      * @return 진행 중 상담 세션 응답 DTO
@@ -62,6 +66,8 @@ public class ChatSessionService {
      * 특정 상담 세션을 만료(EXPIRED) 처리하고 즉시 커밋/플러시한다.
      * ACTIVE 상태일 때만 EXPIRED로 전이하며, 이미 완료/만료된 경우는 아무 동작도 하지 않는다.
      * 호출 측의 트랜잭션(예: readOnly 트랜잭션)이나 예외 발생 여부와 무관하게 즉시 커밋되도록 REQUIRES_NEW로 실행한다.
+     * 실제로 만료시켰을 때만 상담 변경(EXPIRED) 이벤트를 발행한다.
+     * getOrCreateActiveSession 안에서 부를 때는 자기 호출이라 트랜잭션 없이 실행되고, 이벤트는 저장 직후 바로 나간다.
      *
      * @param sessionId 세션 ID
      */
@@ -72,6 +78,7 @@ public class ChatSessionService {
                     if (session.isActive()) {
                         session.expire();
                         chatSessionRepository.saveAndFlush(session);
+                        eventPublisher.publishEvent(ChatSessionChangedEvent.from(session));
                     }
                 });
     }
@@ -83,6 +90,7 @@ public class ChatSessionService {
                             .memberId(memberId)
                             .build()
             );
+            eventPublisher.publishEvent(ChatSessionChangedEvent.from(session));
             return ChatSessionResponse.from(session);
         } catch (DataIntegrityViolationException e) {
             String message = e.getMostSpecificCause().getMessage();
@@ -152,6 +160,7 @@ public class ChatSessionService {
      * 회원이 상담 세션을 명시적으로 종료(COMPLETED) 처리한다.
      * 존재하지 않거나 다른 회원의 세션이면 404(CHAT_ROOM_NOT_FOUND)를 던진다.
      * 이미 완료(COMPLETED)되었거나 만료(EXPIRED)된 세션이면 409(CHAT_ROOM_ALREADY_COMPLETED)를 던진다.
+     * 커밋 뒤 상담 변경(COMPLETED) 신호가 나가도록 이벤트를 발행한다.
      *
      * @param memberId  회원 ID
      * @param sessionId 세션 ID
@@ -167,6 +176,7 @@ public class ChatSessionService {
         }
 
         session.complete();
+        eventPublisher.publishEvent(ChatSessionChangedEvent.from(session));
         return ChatSessionResponse.from(session);
     }
 
@@ -192,6 +202,7 @@ public class ChatSessionService {
     /**
      * 요리 완료 후 연관된 채팅 세션을 종료(COMPLETED) 처리한다.
      * ACTIVE 상태일 때만 complete()를 호출하며, 이미 종료(COMPLETED)되거나 만료(EXPIRED)된 세션은 건너뛴다.
+     * 종료했을 때만 상담 변경(COMPLETED) 이벤트를 발행하며, 요리 완료 트랜잭션이 커밋된 뒤에 신호가 나간다.
      *
      * @param memberId  요청 회원 ID
      * @param sessionId 채팅 세션 ID
@@ -201,6 +212,7 @@ public class ChatSessionService {
         ChatSession session = validateAndGetSession(memberId, sessionId);
         if (session.isActive()) {
             session.complete();
+            eventPublisher.publishEvent(ChatSessionChangedEvent.from(session));
         }
     }
 }
