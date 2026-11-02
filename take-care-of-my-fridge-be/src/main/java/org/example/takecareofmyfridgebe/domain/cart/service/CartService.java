@@ -94,7 +94,7 @@ public class CartService {
             throw new BusinessException(ErrorCode.PURCHASE_LIMIT_EXCEEDED, "구매 한도 초과 · " + limit.productName());
         }
         if (totalQuantity > limit.stock()) {
-            throw new BusinessException(ErrorCode.CART_QUANTITY_EXCEEDS_STOCK);
+            throw new BusinessException(ErrorCode.CART_QUANTITY_EXCEEDS_STOCK, "재고 초과 · " + limit.productName());
         }
     }
 }

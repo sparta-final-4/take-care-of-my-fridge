@@ -64,7 +64,7 @@ public class CartFacade {
     // 품절 상품은 재고가 0이라 담기와 수량 올리기가 뒤의 재고 수량 확인에서 걸린다. 여기서는 판매 중지만 거른다.
     private void validateSellable(Product product) {
         if (product.getStatus() == ProductStatus.STOPPED) {
-            throw new BusinessException(ErrorCode.PRODUCT_NOT_ON_SALE);
+            throw new BusinessException(ErrorCode.PRODUCT_NOT_ON_SALE, "판매 중지 · " + product.getName());
         }
     }
 }
