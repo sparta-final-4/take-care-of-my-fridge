@@ -19,7 +19,7 @@ public record ActiveSale(
         return type == SaleEventType.FLASH_DROP;
     }
 
-    // 번개 드롭 남은 수량이 0이면 상품 재고가 남아 있어도 할인가로는 더 팔지 않는다
+    // 번개 드롭 남은 수량이 0이면 상품 재고가 남아 있어도 할인가로는 더 팔지 않는다.
     public boolean isExhausted() {
         return isFlashDrop() && remainingQuantity == 0;
     }

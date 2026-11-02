@@ -31,9 +31,14 @@ public class SaleEventReader {
                 .collect(Collectors.toMap(Product::getId, product -> SellingPrice.of(product, salesByProductId.get(product.getId()))));
     }
 
-    // 상품 하나의 판매가
+    // 상품 하나의 판매가.
     public SellingPrice findSellingPrice(Product product) {
         return findSellingPrices(List.of(product)).get(product.getId());
+    }
+
+    // 지금 진행 중인 할인 전부를 상품 ID별로 돌려준다. 판단 기준은 findActiveSales와 같다.
+    public Map<Long, ActiveSale> findAllActiveSales() {
+        return toMapByProductId(saleEventItemRepository.findAllActive(SaleEventStatus.OPEN, LocalDateTime.now(SaleEvent.ZONE)));
     }
 
     // 상품 ID별 진행 중 할인을 한 번에 돌려준다. 할인이 없는 상품은 맵에 없다.
@@ -41,17 +46,12 @@ public class SaleEventReader {
         if (productIds.isEmpty()) {
             return Map.of();
         }
-        return byProductId(saleEventItemRepository
+        return toMapByProductId(saleEventItemRepository
                 // 종료로 닫은 행사만 뺀다. 상태는 스케줄러가 늦게 바꿔도 되고, 진행 중인지는 시각으로 판단한다.
                 .findActiveByProductIds(productIds, SaleEventStatus.OPEN, LocalDateTime.now(SaleEvent.ZONE)));
     }
 
-    // 지금 진행 중인 할인 전부를 상품 ID별로 돌려준다. 판단 기준은 findActiveSales와 같다.
-    public Map<Long, ActiveSale> findAllActiveSales() {
-        return byProductId(saleEventItemRepository.findAllActive(SaleEventStatus.OPEN, LocalDateTime.now(SaleEvent.ZONE)));
-    }
-
-    private Map<Long, ActiveSale> byProductId(List<ActiveSale> sales) {
+    private Map<Long, ActiveSale> toMapByProductId(List<ActiveSale> sales) {
         return sales.stream()
                 .collect(Collectors.toMap(ActiveSale::productId, Function.identity(), (first, second) -> first));
     }

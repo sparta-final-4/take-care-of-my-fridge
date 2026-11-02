@@ -35,26 +35,26 @@ import org.springframework.transaction.annotation.Transactional;
 // 등록할 수 있는 상품 목록(판매 중, 재고 있음, 예정·진행 중인 행사에 들지 않음)을 DB 값으로 확인한다.
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({JpaAuditingConfig.class, QueryDslConfig.class, SaleCandidateProductQueryService.class})
+@Import({JpaAuditingConfig.class, QueryDslConfig.class, SaleEventQueryService.class})
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
-class SaleCandidateProductQueryServiceTest extends MySqlContainerSupport {
+class SaleEventQueryServiceCandidateTest extends MySqlContainerSupport {
 
     private static final LocalDateTime NOW = LocalDateTime.now(SaleEvent.ZONE);
 
-    private final SaleCandidateProductQueryService saleCandidateProductQueryService;
+    private final SaleEventQueryService saleEventQueryService;
     private final SaleEventRepository saleEventRepository;
     private final SaleEventItemRepository saleEventItemRepository;
     private final ProductRepository productRepository;
     private final JdbcTemplate jdbcTemplate;
 
     @Autowired
-    SaleCandidateProductQueryServiceTest(
-            SaleCandidateProductQueryService saleCandidateProductQueryService,
+    SaleEventQueryServiceCandidateTest(
+            SaleEventQueryService saleEventQueryService,
             SaleEventRepository saleEventRepository,
             SaleEventItemRepository saleEventItemRepository,
             ProductRepository productRepository,
             DataSource dataSource) {
-        this.saleCandidateProductQueryService = saleCandidateProductQueryService;
+        this.saleEventQueryService = saleEventQueryService;
         this.saleEventRepository = saleEventRepository;
         this.saleEventItemRepository = saleEventItemRepository;
         this.productRepository = productRepository;
@@ -74,7 +74,7 @@ class SaleCandidateProductQueryServiceTest extends MySqlContainerSupport {
         Product overdue = saveProduct("대파", 3000, 5);
         saveEvent(SaleEventType.SPECIAL, SaleEventStatus.ACTIVE, NOW.minusHours(2), NOW.minusMinutes(1), overdue, null);
 
-        List<SaleCandidateProductResponse> candidates = saleCandidateProductQueryService
+        List<SaleCandidateProductResponse> candidates = saleEventQueryService
                 .getCandidates(new SaleCandidateProductsRequest(null, null, null, null)).content();
 
         assertThat(candidates).extracting(SaleCandidateProductResponse::productId).containsExactly(overdue.getId());
@@ -94,7 +94,7 @@ class SaleCandidateProductQueryServiceTest extends MySqlContainerSupport {
         saveEvent(SaleEventType.SPECIAL, SaleEventStatus.ACTIVE, NOW.minusHours(1), NOW.plusHours(1), active, null);
         saveEvent(SaleEventType.SPECIAL, SaleEventStatus.ENDED, NOW.minusHours(2), NOW.minusHours(1), ended, null);
 
-        List<SaleCandidateProductResponse> candidates = saleCandidateProductQueryService
+        List<SaleCandidateProductResponse> candidates = saleEventQueryService
                 .getCandidates(new SaleCandidateProductsRequest(null, null, null, null)).content();
 
         assertThat(candidates)
@@ -110,13 +110,13 @@ class SaleCandidateProductQueryServiceTest extends MySqlContainerSupport {
         saveProduct("쪽파", 3000, 5);
         saveProduct("두부", 3000, 5);
 
-        var byName = saleCandidateProductQueryService
+        var byName = saleEventQueryService
                 .getCandidates(new SaleCandidateProductsRequest("파", null, null, null));
-        var firstPage = saleCandidateProductQueryService
+        var firstPage = saleEventQueryService
                 .getCandidates(new SaleCandidateProductsRequest(null, null, 1, 2));
-        var lastPage = saleCandidateProductQueryService
+        var lastPage = saleEventQueryService
                 .getCandidates(new SaleCandidateProductsRequest(null, null, 2, 2));
-        var mealkit = saleCandidateProductQueryService
+        var mealkit = saleEventQueryService
                 .getCandidates(new SaleCandidateProductsRequest(null, ProductType.MEALKIT, null, null));
 
         assertThat(byName.content()).extracting(SaleCandidateProductResponse::name).containsExactly("쪽파", "국산 대파");

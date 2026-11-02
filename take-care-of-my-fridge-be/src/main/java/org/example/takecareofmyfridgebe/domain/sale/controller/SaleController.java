@@ -3,7 +3,7 @@ package org.example.takecareofmyfridgebe.domain.sale.controller;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.sale.dto.PopularSaleResponse;
-import org.example.takecareofmyfridgebe.domain.sale.facade.PopularSaleFacade;
+import org.example.takecareofmyfridgebe.domain.sale.facade.SaleEventFacade;
 import org.example.takecareofmyfridgebe.global.response.ApiResponse;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -15,11 +15,12 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class SaleController {
 
-    private final PopularSaleFacade popularSaleFacade;
+    private final SaleEventFacade saleEventFacade;
 
+    // 메인 화면의 인기 특가.
     @GetMapping("/popular")
     public ResponseEntity<ApiResponse<List<PopularSaleResponse>>> getPopularSales() {
-        List<PopularSaleResponse> sales = popularSaleFacade.getPopularSales();
+        List<PopularSaleResponse> sales = saleEventFacade.getPopularSales();
         return ResponseEntity.ok(ApiResponse.ok(sales));
     }
 }

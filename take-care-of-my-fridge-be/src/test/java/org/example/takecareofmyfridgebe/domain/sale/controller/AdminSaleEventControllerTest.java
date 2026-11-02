@@ -34,17 +34,14 @@ import org.example.takecareofmyfridgebe.domain.sale.entity.SaleEventStatus;
 import org.example.takecareofmyfridgebe.domain.sale.entity.SaleEventType;
 import org.example.takecareofmyfridgebe.domain.sale.dto.SaleEventDetailResponse;
 import org.example.takecareofmyfridgebe.domain.sale.dto.SaleEventUpdateRequest;
-import org.example.takecareofmyfridgebe.domain.sale.service.SaleEventDetailQueryService;
-import org.example.takecareofmyfridgebe.domain.sale.service.SaleEventListQueryService;
-import org.example.takecareofmyfridgebe.domain.sale.service.SaleEventTerminationService;
-import org.example.takecareofmyfridgebe.domain.sale.service.SaleEventUpdateService;
+import org.example.takecareofmyfridgebe.domain.sale.facade.AdminSaleEventFacade;
+import org.example.takecareofmyfridgebe.domain.sale.service.SaleEventQueryService;
+import org.example.takecareofmyfridgebe.domain.sale.service.SaleEventService;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import org.mockito.ArgumentCaptor;
 import org.example.takecareofmyfridgebe.domain.sale.dto.SpecialSaleCreateRequest;
 import org.example.takecareofmyfridgebe.domain.product.entity.ProductType;
-import org.example.takecareofmyfridgebe.domain.sale.service.SaleEventCreateService;
-import org.example.takecareofmyfridgebe.domain.sale.service.SaleCandidateProductQueryService;
 import org.example.takecareofmyfridgebe.global.response.PageResponse;
 import org.example.takecareofmyfridgebe.global.config.SecurityConfig;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
@@ -78,39 +75,29 @@ class AdminSaleEventControllerTest {
             """;
 
     private final MockMvc mvc;
-    private final SaleEventCreateService saleEventCreateService;
-    private final SaleCandidateProductQueryService saleCandidateProductQueryService;
-    private final SaleEventListQueryService saleEventListQueryService;
-    private final SaleEventDetailQueryService saleEventDetailQueryService;
-    private final SaleEventUpdateService saleEventUpdateService;
-    private final SaleEventTerminationService saleEventTerminationService;
+    private final AdminSaleEventFacade adminSaleEventFacade;
+    private final SaleEventQueryService saleEventQueryService;
+    private final SaleEventService saleEventService;
 
     @Autowired
-    AdminSaleEventControllerTest(MockMvc mvc, SaleEventCreateService saleEventCreateService,
-                                 SaleCandidateProductQueryService saleCandidateProductQueryService,
-                                 SaleEventListQueryService saleEventListQueryService,
-                                 SaleEventDetailQueryService saleEventDetailQueryService,
-                                 SaleEventUpdateService saleEventUpdateService,
-                                 SaleEventTerminationService saleEventTerminationService) {
+    AdminSaleEventControllerTest(MockMvc mvc, AdminSaleEventFacade adminSaleEventFacade,
+                                 SaleEventQueryService saleEventQueryService,
+                                 SaleEventService saleEventService) {
         this.mvc = mvc;
-        this.saleEventCreateService = saleEventCreateService;
-        this.saleCandidateProductQueryService = saleCandidateProductQueryService;
-        this.saleEventListQueryService = saleEventListQueryService;
-        this.saleEventDetailQueryService = saleEventDetailQueryService;
-        this.saleEventUpdateService = saleEventUpdateService;
-        this.saleEventTerminationService = saleEventTerminationService;
+        this.adminSaleEventFacade = adminSaleEventFacade;
+        this.saleEventQueryService = saleEventQueryService;
+        this.saleEventService = saleEventService;
     }
 
     @BeforeEach
     void resetMock() {
-        reset(saleEventCreateService, saleCandidateProductQueryService, saleEventListQueryService,
-                saleEventDetailQueryService, saleEventUpdateService, saleEventTerminationService);
+        reset(adminSaleEventFacade, saleEventQueryService, saleEventService);
     }
 
     @Test
     @DisplayName("관리자가 특가를 등록하면 201과 상품마다 만든 행사 번호를 돌려준다")
     void createSpecialSale_returns201() throws Exception {
-        when(saleEventCreateService.createSpecialSale(any(SpecialSaleCreateRequest.class)))
+        when(adminSaleEventFacade.createSpecialSale(any(SpecialSaleCreateRequest.class)))
                 .thenReturn(new SaleEventsCreateResponse(List.of(7L, 8L)));
 
         mvc.perform(post("/api/admin/sale-events/special")
@@ -124,7 +111,7 @@ class AdminSaleEventControllerTest {
     @Test
     @DisplayName("관리자가 번개 드롭을 등록하면 201과 상품마다 만든 행사 번호를 돌려준다")
     void createFlashDrop_returns201() throws Exception {
-        when(saleEventCreateService.createFlashDrop(any(FlashDropCreateRequest.class)))
+        when(adminSaleEventFacade.createFlashDrop(any(FlashDropCreateRequest.class)))
                 .thenReturn(new SaleEventsCreateResponse(List.of(8L, 9L)));
 
         mvc.perform(post("/api/admin/sale-events/flash-drop")
@@ -138,7 +125,7 @@ class AdminSaleEventControllerTest {
     @Test
     @DisplayName("이미 행사가 있는 상품이면 409와 SALE_001을 돌려준다")
     void createFlashDrop_duplicated_returns409() throws Exception {
-        when(saleEventCreateService.createFlashDrop(any(FlashDropCreateRequest.class)))
+        when(adminSaleEventFacade.createFlashDrop(any(FlashDropCreateRequest.class)))
                 .thenThrow(new BusinessException(ErrorCode.SALE_EVENT_PRODUCT_DUPLICATED, "이미 행사가 있는 상품 · 두부"));
 
         mvc.perform(post("/api/admin/sale-events/flash-drop")
@@ -180,7 +167,7 @@ class AdminSaleEventControllerTest {
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.error.code").value("C001"));
         }
-        verifyNoInteractions(saleEventCreateService);
+        verifyNoInteractions(adminSaleEventFacade);
     }
 
     @Test
@@ -219,7 +206,7 @@ class AdminSaleEventControllerTest {
                             .contentType(MediaType.APPLICATION_JSON).content(body))
                     .andExpect(status().isBadRequest());
         }
-        verifyNoInteractions(saleEventCreateService);
+        verifyNoInteractions(adminSaleEventFacade);
     }
 
     @Test
@@ -233,13 +220,13 @@ class AdminSaleEventControllerTest {
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON).content(FLASH_DROP_BODY))
                 .andExpect(status().isUnauthorized());
-        verifyNoInteractions(saleEventCreateService);
+        verifyNoInteractions(adminSaleEventFacade);
     }
 
     @Test
     @DisplayName("관리자가 등록할 상품 목록을 조회하면 상품마다 재고와 함께 페이지로 돌려준다")
     void getCandidateProducts_returns200() throws Exception {
-        when(saleCandidateProductQueryService.getCandidates(any(SaleCandidateProductsRequest.class)))
+        when(saleEventQueryService.getCandidates(any(SaleCandidateProductsRequest.class)))
                 .thenReturn(new PageResponse<>(List.of(
                         new SaleCandidateProductResponse(1L, ProductType.INGREDIENT, "대파", null, 3000, 7)),
                         1, 10, 1, 1, true));
@@ -262,13 +249,13 @@ class AdminSaleEventControllerTest {
                 .andExpect(status().isBadRequest());
         mvc.perform(get("/api/admin/sale-events/products").with(loginAs(Member.Role.USER)))
                 .andExpect(status().isForbidden());
-        verifyNoInteractions(saleCandidateProductQueryService);
+        verifyNoInteractions(saleEventQueryService);
     }
 
     @Test
     @DisplayName("관리자가 행사 목록을 조회하면 조건을 서비스에 넘기고, 날짜 하나만 주면 그 하루로 본다")
     void getSaleEvents_returns200() throws Exception {
-        when(saleEventListQueryService.getSaleEvents(any(SaleEventListRequest.class)))
+        when(saleEventQueryService.getSaleEvents(any(SaleEventListRequest.class)))
                 .thenReturn(new PageResponse<>(List.of(
                         new SaleEventListResponse(1L, SaleEventType.FLASH_DROP, SaleEventStatus.ACTIVE,
                                 LocalDateTime.of(2026, 10, 1, 18, 0), LocalDateTime.of(2026, 10, 1, 20, 0),
@@ -285,7 +272,7 @@ class AdminSaleEventControllerTest {
                 .andExpect(jsonPath("$.data.content[0].soldQuantity").value(7));
 
         ArgumentCaptor<SaleEventListRequest> captor = ArgumentCaptor.forClass(SaleEventListRequest.class);
-        verify(saleEventListQueryService).getSaleEvents(captor.capture());
+        verify(saleEventQueryService).getSaleEvents(captor.capture());
         assertThat(captor.getValue().status()).isEqualTo(SaleEventStatus.ACTIVE);
         assertThat(captor.getValue().startFrom()).isEqualTo(LocalDate.of(2026, 10, 1));
         assertThat(captor.getValue().startTo()).isEqualTo(LocalDate.of(2026, 10, 1));
@@ -310,7 +297,7 @@ class AdminSaleEventControllerTest {
                 .andExpect(status().isBadRequest());
         mvc.perform(get("/api/admin/sale-events").with(loginAs(Member.Role.USER)))
                 .andExpect(status().isForbidden());
-        verifyNoInteractions(saleEventListQueryService);
+        verifyNoInteractions(saleEventQueryService);
     }
 
     private static final String UPDATE_BODY = """
@@ -327,7 +314,7 @@ class AdminSaleEventControllerTest {
                 .andExpect(jsonPath("$.success").value(true));
 
         ArgumentCaptor<SaleEventUpdateRequest> captor = ArgumentCaptor.forClass(SaleEventUpdateRequest.class);
-        verify(saleEventUpdateService).update(eq(5L), captor.capture());
+        verify(adminSaleEventFacade).update(eq(5L), captor.capture());
         assertThat(captor.getValue().startsAt()).isEqualTo(LocalDateTime.of(2099, 10, 20, 0, 0));
         assertThat(captor.getValue().items()).extracting("productId", "discountRate")
                 .containsExactly(tuple(102L, 30),
@@ -355,16 +342,16 @@ class AdminSaleEventControllerTest {
         mvc.perform(patch("/api/admin/sale-events/5").with(csrf()).with(loginAs(Member.Role.USER))
                         .contentType(MediaType.APPLICATION_JSON).content(UPDATE_BODY))
                 .andExpect(status().isForbidden());
-        verifyNoInteractions(saleEventUpdateService);
+        verifyNoInteractions(adminSaleEventFacade);
     }
 
     @Test
     @DisplayName("시작한 행사나 없는 행사는 서비스의 오류 코드대로 409와 404를 돌려준다")
     void updateSaleEvent_serviceErrors_mapToStatus() throws Exception {
         doThrow(new BusinessException(ErrorCode.SALE_EVENT_NOT_EDITABLE))
-                .when(saleEventUpdateService).update(eq(5L), any());
+                .when(adminSaleEventFacade).update(eq(5L), any());
         doThrow(new BusinessException(ErrorCode.SALE_EVENT_NOT_FOUND))
-                .when(saleEventUpdateService).update(eq(6L), any());
+                .when(adminSaleEventFacade).update(eq(6L), any());
 
         mvc.perform(patch("/api/admin/sale-events/5").with(csrf()).with(loginAs(Member.Role.ADMIN))
                         .contentType(MediaType.APPLICATION_JSON).content(UPDATE_BODY))
@@ -379,11 +366,11 @@ class AdminSaleEventControllerTest {
     @Test
     @DisplayName("관리자가 행사 하나를 조회하면 시각과 행사 항목을 돌려주고, 없는 행사는 404, 일반 회원은 403이다")
     void getSaleEvent_returns200() throws Exception {
-        when(saleEventDetailQueryService.getSaleEvent(5L)).thenReturn(new SaleEventDetailResponse(
+        when(adminSaleEventFacade.getSaleEvent(5L)).thenReturn(new SaleEventDetailResponse(
                 5L, SaleEventType.FLASH_DROP, SaleEventStatus.SCHEDULED,
                 LocalDateTime.of(2099, 10, 1, 18, 0), LocalDateTime.of(2099, 10, 1, 20, 0),
                 List.of(new SaleEventDetailResponse.SaleEventDetailItem(3L, "대파", 3000, 1500, 50, 10, 10))));
-        when(saleEventDetailQueryService.getSaleEvent(6L))
+        when(adminSaleEventFacade.getSaleEvent(6L))
                 .thenThrow(new BusinessException(ErrorCode.SALE_EVENT_NOT_FOUND));
 
         mvc.perform(get("/api/admin/sale-events/5").with(loginAs(Member.Role.ADMIN)))
@@ -406,22 +393,22 @@ class AdminSaleEventControllerTest {
         mvc.perform(delete("/api/admin/sale-events/5").with(csrf()).with(loginAs(Member.Role.ADMIN)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true));
-        verify(saleEventTerminationService).end(5L);
-        verify(saleEventTerminationService).delete(5L);
+        verify(saleEventService).end(5L);
+        verify(saleEventService).delete(5L);
 
         mvc.perform(patch("/api/admin/sale-events/5/end").with(csrf()).with(loginAs(Member.Role.USER)))
                 .andExpect(status().isForbidden());
         mvc.perform(delete("/api/admin/sale-events/5").with(csrf()).with(loginAs(Member.Role.USER)))
                 .andExpect(status().isForbidden());
-        verifyNoMoreInteractions(saleEventTerminationService);
+        verifyNoMoreInteractions(saleEventService);
     }
 
     @Test
     @DisplayName("종료·삭제할 수 없는 할인 행사는 409와 오류 코드, 없는 할인 행사는 404를 돌려준다")
     void endAndDeleteSaleEvent_serviceErrors_mapToStatus() throws Exception {
-        doThrow(new BusinessException(ErrorCode.SALE_EVENT_NOT_ENDABLE)).when(saleEventTerminationService).end(5L);
-        doThrow(new BusinessException(ErrorCode.SALE_EVENT_NOT_DELETABLE)).when(saleEventTerminationService).delete(5L);
-        doThrow(new BusinessException(ErrorCode.SALE_EVENT_NOT_FOUND)).when(saleEventTerminationService).end(7L);
+        doThrow(new BusinessException(ErrorCode.SALE_EVENT_NOT_ENDABLE)).when(saleEventService).end(5L);
+        doThrow(new BusinessException(ErrorCode.SALE_EVENT_NOT_DELETABLE)).when(saleEventService).delete(5L);
+        doThrow(new BusinessException(ErrorCode.SALE_EVENT_NOT_FOUND)).when(saleEventService).end(7L);
 
         mvc.perform(patch("/api/admin/sale-events/5/end").with(csrf()).with(loginAs(Member.Role.ADMIN)))
                 .andExpect(status().isConflict())
@@ -443,33 +430,18 @@ class AdminSaleEventControllerTest {
     @TestConfiguration
     static class TestConfig {
         @Bean
-        SaleEventCreateService saleEventCreateService() {
-            return mock(SaleEventCreateService.class);
+        AdminSaleEventFacade adminSaleEventFacade() {
+            return mock(AdminSaleEventFacade.class);
         }
 
         @Bean
-        SaleCandidateProductQueryService saleCandidateProductQueryService() {
-            return mock(SaleCandidateProductQueryService.class);
+        SaleEventQueryService saleEventQueryService() {
+            return mock(SaleEventQueryService.class);
         }
 
         @Bean
-        SaleEventListQueryService saleEventListQueryService() {
-            return mock(SaleEventListQueryService.class);
-        }
-
-        @Bean
-        SaleEventDetailQueryService saleEventDetailQueryService() {
-            return mock(SaleEventDetailQueryService.class);
-        }
-
-        @Bean
-        SaleEventUpdateService saleEventUpdateService() {
-            return mock(SaleEventUpdateService.class);
-        }
-
-        @Bean
-        SaleEventTerminationService saleEventTerminationService() {
-            return mock(SaleEventTerminationService.class);
+        SaleEventService saleEventService() {
+            return mock(SaleEventService.class);
         }
 
         @Bean

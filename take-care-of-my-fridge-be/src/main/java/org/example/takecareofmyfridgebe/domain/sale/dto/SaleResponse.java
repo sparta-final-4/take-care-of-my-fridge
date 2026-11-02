@@ -11,7 +11,7 @@ public record SaleResponse(
         int discountRate,
         // 종료 시각(+09:00 포함). 프론트가 서버 시각 기준으로 남은 시간을 계산한다.
         OffsetDateTime endsAt,
-        // 번개 드롭 남은 수량·한정 수량. 특가는 null
+        // 번개 드롭 남은 수량·한정 수량. 특가는 null.
         Integer remainingQuantity,
         Integer limitedQuantity
 ) {

@@ -16,7 +16,7 @@ import org.example.takecareofmyfridgebe.domain.sale.dto.FlashDropItemRequest;
 import org.example.takecareofmyfridgebe.domain.sale.dto.SpecialSaleCreateRequest;
 import org.example.takecareofmyfridgebe.domain.sale.dto.SpecialSaleItemRequest;
 import org.example.takecareofmyfridgebe.domain.sale.entity.SaleEventType;
-import org.example.takecareofmyfridgebe.domain.sale.service.SaleEventCreateService;
+import org.example.takecareofmyfridgebe.domain.sale.facade.AdminSaleEventFacade;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 import org.springframework.core.env.Environment;
@@ -29,7 +29,7 @@ public class DealEventService {
 
     private final DealAnalysisRepository analysisRepository;
     private final DealCandidateRepository candidateRepository;
-    private final SaleEventCreateService saleEventCreateService;
+    private final AdminSaleEventFacade adminSaleEventFacade;
     private final AdminAuditLogService auditLogService;
     private final Environment environment;
 
@@ -47,12 +47,12 @@ public class DealEventService {
 
         Long eventId;
         if (request.type() == SaleEventType.FLASH_DROP) {
-            eventId = saleEventCreateService.createFlashDrop(new FlashDropCreateRequest(
+            eventId = adminSaleEventFacade.createFlashDrop(new FlashDropCreateRequest(
                     request.startsAt(), request.endsAt(), List.of(new FlashDropItemRequest(
                     candidate.getProductId(), analysis.getDiscountRate(), request.limitedQuantity()))))
                     .saleEventIds().get(0);
         } else {
-            eventId = saleEventCreateService.createSpecialSale(new SpecialSaleCreateRequest(
+            eventId = adminSaleEventFacade.createSpecialSale(new SpecialSaleCreateRequest(
                     request.startsAt(), request.endsAt(), List.of(new SpecialSaleItemRequest(
                     candidate.getProductId(), analysis.getDiscountRate()))))
                     .saleEventIds().get(0);

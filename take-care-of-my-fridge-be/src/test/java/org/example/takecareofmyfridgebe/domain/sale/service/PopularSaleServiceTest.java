@@ -1,7 +1,6 @@
 package org.example.takecareofmyfridgebe.domain.sale.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.mock;
 
 import java.time.LocalDateTime;
 import java.util.Arrays;
@@ -23,7 +22,7 @@ class PopularSaleServiceTest {
 
     private static final LocalDateTime ENDS_AT = LocalDateTime.of(2026, 11, 1, 18, 0);
 
-    private final PopularSaleService popularSaleService = new PopularSaleService(mock(SaleEventReader.class));
+    private final PopularSaleService popularSaleService = new PopularSaleService();
 
     @Test
     @DisplayName("최근 검색 클릭이 많은 순으로 나오고, 클릭 기록이 없는 상품은 0으로 쳐서 맨 뒤로 간다")

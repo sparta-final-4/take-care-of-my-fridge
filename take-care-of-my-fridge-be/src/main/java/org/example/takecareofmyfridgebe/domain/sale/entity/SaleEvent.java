@@ -14,6 +14,8 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.example.takecareofmyfridgebe.global.entity.BaseTimeEntity;
+import org.example.takecareofmyfridgebe.global.error.BusinessException;
+import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -73,19 +75,26 @@ public class SaleEvent extends BaseTimeEntity {
         this.endsAt = endsAt;
     }
 
-    // 상태 정리가 늦어도 시작 시각이 지났으면 이미 시작한 행사로 본다.
-    public boolean isEditable(LocalDateTime now) {
-        return status == SaleEventStatus.SCHEDULED && startsAt.isAfter(now);
+    // 시작 전인 할인 행사만 고친다.
+    public void validateEditable(LocalDateTime now) {
+        if (!isBeforeStart(now)) {
+            throw new BusinessException(ErrorCode.SALE_EVENT_NOT_EDITABLE);
+        }
     }
 
     // 상태 정리가 늦어도 시각으로 진행 중인지 본다. 종료로 닫은 할인 행사는 진행 중이 아니다.
-    public boolean isEndable(LocalDateTime now) {
-        return SaleEventStatus.OPEN.contains(status) && !startsAt.isAfter(now) && endsAt.isAfter(now);
+    public void validateEndable(LocalDateTime now) {
+        boolean inProgress = SaleEventStatus.OPEN.contains(status) && !startsAt.isAfter(now) && endsAt.isAfter(now);
+        if (!inProgress) {
+            throw new BusinessException(ErrorCode.SALE_EVENT_NOT_ENDABLE);
+        }
     }
 
     // 시작 전인 할인 행사만 지운다. 시작 전의 기준은 수정과 같다.
-    public boolean isDeletable(LocalDateTime now) {
-        return isEditable(now);
+    public void validateDeletable(LocalDateTime now) {
+        if (!isBeforeStart(now)) {
+            throw new BusinessException(ErrorCode.SALE_EVENT_NOT_DELETABLE);
+        }
     }
 
     // 진행 중인 할인 행사를 중간에 닫는다. 종료 시각은 등록한 값 그대로 두고, 닫은 시각을 따로 남긴다.
@@ -97,5 +106,10 @@ public class SaleEvent extends BaseTimeEntity {
     // 실제로 판매가 끝난 시각. 중간에 닫았으면 닫은 시각, 아니면 등록한 종료 시각이다.
     public LocalDateTime actualEndsAt() {
         return endedAt != null && endedAt.isBefore(endsAt) ? endedAt : endsAt;
+    }
+
+    // 상태 정리가 늦어도 시작 시각이 지났으면 이미 시작한 행사로 본다.
+    private boolean isBeforeStart(LocalDateTime now) {
+        return status == SaleEventStatus.SCHEDULED && startsAt.isAfter(now);
     }
 }

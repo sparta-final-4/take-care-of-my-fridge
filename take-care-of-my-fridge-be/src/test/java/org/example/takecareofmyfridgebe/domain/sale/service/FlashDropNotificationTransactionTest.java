@@ -15,11 +15,13 @@ import org.example.takecareofmyfridgebe.domain.product.entity.Product;
 import org.example.takecareofmyfridgebe.domain.product.entity.ProductStatus;
 import org.example.takecareofmyfridgebe.domain.product.entity.ProductType;
 import org.example.takecareofmyfridgebe.domain.product.repository.ProductRepository;
+import org.example.takecareofmyfridgebe.domain.product.service.ProductService;
 import org.example.takecareofmyfridgebe.domain.sale.dto.FlashDropCreateRequest;
 import org.example.takecareofmyfridgebe.domain.sale.dto.FlashDropItemRequest;
 import org.example.takecareofmyfridgebe.domain.sale.dto.SaleEventsCreateResponse;
 import org.example.takecareofmyfridgebe.domain.sale.dto.SpecialSaleCreateRequest;
 import org.example.takecareofmyfridgebe.domain.sale.dto.SpecialSaleItemRequest;
+import org.example.takecareofmyfridgebe.domain.sale.facade.AdminSaleEventFacade;
 import org.example.takecareofmyfridgebe.domain.sale.entity.SaleEvent;
 import org.example.takecareofmyfridgebe.domain.sale.entity.SaleEventItem;
 import org.example.takecareofmyfridgebe.domain.sale.entity.SaleEventStatus;
@@ -48,8 +50,8 @@ import org.springframework.transaction.annotation.Transactional;
 // 커밋된 행사·회원을 다시 읽어 알림 요청을 만들고, Kafka 발행 리스너는 띄우지 않는다.
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({JpaAuditingConfig.class, QueryDslConfig.class,
-        SaleEventCreateService.class, SaleEventStatusService.class, FlashDropNotificationReader.class})
+@Import({JpaAuditingConfig.class, QueryDslConfig.class, SaleEventService.class, SaleEventStatusService.class, SaleEventQueryService.class,
+        FlashDropNotificationService.class, AdminSaleEventFacade.class, ProductService.class})
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @RecordApplicationEvents
 class FlashDropNotificationTransactionTest extends MySqlContainerSupport {
@@ -57,9 +59,8 @@ class FlashDropNotificationTransactionTest extends MySqlContainerSupport {
     private static final LocalDateTime NOW = LocalDateTime.now(SaleEvent.ZONE);
     private static final LocalDateTime TOMORROW = NOW.plusDays(1);
 
-    private final SaleEventCreateService saleEventCreateService;
     private final SaleEventStatusService saleEventStatusService;
-    private final FlashDropNotificationReader flashDropNotificationReader;
+    private final AdminSaleEventFacade adminSaleEventFacade;
     private final SaleEventRepository saleEventRepository;
     private final SaleEventItemRepository saleEventItemRepository;
     private final ProductRepository productRepository;
@@ -68,17 +69,15 @@ class FlashDropNotificationTransactionTest extends MySqlContainerSupport {
 
     @Autowired
     FlashDropNotificationTransactionTest(
-            SaleEventCreateService saleEventCreateService,
             SaleEventStatusService saleEventStatusService,
-            FlashDropNotificationReader flashDropNotificationReader,
+            AdminSaleEventFacade adminSaleEventFacade,
             SaleEventRepository saleEventRepository,
             SaleEventItemRepository saleEventItemRepository,
             ProductRepository productRepository,
             MemberRepository memberRepository,
             DataSource dataSource) {
-        this.saleEventCreateService = saleEventCreateService;
         this.saleEventStatusService = saleEventStatusService;
-        this.flashDropNotificationReader = flashDropNotificationReader;
+        this.adminSaleEventFacade = adminSaleEventFacade;
         this.saleEventRepository = saleEventRepository;
         this.saleEventItemRepository = saleEventItemRepository;
         this.productRepository = productRepository;
@@ -107,7 +106,7 @@ class FlashDropNotificationTransactionTest extends MySqlContainerSupport {
         Product tofu = saveProduct("두부", 3000);
         LocalDateTime startsAt = LocalDateTime.of(TOMORROW.getYear(), TOMORROW.getMonth(), TOMORROW.getDayOfMonth(), 18, 0);
 
-        SaleEventsCreateResponse response = saleEventCreateService.createFlashDrop(new FlashDropCreateRequest(
+        SaleEventsCreateResponse response = adminSaleEventFacade.createFlashDrop(new FlashDropCreateRequest(
                 startsAt, startsAt.plusHours(2), List.of(new FlashDropItemRequest(tofu.getId(), 50, 10))));
 
         List<FlashDropNotificationEvent> published = events.stream(FlashDropNotificationEvent.class).toList();
@@ -116,7 +115,7 @@ class FlashDropNotificationTransactionTest extends MySqlContainerSupport {
         String content = "두부 50%% 번개 드롭 · %d월 %d일 18:00 시작 · 10개 한정"
                 .formatted(startsAt.getMonthValue(), startsAt.getDayOfMonth());
         String dedupeKey = "FLASH_DROP_CREATED:%d:%d".formatted(saleEventId, tofu.getId());
-        assertThat(flashDropNotificationReader.read(published.get(0)))
+        assertThat(adminSaleEventFacade.getFlashDropNotifications(published.get(0)))
                 .extracting(NotificationRequestedMessage::memberId, NotificationRequestedMessage::notificationType,
                         NotificationRequestedMessage::content, NotificationRequestedMessage::linkUrl,
                         NotificationRequestedMessage::dedupeKey)
@@ -131,7 +130,7 @@ class FlashDropNotificationTransactionTest extends MySqlContainerSupport {
         saveMember("user1");
         Product tofu = saveProduct("두부", 3000);
 
-        saleEventCreateService.createSpecialSale(new SpecialSaleCreateRequest(
+        adminSaleEventFacade.createSpecialSale(new SpecialSaleCreateRequest(
                 TOMORROW, TOMORROW.plusDays(7), List.of(new SpecialSaleItemRequest(tofu.getId(), 20))));
 
         assertThat(events.stream(FlashDropNotificationEvent.class)).isEmpty();
@@ -152,7 +151,7 @@ class FlashDropNotificationTransactionTest extends MySqlContainerSupport {
 
         List<FlashDropNotificationEvent> published = events.stream(FlashDropNotificationEvent.class).toList();
         assertThat(published).containsExactly(FlashDropNotificationEvent.started(List.of(dueFlashDrop.getId())));
-        assertThat(flashDropNotificationReader.read(published.get(0)))
+        assertThat(adminSaleEventFacade.getFlashDropNotifications(published.get(0)))
                 .extracting(NotificationRequestedMessage::memberId, NotificationRequestedMessage::content,
                         NotificationRequestedMessage::dedupeKey)
                 .containsExactly(tuple(user.getId(), "두부 50% 번개 드롭 시작 · 10개 한정",
