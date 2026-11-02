@@ -3,8 +3,12 @@ package org.example.takecareofmyfridgebe.domain.search.service;
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import co.elastic.clients.elasticsearch.core.SearchRequest;
 import co.elastic.clients.elasticsearch.core.SearchResponse;
+import co.elastic.clients.elasticsearch.core.TermvectorsResponse;
 import co.elastic.clients.elasticsearch.core.search.Hit;
 import co.elastic.clients.elasticsearch.core.search.TotalHitsRelation;
+import co.elastic.clients.elasticsearch.core.termvectors.Term;
+import co.elastic.clients.elasticsearch.core.termvectors.TermVector;
+import org.example.takecareofmyfridgebe.domain.ingredient.dto.IngredientCandidate;
 import org.example.takecareofmyfridgebe.domain.search.config.RecipeSearchProperties;
 import org.example.takecareofmyfridgebe.domain.search.config.RecipeSearchProperties.IndexProperties;
 import org.example.takecareofmyfridgebe.domain.search.config.RecipeSearchProperties.IngredientIndexProperties;
@@ -17,134 +21,128 @@ import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 class IngredientNameSearchServiceTest {
 
-    private final ElasticsearchClient esClient = mock(ElasticsearchClient.class);
-    private final RecipeEmbedder embedder = mock(RecipeEmbedder.class);
+    private static final double DELTA = 0.001;
 
-    private static RecipeSearchProperties properties(SearchEngine engine, boolean autoMatchByVector) {
+    private final ElasticsearchClient esClient = mock(ElasticsearchClient.class);
+
+    private static RecipeSearchProperties properties(SearchEngine engine) {
         return new RecipeSearchProperties(
                 engine,
                 new IndexProperties(null, null, new IngredientIndexProperties(
-                        "ingredients", null, null, null, 500, List.of(), true, autoMatchByVector, 0.85f)),
+                        "ingredients", null, null, null, 500, List.of(), true)),
                 new VectorProperties(true, 1536, 20, 100, 0.5f, 100));
     }
 
-    private static SearchResponse<IngredientHit> response(List<IngredientHit> docs) {
+    private static SearchResponse<IngredientHit> response(Map<String, Double> scoreByName) {
         return SearchResponse.of(r -> r
                 .took(1)
                 .timedOut(false)
                 .shards(s -> s.total(1).successful(1).failed(0))
                 .hits(h -> h
-                        .total(t -> t.value(docs.size()).relation(TotalHitsRelation.Eq))
-                        .hits(docs.stream()
-                                .map(doc -> Hit.<IngredientHit>of(hit -> hit.index("ingredients_1").id(doc.name()).source(doc)))
+                        .total(t -> t.value(scoreByName.size()).relation(TotalHitsRelation.Eq))
+                        .hits(scoreByName.entrySet().stream()
+                                .map(entry -> Hit.<IngredientHit>of(hit -> hit
+                                        .index("ingredients_1")
+                                        .id(entry.getKey())
+                                        .score(entry.getValue())
+                                        .source(new IngredientHit(entry.getKey()))))
                                 .toList())));
     }
 
-    @Test
-    @DisplayName("입력 전체 키가 별칭이면 그 재료로 정한다")
-    void picksWholeKeyFirst() {
-        Map<String, String> result = IngredientNameSearchService.pickByAlias(
-                List.of("절인 배추", "계란"),
-                Map.of("절인배추", "절인 배추", "계란", "달걀"));
+    private static TermVector termVector(int docCount, long sumTtf, Map<String, Term> terms) {
+        return TermVector.of(v -> v
+                .fieldStatistics(f -> f.docCount(docCount).sumDocFreq(sumTtf).sumTtf(sumTtf))
+                .terms(terms));
+    }
 
-        assertEquals(Map.of("절인 배추", "절인 배추", "계란", "달걀"), result);
+    private static Term term(int termFreq, Integer docFreq) {
+        return Term.of(t -> t.termFreq(termFreq).docFreq(docFreq));
     }
 
     @Test
-    @DisplayName("전체 키가 없으면 단어 키가 가리키는 재료가 하나뿐일 때만 정한다")
-    void picksByWordOnlyWhenUnambiguous() {
-        Map<String, String> nameByKey = Map.of("신선란", "달걀", "흙대파", "대파", "두부", "두부", "김치", "배추김치");
-
-        Map<String, String> result = IngredientNameSearchService.pickByAlias(
-                List.of("무항생제 신선란", "국산 흙대파", "두부 김치", "엄마표 반찬"), nameByKey);
-
-        assertEquals(Map.of("무항생제 신선란", "달걀", "국산 흙대파", "대파"), result);
+    @DisplayName("BM25 계산은 ES _explain 결과와 같다 (소주: name.ko 17.3778)")
+    void bm25MatchesEsExplain() {
+        assertEquals(17.3778, IngredientNameSearchService.bm25(1, 1, 1085, 1, 2.4507, 2.0, 0.75), DELTA);
+        // b=0이면 문서 길이와 상관없다
+        assertEquals(IngredientNameSearchService.bm25(1, 5, 1085, 1, 4.4, 1.0, 0.0),
+                IngredientNameSearchService.bm25(1, 5, 1085, 30, 4.4, 1.0, 0.0), DELTA);
     }
 
     @Test
-    @DisplayName("조회 키는 입력 전체 키 + 두 단어 이상일 때의 단어별 키다")
-    void candidateKeysIncludeWordsOnlyForMultiWordNames() {
-        assertEquals(List.of("무항생제신선란", "무항생제", "신선란"),
-                IngredientNameSearchService.candidateKeys("무항생제 신선란"));
-        assertEquals(List.of("계란"), IngredientNameSearchService.candidateKeys("계란"));
-        assertTrue(IngredientNameSearchService.candidateKeys(" ").isEmpty());
+    @DisplayName("완벽 일치 점수는 필드 중 최대이고, 인덱스에 없는 토큰은 문서 빈도 1로 본다")
+    void perfectScoreUsesBestFieldAndTreatsUnknownTokenAsDocFreqOne() {
+        Map<String, TermVector> vectors = Map.of(
+                "name.ko", termVector(1085, 2659, Map.of("소주", term(1, 1))),
+                "aliases.ko", termVector(1085, 4795, Map.of("소주", term(1, null))));
+
+        double expected = IngredientNameSearchService.bm25(1, 1, 1085, 1, 2659.0 / 1085, 2.0, 0.75);
+        assertEquals(expected, IngredientNameSearchService.perfectScore(vectors), DELTA);
+        assertEquals(0.0, IngredientNameSearchService.perfectScore(Map.of()), DELTA);
     }
 
     @Test
-    @DisplayName("끝 단어: 입력이 2자 이상 키로 끝나면 가장 긴 키의 재료로 정한다")
-    void picksBySuffix() {
-        Map<String, String> nameByKey = Map.of(
-                "우유", "우유", "참외", "참외", "토마토", "토마토", "대추", "대추", "계란", "달걀", "김", "김");
+    @DisplayName("후보는 점수 높은 순(같으면 이름 순)으로 최대 5개다")
+    void ranksByScoreThenNameUpToFive() {
+        List<IngredientCandidate> result = IngredientNameSearchService.rank(Map.of(
+                "우유", 0.57, "달걀", 1.0, "두유", 0.3, "아몬드우유", 0.47, "가지", 0.3, "꿀", 0.1));
 
-        Map<String, String> result = IngredientNameSearchService.pickBySuffix(
-                List.of("서울우유", "꿀참외", "대추토마토", "국산 계란"), nameByKey);
-
-        assertEquals(Map.of("서울우유", "우유", "꿀참외", "참외", "대추토마토", "토마토", "국산 계란", "달걀"), result);
+        assertEquals(List.of(
+                new IngredientCandidate("달걀", 1.0),
+                new IngredientCandidate("우유", 0.57),
+                new IngredientCandidate("아몬드우유", 0.47),
+                new IngredientCandidate("가지", 0.3),
+                new IngredientCandidate("두유", 0.3)), result);
     }
 
     @Test
-    @DisplayName("끝 단어: 앞에만 재료명이 있거나, 한 글자 키뿐이거나, 같은 길이 후보가 둘이면 정하지 않는다")
-    void skipsPrefixSingleCharAndTies() {
-        Map<String, String> nameByKey = Map.of(
-                "새우", "새우", "마늘", "마늘", "김", "김", "참치", "참치", "꽁치", "꽁치");
-
-        Map<String, String> result = IngredientNameSearchService.pickBySuffix(
-                List.of("새우깡", "마늘빵", "조미김", "참치꽁치", "새우"), nameByKey);
-
-        // 새우깡·마늘빵: 끝이 재료명이 아님 / 조미김: 한 글자 키 / 새우: 입력 전체와 같은 키는 별칭 단계 몫
-        assertEquals(Map.of("참치꽁치", "꽁치"), result);
+    @DisplayName("ES 검색을 쓰지 않거나 입력이 비면 조회 없이 빈 목록을 돌려준다")
+    void returnsEmptyWhenEngineIsMySqlOrBlank() {
+        assertTrue(new IngredientNameSearchService(esClient, properties(SearchEngine.MYSQL)).findCandidates("계란").isEmpty());
+        assertTrue(new IngredientNameSearchService(esClient, properties(SearchEngine.ELASTICSEARCH)).findCandidates(" ").isEmpty());
+        verifyNoInteractions(esClient);
     }
 
     @Test
-    @DisplayName("ES 검색을 쓰지 않으면 조회 없이 빈 결과를 돌려준다")
-    void returnsEmptyWhenEngineIsMySql() {
-        IngredientNameSearchService service = new IngredientNameSearchService(
-                esClient, properties(SearchEngine.MYSQL, true), embedder);
-
-        assertTrue(service.resolveAll(List.of("계란")).isEmpty());
-        verifyNoInteractions(esClient, embedder);
-    }
-
-    @Test
-    @DisplayName("ES 조회가 실패하면 예외 없이 빈 결과를 돌려주고 벡터 조회도 하지 않는다")
+    @DisplayName("ES 조회가 실패하면 예외 없이 빈 목록을 돌려준다")
     void returnsEmptyWhenEsFails() throws IOException {
-        IngredientNameSearchService service = new IngredientNameSearchService(
-                esClient, properties(SearchEngine.ELASTICSEARCH, true), embedder);
-        when(esClient.search(any(SearchRequest.class), eq(IngredientHit.class)))
-                .thenThrow(new IOException("ES down"));
+        IngredientNameSearchService service = new IngredientNameSearchService(esClient, properties(SearchEngine.ELASTICSEARCH));
+        when(esClient.search(any(SearchRequest.class), eq(IngredientHit.class))).thenThrow(new IOException("ES down"));
 
-        assertTrue(service.resolveAll(List.of("계란")).isEmpty());
-        verify(embedder, never()).embedAll(anyList());
+        assertTrue(service.findCandidates("계란").isEmpty());
     }
 
     @Test
-    @DisplayName("별칭으로 못 찾으면 끝 단어로 찾고, 자동 벡터 매칭이 꺼져 있으면 임베딩하지 않는다")
-    void resolvesBySuffixWithoutVector() throws IOException {
-        IngredientNameSearchService service = new IngredientNameSearchService(
-                esClient, properties(SearchEngine.ELASTICSEARCH, false), embedder);
-        // 별칭 조회(terms)는 0건, 키 표 조회(전체)는 우유 문서 하나
+    @DisplayName("별칭이 정확히 맞으면 1.0, 나머지는 BM25 점수를 완벽 일치 점수로 나눈 값이다")
+    @SuppressWarnings("unchecked")
+    void scoresAliasAsOneAndNormalizesBm25() throws IOException {
+        IngredientNameSearchService service = new IngredientNameSearchService(esClient, properties(SearchEngine.ELASTICSEARCH));
+        Map<String, TermVector> vectors = Map.of("name.ko", termVector(1085, 2659, Map.of("우유", term(1, 3))));
+        double perfect = IngredientNameSearchService.perfectScore(vectors);
+        // 별칭 조회 -> 달걀, BM25 조회 -> 달걀(낮은 점수), 우유(완벽 일치의 절반)
         when(esClient.search(any(SearchRequest.class), eq(IngredientHit.class)))
-                .thenReturn(response(List.of()))
-                .thenReturn(response(List.of(new IngredientHit("우유", List.of("우유", "흰우유")))));
+                .thenReturn(response(Map.of("달걀", 30.0)))
+                .thenReturn(response(Map.of("달걀", perfect * 0.2, "우유", perfect * 0.5)));
+        when(esClient.termvectors(any(Function.class)))
+                .thenReturn(TermvectorsResponse.of(r -> r.index("ingredients_1").found(true).took(1).version(0).termVectors(vectors)));
 
-        Map<String, String> result = service.resolveAll(List.of("서울우유", "콜라"));
+        List<IngredientCandidate> result = service.findCandidates("계란");
 
-        assertEquals(Map.of("서울우유", "우유"), result);
-        verify(embedder, never()).embedAll(anyList());
+        assertEquals(2, result.size());
+        assertEquals(new IngredientCandidate("달걀", 1.0), result.get(0));
+        assertEquals("우유", result.get(1).value());
+        assertEquals(0.5, result.get(1).score(), DELTA);
     }
 
 }

@@ -8,6 +8,36 @@
           "type": "custom",
           "filter": ["lowercase"]
         }
+      },
+      "tokenizer": {
+        "nori_mixed": {
+          "type": "nori_tokenizer",
+          "decompound_mode": "mixed",
+          "discard_punctuation": true
+        },
+        "nori_discard": {
+          "type": "nori_tokenizer",
+          "decompound_mode": "discard",
+          "discard_punctuation": true
+        }
+      },
+      "analyzer": {
+        "korean": {
+          "type": "custom",
+          "tokenizer": "nori_mixed",
+          "filter": ["lowercase"]
+        },
+        "korean_search": {
+          "type": "custom",
+          "tokenizer": "nori_discard",
+          "filter": ["lowercase"]
+        }
+      }
+    },
+    "similarity": {
+      "alias_bm25": {
+        "type": "BM25",
+        "b": 0
       }
     }
   },
@@ -15,8 +45,19 @@
     "dynamic": "strict",
     "properties": {
       "id":        { "type": "long" },
-      "name":      { "type": "keyword" },
-      "aliases":   { "type": "keyword", "normalizer": "lowercase_normalizer" },
+      "name": {
+        "type": "keyword",
+        "fields": {
+          "ko": { "type": "text", "analyzer": "korean", "search_analyzer": "korean_search" }
+        }
+      },
+      "aliases": {
+        "type": "keyword",
+        "normalizer": "lowercase_normalizer",
+        "fields": {
+          "ko": { "type": "text", "analyzer": "korean", "search_analyzer": "korean_search", "similarity": "alias_bm25" }
+        }
+      },
       "embedding": { "type": "dense_vector", "dims": 1536, "similarity": "cosine" }
     }
   }

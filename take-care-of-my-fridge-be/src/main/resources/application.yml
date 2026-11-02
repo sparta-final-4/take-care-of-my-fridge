@@ -111,9 +111,6 @@ app:
         batch-size: 500
         # 색인할 때 재료 임베딩을 넣는다 (후보 제안 등 나중 기능용)
         embedding-enabled: ${INGREDIENT_EMBEDDING_ENABLED:true}
-        # 자동 매칭에 벡터를 쓸지. text-embedding-3-small로 측정했을 때 오답(콜라 -> 콜라비 0.84)이 많아 끈다
-        auto-match-by-vector: false
-        min-similarity: 0.85
     # 키워드 검색 결과가 0건일 때만 쓰는 벡터 검색. 임베딩을 넣어 재색인한 뒤 켠다
     vector:
       enabled: ${SEARCH_VECTOR_ENABLED:true}

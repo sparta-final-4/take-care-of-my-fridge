@@ -46,8 +46,6 @@ public record RecipeSearchProperties(
      * <br>
      * aliasDictionaries: {"그룹": {"별칭": "표준명"}} 형식 파일 목록. 뒤 파일이 같은 별칭을 덮어쓴다.
      * embeddingEnabled: 색인할 때 재료 임베딩을 넣을지. 레시피 벡터 검색(vector.enabled)과 따로 켠다.
-     * autoMatchByVector: 자동 매칭에 벡터를 쓸지. 틀리면 냉장고에 그대로 저장되므로 측정 근거가 있을 때만 켠다.
-     * minSimilarity: 벡터로 찾을 때 이 코사인 유사도 미만이면 버린다.
      */
     public record IngredientIndexProperties(
             String alias,
@@ -56,9 +54,7 @@ public record RecipeSearchProperties(
             Resource extraSynonyms,
             int batchSize,
             List<Resource> aliasDictionaries,
-            boolean embeddingEnabled,
-            boolean autoMatchByVector,
-            float minSimilarity
+            boolean embeddingEnabled
     ) implements EsIndexProperties {}
 
     // 검색어가 글자로 맞지 않아 0건일 때 쓰는 벡터 검색 설정
