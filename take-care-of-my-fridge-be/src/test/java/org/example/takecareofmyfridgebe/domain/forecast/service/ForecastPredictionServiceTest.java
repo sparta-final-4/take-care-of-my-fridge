@@ -17,6 +17,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import org.example.takecareofmyfridgebe.domain.forecast.dto.DailyNetSales;
+import org.example.takecareofmyfridgebe.domain.forecast.entity.ForecastBatchStatus;
 import org.example.takecareofmyfridgebe.domain.forecast.entity.PredictionRun;
 import org.example.takecareofmyfridgebe.domain.forecast.repository.PredictionRunRepository;
 import org.example.takecareofmyfridgebe.domain.product.entity.Product;
@@ -51,7 +52,7 @@ class ForecastPredictionServiceTest {
                 List.of(new ForecastWorkerClient.Prediction(1L, 9)));
         when(worker.predict(eq(week), anyList(), anyList())).thenReturn(result);
 
-        service.generate(week, cutoff);
+        assertThat(service.generate(week, cutoff)).isEqualTo(ForecastBatchStatus.CREATED);
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<ForecastWorkerClient.ProductHistory>> inputs = ArgumentCaptor.forClass(List.class);
@@ -68,7 +69,8 @@ class ForecastPredictionServiceTest {
         LocalDate week = LocalDate.of(2026, 10, 26);
         when(runs.findByTargetWeekStart(week)).thenReturn(Optional.of(mock(PredictionRun.class)));
 
-        service.generate(week, LocalDateTime.of(2026, 10, 25, 18, 0));
+        assertThat(service.generate(week, LocalDateTime.of(2026, 10, 25, 18, 0)))
+                .isEqualTo(ForecastBatchStatus.ALREADY_EXISTS);
 
         verifyNoInteractions(sales, worker, saver);
     }
@@ -85,10 +87,20 @@ class ForecastPredictionServiceTest {
         when(sales.getDailySales(week.minusDays(84), week.minusDays(1), cutoff))
                 .thenReturn(List.of());
 
-        service.generate(week, cutoff);
+        assertThat(service.generate(week, cutoff)).isEqualTo(ForecastBatchStatus.NO_TRAINING_SAMPLES);
 
         verifyNoInteractions(worker, saver);
     }
+    @Test
+    void reportsWhenNoProductsCanBePredicted() {
+        LocalDate week = LocalDate.of(2026, 10, 26);
+        when(products.findAll()).thenReturn(List.of());
+
+        assertThat(service.generate(week, week.minusDays(1).atTime(18, 0)))
+                .isEqualTo(ForecastBatchStatus.NO_PRODUCTS);
+        verifyNoInteractions(sales, worker, saver);
+    }
+
     @Test
     void savesWhateverModelVersionWorkerReports() {
         LocalDate week = LocalDate.of(2026, 10, 26);

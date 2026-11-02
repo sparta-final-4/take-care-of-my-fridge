@@ -13,6 +13,7 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.forecast.dto.DailyNetSales;
+import org.example.takecareofmyfridgebe.domain.forecast.entity.ForecastBatchStatus;
 import org.example.takecareofmyfridgebe.domain.forecast.repository.PredictionRunRepository;
 import org.example.takecareofmyfridgebe.domain.product.entity.Product;
 import org.example.takecareofmyfridgebe.domain.product.entity.ProductStatus;
@@ -36,19 +37,19 @@ public class ForecastPredictionService {
     private final ForecastWorkerClient workerClient;
     private final ForecastPredictionSaveService saveService;
 
-    public void generate(LocalDate weekStart, LocalDateTime dataCutoffAt) {
+    public ForecastBatchStatus generate(LocalDate weekStart, LocalDateTime dataCutoffAt) {
         if (weekStart.getDayOfWeek() != DayOfWeek.MONDAY
                 || !dataCutoffAt.equals(weekStart.minusDays(1).atTime(18, 0))) {
             throw new IllegalArgumentException("대상 주와 예측 입력 마감 시각이 올바르지 않습니다.");
         }
         if (runRepository.findByTargetWeekStart(weekStart).isPresent()) {
-            return;
+            return ForecastBatchStatus.ALREADY_EXISTS;
         }
         List<Product> products = productRepository.findAll().stream()
                 .filter(product -> product.getStatus() != ProductStatus.STOPPED)
                 .sorted(Comparator.comparing(Product::getId)).toList();
         if (products.isEmpty()) {
-            return;
+            return ForecastBatchStatus.NO_PRODUCTS;
         }
         LocalDate from = weekStart.minusDays(HISTORY_DAYS + TRAINING_WEEKS * 7);
         Map<Long, Map<LocalDate, Long>> history = new HashMap<>();
@@ -72,7 +73,7 @@ public class ForecastPredictionService {
             }
         }
         if (samples.isEmpty()) {
-            return;
+            return ForecastBatchStatus.NO_TRAINING_SAMPLES;
         }
         ForecastWorkerClient.Result result = workerClient.predict(weekStart, samples, inputs);
         // 모델 버전은 워커가 정한다. 워커만 버전을 올려도 실행이 막히지 않도록 값의 형식만 확인한다.
@@ -94,6 +95,7 @@ public class ForecastPredictionService {
                     weekStart.minusDays(FORECAST_DAYS), FORECAST_DAYS).stream().mapToLong(Long::longValue).sum());
         }
         saveService.save(weekStart, dataCutoffAt, result, byId, baselines);
+        return ForecastBatchStatus.CREATED;
     }
 
     private List<Long> window(Map<LocalDate, Long> daily, LocalDate start, int days) {
