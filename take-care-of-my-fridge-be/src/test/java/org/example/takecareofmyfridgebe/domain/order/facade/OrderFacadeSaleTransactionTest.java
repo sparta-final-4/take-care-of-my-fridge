@@ -1,4 +1,4 @@
-package org.example.takecareofmyfridgebe.domain.order.service;
+package org.example.takecareofmyfridgebe.domain.order.facade;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -22,6 +22,7 @@ import org.example.takecareofmyfridgebe.domain.cart.entity.Cart;
 import org.example.takecareofmyfridgebe.domain.cart.entity.CartItem;
 import org.example.takecareofmyfridgebe.domain.cart.repository.CartItemRepository;
 import org.example.takecareofmyfridgebe.domain.cart.repository.CartRepository;
+import org.example.takecareofmyfridgebe.domain.cart.service.CartService;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.StorageType;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderCreateItemRequest;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderCreateRequest;
@@ -31,10 +32,16 @@ import org.example.takecareofmyfridgebe.domain.order.entity.OrderStatus;
 import org.example.takecareofmyfridgebe.domain.order.entity.SaleType;
 import org.example.takecareofmyfridgebe.domain.order.repository.OrderItemRepository;
 import org.example.takecareofmyfridgebe.domain.order.repository.OrderRepository;
+import org.example.takecareofmyfridgebe.domain.order.service.OrderNumberGenerator;
+import org.example.takecareofmyfridgebe.domain.order.service.OrderReader;
+import org.example.takecareofmyfridgebe.domain.order.service.OrderService;
+import org.example.takecareofmyfridgebe.domain.order.service.OrderStatusService;
+import org.example.takecareofmyfridgebe.domain.payment.service.PaymentHistoryRecorder;
 import org.example.takecareofmyfridgebe.domain.payment.service.PaymentService;
 import org.example.takecareofmyfridgebe.domain.product.entity.Product;
 import org.example.takecareofmyfridgebe.domain.product.entity.ProductType;
 import org.example.takecareofmyfridgebe.domain.product.repository.ProductRepository;
+import org.example.takecareofmyfridgebe.domain.refund.service.RefundQueryService;
 import org.example.takecareofmyfridgebe.domain.sale.entity.SaleEvent;
 import org.example.takecareofmyfridgebe.domain.sale.entity.SaleEventItem;
 import org.example.takecareofmyfridgebe.domain.sale.entity.SaleEventType;
@@ -63,11 +70,12 @@ import org.springframework.transaction.annotation.Transactional;
 // 진행 중인 특가·번개 드롭이 있을 때의 주문하기와 취소. 응답이 아니라 커밋된 주문·재고·남은 수량을 다시 읽어 확인한다.
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({JpaAuditingConfig.class, QueryDslConfig.class, OrderCreateService.class, OrderCancelService.class,
-    OrderReader.class, SaleEventReader.class,
-    SaleEventStockService.class, PaymentService.class})
+@Import({JpaAuditingConfig.class, QueryDslConfig.class, OrderFacade.class, OrderStatusFacade.class,
+    OrderReader.class, SaleEventReader.class, SaleEventStockService.class, PaymentService.class,
+    OrderService.class, CartService.class, OrderStatusService.class, RefundQueryService.class,
+    PaymentHistoryRecorder.class})
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
-class OrderCreateServiceSaleTransactionTest extends MySqlContainerSupport {
+class OrderFacadeSaleTransactionTest extends MySqlContainerSupport {
 
     // 이 테스트는 재고와 롤백을 본다. 번호 생성은 OrderNumberGeneratorTest가 맡으므로 매번 다른 번호를 돌려주는 가짜로 바꾼다.
     private static final AtomicLong ORDER_NUMBER_SEQUENCE = new AtomicLong();
@@ -77,8 +85,8 @@ class OrderCreateServiceSaleTransactionTest extends MySqlContainerSupport {
 
     private static final LocalDateTime NOW = LocalDateTime.now(SaleEvent.ZONE);
 
-    private final OrderCreateService orderCreateService;
-    private final OrderCancelService orderCancelService;
+    private final OrderFacade orderFacade;
+    private final OrderStatusFacade orderStatusFacade;
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final CartRepository cartRepository;
@@ -89,9 +97,9 @@ class OrderCreateServiceSaleTransactionTest extends MySqlContainerSupport {
     private final JdbcTemplate jdbcTemplate;
 
     @Autowired
-    OrderCreateServiceSaleTransactionTest(
-            OrderCreateService orderCreateService,
-            OrderCancelService orderCancelService,
+    OrderFacadeSaleTransactionTest(
+            OrderFacade orderFacade,
+            OrderStatusFacade orderStatusFacade,
             OrderRepository orderRepository,
             OrderItemRepository orderItemRepository,
             CartRepository cartRepository,
@@ -100,8 +108,8 @@ class OrderCreateServiceSaleTransactionTest extends MySqlContainerSupport {
             SaleEventRepository saleEventRepository,
             SaleEventItemRepository saleEventItemRepository,
             DataSource dataSource) {
-        this.orderCreateService = orderCreateService;
-        this.orderCancelService = orderCancelService;
+        this.orderFacade = orderFacade;
+        this.orderStatusFacade = orderStatusFacade;
         this.orderRepository = orderRepository;
         this.orderItemRepository = orderItemRepository;
         this.cartRepository = cartRepository;
@@ -243,7 +251,7 @@ class OrderCreateServiceSaleTransactionTest extends MySqlContainerSupport {
         assertThat(remainingOf(flashDrop)).isEqualTo(2);
         assertThat(orderRepository.count()).isEqualTo(1);
 
-        orderCancelService.cancel(7L, firstOrderId);
+        orderStatusFacade.cancel(7L, firstOrderId);
 
         assertThat(remainingOf(flashDrop)).isEqualTo(3);
         assertThat(stockOf(milk)).isEqualTo(10);
@@ -326,7 +334,7 @@ class OrderCreateServiceSaleTransactionTest extends MySqlContainerSupport {
     }
 
     private OrderCreateResult order(Long memberId, String idempotencyKey, OrderCreateItemRequest... lines) {
-        return orderCreateService.createOrder(memberId, idempotencyKey, new OrderCreateRequest(List.of(lines)));
+        return orderFacade.create(memberId, idempotencyKey, new OrderCreateRequest(List.of(lines)));
     }
 
     private OrderCreateItemRequest line(CartItem item, int unitPrice, SaleEventType saleType) {

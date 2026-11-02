@@ -1,4 +1,4 @@
-package org.example.takecareofmyfridgebe.domain.order.service;
+package org.example.takecareofmyfridgebe.domain.order.facade;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -22,6 +22,7 @@ import org.example.takecareofmyfridgebe.domain.cart.entity.Cart;
 import org.example.takecareofmyfridgebe.domain.cart.entity.CartItem;
 import org.example.takecareofmyfridgebe.domain.cart.repository.CartItemRepository;
 import org.example.takecareofmyfridgebe.domain.cart.repository.CartRepository;
+import org.example.takecareofmyfridgebe.domain.cart.service.CartService;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.StorageType;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderCheckoutResponse;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderCreateItemRequest;
@@ -33,6 +34,9 @@ import org.example.takecareofmyfridgebe.domain.order.entity.OrderStatus;
 import org.example.takecareofmyfridgebe.domain.order.entity.SaleType;
 import org.example.takecareofmyfridgebe.domain.order.repository.OrderItemRepository;
 import org.example.takecareofmyfridgebe.domain.order.repository.OrderRepository;
+import org.example.takecareofmyfridgebe.domain.order.service.OrderNumberGenerator;
+import org.example.takecareofmyfridgebe.domain.order.service.OrderReader;
+import org.example.takecareofmyfridgebe.domain.order.service.OrderService;
 import org.example.takecareofmyfridgebe.domain.product.entity.Product;
 import org.example.takecareofmyfridgebe.domain.product.entity.ProductStatus;
 import org.example.takecareofmyfridgebe.domain.product.entity.ProductType;
@@ -60,10 +64,10 @@ import org.springframework.transaction.annotation.Transactional;
 // 응답이 아니라 커밋된 재고·주문·장바구니 상태를 다시 읽어 확인한다.
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({JpaAuditingConfig.class, QueryDslConfig.class, OrderCreateService.class, OrderReader.class,
-    SaleEventReader.class, SaleEventStockService.class})
+@Import({JpaAuditingConfig.class, QueryDslConfig.class, OrderFacade.class, OrderReader.class,
+    SaleEventReader.class, SaleEventStockService.class, OrderService.class, CartService.class})
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
-class OrderCreateServiceTransactionTest extends MySqlContainerSupport {
+class OrderFacadeTransactionTest extends MySqlContainerSupport {
 
     // 이 테스트는 재고와 롤백을 본다. 번호 생성은 OrderNumberGeneratorTest가 맡으므로 매번 다른 번호를 돌려주는 가짜로 바꾼다.
     private static final AtomicLong ORDER_NUMBER_SEQUENCE = new AtomicLong();
@@ -71,7 +75,7 @@ class OrderCreateServiceTransactionTest extends MySqlContainerSupport {
     @MockitoBean
     private OrderNumberGenerator orderNumberGenerator;
 
-    private final OrderCreateService orderCreateService;
+    private final OrderFacade orderFacade;
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final CartRepository cartRepository;
@@ -79,14 +83,14 @@ class OrderCreateServiceTransactionTest extends MySqlContainerSupport {
     private final ProductRepository productRepository;
 
     @Autowired
-    OrderCreateServiceTransactionTest(
-            OrderCreateService orderCreateService,
+    OrderFacadeTransactionTest(
+            OrderFacade orderFacade,
             OrderRepository orderRepository,
             OrderItemRepository orderItemRepository,
             CartRepository cartRepository,
             CartItemRepository cartItemRepository,
             ProductRepository productRepository) {
-        this.orderCreateService = orderCreateService;
+        this.orderFacade = orderFacade;
         this.orderRepository = orderRepository;
         this.orderItemRepository = orderItemRepository;
         this.cartRepository = cartRepository;
@@ -196,10 +200,10 @@ class OrderCreateServiceTransactionTest extends MySqlContainerSupport {
     void createOrder_sameKeyAfterCartItemRemoved_returnsFirstOrder() {
         Product greenOnion = saveProduct("대파", 3000, 10);
         CartItem item = saveCartItem(saveCart(1L), greenOnion, 2);
-        OrderCreateResult first = orderCreateService.createOrder(1L, "key-1", request(item));
+        OrderCreateResult first = orderFacade.create(1L, "key-1", request(item));
         cartItemRepository.deleteById(item.getId());
 
-        OrderCreateResult retry = orderCreateService.createOrder(1L, "key-1", request(item));
+        OrderCreateResult retry = orderFacade.create(1L, "key-1", request(item));
 
         assertThat(retry.created()).isFalse();
         assertThat(retry.response().orderId()).isEqualTo(first.response().orderId());
@@ -220,13 +224,14 @@ class OrderCreateServiceTransactionTest extends MySqlContainerSupport {
     }
 
     @Test
-    @DisplayName("판매 중지 상품은 거절하고 재고는 그대로다")
+    @DisplayName("판매 중지 상품은 상품 이름과 함께 거절하고 재고는 그대로다")
     void createOrder_rejectsStoppedProduct() {
         Product stopped = productRepository.save(product("대파", 3000, 10, ProductStatus.STOPPED));
         CartItem item = saveCartItem(saveCart(1L), stopped, 1);
 
         assertThatThrownBy(() -> order(1L, request(item)))
             .isInstanceOf(BusinessException.class)
+            .hasMessage("판매 중지 · 대파")
             .extracting("errorCode").isEqualTo(ErrorCode.PRODUCT_NOT_ON_SALE);
         assertThat(stockOf(stopped)).isEqualTo(10);
         assertThat(orderRepository.count()).isZero();
@@ -252,8 +257,8 @@ class OrderCreateServiceTransactionTest extends MySqlContainerSupport {
         Product greenOnion = saveProduct("대파", 3000, 10);
         CartItem item = saveCartItem(saveCart(1L), greenOnion, 2);
 
-        OrderCreateResult first = orderCreateService.createOrder(1L, "key-1", request(item));
-        OrderCreateResult second = orderCreateService.createOrder(1L, "key-1", request(item));
+        OrderCreateResult first = orderFacade.create(1L, "key-1", request(item));
+        OrderCreateResult second = orderFacade.create(1L, "key-1", request(item));
 
         assertThat(first.created()).isTrue();
         assertThat(second.created()).isFalse();
@@ -271,9 +276,9 @@ class OrderCreateServiceTransactionTest extends MySqlContainerSupport {
         Cart cart = saveCart(1L);
         CartItem item1 = saveCartItem(cart, greenOnion, 1);
         CartItem item2 = saveCartItem(cart, tofu, 1);
-        orderCreateService.createOrder(1L, "key-1", request(item1));
+        orderFacade.create(1L, "key-1", request(item1));
 
-        assertThatThrownBy(() -> orderCreateService.createOrder(1L, "key-1", request(item2)))
+        assertThatThrownBy(() -> orderFacade.create(1L, "key-1", request(item2)))
             .isInstanceOf(BusinessException.class)
             .extracting("errorCode").isEqualTo(ErrorCode.ORDER_IDEMPOTENCY_KEY_REUSED);
         assertThat(orderRepository.count()).isEqualTo(1);
@@ -287,8 +292,8 @@ class OrderCreateServiceTransactionTest extends MySqlContainerSupport {
         Product greenOnion = saveProduct("대파", 3000, 10);
         CartItem item = saveCartItem(saveCart(1L), greenOnion, 1);
 
-        orderCreateService.createOrder(1L, "key-1", request(item));
-        orderCreateService.createOrder(1L, "key-2", request(item));
+        orderFacade.create(1L, "key-1", request(item));
+        orderFacade.create(1L, "key-2", request(item));
 
         assertThat(orderRepository.count()).isEqualTo(2);
         assertThat(stockOf(greenOnion)).isEqualTo(8);
@@ -301,8 +306,8 @@ class OrderCreateServiceTransactionTest extends MySqlContainerSupport {
         CartItem itemOfMember1 = saveCartItem(saveCart(1L), greenOnion, 1);
         CartItem itemOfMember2 = saveCartItem(saveCart(2L), greenOnion, 1);
 
-        orderCreateService.createOrder(1L, "key-1", request(itemOfMember1));
-        orderCreateService.createOrder(2L, "key-1", request(itemOfMember2));
+        orderFacade.create(1L, "key-1", request(itemOfMember1));
+        orderFacade.create(2L, "key-1", request(itemOfMember2));
 
         assertThat(orderRepository.count()).isEqualTo(2);
         assertThat(stockOf(greenOnion)).isEqualTo(8);
@@ -314,13 +319,13 @@ class OrderCreateServiceTransactionTest extends MySqlContainerSupport {
         Product greenOnion = saveProduct("대파", 3000, 10);
         CartItem item = saveCartItem(saveCart(1L), greenOnion, 1);
 
-        assertThatThrownBy(() -> orderCreateService.createOrder(1L, null, request(item)))
+        assertThatThrownBy(() -> orderFacade.create(1L, null, request(item)))
             .isInstanceOf(BusinessException.class)
             .extracting("errorCode").isEqualTo(ErrorCode.INVALID_INPUT_VALUE);
-        assertThatThrownBy(() -> orderCreateService.createOrder(1L, " ", request(item)))
+        assertThatThrownBy(() -> orderFacade.create(1L, " ", request(item)))
             .isInstanceOf(BusinessException.class)
             .extracting("errorCode").isEqualTo(ErrorCode.INVALID_INPUT_VALUE);
-        assertThatThrownBy(() -> orderCreateService.createOrder(1L, "k".repeat(65), request(item)))
+        assertThatThrownBy(() -> orderFacade.create(1L, "k".repeat(65), request(item)))
             .isInstanceOf(BusinessException.class)
             .extracting("errorCode").isEqualTo(ErrorCode.INVALID_INPUT_VALUE);
         assertThat(orderRepository.count()).isZero();
@@ -362,7 +367,7 @@ class OrderCreateServiceTransactionTest extends MySqlContainerSupport {
         List<Long> orderIds = Collections.synchronizedList(new ArrayList<>());
 
         List<Throwable> failures = runConcurrently(Collections.nCopies(5, () -> {
-            orderIds.add(orderCreateService.createOrder(1L, "same-click", request(item)).response().orderId());
+            orderIds.add(orderFacade.create(1L, "same-click", request(item)).response().orderId());
             return null;
         }));
 
@@ -404,7 +409,7 @@ class OrderCreateServiceTransactionTest extends MySqlContainerSupport {
 
     // 클릭마다 새 멱등 키를 만드는 프론트처럼 매번 다른 키로 주문한다
     private OrderCheckoutResponse order(Long memberId, OrderCreateRequest request) {
-        return orderCreateService.createOrder(memberId, UUID.randomUUID().toString(), request).response();
+        return orderFacade.create(memberId, UUID.randomUUID().toString(), request).response();
     }
 
     private List<Throwable> runConcurrently(List<Callable<Void>> tasks) throws Exception {

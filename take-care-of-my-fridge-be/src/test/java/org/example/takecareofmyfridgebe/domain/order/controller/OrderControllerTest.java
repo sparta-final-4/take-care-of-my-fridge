@@ -31,9 +31,8 @@ import org.example.takecareofmyfridgebe.domain.order.dto.OrderDetailResponse;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderListRequest;
 import org.example.takecareofmyfridgebe.domain.order.dto.OrderSummaryResponse;
 import org.example.takecareofmyfridgebe.domain.order.entity.OrderStatus;
-import org.example.takecareofmyfridgebe.domain.order.service.OrderCancelService;
-import org.example.takecareofmyfridgebe.domain.order.service.OrderConfirmService;
-import org.example.takecareofmyfridgebe.domain.order.service.OrderCreateService;
+import org.example.takecareofmyfridgebe.domain.order.facade.OrderFacade;
+import org.example.takecareofmyfridgebe.domain.order.facade.OrderStatusFacade;
 import org.example.takecareofmyfridgebe.domain.order.service.OrderQueryService;
 import org.example.takecareofmyfridgebe.global.config.SecurityConfig;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
@@ -60,24 +59,22 @@ class OrderControllerTest {
     private static final String BODY = "{\"items\": [{\"cartItemId\": 11, \"unitPrice\": 3000, \"saleType\": null}]}";
 
     private final MockMvc mvc;
-    private final OrderCreateService orderCreateService;
+    private final OrderFacade orderFacade;
     private final OrderQueryService orderQueryService;
-    private final OrderCancelService orderCancelService;
-    private final OrderConfirmService orderConfirmService;
+    private final OrderStatusFacade orderStatusFacade;
 
     @Autowired
-    OrderControllerTest(MockMvc mvc, OrderCreateService orderCreateService, OrderQueryService orderQueryService,
-                        OrderCancelService orderCancelService, OrderConfirmService orderConfirmService) {
+    OrderControllerTest(MockMvc mvc, OrderFacade orderFacade, OrderQueryService orderQueryService,
+                        OrderStatusFacade orderStatusFacade) {
         this.mvc = mvc;
-        this.orderCreateService = orderCreateService;
+        this.orderFacade = orderFacade;
         this.orderQueryService = orderQueryService;
-        this.orderCancelService = orderCancelService;
-        this.orderConfirmService = orderConfirmService;
+        this.orderStatusFacade = orderStatusFacade;
     }
 
     @BeforeEach
     void resetMock() {
-        reset(orderCreateService, orderQueryService, orderCancelService, orderConfirmService);
+        reset(orderFacade, orderQueryService, orderStatusFacade);
     }
 
     @Test
@@ -89,13 +86,13 @@ class OrderControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data").doesNotExist());
 
-        verify(orderCancelService).cancel(7L, 5001L);
+        verify(orderStatusFacade).cancel(7L, 5001L);
     }
 
     @Test
     @DisplayName("결제가 끝난 주문을 취소하면 409다")
     void cancelOrder_paidOrder_returns409() throws Exception {
-        doThrow(new BusinessException(ErrorCode.ORDER_ALREADY_PAID)).when(orderCancelService).cancel(7L, 5001L);
+        doThrow(new BusinessException(ErrorCode.ORDER_ALREADY_PAID)).when(orderStatusFacade).cancel(7L, 5001L);
 
         mvc.perform(patch("/api/orders/5001/cancel")
                         .with(csrf())
@@ -107,7 +104,7 @@ class OrderControllerTest {
     @Test
     @DisplayName("구매 확정은 로그인한 회원 번호와 주문 번호로 서비스를 부르고 200이다")
     void confirmOrder_returns200() throws Exception {
-        when(orderConfirmService.confirm(7L, 5001L)).thenReturn(new OrderConfirmResponse(5001L, OrderStatus.CONFIRMED));
+        when(orderStatusFacade.confirm(7L, 5001L)).thenReturn(new OrderConfirmResponse(5001L, OrderStatus.CONFIRMED));
 
         mvc.perform(patch("/api/orders/5001/confirm")
                         .with(csrf())
@@ -120,7 +117,7 @@ class OrderControllerTest {
     @Test
     @DisplayName("결제 대기 주문을 구매 확정하면 409다")
     void confirmOrder_pendingOrder_returns409() throws Exception {
-        when(orderConfirmService.confirm(7L, 5001L)).thenThrow(new BusinessException(ErrorCode.ORDER_NOT_PAID));
+        when(orderStatusFacade.confirm(7L, 5001L)).thenThrow(new BusinessException(ErrorCode.ORDER_NOT_PAID));
 
         mvc.perform(patch("/api/orders/5001/confirm")
                         .with(csrf())
@@ -132,7 +129,7 @@ class OrderControllerTest {
     @Test
     @DisplayName("구매 확정에서 남의 주문이거나 없는 주문이면 404다")
     void confirmOrder_notOwned_returns404() throws Exception {
-        when(orderConfirmService.confirm(7L, 5001L)).thenThrow(new BusinessException(ErrorCode.ORDER_NOT_FOUND));
+        when(orderStatusFacade.confirm(7L, 5001L)).thenThrow(new BusinessException(ErrorCode.ORDER_NOT_FOUND));
 
         mvc.perform(patch("/api/orders/5001/confirm")
                         .with(csrf())
@@ -220,7 +217,7 @@ class OrderControllerTest {
     @Test
     @DisplayName("새 주문이 만들어지면 201이다")
     void createOrder_created_returns201() throws Exception {
-        when(orderCreateService.createOrder(eq(7L), eq("key-1"), any())).thenReturn(new OrderCreateResult(response(), true));
+        when(orderFacade.create(eq(7L), eq("key-1"), any())).thenReturn(new OrderCreateResult(response(), true));
 
         mvc.perform(post("/api/orders")
                         .header("Idempotency-Key", "key-1")
@@ -235,7 +232,7 @@ class OrderControllerTest {
     @Test
     @DisplayName("같은 멱등 키로 이미 만든 주문을 돌려주면 200이다")
     void createOrder_existing_returns200() throws Exception {
-        when(orderCreateService.createOrder(eq(7L), eq("key-1"), any())).thenReturn(new OrderCreateResult(response(), false));
+        when(orderFacade.create(eq(7L), eq("key-1"), any())).thenReturn(new OrderCreateResult(response(), false));
 
         mvc.perform(post("/api/orders")
                         .header("Idempotency-Key", "key-1")
@@ -250,7 +247,7 @@ class OrderControllerTest {
     @Test
     @DisplayName("멱등 키 헤더가 없으면 서비스의 거절이 400으로 나간다")
     void createOrder_missingKey_returns400() throws Exception {
-        when(orderCreateService.createOrder(eq(7L), isNull(), any()))
+        when(orderFacade.create(eq(7L), isNull(), any()))
                 .thenThrow(new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "Idempotency-Key 헤더가 필요합니다. (64자 이하)"));
 
         mvc.perform(post("/api/orders")
@@ -274,7 +271,7 @@ class OrderControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error.code").value("C001"));
 
-        verifyNoInteractions(orderCreateService);
+        verifyNoInteractions(orderFacade);
     }
 
     @Test
@@ -293,7 +290,7 @@ class OrderControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error.code").value("C001"));
 
-        verifyNoInteractions(orderCreateService);
+        verifyNoInteractions(orderFacade);
     }
 
     private OrderCheckoutResponse response() {
@@ -317,8 +314,8 @@ class OrderControllerTest {
     static class TestConfig {
 
         @Bean
-        OrderCreateService orderCreateService() {
-            return mock(OrderCreateService.class);
+        OrderFacade orderFacade() {
+            return mock(OrderFacade.class);
         }
 
         @Bean
@@ -327,13 +324,8 @@ class OrderControllerTest {
         }
 
         @Bean
-        OrderCancelService orderCancelService() {
-            return mock(OrderCancelService.class);
-        }
-
-        @Bean
-        OrderConfirmService orderConfirmService() {
-            return mock(OrderConfirmService.class);
+        OrderStatusFacade orderStatusFacade() {
+            return mock(OrderStatusFacade.class);
         }
 
         @Bean

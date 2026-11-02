@@ -15,6 +15,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+// 사용자 주문 화면에 보여 줄 조회. 내 주문 내역, 주문 상세, 주문 확인 화면을 한곳에서 답한다.
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -27,11 +28,11 @@ public class OrderQueryService {
     private final OrderReader orderReader;
     private final OrderRepository orderRepository;
 
-    // 주문 확인 화면(결제 대기 주문)용. 결제 이후 주문은 주문 상세 화면이 따로 보여 준다.
-    public OrderCheckoutResponse getCheckout(Long memberId, Long orderId) {
-        Order order = orderReader.getOwnedOrder(memberId, orderId);
-        order.validatePending();
-        return OrderCheckoutResponse.from(order, orderReader.getOrderItems(order));
+    // 내 주문 내역 화면용. 최신 주문이 먼저 온다. id는 주문 순서대로 늘어나 같은 시각의 주문도 순서가 정해진다.
+    public PageResponse<OrderSummaryResponse> getMyOrders(Long memberId, OrderListRequest request) {
+        PageRequest pageable = PageRequest.of(request.page() - 1, request.size(), Sort.by(Sort.Direction.DESC, "id"));
+        return PageResponse.of(orderRepository.findByMemberIdAndStatusIn(memberId, LISTED_STATUSES, pageable)
+                .map(OrderSummaryResponse::from));
     }
 
     // 주문 상세 화면용. 목록에서 빠지는 취소 주문까지 모든 상태를 보여 준다.
@@ -40,10 +41,10 @@ public class OrderQueryService {
         return OrderDetailResponse.from(order, orderReader.getOrderItems(order));
     }
 
-    // 내 주문 내역 화면용. 최신 주문이 먼저 온다. id는 주문 순서대로 늘어나 같은 시각의 주문도 순서가 정해진다.
-    public PageResponse<OrderSummaryResponse> getMyOrders(Long memberId, OrderListRequest request) {
-        PageRequest pageable = PageRequest.of(request.page() - 1, request.size(), Sort.by(Sort.Direction.DESC, "id"));
-        return PageResponse.of(orderRepository.findByMemberIdAndStatusIn(memberId, LISTED_STATUSES, pageable)
-                .map(OrderSummaryResponse::from));
+    // 주문 확인 화면(결제 대기 주문)용. 결제 이후 주문은 주문 상세 화면이 따로 보여 준다.
+    public OrderCheckoutResponse getCheckout(Long memberId, Long orderId) {
+        Order order = orderReader.getOwnedOrder(memberId, orderId);
+        order.validatePending();
+        return OrderCheckoutResponse.from(order, orderReader.getOrderItems(order));
     }
 }

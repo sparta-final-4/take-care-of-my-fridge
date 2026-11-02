@@ -29,7 +29,7 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     @Query("select o from Order o where o.id = :id and o.memberId = :memberId")
     Optional<Order> findByIdAndMemberIdForUpdate(@Param("id") Long id, @Param("memberId") Long memberId);
 
-    // 생성 시각이 기준보다 이른 주문을 id 순으로 나눠 읽는다. 처리에 실패해 남은 건이 뒤의 건을 막지 않도록 id 커서를 쓴다
+    // 생성 시각이 기준보다 이른 주문을 id 순으로 나눠 읽는다. 처리에 실패해 남은 건이 뒤의 건을 막지 않도록 id 커서를 쓴다.
     @Query("""
         select o.id from Order o
         where o.status = :status and o.createdAt < :createdBefore and o.id > :afterId

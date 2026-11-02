@@ -8,7 +8,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
-// 구매 확정이 커밋된 뒤 Kafka로 발행한다. 확정은 이미 끝났으므로 발행이 실패해도 확정을 되돌리지 않고 주문 ID를 남긴다
+// 구매 확정이 커밋된 뒤 Kafka로 발행한다. 확정은 이미 끝났으므로 발행이 실패해도 확정을 되돌리지 않고 주문 ID를 남긴다.
 @Slf4j
 @Component
 @RequiredArgsConstructor
