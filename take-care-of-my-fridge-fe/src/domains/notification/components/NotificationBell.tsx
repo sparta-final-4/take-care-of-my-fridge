@@ -8,7 +8,6 @@ import { ROUTES } from '@/app/paths';
 import { useAuthStore } from '@/common/auth/authStore';
 
 import { notificationQueries } from '../queries';
-import { useNotificationStream } from '../useNotificationStream';
 import { NotificationList } from './NotificationList';
 import { NotificationTitle } from './NotificationTitle';
 
@@ -24,7 +23,6 @@ export function NotificationBell() {
     enabled: authenticated,
     refetchOnWindowFocus: true,
   });
-  useNotificationStream(authenticated);
   const unreadCount = authenticated ? (data?.unreadCount ?? 0) : 0;
 
   // 화면을 옮길 때마다 안 읽은 수를 다시 불러온다. 처음 그릴 때는 위 조회가 불러온다.
