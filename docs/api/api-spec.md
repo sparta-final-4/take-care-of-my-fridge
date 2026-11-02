@@ -257,7 +257,7 @@ HTTP 메서드·경로·DTO 이름은 구현 전 합의합니다.
 | 수량 변경 | 409 | `CART_003` | 번개 드롭 구매 한도 초과 |
 | 항목 삭제 | 400 | 공통 | cartItemIds가 없거나 비어 있거나 숫자가 아님 |
 
-조회 항목(`CartItemResponse`): cartItemId, productId, productName, imageUrl, quantity, listPrice(정가), unitPrice(지금 단가), saleType(`SPECIAL`·`FLASH_DROP`·null), discountRate, flashDropRemaining(남은 수량), flashDropLimit(한정 수량), saleEndsAt(종료 시각, +09:00 포함), soldOut(품절 여부). 할인이 없으면 saleType·discountRate·saleEndsAt은 null이고 unitPrice는 정가입니다. 번개 드롭이 아니면 flashDropRemaining·flashDropLimit은 null입니다.
+조회 항목(`CartItemResponse`): cartItemId, productId, productName, imageUrl, quantity, listPrice(정가), unitPrice(지금 단가), sale(진행 중인 할인, `SaleResponse`), soldOut(품절 여부). 할인이 없으면 sale은 null이고 unitPrice는 정가입니다. `SaleResponse`는 상품 목록·상세와 같은 모양입니다(위 `SaleResponse` 참고). 번개 드롭이 아니면 sale의 remainingQuantity·limitedQuantity는 null입니다.
 
 - **담기**: 장바구니가 없으면 만들고, 이미 담긴 상품이면 수량을 더합니다. 장바구니는 회원당 하나, 한 장바구니에 같은 상품은 하나입니다.
 - **재고 확인**: 담을 때는 기존 수량과 요청 수량의 합이 재고를 넘으면 거절합니다. 재고는 응답으로 주지 않습니다.
