@@ -2,18 +2,29 @@ package org.example.takecareofmyfridgebe.domain.chat.service;
 
 import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatProperties;
+import org.example.takecareofmyfridgebe.domain.chat.dto.ChatSessionListRequest;
+import org.example.takecareofmyfridgebe.domain.chat.dto.ChatSessionListResponse;
+import org.example.takecareofmyfridgebe.domain.chat.dto.ChatSessionMessageStats;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatSessionResponse;
+import org.example.takecareofmyfridgebe.domain.chat.dto.ChatSessionSummaryResponse;
 import org.example.takecareofmyfridgebe.domain.chat.entity.ChatSession;
 import org.example.takecareofmyfridgebe.domain.chat.entity.ChatSessionStatus;
+import org.example.takecareofmyfridgebe.domain.chat.repository.ChatMessageRepository;
 import org.example.takecareofmyfridgebe.domain.chat.repository.ChatSessionRepository;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
+import org.example.takecareofmyfridgebe.global.response.PageResponse;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -21,6 +32,7 @@ import java.time.LocalDateTime;
 public class ChatSessionService {
 
     private final ChatSessionRepository chatSessionRepository;
+    private final ChatMessageRepository chatMessageRepository;
     private final ChatProperties chatProperties;
 
     /**
@@ -95,6 +107,45 @@ public class ChatSessionService {
         ChatSession session = chatSessionRepository.findByIdAndMemberId(sessionId, memberId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND));
         return ChatSessionResponse.from(session);
+    }
+
+    /**
+     * 회원의 상담 내역을 상태 필터에 맞춰 최근 시작순으로 페이지 조회하고, 탭별 건수를 함께 준다. 메시지가 없는 세션은 제외한다.
+     * 세션 목록 1회 + 세션 ID 목록 기준 메시지 수·첫 질문·마지막 메시지 1회 + 탭 건수 1회로 조회해 N+1을 피한다
+     * (전체 개수가 필요하면 count 1회 추가).
+     * 시간 초과로 아직 ACTIVE인 상담은 다음 상담 시작 때 만료되므로 목록·필터·건수 모두 만료(EXPIRED)로 본다.
+     *
+     * @param memberId 회원 ID
+     * @param request  페이지(1부터)·크기·상태(ALL/ACTIVE/ENDED)
+     * @return 탭 건수와 상담 요약 페이지
+     */
+    public ChatSessionListResponse getMySessions(Long memberId, ChatSessionListRequest request) {
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime activeSince = now.minus(chatProperties.sessionTimeout());
+
+        Page<ChatSession> sessions = chatSessionRepository.findMySessionsWithMessages(
+                memberId,
+                request.status(),
+                activeSince,
+                PageRequest.of(request.page() - 1, request.size())
+        );
+
+        Map<Long, ChatSessionMessageStats> statsBySessionId = chatMessageRepository
+                .findStatsBySessionIds(sessions.map(ChatSession::getId).getContent())
+                .stream()
+                .collect(Collectors.toMap(ChatSessionMessageStats::sessionId, Function.identity()));
+
+        PageResponse<ChatSessionSummaryResponse> page = PageResponse.of(sessions.map(session ->
+                ChatSessionSummaryResponse.of(
+                        session,
+                        session.isExpired(chatProperties.sessionTimeout(), now) ? ChatSessionStatus.EXPIRED : session.getStatus(),
+                        statsBySessionId.get(session.getId())
+                )));
+
+        return new ChatSessionListResponse(
+                chatSessionRepository.countMySessionsWithMessages(memberId, activeSince),
+                page
+        );
     }
 
     /**
