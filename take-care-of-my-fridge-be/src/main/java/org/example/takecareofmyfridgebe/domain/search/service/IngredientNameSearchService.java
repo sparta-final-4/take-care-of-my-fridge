@@ -7,8 +7,7 @@ import co.elastic.clients.elasticsearch.core.termvectors.Term;
 import co.elastic.clients.elasticsearch.core.termvectors.TermVector;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.example.takecareofmyfridgebe.domain.ingredient.dto.IngredientCandidate;
-import org.example.takecareofmyfridgebe.domain.ingredient.service.IngredientNameResolver;
+import org.example.takecareofmyfridgebe.domain.search.dto.IngredientCandidate;
 import org.example.takecareofmyfridgebe.domain.search.config.RecipeSearchProperties;
 import org.springframework.stereotype.Service;
 
@@ -32,7 +31,7 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class IngredientNameSearchService implements IngredientNameResolver {
+public class IngredientNameSearchService {
 
     private static final int MAX_CANDIDATES = 5;
     private static final String SEARCH_ANALYZER = "korean_search";
@@ -47,7 +46,10 @@ public class IngredientNameSearchService implements IngredientNameResolver {
     private final ElasticsearchClient esClient;
     private final RecipeSearchProperties properties;
 
-    @Override
+    /**
+     * @param name 다듬은 재료명 하나 (IngredientMatcher.normalize 결과)
+     * @return 점수(0~1) 높은 순 후보. 검색 엔진을 쓰지 않거나 장애면 빈 목록
+     */
     public List<IngredientCandidate> findCandidates(String name) {
         if (!properties.useElasticSearch() || name == null || name.isBlank()) {
             return List.of();

@@ -8,7 +8,7 @@ import co.elastic.clients.elasticsearch.core.search.Hit;
 import co.elastic.clients.elasticsearch.core.search.TotalHitsRelation;
 import co.elastic.clients.elasticsearch.core.termvectors.Term;
 import co.elastic.clients.elasticsearch.core.termvectors.TermVector;
-import org.example.takecareofmyfridgebe.domain.ingredient.dto.IngredientCandidate;
+import org.example.takecareofmyfridgebe.domain.search.dto.IngredientCandidate;
 import org.example.takecareofmyfridgebe.domain.search.config.RecipeSearchProperties;
 import org.example.takecareofmyfridgebe.domain.search.config.RecipeSearchProperties.IndexProperties;
 import org.example.takecareofmyfridgebe.domain.search.config.RecipeSearchProperties.IngredientIndexProperties;
