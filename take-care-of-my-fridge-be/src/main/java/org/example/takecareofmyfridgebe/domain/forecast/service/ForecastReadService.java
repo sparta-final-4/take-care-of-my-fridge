@@ -19,10 +19,12 @@ public class ForecastReadService {
 
     private final PredictionRunRepository runRepository;
     private final SalesForecastRepository forecastRepository;
+    private final ForecastDiagnosticsService diagnosticsService;
 
     public ForecastResponse getLatest() {
         PredictionRun run = runRepository.findTopBySyntheticDataFalseOrderByTargetWeekStartDesc()
-                .orElseThrow(() -> new BusinessException(ErrorCode.FORECAST_NOT_FOUND));
+                .orElseThrow(() -> new BusinessException(ErrorCode.FORECAST_NOT_FOUND,
+                        diagnosticsService.describe(diagnosticsService.latestDueWeek())));
         return toResponse(run);
     }
 
@@ -37,7 +39,8 @@ public class ForecastReadService {
             throw new IllegalArgumentException("weekStart는 월요일이어야 합니다.");
         }
         PredictionRun run = runRepository.findByTargetWeekStartAndSyntheticDataFalse(weekStart)
-                .orElseThrow(() -> new BusinessException(ErrorCode.FORECAST_NOT_FOUND));
+                .orElseThrow(() -> new BusinessException(ErrorCode.FORECAST_NOT_FOUND,
+                        diagnosticsService.describe(weekStart)));
         return toResponse(run);
     }
 

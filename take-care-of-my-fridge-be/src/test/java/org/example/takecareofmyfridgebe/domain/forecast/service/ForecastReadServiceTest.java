@@ -24,7 +24,8 @@ class ForecastReadServiceTest {
 
     private final PredictionRunRepository runs = mock(PredictionRunRepository.class);
     private final SalesForecastRepository forecasts = mock(SalesForecastRepository.class);
-    private final ForecastReadService service = new ForecastReadService(runs, forecasts);
+    private final ForecastDiagnosticsService diagnostics = mock(ForecastDiagnosticsService.class);
+    private final ForecastReadService service = new ForecastReadService(runs, forecasts, diagnostics);
 
     @Test
     void readsRequestedWeekAndExistingNeighborWeeks() {
@@ -56,11 +57,14 @@ class ForecastReadServiceTest {
     void missingWeekReturnsF001() {
         LocalDate week = LocalDate.of(2026, 10, 19);
         when(runs.findByTargetWeekStartAndSyntheticDataFalse(week)).thenReturn(Optional.empty());
+        when(diagnostics.describe(week)).thenReturn("학습 표본: 0개");
 
         assertThatThrownBy(() -> service.getByWeek(week))
                 .isInstanceOfSatisfying(BusinessException.class,
-                        error -> assertThat(error.getErrorCode())
-                                .isEqualTo(ErrorCode.FORECAST_NOT_FOUND));
+                        error -> {
+                            assertThat(error.getErrorCode()).isEqualTo(ErrorCode.FORECAST_NOT_FOUND);
+                            assertThat(error.getMessage()).contains("학습 표본: 0개");
+                        });
         verifyNoInteractions(forecasts);
     }
 
