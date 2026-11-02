@@ -18,6 +18,7 @@ import { useAuthStore } from '@/common/auth/authStore';
 import { streamMessage } from '../api';
 import { useChatStreamingStore } from '../model/useChatStreamingStore';
 import { chatQueries, useCompleteChatSession, useStartChatSession } from '../queries';
+import { ChatEndedNotice } from './ChatEndedNotice';
 import { ChatMessageBubble } from './ChatMessageBubble';
 import styles from './ChatRoomSection.module.scss';
 
@@ -410,6 +411,7 @@ export function ChatRoomSection({
           )}
         </div>
       )}
+      {!hideStatusBanner && isSessionEnded && <ChatEndedNotice onNavigate={onCloseModal} />}
 
       {/* 3단: 메시지 영역 (스크롤) */}
       <div className={styles.messageAreaWrapper}>

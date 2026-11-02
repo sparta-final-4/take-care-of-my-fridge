@@ -1,5 +1,5 @@
 import { ArrowLeftOutlined } from '@ant-design/icons';
-import { useInfiniteQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, Empty, Grid, Result, Segmented, Skeleton, Spin, Typography } from 'antd';
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
@@ -14,7 +14,7 @@ import { SectionLoading } from '@/common/components/SectionLoading';
 
 import { formatChatDateTime, formatChatTime } from '../format';
 import { useChatModalStore } from '../model/useChatModalStore';
-import { chatQueries } from '../queries';
+import { chatQueries, removeEndedActiveSessionAfterUnmount } from '../queries';
 import { ChatSessionConversation } from './ChatSessionConversation';
 import { ChatSessionLiveConversation } from './ChatSessionLiveConversation';
 import { ChatSessionStatusTag } from './ChatSessionStatusTag';
@@ -70,6 +70,10 @@ export function ChatHistorySection() {
     });
     return () => setInlineHost(null);
   }, [setInlineHost, setSearchParams]);
+
+  // 이 화면을 떠나면 오른쪽 칸이 보던 끝난 상담 캐시를 비워, 다음에 채팅창을 열면 새 상담이 열리게 한다.
+  const queryClient = useQueryClient();
+  useEffect(() => () => removeEndedActiveSessionAfterUnmount(queryClient), [queryClient]);
 
   const {
     data,
