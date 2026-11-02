@@ -78,8 +78,6 @@ class RecipeSearchPropertiesTest extends MySqlContainerSupport {
         assertEquals(2, ingredient.aliasDictionaries().size());
         assertTrue(ingredient.aliasDictionaries().stream().allMatch(resource -> resource.exists()));
         assertTrue(ingredient.embeddingEnabled());
-        assertFalse(ingredient.autoMatchByVector());
-        assertEquals(0.85f, ingredient.minSimilarity());
     }
 
     @Test

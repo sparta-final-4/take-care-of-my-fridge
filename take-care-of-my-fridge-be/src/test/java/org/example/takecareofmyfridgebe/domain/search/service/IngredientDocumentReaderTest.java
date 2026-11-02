@@ -43,7 +43,7 @@ class IngredientDocumentReaderTest {
                 SearchEngine.ELASTICSEARCH,
                 new IndexProperties(null, null, new IngredientIndexProperties(
                         "ingredients", null, null, null, 500,
-                        List.of(new ByteArrayResource(ALIASES.getBytes(StandardCharsets.UTF_8))), embedding, false, 0.85f)),
+                        List.of(new ByteArrayResource(ALIASES.getBytes(StandardCharsets.UTF_8))), embedding)),
                 new VectorProperties(false, 3, 20, 100, 0.5f, 100));
         return new IngredientDocumentReader(ingredientService, aliasDictionary, embedder, properties);
     }
