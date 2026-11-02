@@ -9,11 +9,13 @@ import { ROUTES } from '@/app/paths';
 import { getErrorCode } from '@/common/api/errors';
 import { formatPrice } from '@/domains/cart/format';
 import { confirmOrder } from '@/domains/order/api';
-import { ORDER_STATUS_LABELS } from '@/domains/order/format';
+import { ORDER_STATUS_COLORS, ORDER_STATUS_LABELS } from '@/domains/order/format';
 import { orderQueries } from '@/domains/order/queries';
 import {
   getOrderItemRefundState,
+  groupRefundedItems,
   isFullyRefunded,
+  type OrderItemRefundState,
   sumRefundAmountByStatus,
 } from '@/domains/refund/format';
 import { refundQueries } from '@/domains/refund/queries';
@@ -26,8 +28,8 @@ interface OrderDetailSectionProps {
 }
 
 // 주문할 때 저장한 상품·금액을 보여 준다. 환불 내역은 환불 상세 화면이 보여 준다.
-// 결제 완료·구매 확정 주문은 환불 금액을 더하고, 환불이 있으면 환불 상세로 가는 버튼을 둔다.
-// 구매 확정·환불 카드는 결제 완료·구매 확정 주문에 보인다. 구매 확정·전부 환불된 주문은 버튼을 누르면 안 되는 이유를 알린다.
+// 결제 완료·구매 확정·전액 환불 주문은 환불 금액을 더하고, 환불이 있으면 환불 상세로 가는 버튼을 둔다.
+// 구매 확정·환불 카드는 결제 완료·구매 확정·전액 환불 주문에 보인다. 구매 확정·전부 환불된 주문은 버튼을 누르면 안 되는 이유를 알린다.
 // 결제 완료 주문의 환불 신청은 환불 신청 화면으로 이동하고, 환불할 수 있는 수량이 없으면 안내만 한다.
 export function OrderDetailSection({ orderId }: OrderDetailSectionProps) {
   const navigate = useNavigate();
@@ -40,14 +42,16 @@ export function OrderDetailSection({ orderId }: OrderDetailSectionProps) {
     refetch,
   } = useQuery({ ...orderQueries.detail(orderId), enabled: validOrderId });
   // 환불 조회 실패는 화면을 막지 않는다. 환불 표시 없이 주문만 보여 준다.
-  const hasRefundSection = order?.status === 'PAID' || order?.status === 'CONFIRMED';
+  const hasRefundSection =
+    order?.status === 'PAID' || order?.status === 'CONFIRMED' || order?.status === 'REFUNDED';
   const { data: refundHistory = [] } = useQuery({
     ...refundQueries.history(orderId),
     enabled: hasRefundSection,
   });
+  // 환불 가능 수량은 결제 완료 주문만 조회된다. 구매 확정·전액 환불 주문은 환불 내역으로 태그를 정한다.
   const { data: refundableItems } = useQuery({
     ...refundQueries.refundableItems(orderId),
-    enabled: hasRefundSection,
+    enabled: order?.status === 'PAID',
   });
   const { message } = App.useApp();
   const queryClient = useQueryClient();
@@ -84,12 +88,21 @@ export function OrderDetailSection({ orderId }: OrderDetailSectionProps) {
   }
 
   const isConfirmed = order.status === 'CONFIRMED';
+  const isRefunded = order.status === 'REFUNDED';
+  // 환불 내역에는 주문 상품 번호만 있고 상세 상품에는 없어, 같은 주문 안에서 겹치지 않는 상품 이름으로 짝을 짓는다.
+  const refundedQuantityByName = new Map(
+    groupRefundedItems(refundHistory).map((item) => [item.productName, item.quantity]),
+  );
   const refundedAmount = sumRefundAmountByStatus(refundHistory, 'COMPLETED');
   // 환불 가능 상품을 아직 못 읽었으면 막지 않고, 환불 신청 화면이 다시 확인한다
   const nothingToRefund =
     refundableItems !== undefined &&
     refundableItems.every((item) => (item.refundableQuantity ?? 0) === 0);
   const handleRefundClick = () => {
+    if (isRefunded) {
+      message.info('전부 환불된 주문입니다.');
+      return;
+    }
     if (nothingToRefund) {
       message.info('환불할 수 있는 상품이 없습니다.');
       return;
@@ -99,6 +112,10 @@ export function OrderDetailSection({ orderId }: OrderDetailSectionProps) {
   const handleConfirmClick = () => {
     if (isConfirmed) {
       message.info('이미 구매 확정된 주문입니다.');
+      return;
+    }
+    if (isRefunded) {
+      message.info('전부 환불된 주문입니다.');
       return;
     }
     // 환불 정보를 아직 못 읽었으면 막지 않고 서버가 다시 확인한다
@@ -118,10 +135,7 @@ export function OrderDetailSection({ orderId }: OrderDetailSectionProps) {
               주문 상세
             </Typography.Title>
             {order.status && (
-              <Tag
-                color={order.status === 'PAID' ? 'processing' : undefined}
-                className={styles.tag}
-              >
+              <Tag color={ORDER_STATUS_COLORS[order.status]} className={styles.tag}>
                 {ORDER_STATUS_LABELS[order.status]}
               </Tag>
             )}
@@ -147,12 +161,19 @@ export function OrderDetailSection({ orderId }: OrderDetailSectionProps) {
         {order.items?.map((item) => {
           // 환불 정보를 못 읽었으면 태그 없이 보인다. 상세 상품에는 주문 상품 번호가 없어 상품 번호로 짝을 짓는다.
           const refundable = refundableItems?.find((other) => other.productId === item.productId);
+          const refundState =
+            order.status === 'PAID'
+              ? refundable && getOrderItemRefundState(refundable)
+              : toRefundState(
+                  refundedQuantityByName.get(item.productName ?? '') ?? 0,
+                  item.quantity ?? 0,
+                );
           return (
             <OrderItemRow
               key={item.productId}
               item={item}
               linkToProduct
-              refundState={refundable && getOrderItemRefundState(refundable)}
+              refundState={refundState}
             />
           );
         })}
@@ -213,7 +234,7 @@ export function OrderDetailSection({ orderId }: OrderDetailSectionProps) {
             </Typography.Text>
           </Flex>
         </section>
-        {(order.status === 'PAID' || isConfirmed) && (
+        {(order.status === 'PAID' || isConfirmed || isRefunded) && (
           <section className={styles.card} aria-label="구매 확정·환불">
             <Typography.Text strong className={styles.cardTitle}>
               구매 확정·환불
@@ -262,4 +283,10 @@ export function OrderDetailSection({ orderId }: OrderDetailSectionProps) {
       </Modal>
     </div>
   );
+}
+
+// 주문 상품의 환불 수량으로 환불 태그를 정한다.
+function toRefundState(refundedQuantity: number, orderedQuantity: number): OrderItemRefundState {
+  if (refundedQuantity === 0) return 'none';
+  return refundedQuantity < orderedQuantity ? 'partial' : 'full';
 }
