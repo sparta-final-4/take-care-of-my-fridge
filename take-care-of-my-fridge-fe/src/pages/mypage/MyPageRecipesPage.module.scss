@@ -3,6 +3,11 @@
   flex-direction: column;
   gap: var(--ant-margin-xl);
   width: 100%;
+
+  // 마이페이지 레이아웃이 늘린 높이를 목록 카드가 채운다.
+  > section {
+    flex: 1 0 auto;
+  }
 }
 
 .loadingWrapper {

@@ -1204,6 +1204,34 @@
       }
     },
     "/api/chat-sessions": {
+      "get": {
+        "operationId": "getMySessions",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "request",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ChatSessionListRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseChatSessionListResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "chat-session-controller"
+        ]
+      },
       "post": {
         "operationId": "startSession",
         "responses": {
@@ -3063,6 +3091,20 @@
           }
         }
       },
+      "ApiResponseChatSessionListResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ChatSessionListResponse"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorResponse"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
       "ApiResponseChatSessionResponse": {
         "type": "object",
         "properties": {
@@ -4194,6 +4236,41 @@
           }
         }
       },
+      "ChatSessionListRequest": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 1
+          },
+          "size": {
+            "type": "integer",
+            "format": "int32",
+            "maximum": 100,
+            "minimum": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ALL",
+              "ACTIVE",
+              "ENDED"
+            ]
+          }
+        }
+      },
+      "ChatSessionListResponse": {
+        "type": "object",
+        "properties": {
+          "counts": {
+            "$ref": "#/components/schemas/ChatSessionStatusCounts"
+          },
+          "sessions": {
+            "$ref": "#/components/schemas/PageResponseChatSessionSummaryResponse"
+          }
+        }
+      },
       "ChatSessionResponse": {
         "type": "object",
         "properties": {
@@ -4206,6 +4283,58 @@
             "format": "int64"
           },
           "lastMessageAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "COMPLETED",
+              "EXPIRED"
+            ]
+          }
+        }
+      },
+      "ChatSessionStatusCounts": {
+        "type": "object",
+        "properties": {
+          "active": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "ended": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "ChatSessionSummaryResponse": {
+        "type": "object",
+        "properties": {
+          "firstQuestion": {
+            "type": "string"
+          },
+          "lastMessageAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lastMessagePreview": {
+            "type": "string"
+          },
+          "messageCount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "sessionId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "startedAt": {
             "type": "string",
             "format": "date-time"
           },
@@ -5933,6 +6062,36 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/AuditLogResponse"
+            }
+          },
+          "isLast": {
+            "type": "boolean"
+          },
+          "pageNumber": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalElements": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "totalPages": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "PageResponseChatSessionSummaryResponse": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChatSessionSummaryResponse"
             }
           },
           "isLast": {

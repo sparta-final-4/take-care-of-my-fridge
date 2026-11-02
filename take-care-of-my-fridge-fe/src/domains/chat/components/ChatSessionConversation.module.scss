@@ -1,0 +1,52 @@
+@use '@/styles/variables' as *;
+@use '@/styles/mixins' as *;
+
+// 위(날짜·상태) / 가운데(말풍선, 이 칸만 스크롤) / 아래(이어서 상담 또는 안내) 세 단.
+// lg부터 목록과 같은 고정 높이, 그 아래(대화 화면만 보일 때)는 말풍선 칸 최대 높이만 둔다.
+.panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border: 1px solid var(--ant-color-border-secondary);
+  border-radius: var(--ant-border-radius-lg);
+  overflow: hidden;
+
+  @include from(lg) {
+    height: $chat-history-panel-height;
+  }
+}
+
+.header {
+  padding: var(--ant-padding-sm) var(--ant-padding);
+  border-bottom: 1px solid var(--ant-color-border-secondary);
+}
+
+.date {
+  font-variant-numeric: tabular-nums;
+}
+
+.body {
+  max-height: $chat-history-body-max-height;
+  padding: var(--ant-padding);
+  overflow-y: auto;
+  background: var(--ant-color-fill-quaternary);
+
+  @include from(lg) {
+    flex: 1;
+    max-height: none;
+  }
+}
+
+.state {
+  padding: var(--ant-padding-xl) 0;
+}
+
+.footer {
+  padding: var(--ant-padding-sm) var(--ant-padding);
+  border-top: 1px solid var(--ant-color-border-secondary);
+  text-align: center;
+}
+
+.notice {
+  font-size: var(--ant-font-size-sm);
+}

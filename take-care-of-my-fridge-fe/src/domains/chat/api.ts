@@ -2,9 +2,21 @@ import {
   chatMessageApi,
   chatSessionApi,
   type ChatMessageResponse,
+  type ChatSessionListRequest,
+  type ChatSessionListResponse,
   type ChatSessionResponse,
 } from '@/common/api/clients';
 import { unwrap } from '@/common/api/unwrap';
+
+/**
+ * 내 상담 내역(메시지가 있는 상담)을 상태 필터에 맞춰 최근 시작순으로 조회한다. 탭별 건수도 함께 온다. page는 1부터.
+ */
+export async function getMySessions(
+  request: ChatSessionListRequest,
+  signal?: AbortSignal,
+): Promise<ChatSessionListResponse> {
+  return unwrap(chatSessionApi.getMySessions({ request }, { signal }));
+}
 
 /**
  * 회원의 활성 상담 세션을 시작하거나 기존 활성 세션을 가져온다.

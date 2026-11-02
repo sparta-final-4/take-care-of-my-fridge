@@ -121,3 +121,15 @@ $fallback-icon-min-size: 16px;
 $fallback-icon-max-size: 48px;
 // 관리자 상품 이미지 업로드 미리보기 크기(ProductImageUpload의 PREVIEW_SIZE와 같은 값)
 $product-image-preview-size: 160px;
+
+// 상담 대화 화면(목록만 보이는 좁은 화면)의 말풍선 영역 최대 높이
+$chat-history-body-max-height: 60vh;
+// 상담 상태 태그의 "상담 중" 초록 점
+$chat-status-dot-size: 6px;
+
+// 상담 내역 두 칸(lg부터) 고정 높이. 768px 높이 노트북에서 헤더·카드 제목과 함께 한 화면에 들어가는 값
+$chat-history-panel-height: 560px;
+// 두 칸 화면에서 목록 칸 최소 폭("10.28 오후 11:05 · 메시지 99개"와 말줄임된 첫 질문·상태 태그가 들어가는 폭)
+$chat-history-list-min-width: 320px;
+// 좁은 화면에서 진행 중 상담 대화 칸 높이(입력창 포함)
+$chat-history-live-mobile-height: 70vh;

@@ -1,7 +1,15 @@
 import { CloseOutlined, DownOutlined, RobotOutlined, SendOutlined } from '@ant-design/icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { App, Button, Flex, Input, type InputRef, Result, Spin, Typography } from 'antd';
-import { type KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  type KeyboardEvent,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { useNavigate } from 'react-router';
 
 import { ROUTES } from '@/app/paths';
@@ -12,17 +20,35 @@ import { chatQueries, useCompleteChatSession, useStartChatSession } from '../que
 import { ChatMessageBubble } from './ChatMessageBubble';
 import styles from './ChatRoomSection.module.scss';
 
+// 백엔드 ChatMessageCreateRequest의 @Size(max = 500)와 같은 값
+const CHAT_MESSAGE_MAX_LENGTH = 500;
+
 export interface ChatRoomSectionProps {
   onStreamingChange?: (streaming: boolean) => void;
   onRegisterAbort?: (abortFn: () => void) => void;
   onCloseModal?: () => void;
+  // 헤더 왼쪽 제목. 마이페이지 상담 내역에서는 날짜·상태 태그를 넣는다. 없으면 "AI 냉장고 상담".
+  title?: ReactNode;
+  // 마이페이지 상담 내역은 위쪽 상태 태그가 같은 정보를 보여 주므로 "● 상담 중" 상태 줄을 숨긴다.
+  hideStatusBanner?: boolean;
+  // 상담 끝내기가 성공했을 때. 상담 내역은 "상담 중" 탭에서 끝내면 "종료" 탭으로 옮긴다.
+  onSessionCompleted?: () => void;
 }
 
 export function ChatRoomSection({
   onStreamingChange,
   onRegisterAbort,
   onCloseModal,
+  title,
+  hideStatusBanner = false,
+  onSessionCompleted,
 }: ChatRoomSectionProps = {}) {
+  const headerTitle = title ?? (
+    <>
+      <RobotOutlined style={{ fontSize: 18, color: 'var(--ant-color-primary)' }} />
+      <span>AI 냉장고 상담</span>
+    </>
+  );
   const navigate = useNavigate();
   const { modal } = App.useApp();
   const queryClient = useQueryClient();
@@ -175,6 +201,7 @@ export function ChatRoomSection({
       cancelText: '취소',
       onOk: () => {
         completeSessionMutation.mutate(sessionId, {
+          onSuccess: () => onSessionCompleted?.(),
           onError: (err) => {
             const errorInfo = getChatErrorInfo(getErrorCode(err));
             triggerSendError(errorInfo.message);
@@ -209,6 +236,8 @@ export function ChatRoomSection({
         onDone: async () => {
           try {
             await queryClient.refetchQueries({ queryKey: chatQueries.messages(sessionId) });
+            // 상담 내역의 메시지 수·마지막 시각이 바뀌므로 다시 받게 한다.
+            void queryClient.invalidateQueries({ queryKey: chatQueries.sessions() });
           } finally {
             setStreamingUserMessage(null);
             setStreamingAssistantMessage(null);
@@ -250,10 +279,7 @@ export function ChatRoomSection({
     return (
       <div className={styles.loginPrompt}>
         <header className={styles.chatHeader}>
-          <div className={styles.headerTitle}>
-            <RobotOutlined style={{ fontSize: 18, color: 'var(--ant-color-primary)' }} />
-            <span>AI 냉장고 상담</span>
-          </div>
+          <div className={styles.headerTitle}>{headerTitle}</div>
           {onCloseModal && (
             <Button
               type="text"
@@ -293,10 +319,7 @@ export function ChatRoomSection({
     return (
       <div className={styles.chatContainer}>
         <header className={styles.chatHeader}>
-          <div className={styles.headerTitle}>
-            <RobotOutlined style={{ fontSize: 18, color: 'var(--ant-color-primary)' }} />
-            <span>AI 냉장고 상담</span>
-          </div>
+          <div className={styles.headerTitle}>{headerTitle}</div>
           {onCloseModal && (
             <Button
               type="text"
@@ -319,10 +342,7 @@ export function ChatRoomSection({
     <div className={styles.chatContainer}>
       {/* 1단: 헤더 (고정) */}
       <header className={styles.chatHeader}>
-        <div className={styles.headerTitle}>
-          <RobotOutlined style={{ fontSize: 18, color: 'var(--ant-color-primary)' }} />
-          <span>AI 냉장고 상담</span>
-        </div>
+        <div className={styles.headerTitle}>{headerTitle}</div>
 
         <div className={styles.headerActions}>
           {!isSessionEnded && (
@@ -349,30 +369,32 @@ export function ChatRoomSection({
       </header>
 
       {/* 2단: 상태 배너 (고정, 헤더 바로 아래 얇은 줄) */}
-      <div className={styles.statusBanner}>
-        {isSessionEnded ? (
-          <>
+      {!hideStatusBanner && (
+        <div className={styles.statusBanner}>
+          {isSessionEnded ? (
+            <>
+              <div className={styles.statusIndicator}>
+                <span className={`${styles.statusDot} ${styles.ended}`} />
+                <span>상담이 끝났어요</span>
+              </div>
+              <Button
+                type="link"
+                size="small"
+                style={{ padding: 0, height: 'auto', fontSize: 'var(--ant-font-size-sm)' }}
+                onClick={handleStartNewSession}
+                loading={startSessionMutation.isPending}
+              >
+                [새 상담 시작]
+              </Button>
+            </>
+          ) : (
             <div className={styles.statusIndicator}>
-              <span className={`${styles.statusDot} ${styles.ended}`} />
-              <span>상담이 끝났어요</span>
+              <span className={`${styles.statusDot} ${styles.active}`} />
+              <span>상담 중</span>
             </div>
-            <Button
-              type="link"
-              size="small"
-              style={{ padding: 0, height: 'auto', fontSize: 'var(--ant-font-size-sm)' }}
-              onClick={handleStartNewSession}
-              loading={startSessionMutation.isPending}
-            >
-              [새 상담 시작]
-            </Button>
-          </>
-        ) : (
-          <div className={styles.statusIndicator}>
-            <span className={`${styles.statusDot} ${styles.active}`} />
-            <span>상담 중</span>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      )}
 
       {/* 3단: 메시지 영역 (스크롤) */}
       <div className={styles.messageAreaWrapper}>
@@ -445,7 +467,7 @@ export function ChatRoomSection({
           <Input
             ref={inputRef}
             value={inputText}
-            maxLength={200}
+            maxLength={CHAT_MESSAGE_MAX_LENGTH}
             onChange={(e) => setInputText(e.target.value)}
             onKeyDown={handleKeyDown}
             disabled={isInputDisabled}
@@ -469,7 +491,9 @@ export function ChatRoomSection({
         </div>
 
         <div className={styles.counterRow}>
-          <span>{inputText.length} / 200</span>
+          <span>
+            {inputText.length} / {CHAT_MESSAGE_MAX_LENGTH}
+          </span>
         </div>
       </footer>
     </div>

@@ -92,8 +92,21 @@
   }
 }
 
+// md부터 내용 칸만 줄 높이(메뉴 카드와 내용 중 큰 쪽)까지 늘리고, 화면의 최상위 카드가 그 높이를 채운다.
+// 그래서 내용이 적어도 아래 끝이 메뉴 카드와 맞고, 많으면 내용만큼 길어진다.
+// 메뉴(.sidebar)는 위쪽 정렬 그대로라 sticky가 유지된다. 모바일(가로 탭)에는 적용하지 않는다.
 .content {
   flex: 1;
   min-width: 0;
   @include page-enter;
+
+  @include from(md) {
+    display: flex;
+    flex-direction: column;
+    align-self: stretch;
+
+    > * {
+      flex: 1 0 auto;
+    }
+  }
 }
