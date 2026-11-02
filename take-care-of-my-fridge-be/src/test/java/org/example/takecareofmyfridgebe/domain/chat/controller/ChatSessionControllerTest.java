@@ -2,13 +2,18 @@ package org.example.takecareofmyfridgebe.domain.chat.controller;
 
 import org.example.takecareofmyfridgebe.domain.auth.service.AuthSessionService;
 import org.example.takecareofmyfridgebe.domain.auth.service.JwtTokenService;
+import org.example.takecareofmyfridgebe.domain.chat.dto.ChatSessionListResponse;
+import org.example.takecareofmyfridgebe.domain.chat.dto.ChatSessionListStatus;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatSessionResponse;
+import org.example.takecareofmyfridgebe.domain.chat.dto.ChatSessionStatusCounts;
+import org.example.takecareofmyfridgebe.domain.chat.dto.ChatSessionSummaryResponse;
 import org.example.takecareofmyfridgebe.domain.chat.entity.ChatSessionStatus;
 import org.example.takecareofmyfridgebe.domain.chat.service.ChatSessionService;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 import org.example.takecareofmyfridgebe.global.config.SecurityConfig;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
+import org.example.takecareofmyfridgebe.global.response.PageResponse;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,6 +21,8 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.web.servlet.MockMvc;
@@ -23,6 +30,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
@@ -161,6 +170,88 @@ class ChatSessionControllerTest {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.error.code").value("CHAT_001"));
+    }
+
+    @Test
+    @DisplayName("비로그인 사용자가 상담 목록을 조회하면 401을 반환한다")
+    void getMySessionsAnonymousReturns401() throws Exception {
+        mvc.perform(get("/api/chat-sessions"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error.code").value("A003"));
+    }
+
+    @Test
+    @DisplayName("상담 목록은 기본 page=1, size=10, status=ALL로 조회하고 탭 건수와 공통 페이지 형식으로 반환한다")
+    void getMySessionsReturnsPage() throws Exception {
+        Long memberId = 1L;
+        when(chatSessionService.getMySessions(eq(memberId),
+                argThat(req -> req.page() == 1 && req.size() == 10 && req.status() == ChatSessionListStatus.ALL)))
+                .thenReturn(listResponse());
+
+        mvc.perform(get("/api/chat-sessions")
+                        .with(authentication(authenticationFor(memberId))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.counts.total").value(3))
+                .andExpect(jsonPath("$.data.counts.active").value(1))
+                .andExpect(jsonPath("$.data.counts.ended").value(2))
+                .andExpect(jsonPath("$.data.sessions.content[0].sessionId").value(10L))
+                .andExpect(jsonPath("$.data.sessions.content[0].status").value("COMPLETED"))
+                .andExpect(jsonPath("$.data.sessions.content[0].startedAt").value("2026-10-28 12:00:00"))
+                .andExpect(jsonPath("$.data.sessions.content[0].lastMessageAt").value("2026-10-28 12:05:00"))
+                .andExpect(jsonPath("$.data.sessions.content[0].messageCount").value(4))
+                .andExpect(jsonPath("$.data.sessions.content[0].firstQuestion").value("감자로 뭐 만들까요?"))
+                .andExpect(jsonPath("$.data.sessions.content[0].lastMessagePreview").value("감자전을 추천해요"))
+                .andExpect(jsonPath("$.data.sessions.pageNumber").value(1))
+                .andExpect(jsonPath("$.data.sessions.totalElements").value(1))
+                .andExpect(jsonPath("$.data.sessions.isLast").value(true));
+    }
+
+    @Test
+    @DisplayName("상담 목록 status 파라미터를 상태 필터로 받는다")
+    void getMySessionsBindsStatus() throws Exception {
+        Long memberId = 1L;
+        when(chatSessionService.getMySessions(eq(memberId), argThat(req -> req.status() == ChatSessionListStatus.ENDED)))
+                .thenReturn(listResponse());
+
+        mvc.perform(get("/api/chat-sessions")
+                        .param("status", "ENDED")
+                        .with(authentication(authenticationFor(memberId))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.sessions.content[0].sessionId").value(10L));
+    }
+
+    @Test
+    @DisplayName("상담 목록 status가 ALL/ACTIVE/ENDED가 아니면 400을 반환한다")
+    void getMySessionsRejectsUnknownStatus() throws Exception {
+        mvc.perform(get("/api/chat-sessions")
+                        .param("status", "COMPLETED")
+                        .with(authentication(authenticationFor(1L))))
+                .andExpect(status().isBadRequest());
+    }
+
+    private ChatSessionListResponse listResponse() {
+        ChatSessionSummaryResponse summary = new ChatSessionSummaryResponse(
+                10L,
+                ChatSessionStatus.COMPLETED,
+                LocalDateTime.of(2026, 10, 28, 12, 0, 0),
+                LocalDateTime.of(2026, 10, 28, 12, 5, 0),
+                4,
+                "감자로 뭐 만들까요?",
+                "감자전을 추천해요"
+        );
+        return new ChatSessionListResponse(
+                new ChatSessionStatusCounts(3, 1, 2),
+                PageResponse.of(new PageImpl<>(List.of(summary), PageRequest.of(0, 10), 1))
+        );
+    }
+
+    @Test
+    @DisplayName("상담 목록 page가 1보다 작으면 400을 반환한다")
+    void getMySessionsRejectsInvalidPage() throws Exception {
+        mvc.perform(get("/api/chat-sessions")
+                        .param("page", "0")
+                        .with(authentication(authenticationFor(1L))))
+                .andExpect(status().isBadRequest());
     }
 
     private UsernamePasswordAuthenticationToken authenticationFor(Long memberId) {

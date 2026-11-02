@@ -1,0 +1,163 @@
+@use '@/styles/variables' as *;
+@use '@/styles/mixins' as *;
+
+// lg부터 왼쪽(탭 + 목록) / 오른쪽(대화). 두 칸 모두 $chat-history-panel-height 고정 높이.
+.split {
+  display: grid;
+  grid-template-columns: minmax($chat-history-list-min-width, 2fr) minmax(0, 3fr);
+  gap: var(--ant-margin);
+}
+
+.detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ant-margin-xs);
+}
+
+.back {
+  align-self: flex-start;
+  min-height: $touch-target-size;
+}
+
+// 좁은 화면은 카드에 바로 놓인 탭 + 목록(페이지 스크롤).
+// 두 칸 화면은 대화 칸과 같은 테두리 상자이고, 탭은 위에 고정된 채 목록만 칸 안에서 스크롤한다.
+.listPanel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ant-margin-sm);
+  min-width: 0;
+
+  .split & {
+    height: $chat-history-panel-height;
+    padding: var(--ant-padding-xs);
+    border: 1px solid var(--ant-color-border-secondary);
+    border-radius: var(--ant-border-radius-lg);
+  }
+}
+
+.tabs {
+  flex: none;
+}
+
+.tabLabel {
+  font-variant-numeric: tabular-nums;
+}
+
+.scroller {
+  .split & {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+  }
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ant-margin-xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+// 다음 페이지를 받는 동안만 작은 로딩. 끝이면 비어 있다.
+.listEnd {
+  display: flex;
+  justify-content: center;
+  min-height: 1px;
+  padding: var(--ant-padding-xs) 0;
+}
+
+.empty {
+  padding: var(--ant-padding-lg) 0;
+}
+
+// 둥근 카드 한 장. 1줄: 첫 질문 + 상태 / 2줄: 시작 일시 · 메시지 수 / 3줄: 마지막 메시지 + 마지막 시각.
+// 줄 사이 구분선 없이 카드 간격으로만 나눈다. 평소엔 테두리가 투명해 고를 때 크기가 바뀌지 않는다.
+.row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ant-margin-xxs);
+  width: 100%;
+  min-height: $touch-target-size;
+  padding: var(--ant-padding-sm);
+  border: 1px solid transparent;
+  border-radius: var(--ant-border-radius-lg);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color var(--ant-motion-duration-mid),
+    border-color var(--ant-motion-duration-mid);
+
+  &:hover {
+    background-color: var(--ant-color-fill-quaternary);
+  }
+
+  &:focus-visible {
+    outline: var(--ant-line-width-focus) solid var(--ant-color-primary-border);
+    // 목록 칸 스크롤 영역에 잘리지 않게 안쪽으로 그린다
+    outline-offset: calc(-1 * var(--ant-line-width-focus));
+  }
+}
+
+.selected,
+.selected:hover {
+  border-color: var(--ant-color-border);
+  background-color: var(--ant-color-fill-tertiary);
+}
+
+.rowLine {
+  display: flex;
+  align-items: center;
+  gap: var(--ant-margin-xs);
+  min-width: 0;
+}
+
+.question,
+.preview {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.question {
+  font-size: var(--ant-font-size);
+}
+
+.meta,
+.preview,
+.time {
+  font-size: var(--ant-font-size-sm);
+}
+
+.meta,
+.time {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.time {
+  flex: none;
+}
+
+// 두 칸 화면에서 고른 상담이 없을 때(목록이 빈 탭) 대화 칸 자리
+.placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: $chat-history-panel-height;
+  padding: var(--ant-padding);
+  border: 1px solid var(--ant-color-border-secondary);
+  border-radius: var(--ant-border-radius-lg);
+  text-align: center;
+}

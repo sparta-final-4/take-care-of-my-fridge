@@ -40,6 +40,7 @@ models/admin-product-list-request.ts
 models/api-response-add-cart-item-response.ts
 models/api-response-cart-items-response.ts
 models/api-response-change-cart-item-quantity-response.ts
+models/api-response-chat-session-list-response.ts
 models/api-response-chat-session-response.ts
 models/api-response-cooking-complete-response.ts
 models/api-response-cooking-log-response.ts
@@ -105,7 +106,11 @@ models/change-password-request.ts
 models/change-tastes-request.ts
 models/chat-message-create-request.ts
 models/chat-message-response.ts
+models/chat-session-list-request.ts
+models/chat-session-list-response.ts
 models/chat-session-response.ts
+models/chat-session-status-counts.ts
+models/chat-session-summary-response.ts
 models/cooking-complete-request.ts
 models/cooking-complete-response.ts
 models/cooking-log-response.ts
@@ -176,6 +181,7 @@ models/order-item-response.ts
 models/order-list-request.ts
 models/order-summary-response.ts
 models/page-response-audit-log-response.ts
+models/page-response-chat-session-summary-response.ts
 models/page-response-cooking-log-response.ts
 models/page-response-fridge-item-log-response.ts
 models/page-response-member-summary-response.ts

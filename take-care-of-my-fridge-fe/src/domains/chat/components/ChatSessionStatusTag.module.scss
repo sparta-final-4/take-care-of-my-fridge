@@ -1,0 +1,24 @@
+@use '@/styles/variables' as *;
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ant-margin-xxs);
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.dot {
+  width: $chat-status-dot-size;
+  height: $chat-status-dot-size;
+  border-radius: 50%;
+  background-color: var(--ant-color-success);
+}
+
+// 테두리만 남기고 글자는 흐리게
+.ended {
+  border-color: var(--ant-color-border);
+  background: transparent;
+  color: var(--ant-color-text-tertiary);
+}

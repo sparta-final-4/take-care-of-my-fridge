@@ -97,14 +97,16 @@ export function OrderListSection() {
                 </li>
               ))}
             </ul>
-            <Pagination
-              align="center"
-              current={page}
-              pageSize={PAGE_SIZE}
-              total={data?.totalElements ?? 0}
-              showSizeChanger={false}
-              onChange={handleChangePage}
-            />
+            {(data?.totalPages ?? 0) > 1 && (
+              <Pagination
+                align="center"
+                current={page}
+                pageSize={PAGE_SIZE}
+                total={data?.totalElements ?? 0}
+                showSizeChanger={false}
+                onChange={handleChangePage}
+              />
+            )}
           </Flex>
         </SectionLoading>
       )}

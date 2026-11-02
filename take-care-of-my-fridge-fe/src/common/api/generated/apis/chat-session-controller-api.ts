@@ -23,7 +23,11 @@ import { DUMMY_BASE_URL, assertParamExists, setApiKeyToObject, setBasicAuthToObj
 // @ts-ignore
 import { BASE_PATH, COLLECTION_FORMATS, type RequestArgs, BaseAPI, RequiredError, operationServerMap } from '../base';
 // @ts-ignore
+import type { ApiResponseChatSessionListResponse } from '../models';
+// @ts-ignore
 import type { ApiResponseChatSessionResponse } from '../models';
+// @ts-ignore
+import type { ChatSessionListRequest } from '../models';
 /**
  * ChatSessionControllerApi - axios parameter creator
  */
@@ -50,6 +54,44 @@ export const ChatSessionControllerApiAxiosParamCreator = function (configuration
             const localVarRequestOptions = { method: 'PATCH', ...baseOptions, ...options};
             const localVarHeaderParameter = {} as any;
             const localVarQueryParameter = {} as any;
+
+            localVarHeaderParameter['Accept'] = '*/*';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @param {ChatSessionListRequest} request 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        getMySessions: async (request: ChatSessionListRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'request' is not null or undefined
+            assertParamExists('getMySessions', 'request', request)
+            const localVarPath = `/api/chat-sessions`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            if (request !== undefined) {
+                for (const [key, value] of Object.entries(request)) {
+                    localVarQueryParameter[key] = value;
+                }
+            }
 
             localVarHeaderParameter['Accept'] = '*/*';
 
@@ -147,6 +189,18 @@ export const ChatSessionControllerApiFp = function(configuration?: Configuration
         },
         /**
          * 
+         * @param {ChatSessionListRequest} request 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async getMySessions(request: ChatSessionListRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ApiResponseChatSessionListResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.getMySessions(request, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['ChatSessionControllerApi.getMySessions']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
          * @param {number} sessionId 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
@@ -188,6 +242,15 @@ export const ChatSessionControllerApiFactory = function (configuration?: Configu
         },
         /**
          * 
+         * @param {ChatSessionControllerApiGetMySessionsRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        getMySessions(requestParameters: ChatSessionControllerApiGetMySessionsRequest, options?: RawAxiosRequestConfig): AxiosPromise<ApiResponseChatSessionListResponse> {
+            return localVarFp.getMySessions(requestParameters.request, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
          * @param {ChatSessionControllerApiGetSessionRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
@@ -220,6 +283,14 @@ export interface ChatSessionControllerApiInterface {
 
     /**
      * 
+     * @param {ChatSessionControllerApiGetMySessionsRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    getMySessions(requestParameters: ChatSessionControllerApiGetMySessionsRequest, options?: RawAxiosRequestConfig): AxiosPromise<ApiResponseChatSessionListResponse>;
+
+    /**
+     * 
      * @param {ChatSessionControllerApiGetSessionRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
@@ -243,6 +314,13 @@ export interface ChatSessionControllerApiCompleteSessionRequest {
 }
 
 /**
+ * Request parameters for getMySessions operation in ChatSessionControllerApi.
+ */
+export interface ChatSessionControllerApiGetMySessionsRequest {
+    readonly request: ChatSessionListRequest
+}
+
+/**
  * Request parameters for getSession operation in ChatSessionControllerApi.
  */
 export interface ChatSessionControllerApiGetSessionRequest {
@@ -261,6 +339,16 @@ export class ChatSessionControllerApi extends BaseAPI implements ChatSessionCont
      */
     public completeSession(requestParameters: ChatSessionControllerApiCompleteSessionRequest, options?: RawAxiosRequestConfig) {
         return ChatSessionControllerApiFp(this.configuration).completeSession(requestParameters.sessionId, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @param {ChatSessionControllerApiGetMySessionsRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public getMySessions(requestParameters: ChatSessionControllerApiGetMySessionsRequest, options?: RawAxiosRequestConfig) {
+        return ChatSessionControllerApiFp(this.configuration).getMySessions(requestParameters.request, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**

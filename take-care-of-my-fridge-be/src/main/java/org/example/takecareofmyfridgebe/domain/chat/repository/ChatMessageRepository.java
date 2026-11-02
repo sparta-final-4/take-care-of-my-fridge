@@ -8,7 +8,7 @@ import org.springframework.data.repository.query.Param;
 import java.util.List;
 import java.util.Optional;
 
-public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> {
+public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long>, ChatMessageRepositoryCustom {
 
     @Query("SELECT MAX(m.sequence) FROM ChatMessage m WHERE m.session.id = :sessionId")
     Optional<Integer> findMaxSequenceBySessionId(@Param("sessionId") Long sessionId);

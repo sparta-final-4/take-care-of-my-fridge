@@ -189,6 +189,22 @@ HTTP 메서드·경로·DTO 이름은 구현 전 합의합니다.
 - **레시피 요리 통계 (`GET /recipes/{recipeId}/cooking-stats`)**: 비로그인 요청을 허용합니다. 레시피가 없으면 404이며, 요리 기록이 하나도 없으면 모든 카운트(총 횟수, 성공, 실패)가 0으로 반환됩니다.
 - **마이 레시피 (`GET /me/recipes`)**: 회원이 요리 완료한 레시피들을 그룹화하여 후기 작성 상태(`reviewStatus`: ALL, PENDING, COMPLETED) 필터링과 전체 요약 통계(총 요리 수, 고유 레시피 수, 성공 수, 작성 후기 수)를 함께 반환합니다.
 
+## AI 상담 내역 API
+
+상태: **구현 완료** (2026-11-02) · 근거: `ChatSessionController`, `ChatSessionService.getMySessions`
+
+| 기능 | Method / Path | 권한 | 요청 | 성공 응답 | 주요 오류 |
+|---|---|---|---|---|---|
+| 내 상담 목록 | GET /chat-sessions | 로그인 | Query: page(기본 1), size(기본 10, 최대 100), status(ALL/ACTIVE/ENDED, 기본 ALL) | 200, `ChatSessionListResponse` | 400 page/size/status 오류, 401 |
+| 상담 메시지 조회(기존) | GET /chat-sessions/{sessionId}/messages | 로그인 | Path: sessionId | 200, `ChatMessageResponse[]` | 401, 404 없음/타인 상담 |
+
+- `ChatSessionListResponse`: `counts`(`ChatSessionStatusCounts`: total, active, ended — 상태 필터와 상관없는 탭 건수), `sessions`(`PageResponse<ChatSessionSummaryResponse>`, 다음 페이지 여부는 공통 `isLast`).
+- `ChatSessionSummaryResponse`: sessionId, status(ACTIVE/COMPLETED/EXPIRED), startedAt(세션 생성 시각), lastMessageAt, messageCount, firstQuestion(첫 USER 메시지 앞 50자), lastMessagePreview(마지막 메시지 앞 50자, 역할 무관). 자르기는 코드 포인트 기준. 시각은 `yyyy-MM-dd HH:mm:ss`.
+- 상태: ACTIVE = 진행 중이면서 마지막 대화가 시간 제한(`chat.session-timeout`, 30분) 안. ENDED = 종료(COMPLETED) + 만료(EXPIRED). 시간이 지났는데 아직 ACTIVE로 남은 상담(다음 상담 시작 때 만료 처리됨)은 목록 status를 EXPIRED로 주고 ENDED 필터·종료 건수에 넣습니다.
+- 본인 상담만, 최근 시작순(startedAt 내림차순, 같으면 id 내림차순). 메시지가 0개인 상담은 목록·건수에서 빠집니다.
+- 쿼리: 세션 목록 1회 + 세션 ID 목록으로 메시지 수·첫 질문·마지막 메시지 1회(그룹 집계 + 상관 서브쿼리) + 탭 건수 1회(조건 합계). 전체 개수가 필요할 때만 count 1회 추가.
+- 종료·만료된 상담도 본인 것이면 기존 메시지 조회 API로 대화를 볼 수 있습니다.
+
 ## 후기 API
 
 상태: **구현 완료** · 담당: 이현정 · 근거: 실제 백엔드 컨트롤러 및 서비스 구현
