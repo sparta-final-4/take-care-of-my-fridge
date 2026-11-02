@@ -167,22 +167,19 @@ class OrderStatusFacadeConfirmTransactionTest extends MySqlContainerSupport {
     }
 
     @Test
-    @DisplayName("모든 상품이 완료된 환불로 전부 환불된 주문은 거절하고 주문과 확정 수량은 그대로이며 이벤트도 보내지 않는다")
-    void confirm_fullyRefunded_rejects() {
+    @DisplayName("전액 환불된 주문은 전부 환불된 주문으로 거절하고 상태와 확정 수량은 그대로이며 이벤트도 보내지 않는다")
+    void confirm_refundedOrder_rejects() {
         Order order = saveOrder(1L, OrderStatus.PAID);
-        OrderItem first = saveItem(order, 2, SaleType.NONE);
-        OrderItem second = saveItem(order, 1, SaleType.NONE);
-        Payment payment = savePayment(order);
-        saveRefund(payment, first, 2, RefundStatus.COMPLETED);
-        saveRefund(payment, second, 1, RefundStatus.COMPLETED);
+        OrderItem item = saveItem(order, 2, SaleType.NONE);
+        orderStatusFacade.markRefunded(order.getId());
 
         assertThatThrownBy(() -> orderStatusFacade.confirm(1L, order.getId()))
             .isInstanceOf(BusinessException.class)
             .extracting("errorCode").isEqualTo(ErrorCode.ORDER_FULLY_REFUNDED);
         Order unchanged = reload(order);
-        assertThat(unchanged.getStatus()).isEqualTo(OrderStatus.PAID);
+        assertThat(unchanged.getStatus()).isEqualTo(OrderStatus.REFUNDED);
         assertThat(unchanged.getConfirmedAt()).isNull();
-        assertThat(reload(first).getConfirmedQuantity()).isNull();
+        assertThat(reload(item).getConfirmedQuantity()).isNull();
         assertThat(committedEvents.events).isEmpty();
     }
 
@@ -363,6 +360,38 @@ class OrderStatusFacadeConfirmTransactionTest extends MySqlContainerSupport {
         assertThat(failures).isEmpty();
         assertThat(committedEvents.events).hasSize(1);
         assertThat(committedEvents.events.get(0).orderId()).isEqualTo(order.getId());
+    }
+
+    @Test
+    @DisplayName("환불 쪽이 전액 환불로 부르면 결제 완료 주문이 전액 환불 상태가 된다")
+    void markRefunded_paidOrder_changesToRefunded() {
+        Order order = saveOrder(1L, OrderStatus.PAID);
+
+        orderStatusFacade.markRefunded(order.getId());
+
+        Order refunded = reload(order);
+        assertThat(refunded.getStatus()).isEqualTo(OrderStatus.REFUNDED);
+        assertThat(refunded.getConfirmedAt()).isNull();
+    }
+
+    @Test
+    @DisplayName("환불 뒤 구매 확정으로 부르면 바로 구매 확정되고 환불된 상품은 확정 수량 0, 번개 드롭 상품만 이벤트에 싣는다")
+    void confirmAfterRefund_onlyFlashDropRemains_confirms() {
+        Order order = saveOrder(1L, OrderStatus.PAID);
+        OrderItem normal = saveItem(order, 2, SaleType.NONE);
+        OrderItem flashDrop = saveItem(order, 1, SaleType.FLASH_DROP);
+        saveRefund(savePayment(order), normal, 2, RefundStatus.COMPLETED);
+
+        orderStatusFacade.confirmAfterRefund(order.getId());
+
+        Order confirmed = reload(order);
+        assertThat(confirmed.getStatus()).isEqualTo(OrderStatus.CONFIRMED);
+        assertThat(confirmed.getConfirmedAt()).isNotNull();
+        assertThat(reload(normal).getConfirmedQuantity()).isZero();
+        assertThat(reload(flashDrop).getConfirmedQuantity()).isEqualTo(1);
+        assertThat(committedEvents.events).hasSize(1);
+        assertThat(committedEvents.events.get(0).items()).containsExactly(
+            new OrderConfirmedEvent.Item(flashDrop.getId(), 1L, "대파", 1));
     }
 
     private List<Throwable> runConcurrently(List<Callable<Void>> tasks) throws Exception {

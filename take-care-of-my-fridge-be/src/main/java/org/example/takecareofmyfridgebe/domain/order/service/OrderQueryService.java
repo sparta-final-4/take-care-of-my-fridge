@@ -23,7 +23,7 @@ public class OrderQueryService {
 
     // 결제 대기는 PG 결제가 끝났는데 서버 확인이 늦어진 주문일 수 있어 보인다. 취소는 결제가 끝나지 않은 주문이라 뺀다.
     private static final List<OrderStatus> LISTED_STATUSES =
-            List.of(OrderStatus.PENDING, OrderStatus.PAID, OrderStatus.CONFIRMED);
+            List.of(OrderStatus.PENDING, OrderStatus.PAID, OrderStatus.CONFIRMED, OrderStatus.REFUNDED);
 
     private final OrderReader orderReader;
     private final OrderRepository orderRepository;

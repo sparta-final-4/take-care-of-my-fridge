@@ -212,7 +212,7 @@ class OrderQueryServiceTransactionTest extends MySqlContainerSupport {
     }
 
     @Test
-    @DisplayName("주문 목록은 내 결제 대기·결제 완료·구매 확정 주문만 돌려주고 취소된 주문과 남의 주문은 뺀다")
+    @DisplayName("주문 목록은 내 결제 대기·결제 완료·구매 확정·전액 환불 주문만 돌려주고 취소된 주문과 남의 주문은 뺀다")
     void getMyOrders_returnsOnlyMyListedStatuses() {
         Order pending = saveOrder(1L, "20261021143000123010");
         Order paid = saveOrder(1L, "20261021143000123011");
@@ -223,13 +223,17 @@ class OrderQueryServiceTransactionTest extends MySqlContainerSupport {
         Order cancelled = saveOrder(1L, "20261021143000123013");
         cancel(cancelled);
         saveOrder(2L, "20261021143000123014");
+        Order refunded = saveOrder(1L, "20261021143000123015");
+        markPaid(refunded);
+        markRefunded(refunded);
 
         PageResponse<OrderSummaryResponse> response = orderQueryService.getMyOrders(1L, new OrderListRequest(1, 10));
 
-        assertThat(response.totalElements()).isEqualTo(3L);
+        assertThat(response.totalElements()).isEqualTo(4L);
         assertThat(response.content())
             .extracting(OrderSummaryResponse::orderId, OrderSummaryResponse::status, OrderSummaryResponse::payAmount)
             .containsExactly(
+                tuple(refunded.getId(), OrderStatus.REFUNDED, 8000L),
                 tuple(confirmed.getId(), OrderStatus.CONFIRMED, 8000L),
                 tuple(paid.getId(), OrderStatus.PAID, 8000L),
                 tuple(pending.getId(), OrderStatus.PENDING, 8000L));
@@ -274,6 +278,12 @@ class OrderQueryServiceTransactionTest extends MySqlContainerSupport {
     private void confirm(Order order) {
         Order found = orderRepository.findById(order.getId()).orElseThrow();
         found.confirm(LocalDateTime.now());
+        orderRepository.save(found);
+    }
+
+    private void markRefunded(Order order) {
+        Order found = orderRepository.findById(order.getId()).orElseThrow();
+        found.markRefunded();
         orderRepository.save(found);
     }
 
