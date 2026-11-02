@@ -190,7 +190,7 @@
 | order_number | VARCHAR(20) | 불가 | | UK | 주문번호. 밀리초 시각 17자리와 순번 3자리의 숫자 20자리(한국 시각) |
 | member_id | BIGINT | 불가 | | UK(member_id, idempotency_key), 인덱스 | 주문한 회원. 물리 FK 없이 회원 번호만 저장 |
 | idempotency_key | VARCHAR(64) | 허용 | NULL | UK(member_id, idempotency_key) | 주문하기 클릭마다 프론트가 만든 값. 같은 회원이 같은 값으로 다시 보내면 새 주문을 만들지 않음. 기존 주문은 NULL |
-| status | ENUM('PENDING','PAID','CANCELLED','CONFIRMED') | 불가 | 'PENDING' | 인덱스 | 결제 대기·결제 완료·취소·구매 확정 |
+| status | ENUM('PENDING','PAID','CANCELLED','CONFIRMED','REFUNDED') | 불가 | 'PENDING' | 인덱스 | 결제 대기·결제 완료·취소·구매 확정·전액 환불 |
 | total_amount | BIGINT | 불가 | | | 결제할 금액(할인 후). 주문을 만들 때 확정 |
 | paid_at | DATETIME(6) | 허용 | NULL | | 결제 완료 시각. 결제 전에는 NULL |
 | confirmed_at | DATETIME(6) | 허용 | NULL | | 구매 확정 시각. 확정 전에는 NULL |
