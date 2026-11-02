@@ -35,6 +35,7 @@ export const OrderDetailResponseStatusEnum = {
     Paid: 'PAID',
     Cancelled: 'CANCELLED',
     Confirmed: 'CONFIRMED',
+    Refunded: 'REFUNDED',
 } as const;
 
 export type OrderDetailResponseStatusEnum = typeof OrderDetailResponseStatusEnum[keyof typeof OrderDetailResponseStatusEnum];

@@ -5798,7 +5798,8 @@
               "PENDING",
               "PAID",
               "CANCELLED",
-              "CONFIRMED"
+              "CONFIRMED",
+              "REFUNDED"
             ]
           }
         }
@@ -5816,7 +5817,8 @@
               "PENDING",
               "PAID",
               "CANCELLED",
-              "CONFIRMED"
+              "CONFIRMED",
+              "REFUNDED"
             ]
           }
         }
@@ -5946,7 +5948,8 @@
               "PENDING",
               "PAID",
               "CANCELLED",
-              "CONFIRMED"
+              "CONFIRMED",
+              "REFUNDED"
             ]
           }
         }
@@ -6030,7 +6033,8 @@
               "PENDING",
               "PAID",
               "CANCELLED",
-              "CONFIRMED"
+              "CONFIRMED",
+              "REFUNDED"
             ]
           }
         }
