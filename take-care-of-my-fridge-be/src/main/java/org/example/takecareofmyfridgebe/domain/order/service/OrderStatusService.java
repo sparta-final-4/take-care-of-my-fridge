@@ -16,8 +16,8 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-// 주문 상태를 바꾼다. 구매 확정, 결제를 시도한 주문의 취소, 결제 전 주문의 삭제.
-// 사용자 요청(취소·구매 확정)과 스케줄러(만료·자동 확정)의 상태 변경을 모두 맡는다.
+// 주문 상태를 바꾼다. 구매 확정, 결제를 시도한 주문의 취소, 전액 환불, 결제 전 주문의 삭제.
+// 사용자 요청(취소·구매 확정), 스케줄러(만료·자동 확정), 환불 쪽 환불 완료(전액 환불·구매 확정)의 상태 변경을 맡는다.
 // 주문 행 잠금, 결제·환불 확인, 재고 되돌리기는 OrderStatusFacade가 하고, 이 서비스는 그 트랜잭션 안에서 불린다.
 @Service
 @RequiredArgsConstructor
@@ -45,6 +45,12 @@ public class OrderStatusService {
     public void cancel(Order order, List<OrderItem> items) {
         order.cancel();
         items.forEach(OrderItem::releaseFlashDropMember);
+    }
+
+    // 환불 쪽이 전액 환불이라고 판단한 결제 완료 주문을 전액 환불 상태로 바꾼다.
+    @Transactional
+    public void markRefunded(Order order) {
+        order.markRefunded();
     }
 
     // 확정 수량은 주문 수량에서 완료된 환불 수량을 뺀 값이다. 할인 상품은 환불이 없어 주문 수량과 같다.

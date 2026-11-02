@@ -25,7 +25,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 // 주문 상태 변경. 주문 행을 잠그고 결제·환불을 확인한 뒤, 재고를 되돌리고 OrderStatusService로 상태를 바꾼다.
-// 사용자 요청(취소·구매 확정)과 스케줄러(만료·자동 확정), 결제 쪽 스케줄러(결제 쪽 취소)가 부른다.
+// 사용자 요청(취소·구매 확정)과 스케줄러(만료·자동 확정), 결제 쪽 스케줄러(결제 쪽 취소), 환불 쪽 환불 완료가 부른다.
 // 재고 되돌리기와 주문 삭제·취소가 한 트랜잭션이어야 해서 메서드마다 트랜잭션을 연다.
 // 잠금 순서는 OrderFacade와 같다. 주문 행 → 상품 행(ID 순) → 번개 드롭 남은 수량 행.
 // 상품 행 잠금 읽기는 ProductService에 없어 ProductRepository를 직접 쓴다.
@@ -102,6 +102,31 @@ public class OrderStatusFacade {
         List<OrderItem> items = orderReader.getOrderItems(order);
         Map<Long, Long> completedRefundQuantities = refundQueryService.getCompletedRefundQuantities(
                 items.stream().map(OrderItem::getId).toList());
+    // 환불 쪽이 환불 완료 뒤 특가·번개 드롭 상품이 없는 주문의 모든 상품이 환불됐다고 판단하면 부른다.
+    // 전액 환불인지 다시 확인하지 않고, 결제 완료 주문인지만 본다.
+    @Transactional
+    public void markRefunded(Long orderId) {
+        Order order = getOrderForUpdate(orderId);
+        orderStatusService.markRefunded(order);
+    }
+
+    // 환불 쪽이 환불 완료 뒤 특가·번개 드롭 상품 말고는 모두 환불됐다고 판단하면 부른다.
+    // 7일 자동 확정을 기다리지 않고 바로 구매 확정한다. 확정 수량 계산과 구매 확정 이벤트는 구매 확정과 같다.
+    @Transactional
+    public void confirmAfterRefund(Long orderId) {
+        Order order = getOrderForUpdate(orderId);
+        List<OrderItem> items = orderReader.getOrderItems(order);
+        Map<Long, Long> completedRefundQuantities = refundQueryService.getCompletedRefundQuantities(
+                items.stream().map(OrderItem::getId).toList());
+        orderStatusService.confirm(order, items, completedRefundQuantities);
+    }
+
+    // 회원 확인 없이 주문 행을 잠근다. 환불 쪽처럼 회원이 아닌 곳에서 상태를 바꿀 때 쓴다.
+    private Order getOrderForUpdate(Long orderId) {
+        return orderReader.findOrderForUpdate(orderId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.ORDER_NOT_FOUND));
+    }
+
         return orderStatusService.confirm(order, items, completedRefundQuantities);
     }
 
