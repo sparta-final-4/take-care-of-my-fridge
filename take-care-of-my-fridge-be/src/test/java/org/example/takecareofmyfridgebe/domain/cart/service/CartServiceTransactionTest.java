@@ -14,6 +14,7 @@ import org.example.takecareofmyfridgebe.domain.cart.dto.ChangeCartItemQuantityRe
 import org.example.takecareofmyfridgebe.domain.cart.dto.RemoveCartItemsRequest;
 import org.example.takecareofmyfridgebe.domain.cart.entity.Cart;
 import org.example.takecareofmyfridgebe.domain.cart.entity.CartItem;
+import org.example.takecareofmyfridgebe.domain.cart.facade.CartFacade;
 import org.example.takecareofmyfridgebe.domain.cart.repository.CartItemRepository;
 import org.example.takecareofmyfridgebe.domain.cart.repository.CartRepository;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.StorageType;
@@ -21,6 +22,7 @@ import org.example.takecareofmyfridgebe.domain.product.entity.Product;
 import org.example.takecareofmyfridgebe.domain.product.entity.ProductStatus;
 import org.example.takecareofmyfridgebe.domain.product.entity.ProductType;
 import org.example.takecareofmyfridgebe.domain.product.repository.ProductRepository;
+import org.example.takecareofmyfridgebe.domain.product.service.ProductService;
 import org.example.takecareofmyfridgebe.domain.sale.entity.SaleEvent;
 import org.example.takecareofmyfridgebe.domain.sale.entity.SaleEventItem;
 import org.example.takecareofmyfridgebe.domain.sale.entity.SaleEventType;
@@ -47,10 +49,11 @@ import org.springframework.transaction.annotation.Transactional;
 // 테스트 트랜잭션이 켜져 있으면 서비스에서 @Transactional이 빠져도 가려진다.
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({JpaAuditingConfig.class, QueryDslConfig.class, CartService.class, SaleEventReader.class})
+@Import({JpaAuditingConfig.class, QueryDslConfig.class, CartService.class, CartFacade.class, ProductService.class, SaleEventReader.class})
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class CartServiceTransactionTest extends MySqlContainerSupport {
 
+    private final CartFacade cartFacade;
     private final CartService cartService;
     private final CartRepository cartRepository;
     private final CartItemRepository cartItemRepository;
@@ -61,6 +64,7 @@ class CartServiceTransactionTest extends MySqlContainerSupport {
 
     @Autowired
     CartServiceTransactionTest(
+            CartFacade cartFacade,
             CartService cartService,
             CartRepository cartRepository,
             CartItemRepository cartItemRepository,
@@ -68,6 +72,7 @@ class CartServiceTransactionTest extends MySqlContainerSupport {
             SaleEventRepository saleEventRepository,
             SaleEventItemRepository saleEventItemRepository,
             DataSource dataSource) {
+        this.cartFacade = cartFacade;
         this.cartService = cartService;
         this.cartRepository = cartRepository;
         this.cartItemRepository = cartItemRepository;
@@ -93,7 +98,7 @@ class CartServiceTransactionTest extends MySqlContainerSupport {
         Cart cart = cartRepository.save(Cart.builder().memberId(1L).build());
         CartItem item = cartItemRepository.save(CartItem.builder().cart(cart).productId(product.getId()).quantity(1).build());
 
-        ChangeCartItemQuantityResponse response = cartService.changeQuantity(1L, item.getId(), new ChangeCartItemQuantityRequest(3));
+        ChangeCartItemQuantityResponse response = cartFacade.changeQuantity(1L, item.getId(), new ChangeCartItemQuantityRequest(3));
 
         assertThat(response.quantity()).isEqualTo(3);
         assertThat(cartItemRepository.findById(item.getId()).orElseThrow().getQuantity()).isEqualTo(3);
@@ -107,7 +112,7 @@ class CartServiceTransactionTest extends MySqlContainerSupport {
         cartRepository.save(Cart.builder().memberId(2L).build());
         CartItem itemOfA = cartItemRepository.save(CartItem.builder().cart(cartA).productId(product.getId()).quantity(1).build());
 
-        assertThatThrownBy(() -> cartService.changeQuantity(2L, itemOfA.getId(), new ChangeCartItemQuantityRequest(5)))
+        assertThatThrownBy(() -> cartFacade.changeQuantity(2L, itemOfA.getId(), new ChangeCartItemQuantityRequest(5)))
                 .isInstanceOf(BusinessException.class)
                 .extracting(e -> ((BusinessException) e).getErrorCode())
                 .isEqualTo(ErrorCode.CART_ITEM_NOT_FOUND);
@@ -117,7 +122,7 @@ class CartServiceTransactionTest extends MySqlContainerSupport {
     @Test
     @DisplayName("없는 줄 번호는 찾을 수 없다")
     void changeQuantity_rejectsMissingItem() {
-        assertThatThrownBy(() -> cartService.changeQuantity(1L, 999L, new ChangeCartItemQuantityRequest(3)))
+        assertThatThrownBy(() -> cartFacade.changeQuantity(1L, 999L, new ChangeCartItemQuantityRequest(3)))
                 .isInstanceOf(BusinessException.class)
                 .extracting(e -> ((BusinessException) e).getErrorCode())
                 .isEqualTo(ErrorCode.CART_ITEM_NOT_FOUND);
@@ -128,7 +133,7 @@ class CartServiceTransactionTest extends MySqlContainerSupport {
     void addItem_acceptsQuantityEqualToStock() {
         Product product = saveProduct(3, ProductStatus.ON_SALE);
 
-        cartService.addItem(1L, new AddCartItemRequest(product.getId(), 3));
+        cartFacade.addItem(1L, new AddCartItemRequest(product.getId(), 3));
 
         assertThat(cartItemRepository.findByCartMemberIdOrderByIdAsc(1L))
                 .extracting(CartItem::getQuantity)
@@ -142,7 +147,7 @@ class CartServiceTransactionTest extends MySqlContainerSupport {
         Cart cart = cartRepository.save(Cart.builder().memberId(1L).build());
         CartItem item = cartItemRepository.save(CartItem.builder().cart(cart).productId(product.getId()).quantity(3).build());
 
-        assertErrorCode(() -> cartService.addItem(1L, new AddCartItemRequest(product.getId(), 3)), ErrorCode.CART_QUANTITY_EXCEEDS_STOCK);
+        assertErrorCode(() -> cartFacade.addItem(1L, new AddCartItemRequest(product.getId(), 3)), ErrorCode.CART_QUANTITY_EXCEEDS_STOCK);
         assertThat(cartItemRepository.findById(item.getId()).orElseThrow().getQuantity()).isEqualTo(3);
     }
 
@@ -153,7 +158,7 @@ class CartServiceTransactionTest extends MySqlContainerSupport {
         Cart cart = cartRepository.save(Cart.builder().memberId(1L).build());
         CartItem item = cartItemRepository.save(CartItem.builder().cart(cart).productId(product.getId()).quantity(5).build());
 
-        assertErrorCode(() -> cartService.addItem(1L, new AddCartItemRequest(product.getId(), Integer.MAX_VALUE)), ErrorCode.CART_QUANTITY_EXCEEDS_STOCK);
+        assertErrorCode(() -> cartFacade.addItem(1L, new AddCartItemRequest(product.getId(), Integer.MAX_VALUE)), ErrorCode.CART_QUANTITY_EXCEEDS_STOCK);
         assertThat(cartItemRepository.findById(item.getId()).orElseThrow().getQuantity()).isEqualTo(5);
     }
 
@@ -162,7 +167,7 @@ class CartServiceTransactionTest extends MySqlContainerSupport {
     void addItem_rollsBackCartWhenStockInsufficient() {
         Product product = saveProduct(1, ProductStatus.ON_SALE);
 
-        assertErrorCode(() -> cartService.addItem(1L, new AddCartItemRequest(product.getId(), 2)), ErrorCode.CART_QUANTITY_EXCEEDS_STOCK);
+        assertErrorCode(() -> cartFacade.addItem(1L, new AddCartItemRequest(product.getId(), 2)), ErrorCode.CART_QUANTITY_EXCEEDS_STOCK);
         assertThat(cartRepository.findByMemberId(1L)).isEmpty();
     }
 
@@ -171,7 +176,7 @@ class CartServiceTransactionTest extends MySqlContainerSupport {
     void addItem_rejectsStoppedProduct() {
         Product product = saveProduct(10, ProductStatus.STOPPED);
 
-        assertErrorCode(() -> cartService.addItem(1L, new AddCartItemRequest(product.getId(), 1)), ErrorCode.PRODUCT_NOT_ON_SALE);
+        assertErrorCode(() -> cartFacade.addItem(1L, new AddCartItemRequest(product.getId(), 1)), ErrorCode.PRODUCT_NOT_ON_SALE);
         assertThat(cartItemRepository.findByCartMemberIdOrderByIdAsc(1L)).isEmpty();
     }
 
@@ -180,14 +185,14 @@ class CartServiceTransactionTest extends MySqlContainerSupport {
     void addItem_rejectsZeroStockEvenIfOnSale() {
         Product product = saveProduct(0, ProductStatus.ON_SALE);
 
-        assertErrorCode(() -> cartService.addItem(1L, new AddCartItemRequest(product.getId(), 1)), ErrorCode.CART_QUANTITY_EXCEEDS_STOCK);
+        assertErrorCode(() -> cartFacade.addItem(1L, new AddCartItemRequest(product.getId(), 1)), ErrorCode.CART_QUANTITY_EXCEEDS_STOCK);
         assertThat(cartItemRepository.findByCartMemberIdOrderByIdAsc(1L)).isEmpty();
     }
 
     @Test
     @DisplayName("없는 상품은 담을 수 없다")
     void addItem_rejectsMissingProduct() {
-        assertErrorCode(() -> cartService.addItem(1L, new AddCartItemRequest(999L, 1)), ErrorCode.PRODUCT_NOT_FOUND);
+        assertErrorCode(() -> cartFacade.addItem(1L, new AddCartItemRequest(999L, 1)), ErrorCode.PRODUCT_NOT_FOUND);
         assertThat(cartRepository.findByMemberId(1L)).isEmpty();
     }
 
@@ -198,7 +203,7 @@ class CartServiceTransactionTest extends MySqlContainerSupport {
         Cart cart = cartRepository.save(Cart.builder().memberId(1L).build());
         CartItem item = cartItemRepository.save(CartItem.builder().cart(cart).productId(product.getId()).quantity(1).build());
 
-        assertErrorCode(() -> cartService.changeQuantity(1L, item.getId(), new ChangeCartItemQuantityRequest(4)), ErrorCode.CART_QUANTITY_EXCEEDS_STOCK);
+        assertErrorCode(() -> cartFacade.changeQuantity(1L, item.getId(), new ChangeCartItemQuantityRequest(4)), ErrorCode.CART_QUANTITY_EXCEEDS_STOCK);
         assertThat(cartItemRepository.findById(item.getId()).orElseThrow().getQuantity()).isEqualTo(1);
     }
 
@@ -209,7 +214,7 @@ class CartServiceTransactionTest extends MySqlContainerSupport {
         Cart cart = cartRepository.save(Cart.builder().memberId(1L).build());
         CartItem item = cartItemRepository.save(CartItem.builder().cart(cart).productId(product.getId()).quantity(5).build());
 
-        cartService.changeQuantity(1L, item.getId(), new ChangeCartItemQuantityRequest(4));
+        cartFacade.changeQuantity(1L, item.getId(), new ChangeCartItemQuantityRequest(4));
 
         assertThat(cartItemRepository.findById(item.getId()).orElseThrow().getQuantity()).isEqualTo(4);
     }
@@ -221,7 +226,7 @@ class CartServiceTransactionTest extends MySqlContainerSupport {
         Cart cart = cartRepository.save(Cart.builder().memberId(1L).build());
         CartItem item = cartItemRepository.save(CartItem.builder().cart(cart).productId(product.getId()).quantity(5).build());
 
-        assertErrorCode(() -> cartService.changeQuantity(1L, item.getId(), new ChangeCartItemQuantityRequest(6)), ErrorCode.CART_QUANTITY_EXCEEDS_STOCK);
+        assertErrorCode(() -> cartFacade.changeQuantity(1L, item.getId(), new ChangeCartItemQuantityRequest(6)), ErrorCode.CART_QUANTITY_EXCEEDS_STOCK);
         assertThat(cartItemRepository.findById(item.getId()).orElseThrow().getQuantity()).isEqualTo(5);
     }
 
@@ -233,7 +238,7 @@ class CartServiceTransactionTest extends MySqlContainerSupport {
         CartItem item = cartItemRepository.save(CartItem.builder().cart(cart).productId(product.getId()).quantity(3).build());
         saveActiveFlashDrop(product);
 
-        cartService.changeQuantity(1L, item.getId(), new ChangeCartItemQuantityRequest(2));
+        cartFacade.changeQuantity(1L, item.getId(), new ChangeCartItemQuantityRequest(2));
 
         assertThat(cartItemRepository.findById(item.getId()).orElseThrow().getQuantity()).isEqualTo(2);
     }
@@ -245,7 +250,7 @@ class CartServiceTransactionTest extends MySqlContainerSupport {
         Cart cart = cartRepository.save(Cart.builder().memberId(1L).build());
         CartItem item = cartItemRepository.save(CartItem.builder().cart(cart).productId(product.getId()).quantity(1).build());
 
-        assertErrorCode(() -> cartService.changeQuantity(1L, item.getId(), new ChangeCartItemQuantityRequest(2)), ErrorCode.PRODUCT_NOT_ON_SALE);
+        assertErrorCode(() -> cartFacade.changeQuantity(1L, item.getId(), new ChangeCartItemQuantityRequest(2)), ErrorCode.PRODUCT_NOT_ON_SALE);
         assertThat(cartItemRepository.findById(item.getId()).orElseThrow().getQuantity()).isEqualTo(1);
     }
 
@@ -260,7 +265,7 @@ class CartServiceTransactionTest extends MySqlContainerSupport {
         cartItemRepository.save(CartItem.builder().cart(cart).productId(noStock.getId()).quantity(2).build());
         cartItemRepository.save(CartItem.builder().cart(cart).productId(stopped.getId()).quantity(3).build());
 
-        var items = cartService.getItems(1L).items();
+        var items = cartFacade.getItems(1L).items();
 
         assertThat(items).extracting(CartItemResponse::productId)
                 .containsExactly(onSale.getId(), noStock.getId(), stopped.getId());
@@ -270,9 +275,7 @@ class CartServiceTransactionTest extends MySqlContainerSupport {
             assertThat(item.imageUrl()).isEqualTo("https://example.com/green-onion.png");
             assertThat(item.listPrice()).isEqualTo(1000);
             assertThat(item.unitPrice()).isEqualTo(1000);
-            assertThat(item.saleType()).isNull();
-            assertThat(item.discountRate()).isNull();
-            assertThat(item.flashDropRemaining()).isNull();
+            assertThat(item.sale()).isNull();
         });
     }
 

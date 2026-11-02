@@ -15,6 +15,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.util.List;
 import org.example.takecareofmyfridgebe.domain.auth.service.AuthSessionService;
 import org.example.takecareofmyfridgebe.domain.auth.service.JwtTokenService;
+import org.example.takecareofmyfridgebe.domain.cart.facade.CartFacade;
 import org.example.takecareofmyfridgebe.domain.cart.service.CartService;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 import org.example.takecareofmyfridgebe.global.config.SecurityConfig;
@@ -36,17 +37,19 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 class CartControllerTest {
 
     private final MockMvc mvc;
+    private final CartFacade cartFacade;
     private final CartService cartService;
 
     @Autowired
-    CartControllerTest(MockMvc mvc, CartService cartService) {
+    CartControllerTest(MockMvc mvc, CartFacade cartFacade, CartService cartService) {
         this.mvc = mvc;
+        this.cartFacade = cartFacade;
         this.cartService = cartService;
     }
 
     @BeforeEach
     void resetMock() {
-        reset(cartService);
+        reset(cartFacade, cartService);
     }
 
     @Test
@@ -108,6 +111,11 @@ class CartControllerTest {
 
     @TestConfiguration
     static class TestConfig {
+
+        @Bean
+        CartFacade cartFacade() {
+            return mock(CartFacade.class);
+        }
 
         @Bean
         CartService cartService() {
