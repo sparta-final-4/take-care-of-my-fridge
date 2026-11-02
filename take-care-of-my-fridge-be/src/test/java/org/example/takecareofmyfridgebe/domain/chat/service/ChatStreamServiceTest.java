@@ -13,6 +13,7 @@ import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.codec.ServerSentEvent;
 import reactor.core.publisher.Flux;
+import reactor.test.StepVerifier;
 import tools.jackson.databind.ObjectMapper;
 
 import java.time.LocalDateTime;
@@ -25,6 +26,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -32,8 +34,13 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class ChatStreamServiceTest {
 
+    private static final String LOCK_TOKEN = "lock-token";
+
     @Mock
     private ChatMessageService chatMessageService;
+
+    @Mock
+    private ChatStreamLockService chatStreamLockService;
 
     @Mock
     private ChatDailyLimitService chatDailyLimitService;
@@ -172,6 +179,7 @@ class ChatStreamServiceTest {
 
         verify(chatReplyGenerator, never()).generate(any(), any());
         verify(chatDailyLimitService, never()).checkAndIncrement(any());
+        verify(chatStreamLockService, never()).acquire(any());
     }
 
     @Test
@@ -216,5 +224,97 @@ class ChatStreamServiceTest {
         assertThat(events.get(0).data()).isEqualTo("{\"text\":\" 계란\"}");
         assertThat(events.get(1).event()).isEqualTo("message");
         assertThat(events.get(1).data()).isEqualTo("{\"text\":\" 양파 \"}");
+    }
+
+    @Test
+    @DisplayName("다른 창에서 답을 받는 중이면 409 CHAT_REPLY_IN_PROGRESS를 동기로 던지고 하루 횟수를 쓰지 않는다")
+    void streamMessageLockFailureThrowsWithoutUsingDailyCount() {
+        Long memberId = 1L;
+        Long sessionId = 10L;
+
+        when(chatStreamLockService.acquire(sessionId))
+                .thenThrow(new BusinessException(ErrorCode.CHAT_REPLY_IN_PROGRESS));
+
+        assertThatThrownBy(() -> chatStreamService.streamMessage(memberId, sessionId, "안녕"))
+                .isInstanceOf(BusinessException.class)
+                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isEqualTo(ErrorCode.CHAT_REPLY_IN_PROGRESS);
+
+        verify(chatDailyLimitService, never()).checkAndIncrement(any());
+        verify(chatReplyGenerator, never()).generate(any(), any());
+        verify(chatStreamLockService, never()).release(any(), any());
+    }
+
+    @Test
+    @DisplayName("하루 횟수 초과로 실패하면 잡은 잠금을 풀고 그 예외를 그대로 던진다")
+    void streamMessageDailyLimitFailureReleasesLock() {
+        Long memberId = 1L;
+        Long sessionId = 10L;
+
+        when(chatStreamLockService.acquire(sessionId)).thenReturn(LOCK_TOKEN);
+        doThrow(new BusinessException(ErrorCode.CHAT_DAILY_LIMIT_EXCEEDED))
+                .when(chatDailyLimitService).checkAndIncrement(memberId);
+
+        assertThatThrownBy(() -> chatStreamService.streamMessage(memberId, sessionId, "안녕"))
+                .isInstanceOf(BusinessException.class)
+                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isEqualTo(ErrorCode.CHAT_DAILY_LIMIT_EXCEEDED);
+
+        verify(chatStreamLockService, timeout(1_000).times(1)).release(sessionId, LOCK_TOKEN);
+        verify(chatReplyGenerator, never()).generate(any(), any());
+    }
+
+    @Test
+    @DisplayName("답을 끝까지 받으면 done 뒤에 잠금을 한 번 푼다")
+    void streamMessageCompletionReleasesLock() {
+        Long sessionId = 10L;
+        when(chatStreamLockService.acquire(sessionId)).thenReturn(LOCK_TOKEN);
+        when(chatReplyGenerator.generate(sessionId, "질문")).thenReturn(Flux.just("답"));
+        when(chatMessageService.saveExchange(sessionId, "질문", "답")).thenReturn(List.of(
+                new ChatMessageResponse(100L, 1, ChatMessageRole.USER, "질문", LocalDateTime.now()),
+                new ChatMessageResponse(101L, 2, ChatMessageRole.ASSISTANT, "답", LocalDateTime.now())
+        ));
+
+        Flux<ServerSentEvent<String>> stream = chatStreamService.streamMessage(1L, sessionId, "질문");
+        verify(chatStreamLockService, never()).release(any(), any());
+
+        StepVerifier.create(stream)
+                .expectNextMatches(event -> "message".equals(event.event()))
+                .expectNextMatches(event -> "done".equals(event.event()))
+                .verifyComplete();
+
+        verify(chatStreamLockService, timeout(1_000).times(1)).release(sessionId, LOCK_TOKEN);
+    }
+
+    @Test
+    @DisplayName("답 생성이 실패해 error 이벤트로 끝나도 잠금을 푼다")
+    void streamMessageErrorReleasesLock() {
+        Long sessionId = 10L;
+        when(chatStreamLockService.acquire(sessionId)).thenReturn(LOCK_TOKEN);
+        when(chatReplyGenerator.generate(sessionId, "질문"))
+                .thenReturn(Flux.error(new RuntimeException("AI API Connection Timeout")));
+
+        StepVerifier.create(chatStreamService.streamMessage(1L, sessionId, "질문"))
+                .expectNextMatches(event -> "error".equals(event.event()))
+                .verifyComplete();
+
+        verify(chatStreamLockService, timeout(1_000).times(1)).release(sessionId, LOCK_TOKEN);
+    }
+
+    @Test
+    @DisplayName("답을 받다가 연결이 끊겨(cancel) 끝나도 잠금을 푼다")
+    void streamMessageCancelReleasesLock() {
+        Long sessionId = 10L;
+        when(chatStreamLockService.acquire(sessionId)).thenReturn(LOCK_TOKEN);
+        when(chatReplyGenerator.generate(sessionId, "질문"))
+                .thenReturn(Flux.concat(Flux.just("조각1"), Flux.never()));
+
+        StepVerifier.create(chatStreamService.streamMessage(1L, sessionId, "질문"))
+                .expectNextMatches(event -> "message".equals(event.event()))
+                .thenCancel()
+                .verify();
+
+        verify(chatStreamLockService, timeout(1_000).times(1)).release(sessionId, LOCK_TOKEN);
+        verify(chatMessageService, never()).saveExchange(any(), any(), any());
     }
 }

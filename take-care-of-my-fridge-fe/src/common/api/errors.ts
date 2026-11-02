@@ -88,6 +88,11 @@ export function getChatErrorInfo(code?: string): ChatErrorInfo {
       return {
         message: '지금은 상담을 이용할 수 없어요. 잠시 후 다시 시도해 주세요',
       };
+    case 'CHAT_009':
+      return {
+        message: '다른 창에서 답을 받는 중이에요. 답이 끝나면 다시 보내 주세요',
+        action: 'restoreInput',
+      };
     case 'A003':
       return {
         message: '로그인이 만료되었어요. 다시 로그인해 주세요',

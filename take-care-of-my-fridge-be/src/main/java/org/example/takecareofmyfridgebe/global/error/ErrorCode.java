@@ -124,6 +124,7 @@ public enum ErrorCode {
     CHAT_SESSION_EXPIRED(HttpStatus.CONFLICT, "CHAT_006", "상담 세션이 만료되었습니다."),
     CHAT_DAILY_LIMIT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "CHAT_007", "하루 상담 질문 가능 횟수를 초과했습니다."),
     CHAT_SERVICE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "CHAT_008", "일시적으로 상담 기능을 이용할 수 없습니다. 잠시 후 다시 시도해 주세요."),
+    CHAT_REPLY_IN_PROGRESS(HttpStatus.CONFLICT, "CHAT_009", "다른 창에서 답을 받는 중이에요"),
 
     // Recipe
     RECIPE_NOT_FOUND(HttpStatus.NOT_FOUND, "RECIPE_001", "레시피를 찾을 수 없습니다."),

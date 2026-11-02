@@ -16,6 +16,7 @@ import { ROUTES } from '@/app/paths';
 import { getChatErrorInfo, getErrorCode, type ChatErrorInfo } from '@/common/api/errors';
 import { useAuthStore } from '@/common/auth/authStore';
 import { streamMessage } from '../api';
+import { useChatStreamingStore } from '../model/useChatStreamingStore';
 import { chatQueries, useCompleteChatSession, useStartChatSession } from '../queries';
 import { ChatMessageBubble } from './ChatMessageBubble';
 import styles from './ChatRoomSection.module.scss';
@@ -98,6 +99,16 @@ export function ChatRoomSection({
   useEffect(() => {
     onStreamingChange?.(isStreaming);
   }, [isStreaming, onStreamingChange]);
+
+  // 이 창에서 답을 받는 중인 상담을 앱 전체에 알린다. 완료(기록 다시 받기까지)·오류·취소로 스트리밍 말풍선이
+  // 사라지거나, 채팅창을 닫아 이 컴포넌트가 사라지면 비운다.
+  const startStreaming = useChatStreamingStore((state) => state.startStreaming);
+  const finishStreaming = useChatStreamingStore((state) => state.finishStreaming);
+  useEffect(() => {
+    if (!isStreaming || sessionId <= 0) return;
+    startStreaming(sessionId);
+    return () => finishStreaming(sessionId);
+  }, [isStreaming, sessionId, startStreaming, finishStreaming]);
 
   useEffect(() => {
     onRegisterAbort?.(() => {
@@ -252,6 +263,10 @@ export function ChatRoomSection({
           }
           if (errorInfo.action === 'restart') {
             setSendErrorInfo(errorInfo);
+          }
+          // 다시 보낼 수 있는 실패(다른 창에서 답을 받는 중 등)는 보내려던 내용을 입력창에 되돌린다.
+          if (errorInfo.action === 'restoreInput') {
+            setInputText(text);
           }
 
           setStreamingUserMessage(null);
