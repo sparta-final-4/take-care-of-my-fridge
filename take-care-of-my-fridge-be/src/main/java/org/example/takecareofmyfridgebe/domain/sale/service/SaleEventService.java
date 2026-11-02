@@ -82,9 +82,7 @@ public class SaleEventService {
     public void update(Long saleEventId, SaleEventUpdateRequest request, List<Product> products) {
         SaleEvent saleEvent = getSaleEventForUpdate(saleEventId);
         LocalDateTime now = LocalDateTime.now(SaleEvent.ZONE);
-        if (!saleEvent.isEditable(now)) {
-            throw new BusinessException(ErrorCode.SALE_EVENT_NOT_EDITABLE);
-        }
+        saleEvent.validateEditable(now);
         validateStartsAt(request.startsAt());
 
         List<SaleEventItem> items = saleEventItemRepository.findBySaleEventIdOrderById(saleEventId);
@@ -107,18 +105,14 @@ public class SaleEventService {
     public void end(Long saleEventId) {
         SaleEvent saleEvent = getSaleEventForUpdate(saleEventId);
         LocalDateTime now = LocalDateTime.now(SaleEvent.ZONE);
-        if (!saleEvent.isEndable(now)) {
-            throw new BusinessException(ErrorCode.SALE_EVENT_NOT_ENDABLE);
-        }
+        saleEvent.validateEndable(now);
         saleEvent.end(now);
     }
 
     @Transactional
     public void delete(Long saleEventId) {
         SaleEvent saleEvent = getSaleEventForUpdate(saleEventId);
-        if (!saleEvent.isDeletable(LocalDateTime.now(SaleEvent.ZONE))) {
-            throw new BusinessException(ErrorCode.SALE_EVENT_NOT_DELETABLE);
-        }
+        saleEvent.validateDeletable(LocalDateTime.now(SaleEvent.ZONE));
         saleEventItemRepository.deleteAll(saleEventItemRepository.findBySaleEventIdOrderById(saleEventId));
         saleEventRepository.delete(saleEvent);
     }
