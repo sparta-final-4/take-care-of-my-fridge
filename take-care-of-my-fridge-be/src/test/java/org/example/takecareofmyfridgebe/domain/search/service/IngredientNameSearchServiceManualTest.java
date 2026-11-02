@@ -1,7 +1,7 @@
 package org.example.takecareofmyfridgebe.domain.search.service;
 
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
-import org.example.takecareofmyfridgebe.domain.ingredient.dto.IngredientCandidate;
+import org.example.takecareofmyfridgebe.domain.search.dto.IngredientCandidate;
 import org.example.takecareofmyfridgebe.domain.search.config.RecipeSearchProperties;
 import org.example.takecareofmyfridgebe.domain.search.config.RecipeSearchProperties.IndexProperties;
 import org.example.takecareofmyfridgebe.domain.search.config.RecipeSearchProperties.IngredientIndexProperties;

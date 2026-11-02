@@ -1,4 +1,4 @@
-package org.example.takecareofmyfridgebe.domain.ingredient.dto;
+package org.example.takecareofmyfridgebe.domain.search.dto;
 
 /**
  * 재료명 하나에 대한 표준 재료 후보.
