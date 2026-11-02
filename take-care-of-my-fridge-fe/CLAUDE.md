@@ -204,6 +204,7 @@ export async function getMyInfo(signal?: AbortSignal): Promise<MyInfoResponse> {
 - mutation 실패 알림은 `MutationCache.onError`(`src/app/queryClient.ts`)에서 한 번만. 화면에서 직접 처리하면 `meta: { skipGlobalError: true }`.
 - mutation 후에는 `setQueryData`보다 `invalidateQueries`.
   - 예외(응답 전 화면 먼저 바꾸기): 장바구니 수량 변경·삭제만 `onMutate`에서 `setQueryData`로 화면을 먼저 바꾸고, 모든 변경이 끝나면 `invalidateQueries`로 서버 값에 맞춘다(실패 시 되돌림 포함). 요청은 `scope`로 순서대로 보내고, 반영 전에는 주문 버튼을 막는다(`CartSection.tsx`, `CartSummary.tsx`). 주문·결제·환불·요리 완료처럼 서버가 확정해야 하는 동작에는 쓰지 않는다.
+  - 예외(서버 신호로 상태만 맞출 때): 다시 받으면 서버 값이 바뀌는 쿼리(예: POST로 상담을 시작하는 진행 중 상담 `['chat','activeSession']`)는 실시간 신호가 알려 준 상태만 `setQueryData`로 바꾼다. 서버가 이미 확정한 값을 옮기는 것만 허용하고, 다른 필드는 바꾸지 않는다(`domains/chat/chatSessionEvent.ts`).
 - **콜백 위치**: 캐시 무효화는 `useMutation` 옵션에, 메시지·화면 이동은 `mutate(값, { onSuccess })`에 둔다(언마운트되면 실행되지 않음).
 
 ```ts

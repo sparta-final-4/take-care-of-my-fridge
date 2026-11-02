@@ -1,0 +1,15 @@
+.notice {
+  padding: var(--ant-padding-xxs) var(--ant-padding-sm);
+  border-bottom: 1px solid var(--ant-color-border-secondary);
+  background-color: var(--ant-color-fill-quaternary);
+  flex-shrink: 0;
+}
+
+.text {
+  font-size: var(--ant-font-size-sm);
+}
+
+.link:hover .text,
+.link:focus-visible .text {
+  text-decoration: underline;
+}

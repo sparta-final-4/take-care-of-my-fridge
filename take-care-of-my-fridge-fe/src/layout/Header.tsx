@@ -8,9 +8,12 @@ import { ROUTES } from '@/app/paths';
 import { useAuthStore } from '@/common/auth/authStore';
 import { setSession } from '@/common/auth/session';
 import { sessionId } from '@/common/auth/sessionId';
+import { useMemberEventStream } from '@/common/sse/useMemberEventStream';
 import { logout } from '@/domains/auth/api';
 import { cartQueries } from '@/domains/cart/queries';
+import { chatSessionEventListener } from '@/domains/chat/chatSessionEvent';
 import { NotificationBell } from '@/domains/notification/components/NotificationBell';
+import { notificationEventListener } from '@/domains/notification/notificationEvent';
 
 import styles from './Header.module.scss';
 
@@ -41,6 +44,9 @@ const ADMIN_NAV_ITEMS = [
   { label: '정산', path: ROUTES.adminSettlements, activePaths: [ROUTES.adminSettlements] },
 ] as const;
 
+// 회원 실시간 신호에 붙일 도메인 처리기. 바뀌면 다시 연결하므로 모듈 상수로 둔다.
+const MEMBER_EVENT_LISTENERS = [notificationEventListener, chatSessionEventListener];
+
 // 백엔드 검색어 길이 제한(RecipeListRequest.keyword)
 const SEARCH_KEYWORD_MAX_LENGTH = 50;
 
@@ -65,6 +71,8 @@ export function Header() {
     enabled: status === 'authenticated',
   });
   const cartCount = status === 'authenticated' ? (cartItems?.length ?? 0) : 0;
+  // 실시간 신호는 앱 전체에서 여기 하나만 연다. 알림 종을 보여 주는 로그인한 일반 회원만(관리자는 열지 않음).
+  useMemberEventStream(status === 'authenticated' && !isAdmin, MEMBER_EVENT_LISTENERS);
 
   const handleOpenDrawer = () => setDrawerOpen(true);
   const handleCloseDrawer = () => setDrawerOpen(false);
