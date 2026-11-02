@@ -72,6 +72,12 @@ app:
     timeout: 30m
     heartbeat-interval: 30s
     max-connections-per-member: 5
+  # 냉장고 재료명 → 표준 재료 매칭 (IngredientMatcher)
+  ingredient:
+    # 재료 후보 1등 점수가 이 값 이상이면 채택 (1.0 = 이름·별칭 정확 일치)
+    exact-match-score: 1.0
+    # 끝부분 규칙("서울우유" → 우유)에 쓸 후보 이름 최소 글자 수. 한 글자("파", "무")는 뺀다
+    suffix-min-length: 2
   chat:
     daily-limit: 30
     session-timeout: 30m
