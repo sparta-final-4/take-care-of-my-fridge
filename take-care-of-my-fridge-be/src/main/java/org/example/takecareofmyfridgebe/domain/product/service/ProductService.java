@@ -27,6 +27,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -188,15 +189,15 @@ public class ProductService {
     }
 
     // 이미 판매 중지된 상품을 다시 삭제해도 같은 결과이므로 성공으로 처리한다.
-    // 주문 생성과 같은 행 잠금을 걸어, 삭제 직후 진행 중인 주문이 판매 중지 상품을 사지 않게 한다.
+    // 원자적 UPDATE도 주문 생성과 같은 행에 쓰기 잠금을 걸어, 삭제 직후 진행 중인 주문이 판매 중지 상품을 사지 않게 한다.
     @Transactional
     public void deleteProduct(Long productId) {
-        Product product = productRepository.findByIdForUpdate(productId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.PRODUCT_NOT_FOUND));
-        product.stop();
+        if (productRepository.updateStatus(productId, ProductStatus.STOPPED, LocalDateTime.now()) == 0) {
+            throw new BusinessException(ErrorCode.PRODUCT_NOT_FOUND);
+        }
 
         // 단건 인덱싱 위한 이벤트 발행
-        eventPublisher.publishEvent(ProductChangedEvent.from(product.getId()));
+        eventPublisher.publishEvent(ProductChangedEvent.from(productId));
     }
 
     private IngredientProduct updateIngredientDetail(Long productId, ProductUpdateRequest request) {
