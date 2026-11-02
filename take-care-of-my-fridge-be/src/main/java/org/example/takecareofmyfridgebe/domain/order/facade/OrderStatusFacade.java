@@ -96,12 +96,12 @@ public class OrderStatusFacade {
         if (refundQueryService.hasRequestedRefund(order.getId())) {
             throw new BusinessException(ErrorCode.ORDER_REFUND_IN_PROGRESS);
         }
-        if (refundQueryService.isFullyRefunded(order)) {
-            throw new BusinessException(ErrorCode.ORDER_FULLY_REFUNDED);
-        }
         List<OrderItem> items = orderReader.getOrderItems(order);
         Map<Long, Long> completedRefundQuantities = refundQueryService.getCompletedRefundQuantities(
                 items.stream().map(OrderItem::getId).toList());
+        return orderStatusService.confirm(order, items, completedRefundQuantities);
+    }
+
     // 환불 쪽이 환불 완료 뒤 특가·번개 드롭 상품이 없는 주문의 모든 상품이 환불됐다고 판단하면 부른다.
     // 전액 환불인지 다시 확인하지 않고, 결제 완료 주문인지만 본다.
     @Transactional
@@ -125,9 +125,6 @@ public class OrderStatusFacade {
     private Order getOrderForUpdate(Long orderId) {
         return orderReader.findOrderForUpdate(orderId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.ORDER_NOT_FOUND));
-    }
-
-        return orderStatusService.confirm(order, items, completedRefundQuantities);
     }
 
     // 주문하기(OrderFacade)와 같은 순서(상품 ID 순)로 상품 행을 잠가 서로 섞이지 않게 한다.
