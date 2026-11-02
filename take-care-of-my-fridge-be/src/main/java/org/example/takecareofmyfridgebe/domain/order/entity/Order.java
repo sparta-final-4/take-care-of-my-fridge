@@ -116,15 +116,26 @@ public class Order extends BaseTimeEntity {
         return status == OrderStatus.CONFIRMED;
     }
 
-    // 결제 완료 주문만 구매 확정한다. 취소된 주문과 결제 전 주문은 이유를 나눠 거절한다.
+    // 결제 완료 주문만 구매 확정한다. 취소된 주문, 전액 환불된 주문, 결제 전 주문은 이유를 나눠 거절한다.
     public void confirm(LocalDateTime confirmedAt) {
         if (status == OrderStatus.CANCELLED) {
             throw new BusinessException(ErrorCode.ORDER_CANCELLED);
+        }
+        if (status == OrderStatus.REFUNDED) {
+            throw new BusinessException(ErrorCode.ORDER_FULLY_REFUNDED);
         }
         if (status != OrderStatus.PAID) {
             throw new BusinessException(ErrorCode.ORDER_NOT_PAID);
         }
         this.status = OrderStatus.CONFIRMED;
         this.confirmedAt = confirmedAt;
+    }
+
+    // 결제 완료 주문만 전액 환불 상태로 바꾼다. 전액 환불인지는 환불 쪽이 판단한다.
+    public void markRefunded() {
+        if (status != OrderStatus.PAID) {
+            throw new BusinessException(ErrorCode.INVALID_ORDER_STATUS);
+        }
+        this.status = OrderStatus.REFUNDED;
     }
 }
