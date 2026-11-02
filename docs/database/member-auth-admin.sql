@@ -64,6 +64,19 @@ CREATE TABLE prediction_runs (
     CONSTRAINT uk_prediction_runs_target_week_start UNIQUE (target_week_start)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '주간 판매 예측 실행';
 
+-- 주간 예측 배치 시도 상태
+CREATE TABLE forecast_batch_runs (
+    id                BIGINT       NOT NULL AUTO_INCREMENT COMMENT '기록 ID',
+    target_week_start DATE         NOT NULL COMMENT '예측 대상 주 시작일(월요일)',
+    status            VARCHAR(30)  NOT NULL COMMENT '마지막 배치 결과',
+    attempted_at      DATETIME(6)  NOT NULL COMMENT '마지막 배치 시도 시각',
+    failure_type      VARCHAR(100) NULL COMMENT '실패 예외 종류(메시지 제외)',
+    created_at        DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '최초 기록 시각',
+    updated_at        DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '변경 시각',
+    PRIMARY KEY (id),
+    CONSTRAINT uk_forecast_batch_runs_target_week_start UNIQUE (target_week_start)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '주간 예측 배치의 마지막 시도';
+
 -- 5. 상품별 예측 · 실제 판매량
 CREATE TABLE sales_forecasts (
     id                BIGINT       NOT NULL AUTO_INCREMENT COMMENT '상품별 예측 ID',

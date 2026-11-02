@@ -65,6 +65,20 @@
 
 - 주 1건만 저장하며, 주가 시작되면 예측을 바꾸지 않습니다.
 
+## forecast_batch_runs — 주간 예측 배치 시도
+
+| 컬럼 | 타입 | NULL | 기본값 | 제약 | 의미 |
+|---|---|---|---|---|---|
+| id | BIGINT | 불가 | 자동 증가 | PK | 기록 ID |
+| target_week_start | DATE | 불가 | | UK | 예측 대상 주의 월요일 |
+| status | VARCHAR(30) | 불가 | | | CREATED·ALREADY_EXISTS·NO_PRODUCTS·NO_TRAINING_SAMPLES·FAILED |
+| attempted_at | DATETIME(6) | 불가 | | | 마지막 시도 시각(Asia/Seoul) |
+| failure_type | VARCHAR(100) | 허용 | NULL | | 실패 예외의 종류만 저장. 메시지·민감 값 제외 |
+| created_at | DATETIME(6) | 불가 | 현재 시각 | | 최초 기록 시각 |
+| updated_at | DATETIME(6) | 불가 | 현재 시각 | | 마지막 변경 시각 |
+
+- 대상 주마다 최근 배치 결과 1건을 유지합니다. 성공 후 재확인한 ALREADY_EXISTS는 CREATED 상태를 덮어쓰지 않습니다.
+
 ## sales_forecasts — 상품별 예측과 실제 판매량
 
 | 컬럼 | 타입 | NULL | 기본값 | 제약 | 의미 |

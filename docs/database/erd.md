@@ -4,7 +4,7 @@
 
 ## 개인 담당 테이블 관계
 
-회원·인증·관리자 범위의 테이블 8개입니다. 상품·할인 행사·주문 등 다른 도메인의 테이블은 포함하지 않습니다. 컬럼 정의는 [데이터 사전](data-dictionary.md), DDL 초안은 [member-auth-admin.sql](member-auth-admin.sql)에 있습니다.
+회원·인증·관리자 범위의 테이블 9개입니다. 상품·할인 행사·주문 등 다른 도메인의 테이블은 포함하지 않습니다. 컬럼 정의는 [데이터 사전](data-dictionary.md), DDL 초안은 [member-auth-admin.sql](member-auth-admin.sql)에 있습니다.
 
 ```mermaid
 erDiagram
@@ -40,6 +40,13 @@ erDiagram
         date target_week_start UK
         varchar model_version
         datetime data_cutoff_at
+    }
+    forecast_batch_runs {
+        bigint id PK
+        date target_week_start UK
+        varchar status
+        datetime attempted_at
+        varchar failure_type
     }
     sales_forecasts {
         bigint id PK
