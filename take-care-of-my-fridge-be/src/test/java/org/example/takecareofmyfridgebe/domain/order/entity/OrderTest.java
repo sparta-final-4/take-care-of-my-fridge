@@ -141,4 +141,44 @@ class OrderTest {
             .isInstanceOf(BusinessException.class)
             .extracting("errorCode").isEqualTo(ErrorCode.ORDER_CANCELLED);
     }
+
+    @Test
+    void markRefundedChangesPaidOrderToRefunded() {
+        Order order = newOrder();
+        order.markPaid(LocalDateTime.of(2026, 11, 2, 12, 0));
+
+        order.markRefunded();
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.REFUNDED);
+    }
+
+    @Test
+    void markRefundedRejectsPendingAndConfirmedOrder() {
+        Order pending = newOrder();
+        Order confirmed = newOrder();
+        confirmed.markPaid(LocalDateTime.of(2026, 11, 2, 12, 0));
+        confirmed.confirm(LocalDateTime.of(2026, 11, 9, 12, 0));
+
+        assertThatThrownBy(pending::markRefunded)
+            .isInstanceOf(BusinessException.class)
+            .extracting("errorCode").isEqualTo(ErrorCode.INVALID_ORDER_STATUS);
+        assertThatThrownBy(confirmed::markRefunded)
+            .isInstanceOf(BusinessException.class)
+            .extracting("errorCode").isEqualTo(ErrorCode.INVALID_ORDER_STATUS);
+        assertThat(pending.getStatus()).isEqualTo(OrderStatus.PENDING);
+        assertThat(confirmed.getStatus()).isEqualTo(OrderStatus.CONFIRMED);
+    }
+
+    @Test
+    void confirmRejectsRefundedOrderAsFullyRefunded() {
+        Order order = newOrder();
+        order.markPaid(LocalDateTime.of(2026, 11, 2, 12, 0));
+        order.markRefunded();
+
+        assertThatThrownBy(() -> order.confirm(LocalDateTime.now()))
+            .isInstanceOf(BusinessException.class)
+            .extracting("errorCode").isEqualTo(ErrorCode.ORDER_FULLY_REFUNDED);
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.REFUNDED);
+        assertThat(order.getConfirmedAt()).isNull();
+    }
 }
