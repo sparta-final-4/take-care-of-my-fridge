@@ -53,12 +53,13 @@ Q-01~Q-17에 의존하는 테스트는 기대값을 합의한 뒤 구현합니�
 | ORDER-06 | P0 | 타인 주문 조회·취소·확정 | 없는 주문과 같은 404, 상태 불변 | `OrderQueryServiceTransactionTest`, `OrderStatusFacadeCancelTransactionTest`, `OrderStatusFacadeConfirmTransactionTest` |
 | ORDER-07 | P0 | 한정 수량보다 많은 회원이 번개 드롭을 동시에 주문 | 한정 수량만큼만 성공, 남은 수량 0 | `OrderFacadeSaleTransactionTest` |
 | ORDER-08 | P0 | 번개 드롭을 이미 산 회원이 다시 주문, 취소 뒤 다시 주문 | 다시 주문은 `CART_003`, 취소하면 남은 수량이 돌아와 주문 가능 | `OrderFacadeSaleTransactionTest` |
-| ORDER-09 | P1 | 주문 목록 조회 | 결제 대기·결제 완료·구매 확정만 최신순, 취소 제외, 1부터 센 페이지 | `OrderQueryServiceTransactionTest` |
+| ORDER-09 | P1 | 주문 목록 조회 | 결제 대기·결제 완료·구매 확정·전액 환불만 최신순, 취소 제외, 1부터 센 페이지 | `OrderQueryServiceTransactionTest` |
 | ORDER-10 | P1 | 주문번호 생성 | 20자리 숫자, 서버 두 대가 같은 밀리초에 동시에 만들어도 안 겹침, 한 밀리초 1000개 초과나 겹치면 `ORDER_005`, Redis 장애면 `ORDER_013` | `OrderNumberGeneratorTest`, `OrderFacadeConstraintTest` |
 | ORDER-11 | P0 | 결제를 시도한 결제 대기 주문 취소, 취소하기와 결제하기 동시 | 결제 시도가 있으면 `ORDER_012`로 거절하고 주문·재고 불변. 동시면 하나만 성공하고 결제가 붙은 주문은 지워지지 않음 | `OrderStatusFacadeCancelTransactionTest` |
 | ORDER-12 | P0 | 주문 만료, 취소하기와 주문 만료 동시 | 생성 5분이 지난 결제 시도 없는 결제 대기 주문만 지움. 동시면 재고는 한 번만 복구 | `OrderStatusFacadeCancelTransactionTest`, `OrderExpireSchedulerTest` |
 | ORDER-13 | P0 | 결제 정리, 결제 정리와 결제하기·주문 취소 동시 | 진행 중 결제가 없고 마지막 결제 뒤 10분이 지난 결제 대기 주문만 취소 상태로 바꾸고 재고 복구, 결제 행 유지. 동시면 재고는 많아야 한 번 복구 | `OrderStatusFacadeCancelTransactionTest`, `PaymentTimeoutSchedulerTest` |
 | ORDER-14 | P0 | 구매 확정, 다시 확정, 환불 진행 중 거절, 같은 주문 동시 확정 | 구매 확정으로 바뀐 커밋에서만 이벤트가 한 번 나가고 확정 수량이 남은 상품만 실림. 다시 확정·거절이면 안 나가고, 동시면 한 번만. `purchase-confirmed` 토픽에 주문 ID 키로 도착 | `OrderStatusFacadeConfirmTransactionTest`, `OrderConfirmedEventListenerTest` |
+| ORDER-15 | P0 | 결제 완료 주문을 전액 환불로 변경, 결제 완료가 아닌 주문 변경, 전액 환불 주문 구매 확정, 번개 드롭만 남은 주문을 환불 뒤 구매 확정 | 전액 환불로 바뀌고, 결제 완료가 아니면 `ORDER_002`. 전액 환불 주문 구매 확정은 `ORDER_014`로 거절하고 이벤트가 안 나감. 환불 뒤 구매 확정은 환불된 상품 확정 수량 0, 번개 드롭 상품만 이벤트에 실림 | `OrderTest`, `OrderStatusFacadeConfirmTransactionTest` |
 
 ## 환불 필수 시나리오
 
