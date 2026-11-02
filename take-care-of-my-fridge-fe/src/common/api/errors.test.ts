@@ -1,7 +1,12 @@
 import { AxiosError, AxiosHeaders } from 'axios';
 import { describe, expect, it } from 'vitest';
 
-import { getErrorCode, getErrorMessage, getImageUploadErrorMessage } from './errors';
+import {
+  getChatErrorInfo,
+  getErrorCode,
+  getErrorMessage,
+  getImageUploadErrorMessage,
+} from './errors';
 
 function responseError(status: number, data: unknown) {
   const config = { headers: new AxiosHeaders() };
@@ -75,5 +80,14 @@ describe('getImageUploadErrorMessage', () => {
     expect(getImageUploadErrorMessage(new Error('image upload failed: 403'))).toBe(
       '이미지를 올리지 못했습니다. 잠시 후 다시 시도해 주세요.',
     );
+  });
+});
+
+describe('getChatErrorInfo', () => {
+  it('CHAT_009(다른 창에서 답을 받는 중)는 안내하고 보내려던 내용을 되돌린다', () => {
+    expect(getChatErrorInfo('CHAT_009')).toEqual({
+      message: '다른 창에서 답을 받는 중이에요. 답이 끝나면 다시 보내 주세요',
+      action: 'restoreInput',
+    });
   });
 });

@@ -197,12 +197,14 @@ HTTP 메서드·경로·DTO 이름은 구현 전 합의합니다.
 |---|---|---|---|---|---|
 | 내 상담 목록 | GET /chat-sessions | 로그인 | Query: page(기본 1), size(기본 10, 최대 100), status(ALL/ACTIVE/ENDED, 기본 ALL) | 200, `ChatSessionListResponse` | 400 page/size/status 오류, 401 |
 | 상담 메시지 조회(기존) | GET /chat-sessions/{sessionId}/messages | 로그인 | Path: sessionId | 200, `ChatMessageResponse[]` | 401, 404 없음/타인 상담 |
+| 상담 메시지 보내기(기존) | POST /chat-sessions/{sessionId}/messages | 로그인 | Path: sessionId, Body: content(최대 500자) | 200, `text/event-stream` (`message` 조각 → `done`, 실패 시 `error`) | 스트림 전 JSON 오류: 401, 404, 409 `CHAT_005` 끝난 상담·`CHAT_006` 만료·`CHAT_009` 다른 창에서 답을 받는 중, 429 `CHAT_007` 하루 횟수, 503 `CHAT_008` |
 
 - `ChatSessionListResponse`: `counts`(`ChatSessionStatusCounts`: total, active, ended — 상태 필터와 상관없는 탭 건수), `sessions`(`PageResponse<ChatSessionSummaryResponse>`, 다음 페이지 여부는 공통 `isLast`).
 - `ChatSessionSummaryResponse`: sessionId, status(ACTIVE/COMPLETED/EXPIRED), startedAt(세션 생성 시각), lastMessageAt, messageCount, firstQuestion(첫 USER 메시지 앞 50자), lastMessagePreview(마지막 메시지 앞 50자, 역할 무관). 자르기는 코드 포인트 기준. 시각은 `yyyy-MM-dd HH:mm:ss`.
 - 상태: ACTIVE = 진행 중이면서 마지막 대화가 시간 제한(`chat.session-timeout`, 30분) 안. ENDED = 종료(COMPLETED) + 만료(EXPIRED). 시간이 지났는데 아직 ACTIVE로 남은 상담(다음 상담 시작 때 만료 처리됨)은 목록 status를 EXPIRED로 주고 ENDED 필터·종료 건수에 넣습니다.
 - 본인 상담만, 최근 시작순(startedAt 내림차순, 같으면 id 내림차순). 메시지가 0개인 상담은 목록·건수에서 빠집니다.
 - 쿼리: 세션 목록 1회 + 세션 ID 목록으로 메시지 수·첫 질문·마지막 메시지 1회(그룹 집계 + 상관 서브쿼리) + 탭 건수 1회(조건 합계). 전체 개수가 필요할 때만 count 1회 추가.
+- 메시지 보내기 순서(2026-11-02 추가): 세션 검증 → 답 받기 잠금(`chat:streaming:{sessionId}`, SET NX + 요청 토큰, 유지 `app.chat.reply-lock-ttl` 150초) → 하루 횟수 차감 → 스트림. 잠금에 실패하면 409 `CHAT_009`이고 하루 횟수를 쓰지 않습니다. 하루 횟수에서 실패하면 잠금을 풀고 그 오류를 돌려줍니다. 잠금은 스트림이 완료·오류·끊김 중 어느 쪽으로 끝나도 풀고, 토큰이 같을 때만 지웁니다. Redis 장애면 503 `CHAT_008`.
 - 종료·만료된 상담도 본인 것이면 기존 메시지 조회 API로 대화를 볼 수 있습니다.
 
 ## 후기 API
