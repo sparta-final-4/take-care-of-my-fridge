@@ -19,6 +19,12 @@
   width: 100%;
 }
 
+.registrationAction {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--ant-margin-lg);
+}
+
 .excludedTitle {
   margin-top: var(--ant-margin-xl);
 }

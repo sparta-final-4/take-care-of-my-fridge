@@ -23,7 +23,7 @@
 | A-03 /admin/products/new | ADMIN | 현재 API 기준 이미지 URL·권장 보관 일수(1 이상)·보관 방법(상온/냉장/냉동)을 입력해 등록. 가격 1원 이상. 이미지 업로드·유통기한 날짜는 API 제공 후 재검토 |
 | A-04 /admin/forecast | ADMIN | 주간 예상 TOP 10. 모델 버전·생성 시각·dataCutoff·기준선·가상 데이터 표시. 주 시작 후 예측 고정 |
 | A-05 /admin/forecast?tab=result | ADMIN | 예측 vs 실제 판매량. 예측·확정 실적·기준선 비교, TOP 10 일치·진입·이탈·MAE. 집계 시각·산정 기준 표시 |
-| A-06 /admin/deal-candidates | ADMIN | 요일·가상 할인율·최소 재고로 후보 분석. 미검토·선택·보류 저장. 제외 이유 표시. 실제 가격 변경 없음 |
+| A-06 /admin/deal-candidates | ADMIN | 요일·가상 할인율·최소 재고로 후보 분석. 여러 후보를 체크해 공통 기간으로 행사 등록. 선택하지 않은 후보는 미검토 유지, 보류 버튼 없음. 제외 이유 표시. 행사 등록 시 실제 할인 적용 |
 | A-09 /admin/audit | ADMIN, 조회 화면은 제안 | 관리자 작업 이력. 성공·실패·권한 거부 이력. 작업자·대상·변경 전후·시각. 수정·삭제 없음 |
 | A-10 /admin/members | ADMIN | 회원 검색·역할 필터. ACTIVE USER 승격 확인·기록. 정지 계정 승격 금지. 권한 해제 제외 |
 | A-11 /admin/promotions | ADMIN, 담당 협의 | 행사 요청·등록·반려·종료. S5의 특가·번개 드롭 운영과 통합 범위 Q-05 |

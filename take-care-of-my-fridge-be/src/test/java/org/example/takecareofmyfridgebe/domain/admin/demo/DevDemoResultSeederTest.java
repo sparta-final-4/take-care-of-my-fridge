@@ -54,7 +54,8 @@ class DevDemoResultSeederTest extends MySqlContainerSupport {
                     .status(ProductStatus.ON_SALE).build());
         }
         PredictionRun real = runs.save(PredictionRun.builder()
-                .targetWeekStart(java.time.LocalDate.now().with(
+                // 시더와 같은 서울 기준 주차. JVM 기본 시간대(CI는 UTC)를 쓰면 KST 월요일 00~09시에 주차가 어긋난다
+                .targetWeekStart(java.time.LocalDate.now(java.time.ZoneId.of("Asia/Seoul")).with(
                         java.time.temporal.TemporalAdjusters.previousOrSame(
                                 java.time.DayOfWeek.MONDAY)).minusWeeks(2))
                 .modelVersion("real-model").dataCutoffAt(java.time.LocalDateTime.now())

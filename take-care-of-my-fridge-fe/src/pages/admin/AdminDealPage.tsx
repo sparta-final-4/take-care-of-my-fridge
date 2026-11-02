@@ -63,7 +63,8 @@ export default function AdminDealPage() {
   const queryClient = useQueryClient();
   const [form] = Form.useForm<EventFormValues>();
   const [analysisForm] = Form.useForm<AnalysisFormValues>();
-  const [candidate, setCandidate] = useState<Candidate | null>(null);
+  const [selectedCandidateIds, setSelectedCandidateIds] = useState<number[]>([]);
+  const [registrationOpen, setRegistrationOpen] = useState(false);
   const type = Form.useWatch('type', form);
   const {
     data: analysis,
@@ -72,37 +73,56 @@ export default function AdminDealPage() {
     isError,
     refetch,
   } = useQuery(demo ? dealQueries.demo() : dealQueries.latest());
-
-  const review = useMutation({
-    mutationFn: ({
-      candidateId,
-      reviewStatus,
-    }: {
-      candidateId: number;
-      reviewStatus: 'SELECTED' | 'HELD';
-    }) =>
-      saveDealReview(analysis!.analysisId!, {
-        reviews: [{ candidateId, reviewStatus }],
-      }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: dealQueries.all }),
-  });
+  const availableSelectedIds = selectedCandidateIds.filter((id) =>
+    analysis?.candidates?.some(
+      (item) => item.candidateId === id && item.eventRequestStatus === 'NONE',
+    ),
+  );
 
   const registration = useMutation({
-    mutationFn: (values: EventFormValues) =>
-      registerDealEvent(analysis!.analysisId!, {
-        candidateId: candidate!.candidateId!,
-        type: values.type,
-        startsAt: values.startsAt.format(REQUEST_TIME_FORMAT),
-        endsAt: values.endsAt.format(REQUEST_TIME_FORMAT),
-        ...(values.type === 'FLASH_DROP' ? { limitedQuantity: values.limitedQuantity } : {}),
-      }),
-    onSuccess: () => {
-      void message.success('할인 행사를 등록했습니다.');
-      setCandidate(null);
-      form.resetFields();
+    mutationFn: async (values: EventFormValues) => {
+      const candidates = (analysis!.candidates ?? []).filter(
+        (item) => item.candidateId !== undefined && availableSelectedIds.includes(item.candidateId),
+      );
+      const reviews = candidates
+        .filter((item) => item.reviewStatus !== 'SELECTED')
+        .map((item) => ({ candidateId: item.candidateId!, reviewStatus: 'SELECTED' as const }));
+      if (reviews.length > 0) {
+        await saveDealReview(analysis!.analysisId!, { reviews });
+      }
+      const registeredIds: number[] = [];
+      for (const item of candidates) {
+        try {
+          await registerDealEvent(analysis!.analysisId!, {
+            candidateId: item.candidateId!,
+            type: values.type,
+            startsAt: values.startsAt.format(REQUEST_TIME_FORMAT),
+            endsAt: values.endsAt.format(REQUEST_TIME_FORMAT),
+            ...(values.type === 'FLASH_DROP' ? { limitedQuantity: values.limitedQuantity } : {}),
+          });
+          registeredIds.push(item.candidateId!);
+        } catch {
+          return { registeredIds, failed: true };
+        }
+      }
+      return { registeredIds, failed: false };
+    },
+    meta: { skipGlobalError: true },
+    onSuccess: ({ registeredIds, failed }) => {
+      setSelectedCandidateIds((ids) => ids.filter((id) => !registeredIds.includes(id)));
+      if (failed) {
+        void message.warning(
+          `${registeredIds.length}개 등록 완료, 나머지는 등록하지 못했습니다. 다시 시도해 주세요.`,
+        );
+      } else {
+        void message.success(`${registeredIds.length}개 할인 행사를 등록했습니다.`);
+        setRegistrationOpen(false);
+        form.resetFields();
+      }
       void queryClient.invalidateQueries({ queryKey: saleQueries.all });
       return queryClient.invalidateQueries({ queryKey: dealQueries.all });
     },
+    onError: () => void message.error('후보 선택을 저장하지 못했습니다. 다시 시도해 주세요.'),
   });
 
   const runAnalysis = useMutation({
@@ -116,6 +136,7 @@ export default function AdminDealPage() {
     meta: { skipGlobalError: true },
     onSuccess: () => {
       void message.success('할인 후보 분석을 완료했습니다.');
+      setSelectedCandidateIds([]);
       setSearchParams({});
       return queryClient.invalidateQueries({ queryKey: dealQueries.all });
     },
@@ -158,7 +179,12 @@ export default function AdminDealPage() {
     </Form>
   );
   const demoToggle = demoAvailable && (
-    <Button onClick={() => setSearchParams(demo ? {} : { demo: '1' })}>
+    <Button
+      onClick={() => {
+        setSelectedCandidateIds([]);
+        setSearchParams(demo ? {} : { demo: '1' });
+      }}
+    >
       {demo ? '최근 분석 보기' : '임의 할인 이벤트 추천 보기'}
     </Button>
   );
@@ -245,6 +271,14 @@ export default function AdminDealPage() {
         dataSource={analysis.candidates ?? []}
         scroll={{ x: 1050 }}
         pagination={false}
+        rowSelection={{
+          selectedRowKeys: availableSelectedIds,
+          onChange: (keys) => setSelectedCandidateIds(keys.map(Number)),
+          getCheckboxProps: (item) => ({
+            disabled: item.candidateId === undefined || item.eventRequestStatus !== 'NONE',
+            'aria-label': `${item.productName ?? '상품'} 행사 선택`,
+          }),
+        }}
         columns={[
           { title: '상품', dataIndex: 'productName' },
           { title: '정가', dataIndex: 'regularPrice', render: money },
@@ -290,55 +324,20 @@ export default function AdminDealPage() {
                 '-'
               ),
           },
-          {
-            title: '작업',
-            render: (_, item) => (
-              <Space>
-                {item.eventRequestStatus === 'NONE' && item.reviewStatus !== 'SELECTED' && (
-                  <Button
-                    loading={review.isPending}
-                    disabled={item.candidateId === undefined}
-                    onClick={() =>
-                      review.mutate(
-                        { candidateId: item.candidateId!, reviewStatus: 'SELECTED' },
-                        { onSuccess: () => void message.success('행사 후보로 선택했습니다.') },
-                      )
-                    }
-                  >
-                    선택
-                  </Button>
-                )}
-                {item.eventRequestStatus === 'NONE' && item.reviewStatus !== 'HELD' && (
-                  <Button
-                    loading={review.isPending}
-                    disabled={item.candidateId === undefined}
-                    onClick={() =>
-                      review.mutate(
-                        { candidateId: item.candidateId!, reviewStatus: 'HELD' },
-                        { onSuccess: () => void message.success('후보를 보류했습니다.') },
-                      )
-                    }
-                  >
-                    보류
-                  </Button>
-                )}
-                {item.eventRequestStatus === 'NONE' && item.reviewStatus === 'SELECTED' && (
-                  <Button
-                    type="primary"
-                    disabled={analysis.syntheticData && !demoAvailable}
-                    onClick={() => {
-                      form.setFieldsValue({ type: 'SPECIAL' });
-                      setCandidate(item);
-                    }}
-                  >
-                    행사 등록
-                  </Button>
-                )}
-              </Space>
-            ),
-          },
         ]}
       />
+      <div className={styles.registrationAction}>
+        <Button
+          type="primary"
+          disabled={availableSelectedIds.length === 0 || (analysis.syntheticData && !demoAvailable)}
+          onClick={() => {
+            form.setFieldsValue({ type: 'SPECIAL' });
+            setRegistrationOpen(true);
+          }}
+        >
+          선택한 {availableSelectedIds.length}개 행사 등록
+        </Button>
+      </div>
       <Typography.Title level={5} className={styles.excludedTitle}>
         제외 상품
       </Typography.Title>
@@ -365,18 +364,19 @@ export default function AdminDealPage() {
         ]}
       />
       <Drawer
-        title={`${candidate?.productName ?? ''} 행사 등록`}
-        open={candidate !== null}
+        title={`선택한 ${availableSelectedIds.length}개 상품 행사 등록`}
+        open={registrationOpen}
+        closable={!registration.isPending}
+        maskClosable={!registration.isPending}
         onClose={() => {
-          setCandidate(null);
+          setRegistrationOpen(false);
           form.resetFields();
         }}
         destroyOnHidden
         size="min(440px, 100vw)"
       >
         <Typography.Paragraph>
-          추천 할인율 {analysis.discountRate}% · 분석 당시 예상 할인가{' '}
-          {money(candidate?.discountPrice)}
+          선택한 상품에 할인율 {analysis.discountRate}%와 같은 행사 기간을 적용합니다.
         </Typography.Paragraph>
         <Form<EventFormValues>
           form={form}

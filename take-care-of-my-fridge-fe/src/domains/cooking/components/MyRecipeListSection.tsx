@@ -1,4 +1,4 @@
-import { Fragment, type MouseEvent } from 'react';
+import { Fragment, type MouseEvent, type ReactNode } from 'react';
 import { DownOutlined, EditOutlined, UpOutlined } from '@ant-design/icons';
 import { Button, Empty, Flex, Pagination, Select, Tabs, Tag, Tooltip, Typography } from 'antd';
 import dayjs from 'dayjs';
@@ -255,7 +255,8 @@ export function MyRecipeListSection({
       </>
     );
 
-  const tabItems = [
+  // 탭 키는 CookingTabType만 쓴다. Tabs가 넘겨 주는 문자열 키는 이 목록에서 찾아 타입을 확인한다.
+  const tabItems: { key: CookingTabType; label: ReactNode; children: ReactNode }[] = [
     {
       key: 'ALL',
       label: (
@@ -333,7 +334,10 @@ export function MyRecipeListSection({
       {/* 탭 및 목록 컨텐츠 */}
       <Tabs
         activeKey={currentTab}
-        onChange={(key) => onTabChange(key as CookingTabType)}
+        onChange={(key) => {
+          const tab = tabItems.find((item) => item.key === key)?.key;
+          if (tab) onTabChange(tab);
+        }}
         items={tabItems}
         className={styles.tabs}
         destroyOnHidden

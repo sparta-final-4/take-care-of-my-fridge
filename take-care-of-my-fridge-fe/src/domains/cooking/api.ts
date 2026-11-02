@@ -101,5 +101,5 @@ export async function getPopularRecipes(
   size = 6,
   signal?: AbortSignal,
 ): Promise<PopularRecipeResponse[]> {
-  return unwrap(popularRecipeApi.getPopularRecipes({ size }, { signal }));
+  return unwrap(popularRecipeApi.getPopularRecipes({ request: { size } }, { signal }));
 }

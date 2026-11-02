@@ -7,7 +7,6 @@ import type { ReviewResponse, ReviewSearchRequestSortEnum } from '@/common/api/c
 import { SectionCard } from '@/common/components/SectionCard';
 import { useAuthStore } from '@/common/auth/authStore';
 import { cookingQueries } from '@/domains/cooking/queries';
-import { getReviews } from '@/domains/review/api';
 import { reviewQueries, useDeleteReview } from '@/domains/review/queries';
 
 import { ReviewModal, type InitialReviewData } from './ReviewModal';
@@ -51,17 +50,7 @@ export function RecipeReviewSection({ recipeId, tipSummary }: RecipeReviewSectio
     hasNextPage,
     isFetchingNextPage,
     isPending: isReviewsPending,
-  } = useInfiniteQuery({
-    queryKey: [...reviewQueries.lists(), { recipeId, sort, size: PAGE_SIZE }],
-    queryFn: ({ pageParam = 1, signal }) =>
-      getReviews({ recipeId, sort, page: pageParam, size: PAGE_SIZE }, signal),
-    initialPageParam: 1,
-    getNextPageParam: (lastPage) => {
-      const isLast = lastPage.isLast ?? true;
-      const pageNumber = lastPage.pageNumber ?? 1;
-      return isLast ? undefined : pageNumber + 1;
-    },
-  });
+  } = useInfiniteQuery(reviewQueries.infiniteList({ recipeId, sort, size: PAGE_SIZE }));
 
   const totalElements = reviewsData?.pages[0]?.totalElements ?? 0;
   const reviews = reviewsData?.pages.flatMap((page) => page.content ?? []) ?? [];
@@ -119,29 +108,33 @@ export function RecipeReviewSection({ recipeId, tipSummary }: RecipeReviewSectio
     }
 
     if (myReview) {
+      // id가 없으면 수정·삭제할 수 없으므로 버튼을 숨긴다.
+      const myReviewId = myReview.id;
       return (
         <div className={styles.myReviewBox}>
           <Flex justify="space-between" align="center" className={styles.myReviewHeader}>
             <Typography.Text strong className={styles.myReviewBadge}>
               내가 작성한 후기
             </Typography.Text>
-            <Flex gap="small">
-              <Button type="link" size="small" onClick={() => handleOpenEdit(myReview)}>
-                수정
-              </Button>
-              <Popconfirm
-                title="후기 삭제"
-                description="작성한 후기를 삭제하시겠습니까?"
-                onConfirm={() => handleDelete(myReview.id!)}
-                okText="삭제"
-                cancelText="취소"
-                okButtonProps={{ danger: true }}
-              >
-                <Button type="link" danger size="small" loading={deleteMutation.isPending}>
-                  삭제
+            {myReviewId != null && (
+              <Flex gap="small">
+                <Button type="link" size="small" onClick={() => handleOpenEdit(myReview)}>
+                  수정
                 </Button>
-              </Popconfirm>
-            </Flex>
+                <Popconfirm
+                  title="후기 삭제"
+                  description="작성한 후기를 삭제하시겠습니까?"
+                  onConfirm={() => handleDelete(myReviewId)}
+                  okText="삭제"
+                  cancelText="취소"
+                  okButtonProps={{ danger: true }}
+                >
+                  <Button type="link" danger size="small" loading={deleteMutation.isPending}>
+                    삭제
+                  </Button>
+                </Popconfirm>
+              </Flex>
+            )}
           </Flex>
           <Flex vertical gap="small">
             <Flex gap="middle" align="center">
@@ -171,10 +164,10 @@ export function RecipeReviewSection({ recipeId, tipSummary }: RecipeReviewSectio
     <SectionCard
       title={isReviewsPending ? '후기' : `후기 ${totalElements.toLocaleString('ko-KR')}개`}
       extra={
-        <Segmented
+        <Segmented<ReviewSearchRequestSortEnum>
           size="small"
           value={sort}
-          onChange={(val) => setSort(val as ReviewSearchRequestSortEnum)}
+          onChange={setSort}
           options={[
             { label: '최신순', value: 'LATEST' },
             { label: '별점순', value: 'RATING' },
@@ -220,26 +213,6 @@ export function RecipeReviewSection({ recipeId, tipSummary }: RecipeReviewSectio
                     </Flex>
                     <Rate disabled value={review.rating} />
                   </Flex>
-
-                  {review.mine && (
-                    <Flex gap="small">
-                      <Button type="link" size="small" onClick={() => handleOpenEdit(review)}>
-                        수정
-                      </Button>
-                      <Popconfirm
-                        title="후기 삭제"
-                        description="작성한 후기를 삭제하시겠습니까?"
-                        onConfirm={() => handleDelete(review.id!)}
-                        okText="삭제"
-                        cancelText="취소"
-                        okButtonProps={{ danger: true }}
-                      >
-                        <Button type="link" danger size="small" loading={deleteMutation.isPending}>
-                          삭제
-                        </Button>
-                      </Popconfirm>
-                    </Flex>
-                  )}
                 </Flex>
 
                 <Typography.Paragraph className={styles.content}>

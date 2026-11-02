@@ -231,11 +231,12 @@ function CookingCompleteModalBody({
   const handleSubmit = () => {
     if (!canSubmit || result === null) return;
 
-    const usedIngredients = checkedItems.map((item) => ({
-      ingredientId: item.ingredientId,
-      // [전부] 선택 시 명시적 null 전송 (서버에서 전부 차감 처리)
-      quantity: (item.isAll ? null : (item.quantity ?? null)) as unknown as number,
-    }));
+    // [전부]면 quantity 키를 빼고 보낸다(서버가 남은 양 전부를 차감한다). 냉장고 [먹었어요]와 같은 방식.
+    const usedIngredients = checkedItems.map((item) =>
+      item.isAll || item.quantity == null
+        ? { ingredientId: item.ingredientId }
+        : { ingredientId: item.ingredientId, quantity: item.quantity },
+    );
 
     completeCookingMutation.mutate(
       {

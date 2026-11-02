@@ -7,6 +7,8 @@ import org.example.takecareofmyfridgebe.domain.member.repository.MemberRepositor
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeSummary;
 import org.example.takecareofmyfridgebe.domain.recipe.service.RecipeService;
 import org.example.takecareofmyfridgebe.domain.review.dto.RecipeRatingStat;
+import org.example.takecareofmyfridgebe.domain.review.dto.RecipeReviewContentDto;
+import org.example.takecareofmyfridgebe.domain.review.dto.RecipeReviewSummaryCandidate;
 import org.example.takecareofmyfridgebe.domain.review.dto.ReviewCreateRequest;
 import org.example.takecareofmyfridgebe.domain.review.dto.ReviewResponse;
 import org.example.takecareofmyfridgebe.domain.review.dto.ReviewSearchRequest;
@@ -21,6 +23,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -165,7 +168,7 @@ public class RecipeReviewService {
      * @param recipeIds 레시피 ID 목록
      * @return 레시피 ID를 키로 하는 별점 통계 맵
      */
-    public Map<Long, RecipeRatingStat> findRatingStats(java.util.Collection<Long> recipeIds) {
+    public Map<Long, RecipeRatingStat> findRatingStats(Collection<Long> recipeIds) {
         if (recipeIds == null || recipeIds.isEmpty()) {
             return Collections.emptyMap();
         }
@@ -185,5 +188,25 @@ public class RecipeReviewService {
                         stat -> stat,
                         (existing, replacing) -> existing
                 ));
+    }
+
+    /**
+     * 후기 요약 대상 후보(후기 5개 이상인 레시피별 후기 수와 가장 최근 후기 수정 시각)를 조회한다.
+     *
+     * @return 요약 대상 후보 목록
+     */
+    public List<RecipeReviewSummaryCandidate> findSummaryCandidatesWithMinReviews() {
+        return recipeReviewRepository.findSummaryCandidatesWithMinReviews();
+    }
+
+    /**
+     * 특정 레시피의 최근 수정된 후기를 최신순으로 limit 건만큼 별점과 내용만 조회한다.
+     *
+     * @param recipeId 레시피 ID
+     * @param limit    최대 조회 건수
+     * @return 후기 별점·내용 목록
+     */
+    public List<RecipeReviewContentDto> findRecentReviewsByRecipeId(Long recipeId, int limit) {
+        return recipeReviewRepository.findRecentReviewsByRecipeId(recipeId, limit);
     }
 }

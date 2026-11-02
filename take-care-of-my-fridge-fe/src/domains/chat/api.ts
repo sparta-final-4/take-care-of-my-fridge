@@ -14,16 +14,6 @@ export async function startSession(signal?: AbortSignal): Promise<ChatSessionRes
 }
 
 /**
- * 특정 상담 세션의 정보를 조회한다.
- */
-export async function getSession(
-  sessionId: number,
-  signal?: AbortSignal,
-): Promise<ChatSessionResponse> {
-  return unwrap(chatSessionApi.getSession({ sessionId }, { signal }));
-}
-
-/**
  * 진행 중인 상담 세션을 명시적으로 종료(COMPLETED) 처리한다.
  */
 export async function completeSession(sessionId: number): Promise<ChatSessionResponse> {

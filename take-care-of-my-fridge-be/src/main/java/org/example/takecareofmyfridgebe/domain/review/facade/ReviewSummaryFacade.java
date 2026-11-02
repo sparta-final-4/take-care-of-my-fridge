@@ -8,7 +8,7 @@ import org.example.takecareofmyfridgebe.domain.review.dto.RecipeReviewSummaryCan
 import org.example.takecareofmyfridgebe.domain.review.dto.ReviewSummaryItem;
 import org.example.takecareofmyfridgebe.domain.review.dto.ReviewSummaryItemStatus;
 import org.example.takecareofmyfridgebe.domain.review.dto.ReviewSummaryResult;
-import org.example.takecareofmyfridgebe.domain.review.repository.RecipeReviewRepository;
+import org.example.takecareofmyfridgebe.domain.review.service.RecipeReviewService;
 import org.example.takecareofmyfridgebe.global.config.ai.LlmCost;
 import org.example.takecareofmyfridgebe.global.config.ai.LlmCostCalculator;
 import org.springframework.ai.chat.client.ChatClient;
@@ -55,7 +55,7 @@ public class ReviewSummaryFacade {
     private static final String REASON_ABORTED_BY_RATE_LIMIT = "429로 중단";
     private static final String REASON_TIME_BUDGET = "시간 초과로 다음 실행";
 
-    private final RecipeReviewRepository recipeReviewRepository;
+    private final RecipeReviewService recipeReviewService;
     private final RecipeService recipeService;
     private final ChatClient chatClient;
     private final LlmCostCalculator costCalculator;
@@ -63,22 +63,22 @@ public class ReviewSummaryFacade {
 
     @Autowired
     public ReviewSummaryFacade(
-            RecipeReviewRepository recipeReviewRepository,
+            RecipeReviewService recipeReviewService,
             RecipeService recipeService,
             @Qualifier("reviewSummaryChatClient") ChatClient chatClient,
             LlmCostCalculator costCalculator
     ) {
-        this(recipeReviewRepository, recipeService, chatClient, costCalculator, Clock.systemDefaultZone());
+        this(recipeReviewService, recipeService, chatClient, costCalculator, Clock.systemDefaultZone());
     }
 
     public ReviewSummaryFacade(
-            RecipeReviewRepository recipeReviewRepository,
+            RecipeReviewService recipeReviewService,
             RecipeService recipeService,
             @Qualifier("reviewSummaryChatClient") ChatClient chatClient,
             LlmCostCalculator costCalculator,
             Clock clock
     ) {
-        this.recipeReviewRepository = recipeReviewRepository;
+        this.recipeReviewService = recipeReviewService;
         this.recipeService = recipeService;
         this.chatClient = chatClient;
         this.costCalculator = costCalculator;
@@ -87,7 +87,7 @@ public class ReviewSummaryFacade {
 
     /**
      * 대상 고르기 → 레시피마다 (후기 조회 → AI 호출 → 저장)
-     * 조회가 단건 실행이므로 별도 트랜잭션 래핑 없이 바로 호출하며,
+     * 조회는 RecipeReviewService(읽기 전용 트랜잭션)를 건마다 호출하며,
      * AI 호출은 DB 커넥션을 점유하지 않도록 반드시 트랜잭션 밖에서 실행한다.
      * 저장은 RecipeService.updateTipSummary(@Transactional)에서 수행된다.
      * timeBudget이 지나면 남은 레시피는 다음 실행으로 넘기고(SKIPPED),
@@ -191,7 +191,7 @@ public class ReviewSummaryFacade {
      * 결과에 쓰도록 레시피 이름과 기존 요약을 같이 돌려준다.
      */
     private List<Target> findTargets() {
-        List<RecipeReviewSummaryCandidate> candidates = recipeReviewRepository.findSummaryCandidatesWithMinReviews();
+        List<RecipeReviewSummaryCandidate> candidates = recipeReviewService.findSummaryCandidatesWithMinReviews();
         if (candidates == null || candidates.isEmpty()) {
             return Collections.emptyList();
         }
@@ -228,7 +228,7 @@ public class ReviewSummaryFacade {
      * 최근 수정된 후기 50개 조회
      */
     private List<RecipeReviewContentDto> fetchRecentReviews(Long recipeId) {
-        return recipeReviewRepository.findRecentReviewsByRecipeId(
+        return recipeReviewService.findRecentReviewsByRecipeId(
                 recipeId,
                 REVIEWS_SAMPLE_SIZE
         );
