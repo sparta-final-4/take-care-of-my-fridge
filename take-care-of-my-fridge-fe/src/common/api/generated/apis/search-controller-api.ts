@@ -29,6 +29,8 @@ import type { ApiResponsePageResponseProductListItemResponse } from '../models';
 // @ts-ignore
 import type { ApiResponsePageResponseRecipeListItemResponse } from '../models';
 // @ts-ignore
+import type { ApiResponseSearchFridgeMatchResponse } from '../models';
+// @ts-ignore
 import type { ApiResponseVoid } from '../models';
 // @ts-ignore
 import type { ProductListRequest } from '../models';
@@ -36,6 +38,8 @@ import type { ProductListRequest } from '../models';
 import type { RecipeListRequest } from '../models';
 // @ts-ignore
 import type { SearchClickRequest } from '../models';
+// @ts-ignore
+import type { SearchFridgeMatchRequest } from '../models';
 // @ts-ignore
 import type { SearchRecipeClickRequest } from '../models';
 // @ts-ignore
@@ -45,6 +49,44 @@ import type { SearchSuggestionRequest } from '../models';
  */
 export const SearchControllerApiAxiosParamCreator = function (configuration?: Configuration) {
     return {
+        /**
+         * 
+         * @param {SearchFridgeMatchRequest} request 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        matchFridge: async (request: SearchFridgeMatchRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'request' is not null or undefined
+            assertParamExists('matchFridge', 'request', request)
+            const localVarPath = `/api/search/fridge-matches`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            if (request !== undefined) {
+                for (const [key, value] of Object.entries(request)) {
+                    localVarQueryParameter[key] = value;
+                }
+            }
+
+            localVarHeaderParameter['Accept'] = '*/*';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
         /**
          * 
          * @param {SearchClickRequest} searchClickRequest 
@@ -238,6 +280,18 @@ export const SearchControllerApiFp = function(configuration?: Configuration) {
     return {
         /**
          * 
+         * @param {SearchFridgeMatchRequest} request 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async matchFridge(request: SearchFridgeMatchRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ApiResponseSearchFridgeMatchResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.matchFridge(request, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['SearchControllerApi.matchFridge']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
          * @param {SearchClickRequest} searchClickRequest 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
@@ -307,6 +361,15 @@ export const SearchControllerApiFactory = function (configuration?: Configuratio
     return {
         /**
          * 
+         * @param {SearchControllerApiMatchFridgeRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        matchFridge(requestParameters: SearchControllerApiMatchFridgeRequest, options?: RawAxiosRequestConfig): AxiosPromise<ApiResponseSearchFridgeMatchResponse> {
+            return localVarFp.matchFridge(requestParameters.request, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
          * @param {SearchControllerApiRecordClickRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
@@ -359,6 +422,14 @@ export const SearchControllerApiFactory = function (configuration?: Configuratio
 export interface SearchControllerApiInterface {
     /**
      * 
+     * @param {SearchControllerApiMatchFridgeRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    matchFridge(requestParameters: SearchControllerApiMatchFridgeRequest, options?: RawAxiosRequestConfig): AxiosPromise<ApiResponseSearchFridgeMatchResponse>;
+
+    /**
+     * 
      * @param {SearchControllerApiRecordClickRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
@@ -400,6 +471,13 @@ export interface SearchControllerApiInterface {
 }
 
 /**
+ * Request parameters for matchFridge operation in SearchControllerApi.
+ */
+export interface SearchControllerApiMatchFridgeRequest {
+    readonly request: SearchFridgeMatchRequest
+}
+
+/**
  * Request parameters for recordClick operation in SearchControllerApi.
  */
 export interface SearchControllerApiRecordClickRequest {
@@ -438,6 +516,16 @@ export interface SearchControllerApiSuggestRequest {
  * SearchControllerApi - object-oriented interface
  */
 export class SearchControllerApi extends BaseAPI implements SearchControllerApiInterface {
+    /**
+     * 
+     * @param {SearchControllerApiMatchFridgeRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public matchFridge(requestParameters: SearchControllerApiMatchFridgeRequest, options?: RawAxiosRequestConfig) {
+        return SearchControllerApiFp(this.configuration).matchFridge(requestParameters.request, options).then((request) => request(this.axios, this.basePath));
+    }
+
     /**
      * 
      * @param {SearchControllerApiRecordClickRequest} requestParameters Request parameters.

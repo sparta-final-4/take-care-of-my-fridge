@@ -2874,6 +2874,36 @@
         ]
       }
     },
+    "/api/search/fridge-matches": {
+      "get": {
+        "operationId": "matchFridge",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "request",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/SearchFridgeMatchRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseSearchFridgeMatchResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "search-controller"
+        ]
+      }
+    },
     "/api/search/products": {
       "get": {
         "operationId": "searchProducts",
@@ -3876,6 +3906,20 @@
         "properties": {
           "data": {
             "$ref": "#/components/schemas/SaleEventsCreateResponse"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorResponse"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ApiResponseSearchFridgeMatchResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/SearchFridgeMatchResponse"
           },
           "error": {
             "$ref": "#/components/schemas/ErrorResponse"
@@ -7290,6 +7334,23 @@
           }
         }
       },
+      "RecipeMatch": {
+        "type": "object",
+        "properties": {
+          "ingredientCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "ownedCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "recipeId": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
       "RecipeNutritionRequest": {
         "type": "object",
         "properties": {
@@ -8292,6 +8353,45 @@
           "keyword",
           "productId"
         ]
+      },
+      "SearchFridgeMatchRequest": {
+        "type": "object",
+        "properties": {
+          "keyword": {
+            "type": "string",
+            "maxLength": 50,
+            "minLength": 0
+          },
+          "recipeIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "maxItems": 20,
+            "minItems": 0
+          }
+        },
+        "required": [
+          "recipeIds"
+        ]
+      },
+      "SearchFridgeMatchResponse": {
+        "type": "object",
+        "properties": {
+          "keywordItems": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "recipes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RecipeMatch"
+            }
+          }
+        }
       },
       "SearchRecipeClickRequest": {
         "type": "object",
