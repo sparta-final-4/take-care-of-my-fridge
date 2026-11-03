@@ -83,7 +83,7 @@ class SaleEventServiceUpdateTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("특가의 시각과 두 상품의 할인율을 한 번에 고치면 모두 저장되고, 정가는 상품의 지금 정가로 바뀐다")
-    void update_special_savesTimeAndAllItems() {
+    void savesTimeAndAllItemsOfSpecialSale() {
         Product greenOnion = saveProduct("대파", 3000);
         Product tofu = saveProduct("두부", 2000);
         Long eventId = saveSpecialEvent(greenOnion, tofu);
@@ -107,7 +107,7 @@ class SaleEventServiceUpdateTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("번개 드롭의 시각·할인율·한정 수량을 고치면 남은 수량도 한정 수량과 같게 맞춰진다")
-    void update_flashDrop_resetsRemaining() {
+    void resetsRemainingOfFlashDrop() {
         Product tofu = saveProduct("두부", 3000);
         Long eventId = adminSaleEventFacade.createFlashDrop(flashDrop(tofu)).saleEventIds().get(0);
 
@@ -126,7 +126,7 @@ class SaleEventServiceUpdateTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("진행 중·종료 행사와 시작 시각이 지난 예정 행사는 거절하고 값은 그대로다")
-    void update_startedEvent_rejects() {
+    void rejectsStartedEvent() {
         Product greenOnion = saveProduct("대파", 3000);
         Product tofu = saveProduct("두부", 3000);
         Product onion = saveProduct("양파", 3000);
@@ -156,7 +156,7 @@ class SaleEventServiceUpdateTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("항목 하나라도 거절되면 시각과 다른 항목도 바뀌지 않는다")
-    void update_oneItemInvalid_changesNothing() {
+    void changesNothingWhenOneItemIsInvalid() {
         Product greenOnion = saveProduct("대파", 3000);
         Product tofu = saveProduct("두부", 3000);
         Long eventId = saveSpecialEvent(greenOnion, tofu);
@@ -176,7 +176,7 @@ class SaleEventServiceUpdateTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("한정 수량이 재고보다 많으면 거절하고 값은 그대로다")
-    void update_limitedQuantityOverStock_rejects() {
+    void rejectsLimitedQuantityOverStock() {
         Product tofu = saveProduct("두부", 3000);
         Long eventId = adminSaleEventFacade.createFlashDrop(flashDrop(tofu)).saleEventIds().get(0);
 
@@ -193,7 +193,7 @@ class SaleEventServiceUpdateTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("번개 드롭에 한정 수량이 없으면 거절한다")
-    void update_flashDropWithoutLimitedQuantity_rejects() {
+    void rejectsFlashDropWithoutLimitedQuantity() {
         Product tofu = saveProduct("두부", 3000);
         Long eventId = adminSaleEventFacade.createFlashDrop(flashDrop(tofu)).saleEventIds().get(0);
 
@@ -206,7 +206,7 @@ class SaleEventServiceUpdateTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("행사에 든 상품과 다른 상품을 보내면 거절하고 값은 그대로다")
-    void update_differentProducts_rejects() {
+    void rejectsDifferentProducts() {
         Product greenOnion = saveProduct("대파", 3000);
         Product tofu = saveProduct("두부", 3000);
         Product onion = saveProduct("양파", 3000);
@@ -227,7 +227,7 @@ class SaleEventServiceUpdateTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("시작 시각이 지금보다 과거면 거절하고 값은 그대로다")
-    void update_pastStartsAt_rejects() {
+    void rejectsPastStartsAt() {
         Product greenOnion = saveProduct("대파", 3000);
         Long eventId = saveSpecialEvent(greenOnion);
         LocalDateTime past = LocalDateTime.now(ZoneId.of("Asia/Seoul")).minusMinutes(1);
@@ -241,7 +241,7 @@ class SaleEventServiceUpdateTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("없는 행사는 404로 거절한다")
-    void update_missing_rejects() {
+    void rejectsMissingEvent() {
         assertThatThrownBy(() -> adminSaleEventFacade.update(999L, new SaleEventUpdateRequest(
                 TOMORROW, TOMORROW.plusDays(1), List.of(new SaleEventItemUpdateRequest(1L, 10, null)))))
                 .isInstanceOf(BusinessException.class)

@@ -93,7 +93,7 @@ class CartServiceTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("수량 변경은 DB에 반영된다")
-    void changeQuantity_persistsQuantity() {
+    void persistsChangedQuantity() {
         Product product = saveProduct(10, ProductStatus.ON_SALE);
         Cart cart = cartRepository.save(Cart.builder().memberId(1L).build());
         CartItem item = cartItemRepository.save(CartItem.builder().cart(cart).productId(product.getId()).quantity(1).build());
@@ -106,7 +106,7 @@ class CartServiceTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("다른 회원의 줄은 바꿀 수 없고 수량은 그대로다")
-    void changeQuantity_rejectsOthersItem() {
+    void rejectsChangingOthersItem() {
         Product product = saveProduct(10, ProductStatus.ON_SALE);
         Cart cartA = cartRepository.save(Cart.builder().memberId(1L).build());
         cartRepository.save(Cart.builder().memberId(2L).build());
@@ -121,7 +121,7 @@ class CartServiceTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("없는 줄 번호는 찾을 수 없다")
-    void changeQuantity_rejectsMissingItem() {
+    void rejectsChangingMissingItem() {
         assertThatThrownBy(() -> cartFacade.changeQuantity(1L, 999L, new ChangeCartItemQuantityRequest(3)))
                 .isInstanceOf(BusinessException.class)
                 .extracting(e -> ((BusinessException) e).getErrorCode())
@@ -130,7 +130,7 @@ class CartServiceTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("재고와 같은 수량까지는 담긴다")
-    void addItem_acceptsQuantityEqualToStock() {
+    void acceptsAddingQuantityEqualToStock() {
         Product product = saveProduct(3, ProductStatus.ON_SALE);
 
         cartFacade.addItem(1L, new AddCartItemRequest(product.getId(), 3));
@@ -142,7 +142,7 @@ class CartServiceTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("기존 수량에 더해 재고를 넘으면 거절되고 수량은 그대로다")
-    void addItem_rejectsWhenTotalExceedsStock() {
+    void rejectsAddingWhenTotalExceedsStock() {
         Product product = saveProduct(5, ProductStatus.ON_SALE);
         Cart cart = cartRepository.save(Cart.builder().memberId(1L).build());
         CartItem item = cartItemRepository.save(CartItem.builder().cart(cart).productId(product.getId()).quantity(3).build());
@@ -153,7 +153,7 @@ class CartServiceTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("기존 수량과 더해 int를 넘는 수량도 재고 초과로 거절된다")
-    void addItem_rejectsOverflowingQuantity() {
+    void rejectsAddingOverflowingQuantity() {
         Product product = saveProduct(10, ProductStatus.ON_SALE);
         Cart cart = cartRepository.save(Cart.builder().memberId(1L).build());
         CartItem item = cartItemRepository.save(CartItem.builder().cart(cart).productId(product.getId()).quantity(5).build());
@@ -164,7 +164,7 @@ class CartServiceTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("재고 초과로 거절되면 처음 담을 때 만든 장바구니도 남지 않는다")
-    void addItem_rollsBackCartWhenStockInsufficient() {
+    void rollsBackCartWhenAddingExceedsStock() {
         Product product = saveProduct(1, ProductStatus.ON_SALE);
 
         assertErrorCode(() -> cartFacade.addItem(1L, new AddCartItemRequest(product.getId(), 2)), ErrorCode.CART_QUANTITY_EXCEEDS_STOCK);
@@ -173,7 +173,7 @@ class CartServiceTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("판매 중지 상품은 담을 수 없다")
-    void addItem_rejectsStoppedProduct() {
+    void rejectsAddingStoppedProduct() {
         Product product = saveProduct(10, ProductStatus.STOPPED);
 
         assertErrorCode(() -> cartFacade.addItem(1L, new AddCartItemRequest(product.getId(), 1)), ErrorCode.PRODUCT_NOT_ON_SALE);
@@ -182,7 +182,7 @@ class CartServiceTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("재고가 0이어도 상태가 아니라 재고로 판단해 재고 초과로 거절한다")
-    void addItem_rejectsZeroStockEvenIfOnSale() {
+    void rejectsAddingZeroStockEvenIfOnSale() {
         Product product = saveProduct(0, ProductStatus.ON_SALE);
 
         assertErrorCode(() -> cartFacade.addItem(1L, new AddCartItemRequest(product.getId(), 1)), ErrorCode.CART_QUANTITY_EXCEEDS_STOCK);
@@ -191,14 +191,14 @@ class CartServiceTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("없는 상품은 담을 수 없다")
-    void addItem_rejectsMissingProduct() {
+    void rejectsAddingMissingProduct() {
         assertErrorCode(() -> cartFacade.addItem(1L, new AddCartItemRequest(999L, 1)), ErrorCode.PRODUCT_NOT_FOUND);
         assertThat(cartRepository.findByMemberId(1L)).isEmpty();
     }
 
     @Test
     @DisplayName("재고보다 많이 올리면 거절되고 수량은 그대로다")
-    void changeQuantity_rejectsIncreaseOverStock() {
+    void rejectsIncreasingOverStock() {
         Product product = saveProduct(3, ProductStatus.ON_SALE);
         Cart cart = cartRepository.save(Cart.builder().memberId(1L).build());
         CartItem item = cartItemRepository.save(CartItem.builder().cart(cart).productId(product.getId()).quantity(1).build());
@@ -209,7 +209,7 @@ class CartServiceTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("담아 둔 뒤 재고가 줄었어도 수량을 내리는 것은 반영된다")
-    void changeQuantity_allowsDecreaseBelowCurrentEvenOverStock() {
+    void allowsDecreasingBelowCurrentEvenOverStock() {
         Product product = saveProduct(2, ProductStatus.ON_SALE);
         Cart cart = cartRepository.save(Cart.builder().memberId(1L).build());
         CartItem item = cartItemRepository.save(CartItem.builder().cart(cart).productId(product.getId()).quantity(5).build());
@@ -221,7 +221,7 @@ class CartServiceTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("재고가 줄어든 줄은 현재 수량보다 올릴 수 없다")
-    void changeQuantity_rejectsIncreaseWhenAlreadyOverStock() {
+    void rejectsIncreasingWhenAlreadyOverStock() {
         Product product = saveProduct(2, ProductStatus.ON_SALE);
         Cart cart = cartRepository.save(Cart.builder().memberId(1L).build());
         CartItem item = cartItemRepository.save(CartItem.builder().cart(cart).productId(product.getId()).quantity(5).build());
@@ -232,7 +232,7 @@ class CartServiceTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("담아 둔 뒤 번개 드롭으로 바뀌었어도 수량을 내리는 것은 반영된다")
-    void changeQuantity_allowsDecreaseAfterFlashDropStarts() {
+    void allowsDecreasingAfterFlashDropStarts() {
         Product product = saveProduct(10, ProductStatus.ON_SALE);
         Cart cart = cartRepository.save(Cart.builder().memberId(1L).build());
         CartItem item = cartItemRepository.save(CartItem.builder().cart(cart).productId(product.getId()).quantity(3).build());
@@ -245,7 +245,7 @@ class CartServiceTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("판매 중지된 상품의 줄은 수량을 바꿀 수 없다")
-    void changeQuantity_rejectsStoppedProduct() {
+    void rejectsChangingStoppedProduct() {
         Product product = saveProduct(10, ProductStatus.STOPPED);
         Cart cart = cartRepository.save(Cart.builder().memberId(1L).build());
         CartItem item = cartItemRepository.save(CartItem.builder().cart(cart).productId(product.getId()).quantity(1).build());
@@ -256,7 +256,7 @@ class CartServiceTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("조회는 상품 이름·이미지·정가를 붙이고, 재고 0이나 판매 중지 상품은 품절로 표시한다")
-    void getItems_includesProductInfoAndSoldOut() {
+    void includesProductInfoAndSoldOutInItems() {
         Product onSale = saveProduct(5, ProductStatus.ON_SALE);
         Product noStock = saveProduct(0, ProductStatus.SOLD_OUT);
         Product stopped = saveProduct(5, ProductStatus.STOPPED);
@@ -281,7 +281,7 @@ class CartServiceTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("목록에 든 내 줄은 DB에서 지워지고 나머지는 남는다")
-    void removeItems_deletesListedOwnItems() {
+    void deletesListedOwnItems() {
         Cart cart = cartRepository.save(Cart.builder().memberId(1L).build());
         CartItem first = cartItemRepository.save(CartItem.builder().cart(cart).productId(10L).quantity(1).build());
         CartItem second = cartItemRepository.save(CartItem.builder().cart(cart).productId(20L).quantity(1).build());
@@ -293,7 +293,7 @@ class CartServiceTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("다른 회원의 줄과 없는 번호가 섞여도 내 줄만 지우고 오류는 없다")
-    void removeItems_ignoresOthersAndMissingIds() {
+    void ignoresOthersAndMissingIdsOnRemove() {
         Cart cartA = cartRepository.save(Cart.builder().memberId(1L).build());
         Cart cartB = cartRepository.save(Cart.builder().memberId(2L).build());
         CartItem itemOfA = cartItemRepository.save(CartItem.builder().cart(cartA).productId(10L).quantity(1).build());
@@ -306,7 +306,7 @@ class CartServiceTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("같은 요청을 두 번 보내도 같은 결과다")
-    void removeItems_isIdempotent() {
+    void removesIdempotently() {
         Cart cart = cartRepository.save(Cart.builder().memberId(1L).build());
         CartItem item = cartItemRepository.save(CartItem.builder().cart(cart).productId(10L).quantity(1).build());
         RemoveCartItemsRequest request = new RemoveCartItemsRequest(List.of(item.getId()));

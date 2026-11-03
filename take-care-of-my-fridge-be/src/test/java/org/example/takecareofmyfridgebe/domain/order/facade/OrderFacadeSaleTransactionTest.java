@@ -138,7 +138,7 @@ class OrderFacadeSaleTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("진행 중인 특가 상품을 주문하면 할인가로 합계가 계산되고 주문 상품에 할인 구분과 행사 상품 번호가 저장된다")
-    void createOrder_specialSale_savesSalePrice() {
+    void savesSalePriceForSpecialSale() {
         Product tofu = saveProduct("두부", 3000, 10);
         Product greenOnion = saveProduct("대파", 3000, 10);
         SaleEventItem special = saveActiveSale(SaleEventType.SPECIAL, tofu, 20, null);
@@ -161,7 +161,7 @@ class OrderFacadeSaleTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("장바구니에서 본 가격이나 할인 구분이 주문 시점과 다르면 409로 거절하고 주문·재고는 그대로다")
-    void createOrder_priceChanged_rejectsWithoutSideEffects() {
+    void rejectsWithoutSideEffectsWhenPriceChanged() {
         Product tofu = saveProduct("두부", 3000, 10);
         Product greenOnion = saveProduct("대파", 3000, 10);
         Product milk = saveProduct("우유", 3000, 10);
@@ -187,7 +187,7 @@ class OrderFacadeSaleTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("한 항목이라도 가격이 다르면 다른 항목의 재고도 빠지지 않는다")
-    void createOrder_onePriceChanged_rejectsWholeOrder() {
+    void rejectsWholeOrderWhenOnePriceChanged() {
         Product tofu = saveProduct("두부", 3000, 10);
         Product greenOnion = saveProduct("대파", 3000, 10);
         Cart cart = saveCart(1L);
@@ -204,7 +204,7 @@ class OrderFacadeSaleTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("같은 멱등 키로 다시 보내면 그 사이 가격이 바뀌었어도 처음 주문을 그대로 돌려준다")
-    void createOrder_replayAfterPriceChange_returnsFirstOrder() {
+    void returnsFirstOrderOnReplayAfterPriceChange() {
         Product tofu = saveProduct("두부", 3000, 10);
         CartItem item = saveCartItem(saveCart(1L), tofu, 1);
         OrderCreateResult first = order(1L, "same-key", line(item, 3000, null));
@@ -220,7 +220,7 @@ class OrderFacadeSaleTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("번개 드롭을 주문하면 남은 수량이 줄고 주문 상품에 1인 1개 확인용 회원이 저장된다")
-    void createOrder_flashDrop_decreasesRemaining() {
+    void decreasesRemainingForFlashDrop() {
         Product milk = saveProduct("우유", 4000, 10);
         SaleEventItem flashDrop = saveActiveSale(SaleEventType.FLASH_DROP, milk, 50, 3);
         CartItem item = saveCartItem(saveCart(7L), milk, 1);
@@ -238,7 +238,7 @@ class OrderFacadeSaleTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("이미 산 번개 드롭은 다시 주문할 수 없고, 취소하면 남은 수량이 돌아와 다시 주문할 수 있다")
-    void createOrder_flashDropTwice_limitedUntilCancelled() {
+    void limitsFlashDropOrderedTwiceUntilCancelled() {
         Product milk = saveProduct("우유", 4000, 10);
         SaleEventItem flashDrop = saveActiveSale(SaleEventType.FLASH_DROP, milk, 50, 3);
         CartItem item = saveCartItem(saveCart(7L), milk, 1);
@@ -262,7 +262,7 @@ class OrderFacadeSaleTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("번개 드롭 수량을 2개 주문하면 구매 한도 초과로 거절한다")
-    void createOrder_flashDropQuantityOverOne_rejects() {
+    void rejectsFlashDropQuantityOverOne() {
         Product milk = saveProduct("우유", 4000, 10);
         SaleEventItem flashDrop = saveActiveSale(SaleEventType.FLASH_DROP, milk, 50, 3);
         CartItem item = saveCartItem(saveCart(7L), milk, 2);
@@ -278,7 +278,7 @@ class OrderFacadeSaleTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("번개 드롭 남은 수량이 0이면 품절로 거절하고 다른 항목의 재고도 빠지지 않는다")
-    void createOrder_flashDropSoldOut_rejectsWholeOrder() {
+    void rejectsWholeOrderWhenFlashDropSoldOut() {
         Product milk = saveProduct("우유", 4000, 10);
         Product greenOnion = saveProduct("대파", 3000, 10);
         SaleEventItem flashDrop = saveActiveSale(SaleEventType.FLASH_DROP, milk, 50, 1);
@@ -301,7 +301,7 @@ class OrderFacadeSaleTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("한정 3개 번개 드롭을 10명이 동시에 주문하면 정확히 3명만 성공하고 남은 수량은 0이며 음수가 되지 않는다")
-    void createOrder_flashDropConcurrently_neverOversells() throws Exception {
+    void neverOversellsFlashDropConcurrently() throws Exception {
         int members = 10;
         Product milk = saveProduct("우유", 4000, 100);
         SaleEventItem flashDrop = saveActiveSale(SaleEventType.FLASH_DROP, milk, 50, 3);

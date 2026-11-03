@@ -79,7 +79,7 @@ class SaleEventServiceTerminationTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("진행 중인 할인 행사를 종료하면 상태가 종료로 바뀌고 닫은 시각이 남으며, 종료 시각과 행사 항목은 그대로다")
-    void end_active_keepsEndsAt() {
+    void keepsEndsAtWhenEndingActiveEvent() {
         Product tofu = saveProduct("두부");
         SaleEvent event = saveEvent(SaleEventStatus.ACTIVE, minutesFromNow(-60), minutesFromNow(60), tofu);
 
@@ -96,7 +96,7 @@ class SaleEventServiceTerminationTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("종료하면 진행 중 할인 조회에서 빠지고, 그 상품이 후보 상품에 다시 나온다")
-    void end_removesActiveSaleAndFreesProduct() {
+    void removesActiveSaleAndFreesProductOnEnd() {
         Product tofu = saveProduct("두부");
         SaleEvent event = saveEvent(SaleEventStatus.ACTIVE, minutesFromNow(-60), minutesFromNow(60), tofu);
         List<Long> productIds = List.of(tofu.getId());
@@ -112,7 +112,7 @@ class SaleEventServiceTerminationTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("상태 정리가 늦어 예정으로 남았어도 시각상 진행 중이면 종료할 수 있다")
-    void end_scheduledButStarted_ends() {
+    void endsScheduledButStartedEvent() {
         Product tofu = saveProduct("두부");
         SaleEvent event = saveEvent(SaleEventStatus.SCHEDULED, minutesFromNow(-1), minutesFromNow(60), tofu);
 
@@ -124,7 +124,7 @@ class SaleEventServiceTerminationTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("예정·종료·종료 시각이 지난 할인 행사는 종료를 거절하고 상태는 그대로다")
-    void end_notActive_rejects() {
+    void rejectsEndingNotActiveEvent() {
         Product greenOnion = saveProduct("대파");
         Product tofu = saveProduct("두부");
         Product onion = saveProduct("양파");
@@ -146,7 +146,7 @@ class SaleEventServiceTerminationTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("없는 할인 행사는 종료·삭제 모두 404로 거절한다")
-    void missing_rejects() {
+    void rejectsMissingEvent() {
         assertThatThrownBy(() -> saleEventService.end(999L))
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode").isEqualTo(ErrorCode.SALE_EVENT_NOT_FOUND);
@@ -157,7 +157,7 @@ class SaleEventServiceTerminationTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("시작 전인 할인 행사를 삭제하면 할인 행사와 행사 항목이 모두 지워지고 다른 할인 행사는 남는다")
-    void delete_scheduled_removesEventAndItems() {
+    void removesScheduledEventAndItemsOnDelete() {
         Product greenOnion = saveProduct("대파");
         Product tofu = saveProduct("두부");
         Product onion = saveProduct("양파");
@@ -173,7 +173,7 @@ class SaleEventServiceTerminationTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("진행 중·종료 할인 행사와 시작 시각이 지난 예정 할인 행사는 삭제를 거절하고 모두 그대로다")
-    void delete_startedEvent_rejects() {
+    void rejectsDeletingStartedEvent() {
         Product greenOnion = saveProduct("대파");
         Product tofu = saveProduct("두부");
         Product onion = saveProduct("양파");

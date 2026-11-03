@@ -105,7 +105,7 @@ class SaleEventQueryServiceListTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("조건이 없으면 행사의 상품을 한 행씩 최신 행사부터 준다")
-    void getSaleEvents_noCondition_returnsOneRowPerItemNewestFirst() {
+    void returnsOneRowPerItemNewestFirstWithoutCondition() {
         List<SaleEventListResponse> events = query(null, null, null, null, null, null);
 
         assertThat(events).extracting(SaleEventListResponse::saleEventId, SaleEventListResponse::productName)
@@ -116,7 +116,7 @@ class SaleEventQueryServiceListTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("종료된 행사는 등록 당시 정가를, 예정·진행 중 행사는 상품의 현재 정가를 준다")
-    void getSaleEvents_listPriceByStatus() {
+    void returnsListPriceByStatus() {
         jdbcTemplate.update("update products set price = 5000");
 
         List<SaleEventListResponse> events = query(null, null, null, null, null, null);
@@ -130,7 +130,7 @@ class SaleEventQueryServiceListTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("상태와 종류로 거른다")
-    void getSaleEvents_filtersByStatusAndType() {
+    void filtersByStatusAndType() {
         assertThat(ids(query(SaleEventStatus.ACTIVE, null, null, null, null, null))).containsExactly(activeFlash.getId());
         assertThat(ids(query(null, SaleEventType.SPECIAL, null, null, null, null)))
                 .containsExactly(scheduledSpecial.getId(), endedSpecial.getId());
@@ -139,7 +139,7 @@ class SaleEventQueryServiceListTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("시작일 하나만 주면 그날 시작한 행사만, 기간을 주면 그 안에 시작한 행사만 나온다")
-    void getSaleEvents_filtersByStartDate() {
+    void filtersByStartDate() {
         assertThat(ids(query(null, null, LocalDate.of(2026, 10, 1), null, null, null))).containsExactly(activeFlash.getId());
         assertThat(query(null, null, LocalDate.of(2026, 10, 2), null, null, null)).isEmpty();
         assertThat(ids(query(null, null, LocalDate.of(2026, 9, 1), LocalDate.of(2026, 10, 1), null, null)))
@@ -148,7 +148,7 @@ class SaleEventQueryServiceListTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("종료일 하나만 주면 그날 끝난 행사만, 기간을 주면 그 안에 끝난 행사만 나온다")
-    void getSaleEvents_filtersByEndDate() {
+    void filtersByEndDate() {
         assertThat(ids(query(null, null, null, null, LocalDate.of(2026, 9, 30), null))).containsExactly(endedSpecial.getId());
         assertThat(ids(query(null, null, null, null, LocalDate.of(2026, 10, 1), LocalDate.of(2026, 11, 7))))
                 .containsExactly(scheduledSpecial.getId(), activeFlash.getId());
@@ -156,7 +156,7 @@ class SaleEventQueryServiceListTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("판매량은 결제 완료·구매 확정 주문의 수량만 센다")
-    void getSaleEvents_soldQuantityCountsPaidAndConfirmedOnly() {
+    void countsOnlyPaidAndConfirmedAsSoldQuantity() {
         SaleEventItem item = saleEventItemRepository.findAll().stream()
                 .filter(i -> i.getSaleEvent().getId().equals(activeFlash.getId())).findFirst().orElseThrow();
         saveOrder(OrderStatus.PAID, item, 2);
@@ -172,7 +172,7 @@ class SaleEventQueryServiceListTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("정렬 기준과 방향을 주면 그 순서로 나오고, 기준이 같으면 최신 행사가 먼저다")
-    void getSaleEvents_sorts() {
+    void sortsSaleEvents() {
         assertThat(sorted(SaleEventListSort.STARTS_AT, Sort.Direction.ASC))
                 .containsExactly(endedSpecial.getId(), activeFlash.getId(), scheduledSpecial.getId());
         assertThat(sorted(SaleEventListSort.ENDS_AT, Sort.Direction.DESC))

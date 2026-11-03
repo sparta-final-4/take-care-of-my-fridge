@@ -64,7 +64,7 @@ class SaleEventItemRepositoryTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("진행 중인 할인 전부를 읽을 때 시작 시각이 지난 예정 행사는 넣고, 시작 전·종료 시각이 지난·종료로 닫은 행사는 뺀다")
-    void findAllActive_onlyActiveByTime() {
+    void findsOnlyItemsActiveByTime() {
         // given
         Product active = saveProduct("두부");
         Product overdueScheduled = saveProduct("대파");
