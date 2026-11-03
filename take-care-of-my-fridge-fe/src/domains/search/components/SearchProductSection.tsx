@@ -1,3 +1,4 @@
+import { ReloadOutlined } from '@ant-design/icons';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Button, Col, Empty, Flex, Pagination, Result, Row, Skeleton } from 'antd';
 import type { MouseEvent } from 'react';
@@ -8,7 +9,9 @@ import { SectionCard } from '@/common/components/SectionCard';
 import { SectionLoading } from '@/common/components/SectionLoading';
 import { useAddToCart } from '@/domains/cart/hooks/useAddToCart';
 import { ProductCard } from '@/domains/product/components/ProductCard';
+import { PRICE_RANGES, PRODUCT_TYPE_LABELS } from '@/domains/product/format';
 import { recordSearchClick } from '@/domains/search/api';
+import { SearchFilterRow } from '@/domains/search/components/SearchFilterRow';
 import {
   SEARCH_PRODUCT_PAGE_SIZE,
   SEARCH_SECTION_IDS,
@@ -16,8 +19,21 @@ import {
 } from '@/domains/search/hooks/useSearchKeyword';
 import { searchQueries } from '@/domains/search/queries';
 
+const PRODUCT_TYPES = ['INGREDIENT', 'MEALKIT'] as const;
+
 export function SearchProductSection() {
-  const { keyword, productPage, setProductPage, productRequest } = useSearchKeyword();
+  const {
+    keyword,
+    productPage,
+    setProductPage,
+    type,
+    priceRangeKey,
+    productFiltered,
+    setType,
+    setPriceRange,
+    resetProductFilters,
+    productRequest,
+  } = useSearchKeyword();
   const { data, isPending, isError, isPlaceholderData, refetch } = useQuery(
     searchQueries.products(productRequest),
   );
@@ -48,56 +64,85 @@ export function SearchProductSection() {
     <SectionCard
       id={SEARCH_SECTION_IDS.products}
       title={data ? `재료·밀키트 ${totalElements.toLocaleString('ko-KR')}` : '재료·밀키트'}
+      extra={
+        productFiltered && (
+          <Button type="link" icon={<ReloadOutlined />} onClick={resetProductFilters}>
+            초기화
+          </Button>
+        )
+      }
     >
-      {isPending ? (
-        <Skeleton active paragraph={{ rows: 4 }} />
-      ) : isError ? (
-        <Result
-          status="error"
-          title="상품을 불러오지 못했습니다."
-          extra={<Button onClick={() => refetch()}>다시 시도</Button>}
-        />
-      ) : products.length === 0 ? (
-        <Empty description={`‘${keyword}’에 맞는 상품이 없습니다.`}>
-          <Link to={ROUTES.products}>
-            <Button>전체 상품 보기</Button>
-          </Link>
-        </Empty>
-      ) : (
-        <SectionLoading loading={isPlaceholderData}>
-          <Flex vertical gap="large">
-            <Row gutter={[16, 16]}>
-              {products.map((product) => (
-                <Col
-                  key={product.productId}
-                  xs={12}
-                  md={8}
-                  lg={6}
-                  onClick={
-                    product.productId === undefined
-                      ? undefined
-                      : handleClickProduct(product.productId)
-                  }
-                >
-                  <ProductCard
-                    product={product}
-                    pending={pendingProductId === product.productId}
-                    onAddToCart={addToCart}
-                  />
-                </Col>
-              ))}
-            </Row>
-            <Pagination
-              align="center"
-              current={productPage}
-              pageSize={SEARCH_PRODUCT_PAGE_SIZE}
-              total={totalElements}
-              showSizeChanger={false}
-              onChange={handleChangePage}
-            />
-          </Flex>
-        </SectionLoading>
-      )}
+      <Flex vertical gap="large">
+        <Flex vertical gap="small">
+          <SearchFilterRow
+            label="종류"
+            options={PRODUCT_TYPES.map((value) => ({ value, label: PRODUCT_TYPE_LABELS[value] }))}
+            selected={type}
+            onChange={(value) => setType(PRODUCT_TYPES.find((t) => t === value))}
+          />
+          <SearchFilterRow
+            label="가격대"
+            options={PRICE_RANGES.map((range) => ({ value: range.key, label: range.label }))}
+            selected={priceRangeKey}
+            onChange={(value) => setPriceRange(PRICE_RANGES.find((r) => r.key === value)?.key)}
+          />
+        </Flex>
+        {isPending ? (
+          <Skeleton active paragraph={{ rows: 4 }} />
+        ) : isError ? (
+          <Result
+            status="error"
+            title="상품을 불러오지 못했습니다."
+            extra={<Button onClick={() => refetch()}>다시 시도</Button>}
+          />
+        ) : products.length === 0 ? (
+          productFiltered ? (
+            <Empty description={`‘${keyword}’ 중 고른 조건에 맞는 상품이 없습니다.`}>
+              <Button onClick={resetProductFilters}>초기화</Button>
+            </Empty>
+          ) : (
+            <Empty description={`‘${keyword}’에 맞는 상품이 없습니다.`}>
+              <Link to={ROUTES.products}>
+                <Button>전체 상품 보기</Button>
+              </Link>
+            </Empty>
+          )
+        ) : (
+          <SectionLoading loading={isPlaceholderData}>
+            <Flex vertical gap="large">
+              <Row gutter={[16, 16]}>
+                {products.map((product) => (
+                  <Col
+                    key={product.productId}
+                    xs={12}
+                    md={8}
+                    lg={6}
+                    onClick={
+                      product.productId === undefined
+                        ? undefined
+                        : handleClickProduct(product.productId)
+                    }
+                  >
+                    <ProductCard
+                      product={product}
+                      pending={pendingProductId === product.productId}
+                      onAddToCart={addToCart}
+                    />
+                  </Col>
+                ))}
+              </Row>
+              <Pagination
+                align="center"
+                current={productPage}
+                pageSize={SEARCH_PRODUCT_PAGE_SIZE}
+                total={totalElements}
+                showSizeChanger={false}
+                onChange={handleChangePage}
+              />
+            </Flex>
+          </SectionLoading>
+        )}
+      </Flex>
     </SectionCard>
   );
 }
