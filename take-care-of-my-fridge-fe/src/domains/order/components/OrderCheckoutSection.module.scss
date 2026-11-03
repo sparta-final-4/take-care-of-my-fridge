@@ -78,6 +78,41 @@
   font-variant-numeric: tabular-nums;
 }
 
+.methodTitle {
+  margin-top: var(--ant-margin-lg);
+}
+
+// 결제 수단 4개를 2열 격자로 놓는다. 좁은 화면에서도 이름이 잘리지 않는다.
+.methods {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--ant-margin-xs);
+  margin-top: var(--ant-margin-sm);
+}
+
+// Radio.Button의 붙은 테두리 대신 칸마다 테두리를 두고 클릭 영역을 44px 이상으로 맞춘다.
+.method {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: auto;
+  min-height: $touch-target-size;
+  padding: var(--ant-padding-xs) var(--ant-padding-sm);
+  line-height: var(--ant-line-height);
+  text-align: center;
+  border-inline-start-width: 1px;
+  border-radius: var(--ant-border-radius);
+
+  &::before {
+    display: none;
+  }
+
+  &:first-child,
+  &:last-child {
+    border-radius: var(--ant-border-radius);
+  }
+}
+
 .pay {
   margin-top: var(--ant-margin-lg);
 }
