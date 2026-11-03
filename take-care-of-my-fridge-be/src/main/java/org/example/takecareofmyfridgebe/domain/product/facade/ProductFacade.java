@@ -34,12 +34,10 @@ public class ProductFacade {
         return toListPage(productService.getAdminProducts(request));
     }
 
-    // ES 검색이 고른 ID 순서대로 목록을 만든다. 전체 건수는 ES 값을 그대로 쓴다.
-    // PageImpl은 받은 개수가 페이지 크기보다 적으면 전체 건수를 다시 계산하므로, 상품을 뺀 페이지에서도 ES 건수를 지키도록 직접 만든다
+    // ES 검색이 고른 ID 순서대로 목록을 만든다. 전체 건수는 ES 값을 그대로 쓴다
     public PageResponse<ProductListItemResponse> getProductsByIds(List<Long> productIds, long total, ProductListRequest request) {
         List<ProductListItemResponse> content = toListItems(productService.getProductsByIds(productIds));
-        int totalPages = (int) Math.ceil((double) total / request.size());
-        return new PageResponse<>(content, request.page(), request.size(), total, totalPages, request.page() >= totalPages);
+        return PageResponse.of(content, request.page(), request.size(), total);
     }
 
     public ProductDetailResponse getProduct(Long productId) {
