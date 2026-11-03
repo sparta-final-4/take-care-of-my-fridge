@@ -77,6 +77,8 @@ Q-01~Q-17에 의존하는 테스트는 기대값을 합의한 뒤 구현합니�
 | REFUND-10 | P0 | 10분 넘은 요청 상태 환불 정리 | PG 새 취소 금액이 환불 금액과 같으면 완료, 취소 안 됐으면 실패, 기준 시각 이후 신청은 기다림. 한 결제 실패해도 계속 | `RefundFacadeTest`, `RefundReconcileSchedulerTest` |
 | REFUND-11 | P1 | 환불 기록 없는 PG 취소(콘솔 취소), 금액이 맞지 않는 취소 | 결제 이력에만 남기고 재고 그대로, 맞지 않으면 바꾸지 않음 | `RefundFacadeTest` |
 | REFUND-12 | P1 | 환불 내역·요약·환불 가능 수량 조회 | 내역은 최신순, 요약은 `IN_PROGRESS` → `FULL` → `PARTIAL` → `NONE`, 1~50건. 실패한 환불 수량은 남은 수량에 다시 포함 | `RefundQueryServiceTest`, `RefundItemRepositoryTest`, `RefundControllerTest` |
+| REFUND-13 | P0 | 환불 완료 뒤 주문 상태 | 부분 환불이면 결제 완료 유지. 일반 상품만 있는 주문을 모두 환불하면 `REFUNDED`. 일반 상품을 모두 환불하고 특가·번개 드롭이 남으면 바로 `CONFIRMED`와 확정 수량. 환불할 수 있는 상품이 없는 주문은 그대로 | `RefundableOrderPolicyTest`, `RefundCommandServiceTest` |
+| REFUND-14 | P0 | 주문 상태 변경 실패, 같은 환불 동시 완료 | 환불만 새 트랜잭션으로 완료(신청·PG 조회 경로 모두). 환불 정리가 결제 완료로 남은 전액 환불 주문을 주문 쪽으로 맞추고, 실패해도 스케줄러 밖으로 던지지 않음. 동시에 완료해도 재고·결제 이력은 한 번, 주문은 전액 환불 | `RefundFacadeTest`, `RefundReconcileSchedulerTest`, `RefundCommandServiceConcurrencyTest`(실제 MySQL) |
 
 ## 할인 행사 필수 시나리오
 
@@ -117,6 +119,20 @@ Q-01~Q-17에 의존하는 테스트는 기대값을 합의한 뒤 구현합니�
 | PAY-12 | P0 | 실패 처리한 결제가 PG에서 결제됨, 보상 취소 실패 | 보상 취소, 실패하면 이력 `PAID`만 남아 5분 뒤 재시도. 다른 경로로 취소됐으면 기록만 | `PaymentFacadeTest`, `PaymentTimeoutSchedulerTest` |
 | PAY-13 | P1 | 만료 스케줄러 실행 | PG 미결제면 `TIMEOUT`, PG 결제됨이면 웹훅과 같은 규칙. 한 건 실패해도 나머지 처리, id 커서로 이어 읽음 | `PaymentFacadeTest`, `PaymentTimeoutSchedulerTest` |
 | PAY-14 | P1 | PG 취소 요청 타임아웃·4xx | 타임아웃은 같은 멱등 키로 3번까지, 4xx는 재시도 없이 `PAYMENT_009`. 이미 취소된 결제의 전액 취소는 성공 | `PortOneClientTest` |
+| PAY-15 | P0 | 결제대행사 선택 결제 | 결제대행사 없이 결제 준비하면 `C001`. 카카오페이·토스페이는 간편결제, 나머지는 카드 결제창 값. 고른 결제대행사로 결제를 만들고, 실제 결제대행사가 다르면 승인하며 실제 값으로 고침. 확인 못 하면 고른 값 유지 | `PaymentControllerTest`, `PortOneClientTest`, `PaymentCommandServiceTest`, `PaymentFacadeTest` |
+
+## 정산 필수 시나리오
+
+| ID | 우선순위 | 조건·행동 | 기대 결과 | 대응 테스트 |
+|---|---|---|---|---|
+| SETTLE-01 | P0 | 기간 합계 | 시작 시각 이상 종료 시각 미만 이력만. 환불·콘솔 취소의 부분·전액 취소를 환불로. 받지 않은 결제의 PG 승인·보상 취소와 금액 없는 이력은 제외. 이력이 없으면 0 | `SalesHistoryRepositoryTest` |
+| SETTLE-02 | P0 | 같은 날을 다시 집계 | 행을 새로 만들지 않고 새 합계로 덮어씀. 처음이면 그날 0시~다음 날 0시 합계로 생성 | `SettlementCommandServiceTest`, `DailySalesTest` |
+| SETTLE-03 | P0 | 같은 날 첫 행 동시 생성 | `uk_daily_sales_sales_date` 충돌이면 한 번 더 집계해 덮어씀. 다른 제약 위반은 그대로 던짐 | `SettlementFacadeTest` |
+| SETTLE-04 | P0 | 매일 00:10 스케줄러 | 어제 날짜(월초는 지난달 말일)로 집계. 실패해도 예외를 밖으로 던지지 않음 | `SettlementSchedulerTest` |
+| SETTLE-05 | P0 | 집계되지 않은 날이 있는 기간 조회 | 빈 날만 먼저 집계한 뒤 읽음. 환불 건수 없이 집계된 예전 행도 다시 집계 | `SettlementQueryFacadeTest`, `SettlementQueryServiceTest`, `DailySalesRepositoryTest` |
+| SETTLE-06 | P0 | 기간에 오늘 포함, 주·월 단위 | 어제까지는 일별 행, 오늘은 지금까지의 매출. 주는 월~일, 월은 1일~말일, 잘린 주·월은 기간 안의 날만 | `SettlementQueryFacadeTest` |
+| SETTLE-07 | P0 | 음수 순매출, 결제 건별 | 환불이 더 많으면 순매출 음수. 건별 목록은 결제마다 묶어 마지막 사건이 최근인 순, 모두 더하면 기간 합계와 같음, 페이지 1부터 | `DailySalesTest`, `SalesHistoryRepositoryTest`, `SettlementQueryServiceTest` |
+| SETTLE-08 | P0 | 권한·기간 규칙 | USER는 403, 종료일이 내일 이후·3개월 초과·종료일 < 시작일은 `C001`. 건별 조회도 같은 규칙. 화면 URL 조건이 규칙에 맞지 않으면 기본값 | `SettlementControllerTest`, `SettlementSearchRequestTest`, 프론트 `search.test.ts`·`format.test.ts` |
 
 ## 알림 필수 시나리오
 
