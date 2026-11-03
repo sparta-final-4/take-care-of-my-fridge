@@ -98,15 +98,15 @@ public class RecipeRepositoryImpl implements RecipeRepositoryCustom {
                 .fetch();
     }
 
-    // likeIgnoreCase(lower)를 쓰면 idx_recipes_name을 타지 못해 like로 둔다. MySQL 기본 정렬 규칙은 대소문자를 구분하지 않는다
+    // 검색어가 이름 앞쪽에 있을수록 먼저, 같으면 가나다순. 중간 일치라 인덱스는 타지 않지만 레시피 수가 적어 전체를 읽어도 된다
     @Override
-    public List<String> findNamesStartingWith(String prefix, int limit) {
+    public List<String> findNamesContaining(String keyword, int limit) {
         return queryFactory
                 .select(recipe.name)
-                .distinct()
                 .from(recipe)
-                .where(recipe.name.like(escapeLike(prefix) + "%", LIKE_ESCAPE))
-                .orderBy(recipe.name.asc())
+                .where(nameContains(keyword))
+                .groupBy(recipe.name)
+                .orderBy(recipe.name.locate(keyword).asc(), recipe.name.asc())
                 .limit(limit)
                 .fetch();
     }

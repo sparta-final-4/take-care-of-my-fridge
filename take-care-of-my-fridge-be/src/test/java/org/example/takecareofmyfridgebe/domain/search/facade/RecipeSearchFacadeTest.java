@@ -173,7 +173,7 @@ class RecipeSearchFacadeTest {
     }
 
     @Test
-    @DisplayName("자동완성 중 ES가 실패하면 MySQL 이름 앞부분 조회로 대체한다")
+    @DisplayName("자동완성 중 ES가 실패하면 MySQL 이름 조회로 대체한다")
     void suggestNames_fallsBackToMySql_whenEsFails() throws IOException {
         // Given
         when(searchProperties.useElasticSearch()).thenReturn(true);
