@@ -11,9 +11,7 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 
 class SynonymRuleBuilderTest {
 
@@ -37,41 +35,41 @@ class SynonymRuleBuilderTest {
 
     @Test
     @DisplayName("JSON 동의어는 대표명 뒤에 별칭을 붙인 규칙이 된다")
-    void groupedRulesPutNameFirst() throws IOException {
+    void build_putsNameFirst_whenGroupedRules() throws IOException {
         // When
         List<String> rules = builder.build(recipeIndex);
 
         // Then
         List<String> egg = ruleOf(rules, "달걀");
-        assertTrue(egg.containsAll(List.of("계란", "삶은계란")));
+        assertThat(egg).containsAll(List.of("계란", "삶은계란"));
     }
 
     @Test
     @DisplayName("대표명과 서로 포함하는 별칭은 규칙에서 빠진다")
-    void skipsOverlappingAliases() throws IOException {
+    void build_skipsOverlappingAliases() throws IOException {
         // When
         List<String> rules = builder.build(recipeIndex);
 
         // Then: "고운고춧가루"는 대표명 "고춧가루"를 포함하므로 nori가 쪼개서 찾는다
         List<String> chili = ruleOf(rules, "고춧가루");
-        assertTrue(chili.contains("고추가루"));
-        assertFalse(chili.contains("고운고춧가루"));
+        assertThat(chili).contains("고추가루");
+        assertThat(chili).doesNotContain("고운고춧가루");
     }
 
     @Test
     @DisplayName("txt 동의어는 주석과 빈 줄을 빼고 규칙으로 더한다")
-    void lineRulesSkipCommentsAndBlankLines() throws IOException {
+    void build_skipsCommentsAndBlankLines_whenLineRules() throws IOException {
         // When
         List<String> rules = builder.build(recipeIndex);
 
         // Then
-        assertTrue(rules.contains("파스타, 스파게티"));
-        assertTrue(rules.stream().noneMatch(rule -> rule.isBlank() || rule.startsWith("#")));
+        assertThat(rules).contains("파스타, 스파게티");
+        assertThat(rules).noneMatch(rule -> rule.isBlank() || rule.startsWith("#"));
     }
 
     @Test
     @DisplayName("동의어 파일이 없는 인덱스는 빈 규칙을 반환한다")
-    void emptyWhenNoSynonymFiles() throws IOException {
+    void build_returnsEmpty_whenNoSynonymFiles() throws IOException {
         // Given
         EsIndexProperties noSynonyms = new RecipeIndexProperties(
                 "products", new ClassPathResource("elasticsearch/recipes/recipes_index.json"), null, null, 500, false);
@@ -80,6 +78,6 @@ class SynonymRuleBuilderTest {
         List<String> rules = builder.build(noSynonyms);
 
         // Then
-        assertEquals(List.of(), rules);
+        assertThat(rules).isEqualTo(List.of());
     }
 }

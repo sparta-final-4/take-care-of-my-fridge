@@ -18,8 +18,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
 // ES 요청 없이 확인할 수 있는 인덱스 생성 본문(indexBody)만 검증한다. 실제 색인은 ES가 있어야 해서 로컬에서 확인한다.
@@ -52,7 +51,7 @@ class EsIndexerTest {
 
     @Test
     @DisplayName("설정 파일의 동의어 필터에 동의어 규칙을 채워 넣고, 나머지 설정은 그대로 둔다")
-    void fillsSynonymFilter() throws IOException {
+    void indexBody_fillsSynonymFilter() throws IOException {
         // Given
         EsIndexProperties recipeIndex = new RecipeIndexProperties(
                 "recipes",
@@ -66,14 +65,14 @@ class EsIndexerTest {
 
         // Then
         List<String> synonyms = synonymsOf(body, "recipe_synonyms");
-        assertTrue(synonyms.size() > 100);
-        assertTrue(synonyms.contains("파스타, 스파게티"));
-        assertEquals("strict", body.at("/mappings/dynamic").asString());
+        assertThat(synonyms).hasSizeGreaterThan(100);
+        assertThat(synonyms).contains("파스타, 스파게티");
+        assertThat(body.at("/mappings/dynamic").asString()).isEqualTo("strict");
     }
 
     @Test
     @DisplayName("상품 인덱스도 레시피와 같은 동의어 규칙을 검색 분석기의 동의어 필터에 넣는다")
-    void fillsProductSynonymFilter() throws IOException {
+    void indexBody_fillsProductSynonymFilter() throws IOException {
         // Given
         EsIndexProperties productIndex = new ProductIndexProperties(
                 "products",
@@ -93,16 +92,16 @@ class EsIndexerTest {
 
         // Then
         List<String> synonyms = synonymsOf(body, "product_synonyms");
-        assertEquals(synonymsOf(indexerOf(recipeIndex).indexBody(), "recipe_synonyms"), synonyms);
-        assertTrue(synonyms.stream().anyMatch(rule -> rule.startsWith("달걀, ") && rule.contains("계란")));
-        assertEquals("product_synonyms", body.at("/settings/analysis/analyzer/korean_search/filter/3").asString());
+        assertThat(synonyms).isEqualTo(synonymsOf(indexerOf(recipeIndex).indexBody(), "recipe_synonyms"));
+        assertThat(synonyms).anyMatch(rule -> rule.startsWith("달걀, ") && rule.contains("계란"));
+        assertThat(body.at("/settings/analysis/analyzer/korean_search/filter/3").asString()).isEqualTo("product_synonyms");
         // 색인 분석기에는 넣지 않는다 (검색할 때만 펼친다)
-        assertEquals(3, body.at("/settings/analysis/analyzer/korean/filter").size());
+        assertThat(body.at("/settings/analysis/analyzer/korean/filter").size()).isEqualTo(3);
     }
 
     @Test
     @DisplayName("필터 이름과 상관없이 synonym_graph 필터를 모두 찾아 채운다")
-    void fillsAnySynonymFilterName() throws IOException {
+    void indexBody_fillsAnySynonymFilterName() throws IOException {
         // Given: 레시피가 아닌 다른 인덱스 설정
         String settings = """
                 {"settings": {"analysis": {"filter": {
@@ -121,13 +120,13 @@ class EsIndexerTest {
         ObjectNode body = indexerOf(productIndex).indexBody();
 
         // Then
-        assertEquals(List.of("노트북, 랩탑"), synonymsOf(body, "product_synonyms"));
-        assertEquals("의", body.at("/settings/analysis/filter/my_stop/stopwords/0").asString());
+        assertThat(synonymsOf(body, "product_synonyms")).isEqualTo(List.of("노트북, 랩탑"));
+        assertThat(body.at("/settings/analysis/filter/my_stop/stopwords/0").asString()).isEqualTo("의");
     }
 
     @Test
     @DisplayName("동의어 필터가 없는 설정은 그대로 반환한다")
-    void keepsSettingsWithoutSynonymFilter() throws IOException {
+    void indexBody_keepsSettings_whenNoSynonymFilter() throws IOException {
         // Given
         String settings = """
                 {"settings": {"number_of_shards": 1}, "mappings": {"dynamic": "strict"}}
@@ -139,6 +138,6 @@ class EsIndexerTest {
         ObjectNode body = indexerOf(plainIndex).indexBody();
 
         // Then
-        assertEquals(objectMapper.readTree(settings), body);
+        assertThat(body).isEqualTo(objectMapper.readTree(settings));
     }
 }

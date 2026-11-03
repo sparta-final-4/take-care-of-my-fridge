@@ -22,7 +22,7 @@ class EsReindexSchedulerTest {
 
     @Test
     @DisplayName("서버가 여러 대여도 한 대만 실행하도록 서버 간 잠금을 건다")
-    void locksAcrossServers() throws NoSuchMethodException {
+    void reindexProducts_locksAcrossServers() throws NoSuchMethodException {
         SchedulerLock lock = EsReindexScheduler.class.getMethod("reindexProducts")
                 .getAnnotation(SchedulerLock.class);
 
@@ -32,7 +32,7 @@ class EsReindexSchedulerTest {
 
     @Test
     @DisplayName("ES 검색을 쓰면 상품 인덱스를 전체 재색인한다")
-    void reindexesProducts() throws IOException {
+    void reindexProducts_reindexes_whenElasticsearch() throws IOException {
         scheduler(SearchEngine.ELASTICSEARCH).reindexProducts();
 
         verify(productIndexer).reindex();
@@ -40,7 +40,7 @@ class EsReindexSchedulerTest {
 
     @Test
     @DisplayName("MySQL 검색을 쓰면 재색인하지 않는다")
-    void skipsWhenMySql() throws IOException {
+    void reindexProducts_skips_whenMySql() throws IOException {
         scheduler(SearchEngine.MYSQL).reindexProducts();
 
         verify(productIndexer, never()).reindex();
@@ -48,7 +48,7 @@ class EsReindexSchedulerTest {
 
     @Test
     @DisplayName("재색인이 실패해도 예외를 밖으로 던지지 않는다")
-    void swallowsFailure() throws IOException {
+    void reindexProducts_doesNotThrow_whenReindexFails() throws IOException {
         given(productIndexer.reindex()).willThrow(new IOException("ES 연결 실패"));
 
         assertThatCode(() -> scheduler(SearchEngine.ELASTICSEARCH).reindexProducts())

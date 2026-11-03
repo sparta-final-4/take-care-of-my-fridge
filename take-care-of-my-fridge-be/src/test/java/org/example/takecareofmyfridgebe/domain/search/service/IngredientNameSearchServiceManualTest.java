@@ -7,6 +7,7 @@ import org.example.takecareofmyfridgebe.domain.search.config.RecipeSearchPropert
 import org.example.takecareofmyfridgebe.domain.search.config.RecipeSearchProperties.IngredientIndexProperties;
 import org.example.takecareofmyfridgebe.domain.search.config.RecipeSearchProperties.VectorProperties;
 import org.example.takecareofmyfridgebe.domain.search.config.SearchEngine;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 
@@ -28,7 +29,8 @@ class IngredientNameSearchServiceManualTest {
             "서울우유", "무항생제 신선란", "국산 흙대파", "꿀참외", "계란", "새우깡", "마늘빵", "두부 김치", "콜라");
 
     @Test
-    void printFindCandidates() throws Exception {
+    @DisplayName("로컬 ES에 붙여 재료명별 후보를 출력한다")
+    void findCandidates_printsCandidates() throws Exception {
         String url = System.getenv().getOrDefault("ELASTICSEARCH_URL", "http://localhost:9200");
         String alias = System.getenv().getOrDefault("ES_INGREDIENT_ALIAS", "ingredients");
         try (ElasticsearchClient esClient = ElasticsearchClient.of(b -> b.host(url))) {

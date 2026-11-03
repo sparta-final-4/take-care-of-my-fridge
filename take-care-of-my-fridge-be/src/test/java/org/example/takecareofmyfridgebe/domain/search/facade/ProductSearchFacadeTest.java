@@ -17,7 +17,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.io.IOException;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -47,32 +47,32 @@ class ProductSearchFacadeTest {
 
     @Test
     @DisplayName("검색 엔진이 MySQL이면 기존 LIKE 검색을 쓴다")
-    void usesMySqlWhenEngineIsMySql() throws IOException {
+    void getProducts_usesMySql_whenEngineIsMySql() throws IOException {
         // Given
         ProductListRequest request = request("대파");
         when(searchProperties.useElasticSearch()).thenReturn(false);
         when(productFacade.getProducts(request)).thenReturn(page);
 
         // When & Then
-        assertSame(page, facade.getProducts(request));
+        assertThat(facade.getProducts(request)).isSameAs(page);
         verify(productSearchService, never()).search(any());
     }
 
     @Test
     @DisplayName("검색어가 없으면 ES 엔진이어도 기존 목록 조회를 쓴다")
-    void usesMySqlWithoutKeyword() throws IOException {
+    void getProducts_usesMySql_whenKeywordMissing() throws IOException {
         // Given
         ProductListRequest request = request(null);
         when(productFacade.getProducts(request)).thenReturn(page);
 
         // When & Then
-        assertSame(page, facade.getProducts(request));
+        assertThat(facade.getProducts(request)).isSameAs(page);
         verify(productSearchService, never()).search(any());
     }
 
     @Test
     @DisplayName("ES 엔진이고 검색어가 있으면 ES가 고른 ID 순서와 건수로 목록을 만든다")
-    void usesElasticsearch() throws IOException {
+    void getProducts_usesElasticsearch_whenKeywordPresent() throws IOException {
         // Given
         ProductListRequest request = request("대파");
         when(searchProperties.useElasticSearch()).thenReturn(true);
@@ -80,13 +80,13 @@ class ProductSearchFacadeTest {
         when(productFacade.getProductsByIds(List.of(9L, 4L), 7, request)).thenReturn(page);
 
         // When & Then
-        assertSame(page, facade.getProducts(request));
+        assertThat(facade.getProducts(request)).isSameAs(page);
         verify(productFacade, never()).getProducts(any());
     }
 
     @Test
     @DisplayName("ES 검색이 실패하면 MySQL 검색으로 대체한다")
-    void fallsBackToMySqlOnFailure() throws IOException {
+    void getProducts_fallsBackToMySql_whenEsFails() throws IOException {
         // Given
         ProductListRequest request = request("대파");
         when(searchProperties.useElasticSearch()).thenReturn(true);
@@ -94,7 +94,7 @@ class ProductSearchFacadeTest {
         when(productFacade.getProducts(request)).thenReturn(page);
 
         // When & Then
-        assertSame(page, facade.getProducts(request));
+        assertThat(facade.getProducts(request)).isSameAs(page);
         verify(productFacade, never()).getProductsByIds(anyList(), anyLong(), any());
     }
 }

@@ -18,10 +18,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -50,7 +47,7 @@ class IngredientDocumentReaderTest {
 
     @Test
     @DisplayName("문서의 aliases에는 표준명 자신과 별칭이 공백 없는 소문자 키로 들어간다")
-    void documentHasNameAndAliasKeys() {
+    void readAll_includesNameAndAliasKeys() {
         // Given
         when(ingredientService.findIndexSources()).thenReturn(List.of(
                 new IngredientIndexSource(1L, "달걀"),
@@ -61,17 +58,17 @@ class IngredientDocumentReaderTest {
 
         // Then
         Map<String, Object> egg = docs.get(0).source();
-        assertEquals(1L, docs.get(0).id());
-        assertEquals("달걀", egg.get("name"));
-        assertEquals(List.of("달걀", "계란", "신선란"), egg.get("aliases"));
-        assertEquals(List.of("절인배추"), docs.get(1).source().get("aliases"));
-        assertFalse(egg.containsKey("embedding"));
+        assertThat(docs.get(0).id()).isEqualTo(1L);
+        assertThat(egg.get("name")).isEqualTo("달걀");
+        assertThat(egg.get("aliases")).isEqualTo(List.of("달걀", "계란", "신선란"));
+        assertThat(docs.get(1).source().get("aliases")).isEqualTo(List.of("절인배추"));
+        assertThat(egg.containsKey("embedding")).isFalse();
         verify(embedder, never()).embedAll(anyList());
     }
 
     @Test
     @DisplayName("재료 임베딩을 켜면 이름과 별칭을 함께 임베딩해 넣는다 (레시피 벡터 검색 설정과 무관)")
-    void attachesEmbeddingWhenVectorEnabled() {
+    void readAll_attachesEmbedding_whenEmbeddingEnabled() {
         // Given
         when(ingredientService.findIndexSources()).thenReturn(List.of(new IngredientIndexSource(1L, "달걀")));
         when(embedder.embedAll(List.of("달걀 (계란, 신선 란)"))).thenReturn(List.of(new float[]{1, 2, 3}));
@@ -80,12 +77,12 @@ class IngredientDocumentReaderTest {
         List<EsDocument> docs = reader(true).readAll();
 
         // Then
-        assertArrayEquals(new float[]{1, 2, 3}, (float[]) docs.get(0).source().get("embedding"));
+        assertThat((float[]) docs.get(0).source().get("embedding")).containsExactly(new float[]{1, 2, 3});
     }
 
     @Test
     @DisplayName("임베딩이 실패해도 벡터 없이 색인 문서를 만든다")
-    void indexesWithoutEmbeddingWhenEmbeddingFails() {
+    void readAll_indexesWithoutEmbedding_whenEmbeddingFails() {
         // Given
         when(ingredientService.findIndexSources()).thenReturn(List.of(new IngredientIndexSource(1L, "달걀")));
         when(embedder.embedAll(anyList())).thenThrow(new IllegalStateException("OpenAI down"));
@@ -94,16 +91,16 @@ class IngredientDocumentReaderTest {
         List<EsDocument> docs = reader(true).readAll();
 
         // Then
-        assertEquals(1, docs.size());
-        assertFalse(docs.get(0).source().containsKey("embedding"));
+        assertThat(docs.size()).isEqualTo(1);
+        assertThat(docs.get(0).source().containsKey("embedding")).isFalse();
     }
 
     @Test
     @DisplayName("단건 색인은 색인 대상이 아니면 빈 결과를 돌려준다")
-    void readOneReturnsEmptyForNonTarget() {
+    void readOne_returnsEmpty_whenNotIndexTarget() {
         when(ingredientService.findIndexSource(9L)).thenReturn(Optional.empty());
 
-        assertTrue(reader(false).readOne(9L).isEmpty());
+        assertThat(reader(false).readOne(9L).isEmpty()).isTrue();
     }
 
 }

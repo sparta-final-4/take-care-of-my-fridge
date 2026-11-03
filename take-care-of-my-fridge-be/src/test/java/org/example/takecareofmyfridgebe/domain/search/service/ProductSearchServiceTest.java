@@ -25,8 +25,7 @@ import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -43,7 +42,7 @@ class ProductSearchServiceTest {
 
     @Test
     @DisplayName("검색어의 모든 단어가 상품명·설명 중 어딘가에 있어야 하고, products alias로 ID만 조회한다")
-    void keywordMatchesAllWordsAcrossFields() {
+    void searchRequest_matchesAllWordsAcrossFields() {
         // Given
         ProductListRequest request = new ProductListRequest(null, "국산 대파", null, null, null, null, null);
 
@@ -51,18 +50,18 @@ class ProductSearchServiceTest {
         SearchRequest search = service.searchRequest(request);
 
         // Then
-        assertEquals(List.of("products"), search.index());
+        assertThat(search.index()).isEqualTo(List.of("products"));
         MultiMatchQuery keyword = search.query().bool().must().get(0).multiMatch();
-        assertEquals("국산 대파", keyword.query());
-        assertEquals(List.of("name^3", "description"), keyword.fields());
-        assertEquals(TextQueryType.CrossFields, keyword.type());
-        assertEquals(Operator.And, keyword.operator());
-        assertEquals(false, search.source().fetch());
+        assertThat(keyword.query()).isEqualTo("국산 대파");
+        assertThat(keyword.fields()).isEqualTo(List.of("name^3", "description"));
+        assertThat(keyword.type()).isEqualTo(TextQueryType.CrossFields);
+        assertThat(keyword.operator()).isEqualTo(Operator.And);
+        assertThat(search.source().fetch()).isFalse();
     }
 
     @Test
     @DisplayName("조건이 없어도 판매 중지 상품은 상태 filter로 제외한다")
-    void excludesStoppedProducts() {
+    void searchRequest_excludesStoppedProducts() {
         // Given
         ProductListRequest request = new ProductListRequest(null, "대파", null, null, null, null, null);
 
@@ -70,15 +69,15 @@ class ProductSearchServiceTest {
         List<Query> filters = service.searchRequest(request).query().bool().filter();
 
         // Then
-        assertEquals(1, filters.size());
-        assertEquals("status", filters.get(0).terms().field());
-        assertEquals(List.of("ON_SALE", "SOLD_OUT"),
-                filters.get(0).terms().terms().value().stream().map(FieldValue::stringValue).toList());
+        assertThat(filters.size()).isEqualTo(1);
+        assertThat(filters.get(0).terms().field()).isEqualTo("status");
+        assertThat(filters.get(0).terms().terms().value().stream().map(FieldValue::stringValue).toList())
+                .isEqualTo(List.of("ON_SALE", "SOLD_OUT"));
     }
 
     @Test
     @DisplayName("종류와 가격 범위는 점수에 영향 없는 filter로 건다")
-    void conditionsBecomeFilters() {
+    void searchRequest_appliesConditionsAsFilters() {
         // Given
         ProductListRequest request = new ProductListRequest(null, "대파", ProductType.INGREDIENT, 1000, null, null, null);
 
@@ -86,17 +85,17 @@ class ProductSearchServiceTest {
         List<Query> filters = service.searchRequest(request).query().bool().filter();
 
         // Then
-        assertEquals(3, filters.size());
-        assertEquals("product_type", filters.get(1).term().field());
-        assertEquals("INGREDIENT", filters.get(1).term().value().stringValue());
-        assertEquals("price", filters.get(2).range().number().field());
-        assertEquals(1000.0, filters.get(2).range().number().gte());
-        assertNull(filters.get(2).range().number().lte());
+        assertThat(filters.size()).isEqualTo(3);
+        assertThat(filters.get(1).term().field()).isEqualTo("product_type");
+        assertThat(filters.get(1).term().value().stringValue()).isEqualTo("INGREDIENT");
+        assertThat(filters.get(2).range().number().field()).isEqualTo("price");
+        assertThat(filters.get(2).range().number().gte()).isEqualTo(1000.0);
+        assertThat(filters.get(2).range().number().lte()).isNull();
     }
 
     @Test
     @DisplayName("1부터 시작하는 페이지를 from/size로 바꾸고, 목록 API와 같은 정렬을 건다")
-    void pageAndSort() {
+    void searchRequest_appliesPageAndSort() {
         // Given
         ProductListRequest request = new ProductListRequest(ProductSort.PRICE_ASC, "대파", null, null, null, 2, 16);
 
@@ -104,17 +103,17 @@ class ProductSearchServiceTest {
         SearchRequest search = service.searchRequest(request);
 
         // Then
-        assertEquals(16, search.from());
-        assertEquals(16, search.size());
-        assertEquals("price", search.sort().get(0).field().field());
-        assertEquals(SortOrder.Asc, search.sort().get(0).field().order());
-        assertEquals("id", search.sort().get(1).field().field());
-        assertEquals(SortOrder.Desc, search.sort().get(1).field().order());
+        assertThat(search.from()).isEqualTo(16);
+        assertThat(search.size()).isEqualTo(16);
+        assertThat(search.sort().get(0).field().field()).isEqualTo("price");
+        assertThat(search.sort().get(0).field().order()).isEqualTo(SortOrder.Asc);
+        assertThat(search.sort().get(1).field().field()).isEqualTo("id");
+        assertThat(search.sort().get(1).field().order()).isEqualTo(SortOrder.Desc);
     }
 
     @Test
     @DisplayName("관련도 순이면 점수 내림차순, 같은 점수끼리는 최신 상품 순으로 정렬한다")
-    void relevanceSortsByScore() {
+    void searchRequest_sortsByScore_whenRelevance() {
         // Given
         ProductListRequest request = new ProductListRequest(ProductSort.RELEVANCE, "대파", null, null, null, null, null);
 
@@ -122,14 +121,14 @@ class ProductSearchServiceTest {
         SearchRequest search = service.searchRequest(request);
 
         // Then
-        assertEquals(SortOrder.Desc, search.sort().get(0).score().order());
-        assertEquals("id", search.sort().get(1).field().field());
-        assertEquals(SortOrder.Desc, search.sort().get(1).field().order());
+        assertThat(search.sort().get(0).score().order()).isEqualTo(SortOrder.Desc);
+        assertThat(search.sort().get(1).field().field()).isEqualTo("id");
+        assertThat(search.sort().get(1).field().order()).isEqualTo(SortOrder.Desc);
     }
 
     @Test
     @DisplayName("검색 결과의 문서 id를 순서대로 상품 ID로 바꾸고 전체 건수를 함께 돌려준다")
-    void mapsHitsToProductIds() throws IOException {
+    void search_mapsHitsToProductIds() throws IOException {
         // Given
         SearchResponse<Void> response = SearchResponse.of(r -> r
                 .took(1)
@@ -146,7 +145,7 @@ class ProductSearchServiceTest {
         ProductSearchResult result = service.search(new ProductListRequest(null, "대파", null, null, null, null, null));
 
         // Then
-        assertEquals(List.of(9L, 4L), result.productIds());
-        assertEquals(7, result.total());
+        assertThat(result.productIds()).isEqualTo(List.of(9L, 4L));
+        assertThat(result.total()).isEqualTo(7);
     }
 }

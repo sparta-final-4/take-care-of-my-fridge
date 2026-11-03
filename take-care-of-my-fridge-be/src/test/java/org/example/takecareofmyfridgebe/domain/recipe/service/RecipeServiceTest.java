@@ -561,7 +561,8 @@ class RecipeServiceTest {
         when(recipeRepository.findById(99L)).thenReturn(Optional.empty());
 
         // when & then
-        assertThrows(BusinessException.class, () -> service.updateRecipe(99L, updateRequest("이름", null, null)));
+        assertThatThrownBy(() -> service.updateRecipe(99L, updateRequest("이름", null, null)))
+                .isInstanceOf(BusinessException.class);
         verify(eventPublisher, never()).publishEvent(any(Object.class));
     }
 
@@ -579,9 +580,9 @@ class RecipeServiceTest {
 
         // then
         assertThat(result.content()).extracting(RecipeListItemResponse::recipeId).containsExactly(3L, 1L);
-        assertEquals(8, result.totalElements());
-        assertEquals(2, result.pageNumber());
-        assertEquals(3, result.pageSize());
+        assertThat(result.totalElements()).isEqualTo(8);
+        assertThat(result.pageNumber()).isEqualTo(2);
+        assertThat(result.pageSize()).isEqualTo(3);
     }
 
     @Test
