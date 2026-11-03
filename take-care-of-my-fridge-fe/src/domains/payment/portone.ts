@@ -9,20 +9,26 @@ export interface PaymentCustomer {
   email: string;
 }
 
-// PortOne 결제창을 띄운다. 실패·취소면 응답에 code가 있다.
+// 서버가 정한 채널과 결제 방식으로 PortOne 결제창을 띄운다. 실패·취소면 응답에 code가 있다.
 export async function openPaymentWindow(
   payment: PaymentPrepareResponse,
   customer: PaymentCustomer,
 ) {
-  return PortOne.requestPayment({
+  const request = {
     storeId: import.meta.env.VITE_PORTONE_STORE_ID,
-    channelKey: import.meta.env.VITE_PORTONE_CHANNEL_KEY,
+    channelKey: payment.channelKey,
     paymentId: payment.portonePaymentId,
     orderName: payment.orderName,
     totalAmount: payment.amount,
     currency: 'KRW',
-    // 카카오페이 채널
-    payMethod: 'EASY_PAY',
     customer,
-  });
+  } as const;
+  if (payment.payMethod === 'EASY_PAY') {
+    return PortOne.requestPayment({
+      ...request,
+      payMethod: 'EASY_PAY',
+      easyPay: payment.easyPayProvider ? { easyPayProvider: payment.easyPayProvider } : undefined,
+    });
+  }
+  return PortOne.requestPayment({ ...request, payMethod: 'CARD' });
 }
