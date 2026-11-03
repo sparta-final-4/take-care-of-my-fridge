@@ -55,15 +55,15 @@ class RecipeSearchPropertiesTest extends MySqlContainerSupport {
     }
 
     @Test
-    @DisplayName("상품 인덱스 설정이 바인딩되고 동의어 파일은 없다")
+    @DisplayName("상품 인덱스 설정이 바인딩되고 레시피와 같은 동의어 파일을 쓴다")
     void bindsProductIndexProperties() {
         EsIndexProperties product = properties.indexProperties().product();
 
         assertEquals("products", product.alias());
         assertEquals(500, product.batchSize());
         assertTrue(product.indexSettings().exists(), "products_index.json");
-        assertNull(product.synonyms());
-        assertNull(product.extraSynonyms());
+        assertEquals("ingredient_synonyms.json", product.synonyms().getFilename());
+        assertEquals("synonyms.txt", product.extraSynonyms().getFilename());
     }
 
     @Test

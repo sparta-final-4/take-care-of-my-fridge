@@ -32,7 +32,7 @@ public record RecipeSearchProperties(
             boolean embeddingEnabled
     ) implements EsIndexProperties {}
 
-    // 상품 인덱스는 동의어 필터가 없어 synonyms, extraSynonyms를 비워 둔다
+    // 상품 인덱스도 레시피와 같은 동의어 파일을 product_synonyms 필터에 넣는다
     public record ProductIndexProperties(
             String alias,
             Resource indexSettings,

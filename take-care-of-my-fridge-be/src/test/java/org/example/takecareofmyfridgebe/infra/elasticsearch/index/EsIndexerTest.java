@@ -1,6 +1,7 @@
 package org.example.takecareofmyfridgebe.infra.elasticsearch.index;
 
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
+import org.example.takecareofmyfridgebe.domain.search.config.RecipeSearchProperties.ProductIndexProperties;
 import org.example.takecareofmyfridgebe.domain.search.config.RecipeSearchProperties.RecipeIndexProperties;
 import org.example.takecareofmyfridgebe.infra.elasticsearch.config.EsIndexProperties;
 import org.junit.jupiter.api.DisplayName;
@@ -68,6 +69,35 @@ class EsIndexerTest {
         assertTrue(synonyms.size() > 100);
         assertTrue(synonyms.contains("파스타, 스파게티"));
         assertEquals("strict", body.at("/mappings/dynamic").asString());
+    }
+
+    @Test
+    @DisplayName("상품 인덱스도 레시피와 같은 동의어 규칙을 검색 분석기의 동의어 필터에 넣는다")
+    void fillsProductSynonymFilter() throws IOException {
+        // Given
+        EsIndexProperties productIndex = new ProductIndexProperties(
+                "products",
+                new ClassPathResource("elasticsearch/products/products_index.json"),
+                new ClassPathResource("elasticsearch/recipes/ingredient_synonyms.json"),
+                new ClassPathResource("elasticsearch/recipes/synonyms.txt"),
+                500);
+        EsIndexProperties recipeIndex = new RecipeIndexProperties(
+                "recipes",
+                new ClassPathResource("elasticsearch/recipes/recipes_index.json"),
+                new ClassPathResource("elasticsearch/recipes/ingredient_synonyms.json"),
+                new ClassPathResource("elasticsearch/recipes/synonyms.txt"),
+                500, false);
+
+        // When
+        ObjectNode body = indexerOf(productIndex).indexBody();
+
+        // Then
+        List<String> synonyms = synonymsOf(body, "product_synonyms");
+        assertEquals(synonymsOf(indexerOf(recipeIndex).indexBody(), "recipe_synonyms"), synonyms);
+        assertTrue(synonyms.stream().anyMatch(rule -> rule.startsWith("달걀, ") && rule.contains("계란")));
+        assertEquals("product_synonyms", body.at("/settings/analysis/analyzer/korean_search/filter/3").asString());
+        // 색인 분석기에는 넣지 않는다 (검색할 때만 펼친다)
+        assertEquals(3, body.at("/settings/analysis/analyzer/korean/filter").size());
     }
 
     @Test

@@ -100,6 +100,9 @@ app:
       product:
         alias: products
         index-settings: classpath:elasticsearch/products/products_index.json
+        # 레시피와 같은 동의어를 써서 같은 검색어에 레시피·상품이 함께 걸리게 한다
+        synonyms: classpath:elasticsearch/recipes/ingredient_synonyms.json
+        extra-synonyms: classpath:elasticsearch/recipes/synonyms.txt
         batch-size: 500
       # 냉장고 재료명 정제용. 별칭 사전은 뒤에 있는 파일이 같은 별칭을 덮어쓴다
       ingredient:
