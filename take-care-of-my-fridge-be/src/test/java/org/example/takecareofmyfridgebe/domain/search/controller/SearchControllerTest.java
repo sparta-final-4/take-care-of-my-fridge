@@ -9,6 +9,7 @@ import org.example.takecareofmyfridgebe.domain.product.entity.ProductType;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeListItemResponse;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeListRequest;
 import org.example.takecareofmyfridgebe.domain.search.dto.SearchClickRequest;
+import org.example.takecareofmyfridgebe.domain.search.dto.SearchRecipeClickRequest;
 import org.example.takecareofmyfridgebe.domain.search.facade.ProductSearchFacade;
 import org.example.takecareofmyfridgebe.domain.search.facade.RecipeSearchFacade;
 import org.example.takecareofmyfridgebe.domain.search.service.SearchClickHistoryService;
@@ -52,6 +53,10 @@ class SearchControllerTest {
 
     private static final String CLICK_BODY = """
             {"productId": 10, "keyword": "계란"}
+            """;
+
+    private static final String RECIPE_CLICK_BODY = """
+            {"recipeId": 3, "keyword": "김치"}
             """;
 
     @Autowired
@@ -185,6 +190,43 @@ class SearchControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(CLICK_BODY))
                 .andExpect(status().isForbidden());
+
+        verifyNoInteractions(searchClickHistoryService);
+    }
+
+    @Test
+    @DisplayName("비로그인 상태로 레시피 클릭을 보내면 회원 번호 없이 기록하고 데이터 없이 200이다")
+    void recordRecipeClick_returnsOk_whenUnauthenticated() throws Exception {
+        mvc.perform(post("/api/search/recipe-clicks").with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(RECIPE_CLICK_BODY))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data").doesNotExist());
+
+        verify(searchClickHistoryService).recordRecipe(new SearchRecipeClickRequest(3L, "김치"), null);
+    }
+
+    @Test
+    @DisplayName("로그인 상태로 레시피 클릭을 보내면 로그인한 회원 번호와 함께 기록한다")
+    void recordRecipeClick_passesMemberId_whenAuthenticated() throws Exception {
+        mvc.perform(post("/api/search/recipe-clicks").with(csrf()).with(loginAsMember7())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(RECIPE_CLICK_BODY))
+                .andExpect(status().isOk());
+
+        verify(searchClickHistoryService).recordRecipe(new SearchRecipeClickRequest(3L, "김치"), 7L);
+    }
+
+    @Test
+    @DisplayName("레시피 번호가 0이거나 검색어가 비어 있으면 400이고 기록하지 않는다")
+    void recordRecipeClick_returnsBadRequest_whenRequestInvalid() throws Exception {
+        mvc.perform(post("/api/search/recipe-clicks").with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"recipeId": 0, "keyword": " "}
+                                """))
+                .andExpect(status().isBadRequest());
 
         verifyNoInteractions(searchClickHistoryService);
     }

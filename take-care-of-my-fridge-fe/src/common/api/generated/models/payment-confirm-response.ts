@@ -20,10 +20,20 @@ export interface PaymentConfirmResponse {
     'id'?: number;
     'orderId'?: number;
     'paidAt'?: string;
+    'pgProvider'?: PaymentConfirmResponsePgProviderEnum;
     'portonePaymentId'?: string;
     'status'?: PaymentConfirmResponseStatusEnum;
 }
 
+export const PaymentConfirmResponsePgProviderEnum = {
+    Kakaopay: 'KAKAOPAY',
+    Kicc: 'KICC',
+    Inicis: 'INICIS',
+    Tosspayments: 'TOSSPAYMENTS',
+    Tosspay: 'TOSSPAY',
+} as const;
+
+export type PaymentConfirmResponsePgProviderEnum = typeof PaymentConfirmResponsePgProviderEnum[keyof typeof PaymentConfirmResponsePgProviderEnum];
 export const PaymentConfirmResponseStatusEnum = {
     Ready: 'READY',
     Paid: 'PAID',

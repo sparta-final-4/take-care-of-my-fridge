@@ -26,6 +26,7 @@ import org.example.takecareofmyfridgebe.domain.order.repository.OrderRepository;
 import org.example.takecareofmyfridgebe.domain.order.service.OrderReader;
 import org.example.takecareofmyfridgebe.domain.order.service.OrderStatusService;
 import org.example.takecareofmyfridgebe.domain.payment.entity.Payment;
+import org.example.takecareofmyfridgebe.domain.payment.entity.PgProvider;
 import org.example.takecareofmyfridgebe.domain.payment.repository.PaymentRepository;
 import org.example.takecareofmyfridgebe.domain.payment.service.PaymentHistoryRecorder;
 import org.example.takecareofmyfridgebe.domain.payment.service.PaymentService;
@@ -110,7 +111,7 @@ class OrderStatusFacadeConfirmTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("결제 완료 주문을 구매 확정하면 상태가 구매 확정으로 바뀌고 확정 시각이 남는다")
-    void confirm_paidOrder_confirms() {
+    void confirmsPaidOrder() {
         Order order = saveOrder(1L, OrderStatus.PAID);
 
         OrderConfirmResponse response = orderStatusFacade.confirm(1L, order.getId());
@@ -124,7 +125,7 @@ class OrderStatusFacadeConfirmTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("구매 확정하면 주문 수량에서 완료된 환불 수량만 빼서 확정 수량으로 남기고 실패한 환불은 빼지 않는다")
-    void confirm_withCompletedAndFailedRefunds_savesQuantityMinusCompleted() {
+    void savesQuantityMinusCompletedRefundsWhenConfirming() {
         Order order = saveOrder(1L, OrderStatus.PAID);
         OrderItem normal = saveItem(order, 5, SaleType.NONE);
         OrderItem special = saveItem(order, 1, SaleType.SPECIAL);
@@ -141,7 +142,7 @@ class OrderStatusFacadeConfirmTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("환불이 없는 주문을 구매 확정하면 주문 수량이 그대로 확정 수량이다")
-    void confirm_withoutRefund_savesOrderQuantity() {
+    void savesOrderQuantityWhenConfirmingWithoutRefund() {
         Order order = saveOrder(1L, OrderStatus.PAID);
         OrderItem item = saveItem(order, 2, SaleType.NONE);
 
@@ -152,7 +153,7 @@ class OrderStatusFacadeConfirmTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("요청 상태 환불이 있는 주문은 환불이 진행 중이라고 거절하고 주문과 확정 수량은 그대로다")
-    void confirm_withRequestedRefund_rejects() {
+    void rejectsConfirmingWithRequestedRefund() {
         Order order = saveOrder(1L, OrderStatus.PAID);
         OrderItem item = saveItem(order, 3, SaleType.NONE);
         saveRefund(savePayment(order), item, 1, RefundStatus.REQUESTED);
@@ -168,7 +169,7 @@ class OrderStatusFacadeConfirmTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("전액 환불된 주문은 전부 환불된 주문으로 거절하고 상태와 확정 수량은 그대로이며 이벤트도 보내지 않는다")
-    void confirm_refundedOrder_rejects() {
+    void rejectsConfirmingRefundedOrder() {
         Order order = saveOrder(1L, OrderStatus.PAID);
         OrderItem item = saveItem(order, 2, SaleType.NONE);
         orderStatusFacade.markRefunded(order.getId());
@@ -185,7 +186,7 @@ class OrderStatusFacadeConfirmTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("이미 구매 확정된 주문을 다시 확정하면 같은 응답을 주고 확정 시각은 그대로다")
-    void confirm_confirmedOrder_returnsSameAndKeepsConfirmedAt() {
+    void returnsSameAndKeepsConfirmedAtForConfirmedOrder() {
         Order order = saveOrder(1L, OrderStatus.PAID);
         orderStatusFacade.confirm(1L, order.getId());
         LocalDateTime firstConfirmedAt = reload(order).getConfirmedAt();
@@ -198,7 +199,7 @@ class OrderStatusFacadeConfirmTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("결제 대기 주문은 결제 완료된 주문만 확정할 수 있다고 거절하고 상태는 그대로다")
-    void confirm_pendingOrder_rejects() {
+    void rejectsConfirmingPendingOrder() {
         Order order = saveOrder(1L, OrderStatus.PENDING);
 
         assertThatThrownBy(() -> orderStatusFacade.confirm(1L, order.getId()))
@@ -211,7 +212,7 @@ class OrderStatusFacadeConfirmTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("취소된 주문은 취소된 주문으로 거절하고 상태는 그대로다")
-    void confirm_cancelledOrder_rejects() {
+    void rejectsConfirmingCancelledOrder() {
         Order order = saveOrder(1L, OrderStatus.CANCELLED);
 
         assertThatThrownBy(() -> orderStatusFacade.confirm(1L, order.getId()))
@@ -224,7 +225,7 @@ class OrderStatusFacadeConfirmTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("남의 주문은 없는 주문과 똑같이 404이고 상태는 그대로다")
-    void confirm_othersOrder_returnsNotFound() {
+    void returnsNotFoundWhenConfirmingOthersOrder() {
         Order othersOrder = saveOrder(2L, OrderStatus.PAID);
 
         assertThatThrownBy(() -> orderStatusFacade.confirm(1L, othersOrder.getId()))
@@ -240,7 +241,7 @@ class OrderStatusFacadeConfirmTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("같은 주문을 동시에 10번 확정해도 모두 구매 확정 응답을 받고 주문은 구매 확정이다")
-    void confirm_sameOrderConcurrently_allConfirmed() throws Exception {
+    void confirmsSameOrderConcurrently() throws Exception {
         Order order = saveOrder(1L, OrderStatus.PAID);
         List<OrderStatus> responses = Collections.synchronizedList(new ArrayList<>());
 
@@ -258,7 +259,7 @@ class OrderStatusFacadeConfirmTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("구매 확정과 환불 신청이 동시에 와도 주문마다 하나만 성공하고 확정된 주문에는 요청·완료 환불이 없다")
-    void confirmAndRefundRequestConcurrently_onlyOneSucceedsPerOrder() throws Exception {
+    void succeedsForOnlyOneOfConfirmAndRefundRequestPerOrder() throws Exception {
         List<Order> orders = new ArrayList<>();
         List<OrderItem> items = new ArrayList<>();
         List<Callable<Void>> tasks = new ArrayList<>();
@@ -304,7 +305,7 @@ class OrderStatusFacadeConfirmTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("결제 완료 주문을 구매 확정하면 커밋 뒤 구매 확정 이벤트가 한 번 나가고 확정 수량이 남은 상품만 싣는다")
-    void confirm_paidOrder_publishesEventWithRemainingItems() {
+    void publishesEventWithRemainingItemsWhenConfirmingPaidOrder() {
         Order order = saveOrder(1L, OrderStatus.PAID);
         OrderItem remaining = saveItem(order, 3, SaleType.NONE);
         OrderItem allRefunded = saveItem(order, 2, SaleType.NONE);
@@ -323,7 +324,7 @@ class OrderStatusFacadeConfirmTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("이미 구매 확정된 주문을 다시 확정하면 구매 확정 이벤트를 다시 보내지 않는다")
-    void confirm_confirmedOrder_doesNotPublishAgain() {
+    void doesNotPublishAgainForConfirmedOrder() {
         Order order = saveOrder(1L, OrderStatus.PAID);
         saveItem(order, 1, SaleType.NONE);
         orderStatusFacade.confirm(1L, order.getId());
@@ -335,7 +336,7 @@ class OrderStatusFacadeConfirmTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("요청 상태 환불이 있어 거절된 주문은 구매 확정 이벤트를 보내지 않는다")
-    void confirm_withRequestedRefund_doesNotPublish() {
+    void doesNotPublishWhenConfirmingWithRequestedRefund() {
         Order order = saveOrder(1L, OrderStatus.PAID);
         OrderItem item = saveItem(order, 3, SaleType.NONE);
         saveRefund(savePayment(order), item, 1, RefundStatus.REQUESTED);
@@ -348,7 +349,7 @@ class OrderStatusFacadeConfirmTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("같은 주문을 동시에 10번 확정해도 구매 확정 이벤트는 한 번만 나간다")
-    void confirm_sameOrderConcurrently_publishesOnce() throws Exception {
+    void publishesOnceWhenConfirmingSameOrderConcurrently() throws Exception {
         Order order = saveOrder(1L, OrderStatus.PAID);
         saveItem(order, 1, SaleType.NONE);
 
@@ -364,7 +365,7 @@ class OrderStatusFacadeConfirmTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("환불 쪽이 전액 환불로 부르면 결제 완료 주문이 전액 환불 상태가 된다")
-    void markRefunded_paidOrder_changesToRefunded() {
+    void changesPaidOrderToRefunded() {
         Order order = saveOrder(1L, OrderStatus.PAID);
 
         orderStatusFacade.markRefunded(order.getId());
@@ -376,7 +377,7 @@ class OrderStatusFacadeConfirmTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("환불 뒤 구매 확정으로 부르면 바로 구매 확정되고 환불된 상품은 확정 수량 0, 번개 드롭 상품만 이벤트에 싣는다")
-    void confirmAfterRefund_onlyFlashDropRemains_confirms() {
+    void confirmsAfterRefundWhenOnlyFlashDropRemains() {
         Order order = saveOrder(1L, OrderStatus.PAID);
         OrderItem normal = saveItem(order, 2, SaleType.NONE);
         OrderItem flashDrop = saveItem(order, 1, SaleType.FLASH_DROP);
@@ -455,9 +456,9 @@ class OrderStatusFacadeConfirmTransactionTest extends MySqlContainerSupport {
             .order(order)
             .portonePaymentId("payment-" + order.getOrderNumber())
             .amount(order.getTotalAmount())
-            .expiresAt(paidAt.plusMinutes(10))
+            .pgProvider(PgProvider.KAKAOPAY).expiresAt(paidAt.plusMinutes(10))
             .build();
-        payment.complete(paidAt);
+        payment.complete(paidAt, PgProvider.KAKAOPAY);
         return paymentRepository.save(payment);
     }
 

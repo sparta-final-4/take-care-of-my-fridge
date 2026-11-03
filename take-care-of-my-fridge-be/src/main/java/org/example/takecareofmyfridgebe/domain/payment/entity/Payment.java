@@ -45,6 +45,11 @@ public class Payment extends BaseTimeEntity {
     @Column(nullable = false)
     private Long amount;
 
+    // 결제 준비 때 사용자가 고른 결제대행사. 승인할 때 PG 조회 결과와 다르면 실제 결제대행사로 고친다
+    @Enumerated(EnumType.STRING)
+    @Column(name = "pg_provider", nullable = false, length = 20)
+    private PgProvider pgProvider;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private PaymentStatus status;
@@ -61,10 +66,12 @@ public class Payment extends BaseTimeEntity {
     private FailReason failReason;
 
     @Builder
-    private Payment(Order order, String portonePaymentId, Long amount, LocalDateTime expiresAt) {
+    private Payment(Order order, String portonePaymentId, Long amount, PgProvider pgProvider,
+                    LocalDateTime expiresAt) {
         this.order = order;
         this.portonePaymentId = portonePaymentId;
         this.amount = amount;
+        this.pgProvider = pgProvider;
         this.expiresAt = expiresAt;
         this.status = PaymentStatus.READY;
     }
@@ -74,10 +81,14 @@ public class Payment extends BaseTimeEntity {
         return pgPaidAt.isAfter(expiresAt);
     }
 
-    public void complete(LocalDateTime paidAt) {
+    // actualPgProvider는 PG 조회로 확인한 결제대행사. 확인하지 못했으면(null) 고른 값을 그대로 둔다
+    public void complete(LocalDateTime paidAt, PgProvider actualPgProvider) {
         validateReady();
         this.status = PaymentStatus.PAID;
         this.paidAt = paidAt;
+        if (actualPgProvider != null) {
+            this.pgProvider = actualPgProvider;
+        }
     }
 
     public void fail(FailReason reason) {

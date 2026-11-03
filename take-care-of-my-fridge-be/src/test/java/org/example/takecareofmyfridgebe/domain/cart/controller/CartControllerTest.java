@@ -54,7 +54,7 @@ class CartControllerTest {
 
     @Test
     @DisplayName("줄 번호 목록으로 삭제를 요청하면 200이고 번호가 서비스에 그대로 전달된다")
-    void removeItems_passesIdsToService() throws Exception {
+    void passesIdsToServiceOnRemove() throws Exception {
         mvc.perform(delete("/api/cart-items")
                         .param("cartItemIds", "11,12")
                         .with(csrf())
@@ -67,7 +67,7 @@ class CartControllerTest {
 
     @Test
     @DisplayName("줄 번호가 없으면 400이다")
-    void removeItems_rejectsMissingIds() throws Exception {
+    void rejectsRemoveWithMissingIds() throws Exception {
         mvc.perform(delete("/api/cart-items")
                         .with(csrf())
                         .with(loginAsMember7()))
@@ -79,7 +79,7 @@ class CartControllerTest {
 
     @Test
     @DisplayName("줄 번호가 비어 있으면 400이다")
-    void removeItems_rejectsEmptyIds() throws Exception {
+    void rejectsRemoveWithEmptyIds() throws Exception {
         mvc.perform(delete("/api/cart-items")
                         .param("cartItemIds", "")
                         .with(csrf())
@@ -92,7 +92,7 @@ class CartControllerTest {
 
     @Test
     @DisplayName("줄 번호가 숫자가 아니면 400이다")
-    void removeItems_rejectsNonNumericIds() throws Exception {
+    void rejectsRemoveWithNonNumericIds() throws Exception {
         mvc.perform(delete("/api/cart-items")
                         .param("cartItemIds", "a,b")
                         .with(csrf())

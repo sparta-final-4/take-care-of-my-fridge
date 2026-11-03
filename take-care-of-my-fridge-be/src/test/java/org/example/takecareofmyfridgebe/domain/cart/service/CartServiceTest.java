@@ -48,7 +48,7 @@ class CartServiceTest {
 
     @Test
     @DisplayName("장바구니가 없으면 만들고 상품을 담는다")
-    void addItem_createsCartAndItem() {
+    void createsCartAndItemOnAdd() {
         Cart cart = Cart.builder().memberId(1L).build();
         given(cartRepository.findByMemberId(1L)).willReturn(Optional.empty());
         given(cartRepository.save(any(Cart.class))).willReturn(cart);
@@ -68,7 +68,7 @@ class CartServiceTest {
 
     @Test
     @DisplayName("이미 담긴 상품이면 수량을 더한다")
-    void addItem_addsQuantityToExistingItem() {
+    void addsQuantityToExistingItemOnAdd() {
         Cart cart = Cart.builder().memberId(1L).build();
         CartItem item = CartItem.builder().cart(cart).productId(10L).quantity(2).build();
         given(cartRepository.findByMemberId(1L)).willReturn(Optional.of(cart));
@@ -85,7 +85,7 @@ class CartServiceTest {
 
     @Test
     @DisplayName("번개 드롭 상품을 이미 담았으면 한 개 더 담을 수 없고 수량은 그대로다")
-    void addItem_flashDropAlreadyInCart_rejects() {
+    void rejectsAddingFlashDropAlreadyInCart() {
         Cart cart = Cart.builder().memberId(1L).build();
         CartItem item = CartItem.builder().cart(cart).productId(10L).quantity(1).build();
         given(cartRepository.findByMemberId(1L)).willReturn(Optional.of(cart));
@@ -100,7 +100,7 @@ class CartServiceTest {
 
     @Test
     @DisplayName("기존 수량에 더해 재고를 넘으면 거절되고 수량은 그대로다")
-    void addItem_overStock_rejects() {
+    void rejectsAddingOverStock() {
         Cart cart = Cart.builder().memberId(1L).build();
         CartItem item = CartItem.builder().cart(cart).productId(10L).quantity(8).build();
         given(cartRepository.findByMemberId(1L)).willReturn(Optional.of(cart));
@@ -114,7 +114,7 @@ class CartServiceTest {
 
     @Test
     @DisplayName("번개 드롭 상품의 수량을 2로 바꿀 수 없고 수량은 그대로다")
-    void changeQuantity_flashDropOverOne_rejects() {
+    void rejectsFlashDropQuantityOverOne() {
         Cart cart = Cart.builder().memberId(1L).build();
         CartItem item = CartItem.builder().cart(cart).productId(10L).quantity(1).build();
         given(cartItemRepository.findByIdAndCartMemberId(5L, 1L)).willReturn(Optional.of(item));
@@ -127,7 +127,7 @@ class CartServiceTest {
 
     @Test
     @DisplayName("재고가 줄어든 뒤에도 수량을 내리는 것은 반영된다")
-    void changeQuantity_decreaseIsAllowedEvenOverStock() {
+    void allowsDecreasingEvenOverStock() {
         Cart cart = Cart.builder().memberId(1L).build();
         CartItem item = CartItem.builder().cart(cart).productId(10L).quantity(5).build();
         given(cartItemRepository.findByIdAndCartMemberId(5L, 1L)).willReturn(Optional.of(item));

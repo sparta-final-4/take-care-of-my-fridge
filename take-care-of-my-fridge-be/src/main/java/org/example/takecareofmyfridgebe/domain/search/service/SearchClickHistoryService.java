@@ -3,7 +3,9 @@ package org.example.takecareofmyfridgebe.domain.search.service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.takecareofmyfridgebe.domain.search.dto.SearchClickRequest;
+import org.example.takecareofmyfridgebe.domain.search.dto.SearchRecipeClickRequest;
 import org.example.takecareofmyfridgebe.domain.search.repository.SearchClickHistoryRepository;
+import org.example.takecareofmyfridgebe.domain.search.repository.SearchRecipeClickHistoryRepository;
 import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -21,6 +23,7 @@ import java.time.format.DateTimeFormatter;
  * 2) 비로그인: 사람을 구분할 수 없어 상품별로 1분에 ANONYMOUS_LIMIT_PER_MINUTE건까지만 저장한다
  * <br>
  * Redis 장애면 클릭을 놓치지 않도록 거르지 않고 저장한다.
+ * 레시피 클릭은 거르지 않고 그대로 저장한다.
  */
 @Slf4j
 @Service
@@ -40,6 +43,7 @@ public class SearchClickHistoryService {
     private static final Duration ANONYMOUS_LIMIT_KEY_TTL = Duration.ofMinutes(2);
 
     private final SearchClickHistoryRepository searchClickHistoryRepository;
+    private final SearchRecipeClickHistoryRepository searchRecipeClickHistoryRepository;
     private final StringRedisTemplate redisTemplate;
 
     // 검색 결과 상품 클릭을 기록한다. 비로그인이면 memberId는 null이다. 반복 클릭이면 저장하지 않는다.
@@ -73,5 +77,11 @@ public class SearchClickHistoryService {
             redisTemplate.expire(key, ANONYMOUS_LIMIT_KEY_TTL);
         }
         return count != null && count <= ANONYMOUS_LIMIT_PER_MINUTE;
+    }
+
+    // 검색 결과 레시피 클릭을 기록한다. 비로그인이면 memberId는 null이다.
+    @Transactional
+    public void recordRecipe(SearchRecipeClickRequest request, Long memberId) {
+        searchRecipeClickHistoryRepository.save(request.toEntity(memberId));
     }
 }

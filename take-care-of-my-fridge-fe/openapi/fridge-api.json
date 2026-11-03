@@ -2282,6 +2282,16 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PaymentPrepareRequest"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "content": {
@@ -2883,6 +2893,36 @@
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponsePageResponseProductListItemResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "search-controller"
+        ]
+      }
+    },
+    "/api/search/recipe-clicks": {
+      "post": {
+        "operationId": "recordRecipeClick",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchRecipeClickRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseVoid"
                 }
               }
             },
@@ -6465,6 +6505,16 @@
             "type": "string",
             "format": "date-time"
           },
+          "pgProvider": {
+            "type": "string",
+            "enum": [
+              "KAKAOPAY",
+              "KICC",
+              "INICIS",
+              "TOSSPAYMENTS",
+              "TOSSPAY"
+            ]
+          },
           "portonePaymentId": {
             "type": "string"
           },
@@ -6478,12 +6528,36 @@
           }
         }
       },
+      "PaymentPrepareRequest": {
+        "type": "object",
+        "properties": {
+          "pgProvider": {
+            "type": "string",
+            "enum": [
+              "KAKAOPAY",
+              "KICC",
+              "INICIS",
+              "TOSSPAYMENTS",
+              "TOSSPAY"
+            ]
+          }
+        },
+        "required": [
+          "pgProvider"
+        ]
+      },
       "PaymentPrepareResponse": {
         "type": "object",
         "properties": {
           "amount": {
             "type": "integer",
             "format": "int64"
+          },
+          "channelKey": {
+            "type": "string"
+          },
+          "easyPayProvider": {
+            "type": "string"
           },
           "expiresAt": {
             "type": "string",
@@ -6495,6 +6569,19 @@
           },
           "orderName": {
             "type": "string"
+          },
+          "payMethod": {
+            "type": "string"
+          },
+          "pgProvider": {
+            "type": "string",
+            "enum": [
+              "KAKAOPAY",
+              "KICC",
+              "INICIS",
+              "TOSSPAYMENTS",
+              "TOSSPAY"
+            ]
           },
           "portonePaymentId": {
             "type": "string"
@@ -8157,6 +8244,24 @@
         "required": [
           "keyword",
           "productId"
+        ]
+      },
+      "SearchRecipeClickRequest": {
+        "type": "object",
+        "properties": {
+          "keyword": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 0
+          },
+          "recipeId": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "required": [
+          "keyword",
+          "recipeId"
         ]
       },
       "ServerSentEventString": {},

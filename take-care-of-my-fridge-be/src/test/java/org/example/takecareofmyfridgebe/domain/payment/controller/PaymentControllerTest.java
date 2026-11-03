@@ -6,8 +6,10 @@ import org.example.takecareofmyfridgebe.domain.auth.service.JwtTokenService;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 import org.example.takecareofmyfridgebe.domain.payment.dto.PaymentConfirmRequest;
 import org.example.takecareofmyfridgebe.domain.payment.dto.PaymentConfirmResponse;
+import org.example.takecareofmyfridgebe.domain.payment.dto.PaymentPrepareRequest;
 import org.example.takecareofmyfridgebe.domain.payment.dto.PaymentPrepareResponse;
 import org.example.takecareofmyfridgebe.domain.payment.entity.PaymentStatus;
+import org.example.takecareofmyfridgebe.domain.payment.entity.PgProvider;
 import org.example.takecareofmyfridgebe.domain.payment.facade.PaymentFacade;
 import org.example.takecareofmyfridgebe.global.config.SecurityConfig;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
@@ -90,7 +92,7 @@ class PaymentControllerTest {
         PaymentConfirmRequest request = new PaymentConfirmRequest(1L, PORTONE_PAYMENT_ID);
         PaymentConfirmResponse response = new PaymentConfirmResponse(
                 10L, 1L, PORTONE_PAYMENT_ID, 15000L, PaymentStatus.PAID,
-                LocalDateTime.of(2026, 10, 20, 10, 0));
+                LocalDateTime.of(2026, 10, 20, 10, 0), PgProvider.KAKAOPAY);
         when(paymentFacade.confirmPayment(MEMBER_ID, request)).thenReturn(response);
 
         mvc.perform(post("/api/payments/confirm")
@@ -208,25 +210,49 @@ class PaymentControllerTest {
     }
 
     /**
-     * 결제 준비 요청 시 토큰의 회원 ID와 경로의 주문 ID로 Facade를 호출하고,
+     * 결제 준비 요청 시 토큰의 회원 ID, 경로의 주문 ID, 고른 결제대행사로 Facade를 호출하고,
      * 결제창을 띄울 정보가 규격대로 직렬화되는지 검증한다.
      */
     @Test
     void preparePassesTokenMemberIdAndReturnsResponse() throws Exception {
         PaymentPrepareResponse response = new PaymentPrepareResponse(
-                1L, PORTONE_PAYMENT_ID, "대파 외 1건", 15000L, LocalDateTime.of(2026, 10, 20, 10, 10));
-        when(paymentFacade.preparePayment(MEMBER_ID, 1L)).thenReturn(response);
+                1L, PORTONE_PAYMENT_ID, "대파 외 1건", 15000L, LocalDateTime.of(2026, 10, 20, 10, 10),
+                PgProvider.KAKAOPAY, "channel-kakaopay", "EASY_PAY", "KAKAOPAY");
+        when(paymentFacade.preparePayment(MEMBER_ID, 1L, new PaymentPrepareRequest(PgProvider.KAKAOPAY)))
+                .thenReturn(response);
 
         mvc.perform(post("/api/orders/{orderId}/payments", 1L)
                         .with(csrf())
-                        .with(loginUser()))
+                        .with(loginUser())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(prepareBody("\"KAKAOPAY\"")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.orderId").value(1))
                 .andExpect(jsonPath("$.data.portonePaymentId").value(PORTONE_PAYMENT_ID))
                 .andExpect(jsonPath("$.data.orderName").value("대파 외 1건"))
                 .andExpect(jsonPath("$.data.amount").value(15000))
-                .andExpect(jsonPath("$.data.expiresAt").value("2026-10-20T10:10:00"));
+                .andExpect(jsonPath("$.data.expiresAt").value("2026-10-20T10:10:00"))
+                .andExpect(jsonPath("$.data.pgProvider").value("KAKAOPAY"))
+                .andExpect(jsonPath("$.data.channelKey").value("channel-kakaopay"))
+                .andExpect(jsonPath("$.data.payMethod").value("EASY_PAY"))
+                .andExpect(jsonPath("$.data.easyPayProvider").value("KAKAOPAY"));
+    }
+
+    /**
+     * 결제대행사를 고르지 않으면 400(C001)으로 응답하고 Facade를 호출하지 않는지 검증한다.
+     */
+    @Test
+    void prepareWithoutPgProviderReturnsBadRequest() throws Exception {
+        mvc.perform(post("/api/orders/{orderId}/payments", 1L)
+                        .with(csrf())
+                        .with(loginUser())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(prepareBody("null")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value(ErrorCode.INVALID_INPUT_VALUE.getCode()));
+
+        verifyNoInteractions(paymentFacade);
     }
 
     /**
@@ -234,12 +260,14 @@ class PaymentControllerTest {
      */
     @Test
     void prepareOrderNotPayableReturnsConflict() throws Exception {
-        when(paymentFacade.preparePayment(MEMBER_ID, 1L))
+        when(paymentFacade.preparePayment(MEMBER_ID, 1L, new PaymentPrepareRequest(PgProvider.KAKAOPAY)))
                 .thenThrow(new BusinessException(ErrorCode.PAYMENT_ORDER_NOT_PAYABLE));
 
         mvc.perform(post("/api/orders/{orderId}/payments", 1L)
                         .with(csrf())
-                        .with(loginUser()))
+                        .with(loginUser())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(prepareBody("\"KAKAOPAY\"")))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.error.code").value(ErrorCode.PAYMENT_ORDER_NOT_PAYABLE.getCode()));
     }
@@ -257,6 +285,14 @@ class PaymentControllerTest {
                   "portonePaymentId": %s
                 }
                 """.formatted(orderId, portonePaymentId);
+    }
+
+    private static String prepareBody(String pgProvider) {
+        return """
+                {
+                  "pgProvider": %s
+                }
+                """.formatted(pgProvider);
     }
 
     @TestConfiguration

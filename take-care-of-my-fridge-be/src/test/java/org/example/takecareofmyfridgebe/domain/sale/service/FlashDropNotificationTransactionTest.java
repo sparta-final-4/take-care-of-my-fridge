@@ -95,7 +95,7 @@ class FlashDropNotificationTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("번개 드롭을 등록하면 정지되지 않은 일반 회원마다 예고 알림 요청이 만들어지고 관리자와 정지 회원은 빠진다")
-    void createFlashDrop_notifiesActiveUsersOnly(ApplicationEvents events) {
+    void notifiesOnlyActiveUsersOnFlashDropCreation(ApplicationEvents events) {
         Member user1 = saveMember("user1");
         Member user2 = saveMember("user2");
         Member admin = saveMember("admin");
@@ -126,7 +126,7 @@ class FlashDropNotificationTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("특가를 등록하면 알림을 내보내지 않는다")
-    void createSpecialSale_doesNotNotify(ApplicationEvents events) {
+    void doesNotNotifyOnSpecialSaleCreation(ApplicationEvents events) {
         saveMember("user1");
         Product tofu = saveProduct("두부", 3000);
 
@@ -138,7 +138,7 @@ class FlashDropNotificationTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("시작 시각이 된 번개 드롭만 시작 알림을 내보내고, 특가와 아직 시작 전인 번개 드롭은 빠진다")
-    void openAndCloseDue_notifiesStartedFlashDropsOnly(ApplicationEvents events) {
+    void notifiesOnlyStartedFlashDropsWhenOpeningDueEvents(ApplicationEvents events) {
         Member user = saveMember("user1");
         Product tofu = saveProduct("두부", 3000);
         Product milk = saveProduct("우유", 4000);

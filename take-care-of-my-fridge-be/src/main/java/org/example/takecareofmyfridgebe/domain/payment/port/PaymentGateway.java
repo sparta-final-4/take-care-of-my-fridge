@@ -1,9 +1,14 @@
 package org.example.takecareofmyfridgebe.domain.payment.port;
 
+import org.example.takecareofmyfridgebe.domain.payment.entity.PgProvider;
+
 import java.util.Optional;
 import java.util.UUID;
 
 public interface PaymentGateway {
+
+    // 고른 결제대행사의 결제창을 여는 데 필요한 값
+    PaymentCheckout getCheckout(PgProvider pgProvider);
 
     // PG사에서 실제 결제 정보 조회 (금액 검증용). 결제창을 열지 않아 PG에 결제가 없으면 빈 값
     Optional<PaymentGatewayResponse> getPayment(String paymentId);

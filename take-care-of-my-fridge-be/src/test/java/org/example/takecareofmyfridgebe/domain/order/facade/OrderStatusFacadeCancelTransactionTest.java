@@ -40,6 +40,7 @@ import org.example.takecareofmyfridgebe.domain.order.service.OrderService;
 import org.example.takecareofmyfridgebe.domain.order.service.OrderStatusService;
 import org.example.takecareofmyfridgebe.domain.payment.entity.FailReason;
 import org.example.takecareofmyfridgebe.domain.payment.entity.Payment;
+import org.example.takecareofmyfridgebe.domain.payment.entity.PgProvider;
 import org.example.takecareofmyfridgebe.domain.payment.entity.PaymentStatus;
 import org.example.takecareofmyfridgebe.domain.payment.repository.PaymentHistoryRepository;
 import org.example.takecareofmyfridgebe.domain.payment.repository.PaymentRepository;
@@ -163,7 +164,7 @@ class OrderStatusFacadeCancelTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("결제를 시도하지 않은 결제 대기 주문을 취소하면 주문과 주문 상품이 지워지고 재고는 주문 수량만큼 돌아온다")
-    void cancel_pendingOrderWithoutPayment_deletesAndRestoresStock() {
+    void deletesAndRestoresStockOfPendingOrderWithoutPayment() {
         Product greenOnion = saveProduct("대파", 3000, 8);
         Product tofu = saveProduct("두부", 2000, 4);
         Order order = saveOrder(1L, OrderStatus.PENDING, item(greenOnion, 2), item(tofu, 1));
@@ -177,7 +178,7 @@ class OrderStatusFacadeCancelTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("품절된 상품의 주문을 취소하면 재고가 돌아오고 판매 중으로 바뀐다")
-    void cancel_soldOutProduct_marksOnSale() {
+    void marksSoldOutProductOnSaleAgain() {
         Product greenOnion = saveProduct("대파", 3000, 0, ProductStatus.SOLD_OUT);
         Order order = saveOrder(1L, OrderStatus.PENDING, item(greenOnion, 2));
 
@@ -190,7 +191,7 @@ class OrderStatusFacadeCancelTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("번개 드롭으로 산 주문을 취소하면 1인 1개 기록이 담긴 주문 상품이 지워지고 번개 드롭 남은 수량이 돌아온다")
-    void cancel_flashDrop_deletesItemAndRestoresRemaining() {
+    void deletesItemAndRestoresRemainingOfFlashDrop() {
         Product greenOnion = saveProduct("대파", 3000, 0);
         SaleEventItem saleEventItem = saveFlashDrop(greenOnion, 5);
         Order order = saveOrder(1L, OrderStatus.PENDING, flashDropItem(greenOnion, 1L).saleEventItemId(saleEventItem.getId()));
@@ -205,7 +206,7 @@ class OrderStatusFacadeCancelTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("지운 주문을 다시 취소하면 404이고 재고는 한 번만 돌아온다")
-    void cancel_deletedOrder_returnsNotFound() {
+    void returnsNotFoundWhenCancellingDeletedOrder() {
         Product greenOnion = saveProduct("대파", 3000, 8);
         Order order = saveOrder(1L, OrderStatus.PENDING, item(greenOnion, 2));
         orderStatusFacade.cancel(1L, order.getId());
@@ -218,7 +219,7 @@ class OrderStatusFacadeCancelTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("결제 시도가 있는 결제 대기 주문은 실패한 결제여도 거절하고 주문과 재고는 그대로다")
-    void cancel_pendingOrderWithPayment_rejects() {
+    void rejectsCancellingPendingOrderWithPayment() {
         Product greenOnion = saveProduct("대파", 3000, 8);
         Order order = saveOrder(1L, OrderStatus.PENDING, item(greenOnion, 2));
         saveFailedPayment(order);
@@ -233,7 +234,7 @@ class OrderStatusFacadeCancelTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("결제가 끝난 주문은 이미 결제가 완료된 주문으로 거절하고 상태와 재고는 그대로다")
-    void cancel_paidOrder_rejects() {
+    void rejectsCancellingPaidOrder() {
         Product greenOnion = saveProduct("대파", 3000, 8);
         Order order = saveOrder(1L, OrderStatus.PAID, item(greenOnion, 2));
 
@@ -246,7 +247,7 @@ class OrderStatusFacadeCancelTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("남의 주문은 없는 주문과 똑같이 404이고 상태와 재고는 그대로다")
-    void cancel_othersOrder_returnsNotFound() {
+    void returnsNotFoundWhenCancellingOthersOrder() {
         Product greenOnion = saveProduct("대파", 3000, 8);
         Order othersOrder = saveOrder(2L, OrderStatus.PENDING, item(greenOnion, 2));
 
@@ -262,7 +263,7 @@ class OrderStatusFacadeCancelTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("같은 주문을 동시에 5번 취소하면 하나만 지우고 나머지는 404이며 재고는 한 번만 돌아온다")
-    void cancel_sameOrderConcurrently_restoresStockOnce() throws Exception {
+    void restoresStockOnceWhenCancellingSameOrderConcurrently() throws Exception {
         Product greenOnion = saveProduct("대파", 3000, 8);
         Order order = saveOrder(1L, OrderStatus.PENDING, item(greenOnion, 2));
 
@@ -280,7 +281,7 @@ class OrderStatusFacadeCancelTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("취소하기와 결제하기가 동시에 오면 주문이 지워지고 결제가 없거나, 결제가 붙고 주문과 재고가 그대로다")
-    void cancel_withConcurrentPaymentCreate_neverDeletesPaidAttempt() throws Exception {
+    void neverDeletesPaidAttemptWhenCancellingWithConcurrentPaymentCreate() throws Exception {
         for (int round = 0; round < 10; round++) {
             Product greenOnion = saveProduct("대파" + round, 3000, 8);
             Order order = saveOrder(1L, OrderStatus.PENDING, item(greenOnion, 2));
@@ -291,7 +292,7 @@ class OrderStatusFacadeCancelTransactionTest extends MySqlContainerSupport {
                     return null;
                 },
                 () -> {
-                    paymentCommandService.create(order.getId());
+                    paymentCommandService.create(order.getId(), PgProvider.KAKAOPAY);
                     return null;
                 }));
 
@@ -313,7 +314,7 @@ class OrderStatusFacadeCancelTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("취소하기와 주문 만료가 동시에 와도 주문은 한 번만 지워지고 재고는 한 번만 돌아온다")
-    void cancel_withConcurrentExpire_restoresStockOnce() throws Exception {
+    void restoresStockOnceWhenCancellingWithConcurrentExpire() throws Exception {
         for (int round = 0; round < 10; round++) {
             Product greenOnion = saveProduct("대파" + round, 3000, 8);
             Order order = saveOrder(1L, OrderStatus.PENDING, item(greenOnion, 2));
@@ -339,7 +340,7 @@ class OrderStatusFacadeCancelTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("주문 만료는 생성 5분이 지나고 결제 시도가 없는 결제 대기 주문만 지운다")
-    void expireScheduler_deletesOnlyOldPendingOrdersWithoutPayment() {
+    void deletesOnlyOldPendingOrdersWithoutPaymentOnExpire() {
         Product greenOnion = saveProduct("대파", 3000, 0);
         Order abandoned = saveOrder(1L, OrderStatus.PENDING, item(greenOnion, 1));
         Order fresh = saveOrder(2L, OrderStatus.PENDING, item(greenOnion, 1));
@@ -359,7 +360,7 @@ class OrderStatusFacadeCancelTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("결제가 모두 끝났고 마지막 결제가 10분 전보다 이른 결제 대기 주문만 골라 취소 상태로 남기고 재고를 되돌린다")
-    void cancelAbandoned_cancelsOnlyAbandonedOrders() {
+    void cancelsOnlyAbandonedOrders() {
         Product greenOnion = saveProduct("대파", 3000, 0);
         SaleEventItem saleEventItem = saveFlashDrop(greenOnion, 5);
         Order abandoned = saveOrder(1L, OrderStatus.PENDING,
@@ -394,7 +395,7 @@ class OrderStatusFacadeCancelTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("결제 정리와 결제하기가 동시에 오면 주문이 취소되고 새 결제가 없거나, 새 결제가 붙고 주문과 재고가 그대로다")
-    void cancelAbandoned_withConcurrentPaymentCreate_keepsStockConsistent() throws Exception {
+    void keepsStockConsistentWhenCancellingAbandonedWithConcurrentPaymentCreate() throws Exception {
         for (int round = 0; round < 10; round++) {
             Product greenOnion = saveProduct("대파" + round, 3000, 8);
             Order order = saveOrder(1L, OrderStatus.PENDING, item(greenOnion, 2));
@@ -407,7 +408,7 @@ class OrderStatusFacadeCancelTransactionTest extends MySqlContainerSupport {
                     return null;
                 },
                 () -> {
-                    paymentCommandService.create(order.getId());
+                    paymentCommandService.create(order.getId(), PgProvider.KAKAOPAY);
                     return null;
                 }));
 
@@ -428,7 +429,7 @@ class OrderStatusFacadeCancelTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("결제 정리와 주문 취소가 동시에 와도 주문은 취소 상태로 남고 재고는 한 번만 돌아온다")
-    void cancelAbandoned_withConcurrentCancel_restoresStockOnce() throws Exception {
+    void restoresStockOnceWhenCancellingAbandonedWithConcurrentCancel() throws Exception {
         for (int round = 0; round < 10; round++) {
             Product greenOnion = saveProduct("대파" + round, 3000, 8);
             Order order = saveOrder(1L, OrderStatus.PENDING, item(greenOnion, 2));
@@ -455,7 +456,7 @@ class OrderStatusFacadeCancelTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("취소와 다른 회원들의 주문하기가 같은 상품에 동시에 와도 재고가 어긋나지 않는다")
-    void cancel_withConcurrentOrders_keepsStockConsistent() throws Exception {
+    void keepsStockConsistentWhenCancellingWithConcurrentOrders() throws Exception {
         int members = 5;
         Product greenOnion = saveProduct("대파", 3000, 10);
         Long cancelledOrderId = createOrder(1L, greenOnion, 3);
@@ -569,7 +570,7 @@ class OrderStatusFacadeCancelTransactionTest extends MySqlContainerSupport {
             .order(order)
             .portonePaymentId("payment-" + UUID.randomUUID().toString().replace("-", ""))
             .amount(order.getTotalAmount())
-            .expiresAt(LocalDateTime.now().plusMinutes(10))
+            .pgProvider(PgProvider.KAKAOPAY).expiresAt(LocalDateTime.now().plusMinutes(10))
             .build());
     }
 
@@ -578,7 +579,7 @@ class OrderStatusFacadeCancelTransactionTest extends MySqlContainerSupport {
             .order(order)
             .portonePaymentId("payment-" + UUID.randomUUID().toString().replace("-", ""))
             .amount(order.getTotalAmount())
-            .expiresAt(LocalDateTime.now().plusMinutes(10))
+            .pgProvider(PgProvider.KAKAOPAY).expiresAt(LocalDateTime.now().plusMinutes(10))
             .build();
         payment.fail(FailReason.USER_CANCELLED);
         return paymentRepository.save(payment);

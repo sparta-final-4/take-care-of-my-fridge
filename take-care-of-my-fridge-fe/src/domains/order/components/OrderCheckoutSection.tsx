@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { App, Button, Divider, Flex, Modal, Result, Skeleton, Tag, Typography } from 'antd';
+import { App, Button, Divider, Flex, Modal, Radio, Result, Skeleton, Tag, Typography } from 'antd';
+import { useState } from 'react';
 import { useNavigate } from 'react-router';
 
 import { ROUTES } from '@/app/paths';
@@ -10,6 +11,7 @@ import { cartQueries } from '@/domains/cart/queries';
 import { useCancelOnLeave } from '@/domains/order/hooks/useCancelOnLeave';
 import { orderQueries } from '@/domains/order/queries';
 import { confirmPayment, preparePayment } from '@/domains/payment/api';
+import { PG_PROVIDER_OPTIONS, type PgProvider } from '@/domains/payment/pgProvider';
 import { openPaymentWindow, type PaymentCustomer } from '@/domains/payment/portone';
 
 import { OrderItemRow } from './OrderItemRow';
@@ -38,13 +40,21 @@ export function OrderCheckoutSection({ orderId }: OrderCheckoutSectionProps) {
   const { message } = App.useApp();
   const queryClient = useQueryClient();
   const member = useAuthStore((state) => state.member);
+  // 고르기 전에는 결제하기를 막는다
+  const [pgProvider, setPgProvider] = useState<PgProvider>();
 
   // 결제 준비 후 PortOne 결제창을 띄우고, 결제창이 성공으로 끝나면 서버가 PG 결제를 확인한 뒤에만 성공으로 본다.
   // 결제창 실패·취소는 결제창 응답 그대로 돌려준다. 서버가 거절하면(만료·금액 불일치·결제할 수 없는 주문 등)
   // 오류로 끝나 서버 메시지를 띄운다. 지워진 주문(ORDER_001)만 따로 처리한다.
   const payMutation = useMutation({
-    mutationFn: async (customer: PaymentCustomer) => {
-      const payment = await preparePayment(orderId);
+    mutationFn: async ({
+      provider,
+      customer,
+    }: {
+      provider: PgProvider;
+      customer: PaymentCustomer;
+    }) => {
+      const payment = await preparePayment(orderId, provider);
       const response = await openPaymentWindow(payment, customer);
       if (!response || response.code) return response;
       await confirmPayment(orderId, payment.portonePaymentId);
@@ -54,12 +64,20 @@ export function OrderCheckoutSection({ orderId }: OrderCheckoutSectionProps) {
   });
   // 결제사에 보낼 연락처는 회원 가입 때 받은 휴대폰 번호를 쓴다.
   const handlePay = () => {
+    if (!pgProvider) return;
     if (!member?.phone) {
       message.warning('회원 정보에 휴대폰 번호가 없어 결제할 수 없습니다.');
       return;
     }
     payMutation.mutate(
-      { fullName: member.nickname ?? '', phoneNumber: member.phone, email: member.email ?? '' },
+      {
+        provider: pgProvider,
+        customer: {
+          fullName: member.nickname ?? '',
+          phoneNumber: member.phone,
+          email: member.email ?? '',
+        },
+      },
       {
         onSuccess: (response) => {
           if (!response) return;
@@ -178,10 +196,27 @@ export function OrderCheckoutSection({ orderId }: OrderCheckoutSectionProps) {
               {formatPrice(order.payAmount ?? 0)}
             </Typography.Text>
           </Flex>
+          <Typography.Text strong id="payment-method-title" className={styles.methodTitle}>
+            결제 수단
+          </Typography.Text>
+          <Radio.Group
+            aria-labelledby="payment-method-title"
+            value={pgProvider}
+            onChange={(event) => setPgProvider(event.target.value as PgProvider)}
+            disabled={payMutation.isPending}
+            className={styles.methods}
+          >
+            {PG_PROVIDER_OPTIONS.map((option) => (
+              <Radio.Button key={option.value} value={option.value} className={styles.method}>
+                {option.label}
+              </Radio.Button>
+            ))}
+          </Radio.Group>
           <Button
             type="primary"
             size="large"
             block
+            disabled={!pgProvider}
             loading={payMutation.isPending}
             onClick={handlePay}
             className={styles.pay}

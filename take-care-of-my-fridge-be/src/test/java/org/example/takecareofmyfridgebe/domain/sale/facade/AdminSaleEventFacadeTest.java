@@ -82,7 +82,7 @@ class AdminSaleEventFacadeTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("특가의 시각과 행사 항목을 먼저 담은 순서로 주고, 예정 행사의 정가는 상품의 지금 정가다")
-    void getSaleEvent_special_returnsItemsWithCurrentListPrice() {
+    void returnsSpecialSaleItemsWithCurrentListPrice() {
         Product greenOnion = saveProduct("대파", 3000);
         Product tofu = saveProduct("두부", 2000);
         // 한 행사에 상품이 둘인 특가(예전에 묶어 등록한 행사)
@@ -110,7 +110,7 @@ class AdminSaleEventFacadeTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("종료된 번개 드롭의 정가는 등록 당시 정가이고 한정·남은 수량을 함께 준다")
-    void getSaleEvent_endedFlashDrop_returnsStoredListPrice() {
+    void returnsStoredListPriceForEndedFlashDrop() {
         Product tofu = saveProduct("두부", 3000);
         Long eventId = adminSaleEventFacade.createFlashDrop(
                 new FlashDropCreateRequest(TOMORROW, TOMORROW.plusHours(2),
@@ -128,7 +128,7 @@ class AdminSaleEventFacadeTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("없는 행사는 404로 거절한다")
-    void getSaleEvent_missing_rejects() {
+    void rejectsMissingSaleEvent() {
         assertThatThrownBy(() -> adminSaleEventFacade.getSaleEvent(999L))
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode").isEqualTo(ErrorCode.SALE_EVENT_NOT_FOUND);

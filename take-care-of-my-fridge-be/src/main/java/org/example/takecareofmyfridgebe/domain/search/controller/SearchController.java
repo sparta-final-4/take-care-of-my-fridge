@@ -8,6 +8,7 @@ import org.example.takecareofmyfridgebe.domain.product.dto.ProductListRequest;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeListItemResponse;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeListRequest;
 import org.example.takecareofmyfridgebe.domain.search.dto.SearchClickRequest;
+import org.example.takecareofmyfridgebe.domain.search.dto.SearchRecipeClickRequest;
 import org.example.takecareofmyfridgebe.domain.search.facade.ProductSearchFacade;
 import org.example.takecareofmyfridgebe.domain.search.facade.RecipeSearchFacade;
 import org.example.takecareofmyfridgebe.domain.search.service.SearchClickHistoryService;
@@ -53,6 +54,15 @@ public class SearchController {
             @Valid @RequestBody SearchClickRequest request
     ) {
         searchClickHistoryService.record(request, principal == null ? null : principal.memberId());
+        return ResponseEntity.ok(ApiResponse.ok());
+    }
+
+    @PostMapping("/recipe-clicks")
+    public ResponseEntity<ApiResponse<Void>> recordRecipeClick(
+            @AuthenticationPrincipal AuthSessionService.AuthPrincipal principal,
+            @Valid @RequestBody SearchRecipeClickRequest request
+    ) {
+        searchClickHistoryService.recordRecipe(request, principal == null ? null : principal.memberId());
         return ResponseEntity.ok(ApiResponse.ok());
     }
 }

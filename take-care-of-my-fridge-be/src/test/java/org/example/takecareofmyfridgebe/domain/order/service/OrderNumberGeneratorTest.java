@@ -56,7 +56,7 @@ class OrderNumberGeneratorTest extends RedisContainerSupport {
 
     @Test
     @DisplayName("두 서버가 같은 밀리초에 동시에 번호를 만들어도 겹치지 않는다")
-    void next_twoServersSameMillis_noDuplicates() throws InterruptedException {
+    void avoidsDuplicatesFromTwoServersInSameMillis() throws InterruptedException {
         List<OrderNumberGenerator> servers = List.of(fixedAt(NOW), fixedAt(NOW));
         int perServer = 500;
         Set<String> numbers = ConcurrentHashMap.newKeySet();
@@ -81,7 +81,7 @@ class OrderNumberGeneratorTest extends RedisContainerSupport {
 
     @Test
     @DisplayName("번호는 한국 시각 17자리와 순번 3자리이고, 순번 키에는 만료 시간이 걸린다")
-    void next_formatAndKeyTtl() {
+    void keepsFormatAndKeyTtl() {
         Instant utcMidnight = Instant.parse("2026-10-21T00:00:00Z");
 
         String number = fixedAt(utcMidnight).next();
@@ -93,7 +93,7 @@ class OrderNumberGeneratorTest extends RedisContainerSupport {
 
     @Test
     @DisplayName("같은 밀리초에 1000개를 넘으면 다시 주문하게 거절한다")
-    void next_sequenceOverflow_rejects() {
+    void rejectsSequenceOverflow() {
         OrderNumberGenerator generator = fixedAt(NOW);
         IntStream.range(0, 1_000).forEach(i -> generator.next());
 
@@ -104,7 +104,7 @@ class OrderNumberGeneratorTest extends RedisContainerSupport {
 
     @Test
     @DisplayName("Redis에 연결할 수 없으면 503으로 거절한다")
-    void next_redisUnavailable_rejects() {
+    void rejectsWhenRedisUnavailable() {
         LettuceConnectionFactory unreachable = new LettuceConnectionFactory(new RedisStandaloneConfiguration("localhost", 1));
         unreachable.afterPropertiesSet();
         unreachable.start();

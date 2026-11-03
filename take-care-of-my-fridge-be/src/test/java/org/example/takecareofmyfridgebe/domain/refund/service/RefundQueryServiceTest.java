@@ -6,6 +6,7 @@ import org.example.takecareofmyfridgebe.domain.order.entity.OrderItem;
 import org.example.takecareofmyfridgebe.domain.order.entity.SaleType;
 import org.example.takecareofmyfridgebe.domain.order.service.OrderReader;
 import org.example.takecareofmyfridgebe.domain.payment.entity.Payment;
+import org.example.takecareofmyfridgebe.domain.payment.entity.PgProvider;
 import org.example.takecareofmyfridgebe.domain.payment.service.PaymentHistoryRecorder;
 import org.example.takecareofmyfridgebe.domain.refund.dto.RefundHistoryItemResponse;
 import org.example.takecareofmyfridgebe.domain.refund.dto.RefundHistoryResponse;
@@ -350,8 +351,9 @@ class RefundQueryServiceTest extends MySqlContainerSupport {
     private Payment pay(Order target) {
         LocalDateTime paidAt = LocalDateTime.now();
         Payment created = Payment.builder().order(target).portonePaymentId("payment-" + target.getOrderNumber())
-                .amount(target.getTotalAmount()).expiresAt(paidAt.plusMinutes(10)).build();
-        created.complete(paidAt);
+                .amount(target.getTotalAmount()).pgProvider(PgProvider.KAKAOPAY)
+                .expiresAt(paidAt.plusMinutes(10)).build();
+        created.complete(paidAt, PgProvider.KAKAOPAY);
         target.markPaid(paidAt);
         entityManager.persist(created);
         return created;

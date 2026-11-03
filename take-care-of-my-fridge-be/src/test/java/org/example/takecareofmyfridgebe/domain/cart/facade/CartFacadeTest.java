@@ -83,7 +83,7 @@ class CartFacadeTest {
 
     @Test
     @DisplayName("담은 줄을 담은 순서대로 돌려준다")
-    void getItems_returnsItemsInOrder() {
+    void returnsItemsInOrder() {
         Cart cart = Cart.builder().memberId(1L).build();
         CartItem first = CartItem.builder().cart(cart).productId(10L).quantity(2).build();
         CartItem second = CartItem.builder().cart(cart).productId(20L).quantity(1).build();
@@ -101,7 +101,7 @@ class CartFacadeTest {
 
     @Test
     @DisplayName("장바구니가 비어 있으면 빈 목록을 돌려준다")
-    void getItems_returnsEmptyListWhenNothingInCart() {
+    void returnsEmptyListWhenNothingInCart() {
         given(cartItemRepository.findByCartMemberIdOrderByIdAsc(1L)).willReturn(List.of());
 
         assertThat(cartFacade.getItems(1L).items()).isEmpty();
@@ -109,7 +109,7 @@ class CartFacadeTest {
 
     @Test
     @DisplayName("진행 중인 특가·번개 드롭은 항목마다 할인가와 구분이 붙고, 번개 드롭 남은 수량이 0이면 그 항목만 품절이다")
-    void getItems_appliesActiveSales() {
+    void appliesActiveSalesToItems() {
         Cart cart = Cart.builder().memberId(1L).build();
         CartItem normal = CartItem.builder().cart(cart).productId(10L).quantity(1).build();
         CartItem special = CartItem.builder().cart(cart).productId(20L).quantity(2).build();
@@ -148,7 +148,7 @@ class CartFacadeTest {
 
     @Test
     @DisplayName("진행 중인 번개 드롭 상품을 이미 담았으면 한 개 더 담을 수 없다")
-    void addItem_flashDropAlreadyInCart_rejects() {
+    void rejectsAddingFlashDropAlreadyInCart() {
         Cart cart = Cart.builder().memberId(1L).build();
         CartItem item = CartItem.builder().cart(cart).productId(10L).quantity(1).build();
         given(productRepository.findById(10L)).willReturn(Optional.of(productWithStock(ProductStatus.ON_SALE)));
@@ -166,7 +166,7 @@ class CartFacadeTest {
 
     @Test
     @DisplayName("판매 중지 상품은 담을 수 없고 없는 상품과 오류가 다르다")
-    void addItem_stoppedProduct_rejects() {
+    void rejectsAddingStoppedProduct() {
         given(productRepository.findById(10L)).willReturn(Optional.of(productWithStock(ProductStatus.STOPPED)));
 
         assertThatThrownBy(() -> cartFacade.addItem(1L, new AddCartItemRequest(10L, 1)))
@@ -176,7 +176,7 @@ class CartFacadeTest {
 
     @Test
     @DisplayName("없는 상품은 담을 수 없다")
-    void addItem_missingProduct_rejects() {
+    void rejectsAddingMissingProduct() {
         given(productRepository.findById(10L)).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> cartFacade.addItem(1L, new AddCartItemRequest(10L, 1)))

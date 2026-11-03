@@ -1,8 +1,11 @@
 package org.example.takecareofmyfridgebe.domain.search.service;
 
 import org.example.takecareofmyfridgebe.domain.search.dto.SearchClickRequest;
+import org.example.takecareofmyfridgebe.domain.search.dto.SearchRecipeClickRequest;
 import org.example.takecareofmyfridgebe.domain.search.entity.SearchClickHistory;
+import org.example.takecareofmyfridgebe.domain.search.entity.SearchRecipeClickHistory;
 import org.example.takecareofmyfridgebe.domain.search.repository.SearchClickHistoryRepository;
+import org.example.takecareofmyfridgebe.domain.search.repository.SearchRecipeClickHistoryRepository;
 import org.example.takecareofmyfridgebe.global.config.RedisConfig;
 import org.example.takecareofmyfridgebe.support.RedisContainerSupport;
 import org.junit.jupiter.api.BeforeEach;
@@ -23,6 +26,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 // 실제 Redis로 SET NX·INCR 동작을 확인한다
@@ -34,6 +38,7 @@ class SearchClickHistoryServiceTest extends RedisContainerSupport {
     private StringRedisTemplate redisTemplate;
 
     private final SearchClickHistoryRepository repository = mock(SearchClickHistoryRepository.class);
+    private final SearchRecipeClickHistoryRepository recipeRepository = mock(SearchRecipeClickHistoryRepository.class);
 
     private SearchClickHistoryService service;
 
@@ -43,7 +48,7 @@ class SearchClickHistoryServiceTest extends RedisContainerSupport {
         if (keys != null && !keys.isEmpty()) {
             redisTemplate.delete(keys);
         }
-        service = new SearchClickHistoryService(repository, redisTemplate);
+        service = new SearchClickHistoryService(repository, recipeRepository, redisTemplate);
     }
 
     @Test
@@ -143,7 +148,7 @@ class SearchClickHistoryServiceTest extends RedisContainerSupport {
         // Given
         StringRedisTemplate brokenRedis = mock(StringRedisTemplate.class);
         when(brokenRedis.opsForValue()).thenThrow(new QueryTimeoutException("Redis 연결 실패"));
-        SearchClickHistoryService serviceWithBrokenRedis = new SearchClickHistoryService(repository, brokenRedis);
+        SearchClickHistoryService serviceWithBrokenRedis = new SearchClickHistoryService(repository, recipeRepository, brokenRedis);
 
         // When
         serviceWithBrokenRedis.record(new SearchClickRequest(10L, "계란"), 7L);
@@ -151,6 +156,20 @@ class SearchClickHistoryServiceTest extends RedisContainerSupport {
 
         // Then
         verify(repository, times(2)).save(any());
+    }
+
+    @Test
+    @DisplayName("레시피 클릭을 레시피 번호·회원 번호·앞뒤 공백을 뺀 검색어로 저장한다")
+    void recordRecipe_savesClick() {
+        service.recordRecipe(new SearchRecipeClickRequest(3L, " 김치 "), 7L);
+
+        ArgumentCaptor<SearchRecipeClickHistory> captor = ArgumentCaptor.forClass(SearchRecipeClickHistory.class);
+        verify(recipeRepository).save(captor.capture());
+        SearchRecipeClickHistory saved = captor.getValue();
+        assertThat(saved.getRecipeId()).isEqualTo(3L);
+        assertThat(saved.getMemberId()).isEqualTo(7L);
+        assertThat(saved.getKeyword()).isEqualTo("김치");
+        verifyNoInteractions(repository);
     }
 
     private SearchClickHistory captureSaved() {

@@ -114,7 +114,7 @@ class OrderFacadeTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("주문하면 재고가 빠지고 주문·주문 상품이 저장되며 장바구니는 그대로다")
-    void createOrder_decreasesStockAndSavesOrder() {
+    void decreasesStockAndSavesOrder() {
         Product greenOnion = saveProduct("대파", 3000, 10);
         Product tofu = saveProduct("두부", 2000, 5);
         Cart cart = saveCart(1L);
@@ -140,7 +140,7 @@ class OrderFacadeTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("한 상품이라도 재고가 모자라면 앞서 뺀 재고까지 롤백되고 주문은 없다")
-    void createOrder_rollsBackAllStock_whenOneProductShort() {
+    void rollsBackAllStockWhenOneProductIsShort() {
         Product greenOnion = saveProduct("대파", 3000, 10);
         Product tofu = saveProduct("두부", 2000, 1);
         Cart cart = saveCart(1L);
@@ -160,7 +160,7 @@ class OrderFacadeTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("마지막 재고까지 주문하면 상품이 품절 상태로 바뀐다")
-    void createOrder_lastStock_marksProductSoldOut() {
+    void marksProductSoldOutOnLastStock() {
         Product greenOnion = saveProduct("대파", 3000, 2);
         CartItem item = saveCartItem(saveCart(1L), greenOnion, 2);
 
@@ -172,7 +172,7 @@ class OrderFacadeTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("재고가 0이면 품절로 거절한다")
-    void createOrder_rejectsSoldOut() {
+    void rejectsSoldOutProduct() {
         Product greenOnion = saveProduct("대파", 3000, 0);
         CartItem item = saveCartItem(saveCart(1L), greenOnion, 1);
 
@@ -184,7 +184,7 @@ class OrderFacadeTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("장바구니 수량이 음수인 항목은 주문을 거절하고 재고와 주문은 그대로다")
-    void createOrder_rejectsNegativeCartQuantity() {
+    void rejectsNegativeCartQuantity() {
         Product greenOnion = saveProduct("대파", 3000, 10);
         CartItem item = saveCartItem(saveCart(1L), greenOnion, -3);
 
@@ -197,7 +197,7 @@ class OrderFacadeTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("주문 뒤 장바구니 항목이 지워져도 같은 멱등 키 재전송에는 처음 주문을 돌려준다")
-    void createOrder_sameKeyAfterCartItemRemoved_returnsFirstOrder() {
+    void returnsFirstOrderForSameKeyAfterCartItemRemoved() {
         Product greenOnion = saveProduct("대파", 3000, 10);
         CartItem item = saveCartItem(saveCart(1L), greenOnion, 2);
         OrderCreateResult first = orderFacade.create(1L, "key-1", request(item));
@@ -213,7 +213,7 @@ class OrderFacadeTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("장바구니 항목의 상품이 없어졌으면 404로 거절하고 주문은 없다")
-    void createOrder_rejectsMissingProduct() {
+    void rejectsMissingProduct() {
         Cart cart = saveCart(1L);
         CartItem orphan = cartItemRepository.save(CartItem.builder().cart(cart).productId(999_999L).quantity(1).build());
 
@@ -225,7 +225,7 @@ class OrderFacadeTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("판매 중지 상품은 상품 이름과 함께 거절하고 재고는 그대로다")
-    void createOrder_rejectsStoppedProduct() {
+    void rejectsStoppedProduct() {
         Product stopped = productRepository.save(product("대파", 3000, 10, ProductStatus.STOPPED));
         CartItem item = saveCartItem(saveCart(1L), stopped, 1);
 
@@ -239,7 +239,7 @@ class OrderFacadeTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("다른 회원의 장바구니 항목은 주문할 수 없고 재고는 그대로다")
-    void createOrder_rejectsOthersCartItem() {
+    void rejectsOthersCartItem() {
         Product greenOnion = saveProduct("대파", 3000, 10);
         saveCart(1L);
         CartItem itemOfOther = saveCartItem(saveCart(2L), greenOnion, 1);
@@ -253,7 +253,7 @@ class OrderFacadeTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("같은 멱등 키로 다시 주문하면 새로 만들지 않고 처음 주문을 돌려주며 재고는 한 번만 빠진다")
-    void createOrder_sameIdempotencyKey_returnsFirstOrder() {
+    void returnsFirstOrderForSameIdempotencyKey() {
         Product greenOnion = saveProduct("대파", 3000, 10);
         CartItem item = saveCartItem(saveCart(1L), greenOnion, 2);
 
@@ -270,7 +270,7 @@ class OrderFacadeTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("같은 멱등 키로 다른 상품을 주문하면 거절하고 처음 주문과 재고는 그대로다")
-    void createOrder_sameKeyDifferentItems_rejects() {
+    void rejectsSameKeyWithDifferentItems() {
         Product greenOnion = saveProduct("대파", 3000, 10);
         Product tofu = saveProduct("두부", 2000, 5);
         Cart cart = saveCart(1L);
@@ -288,7 +288,7 @@ class OrderFacadeTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("같은 상품이라도 멱등 키가 다르면 새 주문이 만들어진다")
-    void createOrder_differentIdempotencyKey_createsNewOrder() {
+    void createsNewOrderForDifferentIdempotencyKey() {
         Product greenOnion = saveProduct("대파", 3000, 10);
         CartItem item = saveCartItem(saveCart(1L), greenOnion, 1);
 
@@ -301,7 +301,7 @@ class OrderFacadeTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("다른 회원은 같은 멱등 키를 써도 각자 주문된다")
-    void createOrder_sameKeyOtherMember_createsOwnOrder() {
+    void createsOwnOrderForSameKeyOfOtherMember() {
         Product greenOnion = saveProduct("대파", 3000, 10);
         CartItem itemOfMember1 = saveCartItem(saveCart(1L), greenOnion, 1);
         CartItem itemOfMember2 = saveCartItem(saveCart(2L), greenOnion, 1);
@@ -315,7 +315,7 @@ class OrderFacadeTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("멱등 키가 없거나 64자를 넘으면 거절하고 주문은 없다")
-    void createOrder_rejectsMissingOrTooLongKey() {
+    void rejectsMissingOrTooLongKey() {
         Product greenOnion = saveProduct("대파", 3000, 10);
         CartItem item = saveCartItem(saveCart(1L), greenOnion, 1);
 
@@ -334,7 +334,7 @@ class OrderFacadeTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("여러 회원이 동시에 주문하면 재고만큼만 주문되고 나머지는 재고 부족으로 거절된다")
-    void createOrder_concurrentMembers_neverOversells() throws Exception {
+    void neverOversellsWithConcurrentMembers() throws Exception {
         int initialStock = 5;
         int members = 20;
         Product greenOnion = saveProduct("대파", 3000, initialStock);
@@ -361,7 +361,7 @@ class OrderFacadeTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("같은 멱등 키로 동시에 여러 번 주문해도 주문은 하나만 생기고 모두 그 주문을 받는다")
-    void createOrder_sameKeyConcurrently_createsOnlyOneOrder() throws Exception {
+    void createsOnlyOneOrderForSameKeyConcurrently() throws Exception {
         Product greenOnion = saveProduct("대파", 3000, 100);
         CartItem item = saveCartItem(saveCart(1L), greenOnion, 2);
         List<Long> orderIds = Collections.synchronizedList(new ArrayList<>());
@@ -379,7 +379,7 @@ class OrderFacadeTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("장바구니에 담은 순서가 엇갈린 주문이 동시에 와도 데드락 없이 처리된다")
-    void createOrder_crossedProductOrder_noDeadlock() throws Exception {
+    void avoidsDeadlockWithCrossedProductOrder() throws Exception {
         int members = 20;
         Product greenOnion = saveProduct("대파", 3000, 100);
         Product tofu = saveProduct("두부", 2000, 100);

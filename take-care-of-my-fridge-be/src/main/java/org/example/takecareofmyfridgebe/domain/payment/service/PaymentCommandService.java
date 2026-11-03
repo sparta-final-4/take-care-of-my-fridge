@@ -13,6 +13,7 @@ import org.example.takecareofmyfridgebe.domain.payment.entity.FailReason;
 import org.example.takecareofmyfridgebe.domain.payment.entity.Payment;
 import org.example.takecareofmyfridgebe.domain.payment.entity.PaymentChangedBy;
 import org.example.takecareofmyfridgebe.domain.payment.entity.PaymentStatus;
+import org.example.takecareofmyfridgebe.domain.payment.entity.PgProvider;
 import org.example.takecareofmyfridgebe.domain.payment.event.PaymentCompletedEvent;
 import org.example.takecareofmyfridgebe.domain.payment.repository.PaymentRepository;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
@@ -46,7 +47,7 @@ public class PaymentCommandService {
     // 한 주문의 결제 대기 건은 최대 한 건이다. 호출 전에 이전 결제 대기 건을 정리하므로, 여기서 남아 있으면
     // 동시에 들어온 다른 요청이 방금 만든 것이다. 만료됐을 수도 있는 결제를 재사용하지 않고 거절한다
     @Transactional
-    public Payment create(Long orderId) {
+    public Payment create(Long orderId, PgProvider pgProvider) {
         Order order = lockOrder(orderId);
         if (order.getStatus() != OrderStatus.PENDING) {
             throw new BusinessException(ErrorCode.PAYMENT_ORDER_NOT_PAYABLE);
@@ -60,6 +61,7 @@ public class PaymentCommandService {
                 // KG이니시스는 주문번호(oid)를 40자까지만 받으므로 UUID의 하이픈을 빼 8 + 32 = 40자로 만든다
                 .portonePaymentId(PORTONE_PAYMENT_ID_PREFIX + UUID.randomUUID().toString().replace("-", ""))
                 .amount(order.getTotalAmount())
+                .pgProvider(pgProvider)
                 .expiresAt(LocalDateTime.now().plusMinutes(PAYMENT_EXPIRE_MINUTES))
                 .build();
         paymentRepository.save(payment);
@@ -67,9 +69,10 @@ public class PaymentCommandService {
         return payment;
     }
 
-    // 승인하지 못한 결제는 PG에서 돈이 빠진 상태이므로, 호출한 쪽이 거절 결과를 보고 PG 결제를 취소한다
+    // 승인하지 못한 결제는 PG에서 돈이 빠진 상태이므로, 호출한 쪽이 거절 결과를 보고 PG 결제를 취소한다.
+    // actualPgProvider는 PG 조회로 확인한 결제대행사. 확인하지 못했으면 null
     @Transactional
-    public PaymentApproveResult approve(Payment target, PaymentChangedBy changedBy) {
+    public PaymentApproveResult approve(Payment target, PgProvider actualPgProvider, PaymentChangedBy changedBy) {
         Payment payment = getForUpdate(target);
 
         // 확정 요청과 웹훅 중 먼저 처리한 쪽이 있으면 같은 결과를 돌려준다
@@ -88,8 +91,16 @@ public class PaymentCommandService {
             return PaymentApproveResult.rejected(Rejection.ORDER_NOT_PAYABLE);
         }
 
+        // 고른 결제대행사와 다른 채널로 결제창이 열렸어도 금액은 검증했으므로 받고, 실제 결제대행사를 남긴다
+        if (actualPgProvider == null) {
+            log.warn("결제대행사 확인 불가, 고른 값 유지: portonePaymentId={}, 고른 결제대행사={}",
+                    payment.getPortonePaymentId(), payment.getPgProvider());
+        } else if (actualPgProvider != payment.getPgProvider()) {
+            log.warn("고른 결제대행사와 실제 결제대행사가 다름: portonePaymentId={}, 고른 결제대행사={}, 실제 결제대행사={}",
+                    payment.getPortonePaymentId(), payment.getPgProvider(), actualPgProvider);
+        }
         LocalDateTime paidAt = LocalDateTime.now();
-        payment.complete(paidAt);
+        payment.complete(paidAt, actualPgProvider);
         payment.getOrder().markPaid(paidAt);
         paymentHistoryRecorder.recordPaid(payment, changedBy);
         // 이미 결제 완료된 결제는 위에서 돌려보내므로 처음 승인한 요청만 발행한다. 장바구니 삭제는 커밋 뒤에 한다

@@ -69,7 +69,7 @@ class OrderQueryServiceTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("내 결제 대기 주문은 주문 상품과 금액까지 돌려준다")
-    void getCheckout_returnsPendingOrder() {
+    void returnsPendingOrderAsCheckout() {
         Order order = saveOrder(1L, "20261021143000123000");
 
         OrderCheckoutResponse response = orderQueryService.getCheckout(1L, order.getId());
@@ -84,7 +84,7 @@ class OrderQueryServiceTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("남의 주문은 없는 주문과 똑같이 404다")
-    void getCheckout_othersOrder_returnsNotFound() {
+    void returnsNotFoundForOthersOrderCheckout() {
         Order othersOrder = saveOrder(2L, "20261021143000123001");
 
         assertThatThrownBy(() -> orderQueryService.getCheckout(1L, othersOrder.getId()))
@@ -97,7 +97,7 @@ class OrderQueryServiceTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("결제가 끝난 주문은 이미 결제가 완료된 주문으로 거절한다")
-    void getCheckout_paidOrder_rejects() {
+    void rejectsCheckoutOfPaidOrder() {
         Order order = saveOrder(1L, "20261021143000123002");
         Order paid = orderRepository.findById(order.getId()).orElseThrow();
         paid.markPaid(LocalDateTime.now());
@@ -110,7 +110,7 @@ class OrderQueryServiceTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("취소된 주문은 취소된 주문으로 거절한다")
-    void getCheckout_cancelledOrder_rejects() {
+    void rejectsCheckoutOfCancelledOrder() {
         Order order = saveOrder(1L, "20261021143000123003");
         Order cancelled = orderRepository.findById(order.getId()).orElseThrow();
         cancelled.cancel();
@@ -123,7 +123,7 @@ class OrderQueryServiceTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("주문 상세는 주문할 때 저장한 정가·단가로 상품 금액과 할인 금액을 돌려준다")
-    void getDetail_returnsSavedPricesAndAmounts() {
+    void returnsSavedPricesAndAmountsInDetail() {
         Order order = orderRepository.save(Order.builder()
             .orderNumber("20261022143000123030")
             .memberId(1L)
@@ -155,7 +155,7 @@ class OrderQueryServiceTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("구매 확정된 주문은 구매 확정 시각과 주문 상품별 확정 수량을 같이 돌려준다")
-    void getDetail_confirmedOrder_returnsConfirmedAtAndQuantities() {
+    void returnsConfirmedAtAndQuantitiesForConfirmedOrder() {
         Order order = saveOrder(1L, "20261022143000123031");
         markPaid(order);
         confirm(order);
@@ -175,7 +175,7 @@ class OrderQueryServiceTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("결제 대기와 취소된 주문도 상세로 보여 준다")
-    void getDetail_pendingAndCancelledOrders_returnsDetail() {
+    void returnsDetailOfPendingAndCancelledOrders() {
         Order pending = saveOrder(1L, "20261022143000123032");
         Order cancelled = saveOrder(1L, "20261022143000123033");
         cancel(cancelled);
@@ -188,7 +188,7 @@ class OrderQueryServiceTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("주문 상세에서 남의 주문은 없는 주문과 똑같이 404다")
-    void getDetail_othersOrder_returnsNotFound() {
+    void returnsNotFoundForOthersOrderDetail() {
         Order othersOrder = saveOrder(2L, "20261022143000123034");
 
         assertThatThrownBy(() -> orderQueryService.getDetail(1L, othersOrder.getId()))
@@ -201,7 +201,7 @@ class OrderQueryServiceTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("주문 상세는 주문 상품 수와 상관없이 주문과 주문 상품을 한 번씩 읽는다")
-    void getDetail_readsOrderAndItemsOnce() {
+    void readsOrderAndItemsOnceForDetail() {
         Order order = saveOrder(1L, "20261022143000123035");
         orderItemRepository.save(item(order, 3L, "계란", 1, 6900));
         statistics.clear();
@@ -213,7 +213,7 @@ class OrderQueryServiceTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("주문 목록은 내 결제 대기·결제 완료·구매 확정·전액 환불 주문만 돌려주고 취소된 주문과 남의 주문은 뺀다")
-    void getMyOrders_returnsOnlyMyListedStatuses() {
+    void returnsOnlyMyOrdersInListedStatuses() {
         Order pending = saveOrder(1L, "20261021143000123010");
         Order paid = saveOrder(1L, "20261021143000123011");
         markPaid(paid);
@@ -241,7 +241,7 @@ class OrderQueryServiceTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("주문 목록은 최신 주문부터 페이지 크기만큼 나누고 1부터 센 페이지 번호로 돌려준다")
-    void getMyOrders_pagesNewestFirst() {
+    void pagesMyOrdersNewestFirst() {
         Order first = saveOrder(1L, "20261021143000123020");
         Order second = saveOrder(1L, "20261021143000123021");
         Order third = saveOrder(1L, "20261021143000123022");
@@ -262,7 +262,7 @@ class OrderQueryServiceTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("주문이 없으면 빈 목록이다")
-    void getMyOrders_noOrders_returnsEmpty() {
+    void returnsEmptyWhenNoOrders() {
         PageResponse<OrderSummaryResponse> response = orderQueryService.getMyOrders(1L, new OrderListRequest(1, 10));
 
         assertThat(response.content()).isEmpty();

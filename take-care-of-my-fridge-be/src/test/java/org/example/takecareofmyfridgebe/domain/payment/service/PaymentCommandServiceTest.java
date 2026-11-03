@@ -8,6 +8,7 @@ import org.example.takecareofmyfridgebe.domain.payment.dto.PaymentApproveResult;
 import org.example.takecareofmyfridgebe.domain.payment.dto.PaymentApproveResult.Rejection;
 import org.example.takecareofmyfridgebe.domain.payment.entity.FailReason;
 import org.example.takecareofmyfridgebe.domain.payment.entity.Payment;
+import org.example.takecareofmyfridgebe.domain.payment.entity.PgProvider;
 import org.example.takecareofmyfridgebe.domain.payment.entity.PaymentChangedBy;
 import org.example.takecareofmyfridgebe.domain.payment.entity.PaymentStatus;
 import org.example.takecareofmyfridgebe.domain.payment.event.PaymentCompletedEvent;
@@ -70,7 +71,7 @@ class PaymentCommandServiceTest {
 
     private Payment newPayment(Order order) {
         return Payment.builder().order(order).portonePaymentId(PORTONE_PAYMENT_ID).amount(10000L)
-                .expiresAt(LocalDateTime.now().plusMinutes(10)).build();
+                .pgProvider(PgProvider.KAKAOPAY).expiresAt(LocalDateTime.now().plusMinutes(10)).build();
     }
 
     private Payment givenLockedPayment() {
@@ -85,11 +86,34 @@ class PaymentCommandServiceTest {
     // approve
 
     @Test
+    @DisplayName("고른 결제대행사와 다른 결제대행사로 결제됐으면 승인하고 실제 결제대행사를 남긴다")
+    void approve_differentPgProvider_recordsActual() {
+        Payment payment = givenLockedPayment();
+
+        PaymentApproveResult result = paymentCommandService.approve(payment, PgProvider.INICIS, PaymentChangedBy.USER);
+
+        assertThat(result.isApproved()).isTrue();
+        assertThat(payment.getPgProvider()).isEqualTo(PgProvider.INICIS);
+        assertThat(result.response().pgProvider()).isEqualTo(PgProvider.INICIS);
+    }
+
+    @Test
+    @DisplayName("PG 조회로 결제대행사를 확인하지 못했으면 고른 결제대행사를 그대로 둔다")
+    void approve_unknownPgProvider_keepsChosen() {
+        Payment payment = givenLockedPayment();
+
+        PaymentApproveResult result = paymentCommandService.approve(payment, null, PaymentChangedBy.USER);
+
+        assertThat(result.isApproved()).isTrue();
+        assertThat(payment.getPgProvider()).isEqualTo(PgProvider.KAKAOPAY);
+    }
+
+    @Test
     @DisplayName("승인하면 결제와 주문이 함께 PAID가 된다")
     void approve_marksPaymentAndOrderPaid() {
         Payment payment = givenLockedPayment();
 
-        PaymentApproveResult result = paymentCommandService.approve(payment, PaymentChangedBy.USER);
+        PaymentApproveResult result = paymentCommandService.approve(payment, PgProvider.KAKAOPAY, PaymentChangedBy.USER);
 
         assertThat(result.isApproved()).isTrue();
         assertThat(payment.getStatus()).isEqualTo(PaymentStatus.PAID);
@@ -104,10 +128,10 @@ class PaymentCommandServiceTest {
     @DisplayName("이미 PAID면 상태를 바꾸지 않고 같은 결과를 돌려준다")
     void approve_alreadyPaid_returnsSameResult() {
         Payment payment = givenLockedPayment();
-        payment.complete(PAID_AT);
+        payment.complete(PAID_AT, PgProvider.KAKAOPAY);
         payment.getOrder().markPaid(PAID_AT);
 
-        PaymentApproveResult result = paymentCommandService.approve(payment, PaymentChangedBy.USER);
+        PaymentApproveResult result = paymentCommandService.approve(payment, PgProvider.KAKAOPAY, PaymentChangedBy.USER);
 
         assertThat(result.isApproved()).isTrue();
         assertThat(result.response().status()).isEqualTo(PaymentStatus.PAID);
@@ -120,7 +144,7 @@ class PaymentCommandServiceTest {
         Payment payment = givenLockedPayment();
         payment.fail(FailReason.TIMEOUT);
 
-        PaymentApproveResult result = paymentCommandService.approve(payment, PaymentChangedBy.USER);
+        PaymentApproveResult result = paymentCommandService.approve(payment, PgProvider.KAKAOPAY, PaymentChangedBy.USER);
 
         assertThat(result.isApproved()).isFalse();
         assertThat(result.rejection()).isEqualTo(Rejection.PAYMENT_ALREADY_FAILED);
@@ -134,7 +158,7 @@ class PaymentCommandServiceTest {
         Payment payment = givenLockedPayment();
         payment.getOrder().markPaid(PAID_AT);
 
-        PaymentApproveResult result = paymentCommandService.approve(payment, PaymentChangedBy.USER);
+        PaymentApproveResult result = paymentCommandService.approve(payment, PgProvider.KAKAOPAY, PaymentChangedBy.USER);
 
         assertThat(result.rejection()).isEqualTo(Rejection.ORDER_NOT_PAYABLE);
         assertThat(payment.getStatus()).isEqualTo(PaymentStatus.FAILED);
@@ -148,7 +172,7 @@ class PaymentCommandServiceTest {
         Payment payment = givenLockedPayment();
         payment.getOrder().cancel();
 
-        PaymentApproveResult result = paymentCommandService.approve(payment, PaymentChangedBy.USER);
+        PaymentApproveResult result = paymentCommandService.approve(payment, PgProvider.KAKAOPAY, PaymentChangedBy.USER);
 
         assertThat(result.rejection()).isEqualTo(Rejection.ORDER_NOT_PAYABLE);
         assertThat(payment.getFailReason()).isEqualTo(FailReason.ORDER_NOT_PAYABLE);
@@ -163,7 +187,7 @@ class PaymentCommandServiceTest {
         given(paymentRepository.findWithOrderByPortonePaymentIdForUpdate(PORTONE_PAYMENT_ID))
                 .willReturn(Optional.empty());
 
-        assertThatThrownBy(() -> paymentCommandService.approve(payment, PaymentChangedBy.USER))
+        assertThatThrownBy(() -> paymentCommandService.approve(payment, PgProvider.KAKAOPAY, PaymentChangedBy.USER))
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode").isEqualTo(ErrorCode.PAYMENT_NOT_FOUND);
     }
@@ -187,7 +211,7 @@ class PaymentCommandServiceTest {
     @DisplayName("이미 처리된 결제는 실패 처리 요청을 무시한다")
     void fail_alreadyProcessed_ignored() {
         Payment payment = givenLockedPayment();
-        payment.complete(PAID_AT);
+        payment.complete(PAID_AT, PgProvider.KAKAOPAY);
         payment.getOrder().markPaid(PAID_AT);
 
         boolean failed = paymentCommandService.fail(payment, FailReason.TIMEOUT, PaymentChangedBy.USER);
@@ -216,7 +240,7 @@ class PaymentCommandServiceTest {
     // create
 
     @Test
-    @DisplayName("주문 금액과 10분 뒤 만료 시각으로 READY 결제를 만든다")
+    @DisplayName("주문 금액, 고른 결제대행사, 10분 뒤 만료 시각으로 READY 결제를 만든다")
     void create_usesOrderAmount() {
         Order order = newOrder();
         given(orderRepository.findByIdForUpdate(ORDER_ID)).willReturn(Optional.of(order));
@@ -224,11 +248,12 @@ class PaymentCommandServiceTest {
         given(paymentRepository.save(any(Payment.class))).willAnswer(returnsFirstArg());
 
         LocalDateTime before = LocalDateTime.now();
-        Payment payment = paymentCommandService.create(ORDER_ID);
+        Payment payment = paymentCommandService.create(ORDER_ID, PgProvider.TOSSPAYMENTS);
         LocalDateTime after = LocalDateTime.now();
 
         assertThat(payment.getOrder()).isSameAs(order);
         assertThat(payment.getAmount()).isEqualTo(10000L);
+        assertThat(payment.getPgProvider()).isEqualTo(PgProvider.TOSSPAYMENTS);
         assertThat(payment.getStatus()).isEqualTo(PaymentStatus.READY);
         assertThat(payment.getPortonePaymentId()).startsWith("payment-");
         // KG이니시스 주문번호(oid) 최대 길이
@@ -243,8 +268,8 @@ class PaymentCommandServiceTest {
         given(paymentRepository.findByOrderIdAndStatus(ORDER_ID, PaymentStatus.READY)).willReturn(List.of());
         given(paymentRepository.save(any(Payment.class))).willAnswer(returnsFirstArg());
 
-        Payment first = paymentCommandService.create(ORDER_ID);
-        Payment second = paymentCommandService.create(ORDER_ID);
+        Payment first = paymentCommandService.create(ORDER_ID, PgProvider.KAKAOPAY);
+        Payment second = paymentCommandService.create(ORDER_ID, PgProvider.KAKAOPAY);
 
         assertThat(first.getPortonePaymentId()).isNotEqualTo(second.getPortonePaymentId());
     }
@@ -257,7 +282,7 @@ class PaymentCommandServiceTest {
         given(paymentRepository.findByOrderIdAndStatus(ORDER_ID, PaymentStatus.READY))
                 .willReturn(List.of(newPayment(order)));
 
-        assertThatThrownBy(() -> paymentCommandService.create(ORDER_ID))
+        assertThatThrownBy(() -> paymentCommandService.create(ORDER_ID, PgProvider.KAKAOPAY))
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode").isEqualTo(ErrorCode.PAYMENT_IN_PROGRESS);
         verify(paymentRepository, never()).save(any());
@@ -270,7 +295,7 @@ class PaymentCommandServiceTest {
         order.markPaid(PAID_AT);
         given(orderRepository.findByIdForUpdate(ORDER_ID)).willReturn(Optional.of(order));
 
-        assertThatThrownBy(() -> paymentCommandService.create(ORDER_ID))
+        assertThatThrownBy(() -> paymentCommandService.create(ORDER_ID, PgProvider.KAKAOPAY))
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode").isEqualTo(ErrorCode.PAYMENT_ORDER_NOT_PAYABLE);
         verify(paymentRepository, never()).save(any());
@@ -281,7 +306,7 @@ class PaymentCommandServiceTest {
     void create_orderNotFound() {
         given(orderRepository.findByIdForUpdate(ORDER_ID)).willReturn(Optional.empty());
 
-        assertThatThrownBy(() -> paymentCommandService.create(ORDER_ID))
+        assertThatThrownBy(() -> paymentCommandService.create(ORDER_ID, PgProvider.KAKAOPAY))
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode").isEqualTo(ErrorCode.ORDER_NOT_FOUND);
     }

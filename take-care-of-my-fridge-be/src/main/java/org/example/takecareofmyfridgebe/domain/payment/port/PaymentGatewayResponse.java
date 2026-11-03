@@ -1,5 +1,7 @@
 package org.example.takecareofmyfridgebe.domain.payment.port;
 
+import org.example.takecareofmyfridgebe.domain.payment.entity.PgProvider;
+
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -9,16 +11,17 @@ public record PaymentGatewayResponse(
         Long totalAmount,   // PG 응답에 금액이 없으면 null
         long cancelledAmount, // 총 취소 금액. 환불 쪽이 우리 환불 기록과 맞춰 볼 때 쓴다
         LocalDateTime paidAt, // PG가 기록한 결제 완료 시각(서버 시간대). 결제 완료 전이면 null
-        List<Cancellation> cancellations // PG 취소 건. 취소가 없으면 빈 목록
+        List<Cancellation> cancellations, // PG 취소 건. 취소가 없으면 빈 목록
+        PgProvider pgProvider // 실제로 결제된 결제대행사. 응답에 없거나 우리가 쓰지 않는 PG면 null
 ) {
     private static final String STATUS_PAID = "PAID";
     private static final String STATUS_FAILED = "FAILED";
     private static final String STATUS_CANCELLED = "CANCELLED";
 
-    // 취소 건이 필요 없는 결제 검증에서 쓴다
+    // 취소 건과 결제대행사가 필요 없는 결제 검증에서 쓴다
     public PaymentGatewayResponse(String id, String status, Long totalAmount, long cancelledAmount,
                                   LocalDateTime paidAt) {
-        this(id, status, totalAmount, cancelledAmount, paidAt, List.of());
+        this(id, status, totalAmount, cancelledAmount, paidAt, List.of(), null);
     }
 
     public boolean isPaid() {

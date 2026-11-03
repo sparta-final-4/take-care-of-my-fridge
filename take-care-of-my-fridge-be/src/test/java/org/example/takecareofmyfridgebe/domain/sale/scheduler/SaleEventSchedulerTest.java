@@ -25,7 +25,7 @@ class SaleEventSchedulerTest {
 
     @Test
     @DisplayName("실행하면 지금 시각으로 상태를 정리한다")
-    void openAndCloseDueEvents_callsStatusService() {
+    void callsStatusServiceToOpenAndCloseDueEvents() {
         saleEventScheduler.openAndCloseDueEvents();
 
         verify(saleEventStatusService).openAndCloseDue(any(LocalDateTime.class));
@@ -33,7 +33,7 @@ class SaleEventSchedulerTest {
 
     @Test
     @DisplayName("상태 정리가 실패해도 예외를 밖으로 내지 않고 다음 실행에서 다시 처리한다")
-    void openAndCloseDueEvents_swallowsFailure() {
+    void swallowsFailureWhileOpeningAndClosingDueEvents() {
         willThrow(new IllegalStateException("db down")).given(saleEventStatusService)
                 .openAndCloseDue(any(LocalDateTime.class));
 
