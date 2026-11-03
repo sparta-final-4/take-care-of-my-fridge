@@ -59,7 +59,7 @@ public class RecipeSearchFacade {
     }
 
     /**
-     * 검색어 자동완성. ES가 실패하면 이름 앞부분이 같은 레시피만 MySQL에서 찾는다
+     * 검색어 자동완성. ES가 실패하면 이름에 검색어가 든 레시피를 MySQL에서 찾는다
      */
     public List<String> suggestNames(String keyword) {
         if (!searchProperties.useElasticSearch()) {
