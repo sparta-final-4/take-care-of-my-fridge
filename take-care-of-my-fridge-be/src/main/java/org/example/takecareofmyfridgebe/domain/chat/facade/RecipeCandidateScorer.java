@@ -37,6 +37,7 @@ import java.util.stream.Stream;
  * <p>
  * 보유 비율이 기준(minOwnedRatio) 미만인 레시피는 기준 이상 레시피를 위 순서로 먼저 고른 뒤, 10개가 안 차면 같은 순서로 채운다.
  * 흔한 임박 재료(양파·대파 등)만 겹치고 나머지를 거의 사야 하는 레시피가 위로 올라오지 않게 하려는 것이다.
+ * 단, 선택 재료가 있고 레시피가 그 재료를 전부 쓰면 기준 미만이어도 먼저 고른다 (모자람 표시는 그대로 남는다).
  * 냉장고 수량은 재료마다 단위(g·개·대…)가 달라 비교하지 않는다. 기본 양념은 어느 단계에서도 세지 않는다.
  */
 public class RecipeCandidateScorer {
@@ -119,7 +120,7 @@ public class RecipeCandidateScorer {
 
     /**
      * 후보를 거르고 정렬해 상위 10개를 고른다.
-     * 보유 비율 기준 이상인 레시피를 먼저 고르고, 10개가 안 되면 기준 미만 레시피로 채운다.
+     * 보유 비율 기준 이상인 레시피와 선택 재료를 전부 쓰는 레시피를 먼저 고르고, 10개가 안 되면 나머지로 채운다.
      * 부족한 재료 목록은 비워 두고, withMissingIngredients로 채운다.
      *
      * @param rows         lookupIngredientIds로 조회한 레시피 재료 줄
@@ -154,13 +155,20 @@ public class RecipeCandidateScorer {
         boolean fallback = query.selectedIngredientIds().isEmpty()
                 || scored.stream().allMatch(candidate -> candidate.ranking().selectedMatches() == 0);
 
-        // 1차: 보유 비율 기준 이상, 2차: 기준 미만. 각각 같은 정렬 순서
+        // 1차: 보유 비율 기준 이상이거나 선택 재료를 전부 쓰는 레시피, 2차: 나머지. 각각 같은 정렬 순서
+        int selectedCount = Set.copyOf(query.selectedIngredientIds()).size();
         List<RecipeCandidate> top = Stream.concat(
-                        scored.stream().filter(candidate -> !candidate.reason().lacksManyIngredients()).sorted(ORDER),
-                        scored.stream().filter(candidate -> candidate.reason().lacksManyIngredients()).sorted(ORDER))
+                        scored.stream().filter(candidate -> isFirstTier(candidate, selectedCount)).sorted(ORDER),
+                        scored.stream().filter(candidate -> !isFirstTier(candidate, selectedCount)).sorted(ORDER))
                 .limit(LIMIT)
                 .toList();
         return new RecipeCandidates(top, fallback);
+    }
+
+    // 사용자가 고른 재료를 전부 쓰는 레시피는 재료를 많이 사야 해도 1차 후보로 둔다 (구매 링크로 보완)
+    private static boolean isFirstTier(RecipeCandidate candidate, int selectedCount) {
+        boolean usesAllSelected = selectedCount > 0 && candidate.ranking().selectedMatches() == selectedCount;
+        return usesAllSelected || !candidate.reason().lacksManyIngredients();
     }
 
     /**
