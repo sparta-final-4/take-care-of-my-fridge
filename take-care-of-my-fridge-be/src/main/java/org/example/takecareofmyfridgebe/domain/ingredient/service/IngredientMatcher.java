@@ -61,6 +61,9 @@ public class IngredientMatcher {
     // 연속된 공백을 하나의 공백으로 치환하기 위한 정규식
     private static final Pattern WHITESPACE_PATTERN = Pattern.compile("\\s+");
 
+    // DEBUG 로그에 남길 후보 수
+    private static final int DEBUG_CANDIDATE_LIMIT = 3;
+
     private final IngredientRepository ingredientRepository;
     private final IngredientNameSearchService ingredientNameSearchService;
     private final IngredientMatchProperties matchProperties;
@@ -107,9 +110,13 @@ public class IngredientMatcher {
                 unmatchedByKey.putIfAbsent(toLookupKey(name), name);
             }
         }
+        if (!unmatchedByKey.isEmpty()) {
+            log.debug("DB에 같은 이름이 없어 후보 검색: names={}", unmatchedByKey.values());
+        }
         Map<String, String> adoptedByKey = new HashMap<>();
         unmatchedByKey.forEach((key, name) -> pickCandidate(name).ifPresent(adopted -> adoptedByKey.put(key, adopted)));
         Map<String, Ingredient> candidateDictionary = findByNames(new HashSet<>(adoptedByKey.values()));
+        logCandidateLookup(adoptedByKey, unmatchedByKey, candidateDictionary);
 
         // 4. 그래도 없으면 ING_CUSTOM
         Map<String, Ingredient> result = new HashMap<>();
@@ -144,25 +151,61 @@ public class IngredientMatcher {
             return Optional.empty();
         }
         if (candidates == null || candidates.isEmpty()) {
+            log.debug("후보 채택 안 함: name={}, 이유=후보 없음", name);
             return Optional.empty();
         }
 
         Comparator<IngredientCandidate> byScore = Comparator.comparingDouble(IngredientCandidate::score);
+        if (log.isDebugEnabled()) {
+            log.debug("후보 검색 결과: name={}, top3={}", name, candidates.stream()
+                    .sorted(byScore.reversed())
+                    .limit(DEBUG_CANDIDATE_LIMIT)
+                    .map(candidate -> "%s(%.2f)".formatted(candidate.value(), candidate.score()))
+                    .toList());
+        }
         IngredientCandidate top = candidates.stream().max(byScore).orElseThrow();
         if (top.score() >= matchProperties.exactMatchScore()) {
+            log.debug("후보 채택: name={}, adopted={}, 규칙=정확 일치, score={}", name, top.value(), top.score());
             return Optional.ofNullable(top.value());
         }
 
         String compactName = compact(name);
-        return candidates.stream()
+        Optional<IngredientCandidate> suffixMatched = candidates.stream()
                 .filter(candidate -> candidate.value() != null)
                 .filter(candidate -> {
                     String compactCandidate = compact(candidate.value());
                     return compactCandidate.length() >= matchProperties.suffixMinLength()
                             && compactName.endsWith(compactCandidate);
                 })
-                .max(byScore)
-                .map(IngredientCandidate::value);
+                .max(byScore);
+        if (suffixMatched.isPresent()) {
+            log.debug("후보 채택: name={}, adopted={}, 규칙=끝부분, score={}",
+                    name, suffixMatched.get().value(), suffixMatched.get().score());
+        } else {
+            log.debug("후보 채택 안 함: name={}, 이유=1등 점수 {} < {}이고 끝이 같은 {}글자 이상 후보 없음 (비교 이름={})",
+                    name, top.score(), matchProperties.exactMatchScore(), matchProperties.suffixMinLength(), compactName);
+        }
+        return suffixMatched.map(IngredientCandidate::value);
+    }
+
+    // 채택한 후보 이름을 DB에서 다시 찾은 결과. 못 찾으면 그 이름은 ING_CUSTOM이 된다
+    private void logCandidateLookup(
+            Map<String, String> adoptedByKey,
+            Map<String, String> unmatchedByKey,
+            Map<String, Ingredient> candidateDictionary
+    ) {
+        if (!log.isDebugEnabled() || adoptedByKey.isEmpty()) {
+            return;
+        }
+        adoptedByKey.forEach((key, adopted) -> {
+            Ingredient found = candidateDictionary.get(toLookupKey(adopted));
+            if (found == null) {
+                log.debug("채택 이름 DB 재조회 실패, 기타로 둠: name={}, adopted={}", unmatchedByKey.get(key), adopted);
+            } else {
+                log.debug("채택 이름 DB 재조회 성공: name={}, adopted={}, ingredientId={}, ingredientCode={}",
+                        unmatchedByKey.get(key), adopted, found.getId(), found.getIngredientCode());
+            }
+        });
     }
 
     // DB 비교는 대소문자를 구분하지 않으므로("spam" 조회 시 "Spam" 반환) 맵 키도 소문자로 맞춘다.
