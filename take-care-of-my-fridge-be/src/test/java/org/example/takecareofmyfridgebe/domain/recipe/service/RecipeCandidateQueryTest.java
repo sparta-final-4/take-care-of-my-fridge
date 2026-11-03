@@ -140,8 +140,24 @@ class RecipeCandidateQueryTest extends MySqlContainerSupport {
     }
 
     @Test
+    @DisplayName("레시피별 기본 양념을 뺀 재료를 재료마다 한 줄로 레시피에 처음 나온 순서대로 돌려준다")
+    void returnsNonBasicIngredients_inRecipeOrder() {
+        List<RecipeCandidateIngredient> rows = recipeService.findNonBasicIngredients(
+                List.of(eggTofuSoup.getId(), saltOnly.getId(), noTasteRecipe.getId()));
+
+        assertThat(rows)
+                .extracting(RecipeCandidateIngredient::recipeId, RecipeCandidateIngredient::ingredientId,
+                        RecipeCandidateIngredient::ingredientName, RecipeCandidateIngredient::basicSeasoning)
+                .containsExactly(
+                        tuple(eggTofuSoup.getId(), egg.getId(), "계란", false),
+                        tuple(eggTofuSoup.getId(), tofu.getId(), "두부", false),
+                        tuple(noTasteRecipe.getId(), tofu.getId(), "두부", false));
+    }
+
+    @Test
     @DisplayName("빈 ID 목록이면 쿼리 없이 빈 결과를 돌려준다")
     void returnsEmpty_whenIdsAreEmpty() {
+        assertThat(recipeService.findNonBasicIngredients(List.of())).isEmpty();
         assertThat(recipeService.findCandidateIngredients(List.of())).isEmpty();
         assertThat(recipeService.findCandidateInfos(List.of())).isEmpty();
         assertThat(recipeService.findTastesByRecipeIds(List.of())).isEmpty();

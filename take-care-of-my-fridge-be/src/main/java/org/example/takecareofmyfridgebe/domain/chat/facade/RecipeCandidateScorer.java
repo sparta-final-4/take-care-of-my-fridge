@@ -2,6 +2,7 @@ package org.example.takecareofmyfridgebe.domain.chat.facade;
 
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate.ImminentIngredient;
+import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate.MissingIngredient;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate.Ranking;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate.Reason;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidates;
@@ -24,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * AI 없이 규칙으로 레시피 후보를 고르고 정렬한다. 스프링에 의존하지 않는 순수 클래스.
@@ -32,6 +34,9 @@ import java.util.stream.Collectors;
  * 1. 사용자 요청 일치 수 → 2. 선택 재료 겹친 수 → 3. 임박 점수 합 → 4. 선호 맛 겹친 수
  * → 5. 보유 비율 → 6. 없는 재료 수 적은 순 → 7. 레시피 id.
  * 임박을 선호 맛보다 앞에 둔다. 회원 선호 맛은 대부분 레시피와 1~2개씩 겹쳐서, 뒤에 두지 않으면 임박 재료가 순위에 거의 반영되지 않는다.
+ * <p>
+ * 보유 비율이 기준(minOwnedRatio) 미만인 레시피는 기준 이상 레시피를 위 순서로 먼저 고른 뒤, 10개가 안 차면 같은 순서로 채운다.
+ * 흔한 임박 재료(양파·대파 등)만 겹치고 나머지를 거의 사야 하는 레시피가 위로 올라오지 않게 하려는 것이다.
  * 냉장고 수량은 재료마다 단위(g·개·대…)가 달라 비교하지 않는다. 기본 양념은 어느 단계에서도 세지 않는다.
  */
 public class RecipeCandidateScorer {
@@ -51,10 +56,19 @@ public class RecipeCandidateScorer {
             .thenComparingInt(c -> c.ranking().missingCount())
             .thenComparingLong(RecipeCandidate::recipeId);
 
-    private final Set<String> excludedCategories;
+    // 비율 비교의 부동소수 오차 허용치 (예: 2/5와 0.4)
+    private static final double RATIO_EPSILON = 1e-9;
 
-    public RecipeCandidateScorer(Collection<String> excludedCategories) {
+    private final Set<String> excludedCategories;
+    private final double minOwnedRatio;
+
+    /**
+     * @param excludedCategories 후보에서 뺄 레시피 분류
+     * @param minOwnedRatio      보유 비율 기준. 미만인 레시피는 뒤로 보낸다 (0이면 기준 없음)
+     */
+    public RecipeCandidateScorer(Collection<String> excludedCategories, double minOwnedRatio) {
         this.excludedCategories = excludedCategories == null ? Set.of() : Set.copyOf(excludedCategories);
+        this.minOwnedRatio = minOwnedRatio;
     }
 
     /**
@@ -105,6 +119,8 @@ public class RecipeCandidateScorer {
 
     /**
      * 후보를 거르고 정렬해 상위 10개를 고른다.
+     * 보유 비율 기준 이상인 레시피를 먼저 고르고, 10개가 안 되면 기준 미만 레시피로 채운다.
+     * 부족한 재료 목록은 비워 두고, withMissingIngredients로 채운다.
      *
      * @param rows         lookupIngredientIds로 조회한 레시피 재료 줄
      * @param infos        후보 레시피 정보 (없는 레시피는 건너뛴다)
@@ -138,11 +154,50 @@ public class RecipeCandidateScorer {
         boolean fallback = query.selectedIngredientIds().isEmpty()
                 || scored.stream().allMatch(candidate -> candidate.ranking().selectedMatches() == 0);
 
-        List<RecipeCandidate> top = scored.stream()
-                .sorted(ORDER)
+        // 1차: 보유 비율 기준 이상, 2차: 기준 미만. 각각 같은 정렬 순서
+        List<RecipeCandidate> top = Stream.concat(
+                        scored.stream().filter(candidate -> !candidate.reason().lacksManyIngredients()).sorted(ORDER),
+                        scored.stream().filter(candidate -> candidate.reason().lacksManyIngredients()).sorted(ORDER))
                 .limit(LIMIT)
                 .toList();
         return new RecipeCandidates(top, fallback);
+    }
+
+    /**
+     * 후보마다 냉장고에 없는 재료(기본 양념 제외)를 근거에 채운다.
+     *
+     * @param fridge          prepareFridge로 준비한 냉장고 재료
+     * @param nonBasicRows    후보 레시피의 기본 양념을 뺀 재료 전체 (레시피에 나온 순)
+     */
+    public static RecipeCandidates withMissingIngredients(
+            RecipeCandidates result,
+            List<FridgeStock> fridge,
+            List<RecipeCandidateIngredient> nonBasicRows
+    ) {
+        Set<Long> ownedIds = fridge.stream()
+                .map(FridgeStock::ingredientId)
+                .collect(Collectors.toSet());
+        Map<Long, List<MissingIngredient>> missingByRecipe = new LinkedHashMap<>();
+        for (RecipeCandidateIngredient row : nonBasicRows) {
+            if (row.basicSeasoning() || ownedIds.contains(row.ingredientId())) {
+                continue;
+            }
+            List<MissingIngredient> missing = missingByRecipe.computeIfAbsent(row.recipeId(), id -> new ArrayList<>());
+            MissingIngredient ingredient = new MissingIngredient(row.ingredientId(), row.ingredientName());
+            if (!missing.contains(ingredient)) {
+                missing.add(ingredient);
+            }
+        }
+
+        List<RecipeCandidate> candidates = result.candidates().stream()
+                .map(candidate -> new RecipeCandidate(
+                        candidate.recipeId(),
+                        candidate.name(),
+                        candidate.ranking(),
+                        candidate.reason().withMissingIngredients(
+                                missingByRecipe.getOrDefault(candidate.recipeId(), List.of()))))
+                .toList();
+        return new RecipeCandidates(candidates, result.fallback());
     }
 
     private boolean isFilteredOut(RecipeQuery query, RecipeCandidateInfo info, List<RecipeCandidateIngredient> recipeRows) {
@@ -232,7 +287,9 @@ public class RecipeCandidateScorer {
                 imminent,
                 matchedTastes,
                 List.copyOf(matchedRequests),
-                info.cookTimeMin() == null
+                info.cookTimeMin() == null,
+                ranking.ownedRatio() + RATIO_EPSILON < minOwnedRatio,
+                List.of()
         );
         return new RecipeCandidate(info.recipeId(), info.name(), ranking, reason);
     }

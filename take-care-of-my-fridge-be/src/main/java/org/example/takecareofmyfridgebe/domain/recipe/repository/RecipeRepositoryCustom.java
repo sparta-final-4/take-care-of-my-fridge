@@ -33,4 +33,7 @@ public interface RecipeRepositoryCustom {
 
     // AI 상담 후보 검색용: 레시피별 기본 양념을 뺀 재료 종류 수 (재료가 모두 기본 양념이면 빠진다)
     List<RecipeIngredientCountDto> countNonBasicIngredients(Collection<Long> recipeIds);
+
+    // AI 상담 후보 검색용: 레시피별 기본 양념을 뺀 재료 전체 (레시피·재료 쌍마다 한 줄, 레시피 id·레시피에 처음 나온 순)
+    List<RecipeCandidateIngredient> findNonBasicIngredients(Collection<Long> recipeIds);
 }

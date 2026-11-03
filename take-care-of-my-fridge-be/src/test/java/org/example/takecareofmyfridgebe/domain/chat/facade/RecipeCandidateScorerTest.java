@@ -2,6 +2,7 @@ package org.example.takecareofmyfridgebe.domain.chat.facade;
 
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate.ImminentIngredient;
+import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate.MissingIngredient;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidates;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeQuery;
 import org.example.takecareofmyfridgebe.domain.chat.facade.RecipeCandidateScorer.FridgeStock;
@@ -40,7 +41,9 @@ class RecipeCandidateScorerTest {
     private static final long PORK = 5L;
     private static final long SALT = 90L;
 
-    private final RecipeCandidateScorer scorer = new RecipeCandidateScorer(List.of("양념", "음료"));
+    // 정렬·거르기 테스트는 보유 비율 기준 없이(0) 단계별 순서만 확인한다
+    private final RecipeCandidateScorer scorer = new RecipeCandidateScorer(List.of("양념", "음료"), 0);
+    private final RecipeCandidateScorer ratioScorer = new RecipeCandidateScorer(List.of("양념", "음료"), 0.4);
 
     private final List<RecipeCandidateIngredient> rows = new ArrayList<>();
     private final Map<Long, RecipeCandidateInfo> infos = new HashMap<>();
@@ -329,8 +332,129 @@ class RecipeCandidateScorerTest {
         }
     }
 
+    @Nested
+    @DisplayName("보유 비율 기준")
+    class OwnedRatioThreshold {
+
+        @Test
+        @DisplayName("보유 비율이 기준 이상인 레시피가 임박 점수가 더 높은 기준 미만 레시피보다 앞선다")
+        void ranksEnoughOwnedFirst_overHigherImminent() {
+            recipe(10L, "계란찜", "찜", 20, 5, EGG);
+            recipe(20L, "두부부침", "전", 20, 2, TOFU);
+
+            RecipeCandidates result = rank(ratioScorer,
+                    RecipeQuery.of(MEMBER_ID, List.of()),
+                    List.of(stock(EGG, "계란", 0), stock(TOFU, "두부", 10)),
+                    List.of());
+
+            assertThat(result.candidates()).extracting(RecipeCandidate::recipeId).containsExactly(20L, 10L);
+            assertThat(result.candidates().get(1).ranking().imminentScore()).isEqualTo(12);
+            assertThat(result.candidates()).extracting(candidate -> candidate.reason().lacksManyIngredients())
+                    .containsExactly(false, true);
+        }
+
+        @Test
+        @DisplayName("선택 재료가 들어간 레시피도 보유 비율이 기준 미만이면 기준 이상 레시피보다 뒤로 간다")
+        void ranksSelectedRecipeLast_whenOwnedRatioIsLow() {
+            recipe(10L, "두부전골", "전골", 30, 10, TOFU);
+            recipe(20L, "계란말이", "말이", 20, 2, EGG);
+
+            RecipeCandidates result = rank(ratioScorer,
+                    RecipeQuery.of(MEMBER_ID, List.of(TOFU)),
+                    List.of(stock(EGG, "계란", 10), stock(TOFU, "두부", 10)),
+                    List.of());
+
+            assertThat(result.candidates()).extracting(RecipeCandidate::recipeId).containsExactly(20L, 10L);
+            assertThat(result.candidates().get(1).ranking().selectedMatches()).isEqualTo(1);
+            assertThat(result.fallback()).isFalse();
+        }
+
+        @Test
+        @DisplayName("기준 이상 레시피가 10개가 안 되면 기준 미만 레시피를 같은 정렬 순서로 채운다")
+        void fillsWithLowOwnedRecipes_whenEnoughOwnedAreFewerThanTen() {
+            for (long id = 1; id <= 8; id++) {
+                recipe(id, "계란요리" + id, "찜", 20, 2, EGG);
+            }
+            recipe(31L, "두부요리 임박 없음", "찜", 20, 5, TOFU);
+            recipe(32L, "돼지고기요리 D-1", "볶음", 20, 5, PORK);
+            recipe(33L, "돼지고기요리 D-1 재료 많음", "볶음", 20, 9, PORK);
+
+            RecipeCandidates result = rank(ratioScorer,
+                    RecipeQuery.of(MEMBER_ID, List.of()),
+                    List.of(stock(EGG, "계란", 10), stock(TOFU, "두부", 10), stock(PORK, "돼지고기", 1)),
+                    List.of());
+
+            assertThat(result.candidates()).hasSize(10);
+            assertThat(result.candidates()).extracting(RecipeCandidate::recipeId)
+                    .containsExactly(1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 32L, 33L);
+            assertThat(result.candidates()).extracting(candidate -> candidate.reason().lacksManyIngredients())
+                    .containsExactly(false, false, false, false, false, false, false, false, true, true);
+        }
+
+        @Test
+        @DisplayName("보유 비율이 기준과 같으면(2/5 = 0.4) 기준 이상으로 본다")
+        void treatsAsEnough_whenOwnedRatioEqualsThreshold() {
+            recipe(10L, "두부계란국", "국", 20, 5, EGG, TOFU);
+
+            RecipeCandidates result = rank(ratioScorer,
+                    RecipeQuery.of(MEMBER_ID, List.of()),
+                    List.of(stock(EGG, "계란", 10), stock(TOFU, "두부", 10)),
+                    List.of());
+
+            assertThat(result.candidates().get(0).reason().lacksManyIngredients()).isFalse();
+        }
+
+        @Test
+        @DisplayName("기준값이 0이면 보유 비율과 관계없이 정렬 순서대로 고르고 모자람 표시도 없다")
+        void ranksByOrderOnly_whenThresholdIsZero() {
+            recipe(10L, "계란찜", "찜", 20, 5, EGG);
+            recipe(20L, "두부부침", "전", 20, 2, TOFU);
+
+            RecipeCandidates result = rank(scorer,
+                    RecipeQuery.of(MEMBER_ID, List.of()),
+                    List.of(stock(EGG, "계란", 0), stock(TOFU, "두부", 10)),
+                    List.of());
+
+            assertThat(result.candidates()).extracting(RecipeCandidate::recipeId).containsExactly(10L, 20L);
+            assertThat(result.candidates()).extracting(candidate -> candidate.reason().lacksManyIngredients())
+                    .containsExactly(false, false);
+        }
+    }
+
+    @Nested
+    @DisplayName("부족한 재료")
+    class MissingIngredients {
+
+        @Test
+        @DisplayName("냉장고에 없는 재료를 레시피에 나온 순서대로 근거에 채우고 기본 양념은 넣지 않는다")
+        void fillsMissingIngredients_exceptOwnedAndBasic() {
+            recipe(10L, "제육두부조림", "조림", 20, 3, TOFU);
+            recipe(20L, "계란찜", "찜", 20, 1, EGG);
+            List<FridgeStock> fridge = List.of(stock(EGG, "계란", 10), stock(TOFU, "두부", 10));
+            RecipeCandidates ranked = rank(RecipeQuery.of(MEMBER_ID, List.of()), fridge, List.of());
+
+            RecipeCandidates result = RecipeCandidateScorer.withMissingIngredients(ranked, fridge, List.of(
+                    new RecipeCandidateIngredient(10L, PORK, "돼지고기", false),
+                    new RecipeCandidateIngredient(10L, TOFU, "두부", false),
+                    new RecipeCandidateIngredient(10L, ONION, "양파", false),
+                    new RecipeCandidateIngredient(10L, SALT, "소금", true),
+                    new RecipeCandidateIngredient(20L, EGG, "계란", false)));
+
+            assertThat(result.candidates()).extracting(RecipeCandidate::recipeId).containsExactly(20L, 10L);
+            assertThat(result.candidates().get(0).reason().missingIngredients()).isEmpty();
+            assertThat(result.candidates().get(1).reason().missingIngredients()).containsExactly(
+                    new MissingIngredient(PORK, "돼지고기"), new MissingIngredient(ONION, "양파"));
+            assertThat(result.candidates().get(1).ranking()).isEqualTo(ranked.candidates().get(1).ranking());
+        }
+    }
+
     private RecipeCandidates rank(RecipeQuery query, List<FridgeStock> fridge, List<Taste> memberTastes) {
-        return scorer.rank(query, fridge, memberTastes, rows, infos, tastes);
+        return rank(scorer, query, fridge, memberTastes);
+    }
+
+    private RecipeCandidates rank(RecipeCandidateScorer target, RecipeQuery query, List<FridgeStock> fridge,
+                                  List<Taste> memberTastes) {
+        return target.rank(query, fridge, memberTastes, rows, infos, tastes);
     }
 
     // 레시피 하나를 등록한다. ingredientIds는 기본 양념이 아닌 재료이고, 이름은 재료 ID로 정한다

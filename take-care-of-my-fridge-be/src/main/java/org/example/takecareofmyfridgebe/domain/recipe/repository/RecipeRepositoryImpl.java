@@ -122,6 +122,28 @@ public class RecipeRepositoryImpl implements RecipeRepositoryCustom {
     }
 
     @Override
+    public List<RecipeCandidateIngredient> findNonBasicIngredients(Collection<Long> recipeIds) {
+        return queryFactory
+                .select(Projections.constructor(RecipeCandidateIngredient.class,
+                        recipeIngredient.recipe.id,
+                        recipeIngredient.ingredientId,
+                        ingredient.name,
+                        ingredient.basicSeasoning
+                ))
+                .from(recipeIngredient)
+                .join(ingredient).on(ingredient.id.eq(recipeIngredient.ingredientId))
+                .where(
+                        recipeIngredient.recipe.id.in(recipeIds),
+                        ingredient.basicSeasoning.isFalse()
+                )
+                // 같은 재료가 양념 그룹 등으로 여러 번 나와도 한 줄로 묶는다
+                .groupBy(recipeIngredient.recipe.id, recipeIngredient.ingredientId, ingredient.name,
+                        ingredient.basicSeasoning)
+                .orderBy(recipeIngredient.recipe.id.asc(), recipeIngredient.seq.min().asc())
+                .fetch();
+    }
+
+    @Override
     public List<RecipeStepTextDto> findStepTexts(Long recipeId) {
         return queryFactory
                 .select(Projections.constructor(RecipeStepTextDto.class,

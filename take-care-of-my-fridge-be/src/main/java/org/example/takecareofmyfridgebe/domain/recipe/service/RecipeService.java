@@ -253,6 +253,17 @@ public class RecipeService {
 
     /**
      * 다른 도메인(chat 레시피 후보 검색)에서 쓰는 조회.
+     * 레시피별로 기본 양념을 뺀 재료 전체(재료 id·이름)를 레시피에 처음 나온 순서대로 조회한다.
+     */
+    public List<RecipeCandidateIngredient> findNonBasicIngredients(Collection<Long> recipeIds) {
+        if (recipeIds == null || recipeIds.isEmpty()) {
+            return List.of();
+        }
+        return recipeRepository.findNonBasicIngredients(recipeIds);
+    }
+
+    /**
+     * 다른 도메인(chat 레시피 후보 검색)에서 쓰는 조회.
      * 레시피 이름·분류·조리 시간과 기본 양념을 뺀 재료 종류 수를 조회한다. 없는 ID는 Map에서 빠진다.
      */
     public Map<Long, RecipeCandidateInfo> findCandidateInfos(Collection<Long> recipeIds) {

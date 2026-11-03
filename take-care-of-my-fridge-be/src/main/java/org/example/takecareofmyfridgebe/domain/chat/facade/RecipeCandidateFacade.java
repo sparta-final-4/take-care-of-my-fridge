@@ -2,6 +2,7 @@ package org.example.takecareofmyfridgebe.domain.chat.facade;
 
 import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatCandidateProperties;
+import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidates;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeQuery;
 import org.example.takecareofmyfridgebe.domain.chat.facade.RecipeCandidateScorer.FridgeStock;
@@ -38,7 +39,8 @@ public class RecipeCandidateFacade {
      * @return 정렬된 후보와 fallback 여부 (선택 재료가 없거나 하나도 겹치지 않으면 true)
      */
     public RecipeCandidates findCandidates(RecipeQuery query) {
-        RecipeCandidateScorer scorer = new RecipeCandidateScorer(chatCandidateProperties.excludedCategories());
+        RecipeCandidateScorer scorer = new RecipeCandidateScorer(
+                chatCandidateProperties.excludedCategories(), chatCandidateProperties.minOwnedRatio());
 
         List<FridgeStock> fridge = RecipeCandidateScorer.prepareFridge(
                 fridgeService.getItems(query.memberId(), FridgeSortType.EXPIRATION));
@@ -51,6 +53,11 @@ public class RecipeCandidateFacade {
         Map<Long, RecipeCandidateInfo> infos = recipeService.findCandidateInfos(recipeIds);
         Map<Long, Set<Member.Taste>> recipeTastes = recipeService.findTastesByRecipeIds(recipeIds);
 
-        return scorer.rank(query, fridge, memberTastes, rows, infos, recipeTastes);
+        RecipeCandidates ranked = scorer.rank(query, fridge, memberTastes, rows, infos, recipeTastes);
+
+        // 부족한 재료는 고른 10개만 조회한다
+        List<Long> topRecipeIds = ranked.candidates().stream().map(RecipeCandidate::recipeId).toList();
+        return RecipeCandidateScorer.withMissingIngredients(
+                ranked, fridge, recipeService.findNonBasicIngredients(topRecipeIds));
     }
 }
