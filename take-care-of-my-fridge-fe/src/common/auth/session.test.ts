@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { queryClient } from '@/app/queryClient';
 
+import { addRecentKeyword, getRecentKeywords } from '@/domains/search/recentKeywords';
+
 import { useAuthStore } from './authStore';
 import { setSession } from './session';
 
@@ -105,5 +107,15 @@ describe('setSession', () => {
       expect(observer.getCurrentResult().data).toBeUndefined();
       unsubscribe();
     });
+  });
+
+  it('로그인한 회원이 로그아웃하면 최근 검색어를 지우고, 비로그인 확인에서는 남긴다', async () => {
+    addRecentKeyword('김치');
+    await setSession(null);
+    expect(getRecentKeywords()).toEqual(['김치']);
+
+    useAuthStore.setState({ status: 'authenticated' });
+    await setSession(null);
+    expect(getRecentKeywords()).toEqual([]);
   });
 });

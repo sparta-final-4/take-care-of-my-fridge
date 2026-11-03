@@ -2,6 +2,7 @@ import { flushSync } from 'react-dom';
 
 import { queryClient } from '@/app/queryClient';
 import type { MyInfoResponse } from '@/common/api/clients';
+import { clearRecentKeywords } from '@/domains/search/recentKeywords';
 
 import { useAuthStore } from './authStore';
 import { nextSessionId, sessionId } from './sessionId';
@@ -11,6 +12,8 @@ export async function setSession(
   reason: 'expired' | 'suspended' | null = null,
 ) {
   const id = nextSessionId();
+  // 로그아웃·만료 뒤 같은 브라우저를 쓰는 사람에게 이전 회원의 최근 검색어가 보이지 않게 한다.
+  if (!member && useAuthStore.getState().status === 'authenticated') clearRecentKeywords();
   await queryClient.cancelQueries();
   if (id !== sessionId()) return;
   // 화면이 붙어 있는 쿼리는 캐시에서 빼면 다시 받지 못해 로딩에 멈춘다.
