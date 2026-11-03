@@ -26,6 +26,7 @@ import org.example.takecareofmyfridgebe.domain.order.repository.OrderRepository;
 import org.example.takecareofmyfridgebe.domain.order.service.OrderReader;
 import org.example.takecareofmyfridgebe.domain.order.service.OrderStatusService;
 import org.example.takecareofmyfridgebe.domain.payment.entity.Payment;
+import org.example.takecareofmyfridgebe.domain.payment.entity.PgProvider;
 import org.example.takecareofmyfridgebe.domain.payment.repository.PaymentRepository;
 import org.example.takecareofmyfridgebe.domain.payment.service.PaymentHistoryRecorder;
 import org.example.takecareofmyfridgebe.domain.payment.service.PaymentService;
@@ -455,9 +456,9 @@ class OrderStatusFacadeConfirmTransactionTest extends MySqlContainerSupport {
             .order(order)
             .portonePaymentId("payment-" + order.getOrderNumber())
             .amount(order.getTotalAmount())
-            .expiresAt(paidAt.plusMinutes(10))
+            .pgProvider(PgProvider.KAKAOPAY).expiresAt(paidAt.plusMinutes(10))
             .build();
-        payment.complete(paidAt);
+        payment.complete(paidAt, PgProvider.KAKAOPAY);
         return paymentRepository.save(payment);
     }
 

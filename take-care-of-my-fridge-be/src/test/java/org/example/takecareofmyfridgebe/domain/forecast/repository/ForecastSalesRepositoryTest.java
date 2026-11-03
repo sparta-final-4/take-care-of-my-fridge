@@ -9,6 +9,7 @@ import org.example.takecareofmyfridgebe.domain.order.entity.Order;
 import org.example.takecareofmyfridgebe.domain.order.entity.OrderItem;
 import org.example.takecareofmyfridgebe.domain.order.entity.SaleType;
 import org.example.takecareofmyfridgebe.domain.payment.entity.Payment;
+import org.example.takecareofmyfridgebe.domain.payment.entity.PgProvider;
 import org.example.takecareofmyfridgebe.domain.refund.entity.Refund;
 import org.example.takecareofmyfridgebe.domain.refund.entity.RefundItem;
 import org.example.takecareofmyfridgebe.domain.refund.entity.RefundReasonType;
@@ -44,8 +45,8 @@ class ForecastSalesRepositoryTest extends MySqlContainerSupport {
                 .quantity(5).listPrice(1000).unitPrice(1000).saleType(SaleType.NONE).build();
         entityManager.persist(item);
         Payment payment = Payment.builder().order(order).portonePaymentId("forecast-repository-payment")
-                .amount(5000L).expiresAt(day.atTime(10, 0)).build();
-        payment.complete(day.atTime(9, 0));
+                .amount(5000L).pgProvider(PgProvider.KAKAOPAY).expiresAt(day.atTime(10, 0)).build();
+        payment.complete(day.atTime(9, 0), PgProvider.KAKAOPAY);
         entityManager.persist(payment);
         Refund completed = Refund.builder().payment(payment).refundAmount(2000L)
                 .reasonType(RefundReasonType.CHANGE_OF_MIND).build();

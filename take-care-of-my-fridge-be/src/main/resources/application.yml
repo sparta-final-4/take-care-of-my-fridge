@@ -141,7 +141,13 @@ portone:
   # 간단한 테스트용 빈 값으로 채운다
   api-secret: ${PORTONE_API_SECRET:}
   store-id: ${PORTONE_STORE_ID:}
-  channel-key: ${PORTONE_CHANNEL_KEY:}
+  # 결제대행사별 채널 키. 결제창에서 쓰는 공개 값이라 테스트 채널 키를 기본값으로 둔다
+  channels:
+    kakaopay: ${PORTONE_CHANNEL_KAKAOPAY:channel-key-c2b525f3-ef4b-475f-868f-8728605ff965}
+    kicc: ${PORTONE_CHANNEL_KICC:channel-key-876081a3-3d8b-4813-858a-044c4e5adf26}
+    inicis: ${PORTONE_CHANNEL_INICIS:channel-key-d302b8e8-dec4-488d-83eb-8b8f8b325b21}
+    tosspayments: ${PORTONE_CHANNEL_TOSSPAYMENTS:channel-key-b82ea224-4515-4a6f-9465-0a13d9c79213}
+    tosspay: ${PORTONE_CHANNEL_TOSSPAY:channel-key-9b866d23-24cb-47cf-8530-f712f8ddddc6}
   # WebhookVerifier가 기동 시 whsec_ 뒤를 base64로 풀기 때문에 형식만 맞춘 임의 값("local-dummy-webhook-secret")
   webhook-secret: ${PORTONE_WEBHOOK_SECRET:whsec_bG9jYWwtZHVtbXktd2ViaG9vay1zZWNyZXQ=}
 

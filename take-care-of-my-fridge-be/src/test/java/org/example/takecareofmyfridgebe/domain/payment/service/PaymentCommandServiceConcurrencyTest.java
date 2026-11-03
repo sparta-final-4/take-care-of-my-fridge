@@ -7,6 +7,7 @@ import org.example.takecareofmyfridgebe.domain.payment.dto.PaymentApproveResult;
 import org.example.takecareofmyfridgebe.domain.payment.dto.PaymentApproveResult.Rejection;
 import org.example.takecareofmyfridgebe.domain.payment.entity.FailReason;
 import org.example.takecareofmyfridgebe.domain.payment.entity.Payment;
+import org.example.takecareofmyfridgebe.domain.payment.entity.PgProvider;
 import org.example.takecareofmyfridgebe.domain.payment.entity.PaymentChangedBy;
 import org.example.takecareofmyfridgebe.domain.payment.entity.PaymentStatus;
 import org.example.takecareofmyfridgebe.domain.payment.repository.PaymentHistoryRepository;
@@ -92,8 +93,8 @@ class PaymentCommandServiceConcurrencyTest {
         Payment second = savePayment(order, "payment-b");
 
         List<PaymentApproveResult> results = runConcurrently(List.of(
-                () -> paymentCommandService.approve(first, PaymentChangedBy.USER),
-                () -> paymentCommandService.approve(second, PaymentChangedBy.USER)));
+                () -> paymentCommandService.approve(first, PgProvider.KAKAOPAY, PaymentChangedBy.USER),
+                () -> paymentCommandService.approve(second, PgProvider.KAKAOPAY, PaymentChangedBy.USER)));
 
         assertThat(results).filteredOn(PaymentApproveResult::isApproved).hasSize(1);
         assertThat(results).filteredOn(result -> !result.isApproved())
@@ -115,7 +116,7 @@ class PaymentCommandServiceConcurrencyTest {
         List<Object> results = runConcurrently(IntStream.range(0, 5)
                 .<Callable<Object>>mapToObj(i -> () -> {
                     try {
-                        return paymentCommandService.create(order.getId());
+                        return paymentCommandService.create(order.getId(), PgProvider.KAKAOPAY);
                     } catch (BusinessException e) {
                         return e.getErrorCode();
                     }
@@ -138,7 +139,7 @@ class PaymentCommandServiceConcurrencyTest {
         transactionTemplate.executeWithoutResult(status ->
                 orderRepository.findById(order.getId()).orElseThrow().cancel());
 
-        PaymentApproveResult result = paymentCommandService.approve(payment, PaymentChangedBy.USER);
+        PaymentApproveResult result = paymentCommandService.approve(payment, PgProvider.KAKAOPAY, PaymentChangedBy.USER);
 
         assertThat(result.rejection()).isEqualTo(Rejection.ORDER_NOT_PAYABLE);
         Payment saved = paymentRepository.findById(payment.getId()).orElseThrow();
@@ -151,10 +152,10 @@ class PaymentCommandServiceConcurrencyTest {
     @DisplayName("결제를 실패 처리해도 주문은 PENDING으로 남아 같은 주문에 새 결제를 만들 수 있다")
     void failThenCreateAgain_newPaymentForSameOrder() {
         Order order = saveOrder();
-        Payment first = paymentCommandService.create(order.getId());
+        Payment first = paymentCommandService.create(order.getId(), PgProvider.KAKAOPAY);
 
         paymentCommandService.fail(first, FailReason.USER_CANCELLED, PaymentChangedBy.USER);
-        Payment second = paymentCommandService.create(order.getId());
+        Payment second = paymentCommandService.create(order.getId(), PgProvider.KAKAOPAY);
 
         assertThat(second.getPortonePaymentId()).isNotEqualTo(first.getPortonePaymentId());
         assertThat(orderRepository.findById(order.getId()).orElseThrow().getStatus()).isEqualTo(OrderStatus.PENDING);
@@ -176,7 +177,7 @@ class PaymentCommandServiceConcurrencyTest {
                 .order(order)
                 .portonePaymentId(portonePaymentId)
                 .amount(10000L)
-                .expiresAt(LocalDateTime.now().plusMinutes(10))
+                .pgProvider(PgProvider.KAKAOPAY).expiresAt(LocalDateTime.now().plusMinutes(10))
                 .build());
     }
 

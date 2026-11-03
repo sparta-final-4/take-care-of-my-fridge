@@ -40,6 +40,7 @@ import org.example.takecareofmyfridgebe.domain.order.service.OrderService;
 import org.example.takecareofmyfridgebe.domain.order.service.OrderStatusService;
 import org.example.takecareofmyfridgebe.domain.payment.entity.FailReason;
 import org.example.takecareofmyfridgebe.domain.payment.entity.Payment;
+import org.example.takecareofmyfridgebe.domain.payment.entity.PgProvider;
 import org.example.takecareofmyfridgebe.domain.payment.entity.PaymentStatus;
 import org.example.takecareofmyfridgebe.domain.payment.repository.PaymentHistoryRepository;
 import org.example.takecareofmyfridgebe.domain.payment.repository.PaymentRepository;
@@ -291,7 +292,7 @@ class OrderStatusFacadeCancelTransactionTest extends MySqlContainerSupport {
                     return null;
                 },
                 () -> {
-                    paymentCommandService.create(order.getId());
+                    paymentCommandService.create(order.getId(), PgProvider.KAKAOPAY);
                     return null;
                 }));
 
@@ -407,7 +408,7 @@ class OrderStatusFacadeCancelTransactionTest extends MySqlContainerSupport {
                     return null;
                 },
                 () -> {
-                    paymentCommandService.create(order.getId());
+                    paymentCommandService.create(order.getId(), PgProvider.KAKAOPAY);
                     return null;
                 }));
 
@@ -569,7 +570,7 @@ class OrderStatusFacadeCancelTransactionTest extends MySqlContainerSupport {
             .order(order)
             .portonePaymentId("payment-" + UUID.randomUUID().toString().replace("-", ""))
             .amount(order.getTotalAmount())
-            .expiresAt(LocalDateTime.now().plusMinutes(10))
+            .pgProvider(PgProvider.KAKAOPAY).expiresAt(LocalDateTime.now().plusMinutes(10))
             .build());
     }
 
@@ -578,7 +579,7 @@ class OrderStatusFacadeCancelTransactionTest extends MySqlContainerSupport {
             .order(order)
             .portonePaymentId("payment-" + UUID.randomUUID().toString().replace("-", ""))
             .amount(order.getTotalAmount())
-            .expiresAt(LocalDateTime.now().plusMinutes(10))
+            .pgProvider(PgProvider.KAKAOPAY).expiresAt(LocalDateTime.now().plusMinutes(10))
             .build();
         payment.fail(FailReason.USER_CANCELLED);
         return paymentRepository.save(payment);

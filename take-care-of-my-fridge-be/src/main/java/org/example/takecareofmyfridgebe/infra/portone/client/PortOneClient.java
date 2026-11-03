@@ -2,6 +2,8 @@ package org.example.takecareofmyfridgebe.infra.portone.client;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.example.takecareofmyfridgebe.domain.payment.entity.PgProvider;
+import org.example.takecareofmyfridgebe.domain.payment.port.PaymentCheckout;
 import org.example.takecareofmyfridgebe.domain.payment.port.PaymentGateway;
 import org.example.takecareofmyfridgebe.domain.payment.port.PaymentGatewayResponse;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
@@ -26,8 +28,24 @@ public class PortOneClient implements PaymentGateway {
     private static final int MAX_CANCEL_ATTEMPTS = 3;
     private static final String ALREADY_CANCELLED_ERROR_TYPE = "PAYMENT_ALREADY_CANCELLED";
 
+    private static final String PAY_METHOD_CARD = "CARD";
+    private static final String PAY_METHOD_EASY_PAY = "EASY_PAY";
+    private static final String EASY_PAY_PROVIDER_KAKAOPAY = "KAKAOPAY";
+    private static final String EASY_PAY_PROVIDER_TOSSPAY = "TOSSPAY";
+
     private final RestClient portOneRestClient;
     private final PortOneProperties portOneProperties;
+
+    // 카카오페이·토스페이는 간편결제 채널이고, 나머지 결제대행사는 카드 결제창을 연다
+    @Override
+    public PaymentCheckout getCheckout(PgProvider pgProvider) {
+        String channelKey = portOneProperties.channelKeyOf(pgProvider);
+        return switch (pgProvider) {
+            case KAKAOPAY -> new PaymentCheckout(channelKey, PAY_METHOD_EASY_PAY, EASY_PAY_PROVIDER_KAKAOPAY);
+            case TOSSPAY -> new PaymentCheckout(channelKey, PAY_METHOD_EASY_PAY, EASY_PAY_PROVIDER_TOSSPAY);
+            case KICC, INICIS, TOSSPAYMENTS -> new PaymentCheckout(channelKey, PAY_METHOD_CARD, null);
+        };
+    }
 
     // 결제창에서 결제를 시작하지 않았으면 PortOne에 결제 건이 없어 404가 온다
     @Override
