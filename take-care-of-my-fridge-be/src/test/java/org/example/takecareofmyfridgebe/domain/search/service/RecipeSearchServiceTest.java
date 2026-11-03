@@ -25,6 +25,7 @@ import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -40,7 +41,7 @@ import static org.mockito.Mockito.when;
 class RecipeSearchServiceTest {
 
     private final ElasticsearchClient esClient = mock(ElasticsearchClient.class);
-    private final RecipeEmbedder embedder = mock(RecipeEmbedder.class);
+    private final QueryEmbeddingService queryEmbedding = mock(QueryEmbeddingService.class);
     private final RecipeSearchService service = service(true);
 
     private RecipeSearchService service(boolean vectorEnabled) {
@@ -48,7 +49,7 @@ class RecipeSearchServiceTest {
                 SearchEngine.ELASTICSEARCH,
                 new IndexProperties(new RecipeIndexProperties("recipes", null, null, null, 500, false), null, null),
                 new VectorProperties(vectorEnabled, 3, 20, 100, 0.5f, 100));
-        return new RecipeSearchService(esClient, properties, embedder);
+        return new RecipeSearchService(esClient, properties, queryEmbedding);
     }
 
     private static SearchResponse<Void> response(long total, String... ids) {
@@ -174,7 +175,7 @@ class RecipeSearchServiceTest {
 
         // Then
         assertEquals(List.of(7L), result.recipeIds());
-        verify(embedder, never()).embed(anyString());
+        verify(queryEmbedding, never()).embed(anyString());
         verify(esClient, times(1)).search(any(SearchRequest.class), eq(Void.class));
     }
 
@@ -185,7 +186,7 @@ class RecipeSearchServiceTest {
         when(esClient.search(any(SearchRequest.class), eq(Void.class)))
                 .thenReturn(response(0))
                 .thenReturn(response(2, "3", "9"));
-        when(embedder.embed("칼칼한 국물")).thenReturn(new float[]{1, 0, 0});
+        when(queryEmbedding.embed("칼칼한 국물")).thenReturn(Optional.of(new float[]{1, 0, 0}));
 
         // When
         RecipeSearchResult result = service.search(new RecipeListRequest(null, "칼칼한 국물", null, null, null, null, null, null));
@@ -226,7 +227,7 @@ class RecipeSearchServiceTest {
     void vectorFailureReturnsEmpty() throws IOException {
         // Given
         when(esClient.search(any(SearchRequest.class), eq(Void.class))).thenReturn(response(0));
-        when(embedder.embed(anyString())).thenThrow(new IllegalStateException("OpenAI 장애"));
+        when(queryEmbedding.embed(anyString())).thenThrow(new IllegalStateException("OpenAI 장애"));
 
         // When
         RecipeSearchResult result = service.search(new RecipeListRequest(null, "칼칼한 국물", null, null, null, null, null, null));
@@ -234,6 +235,21 @@ class RecipeSearchServiceTest {
         // Then
         assertEquals(List.of(), result.recipeIds());
         assertEquals(0, result.total());
+    }
+
+    @Test
+    @DisplayName("검색어 임베딩 호출 제한에 걸리면 벡터 검색 없이 0건을 돌려준다")
+    void embeddingLimitedReturnsEmpty() throws IOException {
+        // Given
+        when(esClient.search(any(SearchRequest.class), eq(Void.class))).thenReturn(response(0));
+        when(queryEmbedding.embed(anyString())).thenReturn(Optional.empty());
+
+        // When
+        RecipeSearchResult result = service.search(new RecipeListRequest(null, "칼칼한 국물", null, null, null, null, null, null));
+
+        // Then
+        assertEquals(0, result.total());
+        verify(esClient, times(1)).search(any(SearchRequest.class), eq(Void.class));
     }
 
     @Test
@@ -247,7 +263,7 @@ class RecipeSearchServiceTest {
 
         // Then
         assertEquals(0, result.total());
-        verify(embedder, never()).embed(anyString());
+        verify(queryEmbedding, never()).embed(anyString());
         verify(esClient, times(1)).search(any(SearchRequest.class), eq(Void.class));
     }
 }

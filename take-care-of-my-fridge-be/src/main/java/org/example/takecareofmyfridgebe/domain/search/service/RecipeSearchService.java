@@ -19,6 +19,7 @@ import org.springframework.stereotype.Service;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * 레시피 키워드 검색 (ES). 조건에 맞는 레시피 ID만 고르고, 목록 응답은 recipe 도메인이 DB에서 만든다.
@@ -35,7 +36,7 @@ public class RecipeSearchService {
 
     private final ElasticsearchClient esClient;
     private final RecipeSearchProperties properties;
-    private final RecipeEmbedder embedder;
+    private final QueryEmbeddingService queryEmbedding;
 
     public RecipeSearchResult search(RecipeListRequest request) throws IOException {
         RecipeSearchResult keywordResult = toResult(esClient.search(keywordRequest(request), Void.class));
@@ -49,14 +50,18 @@ public class RecipeSearchService {
      * 단어가 맞지 않아 0건인 검색어("칼칼한 국물")를 의미가 가까운 레시피로 다시 찾는다.
      * <br>
      * 벡터 쪽 실패(OpenAI, ES)는 밖으로 내보내지 않고 0건으로 돌려준다. 키워드 결과도 0건이었으므로 사용자가 보는 결과는 같다.
+     * 검색어 임베딩 호출 제한에 걸려도(QueryEmbeddingService) 같은 이유로 0건이다.
      */
     private RecipeSearchResult vectorSearch(RecipeListRequest request) {
         long started = System.nanoTime();
         try {
-            float[] vector = embedder.embed(request.keyword());
+            Optional<float[]> vector = queryEmbedding.embed(request.keyword());
+            if (vector.isEmpty()) {
+                return new RecipeSearchResult(List.of(), 0);
+            }
             long embedMs = (System.nanoTime() - started) / 1_000_000;
 
-            RecipeSearchResult result = toResult(esClient.search(vectorRequest(request, vector), Void.class));
+            RecipeSearchResult result = toResult(esClient.search(vectorRequest(request, vector.get()), Void.class));
             // 기준선(min-similarity)과 k를 정하는 근거로 쓴다
             log.info("레시피 벡터 폴백: keyword={}, bm25Total=0, vectorTotal={}, embedMs={}",
                     request.keyword(), result.total(), embedMs);

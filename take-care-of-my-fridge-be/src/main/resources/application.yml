@@ -123,6 +123,10 @@ app:
       num-candidates: 100
       min-similarity: 0.5
       batch-size: 100
+    # 벡터 폴백의 검색어 임베딩. 같은 검색어는 캐시를 쓰고, 캐시에 없을 때만 1분 호출 수를 센다 (서비스 전체 기준)
+    query-embedding:
+      cache-ttl: ${SEARCH_QUERY_EMBEDDING_CACHE_TTL:1d}
+      limit-per-minute: ${SEARCH_QUERY_EMBEDDING_LIMIT_PER_MINUTE:60}
     
 # 결제
 portone:
