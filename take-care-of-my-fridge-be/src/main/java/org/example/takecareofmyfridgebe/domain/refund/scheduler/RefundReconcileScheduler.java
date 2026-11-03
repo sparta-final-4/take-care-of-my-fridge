@@ -12,7 +12,8 @@ import org.springframework.stereotype.Component;
 import java.time.LocalDateTime;
 
 // 요청 상태로 오래 남은 환불을 PG 조회로 마무리한다. PG에 취소 요청이 닿지 않았거나, 서버가 꺼져 취소 웹훅을 놓친 환불이 대상이다.
-// 그대로 두면 그 주문은 새 환불을 신청할 수 없고 수량도 환불한 것으로 잡힌다
+// 그대로 두면 그 주문은 새 환불을 신청할 수 없고 수량도 환불한 것으로 잡힌다.
+// 이어서 환불은 끝났는데 주문 상태 변경이 실패해 결제 완료로 남은 주문을 전액 환불·구매 확정으로 맞춘다
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -31,6 +32,11 @@ public class RefundReconcileScheduler {
         LocalDateTime staleBefore = LocalDateTime.now().minusMinutes(STALE_MINUTES);
         for (String portonePaymentId : refundQueryService.findPaymentsWithRequestedBefore(staleBefore)) {
             reconcile(portonePaymentId, staleBefore);
+        }
+        try {
+            refundFacade.syncOrderStatuses();
+        } catch (RuntimeException e) {
+            log.error("환불 뒤 주문 상태 맞춤 실패, 다음 실행에서 재시도", e);
         }
     }
 

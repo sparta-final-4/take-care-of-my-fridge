@@ -2,6 +2,8 @@ package org.example.takecareofmyfridgebe.domain.refund.repository;
 
 import jakarta.persistence.LockModeType;
 import org.example.takecareofmyfridgebe.domain.order.entity.OrderItem;
+import org.example.takecareofmyfridgebe.domain.order.entity.OrderStatus;
+import org.example.takecareofmyfridgebe.domain.order.entity.SaleType;
 import org.example.takecareofmyfridgebe.domain.refund.dto.RefundAmountByStatus;
 import org.example.takecareofmyfridgebe.domain.refund.entity.Refund;
 import org.example.takecareofmyfridgebe.domain.refund.entity.RefundStatus;
@@ -21,6 +23,26 @@ public interface RefundRepository extends JpaRepository<Refund, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select r from Refund r where r.id = :id")
     Optional<Refund> findByIdForUpdate(@Param("id") Long id);
+
+    // 환불 정리 스케줄러용. orderStatus 주문 중 refundableSaleType 상품을 모두 completed 환불로 채운 주문.
+    // 부분 환불 주문은 빼서, 실행마다 바뀔 것 없는 주문을 다시 판단하지 않는다
+    @Query("""
+            select o.id from Order o
+            where o.status = :orderStatus
+              and exists (select r.id from Refund r where r.payment.order = o and r.status = :completed)
+              and not exists (
+                  select oi.id from OrderItem oi
+                  where oi.order = o and oi.saleType = :refundableSaleType
+                    and oi.quantity > (select coalesce(sum(ri.quantity), 0) from RefundItem ri
+                                       where ri.orderItem = oi and ri.refund.status = :completed))
+            order by o.id
+            """)
+    List<Long> findFullyRefundedOrderIds(@Param("orderStatus") OrderStatus orderStatus,
+                                         @Param("completed") RefundStatus completed,
+                                         @Param("refundableSaleType") SaleType refundableSaleType);
+
+    @Query("select oi from OrderItem oi where oi.order.id = :orderId order by oi.id")
+    List<OrderItem> findOrderItemsByOrderId(@Param("orderId") Long orderId);
 
     // 주문의 모든 결제에 걸린 환불을 최신순으로 찾는다
     @Query("select r from Refund r where r.payment.order.id = :orderId order by r.id desc")

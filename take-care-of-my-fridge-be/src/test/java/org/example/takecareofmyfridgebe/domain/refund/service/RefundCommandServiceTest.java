@@ -4,8 +4,10 @@ import jakarta.persistence.EntityManager;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.StorageType;
 import org.example.takecareofmyfridgebe.domain.order.entity.Order;
 import org.example.takecareofmyfridgebe.domain.order.entity.OrderItem;
+import org.example.takecareofmyfridgebe.domain.order.entity.OrderStatus;
 import org.example.takecareofmyfridgebe.domain.order.entity.SaleType;
 import org.example.takecareofmyfridgebe.domain.order.service.OrderReader;
+import org.example.takecareofmyfridgebe.domain.order.service.OrderStatusService;
 import org.example.takecareofmyfridgebe.domain.payment.entity.Payment;
 import org.example.takecareofmyfridgebe.domain.payment.entity.PgProvider;
 import org.example.takecareofmyfridgebe.domain.payment.entity.PaymentChangedBy;
@@ -44,14 +46,15 @@ import static org.assertj.core.api.Assertions.tuple;
 
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({JpaAuditingConfig.class, QueryDslConfig.class, RefundCommandService.class, OrderReader.class,
-        PaymentHistoryRecorder.class})
+@Import({JpaAuditingConfig.class, QueryDslConfig.class, RefundCommandService.class, RefundQueryService.class,
+        OrderReader.class, PaymentHistoryRecorder.class, OrderStatusService.class})
 class RefundCommandServiceTest extends MySqlContainerSupport {
 
     private static final Long MEMBER_ID = 1L;
     private static final Long OTHER_MEMBER_ID = 2L;
 
     private final RefundCommandService refundCommandService;
+    private final RefundQueryService refundQueryService;
     private final EntityManager entityManager;
 
     private Order order;
@@ -61,8 +64,10 @@ class RefundCommandServiceTest extends MySqlContainerSupport {
     private OrderItem flashDropItem;
 
     @Autowired
-    RefundCommandServiceTest(RefundCommandService refundCommandService, EntityManager entityManager) {
+    RefundCommandServiceTest(RefundCommandService refundCommandService, RefundQueryService refundQueryService,
+                             EntityManager entityManager) {
         this.refundCommandService = refundCommandService;
+        this.refundQueryService = refundQueryService;
         this.entityManager = entityManager;
     }
 
@@ -286,6 +291,104 @@ class RefundCommandServiceTest extends MySqlContainerSupport {
                         tuple(PaymentEventType.PARTIAL_CANCELLED, 6000L, 21000L, second, "cancellation-2",
                                 PaymentChangedBy.WEBHOOK),
                         tuple(PaymentEventType.CANCELLED, 2000L, 23000L, null, "console-1", PaymentChangedBy.WEBHOOK));
+    }
+
+    @Test
+    @DisplayName("일반 상품만 있는 주문은 부분 환불이면 결제 완료로 두고, 모든 상품이 환불되면 전액 환불로 바꾼다")
+    void complete_allItemsRefunded_marksOrderRefunded() {
+        Order normal = order("20261022-000006");
+        OrderItem first = orderItem(normal, 10L, 2, 3000, SaleType.NONE);
+        OrderItem second = orderItem(normal, 20L, 1, 2000, SaleType.NONE);
+        pay(normal);
+        flushAndClear();
+
+        Long partial = refundCommandService.request(MEMBER_ID, request(normal.getId(), item(first, 2))).refundId();
+        refundCommandService.complete(partial, "cancellation-1", PaymentChangedBy.USER);
+        flushAndClear();
+        assertThat(entityManager.find(Order.class, normal.getId()).getStatus()).isEqualTo(OrderStatus.PAID);
+
+        Long rest = refundCommandService.request(MEMBER_ID, request(normal.getId(), item(second, 1))).refundId();
+        refundCommandService.complete(rest, "cancellation-2", PaymentChangedBy.WEBHOOK);
+        flushAndClear();
+
+        assertThat(entityManager.find(Order.class, normal.getId()).getStatus()).isEqualTo(OrderStatus.REFUNDED);
+    }
+
+    @Test
+    @DisplayName("일반 상품을 모두 환불하고 특가·번개 드롭 상품만 남으면 바로 구매 확정하고 확정 수량을 남긴다")
+    void complete_onlySaleItemsLeft_confirmsOrder() {
+        Long refundId = refundCommandService.request(MEMBER_ID,
+                request(order.getId(), item(itemA, 5), item(itemB, 3))).refundId();
+        refundCommandService.complete(refundId, "cancellation-1", PaymentChangedBy.USER);
+        flushAndClear();
+
+        Order confirmed = entityManager.find(Order.class, order.getId());
+        assertThat(confirmed.getStatus()).isEqualTo(OrderStatus.CONFIRMED);
+        assertThat(confirmed.getConfirmedAt()).isNotNull();
+        assertThat(List.of(itemA, itemB, specialItem, flashDropItem))
+                .extracting(item -> entityManager.find(OrderItem.class, item.getId()).getConfirmedQuantity())
+                .containsExactly(0, 0, 1, 1);
+    }
+
+    @Test
+    @DisplayName("일반 상품이 남아 있으면 특가·번개 드롭이 있는 주문도 결제 완료로 둔다")
+    void complete_normalItemsLeft_keepsOrderPaid() {
+        Long refundId = refundCommandService.request(MEMBER_ID,
+                request(order.getId(), item(itemA, 5), item(itemB, 2))).refundId();
+        refundCommandService.complete(refundId, "cancellation-1", PaymentChangedBy.USER);
+        flushAndClear();
+
+        assertThat(entityManager.find(Order.class, order.getId()).getStatus()).isEqualTo(OrderStatus.PAID);
+    }
+
+    @Test
+    @DisplayName("환불 완료 때 주문이 결제 완료가 아니면 주문 쪽 예외로 환불 완료를 되돌린다")
+    void complete_orderNotPaid_throws() {
+        Order normal = order("20261022-000007");
+        OrderItem only = orderItem(normal, 10L, 1, 3000, SaleType.NONE);
+        pay(normal);
+        flushAndClear();
+        Long refundId = refundCommandService.request(MEMBER_ID, request(normal.getId(), item(only, 1))).refundId();
+        // 정상 흐름에서는 진행 중 환불이 있으면 구매 확정이 막히지만, 상태가 어긋난 경우를 만든다
+        entityManager.find(Order.class, normal.getId()).confirm(LocalDateTime.now());
+        flushAndClear();
+
+        assertError(() -> refundCommandService.complete(refundId, "cancellation-1", PaymentChangedBy.USER),
+                ErrorCode.INVALID_ORDER_STATUS);
+    }
+
+    @Test
+    @DisplayName("환불만 완료하면 재고·결제 이력은 남기고 주문은 결제 완료로 두며, 정리 스케줄러 판단 대상이 된다")
+    void completeWithoutOrderStatus_keepsOrderPaid() {
+        Product greenOnion = product("대파", 8, ProductStatus.ON_SALE);
+        Order normal = order("20261022-000008");
+        OrderItem only = orderItem(normal, greenOnion.getId(), 2, 3000, SaleType.NONE);
+        pay(normal);
+        Order partial = order("20261022-000009");
+        OrderItem partialItem = orderItem(partial, 10L, 2, 3000, SaleType.NONE);
+        pay(partial);
+        flushAndClear();
+        Long refundId = refundCommandService.request(MEMBER_ID, request(normal.getId(), item(only, 2))).refundId();
+        Long partialRefundId = refundCommandService.request(MEMBER_ID, request(partial.getId(), item(partialItem, 1)))
+                .refundId();
+        flushAndClear();
+
+        RefundResponse response = refundCommandService.completeWithoutOrderStatus(refundId, "cancellation-1",
+                PaymentChangedBy.USER);
+        refundCommandService.completeWithoutOrderStatus(partialRefundId, "cancellation-2", PaymentChangedBy.USER);
+        flushAndClear();
+
+        assertThat(response.status()).isEqualTo(RefundStatus.COMPLETED);
+        assertThat(entityManager.find(Product.class, greenOnion.getId()).getStock()).isEqualTo(10);
+        assertThat(entityManager.createQuery(
+                        "select count(h) from PaymentHistory h where h.refundId = :refundId", Long.class)
+                .setParameter("refundId", refundId).getSingleResult()).isEqualTo(1L);
+        assertThat(entityManager.find(Order.class, normal.getId()).getStatus()).isEqualTo(OrderStatus.PAID);
+        assertThat(refundQueryService.findPaidOrderIdsFullyRefunded())
+                .contains(normal.getId())
+                .doesNotContain(partial.getId());
+        assertThat(refundQueryService.findOrderStatusAfterRefund(normal.getId())).contains(OrderStatus.REFUNDED);
+        assertThat(refundQueryService.findOrderStatusAfterRefund(partial.getId())).isEmpty();
     }
 
     private Long paymentId() {

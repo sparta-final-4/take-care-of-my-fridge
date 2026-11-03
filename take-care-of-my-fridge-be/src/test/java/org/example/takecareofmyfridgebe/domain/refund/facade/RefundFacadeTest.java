@@ -1,5 +1,7 @@
 package org.example.takecareofmyfridgebe.domain.refund.facade;
 
+import org.example.takecareofmyfridgebe.domain.order.entity.OrderStatus;
+import org.example.takecareofmyfridgebe.domain.order.facade.OrderStatusFacade;
 import org.example.takecareofmyfridgebe.domain.payment.entity.PaymentChangedBy;
 import org.example.takecareofmyfridgebe.domain.payment.entity.PgProvider;
 import org.example.takecareofmyfridgebe.domain.payment.port.PaymentGateway;
@@ -34,6 +36,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -58,6 +61,9 @@ class RefundFacadeTest {
 
     @Mock
     private PaymentGateway paymentGateway;
+
+    @Mock
+    private OrderStatusFacade orderStatusFacade;
 
     @InjectMocks
     private RefundFacade refundFacade;
@@ -171,12 +177,31 @@ class RefundFacadeTest {
     }
 
     @Test
-    @DisplayName("PG 취소 후 완료 처리가 실패하면 실패로 바꾸지 않고 요청 상태로 돌려준다")
+    @DisplayName("PG 취소 후 주문 상태까지 묶은 완료가 실패하면 환불만 다시 완료한 결과를 돌려준다")
+    void request_completeFails_completesRefundOnly() {
+        givenRequested();
+        given(paymentGateway.cancelPayment(PORTONE_PAYMENT_ID, "단순 변심", 6000L, IDEMPOTENCY_KEY))
+                .willReturn("cancellation-1");
+        given(refundCommandService.complete(REFUND_ID, "cancellation-1", PaymentChangedBy.USER))
+                .willThrow(new BusinessException(ErrorCode.INVALID_ORDER_STATUS));
+        given(refundCommandService.completeWithoutOrderStatus(REFUND_ID, "cancellation-1", PaymentChangedBy.USER))
+                .willReturn(completed);
+
+        RefundResponse response = refundFacade.request(MEMBER_ID, request);
+
+        assertThat(response).isEqualTo(completed);
+        verify(refundCommandService, never()).fail(any(), any());
+    }
+
+    @Test
+    @DisplayName("PG 취소 후 환불만 완료하는 것까지 실패하면 실패로 바꾸지 않고 요청 상태로 돌려준다")
     void request_completeFails_returnsRequested() {
         givenRequested();
         given(paymentGateway.cancelPayment(PORTONE_PAYMENT_ID, "단순 변심", 6000L, IDEMPOTENCY_KEY))
                 .willReturn("cancellation-1");
         given(refundCommandService.complete(REFUND_ID, "cancellation-1", PaymentChangedBy.USER))
+                .willThrow(new IllegalStateException("DB 오류"));
+        given(refundCommandService.completeWithoutOrderStatus(REFUND_ID, "cancellation-1", PaymentChangedBy.USER))
                 .willThrow(new IllegalStateException("DB 오류"));
 
         RefundResponse response = refundFacade.request(MEMBER_ID, request);
@@ -207,6 +232,49 @@ class RefundFacadeTest {
 
         assertThat(refundFacade.syncWithPg(PORTONE_PAYMENT_ID, PaymentChangedBy.WEBHOOK, null)).isTrue();
         verify(refundCommandService).complete(REFUND_ID, "cancellation-1", PaymentChangedBy.WEBHOOK);
+    }
+
+    @Test
+    @DisplayName("PG 조회로 완료할 때도 주문 상태까지 묶은 완료가 실패하면 환불만 다시 완료한다")
+    void sync_completeFails_completesRefundOnly() {
+        givenPg(8000L, new PaymentGatewayResponse.Cancellation("cancellation-1", 6000L, true));
+        givenState(true, List.of(requestedRefund(NOW)));
+        given(refundCommandService.complete(REFUND_ID, "cancellation-1", PaymentChangedBy.WEBHOOK))
+                .willThrow(new BusinessException(ErrorCode.INVALID_ORDER_STATUS));
+
+        assertThat(refundFacade.syncWithPg(PORTONE_PAYMENT_ID, PaymentChangedBy.WEBHOOK, null)).isTrue();
+        verify(refundCommandService).completeWithoutOrderStatus(REFUND_ID, "cancellation-1", PaymentChangedBy.WEBHOOK);
+    }
+
+    // syncOrderStatuses
+
+    @Test
+    @DisplayName("환불은 끝났는데 결제 완료로 남은 주문을 판단대로 주문 쪽에서 전액 환불·구매 확정한다")
+    void syncOrderStatuses_changesByStatus() {
+        given(refundQueryService.findPaidOrderIdsFullyRefunded()).willReturn(List.of(1L, 2L, 3L));
+        given(refundQueryService.findOrderStatusAfterRefund(1L)).willReturn(Optional.of(OrderStatus.REFUNDED));
+        given(refundQueryService.findOrderStatusAfterRefund(2L)).willReturn(Optional.of(OrderStatus.CONFIRMED));
+        given(refundQueryService.findOrderStatusAfterRefund(3L)).willReturn(Optional.empty());
+
+        refundFacade.syncOrderStatuses();
+
+        verify(orderStatusFacade).markRefunded(1L);
+        verify(orderStatusFacade).confirmAfterRefund(2L);
+        verify(orderStatusFacade, never()).markRefunded(3L);
+        verify(orderStatusFacade, never()).confirmAfterRefund(3L);
+    }
+
+    @Test
+    @DisplayName("한 주문의 상태 맞춤이 실패해도 나머지 주문은 계속 맞춘다")
+    void syncOrderStatuses_oneFailure_othersStillProcessed() {
+        given(refundQueryService.findPaidOrderIdsFullyRefunded()).willReturn(List.of(1L, 2L));
+        given(refundQueryService.findOrderStatusAfterRefund(1L)).willReturn(Optional.of(OrderStatus.REFUNDED));
+        given(refundQueryService.findOrderStatusAfterRefund(2L)).willReturn(Optional.of(OrderStatus.REFUNDED));
+        willThrow(new BusinessException(ErrorCode.INVALID_ORDER_STATUS)).given(orderStatusFacade).markRefunded(1L);
+
+        refundFacade.syncOrderStatuses();
+
+        verify(orderStatusFacade).markRefunded(2L);
     }
 
     @Test

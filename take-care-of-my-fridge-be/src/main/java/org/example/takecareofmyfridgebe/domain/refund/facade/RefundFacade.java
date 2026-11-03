@@ -2,6 +2,8 @@ package org.example.takecareofmyfridgebe.domain.refund.facade;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.example.takecareofmyfridgebe.domain.order.entity.OrderStatus;
+import org.example.takecareofmyfridgebe.domain.order.facade.OrderStatusFacade;
 import org.example.takecareofmyfridgebe.domain.payment.entity.PaymentChangedBy;
 import org.example.takecareofmyfridgebe.domain.payment.port.PaymentGateway;
 import org.example.takecareofmyfridgebe.domain.payment.port.PaymentGatewayResponse;
@@ -33,6 +35,7 @@ public class RefundFacade {
     private final RefundCommandService refundCommandService;
     private final RefundQueryService refundQueryService;
     private final PaymentGateway paymentGateway;
+    private final OrderStatusFacade orderStatusFacade;
 
     // 환불을 요청 상태로 저장한 뒤 PG에서 환불 금액만큼 부분 취소하고, 성공하면 완료 처리한다.
     // PG가 거절하면 실패로 바꾸고, 결과를 모르면 PG를 조회해 판단한다. 조회로도 확정하지 못하면 요청 상태로 돌려주고
@@ -56,7 +59,7 @@ public class RefundFacade {
         }
 
         try {
-            return refundCommandService.complete(refund.refundId(), cancellationId, PaymentChangedBy.USER);
+            return completeRefund(refund.refundId(), cancellationId, PaymentChangedBy.USER);
         } catch (RuntimeException e) {
             // PG에서는 돈이 돌아갔으므로 실패로 바꾸지 않는다. 웹훅·스케줄러가 PG 조회로 완료 처리한다
             log.error("PG 취소 후 환불 완료 처리 실패, 웹훅·스케줄러가 마무리 예정: refundId={}, pgCancellationId={}",
@@ -87,7 +90,7 @@ public class RefundFacade {
         if (!state.requestedRefunds().isEmpty()) {
             RefundSyncState.RequestedRefund refund = state.requestedRefunds().get(0);
             if (uncovered == refund.amount()) {
-                refundCommandService.complete(refund.refundId(),
+                completeRefund(refund.refundId(),
                         findCancellationId(pgPayment, refund.amount(), state.recordedCancellationIds()), changedBy);
                 return true;
             }
@@ -110,6 +113,40 @@ public class RefundFacade {
                     portonePaymentId, pgPayment.cancelledAmount(), state.knownCancelledAmount());
         }
         return false;
+    }
+
+    // 환불 정리 스케줄러가 부른다. 환불은 모두 끝났는데 주문 상태 변경이 실패해 결제 완료로 남은 주문을 맞춘다.
+    // 주문마다 주문 쪽이 주문 행을 잠그고 트랜잭션을 따로 연다. 한 주문이 실패해도 나머지는 계속하고, 실패한 주문은 다음 실행에서 다시 본다
+    public void syncOrderStatuses() {
+        for (Long orderId : refundQueryService.findPaidOrderIdsFullyRefunded()) {
+            try {
+                refundQueryService.findOrderStatusAfterRefund(orderId)
+                        .ifPresent(status -> changeOrderStatus(orderId, status));
+            } catch (RuntimeException e) {
+                log.error("환불 뒤 주문 상태 맞춤 실패, 다음 실행에서 재시도: orderId={}", orderId, e);
+            }
+        }
+    }
+
+    private void changeOrderStatus(Long orderId, OrderStatus status) {
+        log.warn("환불 뒤 결제 완료로 남은 주문 상태 맞춤: orderId={}, status={}", orderId, status);
+        if (status == OrderStatus.REFUNDED) {
+            orderStatusFacade.markRefunded(orderId);
+        } else {
+            orderStatusFacade.confirmAfterRefund(orderId);
+        }
+    }
+
+    // 환불 완료와 주문 상태 변경을 한 트랜잭션으로 처리한다. 실패하면 PG에서 이미 돈이 돌아갔으므로 환불만 새 트랜잭션으로 완료하고,
+    // 주문 상태는 환불 정리 스케줄러(syncOrderStatuses)가 맞춘다. 환불만 완료하는 것도 실패하면 예외를 그대로 던진다
+    private RefundResponse completeRefund(Long refundId, String cancellationId, PaymentChangedBy changedBy) {
+        try {
+            return refundCommandService.complete(refundId, cancellationId, changedBy);
+        } catch (RuntimeException e) {
+            log.error("환불 완료 처리 실패, 주문 상태 변경 없이 환불만 다시 완료하고 주문 상태는 정리 스케줄러가 맞춤: refundId={}",
+                    refundId, e);
+            return refundCommandService.completeWithoutOrderStatus(refundId, cancellationId, changedBy);
+        }
     }
 
     // PG에서 취소되지 않은 것이 확실할 때 부른다. failNotCancelledBefore보다 먼저 신청된 요청 상태 환불을 실패로 바꾼다
