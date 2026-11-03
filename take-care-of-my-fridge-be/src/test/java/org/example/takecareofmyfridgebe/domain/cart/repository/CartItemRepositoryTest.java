@@ -38,7 +38,7 @@ class CartItemRepositoryTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("같은 상품이 다른 회원의 장바구니에 있어도 내 장바구니의 줄만 찾는다")
-    void findByCartAndProductId_doesNotMixCarts() {
+    void doesNotMixCartsWhenFindingByCartAndProductId() {
         Cart cartA = cartRepository.save(Cart.builder().memberId(1L).build());
         Cart cartB = cartRepository.save(Cart.builder().memberId(2L).build());
         cartItemRepository.save(CartItem.builder().cart(cartA).productId(10L).quantity(1).build());
@@ -55,7 +55,7 @@ class CartItemRepositoryTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("다른 회원의 줄은 조회되지 않는다")
-    void findByCartMemberId_excludesOtherMembersItems() {
+    void excludesOtherMembersItemsByCartMemberId() {
         Cart cartA = cartRepository.save(Cart.builder().memberId(1L).build());
         cartRepository.save(Cart.builder().memberId(2L).build());
         cartItemRepository.save(CartItem.builder().cart(cartA).productId(10L).quantity(1).build());
@@ -71,7 +71,7 @@ class CartItemRepositoryTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("장바구니가 없는 회원은 빈 목록이다")
-    void findByCartMemberId_returnsEmptyWithoutCart() {
+    void returnsEmptyWithoutCart() {
         Cart cartA = cartRepository.save(Cart.builder().memberId(1L).build());
         cartItemRepository.save(CartItem.builder().cart(cartA).productId(10L).quantity(1).build());
         flushAndClear();
@@ -83,7 +83,7 @@ class CartItemRepositoryTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("담은 순서(id 오름차순)로 조회한다")
-    void findByCartMemberId_ordersById() {
+    void ordersItemsById() {
         Cart cart = cartRepository.save(Cart.builder().memberId(1L).build());
         cartItemRepository.save(CartItem.builder().cart(cart).productId(30L).quantity(1).build());
         cartItemRepository.save(CartItem.builder().cart(cart).productId(10L).quantity(1).build());
@@ -97,7 +97,7 @@ class CartItemRepositoryTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("줄 번호와 회원 번호가 모두 맞으면 내 장바구니의 줄을 찾는다")
-    void findByIdAndCartMemberId_findsOwnItem() {
+    void findsOwnItemById() {
         Cart cart = cartRepository.save(Cart.builder().memberId(1L).build());
         CartItem saved = cartItemRepository.save(CartItem.builder().cart(cart).productId(10L).quantity(2).build());
         flushAndClear();
@@ -110,7 +110,7 @@ class CartItemRepositoryTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("다른 회원의 줄 번호로는 찾지 못한다")
-    void findByIdAndCartMemberId_doesNotFindOthersItem() {
+    void doesNotFindOthersItemById() {
         Cart cartA = cartRepository.save(Cart.builder().memberId(1L).build());
         cartRepository.save(Cart.builder().memberId(2L).build());
         CartItem itemOfA = cartItemRepository.save(CartItem.builder().cart(cartA).productId(10L).quantity(2).build());
@@ -123,7 +123,7 @@ class CartItemRepositoryTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("내 장바구니의 줄만 지우고 다른 회원의 줄은 그대로 둔다")
-    void deleteAllByIdsAndMemberId_deletesOnlyOwnItems() {
+    void deletesOnlyOwnItemsByIds() {
         Cart cartA = cartRepository.save(Cart.builder().memberId(1L).build());
         Cart cartB = cartRepository.save(Cart.builder().memberId(2L).build());
         CartItem itemOfA = cartItemRepository.save(CartItem.builder().cart(cartA).productId(10L).quantity(1).build());
@@ -139,7 +139,7 @@ class CartItemRepositoryTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("목록에 없는 줄은 지우지 않는다")
-    void deleteAllByIdsAndMemberId_keepsUnlistedItems() {
+    void keepsUnlistedItemsOnDelete() {
         Cart cart = cartRepository.save(Cart.builder().memberId(1L).build());
         CartItem first = cartItemRepository.save(CartItem.builder().cart(cart).productId(10L).quantity(1).build());
         CartItem second = cartItemRepository.save(CartItem.builder().cart(cart).productId(20L).quantity(1).build());
