@@ -23,6 +23,8 @@ import { DUMMY_BASE_URL, assertParamExists, setApiKeyToObject, setBasicAuthToObj
 // @ts-ignore
 import { BASE_PATH, COLLECTION_FORMATS, type RequestArgs, BaseAPI, RequiredError, operationServerMap } from '../base';
 // @ts-ignore
+import type { ApiResponseListString } from '../models';
+// @ts-ignore
 import type { ApiResponsePageResponseProductListItemResponse } from '../models';
 // @ts-ignore
 import type { ApiResponsePageResponseRecipeListItemResponse } from '../models';
@@ -36,6 +38,8 @@ import type { RecipeListRequest } from '../models';
 import type { SearchClickRequest } from '../models';
 // @ts-ignore
 import type { SearchRecipeClickRequest } from '../models';
+// @ts-ignore
+import type { SearchSuggestionRequest } from '../models';
 /**
  * SearchControllerApi - axios parameter creator
  */
@@ -185,6 +189,44 @@ export const SearchControllerApiAxiosParamCreator = function (configuration?: Co
                 options: localVarRequestOptions,
             };
         },
+        /**
+         * 
+         * @param {SearchSuggestionRequest} request 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        suggest: async (request: SearchSuggestionRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'request' is not null or undefined
+            assertParamExists('suggest', 'request', request)
+            const localVarPath = `/api/search/suggestions`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            if (request !== undefined) {
+                for (const [key, value] of Object.entries(request)) {
+                    localVarQueryParameter[key] = value;
+                }
+            }
+
+            localVarHeaderParameter['Accept'] = '*/*';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
     }
 };
 
@@ -242,6 +284,18 @@ export const SearchControllerApiFp = function(configuration?: Configuration) {
             const localVarOperationServerBasePath = operationServerMap['SearchControllerApi.searchRecipes']?.[localVarOperationServerIndex]?.url;
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
+        /**
+         * 
+         * @param {SearchSuggestionRequest} request 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async suggest(request: SearchSuggestionRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ApiResponseListString>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.suggest(request, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['SearchControllerApi.suggest']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
     }
 };
 
@@ -287,6 +341,15 @@ export const SearchControllerApiFactory = function (configuration?: Configuratio
         searchRecipes(requestParameters: SearchControllerApiSearchRecipesRequest, options?: RawAxiosRequestConfig): AxiosPromise<ApiResponsePageResponseRecipeListItemResponse> {
             return localVarFp.searchRecipes(requestParameters.request, options).then((request) => request(axios, basePath));
         },
+        /**
+         * 
+         * @param {SearchControllerApiSuggestRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        suggest(requestParameters: SearchControllerApiSuggestRequest, options?: RawAxiosRequestConfig): AxiosPromise<ApiResponseListString> {
+            return localVarFp.suggest(requestParameters.request, options).then((request) => request(axios, basePath));
+        },
     };
 };
 
@@ -326,6 +389,14 @@ export interface SearchControllerApiInterface {
      */
     searchRecipes(requestParameters: SearchControllerApiSearchRecipesRequest, options?: RawAxiosRequestConfig): AxiosPromise<ApiResponsePageResponseRecipeListItemResponse>;
 
+    /**
+     * 
+     * @param {SearchControllerApiSuggestRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    suggest(requestParameters: SearchControllerApiSuggestRequest, options?: RawAxiosRequestConfig): AxiosPromise<ApiResponseListString>;
+
 }
 
 /**
@@ -354,6 +425,13 @@ export interface SearchControllerApiSearchProductsRequest {
  */
 export interface SearchControllerApiSearchRecipesRequest {
     readonly request: RecipeListRequest
+}
+
+/**
+ * Request parameters for suggest operation in SearchControllerApi.
+ */
+export interface SearchControllerApiSuggestRequest {
+    readonly request: SearchSuggestionRequest
 }
 
 /**
@@ -398,6 +476,16 @@ export class SearchControllerApi extends BaseAPI implements SearchControllerApiI
      */
     public searchRecipes(requestParameters: SearchControllerApiSearchRecipesRequest, options?: RawAxiosRequestConfig) {
         return SearchControllerApiFp(this.configuration).searchRecipes(requestParameters.request, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @param {SearchControllerApiSuggestRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public suggest(requestParameters: SearchControllerApiSuggestRequest, options?: RawAxiosRequestConfig) {
+        return SearchControllerApiFp(this.configuration).suggest(requestParameters.request, options).then((request) => request(this.axios, this.basePath));
     }
 }
 
