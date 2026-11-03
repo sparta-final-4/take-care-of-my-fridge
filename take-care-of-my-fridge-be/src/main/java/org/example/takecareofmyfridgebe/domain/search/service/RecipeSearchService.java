@@ -128,7 +128,7 @@ public class RecipeSearchService {
     /**
      * 검색어의 단어가 이름, 재료, 요약 중 어딘가에 모두 있어야 한다 (cross_fields + AND).
      * <br>
-     * 정렬은 기존 목록 API의 정렬 조건을 그대로 따르므로, 넓게 걸리지 않도록 OR가 아니라 AND로 찾는다.
+     * 관련도 순이 아닌 정렬(최신순 등)로도 보여주므로, 넓게 걸리지 않도록 OR가 아니라 AND로 찾는다.
      */
     private static Query keywordQuery(String keyword) {
         return Query.of(q -> q.multiMatch(m -> m
@@ -169,6 +169,7 @@ public class RecipeSearchService {
     private List<SortOptions> sortOptions(RecipeSort sort) {
         return switch (sort) {
             case LATEST -> List.of(sortBy("id", SortOrder.Desc));
+            case RELEVANCE -> List.of(byScore(), sortBy("id", SortOrder.Desc));
             case NAME_ASC -> List.of(sortBy("name.keyword", SortOrder.Asc), sortBy("id", SortOrder.Desc));
             case DIFFICULTY_ASC -> List.of(sortBy("difficulty", SortOrder.Asc), sortBy("id", SortOrder.Desc));
         };
@@ -176,6 +177,11 @@ public class RecipeSearchService {
 
     private static SortOptions sortBy(String field, SortOrder order) {
         return SortOptions.of(o -> o.field(f -> f.field(field).order(order)));
+    }
+
+    // 키워드 검색은 BM25 점수, 벡터 검색은 유사도 점수
+    private static SortOptions byScore() {
+        return SortOptions.of(o -> o.score(s -> s.order(SortOrder.Desc)));
     }
 
 }

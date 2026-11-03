@@ -113,6 +113,21 @@ class ProductSearchServiceTest {
     }
 
     @Test
+    @DisplayName("관련도 순이면 점수 내림차순, 같은 점수끼리는 최신 상품 순으로 정렬한다")
+    void relevanceSortsByScore() {
+        // Given
+        ProductListRequest request = new ProductListRequest(ProductSort.RELEVANCE, "대파", null, null, null, null, null);
+
+        // When
+        SearchRequest search = service.searchRequest(request);
+
+        // Then
+        assertEquals(SortOrder.Desc, search.sort().get(0).score().order());
+        assertEquals("id", search.sort().get(1).field().field());
+        assertEquals(SortOrder.Desc, search.sort().get(1).field().order());
+    }
+
+    @Test
     @DisplayName("검색 결과의 문서 id를 순서대로 상품 ID로 바꾸고 전체 건수를 함께 돌려준다")
     void mapsHitsToProductIds() throws IOException {
         // Given

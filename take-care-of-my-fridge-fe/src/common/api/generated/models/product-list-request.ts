@@ -27,6 +27,7 @@ export interface ProductListRequest {
 
 export const ProductListRequestSortEnum = {
     Latest: 'LATEST',
+    Relevance: 'RELEVANCE',
     PriceAsc: 'PRICE_ASC',
     PriceDesc: 'PRICE_DESC',
 } as const;

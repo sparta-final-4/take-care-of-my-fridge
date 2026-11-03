@@ -121,6 +121,35 @@ class RecipeSearchServiceTest {
     }
 
     @Test
+    @DisplayName("관련도 순이면 점수 내림차순, 같은 점수끼리는 최신 레시피 순으로 정렬한다")
+    void relevanceSortsByScore() {
+        // Given
+        RecipeListRequest request = new RecipeListRequest(RecipeSort.RELEVANCE, "김치", null, null, null, null, null, null);
+
+        // When
+        SearchRequest search = service.keywordRequest(request);
+
+        // Then
+        assertEquals(SortOrder.Desc, search.sort().get(0).score().order());
+        assertEquals("id", search.sort().get(1).field().field());
+        assertEquals(SortOrder.Desc, search.sort().get(1).field().order());
+    }
+
+    @Test
+    @DisplayName("벡터 검색도 관련도 순이면 유사도 점수 내림차순으로 정렬한다")
+    void vectorRelevanceSortsByScore() {
+        // Given
+        RecipeListRequest request = new RecipeListRequest(RecipeSort.RELEVANCE, "칼칼한 국물", null, null, null, null, null, null);
+
+        // When
+        SearchRequest search = service.vectorRequest(request, new float[]{1, 0, 0});
+
+        // Then
+        assertEquals(SortOrder.Desc, search.sort().get(0).score().order());
+        assertEquals("id", search.sort().get(1).field().field());
+    }
+
+    @Test
     @DisplayName("검색 결과의 문서 id를 순서대로 레시피 ID로 바꾸고 전체 건수를 함께 돌려준다")
     void mapsHitsToRecipeIds() throws IOException {
         // Given
