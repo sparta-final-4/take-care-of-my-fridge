@@ -371,14 +371,46 @@ class RecipeCandidateScorerTest {
         }
 
         @Test
-        @DisplayName("선택 재료가 1개일 때 그 재료를 쓰는 레시피는 보유 비율이 기준 미만이어도 앞에 둔다")
-        void ranksSingleSelectedRecipeFirst_whenOwnedRatioIsLow() {
+        @DisplayName("선택 재료가 1개면 그 재료를 쓰는 레시피도 보유 비율이 기준 미만이면 뒤로 간다")
+        void ranksSingleSelectedRecipeLast_whenOwnedRatioIsLow() {
             recipe(10L, "두부전골", "전골", 30, 10, TOFU);
             recipe(20L, "계란말이", "말이", 20, 2, EGG);
 
             RecipeCandidates result = rank(ratioScorer,
                     RecipeQuery.of(MEMBER_ID, List.of(TOFU)),
                     List.of(stock(EGG, "계란", 10), stock(TOFU, "두부", 10)),
+                    List.of());
+
+            assertThat(result.candidates()).extracting(RecipeCandidate::recipeId).containsExactly(20L, 10L);
+            assertThat(result.candidates().get(1).ranking().selectedMatches()).isEqualTo(1);
+            assertThat(result.candidates().get(1).reason().lacksManyIngredients()).isTrue();
+        }
+
+        @Test
+        @DisplayName("기본 양념을 섞어 선택해도 양념을 빼고 1개면 예외 없이 보유 비율 기준을 적용한다")
+        void ranksSelectedRecipeLast_whenOnlyOneNonBasicIsSelectedWithSeasoning() {
+            recipe(10L, "두부전골", "전골", 30, 10, TOFU);
+            rows.add(new RecipeCandidateIngredient(10L, SALT, "소금", true));
+            recipe(20L, "계란말이", "말이", 20, 2, EGG);
+
+            RecipeCandidates result = rank(ratioScorer,
+                    RecipeQuery.of(MEMBER_ID, List.of(TOFU, SALT)),
+                    List.of(stock(EGG, "계란", 10), stock(TOFU, "두부", 10)),
+                    List.of());
+
+            assertThat(result.candidates()).extracting(RecipeCandidate::recipeId).containsExactly(20L, 10L);
+        }
+
+        @Test
+        @DisplayName("기본 양념을 섞어 선택해도 양념을 빼고 2개를 전부 쓰면 보유 비율이 기준 미만이어도 앞에 둔다")
+        void ranksAllSelectedRecipeFirst_whenTwoNonBasicAreSelectedWithSeasoning() {
+            recipe(10L, "두부제육전골", "전골", 30, 10, TOFU, PORK);
+            rows.add(new RecipeCandidateIngredient(10L, SALT, "소금", true));
+            recipe(20L, "계란말이", "말이", 20, 2, EGG);
+
+            RecipeCandidates result = rank(ratioScorer,
+                    RecipeQuery.of(MEMBER_ID, List.of(TOFU, PORK, SALT)),
+                    List.of(stock(EGG, "계란", 10), stock(TOFU, "두부", 10), stock(PORK, "돼지고기", 10)),
                     List.of());
 
             assertThat(result.candidates()).extracting(RecipeCandidate::recipeId).containsExactly(10L, 20L);

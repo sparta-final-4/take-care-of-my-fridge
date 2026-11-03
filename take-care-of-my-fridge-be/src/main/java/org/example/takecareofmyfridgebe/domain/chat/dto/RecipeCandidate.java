@@ -47,7 +47,7 @@ public record RecipeCandidate(
      * @param matchedTastes         회원 선호 맛과 겹친 레시피 맛
      * @param matchedRequests       맞은 사용자 요청 (예: "재료: 두부", "분류: 찌개", "맛: SPICY")
      * @param cookTimeUnknown       조리 시간 정보가 없어 시간 조건을 확인하지 못함
-     * @param lacksManyIngredients  보유 비율이 기준 미만 (재료를 많이 사야 함). 선택 재료를 전부 써서 앞에 온 레시피도 표시한다
+     * @param lacksManyIngredients  보유 비율이 기준 미만 (재료를 많이 사야 함). 선택 재료(2개 이상)를 전부 써서 앞에 온 레시피도 표시한다
      * @param missingIngredients    냉장고에 없는 재료 (기본 양념 제외, 레시피에 나온 순)
      */
     public record Reason(
