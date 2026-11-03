@@ -74,7 +74,8 @@ public class RecipeSearchService {
     }
 
     /**
-     * 검색어 자동완성. 이름의 단어가 검색어 단어로 시작하는 레시피 이름을 고른다 ("김치" → '김치찌개', '돼지고기 김치볶음').
+     * 검색어 자동완성. 이름의 단어가 검색어로 시작하거나("김" → '김치찌개'), 이름 안에 검색어 단어가 있는("찌개" → '김치찌개')
+     * 레시피 이름을 고른다. 단어 안쪽은 형태소 단위로만 찾는다("찌"로는 '김치찌개'가 나오지 않음).
      * <br>
      * 같은 이름은 한 번만 보여주고, 벡터 검색은 하지 않는다.
      */
@@ -85,24 +86,31 @@ public class RecipeSearchService {
                 .toList();
     }
 
-    // 이름이 검색어로 시작하면 더 위로 올린다 ("김치" → '김치찌개'가 '과일 김치'보다 먼저). 점수가 같으면 이름순
+    // 이름이 검색어로 시작하면 맨 위로 올린다 ("김치" → '김치찌개'가 '과일 김치'보다 먼저). 점수가 같으면 이름순
     SearchRequest suggestRequest(String keyword, int size) {
         return SearchRequest.of(s -> s
                 .index(properties.indexProperties().recipe().alias())
                 .query(q -> q.bool(b -> b
-                        .must(m -> m.match(t -> t
-                                .field("name.autocomplete")
-                                .query(keyword)
-                                .operator(Operator.And)))
+                        .must(m -> m.bool(words -> words
+                                .should(nameMatch("name.autocomplete", keyword))
+                                .should(nameMatch("name", keyword))))
                         .should(sh -> sh.prefix(p -> p
                                 .field("name.keyword")
                                 .value(keyword)
-                                .boost(2f)))))
+                                .boost(10f)))))
                 .collapse(c -> c.field("name.keyword"))
                 .sort(byScore(), sortBy("name.keyword", SortOrder.Asc))
                 .size(size)
                 .source(src -> src.filter(f -> f.includes("name")))
                 .trackTotalHits(t -> t.enabled(false)));
+    }
+
+    // name.autocomplete: 단어 앞글자, name: 형태소(nori). 검색어 단어가 모두 있어야 한다
+    private static Query nameMatch(String field, String keyword) {
+        return Query.of(q -> q.match(m -> m
+                .field(field)
+                .query(keyword)
+                .operator(Operator.And)));
     }
 
     public record RecipeNameDocument(String name) {

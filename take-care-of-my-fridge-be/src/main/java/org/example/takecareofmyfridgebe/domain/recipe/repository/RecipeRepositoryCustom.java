@@ -17,8 +17,8 @@ public interface RecipeRepositoryCustom {
 
     List<String> findDistinctCategories();
 
-    // 검색어 자동완성(ES 장애 대체): 이름이 prefix로 시작하는 레시피 이름을 가나다순으로 limit개
-    List<String> findNamesStartingWith(String prefix, int limit);
+    // 검색어 자동완성(ES 장애 대체): 이름에 keyword가 든 레시피 이름을 앞쪽에 든 것부터 limit개
+    List<String> findNamesContaining(String keyword, int limit);
 
     /**
      * 색인용: 레시피별 재료명,역할을 seq 순으로 조회한다. recipeId가 null이면 전체 레시피

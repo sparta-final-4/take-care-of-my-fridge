@@ -164,9 +164,9 @@ public class RecipeService {
     }
 
 
-    // 검색어 자동완성(ES 장애 대체). 이름이 검색어로 시작하는 레시피만 찾는다
+    // 검색어 자동완성(ES 장애 대체). 이름에 검색어가 든 레시피를 찾는다
     public List<String> suggestNames(String keyword, int limit) {
-        return recipeRepository.findNamesStartingWith(keyword, limit);
+        return recipeRepository.findNamesContaining(keyword, limit);
     }
 
     // 검색이 고른 ID 순서대로 목록을 만든다. 전체 건수는 검색 결과 값을 그대로 쓴다
