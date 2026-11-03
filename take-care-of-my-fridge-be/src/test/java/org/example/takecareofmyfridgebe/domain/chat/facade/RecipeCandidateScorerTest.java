@@ -68,18 +68,21 @@ class RecipeCandidateScorerTest {
         }
 
         @Test
-        @DisplayName("선호 맛이 1개 겹친 레시피가 임박 재료만 맞는 레시피보다 앞선다")
-        void ranksTasteFirst_overImminent() {
-            recipe(10L, "두부부침", "전", 20, 5, TOFU);
-            recipe(20L, "계란찜", "찜", 20, 1, EGG);
-            tastes.put(10L, Set.of(Taste.SALTY));
+        @DisplayName("임박 재료가 1개 들어간 레시피가 선호 맛이 2개 겹친 레시피보다 앞선다")
+        void ranksImminentFirst_overTaste() {
+            recipe(10L, "두부부침", "전", 20, 1, TOFU);
+            recipe(20L, "계란찜", "찜", 20, 5, EGG);
+            tastes.put(10L, Set.of(Taste.SALTY, Taste.SWEET));
 
             RecipeCandidates result = rank(
                     RecipeQuery.of(MEMBER_ID, List.of()),
-                    List.of(stock(EGG, "계란", 0), stock(TOFU, "두부", 10)),
-                    List.of(Taste.SALTY));
+                    List.of(stock(EGG, "계란", 3), stock(TOFU, "두부", 10)),
+                    List.of(Taste.SALTY, Taste.SWEET));
 
-            assertThat(result.candidates()).extracting(RecipeCandidate::recipeId).containsExactly(10L, 20L);
+            assertThat(result.candidates()).extracting(RecipeCandidate::recipeId).containsExactly(20L, 10L);
+            assertThat(result.candidates().get(0).ranking().imminentScore()).isEqualTo(6);
+            assertThat(result.candidates().get(0).ranking().tasteMatches()).isZero();
+            assertThat(result.candidates().get(1).ranking().tasteMatches()).isEqualTo(2);
         }
 
         @Test

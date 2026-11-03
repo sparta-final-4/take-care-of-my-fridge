@@ -19,8 +19,8 @@ public record RecipeCandidate(
      *
      * @param requestMatches          1. 사용자 요청 일치 수 (포함 재료 + 원하는 맛 + 분류 일치)
      * @param selectedMatches         2. 선택 재료 겹친 수
-     * @param tasteMatches            3. 선호 맛 겹친 수
-     * @param imminentScore           4. 임박 점수 합 (D-0 12, D-1 10, D-2 8, D-3 6)
+     * @param tasteMatches            4. 선호 맛 겹친 수
+     * @param imminentScore           3. 임박 점수 합 (D-0 12, D-1 10, D-2 8, D-3 6)
      * @param ownedCount              5. 가진 재료 종류 수 (보유 비율의 분자)
      * @param nonBasicIngredientCount 5. 기본 양념 뺀 재료 종류 수 (보유 비율의 분모)
      * @param missingCount            6. 없는 재료 수

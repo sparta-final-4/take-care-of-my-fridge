@@ -29,8 +29,9 @@ import java.util.stream.Collectors;
  * AI 없이 규칙으로 레시피 후보를 고르고 정렬한다. 스프링에 의존하지 않는 순수 클래스.
  * <p>
  * 정렬은 점수를 합산하지 않고, 앞 단계가 같을 때만 다음 단계로 비교한다.
- * 1. 사용자 요청 일치 수 → 2. 선택 재료 겹친 수 → 3. 선호 맛 겹친 수 → 4. 임박 점수 합
+ * 1. 사용자 요청 일치 수 → 2. 선택 재료 겹친 수 → 3. 임박 점수 합 → 4. 선호 맛 겹친 수
  * → 5. 보유 비율 → 6. 없는 재료 수 적은 순 → 7. 레시피 id.
+ * 임박을 선호 맛보다 앞에 둔다. 회원 선호 맛은 대부분 레시피와 1~2개씩 겹쳐서, 뒤에 두지 않으면 임박 재료가 순위에 거의 반영되지 않는다.
  * 냉장고 수량은 재료마다 단위(g·개·대…)가 달라 비교하지 않는다. 기본 양념은 어느 단계에서도 세지 않는다.
  */
 public class RecipeCandidateScorer {
@@ -44,8 +45,8 @@ public class RecipeCandidateScorer {
     private static final Comparator<RecipeCandidate> ORDER = Comparator
             .comparingInt((RecipeCandidate c) -> c.ranking().requestMatches()).reversed()
             .thenComparing(Comparator.comparingInt((RecipeCandidate c) -> c.ranking().selectedMatches()).reversed())
-            .thenComparing(Comparator.comparingInt((RecipeCandidate c) -> c.ranking().tasteMatches()).reversed())
             .thenComparing(Comparator.comparingInt((RecipeCandidate c) -> c.ranking().imminentScore()).reversed())
+            .thenComparing(Comparator.comparingInt((RecipeCandidate c) -> c.ranking().tasteMatches()).reversed())
             .thenComparing(RecipeCandidateScorer::compareOwnedRatioDesc)
             .thenComparingInt(c -> c.ranking().missingCount())
             .thenComparingLong(RecipeCandidate::recipeId);
