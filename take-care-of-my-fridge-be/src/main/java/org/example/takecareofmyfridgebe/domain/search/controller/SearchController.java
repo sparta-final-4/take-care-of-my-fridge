@@ -8,10 +8,13 @@ import org.example.takecareofmyfridgebe.domain.product.dto.ProductListRequest;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeListItemResponse;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeListRequest;
 import org.example.takecareofmyfridgebe.domain.search.dto.SearchClickRequest;
+import org.example.takecareofmyfridgebe.domain.search.dto.SearchFridgeMatchRequest;
+import org.example.takecareofmyfridgebe.domain.search.dto.SearchFridgeMatchResponse;
 import org.example.takecareofmyfridgebe.domain.search.dto.SearchRecipeClickRequest;
 import org.example.takecareofmyfridgebe.domain.search.dto.SearchSuggestionRequest;
 import org.example.takecareofmyfridgebe.domain.search.facade.ProductSearchFacade;
 import org.example.takecareofmyfridgebe.domain.search.facade.RecipeSearchFacade;
+import org.example.takecareofmyfridgebe.domain.search.facade.SearchFridgeMatchFacade;
 import org.example.takecareofmyfridgebe.domain.search.service.SearchClickHistoryService;
 import org.example.takecareofmyfridgebe.global.response.ApiResponse;
 import org.example.takecareofmyfridgebe.global.response.PageResponse;
@@ -34,6 +37,7 @@ public class SearchController {
     private final RecipeSearchFacade recipeSearchFacade;
     private final ProductSearchFacade productSearchFacade;
     private final SearchClickHistoryService searchClickHistoryService;
+    private final SearchFridgeMatchFacade searchFridgeMatchFacade;
 
     @GetMapping("/recipes")
     public ResponseEntity<ApiResponse<PageResponse<RecipeListItemResponse>>> searchRecipes(
@@ -57,6 +61,16 @@ public class SearchController {
     ) {
         List<String> suggestions = recipeSearchFacade.suggestNames(request.keyword());
         return ResponseEntity.ok(ApiResponse.ok(suggestions));
+    }
+
+    // 로그인 회원만 (SecurityConfig)
+    @GetMapping("/fridge-matches")
+    public ResponseEntity<ApiResponse<SearchFridgeMatchResponse>> matchFridge(
+            @AuthenticationPrincipal AuthSessionService.AuthPrincipal principal,
+            @Valid @ModelAttribute SearchFridgeMatchRequest request
+    ) {
+        SearchFridgeMatchResponse response = searchFridgeMatchFacade.match(principal.memberId(), request);
+        return ResponseEntity.ok(ApiResponse.ok(response));
     }
 
     @PostMapping("/clicks")

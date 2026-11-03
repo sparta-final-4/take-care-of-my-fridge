@@ -6,6 +6,7 @@ import org.example.takecareofmyfridgebe.domain.ingredient.service.IngredientServ
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeClassificationResponse;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeCreateRequest;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeDetailResponse;
+import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeIngredientIdDto;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeListItemResponse;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeListRequest;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeSummary;
@@ -181,6 +182,19 @@ public class RecipeService {
                 .toList();
 
         return PageResponse.of(content, request.page(), request.size(), total);
+    }
+
+    /**
+     * 다른 도메인(search)에서 쓰는 조회.
+     * 레시피별 재료 ID. 같은 재료가 여러 줄(양념장 등)에 나와도 한 번만 담는다. 재료가 없는 레시피는 결과에서 빠진다.
+     */
+    public Map<Long, Set<Long>> findIngredientIds(Collection<Long> recipeIds) {
+        if (recipeIds.isEmpty()) {
+            return Map.of();
+        }
+        return recipeIngredientRepository.findIngredientIds(recipeIds).stream()
+                .collect(Collectors.groupingBy(RecipeIngredientIdDto::recipeId,
+                        Collectors.mapping(RecipeIngredientIdDto::ingredientId, Collectors.toSet())));
     }
 
     /**

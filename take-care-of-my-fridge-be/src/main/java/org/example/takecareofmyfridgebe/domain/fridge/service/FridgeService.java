@@ -3,6 +3,7 @@ package org.example.takecareofmyfridgebe.domain.fridge.service;
 import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.IngredientDeductionResponse;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.UsedIngredientRequest;
+import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeIngredientInfo;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemLogResponse;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemLogSearchRequest;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemResponse;
@@ -361,6 +362,17 @@ public class FridgeService {
         Fridge fridge = getFridgeEntity(memberId, fridgeId);
         Ingredient ingredient = fridge.getIngredient();
         return new FridgeNameInfo(fridge.getRawName(), ingredient != null && ingredient.isMealkit());
+    }
+
+    /**
+     * 다른 도메인(search)에서 쓰는 조회.
+     * 지금 쓸 수 있는 재료(소비기한이 오늘 이후)만 돌려준다. 지난 재료는 냉장고 화면처럼 '지남'으로 보고 보유로 치지 않는다.
+     *
+     * @param memberId 회원 ID
+     * @return 표준 재료 ID·이름과 입력한 이름
+     */
+    public List<FridgeIngredientInfo> findUsableIngredients(Long memberId) {
+        return fridgeRepository.findUsableIngredients(memberId, LocalDate.now());
     }
 
     /**
