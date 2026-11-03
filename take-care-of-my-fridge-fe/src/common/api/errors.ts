@@ -93,6 +93,23 @@ export function getChatErrorInfo(code?: string): ChatErrorInfo {
         message: '다른 창에서 답을 받는 중이에요. 답이 끝나면 다시 보내 주세요',
         action: 'restoreInput',
       };
+    // AI가 답을 시작하지 못함(일시 장애·빈 답). 서버가 하루 횟수를 돌려주므로 보내려던 내용을 되돌린다
+    case 'CHAT_010':
+      return {
+        message: 'AI가 잠시 답할 수 없어요. 잠시 후 다시 시도해 주세요',
+        action: 'restoreInput',
+      };
+    // AI 요청이 몰림. 하루 횟수를 돌려받았으므로 보내려던 내용을 되돌린다
+    case 'CHAT_011':
+      return {
+        message: '요청이 많아요. 잠시 후 다시 보내 주세요',
+        action: 'restoreInput',
+      };
+    // 답을 일부 받은 뒤 끊김. 하루 횟수는 쓴 것으로 남는다
+    case 'CHAT_012':
+      return {
+        message: '답을 받다가 끊겼어요. 다시 보내 주세요',
+      };
     case 'A003':
       return {
         message: '로그인이 만료되었어요. 다시 로그인해 주세요',
