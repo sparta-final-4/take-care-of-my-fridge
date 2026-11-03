@@ -5,6 +5,7 @@ import {
   type ProductListRequest,
   type RecipeListRequest,
   type SearchClickRequest,
+  type SearchRecipeClickRequest,
 } from '@/common/api/clients';
 import { unwrap } from '@/common/api/unwrap';
 
@@ -26,4 +27,9 @@ export async function searchProducts(
 // 통합 검색 결과에서 상품을 눌러 상세로 갈 때 남기는 클릭 기록(할인 분석의 검색 클릭 수). 비로그인도 기록한다.
 export async function recordSearchClick(request: SearchClickRequest): Promise<void> {
   await unwrap(searchApi.recordClick({ searchClickRequest: request }));
+}
+
+// 통합 검색 결과에서 레시피를 눌러 상세로 갈 때 남기는 클릭 기록(검색 품질 확인용). 비로그인도 기록한다.
+export async function recordSearchRecipeClick(request: SearchRecipeClickRequest): Promise<void> {
+  await unwrap(searchApi.recordRecipeClick({ searchRecipeClickRequest: request }));
 }
