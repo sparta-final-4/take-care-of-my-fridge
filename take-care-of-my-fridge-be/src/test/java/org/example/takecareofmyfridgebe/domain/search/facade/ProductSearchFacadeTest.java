@@ -2,10 +2,13 @@ package org.example.takecareofmyfridgebe.domain.search.facade;
 
 import org.example.takecareofmyfridgebe.domain.product.dto.ProductListItemResponse;
 import org.example.takecareofmyfridgebe.domain.product.dto.ProductListRequest;
+import org.example.takecareofmyfridgebe.domain.product.entity.ProductType;
 import org.example.takecareofmyfridgebe.domain.product.facade.ProductFacade;
 import org.example.takecareofmyfridgebe.domain.search.config.RecipeSearchProperties;
 import org.example.takecareofmyfridgebe.domain.search.dto.ProductSearchResult;
+import org.example.takecareofmyfridgebe.domain.search.entity.SearchTarget;
 import org.example.takecareofmyfridgebe.domain.search.service.ProductSearchService;
+import org.example.takecareofmyfridgebe.domain.search.service.SearchZeroResultService;
 import org.example.takecareofmyfridgebe.global.response.PageResponse;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -23,6 +26,7 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -35,6 +39,8 @@ class ProductSearchFacadeTest {
     private ProductSearchService productSearchService;
     @Mock
     private RecipeSearchProperties searchProperties;
+    @Mock
+    private SearchZeroResultService searchZeroResultService;
     @InjectMocks
     private ProductSearchFacade facade;
 
@@ -96,5 +102,65 @@ class ProductSearchFacadeTest {
         // When & Then
         assertThat(facade.getProducts(request)).isSameAs(page);
         verify(productFacade, never()).getProductsByIds(anyList(), anyLong(), any());
+    }
+
+    @Test
+    @DisplayName("필터 없이 첫 페이지 결과가 0건이면 검색어를 0건 검색어로 기록한다")
+    void getProducts_recordsZeroResult_whenNoHits() {
+        // Given
+        ProductListRequest request = request("대파");
+        when(productFacade.getProducts(request)).thenReturn(emptyPage(1));
+
+        // When
+        facade.getProducts(request);
+
+        // Then
+        verify(searchZeroResultService).record(SearchTarget.PRODUCT, "대파");
+    }
+
+    @Test
+    @DisplayName("결과가 있으면 0건 검색어로 기록하지 않는다")
+    void getProducts_skipsZeroResult_whenHitsExist() {
+        // Given
+        ProductListRequest request = request("대파");
+        when(productFacade.getProducts(request)).thenReturn(new PageResponse<>(List.of(), 1, 20, 3, 1, true));
+
+        // When
+        facade.getProducts(request);
+
+        // Then
+        verifyNoInteractions(searchZeroResultService);
+    }
+
+    @Test
+    @DisplayName("상품 종류 필터를 걸어 0건이면 기록하지 않는다")
+    void getProducts_skipsZeroResult_whenFiltered() {
+        // Given
+        ProductListRequest request = new ProductListRequest(null, "대파", ProductType.INGREDIENT, null, null, null, null);
+        when(productFacade.getProducts(request)).thenReturn(emptyPage(1));
+
+        // When
+        facade.getProducts(request);
+
+        // Then
+        verifyNoInteractions(searchZeroResultService);
+    }
+
+    @Test
+    @DisplayName("2페이지 이후 요청이 0건이면 기록하지 않는다")
+    void getProducts_skipsZeroResult_whenNotFirstPage() {
+        // Given
+        ProductListRequest request = new ProductListRequest(null, "대파", null, null, null, 2, null);
+        when(productFacade.getProducts(request)).thenReturn(emptyPage(2));
+
+        // When
+        facade.getProducts(request);
+
+        // Then
+        verifyNoInteractions(searchZeroResultService);
+    }
+
+    private PageResponse<ProductListItemResponse> emptyPage(int pageNumber) {
+        return new PageResponse<>(List.of(), pageNumber, 20, 0, 0, true);
     }
 }
