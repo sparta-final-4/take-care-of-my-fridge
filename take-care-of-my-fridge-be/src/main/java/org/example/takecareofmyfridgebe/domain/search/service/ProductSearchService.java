@@ -102,6 +102,7 @@ public class ProductSearchService {
     private List<SortOptions> sortOptions(ProductSort sort) {
         return switch (sort) {
             case LATEST -> List.of(sortBy("id", SortOrder.Desc));
+            case RELEVANCE -> List.of(byScore(), sortBy("id", SortOrder.Desc));
             case PRICE_ASC -> List.of(sortBy("price", SortOrder.Asc), sortBy("id", SortOrder.Desc));
             case PRICE_DESC -> List.of(sortBy("price", SortOrder.Desc), sortBy("id", SortOrder.Desc));
         };
@@ -109,6 +110,10 @@ public class ProductSearchService {
 
     private static SortOptions sortBy(String field, SortOrder order) {
         return SortOptions.of(o -> o.field(f -> f.field(field).order(order)));
+    }
+
+    private static SortOptions byScore() {
+        return SortOptions.of(o -> o.score(s -> s.order(SortOrder.Desc)));
     }
 
 }

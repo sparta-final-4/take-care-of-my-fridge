@@ -27,13 +27,13 @@ export function useSearchKeyword() {
 
   // 요약과 각 결과 섹션이 같은 요청을 써서 종류마다 한 번만 조회한다.
   const recipeRequest: RecipeListRequest = {
-    sort: 'LATEST',
+    sort: 'RELEVANCE',
     keyword,
     page,
     size: SEARCH_RECIPE_PAGE_SIZE,
   };
   const productRequest: ProductListRequest = {
-    sort: 'LATEST',
+    sort: 'RELEVANCE',
     keyword,
     page: productPage,
     size: SEARCH_PRODUCT_PAGE_SIZE,

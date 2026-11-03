@@ -77,7 +77,8 @@ public class ProductRepositoryImpl implements ProductRepositoryCustom {
     // 같은 값끼리는 최신 상품(id 내림차순)이 먼저 오도록 2차 정렬을 둔다.
     private OrderSpecifier<?>[] orderSpecifiers(ProductSort sort) {
         return switch (sort) {
-            case LATEST -> new OrderSpecifier<?>[]{product.id.desc()};
+            // MySQL에는 관련도 점수가 없어 최신순으로 둔다 (ES 장애 대체, engine=mysql)
+            case LATEST, RELEVANCE -> new OrderSpecifier<?>[]{product.id.desc()};
             case PRICE_ASC -> new OrderSpecifier<?>[]{product.price.asc(), product.id.desc()};
             case PRICE_DESC -> new OrderSpecifier<?>[]{product.price.desc(), product.id.desc()};
         };
