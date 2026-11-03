@@ -28,6 +28,7 @@ export interface RecipeListRequest {
 
 export const RecipeListRequestSortEnum = {
     Latest: 'LATEST',
+    Relevance: 'RELEVANCE',
     NameAsc: 'NAME_ASC',
     DifficultyAsc: 'DIFFICULTY_ASC',
 } as const;

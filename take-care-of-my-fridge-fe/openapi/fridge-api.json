@@ -6772,6 +6772,7 @@
             "type": "string",
             "enum": [
               "LATEST",
+              "RELEVANCE",
               "PRICE_ASC",
               "PRICE_DESC"
             ]
@@ -7148,6 +7149,7 @@
             "type": "string",
             "enum": [
               "LATEST",
+              "RELEVANCE",
               "NAME_ASC",
               "DIFFICULTY_ASC"
             ]

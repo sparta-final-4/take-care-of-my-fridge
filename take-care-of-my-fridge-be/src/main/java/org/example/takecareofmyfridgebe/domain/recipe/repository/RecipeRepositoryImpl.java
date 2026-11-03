@@ -139,7 +139,8 @@ public class RecipeRepositoryImpl implements RecipeRepositoryCustom {
     // 같은 값끼리는 최신 레시피(id 내림차순)가 먼저 오도록 2차 정렬을 둔다.
     private OrderSpecifier<?>[] orderSpecifiers(RecipeSort sort) {
         return switch (sort) {
-            case LATEST -> new OrderSpecifier<?>[]{recipe.id.desc()};
+            // MySQL에는 관련도 점수가 없어 최신순으로 둔다 (ES 장애 대체, engine=mysql)
+            case LATEST, RELEVANCE -> new OrderSpecifier<?>[]{recipe.id.desc()};
             case NAME_ASC -> new OrderSpecifier<?>[]{recipe.name.asc(), recipe.id.desc()};
             case DIFFICULTY_ASC -> new OrderSpecifier<?>[]{recipe.difficulty.asc(), recipe.id.desc()};
         };
