@@ -24,9 +24,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowableOfType;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -79,38 +79,38 @@ class EsIndexerReindexTest {
 
     @Test
     @DisplayName("bulk 색인이 실패하면 새 인덱스를 지우고 원래 예외를 던지며, alias는 옮기지 않는다")
-    void deletesNewIndexWhenBulkFails() throws IOException {
+    void reindex_deletesNewIndex_whenBulkFails() throws IOException {
         // Given
         IOException bulkFailure = new IOException("ES 연결 실패");
         when(esClient.bulk(any(Function.class))).thenThrow(bulkFailure);
 
         // When
-        IOException thrown = assertThrows(IOException.class, indexer::reindex);
+        IOException thrown = catchThrowableOfType(IOException.class, indexer::reindex);
 
         // Then
-        assertEquals(bulkFailure, thrown);
+        assertThat(thrown).isEqualTo(bulkFailure);
         List<String> deleted = deletedIndices();
-        assertEquals(1, deleted.size());
-        assertTrue(deleted.get(0).startsWith("recipes_"));
+        assertThat(deleted).hasSize(1);
+        assertThat(deleted.get(0)).startsWith("recipes_");
         verify(indices, never()).updateAliases(any(Function.class));
     }
 
     @Test
     @DisplayName("건수가 맞지 않으면 새 인덱스를 지우고 alias는 옮기지 않는다")
-    void deletesNewIndexWhenCountMismatches() throws IOException {
+    void reindex_deletesNewIndex_whenCountMismatches() throws IOException {
         // Given
         when(esClient.bulk(any(Function.class))).thenReturn(bulkOk());
         when(esClient.count(any(Function.class))).thenReturn(countOf(0));
 
         // When & Then
-        assertThrows(IllegalStateException.class, indexer::reindex);
-        assertTrue(deletedIndices().get(0).startsWith("recipes_"));
+        assertThatThrownBy(indexer::reindex).isInstanceOf(IllegalStateException.class);
+        assertThat(deletedIndices().get(0)).startsWith("recipes_");
         verify(indices, never()).updateAliases(any(Function.class));
     }
 
     @Test
     @DisplayName("alias를 옮긴 뒤 이전 인덱스 삭제가 실패해도 재색인은 성공으로 끝난다")
-    void succeedsWhenOldIndexDeleteFails() throws IOException {
+    void reindex_succeeds_whenOldIndexDeleteFails() throws IOException {
         // Given
         when(esClient.bulk(any(Function.class))).thenReturn(bulkOk());
         when(esClient.count(any(Function.class))).thenReturn(countOf(1));
@@ -123,8 +123,8 @@ class EsIndexerReindexTest {
         String newIndex = indexer.reindex();
 
         // Then
-        assertTrue(newIndex.startsWith("recipes_"));
+        assertThat(newIndex).startsWith("recipes_");
         verify(indices).updateAliases(any(Function.class));
-        assertEquals(List.of("recipes_old"), deletedIndices());
+        assertThat(deletedIndices()).isEqualTo(List.of("recipes_old"));
     }
 }

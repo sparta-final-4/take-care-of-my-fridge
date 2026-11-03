@@ -10,6 +10,7 @@ import org.example.takecareofmyfridgebe.infra.s3.config.ImageStorageProperties;
 import org.example.takecareofmyfridgebe.infra.s3.dto.ImageUploadUrlRequest;
 import org.example.takecareofmyfridgebe.infra.s3.dto.ImageUploadUrlResponse;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
@@ -30,7 +31,8 @@ class ImageUploadUrlServiceTest {
     }
 
     @Test
-    void createsSignedPutUrlUnderEnvPrefixAndMatchingPublicUrl() {
+    @DisplayName("환경 접두사 아래 서명된 PUT URL과 그에 맞는 공개 URL을 만든다")
+    void createProductImageUploadUrl_returnsSignedPutUrlAndPublicUrl() {
         ImageUploadUrlService service = new ImageUploadUrlService(presigner,
                 new ImageStorageProperties("imhungry-images-1", "dev", "https://dev.imhungry.click/"));
 
@@ -49,7 +51,8 @@ class ImageUploadUrlServiceTest {
     }
 
     @Test
-    void rejectsUnsupportedContentType() {
+    @DisplayName("지원하지 않는 이미지 형식이면 INVALID_IMAGE_TYPE 예외를 던진다")
+    void createProductImageUploadUrl_throwException_whenUnsupportedContentType() {
         ImageUploadUrlService service = new ImageUploadUrlService(presigner,
                 new ImageStorageProperties("imhungry-images-1", "dev", "https://dev.imhungry.click"));
 
@@ -59,7 +62,8 @@ class ImageUploadUrlServiceTest {
     }
 
     @Test
-    void disabledWhenBucketIsBlank() {
+    @DisplayName("버킷이 비어 있으면 업로드가 비활성화되어 IMAGE_UPLOAD_DISABLED 예외를 던진다")
+    void createProductImageUploadUrl_throwException_whenBucketIsBlank() {
         ImageUploadUrlService service = new ImageUploadUrlService(presigner,
                 new ImageStorageProperties("", "local", ""));
 

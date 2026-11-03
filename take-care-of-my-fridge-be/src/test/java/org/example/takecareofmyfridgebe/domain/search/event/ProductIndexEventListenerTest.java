@@ -12,7 +12,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.io.IOException;
 
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
@@ -31,7 +31,7 @@ class ProductIndexEventListenerTest {
 
     @Test
     @DisplayName("검색 엔진이 ES면 바뀐 상품 하나를 다시 색인한다")
-    void indexesChangedProduct() throws IOException {
+    void onProductChanged_indexesProduct_whenElasticsearch() throws IOException {
         // Given
         when(properties.useElasticSearch()).thenReturn(true);
 
@@ -44,7 +44,7 @@ class ProductIndexEventListenerTest {
 
     @Test
     @DisplayName("검색 엔진이 MySQL이면 색인하지 않는다")
-    void skipsWhenMySql() throws IOException {
+    void onProductChanged_skipsIndexing_whenMySql() throws IOException {
         // Given
         when(properties.useElasticSearch()).thenReturn(false);
 
@@ -57,12 +57,12 @@ class ProductIndexEventListenerTest {
 
     @Test
     @DisplayName("색인이 실패해도 예외를 밖으로 던지지 않는다")
-    void swallowsIndexFailure() throws IOException {
+    void onProductChanged_doesNotThrow_whenIndexFails() throws IOException {
         // Given
         when(properties.useElasticSearch()).thenReturn(true);
         doThrow(new IOException("ES 연결 실패")).when(productIndexer).indexOne(3L);
 
         // When & Then
-        assertDoesNotThrow(() -> listener.onProductChanged(new ProductChangedEvent(3L)));
+        assertThatCode(() -> listener.onProductChanged(new ProductChangedEvent(3L))).doesNotThrowAnyException();
     }
 }

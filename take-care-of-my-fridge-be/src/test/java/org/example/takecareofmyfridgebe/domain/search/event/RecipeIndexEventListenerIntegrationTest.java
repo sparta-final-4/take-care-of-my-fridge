@@ -41,7 +41,7 @@ class RecipeIndexEventListenerIntegrationTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("트랜잭션이 커밋되면 색인한다")
-    void indexesAfterCommit() throws IOException {
+    void onRecipeChanged_indexes_whenTransactionCommitted() throws IOException {
         // When
         transactionTemplate.executeWithoutResult(status -> eventPublisher.publishEvent(new RecipeChangedEvent(7L)));
 
@@ -51,7 +51,7 @@ class RecipeIndexEventListenerIntegrationTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("트랜잭션이 롤백되면 색인하지 않는다")
-    void skipsAfterRollback() throws IOException {
+    void onRecipeChanged_skipsIndexing_whenTransactionRolledBack() throws IOException {
         // When
         transactionTemplate.executeWithoutResult(status -> {
             eventPublisher.publishEvent(new RecipeChangedEvent(8L));

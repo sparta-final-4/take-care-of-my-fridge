@@ -18,7 +18,7 @@ class SearchClickHistoryServiceTest {
 
     @Test
     @DisplayName("클릭을 상품 번호·회원 번호·앞뒤 공백을 뺀 검색어로 저장한다")
-    void recordsClick() {
+    void record_savesClick() {
         service.record(new SearchClickRequest(10L, " 계란 "), 7L);
 
         SearchClickHistory saved = captureSaved();
@@ -29,7 +29,7 @@ class SearchClickHistoryServiceTest {
 
     @Test
     @DisplayName("비로그인 클릭은 회원 번호 없이 저장한다")
-    void recordsAnonymousClick() {
+    void record_savesWithoutMember_whenAnonymous() {
         service.record(new SearchClickRequest(10L, "계란"), null);
 
         assertThat(captureSaved().getMemberId()).isNull();

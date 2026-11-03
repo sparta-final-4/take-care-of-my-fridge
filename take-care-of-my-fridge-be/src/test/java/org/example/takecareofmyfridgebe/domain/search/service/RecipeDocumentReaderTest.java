@@ -29,8 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
@@ -110,7 +109,7 @@ class RecipeDocumentReaderTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("readOne은 재료(seq 순, 중복 제거), 주재료, 태그, 조리 단계를 ES 문서 필드로 만든다")
-    void readOneBuildsDocument() {
+    void readOne_buildsDocument() {
         // Given: 재료는 seq를 뒤섞어 저장하고, 같은 재료를 두 번 넣는다
         Ingredient kimchi = createIngredient("김치_" + System.nanoTime());
         Ingredient pork = createIngredient("돼지고기_" + System.nanoTime());
@@ -129,22 +128,22 @@ class RecipeDocumentReaderTest extends MySqlContainerSupport {
         Map<String, Object> doc = esDoc.source();
 
         // Then
-        assertEquals(recipe.getId(), esDoc.id());
-        assertEquals(recipe.getId(), doc.get("id"));
-        assertEquals("김치찌개", doc.get("name"));
-        assertEquals("TEST", doc.get("source"));
-        assertEquals(List.of("찌개", "매운맛"), doc.get("tags"));
-        assertEquals(List.of(kimchi.getName(), pork.getName(), onion.getName()), doc.get("ingredients"));
-        assertEquals(List.of(kimchi.getName(), pork.getName()), doc.get("main_ingredients"));
-        assertEquals(3, doc.get("ingredient_count"));
-        assertEquals("고기를 볶는다\n김치를 넣고 끓인다", doc.get("steps_text"));
-        assertEquals(2, doc.get("step_count"));
-        assertTrue(((String) doc.get("created_at")).matches("\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}"));
+        assertThat(esDoc.id()).isEqualTo(recipe.getId());
+        assertThat(doc.get("id")).isEqualTo(recipe.getId());
+        assertThat(doc.get("name")).isEqualTo("김치찌개");
+        assertThat(doc.get("source")).isEqualTo("TEST");
+        assertThat(doc.get("tags")).isEqualTo(List.of("찌개", "매운맛"));
+        assertThat(doc.get("ingredients")).isEqualTo(List.of(kimchi.getName(), pork.getName(), onion.getName()));
+        assertThat(doc.get("main_ingredients")).isEqualTo(List.of(kimchi.getName(), pork.getName()));
+        assertThat(doc.get("ingredient_count")).isEqualTo(3);
+        assertThat(doc.get("steps_text")).isEqualTo("고기를 볶는다\n김치를 넣고 끓인다");
+        assertThat(doc.get("step_count")).isEqualTo(2);
+        assertThat(((String) doc.get("created_at")).matches("\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}")).isTrue();
     }
 
     @Test
     @DisplayName("재료와 조리 단계가 없고 태그가 null이면 빈 목록과 0으로 채운다")
-    void readOneWithoutChildren() {
+    void readOne_fillsEmptyValues_whenNoChildren() {
         // Given
         Recipe recipe = createRecipe("빈 레시피", null);
         flushAndClear();
@@ -153,27 +152,27 @@ class RecipeDocumentReaderTest extends MySqlContainerSupport {
         Map<String, Object> doc = recipeDocumentReader.readOne(recipe.getId()).orElseThrow().source();
 
         // Then
-        assertEquals(List.of(), doc.get("tags"));
-        assertEquals(List.of(), doc.get("ingredients"));
-        assertEquals(List.of(), doc.get("main_ingredients"));
-        assertEquals(0, doc.get("ingredient_count"));
-        assertEquals("", doc.get("steps_text"));
-        assertEquals(0, doc.get("step_count"));
+        assertThat(doc.get("tags")).isEqualTo(List.of());
+        assertThat(doc.get("ingredients")).isEqualTo(List.of());
+        assertThat(doc.get("main_ingredients")).isEqualTo(List.of());
+        assertThat(doc.get("ingredient_count")).isEqualTo(0);
+        assertThat(doc.get("steps_text")).isEqualTo("");
+        assertThat(doc.get("step_count")).isEqualTo(0);
     }
 
     @Test
     @DisplayName("없는 레시피는 readOne이 빈 Optional을 반환한다")
-    void readOneReturnsEmptyWhenMissing() {
+    void readOne_returnsEmpty_whenRecipeMissing() {
         // When
         Optional<EsDocument> doc = recipeDocumentReader.readOne(Long.MAX_VALUE);
 
         // Then
-        assertTrue(doc.isEmpty());
+        assertThat(doc.isEmpty()).isTrue();
     }
 
     @Test
     @DisplayName("readAll은 id 순으로 모든 레시피를 읽고, 재료와 조리 단계를 레시피별로 나눈다")
-    void readAllGroupsByRecipe() {
+    void readAll_groupsByRecipe() {
         // Given
         Ingredient tofu = createIngredient("두부_" + System.nanoTime());
         Ingredient egg = createIngredient("달걀_" + System.nanoTime());
@@ -192,12 +191,12 @@ class RecipeDocumentReaderTest extends MySqlContainerSupport {
                 .toList();
 
         // Then
-        assertEquals(2, docs.size());
-        assertEquals(first.getId(), docs.get(0).id());
-        assertEquals(List.of(tofu.getName()), docs.get(0).source().get("ingredients"));
-        assertEquals(1, docs.get(0).source().get("step_count"));
-        assertEquals(second.getId(), docs.get(1).id());
-        assertEquals(List.of(egg.getName()), docs.get(1).source().get("ingredients"));
-        assertEquals("달걀을 푼다\n말아 굽는다", docs.get(1).source().get("steps_text"));
+        assertThat(docs.size()).isEqualTo(2);
+        assertThat(docs.get(0).id()).isEqualTo(first.getId());
+        assertThat(docs.get(0).source().get("ingredients")).isEqualTo(List.of(tofu.getName()));
+        assertThat(docs.get(0).source().get("step_count")).isEqualTo(1);
+        assertThat(docs.get(1).id()).isEqualTo(second.getId());
+        assertThat(docs.get(1).source().get("ingredients")).isEqualTo(List.of(egg.getName()));
+        assertThat(docs.get(1).source().get("steps_text")).isEqualTo("달걀을 푼다\n말아 굽는다");
     }
 }

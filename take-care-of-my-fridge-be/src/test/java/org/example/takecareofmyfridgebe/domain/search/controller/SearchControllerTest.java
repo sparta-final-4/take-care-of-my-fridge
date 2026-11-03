@@ -32,7 +32,7 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
@@ -73,7 +73,7 @@ class SearchControllerTest {
 
     @Test
     @DisplayName("비로그인 상태에서 레시피를 검색하면 200 OK와 검색 결과 페이지를 반환한다")
-    void searchRecipesUnauthenticatedReturnsOk() throws Exception {
+    void searchRecipes_returnsOk_whenUnauthenticated() throws Exception {
         // Given
         PageResponse<RecipeListItemResponse> page = new PageResponse<>(List.of(), 1, 20, 0, 0, true);
         when(recipeSearchFacade.getRecipes(any(RecipeListRequest.class))).thenReturn(page);
@@ -87,13 +87,13 @@ class SearchControllerTest {
 
         ArgumentCaptor<RecipeListRequest> captor = ArgumentCaptor.forClass(RecipeListRequest.class);
         verify(recipeSearchFacade).getRecipes(captor.capture());
-        assertEquals("계란", captor.getValue().keyword());
-        assertEquals("한식", captor.getValue().cuisineType());
+        assertThat(captor.getValue().keyword()).isEqualTo("계란");
+        assertThat(captor.getValue().cuisineType()).isEqualTo("한식");
     }
 
     @Test
     @DisplayName("페이지 크기가 허용 범위를 벗어나면 400 Bad Request를 반환한다")
-    void searchRecipesInvalidSizeReturnsBadRequest() throws Exception {
+    void searchRecipes_returnsBadRequest_whenSizeInvalid() throws Exception {
         // When & Then
         mvc.perform(get("/api/search/recipes").param("keyword", "계란").param("size", "0"))
                 .andExpect(status().isBadRequest());
@@ -101,7 +101,7 @@ class SearchControllerTest {
 
     @Test
     @DisplayName("비로그인 상태에서 상품을 검색하면 200 OK와 검색 결과 페이지를 반환한다")
-    void searchProductsUnauthenticatedReturnsOk() throws Exception {
+    void searchProducts_returnsOk_whenUnauthenticated() throws Exception {
         // Given
         PageResponse<ProductListItemResponse> page = new PageResponse<>(List.of(), 1, 20, 0, 0, true);
         when(productSearchFacade.getProducts(any(ProductListRequest.class))).thenReturn(page);
@@ -115,13 +115,13 @@ class SearchControllerTest {
 
         ArgumentCaptor<ProductListRequest> captor = ArgumentCaptor.forClass(ProductListRequest.class);
         verify(productSearchFacade).getProducts(captor.capture());
-        assertEquals("대파", captor.getValue().keyword());
-        assertEquals(ProductType.INGREDIENT, captor.getValue().type());
+        assertThat(captor.getValue().keyword()).isEqualTo("대파");
+        assertThat(captor.getValue().type()).isEqualTo(ProductType.INGREDIENT);
     }
 
     @Test
     @DisplayName("상품 검색의 가격 범위가 뒤집혀 있으면 400 Bad Request를 반환한다")
-    void searchProductsInvalidPriceRangeReturnsBadRequest() throws Exception {
+    void searchProducts_returnsBadRequest_whenPriceRangeInvalid() throws Exception {
         // When & Then
         mvc.perform(get("/api/search/products").param("keyword", "대파")
                         .param("minPrice", "5000").param("maxPrice", "1000"))
@@ -130,7 +130,7 @@ class SearchControllerTest {
 
     @Test
     @DisplayName("비로그인 상태로 클릭을 보내면 회원 번호 없이 기록하고 데이터 없이 200이다")
-    void recordClickUnauthenticatedReturnsOk() throws Exception {
+    void recordClick_returnsOk_whenUnauthenticated() throws Exception {
         mvc.perform(post("/api/search/clicks").with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(CLICK_BODY))
@@ -143,7 +143,7 @@ class SearchControllerTest {
 
     @Test
     @DisplayName("로그인 상태로 클릭을 보내면 로그인한 회원 번호와 함께 기록한다")
-    void recordClickAuthenticatedPassesMemberId() throws Exception {
+    void recordClick_passesMemberId_whenAuthenticated() throws Exception {
         mvc.perform(post("/api/search/clicks").with(csrf()).with(loginAsMember7())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(CLICK_BODY))
@@ -154,7 +154,7 @@ class SearchControllerTest {
 
     @Test
     @DisplayName("상품 번호가 없거나 검색어가 비어 있으면 400이고 기록하지 않는다")
-    void recordClickInvalidReturnsBadRequest() throws Exception {
+    void recordClick_returnsBadRequest_whenRequestInvalid() throws Exception {
         mvc.perform(post("/api/search/clicks").with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -167,7 +167,7 @@ class SearchControllerTest {
 
     @Test
     @DisplayName("상품 번호가 0이면 400이고 기록하지 않는다")
-    void recordClickNonPositiveProductIdReturnsBadRequest() throws Exception {
+    void recordClick_returnsBadRequest_whenProductIdNonPositive() throws Exception {
         mvc.perform(post("/api/search/clicks").with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -180,7 +180,7 @@ class SearchControllerTest {
 
     @Test
     @DisplayName("CSRF 토큰 없이 클릭을 보내면 403이고 기록하지 않는다")
-    void recordClickWithoutCsrfReturnsForbidden() throws Exception {
+    void recordClick_returnsForbidden_whenCsrfMissing() throws Exception {
         mvc.perform(post("/api/search/clicks")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(CLICK_BODY))

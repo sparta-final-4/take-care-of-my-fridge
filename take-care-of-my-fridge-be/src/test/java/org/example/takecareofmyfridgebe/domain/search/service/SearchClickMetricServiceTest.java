@@ -34,7 +34,7 @@ class SearchClickMetricServiceTest {
 
     @Test
     @DisplayName("from 0시부터 to 다음 날 0시 전까지를 기준 시각과 함께 조회한다")
-    void queriesFromStartOfFromToStartOfDayAfterTo() {
+    void getProductClicks_queriesFromStartOfFromToStartOfDayAfterTo() {
         List<ProductClickCount> clicks = List.of(new ProductClickCount(1L, 3L), new ProductClickCount(2L, 1L));
         given(searchClickHistoryRepository.countClicksByProduct(
                 LocalDateTime.of(2026, 10, 1, 0, 0), LocalDateTime.of(2026, 10, 4, 0, 0), AS_OF)).willReturn(clicks);
@@ -44,7 +44,7 @@ class SearchClickMetricServiceTest {
 
     @Test
     @DisplayName("from과 to가 같은 날이면 그날 하루를 조회한다")
-    void queriesSingleDay() {
+    void getProductClicks_queriesSingleDay_whenFromEqualsTo() {
         given(searchClickHistoryRepository.countClicksByProduct(
                 LocalDateTime.of(2026, 10, 1, 0, 0), LocalDateTime.of(2026, 10, 2, 0, 0), AS_OF)).willReturn(List.of());
 
@@ -53,7 +53,7 @@ class SearchClickMetricServiceTest {
 
     @Test
     @DisplayName("from이 to보다 늦으면 입력 오류이고 조회하지 않는다")
-    void rejectsFromAfterTo() {
+    void getProductClicks_throwException_whenFromAfterTo() {
         assertThatThrownBy(() -> searchClickMetricService.getProductClicks(TO, FROM, AS_OF))
                 .isInstanceOf(BusinessException.class);
         verifyNoInteractions(searchClickHistoryRepository);
@@ -61,7 +61,7 @@ class SearchClickMetricServiceTest {
 
     @Test
     @DisplayName("기간이나 기준 시각이 없으면 입력 오류이고 조회하지 않는다")
-    void rejectsMissingInput() {
+    void getProductClicks_throwException_whenInputMissing() {
         assertThatThrownBy(() -> searchClickMetricService.getProductClicks(null, TO, AS_OF))
                 .isInstanceOf(BusinessException.class);
         assertThatThrownBy(() -> searchClickMetricService.getProductClicks(FROM, null, AS_OF))

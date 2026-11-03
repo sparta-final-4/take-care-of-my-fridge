@@ -9,9 +9,8 @@ import org.springframework.ai.embedding.EmbeddingModel;
 
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -29,7 +28,7 @@ class RecipeEmbedderTest {
 
     @Test
     @DisplayName("검색어 한 건을 설정한 차원의 벡터로 바꾼다")
-    void embedsOneText() {
+    void embed_returnsVector() {
         // Given
         when(embeddingModel.embed("두부")).thenReturn(new float[]{1, 2, 3});
 
@@ -37,12 +36,12 @@ class RecipeEmbedderTest {
         float[] vector = embedder.embed("두부");
 
         // Then
-        assertArrayEquals(new float[]{1, 2, 3}, vector);
+        assertThat(vector).containsExactly(new float[]{1, 2, 3});
     }
 
     @Test
     @DisplayName("색인용 임베딩은 batchSize 단위로 나눠 호출하고 입력 순서를 지킨다")
-    void embedAllSplitsByBatchSize() {
+    void embedAll_splitsByBatchSize() {
         // Given
         when(embeddingModel.embed(List.of("a", "b"))).thenReturn(List.of(new float[]{1, 0, 0}, new float[]{2, 0, 0}));
         when(embeddingModel.embed(List.of("c"))).thenReturn(List.of(new float[]{3, 0, 0}));
@@ -51,21 +50,21 @@ class RecipeEmbedderTest {
         List<float[]> vectors = embedder.embedAll(List.of("a", "b", "c"));
 
         // Then
-        assertEquals(3, vectors.size());
-        assertEquals(1f, vectors.get(0)[0]);
-        assertEquals(2f, vectors.get(1)[0]);
-        assertEquals(3f, vectors.get(2)[0]);
+        assertThat(vectors.size()).isEqualTo(3);
+        assertThat(vectors.get(0)[0]).isEqualTo(1f);
+        assertThat(vectors.get(1)[0]).isEqualTo(2f);
+        assertThat(vectors.get(2)[0]).isEqualTo(3f);
         verify(embeddingModel, times(2)).embed(anyList());
     }
 
     @Test
     @DisplayName("모델이 설정과 다른 차원을 돌려주면 예외를 던진다")
-    void rejectsWrongDimensions() {
+    void embed_throwException_whenDimensionsMismatch() {
         // Given
         when(embeddingModel.embed("두부")).thenReturn(new float[]{1, 0});
 
         // When & Then
-        assertThrows(IllegalStateException.class, () -> embedder.embed("두부"));
+        assertThatThrownBy(() -> embedder.embed("두부")).isInstanceOf(IllegalStateException.class);
     }
 
 }

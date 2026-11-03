@@ -23,8 +23,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -73,60 +73,60 @@ class IngredientNameSearchServiceTest {
 
     @Test
     @DisplayName("BM25 계산은 ES _explain 결과와 같다 (소주: name.ko 17.3778)")
-    void bm25MatchesEsExplain() {
-        assertEquals(17.3778, IngredientNameSearchService.bm25(1, 1, 1085, 1, 2.4507, 2.0, 0.75), DELTA);
+    void bm25_matchesEsExplain() {
+        assertThat(IngredientNameSearchService.bm25(1, 1, 1085, 1, 2.4507, 2.0, 0.75)).isCloseTo(17.3778, within(DELTA));
         // b=0이면 문서 길이와 상관없다
-        assertEquals(IngredientNameSearchService.bm25(1, 5, 1085, 1, 4.4, 1.0, 0.0),
-                IngredientNameSearchService.bm25(1, 5, 1085, 30, 4.4, 1.0, 0.0), DELTA);
+        assertThat(IngredientNameSearchService.bm25(1, 5, 1085, 30, 4.4, 1.0, 0.0))
+                .isCloseTo(IngredientNameSearchService.bm25(1, 5, 1085, 1, 4.4, 1.0, 0.0), within(DELTA));
     }
 
     @Test
     @DisplayName("완벽 일치 점수는 필드 중 최대이고, 인덱스에 없는 토큰은 문서 빈도 1로 본다")
-    void perfectScoreUsesBestFieldAndTreatsUnknownTokenAsDocFreqOne() {
+    void perfectScore_usesBestFieldAndTreatsUnknownTokenAsDocFreqOne() {
         Map<String, TermVector> vectors = Map.of(
                 "name.ko", termVector(1085, 2659, Map.of("소주", term(1, 1))),
                 "aliases.ko", termVector(1085, 4795, Map.of("소주", term(1, null))));
 
         double expected = IngredientNameSearchService.bm25(1, 1, 1085, 1, 2659.0 / 1085, 2.0, 0.75);
-        assertEquals(expected, IngredientNameSearchService.perfectScore(vectors), DELTA);
-        assertEquals(0.0, IngredientNameSearchService.perfectScore(Map.of()), DELTA);
+        assertThat(IngredientNameSearchService.perfectScore(vectors)).isCloseTo(expected, within(DELTA));
+        assertThat(IngredientNameSearchService.perfectScore(Map.of())).isCloseTo(0.0, within(DELTA));
     }
 
     @Test
     @DisplayName("후보는 점수 높은 순(같으면 이름 순)으로 최대 5개다")
-    void ranksByScoreThenNameUpToFive() {
+    void rank_ordersByScoreThenNameUpToFive() {
         List<IngredientCandidate> result = IngredientNameSearchService.rank(Map.of(
                 "우유", 0.57, "달걀", 1.0, "두유", 0.3, "아몬드우유", 0.47, "가지", 0.3, "꿀", 0.1));
 
-        assertEquals(List.of(
+        assertThat(result).isEqualTo(List.of(
                 new IngredientCandidate("달걀", 1.0),
                 new IngredientCandidate("우유", 0.57),
                 new IngredientCandidate("아몬드우유", 0.47),
                 new IngredientCandidate("가지", 0.3),
-                new IngredientCandidate("두유", 0.3)), result);
+                new IngredientCandidate("두유", 0.3)));
     }
 
     @Test
     @DisplayName("ES 검색을 쓰지 않거나 입력이 비면 조회 없이 빈 목록을 돌려준다")
-    void returnsEmptyWhenEngineIsMySqlOrBlank() {
-        assertTrue(new IngredientNameSearchService(esClient, properties(SearchEngine.MYSQL)).findCandidates("계란").isEmpty());
-        assertTrue(new IngredientNameSearchService(esClient, properties(SearchEngine.ELASTICSEARCH)).findCandidates(" ").isEmpty());
+    void findCandidates_returnsEmpty_whenEngineIsMySqlOrBlank() {
+        assertThat(new IngredientNameSearchService(esClient, properties(SearchEngine.MYSQL)).findCandidates("계란").isEmpty()).isTrue();
+        assertThat(new IngredientNameSearchService(esClient, properties(SearchEngine.ELASTICSEARCH)).findCandidates(" ").isEmpty()).isTrue();
         verifyNoInteractions(esClient);
     }
 
     @Test
     @DisplayName("ES 조회가 실패하면 예외 없이 빈 목록을 돌려준다")
-    void returnsEmptyWhenEsFails() throws IOException {
+    void findCandidates_returnsEmpty_whenEsFails() throws IOException {
         IngredientNameSearchService service = new IngredientNameSearchService(esClient, properties(SearchEngine.ELASTICSEARCH));
         when(esClient.search(any(SearchRequest.class), eq(IngredientHit.class))).thenThrow(new IOException("ES down"));
 
-        assertTrue(service.findCandidates("계란").isEmpty());
+        assertThat(service.findCandidates("계란").isEmpty()).isTrue();
     }
 
     @Test
     @DisplayName("별칭이 정확히 맞으면 1.0, 나머지는 BM25 점수를 완벽 일치 점수로 나눈 값이다")
     @SuppressWarnings("unchecked")
-    void scoresAliasAsOneAndNormalizesBm25() throws IOException {
+    void findCandidates_scoresAliasAsOneAndNormalizesBm25() throws IOException {
         IngredientNameSearchService service = new IngredientNameSearchService(esClient, properties(SearchEngine.ELASTICSEARCH));
         Map<String, TermVector> vectors = Map.of("name.ko", termVector(1085, 2659, Map.of("우유", term(1, 3))));
         double perfect = IngredientNameSearchService.perfectScore(vectors);
@@ -139,10 +139,10 @@ class IngredientNameSearchServiceTest {
 
         List<IngredientCandidate> result = service.findCandidates("계란");
 
-        assertEquals(2, result.size());
-        assertEquals(new IngredientCandidate("달걀", 1.0), result.get(0));
-        assertEquals("우유", result.get(1).value());
-        assertEquals(0.5, result.get(1).score(), DELTA);
+        assertThat(result.size()).isEqualTo(2);
+        assertThat(result.get(0)).isEqualTo(new IngredientCandidate("달걀", 1.0));
+        assertThat(result.get(1).value()).isEqualTo("우유");
+        assertThat(result.get(1).score()).isCloseTo(0.5, within(DELTA));
     }
 
 }
