@@ -1,6 +1,6 @@
-import { MenuOutlined, SearchOutlined } from '@ant-design/icons';
+import { MenuOutlined } from '@ant-design/icons';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { Badge, Button, Divider, Drawer, Flex, Grid, Input, Layout, Typography } from 'antd';
+import { Badge, Button, Divider, Drawer, Flex, Grid, Layout, Typography } from 'antd';
 import { useState } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router';
 
@@ -14,6 +14,7 @@ import { cartQueries } from '@/domains/cart/queries';
 import { chatSessionEventListener } from '@/domains/chat/chatSessionEvent';
 import { NotificationBell } from '@/domains/notification/components/NotificationBell';
 import { notificationEventListener } from '@/domains/notification/notificationEvent';
+import { SearchKeywordInput } from '@/domains/search/components/SearchKeywordInput';
 
 import styles from './Header.module.scss';
 
@@ -46,9 +47,6 @@ const ADMIN_NAV_ITEMS = [
 
 // 회원 실시간 신호에 붙일 도메인 처리기. 바뀌면 다시 연결하므로 모듈 상수로 둔다.
 const MEMBER_EVENT_LISTENERS = [notificationEventListener, chatSessionEventListener];
-
-// 백엔드 검색어 길이 제한(RecipeListRequest.keyword)
-const SEARCH_KEYWORD_MAX_LENGTH = 50;
 
 export function Header() {
   const navigate = useNavigate();
@@ -122,15 +120,11 @@ export function Header() {
 
         {!isAdmin && (
           <div className={styles.searchWrapper}>
-            <Input
+            <SearchKeywordInput
               key={currentKeyword}
-              defaultValue={currentKeyword}
-              prefix={<SearchOutlined />}
-              placeholder="재료나 요리를 검색해 보세요"
-              aria-label="재료나 요리 검색"
-              maxLength={SEARCH_KEYWORD_MAX_LENGTH}
-              enterKeyHint="search"
-              onPressEnter={(event) => handleSearch(event.currentTarget.value)}
+              initialKeyword={currentKeyword}
+              ariaLabel="재료나 요리 검색"
+              onSearch={handleSearch}
               className={styles.searchInput}
             />
           </div>
@@ -213,18 +207,14 @@ export function Header() {
       >
         <Flex vertical gap="middle">
           {!isAdmin && (
-            <Input
+            <SearchKeywordInput
               key={currentKeyword}
-              defaultValue={currentKeyword}
-              prefix={<SearchOutlined />}
-              placeholder="재료나 요리를 검색해 보세요"
-              aria-label="모바일 재료나 요리 검색"
-              maxLength={SEARCH_KEYWORD_MAX_LENGTH}
-              enterKeyHint="search"
-              onPressEnter={(event) => {
-                if (!event.currentTarget.value.trim()) return;
+              initialKeyword={currentKeyword}
+              ariaLabel="모바일 재료나 요리 검색"
+              onSearch={(keyword) => {
+                if (!keyword.trim()) return;
                 handleCloseDrawer();
-                handleSearch(event.currentTarget.value);
+                handleSearch(keyword);
               }}
             />
           )}

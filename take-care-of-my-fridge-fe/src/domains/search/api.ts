@@ -33,3 +33,11 @@ export async function recordSearchClick(request: SearchClickRequest): Promise<vo
 export async function recordSearchRecipeClick(request: SearchRecipeClickRequest): Promise<void> {
   await unwrap(searchApi.recordRecipeClick({ searchRecipeClickRequest: request }));
 }
+
+// 상단 검색창 자동완성. 검색어로 시작하는 단어가 이름에 있는 레시피 이름을 최대 8개 돌려준다.
+export async function suggestSearchKeywords(
+  keyword: string,
+  signal?: AbortSignal,
+): Promise<string[]> {
+  return unwrap(searchApi.suggest({ request: { keyword } }, { signal }));
+}
