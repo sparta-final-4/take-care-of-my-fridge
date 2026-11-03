@@ -2282,6 +2282,16 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PaymentPrepareRequest"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "content": {
@@ -6495,6 +6505,16 @@
             "type": "string",
             "format": "date-time"
           },
+          "pgProvider": {
+            "type": "string",
+            "enum": [
+              "KAKAOPAY",
+              "KICC",
+              "INICIS",
+              "TOSSPAYMENTS",
+              "TOSSPAY"
+            ]
+          },
           "portonePaymentId": {
             "type": "string"
           },
@@ -6508,12 +6528,36 @@
           }
         }
       },
+      "PaymentPrepareRequest": {
+        "type": "object",
+        "properties": {
+          "pgProvider": {
+            "type": "string",
+            "enum": [
+              "KAKAOPAY",
+              "KICC",
+              "INICIS",
+              "TOSSPAYMENTS",
+              "TOSSPAY"
+            ]
+          }
+        },
+        "required": [
+          "pgProvider"
+        ]
+      },
       "PaymentPrepareResponse": {
         "type": "object",
         "properties": {
           "amount": {
             "type": "integer",
             "format": "int64"
+          },
+          "channelKey": {
+            "type": "string"
+          },
+          "easyPayProvider": {
+            "type": "string"
           },
           "expiresAt": {
             "type": "string",
@@ -6525,6 +6569,19 @@
           },
           "orderName": {
             "type": "string"
+          },
+          "payMethod": {
+            "type": "string"
+          },
+          "pgProvider": {
+            "type": "string",
+            "enum": [
+              "KAKAOPAY",
+              "KICC",
+              "INICIS",
+              "TOSSPAYMENTS",
+              "TOSSPAY"
+            ]
           },
           "portonePaymentId": {
             "type": "string"

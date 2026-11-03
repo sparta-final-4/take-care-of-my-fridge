@@ -17,9 +17,24 @@
 
 export interface PaymentPrepareResponse {
     'amount'?: number;
+    'channelKey'?: string;
+    'easyPayProvider'?: string;
     'expiresAt'?: string;
     'orderId'?: number;
     'orderName'?: string;
+    'payMethod'?: string;
+    'pgProvider'?: PaymentPrepareResponsePgProviderEnum;
     'portonePaymentId'?: string;
 }
+
+export const PaymentPrepareResponsePgProviderEnum = {
+    Kakaopay: 'KAKAOPAY',
+    Kicc: 'KICC',
+    Inicis: 'INICIS',
+    Tosspayments: 'TOSSPAYMENTS',
+    Tosspay: 'TOSSPAY',
+} as const;
+
+export type PaymentPrepareResponsePgProviderEnum = typeof PaymentPrepareResponsePgProviderEnum[keyof typeof PaymentPrepareResponsePgProviderEnum];
+
 

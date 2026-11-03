@@ -159,6 +159,7 @@ export * from './page-response-sale-event-list-response';
 export * from './page-response-settlement-payment-response';
 export * from './payment-confirm-request';
 export * from './payment-confirm-response';
+export * from './payment-prepare-request';
 export * from './payment-prepare-response';
 export * from './popular-recipe-request';
 export * from './popular-recipe-response';
