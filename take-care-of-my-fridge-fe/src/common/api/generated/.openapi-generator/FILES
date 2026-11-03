@@ -90,6 +90,7 @@ models/api-response-review-response.ts
 models/api-response-review-summary-result.ts
 models/api-response-sale-event-detail-response.ts
 models/api-response-sale-events-create-response.ts
+models/api-response-search-fridge-match-response.ts
 models/api-response-settlement-response.ts
 models/api-response-sign-up-response.ts
 models/api-response-today-sales-response.ts
@@ -213,6 +214,7 @@ models/recipe-detail-response.ts
 models/recipe-ingredient-request.ts
 models/recipe-list-item-response.ts
 models/recipe-list-request.ts
+models/recipe-match.ts
 models/recipe-nutrition-request.ts
 models/recipe-step-request.ts
 models/recipe-update-request.ts
@@ -243,6 +245,8 @@ models/sale-events-create-response.ts
 models/sale-response.ts
 models/sales-amount-response.ts
 models/search-click-request.ts
+models/search-fridge-match-request.ts
+models/search-fridge-match-response.ts
 models/search-recipe-click-request.ts
 models/search-suggestion-request.ts
 models/settlement-payment-response.ts
