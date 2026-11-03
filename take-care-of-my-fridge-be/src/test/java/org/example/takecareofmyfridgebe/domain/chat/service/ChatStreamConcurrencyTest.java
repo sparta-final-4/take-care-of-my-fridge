@@ -87,7 +87,7 @@ class ChatStreamConcurrencyTest extends RedisContainerSupport {
     @DisplayName("같은 상담에 동시에 두 번 보내면 하나만 스트림을 받고 다른 하나는 409, 하루 횟수는 1만 오른다")
     void streamsOnlyOne_whenSentConcurrently() throws Exception {
         Sinks.Many<String> reply = Sinks.many().unicast().onBackpressureBuffer();
-        given(chatReplyGenerator.generate(anyLong(), any())).willReturn(reply.asFlux());
+        given(chatReplyGenerator.generate(anyLong(), anyLong(), any())).willReturn(reply.asFlux());
 
         int requests = 2;
         ExecutorService executor = Executors.newFixedThreadPool(requests);
@@ -135,7 +135,7 @@ class ChatStreamConcurrencyTest extends RedisContainerSupport {
                 new ChatMessageResponse(1L, 1, ChatMessageRole.USER, "질문", LocalDateTime.now()),
                 new ChatMessageResponse(2L, 2, ChatMessageRole.ASSISTANT, "답", LocalDateTime.now())
         ));
-        given(chatReplyGenerator.generate(anyLong(), any())).willReturn(
+        given(chatReplyGenerator.generate(anyLong(), anyLong(), any())).willReturn(
                 Flux.just("답"),
                 Flux.error(new RuntimeException("AI 연결 실패")),
                 Flux.concat(Flux.just("조각"), Flux.never()),
@@ -167,7 +167,8 @@ class ChatStreamConcurrencyTest extends RedisContainerSupport {
                 .expectNextMatches(event -> "done".equals(event.event()))
                 .verifyComplete();
 
-        assertThat(todayCount()).isEqualTo("4");
+        // 4번 보냈지만 오류는 첫 조각 전 실패라 하루 횟수를 돌려받아 3이다
+        assertThat(todayCount()).isEqualTo("3");
     }
 
     // doFinally는 마지막 신호를 받는 쪽에 넘긴 직후 실행되므로, 다음 요청 전에 잠금이 풀리길 잠깐 기다린다

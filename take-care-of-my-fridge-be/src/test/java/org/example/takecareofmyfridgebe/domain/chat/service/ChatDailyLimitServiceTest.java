@@ -64,7 +64,7 @@ class ChatDailyLimitServiceTest extends RedisContainerSupport {
                 .extracting(e -> ((BusinessException) e).getErrorCode())
                 .isEqualTo(ErrorCode.CHAT_DAILY_LIMIT_EXCEEDED);
 
-        // 실패 후에도 카운트는 31로 유지 (답 생성이 실패해도 차감 유지 원칙)
+        // 한도 초과로 거절돼도 카운트는 31로 유지 (돌려주기는 답 생성이 첫 조각 전에 실패했을 때만 ChatStreamService가 한다)
         String today = ZonedDateTime.now(SEOUL_ZONE).format(DATE_FORMATTER);
         String key = "chat:limit:" + memberId + ":" + today;
         String countStr = stringRedisTemplate.opsForValue().get(key);
@@ -106,5 +106,43 @@ class ChatDailyLimitServiceTest extends RedisContainerSupport {
         Long expireSeconds = stringRedisTemplate.getExpire(key, TimeUnit.SECONDS);
         assertThat(expireSeconds).isNotNull().isGreaterThan(0L);
         assertThat(stringRedisTemplate.opsForValue().get(key)).isEqualTo("6");
+    }
+
+    @Test
+    @DisplayName("횟수를 늘리면 늘린 날짜 키를 돌려주고 그 키로 돌려주기를 하면 1 줄고 유지 시간은 그대로다")
+    void decreasesCountAndKeepsTtl_whenRefunded() {
+        Long memberId = 4L;
+        chatDailyLimitService.checkAndIncrement(memberId);
+        String key = chatDailyLimitService.checkAndIncrement(memberId);
+
+        String today = ZonedDateTime.now(SEOUL_ZONE).format(DATE_FORMATTER);
+        assertThat(key).isEqualTo("chat:limit:" + memberId + ":" + today);
+        assertThat(stringRedisTemplate.opsForValue().get(key)).isEqualTo("2");
+
+        chatDailyLimitService.refund(key);
+
+        assertThat(stringRedisTemplate.opsForValue().get(key)).isEqualTo("1");
+        assertThat(stringRedisTemplate.getExpire(key, TimeUnit.SECONDS)).isGreaterThan(0L);
+    }
+
+    @Test
+    @DisplayName("돌려줄 키가 없으면(만료) 키를 새로 만들지 않는다")
+    void doesNotCreateKey_whenRefundKeyIsMissing() {
+        String key = "chat:limit:5:20000101";
+
+        chatDailyLimitService.refund(key);
+
+        assertThat(stringRedisTemplate.hasKey(key)).isFalse();
+    }
+
+    @Test
+    @DisplayName("횟수가 0이면 돌려주기를 해도 0 아래로 내려가지 않는다")
+    void keepsZero_whenRefundedAtZero() {
+        String key = "chat:limit:6:20000101";
+        stringRedisTemplate.opsForValue().set(key, "0");
+
+        chatDailyLimitService.refund(key);
+
+        assertThat(stringRedisTemplate.opsForValue().get(key)).isEqualTo("0");
     }
 }

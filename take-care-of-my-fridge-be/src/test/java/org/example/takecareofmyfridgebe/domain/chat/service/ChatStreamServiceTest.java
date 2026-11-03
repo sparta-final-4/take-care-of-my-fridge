@@ -35,6 +35,7 @@ import static org.mockito.Mockito.when;
 class ChatStreamServiceTest {
 
     private static final String LOCK_TOKEN = "lock-token";
+    private static final String LIMIT_KEY = "chat:limit:1:20261103";
 
     @Mock
     private ChatMessageService chatMessageService;
@@ -61,7 +62,7 @@ class ChatStreamServiceTest {
         Long sessionId = 10L;
         String userContent = "된장찌개 레시피 알려줘";
 
-        when(chatReplyGenerator.generate(sessionId, userContent))
+        when(chatReplyGenerator.generate(1L, sessionId, userContent))
                 .thenReturn(Flux.just("된장", "찌개", " 레시피"));
 
         AtomicReference<String> executedThreadName = new AtomicReference<>();
@@ -107,7 +108,7 @@ class ChatStreamServiceTest {
         Long sessionId = 10L;
         String userContent = "질문";
 
-        when(chatReplyGenerator.generate(sessionId, userContent))
+        when(chatReplyGenerator.generate(1L, sessionId, userContent))
                 .thenReturn(Flux.error(new BusinessException(ErrorCode.INVALID_CHAT_ROOM_STATUS)));
 
         Flux<ServerSentEvent<String>> stream = chatStreamService.streamMessage(memberId, sessionId, userContent);
@@ -128,7 +129,7 @@ class ChatStreamServiceTest {
         Long sessionId = 10L;
         String userContent = "질문";
 
-        when(chatReplyGenerator.generate(sessionId, userContent))
+        when(chatReplyGenerator.generate(1L, sessionId, userContent))
                 .thenReturn(Flux.error(new RuntimeException("AI API Connection Timeout")));
 
         Flux<ServerSentEvent<String>> stream = chatStreamService.streamMessage(memberId, sessionId, userContent);
@@ -149,7 +150,7 @@ class ChatStreamServiceTest {
         Long sessionId = 10L;
         String userContent = "질문";
 
-        when(chatReplyGenerator.generate(sessionId, userContent))
+        when(chatReplyGenerator.generate(1L, sessionId, userContent))
                 .thenReturn(Flux.just("조각1", "조각2", "조각3"));
 
         Flux<ServerSentEvent<String>> stream = chatStreamService.streamMessage(memberId, sessionId, userContent);
@@ -177,7 +178,7 @@ class ChatStreamServiceTest {
                 .extracting(e -> ((BusinessException) e).getErrorCode())
                 .isEqualTo(ErrorCode.CHAT_ROOM_NOT_FOUND);
 
-        verify(chatReplyGenerator, never()).generate(any(), any());
+        verify(chatReplyGenerator, never()).generate(any(), any(), any());
         verify(chatDailyLimitService, never()).checkAndIncrement(any());
         verify(chatStreamLockService, never()).acquire(any());
     }
@@ -196,7 +197,7 @@ class ChatStreamServiceTest {
                 .extracting(e -> ((BusinessException) e).getErrorCode())
                 .isEqualTo(ErrorCode.CHAT_DAILY_LIMIT_EXCEEDED);
 
-        verify(chatReplyGenerator, never()).generate(any(), any());
+        verify(chatReplyGenerator, never()).generate(any(), any(), any());
         verify(chatMessageService, never()).saveExchange(any(), any(), any());
     }
 
@@ -207,7 +208,7 @@ class ChatStreamServiceTest {
         Long sessionId = 10L;
         String userContent = "재료 뭐 있어?";
 
-        when(chatReplyGenerator.generate(sessionId, userContent))
+        when(chatReplyGenerator.generate(1L, sessionId, userContent))
                 .thenReturn(Flux.just(" 계란", " 양파 "));
 
         when(chatMessageService.saveExchange(eq(sessionId), eq(userContent), eq(" 계란 양파 ")))
@@ -241,7 +242,7 @@ class ChatStreamServiceTest {
                 .isEqualTo(ErrorCode.CHAT_REPLY_IN_PROGRESS);
 
         verify(chatDailyLimitService, never()).checkAndIncrement(any());
-        verify(chatReplyGenerator, never()).generate(any(), any());
+        verify(chatReplyGenerator, never()).generate(any(), any(), any());
         verify(chatStreamLockService, never()).release(any(), any());
     }
 
@@ -261,7 +262,7 @@ class ChatStreamServiceTest {
                 .isEqualTo(ErrorCode.CHAT_DAILY_LIMIT_EXCEEDED);
 
         verify(chatStreamLockService, timeout(1_000).times(1)).release(sessionId, LOCK_TOKEN);
-        verify(chatReplyGenerator, never()).generate(any(), any());
+        verify(chatReplyGenerator, never()).generate(any(), any(), any());
     }
 
     @Test
@@ -269,7 +270,7 @@ class ChatStreamServiceTest {
     void releasesLock_whenStreamCompletes() {
         Long sessionId = 10L;
         when(chatStreamLockService.acquire(sessionId)).thenReturn(LOCK_TOKEN);
-        when(chatReplyGenerator.generate(sessionId, "질문")).thenReturn(Flux.just("답"));
+        when(chatReplyGenerator.generate(1L, sessionId, "질문")).thenReturn(Flux.just("답"));
         when(chatMessageService.saveExchange(sessionId, "질문", "답")).thenReturn(List.of(
                 new ChatMessageResponse(100L, 1, ChatMessageRole.USER, "질문", LocalDateTime.now()),
                 new ChatMessageResponse(101L, 2, ChatMessageRole.ASSISTANT, "답", LocalDateTime.now())
@@ -291,7 +292,7 @@ class ChatStreamServiceTest {
     void releasesLock_whenStreamErrors() {
         Long sessionId = 10L;
         when(chatStreamLockService.acquire(sessionId)).thenReturn(LOCK_TOKEN);
-        when(chatReplyGenerator.generate(sessionId, "질문"))
+        when(chatReplyGenerator.generate(1L, sessionId, "질문"))
                 .thenReturn(Flux.error(new RuntimeException("AI API Connection Timeout")));
 
         StepVerifier.create(chatStreamService.streamMessage(1L, sessionId, "질문"))
@@ -306,7 +307,7 @@ class ChatStreamServiceTest {
     void releasesLock_whenStreamIsCancelled() {
         Long sessionId = 10L;
         when(chatStreamLockService.acquire(sessionId)).thenReturn(LOCK_TOKEN);
-        when(chatReplyGenerator.generate(sessionId, "질문"))
+        when(chatReplyGenerator.generate(1L, sessionId, "질문"))
                 .thenReturn(Flux.concat(Flux.just("조각1"), Flux.never()));
 
         StepVerifier.create(chatStreamService.streamMessage(1L, sessionId, "질문"))
@@ -316,5 +317,92 @@ class ChatStreamServiceTest {
 
         verify(chatStreamLockService, timeout(1_000).times(1)).release(sessionId, LOCK_TOKEN);
         verify(chatMessageService, never()).saveExchange(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("답 조각을 하나도 받기 전에 생성이 실패하면 그 오류 코드를 보내고 하루 횟수를 돌려준다")
+    void refundsDailyCount_whenFailsBeforeFirstChunk() {
+        Long sessionId = 10L;
+        when(chatDailyLimitService.checkAndIncrement(1L)).thenReturn(LIMIT_KEY);
+        when(chatReplyGenerator.generate(1L, sessionId, "질문"))
+                .thenReturn(Flux.error(new BusinessException(ErrorCode.CHAT_AI_UNAVAILABLE)));
+
+        StepVerifier.create(chatStreamService.streamMessage(1L, sessionId, "질문"))
+                .expectNextMatches(event -> "error".equals(event.event())
+                        && event.data().contains("\"code\":\"CHAT_010\""))
+                .verifyComplete();
+
+        verify(chatDailyLimitService, times(1)).refund(LIMIT_KEY);
+        verify(chatMessageService, never()).saveExchange(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("첫 조각을 받은 뒤 끊기면 CHAT_012를 보내고 하루 횟수를 돌려주지 않으며 저장하지 않는다")
+    void keepsDailyCount_whenInterruptedAfterFirstChunk() {
+        Long sessionId = 10L;
+        when(chatDailyLimitService.checkAndIncrement(1L)).thenReturn(LIMIT_KEY);
+        when(chatReplyGenerator.generate(1L, sessionId, "질문")).thenReturn(Flux.concat(
+                Flux.just("조각"),
+                Flux.error(new BusinessException(ErrorCode.CHAT_REPLY_INTERRUPTED))));
+
+        StepVerifier.create(chatStreamService.streamMessage(1L, sessionId, "질문"))
+                .expectNextMatches(event -> "message".equals(event.event()))
+                .expectNextMatches(event -> "error".equals(event.event())
+                        && event.data().contains("\"code\":\"CHAT_012\""))
+                .verifyComplete();
+
+        verify(chatDailyLimitService, never()).refund(any());
+        verify(chatMessageService, never()).saveExchange(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("조각 없이 정상 종료(빈 답)되면 CHAT_010 오류를 보내고 하루 횟수를 돌려주며 저장하지 않는다")
+    void sendsAiUnavailableAndRefunds_whenReplyIsEmpty() {
+        Long sessionId = 10L;
+        when(chatStreamLockService.acquire(sessionId)).thenReturn(LOCK_TOKEN);
+        when(chatDailyLimitService.checkAndIncrement(1L)).thenReturn(LIMIT_KEY);
+        when(chatReplyGenerator.generate(1L, sessionId, "질문")).thenReturn(Flux.empty());
+
+        StepVerifier.create(chatStreamService.streamMessage(1L, sessionId, "질문"))
+                .expectNextMatches(event -> "error".equals(event.event())
+                        && event.data().contains("\"code\":\"CHAT_010\""))
+                .verifyComplete();
+
+        verify(chatDailyLimitService, times(1)).refund(LIMIT_KEY);
+        verify(chatMessageService, never()).saveExchange(any(), any(), any());
+        verify(chatStreamLockService, timeout(1_000).times(1)).release(sessionId, LOCK_TOKEN);
+    }
+
+    @Test
+    @DisplayName("사용자가 첫 조각 전에 연결을 끊으면(cancel) 하루 횟수를 돌려주지 않는다")
+    void keepsDailyCount_whenUserCancelsBeforeFirstChunk() {
+        Long sessionId = 10L;
+        when(chatDailyLimitService.checkAndIncrement(1L)).thenReturn(LIMIT_KEY);
+        when(chatReplyGenerator.generate(1L, sessionId, "질문")).thenReturn(Flux.never());
+
+        StepVerifier.create(chatStreamService.streamMessage(1L, sessionId, "질문"))
+                .thenCancel()
+                .verify();
+
+        verify(chatDailyLimitService, never()).refund(any());
+    }
+
+    @Test
+    @DisplayName("답을 끝까지 받아 저장하면 하루 횟수를 돌려주지 않는다")
+    void keepsDailyCount_whenStreamCompletes() {
+        Long sessionId = 10L;
+        when(chatDailyLimitService.checkAndIncrement(1L)).thenReturn(LIMIT_KEY);
+        when(chatReplyGenerator.generate(1L, sessionId, "질문")).thenReturn(Flux.just("답"));
+        when(chatMessageService.saveExchange(sessionId, "질문", "답")).thenReturn(List.of(
+                new ChatMessageResponse(100L, 1, ChatMessageRole.USER, "질문", LocalDateTime.now()),
+                new ChatMessageResponse(101L, 2, ChatMessageRole.ASSISTANT, "답", LocalDateTime.now())
+        ));
+
+        StepVerifier.create(chatStreamService.streamMessage(1L, sessionId, "질문"))
+                .expectNextMatches(event -> "message".equals(event.event()))
+                .expectNextMatches(event -> "done".equals(event.event()))
+                .verifyComplete();
+
+        verify(chatDailyLimitService, never()).refund(any());
     }
 }

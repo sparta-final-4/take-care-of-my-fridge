@@ -90,4 +90,17 @@ describe('getChatErrorInfo', () => {
       action: 'restoreInput',
     });
   });
+
+  it.each([
+    ['CHAT_010', 'AI가 잠시 답할 수 없어요. 잠시 후 다시 시도해 주세요'],
+    ['CHAT_011', '요청이 많아요. 잠시 후 다시 보내 주세요'],
+  ])('%s(AI가 답을 시작하지 못함)는 안내하고 보내려던 내용을 되돌린다', (code, message) => {
+    expect(getChatErrorInfo(code)).toEqual({ message, action: 'restoreInput' });
+  });
+
+  it('CHAT_012(답을 받다가 끊김)는 안내만 하고 입력은 되돌리지 않는다', () => {
+    expect(getChatErrorInfo('CHAT_012')).toEqual({
+      message: '답을 받다가 끊겼어요. 다시 보내 주세요',
+    });
+  });
 });
