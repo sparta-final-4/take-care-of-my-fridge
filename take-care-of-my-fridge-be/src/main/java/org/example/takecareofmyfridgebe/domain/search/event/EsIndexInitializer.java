@@ -36,7 +36,7 @@ public class EsIndexInitializer {
                     indexer.reindex();
                 }
             } catch (IOException | RuntimeException e) {
-                // 앱은 그대로 뜬다. 검색은 MySQL로 대체되고, 다음 정기 재색인에서 다시 시도한다
+                // 앱은 그대로 뜬다. 검색은 MySQL로 대체된다. 상품은 다음 정기 재색인에서, 레시피·재료는 다음 기동 때 다시 시도한다
                 log.error("[{}] 최초 색인 실패", indexer.alias(), e);
             }
         }

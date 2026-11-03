@@ -15,6 +15,7 @@ import java.io.IOException;
  * <br>
  * 단건 색인 이벤트를 거치지 않은 DB 변경(SQL 직접 입력, DB 초기화, 단건 색인 실패)을 정기적으로 맞춘다.
  * 레시피·재료는 재색인할 때마다 전부 다시 임베딩(OpenAI)하므로 상품만 다시 색인한다.
+ * 레시피·재료를 SQL로 직접 바꿨다면 해당 alias를 지우고 재시작해 EsIndexInitializer가 전체 색인하게 한다.
  */
 @Slf4j
 @Component

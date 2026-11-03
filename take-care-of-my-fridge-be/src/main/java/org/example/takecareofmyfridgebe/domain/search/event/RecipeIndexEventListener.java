@@ -14,7 +14,8 @@ import java.io.IOException;
 /**
  * 이벤트 들어오면 한 건 재색인
  * <br>
- * 실패하더라도 무시. (scheduler 로 전체 재색인도 정기적으로 돌리므로)
+ * 실패하더라도 무시하고 로그만 남긴다. 레시피는 정기 전체 재색인이 없어서(EsReindexScheduler는 상품만),
+ * 실패한 레시피는 다시 저장되거나 alias를 지우고 재시작해 전체 색인할 때까지 이전 상태로 검색된다.
  */
 @Slf4j
 @Component
