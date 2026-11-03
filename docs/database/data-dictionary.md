@@ -182,7 +182,7 @@
 
 ## orders — 주문
 
-- 결제 대기에서 시작해 결제 완료, 취소, 구매 확정으로 바뀝니다. 주문 한 건에 주문 상품 여러 건이 있습니다.
+- 결제 대기에서 시작해 결제 완료, 취소, 구매 확정, 전액 환불로 바뀝니다. 전액 환불과 환불 뒤 바로 구매 확정은 환불 도메인이 환불 완료 때 판단해 바꿉니다. 주문 한 건에 주문 상품 여러 건이 있습니다.
 - 제약 이름: UK `uk_orders_order_number`, `uk_orders_member_id_idempotency_key`. 인덱스 `idx_orders_member_id_status`(member_id, status), `idx_orders_status_created_at`(status, created_at), `idx_orders_status_paid_at`(status, paid_at).
 
 | 컬럼 | 타입 | NULL | 기본값 | 제약 | 의미 |
@@ -231,7 +231,7 @@
 | status | ENUM('REQUESTED','COMPLETED','FAILED') | 불가 | | | 요청(PG 취소 대기)·완료·실패 |
 | portone_cancellation_id | VARCHAR(200) | 허용 | NULL | | PG 취소 건 ID. 완료 전이나 찾지 못하면 NULL |
 | fail_reason | VARCHAR(255) | 허용 | NULL | | 실패 사유(PG 오류 원문). 길면 255자에서 잘라 저장. 사용자에게 보여 주지 않음 |
-| refunded_at | DATETIME(6) | 허용 | NULL | 인덱스 | 환불 완료 시각. 정산 기준 시각. 완료 전에는 NULL |
+| refunded_at | DATETIME(6) | 허용 | NULL | 인덱스 | 환불 완료 시각. 완료 전에는 NULL. 정산은 이 값이 아니라 결제 이력의 `created_at`으로 셉니다 |
 
 - `created_at`이 신청 시각입니다.
 - 실행용 DDL 초안은 [refund.sql](refund.sql)에 있습니다.
@@ -294,18 +294,19 @@
 | order_id | BIGINT | 불가 | | FK | 결제할 주문 |
 | portone_payment_id | VARCHAR(100) | 불가 | | UK | PortOne 결제 ID. 서버가 `payment-` + 하이픈 없는 UUID로 만든 40자. PortOne 결제의 멱등 키 역할 |
 | amount | BIGINT | 불가 | | | 결제 금액(원). 클라이언트 값이 아니라 주문 금액(`orders.total_amount`) |
+| pg_provider | ENUM('KAKAOPAY','KICC','INICIS','TOSSPAYMENTS','TOSSPAY') | 불가 | | | 결제대행사. 결제 준비 때 고른 값이고, 승인할 때 PG 조회로 확인한 실제 결제대행사가 다르면 그 값으로 고침 |
 | status | ENUM('READY','PAID','FAILED') | 불가 | | 인덱스 | 결제 대기·결제 완료·실패 |
 | paid_at | DATETIME(6) | 허용 | NULL | | 결제 완료 시각(서버가 승인한 시각). 결제 완료 전에는 NULL |
 | expires_at | DATETIME(6) | 불가 | | 인덱스 | 결제 대기 만료 시각. 생성 10분 뒤. 이 시각 이후 PG에서 결제되면 받지 않고 취소 |
 | fail_reason | ENUM('PG_FAILED','USER_CANCELLED','AMOUNT_MISMATCH','TIMEOUT','ORDER_NOT_PAYABLE','SUPERSEDED') | 허용 | NULL | | 실패 사유. PG 실패·결제창 닫기·금액 불일치·만료·결제할 수 없는 주문·새 결제로 정리. 실패가 아니면 NULL |
 
-- 실행용 DDL 초안은 [payment.sql](payment.sql)에 있습니다.
+- 실행용 DDL 초안은 [payment.sql](payment.sql)에 있습니다. `pg_provider`와 `idx_payment_histories_created_at`은 아직 이 초안에 없고, 위 정의는 엔티티 기준입니다.
 
 ## payment_histories — 결제 이력
 
 - 결제 한 건에 일어난 사건을 시간순으로 추가만 합니다. 수정·삭제하지 않습니다.
 - 결제 상태 변경과 같은 트랜잭션에서 남기므로 상태 변경이 롤백되면 이력도 남지 않습니다.
-- 제약 이름: 인덱스 `idx_payment_histories_payment_id`(payment_id, created_at), `idx_payment_histories_refund_id`(refund_id). FK `fk_payment_histories_payment`.
+- 제약 이름: 인덱스 `idx_payment_histories_payment_id`(payment_id, created_at), `idx_payment_histories_refund_id`(refund_id), `idx_payment_histories_created_at`(created_at, 정산 기간 조회). FK `fk_payment_histories_payment`.
 
 | 컬럼 | 타입 | NULL | 기본값 | 제약 | 의미 |
 |---|---|---|---|---|---|
@@ -320,6 +321,7 @@
 
 - `created_at`이 사건 시각입니다.
 - 결제 상태와 사건 종류는 다릅니다. 결제는 `FAILED`인데 이력에 `PAID`가 있고 `CANCELLED`가 없으면 보상 취소가 끝나지 않은 결제로 보고 스케줄러가 다시 취소합니다.
+- 정산이 이 테이블을 매출 원장으로 읽습니다. 결제 상태가 `PAID`인 결제의 `PAID`(결제)·`PARTIAL_CANCELLED`·`CANCELLED`(환불·콘솔 취소) 이력을 `created_at` 기준으로 셉니다.
 
 ## webhook_events — PortOne 웹훅 수신 기록
 
@@ -335,6 +337,26 @@
 | raw_payload | TEXT | 불가 | | | 웹훅 본문 원문 |
 | fail_reason | VARCHAR(500) | 허용 | NULL | | 처리 실패 사유. 길면 500자에서 잘라 저장 |
 | processed_at | DATETIME(6) | 허용 | NULL | | 처리 완료 시각(`PROCESSED`·`IGNORED`) |
+
+## daily_sales — 일별 매출 집계
+
+- 담당 도메인: 정산. 설계는 [정산 설계](../architecture/domains/settlement.md)입니다.
+- 하루(한국 시간 0시 ~ 다음 날 0시)의 결제·환불 합계를 날짜마다 한 행으로 둡니다. 매일 00:10에 어제 행을 만들고, 정산 조회가 행 없는 날을 채웁니다. 오늘 행은 만들지 않습니다.
+- 다시 집계하면 같은 행을 새 합계로 덮어씁니다. 지우지 않습니다. 주·월 합계는 저장하지 않습니다.
+- 제약 이름: UK `uk_daily_sales_sales_date`(sales_date).
+
+| 컬럼 | 타입 | NULL | 기본값 | 제약 | 의미 |
+|---|---|---|---|---|---|
+| sales_date | DATE | 불가 | | UK | 매출 날짜(한국 시간) |
+| paid_amount | BIGINT | 불가 | | | 그날 결제 금액 합(원). 결제 이력 `PAID` |
+| refunded_amount | BIGINT | 불가 | | | 그날 환불 금액 합(원). 결제 이력 `PARTIAL_CANCELLED`·`CANCELLED`(환불·콘솔 취소) |
+| net_amount | 미확인(BIGINT로 봄) | 미확인 | | 생성 컬럼 | 순매출(paid_amount − refunded_amount). DB가 계산하며 엔티티는 매핑하지 않고 `getNetAmount()`로 계산. 음수 가능 |
+| paid_count | INT | 불가 | | | 결제 건수(`PAID` 이력 수) |
+| refunded_count | INT | 불가 | | | 환불 건수(취소 이력 수). 같은 결제를 두 번 부분 환불하면 2 |
+
+- 결제 상태가 `PAID`인 결제의 이력만 셉니다. 받지 않은 결제와 그 보상 취소는 빠집니다.
+- 환불 금액이 있는데 환불 건수가 0인 행은 환불 건수 칸이 생기기 전에 집계된 행으로 보고, 정산 조회 때 다시 집계합니다.
+- 저장소에 이 테이블의 DDL 파일은 없습니다. 타입은 엔티티(`DailySales`) 기준이고, `net_amount`의 타입·식과 기본값은 엔티티 주석 외에는 확인하지 못했습니다.
 
 ## search_click_histories — 검색 결과 상품 클릭 기록
 

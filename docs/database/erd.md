@@ -310,6 +310,7 @@ erDiagram
         bigint order_id FK
         varchar portone_payment_id UK
         bigint amount
+        enum pg_provider
         enum status
         datetime expires_at
         enum fail_reason
@@ -322,6 +323,7 @@ erDiagram
         bigint cancelled_amount
         bigint refund_id "외부 참조"
         enum changed_by
+        datetime created_at
     }
     webhook_events {
         bigint id PK
@@ -343,6 +345,39 @@ erDiagram
 | payment_histories.refund_id | 취소를 일으킨 환불 | 환불 |
 
 - 결제가 붙은 주문은 지우지 않습니다. 결제를 시도한 결제 대기 주문은 정리될 때 취소 상태로 남습니다.
+
+## 정산 테이블 관계
+
+정산 테이블 1개입니다. 컬럼 정의는 [데이터 사전](data-dictionary.md#daily_sales--일별-매출-집계)에 있습니다.
+
+```mermaid
+erDiagram
+    payment_histories }o..o| daily_sales : "그날 created_at으로 집계"
+
+    payment_histories {
+        bigint id PK
+        bigint payment_id FK
+        enum event_type
+        bigint amount
+        datetime created_at
+    }
+    daily_sales {
+        bigint id PK
+        date sales_date UK
+        bigint paid_amount
+        bigint refunded_amount
+        bigint net_amount "생성 컬럼"
+        int paid_count
+        int refunded_count
+    }
+```
+
+| 관계 | 의미 | 필수 여부 |
+|---|---|---|
+| payment_histories N : 1 daily_sales | 하루(한국 시간) 동안 남은 결제 이력을 합쳐 그날 한 행을 만듦 | 키로 잇지 않는 집계 관계. FK 없음 |
+
+- daily_sales는 다른 테이블을 FK로 가리키지 않습니다. `sales_date`로 날짜마다 한 행입니다.
+- 결제 상태가 `PAID`인 결제의 `PAID`·`PARTIAL_CANCELLED`·`CANCELLED` 이력만 셉니다. 주·월 합계는 저장하지 않습니다.
 
 ## 확정 절차
 
