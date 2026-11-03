@@ -70,7 +70,7 @@ class SaleEventQueryServiceCandidateTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("종료 시각이 지난 행사는 상태 정리가 늦어도 등록할 상품 목록에서 상품을 막지 않는다")
-    void getCandidates_overdueEventDoesNotBlockProduct() {
+    void ignoresOverdueEventWhenSelectingCandidates() {
         Product overdue = saveProduct("대파", 3000, 5);
         saveEvent(SaleEventType.SPECIAL, SaleEventStatus.ACTIVE, NOW.minusHours(2), NOW.minusMinutes(1), overdue, null);
 
@@ -82,7 +82,7 @@ class SaleEventQueryServiceCandidateTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("등록할 상품 목록에는 판매 중이고 재고가 있으며 예정·진행 중인 행사에 들지 않은 상품만 나온다")
-    void getCandidates_excludesProductsInOpenEventsAndUnsellable() {
+    void excludesProductsInOpenEventsAndUnsellableOnes() {
         Product scheduled = saveProduct("대파", 3000, 7);
         Product active = saveProduct("두부", 3000, 5);
         Product ended = saveProduct("양파", 3000, 3);
@@ -105,7 +105,7 @@ class SaleEventQueryServiceCandidateTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("등록할 상품 목록은 이름·종류로 거르고 페이지로 나뉜다")
-    void getCandidates_filtersAndPaginates() {
+    void filtersAndPaginatesCandidates() {
         saveProduct("국산 대파", 3000, 5);
         saveProduct("쪽파", 3000, 5);
         saveProduct("두부", 3000, 5);

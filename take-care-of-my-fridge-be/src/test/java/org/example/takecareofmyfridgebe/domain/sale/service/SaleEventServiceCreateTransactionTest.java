@@ -82,7 +82,7 @@ class SaleEventServiceCreateTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("특가를 등록하면 상품마다 같은 기간의 예정 행사가 따로 저장되고 할인가의 원 아래는 버린다")
-    void createSpecialSale_savesOneEventPerItem() {
+    void savesOneSpecialSaleEventPerItem() {
         Product greenOnion = saveProduct("대파", 3000);
         Product tofu = saveProduct("두부", 1999);
 
@@ -107,7 +107,7 @@ class SaleEventServiceCreateTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("번개 드롭을 등록하면 한정 수량과 남은 수량이 같은 값으로 저장된다")
-    void createFlashDrop_savesLimitedQuantity() {
+    void savesFlashDropLimitedQuantity() {
         Product tofu = saveProduct("두부", 3000);
 
         SaleEventsCreateResponse response = adminSaleEventFacade.createFlashDrop(flashDrop(tofu));
@@ -124,7 +124,7 @@ class SaleEventServiceCreateTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("번개 드롭 상품을 여럿 등록하면 상품마다 행사가 따로 저장되고 한정 수량도 상품마다 다르다")
-    void createFlashDrop_multipleItems_savesOneEventPerItem() {
+    void savesOneFlashDropEventPerItem() {
         Product tofu = saveProduct("두부", 3000);
         Product greenOnion = saveProduct("대파", 2000);
 
@@ -147,7 +147,7 @@ class SaleEventServiceCreateTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("한 상품의 한정 수량이 재고보다 많으면 다른 상품도 등록되지 않는다")
-    void createFlashDrop_oneItemOverStock_savesNothing() {
+    void savesNothingWhenOneFlashDropItemExceedsStock() {
         Product tofu = saveProduct("두부", 3000);
         Product greenOnion = saveProduct("대파", 2000);
 
@@ -162,7 +162,7 @@ class SaleEventServiceCreateTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("종료 시각이 지난 행사는 상태 정리가 늦어도 같은 상품의 새 행사를 막지 않는다")
-    void create_productInOverdueEvent_allowed() {
+    void allowsProductInOverdueEvent() {
         Product tofu = saveProduct("두부", 3000);
         Long overdueEventId = adminSaleEventFacade.createFlashDrop(flashDrop(tofu)).saleEventIds().get(0);
         changeStatus(overdueEventId, SaleEventStatus.ACTIVE);
@@ -176,7 +176,7 @@ class SaleEventServiceCreateTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("번개 드롭 한정 수량이 재고보다 많으면 거절하고 행사는 저장되지 않는다")
-    void createFlashDrop_limitedQuantityOverStock_rejects() {
+    void rejectsFlashDropLimitedQuantityOverStock() {
         Product tofu = saveProduct("두부", 3000);
         FlashDropCreateRequest request = new FlashDropCreateRequest(TOMORROW, TOMORROW.plusHours(2),
                 List.of(new FlashDropItemRequest(tofu.getId(), 50, 11)));
@@ -191,7 +191,7 @@ class SaleEventServiceCreateTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("예정이나 진행 중인 행사에 든 상품은 거절하고 새 행사는 저장되지 않는다")
-    void create_productInOpenEvent_rejects() {
+    void rejectsProductInOpenEvent() {
         Product greenOnion = saveProduct("대파", 3000);
         Product tofu = saveProduct("두부", 3000);
         adminSaleEventFacade.createSpecialSale(specialSale(item(greenOnion, 20)));
@@ -211,7 +211,7 @@ class SaleEventServiceCreateTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("종료된 행사에 들었던 상품은 새 행사에 다시 넣을 수 있다")
-    void create_productInEndedEvent_saves() {
+    void savesProductInEndedEvent() {
         Product greenOnion = saveProduct("대파", 3000);
         Long endedEventId = adminSaleEventFacade.createSpecialSale(specialSale(item(greenOnion, 20))).saleEventIds().get(0);
         changeStatus(endedEventId, SaleEventStatus.ENDED);
@@ -224,7 +224,7 @@ class SaleEventServiceCreateTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("품절이나 판매 중지 상품은 거절하고 행사는 저장되지 않는다")
-    void create_notOnSaleProduct_rejects() {
+    void rejectsNotOnSaleProduct() {
         Product greenOnion = saveProduct("대파", 3000);
         Product soldOut = saveProduct("두부", 3000, ProductStatus.SOLD_OUT);
         Product stopped = saveProduct("양파", 3000, ProductStatus.STOPPED);
@@ -244,7 +244,7 @@ class SaleEventServiceCreateTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("없는 상품이 섞이면 404이고 행사는 저장되지 않는다")
-    void create_missingProduct_rejects() {
+    void rejectsMissingProduct() {
         Product greenOnion = saveProduct("대파", 3000);
 
         assertThatThrownBy(() -> adminSaleEventFacade.createSpecialSale(specialSale(
@@ -256,7 +256,7 @@ class SaleEventServiceCreateTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("시작 시각이 지금보다 과거면 거절하고 행사는 저장되지 않는다")
-    void create_pastStartsAt_rejects() {
+    void rejectsPastStartsAt() {
         Product greenOnion = saveProduct("대파", 3000);
         LocalDateTime past = LocalDateTime.now(ZoneId.of("Asia/Seoul")).minusMinutes(1);
 

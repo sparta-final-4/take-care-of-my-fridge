@@ -26,7 +26,7 @@ class PopularSaleServiceTest {
 
     @Test
     @DisplayName("최근 검색 클릭이 많은 순으로 나오고, 클릭 기록이 없는 상품은 0으로 쳐서 맨 뒤로 간다")
-    void rank_byClicks() {
+    void ranksByClicks() {
         // given
         List<Product> products = products(1L, 2L, 3L);
         Map<Long, ActiveSale> sales = sales(special(1L, 20), special(2L, 20), special(3L, 20));
@@ -41,7 +41,7 @@ class PopularSaleServiceTest {
 
     @Test
     @DisplayName("클릭 수가 같으면 할인율이 높은 순이고, 할인율도 같으면 상품 ID 순이다")
-    void rank_tieBreak() {
+    void breaksTiesInRanking() {
         // given
         List<Product> products = products(1L, 2L, 3L);
         Map<Long, ActiveSale> sales = sales(special(1L, 10), special(2L, 30), special(3L, 30));
@@ -56,7 +56,7 @@ class PopularSaleServiceTest {
 
     @Test
     @DisplayName("상품이 품절이거나 번개 드롭 남은 수량이 0이면 클릭이 많아도 빠진다")
-    void rank_excludesUnbuyable() {
+    void excludesUnbuyableFromRanking() {
         // given
         Product soldOut = ProductFixture.createProduct(1L, "두부", 2000);
         soldOut.decreaseStock(10);
@@ -74,7 +74,7 @@ class PopularSaleServiceTest {
 
     @Test
     @DisplayName("후보가 6개를 넘으면 순위가 높은 6개만 남는다")
-    void rank_limitsToSix() {
+    void limitsRankingToSix() {
         // given
         List<Product> products = products(1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L);
         Map<Long, ActiveSale> sales = sales(LongStream.rangeClosed(1, 8)

@@ -45,7 +45,7 @@ class SaleControllerTest {
 
     @Test
     @DisplayName("비로그인 상태에서 인기 특가를 조회하면 200 OK와 특가 목록을 반환한다")
-    void getPopularSales_unauthenticated_ok() throws Exception {
+    void allowsUnauthenticatedPopularSales() throws Exception {
         // given
         SaleResponse sale = new SaleResponse(SaleEventType.SPECIAL, 1600, 20,
                 OffsetDateTime.of(2026, 11, 1, 18, 0, 0, 0, ZoneOffset.ofHours(9)), null, null);
@@ -65,7 +65,7 @@ class SaleControllerTest {
 
     @Test
     @DisplayName("공개한 것은 인기 특가 경로 하나뿐이라, 다른 할인 경로는 비로그인이면 401이다")
-    void otherSalePath_unauthenticated_unauthorized() throws Exception {
+    void rejectsUnauthenticatedAccessToOtherSalePaths() throws Exception {
         mvc.perform(get("/api/sales/other"))
                 .andExpect(status().isUnauthorized());
     }

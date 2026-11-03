@@ -72,7 +72,7 @@ class SaleEventLifecycleTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("시작 시각이 지난 예정 행사는 진행 중으로, 종료 시각이 지난 진행 중 행사는 종료로 바뀌고 나머지는 그대로다")
-    void openAndCloseDue_changesOnlyDueEvents() {
+    void changesOnlyDueEventsWhenOpeningAndClosing() {
         Product a = saveProduct("대파", 3000, 10);
         Product b = saveProduct("두부", 3000, 10);
         Product c = saveProduct("우유", 3000, 10);
@@ -92,7 +92,7 @@ class SaleEventLifecycleTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("열기 전에 이미 종료 시각이 지난 예정 행사는 진행 중을 거치지 않고 바로 종료된다")
-    void openAndCloseDue_scheduledEventAlreadyOver_endsDirectly() {
+    void endsScheduledEventDirectlyWhenAlreadyOver() {
         Product a = saveProduct("대파", 3000, 10);
         SaleEvent missed = saveEvent(SaleEventType.SPECIAL, SaleEventStatus.SCHEDULED, NOW.minusHours(2), NOW.minusHours(1), a, null);
 
@@ -103,7 +103,7 @@ class SaleEventLifecycleTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("같은 시각에 두 번 처리해도 결과가 같다")
-    void openAndCloseDue_isIdempotent() {
+    void opensAndClosesIdempotently() {
         Product a = saveProduct("대파", 3000, 10);
         SaleEvent due = saveEvent(SaleEventType.SPECIAL, SaleEventStatus.SCHEDULED, NOW.minusMinutes(1), NOW.plusHours(1), a, null);
 
@@ -115,7 +115,7 @@ class SaleEventLifecycleTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("진행 중인 행사의 상품만 할인으로 조회되고 예정·종료 행사와 종료 시각이 지난 진행 중 행사는 빠진다")
-    void findActiveSales_returnsOnlyActive() {
+    void returnsOnlyActiveSales() {
         Product special = saveProduct("두부", 3000, 10);
         Product flashDrop = saveProduct("우유", 4000, 10);
         Product scheduled = saveProduct("대파", 3000, 10);
@@ -143,7 +143,7 @@ class SaleEventLifecycleTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("스케줄러가 아직 상태를 안 바꿨어도 시작 시각이 지난 예정 행사는 진행 중으로 조회되고, 종료로 닫은 행사는 시각이 남아도 빠진다")
-    void findActiveSales_judgesByTimeNotByStatus() {
+    void judgesActiveSalesByTimeNotByStatus() {
         Product startedButScheduled = saveProduct("대파", 3000, 10);
         Product manuallyEnded = saveProduct("두부", 3000, 10);
         saveEvent(SaleEventType.SPECIAL, SaleEventStatus.SCHEDULED, NOW.minusSeconds(5), NOW.plusHours(1), startedButScheduled, null);

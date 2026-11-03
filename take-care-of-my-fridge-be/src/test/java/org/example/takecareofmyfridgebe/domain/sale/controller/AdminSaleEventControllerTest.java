@@ -96,7 +96,7 @@ class AdminSaleEventControllerTest {
 
     @Test
     @DisplayName("관리자가 특가를 등록하면 201과 상품마다 만든 행사 번호를 돌려준다")
-    void createSpecialSale_returns201() throws Exception {
+    void returns201WhenCreatingSpecialSale() throws Exception {
         when(adminSaleEventFacade.createSpecialSale(any(SpecialSaleCreateRequest.class)))
                 .thenReturn(new SaleEventsCreateResponse(List.of(7L, 8L)));
 
@@ -110,7 +110,7 @@ class AdminSaleEventControllerTest {
 
     @Test
     @DisplayName("관리자가 번개 드롭을 등록하면 201과 상품마다 만든 행사 번호를 돌려준다")
-    void createFlashDrop_returns201() throws Exception {
+    void returns201WhenCreatingFlashDrop() throws Exception {
         when(adminSaleEventFacade.createFlashDrop(any(FlashDropCreateRequest.class)))
                 .thenReturn(new SaleEventsCreateResponse(List.of(8L, 9L)));
 
@@ -124,7 +124,7 @@ class AdminSaleEventControllerTest {
 
     @Test
     @DisplayName("이미 행사가 있는 상품이면 409와 SALE_001을 돌려준다")
-    void createFlashDrop_duplicated_returns409() throws Exception {
+    void returns409WhenCreatingDuplicatedFlashDrop() throws Exception {
         when(adminSaleEventFacade.createFlashDrop(any(FlashDropCreateRequest.class)))
                 .thenThrow(new BusinessException(ErrorCode.SALE_EVENT_PRODUCT_DUPLICATED, "이미 행사가 있는 상품 · 두부"));
 
@@ -138,7 +138,7 @@ class AdminSaleEventControllerTest {
 
     @Test
     @DisplayName("특가 입력값이 잘못되면 400이고 서비스를 부르지 않는다")
-    void createSpecialSale_invalidInput_returns400() throws Exception {
+    void returns400ForInvalidSpecialSaleInput() throws Exception {
         List<String> bodies = List.of(
                 // 종료가 시작보다 빠름
                 """
@@ -172,7 +172,7 @@ class AdminSaleEventControllerTest {
 
     @Test
     @DisplayName("번개 드롭 입력값이 잘못되면 400이고 서비스를 부르지 않는다")
-    void createFlashDrop_invalidInput_returns400() throws Exception {
+    void returns400ForInvalidFlashDropInput() throws Exception {
         List<String> bodies = List.of(
                 // 한정 수량 없음
                 """
@@ -211,7 +211,7 @@ class AdminSaleEventControllerTest {
 
     @Test
     @DisplayName("일반 회원은 403, 로그인하지 않으면 401이고 서비스를 부르지 않는다")
-    void create_nonAdmin_rejects() throws Exception {
+    void rejectsCreationByNonAdmin() throws Exception {
         mvc.perform(post("/api/admin/sale-events/special")
                         .with(csrf()).with(loginAs(Member.Role.USER))
                         .contentType(MediaType.APPLICATION_JSON).content(SPECIAL_BODY))
@@ -225,7 +225,7 @@ class AdminSaleEventControllerTest {
 
     @Test
     @DisplayName("관리자가 등록할 상품 목록을 조회하면 상품마다 재고와 함께 페이지로 돌려준다")
-    void getCandidateProducts_returns200() throws Exception {
+    void returns200WhenGettingCandidateProducts() throws Exception {
         when(saleEventQueryService.getCandidates(any(SaleCandidateProductsRequest.class)))
                 .thenReturn(new PageResponse<>(List.of(
                         new SaleCandidateProductResponse(1L, ProductType.INGREDIENT, "대파", null, 3000, 7)),
@@ -242,7 +242,7 @@ class AdminSaleEventControllerTest {
 
     @Test
     @DisplayName("검색어·페이지 값이 잘못되면 400, 일반 회원은 403이며 서비스를 부르지 않는다")
-    void getCandidateProducts_invalidOrNonAdmin_rejects() throws Exception {
+    void rejectsCandidateProductsWithInvalidInputOrNonAdmin() throws Exception {
         mvc.perform(get("/api/admin/sale-events/products").param("page", "0").with(loginAs(Member.Role.ADMIN)))
                 .andExpect(status().isBadRequest());
         mvc.perform(get("/api/admin/sale-events/products").param("size", "101").with(loginAs(Member.Role.ADMIN)))
@@ -254,7 +254,7 @@ class AdminSaleEventControllerTest {
 
     @Test
     @DisplayName("관리자가 행사 목록을 조회하면 조건을 서비스에 넘기고, 날짜 하나만 주면 그 하루로 본다")
-    void getSaleEvents_returns200() throws Exception {
+    void returns200WhenGettingSaleEvents() throws Exception {
         when(saleEventQueryService.getSaleEvents(any(SaleEventListRequest.class)))
                 .thenReturn(new PageResponse<>(List.of(
                         new SaleEventListResponse(1L, SaleEventType.FLASH_DROP, SaleEventStatus.ACTIVE,
@@ -280,7 +280,7 @@ class AdminSaleEventControllerTest {
 
     @Test
     @DisplayName("기간 순서·페이지 값이 잘못되면 400, 일반 회원은 403이며 서비스를 부르지 않는다")
-    void getSaleEvents_invalidOrNonAdmin_rejects() throws Exception {
+    void rejectsSaleEventListWithInvalidInputOrNonAdmin() throws Exception {
         mvc.perform(get("/api/admin/sale-events").param("startFrom", "2026-10-20").param("startTo", "2026-10-01")
                         .with(loginAs(Member.Role.ADMIN)))
                 .andExpect(status().isBadRequest());
@@ -307,7 +307,7 @@ class AdminSaleEventControllerTest {
 
     @Test
     @DisplayName("관리자가 행사를 고치면 200이고 요청 값을 서비스에 넘긴다")
-    void updateSaleEvent_returns200() throws Exception {
+    void returns200WhenUpdatingSaleEvent() throws Exception {
         mvc.perform(patch("/api/admin/sale-events/5").with(csrf()).with(loginAs(Member.Role.ADMIN))
                         .contentType(MediaType.APPLICATION_JSON).content(UPDATE_BODY))
                 .andExpect(status().isOk())
@@ -323,7 +323,7 @@ class AdminSaleEventControllerTest {
 
     @Test
     @DisplayName("시각·상품·할인율이 잘못되면 400, 일반 회원은 403이며 서비스를 부르지 않는다")
-    void updateSaleEvent_invalidOrNonAdmin_rejects() throws Exception {
+    void rejectsUpdateWithInvalidInputOrNonAdmin() throws Exception {
         for (String body : List.of(
                 "{}",
                 "{\"startsAt\": \"2099-10-20T00:00:00\", \"endsAt\": \"2099-10-26T00:00:00\", \"items\": []}",
@@ -347,7 +347,7 @@ class AdminSaleEventControllerTest {
 
     @Test
     @DisplayName("시작한 행사나 없는 행사는 서비스의 오류 코드대로 409와 404를 돌려준다")
-    void updateSaleEvent_serviceErrors_mapToStatus() throws Exception {
+    void mapsUpdateServiceErrorsToStatus() throws Exception {
         doThrow(new BusinessException(ErrorCode.SALE_EVENT_NOT_EDITABLE))
                 .when(adminSaleEventFacade).update(eq(5L), any());
         doThrow(new BusinessException(ErrorCode.SALE_EVENT_NOT_FOUND))
@@ -365,7 +365,7 @@ class AdminSaleEventControllerTest {
 
     @Test
     @DisplayName("관리자가 행사 하나를 조회하면 시각과 행사 항목을 돌려주고, 없는 행사는 404, 일반 회원은 403이다")
-    void getSaleEvent_returns200() throws Exception {
+    void returns200WhenGettingSaleEvent() throws Exception {
         when(adminSaleEventFacade.getSaleEvent(5L)).thenReturn(new SaleEventDetailResponse(
                 5L, SaleEventType.FLASH_DROP, SaleEventStatus.SCHEDULED,
                 LocalDateTime.of(2099, 10, 1, 18, 0), LocalDateTime.of(2099, 10, 1, 20, 0),
@@ -386,7 +386,7 @@ class AdminSaleEventControllerTest {
 
     @Test
     @DisplayName("관리자가 할인 행사를 종료·삭제하면 200이고 서비스를 부르며, 일반 회원은 403이다")
-    void endAndDeleteSaleEvent_returns200() throws Exception {
+    void returns200WhenEndingAndDeletingSaleEvent() throws Exception {
         mvc.perform(patch("/api/admin/sale-events/5/end").with(csrf()).with(loginAs(Member.Role.ADMIN)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true));
@@ -405,7 +405,7 @@ class AdminSaleEventControllerTest {
 
     @Test
     @DisplayName("종료·삭제할 수 없는 할인 행사는 409와 오류 코드, 없는 할인 행사는 404를 돌려준다")
-    void endAndDeleteSaleEvent_serviceErrors_mapToStatus() throws Exception {
+    void mapsEndAndDeleteServiceErrorsToStatus() throws Exception {
         doThrow(new BusinessException(ErrorCode.SALE_EVENT_NOT_ENDABLE)).when(saleEventService).end(5L);
         doThrow(new BusinessException(ErrorCode.SALE_EVENT_NOT_DELETABLE)).when(saleEventService).delete(5L);
         doThrow(new BusinessException(ErrorCode.SALE_EVENT_NOT_FOUND)).when(saleEventService).end(7L);
