@@ -11,9 +11,7 @@ import org.junit.jupiter.api.Test;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 
 class FridgeItemResponseTest {
 
@@ -45,93 +43,97 @@ class FridgeItemResponseTest {
      * 호환용 필드(expired, imminent)도 status에서 만들어지는지 검증한다.
      */
     @Test
-    void fromWithPastExpirationDateReturnsExpired() {
+    @DisplayName("소비기한이 지난 재료는 EXPIRED 상태와 음수 dDay로 변환한다")
+    void returnsExpired_whenExpirationDateHasPassed() {
         FridgeItemResponse response = FridgeItemResponse.from(fridgeExpiringOn(TODAY.minusDays(2)), TODAY);
 
-        assertEquals(-2, response.dDay());
-        assertEquals(FridgeItemStatus.EXPIRED, response.status());
-        assertTrue(response.expired());
-        assertFalse(response.imminent());
+        assertThat(response.dDay()).isEqualTo(-2);
+        assertThat(response.status()).isEqualTo(FridgeItemStatus.EXPIRED);
+        assertThat(response.expired()).isTrue();
+        assertThat(response.imminent()).isFalse();
     }
 
     /**
      * 소비기한이 오늘인 재료는 dDay가 0, status가 IMMINENT인지 검증한다.
      */
     @Test
-    void fromWithTodayExpirationDateReturnsImminent() {
+    @DisplayName("소비기한이 오늘인 재료는 IMMINENT 상태와 dDay 0으로 변환한다")
+    void returnsImminent_whenExpirationDateIsToday() {
         FridgeItemResponse response = FridgeItemResponse.from(fridgeExpiringOn(TODAY), TODAY);
 
-        assertEquals(0, response.dDay());
-        assertEquals(FridgeItemStatus.IMMINENT, response.status());
-        assertFalse(response.expired());
-        assertTrue(response.imminent());
+        assertThat(response.dDay()).isEqualTo(0);
+        assertThat(response.status()).isEqualTo(FridgeItemStatus.IMMINENT);
+        assertThat(response.expired()).isFalse();
+        assertThat(response.imminent()).isTrue();
     }
 
     /**
      * 소비기한이 3일 이내인 재료는 dDay가 양수, status가 IMMINENT인지 검증한다.
      */
     @Test
-    void fromWithNearExpirationDateReturnsImminent() {
+    @DisplayName("소비기한이 3일 이내인 재료는 IMMINENT 상태로 변환한다")
+    void returnsImminent_whenExpirationDateIsWithinThreeDays() {
         FridgeItemResponse response = FridgeItemResponse.from(fridgeExpiringOn(TODAY.plusDays(3)), TODAY);
 
-        assertEquals(3, response.dDay());
-        assertEquals(FridgeItemStatus.IMMINENT, response.status());
-        assertFalse(response.expired());
-        assertTrue(response.imminent());
+        assertThat(response.dDay()).isEqualTo(3);
+        assertThat(response.status()).isEqualTo(FridgeItemStatus.IMMINENT);
+        assertThat(response.expired()).isFalse();
+        assertThat(response.imminent()).isTrue();
     }
 
     /**
      * 소비기한이 4일 이상 남은 재료는 dDay가 양수, status가 NORMAL인지 검증한다.
      */
     @Test
-    void fromWithFarExpirationDateReturnsNormal() {
+    @DisplayName("소비기한이 4일 이상 남은 재료는 NORMAL 상태로 변환한다")
+    void returnsNormal_whenFourOrMoreDaysLeft() {
         FridgeItemResponse response = FridgeItemResponse.from(fridgeExpiringOn(TODAY.plusDays(4)), TODAY);
 
-        assertEquals(4, response.dDay());
-        assertEquals(FridgeItemStatus.NORMAL, response.status());
-        assertFalse(response.expired());
-        assertFalse(response.imminent());
+        assertThat(response.dDay()).isEqualTo(4);
+        assertThat(response.status()).isEqualTo(FridgeItemStatus.NORMAL);
+        assertThat(response.expired()).isFalse();
+        assertThat(response.imminent()).isFalse();
     }
 
     @Test
     @DisplayName("표준 사전에 매핑된 일반 재료는 ingredientType이 NORMAL이다")
-    void fromWithNormalIngredientReturnsNormalType() {
+    void returnsNormalType_whenIngredientIsMapped() {
         Ingredient normal = Ingredient.builder()
                 .ingredientCode("ING_TOFU")
                 .name("두부")
                 .build();
 
         FridgeItemResponse response = FridgeItemResponse.from(fridgeWithIngredient(normal), TODAY);
-        assertEquals(IngredientType.NORMAL, response.ingredientType());
+        assertThat(response.ingredientType()).isEqualTo(IngredientType.NORMAL);
     }
 
     @Test
     @DisplayName("사용자 직접 입력 재료(ING_CUSTOM)는 ingredientType이 CUSTOM이다")
-    void fromWithCustomIngredientReturnsCustomType() {
+    void returnsCustomType_whenIngredientIsCustom() {
         Ingredient custom = Ingredient.builder()
                 .ingredientCode(Ingredient.ING_CUSTOM)
                 .name("직접입력")
                 .build();
 
         FridgeItemResponse response = FridgeItemResponse.from(fridgeWithIngredient(custom), TODAY);
-        assertEquals(IngredientType.CUSTOM, response.ingredientType());
+        assertThat(response.ingredientType()).isEqualTo(IngredientType.CUSTOM);
     }
 
     @Test
     @DisplayName("밀키트 재료(ING_MEALKIT)는 ingredientType이 MEALKIT이다")
-    void fromWithMealkitIngredientReturnsMealkitType() {
+    void returnsMealkitType_whenIngredientIsMealkit() {
         Ingredient mealkit = Ingredient.builder()
                 .ingredientCode(Ingredient.ING_MEALKIT)
                 .name("밀키트")
                 .build();
 
         FridgeItemResponse response = FridgeItemResponse.from(fridgeWithIngredient(mealkit), TODAY);
-        assertEquals(IngredientType.MEALKIT, response.ingredientType());
+        assertThat(response.ingredientType()).isEqualTo(IngredientType.MEALKIT);
     }
 
     @Test
     @DisplayName("기본 양념 재료(is_basic_seasoning = true)는 basicSeasoning이 true다")
-    void fromWithBasicSeasoningIngredientReturnsBasicSeasoningTrue() {
+    void returnsBasicSeasoningTrue_whenIngredientIsBasicSeasoning() {
         Ingredient soySauce = Ingredient.builder()
                 .ingredientCode("ING_SOY_SAUCE")
                 .name("간장")
@@ -139,20 +141,20 @@ class FridgeItemResponseTest {
                 .build();
 
         FridgeItemResponse response = FridgeItemResponse.from(fridgeWithIngredient(soySauce), TODAY);
-        assertTrue(response.basicSeasoning());
-        assertEquals(IngredientType.NORMAL, response.ingredientType());
+        assertThat(response.basicSeasoning()).isTrue();
+        assertThat(response.ingredientType()).isEqualTo(IngredientType.NORMAL);
     }
 
     @Test
     @DisplayName("기본 양념이 아닌 재료와 재료가 없는 냉장고 재료는 basicSeasoning이 false다")
-    void fromWithoutBasicSeasoningReturnsBasicSeasoningFalse() {
+    void returnsBasicSeasoningFalse_whenNotBasicSeasoningOrIngredientIsMissing() {
         Ingredient tofu = Ingredient.builder()
                 .ingredientCode("ING_TOFU")
                 .name("두부")
                 .basicSeasoning(false)
                 .build();
 
-        assertFalse(FridgeItemResponse.from(fridgeWithIngredient(tofu), TODAY).basicSeasoning());
-        assertFalse(FridgeItemResponse.from(fridgeExpiringOn(TODAY), TODAY).basicSeasoning());
+        assertThat(FridgeItemResponse.from(fridgeWithIngredient(tofu), TODAY).basicSeasoning()).isFalse();
+        assertThat(FridgeItemResponse.from(fridgeExpiringOn(TODAY), TODAY).basicSeasoning()).isFalse();
     }
 }

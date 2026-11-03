@@ -167,7 +167,7 @@ class PurchaseConfirmedConsumerTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("재료 상품과 밀키트가 든 구매 확정을 받으면 상품마다 냉장고 행과 입고 이력을 하나씩 남긴다")
-    void consume_stocksIngredientAndMealkit() throws InterruptedException {
+    void stocksIngredientAndMealkitWithHistory() throws InterruptedException {
         send(event(9101L, 9101L, List.of(
                 new OrderConfirmedEvent.Item(910101L, onionProduct.getId(), "양파 1kg", 2),
                 new OrderConfirmedEvent.Item(910102L, mealkitProduct.getId(), "된장찌개 밀키트", 1)
@@ -199,7 +199,7 @@ class PurchaseConfirmedConsumerTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("같은 구매 확정을 두 번 받아도 한 번만 넣고 DLT로 보내지 않는다")
-    void consume_sameMessageTwice_stocksOnce() throws InterruptedException {
+    void stocksOnce_whenSameMessageArrivesTwice() throws InterruptedException {
         OrderConfirmedEvent duplicated = event(9102L, 9102L, List.of(
                 new OrderConfirmedEvent.Item(910201L, onionProduct.getId(), "양파 1kg", 1)));
 
@@ -217,7 +217,7 @@ class PurchaseConfirmedConsumerTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("재료 연결이 없는 재료 상품이 있으면 주문 전체를 넣지 않고 재시도 뒤 DLT로 보낸다")
-    void consume_unlinkedIngredientProduct_sendsToDlt() throws InterruptedException {
+    void sendsToDltWithoutStocking_whenIngredientLinkIsMissing() throws InterruptedException {
         send(event(9104L, 9103L, List.of(
                 new OrderConfirmedEvent.Item(910401L, onionProduct.getId(), "양파 1kg", 1),
                 new OrderConfirmedEvent.Item(910402L, unlinkedProduct.getId(), "연결 없는 대파", 1)
@@ -230,7 +230,7 @@ class PurchaseConfirmedConsumerTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("상품이 모두 환불돼 items가 빈 구매 확정은 아무것도 넣지 않고 DLT로 보내지 않는다")
-    void consume_emptyItems_doesNothing() throws InterruptedException {
+    void stocksNothing_whenItemsAreEmpty() throws InterruptedException {
         send(event(9105L, 9103L, List.of()));
         // 순서대로 처리되므로 뒤에 보낸 주문이 들어오면 빈 메시지는 처리가 끝난 것이다
         send(event(9106L, 9103L, List.of(

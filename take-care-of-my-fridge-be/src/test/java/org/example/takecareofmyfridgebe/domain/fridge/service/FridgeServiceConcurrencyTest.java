@@ -93,7 +93,7 @@ class FridgeServiceConcurrencyTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("같은 재료를 동시에 일부씩 먹으면 두 차감이 모두 반영된다")
-    void takeOutItem_concurrentPartialDeductionsAreBothApplied() throws Exception {
+    void appliesBothDeductions_whenPartialTakeOutsRunConcurrently() throws Exception {
         Long fridgeId = saveFridge("3.00");
         FridgeItemTakeOutRequest takeOne = new FridgeItemTakeOutRequest(FridgeItemAction.CONSUMED, BigDecimal.ONE);
 
@@ -110,7 +110,7 @@ class FridgeServiceConcurrencyTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("같은 재료를 동시에 전부 먹으면 하나만 처리되고 나머지는 FRIDGE_ITEM_NOT_FOUND다")
-    void takeOutItem_secondRequestGetsNotFoundAfterFirstRemoves() throws Exception {
+    void throwsNotFoundForSecond_whenFullTakeOutsRunConcurrently() throws Exception {
         Long fridgeId = saveFridge("1.00");
         FridgeItemTakeOutRequest takeAll = new FridgeItemTakeOutRequest(FridgeItemAction.CONSUMED, null);
 
@@ -126,7 +126,7 @@ class FridgeServiceConcurrencyTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("같은 재료에 사용과 빼기가 동시에 오면 하나만 처리되고 나머지는 FRIDGE_ITEM_NOT_FOUND다")
-    void takeOutItemAndRemoveItem_secondRequestGetsNotFound() throws Exception {
+    void throwsNotFoundForSecond_whenTakeOutAndRemoveRunConcurrently() throws Exception {
         Long fridgeId = saveFridge("1.00");
         FridgeItemTakeOutRequest takeAll = new FridgeItemTakeOutRequest(FridgeItemAction.CONSUMED, null);
 
