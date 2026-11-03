@@ -59,22 +59,37 @@ export function RefundRequestSection({ orderId }: RefundRequestSectionProps) {
   const [quantities, setQuantities] = useState<Record<number, number>>({});
   const [confirmAsked, setConfirmAsked] = useState(false);
 
-  const validOrderId = Number.isSafeInteger(orderId) && orderId > 0;
-  const orderQuery = useQuery({ ...orderQueries.detail(orderId), enabled: validOrderId });
-  const isPaid = orderQuery.data?.status === 'PAID';
-  const itemsQuery = useQuery({
-    ...refundQueries.refundableItems(orderId),
-    enabled: validOrderId && isPaid,
-  });
   // 실패(수량 초과 등)는 전역 알림이 서버 메시지로 알린다.
-  // 성공·실패 모두 환불 가능 수량과 주문을 다시 불러 화면을 서버와 맞춘다.
   const refundMutation = useMutation({
     mutationFn: requestRefund,
-    onSettled: () =>
+    // 성공하면 이 화면은 환불 상세로 떠난다. 이 화면이 보던 주문·환불 가능 상품을 다시 받으면
+    // 바뀐 주문 상태(전액 환불·구매 확정)로 환불할 수 없는 화면을 그리므로, 다시 받지 않고 낡았다고만 표시한다.
+    // 환불 상세가 이전 내역을 잠깐 보여 주지 않도록 이 주문의 주문 상세·환불 내역은 지워, 열릴 때 새로 받게 한다.
+    onSuccess: () => {
+      queryClient.removeQueries({ queryKey: orderQueries.detail(orderId).queryKey, exact: true });
+      queryClient.removeQueries({ queryKey: refundQueries.history(orderId).queryKey, exact: true });
+      return Promise.all([
+        queryClient.invalidateQueries({ queryKey: refundQueries.all, refetchType: 'none' }),
+        queryClient.invalidateQueries({ queryKey: orderQueries.all, refetchType: 'none' }),
+      ]);
+    },
+    // 실패하면 이 화면에 남으므로 환불 가능 수량과 주문을 다시 불러 화면을 서버와 맞춘다.
+    onError: () =>
       Promise.all([
         queryClient.invalidateQueries({ queryKey: refundQueries.all }),
         queryClient.invalidateQueries({ queryKey: orderQueries.all }),
       ]),
+  });
+
+  const validOrderId = Number.isSafeInteger(orderId) && orderId > 0;
+  // 환불이 성공하면 이 화면의 역할은 끝났다. 페이지 코드를 받는 동안 이 화면이 다시 그려져도
+  // 지운 주문 상세를 다시 받지 않도록 조회를 끈다(그동안은 로딩을 보여 준다).
+  const active = validOrderId && !refundMutation.isSuccess;
+  const orderQuery = useQuery({ ...orderQueries.detail(orderId), enabled: active });
+  const isPaid = orderQuery.data?.status === 'PAID';
+  const itemsQuery = useQuery({
+    ...refundQueries.refundableItems(orderId),
+    enabled: active && isPaid,
   });
 
   const orderIdParam = { orderId: String(orderId) };
@@ -113,7 +128,9 @@ export function RefundRequestSection({ orderId }: RefundRequestSectionProps) {
         subTitle={
           order.status === 'CONFIRMED'
             ? '구매 확정된 주문은 환불할 수 없습니다.'
-            : '결제 완료된 주문만 환불할 수 있습니다.'
+            : order.status === 'REFUNDED'
+              ? '전액 환불된 주문입니다.'
+              : '결제 완료된 주문만 환불할 수 있습니다.'
         }
         extra={<Button onClick={() => navigate(detailPath)}>주문 상세로 돌아가기</Button>}
       />
