@@ -9,9 +9,12 @@ import org.example.takecareofmyfridgebe.domain.product.entity.ProductType;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeListItemResponse;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeListRequest;
 import org.example.takecareofmyfridgebe.domain.search.dto.SearchClickRequest;
+import org.example.takecareofmyfridgebe.domain.search.dto.SearchFridgeMatchRequest;
+import org.example.takecareofmyfridgebe.domain.search.dto.SearchFridgeMatchResponse;
 import org.example.takecareofmyfridgebe.domain.search.dto.SearchRecipeClickRequest;
 import org.example.takecareofmyfridgebe.domain.search.facade.ProductSearchFacade;
 import org.example.takecareofmyfridgebe.domain.search.facade.RecipeSearchFacade;
+import org.example.takecareofmyfridgebe.domain.search.facade.SearchFridgeMatchFacade;
 import org.example.takecareofmyfridgebe.domain.search.service.SearchClickHistoryService;
 import org.example.takecareofmyfridgebe.global.config.SecurityConfig;
 import org.example.takecareofmyfridgebe.global.error.GlobalExceptionHandler;
@@ -32,9 +35,11 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 import java.util.List;
+import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
@@ -71,9 +76,12 @@ class SearchControllerTest {
     @Autowired
     private SearchClickHistoryService searchClickHistoryService;
 
+    @Autowired
+    private SearchFridgeMatchFacade searchFridgeMatchFacade;
+
     @BeforeEach
     void resetMock() {
-        reset(recipeSearchFacade, productSearchFacade, searchClickHistoryService);
+        reset(recipeSearchFacade, productSearchFacade, searchClickHistoryService, searchFridgeMatchFacade);
     }
 
     @Test
@@ -255,6 +263,49 @@ class SearchControllerTest {
         verifyNoInteractions(recipeSearchFacade);
     }
 
+    @Test
+    @DisplayName("로그인 회원이 냉장고 비교를 요청하면 회원 ID와 레시피 ID·검색어를 넘겨 레시피별 보유 재료 수를 반환한다")
+    void matchFridge_returnsOk_whenAuthenticated() throws Exception {
+        // Given
+        when(searchFridgeMatchFacade.match(eq(7L), any(SearchFridgeMatchRequest.class))).thenReturn(
+                new SearchFridgeMatchResponse(List.of(new SearchFridgeMatchResponse.RecipeMatch(3L, 2, 5)), List.of("국산 흙대파")));
+
+        // When & Then
+        mvc.perform(get("/api/search/fridge-matches").with(loginAsMember7())
+                        .param("recipeIds", "3", "4").param("keyword", " 대파 "))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.recipes[0].recipeId").value(3))
+                .andExpect(jsonPath("$.data.recipes[0].ownedCount").value(2))
+                .andExpect(jsonPath("$.data.recipes[0].ingredientCount").value(5))
+                .andExpect(jsonPath("$.data.keywordItems[0]").value("국산 흙대파"));
+
+        ArgumentCaptor<SearchFridgeMatchRequest> captor = ArgumentCaptor.forClass(SearchFridgeMatchRequest.class);
+        verify(searchFridgeMatchFacade).match(eq(7L), captor.capture());
+        assertThat(captor.getValue().recipeIds()).containsExactly(3L, 4L);
+        assertThat(captor.getValue().keyword()).isEqualTo("대파");
+    }
+
+    @Test
+    @DisplayName("비로그인 상태에서 냉장고 비교를 요청하면 401이고 조회하지 않는다")
+    void matchFridge_returnsUnauthorized_whenUnauthenticated() throws Exception {
+        mvc.perform(get("/api/search/fridge-matches").param("recipeIds", "3"))
+                .andExpect(status().isUnauthorized());
+
+        verifyNoInteractions(searchFridgeMatchFacade);
+    }
+
+    @Test
+    @DisplayName("레시피 ID가 없거나 20개를 넘으면 400이고 조회하지 않는다")
+    void matchFridge_returnsBadRequest_whenRecipeIdsInvalid() throws Exception {
+        mvc.perform(get("/api/search/fridge-matches").with(loginAsMember7()))
+                .andExpect(status().isBadRequest());
+        String[] tooMany = IntStream.rangeClosed(1, 21).mapToObj(String::valueOf).toArray(String[]::new);
+        mvc.perform(get("/api/search/fridge-matches").with(loginAsMember7()).param("recipeIds", tooMany))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(searchFridgeMatchFacade);
+    }
+
     private RequestPostProcessor loginAsMember7() {
         return authentication(new UsernamePasswordAuthenticationToken(
                 new AuthSessionService.AuthPrincipal(7L, 8L, Member.Role.USER), null,
@@ -276,6 +327,11 @@ class SearchControllerTest {
         @Bean
         SearchClickHistoryService searchClickHistoryService() {
             return mock(SearchClickHistoryService.class);
+        }
+
+        @Bean
+        SearchFridgeMatchFacade searchFridgeMatchFacade() {
+            return mock(SearchFridgeMatchFacade.class);
         }
 
         @Bean

@@ -46,6 +46,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST,
                                 "/api/members", "/api/webhooks/portone"
                         ).permitAll()
+                        // 통합검색 중 내 냉장고와 비교하는 API만 로그인이 필요하다
+                        .requestMatchers(HttpMethod.GET, "/api/search/fridge-matches").authenticated()
                         .requestMatchers(
                                 "/api/auth/login", "/api/auth/refresh", "/api/auth/logout", "/api/auth/csrf",
                                 "/api/members/email-availability", "/api/members/nickname-availability",

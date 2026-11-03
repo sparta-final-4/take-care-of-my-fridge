@@ -1,6 +1,7 @@
 package org.example.takecareofmyfridgebe.domain.fridge.repository;
 
 import jakarta.persistence.LockModeType;
+import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeIngredientInfo;
 import org.example.takecareofmyfridgebe.domain.fridge.entity.Fridge;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -8,10 +9,19 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
 public interface FridgeRepository extends JpaRepository<Fridge, Long>, FridgeRepositoryCustom {
+
+    // 소비기한이 today 이후(오늘 포함)인 회원 재료. 다 쓴 재료는 삭제되므로 수량은 따로 보지 않는다.
+    @Query("select new org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeIngredientInfo(i.id, i.name, f.rawName) "
+            + "from Fridge f join f.ingredient i where f.memberId = :memberId and f.expirationDate >= :today")
+    List<FridgeIngredientInfo> findUsableIngredients(
+            @Param("memberId") Long memberId,
+            @Param("today") LocalDate today
+    );
 
     @EntityGraph(attributePaths = "ingredient")
     Optional<Fridge> findByIdAndMemberId(Long id, Long memberId);
