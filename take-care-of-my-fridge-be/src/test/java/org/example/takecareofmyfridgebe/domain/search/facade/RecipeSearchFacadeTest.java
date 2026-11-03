@@ -5,7 +5,9 @@ import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeListRequest;
 import org.example.takecareofmyfridgebe.domain.recipe.service.RecipeService;
 import org.example.takecareofmyfridgebe.domain.search.config.RecipeSearchProperties;
 import org.example.takecareofmyfridgebe.domain.search.dto.RecipeSearchResult;
+import org.example.takecareofmyfridgebe.domain.search.entity.SearchTarget;
 import org.example.takecareofmyfridgebe.domain.search.service.RecipeSearchService;
+import org.example.takecareofmyfridgebe.domain.search.service.SearchZeroResultService;
 import org.example.takecareofmyfridgebe.global.response.PageResponse;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -23,6 +25,7 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -35,6 +38,8 @@ class RecipeSearchFacadeTest {
     private RecipeSearchService recipeSearchService;
     @Mock
     private RecipeSearchProperties searchProperties;
+    @Mock
+    private SearchZeroResultService searchZeroResultService;
     @InjectMocks
     private RecipeSearchFacade facade;
 
@@ -96,5 +101,65 @@ class RecipeSearchFacadeTest {
         // When & Then
         assertThat(facade.getRecipes(request)).isSameAs(page);
         verify(recipeService, never()).getRecipesByIds(anyList(), anyLong(), any());
+    }
+
+    @Test
+    @DisplayName("필터 없이 첫 페이지 결과가 0건이면 검색어를 0건 검색어로 기록한다")
+    void getRecipes_recordsZeroResult_whenNoHits() {
+        // Given
+        RecipeListRequest request = request("김치");
+        when(recipeService.getRecipes(request)).thenReturn(emptyPage(1));
+
+        // When
+        facade.getRecipes(request);
+
+        // Then
+        verify(searchZeroResultService).record(SearchTarget.RECIPE, "김치");
+    }
+
+    @Test
+    @DisplayName("결과가 있으면 0건 검색어로 기록하지 않는다")
+    void getRecipes_skipsZeroResult_whenHitsExist() {
+        // Given
+        RecipeListRequest request = request("김치");
+        when(recipeService.getRecipes(request)).thenReturn(new PageResponse<>(List.of(), 1, 20, 3, 1, true));
+
+        // When
+        facade.getRecipes(request);
+
+        // Then
+        verifyNoInteractions(searchZeroResultService);
+    }
+
+    @Test
+    @DisplayName("음식 종류 필터를 걸어 0건이면 기록하지 않는다")
+    void getRecipes_skipsZeroResult_whenFiltered() {
+        // Given
+        RecipeListRequest request = new RecipeListRequest(null, "김치", "한식", null, null, null, null, null);
+        when(recipeService.getRecipes(request)).thenReturn(emptyPage(1));
+
+        // When
+        facade.getRecipes(request);
+
+        // Then
+        verifyNoInteractions(searchZeroResultService);
+    }
+
+    @Test
+    @DisplayName("2페이지 이후 요청이 0건이면 기록하지 않는다")
+    void getRecipes_skipsZeroResult_whenNotFirstPage() {
+        // Given
+        RecipeListRequest request = new RecipeListRequest(null, "김치", null, null, null, null, 2, null);
+        when(recipeService.getRecipes(request)).thenReturn(emptyPage(2));
+
+        // When
+        facade.getRecipes(request);
+
+        // Then
+        verifyNoInteractions(searchZeroResultService);
+    }
+
+    private PageResponse<RecipeListItemResponse> emptyPage(int pageNumber) {
+        return new PageResponse<>(List.of(), pageNumber, 20, 0, 0, true);
     }
 }
