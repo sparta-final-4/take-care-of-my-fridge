@@ -52,7 +52,7 @@ class ChatSessionConcurrencyTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("같은 회원으로 두 스레드가 동시에 getOrCreateActiveSession을 호출하면 둘 다 예외 없이 같은 세션 ID를 받고 DB의 ACTIVE 세션은 1개이다")
-    void concurrentGetOrCreateActiveSessionReturnsSameSessionAndCreatesOnlyOne() throws Exception {
+    void createsOneSession_whenStartedConcurrently() throws Exception {
         Long memberId = 1L;
         int threadCount = 2;
         ExecutorService executor = Executors.newFixedThreadPool(threadCount);

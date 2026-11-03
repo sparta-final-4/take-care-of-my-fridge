@@ -43,7 +43,7 @@ class ChatDailyLimitServiceUnitTest {
 
     @Test
     @DisplayName("30번째 요청까지는 예외 없이 정상 통과한다")
-    void checkAndIncrementPassesUnderLimit() {
+    void passes_whenUnderLimit() {
         Long memberId = 1L;
 
         when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
@@ -59,7 +59,7 @@ class ChatDailyLimitServiceUnitTest {
 
     @Test
     @DisplayName("31번째 요청 시 429 CHAT_DAILY_LIMIT_EXCEEDED 예외가 발생한다")
-    void checkAndIncrementThrows429WhenExceedsLimit() {
+    void throwsLimitExceeded_whenLimitIsExceeded() {
         Long memberId = 1L;
 
         when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
@@ -77,7 +77,7 @@ class ChatDailyLimitServiceUnitTest {
 
     @Test
     @DisplayName("키 최초 생성 시 또는 TTL이 없는 경우(-1L) expire를 호출하여 TTL을 설정한다")
-    void setsTtlWhenExpireIsMissing() {
+    void setsTtl_whenExpireIsMissing() {
         Long memberId = 1L;
 
         when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
@@ -92,7 +92,7 @@ class ChatDailyLimitServiceUnitTest {
 
     @Test
     @DisplayName("Redis 연결 장애(DataAccessException) 발생 시 503 CHAT_SERVICE_UNAVAILABLE 예외가 발생한다")
-    void checkAndIncrementThrows503WhenRedisFails() {
+    void throwsServiceUnavailable_whenRedisFails() {
         Long memberId = 1L;
 
         when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);

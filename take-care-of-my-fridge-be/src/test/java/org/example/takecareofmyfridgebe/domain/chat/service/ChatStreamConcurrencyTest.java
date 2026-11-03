@@ -85,7 +85,7 @@ class ChatStreamConcurrencyTest extends RedisContainerSupport {
 
     @Test
     @DisplayName("같은 상담에 동시에 두 번 보내면 하나만 스트림을 받고 다른 하나는 409, 하루 횟수는 1만 오른다")
-    void concurrentSend_onlyOneProceeds() throws Exception {
+    void streamsOnlyOne_whenSentConcurrently() throws Exception {
         Sinks.Many<String> reply = Sinks.many().unicast().onBackpressureBuffer();
         given(chatReplyGenerator.generate(anyLong(), any())).willReturn(reply.asFlux());
 
@@ -130,7 +130,7 @@ class ChatStreamConcurrencyTest extends RedisContainerSupport {
 
     @Test
     @DisplayName("답을 다 받거나(완료), 생성이 실패하거나(오류), 연결이 끊긴(취소) 뒤에는 같은 상담에 다시 보낼 수 있다")
-    void afterEachEnding_canSendAgain() {
+    void allowsResend_whenPreviousStreamEnds() {
         given(chatMessageService.saveExchange(anyLong(), any(), any())).willReturn(List.of(
                 new ChatMessageResponse(1L, 1, ChatMessageRole.USER, "질문", LocalDateTime.now()),
                 new ChatMessageResponse(2L, 2, ChatMessageRole.ASSISTANT, "답", LocalDateTime.now())

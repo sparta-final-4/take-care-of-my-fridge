@@ -65,7 +65,7 @@ class ChatMessageRepositoryAndServiceTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("saveExchange: 보내면 두 메시지가 sequence 1, 2로 저장되고, 한 번 더 보내면 3, 4로 저장된다")
-    void saveExchangeIncrementsSequenceCorrectly() {
+    void savesExchangeWithIncreasingSequence() {
         Long memberId = 100L;
         ChatSession session = chatSessionRepository.saveAndFlush(
                 ChatSession.builder().memberId(memberId).build()
@@ -112,7 +112,7 @@ class ChatMessageRepositoryAndServiceTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("saveExchange: 검증 후 저장 전에 세션이 COMPLETED가 되면 저장하지 않고 409 예외를 던진다")
-    void saveExchangeThrows409AndDoesNotSaveWhenSessionCompletedBeforeSave() {
+    void throwsConflictWithoutSaving_whenSessionCompletesBeforeSave() {
         Long memberId = 100L;
         ChatSession session = ChatSession.builder().memberId(memberId).build();
         session.complete(); // 세션이 이미 종료됨

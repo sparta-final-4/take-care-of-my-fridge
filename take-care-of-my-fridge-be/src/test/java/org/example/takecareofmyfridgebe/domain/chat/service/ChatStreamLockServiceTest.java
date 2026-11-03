@@ -45,7 +45,7 @@ class ChatStreamLockServiceTest extends RedisContainerSupport {
 
     @Test
     @DisplayName("잠금을 잡으면 키에 토큰이 들어가고 유지 시간은 150초 이하로 걸린다")
-    void acquire_storesTokenWithTtl() {
+    void storesTokenWithTtl_whenAcquired() {
         String token = chatStreamLockService.acquire(SESSION_ID);
 
         assertThat(stringRedisTemplate.opsForValue().get(KEY)).isEqualTo(token);
@@ -55,7 +55,7 @@ class ChatStreamLockServiceTest extends RedisContainerSupport {
 
     @Test
     @DisplayName("이미 잡힌 상담은 409 CHAT_REPLY_IN_PROGRESS, 다른 상담은 따로 잡힌다")
-    void acquire_twiceOnSameSession_throwsInProgress() {
+    void throwsInProgress_whenSameSessionIsAcquiredTwice() {
         chatStreamLockService.acquire(SESSION_ID);
 
         assertThatThrownBy(() -> chatStreamLockService.acquire(SESSION_ID))
@@ -68,7 +68,7 @@ class ChatStreamLockServiceTest extends RedisContainerSupport {
 
     @Test
     @DisplayName("내 토큰으로 풀면 다시 잡을 수 있다")
-    void release_withOwnToken_allowsReacquire() {
+    void allowsReacquire_whenReleasedWithOwnToken() {
         String token = chatStreamLockService.acquire(SESSION_ID);
 
         chatStreamLockService.release(SESSION_ID, token);
@@ -79,7 +79,7 @@ class ChatStreamLockServiceTest extends RedisContainerSupport {
 
     @Test
     @DisplayName("다른 토큰으로는 지우지 않는다 (유지 시간이 지나 다른 요청이 잡은 잠금 보호)")
-    void release_withOtherToken_keepsLock() {
+    void keepsLock_whenReleasedWithOtherToken() {
         String token = chatStreamLockService.acquire(SESSION_ID);
 
         chatStreamLockService.release(SESSION_ID, "other-token");
