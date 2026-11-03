@@ -61,6 +61,7 @@ models/api-response-list-popular-sale-response.ts
 models/api-response-list-refund-history-response.ts
 models/api-response-list-refund-summary-response.ts
 models/api-response-list-refundable-item-response.ts
+models/api-response-list-string.ts
 models/api-response-my-info-response.ts
 models/api-response-my-recipe-list-response.ts
 models/api-response-nickname-availability-response.ts
@@ -243,6 +244,7 @@ models/sale-response.ts
 models/sales-amount-response.ts
 models/search-click-request.ts
 models/search-recipe-click-request.ts
+models/search-suggestion-request.ts
 models/settlement-payment-response.ts
 models/settlement-payment-search-request.ts
 models/settlement-period-response.ts

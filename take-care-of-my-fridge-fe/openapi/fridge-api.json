@@ -2964,6 +2964,36 @@
         ]
       }
     },
+    "/api/search/suggestions": {
+      "get": {
+        "operationId": "suggest",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "request",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/SearchSuggestionRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListString"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "search-controller"
+        ]
+      }
+    },
     "/api/webhooks/portone": {
       "post": {
         "operationId": "handlePortOneWebhook",
@@ -3436,6 +3466,23 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/RefundableItemResponse"
+            }
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorResponse"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ApiResponseListString": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "string"
             }
           },
           "error": {
@@ -8262,6 +8309,19 @@
         "required": [
           "keyword",
           "recipeId"
+        ]
+      },
+      "SearchSuggestionRequest": {
+        "type": "object",
+        "properties": {
+          "keyword": {
+            "type": "string",
+            "maxLength": 50,
+            "minLength": 0
+          }
+        },
+        "required": [
+          "keyword"
         ]
       },
       "ServerSentEventString": {},
