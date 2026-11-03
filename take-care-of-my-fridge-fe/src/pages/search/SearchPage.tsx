@@ -1,5 +1,6 @@
 import { Empty } from 'antd';
 
+import { SearchFridgeNotice } from '@/domains/search/components/SearchFridgeNotice';
 import { SearchProductSection } from '@/domains/search/components/SearchProductSection';
 import { SearchRecipeSection } from '@/domains/search/components/SearchRecipeSection';
 import { SearchSummarySection } from '@/domains/search/components/SearchSummarySection';
@@ -15,6 +16,7 @@ export default function SearchPage() {
       <SearchSummarySection />
       {keyword ? (
         <>
+          <SearchFridgeNotice />
           <SearchRecipeSection />
           <SearchProductSection />
         </>

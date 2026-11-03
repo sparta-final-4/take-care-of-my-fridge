@@ -4,6 +4,8 @@ import {
   type PageResponseRecipeListItemResponse,
   type ProductListRequest,
   type RecipeListRequest,
+  type SearchFridgeMatchRequest,
+  type SearchFridgeMatchResponse,
   type SearchClickRequest,
   type SearchRecipeClickRequest,
 } from '@/common/api/clients';
@@ -40,4 +42,12 @@ export async function suggestSearchKeywords(
   signal?: AbortSignal,
 ): Promise<string[]> {
   return unwrap(searchApi.suggest({ request: { keyword } }, { signal }));
+}
+
+// 통합 검색 결과를 로그인 회원의 냉장고와 비교한다(레시피별 보유 재료 수, 검색어가 든 냉장고 재료). 로그인 회원만.
+export async function matchSearchFridge(
+  request: SearchFridgeMatchRequest,
+  signal?: AbortSignal,
+): Promise<SearchFridgeMatchResponse> {
+  return unwrap(searchApi.matchFridge({ request }, { signal }));
 }

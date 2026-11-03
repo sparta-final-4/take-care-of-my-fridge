@@ -12,6 +12,7 @@ import { COOK_TIME_OPTIONS } from '@/domains/recipe/format';
 import { recipeQueries } from '@/domains/recipe/queries';
 import { recordSearchRecipeClick } from '@/domains/search/api';
 import { SearchFilterRow } from '@/domains/search/components/SearchFilterRow';
+import { useSearchFridgeMatch } from '@/domains/search/hooks/useSearchFridgeMatch';
 import { searchQueries } from '@/domains/search/queries';
 import {
   SEARCH_RECIPE_PAGE_SIZE,
@@ -59,6 +60,8 @@ export function SearchRecipeSection() {
 
   const totalElements = data?.totalElements ?? 0;
   const recipes = data?.content ?? [];
+
+  const { matchById } = useSearchFridgeMatch();
 
   return (
     <SectionCard
@@ -126,7 +129,7 @@ export function SearchRecipeSection() {
                       recipe.recipeId === undefined ? undefined : handleClickRecipe(recipe.recipeId)
                     }
                   >
-                    <RecipeCard recipe={recipe} />
+                    <RecipeCard recipe={recipe} fridgeMatch={matchById.get(recipe.recipeId)} />
                   </Col>
                 ))}
               </Row>
