@@ -583,4 +583,22 @@ class RecipeServiceTest {
         assertEquals(2, result.pageNumber());
         assertEquals(3, result.pageSize());
     }
+
+    @Test
+    @DisplayName("마지막 페이지에서 DB에 없는 ID가 빠져도 전체 건수와 페이지 수는 검색 결과를 따른다")
+    void getRecipesByIds_keepsTotalOnLastPage() {
+        // given: 8건 중 3페이지(7~8번째). 그중 하나는 DB에서 지워졌다
+        Recipe recipe = RecipeFixture.createRecipe(7L, "김치전");
+        when(recipeRepository.findAllById(List.of(7L, 99L))).thenReturn(List.of(recipe));
+        RecipeListRequest request = new RecipeListRequest(null, "김치", null, null, null, null, 3, 3);
+
+        // when
+        PageResponse<RecipeListItemResponse> result = service.getRecipesByIds(List.of(7L, 99L), 8, request);
+
+        // then
+        assertThat(result.content()).extracting(RecipeListItemResponse::recipeId).containsExactly(7L);
+        assertEquals(8, result.totalElements());
+        assertEquals(3, result.totalPages());
+        assertTrue(result.isLast());
+    }
 }
