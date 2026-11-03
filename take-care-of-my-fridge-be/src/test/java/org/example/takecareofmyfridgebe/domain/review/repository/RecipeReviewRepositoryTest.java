@@ -35,8 +35,8 @@ class RecipeReviewRepositoryTest extends MySqlContainerSupport {
     private EntityManager entityManager;
 
     @Test
-    @DisplayName("findSummaryCandidatesWithMinReviews는 후기가 5개 이상인 레시피만 조회하고 4개 이하는 제외한다")
-    void findSummaryCandidatesWithMinReviews_filtersCorrectly() {
+    @DisplayName("요약 후보를 조회하면 후기가 5개 이상인 레시피만 나오고 4개 이하는 빠진다")
+    void returnsOnlyRecipesWithFiveOrMoreReviews() {
         // 회원 5명 생성
         Member member1 = createMember("user1@test.com", "user1");
         Member member2 = createMember("user2@test.com", "user2");
@@ -72,8 +72,8 @@ class RecipeReviewRepositoryTest extends MySqlContainerSupport {
     }
 
     @Test
-    @DisplayName("findRecentReviewsByRecipeId는 최근 수정된 후기의 별점과 내용만 최신순으로 조회한다")
-    void findRecentReviewsByRecipeId_fetchesContentsOnly() {
+    @DisplayName("레시피의 최근 후기를 조회하면 별점과 내용만 최근 수정순으로 나온다")
+    void returnsRatingAndContentInRecentOrder() {
         Member member1 = createMember("m1@test.com", "m1");
         Member member2 = createMember("m2@test.com", "m2");
 

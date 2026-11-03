@@ -14,6 +14,7 @@ import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 import org.example.takecareofmyfridgebe.global.response.PageResponse;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -80,7 +81,8 @@ class RecipeReviewControllerTest {
      * 서비스에 전달되는 currentMemberId가 null인지 검증한다.
      */
     @Test
-    void getReviewsPermittedWithoutAuthentication() throws Exception {
+    @DisplayName("로그인하지 않아도 후기 목록을 조회할 수 있고 회원 ID 없이 서비스를 호출한다")
+    void returnsReviews_whenNotLoggedIn() throws Exception {
         // Given
         ReviewResponse review = new ReviewResponse(
                 100L, 10L, "김치찌개", 5, "맛있어요", "닉네임", false, LocalDateTime.now(), LocalDateTime.now());
@@ -108,7 +110,8 @@ class RecipeReviewControllerTest {
      * 3) 응답 JSON 규격대로 직렬화되는지 검증한다.
      */
     @Test
-    void getReviewsWithEmptyQueryParamsUsesDefaultsAndTokenMemberId() throws Exception {
+    @DisplayName("빈 파라미터로 후기 목록을 조회하면 기본값과 토큰의 회원 ID로 조회한다")
+    void usesDefaultsAndTokenMemberId_whenQueryParamsAreEmpty() throws Exception {
         // Given
         ReviewResponse review = new ReviewResponse(
                 100L, 10L, "김치찌개", 5, "맛있어요", "닉네임", true, LocalDateTime.now(), LocalDateTime.now());
@@ -138,7 +141,8 @@ class RecipeReviewControllerTest {
      * 바인딩 단계에서 거절되어 400 Bad Request(C001)를 반환하는지 검증한다.
      */
     @Test
-    void getReviewsWithInvalidSortReturnsBadRequest() throws Exception {
+    @DisplayName("정의되지 않은 정렬 값으로 후기 목록을 조회하면 400을 반환한다")
+    void returnsBadRequest_whenSortIsInvalid() throws Exception {
         mvc.perform(get("/api/reviews")
                         .param("sort", "ABC"))
                 .andExpect(status().isBadRequest())
@@ -151,7 +155,8 @@ class RecipeReviewControllerTest {
      * 바인딩 단계에서 거절되어 400 Bad Request(C001)를 반환하는지 검증한다.
      */
     @Test
-    void getReviewsWithInvalidPageReturnsBadRequest() throws Exception {
+    @DisplayName("페이지 번호가 숫자가 아니면 400을 반환한다")
+    void returnsBadRequest_whenPageIsNotNumber() throws Exception {
         mvc.perform(get("/api/reviews")
                         .param("page", "abc"))
                 .andExpect(status().isBadRequest())
@@ -164,7 +169,8 @@ class RecipeReviewControllerTest {
      * 유효성 검증(@Max(50))에서 거절되어 400 Bad Request(C001)를 반환하는지 검증한다.
      */
     @Test
-    void getReviewsWithExcessiveSizeReturnsBadRequest() throws Exception {
+    @DisplayName("페이지 크기가 최대치(50)를 넘으면 400을 반환한다")
+    void returnsBadRequest_whenSizeExceedsMax() throws Exception {
         mvc.perform(get("/api/reviews")
                         .param("size", "51"))
                 .andExpect(status().isBadRequest())
@@ -177,7 +183,8 @@ class RecipeReviewControllerTest {
      * 200 OK와 함께 작성된 ReviewResponse를 반환하는지 검증한다.
      */
     @Test
-    void createReviewReturnsSuccess() throws Exception {
+    @DisplayName("올바른 값으로 후기를 작성하면 작성된 후기를 반환한다")
+    void returnsCreatedReview_whenRequestIsValid() throws Exception {
         // Given
         ReviewResponse review = new ReviewResponse(
                 100L, 10L, "김치찌개", 5, "맛있어요", "닉네임", true, LocalDateTime.now(), LocalDateTime.now());
@@ -206,7 +213,8 @@ class RecipeReviewControllerTest {
      * 존재하지 않는 레시피에 후기를 작성하려고 하면 404 Not Found(RECIPE_001)를 반환하는지 검증한다.
      */
     @Test
-    void createReviewWhenRecipeNotFoundReturns404() throws Exception {
+    @DisplayName("없는 레시피에 후기를 작성하면 404를 반환한다")
+    void returnsNotFound_whenRecipeIsMissing() throws Exception {
         when(recipeReviewService.createReview(eq(7L), any(ReviewCreateRequest.class)))
                 .thenThrow(new BusinessException(ErrorCode.RECIPE_NOT_FOUND));
 
@@ -231,7 +239,8 @@ class RecipeReviewControllerTest {
      * 서비스를 호출하지 않고 400 Bad Request 에러를 반환하는지 검증한다.
      */
     @Test
-    void createReviewValidatesInput() throws Exception {
+    @DisplayName("후기 내용이 100자를 넘거나 별점이 범위를 벗어나면 작성하지 않고 400을 반환한다")
+    void returnsBadRequest_whenContentOrRatingIsInvalid() throws Exception {
         // Given: 101자 내용 및 5 초과 별점
         String longContent = "a".repeat(101);
 
@@ -255,7 +264,8 @@ class RecipeReviewControllerTest {
      * 후기 수정 요청 시 200 OK와 함께 수정된 ReviewResponse를 반환하는지 검증한다.
      */
     @Test
-    void updateReviewReturnsSuccess() throws Exception {
+    @DisplayName("후기를 수정하면 수정된 후기를 반환한다")
+    void returnsUpdatedReview() throws Exception {
         // Given
         ReviewResponse updated = new ReviewResponse(
                 100L, 10L, "김치찌개", 4, "수정된 후기", "닉네임", true, LocalDateTime.now(), LocalDateTime.now());
@@ -284,7 +294,8 @@ class RecipeReviewControllerTest {
      * 후기 삭제 성공 시 200 OK와 성공 ApiResponse를 반환하는지 검증한다.
      */
     @Test
-    void deleteReviewReturnsSuccess() throws Exception {
+    @DisplayName("후기를 삭제하면 200을 반환한다")
+    void returnsOk_whenReviewIsDeleted() throws Exception {
         // When & Then
         mvc.perform(delete("/api/reviews/100")
                         .with(authentication(auth(7L)))
@@ -300,7 +311,8 @@ class RecipeReviewControllerTest {
      * 컨트롤러가 404 Not Found 에러를 반환하는지 검증한다.
      */
     @Test
-    void deleteOthersReviewReturnsNotFound() throws Exception {
+    @DisplayName("다른 회원의 후기를 삭제하려고 하면 404를 반환한다")
+    void returnsNotFound_whenDeletingOthersReview() throws Exception {
         // Given
         doThrow(new BusinessException(ErrorCode.REVIEW_NOT_FOUND))
                 .when(recipeReviewService).deleteReview(7L, 999L);
