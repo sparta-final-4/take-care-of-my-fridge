@@ -1,8 +1,12 @@
 import { keepPreviousData, queryOptions } from '@tanstack/react-query';
 
-import type { ProductListRequest, RecipeListRequest } from '@/common/api/clients';
+import type {
+  ProductListRequest,
+  RecipeListRequest,
+  SearchFridgeMatchRequest,
+} from '@/common/api/clients';
 
-import { searchProducts, searchRecipes, suggestSearchKeywords } from './api';
+import { matchSearchFridge, searchProducts, searchRecipes, suggestSearchKeywords } from './api';
 
 export const searchQueries = {
   all: ['search'] as const,
@@ -26,5 +30,10 @@ export const searchQueries = {
       queryFn: ({ signal }) => suggestSearchKeywords(keyword, signal),
       staleTime: 5 * 60 * 1000,
       placeholderData: keepPreviousData,
+    }),
+  fridgeMatch: (request: SearchFridgeMatchRequest) =>
+    queryOptions({
+      queryKey: [...searchQueries.all, 'fridgeMatch', request],
+      queryFn: ({ signal }) => matchSearchFridge(request, signal),
     }),
 };
