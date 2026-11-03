@@ -136,6 +136,29 @@ class RecipeSearchServiceTest {
     }
 
     @Test
+    @DisplayName("자동완성은 단어 앞글자나 이름 속 형태소로 모든 단어를 찾고, 검색어로 시작하는 이름을 올리며, 같은 이름은 한 번만 받는다")
+    void suggestRequest_matchesNamePrefixes_andCollapsesSameName() {
+        // When
+        SearchRequest search = service.suggestRequest("돼지 김", 8);
+
+        // Then
+        assertThat(search.index()).isEqualTo(List.of("recipes"));
+        List<Query> words = search.query().bool().must().get(0).bool().should();
+        assertThat(words).extracting(word -> word.match().field()).containsExactly("name.autocomplete", "name");
+        assertThat(words).allSatisfy(word -> {
+            assertThat(word.match().query().stringValue()).isEqualTo("돼지 김");
+            assertThat(word.match().operator()).isEqualTo(Operator.And);
+        });
+        assertThat(search.query().bool().should().get(0).prefix().field()).isEqualTo("name.keyword");
+        assertThat(search.query().bool().should().get(0).prefix().value()).isEqualTo("돼지 김");
+        assertThat(search.collapse().field()).isEqualTo("name.keyword");
+        assertThat(search.sort().get(0).score().order()).isEqualTo(SortOrder.Desc);
+        assertThat(search.sort().get(1).field().field()).isEqualTo("name.keyword");
+        assertThat(search.size()).isEqualTo(8);
+        assertThat(search.source().filter().includes()).isEqualTo(List.of("name"));
+    }
+
+    @Test
     @DisplayName("벡터 검색도 관련도 순이면 유사도 점수 내림차순으로 정렬한다")
     void vectorRequest_sortsByScore_whenRelevance() {
         // Given

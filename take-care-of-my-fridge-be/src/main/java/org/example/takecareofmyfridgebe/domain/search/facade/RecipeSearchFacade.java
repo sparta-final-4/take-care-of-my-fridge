@@ -14,11 +14,14 @@ import org.example.takecareofmyfridgebe.global.response.PageResponse;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
+import java.util.List;
 
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class RecipeSearchFacade {
+
+    private static final int SUGGESTION_SIZE = 8;
 
     private final RecipeService recipeService;
     private final RecipeSearchService recipeSearchService;
@@ -53,6 +56,21 @@ public class RecipeSearchFacade {
         }
 
         return recipeService.getRecipesByIds(result.recipeIds(), result.total(), request);
+    }
+
+    /**
+     * 검색어 자동완성. ES가 실패하면 이름에 검색어가 든 레시피를 MySQL에서 찾는다
+     */
+    public List<String> suggestNames(String keyword) {
+        if (!searchProperties.useElasticSearch()) {
+            return recipeService.suggestNames(keyword, SUGGESTION_SIZE);
+        }
+        try {
+            return recipeSearchService.suggestNames(keyword, SUGGESTION_SIZE);
+        } catch (IOException | RuntimeException e) {
+            log.warn("ES 레시피 자동완성 실패, MySQL 조회로 대체: keyword={}", keyword, e);
+            return recipeService.suggestNames(keyword, SUGGESTION_SIZE);
+        }
     }
 
     // 필터 때문에 0건이 된 경우와 2페이지 이후는 사전 보강 근거가 아니라서 기록하지 않는다

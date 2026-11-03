@@ -231,6 +231,30 @@ class SearchControllerTest {
         verifyNoInteractions(searchClickHistoryService);
     }
 
+    @Test
+    @DisplayName("비로그인 상태에서 자동완성을 요청하면 앞뒤 공백을 뺀 검색어로 후보 이름 목록을 반환한다")
+    void suggest_returnsOk_whenUnauthenticated() throws Exception {
+        // Given
+        when(recipeSearchFacade.suggestNames("김치")).thenReturn(List.of("김치찌개", "김치볶음밥"));
+
+        // When & Then
+        mvc.perform(get("/api/search/suggestions").param("keyword", " 김치 "))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0]").value("김치찌개"))
+                .andExpect(jsonPath("$.data[1]").value("김치볶음밥"));
+    }
+
+    @Test
+    @DisplayName("자동완성 검색어가 비어 있거나 50자를 넘으면 400이고 조회하지 않는다")
+    void suggest_returnsBadRequest_whenKeywordInvalid() throws Exception {
+        mvc.perform(get("/api/search/suggestions").param("keyword", " "))
+                .andExpect(status().isBadRequest());
+        mvc.perform(get("/api/search/suggestions").param("keyword", "가".repeat(51)))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(recipeSearchFacade);
+    }
+
     private RequestPostProcessor loginAsMember7() {
         return authentication(new UsernamePasswordAuthenticationToken(
                 new AuthSessionService.AuthPrincipal(7L, 8L, Member.Role.USER), null,
