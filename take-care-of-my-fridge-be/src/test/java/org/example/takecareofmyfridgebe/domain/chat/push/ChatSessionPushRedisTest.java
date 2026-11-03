@@ -47,7 +47,7 @@ class ChatSessionPushRedisTest extends RedisContainerSupport {
 
     @Test
     @DisplayName("한 서버가 발행한 상담 신호를 두 서버가 모두 받아, 회원 번호를 뺀 상담 번호·상태만 event: chat으로 넘긴다")
-    void publish_reachesEveryServer() {
+    void deliversToEveryServer() {
         SseConnectionRegistry serverA = startServer();
         SseConnectionRegistry serverB = startServer();
 
@@ -60,7 +60,7 @@ class ChatSessionPushRedisTest extends RedisContainerSupport {
 
     @Test
     @DisplayName("서버마다 자기 연결 관리자에 그 회원 번호로만 넘기고, 다른 회원의 연결로는 보내지 않는다")
-    void publish_sendsOnlyToThatMemberOnEachServer() {
+    void sendsOnlyToTargetMemberOnEachServer() {
         SseConnectionRegistry serverA = startServer();
         SseConnectionRegistry serverB = startServer();
         serverA.subscribe(8002L);
@@ -76,8 +76,8 @@ class ChatSessionPushRedisTest extends RedisContainerSupport {
     }
 
     @Test
-    @DisplayName("알림 채널과 섞이지 않는다: 알림 신호는 상담 구독기가 받지 않는다")
-    void notificationChannel_isIgnored() {
+    @DisplayName("알림 채널로 보낸 신호는 상담 구독기가 받지 않는다")
+    void ignoresNotificationChannel() {
         SseConnectionRegistry server = startServer();
 
         stringRedisTemplate.convertAndSend("notification:push", "{\"memberId\":8004}");
@@ -89,7 +89,7 @@ class ChatSessionPushRedisTest extends RedisContainerSupport {
 
     @Test
     @DisplayName("깨진 메시지가 와도 구독이 죽지 않고 다음 신호를 받는다")
-    void brokenMessage_doesNotKillSubscription() {
+    void keepsSubscription_whenMessageIsBroken() {
         SseConnectionRegistry server = startServer();
 
         stringRedisTemplate.convertAndSend(ChatSessionPushPublisher.CHANNEL, "not-json");

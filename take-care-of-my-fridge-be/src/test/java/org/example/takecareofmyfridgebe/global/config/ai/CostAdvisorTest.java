@@ -11,8 +11,8 @@ import org.springframework.ai.chat.metadata.Usage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.messages.AssistantMessage;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertSame;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -25,18 +25,18 @@ class CostAdvisorTest {
 
     @Test
     @DisplayName("before는 전달받은 ChatClientRequest를 그대로 반환한다")
-    void beforePassesThroughRequest() {
+    void returnsSameRequest_whenBeforeIsCalled() {
         ChatClientRequest request = mock(ChatClientRequest.class);
         AdvisorChain chain = mock(AdvisorChain.class);
 
         ChatClientRequest result = costAdvisor.before(request, chain);
 
-        assertSame(request, result);
+        assertThat(result).isSameAs(request);
     }
 
     @Test
     @DisplayName("after는 Usage가 존재하면 비용을 계산하고 응답을 그대로 반환한다")
-    void afterCalculatesCostWhenUsagePresent() {
+    void calculatesCostAndReturnsSameResponse_whenUsageIsPresent() {
         // Given
         ChatClientResponse response = mock(ChatClientResponse.class);
         AdvisorChain chain = mock(AdvisorChain.class);
@@ -59,12 +59,12 @@ class CostAdvisorTest {
         ChatClientResponse result = costAdvisor.after(response, chain);
 
         // Then
-        assertSame(response, result);
+        assertThat(result).isSameAs(response);
     }
 
     @Test
     @DisplayName("after는 사용량이 없으면(EmptyUsage) 계산 없이 응답을 그대로 반환한다")
-    void afterPassesThroughWhenUsageEmpty() {
+    void returnsSameResponse_whenUsageIsEmpty() {
         // Given
         ChatClientResponse response = mock(ChatClientResponse.class);
         AdvisorChain chain = mock(AdvisorChain.class);
@@ -79,12 +79,12 @@ class CostAdvisorTest {
         ChatClientResponse result = costAdvisor.after(response, chain);
 
         // Then
-        assertSame(response, result);
+        assertThat(result).isSameAs(response);
     }
 
     @Test
     @DisplayName("after는 chatResponse가 null이면 계산 없이 응답을 그대로 반환한다")
-    void afterPassesThroughWhenChatResponseNull() {
+    void returnsSameResponse_whenChatResponseIsNull() {
         // Given
         ChatClientResponse response = mock(ChatClientResponse.class);
         AdvisorChain chain = mock(AdvisorChain.class);
@@ -94,12 +94,12 @@ class CostAdvisorTest {
         ChatClientResponse result = costAdvisor.after(response, chain);
 
         // Then
-        assertSame(response, result);
+        assertThat(result).isSameAs(response);
     }
 
     @Test
     @DisplayName("getOrder는 설정된 order 값을 반환한다")
-    void getOrderReturnsConfiguredOrder() {
-        assertEquals(100, costAdvisor.getOrder());
+    void returnsConfiguredOrder() {
+        assertThat(costAdvisor.getOrder()).isEqualTo(100);
     }
 }

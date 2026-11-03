@@ -67,7 +67,7 @@ class ChatSessionUniqueConstraintTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("같은 회원의 ACTIVE 세션을 두 번 저장하면 두 번째는 유니크 제약 위반(DataIntegrityViolationException)이 발생한다")
-    void savingTwoActiveSessionsForSameMemberThrowsUniqueConstraintViolation() {
+    void throwsUniqueViolation_whenSavingSecondActiveSession() {
         Long memberId = 100L;
 
         // 첫 번째 ACTIVE 세션 저장 성공
@@ -83,7 +83,7 @@ class ChatSessionUniqueConstraintTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("기존 ACTIVE 세션을 COMPLETED로 변경하면 동일 회원의 새로운 ACTIVE 세션을 저장할 수 있다")
-    void completedSessionAllowsNewActiveSessionForSameMember() {
+    void savesNewActiveSession_whenPreviousIsCompleted() {
         Long memberId = 100L;
 
         // 첫 번째 세션 생성 및 종료(COMPLETED)
@@ -102,7 +102,7 @@ class ChatSessionUniqueConstraintTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("COMPLETED나 EXPIRED 상태의 세션은 동일 회원이라도 여러 개 존재할 수 있다")
-    void multipleCompletedAndExpiredSessionsCanExistForSameMember() {
+    void savesManyEndedSessions_whenStatusIsCompletedOrExpired() {
         Long memberId = 100L;
 
         // COMPLETED 세션 2개
@@ -133,8 +133,8 @@ class ChatSessionUniqueConstraintTest extends MySqlContainerSupport {
     }
 
     @Test
-    @DisplayName("이미 진행 중이면 같은 세션 반환")
-    void getOrCreateActiveSessionReturnsSameSessionWhenAlreadyActive() {
+    @DisplayName("이미 진행 중인 세션이 있으면 같은 세션을 반환한다")
+    void returnsSameSession_whenAlreadyActive() {
         Long memberId = 100L;
 
         // 첫 번째 호출: 세션 신규 생성
@@ -149,7 +149,7 @@ class ChatSessionUniqueConstraintTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("같은 회원으로 두 스레드가 동시에 getOrCreateActiveSession 호출 시 둘 다 같은 세션 ID를 받고 DB의 ACTIVE 세션은 1개이다 (10회 반복)")
-    void concurrentGetOrCreateActiveSessionReturnsSameSessionAndCreatesOnlyOne() throws Exception {
+    void createsOneSession_whenStartedConcurrently() throws Exception {
         ExecutorService executor = Executors.newFixedThreadPool(2);
 
         try {

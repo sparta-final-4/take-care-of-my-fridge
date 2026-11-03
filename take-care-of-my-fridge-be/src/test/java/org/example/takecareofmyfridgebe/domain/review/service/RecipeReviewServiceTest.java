@@ -32,12 +32,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.never;
@@ -85,16 +81,16 @@ class RecipeReviewServiceTest {
      * 401 UNAUTHORIZED 예외가 발생하는지 검증한다.
      */
     @Test
-    void getReviewsThrowsUnauthorizedWhenMineIsTrueAndUnauthenticated() {
+    @DisplayName("로그인하지 않고 내 후기만 조회하면 UNAUTHORIZED 예외를 던진다")
+    void throwsUnauthorized_whenMineIsRequestedWithoutLogin() {
         // Given
         ReviewSearchRequest request = new ReviewSearchRequest(10L, true, ReviewSortType.LATEST, 1, 10);
 
         // When & Then
-        BusinessException exception = assertThrows(
-                BusinessException.class,
-                () -> recipeReviewService.getReviews(request, null)
-        );
-        assertEquals(ErrorCode.UNAUTHORIZED, exception.getErrorCode());
+        assertThatThrownBy(() -> recipeReviewService.getReviews(request, null))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.UNAUTHORIZED);
         verify(recipeReviewRepository, never()).findReviewsByCondition(any(), any());
     }
 
@@ -103,7 +99,8 @@ class RecipeReviewServiceTest {
      * 올바르게 설정되는지 검증한다.
      */
     @Test
-    void getReviewsReturnsPagedResponseWithMineFlag() {
+    @DisplayName("후기 목록을 조회하면 현재 회원이 쓴 후기에만 mine을 표시한다")
+    void marksMine_whenReviewIsWrittenByCurrentMember() {
         // Given
         Long currentMemberId = 1L;
         Member member1 = createMember(1L, "사용자1");
@@ -124,16 +121,16 @@ class RecipeReviewServiceTest {
         PageResponse<ReviewResponse> response = recipeReviewService.getReviews(request, currentMemberId);
 
         // Then
-        assertEquals(2, response.content().size());
-        assertEquals(101L, response.content().get(0).id());
-        assertTrue(response.content().get(0).mine());
-        assertEquals("사용자1", response.content().get(0).nickname());
-        assertEquals("김치찌개", response.content().get(0).recipeName());
+        assertThat(response.content().size()).isEqualTo(2);
+        assertThat(response.content().get(0).id()).isEqualTo(101L);
+        assertThat(response.content().get(0).mine()).isTrue();
+        assertThat(response.content().get(0).nickname()).isEqualTo("사용자1");
+        assertThat(response.content().get(0).recipeName()).isEqualTo("김치찌개");
 
-        assertEquals(102L, response.content().get(1).id());
-        assertFalse(response.content().get(1).mine());
-        assertEquals("사용자2", response.content().get(1).nickname());
-        assertEquals("김치찌개", response.content().get(1).recipeName());
+        assertThat(response.content().get(1).id()).isEqualTo(102L);
+        assertThat(response.content().get(1).mine()).isFalse();
+        assertThat(response.content().get(1).nickname()).isEqualTo("사용자2");
+        assertThat(response.content().get(1).recipeName()).isEqualTo("김치찌개");
     }
 
     /**
@@ -142,7 +139,7 @@ class RecipeReviewServiceTest {
      */
     @Test
     @DisplayName("여러 레시피 후기가 섞여도 이름이 맞게 붙고 레시피 조회가 단 1회 수행된다")
-    void getReviewsMapsRecipeNamesForMultipleMixedRecipesWithSingleBatchCall() {
+    void mapsRecipeNamesWithSingleLookup_whenReviewsSpanRecipes() {
         // Given: 레시피 10L과 20L이 섞여 있는 후기 3개
         Long currentMemberId = 1L;
         Member member = createMember(1L, "사용자1");
@@ -165,10 +162,10 @@ class RecipeReviewServiceTest {
         PageResponse<ReviewResponse> response = recipeReviewService.getReviews(request, currentMemberId);
 
         // Then
-        assertEquals(3, response.content().size());
-        assertEquals("김치찌개", response.content().get(0).recipeName());
-        assertEquals("된장찌개", response.content().get(1).recipeName());
-        assertEquals("김치찌개", response.content().get(2).recipeName());
+        assertThat(response.content().size()).isEqualTo(3);
+        assertThat(response.content().get(0).recipeName()).isEqualTo("김치찌개");
+        assertThat(response.content().get(1).recipeName()).isEqualTo("된장찌개");
+        assertThat(response.content().get(2).recipeName()).isEqualTo("김치찌개");
 
         // findSummaries는 N번이 아닌 정확히 1번만 호출되어야 함
         verify(recipeService, times(1)).findSummaries(any());
@@ -179,7 +176,7 @@ class RecipeReviewServiceTest {
      */
     @Test
     @DisplayName("후기 목록이 비어 있으면 findSummaries를 0회 호출하고 빈 목록을 반환한다")
-    void getReviewsWhenEmptyDoesNotCallFindSummaries() {
+    void skipsRecipeLookup_whenReviewsAreEmpty() {
         // Given: 조회 결과가 빈 페이지
         Long currentMemberId = 1L;
         ReviewSearchRequest request = new ReviewSearchRequest(10L, false, ReviewSortType.LATEST, 1, 10);
@@ -191,8 +188,8 @@ class RecipeReviewServiceTest {
         PageResponse<ReviewResponse> response = recipeReviewService.getReviews(request, currentMemberId);
 
         // Then
-        assertNotNull(response);
-        assertTrue(response.content().isEmpty());
+        assertThat(response).isNotNull();
+        assertThat(response.content().isEmpty()).isTrue();
         // findSummaries를 절대 호출하지 않아야 함
         verify(recipeService, never()).findSummaries(any());
     }
@@ -202,7 +199,7 @@ class RecipeReviewServiceTest {
      */
     @Test
     @DisplayName("레시피가 없으면 recipeName은 null로 반환된다")
-    void getReviewsWhenRecipeNotFoundInSummariesLeavesRecipeNameNull() {
+    void returnsNullRecipeName_whenRecipeIsMissing() {
         // Given: 999L 레시피 후기지만 레시피 서비스 요약 결과에는 없음
         Long currentMemberId = 1L;
         Member member = createMember(1L, "사용자1");
@@ -218,26 +215,26 @@ class RecipeReviewServiceTest {
         PageResponse<ReviewResponse> response = recipeReviewService.getReviews(request, currentMemberId);
 
         // Then
-        assertEquals(1, response.content().size());
-        assertNull(response.content().get(0).recipeName());
+        assertThat(response.content().size()).isEqualTo(1);
+        assertThat(response.content().get(0).recipeName()).isNull();
     }
 
     /**
      * 후기 작성 시 레시피가 존재하지 않으면 404 RECIPE_NOT_FOUND 예외가 발생하고 요리 기록 확인을 수행하지 않는지 검증한다.
      */
     @Test
-    void createReviewThrowsRecipeNotFoundWhenRecipeDoesNotExist() {
+    @DisplayName("없는 레시피에 후기를 쓰면 RECIPE_NOT_FOUND 예외를 던지고 요리 기록을 확인하지 않는다")
+    void throwsRecipeNotFound_whenRecipeIsMissing() {
         // Given
         Long memberId = 1L;
         ReviewCreateRequest request = new ReviewCreateRequest(999L, 5, "후기 내용");
         when(recipeService.existsById(999L)).thenReturn(false);
 
         // When & Then
-        BusinessException exception = assertThrows(
-                BusinessException.class,
-                () -> recipeReviewService.createReview(memberId, request)
-        );
-        assertEquals(ErrorCode.RECIPE_NOT_FOUND, exception.getErrorCode());
+        assertThatThrownBy(() -> recipeReviewService.createReview(memberId, request))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.RECIPE_NOT_FOUND);
         verify(cookingService, never()).hasCooked(any(), any());
         verify(recipeReviewRepository, never()).save(any(RecipeReview.class));
     }
@@ -246,7 +243,8 @@ class RecipeReviewServiceTest {
      * 후기 작성 시 요리 기록이 없으면 403 REVIEW_NOT_COOKED 예외가 발생하고 중복 확인을 수행하지 않는지 검증한다.
      */
     @Test
-    void createReviewThrowsForbiddenWhenNotCooked() {
+    @DisplayName("요리 기록 없이 후기를 쓰면 REVIEW_NOT_COOKED 예외를 던지고 중복 확인을 하지 않는다")
+    void throwsNotCooked_whenMemberHasNotCooked() {
         // Given
         Long memberId = 1L;
         ReviewCreateRequest request = new ReviewCreateRequest(10L, 5, "후기 내용");
@@ -255,11 +253,10 @@ class RecipeReviewServiceTest {
         when(cookingService.hasCooked(memberId, 10L)).thenReturn(false);
 
         // When & Then
-        BusinessException exception = assertThrows(
-                BusinessException.class,
-                () -> recipeReviewService.createReview(memberId, request)
-        );
-        assertEquals(ErrorCode.REVIEW_NOT_COOKED, exception.getErrorCode());
+        assertThatThrownBy(() -> recipeReviewService.createReview(memberId, request))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.REVIEW_NOT_COOKED);
         verify(recipeReviewRepository, never()).existsByMemberIdAndRecipeId(any(), any());
         verify(recipeReviewRepository, never()).save(any(RecipeReview.class));
     }
@@ -268,7 +265,8 @@ class RecipeReviewServiceTest {
      * 후기 작성 성공 시 recipeName을 포함하여 응답을 반환하는지 검증한다.
      */
     @Test
-    void createReviewSavesReviewAndReturnsResponse() {
+    @DisplayName("후기를 쓰면 저장하고 레시피 이름을 담아 반환한다")
+    void savesReviewAndReturnsRecipeName() {
         // Given: 1번 회원의 10번 레시피 후기 작성 요청
         Long memberId = 1L;
         Member member = createMember(memberId, "사용자1");
@@ -289,11 +287,11 @@ class RecipeReviewServiceTest {
         ReviewResponse response = recipeReviewService.createReview(memberId, request);
 
         // Then
-        assertEquals(100L, response.id());
-        assertEquals("김치찌개", response.recipeName());
-        assertEquals(5, response.rating());
-        assertEquals("정말 맛있어요!", response.content());
-        assertTrue(response.mine());
+        assertThat(response.id()).isEqualTo(100L);
+        assertThat(response.recipeName()).isEqualTo("김치찌개");
+        assertThat(response.rating()).isEqualTo(5);
+        assertThat(response.content()).isEqualTo("정말 맛있어요!");
+        assertThat(response.mine()).isTrue();
         verify(recipeReviewRepository).save(any(RecipeReview.class));
         verify(recipeService, times(1)).findSummaries(List.of(10L));
     }
@@ -302,7 +300,8 @@ class RecipeReviewServiceTest {
      * 후기 작성 시 회원이 존재하지 않으면 404 MEMBER_NOT_FOUND 예외가 발생하는지 검증한다.
      */
     @Test
-    void createReviewThrowsMemberNotFoundWhenMemberDoesNotExist() {
+    @DisplayName("없는 회원이 후기를 쓰면 MEMBER_NOT_FOUND 예외를 던진다")
+    void throwsMemberNotFound_whenMemberIsMissing() {
         // Given
         Long memberId = 999L;
         ReviewCreateRequest request = new ReviewCreateRequest(10L, 5, "후기 내용");
@@ -313,11 +312,10 @@ class RecipeReviewServiceTest {
         when(memberRepository.findById(memberId)).thenReturn(Optional.empty());
 
         // When & Then
-        BusinessException exception = assertThrows(
-                BusinessException.class,
-                () -> recipeReviewService.createReview(memberId, request)
-        );
-        assertEquals(ErrorCode.MEMBER_NOT_FOUND, exception.getErrorCode());
+        assertThatThrownBy(() -> recipeReviewService.createReview(memberId, request))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.MEMBER_NOT_FOUND);
         verify(recipeReviewRepository, never()).save(any(RecipeReview.class));
     }
 
@@ -326,7 +324,8 @@ class RecipeReviewServiceTest {
      * 사전 조회에서 409 REVIEW_ALREADY_EXISTS 예외가 발생하고 저장을 호출하지 않는지 검증한다.
      */
     @Test
-    void createReviewThrowsConflictWhenAlreadyExists() {
+    @DisplayName("같은 레시피에 이미 후기를 쓴 회원이 다시 쓰면 REVIEW_ALREADY_EXISTS 예외를 던지고 저장하지 않는다")
+    void throwsAlreadyExists_whenReviewAlreadyExists() {
         // Given: 이미 후기가 존재하는 레시피
         Long memberId = 1L;
         ReviewCreateRequest request = new ReviewCreateRequest(10L, 5, "중복 후기");
@@ -336,11 +335,10 @@ class RecipeReviewServiceTest {
         when(recipeReviewRepository.existsByMemberIdAndRecipeId(memberId, 10L)).thenReturn(true);
 
         // When & Then
-        BusinessException exception = assertThrows(
-                BusinessException.class,
-                () -> recipeReviewService.createReview(memberId, request)
-        );
-        assertEquals(ErrorCode.REVIEW_ALREADY_EXISTS, exception.getErrorCode());
+        assertThatThrownBy(() -> recipeReviewService.createReview(memberId, request))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.REVIEW_ALREADY_EXISTS);
         verify(recipeReviewRepository, never()).save(any(RecipeReview.class));
     }
 
@@ -349,7 +347,8 @@ class RecipeReviewServiceTest {
      * 대소문자 무관하게 409 REVIEW_ALREADY_EXISTS 예외로 변환하여 던지는지 검증한다.
      */
     @Test
-    void createReviewConvertsDataIntegrityViolationExceptionToConflict() {
+    @DisplayName("동시 요청으로 후기 유니크 제약을 위반하면 REVIEW_ALREADY_EXISTS 예외로 바꿔 던진다")
+    void throwsAlreadyExists_whenUniqueConstraintIsViolated() {
         // Given: 사전 조회는 통과했으나 save 시점에 DB 유니크 제약 위반 발생 (대문자 포함 메시지)
         Long memberId = 1L;
         Member member = createMember(memberId, "사용자1");
@@ -363,11 +362,10 @@ class RecipeReviewServiceTest {
                 .thenThrow(new DataIntegrityViolationException("Duplicate entry for key 'UK_RECIPE_REVIEWS_MEMBER_ID_RECIPE_ID'"));
 
         // When & Then
-        BusinessException exception = assertThrows(
-                BusinessException.class,
-                () -> recipeReviewService.createReview(memberId, request)
-        );
-        assertEquals(ErrorCode.REVIEW_ALREADY_EXISTS, exception.getErrorCode());
+        assertThatThrownBy(() -> recipeReviewService.createReview(memberId, request))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.REVIEW_ALREADY_EXISTS);
     }
 
     /**
@@ -375,7 +373,8 @@ class RecipeReviewServiceTest {
      * 409로 변환하지 않고 DataIntegrityViolationException 그대로 다시 던지는지 검증한다.
      */
     @Test
-    void createReviewRethrowsDataIntegrityViolationExceptionWhenNotUniqueConstraint() {
+    @DisplayName("유니크 제약이 아닌 다른 무결성 위반은 바꾸지 않고 그대로 던진다")
+    void rethrowsDataIntegrityViolation_whenOtherConstraintIsViolated() {
         // Given: 유니크 제약이 아닌 다른 무결성 제약 위반 발생
         Long memberId = 1L;
         Member member = createMember(memberId, "사용자1");
@@ -389,17 +388,16 @@ class RecipeReviewServiceTest {
                 .thenThrow(new DataIntegrityViolationException("Cannot add or update a child row: a foreign key constraint fails"));
 
         // When & Then
-        assertThrows(
-                DataIntegrityViolationException.class,
-                () -> recipeReviewService.createReview(memberId, request)
-        );
+        assertThatThrownBy(() -> recipeReviewService.createReview(memberId, request))
+                .isInstanceOf(DataIntegrityViolationException.class);
     }
 
     /**
      * 본인의 후기를 수정할 때 엔티티의 별점과 내용이 변경되고 recipeName을 포함하여 반환하는지 검증한다.
      */
     @Test
-    void updateReviewModifiesEntityViaDirtyChecking() {
+    @DisplayName("본인 후기를 수정하면 별점과 내용이 바뀌고 레시피 이름을 담아 반환한다")
+    void updatesRatingAndContent() {
         // Given: 1번 회원의 100번 후기
         Long memberId = 1L;
         Long reviewId = 100L;
@@ -416,11 +414,11 @@ class RecipeReviewServiceTest {
         ReviewResponse response = recipeReviewService.updateReview(memberId, reviewId, updateRequest);
 
         // Then
-        assertEquals(5, response.rating());
-        assertEquals("다시 해보니 정말 맛있네요!", response.content());
-        assertEquals("김치찌개", response.recipeName());
-        assertEquals(5, review.getRating());
-        assertEquals("다시 해보니 정말 맛있네요!", review.getContent());
+        assertThat(response.rating()).isEqualTo(5);
+        assertThat(response.content()).isEqualTo("다시 해보니 정말 맛있네요!");
+        assertThat(response.recipeName()).isEqualTo("김치찌개");
+        assertThat(review.getRating()).isEqualTo(5);
+        assertThat(review.getContent()).isEqualTo("다시 해보니 정말 맛있네요!");
         verify(recipeService, times(1)).findSummaries(List.of(10L));
     }
 
@@ -428,7 +426,8 @@ class RecipeReviewServiceTest {
      * 타인의 후기이거나 존재하지 않는 후기 수정 시 404 REVIEW_NOT_FOUND 예외가 발생하는지 검증한다.
      */
     @Test
-    void updateReviewThrowsNotFoundWhenOwnedByAnotherMemberOrMissing() {
+    @DisplayName("다른 회원의 후기이거나 없는 후기를 수정하면 REVIEW_NOT_FOUND 예외를 던진다")
+    void throwsReviewNotFound_whenReviewIsOthersOrMissing() {
         // Given: 존재하지 않거나 타인의 후기 조회 결과 empty
         Long memberId = 1L;
         Long reviewId = 999L;
@@ -437,18 +436,18 @@ class RecipeReviewServiceTest {
         when(recipeReviewRepository.findByIdAndMemberId(reviewId, memberId)).thenReturn(Optional.empty());
 
         // When & Then
-        BusinessException exception = assertThrows(
-                BusinessException.class,
-                () -> recipeReviewService.updateReview(memberId, reviewId, updateRequest)
-        );
-        assertEquals(ErrorCode.REVIEW_NOT_FOUND, exception.getErrorCode());
+        assertThatThrownBy(() -> recipeReviewService.updateReview(memberId, reviewId, updateRequest))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.REVIEW_NOT_FOUND);
     }
 
     /**
      * 본인의 후기를 삭제할 때 정상적으로 repository.delete가 호출되는지 검증한다.
      */
     @Test
-    void deleteReviewDeletesEntity() {
+    @DisplayName("본인 후기를 삭제하면 저장소에서 삭제한다")
+    void deletesReview() {
         // Given: 1번 회원의 100번 후기
         Long memberId = 1L;
         Long reviewId = 100L;
@@ -466,16 +465,16 @@ class RecipeReviewServiceTest {
 
     @Test
     @DisplayName("recipeIds가 비어있거나 null이면 저장소 호출 없이 빈 Map을 반환한다")
-    void findRatingStatsReturnsEmptyMapWhenIdsEmptyOrNull() {
+    void returnsEmptyMap_whenRecipeIdsAreEmptyOrNull() {
         // When & Then
-        assertTrue(recipeReviewService.findRatingStats(List.of()).isEmpty());
-        assertTrue(recipeReviewService.findRatingStats(null).isEmpty());
+        assertThat(recipeReviewService.findRatingStats(List.of()).isEmpty()).isTrue();
+        assertThat(recipeReviewService.findRatingStats(null).isEmpty()).isTrue();
         verify(recipeReviewRepository, never()).findRatingStatsByRecipeIds(any());
     }
 
     @Test
     @DisplayName("레시피 ID 목록으로 별점 통계를 조회하면 ID를 키로 하는 Map을 반환하고 평점은 소수 첫째자리로 반올림된다")
-    void findRatingStatsReturnsMapWithRoundedRatings() {
+    void returnsRoundedRatingsByRecipeId() {
         // Given
         RecipeRatingStat stat1 = new RecipeRatingStat(10L, 4.666, 3L);
         RecipeRatingStat stat2 = new RecipeRatingStat(20L, 3.0, 1L);
@@ -486,10 +485,10 @@ class RecipeReviewServiceTest {
         Map<Long, RecipeRatingStat> result = recipeReviewService.findRatingStats(List.of(10L, 20L, 10L));
 
         // Then
-        assertEquals(2, result.size());
-        assertEquals(4.7, result.get(10L).averageRating());
-        assertEquals(3L, result.get(10L).reviewCount());
-        assertEquals(3.0, result.get(20L).averageRating());
-        assertEquals(1L, result.get(20L).reviewCount());
+        assertThat(result.size()).isEqualTo(2);
+        assertThat(result.get(10L).averageRating()).isEqualTo(4.7);
+        assertThat(result.get(10L).reviewCount()).isEqualTo(3L);
+        assertThat(result.get(20L).averageRating()).isEqualTo(3.0);
+        assertThat(result.get(20L).reviewCount()).isEqualTo(1L);
     }
 }

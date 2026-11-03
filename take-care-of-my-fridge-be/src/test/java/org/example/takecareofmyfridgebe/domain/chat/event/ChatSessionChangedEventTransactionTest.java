@@ -83,7 +83,7 @@ class ChatSessionChangedEventTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("상담 종료가 커밋되면 COMPLETED 신호를 한 번 발행한다")
-    void completeSession_publishesAfterCommit() {
+    void publishesCompleted_whenCompleteIsCommitted() {
         Long sessionId = saveActiveSession();
 
         chatSessionService.completeSession(MEMBER_ID, sessionId);
@@ -93,7 +93,7 @@ class ChatSessionChangedEventTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("요리 완료 트랜잭션 안에서 상담을 끝내면 커밋 전에는 발행하지 않고 커밋된 뒤 발행한다")
-    void completeFromCooking_publishesOnlyAfterOuterCommit() {
+    void publishesAfterOuterCommit_whenCompletedFromCooking() {
         Long sessionId = saveActiveSession();
 
         transactionTemplate.executeWithoutResult(status -> {
@@ -106,7 +106,7 @@ class ChatSessionChangedEventTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("요리 완료 트랜잭션이 롤백되면 상담도 그대로이고 신호도 발행하지 않는다")
-    void completeFromCooking_rollback_doesNotPublish() {
+    void doesNotPublish_whenCookingTransactionRollsBack() {
         Long sessionId = saveActiveSession();
 
         transactionTemplate.executeWithoutResult(status -> {
@@ -121,7 +121,7 @@ class ChatSessionChangedEventTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("답 저장이 커밋되면 ACTIVE 신호를 발행한다")
-    void saveExchange_publishesAfterCommit() {
+    void publishesActive_whenExchangeIsCommitted() {
         Long sessionId = saveActiveSession();
 
         chatMessageService.saveExchange(sessionId, "질문", "답");
@@ -131,7 +131,7 @@ class ChatSessionChangedEventTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("트랜잭션이 없는 상담 시작 경로에서도 새로 만들면 바로 발행하고, 진행 중 상담을 그대로 돌려줄 때는 발행하지 않는다")
-    void startWithoutTransaction_publishesOnlyWhenCreated() {
+    void publishesOnlyWhenCreated_whenStartingWithoutTransaction() {
         ChatSessionResponse created = chatSessionService.getOrCreateActiveSession(MEMBER_ID);
         verify(chatSessionPushPublisher).publish(MEMBER_ID, created.id(), ChatSessionStatus.ACTIVE);
         clearInvocations(chatSessionPushPublisher);
@@ -144,7 +144,7 @@ class ChatSessionChangedEventTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("상담 시작 때 시간이 지난 상담이 있으면 EXPIRED, 새 상담 ACTIVE 순으로 발행한다")
-    void startWithExpiredSession_publishesExpiredThenActive() {
+    void publishesExpiredThenActive_whenStartingWithExpiredSession() {
         Long oldSessionId = saveActiveSession();
         makeIdle(oldSessionId);
 
@@ -157,7 +157,7 @@ class ChatSessionChangedEventTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("보내기 검증에서 만료시키면 바깥 요청이 실패해도 만료는 커밋되어 EXPIRED 신호를 발행한다")
-    void validateForSending_expired_publishesExpired() {
+    void publishesExpired_whenSendingToTimedOutSession() {
         Long sessionId = saveActiveSession();
         makeIdle(sessionId);
 
@@ -171,7 +171,7 @@ class ChatSessionChangedEventTransactionTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("이미 끝난 상담을 종료하려다 실패하면 발행하지 않는다")
-    void completeSession_failure_doesNotPublish() {
+    void doesNotPublish_whenCompleteFails() {
         Long sessionId = saveActiveSession();
         chatSessionService.completeSession(MEMBER_ID, sessionId);
         clearInvocations(chatSessionPushPublisher);

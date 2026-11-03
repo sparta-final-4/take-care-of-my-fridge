@@ -16,14 +16,14 @@ class ReviewSummarySchedulerConditionalTest {
 
     @Test
     @DisplayName("app.review-summary.enabled=false이면 ReviewSummaryScheduler 빈이 등록되지 않는다")
-    void schedulerNotRegisteredWhenDisabled() {
+    void doesNotRegisterScheduler_whenDisabled() {
         contextRunner.withPropertyValues("app.review-summary.enabled=false")
                 .run(context -> assertThat(context).doesNotHaveBean(ReviewSummaryScheduler.class));
     }
 
     @Test
     @DisplayName("app.review-summary.enabled=true이면 ReviewSummaryScheduler 빈이 등록된다")
-    void schedulerRegisteredWhenEnabled() {
+    void registersScheduler_whenEnabled() {
         contextRunner.withPropertyValues("app.review-summary.enabled=true")
                 .run(context -> assertThat(context).hasSingleBean(ReviewSummaryScheduler.class));
     }

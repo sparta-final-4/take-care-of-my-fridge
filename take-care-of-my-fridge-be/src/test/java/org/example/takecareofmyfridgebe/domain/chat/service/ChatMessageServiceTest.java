@@ -57,7 +57,7 @@ class ChatMessageServiceTest {
 
     @Test
     @DisplayName("saveExchange: 메시지가 없을 때 저장하면 sequence 1, 2로 저장되고 세션의 lastMessageAt이 갱신된다")
-    void saveExchangeFirstTimeAssignsSequence1And2AndTouchesSession() {
+    void assignsSequenceOneAndTwo_whenNoMessagesExist() {
         Long sessionId = 10L;
         ChatSession session = ChatSession.builder().memberId(1L).build();
         LocalDateTime beforeTime = LocalDateTime.now().minusHours(1);
@@ -102,7 +102,7 @@ class ChatMessageServiceTest {
 
     @Test
     @DisplayName("saveExchange: 기존 마지막 sequence가 2이면 다음 메시지는 sequence 3, 4로 저장된다")
-    void saveExchangeSecondTimeAssignsSequence3And4() {
+    void assignsSequenceThreeAndFour_whenLastSequenceIsTwo() {
         Long sessionId = 10L;
         ChatSession session = ChatSession.builder().memberId(1L).build();
 
@@ -126,7 +126,7 @@ class ChatMessageServiceTest {
 
     @Test
     @DisplayName("saveExchange: 검증 후 저장 전에 세션이 COMPLETED가 되면 메시지를 저장하지 않고 409 예외를 던진다")
-    void saveExchangeThrows409WhenSessionCompletedBeforeSave() {
+    void throwsConflictWithoutSaving_whenSessionCompletesBeforeSave() {
         Long sessionId = 10L;
         ChatSession session = ChatSession.builder().memberId(1L).build();
         session.complete(); // 답을 만드는 동안 세션이 완료됨
@@ -145,7 +145,7 @@ class ChatMessageServiceTest {
 
     @Test
     @DisplayName("saveExchange: 답을 저장하면 상담 바뀜 이벤트를 ACTIVE로 발행한다")
-    void saveExchangePublishesActiveChange() {
+    void publishesActive_whenExchangeIsSaved() {
         Long sessionId = 10L;
         ChatSession session = ChatSession.builder().memberId(1L).build();
         ReflectionTestUtils.setField(session, "id", sessionId);
@@ -161,7 +161,7 @@ class ChatMessageServiceTest {
 
     @Test
     @DisplayName("validateSessionForSending: 없거나 다른 회원의 세션이면 404 CHAT_ROOM_NOT_FOUND 예외가 발생한다")
-    void validateSessionForSendingThrows404WhenNotFoundOrOtherMember() {
+    void throwsNotFound_whenSendingToOthersOrMissingSession() {
         Long memberId = 1L;
         Long sessionId = 999L;
         when(chatSessionRepository.findByIdAndMemberId(sessionId, memberId)).thenReturn(Optional.empty());
@@ -174,7 +174,7 @@ class ChatMessageServiceTest {
 
     @Test
     @DisplayName("validateSessionForSending: 30분 이내 활성 세션은 정상적으로 검증을 통과한다")
-    void validateSessionForSendingPassesWhenActiveAndNotExpired() {
+    void passesValidation_whenSessionIsActiveWithin30Minutes() {
         Long memberId = 1L;
         Long sessionId = 10L;
         ChatSession session = ChatSession.builder().memberId(memberId).build();
@@ -189,7 +189,7 @@ class ChatMessageServiceTest {
 
     @Test
     @DisplayName("validateSessionForSending: 마지막 대화로부터 30분이 지난 세션은 expireSession을 호출해 만료시키고 CHAT_SESSION_EXPIRED 예외를 던진다")
-    void validateSessionForSendingExpiresSessionAndThrows409WhenExpired() {
+    void expiresSessionAndThrows_whenIdleOver30Minutes() {
         Long memberId = 1L;
         Long sessionId = 10L;
         ChatSession session = ChatSession.builder().memberId(memberId).build();
@@ -208,7 +208,7 @@ class ChatMessageServiceTest {
 
     @Test
     @DisplayName("validateSessionForSending: 이미 종료(COMPLETED)된 세션에 메시지를 보내면 409 CHAT_ROOM_ALREADY_COMPLETED 예외가 발생한다")
-    void validateSessionForSendingThrows409WhenSessionCompleted() {
+    void throwsAlreadyCompleted_whenSessionIsCompleted() {
         Long memberId = 1L;
         Long sessionId = 10L;
         ChatSession session = ChatSession.builder().memberId(memberId).build();
@@ -224,7 +224,7 @@ class ChatMessageServiceTest {
 
     @Test
     @DisplayName("validateSessionForSending: 만료(EXPIRED)된 세션에 메시지를 보내면 409 CHAT_ROOM_ALREADY_COMPLETED 예외가 발생한다")
-    void validateSessionForSendingThrows409WhenSessionExpired() {
+    void throwsAlreadyCompleted_whenSessionIsExpired() {
         Long memberId = 1L;
         Long sessionId = 10L;
         ChatSession session = ChatSession.builder().memberId(memberId).build();
@@ -240,7 +240,7 @@ class ChatMessageServiceTest {
 
     @Test
     @DisplayName("getMessages: 종료된 세션도 메시지 목록을 정상적으로 조회할 수 있다")
-    void getMessagesReturnsMessagesEvenIfSessionCompleted() {
+    void returnsMessages_whenSessionIsCompleted() {
         Long memberId = 1L;
         Long sessionId = 10L;
         ChatSession session = ChatSession.builder().memberId(memberId).build();
@@ -271,7 +271,7 @@ class ChatMessageServiceTest {
 
     @Test
     @DisplayName("getMessages: 남의 세션이거나 존재하지 않는 세션이면 404 CHAT_ROOM_NOT_FOUND 예외가 발생한다")
-    void getMessagesThrows404WhenNotFound() {
+    void throwsNotFound_whenGettingMessagesOfOthersOrMissingSession() {
         Long memberId = 1L;
         Long sessionId = 999L;
         when(chatSessionRepository.findByIdAndMemberId(sessionId, memberId)).thenReturn(Optional.empty());

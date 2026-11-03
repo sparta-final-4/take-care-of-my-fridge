@@ -45,6 +45,9 @@ take-care-of-my-fridge-be/ 개발 규칙. 이 문서와 기존 코드의 패턴�
    └── entity           # BaseTimeEntity (createdAt, updatedAt 등 공통 엔티티)
 ```
 - 모든 인프라성 설정(JPA Auditing, QueryDSL, Redis, Redisson, Kafka 등)은 global/config/의 단일 Config 클래스로 관리한다. 도메인 패키지 내부에서 @Configuration을 중복 선언하지 않는다.
+- 설정 값 클래스(@ConfigurationProperties) 위치
+    - 한 도메인에서만 쓰는 설정은 domain/{도메인}/config에 둘 수 있다. 예: domain/search/config/RecipeSearchProperties, domain/chat/config/ChatProperties
+    - 여러 도메인이 같이 쓰는 설정은 global/config에 둔다. 예: global/config/SseProperties
 
 4. 레이어별 구현 규칙
 
@@ -185,3 +188,16 @@ public enum ErrorCode {
     private final String message;
 }
 ```
+
+6. 테스트 작성
+- 검증은 AssertJ만 쓴다.
+    - 값: assertThat(...).isEqualTo(...) / containsExactly(...) / isEmpty() 등
+    - 예외: assertThatThrownBy(...).isInstanceOf(...) 또는 assertThatExceptionOfType(...)
+    - BusinessException은 에러 코드까지 확인한다: .extracting("errorCode").isEqualTo(ErrorCode.XXX)
+    - JUnit의 assertEquals, assertTrue, assertThrows 등은 쓰지 않는다.
+    - Mockito의 given, verify 등 목 설정과 호출 확인은 그대로 쓴다.
+- 테스트 설명은 @DisplayName에 한국어 한 문장으로, 무엇을 하면 어떻게 되는지 쓴다.
+    - 예: @DisplayName("DB에 같은 이름이 없고 끝부분이 같은 후보가 있으면 그 재료로 매칭한다")
+- 테스트 메서드 이름은 영어 동사로 시작하는 카멜 표기로 쓴다. 결과를 먼저 쓰고 조건은 _when 뒤에 쓴다.
+    - 형식: {동사}{결과}_when{조건} (조건이 없으면 _when을 생략)
+    - 예: returnsCustomIngredient_whenNoCandidate, throwsNotFound_whenSessionIsOthers, decreasesQuantityInExpiryOrder

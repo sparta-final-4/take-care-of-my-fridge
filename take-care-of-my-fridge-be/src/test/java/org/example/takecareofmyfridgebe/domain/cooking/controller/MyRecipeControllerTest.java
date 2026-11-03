@@ -16,6 +16,7 @@ import org.example.takecareofmyfridgebe.global.config.SecurityConfig;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 import org.example.takecareofmyfridgebe.global.response.PageResponse;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -73,7 +74,8 @@ class MyRecipeControllerTest {
      * 서비스를 호출하지 않고 401 Unauthorized(A003) 에러를 반환하는지 검증한다.
      */
     @Test
-    void unauthenticatedRequestReturnsUnauthorized() throws Exception {
+    @DisplayName("로그인하지 않고 내 레시피 목록을 요청하면 서비스를 호출하지 않고 401을 반환한다")
+    void returnsUnauthorized_whenNotLoggedIn() throws Exception {
         // When & Then: 인증 정보 없이 GET 요청 시 401 응답 및 서비스 미호출 확인
         mvc.perform(get("/api/me/recipes"))
                 .andExpect(status().isUnauthorized())
@@ -89,7 +91,8 @@ class MyRecipeControllerTest {
      * 2) 200 OK와 함께 summary 통계 및 recipes 페이징 필드가 규격대로 직렬화되는지 검증한다.
      */
     @Test
-    void getMyRecipesWithDefaultParametersReturnsOk() throws Exception {
+    @DisplayName("파라미터 없이 내 레시피를 조회하면 기본 조건으로 조회하고 요약과 목록을 반환한다")
+    void usesDefaultConditions_whenParamsAreMissing() throws Exception {
         // Given: 요약 통계와 레시피 목록 DTO 준비
         Long memberId = 7L;
         MostCookedRecipeResponse mostCooked = new MostCookedRecipeResponse(1L, "불닭 참치 두부조림", 3L);
@@ -172,7 +175,8 @@ class MyRecipeControllerTest {
      * DTO로 바인딩되어 서비스에 정확히 전달되는지 검증한다.
      */
     @Test
-    void getMyRecipesWithCustomParametersPassesToService() throws Exception {
+    @DisplayName("내 레시피 조회 파라미터를 보내면 그대로 서비스에 넘긴다")
+    void passesQueryParamsToService() throws Exception {
         // Given: 2페이지 조회 시 빈 페이지 응답 준비
         Long memberId = 7L;
         MyRecipeSummaryResponse summary = new MyRecipeSummaryResponse(10L, 20L, 6L, 4L, null, 0L);
@@ -202,7 +206,8 @@ class MyRecipeControllerTest {
      * page 번호가 1 미만(0)이면 유효성 검증 실패로 400 Bad Request를 반환하는지 검증한다.
      */
     @Test
-    void getMyRecipesWithInvalidPageReturnsBadRequest() throws Exception {
+    @DisplayName("페이지 번호가 0이면 400을 반환한다")
+    void returnsBadRequest_whenPageIsZero() throws Exception {
         // When & Then: 0 페이지 요청 시 400 반환 및 서비스 미호출 확인
         mvc.perform(get("/api/me/recipes")
                         .param("page", "0")
@@ -217,7 +222,8 @@ class MyRecipeControllerTest {
      * page size가 1 미만(0)이면 유효성 검증 실패로 400 Bad Request를 반환하는지 검증한다.
      */
     @Test
-    void getMyRecipesWithZeroSizeReturnsBadRequest() throws Exception {
+    @DisplayName("페이지 크기가 0이면 400을 반환한다")
+    void returnsBadRequest_whenSizeIsZero() throws Exception {
         // When & Then: size 0 요청 시 400 반환 및 서비스 미호출 확인
         mvc.perform(get("/api/me/recipes")
                         .param("size", "0")
@@ -232,7 +238,8 @@ class MyRecipeControllerTest {
      * page size가 50을 초과(51)하면 유효성 검증 실패로 400 Bad Request를 반환하는지 검증한다.
      */
     @Test
-    void getMyRecipesWithOverSizeReturnsBadRequest() throws Exception {
+    @DisplayName("페이지 크기가 최대치(50)를 넘으면 400을 반환한다")
+    void returnsBadRequest_whenSizeExceedsMax() throws Exception {
         // When & Then: size 51 요청 시 400 반환 및 서비스 미호출 확인
         mvc.perform(get("/api/me/recipes")
                         .param("size", "51")

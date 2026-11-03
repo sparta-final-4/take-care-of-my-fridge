@@ -34,7 +34,7 @@ class PurchaseConfirmedConsumerDuplicateTest {
 
     @Test
     @DisplayName("입고 이력 유니크 제약 위반이면 이미 입고된 것으로 보고 예외 없이 건너뛴다")
-    void consume_commerceHistoryUniqueViolation_skips() {
+    void skipsWithoutException_whenCommerceHistoryIsDuplicated() {
         doThrow(violation("uk_fridge_commerce_histories_order_item_id")).when(fridgeFacade).stockPurchasedItems(MESSAGE);
 
         assertThatCode(() -> consumer.consume(MESSAGE)).doesNotThrowAnyException();
@@ -42,7 +42,7 @@ class PurchaseConfirmedConsumerDuplicateTest {
 
     @Test
     @DisplayName("다른 제약 위반은 다시 던져 재시도 뒤 DLT로 가게 한다")
-    void consume_otherViolation_rethrows() {
+    void rethrows_whenOtherConstraintIsViolated() {
         DataIntegrityViolationException other = violation("fk_fridge_ingredient");
         doThrow(other).when(fridgeFacade).stockPurchasedItems(MESSAGE);
 

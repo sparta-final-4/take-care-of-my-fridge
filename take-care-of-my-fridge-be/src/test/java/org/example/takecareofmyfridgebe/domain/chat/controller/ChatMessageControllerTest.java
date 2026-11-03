@@ -66,7 +66,7 @@ class ChatMessageControllerTest {
 
     @Test
     @DisplayName("비로그인 사용자가 메시지 전송 요청 시 401 Unauthorized를 반환한다")
-    void sendMessageAnonymousReturns401() throws Exception {
+    void returnsUnauthorized_whenNotLoggedIn() throws Exception {
         mvc.perform(post("/api/chat-sessions/1/messages")
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -77,7 +77,7 @@ class ChatMessageControllerTest {
 
     @Test
     @DisplayName("정상: 컨트롤러가 ChatStreamService를 호출하고 X-Accel-Buffering: no 헤더와 함께 SSE 스트림을 반환한다")
-    void sendMessageStreamsSSEWithHeader() throws Exception {
+    void streamsSseWithNoBufferingHeader() throws Exception {
         Long memberId = 1L;
         Long sessionId = 10L;
         String userContent = "된장찌개 레시피 알려줘";
@@ -111,7 +111,7 @@ class ChatMessageControllerTest {
 
     @Test
     @DisplayName("메시지 내용이 비어 있으면 400 Bad Request를 반환한다")
-    void sendMessageBlankContentReturns400() throws Exception {
+    void returnsBadRequest_whenContentIsBlank() throws Exception {
         Long memberId = 1L;
         Long sessionId = 10L;
 
@@ -126,7 +126,7 @@ class ChatMessageControllerTest {
 
     @Test
     @DisplayName("메시지 내용이 정확히 500자이면 정상 처리(200 OK SSE)된다")
-    void sendMessageContent500CharactersReturns200() throws Exception {
+    void streamsReply_whenContentIs500Chars() throws Exception {
         Long memberId = 1L;
         Long sessionId = 10L;
         String content500 = "a".repeat(500);
@@ -144,7 +144,7 @@ class ChatMessageControllerTest {
 
     @Test
     @DisplayName("메시지 내용이 501자 이상이면 400 Bad Request를 반환한다")
-    void sendMessageContent501CharactersReturns400() throws Exception {
+    void returnsBadRequest_whenContentExceeds500Chars() throws Exception {
         Long memberId = 1L;
         Long sessionId = 10L;
         String content501 = "a".repeat(501);
@@ -160,7 +160,7 @@ class ChatMessageControllerTest {
 
     @Test
     @DisplayName("30분 지난 만료된 세션에 메시지 전송 시 409 Conflict (CHAT_006) JSON을 반환한다")
-    void sendMessageWhenSessionExpiredReturns409Json() throws Exception {
+    void returnsConflictJson_whenSessionIsExpired() throws Exception {
         Long memberId = 1L;
         Long sessionId = 10L;
 
@@ -179,7 +179,7 @@ class ChatMessageControllerTest {
 
     @Test
     @DisplayName("하루 질문 한도(30회)를 초과한 회원이 메시지 전송 시 429 Too Many Requests (CHAT_007) JSON을 반환한다")
-    void sendMessageWhenDailyLimitExceededReturns429Json() throws Exception {
+    void returnsTooManyRequestsJson_whenDailyLimitIsExceeded() throws Exception {
         Long memberId = 1L;
         Long sessionId = 10L;
 
@@ -198,7 +198,7 @@ class ChatMessageControllerTest {
 
     @Test
     @DisplayName("Redis 장애 등으로 상담 서비스 불가 시 503 Service Unavailable (CHAT_008) JSON을 반환한다")
-    void sendMessageWhenServiceUnavailableReturns503Json() throws Exception {
+    void returnsServiceUnavailableJson_whenServiceIsUnavailable() throws Exception {
         Long memberId = 1L;
         Long sessionId = 10L;
 
@@ -217,7 +217,7 @@ class ChatMessageControllerTest {
 
     @Test
     @DisplayName("존재하지 않거나 타인의 세션에 메시지 전송 시 404 Not Found (CHAT_001) JSON을 반환한다")
-    void sendMessageWhenSessionNotFoundReturns404Json() throws Exception {
+    void returnsNotFoundJson_whenSessionIsOthersOrMissing() throws Exception {
         Long memberId = 1L;
         Long sessionId = 999L;
 
@@ -236,7 +236,7 @@ class ChatMessageControllerTest {
 
     @Test
     @DisplayName("이미 종료된 세션에 메시지 전송 시 409 Conflict (CHAT_005) JSON을 반환한다")
-    void sendMessageWhenSessionAlreadyCompletedReturns409Json() throws Exception {
+    void returnsConflictJson_whenSessionIsCompleted() throws Exception {
         Long memberId = 1L;
         Long sessionId = 10L;
 
@@ -255,7 +255,7 @@ class ChatMessageControllerTest {
 
     @Test
     @DisplayName("메시지 목록 조회 시 200 OK와 전체 메시지 목록을 반환한다")
-    void getMessagesReturns200WithList() throws Exception {
+    void returnsMessages() throws Exception {
         Long memberId = 1L;
         Long sessionId = 10L;
 
@@ -275,7 +275,7 @@ class ChatMessageControllerTest {
 
     @Test
     @DisplayName("존재하지 않거나 타인의 세션 메시지 조회 시 404 Not Found를 반환한다")
-    void getMessagesWhenSessionNotFoundReturns404() throws Exception {
+    void returnsNotFound_whenMessagesSessionIsOthersOrMissing() throws Exception {
         Long memberId = 1L;
         Long sessionId = 999L;
 

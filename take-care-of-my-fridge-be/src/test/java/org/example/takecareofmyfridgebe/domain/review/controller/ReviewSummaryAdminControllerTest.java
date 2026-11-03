@@ -55,7 +55,7 @@ class ReviewSummaryAdminControllerTest {
 
     @Test
     @DisplayName("비로그인 사용자가 실행 요청 시 401 Unauthorized를 반환한다")
-    void anonymousRequestReturns401() throws Exception {
+    void returnsUnauthorized_whenNotLoggedIn() throws Exception {
         mvc.perform(post("/api/admin/review-summaries/run")
                         .with(csrf()))
                 .andExpect(status().isUnauthorized())
@@ -64,7 +64,7 @@ class ReviewSummaryAdminControllerTest {
 
     @Test
     @DisplayName("일반 회원(USER)이 실행 요청 시 403 Forbidden을 반환한다")
-    void userRequestReturns403() throws Exception {
+    void returnsForbidden_whenRequesterIsUser() throws Exception {
         mvc.perform(post("/api/admin/review-summaries/run")
                         .with(csrf())
                         .with(authentication(authenticationFor(Member.Role.USER))))
@@ -75,7 +75,7 @@ class ReviewSummaryAdminControllerTest {
     @Test
     @DisplayName("관리자(ADMIN)가 실행 요청 시 200 OK와 작업 결과를 반환한다")
     @SuppressWarnings("unchecked")
-    void adminRequestReturns200WithResult() throws Throwable {
+    void returnsResult_whenRequesterIsAdmin() throws Throwable {
         ReviewSummaryResult dummyResult = new ReviewSummaryResult(10, 8, 1, 1, 1200L, 0L, 0L, 0.0, List.of());
         LockingTaskExecutor.TaskResult<ReviewSummaryResult> taskResult = mock(LockingTaskExecutor.TaskResult.class);
         when(taskResult.wasExecuted()).thenReturn(true);
@@ -98,7 +98,7 @@ class ReviewSummaryAdminControllerTest {
     @Test
     @DisplayName("이미 잠금이 잡혀 있으면 409 Conflict(REVIEW_SUMMARY_RUNNING)를 반환하고 요약을 실행하지 않는다")
     @SuppressWarnings("unchecked")
-    void returns409WhenLockAlreadyHeld() throws Throwable {
+    void returnsConflict_whenLockIsAlreadyHeld() throws Throwable {
         LockingTaskExecutor.TaskResult<ReviewSummaryResult> notExecutedResult = mock(LockingTaskExecutor.TaskResult.class);
         when(notExecutedResult.wasExecuted()).thenReturn(false);
 
@@ -119,7 +119,7 @@ class ReviewSummaryAdminControllerTest {
     @Test
     @DisplayName("수동 실행이 끝난 직후 다시 실행하면 200 OK를 반환하고 lockAtLeastFor는 0이다")
     @SuppressWarnings("unchecked")
-    void canExecuteAgainImmediatelyAfterManualExecutionFinishes() throws Throwable {
+    void runsAgain_whenPreviousManualRunHasFinished() throws Throwable {
         ReviewSummaryResult dummyResult1 = new ReviewSummaryResult(5, 5, 0, 0, 500L, 0L, 0L, 0.0, List.of());
         ReviewSummaryResult dummyResult2 = new ReviewSummaryResult(3, 3, 0, 0, 300L, 0L, 0L, 0.0, List.of());
 
@@ -161,7 +161,7 @@ class ReviewSummaryAdminControllerTest {
     @Test
     @DisplayName("잠금 실행 중 RuntimeException이 발생하면 500 Internal Server Error를 반환한다")
     @SuppressWarnings("unchecked")
-    void returns500WhenRuntimeExceptionOccurs() throws Throwable {
+    void returnsInternalServerError_whenRuntimeExceptionOccurs() throws Throwable {
         when(lockingTaskExecutor.executeWithLock(any(LockingTaskExecutor.TaskWithResult.class), any(LockConfiguration.class)))
                 .thenThrow(new RuntimeException("Redis 분산 락 통신 실패"));
 
@@ -176,7 +176,7 @@ class ReviewSummaryAdminControllerTest {
     @Test
     @DisplayName("잠금 실행 중 Error가 발생하면 잡아서 500 응답으로 바꾸지 않고 그대로 던져진다")
     @SuppressWarnings("unchecked")
-    void rethrowsErrorWhenErrorOccurs() throws Throwable {
+    void rethrowsError_whenErrorOccurs() throws Throwable {
         OutOfMemoryError expectedError = new OutOfMemoryError("자바 힙 메모리 부족");
         when(lockingTaskExecutor.executeWithLock(any(LockingTaskExecutor.TaskWithResult.class), any(LockConfiguration.class)))
                 .thenThrow(expectedError);

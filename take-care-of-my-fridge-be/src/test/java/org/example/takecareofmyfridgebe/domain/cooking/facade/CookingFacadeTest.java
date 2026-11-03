@@ -11,6 +11,7 @@ import org.example.takecareofmyfridgebe.domain.cooking.service.CookingService;
 import org.example.takecareofmyfridgebe.domain.fridge.service.FridgeService;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
@@ -23,8 +24,8 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.math.BigDecimal;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
@@ -58,7 +59,8 @@ class CookingFacadeTest {
      * 요리 기록 저장 및 냉장고 차감 로직을 전혀 실행하지 않고 404 CHAT_ROOM_NOT_FOUND로 즉시 종료되는지 검증한다.
      */
     @Test
-    void completeCookingFastFailsWhenChatSessionBelongsToAnotherMember() {
+    @DisplayName("다른 회원의 상담이거나 없는 상담으로 요리를 완료하면 기록·차감 없이 CHAT_ROOM_NOT_FOUND 예외를 던진다")
+    void throwsChatRoomNotFound_whenSessionIsOthersOrMissing() {
         // Given
         Long memberId = 7L;
         Long invalidSessionId = 999L;
@@ -69,11 +71,10 @@ class CookingFacadeTest {
                 .when(chatSessionService).validateAndGetSession(memberId, invalidSessionId);
 
         // When & Then
-        BusinessException exception = assertThrows(
-                BusinessException.class,
-                () -> cookingFacade.completeCooking(memberId, request)
-        );
-        assertEquals(ErrorCode.CHAT_ROOM_NOT_FOUND, exception.getErrorCode());
+        assertThatThrownBy(() -> cookingFacade.completeCooking(memberId, request))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.CHAT_ROOM_NOT_FOUND);
 
         verify(cookingService, never()).saveCookingLog(any(), any());
         verify(fridgeService, never()).consumeForCooking(any(), any(), any());
@@ -85,7 +86,8 @@ class CookingFacadeTest {
      * 요리 기록 저장 및 냉장고 차감 로직을 전혀 실행하지 않고 409 CHAT_ROOM_ALREADY_COMPLETED로 즉시 실패하는지 검증한다.
      */
     @Test
-    void completeCookingFastFailsWithConflictWhenChatSessionIsAlreadyCompleted() {
+    @DisplayName("이미 종료된 상담으로 요리를 완료하면 기록·차감 없이 CHAT_ROOM_ALREADY_COMPLETED 예외를 던진다")
+    void throwsAlreadyCompleted_whenSessionIsCompleted() {
         // Given
         Long memberId = 7L;
         Long completedSessionId = 20L;
@@ -96,12 +98,12 @@ class CookingFacadeTest {
                 .when(chatSessionService).validateAndGetSession(memberId, completedSessionId);
 
         // When & Then
-        BusinessException exception = assertThrows(
-                BusinessException.class,
-                () -> cookingFacade.completeCooking(memberId, request)
-        );
-        assertEquals(ErrorCode.CHAT_ROOM_ALREADY_COMPLETED, exception.getErrorCode());
-        assertEquals(HttpStatus.CONFLICT, exception.getErrorCode().getStatus());
+        assertThatThrownBy(() -> cookingFacade.completeCooking(memberId, request))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.CHAT_ROOM_ALREADY_COMPLETED)
+                .extracting("status")
+                .isEqualTo(HttpStatus.CONFLICT);
 
         verify(cookingService, never()).saveCookingLog(any(), any());
         verify(fridgeService, never()).consumeForCooking(any(), any(), any());
@@ -113,7 +115,8 @@ class CookingFacadeTest {
      * 1) 세션 검증 -> 2) 기록 저장 -> 3) 재료 차감 -> 4) 세션 완료 순서로 실행되는지 검증한다.
      */
     @Test
-    void completeCookingExecutesInOrderAndReturnsResponse() {
+    @DisplayName("요리를 완료하면 상담 확인, 기록 저장, 재료 차감, 상담 완료 순서로 처리한다")
+    void completesCookingInOrder() {
         // Given
         Long memberId = 7L;
         Long sessionId = 10L;
@@ -138,9 +141,9 @@ class CookingFacadeTest {
         CookingCompleteResponse response = cookingFacade.completeCooking(memberId, request);
 
         // Then
-        assertEquals(100L, response.cookingLogId());
-        assertEquals(1, response.deductions().size());
-        assertEquals(3L, response.deductions().get(0).ingredientId());
+        assertThat(response.cookingLogId()).isEqualTo(100L);
+        assertThat(response.deductions().size()).isEqualTo(1);
+        assertThat(response.deductions().get(0).ingredientId()).isEqualTo(3L);
 
         InOrder inOrder = inOrder(chatSessionService, cookingService, fridgeService);
         inOrder.verify(chatSessionService).validateAndGetSession(memberId, sessionId);

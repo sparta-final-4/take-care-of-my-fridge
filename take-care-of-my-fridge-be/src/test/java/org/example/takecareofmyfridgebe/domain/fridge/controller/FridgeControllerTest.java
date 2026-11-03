@@ -24,6 +24,7 @@ import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 import org.example.takecareofmyfridgebe.global.response.PageResponse;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -86,7 +87,8 @@ class FridgeControllerTest {
      * 서비스를 호출하지 않고 401 Unauthorized(A003) 에러를 반환하는지 검증한다.
      */
     @Test
-    void unauthenticatedRequestReturnsUnauthorized() throws Exception {
+    @DisplayName("로그인하지 않고 냉장고 재료 목록을 요청하면 서비스를 호출하지 않고 401을 반환한다")
+    void returnsUnauthorized_whenNotLoggedIn() throws Exception {
         // When & Then: 인증 정보 없이 GET 요청 시 401 응답 및 서비스 미호출 확인
         mvc.perform(get("/api/fridge/items"))
                 .andExpect(status().isUnauthorized())
@@ -103,7 +105,8 @@ class FridgeControllerTest {
      * 3) 응답 JSON 필드가 규격대로 직렬화되는지 검증한다.
      */
     @Test
-    void getItemsWithEmptyQueryParamsUsesDefaultsAndTokenMemberId() throws Exception {
+    @DisplayName("정렬을 빈 값으로 보내면 기본 정렬과 토큰의 회원 ID로 목록을 조회한다")
+    void usesDefaultSortAndTokenMemberId_whenSortIsEmpty() throws Exception {
         // Given: 7번 회원의 기본 조건 조회 시 반환할 응답 DTO 준비
         FridgeItemResponse item = new FridgeItemResponse(
                 1L,
@@ -161,7 +164,8 @@ class FridgeControllerTest {
      * 지금은 받지 않는 storage·imminentOnly 파라미터는 무시되는지 검증한다.
      */
     @Test
-    void getItemsWithSortPassesSortToServiceAndIgnoresRemovedFilters() throws Exception {
+    @DisplayName("정렬을 지정해 목록을 조회하면 정렬은 서비스에 넘기고 받지 않는 필터 파라미터는 무시한다")
+    void passesSortAndIgnoresRemovedFilters_whenSortIsGiven() throws Exception {
         // Given
         when(fridgeService.getItems(7L, FridgeSortType.NAME))
                 .thenReturn(List.of());
@@ -186,7 +190,8 @@ class FridgeControllerTest {
      * 바인딩 단계에서 거절되어 400 Bad Request(C001)를 반환하는지 검증한다.
      */
     @Test
-    void getItemsWithInvalidSortReturnsBadRequest() throws Exception {
+    @DisplayName("정의되지 않은 정렬 값으로 목록을 조회하면 400을 반환한다")
+    void returnsBadRequest_whenSortIsInvalid() throws Exception {
         mvc.perform(get("/api/fridge/items")
                         .param("sort", "INVALID_SORT")
                         .with(authentication(new UsernamePasswordAuthenticationToken(
@@ -205,7 +210,8 @@ class FridgeControllerTest {
      * 등록된 재료 목록이 반환되는지 검증한다.
      */
     @Test
-    void createItemsUsesTokenMemberIdAndReturnsSavedItems() throws Exception {
+    @DisplayName("재료 등록을 요청하면 토큰의 회원 ID로 등록하고 등록된 재료 목록을 반환한다")
+    void createsItemsWithTokenMemberId() throws Exception {
         // Given
         FridgeItemResponse saved = new FridgeItemResponse(
                 10L,
@@ -267,7 +273,8 @@ class FridgeControllerTest {
      * 모두 FridgeFacade를 호출하지 않고 400 Bad Request(C001)를 반환하는지 검증한다.
      */
     @Test
-    void createItemsRejectsInvalidRequestsWithBadRequest() throws Exception {
+    @DisplayName("재료 등록 요청 값이 잘못되면 등록하지 않고 400을 반환한다")
+    void returnsBadRequest_whenCreateRequestIsInvalid() throws Exception {
         // 21개 항목 JSON 생성
         String twentyOneItems = IntStream.range(0, 21)
                 .mapToObj(i -> "{\"rawName\":\"두부\",\"quantity\":1}")
@@ -308,7 +315,8 @@ class FridgeControllerTest {
      * 수정된 재료 응답이 반환되는지 검증한다.
      */
     @Test
-    void updateItemUsesTokenMemberIdAndReturnsUpdatedItem() throws Exception {
+    @DisplayName("재료 수정을 요청하면 토큰의 회원 ID로 수정하고 수정된 재료를 반환한다")
+    void updatesItemWithTokenMemberId() throws Exception {
         // Given
         FridgeItemResponse updated = new FridgeItemResponse(
                 100L,
@@ -365,7 +373,8 @@ class FridgeControllerTest {
      * 404 Not Found(FRIDGE_001) 응답을 반환하는지 검증한다.
      */
     @Test
-    void updateItemReturnsNotFoundWhenTargetBelongsToAnotherMember() throws Exception {
+    @DisplayName("다른 회원의 재료를 수정하려고 하면 404를 반환한다")
+    void returnsNotFound_whenUpdatingOthersItem() throws Exception {
         // Given
         when(fridgeFacade.updateItem(eq(7L), eq(999L), any(FridgeItemUpdateRequest.class)))
                 .thenThrow(new BusinessException(ErrorCode.FRIDGE_ITEM_NOT_FOUND));
@@ -397,7 +406,8 @@ class FridgeControllerTest {
      * 모두 FridgeFacade를 호출하지 않고 400 Bad Request(C001)를 반환하는지 검증한다.
      */
     @Test
-    void updateItemRejectsInvalidRequestsWithBadRequest() throws Exception {
+    @DisplayName("재료 수정 요청 값이 잘못되면 수정하지 않고 400을 반환한다")
+    void returnsBadRequest_whenUpdateRequestIsInvalid() throws Exception {
         List<String> invalidBodies = List.of(
                 // quantity 0
                 "{\"quantity\":0}",
@@ -433,7 +443,8 @@ class FridgeControllerTest {
      * 모두 토큰의 회원 ID(7L)를 사용해 200 OK를 반환하는지 검증한다.
      */
     @Test
-    void removeItemPassesTokenMemberIdAndReasonToService() throws Exception {
+    @DisplayName("재료 빼기를 요청하면 토큰의 회원 ID와 빼는 사유로 재료를 뺀다")
+    void removesItemWithTokenMemberIdAndReason() throws Exception {
         for (FridgeRemoveReason reason : FridgeRemoveReason.values()) {
             mvc.perform(delete("/api/fridge/items/100")
                             .param("reason", reason.name())
@@ -454,7 +465,8 @@ class FridgeControllerTest {
      * 서비스를 호출하지 않고 400 Bad Request(C001)를 반환하는지 검증한다.
      */
     @Test
-    void removeItemWithMissingOrInvalidReasonReturnsBadRequest() throws Exception {
+    @DisplayName("재료 빼는 사유가 없거나 잘못되면 빼지 않고 400을 반환한다")
+    void returnsBadRequest_whenRemoveReasonIsMissingOrInvalid() throws Exception {
         // 1) reason 파라미터 아예 누락
         mvc.perform(delete("/api/fridge/items/100")
                         .with(csrf())
@@ -495,7 +507,8 @@ class FridgeControllerTest {
      * FRIDGE_ITEM_NOT_FOUND(404) 응답이 반환되는지 검증한다.
      */
     @Test
-    void removeItemReturnsNotFoundWhenTargetBelongsToAnotherMember() throws Exception {
+    @DisplayName("다른 회원의 재료를 빼려고 하면 404를 반환한다")
+    void returnsNotFound_whenRemovingOthersItem() throws Exception {
         // Given
         doThrow(new BusinessException(ErrorCode.FRIDGE_ITEM_NOT_FOUND))
                 .when(fridgeService).removeItem(7L, 999L, FridgeRemoveReason.CONSUMED);
@@ -517,7 +530,8 @@ class FridgeControllerTest {
      * 응답의 fridgeId·removed·remainingQuantity가 규격대로 직렬화되는지 검증한다.
      */
     @Test
-    void takeOutItemPassesTokenMemberIdAndRequestToService() throws Exception {
+    @DisplayName("재료 먹음·버림을 요청하면 토큰의 회원 ID와 요청 본문으로 처리하고 처리 결과를 반환한다")
+    void takesOutItemWithTokenMemberId() throws Exception {
         // Given
         when(fridgeService.takeOutItem(eq(7L), eq(100L), any(FridgeItemTakeOutRequest.class)))
                 .thenReturn(new FridgeItemTakeOutResponse(100L, false, new BigDecimal("2.50")));
@@ -546,7 +560,8 @@ class FridgeControllerTest {
      * 서비스를 호출하지 않고 400 Bad Request(C001)를 반환하는지 검증한다.
      */
     @Test
-    void takeOutItemRejectsInvalidRequestsWithBadRequest() throws Exception {
+    @DisplayName("재료 먹음·버림 요청 값이 잘못되면 처리하지 않고 400을 반환한다")
+    void returnsBadRequest_whenTakeOutRequestIsInvalid() throws Exception {
         List<String> invalidBodies = List.of(
                 // action 누락
                 "{\"quantity\":1}",
@@ -579,7 +594,8 @@ class FridgeControllerTest {
      * 400 Bad Request(FRIDGE_005) 응답을 반환하는지 검증한다.
      */
     @Test
-    void takeOutItemReturnsBadRequestWhenMealkitQuantityIsNotInteger() throws Exception {
+    @DisplayName("밀키트를 소수 수량으로 빼려고 하면 400을 반환한다")
+    void returnsBadRequest_whenMealkitQuantityIsNotInteger() throws Exception {
         // Given
         when(fridgeService.takeOutItem(eq(7L), eq(100L), any(FridgeItemTakeOutRequest.class)))
                 .thenThrow(new BusinessException(ErrorCode.FRIDGE_MEALKIT_QUANTITY_NOT_INTEGER));
@@ -604,7 +620,8 @@ class FridgeControllerTest {
      * 2) PageResponse와 FridgeItemLogResponse 필드가 규격대로 직렬화되는지 검증한다.
      */
     @Test
-    void getLogsWithoutParamsUsesDefaultsAndTokenMemberId() throws Exception {
+    @DisplayName("파라미터 없이 기록을 조회하면 기본 조건과 토큰의 회원 ID로 조회한다")
+    void usesDefaultConditionsAndTokenMemberId_whenLogParamsAreMissing() throws Exception {
         // Given
         FridgeItemLogResponse logResponse = new FridgeItemLogResponse(
                 1L, 10L, "두부", "모", "국산 두부", new BigDecimal("0.50"),
@@ -638,7 +655,8 @@ class FridgeControllerTest {
      * action·from·to·page·size 파라미터가 그대로 바인딩되어 서비스에 전달되는지 검증한다.
      */
     @Test
-    void getLogsBindsQueryParams() throws Exception {
+    @DisplayName("기록 조회 파라미터를 보내면 그대로 서비스에 넘긴다")
+    void passesLogQueryParamsToService() throws Exception {
         when(fridgeService.getLogs(eq(7L), any(FridgeItemLogSearchRequest.class)))
                 .thenReturn(new PageResponse<>(List.of(), 2, 10, 0, 0, true));
 
@@ -662,7 +680,8 @@ class FridgeControllerTest {
      * 서비스를 호출하지 않고 400 Bad Request(C001)를 반환하는지 검증한다.
      */
     @Test
-    void getLogsWithInvalidParamsReturnsBadRequest() throws Exception {
+    @DisplayName("기록 조회 파라미터가 잘못되면 조회하지 않고 400을 반환한다")
+    void returnsBadRequest_whenLogParamsAreInvalid() throws Exception {
         List<String[]> invalidParams = List.of(
                 new String[]{"action", "WRONG_ENTRY"},
                 new String[]{"from", "2026/10/01"},

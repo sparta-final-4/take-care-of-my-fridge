@@ -6,6 +6,7 @@ import org.example.takecareofmyfridgebe.domain.cooking.dto.CookingStatsResponse;
 import org.example.takecareofmyfridgebe.domain.cooking.service.CookingService;
 import org.example.takecareofmyfridgebe.global.config.SecurityConfig;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -47,7 +48,8 @@ class CookingStatsControllerTest {
      * 401 Unauthorized가 아닌 200 OK와 통계 데이터를 반환하는지 검증한다.
      */
     @Test
-    void getCookingStatsUnauthenticatedReturnsOk() throws Exception {
+    @DisplayName("로그인하지 않아도 레시피 요리 통계를 조회할 수 있다")
+    void returnsStats_whenNotLoggedIn() throws Exception {
         // Given
         Long recipeId = 12L;
         CookingStatsResponse response = new CookingStatsResponse(recipeId, 10L, 8L, 2L);
@@ -71,7 +73,8 @@ class CookingStatsControllerTest {
      * 404가 아닌 200 OK와 0으로 채워진 통계를 반환하는지 검증한다.
      */
     @Test
-    void getCookingStatsWithNoLogsReturnsZeros() throws Exception {
+    @DisplayName("요리 기록이 없는 레시피의 통계를 조회하면 0으로 채운 통계를 반환한다")
+    void returnsZeroStats_whenRecipeHasNoLogs() throws Exception {
         // Given
         Long recipeId = 99L;
         CookingStatsResponse response = new CookingStatsResponse(recipeId, 0L, 0L, 0L);
@@ -94,7 +97,8 @@ class CookingStatsControllerTest {
      * 존재하지 않는 레시피의 요리 통계를 조회하면 404 Not Found를 반환한다.
      */
     @Test
-    void getCookingStatsWhenRecipeNotFoundReturns404() throws Exception {
+    @DisplayName("없는 레시피의 요리 통계를 조회하면 404를 반환한다")
+    void returnsNotFound_whenRecipeIsMissing() throws Exception {
         // Given
         Long recipeId = 999L;
         when(cookingService.getCookingStats(recipeId))

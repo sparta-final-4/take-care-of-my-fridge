@@ -64,7 +64,7 @@ class ChatSessionExpiryIntegrationTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("30분 지난 세션에 메시지 전송 시 409 CHAT_SESSION_EXPIRED가 발생하고 DB에 실제로 EXPIRED로 저장된다")
-    void sendingMessageToSessionOlderThan30MinutesExpiresSessionInDbAndThrowsExpiredError() {
+    void expiresSessionInDb_whenSendingAfter30Minutes() {
         Long memberId = 100L;
 
         // 1. ACTIVE 세션 생성 및 저장
@@ -93,7 +93,7 @@ class ChatSessionExpiryIntegrationTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("30분 지난 세션이 있을 때 상담 시작(getOrCreateActiveSession) 시 기존 세션은 EXPIRED로 바뀌고 유니크 제약 오류 없이 새 ACTIVE 세션을 반환한다")
-    void startingChatWithExpiredSessionMarksOldExpiredAndCreatesNewActiveSession() {
+    void createsNewSession_whenStartingWithTimedOutSession() {
         Long memberId = 200L;
 
         // 1. 기존 ACTIVE 세션 생성 및 저장

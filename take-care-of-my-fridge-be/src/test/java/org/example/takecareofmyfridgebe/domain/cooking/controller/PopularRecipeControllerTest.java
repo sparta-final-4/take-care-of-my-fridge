@@ -43,7 +43,7 @@ class PopularRecipeControllerTest {
 
     @Test
     @DisplayName("비로그인 상태에서 인기 레시피 기본 조회(size=6) 시 200 OK와 레시피 목록을 반환한다")
-    void getPopularRecipesUnauthenticatedDefaultSizeReturnsOk() throws Exception {
+    void returnsDefaultSizeRecipes_whenNotLoggedIn() throws Exception {
         // Given
         PopularRecipeResponse recipeResponse = new PopularRecipeResponse(
                 1L, "된장찌개", "image.jpg", "구수한 된장 팁", 5L, 4.8, 12L
@@ -67,7 +67,7 @@ class PopularRecipeControllerTest {
 
     @Test
     @DisplayName("size 파라미터가 지정되면 해당 size로 서비스를 호출한다")
-    void getPopularRecipesWithSizeParameter() throws Exception {
+    void passesSizeToService_whenSizeIsGiven() throws Exception {
         // Given
         when(popularRecipeService.getPopularRecipes(10)).thenReturn(List.of());
 
@@ -82,7 +82,7 @@ class PopularRecipeControllerTest {
 
     @Test
     @DisplayName("size가 최대 허용치(20)를 초과하거나 1 미만이면 400 Bad Request를 반환한다")
-    void getPopularRecipesExceedingMaxSizeReturnsBadRequest() throws Exception {
+    void returnsBadRequest_whenSizeIsOutOfRange() throws Exception {
         // When & Then: size=21
         mvc.perform(get("/api/recipes/popular").param("size", "21"))
                 .andExpect(status().isBadRequest());

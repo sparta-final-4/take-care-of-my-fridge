@@ -23,6 +23,7 @@ import org.example.takecareofmyfridgebe.domain.ingredient.service.IngredientServ
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 import org.example.takecareofmyfridgebe.global.response.PageResponse;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -42,12 +43,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.inOrder;
@@ -84,7 +81,8 @@ class FridgeServiceTest {
      * 두 엔티티를 조회했을 때 각각의 필드와 상태값이 FridgeItemResponse로 올바르게 변환되는지 확인한다.
      */
     @Test
-    void getItemsMapsFridgeEntitiesToResponses() {
+    @DisplayName("냉장고 재료를 조회하면 출처와 소비기한 상태를 담은 응답으로 변환한다")
+    void mapsItemsToResponsesWithExpiryStatus() {
         // Given: 테스트용 표준 재료(두부)와 냉장고 재료 엔티티 2건(임박 1건, 만료 1건) 생성
         LocalDate today = LocalDate.now();
         Ingredient ingredient = Ingredient.builder()
@@ -131,30 +129,30 @@ class FridgeServiceTest {
         List<FridgeItemResponse> result = fridgeService.getItems(7L, FridgeSortType.EXPIRATION);
 
         // Then: 첫 번째 재료(임박)와 두 번째 재료(만료)의 응답 DTO 필드 및 계산값 검증
-        assertEquals(2, result.size());
+        assertThat(result.size()).isEqualTo(2);
 
         FridgeItemResponse first = result.get(0);
-        assertEquals(1L, first.id());
-        assertEquals(10L, first.ingredientId());
-        assertEquals("두부", first.ingredientName());
-        assertEquals("모", first.baseUnit());
-        assertEquals("국산 두부", first.rawName());
-        assertEquals(new BigDecimal("2.00"), first.quantity());
-        assertEquals(StorageType.REFRIGERATED, first.storage());
-        assertEquals(today.plusDays(2), first.expirationDate());
-        assertEquals(FridgeSource.MANUAL, first.source());
-        assertNull(first.orderItemId());
-        assertTrue(first.imminent());
-        assertFalse(first.expired());
-        assertEquals(LocalDateTime.of(2026, 10, 18, 9, 0), first.createdAt());
-        assertEquals(LocalDateTime.of(2026, 10, 18, 9, 30), first.updatedAt());
+        assertThat(first.id()).isEqualTo(1L);
+        assertThat(first.ingredientId()).isEqualTo(10L);
+        assertThat(first.ingredientName()).isEqualTo("두부");
+        assertThat(first.baseUnit()).isEqualTo("모");
+        assertThat(first.rawName()).isEqualTo("국산 두부");
+        assertThat(first.quantity()).isEqualTo(new BigDecimal("2.00"));
+        assertThat(first.storage()).isEqualTo(StorageType.REFRIGERATED);
+        assertThat(first.expirationDate()).isEqualTo(today.plusDays(2));
+        assertThat(first.source()).isEqualTo(FridgeSource.MANUAL);
+        assertThat(first.orderItemId()).isNull();
+        assertThat(first.imminent()).isTrue();
+        assertThat(first.expired()).isFalse();
+        assertThat(first.createdAt()).isEqualTo(LocalDateTime.of(2026, 10, 18, 9, 0));
+        assertThat(first.updatedAt()).isEqualTo(LocalDateTime.of(2026, 10, 18, 9, 30));
 
         FridgeItemResponse second = result.get(1);
-        assertEquals(2L, second.id());
-        assertEquals(55L, second.orderItemId());
-        assertEquals(FridgeSource.COMMERCE, second.source());
-        assertFalse(second.imminent());
-        assertTrue(second.expired());
+        assertThat(second.id()).isEqualTo(2L);
+        assertThat(second.orderItemId()).isEqualTo(55L);
+        assertThat(second.source()).isEqualTo(FridgeSource.COMMERCE);
+        assertThat(second.imminent()).isFalse();
+        assertThat(second.expired()).isTrue();
 
         verify(fridgeRepository).findItemsByCondition(7L, FridgeSortType.EXPIRATION);
     }
@@ -164,7 +162,8 @@ class FridgeServiceTest {
      * 저장된 엔티티들을 FridgeItemResponse 목록으로 변환해 반환하는지 검증한다.
      */
     @Test
-    void saveItemsSavesAllEntitiesAndMapsToResponses() {
+    @DisplayName("재료 목록을 한 번에 저장하고 저장된 재료를 응답으로 변환한다")
+    void savesAllItemsAndReturnsResponses() {
         // Given
         LocalDate today = LocalDate.now();
         Ingredient ingredient = Ingredient.builder()
@@ -195,13 +194,13 @@ class FridgeServiceTest {
         List<FridgeItemResponse> responses = fridgeService.saveItems(itemsToSave);
 
         // Then
-        assertEquals(1, responses.size());
-        assertEquals(100L, responses.get(0).id());
-        assertEquals(10L, responses.get(0).ingredientId());
-        assertEquals("두부", responses.get(0).ingredientName());
-        assertEquals("국산 두부 300g", responses.get(0).rawName());
-        assertFalse(responses.get(0).imminent());
-        assertFalse(responses.get(0).expired());
+        assertThat(responses.size()).isEqualTo(1);
+        assertThat(responses.get(0).id()).isEqualTo(100L);
+        assertThat(responses.get(0).ingredientId()).isEqualTo(10L);
+        assertThat(responses.get(0).ingredientName()).isEqualTo("두부");
+        assertThat(responses.get(0).rawName()).isEqualTo("국산 두부 300g");
+        assertThat(responses.get(0).imminent()).isFalse();
+        assertThat(responses.get(0).expired()).isFalse();
         verify(fridgeRepository).saveAll(itemsToSave);
     }
 
@@ -212,7 +211,8 @@ class FridgeServiceTest {
      * 3) JPA 더티 체킹으로 반영하므로 fridgeRepository.save를 호출하지 않는지 검증한다.
      */
     @Test
-    void updateItemUpdatesEntityViaDirtyCheckingAndPreservesSourceAndOrderItemId() {
+    @DisplayName("재료를 수정하면 save 호출 없이 값이 바뀌고 출처와 주문 상품 ID는 유지된다")
+    void updatesItemAndKeepsSourceAndOrderItemId() {
         // Given: 커머스 입고(COMMERCE, orderItemId=55L)로 등록된 7번 회원의 냉장고 재료
         LocalDate today = LocalDate.now();
         Ingredient oldIngredient = Ingredient.builder()
@@ -260,16 +260,16 @@ class FridgeServiceTest {
         FridgeItemResponse response = fridgeService.updateItem(7L, 100L, newIngredient, request);
 
         // Then: 엔티티와 응답 DTO에 변경된 값이 반영되고 source·orderItemId는 그대로 유지되며 save는 미호출
-        assertSame(newIngredient, fridge.getIngredient());
-        assertEquals(20L, response.ingredientId());
-        assertEquals("배추김치", response.ingredientName());
-        assertEquals("포기", response.baseUnit());
-        assertEquals("비비고 썰은배추김치(500g)", response.rawName());
-        assertEquals(new BigDecimal("2.50"), response.quantity());
-        assertEquals(StorageType.FROZEN, response.storage());
-        assertEquals(today.plusDays(10), response.expirationDate());
-        assertEquals(FridgeSource.COMMERCE, response.source());
-        assertEquals(55L, response.orderItemId());
+        assertThat(fridge.getIngredient()).isSameAs(newIngredient);
+        assertThat(response.ingredientId()).isEqualTo(20L);
+        assertThat(response.ingredientName()).isEqualTo("배추김치");
+        assertThat(response.baseUnit()).isEqualTo("포기");
+        assertThat(response.rawName()).isEqualTo("비비고 썰은배추김치(500g)");
+        assertThat(response.quantity()).isEqualTo(new BigDecimal("2.50"));
+        assertThat(response.storage()).isEqualTo(StorageType.FROZEN);
+        assertThat(response.expirationDate()).isEqualTo(today.plusDays(10));
+        assertThat(response.source()).isEqualTo(FridgeSource.COMMERCE);
+        assertThat(response.orderItemId()).isEqualTo(55L);
 
         verify(fridgeRepository, never()).save(any(Fridge.class));
     }
@@ -279,7 +279,8 @@ class FridgeServiceTest {
      * 기존 표준 재료를 그대로 유지하고 나머지 값만 수정하는지 검증한다.
      */
     @Test
-    void updateItemKeepsExistingIngredientWhenIngredientIsNull() {
+    @DisplayName("다시 매칭한 재료 없이 수정하면 기존 재료를 유지하고 나머지 값만 바꾼다")
+    void keepsIngredient_whenIngredientIsNull() {
         // Given: 두부(ingredientId=10L)로 매핑된 7번 회원의 냉장고 재료
         LocalDate today = LocalDate.now();
         Ingredient existingIngredient = Ingredient.builder()
@@ -316,11 +317,11 @@ class FridgeServiceTest {
         FridgeItemResponse response = fridgeService.updateItem(7L, 100L, null, request);
 
         // Then: 기존 재료는 유지되고 수량·보관방식·소비기한만 변경
-        assertSame(existingIngredient, fridge.getIngredient());
-        assertEquals(10L, response.ingredientId());
-        assertEquals(new BigDecimal("2.00"), response.quantity());
-        assertEquals(StorageType.FROZEN, response.storage());
-        assertEquals(today.plusDays(10), response.expirationDate());
+        assertThat(fridge.getIngredient()).isSameAs(existingIngredient);
+        assertThat(response.ingredientId()).isEqualTo(10L);
+        assertThat(response.quantity()).isEqualTo(new BigDecimal("2.00"));
+        assertThat(response.storage()).isEqualTo(StorageType.FROZEN);
+        assertThat(response.expirationDate()).isEqualTo(today.plusDays(10));
     }
 
     private Fridge tofuInFridge(LocalDate expirationDate) {
@@ -352,7 +353,8 @@ class FridgeServiceTest {
      * (수정 창을 열어 둔 사이 요리로 차감된 수량을 화면의 옛 값으로 덮어쓰지 않는다)
      */
     @Test
-    void updateItemWithOnlyExpirationDateKeepsQuantity() {
+    @DisplayName("소비기한만 보내 수정하면 수량·이름·보관방식은 그대로 둔다")
+    void keepsQuantity_whenOnlyExpirationDateIsSent() {
         LocalDate today = LocalDate.now();
         Fridge fridge = tofuInFridge(today.plusDays(3));
         when(fridgeRepository.findForUpdateByIdAndMemberId(100L, 7L)).thenReturn(Optional.of(fridge));
@@ -360,17 +362,18 @@ class FridgeServiceTest {
         FridgeItemResponse response = fridgeService.updateItem(
                 7L, 100L, null, new FridgeItemUpdateRequest(null, null, null, today.plusDays(10)));
 
-        assertEquals(new BigDecimal("1.00"), response.quantity());
-        assertEquals("찌개용 두부", response.rawName());
-        assertEquals(StorageType.REFRIGERATED, response.storage());
-        assertEquals(today.plusDays(10), response.expirationDate());
+        assertThat(response.quantity()).isEqualTo(new BigDecimal("1.00"));
+        assertThat(response.rawName()).isEqualTo("찌개용 두부");
+        assertThat(response.storage()).isEqualTo(StorageType.REFRIGERATED);
+        assertThat(response.expirationDate()).isEqualTo(today.plusDays(10));
     }
 
     /**
      * 수량을 보내면 그 값으로 바뀌고, 보내지 않은 칸은 그대로인지 검증한다.
      */
     @Test
-    void updateItemWithQuantityChangesOnlyQuantity() {
+    @DisplayName("수량만 보내 수정하면 수량만 바뀌고 나머지는 그대로 둔다")
+    void changesOnlyQuantity_whenOnlyQuantityIsSent() {
         LocalDate today = LocalDate.now();
         Fridge fridge = tofuInFridge(today.plusDays(3));
         when(fridgeRepository.findForUpdateByIdAndMemberId(100L, 7L)).thenReturn(Optional.of(fridge));
@@ -378,15 +381,16 @@ class FridgeServiceTest {
         FridgeItemResponse response = fridgeService.updateItem(
                 7L, 100L, null, new FridgeItemUpdateRequest(null, new BigDecimal("3.50"), null, null));
 
-        assertEquals(new BigDecimal("3.50"), response.quantity());
-        assertEquals(today.plusDays(3), response.expirationDate());
+        assertThat(response.quantity()).isEqualTo(new BigDecimal("3.50"));
+        assertThat(response.expirationDate()).isEqualTo(today.plusDays(3));
     }
 
     /**
      * 모든 칸이 null이면 아무것도 바뀌지 않고 현재 값을 그대로 반환하는지 검증한다.
      */
     @Test
-    void updateItemWithAllNullFieldsReturnsCurrentValues() {
+    @DisplayName("모든 칸을 비워 수정하면 아무것도 바꾸지 않고 현재 값을 반환한다")
+    void returnsCurrentValues_whenAllFieldsAreNull() {
         LocalDate today = LocalDate.now();
         Fridge fridge = tofuInFridge(today.plusDays(3));
         when(fridgeRepository.findForUpdateByIdAndMemberId(100L, 7L)).thenReturn(Optional.of(fridge));
@@ -394,24 +398,26 @@ class FridgeServiceTest {
         FridgeItemResponse response = fridgeService.updateItem(
                 7L, 100L, null, new FridgeItemUpdateRequest(null, null, null, null));
 
-        assertEquals(10L, response.ingredientId());
-        assertEquals("찌개용 두부", response.rawName());
-        assertEquals(new BigDecimal("1.00"), response.quantity());
-        assertEquals(StorageType.REFRIGERATED, response.storage());
-        assertEquals(today.plusDays(3), response.expirationDate());
+        assertThat(response.ingredientId()).isEqualTo(10L);
+        assertThat(response.rawName()).isEqualTo("찌개용 두부");
+        assertThat(response.quantity()).isEqualTo(new BigDecimal("1.00"));
+        assertThat(response.storage()).isEqualTo(StorageType.REFRIGERATED);
+        assertThat(response.expirationDate()).isEqualTo(today.plusDays(3));
     }
 
     /**
      * 잠금 조회 결과가 없으면(차감으로 이미 지워졌거나 남의 재료) 404(FRIDGE_ITEM_NOT_FOUND)인지 검증한다.
      */
     @Test
-    void updateItemThrowsNotFoundWhenItemWasDeleted() {
+    @DisplayName("수정할 재료를 잠금 조회로 찾지 못하면 FRIDGE_ITEM_NOT_FOUND 예외를 던진다")
+    void throwsNotFound_whenLockedItemIsMissing() {
         when(fridgeRepository.findForUpdateByIdAndMemberId(100L, 7L)).thenReturn(Optional.empty());
 
-        BusinessException exception = assertThrows(BusinessException.class, () -> fridgeService.updateItem(
-                7L, 100L, null, new FridgeItemUpdateRequest(null, new BigDecimal("2"), null, null)));
-
-        assertEquals(ErrorCode.FRIDGE_ITEM_NOT_FOUND, exception.getErrorCode());
+        assertThatThrownBy(() -> fridgeService.updateItem(
+                7L, 100L, null, new FridgeItemUpdateRequest(null, new BigDecimal("2"), null, null)))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.FRIDGE_ITEM_NOT_FOUND);
         verify(fridgeRepository, never()).findByIdAndMemberId(any(), any());
     }
 
@@ -419,7 +425,8 @@ class FridgeServiceTest {
      * 재매핑 비교용 조회가 저장된 rawName과 밀키트(ING_MEALKIT) 여부를 함께 반환하는지 검증한다.
      */
     @Test
-    void getNameInfoReturnsRawNameAndMealkitFlag() {
+    @DisplayName("재매핑 비교용 조회는 저장된 원문 이름과 밀키트 여부를 반환한다")
+    void returnsRawNameAndMealkitFlag() {
         // Given: 밀키트 재료로 매핑된 냉장고 재료
         Ingredient mealkit = Ingredient.builder()
                 .ingredientCode(Ingredient.ING_MEALKIT)
@@ -444,8 +451,8 @@ class FridgeServiceTest {
         FridgeNameInfo nameInfo = fridgeService.getNameInfo(7L, 200L);
 
         // Then
-        assertEquals("밀푀유나베 밀키트", nameInfo.rawName());
-        assertTrue(nameInfo.mealkit());
+        assertThat(nameInfo.rawName()).isEqualTo("밀푀유나베 밀키트");
+        assertThat(nameInfo.mealkit()).isTrue();
     }
 
     /**
@@ -453,16 +460,16 @@ class FridgeServiceTest {
      * BusinessException(ErrorCode.FRIDGE_ITEM_NOT_FOUND) 예외가 발생하는지 검증한다.
      */
     @Test
-    void getNameInfoThrowsNotFoundWhenOwnedByAnotherMemberOrMissing() {
+    @DisplayName("재매핑 비교용 조회에서 다른 회원의 재료이거나 없는 재료면 FRIDGE_ITEM_NOT_FOUND 예외를 던진다")
+    void throwsNotFound_whenNameInfoTargetIsOthersOrMissing() {
         // Given
         when(fridgeRepository.findByIdAndMemberId(999L, 7L)).thenReturn(Optional.empty());
 
         // When & Then
-        BusinessException exception = assertThrows(
-                BusinessException.class,
-                () -> fridgeService.getNameInfo(7L, 999L)
-        );
-        assertEquals(ErrorCode.FRIDGE_ITEM_NOT_FOUND, exception.getErrorCode());
+        assertThatThrownBy(() -> fridgeService.getNameInfo(7L, 999L))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.FRIDGE_ITEM_NOT_FOUND);
     }
 
     /**
@@ -470,16 +477,16 @@ class FridgeServiceTest {
      * BusinessException(ErrorCode.FRIDGE_ITEM_NOT_FOUND) 예외가 발생하는지 검증한다.
      */
     @Test
-    void getFridgeEntityThrowsNotFoundWhenOwnedByAnotherMemberOrMissing() {
+    @DisplayName("다른 회원의 재료이거나 없는 재료를 조회하면 FRIDGE_ITEM_NOT_FOUND 예외를 던진다")
+    void throwsNotFound_whenItemIsOthersOrMissing() {
         // Given: 7번 회원이 다른 회원의 재료(또는 존재하지 않는 재료) 999L을 조회
         when(fridgeRepository.findByIdAndMemberId(999L, 7L)).thenReturn(Optional.empty());
 
         // When & Then: FRIDGE_ITEM_NOT_FOUND 예외 발생 확인
-        BusinessException exception = assertThrows(
-                BusinessException.class,
-                () -> fridgeService.getFridgeEntity(7L, 999L)
-        );
-        assertEquals(ErrorCode.FRIDGE_ITEM_NOT_FOUND, exception.getErrorCode());
+        assertThatThrownBy(() -> fridgeService.getFridgeEntity(7L, 999L))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.FRIDGE_ITEM_NOT_FOUND);
     }
 
     /**
@@ -488,7 +495,8 @@ class FridgeServiceTest {
      * 2) 반드시 기록을 먼저 저장(save)한 뒤 냉장고에서 재료를 삭제(delete)하는지 검증한다.
      */
     @Test
-    void removeItemSavesLogBeforeDeletingFridgeWhenReasonRequiresLog() {
+    @DisplayName("다 먹음·버림 사유로 재료를 빼면 기록을 먼저 저장한 뒤 재료를 삭제한다")
+    void savesLogBeforeDeleting_whenReasonIsConsumedOrDiscarded() {
         // Given: 7번 회원이 보유한 100번 재료(국산 두부 300g, 남은 수량 1.50)
         Ingredient ingredient = Ingredient.builder()
                 .ingredientCode("ING_TOFU")
@@ -523,13 +531,13 @@ class FridgeServiceTest {
         inOrder.verify(fridgeRepository).delete(fridge);
 
         FridgeItemLog savedLog = logCaptor.getValue();
-        assertEquals(7L, savedLog.getMemberId());
-        assertSame(ingredient, savedLog.getIngredient());
-        assertEquals(100L, savedLog.getFridgeId());
-        assertEquals("국산 두부 300g", savedLog.getRawName());
-        assertEquals(new BigDecimal("1.50"), savedLog.getQuantity());
-        assertEquals(FridgeItemAction.CONSUMED, savedLog.getAction());
-        assertNull(savedLog.getCookingLogId());
+        assertThat(savedLog.getMemberId()).isEqualTo(7L);
+        assertThat(savedLog.getIngredient()).isSameAs(ingredient);
+        assertThat(savedLog.getFridgeId()).isEqualTo(100L);
+        assertThat(savedLog.getRawName()).isEqualTo("국산 두부 300g");
+        assertThat(savedLog.getQuantity()).isEqualTo(new BigDecimal("1.50"));
+        assertThat(savedLog.getAction()).isEqualTo(FridgeItemAction.CONSUMED);
+        assertThat(savedLog.getCookingLogId()).isNull();
     }
 
     /**
@@ -538,7 +546,8 @@ class FridgeServiceTest {
      * WRONG_ENTRY.toAction()을 직접 호출하면 BusinessException(INVALID_FRIDGE_LOG)이 발생하는지 검증한다.
      */
     @Test
-    void removeItemDeletesFridgeWithoutSavingLogWhenReasonIsWrongEntry() {
+    @DisplayName("잘못 등록 사유로 재료를 빼면 기록 없이 재료만 삭제한다")
+    void deletesWithoutLog_whenReasonIsWrongEntry() {
         // Given
         Ingredient ingredient = Ingredient.builder()
                 .ingredientCode("ING_TOFU")
@@ -568,11 +577,10 @@ class FridgeServiceTest {
         // Then: 이력 저장소는 전혀 호출되지 않고 재료 삭제만 수행되며, WRONG_ENTRY.toAction()은 BusinessException(INVALID_FRIDGE_LOG)을 던짐
         verifyNoInteractions(fridgeItemLogRepository);
         verify(fridgeRepository).delete(fridge);
-        BusinessException exception = assertThrows(
-                BusinessException.class,
-                FridgeRemoveReason.WRONG_ENTRY::toAction
-        );
-        assertEquals(ErrorCode.INVALID_FRIDGE_LOG, exception.getErrorCode());
+        assertThatThrownBy(FridgeRemoveReason.WRONG_ENTRY::toAction)
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.INVALID_FRIDGE_LOG);
     }
 
     /**
@@ -580,16 +588,16 @@ class FridgeServiceTest {
      * FRIDGE_ITEM_NOT_FOUND(404) 예외가 발생하고 기록 저장과 삭제 모두 수행되지 않는지 검증한다.
      */
     @Test
-    void removeItemThrowsNotFoundWhenTargetBelongsToAnotherMember() {
+    @DisplayName("다른 회원의 재료를 빼려고 하면 FRIDGE_ITEM_NOT_FOUND 예외를 던지고 기록·삭제를 하지 않는다")
+    void throwsNotFound_whenRemovingOthersItem() {
         // Given
         when(fridgeRepository.findForUpdateByIdAndMemberId(999L, 7L)).thenReturn(Optional.empty());
 
         // When & Then
-        BusinessException exception = assertThrows(
-                BusinessException.class,
-                () -> fridgeService.removeItem(7L, 999L, FridgeRemoveReason.DISCARDED)
-        );
-        assertEquals(ErrorCode.FRIDGE_ITEM_NOT_FOUND, exception.getErrorCode());
+        assertThatThrownBy(() -> fridgeService.removeItem(7L, 999L, FridgeRemoveReason.DISCARDED))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.FRIDGE_ITEM_NOT_FOUND);
         verifyNoInteractions(fridgeItemLogRepository);
         verify(fridgeRepository, never()).delete(any(Fridge.class));
     }
@@ -601,7 +609,8 @@ class FridgeServiceTest {
      * 3) 응답이 removed = false, remainingQuantity = 2.00인지 검증한다.
      */
     @Test
-    void takeOutItemDeductsPartialQuantityAndKeepsFridge() {
+    @DisplayName("남은 양보다 적게 먹으면 남은 양을 줄이고 재료는 남긴다")
+    void deductsQuantityAndKeepsItem_whenQuantityIsLessThanRemaining() {
         // Given: 7번 회원의 100번 재료(남은 양 3.00)
         Fridge fridge = fridgeWithQuantity("3.00");
         when(fridgeRepository.findForUpdateByIdAndMemberId(100L, 7L)).thenReturn(Optional.of(fridge));
@@ -613,13 +622,13 @@ class FridgeServiceTest {
         // Then
         ArgumentCaptor<FridgeItemLog> logCaptor = ArgumentCaptor.forClass(FridgeItemLog.class);
         verify(fridgeItemLogRepository).save(logCaptor.capture());
-        assertEquals(0, BigDecimal.ONE.compareTo(logCaptor.getValue().getQuantity()));
-        assertEquals(FridgeItemAction.CONSUMED, logCaptor.getValue().getAction());
+        assertThat(BigDecimal.ONE.compareTo(logCaptor.getValue().getQuantity())).isEqualTo(0);
+        assertThat(logCaptor.getValue().getAction()).isEqualTo(FridgeItemAction.CONSUMED);
         verify(fridgeRepository, never()).delete(any(Fridge.class));
 
-        assertEquals(100L, response.fridgeId());
-        assertFalse(response.removed());
-        assertEquals(0, new BigDecimal("2.00").compareTo(response.remainingQuantity()));
+        assertThat(response.fridgeId()).isEqualTo(100L);
+        assertThat(response.removed()).isFalse();
+        assertThat(new BigDecimal("2.00").compareTo(response.remainingQuantity())).isEqualTo(0);
     }
 
     /**
@@ -627,7 +636,8 @@ class FridgeServiceTest {
      * 남은 양 전부(3.00)를 이력으로 남기고 재료를 삭제하며, removed = true, remainingQuantity = 0인지 검증한다.
      */
     @Test
-    void takeOutItemRemovesFridgeWhenQuantityIsNullOrExceedsRemaining() {
+    @DisplayName("수량 없이 또는 남은 양보다 많이 빼면 남은 양 전부를 기록하고 재료를 삭제한다")
+    void removesItem_whenQuantityIsNullOrExceedsRemaining() {
         for (BigDecimal requested : new BigDecimal[]{null, new BigDecimal("5")}) {
             // Given
             Fridge fridge = fridgeWithQuantity("3.00");
@@ -642,11 +652,11 @@ class FridgeServiceTest {
             InOrder inOrder = inOrder(fridgeItemLogRepository, fridgeRepository);
             inOrder.verify(fridgeItemLogRepository).save(logCaptor.capture());
             inOrder.verify(fridgeRepository).delete(fridge);
-            assertEquals(0, new BigDecimal("3.00").compareTo(logCaptor.getValue().getQuantity()));
-            assertEquals(FridgeItemAction.DISCARDED, logCaptor.getValue().getAction());
+            assertThat(new BigDecimal("3.00").compareTo(logCaptor.getValue().getQuantity())).isEqualTo(0);
+            assertThat(logCaptor.getValue().getAction()).isEqualTo(FridgeItemAction.DISCARDED);
 
-            assertTrue(response.removed());
-            assertEquals(0, BigDecimal.ZERO.compareTo(response.remainingQuantity()));
+            assertThat(response.removed()).isTrue();
+            assertThat(BigDecimal.ZERO.compareTo(response.remainingQuantity())).isEqualTo(0);
 
             clearInvocations(fridgeItemLogRepository, fridgeRepository);
         }
@@ -657,7 +667,8 @@ class FridgeServiceTest {
      * 재료가 삭제되고, 이력에는 처리 전 남은 양 전부(1.00)가 기록되는지 검증한다.
      */
     @Test
-    void takeOutItemRemovesFridgeWhenRemainderIsBelowThreshold() {
+    @DisplayName("빼고 남은 양이 0.05 미만이면 재료를 삭제하고 처리 전 양 전부를 기록한다")
+    void removesItem_whenRemainderIsBelowThreshold() {
         // Given
         Fridge fridge = fridgeWithQuantity("1.00");
         when(fridgeRepository.findForUpdateByIdAndMemberId(100L, 7L)).thenReturn(Optional.of(fridge));
@@ -669,9 +680,9 @@ class FridgeServiceTest {
         // Then
         ArgumentCaptor<FridgeItemLog> logCaptor = ArgumentCaptor.forClass(FridgeItemLog.class);
         verify(fridgeItemLogRepository).save(logCaptor.capture());
-        assertEquals(0, new BigDecimal("1.00").compareTo(logCaptor.getValue().getQuantity()));
+        assertThat(new BigDecimal("1.00").compareTo(logCaptor.getValue().getQuantity())).isEqualTo(0);
         verify(fridgeRepository).delete(fridge);
-        assertTrue(response.removed());
+        assertThat(response.removed()).isTrue();
     }
 
     /**
@@ -679,17 +690,17 @@ class FridgeServiceTest {
      * FRIDGE_ITEM_NOT_FOUND(404) 예외가 발생하고 이력 저장과 삭제 모두 수행되지 않는지 검증한다.
      */
     @Test
-    void takeOutItemThrowsNotFoundWhenTargetBelongsToAnotherMember() {
+    @DisplayName("다른 회원의 재료를 먹음·버림 처리하면 FRIDGE_ITEM_NOT_FOUND 예외를 던지고 기록·삭제를 하지 않는다")
+    void throwsNotFound_whenTakingOutOthersItem() {
         // Given
         when(fridgeRepository.findForUpdateByIdAndMemberId(999L, 7L)).thenReturn(Optional.empty());
 
         // When & Then
-        BusinessException exception = assertThrows(
-                BusinessException.class,
-                () -> fridgeService.takeOutItem(
-                        7L, 999L, new FridgeItemTakeOutRequest(FridgeItemAction.CONSUMED, null))
-        );
-        assertEquals(ErrorCode.FRIDGE_ITEM_NOT_FOUND, exception.getErrorCode());
+        assertThatThrownBy(() -> fridgeService.takeOutItem(
+                7L, 999L, new FridgeItemTakeOutRequest(FridgeItemAction.CONSUMED, null)))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.FRIDGE_ITEM_NOT_FOUND);
         verifyNoInteractions(fridgeItemLogRepository);
         verify(fridgeRepository, never()).delete(any(Fridge.class));
     }
@@ -700,21 +711,22 @@ class FridgeServiceTest {
      * 남은 양(2)보다 큰 소수(2.5)도 전부 빼기로 넘어가지 않고 같은 예외가 나는지 함께 확인한다.
      */
     @Test
-    void takeOutItemRejectsFractionalQuantityForMealkit() {
+    @DisplayName("밀키트를 소수 수량으로 빼면 예외를 던지고 남은 양·기록을 바꾸지 않는다")
+    void throwsMealkitQuantityNotInteger_whenMealkitQuantityIsFractional() {
         for (String requested : new String[]{"0.5", "2.5"}) {
             // Given: 남은 양 2개인 밀키트
             Fridge fridge = mealkitWithQuantity("2");
             when(fridgeRepository.findForUpdateByIdAndMemberId(100L, 7L)).thenReturn(Optional.of(fridge));
 
             // When & Then
-            BusinessException exception = assertThrows(
-                    BusinessException.class,
-                    () -> fridgeService.takeOutItem(7L, 100L,
-                            new FridgeItemTakeOutRequest(FridgeItemAction.CONSUMED, new BigDecimal(requested)))
-            );
-            assertEquals(ErrorCode.FRIDGE_MEALKIT_QUANTITY_NOT_INTEGER, exception.getErrorCode());
-            assertEquals(HttpStatus.BAD_REQUEST, exception.getErrorCode().getStatus());
-            assertEquals(0, new BigDecimal("2").compareTo(fridge.getQuantity()));
+            assertThatThrownBy(() -> fridgeService.takeOutItem(7L, 100L,
+                    new FridgeItemTakeOutRequest(FridgeItemAction.CONSUMED, new BigDecimal(requested))))
+                    .isInstanceOf(BusinessException.class)
+                    .extracting("errorCode")
+                    .isEqualTo(ErrorCode.FRIDGE_MEALKIT_QUANTITY_NOT_INTEGER)
+                    .extracting("status")
+                    .isEqualTo(HttpStatus.BAD_REQUEST);
+            assertThat(new BigDecimal("2").compareTo(fridge.getQuantity())).isEqualTo(0);
             verifyNoInteractions(fridgeItemLogRepository);
             verify(fridgeRepository, never()).delete(any(Fridge.class));
         }
@@ -725,7 +737,8 @@ class FridgeServiceTest {
      * 수량 없이(null) 빼면 전부 빼기로 처리되는지 검증한다.
      */
     @Test
-    void takeOutItemAllowsIntegerOrNullQuantityForMealkit() {
+    @DisplayName("밀키트를 정수 수량이나 수량 없이 빼면 정상 처리한다")
+    void takesOutMealkit_whenQuantityIsIntegerOrNull() {
         for (String requested : new String[]{"1", "1.00"}) {
             // Given
             Fridge fridge = mealkitWithQuantity("2");
@@ -736,8 +749,8 @@ class FridgeServiceTest {
                     new FridgeItemTakeOutRequest(FridgeItemAction.CONSUMED, new BigDecimal(requested)));
 
             // Then: 1개 남음
-            assertFalse(response.removed());
-            assertEquals(0, BigDecimal.ONE.compareTo(response.remainingQuantity()));
+            assertThat(response.removed()).isFalse();
+            assertThat(BigDecimal.ONE.compareTo(response.remainingQuantity())).isEqualTo(0);
         }
 
         // 수량 없이 빼면 전부
@@ -745,14 +758,15 @@ class FridgeServiceTest {
         when(fridgeRepository.findForUpdateByIdAndMemberId(100L, 7L)).thenReturn(Optional.of(fridge));
         FridgeItemTakeOutResponse response = fridgeService.takeOutItem(
                 7L, 100L, new FridgeItemTakeOutRequest(FridgeItemAction.DISCARDED, null));
-        assertTrue(response.removed());
+        assertThat(response.removed()).isTrue();
     }
 
     /**
      * 밀키트가 아닌 재료는 지금처럼 소수 수량(0.5)으로 뺄 수 있는지 검증한다.
      */
     @Test
-    void takeOutItemAllowsFractionalQuantityForNormalIngredient() {
+    @DisplayName("밀키트가 아닌 재료는 소수 수량으로 뺄 수 있다")
+    void takesOutFractionalQuantity_whenIngredientIsNotMealkit() {
         // Given: 남은 양 3.00인 두부
         Fridge fridge = fridgeWithQuantity("3.00");
         when(fridgeRepository.findForUpdateByIdAndMemberId(100L, 7L)).thenReturn(Optional.of(fridge));
@@ -762,8 +776,8 @@ class FridgeServiceTest {
                 7L, 100L, new FridgeItemTakeOutRequest(FridgeItemAction.CONSUMED, new BigDecimal("0.5")));
 
         // Then
-        assertFalse(response.removed());
-        assertEquals(0, new BigDecimal("2.50").compareTo(response.remainingQuantity()));
+        assertThat(response.removed()).isFalse();
+        assertThat(new BigDecimal("2.50").compareTo(response.remainingQuantity())).isEqualTo(0);
     }
 
     /**
@@ -771,24 +785,24 @@ class FridgeServiceTest {
      * 정수(3)로 수정하면 정상 반영되는지 검증한다.
      */
     @Test
-    void updateItemAllowsOnlyIntegerQuantityForMealkit() {
+    @DisplayName("밀키트 수량을 수정하면 소수는 거절하고 정수만 반영한다")
+    void updatesOnlyIntegerQuantity_whenItemIsMealkit() {
         // Given
         Fridge fridge = mealkitWithQuantity("2");
         when(fridgeRepository.findForUpdateByIdAndMemberId(100L, 7L)).thenReturn(Optional.of(fridge));
 
         // When & Then: 소수는 거절
-        BusinessException exception = assertThrows(
-                BusinessException.class,
-                () -> fridgeService.updateItem(7L, 100L, null,
-                        new FridgeItemUpdateRequest(null, new BigDecimal("1.5"), null, null))
-        );
-        assertEquals(ErrorCode.FRIDGE_MEALKIT_QUANTITY_NOT_INTEGER, exception.getErrorCode());
-        assertEquals(0, new BigDecimal("2").compareTo(fridge.getQuantity()));
+        assertThatThrownBy(() -> fridgeService.updateItem(7L, 100L, null,
+                new FridgeItemUpdateRequest(null, new BigDecimal("1.5"), null, null)))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.FRIDGE_MEALKIT_QUANTITY_NOT_INTEGER);
+        assertThat(new BigDecimal("2").compareTo(fridge.getQuantity())).isEqualTo(0);
 
         // When & Then: 정수는 반영
         FridgeItemResponse response = fridgeService.updateItem(7L, 100L, null,
                 new FridgeItemUpdateRequest(null, new BigDecimal("3"), null, null));
-        assertEquals(0, new BigDecimal("3").compareTo(response.quantity()));
+        assertThat(new BigDecimal("3").compareTo(response.quantity())).isEqualTo(0);
     }
 
     /**
@@ -797,7 +811,8 @@ class FridgeServiceTest {
      * 2) 기록이 FridgeItemLogResponse로 변환되고(cookingLogId가 있으면 cookedByRecipe = true) 페이지 번호가 다시 1부터인지 검증한다.
      */
     @Test
-    void getLogsPassesConditionWithZeroBasedPageAndMapsToResponses() {
+    @DisplayName("기록을 조회하면 1부터 시작하는 페이지를 0부터로 바꿔 조회하고 응답으로 변환한다")
+    void passesZeroBasedPageAndMapsLogs() {
         // Given: 요리 완료로 소진한 기록 1건
         Ingredient ingredient = Ingredient.builder()
                 .ingredientCode("ING_TOFU")
@@ -830,30 +845,30 @@ class FridgeServiceTest {
                 7L, new FridgeItemLogSearchRequest(FridgeItemAction.CONSUMED, from, to, 2, 10));
 
         // Then
-        assertEquals(2, response.pageNumber());
-        assertEquals(11, response.totalElements());
+        assertThat(response.pageNumber()).isEqualTo(2);
+        assertThat(response.totalElements()).isEqualTo(11);
         FridgeItemLogResponse first = response.content().get(0);
-        assertEquals(1L, first.id());
-        assertEquals(10L, first.ingredientId());
-        assertEquals("두부", first.ingredientName());
-        assertEquals("모", first.baseUnit());
-        assertEquals("국산 두부", first.rawName());
-        assertEquals(new BigDecimal("0.50"), first.quantity());
-        assertEquals(FridgeItemAction.CONSUMED, first.action());
-        assertTrue(first.cookedByRecipe());
+        assertThat(first.id()).isEqualTo(1L);
+        assertThat(first.ingredientId()).isEqualTo(10L);
+        assertThat(first.ingredientName()).isEqualTo("두부");
+        assertThat(first.baseUnit()).isEqualTo("모");
+        assertThat(first.rawName()).isEqualTo("국산 두부");
+        assertThat(first.quantity()).isEqualTo(new BigDecimal("0.50"));
+        assertThat(first.action()).isEqualTo(FridgeItemAction.CONSUMED);
+        assertThat(first.cookedByRecipe()).isTrue();
     }
 
     /**
      * 시작일(from)이 종료일(to)보다 늦으면 INVALID_INPUT_VALUE(400) 예외가 발생하고 조회하지 않는지 검증한다.
      */
     @Test
-    void getLogsThrowsWhenFromIsAfterTo() {
-        BusinessException exception = assertThrows(
-                BusinessException.class,
-                () -> fridgeService.getLogs(7L, new FridgeItemLogSearchRequest(
-                        null, LocalDate.of(2026, 10, 10), LocalDate.of(2026, 10, 1), 1, 20))
-        );
-        assertEquals(ErrorCode.INVALID_INPUT_VALUE, exception.getErrorCode());
+    @DisplayName("기록 조회 시작일이 종료일보다 늦으면 INVALID_INPUT_VALUE 예외를 던지고 조회하지 않는다")
+    void throwsInvalidInput_whenFromIsAfterTo() {
+        assertThatThrownBy(() -> fridgeService.getLogs(7L, new FridgeItemLogSearchRequest(
+                null, LocalDate.of(2026, 10, 10), LocalDate.of(2026, 10, 1), 1, 20)))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.INVALID_INPUT_VALUE);
         verifyNoInteractions(fridgeItemLogRepository);
     }
 
@@ -864,7 +879,8 @@ class FridgeServiceTest {
      * 3) 차감된 줄마다 FridgeItemLog(cookingLogId 포함)가 기록되고 완전히 소진된 줄은 삭제되는지 검증한다.
      */
     @Test
-    void consumeForCookingDeductsInExpirationOrderAndRecordsLogsWithCookingLogId() {
+    @DisplayName("요리 완료로 재료를 차감하면 기본 양념·기타·밀키트는 제외하고 소비기한 빠른 순으로 차감해 요리 기록 ID와 함께 기록한다")
+    void deductsInExpiryOrderAndLogsCookingId() {
         // Given: 7번 회원이 3번 재료(두부)를 소비기한 빠른 순으로 2줄 보유 (1.00모, 2.00모)
         Fridge item1 = fridgeWithQuantity("1.00");
         ReflectionTestUtils.setField(item1, "id", 101L);
@@ -884,37 +900,38 @@ class FridgeServiceTest {
 
         // Then
         // 99번은 제외되어 3번만 차감 결과에 포함됨
-        assertEquals(1, deductions.size());
-        assertEquals(3L, deductions.get(0).ingredientId());
-        assertEquals(0, new BigDecimal("1.50").compareTo(deductions.get(0).deductedQuantity()));
-        assertEquals(0, new BigDecimal("1.50").compareTo(deductions.get(0).remainingQuantity()));
+        assertThat(deductions.size()).isEqualTo(1);
+        assertThat(deductions.get(0).ingredientId()).isEqualTo(3L);
+        assertThat(new BigDecimal("1.50").compareTo(deductions.get(0).deductedQuantity())).isEqualTo(0);
+        assertThat(new BigDecimal("1.50").compareTo(deductions.get(0).remainingQuantity())).isEqualTo(0);
 
         // 첫 번째 줄(1.00)은 모두 소진되어 삭제 호출
-        assertTrue(item1.isEmpty());
+        assertThat(item1.isEmpty()).isTrue();
         verify(fridgeRepository).delete(item1);
 
         // 두 번째 줄(2.00)은 0.50 차감되어 1.50 남음
-        assertFalse(item2.isEmpty());
-        assertEquals(0, new BigDecimal("1.50").compareTo(item2.getQuantity()));
+        assertThat(item2.isEmpty()).isFalse();
+        assertThat(new BigDecimal("1.50").compareTo(item2.getQuantity())).isEqualTo(0);
         verify(fridgeRepository, never()).delete(item2);
 
         // 2건의 이력이 cookingLogId=500L로 저장됨
         ArgumentCaptor<FridgeItemLog> logCaptor = ArgumentCaptor.forClass(FridgeItemLog.class);
         verify(fridgeItemLogRepository, times(2)).save(logCaptor.capture());
         List<FridgeItemLog> logs = logCaptor.getAllValues();
-        assertEquals(500L, logs.get(0).getCookingLogId());
-        assertEquals(500L, logs.get(1).getCookingLogId());
+        assertThat(logs.get(0).getCookingLogId()).isEqualTo(500L);
+        assertThat(logs.get(1).getCookingLogId()).isEqualTo(500L);
     }
 
     @Test
-    void countConsumedByCookingReturnsCountFromRepository() {
+    @DisplayName("요리로 소진한 재료 종류 수를 저장소에서 조회해 반환한다")
+    void returnsCountConsumedByCooking() {
         Long memberId = 7L;
         org.mockito.Mockito.when(fridgeItemLogRepository.countConsumedByCooking(memberId))
                 .thenReturn(42L);
 
         long result = fridgeService.countConsumedByCooking(memberId);
 
-        assertEquals(42L, result);
+        assertThat(result).isEqualTo(42L);
         org.mockito.Mockito.verify(fridgeItemLogRepository).countConsumedByCooking(memberId);
     }
 

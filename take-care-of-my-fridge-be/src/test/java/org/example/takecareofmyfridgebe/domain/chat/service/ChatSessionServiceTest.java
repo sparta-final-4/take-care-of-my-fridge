@@ -56,7 +56,7 @@ class ChatSessionServiceTest {
 
     @Test
     @DisplayName("진행 중인 세션이 없으면 새로 만들어 반환한다")
-    void createsNewSessionWhenNoActiveSessionExists() {
+    void createsNewSession_whenNoActiveSession() {
         Long memberId = 1L;
         when(chatSessionRepository.findByMemberIdAndStatus(memberId, ChatSessionStatus.ACTIVE))
                 .thenReturn(Optional.empty());
@@ -76,7 +76,7 @@ class ChatSessionServiceTest {
 
     @Test
     @DisplayName("진행 중인 세션이 이미 있으면 새 세션을 만들지 않고 기존 세션을 반환한다")
-    void returnsExistingSessionWhenActiveSessionExists() {
+    void returnsExistingSession_whenActiveSessionExists() {
         Long memberId = 1L;
         ChatSession existingSession = ChatSession.builder().memberId(memberId).build();
         ReflectionTestUtils.setField(existingSession, "id", 50L);
@@ -93,7 +93,7 @@ class ChatSessionServiceTest {
 
     @Test
     @DisplayName("진행 중인 세션이 30분 지난 경우 기존 세션을 만료시키고 새 세션을 만들어 반환한다")
-    void getOrCreateActiveSessionExpiresExistingAndCreatesNewWhenExpired() {
+    void expiresOldAndCreatesNew_whenActiveSessionIsTimedOut() {
         Long memberId = 1L;
         Long expiredSessionId = 50L;
         ChatSession expiredSession = ChatSession.builder().memberId(memberId).build();
@@ -122,7 +122,7 @@ class ChatSessionServiceTest {
 
     @Test
     @DisplayName("expireSession: ACTIVE 세션을 EXPIRED로 상태 변경하고 saveAndFlush를 호출한다")
-    void expireSessionMarksActiveSessionAsExpiredAndFlushes() {
+    void marksExpiredAndFlushes_whenExpiringActiveSession() {
         Long sessionId = 10L;
         ChatSession session = ChatSession.builder().memberId(1L).build();
         ReflectionTestUtils.setField(session, "id", sessionId);
@@ -137,7 +137,7 @@ class ChatSessionServiceTest {
 
     @Test
     @DisplayName("본인의 세션 단건 조회 시 정상적으로 반환한다")
-    void getSessionReturnsSession() {
+    void returnsOwnSession() {
         Long memberId = 1L;
         Long sessionId = 10L;
         ChatSession session = ChatSession.builder().memberId(memberId).build();
@@ -154,7 +154,7 @@ class ChatSessionServiceTest {
 
     @Test
     @DisplayName("존재하지 않거나 남의 세션을 조회하면 404 CHAT_ROOM_NOT_FOUND 예외를 던진다")
-    void getSessionThrowsNotFoundWhenSessionNotExistsOrBelongsToOthers() {
+    void throwsNotFound_whenGettingOthersOrMissingSession() {
         Long memberId = 1L;
         Long sessionId = 999L;
 
@@ -169,7 +169,7 @@ class ChatSessionServiceTest {
 
     @Test
     @DisplayName("존재하지 않거나 남의 세션을 종료하려고 하면 404 CHAT_ROOM_NOT_FOUND 예외를 던진다")
-    void completeSessionThrowsNotFoundWhenSessionNotExistsOrBelongsToOthers() {
+    void throwsNotFound_whenCompletingOthersOrMissingSession() {
         Long memberId = 1L;
         Long sessionId = 999L;
 
@@ -184,7 +184,7 @@ class ChatSessionServiceTest {
 
     @Test
     @DisplayName("진행 중인 세션을 정상적으로 종료(COMPLETED)한다")
-    void completeSessionChangesStatusToCompleted() {
+    void completesActiveSession() {
         Long memberId = 1L;
         Long sessionId = 10L;
         ChatSession session = ChatSession.builder().memberId(memberId).build();
@@ -202,7 +202,7 @@ class ChatSessionServiceTest {
 
     @Test
     @DisplayName("이미 완료(COMPLETED)된 세션을 종료하려고 하면 409 CHAT_ROOM_ALREADY_COMPLETED 예외를 던진다")
-    void completeSessionThrowsConflictWhenSessionAlreadyCompleted() {
+    void throwsAlreadyCompleted_whenSessionIsCompleted() {
         Long memberId = 1L;
         Long sessionId = 10L;
         ChatSession session = ChatSession.builder().memberId(memberId).build();
@@ -220,7 +220,7 @@ class ChatSessionServiceTest {
 
     @Test
     @DisplayName("이미 만료(EXPIRED)된 세션을 종료하려고 하면 409 CHAT_ROOM_ALREADY_COMPLETED 예외를 던진다")
-    void completeSessionThrowsConflictWhenSessionExpired() {
+    void throwsAlreadyCompleted_whenSessionIsExpired() {
         Long memberId = 1L;
         Long sessionId = 10L;
         ChatSession session = ChatSession.builder().memberId(memberId).build();
@@ -238,7 +238,7 @@ class ChatSessionServiceTest {
 
     @Test
     @DisplayName("세션 종료 후 다시 시작하면 새로운 세션을 생성한다")
-    void createsNewSessionAfterPreviousSessionCompleted() {
+    void createsNewSession_whenPreviousSessionIsCompleted() {
         Long memberId = 1L;
         Long oldSessionId = 10L;
         Long newSessionId = 11L;
@@ -270,7 +270,7 @@ class ChatSessionServiceTest {
 
     @Test
     @DisplayName("세션 저장 중 uk_chat_sessions_active_member_id 유니크 위반이 발생하면 기존 진행 중 세션을 반환한다")
-    void getOrCreateActiveSessionReturnsExistingSessionWhenDuplicateKeyOccurs() {
+    void returnsExistingSession_whenDuplicateKeyOccurs() {
         Long memberId = 1L;
         Long existingSessionId = 77L;
         ChatSession existingSession = ChatSession.builder().memberId(memberId).build();
@@ -293,7 +293,7 @@ class ChatSessionServiceTest {
 
     @Test
     @DisplayName("세션 저장 중 uk_chat_sessions_active_member_id가 아닌 다른 제약 위반이 발생하면 예외를 그대로 다시 던진다")
-    void getOrCreateActiveSessionRethrowsExceptionWhenOtherConstraintFails() {
+    void rethrows_whenOtherConstraintFails() {
         Long memberId = 1L;
 
         when(chatSessionRepository.findByMemberIdAndStatus(memberId, ChatSessionStatus.ACTIVE))
@@ -310,7 +310,7 @@ class ChatSessionServiceTest {
 
     @Test
     @DisplayName("상담 바뀜 이벤트: 새 상담을 만들면 ACTIVE로 발행한다")
-    void publishesActiveWhenNewSessionCreated() {
+    void publishesActive_whenNewSessionIsCreated() {
         Long memberId = 1L;
         when(chatSessionRepository.findByMemberIdAndStatus(memberId, ChatSessionStatus.ACTIVE))
                 .thenReturn(Optional.empty());
@@ -327,7 +327,7 @@ class ChatSessionServiceTest {
 
     @Test
     @DisplayName("상담 바뀜 이벤트: 진행 중 상담을 그대로 돌려줄 때는 발행하지 않는다")
-    void doesNotPublishWhenExistingSessionReturned() {
+    void doesNotPublish_whenExistingSessionIsReturned() {
         Long memberId = 1L;
         ChatSession existingSession = ChatSession.builder().memberId(memberId).build();
         ReflectionTestUtils.setField(existingSession, "id", 50L);
@@ -341,7 +341,7 @@ class ChatSessionServiceTest {
 
     @Test
     @DisplayName("상담 바뀜 이벤트: 저장 경합으로 다른 요청이 만든 상담을 돌려줄 때는 발행하지 않는다")
-    void doesNotPublishWhenDuplicateKeyReturnsOtherSession() {
+    void doesNotPublish_whenDuplicateKeyReturnsOtherSession() {
         Long memberId = 1L;
         ChatSession existingSession = ChatSession.builder().memberId(memberId).build();
         ReflectionTestUtils.setField(existingSession, "id", 77L);
@@ -358,7 +358,7 @@ class ChatSessionServiceTest {
 
     @Test
     @DisplayName("상담 바뀜 이벤트: 시간이 지난 상담을 만료시키고 새로 만들면 EXPIRED, ACTIVE 순으로 발행한다")
-    void publishesExpiredThenActiveWhenExpiredSessionReplaced() {
+    void publishesExpiredThenActive_whenTimedOutSessionIsReplaced() {
         Long memberId = 1L;
         ChatSession expiredSession = ChatSession.builder().memberId(memberId).build();
         ReflectionTestUtils.setField(expiredSession, "id", 50L);
@@ -383,7 +383,7 @@ class ChatSessionServiceTest {
 
     @Test
     @DisplayName("상담 바뀜 이벤트: 실제로 만료시켰을 때만 EXPIRED로 발행하고, 이미 끝난 상담이면 발행하지 않는다")
-    void expireSessionPublishesOnlyWhenActuallyExpired() {
+    void publishesExpiredOnly_whenActuallyExpired() {
         ChatSession active = ChatSession.builder().memberId(1L).build();
         ReflectionTestUtils.setField(active, "id", 10L);
         ChatSession completed = ChatSession.builder().memberId(1L).build();
@@ -402,7 +402,7 @@ class ChatSessionServiceTest {
 
     @Test
     @DisplayName("상담 바뀜 이벤트: 상담을 종료하면 COMPLETED로 발행하고, 종료에 실패하면 발행하지 않는다")
-    void completeSessionPublishesCompleted() {
+    void publishesCompleted_whenSessionIsCompleted() {
         ChatSession session = ChatSession.builder().memberId(1L).build();
         ReflectionTestUtils.setField(session, "id", 10L);
         when(chatSessionRepository.findByIdAndMemberId(10L, 1L)).thenReturn(Optional.of(session));
@@ -417,7 +417,7 @@ class ChatSessionServiceTest {
 
     @Test
     @DisplayName("상담 바뀜 이벤트: 요리 완료로 진행 중 상담을 끝내면 COMPLETED로 발행하고, 이미 만료된 상담은 발행하지 않는다")
-    void completeSessionFromCookingPublishesOnlyWhenCompleted() {
+    void publishesCompletedOnly_whenCookingCompletesActiveSession() {
         ChatSession active = ChatSession.builder().memberId(1L).build();
         ReflectionTestUtils.setField(active, "id", 10L);
         ChatSession expired = ChatSession.builder().memberId(1L).build();

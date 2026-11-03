@@ -9,6 +9,7 @@ import org.example.takecareofmyfridgebe.global.config.JpaAuditingConfig;
 import org.example.takecareofmyfridgebe.global.config.QueryDslConfig;
 import org.example.takecareofmyfridgebe.support.MySqlContainerSupport;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
@@ -22,7 +23,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * FridgeItemLogRepositoryImpl의 실제 쿼리(MySQL Testcontainers) 테스트.
@@ -63,7 +64,8 @@ class FridgeItemLogRepositoryTest extends MySqlContainerSupport {
      * 페이지 크기(2)보다 기록이 많을 때 totalElements·totalPages가 본인 기록 수(3) 기준인지 검증한다.
      */
     @Test
-    void findLogsByConditionReturnsOnlyMemberLogsInLatestOrderWithTotalCount() {
+    @DisplayName("기록을 조회하면 본인 기록만 최신순으로 나오고 전체 건수도 본인 기록 기준이다")
+    void returnsOnlyMemberLogsInLatestOrder() {
         // Given: 본인 기록 3건(시각 제각각), 다른 회원 기록 1건(가장 최근)
         Long oldest = saveLog(MEMBER_ID, FridgeItemAction.CONSUMED, LocalDateTime.of(2026, 10, 1, 9, 0));
         Long latest = saveLog(MEMBER_ID, FridgeItemAction.DISCARDED, LocalDateTime.of(2026, 10, 3, 9, 0));
@@ -78,18 +80,19 @@ class FridgeItemLogRepositoryTest extends MySqlContainerSupport {
                 MEMBER_ID, null, null, null, PageRequest.of(1, 2));
 
         // Then
-        assertEquals(List.of(latest, middle), ids(first));
-        assertEquals(List.of(oldest), ids(second));
-        assertEquals(3, first.getTotalElements());
-        assertEquals(2, first.getTotalPages());
-        assertEquals("두부", first.getContent().get(0).getIngredient().getName());
+        assertThat(ids(first)).isEqualTo(List.of(latest, middle));
+        assertThat(ids(second)).isEqualTo(List.of(oldest));
+        assertThat(first.getTotalElements()).isEqualTo(3);
+        assertThat(first.getTotalPages()).isEqualTo(2);
+        assertThat(first.getContent().get(0).getIngredient().getName()).isEqualTo("두부");
     }
 
     /**
      * created_at이 같은 기록은 id가 큰(나중에 저장된) 기록이 먼저 나오는지 검증한다.
      */
     @Test
-    void findLogsByConditionOrdersByIdDescWhenCreatedAtIsSame() {
+    @DisplayName("등록 시각이 같은 기록은 나중에 저장한 기록이 먼저 나온다")
+    void returnsLaterSavedLogFirst_whenCreatedAtIsSame() {
         LocalDateTime sameTime = LocalDateTime.of(2026, 10, 5, 12, 0);
         Long firstSaved = saveLog(MEMBER_ID, FridgeItemAction.CONSUMED, sameTime);
         Long secondSaved = saveLog(MEMBER_ID, FridgeItemAction.CONSUMED, sameTime);
@@ -98,14 +101,15 @@ class FridgeItemLogRepositoryTest extends MySqlContainerSupport {
         Page<FridgeItemLog> page = fridgeItemLogRepository.findLogsByCondition(
                 MEMBER_ID, null, null, null, PageRequest.of(0, 20));
 
-        assertEquals(List.of(secondSaved, firstSaved), ids(page));
+        assertThat(ids(page)).isEqualTo(List.of(secondSaved, firstSaved));
     }
 
     /**
      * action=DISCARDED로 조회하면 버린 기록만 나오고 totalElements도 버린 기록 수인지 검증한다.
      */
     @Test
-    void findLogsByConditionFiltersByAction() {
+    @DisplayName("행동(action)으로 조회하면 그 행동의 기록만 나온다")
+    void returnsOnlyMatchingLogs_whenActionIsGiven() {
         saveLog(MEMBER_ID, FridgeItemAction.CONSUMED, LocalDateTime.of(2026, 10, 1, 9, 0));
         Long discarded = saveLog(MEMBER_ID, FridgeItemAction.DISCARDED, LocalDateTime.of(2026, 10, 2, 9, 0));
         flushAndClear();
@@ -113,8 +117,8 @@ class FridgeItemLogRepositoryTest extends MySqlContainerSupport {
         Page<FridgeItemLog> page = fridgeItemLogRepository.findLogsByCondition(
                 MEMBER_ID, FridgeItemAction.DISCARDED, null, null, PageRequest.of(0, 20));
 
-        assertEquals(List.of(discarded), ids(page));
-        assertEquals(1, page.getTotalElements());
+        assertThat(ids(page)).isEqualTo(List.of(discarded));
+        assertThat(page.getTotalElements()).isEqualTo(1);
     }
 
     /**
@@ -122,7 +126,8 @@ class FridgeItemLogRepositoryTest extends MySqlContainerSupport {
      * 시작일 00:00과 종료일 23:59:59 기록은 포함되고, 시작일 전날 23:59:59와 종료일 다음 날 00:00 기록은 빠지는지 검증한다.
      */
     @Test
-    void findLogsByConditionFiltersByPeriodIncludingWholeEndDate() {
+    @DisplayName("기간으로 조회하면 시작일 0시부터 종료일 끝까지의 기록만 나온다")
+    void includesWholeEndDate_whenPeriodIsGiven() {
         saveLog(MEMBER_ID, FridgeItemAction.CONSUMED, LocalDateTime.of(2026, 9, 30, 23, 59, 59));
         Long startOfFrom = saveLog(MEMBER_ID, FridgeItemAction.CONSUMED, LocalDateTime.of(2026, 10, 1, 0, 0));
         Long endOfTo = saveLog(MEMBER_ID, FridgeItemAction.CONSUMED, LocalDateTime.of(2026, 10, 10, 23, 59, 59));
@@ -132,8 +137,8 @@ class FridgeItemLogRepositoryTest extends MySqlContainerSupport {
         Page<FridgeItemLog> page = fridgeItemLogRepository.findLogsByCondition(
                 MEMBER_ID, null, LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 10), PageRequest.of(0, 20));
 
-        assertEquals(List.of(endOfTo, startOfFrom), ids(page));
-        assertEquals(2, page.getTotalElements());
+        assertThat(ids(page)).isEqualTo(List.of(endOfTo, startOfFrom));
+        assertThat(page.getTotalElements()).isEqualTo(2);
     }
 
     // 기록을 저장한 뒤 created_at을 지정한 시각으로 바꾸고 id를 반환한다.
@@ -166,7 +171,8 @@ class FridgeItemLogRepositoryTest extends MySqlContainerSupport {
      * 3) 다른 회원의 요리 차감 이력 및 cookingLogId가 없는(단순 폐기 등) 이력은 제외된다.
      */
     @Test
-    void countConsumedByCookingCountsDistinctIngredients() {
+    @DisplayName("요리로 소진한 재료는 다른 회원과 요리 외 기록을 빼고 재료 종류 수로 센다")
+    void countsDistinctIngredientsConsumedByCooking() {
         Ingredient onion = Ingredient.builder()
                 .ingredientCode("ING_ONION")
                 .name("양파")
@@ -187,14 +193,14 @@ class FridgeItemLogRepositoryTest extends MySqlContainerSupport {
         flushAndClear();
 
         // 같은 재료로 여러 번 요리해도 1
-        assertEquals(1L, fridgeItemLogRepository.countConsumedByCooking(MEMBER_ID));
+        assertThat(fridgeItemLogRepository.countConsumedByCooking(MEMBER_ID)).isEqualTo(1L);
 
         // 2) 다른 재료(양파) 추가 차감 -> 총 2종류
         saveCookingItemLog(MEMBER_ID, onion, cookingLog1, 4L);
         flushAndClear();
 
         // 다른 재료 2종이면 2
-        assertEquals(2L, fridgeItemLogRepository.countConsumedByCooking(MEMBER_ID));
+        assertThat(fridgeItemLogRepository.countConsumedByCooking(MEMBER_ID)).isEqualTo(2L);
 
         // 3) 다른 회원(OTHER_MEMBER_ID)의 요리 차감 이력 및 cookingLogId 없는 이력
         saveCookingItemLog(OTHER_MEMBER_ID, tofu, cookingLog2, 5L);
@@ -203,7 +209,7 @@ class FridgeItemLogRepositoryTest extends MySqlContainerSupport {
         flushAndClear();
 
         // 다른 회원 및 cookingLogId 없는 이력 제외 -> 여전히 2
-        assertEquals(2L, fridgeItemLogRepository.countConsumedByCooking(MEMBER_ID));
+        assertThat(fridgeItemLogRepository.countConsumedByCooking(MEMBER_ID)).isEqualTo(2L);
     }
 
     private Long saveCookingItemLog(Long memberId, Ingredient ingredient, Long cookingLogId, Long fridgeId) {

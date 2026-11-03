@@ -6,7 +6,6 @@ import org.example.takecareofmyfridgebe.domain.cooking.dto.CookingLogSearchReque
 import org.example.takecareofmyfridgebe.domain.cooking.dto.CookingLogUpdateRequest;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.CookingStatsResponse;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.MostCookedRecipeDto;
-import org.example.takecareofmyfridgebe.domain.cooking.dto.MostCookedRecipeResponse;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeListResponse;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeResponse;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeReviewResponse;
@@ -14,7 +13,6 @@ import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeReviewStatus;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeSearchRequest;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeSortType;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeSummaryCount;
-import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeSummaryResponse;
 import org.example.takecareofmyfridgebe.domain.cooking.entity.CookingLog;
 import org.example.takecareofmyfridgebe.domain.cooking.entity.CookingResult;
 import org.example.takecareofmyfridgebe.domain.cooking.repository.CookingLogRepository;
@@ -24,6 +22,7 @@ import org.example.takecareofmyfridgebe.domain.recipe.service.RecipeService;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 import org.example.takecareofmyfridgebe.global.response.PageResponse;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -41,12 +40,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -80,7 +75,8 @@ class CookingServiceTest {
      * 정상적인 요리 기록 저장 요청 시 엔티티를 repository.save로 저장하는지 검증한다.
      */
     @Test
-    void saveCookingLogSavesEntity() {
+    @DisplayName("요리 기록 저장을 요청하면 요리 기록을 저장한다")
+    void savesCookingLog() {
         // Given
         Long memberId = 7L;
         CookingCompleteRequest request = new CookingCompleteRequest(
@@ -95,7 +91,7 @@ class CookingServiceTest {
         CookingLog result = cookingService.saveCookingLog(memberId, request);
 
         // Then
-        assertEquals(100L, result.getId());
+        assertThat(result.getId()).isEqualTo(100L);
         verify(recipeService).existsById(12L);
         verify(cookingLogRepository).save(any(CookingLog.class));
     }
@@ -104,7 +100,8 @@ class CookingServiceTest {
      * 요리 완료 요청 시 존재하지 않는 레시피이면 404 RECIPE_NOT_FOUND 예외가 발생한다.
      */
     @Test
-    void saveCookingLogThrowsWhenRecipeNotFound() {
+    @DisplayName("없는 레시피로 요리 기록을 저장하면 RECIPE_NOT_FOUND 예외를 던지고 저장하지 않는다")
+    void throwsRecipeNotFound_whenSavingWithMissingRecipe() {
         // Given
         Long memberId = 7L;
         CookingCompleteRequest request = new CookingCompleteRequest(
@@ -112,12 +109,12 @@ class CookingServiceTest {
         when(recipeService.existsById(999L)).thenReturn(false);
 
         // When & Then
-        BusinessException exception = assertThrows(
-                BusinessException.class,
-                () -> cookingService.saveCookingLog(memberId, request)
-        );
-        assertEquals(ErrorCode.RECIPE_NOT_FOUND, exception.getErrorCode());
-        assertEquals(HttpStatus.NOT_FOUND, exception.getErrorCode().getStatus());
+        assertThatThrownBy(() -> cookingService.saveCookingLog(memberId, request))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.RECIPE_NOT_FOUND)
+                .extracting("status")
+                .isEqualTo(HttpStatus.NOT_FOUND);
         verify(cookingLogRepository, never()).save(any());
     }
 
@@ -126,7 +123,8 @@ class CookingServiceTest {
      * chatSessionId가 존재하면 fromChat=true, 없으면 false로 변환된다.
      */
     @Test
-    void getCookingLogsReturnsPagedResponse() {
+    @DisplayName("요리 기록을 조회하면 상담 여부를 담은 응답 페이지로 변환한다")
+    void returnsLogsWithFromChatFlag() {
         // Given
         Long memberId = 7L;
         CookingLogSearchRequest request = new CookingLogSearchRequest(
@@ -160,43 +158,44 @@ class CookingServiceTest {
         PageResponse<CookingLogResponse> response = cookingService.getCookingLogs(memberId, request);
 
         // Then
-        assertEquals(2, response.content().size());
-        assertEquals(1, response.pageNumber());
-        assertEquals(10, response.pageSize());
-        assertEquals(2L, response.totalElements());
+        assertThat(response.content().size()).isEqualTo(2);
+        assertThat(response.pageNumber()).isEqualTo(1);
+        assertThat(response.pageSize()).isEqualTo(10);
+        assertThat(response.totalElements()).isEqualTo(2L);
 
         CookingLogResponse dto1 = response.content().get(0);
-        assertEquals(101L, dto1.id());
-        assertEquals(12L, dto1.recipeId());
-        assertTrue(dto1.fromChat());
-        assertEquals(CookingResult.SUCCESS, dto1.result());
-        assertEquals("성공 메모", dto1.memo());
+        assertThat(dto1.id()).isEqualTo(101L);
+        assertThat(dto1.recipeId()).isEqualTo(12L);
+        assertThat(dto1.fromChat()).isTrue();
+        assertThat(dto1.result()).isEqualTo(CookingResult.SUCCESS);
+        assertThat(dto1.memo()).isEqualTo("성공 메모");
 
         CookingLogResponse dto2 = response.content().get(1);
-        assertEquals(102L, dto2.id());
-        assertEquals(12L, dto2.recipeId());
-        assertFalse(dto2.fromChat());
-        assertEquals(CookingResult.FAILED, dto2.result());
-        assertEquals("실패 메모", dto2.memo());
+        assertThat(dto2.id()).isEqualTo(102L);
+        assertThat(dto2.recipeId()).isEqualTo(12L);
+        assertThat(dto2.fromChat()).isFalse();
+        assertThat(dto2.result()).isEqualTo(CookingResult.FAILED);
+        assertThat(dto2.memo()).isEqualTo("실패 메모");
     }
 
     /**
      * getCookingLogs 호출 시 시작일(from)이 종료일(to)보다 이후이면 INVALID_INPUT_VALUE 예외가 발생한다.
      */
     @Test
-    void getCookingLogsThrowsWhenFromIsAfterTo() {
+    @DisplayName("요리 기록 조회 시작일이 종료일보다 늦으면 INVALID_INPUT_VALUE 예외를 던지고 조회하지 않는다")
+    void throwsInvalidInput_whenFromIsAfterTo() {
         // Given
         Long memberId = 7L;
         CookingLogSearchRequest request = new CookingLogSearchRequest(
                 null, LocalDate.of(2026, 10, 15), LocalDate.of(2026, 10, 1), 1, 10);
 
         // When & Then
-        BusinessException exception = assertThrows(
-                BusinessException.class,
-                () -> cookingService.getCookingLogs(memberId, request)
-        );
-        assertEquals(ErrorCode.INVALID_INPUT_VALUE, exception.getErrorCode());
-        assertEquals(HttpStatus.BAD_REQUEST, exception.getErrorCode().getStatus());
+        assertThatThrownBy(() -> cookingService.getCookingLogs(memberId, request))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.INVALID_INPUT_VALUE)
+                .extracting("status")
+                .isEqualTo(HttpStatus.BAD_REQUEST);
         verifyNoInteractions(cookingLogRepository);
     }
 
@@ -204,7 +203,8 @@ class CookingServiceTest {
      * getMyRecipes 호출 시 repository에서 조회된 레시피 페이징 결과와 전체 요약 통계(summary)를 조합하여 반환하는지 검증한다.
      */
     @Test
-    void getMyRecipesReturnsSummaryAndPagedRecipes() {
+    @DisplayName("내 레시피를 조회하면 요약 통계와 레시피 목록을 함께 반환한다")
+    void returnsSummaryAndRecipes() {
         // Given: 레시피 목록 및 요약 통계 준비
         Long memberId = 7L;
         MyRecipeSearchRequest request = new MyRecipeSearchRequest(
@@ -236,29 +236,29 @@ class CookingServiceTest {
         MyRecipeListResponse response = cookingService.getMyRecipes(memberId, request);
 
         // Then: 요약 통계(summary) 및 페이징된 레시피 목록(recipes) 결합 확인
-        assertEquals(4L, response.summary().recipeCount());
-        assertEquals(10L, response.summary().totalCookCount());
-        assertEquals(3L, response.summary().writtenCount());
-        assertEquals(1L, response.summary().notWrittenCount());
-        assertNotNull(response.summary().mostCookedRecipe());
-        assertEquals(1L, response.summary().mostCookedRecipe().recipeId());
-        assertEquals("불닭 참치 두부조림", response.summary().mostCookedRecipe().recipeName());
-        assertEquals(3L, response.summary().mostCookedRecipe().cookCount());
-        assertEquals(5L, response.summary().consumedIngredientCount());
+        assertThat(response.summary().recipeCount()).isEqualTo(4L);
+        assertThat(response.summary().totalCookCount()).isEqualTo(10L);
+        assertThat(response.summary().writtenCount()).isEqualTo(3L);
+        assertThat(response.summary().notWrittenCount()).isEqualTo(1L);
+        assertThat(response.summary().mostCookedRecipe()).isNotNull();
+        assertThat(response.summary().mostCookedRecipe().recipeId()).isEqualTo(1L);
+        assertThat(response.summary().mostCookedRecipe().recipeName()).isEqualTo("불닭 참치 두부조림");
+        assertThat(response.summary().mostCookedRecipe().cookCount()).isEqualTo(3L);
+        assertThat(response.summary().consumedIngredientCount()).isEqualTo(5L);
 
         PageResponse<MyRecipeResponse> recipes = response.recipes();
-        assertEquals(2, recipes.pageNumber());
-        assertEquals(5, recipes.pageSize());
-        assertEquals(6L, recipes.totalElements());
-        assertEquals(2, recipes.totalPages());
-        assertEquals(1, recipes.content().size());
+        assertThat(recipes.pageNumber()).isEqualTo(2);
+        assertThat(recipes.pageSize()).isEqualTo(5);
+        assertThat(recipes.totalElements()).isEqualTo(6L);
+        assertThat(recipes.totalPages()).isEqualTo(2);
+        assertThat(recipes.content().size()).isEqualTo(1);
 
         MyRecipeResponse item = recipes.content().get(0);
-        assertEquals(1L, item.recipeId());
-        assertEquals("불닭 참치 두부조림", item.recipeName());
-        assertTrue(item.fromChat());
-        assertNotNull(item.review());
-        assertEquals(101L, item.review().id());
+        assertThat(item.recipeId()).isEqualTo(1L);
+        assertThat(item.recipeName()).isEqualTo("불닭 참치 두부조림");
+        assertThat(item.fromChat()).isTrue();
+        assertThat(item.review()).isNotNull();
+        assertThat(item.review().id()).isEqualTo(101L);
 
         verify(cookingLogRepository).findMyRecipes(
                 eq(memberId), eq(MyRecipeReviewStatus.WRITTEN), eq(MyRecipeSortType.MOST), eq(PageRequest.of(1, 5)));
@@ -272,7 +272,8 @@ class CookingServiceTest {
      * 요리 기록이 없는 회원의 경우 빈 페이지와 0으로 초기화된 요약 통계(mostCookedRecipe=null, consumedIngredientCount=0)를 반환하는지 검증한다.
      */
     @Test
-    void getMyRecipesWithEmptyResultReturnsZeroSummaryAndEmptyPage() {
+    @DisplayName("요리 기록이 없는 회원은 빈 목록과 0으로 채운 요약을 받는다")
+    void returnsZeroSummary_whenNoCookingLogs() {
         // Given: 빈 레시피 페이지와 0으로 채워진 요약 통계 준비
         Long memberId = 7L;
         MyRecipeSearchRequest request = new MyRecipeSearchRequest(
@@ -297,14 +298,14 @@ class CookingServiceTest {
         MyRecipeListResponse response = cookingService.getMyRecipes(memberId, request);
 
         // Then: 요약 통계가 0이고 레시피 목록이 비어 있는지 확인
-        assertEquals(0L, response.summary().recipeCount());
-        assertEquals(0L, response.summary().totalCookCount());
-        assertEquals(0L, response.summary().writtenCount());
-        assertEquals(0L, response.summary().notWrittenCount());
-        assertNull(response.summary().mostCookedRecipe());
-        assertEquals(0L, response.summary().consumedIngredientCount());
-        assertTrue(response.recipes().content().isEmpty());
-        assertEquals(0L, response.recipes().totalElements());
+        assertThat(response.summary().recipeCount()).isEqualTo(0L);
+        assertThat(response.summary().totalCookCount()).isEqualTo(0L);
+        assertThat(response.summary().writtenCount()).isEqualTo(0L);
+        assertThat(response.summary().notWrittenCount()).isEqualTo(0L);
+        assertThat(response.summary().mostCookedRecipe()).isNull();
+        assertThat(response.summary().consumedIngredientCount()).isEqualTo(0L);
+        assertThat(response.recipes().content().isEmpty()).isTrue();
+        assertThat(response.recipes().totalElements()).isEqualTo(0L);
     }
 
     /**
@@ -312,7 +313,8 @@ class CookingServiceTest {
      * mostCookedRecipe의 recipeName이 빈 문자열이 아닌 null로 설정되는지 검증한다.
      */
     @Test
-    void getMyRecipesWhenRecipeSummaryMissingReturnsNullRecipeName() {
+    @DisplayName("가장 많이 만든 레시피의 정보를 찾지 못하면 레시피 이름을 null로 반환한다")
+    void returnsNullRecipeName_whenRecipeSummaryIsMissing() {
         Long memberId = 7L;
         MyRecipeSearchRequest request = new MyRecipeSearchRequest(
                 MyRecipeReviewStatus.ALL, MyRecipeSortType.RECENT, 1, 10);
@@ -328,11 +330,11 @@ class CookingServiceTest {
 
         MyRecipeListResponse response = cookingService.getMyRecipes(memberId, request);
 
-        assertNotNull(response.summary().mostCookedRecipe());
-        assertEquals(999L, response.summary().mostCookedRecipe().recipeId());
-        assertNull(response.summary().mostCookedRecipe().recipeName());
-        assertEquals(2L, response.summary().mostCookedRecipe().cookCount());
-        assertEquals(1L, response.summary().consumedIngredientCount());
+        assertThat(response.summary().mostCookedRecipe()).isNotNull();
+        assertThat(response.summary().mostCookedRecipe().recipeId()).isEqualTo(999L);
+        assertThat(response.summary().mostCookedRecipe().recipeName()).isNull();
+        assertThat(response.summary().mostCookedRecipe().cookCount()).isEqualTo(2L);
+        assertThat(response.summary().consumedIngredientCount()).isEqualTo(1L);
     }
 
     /**
@@ -340,7 +342,8 @@ class CookingServiceTest {
      * repository.save()를 호출하지 않고 JPA 더티 체킹에 위임하는지 검증한다.
      */
     @Test
-    void updateCookingLogModifiesResultAndMemoWithDirtyChecking() {
+    @DisplayName("요리 기록을 수정하면 save 호출 없이 결과와 메모만 바뀐다")
+    void updatesResultAndMemo() {
         // Given
         Long memberId = 7L;
         Long cookingLogId = 100L;
@@ -362,11 +365,11 @@ class CookingServiceTest {
         CookingLogResponse response = cookingService.updateCookingLog(memberId, cookingLogId, request);
 
         // Then
-        assertEquals(cookingLogId, response.id());
-        assertEquals(CookingResult.FAILED, response.result());
-        assertEquals("수정된 메모", response.memo());
-        assertEquals(CookingResult.FAILED, cookingLog.getResult());
-        assertEquals("수정된 메모", cookingLog.getMemo());
+        assertThat(response.id()).isEqualTo(cookingLogId);
+        assertThat(response.result()).isEqualTo(CookingResult.FAILED);
+        assertThat(response.memo()).isEqualTo("수정된 메모");
+        assertThat(cookingLog.getResult()).isEqualTo(CookingResult.FAILED);
+        assertThat(cookingLog.getMemo()).isEqualTo("수정된 메모");
 
         // 더티 체킹 검증: save()를 호출하지 않음
         verify(cookingLogRepository, never()).save(any(CookingLog.class));
@@ -377,7 +380,8 @@ class CookingServiceTest {
      * 404 COOKING_LOG_NOT_FOUND 예외를 던지는지 검증한다.
      */
     @Test
-    void updateCookingLogThrowsWhenNotFoundOrDifferentMember() {
+    @DisplayName("다른 회원의 요리 기록이거나 없는 기록을 수정하면 COOKING_LOG_NOT_FOUND 예외를 던진다")
+    void throwsCookingLogNotFound_whenLogIsOthersOrMissing() {
         // Given
         Long memberId = 7L;
         Long cookingLogId = 999L;
@@ -387,12 +391,12 @@ class CookingServiceTest {
         CookingLogUpdateRequest request = new CookingLogUpdateRequest(CookingResult.SUCCESS, "메모");
 
         // When & Then
-        BusinessException exception = assertThrows(
-                BusinessException.class,
-                () -> cookingService.updateCookingLog(memberId, cookingLogId, request)
-        );
-        assertEquals(ErrorCode.COOKING_LOG_NOT_FOUND, exception.getErrorCode());
-        assertEquals(HttpStatus.NOT_FOUND, exception.getErrorCode().getStatus());
+        assertThatThrownBy(() -> cookingService.updateCookingLog(memberId, cookingLogId, request))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.COOKING_LOG_NOT_FOUND)
+                .extracting("status")
+                .isEqualTo(HttpStatus.NOT_FOUND);
         verify(cookingLogRepository, never()).save(any(CookingLog.class));
     }
 
@@ -402,7 +406,8 @@ class CookingServiceTest {
      * (재료 차감과 묶인 값은 되돌리기 어려워 결과와 메모만 수정)
      */
     @Test
-    void updateCookingLogPreservesRecipeChatSessionAndIngredientsDeductionState() {
+    @DisplayName("요리 기록을 수정해도 레시피·상담·회원 값은 그대로이고 결과와 메모만 바뀐다")
+    void keepsRecipeAndChatSession_whenCookingLogIsUpdated() {
         // Given
         Long memberId = 7L;
         Long cookingLogId = 100L;
@@ -427,22 +432,23 @@ class CookingServiceTest {
         CookingLogResponse response = cookingService.updateCookingLog(memberId, cookingLogId, request);
 
         // Then: 결과와 메모만 변경되고 차감/상담 식별자는 그대로 유지됨
-        assertEquals(CookingResult.FAILED, response.result());
-        assertNull(response.memo());
-        assertEquals(recipeId, response.recipeId());
-        assertTrue(response.fromChat());
+        assertThat(response.result()).isEqualTo(CookingResult.FAILED);
+        assertThat(response.memo()).isNull();
+        assertThat(response.recipeId()).isEqualTo(recipeId);
+        assertThat(response.fromChat()).isTrue();
 
         // 엔티티 내부 필드 보존 검증
-        assertEquals(memberId, cookingLog.getMemberId());
-        assertEquals(recipeId, cookingLog.getRecipeId());
-        assertEquals(chatSessionId, cookingLog.getChatSessionId());
+        assertThat(cookingLog.getMemberId()).isEqualTo(memberId);
+        assertThat(cookingLog.getRecipeId()).isEqualTo(recipeId);
+        assertThat(cookingLog.getChatSessionId()).isEqualTo(chatSessionId);
     }
 
     /**
      * 레시피 요리 통계 조회 시 repository.getCookingStats(recipeId)를 호출하여 반환하는지 검증한다.
      */
     @Test
-    void getCookingStatsDelegatesToRepository() {
+    @DisplayName("레시피 요리 통계를 조회하면 저장소의 집계 결과를 반환한다")
+    void returnsCookingStats() {
         // Given
         Long recipeId = 12L;
         CookingStatsResponse expected = new CookingStatsResponse(recipeId, 10L, 7L, 3L);
@@ -453,11 +459,11 @@ class CookingServiceTest {
         CookingStatsResponse actual = cookingService.getCookingStats(recipeId);
 
         // Then
-        assertEquals(expected, actual);
-        assertEquals(recipeId, actual.recipeId());
-        assertEquals(10L, actual.totalCount());
-        assertEquals(7L, actual.successCount());
-        assertEquals(3L, actual.failedCount());
+        assertThat(actual).isEqualTo(expected);
+        assertThat(actual.recipeId()).isEqualTo(recipeId);
+        assertThat(actual.totalCount()).isEqualTo(10L);
+        assertThat(actual.successCount()).isEqualTo(7L);
+        assertThat(actual.failedCount()).isEqualTo(3L);
         verify(recipeService).existsById(recipeId);
         verify(cookingLogRepository).getCookingStats(recipeId);
     }
@@ -466,18 +472,19 @@ class CookingServiceTest {
      * 레시피 요리 통계 조회 시 존재하지 않는 레시피이면 404 RECIPE_NOT_FOUND 예외가 발생한다.
      */
     @Test
-    void getCookingStatsThrowsWhenRecipeNotFound() {
+    @DisplayName("없는 레시피의 요리 통계를 조회하면 RECIPE_NOT_FOUND 예외를 던진다")
+    void throwsRecipeNotFound_whenStatsRecipeIsMissing() {
         // Given
         Long recipeId = 999L;
         when(recipeService.existsById(recipeId)).thenReturn(false);
 
         // When & Then
-        BusinessException exception = assertThrows(
-                BusinessException.class,
-                () -> cookingService.getCookingStats(recipeId)
-        );
-        assertEquals(ErrorCode.RECIPE_NOT_FOUND, exception.getErrorCode());
-        assertEquals(HttpStatus.NOT_FOUND, exception.getErrorCode().getStatus());
+        assertThatThrownBy(() -> cookingService.getCookingStats(recipeId))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.RECIPE_NOT_FOUND)
+                .extracting("status")
+                .isEqualTo(HttpStatus.NOT_FOUND);
         verify(cookingLogRepository, never()).getCookingStats(any());
     }
 
@@ -485,7 +492,8 @@ class CookingServiceTest {
      * 특정 레시피 요리 완료 여부 조회 시 repository.existsByMemberIdAndRecipeId를 호출하여 반환한다.
      */
     @Test
-    void hasCookedDelegatesToRepository() {
+    @DisplayName("레시피 요리 여부를 조회하면 저장소의 결과를 반환한다")
+    void returnsHasCooked() {
         // Given
         Long memberId = 1L;
         Long recipeId = 10L;
@@ -495,7 +503,7 @@ class CookingServiceTest {
         boolean actual = cookingService.hasCooked(memberId, recipeId);
 
         // Then
-        assertTrue(actual);
+        assertThat(actual).isTrue();
         verify(cookingLogRepository).existsByMemberIdAndRecipeId(memberId, recipeId);
     }
 }

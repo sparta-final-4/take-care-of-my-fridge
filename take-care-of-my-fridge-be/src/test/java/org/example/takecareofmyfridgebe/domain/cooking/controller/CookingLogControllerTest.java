@@ -16,6 +16,7 @@ import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 import org.example.takecareofmyfridgebe.global.response.PageResponse;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -85,7 +86,8 @@ class CookingLogControllerTest {
      * 서비스를 호출하지 않고 401 Unauthorized(A003) 에러를 반환하는지 검증한다.
      */
     @Test
-    void unauthenticatedRequestReturnsUnauthorized() throws Exception {
+    @DisplayName("로그인하지 않고 요리 기록 목록을 요청하면 서비스를 호출하지 않고 401을 반환한다")
+    void returnsUnauthorized_whenNotLoggedIn() throws Exception {
         mvc.perform(get("/api/cooking-logs"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.success").value(false))
@@ -101,7 +103,8 @@ class CookingLogControllerTest {
      * 3) 응답 JSON 필드가 ISO 날짜 포맷 규격대로 직렬화되는지 검증한다.
      */
     @Test
-    void getCookingLogsWithEmptyQueryParamsUsesDefaultsAndTokenMemberId() throws Exception {
+    @DisplayName("빈 파라미터로 요리 기록을 조회하면 기본값과 토큰의 회원 ID로 조회한다")
+    void usesDefaultsAndTokenMemberId_whenQueryParamsAreEmpty() throws Exception {
         // Given
         CookingLogResponse response = new CookingLogResponse(
                 100L, 12L, CookingResult.SUCCESS, "맛있어요", true,
@@ -140,7 +143,8 @@ class CookingLogControllerTest {
      * 400 Bad Request(C001)를 반환하는지 검증한다.
      */
     @Test
-    void getCookingLogsWithExcessiveSizeReturnsBadRequest() throws Exception {
+    @DisplayName("페이지 크기가 최대치(100)를 넘으면 400을 반환한다")
+    void returnsBadRequest_whenSizeExceedsMax() throws Exception {
         mvc.perform(get("/api/cooking-logs")
                         .param("size", "101")
                         .with(authentication(auth(7L))))
@@ -155,7 +159,8 @@ class CookingLogControllerTest {
      * 유효한 요리 완료 요청 시 200 OK와 함께 CookingCompleteResponse를 반환하는지 검증한다.
      */
     @Test
-    void completeCookingReturnsSuccessResponse() throws Exception {
+    @DisplayName("올바른 값으로 요리 완료를 요청하면 요리 완료 결과를 반환한다")
+    void returnsCompleteResponse_whenRequestIsValid() throws Exception {
         CookingCompleteResponse response = new CookingCompleteResponse(
                 100L,
                 List.of(new IngredientDeductionResponse(3L, new BigDecimal("1.00"), BigDecimal.ZERO))
@@ -189,7 +194,8 @@ class CookingLogControllerTest {
      * 프론트는 [전부]를 고르면 quantity 키를 빼고 보낸다.
      */
     @Test
-    void completeCookingWithoutQuantityPassesNullQuantity() throws Exception {
+    @DisplayName("사용 재료에 수량이 없으면 수량을 null로 넘겨 전부 차감을 요청한다")
+    void passesNullQuantity_whenQuantityIsMissing() throws Exception {
         when(cookingFacade.completeCooking(eq(7L), any(CookingCompleteRequest.class)))
                 .thenReturn(new CookingCompleteResponse(100L, List.of()));
 
@@ -218,7 +224,8 @@ class CookingLogControllerTest {
      * 존재하지 않는 레시피로 요리 완료 요청 시 404 Not Found(RECIPE_001)를 반환하는지 검증한다.
      */
     @Test
-    void completeCookingWhenRecipeNotFoundReturns404() throws Exception {
+    @DisplayName("없는 레시피로 요리 완료를 요청하면 404를 반환한다")
+    void returnsNotFound_whenRecipeIsMissing() throws Exception {
         when(cookingFacade.completeCooking(eq(7L), any(CookingCompleteRequest.class)))
                 .thenThrow(new BusinessException(ErrorCode.RECIPE_NOT_FOUND));
 
@@ -241,7 +248,8 @@ class CookingLogControllerTest {
      * 중복된 ingredientId가 요청 본문에 포함되면 400 Bad Request(C001) 에러를 반환하는지 검증한다.
      */
     @Test
-    void completeCookingWithDuplicateIngredientIdReturnsBadRequest() throws Exception {
+    @DisplayName("요리 완료 요청에 같은 재료 ID가 두 번 있으면 400을 반환한다")
+    void returnsBadRequest_whenIngredientIdIsDuplicated() throws Exception {
         mvc.perform(post("/api/cooking-logs")
                         .with(authentication(auth(7L)))
                         .with(csrf())
@@ -265,7 +273,8 @@ class CookingLogControllerTest {
      * 메모가 50자를 초과하면 400 Bad Request를 반환하는지 검증한다.
      */
     @Test
-    void completeCookingWithExcessiveMemoReturnsBadRequest() throws Exception {
+    @DisplayName("요리 완료 메모가 50자를 넘으면 400을 반환한다")
+    void returnsBadRequest_whenCompleteMemoExceeds50Chars() throws Exception {
         String longMemo = "a".repeat(51);
 
         mvc.perform(post("/api/cooking-logs")
@@ -287,7 +296,8 @@ class CookingLogControllerTest {
      * 요리 기록 수정 정상 요청 시 200 OK와 수정된 정보를 반환하는지 검증한다.
      */
     @Test
-    void updateCookingLogSuccessReturnsOk() throws Exception {
+    @DisplayName("올바른 값으로 요리 기록을 수정하면 수정된 기록을 반환한다")
+    void returnsUpdatedLog_whenUpdateRequestIsValid() throws Exception {
         Long memberId = 7L;
         Long cookingLogId = 10L;
         CookingLogResponse response = new CookingLogResponse(
@@ -317,7 +327,8 @@ class CookingLogControllerTest {
      * 메모를 null로 보내어 메모를 지우는 경우에도 200 OK를 반환하는지 검증한다.
      */
     @Test
-    void updateCookingLogWithNullMemoReturnsOk() throws Exception {
+    @DisplayName("메모를 비워 요리 기록을 수정해도 200을 반환한다")
+    void returnsOk_whenMemoIsNull() throws Exception {
         Long memberId = 7L;
         Long cookingLogId = 10L;
         CookingLogResponse response = new CookingLogResponse(
@@ -346,7 +357,8 @@ class CookingLogControllerTest {
      * 요리 결과(result)가 null이면 400 Bad Request를 반환하는지 검증한다.
      */
     @Test
-    void updateCookingLogWithNullResultReturnsBadRequest() throws Exception {
+    @DisplayName("요리 결과 없이 요리 기록을 수정하면 400을 반환한다")
+    void returnsBadRequest_whenResultIsNull() throws Exception {
         mvc.perform(patch("/api/cooking-logs/10")
                         .with(authentication(auth(7L)))
                         .with(csrf())
@@ -365,7 +377,8 @@ class CookingLogControllerTest {
      * 메모가 50자를 초과하면 400 Bad Request를 반환하는지 검증한다.
      */
     @Test
-    void updateCookingLogWithExcessiveMemoReturnsBadRequest() throws Exception {
+    @DisplayName("요리 기록 수정 메모가 50자를 넘으면 400을 반환한다")
+    void returnsBadRequest_whenUpdateMemoExceeds50Chars() throws Exception {
         String longMemo = "a".repeat(51);
 
         mvc.perform(patch("/api/cooking-logs/10")
@@ -386,7 +399,8 @@ class CookingLogControllerTest {
      * 미인증 상태로 요리 기록 수정을 요청하면 401 Unauthorized를 반환하는지 검증한다.
      */
     @Test
-    void updateCookingLogUnauthenticatedReturnsUnauthorized() throws Exception {
+    @DisplayName("로그인하지 않고 요리 기록을 수정하면 401을 반환한다")
+    void returnsUnauthorized_whenUpdatingWithoutLogin() throws Exception {
         mvc.perform(patch("/api/cooking-logs/10")
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -405,7 +419,8 @@ class CookingLogControllerTest {
      * 본인 기록이 아니거나 존재하지 않는 요리 기록이면 404 Not Found(COOKING_001)를 반환하는지 검증한다.
      */
     @Test
-    void updateCookingLogNotFoundReturnsNotFound() throws Exception {
+    @DisplayName("다른 회원의 요리 기록이거나 없는 기록을 수정하면 404를 반환한다")
+    void returnsNotFound_whenLogIsOthersOrMissing() throws Exception {
         Long memberId = 7L;
         Long cookingLogId = 999L;
 

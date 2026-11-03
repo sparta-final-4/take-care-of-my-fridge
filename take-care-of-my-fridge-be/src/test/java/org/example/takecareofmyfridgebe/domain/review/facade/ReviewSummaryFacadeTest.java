@@ -101,8 +101,8 @@ class ReviewSummaryFacadeTest {
     }
 
     @Test
-    @DisplayName("대상 고르기: tipSummary가 없으면 포함, 바뀐 후기가 없으면 제외, 최대 100개 제한")
-    void targetSelectionFiltersCorrectly() {
+    @DisplayName("요약이 없거나 요약 뒤에 바뀐 후기가 있는 레시피만 최대 100개까지 요약 대상으로 고른다")
+    void selectsOnlyRecipesNeedingSummary() {
         LocalDateTime baseTime = LocalDateTime.of(2026, 10, 28, 0, 0);
 
         List<RecipeReviewSummaryCandidate> candidates = new ArrayList<>();
@@ -146,7 +146,7 @@ class ReviewSummaryFacadeTest {
 
     @Test
     @DisplayName("AI 요약 결과가 비어 있으면 저장을 건너뛰고 skippedCount를 증가시킨다")
-    void blankSummaryIsSkipped() {
+    void skipsSaving_whenSummaryIsBlank() {
         LocalDateTime now = LocalDateTime.now();
         when(recipeReviewService.findSummaryCandidatesWithMinReviews()).thenReturn(List.of(
                 new RecipeReviewSummaryCandidate(1L, 5L, now)
@@ -169,7 +169,7 @@ class ReviewSummaryFacadeTest {
 
     @Test
     @DisplayName("AI 요약 결과가 150자를 초과할 때 문장 끝(. ! ?)이 있으면 150자 안의 마지막 문장 경계에서 자르고 저장한다")
-    void longSummaryIsTruncatedAtLastSentenceBoundaryWithin150Chars() {
+    void truncatesAtLastSentenceEnd_whenSummaryExceeds150Chars() {
         LocalDateTime now = LocalDateTime.now();
         when(recipeReviewService.findSummaryCandidatesWithMinReviews()).thenReturn(List.of(
                 new RecipeReviewSummaryCandidate(10L, 5L, now)
@@ -200,7 +200,7 @@ class ReviewSummaryFacadeTest {
 
     @Test
     @DisplayName("AI 요약 결과가 150자를 초과하고 150자 안에 문장 끝(. ! ?)이 없으면 150자에서 자르고 '…'를 붙여 저장한다")
-    void longSummaryWithoutSentenceBoundaryAppendsEllipsis() {
+    void truncatesWithEllipsis_whenNoSentenceEndWithin150Chars() {
         LocalDateTime now = LocalDateTime.now();
         when(recipeReviewService.findSummaryCandidatesWithMinReviews()).thenReturn(List.of(
                 new RecipeReviewSummaryCandidate(10L, 5L, now)
@@ -221,7 +221,7 @@ class ReviewSummaryFacadeTest {
 
     @Test
     @DisplayName("작업 시작 후 25분이 지나면 시간 초과로 남은 레시피는 건너뛰고 종료한다")
-    void timeBudgetExceededSkipsRemainingRecipes() {
+    void skipsRemainingRecipes_whenTimeBudgetIsExceeded() {
         LocalDateTime now = LocalDateTime.now();
         // latestReviewUpdatedAt 최신순: 3L -> 2L -> 1L 순으로 정렬됨
         when(recipeReviewService.findSummaryCandidatesWithMinReviews()).thenReturn(List.of(
@@ -271,7 +271,7 @@ class ReviewSummaryFacadeTest {
 
     @Test
     @DisplayName("한 레시피에서 일반 예외가 발생해도 다음 레시피는 계속 진행한다")
-    void exceptionInOneRecipeContinuesNextRecipe() {
+    void continuesNextRecipe_whenOneRecipeFails() {
         LocalDateTime now = LocalDateTime.now();
         when(recipeReviewService.findSummaryCandidatesWithMinReviews()).thenReturn(List.of(
                 new RecipeReviewSummaryCandidate(1L, 5L, now.minusMinutes(1)),
@@ -302,7 +302,7 @@ class ReviewSummaryFacadeTest {
 
     @Test
     @DisplayName("OpenAI 429 한도 초과 예외가 발생하면 남은 레시피를 건너뛰고 작업을 즉시 종료한다")
-    void rateLimitExceptionAbortsRemainingRecipes() {
+    void stopsRemainingRecipes_whenRateLimitIsExceeded() {
         LocalDateTime now = LocalDateTime.now();
         when(recipeReviewService.findSummaryCandidatesWithMinReviews()).thenReturn(List.of(
                 new RecipeReviewSummaryCandidate(1L, 5L, now.plusMinutes(1)),
@@ -345,7 +345,7 @@ class ReviewSummaryFacadeTest {
 
     @Test
     @DisplayName("후기에 '규칙을 무시해' 같은 지시문이 포함되어도 프롬프트는 <reviews> 태그로 감싸고 안내 문구를 포함한다")
-    void promptSeparatesReviewsWithTagsAndInstruction() {
+    void wrapsReviewsInTags_whenReviewContainsInstruction() {
         LocalDateTime now = LocalDateTime.now();
         when(recipeReviewService.findSummaryCandidatesWithMinReviews()).thenReturn(List.of(
                 new RecipeReviewSummaryCandidate(1L, 5L, now)
@@ -379,7 +379,7 @@ class ReviewSummaryFacadeTest {
 
     @Test
     @DisplayName("AI 요약 결과가 앞뒤 쌍따옴표(\"요약\") 형태로 오면 따옴표 없이 저장된다")
-    void doubleQuotesAreStrippedBeforeSaving() {
+    void stripsDoubleQuotes_whenSummaryIsQuoted() {
         LocalDateTime now = LocalDateTime.now();
         when(recipeReviewService.findSummaryCandidatesWithMinReviews()).thenReturn(List.of(
                 new RecipeReviewSummaryCandidate(1L, 5L, now)
@@ -399,7 +399,7 @@ class ReviewSummaryFacadeTest {
 
     @Test
     @DisplayName("AI 요약 결과가 다양한 앞뒤 따옴표(“ ”, ' ', ‘ ’)로 감싸져 있어도 모두 제거하고 trim하여 저장된다")
-    void variousQuotesAreStrippedBeforeSaving() {
+    void stripsAllQuoteTypes_whenSummaryIsQuoted() {
         LocalDateTime now = LocalDateTime.now();
         when(recipeReviewService.findSummaryCandidatesWithMinReviews()).thenReturn(List.of(
                 new RecipeReviewSummaryCandidate(2L, 5L, now)
@@ -420,7 +420,7 @@ class ReviewSummaryFacadeTest {
 
     @Test
     @DisplayName("AI 요약 결과가 따옴표만으로 구성된 경우 저장하지 않고 건너뛴다")
-    void quotesOnlySummaryIsSkipped() {
+    void skipsSaving_whenSummaryIsOnlyQuotes() {
         LocalDateTime now = LocalDateTime.now();
         when(recipeReviewService.findSummaryCandidatesWithMinReviews()).thenReturn(List.of(
                 new RecipeReviewSummaryCandidate(3L, 5L, now)
@@ -442,7 +442,7 @@ class ReviewSummaryFacadeTest {
 
     @Test
     @DisplayName("성공·건너뜀·실패가 레시피별 items에 들어가고, 사용량이 있는 호출만 토큰·비용 합계에 더한다")
-    void itemsAndTotalsReflectEachOutcome() {
+    void recordsItemsAndUsageTotalsPerOutcome() {
         LocalDateTime now = LocalDateTime.now();
         // latestReviewUpdatedAt 최신순: 4L -> 3L -> 2L -> 1L
         when(recipeReviewService.findSummaryCandidatesWithMinReviews()).thenReturn(List.of(
@@ -516,7 +516,7 @@ class ReviewSummaryFacadeTest {
 
     @Test
     @DisplayName("관리자 실행 예산(20초)이 지나면 남은 레시피는 SKIPPED(시간 초과로 다음 실행)로 items에 들어간다")
-    void adminBudgetExceededAddsRemainingAsSkippedItems() {
+    void addsRemainingAsSkipped_whenAdminTimeBudgetIsExceeded() {
         LocalDateTime now = LocalDateTime.now();
         when(recipeReviewService.findSummaryCandidatesWithMinReviews()).thenReturn(List.of(
                 new RecipeReviewSummaryCandidate(1L, 5L, now.plusMinutes(1)),

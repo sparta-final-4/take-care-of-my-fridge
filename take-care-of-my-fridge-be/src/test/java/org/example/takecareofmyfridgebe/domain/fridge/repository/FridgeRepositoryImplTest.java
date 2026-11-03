@@ -7,6 +7,7 @@ import com.querydsl.jpa.impl.JPAQueryFactory;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeSortType;
 import org.example.takecareofmyfridgebe.domain.fridge.entity.Fridge;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -15,11 +16,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.example.takecareofmyfridgebe.domain.fridge.entity.QFridge.fridge;
 import static org.example.takecareofmyfridgebe.domain.ingredient.entity.QIngredient.ingredient;
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -60,12 +60,11 @@ class FridgeRepositoryImplTest {
      * 전체 회원의 재료를 조회하지 않고 예외가 발생하는지 검증한다.
      */
     @Test
-    void findItemsByConditionThrowsWhenMemberIdIsNull() {
+    @DisplayName("회원 ID가 없으면 조회하지 않고 예외를 던진다")
+    void throwsIllegalArgument_whenMemberIdIsNull() {
         // When & Then: 예외 발생 및 쿼리 미실행 확인
-        assertThrows(
-                IllegalArgumentException.class,
-                () -> repository.findItemsByCondition(null, FridgeSortType.EXPIRATION)
-        );
+        assertThatThrownBy(() -> repository.findItemsByCondition(null, FridgeSortType.EXPIRATION))
+                .isInstanceOf(IllegalArgumentException.class);
         verify(jpaQuery, never()).fetch();
     }
 
@@ -76,7 +75,8 @@ class FridgeRepositoryImplTest {
      * 3) orderBy 절이 expirationDate ASC, id ASC 순서로 들어가는지 검증한다.
      */
     @Test
-    void findItemsByConditionWithDefaultExpirationSortFiltersByMemberOnly() {
+    @DisplayName("소비기한순 정렬이면 회원 조건만 걸고 소비기한·ID 오름차순으로 정렬한다")
+    void filtersByMemberAndSortsByExpiration_whenSortIsExpiration() {
         // When
         repository.findItemsByCondition(7L, FridgeSortType.EXPIRATION);
 
@@ -87,15 +87,13 @@ class FridgeRepositoryImplTest {
         // Then: where 조건 캡처 및 확인 (memberId만 적용)
         ArgumentCaptor<Predicate> whereCaptor = ArgumentCaptor.forClass(Predicate.class);
         verify(jpaQuery).where(whereCaptor.capture());
-        assertEquals(fridge.memberId.eq(7L), whereCaptor.getValue());
+        assertThat(whereCaptor.getValue()).isEqualTo(fridge.memberId.eq(7L));
 
         // Then: 정렬 조건 캡처 및 확인 (소비기한 오름차순 + id 오름차순)
         ArgumentCaptor<OrderSpecifier<?>[]> orderCaptor = ArgumentCaptor.forClass(OrderSpecifier[].class);
         verify(jpaQuery).orderBy(orderCaptor.capture());
-        assertArrayEquals(
-                new OrderSpecifier<?>[]{fridge.expirationDate.asc(), fridge.id.asc()},
-                orderCaptor.getValue()
-        );
+        assertThat(orderCaptor.getValue())
+                .containsExactly(fridge.expirationDate.asc(), fridge.id.asc());
     }
 
     /**
@@ -103,17 +101,16 @@ class FridgeRepositoryImplTest {
      * orderBy 절이 createdAt DESC, id DESC 순서로 들어가는지 검증한다.
      */
     @Test
-    void findItemsByConditionWithCreatedSortUsesCreatedAtDescThenIdDesc() {
+    @DisplayName("최신 등록순 정렬이면 등록일·ID 내림차순으로 정렬한다")
+    void sortsByCreatedAtDesc_whenSortIsCreated() {
         // When
         repository.findItemsByCondition(7L, FridgeSortType.CREATED);
 
         // Then: 정렬 조건 확인 (등록일 내림차순 + id 내림차순)
         ArgumentCaptor<OrderSpecifier<?>[]> orderCaptor = ArgumentCaptor.forClass(OrderSpecifier[].class);
         verify(jpaQuery).orderBy(orderCaptor.capture());
-        assertArrayEquals(
-                new OrderSpecifier<?>[]{fridge.createdAt.desc(), fridge.id.desc()},
-                orderCaptor.getValue()
-        );
+        assertThat(orderCaptor.getValue())
+                .containsExactly(fridge.createdAt.desc(), fridge.id.desc());
     }
 
     /**
@@ -121,16 +118,15 @@ class FridgeRepositoryImplTest {
      * orderBy 절이 ingredient.name ASC, rawName ASC, id ASC 순서로 들어가는지 검증한다.
      */
     @Test
-    void findItemsByConditionWithNameSortUsesIngredientNameThenRawNameThenId() {
+    @DisplayName("재료명순 정렬이면 재료명·표시 이름·ID 오름차순으로 정렬한다")
+    void sortsByIngredientNameAndRawName_whenSortIsName() {
         // When
         repository.findItemsByCondition(7L, FridgeSortType.NAME);
 
         // Then: 정렬 조건 확인 (표준 재료명 오름차순 + 표시명 오름차순 + id 오름차순)
         ArgumentCaptor<OrderSpecifier<?>[]> orderCaptor = ArgumentCaptor.forClass(OrderSpecifier[].class);
         verify(jpaQuery).orderBy(orderCaptor.capture());
-        assertArrayEquals(
-                new OrderSpecifier<?>[]{ingredient.name.asc(), fridge.rawName.asc(), fridge.id.asc()},
-                orderCaptor.getValue()
-        );
+        assertThat(orderCaptor.getValue())
+                .containsExactly(ingredient.name.asc(), fridge.rawName.asc(), fridge.id.asc());
     }
 }

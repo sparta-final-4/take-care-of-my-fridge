@@ -14,6 +14,7 @@ import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeSortType;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeSummaryCount;
 import org.example.takecareofmyfridgebe.domain.cooking.entity.CookingLog;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -25,13 +26,11 @@ import org.springframework.data.domain.PageRequest;
 import java.util.List;
 import java.util.Optional;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.example.takecareofmyfridgebe.domain.cooking.entity.QCookingLog.cookingLog;
 import static org.example.takecareofmyfridgebe.domain.recipe.entity.QRecipe.recipe;
 import static org.example.takecareofmyfridgebe.domain.review.entity.QRecipeReview.recipeReview;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -79,12 +78,11 @@ class CookingLogRepositoryImplTest {
      * 쿼리를 실행하지 않고 IllegalArgumentException이 발생하는지 검증한다.
      */
     @Test
-    void findLogsByConditionThrowsWhenMemberIdIsNull() {
+    @DisplayName("요리 기록 조회에서 회원 ID가 없으면 쿼리를 실행하지 않고 예외를 던진다")
+    void throwsIllegalArgument_whenLogsMemberIdIsNull() {
         // When & Then
-        assertThrows(
-                IllegalArgumentException.class,
-                () -> repository.findLogsByCondition(null, null, null, null, PageRequest.of(0, 10))
-        );
+        assertThatThrownBy(() -> repository.findLogsByCondition(null, null, null, null, PageRequest.of(0, 10)))
+                .isInstanceOf(IllegalArgumentException.class);
         verify(queryFactory, never()).selectFrom(any());
     }
 
@@ -93,12 +91,11 @@ class CookingLogRepositoryImplTest {
      * 쿼리를 실행하지 않고 IllegalArgumentException이 발생하는지 검증한다.
      */
     @Test
-    void findMyRecipesThrowsWhenMemberIdIsNull() {
+    @DisplayName("내 레시피 조회에서 회원 ID가 없으면 쿼리를 실행하지 않고 예외를 던진다")
+    void throwsIllegalArgument_whenMyRecipesMemberIdIsNull() {
         // When & Then
-        assertThrows(
-                IllegalArgumentException.class,
-                () -> repository.findMyRecipes(null, MyRecipeReviewStatus.ALL, MyRecipeSortType.RECENT, PageRequest.of(0, 10))
-        );
+        assertThatThrownBy(() -> repository.findMyRecipes(null, MyRecipeReviewStatus.ALL, MyRecipeSortType.RECENT, PageRequest.of(0, 10)))
+                .isInstanceOf(IllegalArgumentException.class);
         verify(queryFactory, never()).select(any(Expression.class));
     }
 
@@ -107,12 +104,11 @@ class CookingLogRepositoryImplTest {
      * 쿼리를 실행하지 않고 IllegalArgumentException이 발생하는지 검증한다.
      */
     @Test
-    void getMyRecipesSummaryCountThrowsWhenMemberIdIsNull() {
+    @DisplayName("내 레시피 요약 조회에서 회원 ID가 없으면 쿼리를 실행하지 않고 예외를 던진다")
+    void throwsIllegalArgument_whenSummaryMemberIdIsNull() {
         // When & Then
-        assertThrows(
-                IllegalArgumentException.class,
-                () -> repository.getMyRecipesSummaryCount(null)
-        );
+        assertThatThrownBy(() -> repository.getMyRecipesSummaryCount(null))
+                .isInstanceOf(IllegalArgumentException.class);
         verify(queryFactory, never()).select(any(Expression.class));
     }
 
@@ -121,12 +117,11 @@ class CookingLogRepositoryImplTest {
      * 쿼리를 실행하지 않고 IllegalArgumentException이 발생하는지 검증한다.
      */
     @Test
-    void findMostCookedRecipeThrowsWhenMemberIdIsNull() {
+    @DisplayName("가장 많이 만든 레시피 조회에서 회원 ID가 없으면 쿼리를 실행하지 않고 예외를 던진다")
+    void throwsIllegalArgument_whenMostCookedMemberIdIsNull() {
         // When & Then
-        assertThrows(
-                IllegalArgumentException.class,
-                () -> repository.findMostCookedRecipe(null)
-        );
+        assertThatThrownBy(() -> repository.findMostCookedRecipe(null))
+                .isInstanceOf(IllegalArgumentException.class);
         verify(queryFactory, never()).select(any(Expression.class));
     }
 
@@ -135,7 +130,8 @@ class CookingLogRepositoryImplTest {
      * 기본 ALL 조회에서는 where 절에 reviewId 조건이 포함되지 않는지 검증한다.
      */
     @Test
-    void findMyRecipesBuildsCorrectJoinsAndBasicWhereClause() {
+    @DisplayName("내 레시피를 전체 조건으로 조회하면 레시피·후기를 left join하고 후기 조건은 넣지 않는다")
+    void joinsRecipeAndReviewWithoutReviewFilter_whenStatusIsAll() {
         // Given
         Long memberId = 7L;
         PageRequest pageRequest = PageRequest.of(0, 10);
@@ -179,11 +175,11 @@ class CookingLogRepositoryImplTest {
         ArgumentCaptor<Predicate[]> whereCaptor = ArgumentCaptor.forClass(Predicate[].class);
         verify(myRecipeQuery).where(whereCaptor.capture());
         Predicate[] predicates = whereCaptor.getValue();
-        assertEquals(cookingLog.memberId.eq(memberId), predicates[0]);
-        assertNull(predicates[1]);
+        assertThat(predicates[0]).isEqualTo(cookingLog.memberId.eq(memberId));
+        assertThat(predicates[1]).isNull();
 
-        assertEquals(0, result.getContent().size());
-        assertEquals(0, result.getTotalElements());
+        assertThat(result.getContent().size()).isEqualTo(0);
+        assertThat(result.getTotalElements()).isEqualTo(0);
     }
 
     /**
@@ -192,7 +188,8 @@ class CookingLogRepositoryImplTest {
      * 2) orderBy 절이 count() DESC, max(createdAt) DESC, recipeId DESC 순서로 들어가는지 검증한다.
      */
     @Test
-    void findMyRecipesWithWrittenFilterAndMostSort() {
+    @DisplayName("후기 작성 레시피를 많이 만든 순으로 조회하면 후기 있음 조건과 요리 횟수순 정렬을 넣는다")
+    void filtersWrittenAndSortsByCount_whenWrittenAndMost() {
         // Given
         Long memberId = 7L;
         PageRequest pageRequest = PageRequest.of(1, 5);
@@ -231,23 +228,24 @@ class CookingLogRepositoryImplTest {
         ArgumentCaptor<Predicate[]> whereCaptor = ArgumentCaptor.forClass(Predicate[].class);
         verify(myRecipeQuery).where(whereCaptor.capture());
         Predicate[] predicates = whereCaptor.getValue();
-        assertEquals(cookingLog.memberId.eq(memberId), predicates[0]);
-        assertEquals(recipeReview.id.isNotNull(), predicates[1]);
+        assertThat(predicates[0]).isEqualTo(cookingLog.memberId.eq(memberId));
+        assertThat(predicates[1]).isEqualTo(recipeReview.id.isNotNull());
 
         // Then: orderBy 정렬 확인
         ArgumentCaptor<OrderSpecifier[]> orderCaptor = ArgumentCaptor.forClass(OrderSpecifier[].class);
         verify(myRecipeQuery).orderBy(orderCaptor.capture());
         OrderSpecifier[] orderSpecifiers = orderCaptor.getValue();
-        assertEquals(cookingLog.count().desc(), orderSpecifiers[0]);
-        assertEquals(cookingLog.createdAt.max().desc(), orderSpecifiers[1]);
-        assertEquals(cookingLog.recipeId.desc(), orderSpecifiers[2]);
+        assertThat(orderSpecifiers[0]).isEqualTo(cookingLog.count().desc());
+        assertThat(orderSpecifiers[1]).isEqualTo(cookingLog.createdAt.max().desc());
+        assertThat(orderSpecifiers[2]).isEqualTo(cookingLog.recipeId.desc());
     }
 
     /**
      * reviewStatus=NOT_WRITTEN 조회 시 where 절에 recipeReview.id IS NULL 조건이 적용되는지 검증한다.
      */
     @Test
-    void findMyRecipesWithNotWrittenFilter() {
+    @DisplayName("후기 미작성 레시피를 조회하면 후기 없음 조건을 넣는다")
+    void filtersNotWritten_whenStatusIsNotWritten() {
         // Given
         Long memberId = 7L;
         PageRequest pageRequest = PageRequest.of(0, 10);
@@ -281,7 +279,7 @@ class CookingLogRepositoryImplTest {
         ArgumentCaptor<Predicate[]> whereCaptor = ArgumentCaptor.forClass(Predicate[].class);
         verify(myRecipeQuery).where(whereCaptor.capture());
         Predicate[] predicates = whereCaptor.getValue();
-        assertEquals(recipeReview.id.isNull(), predicates[1]);
+        assertThat(predicates[1]).isEqualTo(recipeReview.id.isNull());
     }
 
     /**
@@ -289,7 +287,8 @@ class CookingLogRepositoryImplTest {
      * notWrittenCount(recipeCount - writtenCount)가 자동 산출되는지 검증한다.
      */
     @Test
-    void getMyRecipesSummaryCountBuildsSingleQueryAndCalculatesCounts() {
+    @DisplayName("내 레시피 요약은 한 번의 쿼리로 세고 후기 미작성 수는 레시피 수에서 작성 수를 빼서 구한다")
+    void calculatesSummaryCountsWithSingleQuery() {
         // Given: 레시피 3개, 총 요리 7회, 후기 2건 작성 -> 미작성 1건
         Long memberId = 7L;
         MyRecipeSummaryCount expectedSummary = new MyRecipeSummaryCount(3L, 7L, 2L);
@@ -306,10 +305,10 @@ class CookingLogRepositoryImplTest {
         MyRecipeSummaryCount summary = repository.getMyRecipesSummaryCount(memberId);
 
         // Then: 조인 및 조건 호출 확인과 자동 계산된 notWrittenCount 확인
-        assertEquals(3L, summary.recipeCount());
-        assertEquals(7L, summary.totalCookCount());
-        assertEquals(2L, summary.writtenCount());
-        assertEquals(1L, summary.notWrittenCount()); // 3 - 2 = 1
+        assertThat(summary.recipeCount()).isEqualTo(3L);
+        assertThat(summary.totalCookCount()).isEqualTo(7L);
+        assertThat(summary.writtenCount()).isEqualTo(2L);
+        assertThat(summary.notWrittenCount()).isEqualTo(1L); // 3 - 2 = 1
 
         verify(summaryQuery).leftJoin(recipeReview);
         verify(summaryQuery).where(cookingLog.memberId.eq(memberId));
@@ -319,7 +318,8 @@ class CookingLogRepositoryImplTest {
      * findMostCookedRecipe 호출 시 query 조립과 결과 DTO 반환을 검증한다.
      */
     @Test
-    void findMostCookedRecipeBuildsQueryAndReturnsResult() {
+    @DisplayName("가장 많이 만든 레시피를 조회하면 쿼리 결과를 그대로 반환한다")
+    void returnsMostCookedRecipe() {
         Long memberId = 7L;
         MostCookedRecipeDto expected = new MostCookedRecipeDto(1L, 5L);
 
@@ -333,9 +333,9 @@ class CookingLogRepositoryImplTest {
 
         Optional<MostCookedRecipeDto> result = repository.findMostCookedRecipe(memberId);
 
-        assertTrue(result.isPresent());
-        assertEquals(1L, result.get().recipeId());
-        assertEquals(5L, result.get().cookCount());
+        assertThat(result.isPresent()).isTrue();
+        assertThat(result.get().recipeId()).isEqualTo(1L);
+        assertThat(result.get().cookCount()).isEqualTo(5L);
     }
 
     /**
@@ -343,12 +343,11 @@ class CookingLogRepositoryImplTest {
      * 쿼리를 실행하지 않고 IllegalArgumentException이 발생하는지 검증한다.
      */
     @Test
-    void getCookingStatsThrowsWhenRecipeIdIsNull() {
+    @DisplayName("요리 통계 조회에서 레시피 ID가 없으면 쿼리를 실행하지 않고 예외를 던진다")
+    void throwsIllegalArgument_whenRecipeIdIsNull() {
         // When & Then
-        assertThrows(
-                IllegalArgumentException.class,
-                () -> repository.getCookingStats(null)
-        );
+        assertThatThrownBy(() -> repository.getCookingStats(null))
+                .isInstanceOf(IllegalArgumentException.class);
         verify(queryFactory, never()).select(any(Expression.class));
     }
 
@@ -357,7 +356,8 @@ class CookingLogRepositoryImplTest {
      * 결과 DTO에 recipeId와 집계 카운트를 결합하여 반환하는지 검증한다.
      */
     @Test
-    void getCookingStatsBuildsSingleQueryAndReturnsResponse() {
+    @DisplayName("요리 통계는 한 번의 집계 쿼리로 구해 레시피 ID와 함께 반환한다")
+    void returnsStatsWithSingleQuery() {
         // Given
         Long recipeId = 12L;
         CookingStatsCount countResult = new CookingStatsCount(10L, 7L, 3L);
@@ -371,10 +371,10 @@ class CookingLogRepositoryImplTest {
         CookingStatsResponse response = repository.getCookingStats(recipeId);
 
         // Then
-        assertEquals(recipeId, response.recipeId());
-        assertEquals(10L, response.totalCount());
-        assertEquals(7L, response.successCount());
-        assertEquals(3L, response.failedCount());
+        assertThat(response.recipeId()).isEqualTo(recipeId);
+        assertThat(response.totalCount()).isEqualTo(10L);
+        assertThat(response.successCount()).isEqualTo(7L);
+        assertThat(response.failedCount()).isEqualTo(3L);
 
         verify(statsCountQuery).from(cookingLog);
         verify(statsCountQuery).where(cookingLog.recipeId.eq(recipeId));
@@ -384,7 +384,8 @@ class CookingLogRepositoryImplTest {
      * getCookingStats 호출 시 쿼리 결과가 null이면 모든 카운트가 0인 응답을 반환하는지 검증한다.
      */
     @Test
-    void getCookingStatsReturnsZeroWhenFetchOneIsNull() {
+    @DisplayName("요리 통계 쿼리 결과가 없으면 모든 횟수를 0으로 반환한다")
+    void returnsZeroStats_whenQueryResultIsNull() {
         // Given
         Long recipeId = 12L;
 
@@ -397,9 +398,9 @@ class CookingLogRepositoryImplTest {
         CookingStatsResponse response = repository.getCookingStats(recipeId);
 
         // Then
-        assertEquals(recipeId, response.recipeId());
-        assertEquals(0L, response.totalCount());
-        assertEquals(0L, response.successCount());
-        assertEquals(0L, response.failedCount());
+        assertThat(response.recipeId()).isEqualTo(recipeId);
+        assertThat(response.totalCount()).isEqualTo(0L);
+        assertThat(response.successCount()).isEqualTo(0L);
+        assertThat(response.failedCount()).isEqualTo(0L);
     }
 }

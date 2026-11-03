@@ -21,7 +21,7 @@ class ChatSessionPushPublisherTest {
 
     @Test
     @DisplayName("상담 채널에 회원 번호·상담 번호·상태를 JSON 문자열로 발행한다")
-    void publish_sendsJsonToChatChannel() {
+    void publishesJsonToChatChannel() {
         publisher.publish(7L, 15L, ChatSessionStatus.COMPLETED);
 
         verify(stringRedisTemplate).convertAndSend("chat:push", "{\"memberId\":7,\"sessionId\":15,\"status\":\"COMPLETED\"}");
@@ -29,7 +29,7 @@ class ChatSessionPushPublisherTest {
 
     @Test
     @DisplayName("Redis 발행이 실패해도 예외를 던지지 않는다")
-    void publish_redisDown_doesNotThrow() {
+    void doesNotThrow_whenRedisIsDown() {
         willThrow(new RedisConnectionFailureException("down")).given(stringRedisTemplate)
                 .convertAndSend(anyString(), anyString());
 

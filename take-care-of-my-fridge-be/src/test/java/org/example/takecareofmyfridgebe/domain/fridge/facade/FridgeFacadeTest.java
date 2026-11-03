@@ -19,6 +19,7 @@ import org.example.takecareofmyfridgebe.domain.product.service.ProductService;
 import org.example.takecareofmyfridgebe.dummy.ProductFixture;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -34,9 +35,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -76,8 +76,9 @@ class FridgeFacadeTest {
      * 3) rawName은 다듬어진 이름이 아니라 사용자가 입력한 원문 그대로 엔티티에 저장되는지 검증한다.
      */
     @Test
+    @DisplayName("재료를 등록할 때 보관방식·소비기한이 비어 있으면 재료 권장값을 쓰고, 입력한 값과 원문 이름은 그대로 저장한다")
     @SuppressWarnings("unchecked")
-    void createItemsAppliesDefaultValuesWhenNullAndPreservesRawName() {
+    void appliesIngredientDefaults_whenStorageOrExpirationIsMissing() {
         // Given: 기본 보관방식이 냉장(REFRIGERATED)이고 기본 소비기한이 5일인 두부 표준 재료
         LocalDate today = LocalDate.now();
         Ingredient tofu = Ingredient.builder()
@@ -124,32 +125,32 @@ class FridgeFacadeTest {
         List<FridgeItemResponse> result = fridgeFacade.createItems(7L, request);
 
         // Then: FridgeService.saveItems로 전달된 Fridge 엔티티 목록 캡처 및 검증
-        assertEquals(0, result.size());
+        assertThat(result.size()).isEqualTo(0);
         ArgumentCaptor<List<Fridge>> captor = ArgumentCaptor.forClass(List.class);
         verify(fridgeService).saveItems(captor.capture());
 
         List<Fridge> savedFridges = captor.getValue();
-        assertEquals(2, savedFridges.size());
+        assertThat(savedFridges.size()).isEqualTo(2);
 
         // 첫 번째 재료: 원문 rawName 유지 + 두부의 권장 보관방식(REFRIGERATED) 및 권장 소비기한(오늘+5일) 적용 확인
         Fridge first = savedFridges.get(0);
-        assertEquals(7L, first.getMemberId());
-        assertSame(tofu, first.getIngredient());
-        assertEquals("[특가] 국산 두부 300g", first.getRawName());
-        assertEquals(new BigDecimal("2"), first.getQuantity());
-        assertEquals(StorageType.REFRIGERATED, first.getStorage());
-        assertEquals(today.plusDays(5), first.getExpirationDate());
-        assertEquals(FridgeSource.MANUAL, first.getSource());
+        assertThat(first.getMemberId()).isEqualTo(7L);
+        assertThat(first.getIngredient()).isSameAs(tofu);
+        assertThat(first.getRawName()).isEqualTo("[특가] 국산 두부 300g");
+        assertThat(first.getQuantity()).isEqualTo(new BigDecimal("2"));
+        assertThat(first.getStorage()).isEqualTo(StorageType.REFRIGERATED);
+        assertThat(first.getExpirationDate()).isEqualTo(today.plusDays(5));
+        assertThat(first.getSource()).isEqualTo(FridgeSource.MANUAL);
 
         // 두 번째 재료: 원문 rawName 유지 + 사용자가 직접 입력한 보관방식(FROZEN) 및 소비기한(오늘+14일) 적용 확인
         Fridge second = savedFridges.get(1);
-        assertEquals(7L, second.getMemberId());
-        assertSame(custom, second.getIngredient());
-        assertEquals("엄마표 겉절이", second.getRawName());
-        assertEquals(new BigDecimal("1"), second.getQuantity());
-        assertEquals(StorageType.FROZEN, second.getStorage());
-        assertEquals(customExpiration, second.getExpirationDate());
-        assertEquals(FridgeSource.MANUAL, second.getSource());
+        assertThat(second.getMemberId()).isEqualTo(7L);
+        assertThat(second.getIngredient()).isSameAs(custom);
+        assertThat(second.getRawName()).isEqualTo("엄마표 겉절이");
+        assertThat(second.getQuantity()).isEqualTo(new BigDecimal("1"));
+        assertThat(second.getStorage()).isEqualTo(StorageType.FROZEN);
+        assertThat(second.getExpirationDate()).isEqualTo(customExpiration);
+        assertThat(second.getSource()).isEqualTo(FridgeSource.MANUAL);
     }
 
     /**
@@ -158,7 +159,8 @@ class FridgeFacadeTest {
      * FridgeService.updateItem에 전달하는지 검증한다.
      */
     @Test
-    void updateItemDoesNotCallMatcherWhenRawNameIsSame() {
+    @DisplayName("수정할 이름이 기존 이름과 같으면 재료를 다시 매칭하지 않고 기존 재료를 유지한다")
+    void keepsIngredientWithoutMatching_whenRawNameIsSame() {
         // Given: 기존 rawName이 "국산 두부 300g"인 냉장고 재료
         FridgeItemUpdateRequest request = new FridgeItemUpdateRequest(
                 "국산 두부 300g",
@@ -175,7 +177,7 @@ class FridgeFacadeTest {
         FridgeItemResponse actual = fridgeFacade.updateItem(7L, 100L, request);
 
         // Then: 매핑기(IngredientMatcher)를 호출하지 않고 ingredient를 null(기존 재료 유지)로 전달했는지 확인
-        assertSame(expectedResponse, actual);
+        assertThat(actual).isSameAs(expectedResponse);
         verifyNoInteractions(ingredientMatcher);
         verify(fridgeService).updateItem(7L, 100L, null, request);
     }
@@ -185,7 +187,8 @@ class FridgeFacadeTest {
      * ingredient를 null(기존 재료 유지)로 전달하는지 검증한다.
      */
     @Test
-    void updateItemDoesNotCallMatcherWhenRawNameIsNotSent() {
+    @DisplayName("이름을 보내지 않고 수정하면 재료를 다시 매칭하지 않고 기존 재료를 유지한다")
+    void keepsIngredientWithoutMatching_whenRawNameIsNotSent() {
         FridgeItemUpdateRequest request = new FridgeItemUpdateRequest(
                 null,
                 null,
@@ -199,7 +202,7 @@ class FridgeFacadeTest {
 
         FridgeItemResponse actual = fridgeFacade.updateItem(7L, 100L, request);
 
-        assertSame(expectedResponse, actual);
+        assertThat(actual).isSameAs(expectedResponse);
         verifyNoInteractions(ingredientMatcher);
         verify(fridgeService).updateItem(7L, 100L, null, request);
     }
@@ -210,7 +213,8 @@ class FridgeFacadeTest {
      * FridgeService.updateItem으로 전달하는지 검증한다.
      */
     @Test
-    void updateItemCallsMatcherWhenRawNameIsChanged() {
+    @DisplayName("수정할 이름이 기존 이름과 다르면 재료를 다시 매칭해 새 재료로 수정한다")
+    void rematchesIngredient_whenRawNameIsChanged() {
         // Given: 기존 rawName이 "두부"인 재료를 "[특가] 신라면 5개입"으로 이름을 바꿔 수정하는 상황
         Ingredient newIngredient = Ingredient.builder()
                 .ingredientCode("ING_RAMEN")
@@ -237,7 +241,7 @@ class FridgeFacadeTest {
         FridgeItemResponse actual = fridgeFacade.updateItem(7L, 100L, request);
 
         // Then: IngredientMatcher.match가 호출되고 새로 매핑된 newIngredient가 전달되었는지 확인
-        assertSame(expectedResponse, actual);
+        assertThat(actual).isSameAs(expectedResponse);
         verify(ingredientMatcher).match("[특가] 신라면 5개입");
         verify(fridgeService).updateItem(7L, 100L, newIngredient, request);
     }
@@ -248,7 +252,8 @@ class FridgeFacadeTest {
      * FridgeService.updateItem에 전달하는지 검증한다.
      */
     @Test
-    void updateItemKeepsMealkitWhenRawNameIsChanged() {
+    @DisplayName("밀키트 재료는 이름이 바뀌어도 다시 매칭하지 않고 밀키트로 유지한다")
+    void keepsMealkit_whenMealkitRawNameIsChanged() {
         // Given: 기존 rawName이 "밀푀유나베 밀키트"인 밀키트 재료를 다른 이름으로 수정하는 상황
         FridgeItemUpdateRequest request = new FridgeItemUpdateRequest(
                 "밀푀유나베 밀키트 2인분",
@@ -265,7 +270,7 @@ class FridgeFacadeTest {
         FridgeItemResponse actual = fridgeFacade.updateItem(7L, 200L, request);
 
         // Then: 매핑을 호출하지 않고 null(기존 밀키트 유지)을 전달
-        assertSame(expectedResponse, actual);
+        assertThat(actual).isSameAs(expectedResponse);
         verifyNoInteractions(ingredientMatcher);
         verify(fridgeService).updateItem(7L, 200L, null, request);
     }
@@ -276,8 +281,9 @@ class FridgeFacadeTest {
      * 표시 이름은 상품명, 출처는 COMMERCE와 주문 상품 ID다.
      */
     @Test
+    @DisplayName("구매 확정된 재료 상품은 상품마다 냉장고 재료를 한 줄씩 넣는다")
     @SuppressWarnings("unchecked")
-    void stockPurchasedItemsStocksIngredientProducts() {
+    void stocksIngredientProducts() {
         // Given: 양파 상품(1개 = 기본 단위 5)과 두부 상품(1개 = 기본 단위 1)
         Product onionProduct = ProductFixture.createProduct(1L, "양파 1kg", 3900);
         Product tofuProduct = ProductFixture.createProduct(2L, "국산 두부", 2000);
@@ -302,22 +308,22 @@ class FridgeFacadeTest {
         ArgumentCaptor<List<Fridge>> captor = ArgumentCaptor.forClass(List.class);
         verify(fridgeService).stockCommerceItems(captor.capture());
         List<Fridge> fridges = captor.getValue();
-        assertEquals(2, fridges.size());
+        assertThat(fridges.size()).isEqualTo(2);
 
         Fridge onionFridge = fridges.get(0);
-        assertSame(onion, onionFridge.getIngredient());
-        assertEquals(0, new BigDecimal("10").compareTo(onionFridge.getQuantity()));
-        assertEquals(StorageType.ROOM_TEMP, onionFridge.getStorage());
-        assertEquals(LocalDate.of(2026, 11, 13), onionFridge.getExpirationDate());
-        assertEquals("양파 1kg", onionFridge.getRawName());
-        assertEquals(FridgeSource.COMMERCE, onionFridge.getSource());
-        assertEquals(101L, onionFridge.getOrderItemId());
-        assertEquals(7L, onionFridge.getMemberId());
+        assertThat(onionFridge.getIngredient()).isSameAs(onion);
+        assertThat(new BigDecimal("10").compareTo(onionFridge.getQuantity())).isEqualTo(0);
+        assertThat(onionFridge.getStorage()).isEqualTo(StorageType.ROOM_TEMP);
+        assertThat(onionFridge.getExpirationDate()).isEqualTo(LocalDate.of(2026, 11, 13));
+        assertThat(onionFridge.getRawName()).isEqualTo("양파 1kg");
+        assertThat(onionFridge.getSource()).isEqualTo(FridgeSource.COMMERCE);
+        assertThat(onionFridge.getOrderItemId()).isEqualTo(101L);
+        assertThat(onionFridge.getMemberId()).isEqualTo(7L);
 
         Fridge tofuFridge = fridges.get(1);
-        assertSame(tofu, tofuFridge.getIngredient());
-        assertEquals(0, new BigDecimal("3").compareTo(tofuFridge.getQuantity()));
-        assertEquals(102L, tofuFridge.getOrderItemId());
+        assertThat(tofuFridge.getIngredient()).isSameAs(tofu);
+        assertThat(new BigDecimal("3").compareTo(tofuFridge.getQuantity())).isEqualTo(0);
+        assertThat(tofuFridge.getOrderItemId()).isEqualTo(102L);
         // 밀키트가 없으면 밀키트용 기본 재료를 조회하지 않는다
         verify(ingredientService, never()).getMealkitIngredient();
     }
@@ -326,8 +332,9 @@ class FridgeFacadeTest {
      * 밀키트 상품은 밀키트용 기본 재료(ING_MEALKIT)로, 확정 수량(개수) 그대로 넣는다.
      */
     @Test
+    @DisplayName("구매 확정된 밀키트 상품은 밀키트 재료로 확정 수량(개수)만큼 넣는다")
     @SuppressWarnings("unchecked")
-    void stockPurchasedItemsStocksMealkitAsCount() {
+    void stocksMealkitByCount() {
         // Given
         Product mealkitProduct = ProductFixture.createMealkitProduct(3L, "된장찌개 밀키트", 12900);
         Ingredient mealkit = ingredientWithId(1150L, Ingredient.ING_MEALKIT, "밀키트");
@@ -349,11 +356,11 @@ class FridgeFacadeTest {
         ArgumentCaptor<List<Fridge>> captor = ArgumentCaptor.forClass(List.class);
         verify(fridgeService).stockCommerceItems(captor.capture());
         Fridge fridge = captor.getValue().get(0);
-        assertSame(mealkit, fridge.getIngredient());
-        assertEquals(0, new BigDecimal("2").compareTo(fridge.getQuantity()));
-        assertEquals("된장찌개 밀키트", fridge.getRawName());
-        assertEquals(LocalDate.of(2026, 11, 13), fridge.getExpirationDate());
-        assertEquals(FridgeSource.COMMERCE, fridge.getSource());
+        assertThat(fridge.getIngredient()).isSameAs(mealkit);
+        assertThat(new BigDecimal("2").compareTo(fridge.getQuantity())).isEqualTo(0);
+        assertThat(fridge.getRawName()).isEqualTo("된장찌개 밀키트");
+        assertThat(fridge.getExpirationDate()).isEqualTo(LocalDate.of(2026, 11, 13));
+        assertThat(fridge.getSource()).isEqualTo(FridgeSource.COMMERCE);
     }
 
     /**
@@ -361,7 +368,8 @@ class FridgeFacadeTest {
      * 주문 한 건을 한 번에 저장하므로 함께 온 정상 상품도 넣지 않는다.
      */
     @Test
-    void stockPurchasedItemsThrowsWhenIngredientLinkIsMissing() {
+    @DisplayName("재료 상품에 연결된 재료가 없으면 예외를 던지고 그 주문의 상품을 하나도 넣지 않는다")
+    void throwsProductDetailMissing_whenIngredientLinkIsMissing() {
         // Given: 양파 상품은 연결이 있고, 대파 상품은 상세 행이 없음
         Product onionProduct = ProductFixture.createProduct(1L, "양파 1kg", 3900);
         Product greenOnionProduct = ProductFixture.createProduct(4L, "대파", 2500);
@@ -379,9 +387,10 @@ class FridgeFacadeTest {
         when(ingredientService.getIngredientsByIds(Set.of(10L))).thenReturn(Map.of(10L, onion));
 
         // When & Then
-        BusinessException exception = assertThrows(BusinessException.class,
-                () -> fridgeFacade.stockPurchasedItems(message));
-        assertEquals(ErrorCode.PRODUCT_DETAIL_MISSING, exception.getErrorCode());
+        assertThatThrownBy(() -> fridgeFacade.stockPurchasedItems(message))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.PRODUCT_DETAIL_MISSING);
         verify(fridgeService, never()).stockCommerceItems(anyList());
     }
 
@@ -389,7 +398,8 @@ class FridgeFacadeTest {
      * 모두 환불된 주문처럼 items가 비어 있으면 아무것도 조회·저장하지 않는다.
      */
     @Test
-    void stockPurchasedItemsDoesNothingWhenItemsAreEmpty() {
+    @DisplayName("구매 확정 상품이 비어 있으면 아무것도 조회·저장하지 않는다")
+    void stocksNothing_whenItemsAreEmpty() {
         // When
         fridgeFacade.stockPurchasedItems(message(List.of()));
 
@@ -401,8 +411,9 @@ class FridgeFacadeTest {
      * 이미 입고 이력이 있는 주문 상품은 걸러 내고 남은 상품만 넣는다.
      */
     @Test
+    @DisplayName("이미 입고된 주문 상품은 빼고 나머지 상품만 넣는다")
     @SuppressWarnings("unchecked")
-    void stockPurchasedItemsSkipsAlreadyStockedOrderItems() {
+    void stocksOnlyNewItems_whenSomeItemsAreAlreadyStocked() {
         // Given: 101은 이미 입고됨
         Product tofuProduct = ProductFixture.createProduct(2L, "국산 두부", 2000);
         Ingredient tofu = ingredientWithId(11L, "ING_TOFU", "두부");
@@ -423,14 +434,15 @@ class FridgeFacadeTest {
         // Then
         ArgumentCaptor<List<Fridge>> captor = ArgumentCaptor.forClass(List.class);
         verify(fridgeService).stockCommerceItems(captor.capture());
-        assertEquals(List.of(102L), captor.getValue().stream().map(Fridge::getOrderItemId).toList());
+        assertThat(captor.getValue().stream().map(Fridge::getOrderItemId).toList()).isEqualTo(List.of(102L));
     }
 
     /**
      * 같은 메시지를 다시 받아 모든 주문 상품이 이미 입고됐으면 상품을 조회하지 않고 끝낸다.
      */
     @Test
-    void stockPurchasedItemsDoesNothingWhenAllOrderItemsAreStocked() {
+    @DisplayName("모든 주문 상품이 이미 입고됐으면 상품을 조회하지 않고 끝낸다")
+    void skipsProductLookup_whenAllItemsAreAlreadyStocked() {
         // Given
         PurchaseConfirmedMessage message = message(List.of(
                 new PurchaseConfirmedMessage.Item(101L, 1L, "양파 1kg", 2)

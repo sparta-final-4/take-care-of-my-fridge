@@ -56,7 +56,7 @@ class ChatStreamServiceTest {
 
     @Test
     @DisplayName("정상: message 조각들이 방출되고 saveExchange가 boundedElastic 스레드에서 실행된 후 done 이벤트가 온다")
-    void streamMessageSavesExchangeOnBoundedElasticScheduler() {
+    void savesExchangeOnBoundedElastic_whenStreamCompletes() {
         Long memberId = 1L;
         Long sessionId = 10L;
         String userContent = "된장찌개 레시피 알려줘";
@@ -102,7 +102,7 @@ class ChatStreamServiceTest {
 
     @Test
     @DisplayName("생성 중 BusinessException 실패: error 이벤트(비즈니스 코드) 방출 후 저장하지 않는다")
-    void streamMessageBusinessErrorEmitsErrorEventAndDoesNotSave() {
+    void emitsBusinessErrorWithoutSaving_whenBusinessExceptionOccurs() {
         Long memberId = 1L;
         Long sessionId = 10L;
         String userContent = "질문";
@@ -123,7 +123,7 @@ class ChatStreamServiceTest {
 
     @Test
     @DisplayName("생성 중 일반 RuntimeException 실패: error 이벤트(COMMON_002) 방출 후 저장하지 않는다")
-    void streamMessageGeneralErrorEmitsInternalServerErrorEventAndDoesNotSave() {
+    void emitsInternalErrorWithoutSaving_whenRuntimeExceptionOccurs() {
         Long memberId = 1L;
         Long sessionId = 10L;
         String userContent = "질문";
@@ -144,7 +144,7 @@ class ChatStreamServiceTest {
 
     @Test
     @DisplayName("중간에 연결이 끊기면(cancel) saveExchange를 호출하지 않고 저장하지 않는다")
-    void streamMessageCancelledDoesNotSave() {
+    void doesNotSave_whenCancelled() {
         Long memberId = 1L;
         Long sessionId = 10L;
         String userContent = "질문";
@@ -165,7 +165,7 @@ class ChatStreamServiceTest {
 
     @Test
     @DisplayName("세션 검증 실패(404, 409): 스트림 생성 전 동기 예외를 던진다")
-    void streamMessageValidationFailureThrowsSynchronously() {
+    void throwsSynchronously_whenValidationFails() {
         Long memberId = 1L;
         Long sessionId = 999L;
 
@@ -184,7 +184,7 @@ class ChatStreamServiceTest {
 
     @Test
     @DisplayName("하루 질문 한도 초과 시 스트림 생성 전 동기 429 CHAT_DAILY_LIMIT_EXCEEDED 예외를 던지고 답을 생성하지 않는다")
-    void streamMessageDailyLimitExceededThrowsSynchronously() {
+    void throwsSynchronously_whenDailyLimitIsExceeded() {
         Long memberId = 1L;
         Long sessionId = 10L;
 
@@ -202,7 +202,7 @@ class ChatStreamServiceTest {
 
     @Test
     @DisplayName("공백으로 시작하는 답변 조각(\" 계란\")이 JSON 안에 그대로 유지된다")
-    void streamMessagePreservesLeadingSpaceInJson() {
+    void keepsLeadingSpaceInJson() {
         Long memberId = 1L;
         Long sessionId = 10L;
         String userContent = "재료 뭐 있어?";
@@ -228,7 +228,7 @@ class ChatStreamServiceTest {
 
     @Test
     @DisplayName("다른 창에서 답을 받는 중이면 409 CHAT_REPLY_IN_PROGRESS를 동기로 던지고 하루 횟수를 쓰지 않는다")
-    void streamMessageLockFailureThrowsWithoutUsingDailyCount() {
+    void throwsInProgressWithoutCounting_whenLockIsHeld() {
         Long memberId = 1L;
         Long sessionId = 10L;
 
@@ -247,7 +247,7 @@ class ChatStreamServiceTest {
 
     @Test
     @DisplayName("하루 횟수 초과로 실패하면 잡은 잠금을 풀고 그 예외를 그대로 던진다")
-    void streamMessageDailyLimitFailureReleasesLock() {
+    void releasesLock_whenDailyLimitFails() {
         Long memberId = 1L;
         Long sessionId = 10L;
 
@@ -266,7 +266,7 @@ class ChatStreamServiceTest {
 
     @Test
     @DisplayName("답을 끝까지 받으면 done 뒤에 잠금을 한 번 푼다")
-    void streamMessageCompletionReleasesLock() {
+    void releasesLock_whenStreamCompletes() {
         Long sessionId = 10L;
         when(chatStreamLockService.acquire(sessionId)).thenReturn(LOCK_TOKEN);
         when(chatReplyGenerator.generate(sessionId, "질문")).thenReturn(Flux.just("답"));
@@ -288,7 +288,7 @@ class ChatStreamServiceTest {
 
     @Test
     @DisplayName("답 생성이 실패해 error 이벤트로 끝나도 잠금을 푼다")
-    void streamMessageErrorReleasesLock() {
+    void releasesLock_whenStreamErrors() {
         Long sessionId = 10L;
         when(chatStreamLockService.acquire(sessionId)).thenReturn(LOCK_TOKEN);
         when(chatReplyGenerator.generate(sessionId, "질문"))
@@ -303,7 +303,7 @@ class ChatStreamServiceTest {
 
     @Test
     @DisplayName("답을 받다가 연결이 끊겨(cancel) 끝나도 잠금을 푼다")
-    void streamMessageCancelReleasesLock() {
+    void releasesLock_whenStreamIsCancelled() {
         Long sessionId = 10L;
         when(chatStreamLockService.acquire(sessionId)).thenReturn(LOCK_TOKEN);
         when(chatReplyGenerator.generate(sessionId, "질문"))

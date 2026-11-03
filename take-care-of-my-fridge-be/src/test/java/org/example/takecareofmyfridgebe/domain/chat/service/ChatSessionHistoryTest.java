@@ -165,7 +165,7 @@ class ChatSessionHistoryTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("종료·만료된 본인 상담도 기존 메시지 조회 API로 대화를 볼 수 있다")
-    void endedSessionMessagesAreReadable() {
+    void returnsMessages_whenSessionIsEnded() {
         ChatSession completed = endedSession(MEMBER_ID, ChatSessionStatus.COMPLETED, LocalDateTime.of(2026, 10, 1, 9, 0));
         addMessage(completed, 1, ChatMessageRole.USER, "완료 질문");
         ChatSession expired = endedSession(MEMBER_ID, ChatSessionStatus.EXPIRED, LocalDateTime.of(2026, 10, 2, 9, 0));
@@ -195,7 +195,7 @@ class ChatSessionHistoryTest extends MySqlContainerSupport {
     }
 
     @Test
-    @DisplayName("상태 필터: ACTIVE는 진행 중만, ENDED는 종료·만료만")
+    @DisplayName("상태로 거르면 ACTIVE는 진행 중인 상담만, ENDED는 종료·만료된 상담만 나온다")
     void filtersByStatus() {
         ChatSession completed = endedSession(MEMBER_ID, ChatSessionStatus.COMPLETED, LocalDateTime.of(2026, 10, 1, 9, 0));
         addMessage(completed, 1, ChatMessageRole.USER, "종료");
@@ -257,7 +257,7 @@ class ChatSessionHistoryTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("필터를 건 목록도 다음 페이지가 있는지(isLast)를 알려 준다")
-    void tellsWhetherNextPageExistsWithFilter() {
+    void tellsWhetherNextPageExists_whenFiltered() {
         for (int day = 1; day <= 3; day++) {
             ChatSession session = endedSession(MEMBER_ID, ChatSessionStatus.COMPLETED, LocalDateTime.of(2026, 10, day, 9, 0));
             addMessage(session, 1, ChatMessageRole.USER, "질문 " + day);

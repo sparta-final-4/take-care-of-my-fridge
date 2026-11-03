@@ -34,7 +34,7 @@ class ChatSessionPushSubscriberTest {
 
     @Test
     @DisplayName("받은 신호를 그 회원 연결에 event: chat으로 넘기고, data는 회원 번호를 뺀 상담 번호·상태 JSON이다")
-    void onMessage_sendsChatEventWithoutMemberId() {
+    void sendsChatEventWithoutMemberId() {
         subscriber.onMessage(message("{\"memberId\":7,\"sessionId\":15,\"status\":\"COMPLETED\"}"), null);
 
         verify(sseConnectionRegistry).send(7L, "chat", "{\"sessionId\":15,\"status\":\"COMPLETED\"}");
@@ -42,7 +42,7 @@ class ChatSessionPushSubscriberTest {
 
     @Test
     @DisplayName("깨진 메시지는 로그만 남기고 연결 관리자를 부르지 않는다")
-    void onMessage_brokenMessage_ignored() {
+    void ignoresMessage_whenMessageIsBroken() {
         subscriber.onMessage(message("not-json"), null);
 
         verifyNoInteractions(sseConnectionRegistry);
@@ -50,7 +50,7 @@ class ChatSessionPushSubscriberTest {
 
     @Test
     @DisplayName("시작해도 그 자리에서 구독하지 않고 나중에 시도하도록 맡긴다")
-    void start_doesNotSubscribeImmediately() {
+    void defersSubscription_whenStarted() {
         subscriber.start();
 
         verify(taskScheduler).schedule(any(Runnable.class), any(Instant.class));
@@ -60,7 +60,7 @@ class ChatSessionPushSubscriberTest {
 
     @Test
     @DisplayName("컨테이너가 돌고 있으면 상담 채널에 등록하고 다시 시도하지 않는다")
-    void subscribe_registersChannel() {
+    void registersChannel_whenContainerIsRunning() {
         given(container.isRunning()).willReturn(true);
         subscriber.start();
 
@@ -72,7 +72,7 @@ class ChatSessionPushSubscriberTest {
 
     @Test
     @DisplayName("Redis에 연결할 수 없어도 예외를 던지지 않고 등록을 지운 뒤 다시 시도한다")
-    void subscribe_redisDown_retriesLater() {
+    void retriesLater_whenRedisIsDown() {
         given(container.isRunning()).willReturn(true);
         willThrow(new RedisConnectionFailureException("down")).given(container)
                 .addMessageListener(any(MessageListener.class), any(Topic.class));
@@ -86,7 +86,7 @@ class ChatSessionPushSubscriberTest {
 
     @Test
     @DisplayName("컨테이너가 아직 돌지 않으면 등록하지 않고 다시 시도한다")
-    void subscribe_containerNotRunning_retriesLater() {
+    void retriesLater_whenContainerIsNotRunning() {
         given(container.isRunning()).willReturn(false);
         subscriber.start();
 
@@ -98,7 +98,7 @@ class ChatSessionPushSubscriberTest {
 
     @Test
     @DisplayName("정지하면 구독을 풀고 이후에는 시도하지 않는다")
-    void stop_removesSubscription() {
+    void removesSubscription_whenStopped() {
         given(container.isRunning()).willReturn(true);
         subscriber.start();
 

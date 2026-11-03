@@ -54,7 +54,7 @@ class ChatSessionControllerTest {
 
     @Test
     @DisplayName("비로그인 사용자가 세션 시작 요청 시 401 Unauthorized를 반환한다")
-    void startSessionAnonymousReturns401() throws Exception {
+    void returnsUnauthorized_whenStartingWithoutLogin() throws Exception {
         mvc.perform(post("/api/chat-sessions")
                         .with(csrf()))
                 .andExpect(status().isUnauthorized())
@@ -63,7 +63,7 @@ class ChatSessionControllerTest {
 
     @Test
     @DisplayName("로그인 사용자가 세션 시작 요청 시 200 OK와 세션 응답을 반환한다")
-    void startSessionReturns200WithSession() throws Exception {
+    void returnsSession_whenStarting() throws Exception {
         Long memberId = 1L;
         ChatSessionResponse dummyResponse = new ChatSessionResponse(
                 10L,
@@ -84,7 +84,7 @@ class ChatSessionControllerTest {
 
     @Test
     @DisplayName("로그인 사용자가 세션 단건 조회 시 200 OK와 세션 정보를 반환한다")
-    void getSessionReturns200WithSession() throws Exception {
+    void returnsOwnSession() throws Exception {
         Long memberId = 1L;
         Long sessionId = 10L;
         ChatSessionResponse dummyResponse = new ChatSessionResponse(
@@ -105,7 +105,7 @@ class ChatSessionControllerTest {
 
     @Test
     @DisplayName("존재하지 않거나 타인의 세션 조회 시 404 Not Found (CHAT_001)를 반환한다")
-    void getSessionReturns404WhenNotFound() throws Exception {
+    void returnsNotFound_whenGettingOthersOrMissingSession() throws Exception {
         Long memberId = 1L;
         Long sessionId = 999L;
         when(chatSessionService.getSession(memberId, sessionId))
@@ -120,7 +120,7 @@ class ChatSessionControllerTest {
 
     @Test
     @DisplayName("로그인 사용자가 세션 종료 요청 시 200 OK와 종료된 세션 정보를 반환한다")
-    void completeSessionReturns200WithCompletedSession() throws Exception {
+    void returnsCompletedSession_whenCompleting() throws Exception {
         Long memberId = 1L;
         Long sessionId = 10L;
         ChatSessionResponse dummyResponse = new ChatSessionResponse(
@@ -142,7 +142,7 @@ class ChatSessionControllerTest {
 
     @Test
     @DisplayName("이미 종료된 세션을 종료 요청 시 409 Conflict (CHAT_005)를 반환한다")
-    void completeSessionReturns409WhenAlreadyCompleted() throws Exception {
+    void returnsConflict_whenSessionIsAlreadyCompleted() throws Exception {
         Long memberId = 1L;
         Long sessionId = 10L;
         when(chatSessionService.completeSession(memberId, sessionId))
@@ -158,7 +158,7 @@ class ChatSessionControllerTest {
 
     @Test
     @DisplayName("존재하지 않거나 타인의 세션을 종료 요청 시 404 Not Found (CHAT_001)를 반환한다")
-    void completeSessionReturns404WhenNotFound() throws Exception {
+    void returnsNotFound_whenCompletingOthersOrMissingSession() throws Exception {
         Long memberId = 1L;
         Long sessionId = 999L;
         when(chatSessionService.completeSession(memberId, sessionId))
@@ -174,7 +174,7 @@ class ChatSessionControllerTest {
 
     @Test
     @DisplayName("비로그인 사용자가 상담 목록을 조회하면 401을 반환한다")
-    void getMySessionsAnonymousReturns401() throws Exception {
+    void returnsUnauthorized_whenListingWithoutLogin() throws Exception {
         mvc.perform(get("/api/chat-sessions"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.error.code").value("A003"));
@@ -182,7 +182,7 @@ class ChatSessionControllerTest {
 
     @Test
     @DisplayName("상담 목록은 기본 page=1, size=10, status=ALL로 조회하고 탭 건수와 공통 페이지 형식으로 반환한다")
-    void getMySessionsReturnsPage() throws Exception {
+    void returnsSessionPageWithDefaults() throws Exception {
         Long memberId = 1L;
         when(chatSessionService.getMySessions(eq(memberId),
                 argThat(req -> req.page() == 1 && req.size() == 10 && req.status() == ChatSessionListStatus.ALL)))
@@ -208,7 +208,7 @@ class ChatSessionControllerTest {
 
     @Test
     @DisplayName("상담 목록 status 파라미터를 상태 필터로 받는다")
-    void getMySessionsBindsStatus() throws Exception {
+    void passesStatusFilter_whenStatusIsGiven() throws Exception {
         Long memberId = 1L;
         when(chatSessionService.getMySessions(eq(memberId), argThat(req -> req.status() == ChatSessionListStatus.ENDED)))
                 .thenReturn(listResponse());
@@ -222,7 +222,7 @@ class ChatSessionControllerTest {
 
     @Test
     @DisplayName("상담 목록 status가 ALL/ACTIVE/ENDED가 아니면 400을 반환한다")
-    void getMySessionsRejectsUnknownStatus() throws Exception {
+    void returnsBadRequest_whenStatusIsUnknown() throws Exception {
         mvc.perform(get("/api/chat-sessions")
                         .param("status", "COMPLETED")
                         .with(authentication(authenticationFor(1L))))
@@ -247,7 +247,7 @@ class ChatSessionControllerTest {
 
     @Test
     @DisplayName("상담 목록 page가 1보다 작으면 400을 반환한다")
-    void getMySessionsRejectsInvalidPage() throws Exception {
+    void returnsBadRequest_whenPageIsLessThanOne() throws Exception {
         mvc.perform(get("/api/chat-sessions")
                         .param("page", "0")
                         .with(authentication(authenticationFor(1L))))

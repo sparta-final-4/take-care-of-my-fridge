@@ -50,7 +50,7 @@ class ChatDailyLimitServiceTest extends RedisContainerSupport {
 
     @Test
     @DisplayName("30번째 요청까지 정상 처리되고 31번째 요청 시 429 CHAT_DAILY_LIMIT_EXCEEDED 예외가 발생한다")
-    void dailyLimitUpTo30SucceedsAnd31stThrowsLimitExceeded() {
+    void throwsLimitExceeded_whenRequestIs31st() {
         Long memberId = 1L;
 
         // 1부터 30까지는 정상적으로 수행됨
@@ -73,7 +73,7 @@ class ChatDailyLimitServiceTest extends RedisContainerSupport {
 
     @Test
     @DisplayName("키 최초 생성 시 TTL이 다음 날 0시(Asia/Seoul) + 1시간 기준으로 정상 설정된다")
-    void setsTtlUntilNextDayOneAmOnKeyCreation() {
+    void setsTtlToNextDayOneAm_whenKeyIsCreated() {
         Long memberId = 2L;
 
         chatDailyLimitService.checkAndIncrement(memberId);
@@ -90,7 +90,7 @@ class ChatDailyLimitServiceTest extends RedisContainerSupport {
 
     @Test
     @DisplayName("기존 키에 일시적 장애 등으로 TTL이 없는 경우(ttl < 0) 호출 시 즉시 TTL이 재설정된다")
-    void resetsTtlWhenKeyHasNoExpire() {
+    void resetsTtl_whenKeyHasNoExpire() {
         Long memberId = 3L;
         String today = ZonedDateTime.now(SEOUL_ZONE).format(DATE_FORMATTER);
         String key = "chat:limit:" + memberId + ":" + today;

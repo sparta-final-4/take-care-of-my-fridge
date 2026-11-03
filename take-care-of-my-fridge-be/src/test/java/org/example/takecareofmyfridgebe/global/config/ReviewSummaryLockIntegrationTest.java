@@ -38,7 +38,7 @@ class ReviewSummaryLockIntegrationTest extends RedisContainerSupport {
 
     @Test
     @DisplayName("Testcontainers Redis 환경에서 두 번 연달아 잠금을 시도하면 두 번째는 실패한다")
-    void consecutiveLockAttemptsFailSecondTime() {
+    void failsSecondLock_whenLockedTwiceInRow() {
         LockConfiguration lockConfig = new LockConfiguration(
                 Instant.now(),
                 "reviewSummary",
@@ -66,7 +66,7 @@ class ReviewSummaryLockIntegrationTest extends RedisContainerSupport {
 
     @Test
     @DisplayName("LockingTaskExecutor로 동일 잠금 실행 시 두 번째는 작업이 실행되지 않는다")
-    void lockingTaskExecutorExecutesOnlyOnceConcurrently() throws Throwable {
+    void runsTaskOnce_whenSameLockIsExecutedTwice() throws Throwable {
         LockConfiguration lockConfig = new LockConfiguration(
                 Instant.now(),
                 "reviewSummaryExecutorTest",
@@ -93,7 +93,7 @@ class ReviewSummaryLockIntegrationTest extends RedisContainerSupport {
 
     @Test
     @DisplayName("수동 실행처럼 lockAtLeastFor가 0이면 작업 완료 즉시 다시 잠금을 획득하여 실행할 수 있다")
-    void canAcquireLockImmediatelyWhenLockAtLeastForIsZero() throws Throwable {
+    void reacquiresLockImmediately_whenLockAtLeastForIsZero() throws Throwable {
         LockConfiguration manualLockConfig = new LockConfiguration(
                 Instant.now(),
                 "reviewSummaryManualZeroLockTest",

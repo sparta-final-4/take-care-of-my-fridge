@@ -39,7 +39,7 @@ class LlmCostCalculatorTest {
 
     @Test
     @DisplayName("응답이 null이거나 사용량이 없으면(EmptyUsage, 메타데이터 없이 만든 응답) 비어 있다")
-    void emptyWhenUsageIsMissing() {
+    void returnsEmpty_whenUsageIsMissing() {
         assertThat(calculator.calculate(null)).isEmpty();
         assertThat(calculator.calculate(responseWith(new EmptyUsage()))).isEmpty();
         assertThat(calculator.calculate(new ChatResponse(List.of(new Generation(new AssistantMessage("요약"))))))
