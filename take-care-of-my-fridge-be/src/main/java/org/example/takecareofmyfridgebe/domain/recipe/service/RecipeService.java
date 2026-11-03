@@ -3,12 +3,17 @@ package org.example.takecareofmyfridgebe.domain.recipe.service;
 import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.ingredient.repository.IngredientRepository;
 import org.example.takecareofmyfridgebe.domain.ingredient.service.IngredientService;
+import org.example.takecareofmyfridgebe.domain.member.entity.Member;
+import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeCandidateIngredient;
+import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeCandidateInfo;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeClassificationResponse;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeCreateRequest;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeDetailResponse;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeListItemResponse;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeListRequest;
+import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeIngredientCountDto;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeSummary;
+import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeTasteDto;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeUpdatedAtDto;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeUpdateRequest;
 import org.example.takecareofmyfridgebe.domain.recipe.entity.Recipe;
@@ -18,6 +23,7 @@ import org.example.takecareofmyfridgebe.domain.recipe.event.RecipeChangedEvent;
 import org.example.takecareofmyfridgebe.domain.recipe.repository.RecipeIngredientRepository;
 import org.example.takecareofmyfridgebe.domain.recipe.repository.RecipeRepository;
 import org.example.takecareofmyfridgebe.domain.recipe.repository.RecipeStepRepository;
+import org.example.takecareofmyfridgebe.domain.recipe.repository.RecipeTasteRepository;
 import org.example.takecareofmyfridgebe.global.config.CacheNames;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
@@ -33,6 +39,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -51,6 +58,7 @@ public class RecipeService {
     private final RecipeRepository recipeRepository;
     private final RecipeIngredientRepository recipeIngredientRepository;
     private final RecipeStepRepository recipeStepRepository;
+    private final RecipeTasteRepository recipeTasteRepository;
     private final IngredientRepository ingredientRepository;
     private final IngredientService ingredientService;
     private final ApplicationEventPublisher eventPublisher;
@@ -213,6 +221,57 @@ public class RecipeService {
                         Recipe::getId,
                         recipe -> new RecipeSummary(recipe.getId(), recipe.getName(), recipe.getImageUrl(), recipe.getTipSummary()),
                         (existing, replacing) -> existing
+                ));
+    }
+
+    /**
+     * 다른 도메인(chat 레시피 후보 검색)에서 쓰는 조회.
+     * 레시피별 맛 집합을 한 번의 쿼리로 조회한다. 맛이 없는 레시피는 Map에서 빠진다.
+     */
+    public Map<Long, Set<Member.Taste>> findTastesByRecipeIds(Collection<Long> recipeIds) {
+        if (recipeIds == null || recipeIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        return recipeTasteRepository.findTastesByRecipeIdIn(recipeIds).stream()
+                .collect(Collectors.groupingBy(
+                        RecipeTasteDto::recipeId,
+                        Collectors.mapping(RecipeTasteDto::taste,
+                                Collectors.toCollection(() -> EnumSet.noneOf(Member.Taste.class)))
+                ));
+    }
+
+    /**
+     * 다른 도메인(chat 레시피 후보 검색)에서 쓰는 조회.
+     * 주어진 재료가 들어간 레시피 재료 줄(레시피 id, 재료 id·이름, 기본 양념 여부)을 조회한다.
+     */
+    public List<RecipeCandidateIngredient> findCandidateIngredients(Collection<Long> ingredientIds) {
+        if (ingredientIds == null || ingredientIds.isEmpty()) {
+            return List.of();
+        }
+        return recipeRepository.findCandidateIngredients(ingredientIds);
+    }
+
+    /**
+     * 다른 도메인(chat 레시피 후보 검색)에서 쓰는 조회.
+     * 레시피 이름·분류·조리 시간과 기본 양념을 뺀 재료 종류 수를 조회한다. 없는 ID는 Map에서 빠진다.
+     */
+    public Map<Long, RecipeCandidateInfo> findCandidateInfos(Collection<Long> recipeIds) {
+        if (recipeIds == null || recipeIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        Map<Long, Long> nonBasicCounts = recipeRepository.countNonBasicIngredients(recipeIds).stream()
+                .collect(Collectors.toMap(RecipeIngredientCountDto::recipeId, RecipeIngredientCountDto::count));
+
+        return recipeRepository.findAllById(recipeIds).stream()
+                .collect(Collectors.toMap(
+                        Recipe::getId,
+                        recipe -> new RecipeCandidateInfo(
+                                recipe.getId(),
+                                recipe.getName(),
+                                recipe.getCategory(),
+                                recipe.getCookTimeMin(),
+                                nonBasicCounts.getOrDefault(recipe.getId(), 0L).intValue()
+                        )
                 ));
     }
 

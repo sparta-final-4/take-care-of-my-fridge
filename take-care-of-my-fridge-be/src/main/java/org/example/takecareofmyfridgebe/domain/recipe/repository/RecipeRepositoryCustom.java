@@ -1,5 +1,7 @@
 package org.example.takecareofmyfridgebe.domain.recipe.repository;
 
+import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeCandidateIngredient;
+import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeIngredientCountDto;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeIngredientNameDto;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeListRequest;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeStepTextDto;
@@ -7,6 +9,7 @@ import org.example.takecareofmyfridgebe.domain.recipe.entity.Recipe;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
+import java.util.Collection;
 import java.util.List;
 
 public interface RecipeRepositoryCustom {
@@ -24,4 +27,10 @@ public interface RecipeRepositoryCustom {
 
     // recipeId가 null이면 전체 레시피. 레시피 id, step_no 순
     List<RecipeStepTextDto> findStepTexts(Long recipeId);
+
+    // AI 상담 후보 검색용: 주어진 재료가 들어간 레시피 재료 줄 (레시피·재료 쌍마다 한 줄)
+    List<RecipeCandidateIngredient> findCandidateIngredients(Collection<Long> ingredientIds);
+
+    // AI 상담 후보 검색용: 레시피별 기본 양념을 뺀 재료 종류 수 (재료가 모두 기본 양념이면 빠진다)
+    List<RecipeIngredientCountDto> countNonBasicIngredients(Collection<Long> recipeIds);
 }
