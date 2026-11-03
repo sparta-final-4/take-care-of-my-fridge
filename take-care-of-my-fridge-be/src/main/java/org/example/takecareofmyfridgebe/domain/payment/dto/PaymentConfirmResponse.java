@@ -2,6 +2,7 @@ package org.example.takecareofmyfridgebe.domain.payment.dto;
 
 import org.example.takecareofmyfridgebe.domain.payment.entity.Payment;
 import org.example.takecareofmyfridgebe.domain.payment.entity.PaymentStatus;
+import org.example.takecareofmyfridgebe.domain.payment.entity.PgProvider;
 
 import java.time.LocalDateTime;
 
@@ -11,7 +12,8 @@ public record PaymentConfirmResponse(
         String portonePaymentId,
         Long amount,
         PaymentStatus status,
-        LocalDateTime paidAt
+        LocalDateTime paidAt,
+        PgProvider pgProvider
 ) {
     public static PaymentConfirmResponse from(Payment payment) {
         return new PaymentConfirmResponse(
@@ -20,7 +22,8 @@ public record PaymentConfirmResponse(
                 payment.getPortonePaymentId(),
                 payment.getAmount(),
                 payment.getStatus(),
-                payment.getPaidAt()
+                payment.getPaidAt(),
+                payment.getPgProvider()
         );
     }
 }

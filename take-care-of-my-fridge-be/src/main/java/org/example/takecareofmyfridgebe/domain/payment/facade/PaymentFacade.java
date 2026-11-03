@@ -6,11 +6,13 @@ import org.example.takecareofmyfridgebe.domain.payment.dto.PaymentApproveResult;
 import org.example.takecareofmyfridgebe.domain.payment.dto.PaymentApproveResult.Rejection;
 import org.example.takecareofmyfridgebe.domain.payment.dto.PaymentConfirmRequest;
 import org.example.takecareofmyfridgebe.domain.payment.dto.PaymentConfirmResponse;
+import org.example.takecareofmyfridgebe.domain.payment.dto.PaymentPrepareRequest;
 import org.example.takecareofmyfridgebe.domain.payment.dto.PaymentPrepareResponse;
 import org.example.takecareofmyfridgebe.domain.payment.entity.FailReason;
 import org.example.takecareofmyfridgebe.domain.payment.entity.Payment;
 import org.example.takecareofmyfridgebe.domain.payment.entity.PaymentChangedBy;
 import org.example.takecareofmyfridgebe.domain.payment.entity.PaymentStatus;
+import org.example.takecareofmyfridgebe.domain.payment.port.PaymentCheckout;
 import org.example.takecareofmyfridgebe.domain.payment.port.PaymentGateway;
 import org.example.takecareofmyfridgebe.domain.payment.port.PaymentGatewayResponse;
 import org.example.takecareofmyfridgebe.domain.payment.service.PaymentCommandService;
@@ -38,12 +40,12 @@ public class PaymentFacade {
     private final PaymentGateway paymentGateway;
     private final PaymentHistoryRecorder paymentHistoryRecorder;
 
-    // 결제하기를 누를 때 프론트가 호출한다. 응답의 portonePaymentId로 결제창을 띄운다.
+    // 결제하기를 누를 때 프론트가 호출한다. 응답의 portonePaymentId와 고른 결제대행사의 채널 값으로 결제창을 띄운다.
     // 창 닫기 요청이 오지 않아 결제 대기로 남은 이전 결제가 있으면 정리한 뒤 새 결제를 만든다.
     // 규칙: 이전 결제가 PG에서 이미 끝났으면 그 결제를 승인하고 새 결제는 만들지 않는다.
     //  아직 진행 중이면 가장 최근에 연 결제창만 인정한다. 이전 창(다른 탭·기기)에서 나중에 결제되면 FAILED 결제라 환불된다.
     //  서버는 "다른 탭에서 결제 중"과 "브라우저 종료로 버려진 창"을 구분할 수 없어, 버려진 창 때문에 재결제가 막히지 않도록 이렇게 정했다
-    public PaymentPrepareResponse preparePayment(Long memberId, Long orderId) {
+    public PaymentPrepareResponse preparePayment(Long memberId, Long orderId, PaymentPrepareRequest request) {
         paymentService.validatePayableOrder(memberId, orderId);
 
         // 이전 결제가 PG에서 끝났으면 웹훅과 같은 규칙으로 처리한다. 승인됐으면 주문이 PAID라 아래 생성이 거절된다.
@@ -54,8 +56,10 @@ public class PaymentFacade {
             }
         }
 
-        Payment payment = paymentCommandService.create(orderId);
-        return PaymentPrepareResponse.of(payment, paymentService.getOrderName(orderId));
+        // 결제창 값을 만들지 못하면 결제창을 열 수 없는 결제가 남지 않도록 결제를 만들기 전에 구한다
+        PaymentCheckout checkout = paymentGateway.getCheckout(request.pgProvider());
+        Payment payment = paymentCommandService.create(orderId, request.pgProvider());
+        return PaymentPrepareResponse.of(payment, paymentService.getOrderName(orderId), checkout);
     }
 
     // 결제창에서 결제를 마친 뒤 프론트가 호출한다
@@ -88,7 +92,8 @@ public class PaymentFacade {
 
         PaidDecision decision = decidePaid(payment, pgPayment);
         if (decision == PaidDecision.APPROVE) {
-            PaymentApproveResult result = paymentCommandService.approve(payment, PaymentChangedBy.USER);
+            PaymentApproveResult result = paymentCommandService.approve(payment, pgPayment.pgProvider(),
+                    PaymentChangedBy.USER);
             if (result.isApproved()) {
                 return result.response();
             }
@@ -136,7 +141,8 @@ public class PaymentFacade {
                 case READY -> {
                     PaidDecision decision = decidePaid(payment, pgPayment);
                     if (decision == PaidDecision.APPROVE) {
-                        PaymentApproveResult result = paymentCommandService.approve(payment, changedBy);
+                        PaymentApproveResult result = paymentCommandService.approve(payment, pgPayment.pgProvider(),
+                                changedBy);
                         // 읽은 뒤 다른 요청이 실패 처리했거나, 같은 주문의 다른 결제가 먼저 승인됐거나, 주문이 취소된 경우다.
                         // 취소가 실패하면 예외를 던져 웹훅 재전송으로 다시 시도한다
                         if (!result.isApproved()) {

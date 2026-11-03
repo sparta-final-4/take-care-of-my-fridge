@@ -5,6 +5,7 @@ import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 import org.example.takecareofmyfridgebe.domain.order.entity.Order;
 import org.example.takecareofmyfridgebe.domain.payment.entity.FailReason;
 import org.example.takecareofmyfridgebe.domain.payment.entity.Payment;
+import org.example.takecareofmyfridgebe.domain.payment.entity.PgProvider;
 import org.example.takecareofmyfridgebe.domain.payment.entity.PaymentChangedBy;
 import org.example.takecareofmyfridgebe.domain.payment.entity.PaymentEventType;
 import org.example.takecareofmyfridgebe.domain.payment.entity.PaymentHistory;
@@ -159,13 +160,13 @@ class SalesHistoryRepositoryTest extends MySqlContainerSupport {
 
     private Payment paidPayment(long amount, LocalDateTime paidAt) {
         Payment payment = payment(amount);
-        payment.complete(paidAt);
+        payment.complete(paidAt, PgProvider.KAKAOPAY);
         return payment;
     }
 
     private Payment payment(long amount) {
         Payment payment = Payment.builder().order(order).portonePaymentId("payment-" + ++sequence).amount(amount)
-                .expiresAt(FROM.plusDays(1)).build();
+                .pgProvider(PgProvider.KAKAOPAY).expiresAt(FROM.plusDays(1)).build();
         entityManager.persist(payment);
         return payment;
     }

@@ -5,6 +5,7 @@ import org.example.takecareofmyfridgebe.domain.order.entity.Order;
 import org.example.takecareofmyfridgebe.domain.order.entity.OrderItem;
 import org.example.takecareofmyfridgebe.domain.order.entity.SaleType;
 import org.example.takecareofmyfridgebe.domain.payment.entity.Payment;
+import org.example.takecareofmyfridgebe.domain.payment.entity.PgProvider;
 import org.example.takecareofmyfridgebe.domain.refund.dto.RefundedQuantity;
 import org.example.takecareofmyfridgebe.domain.refund.entity.Refund;
 import org.example.takecareofmyfridgebe.domain.refund.entity.RefundItem;
@@ -55,7 +56,7 @@ class RefundItemRepositoryTest extends MySqlContainerSupport {
         itemA = orderItem(order, 10L, 5);
         itemB = orderItem(order, 20L, 3);
         payment = Payment.builder().order(order).portonePaymentId("payment-1").amount(50000L)
-                .expiresAt(LocalDateTime.now().plusMinutes(10)).build();
+                .pgProvider(PgProvider.KAKAOPAY).expiresAt(LocalDateTime.now().plusMinutes(10)).build();
         entityManager.persist(payment);
     }
 

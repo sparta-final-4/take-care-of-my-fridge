@@ -1,6 +1,7 @@
 package org.example.takecareofmyfridgebe.domain.refund.facade;
 
 import org.example.takecareofmyfridgebe.domain.payment.entity.PaymentChangedBy;
+import org.example.takecareofmyfridgebe.domain.payment.entity.PgProvider;
 import org.example.takecareofmyfridgebe.domain.payment.port.PaymentGateway;
 import org.example.takecareofmyfridgebe.domain.payment.port.PaymentGatewayResponse;
 import org.example.takecareofmyfridgebe.domain.refund.dto.RefundCreateRequest;
@@ -76,7 +77,7 @@ class RefundFacadeTest {
     private void givenPg(long cancelledAmount, PaymentGatewayResponse.Cancellation... cancellations) {
         given(paymentGateway.getPayment(PORTONE_PAYMENT_ID)).willReturn(Optional.of(new PaymentGatewayResponse(
                 PORTONE_PAYMENT_ID, "PARTIAL_CANCELLED", 10000L, cancelledAmount, NOW.minusDays(1),
-                List.of(cancellations))));
+                List.of(cancellations), PgProvider.KAKAOPAY)));
     }
 
     private void givenState(boolean paid, List<RefundSyncState.RequestedRefund> requestedRefunds) {

@@ -4,11 +4,14 @@ import org.example.takecareofmyfridgebe.domain.order.entity.Order;
 import org.example.takecareofmyfridgebe.domain.payment.dto.PaymentApproveResult;
 import org.example.takecareofmyfridgebe.domain.payment.dto.PaymentConfirmRequest;
 import org.example.takecareofmyfridgebe.domain.payment.dto.PaymentConfirmResponse;
+import org.example.takecareofmyfridgebe.domain.payment.dto.PaymentPrepareRequest;
 import org.example.takecareofmyfridgebe.domain.payment.dto.PaymentPrepareResponse;
 import org.example.takecareofmyfridgebe.domain.payment.entity.FailReason;
 import org.example.takecareofmyfridgebe.domain.payment.entity.Payment;
+import org.example.takecareofmyfridgebe.domain.payment.entity.PgProvider;
 import org.example.takecareofmyfridgebe.domain.payment.entity.PaymentChangedBy;
 import org.example.takecareofmyfridgebe.domain.payment.entity.PaymentStatus;
+import org.example.takecareofmyfridgebe.domain.payment.port.PaymentCheckout;
 import org.example.takecareofmyfridgebe.domain.payment.port.PaymentGateway;
 import org.example.takecareofmyfridgebe.domain.payment.port.PaymentGatewayResponse;
 import org.example.takecareofmyfridgebe.domain.payment.service.PaymentCommandService;
@@ -98,6 +101,8 @@ class PaymentFacadeTest {
                 .willReturn(Optional.of(new PaymentGatewayResponse(PORTONE_PAYMENT_ID, "PAID", AMOUNT, 0L, paidAt)));
     }
 
+    private static final PaymentPrepareRequest PREPARE_REQUEST = new PaymentPrepareRequest(PgProvider.KAKAOPAY);
+
     private PaymentConfirmResponse confirm(Long memberId) {
         return paymentFacade.confirmPayment(memberId, new PaymentConfirmRequest(ORDER_ID, PORTONE_PAYMENT_ID));
     }
@@ -110,13 +115,28 @@ class PaymentFacadeTest {
         newPayment();
         givenPgPayment("PAID", AMOUNT);
         PaymentConfirmResponse approved = mock(PaymentConfirmResponse.class);
-        given(paymentCommandService.approve(thePayment(), any())).willReturn(PaymentApproveResult.approved(approved));
+        given(paymentCommandService.approve(thePayment(), any(), any()))
+                .willReturn(PaymentApproveResult.approved(approved));
 
         PaymentConfirmResponse response = confirm(MEMBER_ID);
 
         assertThat(response).isSameAs(approved);
         verify(paymentCommandService, never()).fail(any(), any(), any());
         verify(paymentGateway, never()).cancelPayment(anyString(), anyString(), isNull());
+    }
+
+    @Test
+    @DisplayName("승인할 때 PG 조회로 확인한 실제 결제대행사를 넘긴다")
+    void confirm_passesActualPgProvider() {
+        newPayment();
+        given(paymentGateway.getPayment(PORTONE_PAYMENT_ID)).willReturn(Optional.of(new PaymentGatewayResponse(
+                PORTONE_PAYMENT_ID, "PAID", AMOUNT, 0L, EXPIRES_AT.minusMinutes(1), List.of(), PgProvider.TOSSPAYMENTS)));
+        given(paymentCommandService.approve(thePayment(), eq(PgProvider.TOSSPAYMENTS), any()))
+                .willReturn(PaymentApproveResult.approved(mock(PaymentConfirmResponse.class)));
+
+        confirm(MEMBER_ID);
+
+        verify(paymentCommandService).approve(thePayment(), eq(PgProvider.TOSSPAYMENTS), eq(PaymentChangedBy.USER));
     }
 
     @Test
@@ -146,7 +166,7 @@ class PaymentFacadeTest {
     @DisplayName("이미 PAID면 PG 조회 없이 같은 결과를 돌려준다")
     void confirm_alreadyPaid_returnsSameResult() {
         Payment payment = newPayment();
-        payment.complete(LocalDateTime.of(2026, 10, 19, 10, 0));
+        payment.complete(LocalDateTime.of(2026, 10, 19, 10, 0), PgProvider.KAKAOPAY);
 
         PaymentConfirmResponse response = confirm(MEMBER_ID);
 
@@ -196,7 +216,7 @@ class PaymentFacadeTest {
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode").isEqualTo(ErrorCode.PAYMENT_NOT_PAID);
         verify(paymentCommandService).fail(thePayment(), eq(FailReason.PG_FAILED), any());
-        verify(paymentCommandService, never()).approve(any(), any());
+        verify(paymentCommandService, never()).approve(any(), any(), any());
     }
 
     @Test
@@ -224,7 +244,7 @@ class PaymentFacadeTest {
         InOrder inOrder = inOrder(paymentCommandService, paymentGateway);
         inOrder.verify(paymentCommandService).fail(thePayment(), eq(FailReason.AMOUNT_MISMATCH), any());
         inOrder.verify(paymentGateway).cancelPayment(anyString(), anyString(), isNull());
-        verify(paymentCommandService, never()).approve(any(), any());
+        verify(paymentCommandService, never()).approve(any(), any(), any());
     }
 
     @Test
@@ -297,7 +317,7 @@ class PaymentFacadeTest {
     @DisplayName("READY가 아닌 결제는 실패 처리하지 않는다")
     void failByUser_notReady_throws() {
         Payment payment = newPayment();
-        payment.complete(LocalDateTime.of(2026, 10, 19, 10, 0));
+        payment.complete(LocalDateTime.of(2026, 10, 19, 10, 0), PgProvider.KAKAOPAY);
 
         assertThatThrownBy(() -> paymentFacade.failByUser(MEMBER_ID, PORTONE_PAYMENT_ID))
                 .isInstanceOf(BusinessException.class)
@@ -337,10 +357,11 @@ class PaymentFacadeTest {
     @DisplayName("PG PAID + 우리 READY + 금액 일치면 승인한다")
     void sync_pgPaid_ready_approves() {
         givenPgPayment("PAID", AMOUNT);
-        given(paymentCommandService.approve(thePayment(), any())).willReturn(PaymentApproveResult.approved(mock(PaymentConfirmResponse.class)));
+        given(paymentCommandService.approve(thePayment(), any(), any()))
+                .willReturn(PaymentApproveResult.approved(mock(PaymentConfirmResponse.class)));
 
         assertThat(paymentFacade.syncWithPg(syncPayment(), PaymentChangedBy.WEBHOOK)).isTrue();
-        verify(paymentCommandService).approve(thePayment(), any());
+        verify(paymentCommandService).approve(thePayment(), any(), any());
         verify(paymentGateway, never()).cancelPayment(anyString(), anyString(), any());
     }
 
@@ -354,7 +375,7 @@ class PaymentFacadeTest {
         InOrder inOrder = inOrder(paymentCommandService, paymentGateway);
         inOrder.verify(paymentCommandService).fail(thePayment(), eq(FailReason.AMOUNT_MISMATCH), any());
         inOrder.verify(paymentGateway).cancelPayment(anyString(), anyString(), isNull());
-        verify(paymentCommandService, never()).approve(any(), any());
+        verify(paymentCommandService, never()).approve(any(), any(), any());
     }
 
     @Test
@@ -404,7 +425,7 @@ class PaymentFacadeTest {
     @DisplayName("PG PAID + 우리 PAID면 아무것도 바꾸지 않는다")
     void sync_pgPaid_paid_noChange() {
         Payment payment = syncPayment();
-        payment.complete(LocalDateTime.of(2026, 10, 19, 10, 0));
+        payment.complete(LocalDateTime.of(2026, 10, 19, 10, 0), PgProvider.KAKAOPAY);
         givenPgPayment("PAID", AMOUNT);
 
         assertThat(paymentFacade.syncWithPg(payment, PaymentChangedBy.WEBHOOK)).isFalse();
@@ -426,7 +447,7 @@ class PaymentFacadeTest {
     @DisplayName("PG CANCELLED + 우리 PAID면 환불 도메인 몫이므로 바꾸지 않는다")
     void sync_pgCancelled_paid_noChange() {
         Payment payment = syncPayment();
-        payment.complete(LocalDateTime.of(2026, 10, 19, 10, 0));
+        payment.complete(LocalDateTime.of(2026, 10, 19, 10, 0), PgProvider.KAKAOPAY);
         givenPgPayment("CANCELLED", AMOUNT);
 
         assertThat(paymentFacade.syncWithPg(payment, PaymentChangedBy.WEBHOOK)).isFalse();
@@ -448,7 +469,7 @@ class PaymentFacadeTest {
         InOrder inOrder = inOrder(paymentCommandService, paymentGateway);
         inOrder.verify(paymentCommandService).fail(thePayment(), eq(FailReason.TIMEOUT), any());
         inOrder.verify(paymentGateway).cancelPayment(eq(PORTONE_PAYMENT_ID), anyString(), isNull());
-        verify(paymentCommandService, never()).approve(any(), any());
+        verify(paymentCommandService, never()).approve(any(), any(), any());
     }
 
     @Test
@@ -456,11 +477,12 @@ class PaymentFacadeTest {
     void confirm_paidAtExpiry_approves() {
         newPayment();
         givenPgPaidAt(EXPIRES_AT);
-        given(paymentCommandService.approve(thePayment(), any())).willReturn(PaymentApproveResult.approved(mock(PaymentConfirmResponse.class)));
+        given(paymentCommandService.approve(thePayment(), any(), any()))
+                .willReturn(PaymentApproveResult.approved(mock(PaymentConfirmResponse.class)));
 
         confirm(MEMBER_ID);
 
-        verify(paymentCommandService).approve(thePayment(), any());
+        verify(paymentCommandService).approve(thePayment(), any(), any());
         verify(paymentCommandService, never()).fail(any(), any(), any());
     }
 
@@ -499,7 +521,7 @@ class PaymentFacadeTest {
         InOrder inOrder = inOrder(paymentCommandService, paymentGateway);
         inOrder.verify(paymentCommandService).fail(thePayment(), eq(FailReason.TIMEOUT), any());
         inOrder.verify(paymentGateway).cancelPayment(eq(PORTONE_PAYMENT_ID), anyString(), isNull());
-        verify(paymentCommandService, never()).approve(any(), any());
+        verify(paymentCommandService, never()).approve(any(), any(), any());
     }
 
     @Test
@@ -550,11 +572,12 @@ class PaymentFacadeTest {
     @DisplayName("만료: 만료 시각 전에 PG 결제가 끝났으면 승인한다")
     void expire_paidBeforeExpiry_approves() {
         givenPgPaidAt(EXPIRES_AT.minusSeconds(1));
-        given(paymentCommandService.approve(thePayment(), any())).willReturn(PaymentApproveResult.approved(mock(PaymentConfirmResponse.class)));
+        given(paymentCommandService.approve(thePayment(), any(), any()))
+                .willReturn(PaymentApproveResult.approved(mock(PaymentConfirmResponse.class)));
 
         paymentFacade.expire(syncPayment());
 
-        verify(paymentCommandService).approve(thePayment(), any());
+        verify(paymentCommandService).approve(thePayment(), any(), any());
         verify(paymentCommandService, never()).fail(any(), any(), any());
     }
 
@@ -567,7 +590,7 @@ class PaymentFacadeTest {
 
         verify(paymentCommandService).fail(thePayment(), eq(FailReason.TIMEOUT), any());
         verify(paymentGateway).cancelPayment(eq(PORTONE_PAYMENT_ID), anyString(), isNull());
-        verify(paymentCommandService, never()).approve(any(), any());
+        verify(paymentCommandService, never()).approve(any(), any(), any());
     }
 
     // 승인 거절 (1:N - 같은 주문의 다른 결제가 먼저 승인됐거나 주문이 취소된 경우)
@@ -577,7 +600,7 @@ class PaymentFacadeTest {
     void confirm_orderNotPayable_cancelsPg() {
         newPayment();
         givenPgPayment("PAID", AMOUNT);
-        given(paymentCommandService.approve(thePayment(), any()))
+        given(paymentCommandService.approve(thePayment(), any(), any()))
                 .willReturn(PaymentApproveResult.rejected(PaymentApproveResult.Rejection.ORDER_NOT_PAYABLE));
 
         assertThatThrownBy(() -> confirm(MEMBER_ID))
@@ -591,7 +614,7 @@ class PaymentFacadeTest {
     void confirm_failedMeanwhile_compensates() {
         newPayment();
         givenPgPayment("PAID", AMOUNT);
-        given(paymentCommandService.approve(thePayment(), any()))
+        given(paymentCommandService.approve(thePayment(), any(), any()))
                 .willReturn(PaymentApproveResult.rejected(PaymentApproveResult.Rejection.PAYMENT_ALREADY_FAILED));
 
         assertThatThrownBy(() -> confirm(MEMBER_ID))
@@ -605,7 +628,7 @@ class PaymentFacadeTest {
     void confirm_rejected_pgCancelFails_stillRejected() {
         newPayment();
         givenPgPayment("PAID", AMOUNT);
-        given(paymentCommandService.approve(thePayment(), any()))
+        given(paymentCommandService.approve(thePayment(), any(), any()))
                 .willReturn(PaymentApproveResult.rejected(PaymentApproveResult.Rejection.ORDER_NOT_PAYABLE));
         willThrow(new IllegalStateException("PG 오류")).given(paymentGateway).cancelPayment(anyString(), anyString(), isNull());
 
@@ -618,7 +641,7 @@ class PaymentFacadeTest {
     @DisplayName("웹훅: 승인이 거절되면 PG를 취소한다")
     void sync_rejected_cancelsPg() {
         givenPgPayment("PAID", AMOUNT);
-        given(paymentCommandService.approve(thePayment(), any()))
+        given(paymentCommandService.approve(thePayment(), any(), any()))
                 .willReturn(PaymentApproveResult.rejected(PaymentApproveResult.Rejection.ORDER_NOT_PAYABLE));
 
         assertThat(paymentFacade.syncWithPg(syncPayment(), PaymentChangedBy.WEBHOOK)).isTrue();
@@ -629,7 +652,7 @@ class PaymentFacadeTest {
     @DisplayName("웹훅: 승인 거절 후 PG 취소가 실패하면 예외를 던져 재전송으로 다시 시도한다")
     void sync_rejected_pgCancelFails_throws() {
         givenPgPayment("PAID", AMOUNT);
-        given(paymentCommandService.approve(thePayment(), any()))
+        given(paymentCommandService.approve(thePayment(), any(), any()))
                 .willReturn(PaymentApproveResult.rejected(PaymentApproveResult.Rejection.ORDER_NOT_PAYABLE));
         willThrow(new IllegalStateException("PG 오류")).given(paymentGateway).cancelPayment(anyString(), anyString(), isNull());
 
@@ -642,7 +665,7 @@ class PaymentFacadeTest {
         Order order = Order.builder().orderNumber("20261019-000001").memberId(MEMBER_ID).totalAmount(AMOUNT).build();
         ReflectionTestUtils.setField(order, "id", ORDER_ID);
         return Payment.builder().order(order).portonePaymentId("payment-new").amount(AMOUNT)
-                .expiresAt(EXPIRES_AT).build();
+                .pgProvider(PgProvider.KAKAOPAY).expiresAt(EXPIRES_AT).build();
     }
 
     @Test
@@ -650,17 +673,23 @@ class PaymentFacadeTest {
     void prepare_noPrevious_createsPayment() {
         Payment created = newPaymentForOrder();
         given(paymentService.findReady(ORDER_ID)).willReturn(List.of());
-        given(paymentCommandService.create(ORDER_ID)).willReturn(created);
+        given(paymentCommandService.create(ORDER_ID, PgProvider.KAKAOPAY)).willReturn(created);
         given(paymentService.getOrderName(ORDER_ID)).willReturn("대파 외 1건");
+        given(paymentGateway.getCheckout(PgProvider.KAKAOPAY))
+                .willReturn(new PaymentCheckout("channel-kakaopay", "EASY_PAY", "KAKAOPAY"));
 
-        PaymentPrepareResponse response = paymentFacade.preparePayment(MEMBER_ID, ORDER_ID);
+        PaymentPrepareResponse response = paymentFacade.preparePayment(MEMBER_ID, ORDER_ID, PREPARE_REQUEST);
 
         assertThat(response.orderId()).isEqualTo(ORDER_ID);
         assertThat(response.portonePaymentId()).isEqualTo("payment-new");
         assertThat(response.orderName()).isEqualTo("대파 외 1건");
         assertThat(response.amount()).isEqualTo(AMOUNT);
         assertThat(response.expiresAt()).isEqualTo(EXPIRES_AT);
-        verifyNoInteractions(paymentGateway);
+        assertThat(response.pgProvider()).isEqualTo(PgProvider.KAKAOPAY);
+        assertThat(response.channelKey()).isEqualTo("channel-kakaopay");
+        assertThat(response.payMethod()).isEqualTo("EASY_PAY");
+        assertThat(response.easyPayProvider()).isEqualTo("KAKAOPAY");
+        verify(paymentGateway, never()).getPayment(anyString());
     }
 
     @Test
@@ -669,7 +698,7 @@ class PaymentFacadeTest {
         willThrow(new BusinessException(ErrorCode.ORDER_ACCESS_DENIED))
                 .given(paymentService).validatePayableOrder(OTHER_MEMBER_ID, ORDER_ID);
 
-        assertThatThrownBy(() -> paymentFacade.preparePayment(OTHER_MEMBER_ID, ORDER_ID))
+        assertThatThrownBy(() -> paymentFacade.preparePayment(OTHER_MEMBER_ID, ORDER_ID, PREPARE_REQUEST))
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode").isEqualTo(ErrorCode.ORDER_ACCESS_DENIED);
         verifyNoInteractions(paymentGateway, paymentCommandService);
@@ -680,13 +709,15 @@ class PaymentFacadeTest {
     void prepare_previousReady_supersededBeforeCreate() {
         given(paymentService.findReady(ORDER_ID)).willReturn(List.of(syncPayment()));
         given(paymentGateway.getPayment(PORTONE_PAYMENT_ID)).willReturn(Optional.empty());
-        given(paymentCommandService.create(ORDER_ID)).willReturn(newPaymentForOrder());
+        given(paymentCommandService.create(ORDER_ID, PgProvider.KAKAOPAY)).willReturn(newPaymentForOrder());
+        given(paymentGateway.getCheckout(PgProvider.KAKAOPAY))
+                .willReturn(new PaymentCheckout("channel-kakaopay", "EASY_PAY", "KAKAOPAY"));
 
-        paymentFacade.preparePayment(MEMBER_ID, ORDER_ID);
+        paymentFacade.preparePayment(MEMBER_ID, ORDER_ID, PREPARE_REQUEST);
 
         InOrder inOrder = inOrder(paymentCommandService);
         inOrder.verify(paymentCommandService).fail(thePayment(), eq(FailReason.SUPERSEDED), any());
-        inOrder.verify(paymentCommandService).create(ORDER_ID);
+        inOrder.verify(paymentCommandService).create(ORDER_ID, PgProvider.KAKAOPAY);
     }
 
     @Test
@@ -694,15 +725,15 @@ class PaymentFacadeTest {
     void prepare_previousPaidAtPg_approvesInsteadOfSuperseding() {
         given(paymentService.findReady(ORDER_ID)).willReturn(List.of(syncPayment()));
         givenPgPayment("PAID", AMOUNT);
-        given(paymentCommandService.approve(thePayment(), any()))
+        given(paymentCommandService.approve(thePayment(), any(), any()))
                 .willReturn(PaymentApproveResult.approved(mock(PaymentConfirmResponse.class)));
-        given(paymentCommandService.create(ORDER_ID))
+        given(paymentCommandService.create(ORDER_ID, PgProvider.KAKAOPAY))
                 .willThrow(new BusinessException(ErrorCode.PAYMENT_ORDER_NOT_PAYABLE));
 
-        assertThatThrownBy(() -> paymentFacade.preparePayment(MEMBER_ID, ORDER_ID))
+        assertThatThrownBy(() -> paymentFacade.preparePayment(MEMBER_ID, ORDER_ID, PREPARE_REQUEST))
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode").isEqualTo(ErrorCode.PAYMENT_ORDER_NOT_PAYABLE);
-        verify(paymentCommandService).approve(thePayment(), any());
+        verify(paymentCommandService).approve(thePayment(), any(), any());
         verify(paymentCommandService, never()).fail(any(), any(), any());
     }
 
@@ -712,9 +743,9 @@ class PaymentFacadeTest {
         given(paymentService.findReady(ORDER_ID)).willReturn(List.of(syncPayment()));
         given(paymentGateway.getPayment(PORTONE_PAYMENT_ID)).willThrow(new IllegalStateException("PG 오류"));
 
-        assertThatThrownBy(() -> paymentFacade.preparePayment(MEMBER_ID, ORDER_ID))
+        assertThatThrownBy(() -> paymentFacade.preparePayment(MEMBER_ID, ORDER_ID, PREPARE_REQUEST))
                 .isInstanceOf(IllegalStateException.class);
-        verify(paymentCommandService, never()).create(any());
+        verify(paymentCommandService, never()).create(any(), any());
         verify(paymentCommandService, never()).fail(any(), any(), any());
     }
 
