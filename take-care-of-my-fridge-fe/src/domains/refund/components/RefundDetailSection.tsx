@@ -8,6 +8,7 @@ import { getErrorCode } from '@/common/api/errors';
 import { FallbackImage } from '@/common/components/FallbackImage';
 import { formatPrice } from '@/domains/cart/format';
 import { OrderItemHeader, OrderItemRow } from '@/domains/order/components/OrderItemRow';
+import { ORDER_STATUS_COLORS, ORDER_STATUS_LABELS } from '@/domains/order/format';
 import { orderQueries } from '@/domains/order/queries';
 import {
   getOverallRefundStatus,
@@ -81,13 +82,20 @@ export function RefundDetailSection({ orderId }: RefundDetailSectionProps) {
             <Typography.Title level={3} className={styles.title}>
               환불 상세
             </Typography.Title>
-            {overallStatus && (
-              <Tag
-                color={overallStatus === 'REQUESTED' ? 'processing' : undefined}
-                className={styles.tag}
-              >
-                {REFUND_STATUS_LABELS[overallStatus]}
+            {/* 전액 환불된 주문은 주문 내역과 같은 상태 태그를 보여 준다 */}
+            {order.status === 'REFUNDED' ? (
+              <Tag color={ORDER_STATUS_COLORS.REFUNDED} className={styles.tag}>
+                {ORDER_STATUS_LABELS.REFUNDED}
               </Tag>
+            ) : (
+              overallStatus && (
+                <Tag
+                  color={overallStatus === 'REQUESTED' ? 'processing' : undefined}
+                  className={styles.tag}
+                >
+                  {REFUND_STATUS_LABELS[overallStatus]}
+                </Tag>
+              )
             )}
           </Flex>
           <Typography.Text type="secondary" className={styles.meta}>
