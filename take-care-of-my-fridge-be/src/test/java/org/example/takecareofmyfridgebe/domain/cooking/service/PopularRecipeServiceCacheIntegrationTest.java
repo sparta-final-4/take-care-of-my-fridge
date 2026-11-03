@@ -26,9 +26,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import java.util.List;
 import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.times;
@@ -74,7 +72,7 @@ class PopularRecipeServiceCacheIntegrationTest extends RedisContainerSupport {
 
     @Test
     @DisplayName("같은 size로 두 번 호출하면 집계 조회가 1회만 실행되고 Redis 캐시에서 역직렬화되어 반환된다")
-    void getPopularRecipesCachesResultOnSecondCall() {
+    void returnsCachedResult_whenCalledTwiceWithSameSize() {
         // Given
         int size = 6;
         PopularRecipeCookingCount count = new PopularRecipeCookingCount(10L, 7L);
@@ -100,26 +98,26 @@ class PopularRecipeServiceCacheIntegrationTest extends RedisContainerSupport {
         System.out.println("DEBUG_CACHE_CHECK: cachedValue = " + cachedValue);
 
         // Then
-        assertEquals(1, firstCall.size());
-        assertEquals("된장찌개", firstCall.get(0).recipeName());
-        assertEquals(4.8, firstCall.get(0).averageRating());
-        assertEquals(15L, firstCall.get(0).reviewCount());
+        assertThat(firstCall.size()).isEqualTo(1);
+        assertThat(firstCall.get(0).recipeName()).isEqualTo("된장찌개");
+        assertThat(firstCall.get(0).averageRating()).isEqualTo(4.8);
+        assertThat(firstCall.get(0).reviewCount()).isEqualTo(15L);
         verify(cookingLogRepository, times(1)).findPopularCookingCounts(any(), eq(size));
 
         // When: 두 번째 호출 (캐시 히트 -> Redis에서 꺼내옴)
         List<PopularRecipeResponse> secondCall = popularRecipeService.getPopularRecipes(size);
 
         // Then: DB 집계 메서드는 여전히 1회만 호출됨
-        assertEquals(1, secondCall.size());
-        assertEquals("된장찌개", secondCall.get(0).recipeName());
-        assertEquals(4.8, secondCall.get(0).averageRating());
-        assertEquals(15L, secondCall.get(0).reviewCount());
+        assertThat(secondCall.size()).isEqualTo(1);
+        assertThat(secondCall.get(0).recipeName()).isEqualTo("된장찌개");
+        assertThat(secondCall.get(0).averageRating()).isEqualTo(4.8);
+        assertThat(secondCall.get(0).reviewCount()).isEqualTo(15L);
         verify(cookingLogRepository, times(1)).findPopularCookingCounts(any(), eq(size));
     }
 
     @Test
     @DisplayName("빈 결과는 unless 조건으로 인해 캐시되지 않고 다음 호출 시 다시 집계 조회를 시도한다")
-    void emptyResultIsNotCachedDueToUnlessCondition() {
+    void doesNotCacheEmptyResult() {
         // Given
         int size = 6;
         when(cookingLogRepository.findPopularCookingCounts(any(), eq(size)))
@@ -129,14 +127,14 @@ class PopularRecipeServiceCacheIntegrationTest extends RedisContainerSupport {
         List<PopularRecipeResponse> firstCall = popularRecipeService.getPopularRecipes(size);
 
         // Then: 빈 결과 반환
-        assertTrue(firstCall.isEmpty());
+        assertThat(firstCall.isEmpty()).isTrue();
         verify(cookingLogRepository, times(1)).findPopularCookingCounts(any(), eq(size));
 
         // When: 두 번째 호출
         List<PopularRecipeResponse> secondCall = popularRecipeService.getPopularRecipes(size);
 
         // Then: 캐시되지 않았으므로 다시 repository가 호출되어 총 2회 호출됨
-        assertTrue(secondCall.isEmpty());
+        assertThat(secondCall.isEmpty()).isTrue();
         verify(cookingLogRepository, times(2)).findPopularCookingCounts(any(), eq(size));
     }
 }

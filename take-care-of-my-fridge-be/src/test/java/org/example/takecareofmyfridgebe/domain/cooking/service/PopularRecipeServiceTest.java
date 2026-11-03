@@ -17,9 +17,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.List;
 import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.never;
@@ -43,7 +41,7 @@ class PopularRecipeServiceTest {
 
     @Test
     @DisplayName("최근 30일간 요리 기록이 없으면 추가 조회 없이 빈 목록을 반환한다")
-    void getPopularRecipesReturnsEmptyListWhenNoCookingLogs() {
+    void returnsEmptyList_whenNoRecentCookingLogs() {
         // Given
         when(cookingLogRepository.findPopularCookingCounts(any(), anyInt()))
                 .thenReturn(List.of());
@@ -52,14 +50,14 @@ class PopularRecipeServiceTest {
         List<PopularRecipeResponse> result = popularRecipeService.getPopularRecipes(6);
 
         // Then
-        assertTrue(result.isEmpty());
+        assertThat(result.isEmpty()).isTrue();
         verify(recipeService, never()).findSummaries(any());
         verify(recipeReviewService, never()).findRatingStats(any());
     }
 
     @Test
     @DisplayName("인기 요리 순위와 레시피 기본정보, 후기 평점을 정상 매핑하며 후기 없는 레시피는 평점이 null, 리뷰 수가 0으로 매핑된다")
-    void getPopularRecipesCombinesAllDataCorrectly() {
+    void combinesRankRecipeAndRating() {
         // Given
         PopularRecipeCookingCount count1 = new PopularRecipeCookingCount(1L, 5L);
         PopularRecipeCookingCount count2 = new PopularRecipeCookingCount(2L, 3L);
@@ -80,24 +78,24 @@ class PopularRecipeServiceTest {
         List<PopularRecipeResponse> result = popularRecipeService.getPopularRecipes(6);
 
         // Then
-        assertEquals(2, result.size());
+        assertThat(result.size()).isEqualTo(2);
 
         PopularRecipeResponse res1 = result.get(0);
-        assertEquals(1L, res1.recipeId());
-        assertEquals("된장찌개", res1.recipeName());
-        assertEquals("image1.jpg", res1.imageUrl());
-        assertEquals("구수한 된장 팁", res1.tipSummary());
-        assertEquals(5L, res1.cookedMemberCount());
-        assertEquals(4.5, res1.averageRating());
-        assertEquals(10L, res1.reviewCount());
+        assertThat(res1.recipeId()).isEqualTo(1L);
+        assertThat(res1.recipeName()).isEqualTo("된장찌개");
+        assertThat(res1.imageUrl()).isEqualTo("image1.jpg");
+        assertThat(res1.tipSummary()).isEqualTo("구수한 된장 팁");
+        assertThat(res1.cookedMemberCount()).isEqualTo(5L);
+        assertThat(res1.averageRating()).isEqualTo(4.5);
+        assertThat(res1.reviewCount()).isEqualTo(10L);
 
         PopularRecipeResponse res2 = result.get(1);
-        assertEquals(2L, res2.recipeId());
-        assertEquals("김치찌개", res2.recipeName());
-        assertEquals("image2.jpg", res2.imageUrl());
-        assertNull(res2.tipSummary());
-        assertEquals(3L, res2.cookedMemberCount());
-        assertNull(res2.averageRating());
-        assertEquals(0L, res2.reviewCount());
+        assertThat(res2.recipeId()).isEqualTo(2L);
+        assertThat(res2.recipeName()).isEqualTo("김치찌개");
+        assertThat(res2.imageUrl()).isEqualTo("image2.jpg");
+        assertThat(res2.tipSummary()).isNull();
+        assertThat(res2.cookedMemberCount()).isEqualTo(3L);
+        assertThat(res2.averageRating()).isNull();
+        assertThat(res2.reviewCount()).isEqualTo(0L);
     }
 }

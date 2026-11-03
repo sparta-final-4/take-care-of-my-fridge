@@ -21,6 +21,7 @@ import org.example.takecareofmyfridgebe.global.config.JpaAuditingConfig;
 import org.example.takecareofmyfridgebe.global.config.QueryDslConfig;
 import org.example.takecareofmyfridgebe.support.MySqlContainerSupport;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
@@ -34,11 +35,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * CookingLogRepositoryImpl의 실제 쿼리(MySQL Testcontainers) 테스트.
@@ -155,7 +152,8 @@ class CookingLogRepositoryTest extends MySqlContainerSupport {
      * findMyRecipes 조회 시 타 회원의 요리 기록은 완전히 제외되고 본인 요리 기록만 집계되는지 검증한다.
      */
     @Test
-    void findMyRecipesExcludesOtherMembers() {
+    @DisplayName("내 레시피를 조회하면 다른 회원의 요리 기록은 빼고 본인 기록만 센다")
+    void excludesOtherMembersLogs_whenFindingMyRecipes() {
         // Given
         saveCookingLog(testMember.getId(), recipeA.getId(), null, CookingResult.SUCCESS, "내 요리", LocalDateTime.of(2026, 10, 10, 10, 0));
         saveCookingLog(OTHER_MEMBER_ID, recipeA.getId(), null, CookingResult.SUCCESS, "타인 요리", LocalDateTime.of(2026, 10, 11, 10, 0));
@@ -167,11 +165,11 @@ class CookingLogRepositoryTest extends MySqlContainerSupport {
                 testMember.getId(), MyRecipeReviewStatus.ALL, MyRecipeSortType.RECENT, PageRequest.of(0, 10));
 
         // Then: 본인 레시피만 1건 집계
-        assertEquals(1, result.getTotalElements());
+        assertThat(result.getTotalElements()).isEqualTo(1);
         MyRecipeResponse item = result.getContent().get(0);
-        assertEquals(recipeA.getId(), item.recipeId());
-        assertEquals("불닭 참치 두부조림", item.recipeName());
-        assertEquals(1L, item.cookCount());
+        assertThat(item.recipeId()).isEqualTo(recipeA.getId());
+        assertThat(item.recipeName()).isEqualTo("불닭 참치 두부조림");
+        assertThat(item.cookCount()).isEqualTo(1L);
     }
 
     /**
@@ -179,7 +177,8 @@ class CookingLogRepositoryTest extends MySqlContainerSupport {
      * 본인이 작성한 후기 정보(id, rating, content)가 정상 매핑되는지 검증한다.
      */
     @Test
-    void findMyRecipesLeftJoinsReview() {
+    @DisplayName("내 레시피를 조회하면 본인이 쓴 후기 정보를 함께 담는다")
+    void returnsOwnReview_whenFindingMyRecipes() {
         // Given: recipeA는 후기 있음, recipeB는 후기 없음
         saveCookingLog(testMember.getId(), recipeA.getId(), null, CookingResult.SUCCESS, "A", LocalDateTime.of(2026, 10, 10, 10, 0));
         saveCookingLog(testMember.getId(), recipeB.getId(), null, CookingResult.SUCCESS, "B", LocalDateTime.of(2026, 10, 11, 10, 0));
@@ -193,21 +192,22 @@ class CookingLogRepositoryTest extends MySqlContainerSupport {
         // Then: recipeB는 review가 null, recipeA는 review가 존재
         MyRecipeResponse itemB = result.getContent().stream()
                 .filter(r -> r.recipeId().equals(recipeB.getId())).findFirst().orElseThrow();
-        assertNull(itemB.review());
+        assertThat(itemB.review()).isNull();
 
         MyRecipeResponse itemA = result.getContent().stream()
                 .filter(r -> r.recipeId().equals(recipeA.getId())).findFirst().orElseThrow();
-        assertNotNull(itemA.review());
-        assertEquals(reviewA.getId(), itemA.review().id());
-        assertEquals(5, itemA.review().rating());
-        assertEquals("진짜 맛있어요!", itemA.review().content());
+        assertThat(itemA.review()).isNotNull();
+        assertThat(itemA.review().id()).isEqualTo(reviewA.getId());
+        assertThat(itemA.review().rating()).isEqualTo(5);
+        assertThat(itemA.review().content()).isEqualTo("진짜 맛있어요!");
     }
 
     /**
      * AI 상담 여부: 여러 요리 기록 중 하나라도 chat_session_id가 있으면 fromChat이 true인지 검증한다.
      */
     @Test
-    void findMyRecipesFromChatIsTrueIfAnyLogHasChatSessionId() {
+    @DisplayName("요리 기록 중 하나라도 상담에서 나왔으면 fromChat을 true로 표시한다")
+    void marksFromChat_whenAnyLogHasChatSession() {
         // Given: recipeA 1회차(chatSessionId=null), 2회차(chatSessionId=10L)
         saveCookingLog(testMember.getId(), recipeA.getId(), null, CookingResult.SUCCESS, "1회차", LocalDateTime.of(2026, 10, 10, 10, 0));
         saveCookingLog(testMember.getId(), recipeA.getId(), 10L, CookingResult.SUCCESS, "2회차", LocalDateTime.of(2026, 10, 12, 10, 0));
@@ -218,17 +218,18 @@ class CookingLogRepositoryTest extends MySqlContainerSupport {
                 testMember.getId(), MyRecipeReviewStatus.ALL, MyRecipeSortType.RECENT, PageRequest.of(0, 10));
 
         // Then: cookCount 2, fromChat true
-        assertEquals(1, result.getContent().size());
+        assertThat(result.getContent().size()).isEqualTo(1);
         MyRecipeResponse item = result.getContent().get(0);
-        assertEquals(2L, item.cookCount());
-        assertTrue(item.fromChat());
+        assertThat(item.cookCount()).isEqualTo(2L);
+        assertThat(item.fromChat()).isTrue();
     }
 
     /**
      * reviewStatus 필터: WRITTEN은 후기 있는 레시피만, NOT_WRITTEN은 후기 없는 레시피만 조회되는지 검증한다.
      */
     @Test
-    void findMyRecipesFiltersByReviewStatus() {
+    @DisplayName("후기 작성 여부로 내 레시피를 조회하면 그 조건에 맞는 레시피만 나온다")
+    void filtersByReviewStatus() {
         // Given: recipeA(후기 작성), recipeB(후기 미작성)
         saveCookingLog(testMember.getId(), recipeA.getId(), null, CookingResult.SUCCESS, "A", LocalDateTime.of(2026, 10, 10, 10, 0));
         saveCookingLog(testMember.getId(), recipeB.getId(), null, CookingResult.SUCCESS, "B", LocalDateTime.of(2026, 10, 11, 10, 0));
@@ -240,23 +241,24 @@ class CookingLogRepositoryTest extends MySqlContainerSupport {
                 testMember.getId(), MyRecipeReviewStatus.WRITTEN, MyRecipeSortType.RECENT, PageRequest.of(0, 10));
 
         // Then: recipeA만 반환
-        assertEquals(1, written.getTotalElements());
-        assertEquals(recipeA.getId(), written.getContent().get(0).recipeId());
+        assertThat(written.getTotalElements()).isEqualTo(1);
+        assertThat(written.getContent().get(0).recipeId()).isEqualTo(recipeA.getId());
 
         // When: NOT_WRITTEN 조회
         Page<MyRecipeResponse> notWritten = cookingLogRepository.findMyRecipes(
                 testMember.getId(), MyRecipeReviewStatus.NOT_WRITTEN, MyRecipeSortType.RECENT, PageRequest.of(0, 10));
 
         // Then: recipeB만 반환
-        assertEquals(1, notWritten.getTotalElements());
-        assertEquals(recipeB.getId(), notWritten.getContent().get(0).recipeId());
+        assertThat(notWritten.getTotalElements()).isEqualTo(1);
+        assertThat(notWritten.getContent().get(0).recipeId()).isEqualTo(recipeB.getId());
     }
 
     /**
      * sort=MOST 정렬 시 요리 횟수 많은 순, 횟수가 같으면 마지막 요리 최신순으로 정렬되는지 검증한다.
      */
     @Test
-    void findMyRecipesSortsByMostCooked() {
+    @DisplayName("많이 만든 순으로 조회하면 요리 횟수 순, 같으면 마지막 요리가 최근인 순으로 나온다")
+    void sortsByCookCountThenRecent_whenSortIsMost() {
         // Given: recipeA(1회, 10.10), recipeB(3회, 10.05), recipeC(1회, 10.12)
         saveCookingLog(testMember.getId(), recipeA.getId(), null, CookingResult.SUCCESS, "A1", LocalDateTime.of(2026, 10, 10, 10, 0));
 
@@ -272,18 +274,19 @@ class CookingLogRepositoryTest extends MySqlContainerSupport {
                 testMember.getId(), MyRecipeReviewStatus.ALL, MyRecipeSortType.MOST, PageRequest.of(0, 10));
 
         // Then: 1위 recipeB(3회), 2위 recipeC(1회, 10.12), 3위 recipeA(1회, 10.10)
-        assertEquals(3, result.getContent().size());
-        assertEquals(recipeB.getId(), result.getContent().get(0).recipeId());
-        assertEquals(3L, result.getContent().get(0).cookCount());
-        assertEquals(recipeC.getId(), result.getContent().get(1).recipeId());
-        assertEquals(recipeA.getId(), result.getContent().get(2).recipeId());
+        assertThat(result.getContent().size()).isEqualTo(3);
+        assertThat(result.getContent().get(0).recipeId()).isEqualTo(recipeB.getId());
+        assertThat(result.getContent().get(0).cookCount()).isEqualTo(3L);
+        assertThat(result.getContent().get(1).recipeId()).isEqualTo(recipeC.getId());
+        assertThat(result.getContent().get(2).recipeId()).isEqualTo(recipeA.getId());
     }
 
     /**
      * getMyRecipesSummaryCount 단일 쿼리로 요리 완료 레시피 수, 총 요리 횟수, 작성 및 미작성 후기 수를 정확히 집계하는지 검증한다.
      */
     @Test
-    void getMyRecipesSummaryCalculatesAccurately() {
+    @DisplayName("내 레시피 요약은 레시피 수, 요리 횟수, 후기 작성·미작성 수를 정확히 센다")
+    void calculatesMyRecipesSummary() {
         // Given: recipeA(2회 요리, 후기 작성), recipeB(1회 요리, 후기 미작성), 타 회원 요리 기록
         saveCookingLog(testMember.getId(), recipeA.getId(), null, CookingResult.SUCCESS, "A1", LocalDateTime.of(2026, 10, 1, 10, 0));
         saveCookingLog(testMember.getId(), recipeA.getId(), null, CookingResult.SUCCESS, "A2", LocalDateTime.of(2026, 10, 2, 10, 0));
@@ -298,26 +301,28 @@ class CookingLogRepositoryTest extends MySqlContainerSupport {
         MyRecipeSummaryCount summary = cookingLogRepository.getMyRecipesSummaryCount(testMember.getId());
 
         // Then: 본인 기록 기준 recipeCount 2, totalCookCount 3, writtenCount 1, notWrittenCount 1 확인
-        assertEquals(2L, summary.recipeCount());
-        assertEquals(3L, summary.totalCookCount());
-        assertEquals(1L, summary.writtenCount());
-        assertEquals(1L, summary.notWrittenCount());
+        assertThat(summary.recipeCount()).isEqualTo(2L);
+        assertThat(summary.totalCookCount()).isEqualTo(3L);
+        assertThat(summary.writtenCount()).isEqualTo(1L);
+        assertThat(summary.notWrittenCount()).isEqualTo(1L);
     }
 
     /**
      * 요리 기록이 없는 경우 findMostCookedRecipe는 Optional.empty()를 반환한다.
      */
     @Test
-    void findMostCookedRecipeReturnsEmptyWhenNoLogs() {
+    @DisplayName("요리 기록이 없으면 가장 많이 만든 레시피는 비어 있다")
+    void returnsEmpty_whenNoCookingLogs() {
         Optional<MostCookedRecipeDto> result = cookingLogRepository.findMostCookedRecipe(testMember.getId());
-        assertTrue(result.isEmpty());
+        assertThat(result.isEmpty()).isTrue();
     }
 
     /**
      * 가장 많이 요리한 레시피를 조회하고, 요리 횟수가 같을 때는 가장 최근에 요리한 레시피가 반환된다.
      */
     @Test
-    void findMostCookedRecipeReturnsMostCookedAndRecentWhenTied() {
+    @DisplayName("가장 많이 만든 레시피를 조회하면 횟수가 같을 때 최근에 만든 레시피가 나온다")
+    void returnsMostRecent_whenCookCountIsTied() {
         // Given: recipeA 1회(10.01), recipeB 2회(10.05), recipeC 2회(10.10)
         saveCookingLog(testMember.getId(), recipeA.getId(), null, CookingResult.SUCCESS, "A1", LocalDateTime.of(2026, 10, 1, 10, 0));
 
@@ -332,16 +337,17 @@ class CookingLogRepositoryTest extends MySqlContainerSupport {
         Optional<MostCookedRecipeDto> result = cookingLogRepository.findMostCookedRecipe(testMember.getId());
 
         // Then: 2회 중 최근(10.10)인 recipeC가 1위
-        assertTrue(result.isPresent());
-        assertEquals(recipeC.getId(), result.get().recipeId());
-        assertEquals(2L, result.get().cookCount());
+        assertThat(result.isPresent()).isTrue();
+        assertThat(result.get().recipeId()).isEqualTo(recipeC.getId());
+        assertThat(result.get().cookCount()).isEqualTo(2L);
     }
 
     /**
      * findMostCookedRecipe 조회 시 다른 회원의 요리 기록은 완전히 제외된다.
      */
     @Test
-    void findMostCookedRecipeExcludesOtherMembers() {
+    @DisplayName("가장 많이 만든 레시피를 조회하면 다른 회원의 요리 기록은 뺀다")
+    void excludesOtherMembersLogs_whenFindingMostCooked() {
         // Given: testMember는 recipeA 1회, OTHER_MEMBER는 recipeB 10회
         saveCookingLog(testMember.getId(), recipeA.getId(), null, CookingResult.SUCCESS, "A1", LocalDateTime.of(2026, 10, 1, 10, 0));
         saveCookingLog(OTHER_MEMBER_ID, recipeB.getId(), null, CookingResult.SUCCESS, "B_other", LocalDateTime.of(2026, 10, 2, 10, 0));
@@ -351,24 +357,25 @@ class CookingLogRepositoryTest extends MySqlContainerSupport {
         Optional<MostCookedRecipeDto> result = cookingLogRepository.findMostCookedRecipe(testMember.getId());
 
         // Then: testMember의 recipeA만 집계되어야 함
-        assertTrue(result.isPresent());
-        assertEquals(recipeA.getId(), result.get().recipeId());
-        assertEquals(1L, result.get().cookCount());
+        assertThat(result.isPresent()).isTrue();
+        assertThat(result.get().recipeId()).isEqualTo(recipeA.getId());
+        assertThat(result.get().cookCount()).isEqualTo(1L);
     }
 
     /**
      * findByIdAndMemberId로 본인의 요리 기록만 정상 조회되고, 다른 회원의 기록이거나 없으면 Optional.empty()가 반환되는지 검증한다.
      */
     @Test
-    void findByIdAndMemberIdReturnsOnlyOwnRecord() {
+    @DisplayName("요리 기록을 ID와 회원으로 조회하면 본인 기록만 나오고 다른 회원 기록이나 없는 기록은 비어 있다")
+    void returnsOnlyOwnLog() {
         CookingLog myLog = saveCookingLog(testMember.getId(), recipeA.getId(), null, CookingResult.SUCCESS, "내 기록", LocalDateTime.now());
         CookingLog otherLog = saveCookingLog(OTHER_MEMBER_ID, recipeA.getId(), null, CookingResult.SUCCESS, "타인 기록", LocalDateTime.now());
         flushAndClear();
 
         // When & Then
-        assertTrue(cookingLogRepository.findByIdAndMemberId(myLog.getId(), testMember.getId()).isPresent());
-        assertTrue(cookingLogRepository.findByIdAndMemberId(otherLog.getId(), testMember.getId()).isEmpty());
-        assertTrue(cookingLogRepository.findByIdAndMemberId(99999L, testMember.getId()).isEmpty());
+        assertThat(cookingLogRepository.findByIdAndMemberId(myLog.getId(), testMember.getId()).isPresent()).isTrue();
+        assertThat(cookingLogRepository.findByIdAndMemberId(otherLog.getId(), testMember.getId()).isEmpty()).isTrue();
+        assertThat(cookingLogRepository.findByIdAndMemberId(99999L, testMember.getId()).isEmpty()).isTrue();
     }
 
     /**
@@ -376,7 +383,8 @@ class CookingLogRepositoryTest extends MySqlContainerSupport {
      * 연결된 fridge_item_logs(재료 차감 이력)가 변경되지 않는지 검증한다.
      */
     @Test
-    void updateCookingLogDoesNotAffectFridgeItemLogs() {
+    @DisplayName("요리 기록을 수정해도 다른 필드와 재료 차감 기록은 바뀌지 않는다")
+    void keepsOtherFieldsAndFridgeLogs_whenCookingLogIsUpdated() {
         // Given: 요리 기록 생성
         CookingLog log = saveCookingLog(testMember.getId(), recipeA.getId(), 10L, CookingResult.SUCCESS, "초기 메모", LocalDateTime.now());
 
@@ -410,18 +418,18 @@ class CookingLogRepositoryTest extends MySqlContainerSupport {
 
         // Then: 요리 기록의 결과와 메모만 변경되고 다른 필드는 보존됨
         CookingLog updatedCookingLog = cookingLogRepository.findById(log.getId()).orElseThrow();
-        assertEquals(CookingResult.FAILED, updatedCookingLog.getResult());
-        assertEquals("수정된 메모", updatedCookingLog.getMemo());
-        assertEquals(recipeA.getId(), updatedCookingLog.getRecipeId());
-        assertEquals(10L, updatedCookingLog.getChatSessionId());
+        assertThat(updatedCookingLog.getResult()).isEqualTo(CookingResult.FAILED);
+        assertThat(updatedCookingLog.getMemo()).isEqualTo("수정된 메모");
+        assertThat(updatedCookingLog.getRecipeId()).isEqualTo(recipeA.getId());
+        assertThat(updatedCookingLog.getChatSessionId()).isEqualTo(10L);
 
         // 연결된 fridge_item_logs는 아무런 변경 없이 유지됨
         FridgeItemLog foundFridgeItemLog = em.find(FridgeItemLog.class, itemLog.getId());
-        assertNotNull(foundFridgeItemLog);
-        assertEquals(log.getId(), foundFridgeItemLog.getCookingLogId());
-        assertEquals(new BigDecimal("100.00"), foundFridgeItemLog.getQuantity());
-        assertEquals(FridgeItemAction.CONSUMED, foundFridgeItemLog.getAction());
-        assertEquals("깐양파", foundFridgeItemLog.getRawName());
+        assertThat(foundFridgeItemLog).isNotNull();
+        assertThat(foundFridgeItemLog.getCookingLogId()).isEqualTo(log.getId());
+        assertThat(foundFridgeItemLog.getQuantity()).isEqualTo(new BigDecimal("100.00"));
+        assertThat(foundFridgeItemLog.getAction()).isEqualTo(FridgeItemAction.CONSUMED);
+        assertThat(foundFridgeItemLog.getRawName()).isEqualTo("깐양파");
     }
 
     /**
@@ -429,7 +437,8 @@ class CookingLogRepositoryTest extends MySqlContainerSupport {
      * 다른 레시피의 요리 기록은 집계에 포함되지 않아야 한다.
      */
     @Test
-    void getCookingStatsCalculatesAccurately() {
+    @DisplayName("레시피 요리 통계는 그 레시피의 요리·성공·실패 횟수만 정확히 센다")
+    void calculatesCookingStatsForRecipe() {
         // Given: recipeA 성공 2회, 실패 1회 (총 3회) / recipeB 성공 1회
         saveCookingLog(testMember.getId(), recipeA.getId(), null, CookingResult.SUCCESS, "A1", LocalDateTime.of(2026, 10, 1, 10, 0));
         saveCookingLog(testMember.getId(), recipeA.getId(), null, CookingResult.SUCCESS, "A2", LocalDateTime.of(2026, 10, 2, 10, 0));
@@ -442,17 +451,17 @@ class CookingLogRepositoryTest extends MySqlContainerSupport {
         CookingStatsResponse statsA = cookingLogRepository.getCookingStats(recipeA.getId());
 
         // Then: recipeA 기준 총 3회, 성공 2회, 실패 1회
-        assertEquals(recipeA.getId(), statsA.recipeId());
-        assertEquals(3L, statsA.totalCount());
-        assertEquals(2L, statsA.successCount());
-        assertEquals(1L, statsA.failedCount());
+        assertThat(statsA.recipeId()).isEqualTo(recipeA.getId());
+        assertThat(statsA.totalCount()).isEqualTo(3L);
+        assertThat(statsA.successCount()).isEqualTo(2L);
+        assertThat(statsA.failedCount()).isEqualTo(1L);
 
         // When: 요리 기록이 없는 recipeC 조회 시 404가 아닌 0으로 반환
         CookingStatsResponse statsC = cookingLogRepository.getCookingStats(recipeC.getId());
-        assertEquals(recipeC.getId(), statsC.recipeId());
-        assertEquals(0L, statsC.totalCount());
-        assertEquals(0L, statsC.successCount());
-        assertEquals(0L, statsC.failedCount());
+        assertThat(statsC.recipeId()).isEqualTo(recipeC.getId());
+        assertThat(statsC.totalCount()).isEqualTo(0L);
+        assertThat(statsC.successCount()).isEqualTo(0L);
+        assertThat(statsC.failedCount()).isEqualTo(0L);
     }
 
     /**
@@ -463,7 +472,8 @@ class CookingLogRepositoryTest extends MySqlContainerSupport {
      * - size 파라미터만큼만 조회된다.
      */
     @Test
-    void findPopularCookingCountsCalculatesPopularRecipesCorrectly() {
+    @DisplayName("인기 레시피는 최근 30일 기록만 만든 회원 수 순으로 세어 size만큼 반환한다")
+    void returnsPopularRecipesByMemberCount() {
         // Given
         LocalDateTime now = LocalDateTime.of(2026, 10, 26, 12, 0);
         LocalDateTime since = now.minusDays(30);
@@ -493,24 +503,24 @@ class CookingLogRepositoryTest extends MySqlContainerSupport {
         List<PopularRecipeCookingCount> top2 = cookingLogRepository.findPopularCookingCounts(since, 2);
 
         // Then: size 제한 및 순위 검증 (recipeA 1위, recipeB 2위)
-        assertEquals(2, top2.size());
-        assertEquals(recipeA.getId(), top2.get(0).recipeId());
-        assertEquals(2L, top2.get(0).cookedMemberCount()); // member1 중복 제거되어 2명
-        assertEquals(recipeB.getId(), top2.get(1).recipeId());
-        assertEquals(2L, top2.get(1).cookedMemberCount());
+        assertThat(top2.size()).isEqualTo(2);
+        assertThat(top2.get(0).recipeId()).isEqualTo(recipeA.getId());
+        assertThat(top2.get(0).cookedMemberCount()).isEqualTo(2L); // member1 중복 제거되어 2명
+        assertThat(top2.get(1).recipeId()).isEqualTo(recipeB.getId());
+        assertThat(top2.get(1).cookedMemberCount()).isEqualTo(2L);
 
         // When: 전체 조회 (size 10)
         List<PopularRecipeCookingCount> all = cookingLogRepository.findPopularCookingCounts(since, 10);
 
         // Then: 총 3개 레시피가 순서대로 정렬됨 (recipeA -> recipeB -> recipeC)
-        assertEquals(3, all.size());
-        assertEquals(recipeA.getId(), all.get(0).recipeId());
-        assertEquals(recipeB.getId(), all.get(1).recipeId());
-        assertEquals(recipeC.getId(), all.get(2).recipeId());
-        assertEquals(1L, all.get(2).cookedMemberCount()); // 31일 전 기록 제외되어 1명
+        assertThat(all.size()).isEqualTo(3);
+        assertThat(all.get(0).recipeId()).isEqualTo(recipeA.getId());
+        assertThat(all.get(1).recipeId()).isEqualTo(recipeB.getId());
+        assertThat(all.get(2).recipeId()).isEqualTo(recipeC.getId());
+        assertThat(all.get(2).cookedMemberCount()).isEqualTo(1L); // 31일 전 기록 제외되어 1명
 
         // When: 요리 기록이 없는 기간(미래)으로 조회 시 빈 목록 반환
         List<PopularRecipeCookingCount> empty = cookingLogRepository.findPopularCookingCounts(now.plusDays(1), 10);
-        assertTrue(empty.isEmpty());
+        assertThat(empty.isEmpty()).isTrue();
     }
 }
