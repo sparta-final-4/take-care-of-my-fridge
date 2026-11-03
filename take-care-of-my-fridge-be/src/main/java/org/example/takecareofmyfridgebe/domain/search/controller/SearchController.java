@@ -9,6 +9,7 @@ import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeListItemResponse
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeListRequest;
 import org.example.takecareofmyfridgebe.domain.search.dto.SearchClickRequest;
 import org.example.takecareofmyfridgebe.domain.search.dto.SearchRecipeClickRequest;
+import org.example.takecareofmyfridgebe.domain.search.dto.SearchSuggestionRequest;
 import org.example.takecareofmyfridgebe.domain.search.facade.ProductSearchFacade;
 import org.example.takecareofmyfridgebe.domain.search.facade.RecipeSearchFacade;
 import org.example.takecareofmyfridgebe.domain.search.service.SearchClickHistoryService;
@@ -22,6 +23,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/search")
@@ -46,6 +49,14 @@ public class SearchController {
     ) {
         PageResponse<ProductListItemResponse> products = productSearchFacade.getProducts(request);
         return ResponseEntity.ok(ApiResponse.ok(products));
+    }
+
+    @GetMapping("/suggestions")
+    public ResponseEntity<ApiResponse<List<String>>> suggest(
+            @Valid @ModelAttribute SearchSuggestionRequest request
+    ) {
+        List<String> suggestions = recipeSearchFacade.suggestNames(request.keyword());
+        return ResponseEntity.ok(ApiResponse.ok(suggestions));
     }
 
     @PostMapping("/clicks")

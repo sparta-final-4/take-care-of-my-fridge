@@ -21,6 +21,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
@@ -157,6 +158,44 @@ class RecipeSearchFacadeTest {
 
         // Then
         verifyNoInteractions(searchZeroResultService);
+    }
+
+    @Test
+    @DisplayName("자동완성은 ES 엔진이면 ES에서 이름 후보를 찾는다")
+    void suggestNames_usesElasticsearch_whenEngineIsEs() throws IOException {
+        // Given
+        when(searchProperties.useElasticSearch()).thenReturn(true);
+        when(recipeSearchService.suggestNames("김치", 8)).thenReturn(List.of("김치찌개", "김치볶음밥"));
+
+        // When & Then
+        assertThat(facade.suggestNames("김치")).containsExactly("김치찌개", "김치볶음밥");
+        verify(recipeService, never()).suggestNames(any(), anyInt());
+    }
+
+    @Test
+    @DisplayName("자동완성 중 ES가 실패하면 MySQL 이름 앞부분 조회로 대체한다")
+    void suggestNames_fallsBackToMySql_whenEsFails() throws IOException {
+        // Given
+        when(searchProperties.useElasticSearch()).thenReturn(true);
+        when(recipeSearchService.suggestNames("김치", 8)).thenThrow(new IOException("down"));
+        when(recipeService.suggestNames("김치", 8)).thenReturn(List.of("김치찌개"));
+
+        // When & Then
+        assertThat(facade.suggestNames("김치")).containsExactly("김치찌개");
+    }
+
+    @Test
+    @DisplayName("자동완성은 MySQL 엔진이면 ES를 부르지 않는다")
+    void suggestNames_usesMySql_whenEngineIsMySql() throws IOException {
+        // Given
+        when(searchProperties.useElasticSearch()).thenReturn(false);
+        when(recipeService.suggestNames("김치", 8)).thenReturn(List.of());
+
+        // When
+        facade.suggestNames("김치");
+
+        // Then
+        verify(recipeSearchService, never()).suggestNames(any(), anyInt());
     }
 
     private PageResponse<RecipeListItemResponse> emptyPage(int pageNumber) {

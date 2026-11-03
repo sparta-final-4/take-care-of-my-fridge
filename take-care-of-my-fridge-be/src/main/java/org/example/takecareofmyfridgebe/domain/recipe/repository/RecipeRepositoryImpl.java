@@ -98,6 +98,19 @@ public class RecipeRepositoryImpl implements RecipeRepositoryCustom {
                 .fetch();
     }
 
+    // likeIgnoreCase(lower)를 쓰면 idx_recipes_name을 타지 못해 like로 둔다. MySQL 기본 정렬 규칙은 대소문자를 구분하지 않는다
+    @Override
+    public List<String> findNamesStartingWith(String prefix, int limit) {
+        return queryFactory
+                .select(recipe.name)
+                .distinct()
+                .from(recipe)
+                .where(recipe.name.like(escapeLike(prefix) + "%", LIKE_ESCAPE))
+                .orderBy(recipe.name.asc())
+                .limit(limit)
+                .fetch();
+    }
+
     private List<String> findDistinctValues(StringPath column) {
         return queryFactory
                 .select(column)
