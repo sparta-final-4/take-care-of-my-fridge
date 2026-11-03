@@ -58,6 +58,7 @@ class RefundReconcileSchedulerTest {
                 .isBeforeOrEqualTo(LocalDateTime.now().minusMinutes(RefundReconcileScheduler.STALE_MINUTES))
                 .isAfterOrEqualTo(before.minusMinutes(RefundReconcileScheduler.STALE_MINUTES));
         verify(refundFacade).syncWithPg("payment-1", PaymentChangedBy.SCHEDULER, staleBefore.getValue());
+        verify(refundFacade).syncOrderStatuses();
     }
 
     @Test
@@ -70,5 +71,17 @@ class RefundReconcileSchedulerTest {
         scheduler.reconcileStaleRefunds();
 
         verify(refundFacade).syncWithPg(eq("payment-2"), eq(PaymentChangedBy.SCHEDULER), any());
+        verify(refundFacade).syncOrderStatuses();
+    }
+
+    @Test
+    @DisplayName("주문 상태 맞춤이 실패해도 스케줄러 밖으로 예외를 던지지 않는다")
+    void syncOrderStatusesFailure_isCaught() {
+        given(refundQueryService.findPaymentsWithRequestedBefore(any())).willReturn(List.of());
+        willThrow(new IllegalStateException("DB 오류")).given(refundFacade).syncOrderStatuses();
+
+        scheduler.reconcileStaleRefunds();
+
+        verify(refundFacade).syncOrderStatuses();
     }
 }

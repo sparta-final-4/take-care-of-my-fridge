@@ -3,6 +3,8 @@ package org.example.takecareofmyfridgebe.domain.refund.service;
 import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.order.entity.Order;
 import org.example.takecareofmyfridgebe.domain.order.entity.OrderItem;
+import org.example.takecareofmyfridgebe.domain.order.entity.OrderStatus;
+import org.example.takecareofmyfridgebe.domain.order.entity.SaleType;
 import org.example.takecareofmyfridgebe.domain.order.service.OrderReader;
 import org.example.takecareofmyfridgebe.domain.payment.entity.Payment;
 import org.example.takecareofmyfridgebe.domain.payment.entity.PaymentStatus;
@@ -32,6 +34,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -72,17 +75,20 @@ public class RefundQueryService {
         return refundRepository.existsByOrderIdAndStatus(orderId, RefundStatus.REQUESTED);
     }
 
-    // 구매 확정 검증용. 모든 주문 상품을 완료된 환불이 주문 수량만큼 채웠으면 true다.
-    // 특가·번개 드롭 상품은 환불할 수 없으므로 이런 상품이 있는 주문은 false다
-    public boolean isFullyRefunded(Order order) {
-        List<OrderItem> orderItems = orderReader.getOrderItems(order);
-        Map<Long, Long> completedById = getCompletedRefundQuantities(
-                orderItems.stream().map(OrderItem::getId).toList());
-        return !orderItems.isEmpty() && orderItems.stream()
-                .allMatch(item -> completedById.getOrDefault(item.getId(), 0L) >= item.getQuantity());
+    // 환불 정리 스케줄러용. 환불할 수 있는 상품을 모두 환불했는데 아직 결제 완료인 주문.
+    // 주문 상태 변경이 실패해 환불만 완료된 주문이 대상이다
+    public List<Long> findPaidOrderIdsFullyRefunded() {
+        return refundRepository.findFullyRefundedOrderIds(OrderStatus.PAID, RefundStatus.COMPLETED, SaleType.NONE);
     }
 
-    // 구매 확정 수량 계산용. 완료된 환불만 주문 상품별로 합산하고, 환불이 없는 주문 상품은 결과에 없다
+    // 환불 정리 스케줄러용. 완료된 환불 기준으로 주문이 옮겨 갈 상태. 부분 환불이면 비어 있다
+    public Optional<OrderStatus> findOrderStatusAfterRefund(Long orderId) {
+        List<OrderItem> orderItems = refundRepository.findOrderItemsByOrderId(orderId);
+        return RefundableOrderPolicy.statusAfterRefund(orderItems,
+                getCompletedRefundQuantities(orderItems.stream().map(OrderItem::getId).toList()));
+    }
+
+    // 구매 확정 수량 계산과 환불 완료 뒤 주문 상태 판단에 쓴다. 완료된 환불만 주문 상품별로 합산하고, 환불이 없는 주문 상품은 결과에 없다
     public Map<Long, Long> getCompletedRefundQuantities(List<Long> orderItemIds) {
         return refundItemRepository
                 .findRefundedQuantitiesByOrderItemIds(orderItemIds, List.of(RefundStatus.COMPLETED)).stream()
