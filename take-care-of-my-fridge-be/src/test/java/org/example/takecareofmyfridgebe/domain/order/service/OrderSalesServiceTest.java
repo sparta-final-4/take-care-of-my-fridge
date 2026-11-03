@@ -4,6 +4,7 @@ import org.example.takecareofmyfridgebe.domain.order.dto.DailyProductSales;
 import org.example.takecareofmyfridgebe.domain.order.entity.OrderStatus;
 import org.example.takecareofmyfridgebe.domain.order.repository.OrderItemRepository;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -30,6 +31,7 @@ class OrderSalesServiceTest {
     private OrderSalesService orderSalesService;
 
     @Test
+    @DisplayName("시작일 0시부터 종료일 다음 날 0시까지 조회한다")
     void queriesFromStartOfFromToStartOfDayAfterTo() {
         List<DailyProductSales> sales = List.of(new DailyProductSales(1L, LocalDate.of(2026, 10, 2), 5L));
         given(orderItemRepository.findDailyProductSales(OrderStatus.CONFIRMED,
@@ -42,6 +44,7 @@ class OrderSalesServiceTest {
     }
 
     @Test
+    @DisplayName("시작일이 종료일보다 늦으면 거절한다")
     void rejectsFromAfterTo() {
         assertThatThrownBy(() ->
             orderSalesService.getDailyProductSales(LocalDate.of(2026, 10, 3), LocalDate.of(2026, 10, 1), AS_OF))
@@ -49,6 +52,7 @@ class OrderSalesServiceTest {
     }
 
     @Test
+    @DisplayName("기준 시각이 없으면 거절한다")
     void rejectsMissingAsOf() {
         assertThatThrownBy(() ->
             orderSalesService.getDailyProductSales(LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 3), null))

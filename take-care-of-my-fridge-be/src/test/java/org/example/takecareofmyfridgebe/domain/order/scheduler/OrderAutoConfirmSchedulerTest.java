@@ -15,6 +15,7 @@ import org.example.takecareofmyfridgebe.domain.order.facade.OrderStatusFacade;
 import org.example.takecareofmyfridgebe.domain.order.service.OrderStatusService;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 // 어떤 주문을 확정하는지는 OrderStatusFacadeConfirmTransactionTest가 실제 DB로 확인한다. 여기서는 기준 시각, 건너뛰기, 나눠 읽기만 본다.
@@ -28,6 +29,7 @@ class OrderAutoConfirmSchedulerTest {
     private final OrderAutoConfirmScheduler scheduler = new OrderAutoConfirmScheduler(orderStatusService, orderStatusFacade);
 
     @Test
+    @DisplayName("결제 7일 뒤를 기준 시각으로 확정 대상을 조회한다")
     void usesExactlySevenDaysAfterPaymentAsCutoff() {
         scheduler.confirmDueOrders(NOW);
 
@@ -35,6 +37,7 @@ class OrderAutoConfirmSchedulerTest {
     }
 
     @Test
+    @DisplayName("환불이 진행 중인 주문은 건너뛰고 다음 주문을 확정한다")
     void skipsRequestedRefundAndContinuesWithNextOrder() {
         List<Order> orders = List.of(order(1L, 10L), order(2L, 20L));
         when(orderStatusService.findPaidOrders(CUTOFF, 0L, OrderAutoConfirmScheduler.BATCH_SIZE)).thenReturn(orders);
@@ -48,6 +51,7 @@ class OrderAutoConfirmSchedulerTest {
     }
 
     @Test
+    @DisplayName("전액 환불된 주문은 건너뛰고 다음 주문을 확정한다")
     void skipsFullyRefundedAndContinuesWithNextOrder() {
         List<Order> orders = List.of(order(1L, 10L), order(2L, 20L));
         when(orderStatusService.findPaidOrders(CUTOFF, 0L, OrderAutoConfirmScheduler.BATCH_SIZE)).thenReturn(orders);
@@ -61,6 +65,7 @@ class OrderAutoConfirmSchedulerTest {
     }
 
     @Test
+    @DisplayName("마지막으로 처리한 주문 id 뒤부터 다음 묶음을 읽는다")
     void readsNextBatchAfterLastProcessedId() {
         List<Order> firstBatch = LongStream.rangeClosed(1, OrderAutoConfirmScheduler.BATCH_SIZE)
                 .mapToObj(id -> order(id, 10L)).toList();

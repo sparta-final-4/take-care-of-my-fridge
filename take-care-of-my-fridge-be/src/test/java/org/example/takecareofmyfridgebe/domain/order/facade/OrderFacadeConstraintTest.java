@@ -84,7 +84,7 @@ class OrderFacadeConstraintTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("주문번호가 겹치면 409로 거절하고 두 번째 주문의 재고 차감까지 롤백된다")
-    void createOrder_duplicateOrderNumber_rejectsAndRollsBack() {
+    void rejectsAndRollsBackDuplicateOrderNumber() {
         given(orderNumberGenerator.next()).willReturn("20261021143000123000");
         Product greenOnion = productRepository.save(Product.builder()
             .productType(ProductType.INGREDIENT).name("대파").price(3000).stock(10)

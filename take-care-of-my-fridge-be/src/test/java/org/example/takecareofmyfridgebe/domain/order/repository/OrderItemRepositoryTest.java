@@ -39,7 +39,7 @@ class OrderItemRepositoryTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("기준 시각 뒤에 구매 확정된 주문은 판매량에 들어가지 않는다")
-    void findDailyProductSales_excludesConfirmedAfterAsOf() {
+    void excludesOrdersConfirmedAfterAsOf() {
         confirmedOrder(DAY.atTime(10, 0), 10L, 2);
         confirmedOrder(DAY.atTime(15, 0), 10L, 3);
         flushAndClear();
@@ -52,7 +52,7 @@ class OrderItemRepositoryTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("결제 대기·결제 완료·취소 주문은 판매량에 들어가지 않는다")
-    void findDailyProductSales_onlyConfirmedOrders() {
+    void includesOnlyConfirmedOrders() {
         confirmedOrder(DAY.atTime(10, 0), 10L, 1);
 
         Order pending = persistOrder();
@@ -73,7 +73,7 @@ class OrderItemRepositoryTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("같은 상품·같은 날 주문은 하나로 합치고, 마지막 날은 하루 통째로 들어가며 그다음 날은 빠진다")
-    void findDailyProductSales_sumsByProductAndDayWithinRange() {
+    void sumsByProductAndDayWithinRange() {
         confirmedOrder(DAY.atStartOfDay(), 10L, 1);
         confirmedOrder(DAY.atTime(23, 59, 59), 10L, 2);
         confirmedOrder(DAY.atTime(13, 0), 20L, 4);
@@ -90,7 +90,7 @@ class OrderItemRepositoryTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("확정 전에 환불이 완료된 수량은 확정 수량에서 빠져 판매량에 들어가지 않는다")
-    void findDailyProductSales_usesConfirmedQuantity() {
+    void usesConfirmedQuantity() {
         confirmedOrder(DAY.atTime(10, 0), 10L, 5, 2);
         flushAndClear();
 
@@ -100,7 +100,7 @@ class OrderItemRepositoryTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("평상시 기준선은 같은 날의 할인 행사 주문을 제외한다")
-    void findDailyRegularProductSales_excludesSaleOrders() {
+    void excludesSaleOrdersFromRegularSales() {
         confirmedOrder(DAY.atTime(10, 0), 10L, 3, 1);
         Order saleOrder = persistOrder();
         saleOrder.markPaid(DAY.atTime(10, 0));

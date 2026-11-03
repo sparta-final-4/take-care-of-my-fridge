@@ -79,7 +79,7 @@ class OrderControllerTest {
 
     @Test
     @DisplayName("주문 취소는 로그인한 회원 번호와 주문 번호로 서비스를 부르고 데이터 없이 200이다")
-    void cancelOrder_returns200() throws Exception {
+    void returns200WhenCancellingOrder() throws Exception {
         mvc.perform(patch("/api/orders/5001/cancel")
                         .with(csrf())
                         .with(loginAsMember7()))
@@ -91,7 +91,7 @@ class OrderControllerTest {
 
     @Test
     @DisplayName("결제가 끝난 주문을 취소하면 409다")
-    void cancelOrder_paidOrder_returns409() throws Exception {
+    void returns409WhenCancellingPaidOrder() throws Exception {
         doThrow(new BusinessException(ErrorCode.ORDER_ALREADY_PAID)).when(orderStatusFacade).cancel(7L, 5001L);
 
         mvc.perform(patch("/api/orders/5001/cancel")
@@ -103,7 +103,7 @@ class OrderControllerTest {
 
     @Test
     @DisplayName("구매 확정은 로그인한 회원 번호와 주문 번호로 서비스를 부르고 200이다")
-    void confirmOrder_returns200() throws Exception {
+    void returns200WhenConfirmingOrder() throws Exception {
         when(orderStatusFacade.confirm(7L, 5001L)).thenReturn(new OrderConfirmResponse(5001L, OrderStatus.CONFIRMED));
 
         mvc.perform(patch("/api/orders/5001/confirm")
@@ -116,7 +116,7 @@ class OrderControllerTest {
 
     @Test
     @DisplayName("결제 대기 주문을 구매 확정하면 409다")
-    void confirmOrder_pendingOrder_returns409() throws Exception {
+    void returns409WhenConfirmingPendingOrder() throws Exception {
         when(orderStatusFacade.confirm(7L, 5001L)).thenThrow(new BusinessException(ErrorCode.ORDER_NOT_PAID));
 
         mvc.perform(patch("/api/orders/5001/confirm")
@@ -128,7 +128,7 @@ class OrderControllerTest {
 
     @Test
     @DisplayName("구매 확정에서 남의 주문이거나 없는 주문이면 404다")
-    void confirmOrder_notOwned_returns404() throws Exception {
+    void returns404WhenConfirmingNotOwnedOrder() throws Exception {
         when(orderStatusFacade.confirm(7L, 5001L)).thenThrow(new BusinessException(ErrorCode.ORDER_NOT_FOUND));
 
         mvc.perform(patch("/api/orders/5001/confirm")
@@ -140,7 +140,7 @@ class OrderControllerTest {
 
     @Test
     @DisplayName("주문 상세 조회는 로그인한 회원 번호와 주문 번호로 서비스를 부르고 200이다")
-    void getDetail_returns200() throws Exception {
+    void returns200WhenGettingDetail() throws Exception {
         when(orderQueryService.getDetail(7L, 5001L)).thenReturn(detailResponse());
 
         mvc.perform(get("/api/orders/5001")
@@ -153,7 +153,7 @@ class OrderControllerTest {
 
     @Test
     @DisplayName("주문 상세 조회에서 남의 주문이거나 없는 주문이면 404다")
-    void getDetail_notOwned_returns404() throws Exception {
+    void returns404WhenGettingDetailOfNotOwnedOrder() throws Exception {
         when(orderQueryService.getDetail(7L, 5001L)).thenThrow(new BusinessException(ErrorCode.ORDER_NOT_FOUND));
 
         mvc.perform(get("/api/orders/5001")
@@ -164,7 +164,7 @@ class OrderControllerTest {
 
     @Test
     @DisplayName("주문 확인 조회는 로그인한 회원 번호와 주문 번호로 서비스를 부르고 200이다")
-    void getCheckout_returns200() throws Exception {
+    void returns200WhenGettingCheckout() throws Exception {
         when(orderQueryService.getCheckout(7L, 5001L)).thenReturn(response());
 
         mvc.perform(get("/api/orders/5001/checkout")
@@ -176,7 +176,7 @@ class OrderControllerTest {
 
     @Test
     @DisplayName("남의 주문이거나 없는 주문이면 404다")
-    void getCheckout_notOwned_returns404() throws Exception {
+    void returns404WhenGettingCheckoutOfNotOwnedOrder() throws Exception {
         when(orderQueryService.getCheckout(7L, 5001L)).thenThrow(new BusinessException(ErrorCode.ORDER_NOT_FOUND));
 
         mvc.perform(get("/api/orders/5001/checkout")
@@ -187,7 +187,7 @@ class OrderControllerTest {
 
     @Test
     @DisplayName("주문 목록은 페이지를 주지 않으면 1페이지 10개로 서비스를 부르고 200이다")
-    void getMyOrders_defaultPage_returns200() throws Exception {
+    void returns200ForDefaultPageOfMyOrders() throws Exception {
         PageResponse<OrderSummaryResponse> page = new PageResponse<>(
                 List.of(new OrderSummaryResponse(5001L, "20261020143005123001",
                         LocalDateTime.of(2026, 10, 20, 14, 30), 3000L, OrderStatus.PAID)),
@@ -204,7 +204,7 @@ class OrderControllerTest {
 
     @Test
     @DisplayName("주문 목록의 페이지 크기가 100을 넘으면 400이고 서비스를 부르지 않는다")
-    void getMyOrders_tooLargeSize_returns400() throws Exception {
+    void returns400ForTooLargeSizeOfMyOrders() throws Exception {
         mvc.perform(get("/api/orders")
                         .param("size", "101")
                         .with(loginAsMember7()))
@@ -216,7 +216,7 @@ class OrderControllerTest {
 
     @Test
     @DisplayName("새 주문이 만들어지면 201이다")
-    void createOrder_created_returns201() throws Exception {
+    void returns201WhenOrderIsCreated() throws Exception {
         when(orderFacade.create(eq(7L), eq("key-1"), any())).thenReturn(new OrderCreateResult(response(), true));
 
         mvc.perform(post("/api/orders")
@@ -231,7 +231,7 @@ class OrderControllerTest {
 
     @Test
     @DisplayName("같은 멱등 키로 이미 만든 주문을 돌려주면 200이다")
-    void createOrder_existing_returns200() throws Exception {
+    void returns200WhenOrderAlreadyExists() throws Exception {
         when(orderFacade.create(eq(7L), eq("key-1"), any())).thenReturn(new OrderCreateResult(response(), false));
 
         mvc.perform(post("/api/orders")
@@ -246,7 +246,7 @@ class OrderControllerTest {
 
     @Test
     @DisplayName("멱등 키 헤더가 없으면 서비스의 거절이 400으로 나간다")
-    void createOrder_missingKey_returns400() throws Exception {
+    void returns400WhenCreatingOrderWithMissingKey() throws Exception {
         when(orderFacade.create(eq(7L), isNull(), any()))
                 .thenThrow(new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "Idempotency-Key 헤더가 필요합니다. (64자 이하)"));
 
@@ -261,7 +261,7 @@ class OrderControllerTest {
 
     @Test
     @DisplayName("장바구니 항목 번호가 비어 있으면 400이고 서비스를 부르지 않는다")
-    void createOrder_emptyCartItemIds_returns400() throws Exception {
+    void returns400WhenCreatingOrderWithEmptyCartItemIds() throws Exception {
         mvc.perform(post("/api/orders")
                         .header("Idempotency-Key", "key-1")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -276,7 +276,7 @@ class OrderControllerTest {
 
     @Test
     @DisplayName("장바구니 항목 번호가 50개를 넘으면 400이고 서비스를 부르지 않는다")
-    void createOrder_tooManyCartItemIds_returns400() throws Exception {
+    void returns400WhenCreatingOrderWithTooManyCartItemIds() throws Exception {
         String items = IntStream.rangeClosed(1, 51)
                 .mapToObj(id -> "{\"cartItemId\": " + id + ", \"unitPrice\": 3000}")
                 .collect(Collectors.joining(","));

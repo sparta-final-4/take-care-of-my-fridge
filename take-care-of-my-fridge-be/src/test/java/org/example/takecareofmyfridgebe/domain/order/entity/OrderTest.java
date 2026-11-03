@@ -2,6 +2,7 @@ package org.example.takecareofmyfridgebe.domain.order.entity;
 
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
@@ -16,6 +17,7 @@ class OrderTest {
     }
 
     @Test
+    @DisplayName("새 주문은 결제 대기 상태로 시작한다")
     void newOrderStartsPending() {
         Order order = newOrder();
 
@@ -24,6 +26,7 @@ class OrderTest {
     }
 
     @Test
+    @DisplayName("결제 완료 처리하면 결제 시각이 기록된다")
     void markPaidRecordsPaidAt() {
         Order order = newOrder();
         LocalDateTime now = LocalDateTime.of(2026, 10, 13, 12, 0);
@@ -35,6 +38,7 @@ class OrderTest {
     }
 
     @Test
+    @DisplayName("결제 대기 상태에서만 취소할 수 있다")
     void cancelWorksOnlyWhilePending() {
         Order order = newOrder();
         order.markPaid(LocalDateTime.now());
@@ -44,6 +48,7 @@ class OrderTest {
     }
 
     @Test
+    @DisplayName("결제 완료 주문을 취소하면 이미 결제된 주문 오류가 난다")
     void cancelRejectsPaidOrderAsAlreadyPaid() {
         Order order = newOrder();
         order.markPaid(LocalDateTime.now());
@@ -54,6 +59,7 @@ class OrderTest {
     }
 
     @Test
+    @DisplayName("이미 취소된 주문을 취소하면 취소된 주문 오류가 난다")
     void cancelRejectsCancelledOrder() {
         Order order = newOrder();
         order.cancel();
@@ -65,6 +71,7 @@ class OrderTest {
     }
 
     @Test
+    @DisplayName("결제 완료 뒤에만 구매 확정할 수 있다")
     void confirmWorksOnlyAfterPaid() {
         Order order = newOrder();
 
@@ -79,6 +86,7 @@ class OrderTest {
     }
 
     @Test
+    @DisplayName("결제 대기 주문을 구매 확정하면 결제되지 않은 주문 오류가 난다")
     void confirmRejectsPendingOrderAsNotPaid() {
         Order order = newOrder();
 
@@ -89,6 +97,7 @@ class OrderTest {
     }
 
     @Test
+    @DisplayName("취소된 주문을 구매 확정하면 취소된 주문 오류가 난다")
     void confirmRejectsCancelledOrderAsCancelled() {
         Order order = newOrder();
         order.cancel();
@@ -100,6 +109,7 @@ class OrderTest {
     }
 
     @Test
+    @DisplayName("구매 확정 뒤에만 구매 확정 여부가 참이다")
     void isConfirmedIsTrueOnlyAfterConfirm() {
         Order order = newOrder();
         assertThat(order.isConfirmed()).isFalse();
@@ -112,11 +122,13 @@ class OrderTest {
     }
 
     @Test
+    @DisplayName("결제 대기 주문은 결제 대기 검증을 통과한다")
     void validatePendingPassesForPendingOrder() {
         newOrder().validatePending();
     }
 
     @Test
+    @DisplayName("결제 완료·구매 확정 주문은 결제 대기 검증에서 이미 결제된 주문 오류가 난다")
     void validatePendingRejectsPaidAndConfirmedOrder() {
         Order paid = newOrder();
         paid.markPaid(LocalDateTime.of(2026, 10, 21, 12, 0));
@@ -133,6 +145,7 @@ class OrderTest {
     }
 
     @Test
+    @DisplayName("취소된 주문은 결제 대기 검증에서 취소된 주문 오류가 난다")
     void validatePendingRejectsCancelledOrder() {
         Order cancelled = newOrder();
         cancelled.cancel();
@@ -143,6 +156,7 @@ class OrderTest {
     }
 
     @Test
+    @DisplayName("결제 완료 주문을 전액 환불 상태로 바꾼다")
     void markRefundedChangesPaidOrderToRefunded() {
         Order order = newOrder();
         order.markPaid(LocalDateTime.of(2026, 11, 2, 12, 0));
@@ -153,6 +167,7 @@ class OrderTest {
     }
 
     @Test
+    @DisplayName("결제 대기·구매 확정 주문은 전액 환불 상태로 바꿀 수 없다")
     void markRefundedRejectsPendingAndConfirmedOrder() {
         Order pending = newOrder();
         Order confirmed = newOrder();
@@ -170,6 +185,7 @@ class OrderTest {
     }
 
     @Test
+    @DisplayName("전액 환불된 주문을 구매 확정하면 전액 환불 주문 오류가 난다")
     void confirmRejectsRefundedOrderAsFullyRefunded() {
         Order order = newOrder();
         order.markPaid(LocalDateTime.of(2026, 11, 2, 12, 0));

@@ -38,7 +38,7 @@ class OrderConfirmedEventListenerTest extends KafkaContainerSupport {
 
     @Test
     @DisplayName("구매 확정 이벤트를 주문 ID를 키로 구매 확정 토픽에 보내고 주문 상품별 확정 수량을 싣는다")
-    void onOrderConfirmed_sendsToPurchaseConfirmedTopic() throws InterruptedException {
+    void sendsToPurchaseConfirmedTopic() throws InterruptedException {
         LocalDateTime confirmedAt = LocalDateTime.of(2026, 10, 30, 14, 30, 5);
         OrderConfirmedEvent event = new OrderConfirmedEvent(100L, 7L, confirmedAt, List.of(
             new OrderConfirmedEvent.Item(11L, 3L, "대파", 2),
