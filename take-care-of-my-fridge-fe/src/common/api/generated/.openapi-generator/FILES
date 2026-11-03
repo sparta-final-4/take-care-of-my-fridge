@@ -195,6 +195,7 @@ models/page-response-sale-event-list-response.ts
 models/page-response-settlement-payment-response.ts
 models/payment-confirm-request.ts
 models/payment-confirm-response.ts
+models/payment-prepare-request.ts
 models/payment-prepare-response.ts
 models/popular-recipe-request.ts
 models/popular-recipe-response.ts
@@ -241,6 +242,7 @@ models/sale-events-create-response.ts
 models/sale-response.ts
 models/sales-amount-response.ts
 models/search-click-request.ts
+models/search-recipe-click-request.ts
 models/settlement-payment-response.ts
 models/settlement-payment-search-request.ts
 models/settlement-period-response.ts

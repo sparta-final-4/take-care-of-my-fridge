@@ -30,6 +30,8 @@ import type { ApiResponsePaymentPrepareResponse } from '../models';
 import type { ApiResponseVoid } from '../models';
 // @ts-ignore
 import type { PaymentConfirmRequest } from '../models';
+// @ts-ignore
+import type { PaymentPrepareRequest } from '../models';
 /**
  * PaymentControllerApi - axios parameter creator
  */
@@ -105,12 +107,15 @@ export const PaymentControllerApiAxiosParamCreator = function (configuration?: C
         /**
          * 
          * @param {number} orderId 
+         * @param {PaymentPrepareRequest} paymentPrepareRequest 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        prepare: async (orderId: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+        prepare: async (orderId: number, paymentPrepareRequest: PaymentPrepareRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
             // verify required parameter 'orderId' is not null or undefined
             assertParamExists('prepare', 'orderId', orderId)
+            // verify required parameter 'paymentPrepareRequest' is not null or undefined
+            assertParamExists('prepare', 'paymentPrepareRequest', paymentPrepareRequest)
             const localVarPath = `/api/orders/{orderId}/payments`
                 .replace('{orderId}', encodeURIComponent(String(orderId)));
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
@@ -124,11 +129,13 @@ export const PaymentControllerApiAxiosParamCreator = function (configuration?: C
             const localVarHeaderParameter = {} as any;
             const localVarQueryParameter = {} as any;
 
+            localVarHeaderParameter['Content-Type'] = 'application/json';
             localVarHeaderParameter['Accept'] = '*/*';
 
             setSearchParams(localVarUrlObj, localVarQueryParameter);
             let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
             localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(paymentPrepareRequest, localVarRequestOptions, configuration)
 
             return {
                 url: toPathString(localVarUrlObj),
@@ -171,11 +178,12 @@ export const PaymentControllerApiFp = function(configuration?: Configuration) {
         /**
          * 
          * @param {number} orderId 
+         * @param {PaymentPrepareRequest} paymentPrepareRequest 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async prepare(orderId: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ApiResponsePaymentPrepareResponse>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.prepare(orderId, options);
+        async prepare(orderId: number, paymentPrepareRequest: PaymentPrepareRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ApiResponsePaymentPrepareResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.prepare(orderId, paymentPrepareRequest, options);
             const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
             const localVarOperationServerBasePath = operationServerMap['PaymentControllerApi.prepare']?.[localVarOperationServerIndex]?.url;
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
@@ -214,7 +222,7 @@ export const PaymentControllerApiFactory = function (configuration?: Configurati
          * @throws {RequiredError}
          */
         prepare(requestParameters: PaymentControllerApiPrepareRequest, options?: RawAxiosRequestConfig): AxiosPromise<ApiResponsePaymentPrepareResponse> {
-            return localVarFp.prepare(requestParameters.orderId, options).then((request) => request(axios, basePath));
+            return localVarFp.prepare(requestParameters.orderId, requestParameters.paymentPrepareRequest, options).then((request) => request(axios, basePath));
         },
     };
 };
@@ -268,6 +276,8 @@ export interface PaymentControllerApiFailRequest {
  */
 export interface PaymentControllerApiPrepareRequest {
     readonly orderId: number
+
+    readonly paymentPrepareRequest: PaymentPrepareRequest
 }
 
 /**
@@ -301,7 +311,7 @@ export class PaymentControllerApi extends BaseAPI implements PaymentControllerAp
      * @throws {RequiredError}
      */
     public prepare(requestParameters: PaymentControllerApiPrepareRequest, options?: RawAxiosRequestConfig) {
-        return PaymentControllerApiFp(this.configuration).prepare(requestParameters.orderId, options).then((request) => request(this.axios, this.basePath));
+        return PaymentControllerApiFp(this.configuration).prepare(requestParameters.orderId, requestParameters.paymentPrepareRequest, options).then((request) => request(this.axios, this.basePath));
     }
 }
 
