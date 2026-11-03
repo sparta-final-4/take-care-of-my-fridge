@@ -1,26 +1,39 @@
 package org.example.takecareofmyfridgebe.domain.ingredient.service;
 
+import org.example.takecareofmyfridgebe.domain.ingredient.config.IngredientMatchProperties;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.Ingredient;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.StorageType;
 import org.example.takecareofmyfridgebe.domain.ingredient.repository.IngredientRepository;
+import org.example.takecareofmyfridgebe.domain.search.dto.IngredientCandidate;
+import org.example.takecareofmyfridgebe.domain.search.service.IngredientNameSearchService;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Stream;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -38,8 +51,16 @@ class IngredientMatcherTest {
     @Mock
     private IngredientRepository ingredientRepository;
 
-    @InjectMocks
+    @Mock
+    private IngredientNameSearchService ingredientNameSearchService;
+
     private IngredientMatcher ingredientMatcher;
+
+    @BeforeEach
+    void setUp() {
+        ingredientMatcher = new IngredientMatcher(
+                ingredientRepository, ingredientNameSearchService, new IngredientMatchProperties(1.0, 2));
+    }
 
     /**
      * 괄호 안 문구([특가], (500g))와 숫자+단위(10구, 300g, 2개입)가 제거되고
@@ -258,5 +279,111 @@ class IngredientMatcherTest {
                 () -> ingredientMatcher.match("엄마표 겉절이")
         );
         assertEquals(ErrorCode.CUSTOM_INGREDIENT_NOT_CONFIGURED, exception.getErrorCode());
+    }
+
+    // ===== 후보 검색(findCandidates) 연결: 점수는 실제 인덱스에서 측정한 값을 그대로 넣는다 =====
+
+    // DB에 있는 표준 재료. 입력 원문 이름은 없고 후보 이름만 있다
+    private static final List<String> DB_NAMES =
+            List.of("달걀", "우유", "대파", "참외", "꿀", "마늘", "루콜라", "골파", "양파", "쪽파");
+
+    private static Stream<Arguments> measuredCandidates() {
+        return Stream.of(
+                Arguments.of("계란", List.of(new IngredientCandidate("달걀", 1.0)), "달걀"),
+                Arguments.of("서울우유", List.of(new IngredientCandidate("우유", 0.57)), "우유"),
+                Arguments.of("국산 흙대파", List.of(new IngredientCandidate("대파", 0.48)), "대파"),
+                Arguments.of("꿀참외", List.of(
+                        new IngredientCandidate("꿀", 0.61), new IngredientCandidate("참외", 0.50)), "참외"),
+                Arguments.of("마늘빵", List.of(new IngredientCandidate("마늘", 0.60)), "기타"),
+                Arguments.of("콜라", List.of(new IngredientCandidate("루콜라", 0.82)), "기타"),
+                Arguments.of("새우깡", List.of(), "기타"),
+                Arguments.of("파", List.of(
+                        new IngredientCandidate("골파", 0.82),
+                        new IngredientCandidate("양파", 0.82),
+                        new IngredientCandidate("쪽파", 0.82)), "기타")
+        );
+    }
+
+    @ParameterizedTest(name = "{0} → {2}")
+    @MethodSource("measuredCandidates")
+    @DisplayName("DB에 없는 이름은 1등이 정확 일치(1.0)거나, 입력 끝이 두 글자 이상 후보 이름과 같을 때만 그 후보로 매핑한다")
+    void matchAdoptsCandidateByExactScoreOrSuffix(String rawName, List<IngredientCandidate> candidates, String expected) {
+        givenDatabase();
+        when(ingredientNameSearchService.findCandidates(rawName)).thenReturn(candidates);
+
+        Ingredient matched = ingredientMatcher.match(rawName);
+
+        assertEquals(expected, matched.getName());
+    }
+
+    @Test
+    @DisplayName("DB에 같은 이름이 있으면 후보 검색을 부르지 않는다")
+    void matchAllSkipsCandidateSearchWhenFoundInDatabase() {
+        givenDatabase();
+
+        Map<String, Ingredient> matched = ingredientMatcher.matchAll(List.of("우유 1L", "[특가] 대파"));
+
+        assertEquals("우유", matched.get("우유 1L").getName());
+        assertEquals("대파", matched.get("[특가] 대파").getName());
+        verify(ingredientNameSearchService, never()).findCandidates(anyString());
+        verify(ingredientRepository, times(1)).findByNameIn(anyCollection());
+    }
+
+    @Test
+    @DisplayName("여러 이름이면 못 찾은 이름만 후보 검색하고, 채택한 후보 이름들은 DB에서 한 번에 다시 찾는다")
+    void matchAllSearchesOnlyUnmatchedAndRequeriesAdoptedOnce() {
+        givenDatabase();
+        when(ingredientNameSearchService.findCandidates("서울우유"))
+                .thenReturn(List.of(new IngredientCandidate("우유", 0.57)));
+        when(ingredientNameSearchService.findCandidates("국산 흙대파"))
+                .thenReturn(List.of(new IngredientCandidate("대파", 0.48)));
+        when(ingredientNameSearchService.findCandidates("새우깡")).thenReturn(List.of());
+
+        Map<String, Ingredient> matched = ingredientMatcher.matchAll(
+                List.of("우유", "서울우유 900ml", "국산 흙대파 1단", "새우깡"));
+
+        assertEquals("우유", matched.get("우유").getName());
+        assertEquals("우유", matched.get("서울우유 900ml").getName());
+        assertEquals("대파", matched.get("국산 흙대파 1단").getName());
+        assertEquals("기타", matched.get("새우깡").getName());
+        verify(ingredientNameSearchService, times(3)).findCandidates(anyString());
+        verify(ingredientNameSearchService, never()).findCandidates("우유");
+        verify(ingredientRepository).findByNameIn(Set.of("우유", "서울우유", "국산 흙대파", "새우깡"));
+        verify(ingredientRepository).findByNameIn(Set.of("우유", "대파"));
+        verify(ingredientRepository, times(2)).findByNameIn(anyCollection());
+    }
+
+    @Test
+    @DisplayName("후보 검색이 예외를 던져도 밖으로 내보내지 않고 그 이름은 기타로 등록한다")
+    void matchAllFallsBackToCustomWhenCandidateSearchFails() {
+        givenDatabase();
+        when(ingredientNameSearchService.findCandidates(any())).thenThrow(new IllegalStateException("es down"));
+
+        Map<String, Ingredient> matched = assertDoesNotThrow(
+                () -> ingredientMatcher.matchAll(List.of("서울우유", "우유")));
+
+        assertEquals("기타", matched.get("서울우유").getName());
+        assertEquals("우유", matched.get("우유").getName());
+    }
+
+    // DB: 이름이 같은 표준 재료만 돌려주고, ING_CUSTOM은 "기타"
+    private void givenDatabase() {
+        when(ingredientRepository.findByNameIn(anyCollection())).thenAnswer(invocation -> {
+            Collection<String> names = invocation.getArgument(0);
+            return DB_NAMES.stream().filter(names::contains).map(name -> ingredient("ING_" + name, name)).toList();
+        });
+        lenient().when(ingredientRepository.findByIngredientCode(Ingredient.ING_CUSTOM))
+                .thenReturn(Optional.of(ingredient(Ingredient.ING_CUSTOM, "기타")));
+    }
+
+    private static Ingredient ingredient(String code, String name) {
+        return Ingredient.builder()
+                .ingredientCode(code)
+                .name(name)
+                .baseUnit("개")
+                .defaultStorage(StorageType.REFRIGERATED)
+                .defaultShelfDays(7)
+                .basicSeasoning(false)
+                .build();
     }
 }

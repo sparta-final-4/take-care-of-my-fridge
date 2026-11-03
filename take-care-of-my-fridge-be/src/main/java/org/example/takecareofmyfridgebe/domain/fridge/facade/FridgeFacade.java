@@ -44,7 +44,7 @@ public class FridgeFacade {
     /**
      * [냉장고 재료 매핑 및 등록]
      * ingredient 도메인(표준 재료 매핑)과 fridge 도메인(냉장고 저장)을 조율한다.
-     * 추후 Elasticsearch 외부 I/O가 추가되는 매핑 단계를 DB 트랜잭션 밖에 두기 위해
+     * Elasticsearch 재료 후보 검색(외부 I/O)이 있는 매핑 단계를 DB 트랜잭션 밖에 두기 위해
      * Facade에는 트랜잭션을 걸지 않고, 엔티티 조립 후 FridgeService.saveItems에서 한 트랜잭션으로 저장한다.
      *
      * @param memberId 로그인한 회원 ID
@@ -81,7 +81,7 @@ public class FridgeFacade {
      * [냉장고 재료 수정 및 선택적 재매핑]
      * 본인 재료 여부를 먼저 확인한 뒤, 입력된 rawName이 기존과 다를 때만 표준 재료를 다시 매핑한다.
      * 단, 밀키트(ING_MEALKIT) 재료는 이름을 바꿔도 다시 매핑하지 않고 밀키트로 유지한다.
-     * 추후 Elasticsearch 외부 I/O가 추가되는 매핑 단계를 DB 쓰기 트랜잭션 밖에 두기 위해
+     * Elasticsearch 재료 후보 검색(외부 I/O)이 있는 매핑 단계를 DB 쓰기 트랜잭션 밖에 두기 위해
      * Facade에는 트랜잭션을 걸지 않고, 매핑 확정 후 FridgeService.updateItem에서 수정한다.
      *
      * @param memberId 로그인한 회원 ID
