@@ -241,6 +241,7 @@ models/sale-events-create-response.ts
 models/sale-response.ts
 models/sales-amount-response.ts
 models/search-click-request.ts
+models/search-recipe-click-request.ts
 models/settlement-payment-response.ts
 models/settlement-payment-search-request.ts
 models/settlement-period-response.ts

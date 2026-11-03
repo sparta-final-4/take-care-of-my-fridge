@@ -205,6 +205,7 @@ export * from './sale-events-create-response';
 export * from './sale-response';
 export * from './sales-amount-response';
 export * from './search-click-request';
+export * from './search-recipe-click-request';
 export * from './settlement-payment-response';
 export * from './settlement-payment-search-request';
 export * from './settlement-period-response';

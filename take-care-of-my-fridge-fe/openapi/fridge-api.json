@@ -2894,6 +2894,36 @@
         ]
       }
     },
+    "/api/search/recipe-clicks": {
+      "post": {
+        "operationId": "recordRecipeClick",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchRecipeClickRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "search-controller"
+        ]
+      }
+    },
     "/api/search/recipes": {
       "get": {
         "operationId": "searchRecipes",
@@ -8157,6 +8187,24 @@
         "required": [
           "keyword",
           "productId"
+        ]
+      },
+      "SearchRecipeClickRequest": {
+        "type": "object",
+        "properties": {
+          "keyword": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 0
+          },
+          "recipeId": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "required": [
+          "keyword",
+          "recipeId"
         ]
       },
       "ServerSentEventString": {},
