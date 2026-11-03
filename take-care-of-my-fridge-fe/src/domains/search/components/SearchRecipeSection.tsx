@@ -1,6 +1,7 @@
 import { ReloadOutlined } from '@ant-design/icons';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { Button, Col, Empty, Flex, Pagination, Result, Row, Skeleton } from 'antd';
+import type { MouseEvent } from 'react';
 import { Link } from 'react-router';
 
 import { ROUTES } from '@/app/paths';
@@ -9,6 +10,7 @@ import { SectionLoading } from '@/common/components/SectionLoading';
 import { RecipeCard } from '@/domains/recipe/components/RecipeCard';
 import { COOK_TIME_OPTIONS } from '@/domains/recipe/format';
 import { recipeQueries } from '@/domains/recipe/queries';
+import { recordSearchRecipeClick } from '@/domains/search/api';
 import { SearchFilterRow } from '@/domains/search/components/SearchFilterRow';
 import { searchQueries } from '@/domains/search/queries';
 import {
@@ -36,6 +38,18 @@ export function SearchRecipeSection() {
   // 분류를 못 받아 오면 음식 종류 칩 줄만 비워 두고 조리 시간 필터는 그대로 쓴다.
   const { data: classifications } = useQuery(recipeQueries.classifications());
   const cuisineTypes = classifications?.cuisineTypes ?? [];
+  const { mutate: recordClick } = useMutation({
+    mutationFn: recordSearchRecipeClick,
+    // 클릭 기록은 사용자가 모르게 남긴다. 실패해도 알리지 않고 상세 이동은 그대로 한다.
+    meta: { skipGlobalError: true },
+  });
+
+  // 카드의 상세 링크를 누를 때만 기록한다.
+  const handleClickRecipe = (recipeId: number) => (event: MouseEvent<HTMLElement>) => {
+    const link = event.target instanceof Element ? event.target.closest('a') : null;
+    if (!link || !event.currentTarget.contains(link)) return;
+    recordClick({ recipeId, keyword });
+  };
 
   const handleChangePage = (nextPage: number) => {
     setPage(nextPage);
@@ -103,7 +117,15 @@ export function SearchRecipeSection() {
             <Flex vertical gap="large">
               <Row gutter={[16, 16]}>
                 {recipes.map((recipe) => (
-                  <Col key={recipe.recipeId} xs={12} md={8} lg={6}>
+                  <Col
+                    key={recipe.recipeId}
+                    xs={12}
+                    md={8}
+                    lg={6}
+                    onClick={
+                      recipe.recipeId === undefined ? undefined : handleClickRecipe(recipe.recipeId)
+                    }
+                  >
                     <RecipeCard recipe={recipe} />
                   </Col>
                 ))}
