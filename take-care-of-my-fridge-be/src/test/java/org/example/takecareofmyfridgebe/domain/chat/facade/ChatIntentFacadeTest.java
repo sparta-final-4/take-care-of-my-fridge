@@ -9,6 +9,7 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntentResolution;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntentResolution.Source;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageCreateRequest;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageMode;
+import org.example.takecareofmyfridgebe.domain.chat.dto.DetailQuestion;
 import org.example.takecareofmyfridgebe.domain.chat.dto.IntentResult;
 import org.example.takecareofmyfridgebe.domain.chat.dto.KeywordMatch;
 import org.example.takecareofmyfridgebe.domain.chat.dto.LastRecommendation;
@@ -480,8 +481,29 @@ class ChatIntentFacadeTest {
             assertThat(resolution.recommends()).isTrue();
         }
 
+        @Test
+        @DisplayName("레시피 자세히의 질문 종류를 넘긴다 (두 번째 거 어떻게 만들어 → HOW_TO, 시간 → TIME, 재료 → INGREDIENTS)")
+        void passesDetailQuestion() {
+            assertThat(resolveDetail("두 번째 거 어떻게 만들어?", detail(2, null, "HOW_TO")).detailQuestion())
+                    .isEqualTo(DetailQuestion.HOW_TO);
+            assertThat(resolveDetail("첫 번째 거는 시간 얼마나 걸려?", detail(1, null, "TIME")).detailQuestion())
+                    .isEqualTo(DetailQuestion.TIME);
+            assertThat(resolveDetail("그거 재료 뭐 들어가?", detail(1, null, "INGREDIENTS")).detailQuestion())
+                    .isEqualTo(DetailQuestion.INGREDIENTS);
+        }
+
+        private ChatIntentResolution resolveDetail(String message, IntentResult result) {
+            givenExtracted(result);
+            return facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of(message), context);
+        }
+
         private static IntentResult detail(Integer index, String name) {
-            return new IntentResult(ChatIntent.RECIPE_DETAIL, null, null, null, null, null, null, null, null, null, index, name);
+            return detail(index, name, null);
+        }
+
+        private static IntentResult detail(Integer index, String name, String question) {
+            return new IntentResult(ChatIntent.RECIPE_DETAIL, null, null, null, null, null, null, null, null, null, index, name,
+                    null, null, question);
         }
     }
 

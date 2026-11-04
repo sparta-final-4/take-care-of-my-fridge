@@ -80,9 +80,9 @@ public class ChatIntentFacade {
     public ChatIntentResolution resolve(Long memberId, Long sessionId, ChatMessageCreateRequest request, ChatContext context) {
         Decision decision = decide(memberId, sessionId, request, context);
         ChatIntentResolution resolution = decision.resolution();
-        log.info("상담 의도 - memberId: {}, sessionId: {}, 의도: {}, 출처: {}, 조건: {}, 지울 조건(removed): {}, 대상 레시피: {}",
+        log.info("상담 의도 - memberId: {}, sessionId: {}, 의도: {}, 출처: {}, 조건: {}, 지울 조건(removed): {}, 대상 레시피: {}, 질문 종류: {}",
                 memberId, sessionId, resolution.intent(), resolution.source(), summarize(resolution.recipeQuery()),
-                decision.removed(), resolution.targetRecipeId());
+                decision.removed(), resolution.targetRecipeId(), resolution.detailQuestion());
         return resolution;
     }
 
@@ -148,7 +148,8 @@ public class ChatIntentFacade {
                 memberId, sessionId, result.wantedTastes(), result.avoidTastes(), wanted, avoid);
         return new IntentResult(result.intent(), wanted, result.moodCategories(), result.maxMinutes(), result.includeIngredients(),
                 result.excludeIngredients(), result.useSelectedOnly(), result.keywords(), result.dishText(),
-                result.preferenceText(), result.targetIndex(), result.targetName(), result.removed(), avoid);
+                result.preferenceText(), result.targetIndex(), result.targetName(), result.removed(), avoid,
+                result.detailQuestion());
     }
 
     private static boolean sameTastes(List<String> corrected, List<String> original) {
@@ -236,7 +237,7 @@ public class ChatIntentFacade {
                     memberId, sessionId, result.targetIndex(), result.targetName());
             return ChatIntentResolution.general(Source.AI);
         }
-        return ChatIntentResolution.recipeDetail(Source.AI, recipeId);
+        return ChatIntentResolution.recipeDetail(Source.AI, recipeId, result.question());
     }
 
     /**

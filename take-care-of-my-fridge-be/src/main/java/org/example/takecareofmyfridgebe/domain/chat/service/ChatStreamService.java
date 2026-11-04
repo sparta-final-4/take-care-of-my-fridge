@@ -8,6 +8,7 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.ChatErrorEventResponse;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntent;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntentResolution;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageCreateRequest;
+import org.example.takecareofmyfridgebe.domain.chat.dto.DetailQuestion;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageEventResponse;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageResponse;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationTextEventResponse;
@@ -163,7 +164,9 @@ public class ChatStreamService {
         ChatContext context = chatContextFacade.load(sessionId);
         ChatIntentResolution resolution = chatIntentFacade.resolve(memberId, sessionId, request, context);
         if (resolution != null && resolution.intent() == ChatIntent.RECIPE_DETAIL) {
-            return planRecipeDetail(memberId, sessionId, resolution.targetRecipeId(), context);
+            // 사용자 말 대신 질문 종류로 만든 질문을 넘긴다 ("두 번째 거"를 단계 번호로 알아듣지 않게). 저장하는 사용자 메시지는 원래 말
+            String question = DetailQuestion.questionFor(resolution.detailQuestion(), request.content());
+            return planRecipeDetail(memberId, sessionId, resolution.targetRecipeId(), question, context);
         }
         if (resolution == null || !resolution.recommends()) {
             return ReplyPlan.general(context);
@@ -185,10 +188,10 @@ public class ChatStreamService {
     }
 
     // 레시피 자세히: 레시피 정보와 카드 하나를 만든다. 레시피가 지워졌으면 정해진 답, 읽다 실패하면 일반 답
-    private ReplyPlan planRecipeDetail(Long memberId, Long sessionId, Long recipeId, ChatContext context) {
+    private ReplyPlan planRecipeDetail(Long memberId, Long sessionId, Long recipeId, String question, ChatContext context) {
         try {
             return chatRecommendationFacade.describe(memberId, recipeId)
-                    .map(detail -> new ReplyPlan(context, null, null, detail, false))
+                    .map(detail -> new ReplyPlan(context, null, null, detail.withQuestion(question), false))
                     .orElseGet(() -> {
                         log.info("상담 레시피 자세히 대상이 지워짐 - memberId: {}, sessionId: {}, recipeId: {}", memberId, sessionId, recipeId);
                         return new ReplyPlan(context, null, null, null, true);
@@ -205,7 +208,8 @@ public class ChatStreamService {
             return Flux.just(RECIPE_GONE_REPLY);
         }
         if (plan.detail() != null) {
-            return chatReplyGenerator.generateRecipeDetail(memberId, sessionId, content, plan.detail().recipeInfo());
+            String question = plan.detail().question() == null ? content : plan.detail().question();
+            return chatReplyGenerator.generateRecipeDetail(memberId, sessionId, question, plan.detail().recipeInfo());
         }
         if (plan.recommendation() == null) {
             // 일반 답에만 이전 대화(최근 3턴)를 넣는다. 추천 설명은 후보 정보로 충분하다
@@ -297,7 +301,9 @@ public class ChatStreamService {
             List<Integer> receivedNumbers = new ArrayList<>();
             for (int i = 0; i < recipes.size(); i++) {
                 String description = i < descriptions.size() ? descriptions.get(i).toString().strip() : "";
-                cards.add(new RecommendationToSave(recipes.get(i).recipeId(), description.isEmpty() ? null : description));
+                // AI 설명이 없으면 카드에 미리 정한 설명(레시피 자세히 카드의 "물어보신 레시피예요")을 저장한다
+                String saved = description.isEmpty() ? recipes.get(i).description() : description;
+                cards.add(new RecommendationToSave(recipes.get(i).recipeId(), saved));
                 if (!description.isEmpty()) {
                     receivedNumbers.add(i + 1);
                 }

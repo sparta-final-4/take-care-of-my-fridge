@@ -63,6 +63,8 @@ class ChatIntentPromptTest {
                 "맛을 피하는 말(\"~ 말고\"가 맛이면)은 removed가 아니라 avoidTastes에 쓴다",
                 "[직전 조건]의 피할 맛은 그대로 이어 쓰고, 이번에 그 맛을 원하면 뺀다",
                 "REFINE이 아니면 removed는 빈 목록",
+                "detailQuestion: 무엇을 묻는지. HOW_TO(만드는 법), TIME(조리 시간), INGREDIENTS(재료), TIP(팁·요령), OTHER(그 밖)",
+                "\"두 번째 거 어떻게 만들어?\" → HOW_TO",
                 "새 요리 이름이나 새 조건으로 처음부터 추천해 달라는 말(\"김치찌개 먹고 싶어\")은 RECOMMEND");
     }
 

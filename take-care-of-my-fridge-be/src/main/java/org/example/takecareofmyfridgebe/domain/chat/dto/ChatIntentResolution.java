@@ -8,12 +8,14 @@ package org.example.takecareofmyfridgebe.domain.chat.dto;
  * @param source         의도를 정한 방법
  * @param recipeQuery    추천 조건 (REFINE이면 직전 조건과 합친 것). RECOMMEND·REFINE이 아니면 null
  * @param targetRecipeId RECIPE_DETAIL일 때 물어본 레시피 ID. 그 밖에는 null
+ * @param detailQuestion RECIPE_DETAIL일 때 질문 종류 (모르면 null, OTHER처럼 다룬다). 그 밖에는 null
  */
 public record ChatIntentResolution(
         ChatIntent intent,
         Source source,
         RecipeQuery recipeQuery,
-        Long targetRecipeId
+        Long targetRecipeId,
+        DetailQuestion detailQuestion
 ) {
 
     public enum Source {
@@ -26,19 +28,23 @@ public record ChatIntentResolution(
     }
 
     public static ChatIntentResolution general(Source source) {
-        return new ChatIntentResolution(ChatIntent.GENERAL, source, null, null);
+        return new ChatIntentResolution(ChatIntent.GENERAL, source, null, null, null);
     }
 
     public static ChatIntentResolution recommend(Source source, RecipeQuery recipeQuery) {
-        return new ChatIntentResolution(ChatIntent.RECOMMEND, source, recipeQuery, null);
+        return new ChatIntentResolution(ChatIntent.RECOMMEND, source, recipeQuery, null, null);
     }
 
     public static ChatIntentResolution refine(Source source, RecipeQuery recipeQuery) {
-        return new ChatIntentResolution(ChatIntent.REFINE, source, recipeQuery, null);
+        return new ChatIntentResolution(ChatIntent.REFINE, source, recipeQuery, null, null);
     }
 
     public static ChatIntentResolution recipeDetail(Source source, Long recipeId) {
-        return new ChatIntentResolution(ChatIntent.RECIPE_DETAIL, source, null, recipeId);
+        return recipeDetail(source, recipeId, null);
+    }
+
+    public static ChatIntentResolution recipeDetail(Source source, Long recipeId, DetailQuestion question) {
+        return new ChatIntentResolution(ChatIntent.RECIPE_DETAIL, source, null, recipeId, question);
     }
 
     // 후보를 찾아 카드로 추천하는지 (새 추천·다시 추천)

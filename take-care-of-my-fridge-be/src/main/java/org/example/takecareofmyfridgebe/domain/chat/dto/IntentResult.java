@@ -31,6 +31,7 @@ import java.util.stream.Collectors;
  * @param targetName         RECIPE_DETAIL일 때 말한 레시피 이름 (예: "깐풍기"). 없으면 빈 문자열
  * @param removed            REFINE일 때 지우라고 한 조건 종류 (RefineCondition 이름, "시간 상관없이" → MAX_MINUTES). 없으면 빈 목록
  * @param avoidTastes        피할 맛 (Member.Taste 이름, "매운 거 말고" → SPICY). 말하지 않았으면 빈 목록
+ * @param detailQuestion     RECIPE_DETAIL일 때 질문 종류 (DetailQuestion 이름: HOW_TO, TIME, INGREDIENTS, TIP, OTHER). 다른 의도면 빈 값
  */
 public record IntentResult(
         ChatIntent intent,
@@ -46,13 +47,18 @@ public record IntentResult(
         Integer targetIndex,
         String targetName,
         List<String> removed,
-        List<String> avoidTastes
+        List<String> avoidTastes,
+        String detailQuestion
 ) {
 
     // 레시피 검색에 쓸 요리 이름 키워드 최대 개수
     public static final int MAX_KEYWORDS = 6;
 
     private static final Set<String> TASTE_NAMES = Arrays.stream(Member.Taste.values())
+            .map(Enum::name)
+            .collect(Collectors.toUnmodifiableSet());
+
+    private static final Set<String> QUESTION_NAMES = Arrays.stream(DetailQuestion.values())
             .map(Enum::name)
             .collect(Collectors.toUnmodifiableSet());
 
@@ -80,6 +86,14 @@ public record IntentResult(
                         List<String> removed) {
         this(intent, wantedTastes, moodCategories, maxMinutes, includeIngredients, excludeIngredients, useSelectedOnly,
                 keywords, dishText, preferenceText, targetIndex, targetName, removed, null);
+    }
+
+    public IntentResult(ChatIntent intent, List<String> wantedTastes, List<String> moodCategories, Integer maxMinutes,
+                        List<String> includeIngredients, List<String> excludeIngredients, Boolean useSelectedOnly,
+                        List<String> keywords, String dishText, String preferenceText, Integer targetIndex, String targetName,
+                        List<String> removed, List<String> avoidTastes) {
+        this(intent, wantedTastes, moodCategories, maxMinutes, includeIngredients, excludeIngredients, useSelectedOnly,
+                keywords, dishText, preferenceText, targetIndex, targetName, removed, avoidTastes, null);
     }
 
     // 의도만 있고 조건은 하나도 말하지 않은 결과
@@ -112,7 +126,10 @@ public record IntentResult(
                 targetIndex == null || targetIndex <= 0 ? null : targetIndex,
                 targetName == null || targetName.isBlank() ? null : targetName.strip(),
                 cleanNames(removed, name -> name.toUpperCase(Locale.ROOT), CONDITION_NAMES),
-                cleanNames(avoidTastes, name -> name.toUpperCase(Locale.ROOT), TASTE_NAMES)
+                cleanNames(avoidTastes, name -> name.toUpperCase(Locale.ROOT), TASTE_NAMES),
+                detailQuestion == null || !QUESTION_NAMES.contains(detailQuestion.strip().toUpperCase(Locale.ROOT))
+                        ? null
+                        : detailQuestion.strip().toUpperCase(Locale.ROOT)
         );
     }
 
@@ -125,6 +142,11 @@ public record IntentResult(
                 .filter(CONDITION_NAMES::contains)
                 .map(RefineCondition::valueOf)
                 .collect(Collectors.toUnmodifiableSet());
+    }
+
+    // 레시피 자세히 질문 종류. sanitize한 뒤에 쓴다 (없으면 null)
+    public DetailQuestion question() {
+        return detailQuestion == null || !QUESTION_NAMES.contains(detailQuestion) ? null : DetailQuestion.valueOf(detailQuestion);
     }
 
     // 피할 맛을 Member.Taste로 바꾼다. sanitize한 뒤에 쓴다 (말하지 않았으면 빈 목록)

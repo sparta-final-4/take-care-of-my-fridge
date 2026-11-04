@@ -38,4 +38,10 @@ class ChatRecipeDetailPromptTest {
                 "\"(뒤 n단계 생략)\"이 있으면 뒤 단계를 지어내지 말고 카드를 눌러 보라고 말한다",
                 "[냉장고 기준]은 냉장고에 있는지, 장볼 게 있는지, 만들 수 있는지 물었을 때만 말한다");
     }
+
+    @Test
+    @DisplayName("질문의 번호는 레시피를 가리키는 말이라 단계 번호로 해석하지 않게 한다")
+    void forbidsReadingOrdinalAsStep() {
+        assertThat(prompt).contains("질문에 나온 번호(\"두 번째\")는 레시피를 가리키는 말이다. 단계 번호로 해석하지 않는다");
+    }
 }

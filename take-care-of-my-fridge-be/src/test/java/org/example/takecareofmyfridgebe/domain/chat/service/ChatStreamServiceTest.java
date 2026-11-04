@@ -10,6 +10,7 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageMode;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageResponse;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse.RecommendedRecipe;
+import org.example.takecareofmyfridgebe.domain.chat.dto.DetailQuestion;
 import org.example.takecareofmyfridgebe.domain.chat.dto.LastRecommendation;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeDetailReply;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeQuery;
@@ -841,12 +842,15 @@ class ChatStreamServiceTest {
         Long sessionId = 10L;
         ChatMessageCreateRequest request = ChatMessageCreateRequest.of("두 번째 거 어떻게 만들어?");
         when(chatIntentFacade.resolve(eq(1L), eq(sessionId), eq(request), any()))
-                .thenReturn(ChatIntentResolution.recipeDetail(Source.AI, 315L));
+                .thenReturn(ChatIntentResolution.recipeDetail(Source.AI, 315L, DetailQuestion.HOW_TO));
+        RecommendedRecipe detailCard = new RecommendedRecipe(315L, "두부전", null, "전", 20, List.of(), List.of(), List.of(),
+                List.of(), List.of(), false, "물어보신 레시피예요", "물어보신 레시피예요");
         when(chatRecommendationFacade.describe(1L, 315L)).thenReturn(Optional.of(
-                new RecipeDetailReply(ChatRecommendationsEventResponse.of(List.of(card(315L, "두부전"))), "[레시피 정보]")));
-        when(chatReplyGenerator.generateRecipeDetail(1L, sessionId, "두 번째 거 어떻게 만들어?", "[레시피 정보]"))
+                new RecipeDetailReply(ChatRecommendationsEventResponse.of(List.of(detailCard)), "[레시피 정보]")));
+        // AI에는 사용자 말 대신 질문 종류로 만든 질문이 간다 ("두 번째"를 단계 번호로 알아듣지 않게)
+        when(chatReplyGenerator.generateRecipeDetail(1L, sessionId, "이 레시피 만드는 법을 처음부터 끝까지 알려줘", "[레시피 정보]"))
                 .thenReturn(Flux.just("1. 두부를 ", "부쳐요."));
-        List<RecommendationToSave> expectedCards = List.of(new RecommendationToSave(315L, null));
+        List<RecommendationToSave> expectedCards = List.of(new RecommendationToSave(315L, "물어보신 레시피예요"));
         when(chatMessageService.saveExchange(sessionId, "두 번째 거 어떻게 만들어?", "1. 두부를 부쳐요.", expectedCards))
                 .thenReturn(List.of(
                         new ChatMessageResponse(100L, 1, ChatMessageRole.USER, "두 번째 거 어떻게 만들어?", LocalDateTime.now()),
@@ -857,6 +861,7 @@ class ChatStreamServiceTest {
         assertThat(events).extracting(ServerSentEvent::event).containsExactly("recommendations", "message", "message", "done");
         assertThat(events.get(0).data()).contains("\"recipeId\":315");
         verify(chatMessageService).saveExchange(sessionId, "두 번째 거 어떻게 만들어?", "1. 두부를 부쳐요.", expectedCards);
+        verify(chatReplyGenerator, never()).generateRecipeDetail(any(), any(), eq("두 번째 거 어떻게 만들어?"), any());
         verify(chatContextStore).touch(sessionId);
         verify(chatContextStore, never()).saveRecommendation(any(), any(), any());
     }

@@ -45,7 +45,8 @@ import java.util.stream.Stream;
 @RequiredArgsConstructor
 public class ChatRecommendationFacade {
 
-    // 레시피 자세히 답에 붙는 카드 한 줄 이유 (설명 글이 없어 이 줄이 보인다)
+    // 레시피 자세히 답에 붙는 카드 한 줄. 카드 설명으로도 넣어 저장하므로(화면은 설명이 있으면 이유 줄을 숨김)
+    // 답 받을 때와 다시 불러올 때 모두 이 줄만 보이고, 지금 냉장고 기준 이유("내일까지인 깻잎…")는 보이지 않는다
     static final String DETAIL_CARD_REASON = "물어보신 레시피예요";
     // 레시피 정보 DEBUG 로그에 남길 앞부분 글자 수
     private static final int RECIPE_INFO_LOG_LENGTH = 300;
@@ -148,9 +149,10 @@ public class ChatRecommendationFacade {
         }
         RecommendedRecipe card = candidate == null
                 ? new RecommendedRecipe(recipe.recipeId(), recipe.name(), recipe.imageUrl(), recipe.category(),
-                recipe.cookTimeMin(), List.of(), List.of(), List.of(), List.of(), List.of(), false, DETAIL_CARD_REASON, null)
+                recipe.cookTimeMin(), List.of(), List.of(), List.of(), List.of(), List.of(), false, DETAIL_CARD_REASON,
+                DETAIL_CARD_REASON)
                 : toCard(candidate, new RecipeSummary(recipe.recipeId(), recipe.name(), recipe.imageUrl(), recipe.tipSummary()),
-                DETAIL_CARD_REASON, null);
+                DETAIL_CARD_REASON, DETAIL_CARD_REASON);
         return Optional.of(new RecipeDetailReply(ChatRecommendationsEventResponse.of(List.of(card)), recipeInfo));
     }
 

@@ -191,7 +191,8 @@ class ChatRecommendationFacadeTest {
         assertThat(card.recipeId()).isEqualTo(20L);
         assertThat(card.imageUrl()).isEqualTo("https://img/20.jpg");
         assertThat(card.reason()).isEqualTo("물어보신 레시피예요");
-        assertThat(card.description()).isNull();
+        // 설명으로도 넣어 저장하므로 답 받을 때·다시 불러올 때 모두 이유 줄 대신 이 줄만 보인다
+        assertThat(card.description()).isEqualTo("물어보신 레시피예요");
         assertThat(reply.recipeInfo()).startsWith("[레시피 정보]\n이름: 깐풍기").contains("1. 닭을 튀긴다.", "[냉장고 기준]");
     }
 

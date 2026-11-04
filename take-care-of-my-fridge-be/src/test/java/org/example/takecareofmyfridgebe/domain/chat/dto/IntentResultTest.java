@@ -112,4 +112,17 @@ class IntentResultTest {
         assertThat(result.avoidedTastes()).containsExactly(Taste.SPICY);
         assertThat(IntentResult.general().avoidedTastes()).isEmpty();
     }
+
+    @Test
+    @DisplayName("레시피 자세히 질문 종류는 정해진 이름만 남기고 소문자는 대문자로 맞추며, 없거나 모르는 값이면 null이다")
+    void sanitizesDetailQuestion() {
+        IntentResult howTo = new IntentResult(ChatIntent.RECIPE_DETAIL, null, null, null, null, null, null, null, null, null,
+                2, null, null, null, " how_to ").sanitize(CATEGORIES);
+        IntentResult unknown = new IntentResult(ChatIntent.RECIPE_DETAIL, null, null, null, null, null, null, null, null, null,
+                2, null, null, null, "STEP").sanitize(CATEGORIES);
+
+        assertThat(howTo.question()).isEqualTo(DetailQuestion.HOW_TO);
+        assertThat(unknown.question()).isNull();
+        assertThat(IntentResult.general().question()).isNull();
+    }
 }
