@@ -1,0 +1,158 @@
+package org.example.takecareofmyfridgebe.domain.payment.service;
+
+import jakarta.persistence.EntityManager;
+import org.example.takecareofmyfridgebe.domain.member.entity.Member;
+import org.example.takecareofmyfridgebe.domain.payment.dto.BillingKeyResponse;
+import org.example.takecareofmyfridgebe.domain.payment.entity.BillingKey;
+import org.example.takecareofmyfridgebe.domain.payment.entity.CardType;
+import org.example.takecareofmyfridgebe.domain.payment.port.BillingKeyInfo;
+import org.example.takecareofmyfridgebe.global.config.JpaAuditingConfig;
+import org.example.takecareofmyfridgebe.global.config.QueryDslConfig;
+import org.example.takecareofmyfridgebe.global.error.BusinessException;
+import org.example.takecareofmyfridgebe.global.error.ErrorCode;
+import org.example.takecareofmyfridgebe.support.MySqlContainerSupport;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
+import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
+import org.springframework.context.annotation.Import;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+@DataJpaTest
+@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
+@Import({JpaAuditingConfig.class, QueryDslConfig.class, BillingKeyService.class})
+class BillingKeyServiceTest extends MySqlContainerSupport {
+
+    private final BillingKeyService billingKeyService;
+    private final EntityManager entityManager;
+
+    private Long memberId;
+    private Long otherMemberId;
+
+    @Autowired
+    BillingKeyServiceTest(BillingKeyService billingKeyService, EntityManager entityManager) {
+        this.billingKeyService = billingKeyService;
+        this.entityManager = entityManager;
+    }
+
+    @BeforeEach
+    void setUp() {
+        memberId = member("card@example.com", "카드회원");
+        otherMemberId = member("other@example.com", "다른회원");
+    }
+
+    @Test
+    @DisplayName("첫 카드를 등록하면 대표 카드로 저장하고 카드 정보를 돌려준다")
+    void register_saveAsDefault_whenFirstCard() {
+        BillingKeyResponse response = billingKeyService.register(memberId, info("billing-key-1"));
+
+        assertThat(response.cardId()).isNotNull();
+        assertThat(response.isDefault()).isTrue();
+        assertThat(response.cardName()).isEqualTo("신한카드 Deep Dream");
+        assertThat(response.cardLast4()).isEqualTo("1234");
+        assertThat(response.cardType()).isEqualTo(CardType.CREDIT);
+    }
+
+    @Test
+    @DisplayName("두 번째 카드부터는 대표 카드가 아니다")
+    void register_saveAsNotDefault_whenCardExists() {
+        billingKeyService.register(memberId, info("billing-key-1"));
+
+        BillingKeyResponse second = billingKeyService.register(memberId, info("billing-key-2"));
+
+        assertThat(second.isDefault()).isFalse();
+    }
+
+    @Test
+    @DisplayName("같은 빌링키로 다시 등록하면 새로 저장하지 않고 처음 저장한 카드를 돌려준다")
+    void register_returnExisting_whenSameBillingKey() {
+        BillingKeyResponse first = billingKeyService.register(memberId, info("billing-key-1"));
+
+        BillingKeyResponse again = billingKeyService.register(memberId, info("billing-key-1"));
+
+        assertThat(again.cardId()).isEqualTo(first.cardId());
+        assertThat(billingKeyService.getCards(memberId)).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("다른 회원이 이미 저장한 빌링키를 등록하면 확인 실패로 거절한다")
+    void register_throwException_whenBillingKeyOfOtherMember() {
+        billingKeyService.register(otherMemberId, info("billing-key-1"));
+
+        assertThatThrownBy(() -> billingKeyService.register(memberId, info("billing-key-1")))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode").isEqualTo(ErrorCode.BILLING_KEY_NOT_VERIFIED);
+    }
+
+    @Test
+    @DisplayName("사용 중 카드가 5장이면 등록 준비와 등록을 모두 거절한다")
+    void register_throwException_whenFiveCards() {
+        for (int i = 1; i <= 5; i++) {
+            billingKeyService.register(memberId, info("billing-key-" + i));
+        }
+
+        assertThatThrownBy(() -> billingKeyService.validateRegistrable(memberId))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode").isEqualTo(ErrorCode.BILLING_KEY_LIMIT_EXCEEDED);
+        assertThatThrownBy(() -> billingKeyService.register(memberId, info("billing-key-6")))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode").isEqualTo(ErrorCode.BILLING_KEY_LIMIT_EXCEEDED);
+    }
+
+    @Test
+    @DisplayName("삭제한 카드는 5장 한도와 목록에서 빠진다")
+    void getCards_excludeDeleted() {
+        for (int i = 1; i <= 5; i++) {
+            billingKeyService.register(memberId, info("billing-key-" + i));
+        }
+        BillingKey deleted = entityManager.createQuery(
+                        "select b from BillingKey b where b.billingKey = 'billing-key-3'", BillingKey.class)
+                .getSingleResult();
+        deleted.delete(LocalDateTime.now());
+        entityManager.flush();
+
+        billingKeyService.validateRegistrable(memberId);
+        assertThat(billingKeyService.getCards(memberId)).hasSize(4)
+                .extracting(BillingKeyResponse::cardId).doesNotContain(deleted.getId());
+    }
+
+    @Test
+    @DisplayName("카드 목록은 대표 카드를 먼저, 그다음 최근에 등록한 카드 순으로 돌려주고 다른 회원 카드는 넣지 않는다")
+    void getCards_orderDefaultFirstThenLatest() {
+        BillingKeyResponse first = billingKeyService.register(memberId, info("billing-key-1"));
+        BillingKeyResponse second = billingKeyService.register(memberId, info("billing-key-2"));
+        BillingKeyResponse third = billingKeyService.register(memberId, info("billing-key-3"));
+        billingKeyService.register(otherMemberId, info("billing-key-9"));
+
+        List<BillingKeyResponse> cards = billingKeyService.getCards(memberId);
+
+        assertThat(cards).extracting(BillingKeyResponse::cardId)
+                .containsExactly(first.cardId(), third.cardId(), second.cardId());
+    }
+
+    @Test
+    @DisplayName("없는 회원으로 등록하면 회원 없음 오류가 난다")
+    void register_throwException_whenMemberNotFound() {
+        assertThatThrownBy(() -> billingKeyService.register(-1L, info("billing-key-1")))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode").isEqualTo(ErrorCode.MEMBER_NOT_FOUND);
+    }
+
+    private BillingKeyInfo info(String billingKey) {
+        return new BillingKeyInfo(billingKey, true, "member-" + memberId, "신한카드 Deep Dream", "53275012****1234",
+                CardType.CREDIT);
+    }
+
+    private Long member(String email, String nickname) {
+        Member member = Member.builder().email(email).passwordHash("hash").nickname(nickname).build();
+        entityManager.persist(member);
+        return member.getId();
+    }
+}

@@ -157,6 +157,8 @@ portone:
     inicis: ${PORTONE_CHANNEL_INICIS:channel-key-d302b8e8-dec4-488d-83eb-8b8f8b325b21}
     tosspayments: ${PORTONE_CHANNEL_TOSSPAYMENTS:channel-key-b82ea224-4515-4a6f-9465-0a13d9c79213}
     tosspay: ${PORTONE_CHANNEL_TOSSPAY:channel-key-9b866d23-24cb-47cf-8530-f712f8ddddc6}
+  # 토스페이먼츠 정기결제(빌링) 테스트 채널. 카드 등록(빌링키 발급)과 등록 카드 결제에 쓴다
+  billing-channel-key: ${PORTONE_CHANNEL_BILLING:channel-key-8cbf22a0-1ed2-445e-b639-e613828f3ed1}
   # WebhookVerifier가 기동 시 whsec_ 뒤를 base64로 풀기 때문에 형식만 맞춘 임의 값("local-dummy-webhook-secret")
   webhook-secret: ${PORTONE_WEBHOOK_SECRET:whsec_bG9jYWwtZHVtbXktd2ViaG9vay1zZWNyZXQ=}
 
