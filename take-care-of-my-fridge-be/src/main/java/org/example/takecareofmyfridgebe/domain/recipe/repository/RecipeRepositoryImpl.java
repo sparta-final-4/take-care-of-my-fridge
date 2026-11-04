@@ -8,6 +8,8 @@ import com.querydsl.core.types.dsl.StringPath;
 import com.querydsl.jpa.impl.JPAQuery;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import lombok.RequiredArgsConstructor;
+import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeCandidateIngredient;
+import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeIngredientCountDto;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeIngredientNameDto;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeListRequest;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeSort;
@@ -18,6 +20,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.support.PageableExecutionUtils;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 
 import static org.example.takecareofmyfridgebe.domain.ingredient.entity.QIngredient.ingredient;
@@ -82,6 +85,61 @@ public class RecipeRepositoryImpl implements RecipeRepositoryCustom {
                 .join(ingredient).on(ingredient.id.eq(recipeIngredient.ingredientId))
                 .where(recipeIdEq(recipeIngredient.recipe.id, recipeId))
                 .orderBy(recipeIngredient.recipe.id.asc(), recipeIngredient.seq.asc())
+                .fetch();
+    }
+
+    @Override
+    public List<RecipeCandidateIngredient> findCandidateIngredients(Collection<Long> ingredientIds) {
+        return queryFactory
+                .select(Projections.constructor(RecipeCandidateIngredient.class,
+                        recipeIngredient.recipe.id,
+                        recipeIngredient.ingredientId,
+                        ingredient.name,
+                        ingredient.basicSeasoning
+                ))
+                .distinct()
+                .from(recipeIngredient)
+                .join(ingredient).on(ingredient.id.eq(recipeIngredient.ingredientId))
+                .where(recipeIngredient.ingredientId.in(ingredientIds))
+                .fetch();
+    }
+
+    @Override
+    public List<RecipeIngredientCountDto> countNonBasicIngredients(Collection<Long> recipeIds) {
+        return queryFactory
+                .select(Projections.constructor(RecipeIngredientCountDto.class,
+                        recipeIngredient.recipe.id,
+                        recipeIngredient.ingredientId.countDistinct()
+                ))
+                .from(recipeIngredient)
+                .join(ingredient).on(ingredient.id.eq(recipeIngredient.ingredientId))
+                .where(
+                        recipeIngredient.recipe.id.in(recipeIds),
+                        ingredient.basicSeasoning.isFalse()
+                )
+                .groupBy(recipeIngredient.recipe.id)
+                .fetch();
+    }
+
+    @Override
+    public List<RecipeCandidateIngredient> findNonBasicIngredients(Collection<Long> recipeIds) {
+        return queryFactory
+                .select(Projections.constructor(RecipeCandidateIngredient.class,
+                        recipeIngredient.recipe.id,
+                        recipeIngredient.ingredientId,
+                        ingredient.name,
+                        ingredient.basicSeasoning
+                ))
+                .from(recipeIngredient)
+                .join(ingredient).on(ingredient.id.eq(recipeIngredient.ingredientId))
+                .where(
+                        recipeIngredient.recipe.id.in(recipeIds),
+                        ingredient.basicSeasoning.isFalse()
+                )
+                // 같은 재료가 양념 그룹 등으로 여러 번 나와도 한 줄로 묶는다
+                .groupBy(recipeIngredient.recipe.id, recipeIngredient.ingredientId, ingredient.name,
+                        ingredient.basicSeasoning)
+                .orderBy(recipeIngredient.recipe.id.asc(), recipeIngredient.seq.min().asc())
                 .fetch();
     }
 
