@@ -24,8 +24,9 @@ $recipe-sort-select-width: 130px;
 // 내 레시피 관리 표. 좁은 화면에서는 이보다 줄이지 않고 가로 스크롤한다(레시피 이름 칸이 최소한 남는 너비).
 $recipe-table-min-width: 520px;
 $history-date-width: 44px;
-// AI 상담 추천 카드 이미지 (채팅창 380px에서 이름·태그가 한 줄 이상 남는 크기)
-$chat-recommend-thumb-size: 64px;
+// AI 상담 추천 카드: 이미지 48px + 위아래 여백으로 카드 한 장 약 72px. 왼쪽 들여쓰기는 AI 말풍선(아바타 24px + 간격 8px)에 맞춘다
+$chat-recommend-thumb-size: 48px;
+$chat-assistant-indent: 32px;
 
 // 12px(var(--ant-font-size-sm))보다 작은 아이콘 치수. 글자는 antd 단계(12 / 14 / 16 / 20 / 24 / 30)만 쓴다.
 $font-size-2xs: 10px;

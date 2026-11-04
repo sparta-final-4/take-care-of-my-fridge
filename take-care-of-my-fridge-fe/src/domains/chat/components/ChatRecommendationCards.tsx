@@ -1,13 +1,13 @@
 import { DownOutlined, UpOutlined } from '@ant-design/icons';
-import { Button, Flex, Tag, Typography } from 'antd';
-import { useState } from 'react';
+import { Button, Tag, Typography } from 'antd';
+import { useId, useState } from 'react';
 import { generatePath, Link } from 'react-router';
 
 import { ROUTES } from '@/app/paths';
 import { FallbackImage } from '@/common/components/FallbackImage';
 import { ddayTagColor } from '@/domains/fridge/format';
 
-import { type ChatRecommendedRecipe, formatImminentLabel } from '../recommendations';
+import { type ChatRecommendedRecipe, summarizeImminent } from '../recommendations';
 import styles from './ChatRecommendationCards.module.scss';
 
 interface ChatRecommendationCardsProps {
@@ -16,7 +16,7 @@ interface ChatRecommendationCardsProps {
   onNavigate?: () => void;
 }
 
-// AI 상담 추천 카드 (최대 3개). 채팅창 380px에 맞게 세로로 쌓는다.
+// AI 상담 추천 카드 (최대 3개). 설명 말풍선 아래에 작은 카드(약 72px)를 세로로 쌓는다.
 export function ChatRecommendationCards({ recipes, onNavigate }: ChatRecommendationCardsProps) {
   if (recipes.length === 0) return null;
   return (
@@ -34,7 +34,9 @@ interface RecommendationCardProps {
 }
 
 function RecommendationCard({ recipe, onNavigate }: RecommendationCardProps) {
-  const [showMissing, setShowMissing] = useState(false);
+  const [showShopping, setShowShopping] = useState(false);
+  const shoppingListId = useId();
+  const imminent = summarizeImminent(recipe.imminentIngredients);
   const meta = [
     recipe.category,
     recipe.cookTimeMin === null ? '시간 정보 없음' : `${recipe.cookTimeMin}분`,
@@ -44,66 +46,68 @@ function RecommendationCard({ recipe, onNavigate }: RecommendationCardProps) {
 
   return (
     <li className={styles.card}>
+      {/* 카드 전체를 덮는 링크. 장볼 재료 버튼만 링크 위에 올려 따로 누른다 */}
       <Link
         to={generatePath(ROUTES.recipeDetail, { recipeId: String(recipe.recipeId) })}
         onClick={onNavigate}
-        className={styles.link}
-      >
+        className={styles.cardLink}
+        aria-label={`${recipe.name} 레시피 보기`}
+      />
+      <div className={styles.row}>
         <FallbackImage
           src={recipe.imageUrl}
-          alt={recipe.name}
+          alt=""
           kind="recipe"
           size="small"
           className={styles.thumb}
         />
-        <Flex vertical gap={4} className={styles.body}>
-          <Typography.Text strong ellipsis className={styles.name}>
-            {recipe.name}
-          </Typography.Text>
-          <Typography.Text type="secondary" className={styles.meta}>
-            {meta}
-          </Typography.Text>
-          <Flex wrap gap={4}>
-            {recipe.missingSelectedIngredients.map((name) => (
-              <Tag key={`missing-${name}`} variant="filled" color="error" className={styles.tag}>
-                {name} 없음
+        <div className={styles.body}>
+          <div className={styles.titleLine}>
+            <Typography.Text strong ellipsis className={styles.name}>
+              {recipe.name}
+            </Typography.Text>
+            <span className={styles.meta}>{meta}</span>
+          </div>
+          <div className={styles.infoLine}>
+            {imminent && (
+              <Tag variant="filled" color={ddayTagColor(imminent.dDay)} className={styles.tag}>
+                {imminent.label}
               </Tag>
-            ))}
-            {recipe.imminentIngredients.map((ingredient) => (
-              <Tag
-                key={`imminent-${ingredient.name}`}
-                variant="filled"
-                color={ddayTagColor(ingredient.dDay)}
-                className={styles.tag}
+            )}
+            {recipe.missingSelectedIngredients.length > 0 && (
+              <Tag variant="filled" color="error" className={styles.tag}>
+                {recipe.missingSelectedIngredients.join('·')} 없음
+              </Tag>
+            )}
+            {recipe.missingIngredients.length > 0 && (
+              <Button
+                type="link"
+                size="small"
+                onClick={() => setShowShopping((shown) => !shown)}
+                aria-expanded={showShopping}
+                aria-controls={shoppingListId}
+                className={styles.shoppingToggle}
               >
-                {ingredient.name} {formatImminentLabel(ingredient.dDay)}
-              </Tag>
-            ))}
+                장볼 재료 {recipe.missingIngredients.length}
+                {showShopping ? <UpOutlined /> : <DownOutlined />}
+              </Button>
+            )}
             {recipe.lacksManyIngredients && (
               <Tag variant="filled" color="warning" className={styles.tag}>
                 장보기 필요
               </Tag>
             )}
-          </Flex>
-        </Flex>
-      </Link>
-      {recipe.missingIngredients.length > 0 && (
-        <div className={styles.missing}>
-          <Button
-            type="link"
-            size="small"
-            onClick={() => setShowMissing((shown) => !shown)}
-            aria-expanded={showMissing}
-            className={styles.missingToggle}
-          >
-            부족한 재료 {recipe.missingIngredients.length}개{' '}
-            {showMissing ? <UpOutlined /> : <DownOutlined />}
-          </Button>
-          {showMissing && (
-            <Typography.Text type="secondary" className={styles.missingNames}>
-              {recipe.missingIngredients.map((ingredient) => ingredient.name).join(', ')}
-            </Typography.Text>
-          )}
+          </div>
+        </div>
+      </div>
+      {showShopping && (
+        <div id={shoppingListId} className={styles.shopping}>
+          <Typography.Text className={styles.shoppingNames}>
+            {recipe.missingIngredients.map((ingredient) => ingredient.name).join(', ')}
+          </Typography.Text>
+          <Typography.Text type="secondary" className={styles.shoppingNote}>
+            소금·간장 같은 기본 양념은 빼고 셌어요
+          </Typography.Text>
         </div>
       )}
     </li>

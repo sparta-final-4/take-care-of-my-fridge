@@ -104,3 +104,15 @@ export function formatImminentLabel(dDay: number): string {
   if (dDay === 2) return '모레까지';
   return `${dDay}일 남음`;
 }
+
+// 가장 급한 날짜의 임박 재료만 한 줄로 ("고추·깻잎 내일까지"). 없으면 null
+export function summarizeImminent(
+  imminent: ChatRecommendationImminentIngredient[],
+): { label: string; dDay: number } | null {
+  if (imminent.length === 0) return null;
+  const dDay = Math.min(...imminent.map((ingredient) => ingredient.dDay));
+  const names = imminent
+    .filter((ingredient) => ingredient.dDay === dDay)
+    .map((ingredient) => ingredient.name);
+  return { label: `${names.join('·')} ${formatImminentLabel(dDay)}`, dDay };
+}

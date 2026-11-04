@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatImminentLabel, parseChatRecommendations } from './recommendations';
+import {
+  formatImminentLabel,
+  parseChatRecommendations,
+  summarizeImminent,
+} from './recommendations';
 
 describe('parseChatRecommendations', () => {
   it('recommendations 이벤트 data를 읽어 카드 정보로 바꾼다', () => {
@@ -83,5 +87,21 @@ describe('formatImminentLabel', () => {
     expect(formatImminentLabel(1)).toBe('내일까지');
     expect(formatImminentLabel(2)).toBe('모레까지');
     expect(formatImminentLabel(3)).toBe('3일 남음');
+  });
+});
+
+describe('summarizeImminent', () => {
+  it('가장 급한 날짜의 재료만 모아 한 줄로 쓰고 그 날짜를 돌려준다', () => {
+    expect(
+      summarizeImminent([
+        { name: '고추', dDay: 1 },
+        { name: '대파', dDay: 2 },
+        { name: '깻잎', dDay: 1 },
+      ]),
+    ).toEqual({ label: '고추·깻잎 내일까지', dDay: 1 });
+  });
+
+  it('임박 재료가 없으면 null을 돌려준다', () => {
+    expect(summarizeImminent([])).toBeNull();
   });
 });

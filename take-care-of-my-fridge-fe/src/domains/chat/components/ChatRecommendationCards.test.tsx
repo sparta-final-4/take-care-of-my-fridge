@@ -31,7 +31,7 @@ function render(recipes: ChatRecommendedRecipe[]) {
 }
 
 describe('ChatRecommendationCards', () => {
-  it('카드마다 이름·분류·조리 시간을 보여 주고 누르면 레시피 상세로 간다', () => {
+  it('첫 줄에 이름과 분류·조리 시간을 보여 주고, 카드를 누르면 레시피 상세로 간다', () => {
     const html = render([
       recipe({}),
       recipe({ recipeId: 139, name: '참치김치찌개', cookTimeMin: null }),
@@ -41,40 +41,42 @@ describe('ChatRecommendationCards', () => {
     expect(html).toContain('국 · 25분');
     expect(html).toContain('국 · 시간 정보 없음');
     expect(html).toContain('href="/recipes/631"');
-    expect(html).toContain('href="/recipes/139"');
+    expect(html).toContain('aria-label="참치김치찌개 레시피 보기"');
   });
 
-  it('임박 재료는 오늘까지·내일까지로, 냉장고에 없는 선택 재료는 "없음"으로, 많이 모자라면 장보기 필요로 보여 준다', () => {
+  it('둘째 줄에 가장 급한 임박 재료 하나, 냉장고에 없는 선택 재료, 장볼 재료 수, 장보기 필요를 보여 준다', () => {
     const html = render([
       recipe({
         imminentIngredients: [
           { name: '고추', dDay: 1 },
-          { name: '대파', dDay: 0 },
+          { name: '깻잎', dDay: 1 },
+          { name: '대파', dDay: 2 },
         ],
         missingSelectedIngredients: ['두부'],
+        missingIngredients: [
+          { ingredientId: 1, name: '장어' },
+          { ingredientId: 2, name: '생강' },
+        ],
         lacksManyIngredients: true,
       }),
     ]);
 
-    expect(html).toContain('고추 내일까지');
-    expect(html).toContain('대파 오늘까지');
+    expect(html).toContain('고추·깻잎 내일까지');
+    expect(html).not.toContain('대파 모레까지');
     expect(html).toContain('두부 없음');
+    expect(html).toContain('장볼 재료 2');
     expect(html).toContain('장보기 필요');
   });
 
-  it('부족한 재료는 개수만 보여 주고 이름은 펼쳐야 보인다', () => {
-    const html = render([
-      recipe({
-        missingIngredients: [
-          { ingredientId: 1, name: '멸치' },
-          { ingredientId: 2, name: '다시마' },
-        ],
-      }),
-    ]);
+  it('장볼 재료 이름과 기본 양념 안내는 펼쳐야 보인다', () => {
+    const html = render([recipe({ missingIngredients: [{ ingredientId: 1, name: '장어' }] })]);
 
-    expect(html).toContain('부족한 재료 2개');
     expect(html).toContain('aria-expanded="false"');
-    expect(html).not.toContain('멸치, 다시마');
+    expect(html).not.toContain('기본 양념은 빼고 셌어요');
+  });
+
+  it('장볼 재료가 없으면 장볼 재료 버튼을 그리지 않는다', () => {
+    expect(render([recipe({})])).not.toContain('장볼 재료');
   });
 
   it('추천 레시피가 없으면 아무것도 그리지 않는다', () => {
