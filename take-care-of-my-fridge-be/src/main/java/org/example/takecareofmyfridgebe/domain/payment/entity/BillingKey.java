@@ -48,7 +48,7 @@ public class BillingKey extends BaseTimeEntity {
     private String cardName;
 
     // 카드 번호 끝 4자리. PortOne의 마스킹된 카드 번호(card.number)에서 뽑는다
-    @Column(name = "card_last4", length = 4)
+    @Column(name = "card_last4", columnDefinition = "CHAR(4)")
     private String cardLast4;
 
     @Enumerated(EnumType.STRING)
