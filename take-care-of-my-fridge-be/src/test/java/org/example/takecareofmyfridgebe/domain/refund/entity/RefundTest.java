@@ -19,14 +19,14 @@ class RefundTest {
 
     @Test
     @DisplayName("새 환불은 요청 상태다")
-    void newRefund_isRequested() {
+    void build_createRequestedRefund() {
         assertThat(refund.getStatus()).isEqualTo(RefundStatus.REQUESTED);
         assertThat(refund.getRefundedAt()).isNull();
     }
 
     @Test
     @DisplayName("요청 상태의 환불을 완료하면 취소 ID와 환불 시각이 남는다")
-    void complete_requested() {
+    void complete_markCompleted_whenRequested() {
         refund.complete("cancellation-1", REFUNDED_AT);
 
         assertThat(refund.getStatus()).isEqualTo(RefundStatus.COMPLETED);
@@ -36,7 +36,7 @@ class RefundTest {
 
     @Test
     @DisplayName("요청 상태의 환불을 실패 처리하면 사유가 남고 환불 시각은 비어 있다")
-    void fail_requested() {
+    void fail_markFailed_whenRequested() {
         refund.fail("PG 오류");
 
         assertThat(refund.getStatus()).isEqualTo(RefundStatus.FAILED);
@@ -46,7 +46,7 @@ class RefundTest {
 
     @Test
     @DisplayName("실패 사유가 컬럼 길이를 넘으면 잘라서 저장한다")
-    void fail_truncatesLongReason() {
+    void fail_truncateReason_whenReasonTooLong() {
         refund.fail("가".repeat(300));
 
         assertThat(refund.getFailReason()).hasSize(255);
@@ -54,7 +54,7 @@ class RefundTest {
 
     @Test
     @DisplayName("완료된 환불은 다시 완료하거나 실패 처리할 수 없다")
-    void completed_cannotChange() {
+    void completeAndFail_throwException_whenAlreadyCompleted() {
         refund.complete("cancellation-1", REFUNDED_AT);
 
         assertInvalidState(() -> refund.complete("cancellation-2", REFUNDED_AT));
@@ -63,7 +63,7 @@ class RefundTest {
 
     @Test
     @DisplayName("실패한 환불은 다시 완료하거나 실패 처리할 수 없다")
-    void failed_cannotChange() {
+    void completeAndFail_throwException_whenAlreadyFailed() {
         refund.fail("PG 오류");
 
         assertInvalidState(() -> refund.complete("cancellation-1", REFUNDED_AT));
@@ -73,7 +73,6 @@ class RefundTest {
     private void assertInvalidState(Runnable action) {
         assertThatThrownBy(action::run)
                 .isInstanceOf(BusinessException.class)
-                .extracting(e -> ((BusinessException) e).getErrorCode())
-                .isEqualTo(ErrorCode.INVALID_REFUND_STATE);
+                .extracting("errorCode").isEqualTo(ErrorCode.INVALID_REFUND_STATE);
     }
 }

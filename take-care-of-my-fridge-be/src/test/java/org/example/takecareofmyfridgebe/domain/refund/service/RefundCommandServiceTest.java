@@ -84,7 +84,7 @@ class RefundCommandServiceTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("일부 수량을 환불 신청하면 단가 × 수량 금액으로 요청 상태 환불이 저장된다")
-    void partialRefund() {
+    void request_saveRequestedRefund_whenPartialQuantity() {
         RefundRequested requested = refundCommandService.request(MEMBER_ID, request(order.getId(), item(itemA, 2)));
         Long refundId = requested.refundId();
         flushAndClear();
@@ -103,7 +103,7 @@ class RefundCommandServiceTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("여러 상품을 한 번에 환불하면 금액을 합산한다")
-    void multipleItems() {
+    void request_sumAmount_whenMultipleItems() {
         Long refundId = refundCommandService.request(MEMBER_ID,
                 request(order.getId(), item(itemA, 1), item(itemB, 3))).refundId();
         flushAndClear();
@@ -114,7 +114,7 @@ class RefundCommandServiceTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("남은 수량까지는 다시 신청할 수 있고 넘으면 거절한다")
-    void remainingQuantity() {
+    void request_throwException_whenExceedRemainingQuantity() {
         Long first = refundCommandService.request(MEMBER_ID, request(order.getId(), item(itemA, 3))).refundId();
         refundCommandService.complete(first, "cancellation-1", PaymentChangedBy.USER);
         Long second = refundCommandService.request(MEMBER_ID, request(order.getId(), item(itemA, 2))).refundId();
@@ -126,14 +126,14 @@ class RefundCommandServiceTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("한 번에 주문 수량보다 많이 신청하면 거절한다")
-    void exceedOrderQuantity() {
+    void request_throwException_whenExceedOrderQuantity() {
         assertError(() -> refundCommandService.request(MEMBER_ID, request(order.getId(), item(itemA, 6))),
                 ErrorCode.EXCEED_REFUNDABLE_QUANTITY);
     }
 
     @Test
     @DisplayName("구매 확정된 주문은 환불할 수 없다")
-    void confirmedOrder() {
+    void request_throwException_whenOrderConfirmed() {
         Order confirmed = entityManager.find(Order.class, order.getId());
         confirmed.confirm(LocalDateTime.now());
         flushAndClear();
@@ -144,7 +144,7 @@ class RefundCommandServiceTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("결제 전 주문은 환불할 수 없다")
-    void pendingOrder() {
+    void request_throwException_whenOrderPending() {
         Order pending = order("20261022-000002");
         OrderItem item = orderItem(pending, 10L, 1, 3000, SaleType.NONE);
         flushAndClear();
@@ -155,14 +155,14 @@ class RefundCommandServiceTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("다른 회원의 주문은 없는 주문처럼 거절한다")
-    void otherMembersOrder() {
+    void request_throwException_whenOtherMembersOrder() {
         assertError(() -> refundCommandService.request(OTHER_MEMBER_ID, request(order.getId(), item(itemA, 1))),
                 ErrorCode.ORDER_NOT_FOUND);
     }
 
     @Test
     @DisplayName("다른 주문의 상품은 환불할 수 없다")
-    void otherOrdersItem() {
+    void request_throwException_whenOtherOrdersItem() {
         Order other = order("20261022-000003");
         OrderItem otherItem = orderItem(other, 10L, 1, 3000, SaleType.NONE);
         flushAndClear();
@@ -173,7 +173,7 @@ class RefundCommandServiceTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("특가·번개 드롭 상품은 환불할 수 없다")
-    void saleItems() {
+    void request_throwException_whenSaleItem() {
         assertError(() -> refundCommandService.request(MEMBER_ID, request(order.getId(), item(specialItem, 1))),
                 ErrorCode.NON_REFUNDABLE_SALE_ITEM);
         assertError(() -> refundCommandService.request(MEMBER_ID, request(order.getId(), item(flashDropItem, 1))),
@@ -182,14 +182,14 @@ class RefundCommandServiceTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("같은 상품을 한 요청에 두 번 넣으면 거절한다")
-    void duplicateItem() {
+    void request_throwException_whenDuplicateItem() {
         assertError(() -> refundCommandService.request(MEMBER_ID,
                 request(order.getId(), item(itemA, 1), item(itemA, 1))), ErrorCode.INVALID_INPUT_VALUE);
     }
 
     @Test
     @DisplayName("환불을 완료하면 취소 ID와 환불 시각이 남고 환불 수량만큼 재고가 돌아온다")
-    void complete_restoresStock() {
+    void complete_restoreStock() {
         Product greenOnion = product("대파", 8, ProductStatus.ON_SALE);
         Product tofu = product("두부", 0, ProductStatus.SOLD_OUT);
         Order paid = order("20261022-000004");
@@ -220,7 +220,7 @@ class RefundCommandServiceTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("이미 완료된 환불을 다시 완료하면 바꾸지 않고 현재 상태를 돌려주며 재고는 한 번만 돌아온다")
-    void complete_twice_keepsFirst() {
+    void complete_keepFirstResult_whenAlreadyCompleted() {
         Product greenOnion = product("대파", 8, ProductStatus.ON_SALE);
         Order paid = order("20261022-000005");
         OrderItem greenOnionItem = orderItem(paid, greenOnion.getId(), 3, 3000, SaleType.NONE);
@@ -241,7 +241,7 @@ class RefundCommandServiceTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("같은 주문에 진행 중인 환불이 있으면 새 신청을 거절한다")
-    void requestedRefundExists_rejects() {
+    void request_throwException_whenRequestedRefundExists() {
         refundCommandService.request(MEMBER_ID, request(order.getId(), item(itemA, 1)));
 
         assertError(() -> refundCommandService.request(MEMBER_ID, request(order.getId(), item(itemB, 1))),
@@ -250,7 +250,7 @@ class RefundCommandServiceTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("실패한 환불의 수량은 다시 신청할 수 있다")
-    void failedRefund_canRequestAgain() {
+    void request_success_whenPreviousRefundFailed() {
         Long refundId = refundCommandService.request(MEMBER_ID, request(order.getId(), item(itemA, 5))).refundId();
         RefundResponse failed = refundCommandService.fail(refundId, "PG 취소 거절");
         flushAndClear();
@@ -263,7 +263,7 @@ class RefundCommandServiceTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("이미 완료된 환불을 실패로 바꾸려 하면 바꾸지 않는다")
-    void failCompleted_keepsCompleted() {
+    void fail_keepCompleted_whenAlreadyCompleted() {
         Long refundId = refundCommandService.request(MEMBER_ID, request(order.getId(), item(itemA, 1))).refundId();
         refundCommandService.complete(refundId, "cancellation-1", PaymentChangedBy.USER);
         flushAndClear();
@@ -273,7 +273,7 @@ class RefundCommandServiceTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("환불을 완료하면 결제 이력에 부분 취소를, 누적 취소가 결제 금액에 닿으면 전액 취소를 남긴다")
-    void complete_recordsPaymentHistory() {
+    void complete_recordPaymentHistory() {
         Long first = refundCommandService.request(MEMBER_ID, request(order.getId(), item(itemA, 5))).refundId();
         refundCommandService.complete(first, "cancellation-1", PaymentChangedBy.USER);
         Long second = refundCommandService.request(MEMBER_ID, request(order.getId(), item(itemB, 3))).refundId();
@@ -295,7 +295,7 @@ class RefundCommandServiceTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("일반 상품만 있는 주문은 부분 환불이면 결제 완료로 두고, 모든 상품이 환불되면 전액 환불로 바꾼다")
-    void complete_allItemsRefunded_marksOrderRefunded() {
+    void complete_markOrderRefunded_whenAllItemsRefunded() {
         Order normal = order("20261022-000006");
         OrderItem first = orderItem(normal, 10L, 2, 3000, SaleType.NONE);
         OrderItem second = orderItem(normal, 20L, 1, 2000, SaleType.NONE);
@@ -316,7 +316,7 @@ class RefundCommandServiceTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("일반 상품을 모두 환불하고 특가·번개 드롭 상품만 남으면 바로 구매 확정하고 확정 수량을 남긴다")
-    void complete_onlySaleItemsLeft_confirmsOrder() {
+    void complete_confirmOrder_whenOnlySaleItemsLeft() {
         Long refundId = refundCommandService.request(MEMBER_ID,
                 request(order.getId(), item(itemA, 5), item(itemB, 3))).refundId();
         refundCommandService.complete(refundId, "cancellation-1", PaymentChangedBy.USER);
@@ -332,7 +332,7 @@ class RefundCommandServiceTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("일반 상품이 남아 있으면 특가·번개 드롭이 있는 주문도 결제 완료로 둔다")
-    void complete_normalItemsLeft_keepsOrderPaid() {
+    void complete_keepOrderPaid_whenNormalItemsLeft() {
         Long refundId = refundCommandService.request(MEMBER_ID,
                 request(order.getId(), item(itemA, 5), item(itemB, 2))).refundId();
         refundCommandService.complete(refundId, "cancellation-1", PaymentChangedBy.USER);
@@ -343,7 +343,7 @@ class RefundCommandServiceTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("환불 완료 때 주문이 결제 완료가 아니면 주문 쪽 예외로 환불 완료를 되돌린다")
-    void complete_orderNotPaid_throws() {
+    void complete_throwException_whenOrderNotPaid() {
         Order normal = order("20261022-000007");
         OrderItem only = orderItem(normal, 10L, 1, 3000, SaleType.NONE);
         pay(normal);
@@ -359,7 +359,7 @@ class RefundCommandServiceTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("환불만 완료하면 재고·결제 이력은 남기고 주문은 결제 완료로 두며, 정리 스케줄러 판단 대상이 된다")
-    void completeWithoutOrderStatus_keepsOrderPaid() {
+    void completeWithoutOrderStatus_keepOrderPaid() {
         Product greenOnion = product("대파", 8, ProductStatus.ON_SALE);
         Order normal = order("20261022-000008");
         OrderItem only = orderItem(normal, greenOnion.getId(), 2, 3000, SaleType.NONE);
@@ -454,8 +454,7 @@ class RefundCommandServiceTest extends MySqlContainerSupport {
     private void assertError(Runnable action, ErrorCode expected) {
         assertThatThrownBy(action::run)
                 .isInstanceOf(BusinessException.class)
-                .extracting(e -> ((BusinessException) e).getErrorCode())
-                .isEqualTo(expected);
+                .extracting("errorCode").isEqualTo(expected);
     }
 
     private void flushAndClear() {

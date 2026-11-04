@@ -16,7 +16,7 @@ class RefundableOrderPolicyTest {
 
     @Test
     @DisplayName("일반 상품만 있는 주문의 모든 상품이 환불되면 전액 환불이다")
-    void statusAfterRefund_allNormalRefunded_refunded() {
+    void statusAfterRefund_returnRefunded_whenAllNormalItemsRefunded() {
         List<OrderItem> items = List.of(item(1L, 2, SaleType.NONE), item(2L, 1, SaleType.NONE));
 
         assertThat(RefundableOrderPolicy.statusAfterRefund(items, Map.of(1L, 2L, 2L, 1L)))
@@ -25,7 +25,7 @@ class RefundableOrderPolicyTest {
 
     @Test
     @DisplayName("일반 상품이 모두 환불되고 특가·번개 드롭 상품이 남으면 구매 확정이다")
-    void statusAfterRefund_onlySaleItemsLeft_confirmed() {
+    void statusAfterRefund_returnConfirmed_whenOnlySaleItemsLeft() {
         List<OrderItem> items = List.of(item(1L, 2, SaleType.NONE), item(2L, 1, SaleType.FLASH_DROP),
                 item(3L, 1, SaleType.SPECIAL));
 
@@ -35,7 +35,7 @@ class RefundableOrderPolicyTest {
 
     @Test
     @DisplayName("환불되지 않은 일반 상품 수량이 남으면 주문 상태를 바꾸지 않는다")
-    void statusAfterRefund_partial_empty() {
+    void statusAfterRefund_returnEmpty_whenPartialRefund() {
         List<OrderItem> items = List.of(item(1L, 2, SaleType.NONE), item(2L, 1, SaleType.NONE),
                 item(3L, 1, SaleType.FLASH_DROP));
 
@@ -45,7 +45,7 @@ class RefundableOrderPolicyTest {
 
     @Test
     @DisplayName("환불할 수 있는 상품이 없는 주문은 주문 상태를 바꾸지 않는다")
-    void statusAfterRefund_noRefundableItem_empty() {
+    void statusAfterRefund_returnEmpty_whenNoRefundableItem() {
         assertThat(RefundableOrderPolicy.statusAfterRefund(List.of(), Map.of())).isEmpty();
         assertThat(RefundableOrderPolicy.statusAfterRefund(
                 List.of(item(1L, 1, SaleType.SPECIAL), item(2L, 1, SaleType.FLASH_DROP)), Map.of())).isEmpty();

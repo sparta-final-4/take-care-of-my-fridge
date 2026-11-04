@@ -46,7 +46,7 @@ class PaymentTimeoutSchedulerTest {
 
     @Test
     @DisplayName("만료 대상이 없으면 아무것도 처리하지 않는다")
-    void noExpiredPayments() {
+    void expireOverduePayments_doNothing_whenNoExpiredPayment() {
         given(paymentService.findExpiredReady(any(), eq(0L), eq(PaymentTimeoutScheduler.BATCH_SIZE))).willReturn(List.of());
 
         scheduler.expireOverduePayments();
@@ -56,7 +56,7 @@ class PaymentTimeoutSchedulerTest {
 
     @Test
     @DisplayName("한 건 처리가 실패해도 나머지 건은 계속 처리한다")
-    void oneFailure_othersStillProcessed() {
+    void expireOverduePayments_continueOthers_whenOneFails() {
         Payment first = payment(1L);
         Payment second = payment(2L);
         Payment third = payment(3L);
@@ -72,7 +72,7 @@ class PaymentTimeoutSchedulerTest {
 
     @Test
     @DisplayName("한 번에 다 못 읽으면 마지막 id 다음부터 이어서 읽어 남은 건을 처리한다")
-    void fullBatch_readsNextPageAfterLastId() {
+    void expireOverduePayments_readNextPageAfterLastId_whenBatchIsFull() {
         List<Payment> fullPage = LongStream.rangeClosed(1, PaymentTimeoutScheduler.BATCH_SIZE)
                 .mapToObj(PaymentTimeoutSchedulerTest::payment)
                 .toList();
@@ -90,7 +90,7 @@ class PaymentTimeoutSchedulerTest {
 
     @Test
     @DisplayName("보상 취소 재시도는 한 건이 실패해도 나머지 건을 계속 시도한다")
-    void retryCompensations_oneFailure_othersStillProcessed() {
+    void retryCompensations_continueOthers_whenOneFails() {
         Payment first = payment(1L);
         Payment second = payment(2L);
         given(paymentService.findCompensationPending(0L, PaymentTimeoutScheduler.BATCH_SIZE))
@@ -104,7 +104,7 @@ class PaymentTimeoutSchedulerTest {
 
     @Test
     @DisplayName("결제 대기 주문 취소가 한 건 실패해도 나머지 주문은 계속 취소한다")
-    void cancelAbandonedOrders_oneFailure_othersStillProcessed() {
+    void cancelAbandonedOrders_continueOthers_whenOneFails() {
         given(paymentService.findAbandonedOrderIds(any(), eq(0L), eq(PaymentTimeoutScheduler.BATCH_SIZE)))
                 .willReturn(List.of(1L, 2L, 3L));
         willThrow(new IllegalStateException("DB 오류")).given(orderStatusFacade).cancelAbandoned(eq(2L), any());

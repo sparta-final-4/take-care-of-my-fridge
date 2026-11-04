@@ -62,7 +62,7 @@ class RefundItemRepositoryTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("요청·완료 상태 환불의 수량을 주문 상품별로 합산한다")
-    void sumsRequestedAndCompleted() {
+    void findRefundedQuantitiesByOrderItemIds_sumRequestedAndCompleted() {
         refund(RefundStatus.REQUESTED, itemA, 1);
         refund(RefundStatus.COMPLETED, itemA, 2);
         refund(RefundStatus.COMPLETED, itemB, 1);
@@ -75,7 +75,7 @@ class RefundItemRepositoryTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("실패한 환불의 수량은 합산하지 않는다")
-    void excludesFailed() {
+    void findRefundedQuantitiesByOrderItemIds_excludeFailed() {
         refund(RefundStatus.FAILED, itemA, 4);
         refund(RefundStatus.COMPLETED, itemA, 1);
         flushAndClear();
@@ -85,7 +85,7 @@ class RefundItemRepositoryTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("요청하지 않은 주문 상품의 환불은 섞이지 않는다")
-    void onlyRequestedOrderItems() {
+    void findRefundedQuantitiesByOrderItemIds_returnOnlyRequestedOrderItems() {
         refund(RefundStatus.COMPLETED, itemA, 1);
         refund(RefundStatus.COMPLETED, itemB, 2);
         flushAndClear();
@@ -95,7 +95,7 @@ class RefundItemRepositoryTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("환불이 없는 주문 상품은 결과에 없다")
-    void noRefund_isEmpty() {
+    void findRefundedQuantitiesByOrderItemIds_returnEmpty_whenNoRefund() {
         flushAndClear();
 
         assertThat(sum(List.of(itemA.getId(), itemB.getId()))).isEmpty();

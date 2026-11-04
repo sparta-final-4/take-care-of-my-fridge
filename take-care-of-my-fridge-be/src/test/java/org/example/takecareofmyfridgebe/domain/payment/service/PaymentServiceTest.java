@@ -54,7 +54,7 @@ class PaymentServiceTest {
 
     @Test
     @DisplayName("본인의 결제 대기 주문이면 통과한다")
-    void validatePayableOrder_pending_passes() {
+    void validatePayableOrder_success_whenOwnPendingOrder() {
         given(orderRepository.findById(ORDER_ID)).willReturn(Optional.of(newOrder()));
 
         paymentService.validatePayableOrder(MEMBER_ID, ORDER_ID);
@@ -62,7 +62,7 @@ class PaymentServiceTest {
 
     @Test
     @DisplayName("주문이 없으면 ORDER_NOT_FOUND")
-    void validatePayableOrder_notFound() {
+    void validatePayableOrder_throwException_whenOrderNotFound() {
         given(orderRepository.findById(ORDER_ID)).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> paymentService.validatePayableOrder(MEMBER_ID, ORDER_ID))
@@ -72,7 +72,7 @@ class PaymentServiceTest {
 
     @Test
     @DisplayName("다른 회원의 주문이면 ORDER_ACCESS_DENIED")
-    void validatePayableOrder_otherMember_denied() {
+    void validatePayableOrder_throwException_whenOtherMember() {
         given(orderRepository.findById(ORDER_ID)).willReturn(Optional.of(newOrder()));
 
         assertThatThrownBy(() -> paymentService.validatePayableOrder(2L, ORDER_ID))
@@ -82,7 +82,7 @@ class PaymentServiceTest {
 
     @Test
     @DisplayName("이미 결제됐거나 취소된 주문이면 PAYMENT_ORDER_NOT_PAYABLE")
-    void validatePayableOrder_notPending_rejected() {
+    void validatePayableOrder_throwException_whenNotPending() {
         Order order = newOrder();
         order.cancel();
         given(orderRepository.findById(ORDER_ID)).willReturn(Optional.of(order));
@@ -94,7 +94,7 @@ class PaymentServiceTest {
 
     @Test
     @DisplayName("주문 상품이 하나면 상품명을, 여러 개면 첫 상품명 외 N건을 주문명으로 쓴다")
-    void getOrderName() {
+    void getOrderName_success() {
         Order order = newOrder();
         given(orderItemRepository.findByOrderIdOrderByIdAsc(ORDER_ID))
                 .willReturn(List.of(item(order, "대파")))
@@ -106,7 +106,7 @@ class PaymentServiceTest {
 
     @Test
     @DisplayName("결제가 없으면 PAYMENT_NOT_FOUND")
-    void getWithOrder_notFound() {
+    void getWithOrder_throwException_whenPaymentNotFound() {
         given(paymentRepository.findWithOrderByPortonePaymentId("payment-x")).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> paymentService.getWithOrder("payment-x"))

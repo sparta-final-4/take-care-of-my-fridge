@@ -20,6 +20,7 @@ import org.example.takecareofmyfridgebe.global.config.SecurityConfig;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -76,11 +77,9 @@ class RefundControllerTest {
         reset(refundFacade, refundQueryService);
     }
 
-    /**
-     * 비로그인 상태로 환불을 신청하면 Facade를 호출하지 않고 401(A003)을 반환하는지 검증한다.
-     */
     @Test
-    void requestWithoutLoginReturnsUnauthorized() throws Exception {
+    @DisplayName("비로그인 상태로 환불을 신청하면 Facade를 호출하지 않고 401(A003)을 반환한다")
+    void request_returnUnauthorized_whenNotLoggedIn() throws Exception {
         mvc.perform(post("/api/refunds")
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -92,12 +91,9 @@ class RefundControllerTest {
         verifyNoInteractions(refundFacade);
     }
 
-    /**
-     * 환불 신청 시 토큰의 회원 ID와 요청 본문이 Facade로 전달되고,
-     * 201과 함께 응답 DTO가 규격대로 직렬화되는지 검증한다.
-     */
     @Test
-    void requestPassesTokenMemberIdAndReturnsCreated() throws Exception {
+    @DisplayName("환불을 신청하면 토큰의 회원 ID와 요청 본문을 Facade로 전달하고, 201과 함께 응답 DTO를 규격대로 직렬화한다")
+    void request_returnCreated() throws Exception {
         RefundCreateRequest request = new RefundCreateRequest(
                 10L, List.of(new RefundCreateRequest.Item(1L, 2)), RefundReasonType.CHANGE_OF_MIND, "포장이 뜯겨 있어요");
         RefundResponse response = new RefundResponse(
@@ -119,12 +115,9 @@ class RefundControllerTest {
         verify(refundFacade).request(MEMBER_ID, request);
     }
 
-    /**
-     * 주문 ID 누락, 빈 상품 목록, 0개 수량, 사유 누락, 500자를 넘는 상세 사유면
-     * Facade를 호출하지 않고 400(C001)을 반환하는지 검증한다.
-     */
     @Test
-    void requestWithInvalidBodyReturnsBadRequest() throws Exception {
+    @DisplayName("주문 ID 누락, 빈 상품 목록, 0개 수량, 사유 누락, 500자를 넘는 상세 사유면 Facade를 호출하지 않고 400(C001)을 반환한다")
+    void request_returnBadRequest_whenInvalidBody() throws Exception {
         for (String body : List.of(
                 requestBody("null", VALID_ITEMS, "\"CHANGE_OF_MIND\"", "null"),
                 requestBody("10", "[]", "\"CHANGE_OF_MIND\"", "null"),
@@ -144,11 +137,9 @@ class RefundControllerTest {
         verifyNoInteractions(refundFacade);
     }
 
-    /**
-     * 구매 확정된 주문을 환불하려 하면 해당 ErrorCode의 상태와 코드(409, REFUND_010)로 응답하는지 검증한다.
-     */
     @Test
-    void requestConfirmedOrderReturnsErrorCode() throws Exception {
+    @DisplayName("구매 확정된 주문을 환불하려 하면 해당 ErrorCode의 상태와 코드(409, REFUND_010)로 응답한다")
+    void request_returnConflict_whenOrderConfirmed() throws Exception {
         when(refundFacade.request(anyLong(), any()))
                 .thenThrow(new BusinessException(ErrorCode.REFUND_ORDER_CONFIRMED));
 
@@ -162,11 +153,9 @@ class RefundControllerTest {
                 .andExpect(jsonPath("$.error.code").value(ErrorCode.REFUND_ORDER_CONFIRMED.getCode()));
     }
 
-    /**
-     * 비로그인 상태로 환불 가능 수량을 조회하면 서비스를 호출하지 않고 401(A003)을 반환하는지 검증한다.
-     */
     @Test
-    void getRefundableItemsWithoutLoginReturnsUnauthorized() throws Exception {
+    @DisplayName("비로그인 상태로 환불 가능 수량을 조회하면 서비스를 호출하지 않고 401(A003)을 반환한다")
+    void getRefundableItems_returnUnauthorized_whenNotLoggedIn() throws Exception {
         mvc.perform(get("/api/refunds/refundable-items").param("orderId", "10"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.error.code").value(ErrorCode.UNAUTHORIZED.getCode()));
@@ -174,11 +163,9 @@ class RefundControllerTest {
         verifyNoInteractions(refundQueryService);
     }
 
-    /**
-     * orderId 없이 조회하면 서비스를 호출하지 않고 400(C001)을 반환하는지 검증한다.
-     */
     @Test
-    void getRefundableItemsWithoutOrderIdReturnsBadRequest() throws Exception {
+    @DisplayName("orderId 없이 조회하면 서비스를 호출하지 않고 400(C001)을 반환한다")
+    void getRefundableItems_returnBadRequest_whenOrderIdMissing() throws Exception {
         mvc.perform(get("/api/refunds/refundable-items").with(loginUser()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error.code").value(ErrorCode.INVALID_INPUT_VALUE.getCode()));
@@ -186,11 +173,9 @@ class RefundControllerTest {
         verifyNoInteractions(refundQueryService);
     }
 
-    /**
-     * 토큰의 회원 ID와 쿼리의 주문 ID로 서비스를 호출하고, 상품별 환불 가능 수량이 규격대로 직렬화되는지 검증한다.
-     */
     @Test
-    void getRefundableItemsPassesTokenMemberIdAndReturnsItems() throws Exception {
+    @DisplayName("토큰의 회원 ID와 쿼리의 주문 ID로 서비스를 호출하고, 상품별 환불 가능 수량을 규격대로 직렬화한다")
+    void getRefundableItems_success() throws Exception {
         when(refundQueryService.getRefundableItems(MEMBER_ID, 10L)).thenReturn(List.of(
                 new RefundableItemResponse(1L, 100L, "대파", "https://img.test/greenonion.png", 3000,
                         5, 2, 3, SaleType.NONE, true),
@@ -215,11 +200,9 @@ class RefundControllerTest {
         verify(refundQueryService).getRefundableItems(MEMBER_ID, 10L);
     }
 
-    /**
-     * 구매 확정된 주문을 조회하면 409(REFUND_010)로 응답하는지 검증한다.
-     */
     @Test
-    void getRefundableItemsConfirmedOrderReturnsErrorCode() throws Exception {
+    @DisplayName("구매 확정된 주문을 조회하면 409(REFUND_010)로 응답한다")
+    void getRefundableItems_returnConflict_whenOrderConfirmed() throws Exception {
         when(refundQueryService.getRefundableItems(MEMBER_ID, 10L))
                 .thenThrow(new BusinessException(ErrorCode.REFUND_ORDER_CONFIRMED));
 
@@ -228,11 +211,9 @@ class RefundControllerTest {
                 .andExpect(jsonPath("$.error.code").value(ErrorCode.REFUND_ORDER_CONFIRMED.getCode()));
     }
 
-    /**
-     * 비로그인 상태로 환불 내역을 조회하면 서비스를 호출하지 않고 401(A003)을 반환하는지 검증한다.
-     */
     @Test
-    void getRefundHistoryWithoutLoginReturnsUnauthorized() throws Exception {
+    @DisplayName("비로그인 상태로 환불 내역을 조회하면 서비스를 호출하지 않고 401(A003)을 반환한다")
+    void getRefundHistory_returnUnauthorized_whenNotLoggedIn() throws Exception {
         mvc.perform(get("/api/refunds").param("orderId", "10"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.error.code").value(ErrorCode.UNAUTHORIZED.getCode()));
@@ -240,11 +221,9 @@ class RefundControllerTest {
         verifyNoInteractions(refundQueryService);
     }
 
-    /**
-     * orderId 없이 환불 내역을 조회하면 서비스를 호출하지 않고 400(C001)을 반환하는지 검증한다.
-     */
     @Test
-    void getRefundHistoryWithoutOrderIdReturnsBadRequest() throws Exception {
+    @DisplayName("orderId 없이 환불 내역을 조회하면 서비스를 호출하지 않고 400(C001)을 반환한다")
+    void getRefundHistory_returnBadRequest_whenOrderIdMissing() throws Exception {
         mvc.perform(get("/api/refunds").with(loginUser()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error.code").value(ErrorCode.INVALID_INPUT_VALUE.getCode()));
@@ -252,11 +231,9 @@ class RefundControllerTest {
         verifyNoInteractions(refundQueryService);
     }
 
-    /**
-     * 토큰의 회원 ID와 쿼리의 주문 ID로 서비스를 호출하고, 환불 내역과 환불 상품이 규격대로 직렬화되는지 검증한다.
-     */
     @Test
-    void getRefundHistoryPassesTokenMemberIdAndReturnsHistory() throws Exception {
+    @DisplayName("토큰의 회원 ID와 쿼리의 주문 ID로 서비스를 호출하고, 환불 내역과 환불 상품을 규격대로 직렬화한다")
+    void getRefundHistory_success() throws Exception {
         when(refundQueryService.getRefundHistory(MEMBER_ID, 10L)).thenReturn(List.of(
                 new RefundHistoryResponse(100L, RefundStatus.COMPLETED, RefundReasonType.CHANGE_OF_MIND,
                         "포장이 뜯겨 있어요", 6000L, LocalDateTime.of(2026, 10, 23, 9, 59),
@@ -284,22 +261,18 @@ class RefundControllerTest {
         verify(refundQueryService).getRefundHistory(MEMBER_ID, 10L);
     }
 
-    /**
-     * 비로그인 상태로 환불 요약을 조회하면 서비스를 호출하지 않고 401(A003)을 반환하는지 검증한다.
-     */
     @Test
-    void getRefundSummariesWithoutLoginReturnsUnauthorized() throws Exception {
+    @DisplayName("비로그인 상태로 환불 요약을 조회하면 서비스를 호출하지 않고 401(A003)을 반환한다")
+    void getRefundSummaries_returnUnauthorized_whenNotLoggedIn() throws Exception {
         mvc.perform(get("/api/refunds/summaries").param("orderIds", "10"))
                 .andExpect(status().isUnauthorized());
 
         verifyNoInteractions(refundQueryService);
     }
 
-    /**
-     * 쉼표로 받은 주문 ID 목록과 토큰의 회원 ID로 서비스를 호출하고, 주문별 환불 요약이 규격대로 직렬화되는지 검증한다.
-     */
     @Test
-    void getRefundSummariesPassesOrderIdsAndReturnsSummaries() throws Exception {
+    @DisplayName("쉼표로 받은 주문 ID 목록과 토큰의 회원 ID로 서비스를 호출하고, 주문별 환불 요약을 규격대로 직렬화한다")
+    void getRefundSummaries_success() throws Exception {
         when(refundQueryService.getRefundSummaries(MEMBER_ID, List.of(10L, 11L))).thenReturn(List.of(
                 new RefundSummaryResponse(10L, RefundSummaryStatus.PARTIAL, 3000L),
                 new RefundSummaryResponse(11L, RefundSummaryStatus.NONE, 0L)));
@@ -314,11 +287,9 @@ class RefundControllerTest {
         verify(refundQueryService).getRefundSummaries(MEMBER_ID, List.of(10L, 11L));
     }
 
-    /**
-     * 빈 값이 섞인 주문 ID 목록(orderIds=10,,11)도 500 없이 서비스로 넘어가는지 검증한다. 빈 값은 서비스가 걸러낸다.
-     */
     @Test
-    void getRefundSummariesWithEmptyElementPassesToService() throws Exception {
+    @DisplayName("빈 값이 섞인 주문 ID 목록(orderIds=10,,11)도 500 없이 서비스로 넘긴다(빈 값은 서비스가 걸러낸다)")
+    void getRefundSummaries_passToService_whenOrderIdsHaveEmptyElement() throws Exception {
         when(refundQueryService.getRefundSummaries(eq(MEMBER_ID), any())).thenReturn(List.of());
 
         mvc.perform(get("/api/refunds/summaries").param("orderIds", "10,,11").with(loginUser()))
@@ -327,11 +298,9 @@ class RefundControllerTest {
         verify(refundQueryService).getRefundSummaries(eq(MEMBER_ID), argThat(ids -> ids.containsAll(List.of(10L, 11L))));
     }
 
-    /**
-     * 서비스가 REFUND_013으로 거절하면 400과 해당 오류 코드로 응답하는지 검증한다. 1~50건 범위 판단은 서비스 테스트가 맡는다.
-     */
     @Test
-    void getRefundSummariesBusinessExceptionReturnsErrorCode() throws Exception {
+    @DisplayName("서비스가 REFUND_013으로 거절하면 400과 해당 오류 코드로 응답한다(1~50건 범위 판단은 서비스 테스트가 맡는다)")
+    void getRefundSummaries_returnBadRequest_whenServiceRejects() throws Exception {
         when(refundQueryService.getRefundSummaries(MEMBER_ID, List.of(10L)))
                 .thenThrow(new BusinessException(ErrorCode.INVALID_REFUND_SUMMARY_REQUEST));
 
