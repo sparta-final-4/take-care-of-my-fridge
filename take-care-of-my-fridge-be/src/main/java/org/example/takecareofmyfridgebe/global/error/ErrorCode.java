@@ -96,6 +96,9 @@ public enum ErrorCode {
     PAYMENT_IN_PROGRESS(HttpStatus.CONFLICT, "PAYMENT_008", "이미 진행 중인 결제가 있습니다. 잠시 후 다시 시도해 주세요."),
     PG_CANCEL_REJECTED(HttpStatus.BAD_GATEWAY, "PAYMENT_009", "PG사가 결제 취소를 거절했습니다."),
 
+    // Billing Key (등록 카드)
+    INVALID_BILLING_KEY_STATUS(HttpStatus.CONFLICT, "BILLING_001", "유효하지 않은 카드 상태 변경입니다."),
+
     // Webhook
     INVALID_WEBHOOK_SIGNATURE(HttpStatus.UNAUTHORIZED, "WEBHOOK_001", "웹훅 서명이 유효하지 않습니다."),
     WEBHOOK_EVENT_NOT_FOUND(HttpStatus.NOT_FOUND, "WEBHOOK_002", "웹훅 이벤트를 찾을 수 없습니다."),
