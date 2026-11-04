@@ -69,7 +69,7 @@ class ChatIntentFacadeTest {
         ingredientMatcher = mock(IngredientMatcher.class);
         chatMessageService = mock(ChatMessageService.class);
         facade = new ChatIntentFacade(extractor, recipeService, ingredientMatcher,
-                new ChatCandidateProperties(List.of("양념", "음료"), 0.4, List.of()), chatMessageService);
+                new ChatCandidateProperties(List.of("양념", "음료"), 0.4, List.of(), List.of("백김치", "물김치", "동치미", "나박김치")), chatMessageService);
         when(recipeService.getClassifications())
                 .thenReturn(new RecipeClassificationResponse(List.of("한식"), List.of("국", "기타", "샐러드", "양념", "음료", "찌개")));
     }

@@ -12,7 +12,8 @@ import java.util.List;
  * @param minOwnedRatio      보유 비율(가진 재료 / 기본 양념 뺀 재료) 기준. 미만인 레시피는 기준 이상 레시피로
  *                           10개가 안 찰 때만 뒤에 채운다(선택 재료 2개 이상을 전부 쓰는 레시피는 예외). 0이면 기준 없이 정렬 순서대로 고른다
  * @param spicyIngredients   이 재료가 들어 있으면 매운 레시피로 본다 (맛 데이터에 매운맛이 빠진 레시피 보완). 공백 빼고 이름에 들어 있으면 해당.
- *                           그냥 "고추"는 넣지 않는다 (풋고추·꽈리고추·고명으로 조금 들어가는 경우가 많아서)
+ *                           그냥 "고추"는 넣지 않는다 (풋고추·꽈리고추·고명으로 조금 들어가는 경우가 많아서). 김치류는 넣는다
+ * @param spicyExclusions    이름에 매운 재료가 들어 있어도 이 이름이면 매운 재료로 보지 않는다 (안 매운 김치: 백김치·물김치·동치미·나박김치)
  */
 @ConfigurationProperties(prefix = "app.chat.candidate")
 public record ChatCandidateProperties(
@@ -20,7 +21,10 @@ public record ChatCandidateProperties(
         List<String> excludedCategories,
         @DefaultValue("0.4")
         double minOwnedRatio,
-        @DefaultValue({"청양고추", "홍고추", "청고추", "고춧가루", "고추장", "건고추", "베트남고추", "페퍼론치노", "핫소스", "고추기름"})
-        List<String> spicyIngredients
+        @DefaultValue({"청양고추", "홍고추", "청고추", "고춧가루", "고추장", "건고추", "베트남고추", "페퍼론치노", "핫소스", "고추기름",
+                "김치", "배추김치", "깍두기", "열무김치", "총각김치", "파김치", "갓김치"})
+        List<String> spicyIngredients,
+        @DefaultValue({"백김치", "물김치", "동치미", "나박김치"})
+        List<String> spicyExclusions
 ) {
 }

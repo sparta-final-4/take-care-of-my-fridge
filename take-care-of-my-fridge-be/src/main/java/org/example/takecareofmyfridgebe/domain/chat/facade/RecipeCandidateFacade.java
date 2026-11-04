@@ -170,7 +170,8 @@ public class RecipeCandidateFacade {
             return recipeTastes;
         }
         Set<Long> spicyIds = SpicyRecipeDetector.spicyRecipeIds(
-                recipeService.findIngredientTexts(recipeIds), chatCandidateProperties.spicyIngredients());
+                recipeService.findIngredientTexts(recipeIds), chatCandidateProperties.spicyIngredients(),
+                chatCandidateProperties.spicyExclusions());
         Map<Long, Set<Member.Taste>> merged = new HashMap<>(recipeTastes);
         for (Long id : spicyIds) {
             Set<Member.Taste> tastes = new HashSet<>(merged.getOrDefault(id, Set.of()));

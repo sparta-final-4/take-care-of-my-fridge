@@ -65,7 +65,7 @@ class RecipeCandidateFacadeTest {
         ingredientService = mock(IngredientService.class);
         recipeSearchService = mock(RecipeSearchService.class);
         facade = new RecipeCandidateFacade(fridgeService, memberService, recipeService, ingredientService, recipeSearchService,
-                new ChatCandidateProperties(List.of("양념", "음료"), 0.4, List.of("청양고추", "홍고추", "청고추", "고춧가루", "고추장", "건고추", "베트남고추", "페퍼론치노", "핫소스", "고추기름")));
+                new ChatCandidateProperties(List.of("양념", "음료"), 0.4, List.of("청양고추", "홍고추", "청고추", "고춧가루", "고추장", "건고추", "베트남고추", "페퍼론치노", "핫소스", "고추기름", "김치", "깍두기"), List.of("백김치", "물김치", "동치미", "나박김치")));
         when(fridgeService.getItems(any(), any())).thenReturn(List.of());
     }
 
@@ -211,7 +211,7 @@ class RecipeCandidateFacadeTest {
     }
 
     @Test
-    @DisplayName("\"매운 거 말고\"면 맛 데이터나 매운 재료(원문 홍고추·청고추)로 매운 레시피를 후보에서 뺀다")
+    @DisplayName("\"매운 거 말고\"면 맛 데이터나 매운 재료(원문 홍고추·청고추, 김치)로 매운 레시피를 후보에서 빼고, 백김치는 남긴다")
     void dropsSpicyRecipes_whenAvoidingSpicy() throws Exception {
         when(memberService.getMyInfo(MEMBER_ID)).thenReturn(mock(MyInfoResponse.class));
         givenKeywordRecipes(Map.of(
@@ -220,11 +220,13 @@ class RecipeCandidateFacadeTest {
                 30L, recipe(30L, "장어조림", Set.of(Taste.SALTY), List.of("장어", "고추", "청고추")),
                 40L, recipe(40L, "닭강정", Set.of(Taste.SWEET), List.of("닭고기")),
                 50L, recipe(50L, "유린기", Set.of(Taste.SPICY), List.of("닭고기")),
-                60L, recipe(60L, "꿔바로우", Set.of(Taste.SWEET), List.of("돼지고기", "고추"))));
+                60L, recipe(60L, "꿔바로우", Set.of(Taste.SWEET), List.of("돼지고기", "고추")),
+                70L, recipe(70L, "두부김치", Set.of(Taste.SALTY), List.of("두부", "김치")),
+                80L, recipe(80L, "백김치말이", Set.of(Taste.MILD), List.of("백김치"))));
 
         RecipeCandidates result = facade.findCandidates(avoidSpicy(List.of("튀김")));
 
-        assertThat(result.candidates()).extracting(RecipeCandidate::recipeId).containsExactlyInAnyOrder(20L, 40L, 60L);
+        assertThat(result.candidates()).extracting(RecipeCandidate::recipeId).containsExactlyInAnyOrder(20L, 40L, 60L, 80L);
     }
 
     @Test

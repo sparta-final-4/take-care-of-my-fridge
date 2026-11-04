@@ -12,7 +12,8 @@ import java.util.stream.Collectors;
  * <ul>
  *   <li>매운 재료 목록은 설정값(app.chat.candidate.spicy-ingredients)이다. 그냥 "고추"는 넣지 않는다 (풋고추·꽈리고추·고명이 많아서)</li>
  *   <li>재료 사전 이름과 레시피에 적힌 이름을 모두 본다 (사전 정리로 홍고추가 "고추"로 합쳐졌어도 원문 이름으로 잡히게)</li>
- *   <li>공백은 빼고, 이름에 목록 재료가 들어 있으면 매운 재료다 ("다진 청양고추", "홍고추채")</li>
+ *   <li>공백은 빼고, 이름에 목록 재료가 들어 있으면 매운 재료다 ("다진 청양고추", "홍고추채", "배추 김치")</li>
+ *   <li>단, 이름에 제외 목록(백김치·물김치·동치미·나박김치)이 들어 있으면 매운 재료로 보지 않는다 ("김치"가 들어 있어도)</li>
  * </ul>
  */
 public final class SpicyRecipeDetector {
@@ -23,19 +24,26 @@ public final class SpicyRecipeDetector {
     /**
      * @param ingredientTexts  레시피별 재료 이름들 (사전 이름·레시피에 적힌 이름)
      * @param spicyIngredients 매운 재료 이름 목록
+     * @param exclusions       매운 재료가 들어 있어도 매운 재료로 보지 않는 이름 목록
      * @return 매운 재료가 들어 있는 레시피 ID
      */
-    public static Set<Long> spicyRecipeIds(Map<Long, List<String>> ingredientTexts, Collection<String> spicyIngredients) {
-        List<String> spicy = spicyIngredients.stream().map(SpicyRecipeDetector::compact).filter(name -> !name.isEmpty()).toList();
+    public static Set<Long> spicyRecipeIds(Map<Long, List<String>> ingredientTexts, Collection<String> spicyIngredients,
+                                           Collection<String> exclusions) {
+        List<String> spicy = compactAll(spicyIngredients);
+        List<String> excluded = compactAll(exclusions);
         return ingredientTexts.entrySet().stream()
-                .filter(entry -> entry.getValue().stream().anyMatch(name -> isSpicy(name, spicy)))
+                .filter(entry -> entry.getValue().stream().anyMatch(name -> isSpicy(name, spicy, excluded)))
                 .map(Map.Entry::getKey)
                 .collect(Collectors.toUnmodifiableSet());
     }
 
-    private static boolean isSpicy(String name, List<String> spicy) {
+    private static boolean isSpicy(String name, List<String> spicy, List<String> excluded) {
         String text = compact(name);
-        return spicy.stream().anyMatch(text::contains);
+        return excluded.stream().noneMatch(text::contains) && spicy.stream().anyMatch(text::contains);
+    }
+
+    private static List<String> compactAll(Collection<String> names) {
+        return names == null ? List.of() : names.stream().map(SpicyRecipeDetector::compact).filter(name -> !name.isEmpty()).toList();
     }
 
     private static String compact(String text) {
