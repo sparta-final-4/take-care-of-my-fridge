@@ -31,6 +31,7 @@ public record ChatRecommendationsEventResponse(
      *                                   missingIngredients에도 들어 있다
      * @param lacksManyIngredients 재료를 많이 사야 하는지 (보유 비율 기준 미만)
      * @param reason               카드에 보여 줄 추천 이유 한 줄 (25자 안팎, 예: "버섯·두부가 주재료예요")
+     * @param description          카드 아래 AI 설명. 추천 이벤트에서는 null(설명은 따로 흘러나옴), 메시지 조회에서는 저장된 값
      */
     public record RecommendedRecipe(
             Long recipeId,
@@ -44,7 +45,8 @@ public record ChatRecommendationsEventResponse(
             List<MissingIngredient> missingIngredients,
             List<String> missingSelectedIngredients,
             boolean lacksManyIngredients,
-            String reason
+            String reason,
+            String description
     ) {
     }
 

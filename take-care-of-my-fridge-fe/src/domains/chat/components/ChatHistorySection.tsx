@@ -1,6 +1,6 @@
 import { ArrowLeftOutlined } from '@ant-design/icons';
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
-import { Button, Empty, Grid, Result, Segmented, Skeleton, Spin, Typography } from 'antd';
+import { Button, Empty, Grid, Result, Segmented, Skeleton, Spin, Tag, Typography } from 'antd';
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
 
@@ -46,6 +46,9 @@ function parseTab(value: string | null): ChatTab {
 // 진행 중 상담은 오른쪽 칸에서 바로 대화한다. 이 화면에 있는 동안은 채팅창을 닫고, 채팅창 열기 요청은
 // 이 화면의 진행 중 상담(없으면 새 상담)을 고르는 것으로 바꿔 같은 상담이 두 곳에서 열리지 않게 한다.
 // 탭은 URL 쿼리(status)에 두어 새로고침·뒤로 가기에도 유지한다. 고른 상담은 화면 상태라 useState에 둔다.
+// 목록 줄에 보여 줄 추천 메뉴 칩 수
+const MENU_CHIP_LIMIT = 3;
+
 export function ChatHistorySection() {
   const openChat = useChatModalStore((state) => state.openChat);
   const setInlineHost = useChatModalStore((state) => state.setInlineHost);
@@ -167,6 +170,8 @@ export function ChatHistorySection() {
       <ul className={styles.list}>
         {sessions.map((session) => {
           const isSelected = isSplit && session.sessionId === selected?.sessionId;
+          // 이 상담에서 최근에 추천한 메뉴 (서버가 최대 3개까지 준다)
+          const menus = (session.recommendedRecipes ?? []).slice(0, MENU_CHIP_LIMIT);
           return (
             <li key={session.sessionId}>
               <button
@@ -184,6 +189,15 @@ export function ChatHistorySection() {
                 <Typography.Text type="secondary" className={styles.meta}>
                   {formatChatDateTime(session.startedAt)} · 메시지 {session.messageCount ?? 0}개
                 </Typography.Text>
+                {menus.length > 0 && (
+                  <span className={styles.menuChips} aria-label="추천받은 메뉴">
+                    {menus.map((menu) => (
+                      <Tag key={menu.recipeId} className={styles.menuChip}>
+                        {menu.name}
+                      </Tag>
+                    ))}
+                  </span>
+                )}
                 <span className={styles.rowLine}>
                   <Typography.Text type="secondary" className={styles.preview}>
                     {session.lastMessagePreview ?? ''}

@@ -14,12 +14,16 @@
  */
 
 
+// May contain unused imports in some cases
+// @ts-ignore
+import type { RecommendedRecipeName } from './recommended-recipe-name';
 
 export interface ChatSessionSummaryResponse {
     'firstQuestion'?: string;
     'lastMessageAt'?: string;
     'lastMessagePreview'?: string;
     'messageCount'?: number;
+    'recommendedRecipes'?: Array<RecommendedRecipeName>;
     'sessionId'?: number;
     'startedAt'?: string;
     'status'?: ChatSessionSummaryResponseStatusEnum;

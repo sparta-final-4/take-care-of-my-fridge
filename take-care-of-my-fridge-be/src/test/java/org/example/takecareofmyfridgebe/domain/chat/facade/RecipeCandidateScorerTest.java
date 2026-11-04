@@ -752,6 +752,40 @@ class RecipeCandidateScorerTest {
     }
 
     @Nested
+    @DisplayName("이 상담에서 이미 추천한 레시피")
+    class AlreadyRecommended {
+
+        @Test
+        @DisplayName("같은 조건으로 두 번 추천하면 두 번째는 이미 추천한 레시피를 뒤로 보내 다른 레시피가 위로 온다")
+        void ranksNotYetRecommendedFirst() {
+            recipe(10L, "계란찜", "찜", 20, 1, EGG);
+            recipe(20L, "계란말이", "말이", 20, 1, EGG);
+            recipe(30L, "계란국", "국", 20, 1, EGG);
+            List<FridgeStock> fridge = List.of(stock(EGG, "계란", 0));
+
+            RecipeCandidates first = rank(RecipeQuery.of(MEMBER_ID, List.of()), fridge, List.of());
+            RecipeCandidates second = rank(RecipeQuery.of(MEMBER_ID, List.of()).withAlreadyRecommended(Set.of(10L, 20L)),
+                    fridge, List.of());
+
+            assertThat(first.candidates()).extracting(RecipeCandidate::recipeId).containsExactly(10L, 20L, 30L);
+            assertThat(second.candidates()).extracting(RecipeCandidate::recipeId).containsExactly(30L, 10L, 20L);
+        }
+
+        @Test
+        @DisplayName("요청 일치는 이미 추천했는지보다 앞선다")
+        void keepsRequestFirst() {
+            recipe(10L, "계란찜", "찜", 20, 1, EGG);
+            recipe(20L, "계란국", "국", 20, 1, EGG);
+            RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, List.of("찜"), null, null, false)
+                    .withAlreadyRecommended(Set.of(10L));
+
+            RecipeCandidates result = rank(query, List.of(stock(EGG, "계란", 0)), List.of());
+
+            assertThat(result.candidates()).extracting(RecipeCandidate::recipeId).containsExactly(10L, 20L);
+        }
+    }
+
+    @Nested
     @DisplayName("부족한 재료")
     class MissingIngredients {
 

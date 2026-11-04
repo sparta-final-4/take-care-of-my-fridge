@@ -10,6 +10,25 @@
   list-style: none;
 }
 
+.item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ant-margin-xxs);
+}
+
+// 카드 아래 AI 설명 (그 카드에 대한 한두 문장)
+.description {
+  margin: 0 0 var(--ant-margin-xs);
+  padding-inline: var(--ant-padding-xxs);
+  font-size: var(--ant-font-size);
+  white-space: pre-wrap;
+  color: var(--ant-color-text);
+
+  &:global(.ant-typography) {
+    margin-bottom: var(--ant-margin-xs);
+  }
+}
+
 .card {
   position: relative;
   border: 1px solid var(--ant-color-border-secondary);

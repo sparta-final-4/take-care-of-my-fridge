@@ -211,6 +211,7 @@ HTTP 메서드·경로·DTO 이름은 구현 전 합의합니다.
 - 추천 카드 이벤트(2026-11-04 추가): 추천이면 설명 글(`message`)보다 먼저 `event: recommendations`를 한 번 보냅니다. 일반 질문이면 보내지 않습니다. 카드는 아직 저장하지 않아 메시지 조회 API에는 나오지 않고, 저장되는 AI 메시지는 설명 글만입니다.
   - `data`: `{ recipes: RecommendedRecipe[] (최대 3개), relaxed: string[] (지금은 항상 빈 목록), empty: boolean (조건에 맞는 후보가 없으면 true, 이때 recipes는 빈 목록) }`
   - `RecommendedRecipe`: recipeId, name, imageUrl(없으면 null), category, cookTimeMin(없으면 null), usedIngredients(쓰는 냉장고 재료 이름, 임박한 순), imminentIngredients(`{ name, dDay }`, D-3 이내, dDay 0은 오늘까지), matchedTastes(겹친 맛 한글: 메시지로 말한 맛, 없으면 회원 선호 맛), missingIngredients(`{ ingredientId, name }`, 기본 양념 제외), missingSelectedIngredients(고른·말한 재료 중 냉장고에 없는 것의 이름. 같은 종류로 넓혔으면 레시피에 쓰인 이름, 예: 버섯 → 표고버섯. missingIngredients에도 들어 있음), lacksManyIngredients(재료를 많이 사야 함), reason(카드에 보여 줄 추천 이유 한 줄, 25자 안팎. 우선순위: 요리 이름 키워드·요청 일치 > 선택 재료 > 임박 재료 > 겹친 맛, 예: "찾으신 냉면 요리예요", "버섯·두부가 주재료예요", "내일까지인 고추를 쓸 수 있어요")
+  - 카드 설명 이벤트(2026-11-05 추가): 추천 답은 `[소개]`·`[1]`~`[3]` 표시로 나눠 보냅니다. 소개 글은 `message`, 카드 설명 글은 `event: recommendation_text`로 옵니다. `data`: `{ index: number (카드 순서, 0부터), text: string (그 카드 설명의 이어지는 글) }`. AI가 표시를 빼먹으면 전체가 `message`(소개)로 오고 카드 설명은 비어 있습니다. 저장은 소개가 AI 메시지 content, 카드 설명이 카드의 description이고, 메시지 조회의 `recommendations[].description`으로 다시 받습니다.
   - 하루 횟수: `recommendations`는 첫 조각으로 치지 않습니다. 카드를 보낸 뒤 설명 글 첫 조각 전에 실패해도 하루 횟수를 돌려줍니다. 후보 검색이 실패하면 카드 없이 일반 답을 합니다.
 
 ## 후기 API

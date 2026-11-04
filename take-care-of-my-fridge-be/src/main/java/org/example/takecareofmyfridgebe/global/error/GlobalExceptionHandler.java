@@ -2,17 +2,24 @@ package org.example.takecareofmyfridgebe.global.error;
 
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
+import org.example.takecareofmyfridgebe.domain.auth.service.AuthSessionService.AuthPrincipal;
 import org.example.takecareofmyfridgebe.global.response.ApiResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.authorization.AuthorizationDeniedException;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
+
+import java.io.IOException;
+import java.util.Locale;
 
 @Slf4j
 @RestControllerAdvice
@@ -117,6 +124,51 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(HttpStatus.NOT_FOUND)
                 .body(ApiResponse.error("COMMON_003", "요청한 리소스를 찾을 수 없습니다."));
+    }
+
+    /**
+     * 스트리밍 중 클라이언트가 연결을 끊어 응답을 더 쓸 수 없을 때. 긴 스택 대신 DEBUG 한 줄만 남기고 응답은 보내지 않는다.
+     * 요청 주소에 상담 ID(/api/chat-sessions/{sessionId}/messages)가 들어 있다. 사용자 취소 처리(답 받기 잠금 해제 등)는 스트림 쪽에서 그대로 한다.
+     */
+    @ExceptionHandler(AsyncRequestNotUsableException.class)
+    public void handleAsyncRequestNotUsable(AsyncRequestNotUsableException e, HttpServletRequest request) {
+        logClientDisconnected(request);
+    }
+
+    /**
+     * 연결이 끊겨 쓰기에 실패한 IOException(Broken pipe, 연결 재설정 등)은 클라이언트 끊김으로 보고 DEBUG 한 줄만 남긴다.
+     * 그 밖의 IOException은 서버 오류로 처리한다.
+     */
+    @ExceptionHandler(IOException.class)
+    public ResponseEntity<ApiResponse<Void>> handleIoException(IOException e, HttpServletRequest request) {
+        if (isClientDisconnect(e)) {
+            logClientDisconnected(request);
+            return null;
+        }
+        return handleException(e);
+    }
+
+    private static void logClientDisconnected(HttpServletRequest request) {
+        if (log.isDebugEnabled()) {
+            log.debug("클라이언트 연결 끊김 - memberId: {}, uri: {}", currentMemberId(), request.getRequestURI());
+        }
+    }
+
+    // 톰캣 ClientAbortException 또는 끊긴 연결에 쓰다 난 오류
+    static boolean isClientDisconnect(IOException e) {
+        if ("ClientAbortException".equals(e.getClass().getSimpleName())) {
+            return true;
+        }
+        String message = e.getMessage() == null ? "" : e.getMessage().toLowerCase(Locale.ROOT);
+        return message.contains("broken pipe") || message.contains("connection reset")
+                || message.contains("connection abort") || message.contains("중단");
+    }
+
+    private static Long currentMemberId() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        return authentication != null && authentication.getPrincipal() instanceof AuthPrincipal principal
+                ? principal.memberId()
+                : null;
     }
 
     /**

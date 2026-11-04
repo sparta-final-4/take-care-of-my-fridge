@@ -6,6 +6,7 @@ import org.example.takecareofmyfridgebe.domain.auth.service.AuthSessionService.A
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatSessionListRequest;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatSessionListResponse;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatSessionResponse;
+import org.example.takecareofmyfridgebe.domain.chat.facade.ChatSessionQueryFacade;
 import org.example.takecareofmyfridgebe.domain.chat.service.ChatSessionService;
 import org.example.takecareofmyfridgebe.global.response.ApiResponse;
 import org.springframework.http.ResponseEntity;
@@ -24,6 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class ChatSessionController {
 
     private final ChatSessionService chatSessionService;
+    private final ChatSessionQueryFacade chatSessionQueryFacade;
 
     /**
      * 회원의 상담 내역(메시지가 있는 세션)을 상태 필터(ALL/ACTIVE/ENDED)에 맞춰 최근 시작순으로 페이지 조회하고 탭별 건수를 함께 준다. page는 1부터.
@@ -32,7 +34,7 @@ public class ChatSessionController {
     public ResponseEntity<ApiResponse<ChatSessionListResponse>> getMySessions(
             @AuthenticationPrincipal AuthPrincipal principal,
             @Valid @ModelAttribute ChatSessionListRequest request) {
-        ChatSessionListResponse response = chatSessionService.getMySessions(principal.memberId(), request);
+        ChatSessionListResponse response = chatSessionQueryFacade.getMySessions(principal.memberId(), request);
         return ResponseEntity.ok(ApiResponse.ok(response));
     }
 

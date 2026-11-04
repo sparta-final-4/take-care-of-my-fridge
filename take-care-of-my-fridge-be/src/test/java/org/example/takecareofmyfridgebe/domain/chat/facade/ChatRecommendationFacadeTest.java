@@ -10,6 +10,7 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate.Reason;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidates;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeQuery;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecommendationReply;
+import org.example.takecareofmyfridgebe.domain.chat.dto.SavedRecommendation;
 import org.example.takecareofmyfridgebe.domain.ingredient.service.IngredientService;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member.Taste;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeSummary;
@@ -25,6 +26,8 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class ChatRecommendationFacadeTest {
@@ -101,12 +104,37 @@ class ChatRecommendationFacadeTest {
         ChatRecommendationsEventResponse event = ChatRecommendationsEventResponse.of(List.of(new RecommendedRecipe(
                 10L, "두부찌개", null, "찌개", null, List.of("양파"),
                 List.of(new ChatRecommendationsEventResponse.ImminentIngredient("양파", 0)), List.of("매운맛"),
-                List.of(), List.of(), false, "이유")));
+                List.of(), List.of(), false, "이유", null)));
 
         String json = new ObjectMapper().writeValueAsString(event);
 
         assertThat(json).contains("\"recipes\":[", "\"relaxed\":[]", "\"empty\":false",
                 "\"imminentIngredients\":[{\"name\":\"양파\",\"dDay\":0}]", "\"cookTimeMin\":null", "\"imageUrl\":null", "\"reason\":\"이유\"");
+    }
+
+    @Test
+    @DisplayName("저장된 카드를 순서·설명 그대로 다시 만들고, 지워진 레시피는 빼며, 레시피 계산은 한 번에 한다")
+    void rebuildsCardsInOrder_skippingDeletedRecipe() {
+        List<SavedRecommendation> saved = List.of(
+                new SavedRecommendation(2L, 20L, 1, "둘째 설명"),
+                new SavedRecommendation(2L, 10L, 0, "첫째 설명"),
+                new SavedRecommendation(2L, 99L, 2, "지워진 레시피"),
+                new SavedRecommendation(4L, 30L, 0, null));
+        when(recipeCandidateFacade.describeRecipes(1L, List.of(20L, 10L, 99L, 30L))).thenReturn(Map.of(
+                10L, candidate(10L, "두부조림", "조림", 20, reason(List.of(Taste.SALTY))),
+                20L, candidate(20L, "두부국", "국", null, reason(List.of())),
+                30L, candidate(30L, "장어조림", "조림", 30, reason(List.of()))));
+        when(recipeService.findSummaries(List.of(20L, 10L, 99L, 30L)))
+                .thenReturn(Map.of(10L, new RecipeSummary(10L, "두부조림", "https://img/10.jpg", null)));
+
+        Map<Long, List<RecommendedRecipe>> cards = facade.rebuildCards(1L, saved);
+
+        assertThat(cards.get(2L)).extracting(RecommendedRecipe::recipeId).containsExactly(10L, 20L);
+        assertThat(cards.get(2L)).extracting(RecommendedRecipe::description).containsExactly("첫째 설명", "둘째 설명");
+        assertThat(cards.get(2L).get(0).imageUrl()).isEqualTo("https://img/10.jpg");
+        assertThat(cards.get(2L).get(0).missingSelectedIngredients()).isEmpty();
+        assertThat(cards.get(4L)).extracting(RecommendedRecipe::recipeId).containsExactly(30L);
+        verify(recipeCandidateFacade, times(1)).describeRecipes(any(), any());
     }
 
     private static RecipeCandidate candidate(Long id, String name, String category, Integer cookTimeMin, Reason reason) {

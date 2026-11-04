@@ -6,7 +6,7 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageCreateRequest
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageMode;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageResponse;
 import org.example.takecareofmyfridgebe.domain.chat.entity.ChatMessageRole;
-import org.example.takecareofmyfridgebe.domain.chat.service.ChatMessageService;
+import org.example.takecareofmyfridgebe.domain.chat.facade.ChatMessageQueryFacade;
 import org.example.takecareofmyfridgebe.domain.chat.service.ChatStreamService;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 import org.example.takecareofmyfridgebe.global.config.SecurityConfig;
@@ -63,11 +63,11 @@ class ChatMessageControllerTest {
     private ChatStreamService chatStreamService;
 
     @Autowired
-    private ChatMessageService chatMessageService;
+    private ChatMessageQueryFacade chatMessageQueryFacade;
 
     @BeforeEach
     void setUp() {
-        reset(chatStreamService, chatMessageService);
+        reset(chatStreamService, chatMessageQueryFacade);
     }
 
     @Test
@@ -325,7 +325,7 @@ class ChatMessageControllerTest {
         ChatMessageResponse msg1 = new ChatMessageResponse(1L, 1, ChatMessageRole.USER, "질문 1", LocalDateTime.now());
         ChatMessageResponse msg2 = new ChatMessageResponse(2L, 2, ChatMessageRole.ASSISTANT, "답변 1", LocalDateTime.now());
 
-        when(chatMessageService.getMessages(memberId, sessionId)).thenReturn(List.of(msg1, msg2));
+        when(chatMessageQueryFacade.getMessages(memberId, sessionId)).thenReturn(List.of(msg1, msg2));
 
         mvc.perform(get("/api/chat-sessions/{sessionId}/messages", sessionId)
                         .with(authentication(authenticationFor(memberId))))
@@ -342,7 +342,7 @@ class ChatMessageControllerTest {
         Long memberId = 1L;
         Long sessionId = 999L;
 
-        when(chatMessageService.getMessages(memberId, sessionId))
+        when(chatMessageQueryFacade.getMessages(memberId, sessionId))
                 .thenThrow(new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND));
 
         mvc.perform(get("/api/chat-sessions/{sessionId}/messages", sessionId)
@@ -378,8 +378,8 @@ class ChatMessageControllerTest {
         }
 
         @Bean
-        ChatMessageService chatMessageService() {
-            return mock(ChatMessageService.class);
+        ChatMessageQueryFacade chatMessageQueryFacade() {
+            return mock(ChatMessageQueryFacade.class);
         }
     }
 }

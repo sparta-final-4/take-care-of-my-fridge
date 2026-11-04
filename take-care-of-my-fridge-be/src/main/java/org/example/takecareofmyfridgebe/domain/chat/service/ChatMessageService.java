@@ -3,11 +3,15 @@ package org.example.takecareofmyfridgebe.domain.chat.service;
 import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatProperties;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageResponse;
+import org.example.takecareofmyfridgebe.domain.chat.dto.RecommendationToSave;
+import org.example.takecareofmyfridgebe.domain.chat.dto.SavedRecommendation;
 import org.example.takecareofmyfridgebe.domain.chat.entity.ChatMessage;
 import org.example.takecareofmyfridgebe.domain.chat.entity.ChatMessageRole;
+import org.example.takecareofmyfridgebe.domain.chat.entity.ChatRecommendation;
 import org.example.takecareofmyfridgebe.domain.chat.entity.ChatSession;
 import org.example.takecareofmyfridgebe.domain.chat.event.ChatSessionChangedEvent;
 import org.example.takecareofmyfridgebe.domain.chat.repository.ChatMessageRepository;
+import org.example.takecareofmyfridgebe.domain.chat.repository.ChatRecommendationRepository;
 import org.example.takecareofmyfridgebe.domain.chat.repository.ChatSessionRepository;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
@@ -16,7 +20,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -25,6 +34,7 @@ public class ChatMessageService {
 
     private final ChatSessionRepository chatSessionRepository;
     private final ChatMessageRepository chatMessageRepository;
+    private final ChatRecommendationRepository chatRecommendationRepository;
     private final ChatSessionService chatSessionService;
     private final ChatProperties chatProperties;
     private final ApplicationEventPublisher eventPublisher;
@@ -64,6 +74,17 @@ public class ChatMessageService {
      */
     @Transactional
     public List<ChatMessageResponse> saveExchange(Long sessionId, String userContent, String assistantContent) {
+        return saveExchange(sessionId, userContent, assistantContent, List.of());
+    }
+
+    /**
+     * 사용자 메시지와 AI 답을 저장하고, AI 답에 붙은 레시피 추천 카드를 같은 트랜잭션에서 순서대로 저장한다 (카드가 없으면 저장하지 않음).
+     *
+     * @param recommendations 보여 준 순서대로의 레시피 추천 (display_order 0부터)
+     */
+    @Transactional
+    public List<ChatMessageResponse> saveExchange(Long sessionId, String userContent, String assistantContent,
+                                                  List<RecommendationToSave> recommendations) {
         ChatSession session = chatSessionRepository.findById(sessionId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND));
 
@@ -94,6 +115,15 @@ public class ChatMessageService {
 
         ChatMessage savedUser = chatMessageRepository.save(userMessage);
         ChatMessage savedAssistant = chatMessageRepository.save(assistantMessage);
+        for (int order = 0; order < recommendations.size(); order++) {
+            RecommendationToSave recommendation = recommendations.get(order);
+            chatRecommendationRepository.save(ChatRecommendation.builder()
+                    .message(savedAssistant)
+                    .recipeId(recommendation.recipeId())
+                    .displayOrder(order)
+                    .description(recommendation.description())
+                    .build());
+        }
         eventPublisher.publishEvent(ChatSessionChangedEvent.from(session));
 
         return List.of(ChatMessageResponse.from(savedUser), ChatMessageResponse.from(savedAssistant));
@@ -107,6 +137,40 @@ public class ChatMessageService {
      * @param sessionId 세션 ID
      * @return sequence 순으로 정렬된 메시지 응답 DTO 목록
      */
+    /**
+     * AI 메시지 여러 개에 붙은 레시피 추천을 한 번에 조회한다 (메시지 id, 보여 준 순서대로).
+     */
+    public List<SavedRecommendation> findRecipeRecommendations(Collection<Long> messageIds) {
+        if (messageIds.isEmpty()) {
+            return List.of();
+        }
+        return chatRecommendationRepository.findRecipeRecommendationsByMessageIds(messageIds).stream()
+                .map(SavedRecommendation::from)
+                .toList();
+    }
+
+    /**
+     * 상담마다 최근에 추천한 레시피 ID를 limit개까지 (최근 답부터, 카드 순서, 중복 제외). 상담 수와 상관없이 쿼리 한 번이다.
+     */
+    public Map<Long, List<Long>> findRecentRecommendedRecipeIds(Collection<Long> sessionIds, int limit) {
+        if (sessionIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<Long, List<Long>> bySession = new LinkedHashMap<>();
+        for (ChatRecommendation recommendation : chatRecommendationRepository.findRecipeRecommendationsBySessionIds(sessionIds)) {
+            List<Long> ids = bySession.computeIfAbsent(recommendation.getMessage().getSession().getId(), id -> new ArrayList<>());
+            if (ids.size() < limit && !ids.contains(recommendation.getRecipeId())) {
+                ids.add(recommendation.getRecipeId());
+            }
+        }
+        return bySession;
+    }
+
+    // 이 상담에서 이미 추천한 레시피 ID (다음 추천에서 뒤로 보낸다)
+    public Set<Long> findRecommendedRecipeIds(Long sessionId) {
+        return Set.copyOf(chatRecommendationRepository.findRecipeIdsBySessionId(sessionId));
+    }
+
     public List<ChatMessageResponse> getMessages(Long memberId, Long sessionId) {
         chatSessionRepository.findByIdAndMemberId(sessionId, memberId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND));

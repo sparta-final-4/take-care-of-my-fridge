@@ -161,3 +161,21 @@
   border-radius: var(--ant-border-radius-lg);
   text-align: center;
 }
+
+// 추천받은 메뉴 칩 (최대 3개, 길면 말줄임)
+.menuChips {
+  display: flex;
+  gap: var(--ant-margin-xxs);
+  min-width: 0;
+  overflow: hidden;
+}
+
+.menuChip {
+  min-width: 0;
+  max-width: 100%;
+  margin-inline-end: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--ant-font-size-sm);
+}

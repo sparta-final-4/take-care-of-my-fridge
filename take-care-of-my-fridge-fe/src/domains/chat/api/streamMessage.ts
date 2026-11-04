@@ -4,7 +4,12 @@ import { useAuthStore } from '@/common/auth/authStore';
 import { setSession } from '@/common/auth/session';
 import { refresh } from '@/domains/auth/api';
 
-import { type ChatRecommendations, parseChatRecommendations } from '../recommendations';
+import {
+  type ChatRecommendations,
+  type ChatRecommendationText,
+  parseChatRecommendations,
+  parseChatRecommendationText,
+} from '../recommendations';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '';
 
@@ -19,6 +24,8 @@ export interface StreamMessageOptions {
   onChunk: (chunk: string) => void;
   // 추천이면 글 조각보다 먼저 한 번 온다 (event: recommendations). 일반 질문이면 오지 않는다
   onRecommendations?: (recommendations: ChatRecommendations) => void;
+  // 카드 설명 조각 (event: recommendation_text). 소개 글은 onChunk로 온다
+  onRecommendationText?: (piece: ChatRecommendationText) => void;
   onDone: (data: { userMessageId?: number; assistantMessageId?: number }) => void;
   onError: (error: { code?: string; message?: string }) => void;
 }
@@ -58,6 +65,7 @@ export async function streamMessage({
   signal,
   onChunk,
   onRecommendations,
+  onRecommendationText,
   onDone,
   onError,
 }: StreamMessageOptions): Promise<void> {
@@ -194,6 +202,9 @@ export async function streamMessage({
         } else if (eventType === 'recommendations') {
           const recommendations = parseChatRecommendations(data);
           if (recommendations) onRecommendations?.(recommendations);
+        } else if (eventType === 'recommendation_text') {
+          const piece = parseChatRecommendationText(data);
+          if (piece) onRecommendationText?.(piece);
         } else if (eventType === 'done') {
           isStreamCompleted = true;
           let parsed = {};

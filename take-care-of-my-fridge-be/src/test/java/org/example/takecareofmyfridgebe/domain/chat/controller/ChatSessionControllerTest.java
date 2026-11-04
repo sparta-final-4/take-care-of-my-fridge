@@ -8,6 +8,7 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.ChatSessionResponse;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatSessionStatusCounts;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatSessionSummaryResponse;
 import org.example.takecareofmyfridgebe.domain.chat.entity.ChatSessionStatus;
+import org.example.takecareofmyfridgebe.domain.chat.facade.ChatSessionQueryFacade;
 import org.example.takecareofmyfridgebe.domain.chat.service.ChatSessionService;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 import org.example.takecareofmyfridgebe.global.config.SecurityConfig;
@@ -51,6 +52,9 @@ class ChatSessionControllerTest {
 
     @Autowired
     private ChatSessionService chatSessionService;
+
+    @Autowired
+    private ChatSessionQueryFacade chatSessionQueryFacade;
 
     @Test
     @DisplayName("비로그인 사용자가 세션 시작 요청 시 401 Unauthorized를 반환한다")
@@ -184,7 +188,7 @@ class ChatSessionControllerTest {
     @DisplayName("상담 목록은 기본 page=1, size=10, status=ALL로 조회하고 탭 건수와 공통 페이지 형식으로 반환한다")
     void returnsSessionPageWithDefaults() throws Exception {
         Long memberId = 1L;
-        when(chatSessionService.getMySessions(eq(memberId),
+        when(chatSessionQueryFacade.getMySessions(eq(memberId),
                 argThat(req -> req.page() == 1 && req.size() == 10 && req.status() == ChatSessionListStatus.ALL)))
                 .thenReturn(listResponse());
 
@@ -210,7 +214,7 @@ class ChatSessionControllerTest {
     @DisplayName("상담 목록 status 파라미터를 상태 필터로 받는다")
     void passesStatusFilter_whenStatusIsGiven() throws Exception {
         Long memberId = 1L;
-        when(chatSessionService.getMySessions(eq(memberId), argThat(req -> req.status() == ChatSessionListStatus.ENDED)))
+        when(chatSessionQueryFacade.getMySessions(eq(memberId), argThat(req -> req.status() == ChatSessionListStatus.ENDED)))
                 .thenReturn(listResponse());
 
         mvc.perform(get("/api/chat-sessions")
@@ -238,7 +242,7 @@ class ChatSessionControllerTest {
                 4,
                 "감자로 뭐 만들까요?",
                 "감자전을 추천해요"
-        );
+        , List.of());
         return new ChatSessionListResponse(
                 new ChatSessionStatusCounts(3, 1, 2),
                 PageResponse.of(new PageImpl<>(List.of(summary), PageRequest.of(0, 10), 1))
@@ -277,6 +281,11 @@ class ChatSessionControllerTest {
         @Bean
         ChatSessionService chatSessionService() {
             return mock(ChatSessionService.class);
+        }
+
+        @Bean
+        ChatSessionQueryFacade chatSessionQueryFacade() {
+            return mock(ChatSessionQueryFacade.class);
         }
     }
 }

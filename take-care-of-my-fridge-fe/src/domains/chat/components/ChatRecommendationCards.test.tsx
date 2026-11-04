@@ -19,6 +19,7 @@ function recipe(overrides: Partial<ChatRecommendedRecipe>): ChatRecommendedRecip
     missingSelectedIngredients: [],
     lacksManyIngredients: false,
     reason: '감자를 쓸 수 있어요',
+    description: null,
     ...overrides,
   };
 }
@@ -89,5 +90,40 @@ describe('ChatRecommendationCards', () => {
 
   it('추천 레시피가 없으면 아무것도 그리지 않는다', () => {
     expect(render([])).toBe('');
+  });
+
+  it('카드 아래에 설명을 보여 주고, 설명이 있으면 카드 안 이유 한 줄은 숨긴다', () => {
+    const html = render([
+      recipe({ description: '두부를 졸여 짭짤하게 먹어요.', reason: '두부가 주재료예요' }),
+    ]);
+
+    expect(html).toContain('두부를 졸여 짭짤하게 먹어요.');
+    expect(html).not.toContain('두부가 주재료예요');
+  });
+
+  it('받는 중인 설명이 있으면 저장된 설명 대신 그 글을 보여 준다', () => {
+    const html = renderToStaticMarkup(
+      <MemoryRouter>
+        <ChatRecommendationCards
+          recipes={[recipe({ description: null, reason: '이유' })]}
+          descriptions={['받는 중인 설명']}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(html).toContain('받는 중인 설명');
+    expect(html).not.toContain('이유');
+  });
+
+  it('기록에서 다시 그린 카드는 냉장고에 없는 선택 재료가 비어 있어도 그 태그 없이 그린다', () => {
+    const html = render([
+      recipe({
+        missingSelectedIngredients: [],
+        missingIngredients: [{ ingredientId: 1, name: '두부' }],
+      }),
+    ]);
+
+    expect(html).not.toContain('없음');
+    expect(html).toContain('장볼 재료 1');
   });
 });

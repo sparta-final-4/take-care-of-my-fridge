@@ -21,6 +21,7 @@ import java.util.Set;
  * @param preferenceText           사용자가 원한 특징·요리 표현 그대로 (예: "차가운 요리"). 고른 레시피가 요청에 하나도 안 맞으면 안내에 쓴다
  * @param selectedIngredientGroups 선택 재료별 같은 종류 재료 ID (예: 버섯 → 표고버섯·양송이버섯). 묶음 안의 재료를 하나라도 쓰면
  *                                 그 선택 재료를 쓴 것으로 센다. 후보 검색(RecipeCandidateFacade)이 채우며, 없으면 선택 재료 자신만이다
+ * @param alreadyRecommendedIds    이 상담에서 이미 추천한 레시피 ID. 정렬에서 요청 바로 뒤에 "추천하지 않은 것 먼저"로 쓴다
  * @param keywordMatches           키워드 검색으로 찾은 레시피 ID별 맞은 방식(이름·늘린 이름·재료·쪼개짐·벡터). 후보 검색(RecipeCandidateFacade)이 채운다
  */
 public record RecipeQuery(
@@ -35,7 +36,8 @@ public record RecipeQuery(
         String keywordText,
         String preferenceText,
         Map<Long, Set<Long>> selectedIngredientGroups,
-        Map<Long, KeywordMatch> keywordMatches
+        Map<Long, KeywordMatch> keywordMatches,
+        Set<Long> alreadyRecommendedIds
 ) {
     public RecipeQuery {
         selectedIngredientIds = orEmpty(selectedIngredientIds);
@@ -47,6 +49,7 @@ public record RecipeQuery(
         preferenceText = preferenceText == null || preferenceText.isBlank() ? null : preferenceText.strip();
         selectedIngredientGroups = selectedIngredientGroups == null ? Map.of() : Map.copyOf(selectedIngredientGroups);
         keywordMatches = keywordMatches == null ? Map.of() : Map.copyOf(keywordMatches);
+        alreadyRecommendedIds = alreadyRecommendedIds == null ? Set.of() : Set.copyOf(alreadyRecommendedIds);
     }
 
     public RecipeQuery(
@@ -62,7 +65,7 @@ public record RecipeQuery(
             String preferenceText
     ) {
         this(memberId, selectedIngredientIds, wantedTastes, moodCategories, maxMinutes, excludeIngredientIds,
-                useSelectedOnly, keywords, keywordText, preferenceText, null, null);
+                useSelectedOnly, keywords, keywordText, preferenceText, null, null, null);
     }
 
     public RecipeQuery(
@@ -96,13 +99,22 @@ public record RecipeQuery(
     // 선택 재료 묶음을 채운 검색 조건
     public RecipeQuery withSelectedIngredientGroups(Map<Long, Set<Long>> groups) {
         return new RecipeQuery(memberId, selectedIngredientIds, wantedTastes, moodCategories, maxMinutes,
-                excludeIngredientIds, useSelectedOnly, keywords, keywordText, preferenceText, groups, keywordMatches);
+                excludeIngredientIds, useSelectedOnly, keywords, keywordText, preferenceText, groups, keywordMatches,
+                alreadyRecommendedIds);
     }
 
     // 키워드 검색 결과를 채운 검색 조건
     public RecipeQuery withKeywordMatches(Map<Long, KeywordMatch> matches) {
         return new RecipeQuery(memberId, selectedIngredientIds, wantedTastes, moodCategories, maxMinutes,
-                excludeIngredientIds, useSelectedOnly, keywords, keywordText, preferenceText, selectedIngredientGroups, matches);
+                excludeIngredientIds, useSelectedOnly, keywords, keywordText, preferenceText, selectedIngredientGroups, matches,
+                alreadyRecommendedIds);
+    }
+
+    // 이 상담에서 이미 추천한 레시피를 채운 검색 조건
+    public RecipeQuery withAlreadyRecommended(Set<Long> recipeIds) {
+        return new RecipeQuery(memberId, selectedIngredientIds, wantedTastes, moodCategories, maxMinutes,
+                excludeIngredientIds, useSelectedOnly, keywords, keywordText, preferenceText, selectedIngredientGroups,
+                keywordMatches, recipeIds);
     }
 
     // 말한 요리를 찾지 못했는지.
@@ -116,6 +128,11 @@ public record RecipeQuery(
             return keywordMatches.values().stream().noneMatch(match -> match.type() == KeywordMatch.Type.NAME);
         }
         return keywordMatches.values().stream().noneMatch(KeywordMatch::strong);
+    }
+
+    // 사용자 요청 조건(요리 이름 키워드·분류·요리 이름)이 있는지. 있으면 회원 선호 맛은 말하지 않는다
+    public boolean hasRequest() {
+        return !keywords.isEmpty() || !moodCategories.isEmpty() || keywordText != null;
     }
 
     // 선택 재료 하나의 같은 종류 재료 ID (선택 재료 자신 포함)

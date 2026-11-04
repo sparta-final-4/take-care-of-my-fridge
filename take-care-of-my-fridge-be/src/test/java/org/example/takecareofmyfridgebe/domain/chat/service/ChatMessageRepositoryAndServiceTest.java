@@ -2,6 +2,8 @@ package org.example.takecareofmyfridgebe.domain.chat.service;
 
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatProperties;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageResponse;
+import org.example.takecareofmyfridgebe.domain.chat.dto.RecommendationToSave;
+import org.example.takecareofmyfridgebe.domain.chat.dto.SavedRecommendation;
 import org.example.takecareofmyfridgebe.domain.chat.entity.ChatMessageRole;
 import org.example.takecareofmyfridgebe.domain.chat.entity.ChatSession;
 import org.example.takecareofmyfridgebe.domain.chat.repository.ChatMessageRepository;
@@ -11,6 +13,7 @@ import org.example.takecareofmyfridgebe.global.config.QueryDslConfig;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 import org.example.takecareofmyfridgebe.support.MySqlContainerSupport;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -25,6 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -59,6 +63,15 @@ class ChatMessageRepositoryAndServiceTest extends MySqlContainerSupport {
         } catch (Exception ignored) {
         }
 
+        jdbcTemplate.execute("DELETE FROM chat_recommendations");
+        jdbcTemplate.execute("DELETE FROM chat_messages");
+        jdbcTemplate.execute("DELETE FROM chat_sessions");
+    }
+
+    // 같은 MySQL을 쓰는 다른 테스트 클래스가 상담·메시지를 지울 수 있게 추천까지 지워 둔다
+    @AfterEach
+    void cleanUp() {
+        jdbcTemplate.execute("DELETE FROM chat_recommendations");
         jdbcTemplate.execute("DELETE FROM chat_messages");
         jdbcTemplate.execute("DELETE FROM chat_sessions");
     }
@@ -131,5 +144,65 @@ class ChatMessageRepositoryAndServiceTest extends MySqlContainerSupport {
                 .map(ChatMessageResponse::from)
                 .toList();
         assertThat(messages).isEmpty();
+    }
+
+    @Test
+    @DisplayName("saveExchange: 추천 카드 3개를 AI 메시지에 보여 준 순서대로 설명과 함께 저장하고 한 번에 조회한다")
+    void savesRecommendationsInOrderWithDescription() {
+        ChatSession session = chatSessionRepository.saveAndFlush(ChatSession.builder().memberId(101L).build());
+
+        List<ChatMessageResponse> saved = chatMessageService.saveExchange(session.getId(), "뭐 먹지?", "소개", List.of(
+                new RecommendationToSave(30L, "첫 카드 설명"),
+                new RecommendationToSave(10L, null),
+                new RecommendationToSave(20L, "셋째 카드 설명")));
+
+        Long assistantId = saved.get(1).id();
+        assertThat(chatMessageService.findRecipeRecommendations(List.of(assistantId))).containsExactly(
+                new SavedRecommendation(assistantId, 30L, 0, "첫 카드 설명"),
+                new SavedRecommendation(assistantId, 10L, 1, null),
+                new SavedRecommendation(assistantId, 20L, 2, "셋째 카드 설명"));
+    }
+
+    @Test
+    @DisplayName("saveExchange: 추천 카드가 없으면 추천을 저장하지 않는다")
+    void savesNoRecommendations_whenNoCards() {
+        ChatSession session = chatSessionRepository.saveAndFlush(ChatSession.builder().memberId(102L).build());
+
+        List<ChatMessageResponse> saved = chatMessageService.saveExchange(session.getId(), "두부 보관?", "냉장 보관");
+
+        assertThat(chatMessageService.findRecipeRecommendations(List.of(saved.get(1).id()))).isEmpty();
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM chat_recommendations", Long.class)).isZero();
+    }
+
+    @Test
+    @DisplayName("이 상담에서 추천한 레시피 ID를 중복 없이 읽고, 다른 상담의 추천은 넣지 않는다")
+    void findsRecommendedRecipeIdsOfSession() {
+        ChatSession session = chatSessionRepository.saveAndFlush(ChatSession.builder().memberId(103L).build());
+        ChatSession other = chatSessionRepository.saveAndFlush(ChatSession.builder().memberId(104L).build());
+        chatMessageService.saveExchange(session.getId(), "뭐 먹지?", "소개",
+                List.of(new RecommendationToSave(10L, null), new RecommendationToSave(20L, null)));
+        chatMessageService.saveExchange(session.getId(), "또 추천", "소개",
+                List.of(new RecommendationToSave(20L, null), new RecommendationToSave(30L, null)));
+        chatMessageService.saveExchange(other.getId(), "다른 상담", "소개", List.of(new RecommendationToSave(99L, null)));
+
+        assertThat(chatMessageService.findRecommendedRecipeIds(session.getId())).containsExactlyInAnyOrder(10L, 20L, 30L);
+    }
+
+    @Test
+    @DisplayName("상담마다 최근 답부터 카드 순서로 추천 레시피를 중복 없이 최대 3개 읽는다")
+    void findsRecentRecommendedRecipeIdsPerSession() {
+        ChatSession session = chatSessionRepository.saveAndFlush(ChatSession.builder().memberId(105L).build());
+        ChatSession other = chatSessionRepository.saveAndFlush(ChatSession.builder().memberId(106L).build());
+        chatMessageService.saveExchange(session.getId(), "첫 추천", "소개",
+                List.of(new RecommendationToSave(10L, null), new RecommendationToSave(20L, null)));
+        chatMessageService.saveExchange(session.getId(), "두 번째 추천", "소개",
+                List.of(new RecommendationToSave(30L, null), new RecommendationToSave(10L, null), new RecommendationToSave(40L, null)));
+        chatMessageService.saveExchange(other.getId(), "다른 상담", "소개", List.of(new RecommendationToSave(99L, null)));
+
+        Map<Long, List<Long>> result = chatMessageService.findRecentRecommendedRecipeIds(
+                List.of(session.getId(), other.getId()), 3);
+
+        assertThat(result.get(session.getId())).containsExactly(30L, 10L, 40L);
+        assertThat(result.get(other.getId())).containsExactly(99L);
     }
 }
