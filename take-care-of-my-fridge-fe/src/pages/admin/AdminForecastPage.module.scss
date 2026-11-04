@@ -11,6 +11,17 @@
   margin-bottom: var(--ant-margin-lg);
 }
 
+.controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--ant-margin-xs);
+}
+
+.demoAction {
+  margin-left: auto;
+}
+
 .loading {
   padding: var(--ant-padding-xxl) 0;
   text-align: center;

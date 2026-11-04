@@ -9,7 +9,6 @@ import {
   Empty,
   Result,
   Row,
-  Space,
   Spin,
   Statistic,
   Table,
@@ -68,7 +67,7 @@ export default function AdminForecastPage() {
   return (
     <section className={styles.container}>
       <Typography.Title level={2}>판매 예측</Typography.Title>
-      <Space wrap className={styles.controls}>
+      <div className={styles.controls}>
         <DatePicker
           aria-label="조회할 주의 월요일"
           placeholder="조회할 주의 월요일"
@@ -82,11 +81,6 @@ export default function AdminForecastPage() {
         >
           최신 주
         </Button>
-        {demoAvailable && (
-          <Button type={demo ? 'primary' : 'default'} onClick={() => updateParams('demo', '1')}>
-            임의 테스트 결과
-          </Button>
-        )}
         <Button
           disabled={isPlaceholderData || !data?.previousWeekStart}
           onClick={() => updateParams('weekStart', data?.previousWeekStart ?? undefined)}
@@ -99,7 +93,16 @@ export default function AdminForecastPage() {
         >
           다음 주
         </Button>
-      </Space>
+        {demoAvailable && (
+          <Button
+            className={styles.demoAction}
+            type={demo ? 'primary' : 'default'}
+            onClick={() => updateParams('demo', '1')}
+          >
+            임의 테스트 결과
+          </Button>
+        )}
+      </div>
 
       {isPending ? (
         <div className={styles.loading}>
