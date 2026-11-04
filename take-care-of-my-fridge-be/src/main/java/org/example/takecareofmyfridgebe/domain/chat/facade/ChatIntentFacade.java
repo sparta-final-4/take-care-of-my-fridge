@@ -17,6 +17,7 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.RefineCondition;
 import org.example.takecareofmyfridgebe.domain.chat.service.ChatIntentExtractor;
 import org.example.takecareofmyfridgebe.domain.chat.service.ChatMessageService;
 import org.example.takecareofmyfridgebe.domain.ingredient.service.IngredientMatcher;
+import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeSummary;
 import org.example.takecareofmyfridgebe.domain.recipe.service.RecipeService;
 import org.springframework.stereotype.Component;
@@ -133,6 +134,8 @@ public class ChatIntentFacade {
      *       ("좀 더 매운 걸로" → 맛만 바뀌고 분류·키워드는 그대로, "국물 말고 볶음으로" → 분류만 바뀜, "다른 거 없어?" → 모두 그대로).
      *       removed에 있는 조건은 직전 값을 지우고 이번 말의 값만 쓴다 ("매운 거 말고" → 맛 조건 없음, "시간 상관없이" → 시간 조건 없음)</li>
      *   <li>요리 이름·원한 표현: 이어 가지 않는다 (다시 추천에서 "김피탕 레시피는 없어서…" 같은 안내가 다시 나오지 않게)</li>
+     *   <li>피할 맛: 이번에 말한 피할 맛 + 직전 피할 맛을 이어 간다 ("매운 거 말고" 뒤 "다른 거 없어?"도 안 매운 걸로).
+     *       이번 원하는 맛에 다시 들어간 맛("다시 매운 걸로")은 직전 피할 맛에서 풀고, 이번에 말한 피할 맛은 원하는 맛보다 앞선다</li>
      *   <li>재료: AI에 넘기지 않으므로 서버가 이어 간다. 직전 선택 재료 + 이번에 고르거나 말한 재료, 뺄 재료는 합친 뒤 선택 재료에서 뺀다.
      *       removed에 INCLUDE면 직전 선택 재료(와 선택 재료만 쓰기)를, EXCLUDE면 직전 뺄 재료를 지운다</li>
      * </ul>
@@ -153,10 +156,18 @@ public class ChatIntentFacade {
         boolean useSelectedOnly = removed.contains(RefineCondition.INCLUDE)
                 ? current.useSelectedOnly()
                 : previous.useSelectedOnly() || current.useSelectedOnly();
+        List<Member.Taste> wanted = merged(current.wantedTastes(), previous.wantedTastes(), removed.contains(RefineCondition.TASTE))
+                .stream()
+                .filter(taste -> !current.avoidTastes().contains(taste))
+                .toList();
+        List<Member.Taste> avoid = Stream.concat(current.avoidTastes().stream(),
+                        previous.avoidTastes().stream().filter(taste -> !wanted.contains(taste)))
+                .distinct()
+                .toList();
         return new RecipeQuery(
                 previous.memberId(),
                 selectedIds,
-                merged(current.wantedTastes(), previous.wantedTastes(), removed.contains(RefineCondition.TASTE)),
+                wanted,
                 merged(current.moodCategories(), previous.moodCategories(), removed.contains(RefineCondition.CATEGORY)),
                 current.maxMinutes() != null || removed.contains(RefineCondition.MAX_MINUTES) ? current.maxMinutes() : previous.maxMinutes(),
                 excludeIds,
@@ -164,7 +175,7 @@ public class ChatIntentFacade {
                 merged(current.keywords(), previous.keywords(), removed.contains(RefineCondition.KEYWORD)),
                 null,
                 null
-        );
+        ).withAvoidTastes(avoid);
     }
 
     // 뺄 조건이면 이번 값만, 아니면 이번 값이 비었을 때 직전 값
@@ -277,6 +288,9 @@ public class ChatIntentFacade {
         if (!query.wantedTastes().isEmpty()) {
             parts.add("원하는 맛 " + query.wantedTastes().stream().map(Enum::name).collect(Collectors.joining(NAME_DELIMITER)));
         }
+        if (query.avoidTastes() != null && !query.avoidTastes().isEmpty()) {
+            parts.add("피할 맛 " + query.avoidTastes().stream().map(Enum::name).collect(Collectors.joining(NAME_DELIMITER)));
+        }
         if (!query.moodCategories().isEmpty()) {
             parts.add("분류 " + String.join(NAME_DELIMITER, query.moodCategories()));
         }
@@ -311,6 +325,7 @@ public class ChatIntentFacade {
                 .toList();
 
         boolean useSelectedOnly = request.useSelectedOnly() || Boolean.TRUE.equals(result.useSelectedOnly());
+        // 피할 맛이 원하는 맛과 겹치면 피할 맛이 이긴다 (withAvoidTastes가 원하는 맛에서 뺀다)
         return new RecipeQuery(
                 memberId,
                 selectedIds,
@@ -322,7 +337,7 @@ public class ChatIntentFacade {
                 result.keywords(),
                 result.dishText(),
                 result.preferenceText()
-        );
+        ).withAvoidTastes(result.avoidedTastes());
     }
 
     // 재료 이름 → 재료 ID. 못 찾은 이름(ING_CUSTOM)은 뺀다. 매칭이 실패하면(DB·검색 장애) 재료 조건 없이 계속한다

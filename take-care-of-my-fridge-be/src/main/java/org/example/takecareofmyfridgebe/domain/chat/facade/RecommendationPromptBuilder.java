@@ -206,6 +206,9 @@ public final class RecommendationPromptBuilder {
         if (!query.wantedTastes().isEmpty()) {
             conditions.add("원하는 맛 " + tastes(query.wantedTastes()));
         }
+        if (!query.avoidTastes().isEmpty()) {
+            conditions.add("피할 맛 " + tastes(query.avoidTastes()));
+        }
         if (!query.moodCategories().isEmpty()) {
             conditions.add("분류 " + String.join(NAME_DELIMITER, query.moodCategories()));
         }

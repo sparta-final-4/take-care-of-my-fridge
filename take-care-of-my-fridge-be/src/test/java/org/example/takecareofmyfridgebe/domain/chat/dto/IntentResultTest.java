@@ -102,4 +102,14 @@ class IntentResultTest {
         assertThat(result.removedConditions()).containsExactlyInAnyOrder(RefineCondition.TASTE, RefineCondition.MAX_MINUTES);
         assertThat(IntentResult.general().removedConditions()).isEmpty();
     }
+
+    @Test
+    @DisplayName("피할 맛(avoidTastes)은 정해진 맛 이름만 남기고 소문자는 대문자로 맞추며, 없으면 빈 목록이다")
+    void sanitizesAvoidTastes() {
+        IntentResult result = new IntentResult(ChatIntent.RECOMMEND, null, null, null, null, null, null, null, null, null,
+                null, null, null, List.of("spicy", "없는맛")).sanitize(CATEGORIES);
+
+        assertThat(result.avoidedTastes()).containsExactly(Taste.SPICY);
+        assertThat(IntentResult.general().avoidedTastes()).isEmpty();
+    }
 }

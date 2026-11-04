@@ -51,7 +51,7 @@ class ChatContextStoreTest extends RedisContainerSupport {
     @DisplayName("직전 추천 조건·카드를 chat:context:{sessionId}에 30분 동안 두고 그대로 읽는다")
     void savesAndFindsLastRecommendation_withSessionTimeout() {
         RecipeQuery query = new RecipeQuery(1L, List.of(21L), List.of(Taste.SPICY), List.of("국"), 30, List.of(15L), true,
-                List.of("김치찌개"), "김치찌개", "얼큰한 국물");
+                List.of("김치찌개"), "김치찌개", "얼큰한 국물").withAvoidTastes(List.of(Taste.SWEET));
 
         chatContextStore.saveRecommendation(SESSION_ID, query, List.of(10L, 20L, 30L));
 
@@ -73,6 +73,19 @@ class ChatContextStoreTest extends RedisContainerSupport {
         assertThat(stringRedisTemplate.getExpire(KEY, TimeUnit.SECONDS)).isGreaterThan(5L);
         assertThat(chatContextStore.find(SESSION_ID).orElseThrow().recipeIds()).containsExactly(10L);
         assertThat(stringRedisTemplate.hasKey("chat:context:999")).isFalse();
+    }
+
+    @Test
+    @DisplayName("피할 맛이 없던 예전 값도 피할 맛 없이 읽는다")
+    void readsOldValueWithoutAvoidTastes() {
+        stringRedisTemplate.opsForValue().set(KEY, "{\"query\":{\"selectedIngredientIds\":[],\"wantedTastes\":[\"SPICY\"],"
+                + "\"moodCategories\":[],\"maxMinutes\":null,\"excludeIngredientIds\":[],\"useSelectedOnly\":false,"
+                + "\"keywords\":[],\"keywordText\":null,\"preferenceText\":null},\"recipeIds\":[10]}");
+
+        RecipeQuery query = chatContextStore.find(SESSION_ID).orElseThrow().query().toRecipeQuery(1L);
+
+        assertThat(query.wantedTastes()).containsExactly(Taste.SPICY);
+        assertThat(query.avoidTastes()).isEmpty();
     }
 
     @Test

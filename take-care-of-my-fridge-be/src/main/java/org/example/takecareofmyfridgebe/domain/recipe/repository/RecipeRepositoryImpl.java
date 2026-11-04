@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeCandidateIngredient;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeIngredientCountDto;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeIngredientNameDto;
+import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeIngredientTextDto;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeListRequest;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeSort;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeStepTextDto;
@@ -140,6 +141,20 @@ public class RecipeRepositoryImpl implements RecipeRepositoryCustom {
                 .groupBy(recipeIngredient.recipe.id, recipeIngredient.ingredientId, ingredient.name,
                         ingredient.basicSeasoning)
                 .orderBy(recipeIngredient.recipe.id.asc(), recipeIngredient.seq.min().asc())
+                .fetch();
+    }
+
+    @Override
+    public List<RecipeIngredientTextDto> findIngredientTexts(Collection<Long> recipeIds) {
+        return queryFactory
+                .select(Projections.constructor(RecipeIngredientTextDto.class,
+                        recipeIngredient.recipe.id,
+                        ingredient.name,
+                        recipeIngredient.displayName
+                ))
+                .from(recipeIngredient)
+                .leftJoin(ingredient).on(ingredient.id.eq(recipeIngredient.ingredientId))
+                .where(recipeIngredient.recipe.id.in(recipeIds))
                 .fetch();
     }
 

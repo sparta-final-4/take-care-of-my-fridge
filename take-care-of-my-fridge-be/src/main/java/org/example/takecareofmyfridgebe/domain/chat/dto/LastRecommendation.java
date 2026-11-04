@@ -36,18 +36,21 @@ public record LastRecommendation(
             boolean useSelectedOnly,
             List<String> keywords,
             String keywordText,
-            String preferenceText
+            String preferenceText,
+            List<Member.Taste> avoidTastes
     ) {
 
         public static QuerySnapshot from(RecipeQuery query) {
             return new QuerySnapshot(query.selectedIngredientIds(), query.wantedTastes(), query.moodCategories(),
                     query.maxMinutes(), query.excludeIngredientIds(), query.useSelectedOnly(), query.keywords(),
-                    query.keywordText(), query.preferenceText());
+                    query.keywordText(), query.preferenceText(), query.avoidTastes());
         }
 
+        // 피할 맛이 없던 예전 값(Redis)도 읽힌다 (null → 빈 목록)
         public RecipeQuery toRecipeQuery(Long memberId) {
             return new RecipeQuery(memberId, selectedIngredientIds, wantedTastes, moodCategories, maxMinutes,
-                    excludeIngredientIds, useSelectedOnly, keywords, keywordText, preferenceText);
+                    excludeIngredientIds, useSelectedOnly, keywords, keywordText, preferenceText)
+                    .withAvoidTastes(avoidTastes);
         }
     }
 }

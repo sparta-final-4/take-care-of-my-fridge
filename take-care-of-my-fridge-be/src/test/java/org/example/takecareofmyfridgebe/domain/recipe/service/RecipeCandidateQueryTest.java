@@ -155,6 +155,23 @@ class RecipeCandidateQueryTest extends MySqlContainerSupport {
     }
 
     @Test
+    @DisplayName("레시피별 재료 이름을 재료 사전 이름과 레시피에 적힌 이름 둘 다(기본 양념 포함) 돌려준다")
+    void returnsIngredientTexts_withDictionaryAndDisplayNames() {
+        Ingredient pepper = ingredient("ING_PEPPER", "고추", false);
+        Recipe kkanpunggi = recipe("R4", "깐풍기", "튀김", 30);
+        entityManager.persist(RecipeIngredient.builder().recipe(kkanpunggi).ingredientId(pepper.getId()).seq(1).displayName("홍고추").build());
+        entityManager.persist(RecipeIngredient.builder().recipe(kkanpunggi).ingredientId(salt.getId()).seq(2).displayName("소금").build());
+        entityManager.flush();
+        entityManager.clear();
+
+        Map<Long, List<String>> texts = recipeService.findIngredientTexts(List.of(kkanpunggi.getId(), saltOnly.getId()));
+
+        assertThat(texts.get(kkanpunggi.getId())).containsExactlyInAnyOrder("고추", "홍고추", "소금", "소금");
+        assertThat(texts.get(saltOnly.getId())).containsExactly("소금", "소금");
+        assertThat(recipeService.findIngredientTexts(List.of())).isEmpty();
+    }
+
+    @Test
     @DisplayName("빈 ID 목록이면 쿼리 없이 빈 결과를 돌려준다")
     void returnsEmpty_whenIdsAreEmpty() {
         assertThat(recipeService.findNonBasicIngredients(List.of())).isEmpty();

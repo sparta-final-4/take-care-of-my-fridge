@@ -23,6 +23,7 @@ import java.util.Set;
  *                                 그 선택 재료를 쓴 것으로 센다. 후보 검색(RecipeCandidateFacade)이 채우며, 없으면 선택 재료 자신만이다
  * @param alreadyRecommendedIds    이 상담에서 이미 추천한 레시피 ID. 정렬에서 요청 바로 뒤에 "추천하지 않은 것 먼저"로 쓴다
  * @param keywordMatches           키워드 검색으로 찾은 레시피 ID별 맞은 방식(이름·늘린 이름·재료·쪼개짐·벡터). 후보 검색(RecipeCandidateFacade)이 채운다
+ * @param avoidTastes              피할 맛 ("매운 거 말고" → 매운맛). 이 맛인 레시피는 후보에서 빼고(3개가 안 되면 뒤에 채움), 원하는 맛·회원 선호 맛보다 앞선다
  */
 public record RecipeQuery(
         Long memberId,
@@ -37,7 +38,8 @@ public record RecipeQuery(
         String preferenceText,
         Map<Long, Set<Long>> selectedIngredientGroups,
         Map<Long, KeywordMatch> keywordMatches,
-        Set<Long> alreadyRecommendedIds
+        Set<Long> alreadyRecommendedIds,
+        List<Member.Taste> avoidTastes
 ) {
     public RecipeQuery {
         selectedIngredientIds = orEmpty(selectedIngredientIds);
@@ -50,6 +52,7 @@ public record RecipeQuery(
         selectedIngredientGroups = selectedIngredientGroups == null ? Map.of() : Map.copyOf(selectedIngredientGroups);
         keywordMatches = keywordMatches == null ? Map.of() : Map.copyOf(keywordMatches);
         alreadyRecommendedIds = alreadyRecommendedIds == null ? Set.of() : Set.copyOf(alreadyRecommendedIds);
+        avoidTastes = orEmpty(avoidTastes);
     }
 
     public RecipeQuery(
@@ -65,7 +68,7 @@ public record RecipeQuery(
             String preferenceText
     ) {
         this(memberId, selectedIngredientIds, wantedTastes, moodCategories, maxMinutes, excludeIngredientIds,
-                useSelectedOnly, keywords, keywordText, preferenceText, null, null, null);
+                useSelectedOnly, keywords, keywordText, preferenceText, null, null, null, null);
     }
 
     public RecipeQuery(
@@ -100,21 +103,30 @@ public record RecipeQuery(
     public RecipeQuery withSelectedIngredientGroups(Map<Long, Set<Long>> groups) {
         return new RecipeQuery(memberId, selectedIngredientIds, wantedTastes, moodCategories, maxMinutes,
                 excludeIngredientIds, useSelectedOnly, keywords, keywordText, preferenceText, groups, keywordMatches,
-                alreadyRecommendedIds);
+                alreadyRecommendedIds, avoidTastes);
     }
 
     // 키워드 검색 결과를 채운 검색 조건
     public RecipeQuery withKeywordMatches(Map<Long, KeywordMatch> matches) {
         return new RecipeQuery(memberId, selectedIngredientIds, wantedTastes, moodCategories, maxMinutes,
                 excludeIngredientIds, useSelectedOnly, keywords, keywordText, preferenceText, selectedIngredientGroups, matches,
-                alreadyRecommendedIds);
+                alreadyRecommendedIds, avoidTastes);
     }
 
     // 이 상담에서 이미 추천한 레시피를 채운 검색 조건
     public RecipeQuery withAlreadyRecommended(Set<Long> recipeIds) {
         return new RecipeQuery(memberId, selectedIngredientIds, wantedTastes, moodCategories, maxMinutes,
                 excludeIngredientIds, useSelectedOnly, keywords, keywordText, preferenceText, selectedIngredientGroups,
-                keywordMatches, recipeIds);
+                keywordMatches, recipeIds, avoidTastes);
+    }
+
+    // 피할 맛을 채운 검색 조건. 원하는 맛과 겹치면 피할 맛이 이긴다 (원하는 맛에서 뺀다)
+    public RecipeQuery withAvoidTastes(List<Member.Taste> tastes) {
+        List<Member.Taste> avoid = orEmpty(tastes).stream().distinct().toList();
+        List<Member.Taste> wanted = wantedTastes.stream().filter(taste -> !avoid.contains(taste)).toList();
+        return new RecipeQuery(memberId, selectedIngredientIds, wanted, moodCategories, maxMinutes,
+                excludeIngredientIds, useSelectedOnly, keywords, keywordText, preferenceText, selectedIngredientGroups,
+                keywordMatches, alreadyRecommendedIds, avoid);
     }
 
     // 말한 요리를 찾지 못했는지.

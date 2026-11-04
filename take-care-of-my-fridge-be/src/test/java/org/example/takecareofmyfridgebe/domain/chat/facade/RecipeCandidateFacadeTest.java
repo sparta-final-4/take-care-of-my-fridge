@@ -32,6 +32,8 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -63,7 +65,7 @@ class RecipeCandidateFacadeTest {
         ingredientService = mock(IngredientService.class);
         recipeSearchService = mock(RecipeSearchService.class);
         facade = new RecipeCandidateFacade(fridgeService, memberService, recipeService, ingredientService, recipeSearchService,
-                new ChatCandidateProperties(List.of("양념", "음료"), 0.4));
+                new ChatCandidateProperties(List.of("양념", "음료"), 0.4, List.of("청양고추", "홍고추", "청고추", "고춧가루", "고추장", "건고추", "베트남고추", "페퍼론치노", "핫소스", "고추기름")));
         when(fridgeService.getItems(any(), any())).thenReturn(List.of());
     }
 
@@ -206,6 +208,124 @@ class RecipeCandidateFacadeTest {
                 .thenReturn(Map.of(30L, new RecipeCandidateInfo(30L, "두부조림", "조림", 20, 1)));
 
         assertThat(facade.describeRecipes(MEMBER_ID, List.of(30L, 99L))).containsOnlyKeys(30L);
+    }
+
+    @Test
+    @DisplayName("\"매운 거 말고\"면 맛 데이터나 매운 재료(원문 홍고추·청고추)로 매운 레시피를 후보에서 뺀다")
+    void dropsSpicyRecipes_whenAvoidingSpicy() throws Exception {
+        when(memberService.getMyInfo(MEMBER_ID)).thenReturn(mock(MyInfoResponse.class));
+        givenKeywordRecipes(Map.of(
+                10L, recipe(10L, "깐풍기", Set.of(Taste.SALTY, Taste.SWEET), List.of("닭고기", "고추", "홍고추")),
+                20L, recipe(20L, "탕수육", Set.of(Taste.SWEET), List.of("돼지고기")),
+                30L, recipe(30L, "장어조림", Set.of(Taste.SALTY), List.of("장어", "고추", "청고추")),
+                40L, recipe(40L, "닭강정", Set.of(Taste.SWEET), List.of("닭고기")),
+                50L, recipe(50L, "유린기", Set.of(Taste.SPICY), List.of("닭고기")),
+                60L, recipe(60L, "꿔바로우", Set.of(Taste.SWEET), List.of("돼지고기", "고추"))));
+
+        RecipeCandidates result = facade.findCandidates(avoidSpicy(List.of("튀김")));
+
+        assertThat(result.candidates()).extracting(RecipeCandidate::recipeId).containsExactlyInAnyOrder(20L, 40L, 60L);
+    }
+
+    @Test
+    @DisplayName("매운 레시피를 빼서 3개보다 적으면 그때만 매운 레시피를 뒤에 채운다")
+    void refillsSpicyRecipesAtEnd_whenTooFew() throws Exception {
+        when(memberService.getMyInfo(MEMBER_ID)).thenReturn(mock(MyInfoResponse.class));
+        givenKeywordRecipes(Map.of(
+                10L, recipe(10L, "깐풍기", Set.of(Taste.SALTY), List.of("홍고추")),
+                20L, recipe(20L, "탕수육", Set.of(Taste.SWEET), List.of("돼지고기")),
+                30L, recipe(30L, "장어조림", Set.of(Taste.SALTY), List.of("청고추"))));
+
+        RecipeCandidates result = facade.findCandidates(avoidSpicy(List.of("튀김")));
+
+        assertThat(result.candidates()).extracting(RecipeCandidate::recipeId).hasSize(3).startsWith(20L);
+    }
+
+    @Test
+    @DisplayName("회원 선호 맛에 매운맛이 있어도 피할 맛이 이겨 매운맛을 세지 않고 매운 레시피를 뺀다")
+    void avoidWinsOverMemberTaste() throws Exception {
+        MyInfoResponse myInfo = mock(MyInfoResponse.class);
+        when(myInfo.tastes()).thenReturn(List.of(Taste.SPICY, Taste.SWEET));
+        when(memberService.getMyInfo(MEMBER_ID)).thenReturn(myInfo);
+        givenKeywordRecipes(Map.of(
+                10L, recipe(10L, "깐풍기", Set.of(Taste.SWEET), List.of("홍고추")),
+                20L, recipe(20L, "탕수육", Set.of(Taste.SWEET), List.of("돼지고기")),
+                30L, recipe(30L, "닭강정", Set.of(Taste.SWEET), List.of("닭고기")),
+                40L, recipe(40L, "꿔바로우", Set.of(Taste.SWEET), List.of("돼지고기"))));
+
+        RecipeCandidates result = facade.findCandidates(avoidSpicy(null));
+
+        assertThat(result.candidates()).extracting(RecipeCandidate::recipeId).doesNotContain(10L);
+        assertThat(result.candidates()).allSatisfy(candidate ->
+                assertThat(candidate.reason().matchedTastes()).doesNotContain(Taste.SPICY));
+    }
+
+    @Test
+    @DisplayName("\"매운 거 먹고 싶어\"도 같은 기준: 맛 데이터에 매운맛이 없어도 재료에 고춧가루가 있으면 원하는 맛과 맞은 것으로 센다")
+    void countsSpicyIngredient_asWantedSpicy() throws Exception {
+        givenKeywordRecipes(Map.of(
+                10L, recipe(10L, "깻잎말이김치", Set.of(Taste.SALTY, Taste.UMAMI), List.of("깻잎", "고춧가루")),
+                20L, recipe(20L, "깻잎전", Set.of(Taste.SALTY), List.of("깻잎", "고추"))));
+        RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), List.of(Taste.SPICY), null, null, null, false,
+                List.of("깻잎"), null);
+
+        RecipeCandidates result = facade.findCandidates(query);
+
+        assertThat(result.candidates().get(0).recipeId()).isEqualTo(10L);
+        assertThat(result.candidates().get(0).reason().matchedWantedTastes()).containsExactly(Taste.SPICY);
+        assertThat(result.candidates().get(1).reason().matchedWantedTastes()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("원하는 맛·피할 맛·회원 선호 맛 어디에도 매운맛이 없으면 재료 이름을 조회하지 않는다")
+    void skipsIngredientTexts_whenSpicyDoesNotMatter() throws Exception {
+        MyInfoResponse myInfo = mock(MyInfoResponse.class);
+        when(myInfo.tastes()).thenReturn(List.of(Taste.SALTY));
+        when(memberService.getMyInfo(MEMBER_ID)).thenReturn(myInfo);
+        givenKeywordRecipes(Map.of(20L, recipe(20L, "탕수육", Set.of(Taste.SWEET), List.of("돼지고기"))));
+
+        facade.findCandidates(new RecipeQuery(MEMBER_ID, List.of(), null, null, null, null, false, List.of("튀김"), null));
+
+        verify(recipeService, never()).findIngredientTexts(any());
+    }
+
+    private RecipeQuery avoidSpicy(List<String> keywords) {
+        return new RecipeQuery(MEMBER_ID, List.of(), null, null, null, null, false,
+                keywords == null ? List.of("튀김") : keywords, null).withAvoidTastes(List.of(Taste.SPICY));
+    }
+
+    private record TestRecipe(RecipeCandidateInfo info, Set<Taste> tastes, List<String> ingredientTexts) {
+    }
+
+    private static TestRecipe recipe(Long id, String name, Set<Taste> tastes, List<String> ingredientTexts) {
+        return new TestRecipe(new RecipeCandidateInfo(id, name, "튀김", 30, 1), tastes, ingredientTexts);
+    }
+
+    // 키워드 검색으로 찾히는 레시피들 (맛 데이터·재료 이름까지)
+    private void givenKeywordRecipes(Map<Long, TestRecipe> recipes) throws Exception {
+        List<Long> ids = recipes.keySet().stream().sorted().toList();
+        when(recipeSearchService.search(any(RecipeListRequest.class))).thenReturn(new RecipeSearchResult(ids, ids.size()));
+        Map<Long, RecipeCandidateInfo> infos = new HashMap<>();
+        Map<Long, Set<Taste>> tastes = new HashMap<>();
+        Map<Long, List<String>> texts = new HashMap<>();
+        recipes.forEach((id, recipe) -> {
+            infos.put(id, recipe.info());
+            tastes.put(id, recipe.tastes());
+            texts.put(id, recipe.ingredientTexts());
+        });
+        when(recipeService.findCandidateInfos(any())).thenAnswer(invocation -> filter(infos, invocation.getArgument(0)));
+        when(recipeService.findTastesByRecipeIds(any())).thenAnswer(invocation -> filter(tastes, invocation.getArgument(0)));
+        when(recipeService.findIngredientTexts(any())).thenAnswer(invocation -> filter(texts, invocation.getArgument(0)));
+    }
+
+    private static <T> Map<Long, T> filter(Map<Long, T> values, Collection<Long> ids) {
+        Map<Long, T> result = new HashMap<>();
+        ids.forEach(id -> {
+            if (values.containsKey(id)) {
+                result.put(id, values.get(id));
+            }
+        });
+        return result;
     }
 
     private static FridgeItemResponse fridgeItem(long ingredientId, String name, long dDay) {

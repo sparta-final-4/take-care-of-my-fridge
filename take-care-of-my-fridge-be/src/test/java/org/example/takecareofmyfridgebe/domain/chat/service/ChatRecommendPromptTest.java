@@ -101,4 +101,10 @@ class ChatRecommendPromptTest {
     void forbidsInternalReasoning() {
         assertThat(prompt).contains("내부 조건이나 판단 과정은 말하지 않는다").doesNotContain("마크다운");
     }
+
+    @Test
+    @DisplayName("조건에 피할 맛이 있으면 그 맛 이야기를 소개·카드 설명 어디에도 쓰지 않게 한다")
+    void forbidsAvoidedTasteTalk() {
+        assertThat(prompt).contains("조건에 \"피할 맛\"이 있으면 그 맛 이야기(\"매콤한\", \"얼큰한\", \"달콤한\")를 소개·카드 설명 어디에도 쓰지 않는다");
+    }
 }

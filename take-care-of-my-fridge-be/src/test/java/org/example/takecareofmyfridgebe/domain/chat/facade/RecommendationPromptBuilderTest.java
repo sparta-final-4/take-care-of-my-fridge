@@ -312,6 +312,16 @@ class RecommendationPromptBuilderTest {
                 .doesNotContain("[이미 안내한 말]", "같이 쓸 수 있어요");
     }
 
+    @Test
+    @DisplayName("조건 줄에 피할 맛을 한글로 쓴다")
+    void writesAvoidTastesInConditionLine() {
+        RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, List.of("튀김"), null, null, false)
+                .withAvoidTastes(List.of(Taste.SPICY));
+
+        assertThat(RecommendationPromptBuilder.build("매운 거 말고", query, NAMES, List.of(), false))
+                .contains("조건: 피할 맛 매운맛 / 분류 튀김");
+    }
+
     private static RecipeQuery kimpiQuery(Map<Long, KeywordMatch> matches) {
         return new RecipeQuery(MEMBER_ID, List.of(), null, List.of("튀김"), null, null, false,
                 List.of("김피탕", "탕수육", "깐풍기"), "김피탕", "김피탕 같은 요리")
