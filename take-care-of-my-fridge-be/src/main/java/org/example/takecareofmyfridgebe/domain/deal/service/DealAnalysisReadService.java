@@ -17,6 +17,7 @@ public class DealAnalysisReadService {
 
     private final DealAnalysisRepository analysisRepository;
     private final DealCandidateRepository candidateRepository;
+    private final DealAnalysisDiagnosticsService diagnosticsService;
 
     public DealAnalysisResponse getById(Long analysisId) {
         DealAnalysis analysis = analysisRepository.findById(analysisId)
@@ -26,7 +27,8 @@ public class DealAnalysisReadService {
 
     public DealAnalysisResponse getLatestForMember(Long memberId) {
         DealAnalysis analysis = analysisRepository.findTopByMemberIdOrderByCreatedAtDescIdDesc(memberId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.DEAL_ANALYSIS_NOT_FOUND));
+                .orElseThrow(() -> new BusinessException(ErrorCode.DEAL_ANALYSIS_NOT_FOUND,
+                        diagnosticsService.describeMissing()));
         return toResponse(analysis);
     }
 

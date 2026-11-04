@@ -31,13 +31,15 @@ import java.util.stream.Stream;
  * AI 없이 규칙으로 레시피 후보를 고르고 정렬한다. 스프링에 의존하지 않는 순수 클래스.
  * <p>
  * 정렬은 점수를 합산하지 않고, 앞 단계가 같을 때만 다음 단계로 비교한다.
- * 1. 사용자 요청 일치 수 → 2. 선택 재료 겹친 수 → 3. 임박 점수 합 → 4. 선호 맛 겹친 수
+ * 1. 사용자 요청 일치 수(원하는 맛·분류) → 2. 선택 재료 겹친 수 → 3. 임박 점수 합 → 4. 선호 맛 겹친 수
  * → 5. 보유 비율 → 6. 없는 재료 수 적은 순 → 7. 레시피 id.
  * 임박을 선호 맛보다 앞에 둔다. 회원 선호 맛은 대부분 레시피와 1~2개씩 겹쳐서, 뒤에 두지 않으면 임박 재료가 순위에 거의 반영되지 않는다.
  * <p>
  * 보유 비율이 기준(minOwnedRatio) 미만인 레시피는 기준 이상 레시피를 위 순서로 먼저 고른 뒤, 10개가 안 차면 같은 순서로 채운다.
  * 흔한 임박 재료(양파·대파 등)만 겹치고 나머지를 거의 사야 하는 레시피가 위로 올라오지 않게 하려는 것이다.
  * 단, 선택 재료가 기본 양념을 빼고 2개 이상이고 레시피가 그 재료를 전부 쓰면 기준 미만이어도 먼저 고른다 (모자람 표시는 그대로 남는다).
+ * 메시지에서 말한 재료는 선택 재료로 합쳐서 오므로 1단계에서 세지 않고 2단계에서 센다.
+ * useSelectedOnly면 선택 재료(기본 양념 제외)를 하나도 쓰지 않는 레시피는 뺀다.
  * 냉장고 수량은 재료마다 단위(g·개·대…)가 달라 비교하지 않는다. 기본 양념은 어느 단계에서도 세지 않는다.
  */
 public class RecipeCandidateScorer {
@@ -101,7 +103,7 @@ public class RecipeCandidateScorer {
     }
 
     /**
-     * 레시피 재료를 조회할 재료 ID: 냉장고·선택·포함 재료(후보를 모으는 재료)와 제외 재료(필터용).
+     * 레시피 재료를 조회할 재료 ID: 냉장고·선택 재료(후보를 모으는 재료)와 제외 재료(필터용).
      */
     public Set<Long> lookupIngredientIds(RecipeQuery query, List<FridgeStock> fridge) {
         Set<Long> ids = new LinkedHashSet<>(matchIngredientIds(query, fridge));
@@ -110,8 +112,8 @@ public class RecipeCandidateScorer {
     }
 
     /**
-     * 냉장고·선택·포함 재료 중 기본 양념이 아닌 재료가 하나라도 들어간 레시피 ID.
-     * 기본 양념만 겹치는 레시피는 후보가 아니다.
+     * 냉장고·선택 재료 중 기본 양념이 아닌 재료가 하나라도 들어간 레시피 ID.
+     * 냉장고에 없는 선택 재료도 포함한다. 기본 양념만 겹치는 레시피는 후보가 아니다.
      */
     public Set<Long> candidateRecipeIds(RecipeQuery query, List<FridgeStock> fridge, List<RecipeCandidateIngredient> rows) {
         Set<Long> matchIds = matchIngredientIds(query, fridge);
@@ -122,7 +124,7 @@ public class RecipeCandidateScorer {
     }
 
     /**
-     * 후보를 거르고 정렬해 상위 10개를 고른다.
+     * 후보를 거르고 정렬해 상위 10개를 고른다. useSelectedOnly면 선택 재료를 하나도 쓰지 않는 레시피는 뺀다.
      * 보유 비율 기준 이상인 레시피와 선택 재료(기본 양념 제외 2개 이상)를 전부 쓰는 레시피를 먼저 고르고, 10개가 안 되면 나머지로 채운다.
      * 부족한 재료 목록은 비워 두고, withMissingIngredients로 채운다.
      *
@@ -144,11 +146,17 @@ public class RecipeCandidateScorer {
                 .collect(Collectors.groupingBy(RecipeCandidateIngredient::recipeId, LinkedHashMap::new, Collectors.toList()));
         Set<Member.Taste> preferred = toTasteSet(memberTastes);
 
+        // 선택 재료만 쓰기는 기본 양념 뺀 선택 재료가 있을 때만 건다 (없으면 모든 레시피가 빠지므로)
+        int selectedCount = countNonBasicSelected(query, rows);
+        boolean selectedOnly = query.useSelectedOnly() && selectedCount > 0;
+        Set<Long> selectedIds = Set.copyOf(query.selectedIngredientIds());
+
         List<RecipeCandidate> scored = new ArrayList<>();
         for (Long recipeId : candidateRecipeIds(query, fridge, rows)) {
             RecipeCandidateInfo info = infos.get(recipeId);
             List<RecipeCandidateIngredient> recipeRows = rowsByRecipe.getOrDefault(recipeId, List.of());
-            if (info == null || isFilteredOut(query, info, recipeRows)) {
+            if (info == null || isFilteredOut(query, info, recipeRows)
+                    || (selectedOnly && !usesAnySelected(recipeRows, selectedIds))) {
                 continue;
             }
             scored.add(score(query, info, recipeRows, fridgeById, preferred,
@@ -159,7 +167,6 @@ public class RecipeCandidateScorer {
                 || scored.stream().allMatch(candidate -> candidate.ranking().selectedMatches() == 0);
 
         // 1차: 보유 비율 기준 이상이거나 선택 재료(2개 이상)를 전부 쓰는 레시피, 2차: 나머지. 각각 같은 정렬 순서
-        int selectedCount = countNonBasicSelected(query, rows);
         List<RecipeCandidate> top = Stream.concat(
                         scored.stream().filter(candidate -> isFirstTier(candidate, selectedCount)).sorted(ORDER),
                         scored.stream().filter(candidate -> !isFirstTier(candidate, selectedCount)).sorted(ORDER))
@@ -174,6 +181,11 @@ public class RecipeCandidateScorer {
         boolean usesAllSelected = selectedCount >= MIN_SELECTED_FOR_EXCEPTION
                 && candidate.ranking().selectedMatches() == selectedCount;
         return usesAllSelected || !candidate.reason().lacksManyIngredients();
+    }
+
+    private static boolean usesAnySelected(List<RecipeCandidateIngredient> recipeRows, Set<Long> selectedIds) {
+        return recipeRows.stream()
+                .anyMatch(row -> !row.basicSeasoning() && selectedIds.contains(row.ingredientId()));
     }
 
     // 기본 양념을 뺀 선택 재료 수. 레시피 재료 줄에서 기본 양념으로 확인된 재료만 뺀다
@@ -249,7 +261,6 @@ public class RecipeCandidateScorer {
             Set<Member.Taste> tastes
     ) {
         Set<Long> selectedIds = Set.copyOf(query.selectedIngredientIds());
-        Set<Long> includeIds = Set.copyOf(query.includeIngredientIds());
 
         List<RecipeCandidateIngredient> nonBasic = recipeRows.stream()
                 .filter(row -> !row.basicSeasoning())
@@ -269,13 +280,8 @@ public class RecipeCandidateScorer {
                 .distinct()
                 .count();
 
-        // 1단계: 사용자 요청 (포함 재료 + 원하는 맛 + 분류 일치)
+        // 1단계: 사용자 요청 (원하는 맛 + 분류 일치). 말한 재료는 선택 재료로 합쳐져 2단계에서 센다
         List<String> matchedRequests = new ArrayList<>();
-        nonBasic.stream()
-                .filter(row -> includeIds.contains(row.ingredientId()))
-                .map(RecipeCandidateIngredient::ingredientName)
-                .distinct()
-                .forEach(name -> matchedRequests.add("재료: " + name));
         query.wantedTastes().stream()
                 .distinct()
                 .filter(tastes::contains)
@@ -336,7 +342,6 @@ public class RecipeCandidateScorer {
         Set<Long> ids = new HashSet<>();
         fridge.forEach(stock -> ids.add(stock.ingredientId()));
         ids.addAll(query.selectedIngredientIds());
-        ids.addAll(query.includeIngredientIds());
         return ids;
     }
 

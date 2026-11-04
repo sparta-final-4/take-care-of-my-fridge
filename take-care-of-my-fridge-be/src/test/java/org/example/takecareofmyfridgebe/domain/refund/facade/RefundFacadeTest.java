@@ -99,7 +99,7 @@ class RefundFacadeTest {
 
     @Test
     @DisplayName("요청 상태로 저장한 뒤 환불 ID 멱등 키로 PG를 부분 취소하고 취소 ID로 완료 처리한 결과를 돌려준다")
-    void request_cancelsPgThenCompletes() {
+    void request_cancelPgAndComplete() {
         givenRequested();
         given(paymentGateway.cancelPayment(PORTONE_PAYMENT_ID, "단순 변심", 6000L, IDEMPOTENCY_KEY))
                 .willReturn("cancellation-1");
@@ -116,7 +116,7 @@ class RefundFacadeTest {
 
     @Test
     @DisplayName("PG가 취소를 거절하면 환불을 실패로 바꾸고 REFUND_012로 거절한다")
-    void request_pgRejected_failsRefund() {
+    void request_failRefundAndThrowException_whenPgRejected() {
         givenRequested();
         given(paymentGateway.cancelPayment(PORTONE_PAYMENT_ID, "단순 변심", 6000L, IDEMPOTENCY_KEY))
                 .willThrow(new BusinessException(ErrorCode.PG_CANCEL_REJECTED, "PG 취소 거절: INVALID_REQUEST"));
@@ -130,7 +130,7 @@ class RefundFacadeTest {
 
     @Test
     @DisplayName("PG 취소 결과를 모르면 PG를 조회하고, 이번 금액만큼 취소됐으면 완료 처리한다")
-    void request_unknown_pgCancelled_completes() {
+    void request_complete_whenCancelResultUnknownAndPgCancelled() {
         givenRequested();
         given(paymentGateway.cancelPayment(PORTONE_PAYMENT_ID, "단순 변심", 6000L, IDEMPOTENCY_KEY))
                 .willThrow(new ResourceAccessException("timeout"));
@@ -146,7 +146,7 @@ class RefundFacadeTest {
 
     @Test
     @DisplayName("PG 취소 결과를 모르고 PG에서도 아직 취소되지 않았으면 실패로 바꾸지 않고 요청 상태로 돌려준다")
-    void request_unknown_notCancelled_staysRequested() {
+    void request_keepRequested_whenCancelResultUnknownAndPgNotCancelled() {
         givenRequested();
         given(paymentGateway.cancelPayment(PORTONE_PAYMENT_ID, "단순 변심", 6000L, IDEMPOTENCY_KEY))
                 .willThrow(new ResourceAccessException("timeout"));
@@ -163,7 +163,7 @@ class RefundFacadeTest {
 
     @Test
     @DisplayName("PG 취소 결과를 모르고 PG 조회도 실패하면 요청 상태로 돌려준다")
-    void request_unknown_lookupFails_staysRequested() {
+    void request_keepRequested_whenCancelResultUnknownAndPgLookupFails() {
         givenRequested();
         given(paymentGateway.cancelPayment(PORTONE_PAYMENT_ID, "단순 변심", 6000L, IDEMPOTENCY_KEY))
                 .willThrow(new ResourceAccessException("timeout"));
@@ -178,7 +178,7 @@ class RefundFacadeTest {
 
     @Test
     @DisplayName("PG 취소 후 주문 상태까지 묶은 완료가 실패하면 환불만 다시 완료한 결과를 돌려준다")
-    void request_completeFails_completesRefundOnly() {
+    void request_completeRefundOnly_whenCompleteFails() {
         givenRequested();
         given(paymentGateway.cancelPayment(PORTONE_PAYMENT_ID, "단순 변심", 6000L, IDEMPOTENCY_KEY))
                 .willReturn("cancellation-1");
@@ -195,7 +195,7 @@ class RefundFacadeTest {
 
     @Test
     @DisplayName("PG 취소 후 환불만 완료하는 것까지 실패하면 실패로 바꾸지 않고 요청 상태로 돌려준다")
-    void request_completeFails_returnsRequested() {
+    void request_keepRequested_whenCompleteWithoutOrderStatusFails() {
         givenRequested();
         given(paymentGateway.cancelPayment(PORTONE_PAYMENT_ID, "단순 변심", 6000L, IDEMPOTENCY_KEY))
                 .willReturn("cancellation-1");
@@ -212,7 +212,7 @@ class RefundFacadeTest {
 
     @Test
     @DisplayName("멱등 키는 PortOne이 받는 UUID 형식이고, 같은 환불이면 늘 같고 다른 환불이면 다르다")
-    void idempotencyKey_isStableUuid() {
+    void idempotencyKey_returnStableUuid() {
         assertThat(RefundFacade.idempotencyKey(REFUND_ID))
                 .matches("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
                 .isEqualTo(RefundFacade.idempotencyKey(REFUND_ID))
@@ -223,7 +223,7 @@ class RefundFacadeTest {
 
     @Test
     @DisplayName("PG에서 새로 취소된 금액이 진행 중 환불 금액과 같으면 아직 기록하지 않은 취소 ID로 완료 처리한다")
-    void sync_matchingAmount_completes() {
+    void syncWithPg_complete_whenCancelledAmountMatches() {
         givenPg(8000L,
                 new PaymentGatewayResponse.Cancellation("cancellation-old", 2000L, true),
                 new PaymentGatewayResponse.Cancellation("cancellation-failed", 6000L, false),
@@ -236,7 +236,7 @@ class RefundFacadeTest {
 
     @Test
     @DisplayName("PG 조회로 완료할 때도 주문 상태까지 묶은 완료가 실패하면 환불만 다시 완료한다")
-    void sync_completeFails_completesRefundOnly() {
+    void syncWithPg_completeRefundOnly_whenCompleteFails() {
         givenPg(8000L, new PaymentGatewayResponse.Cancellation("cancellation-1", 6000L, true));
         givenState(true, List.of(requestedRefund(NOW)));
         given(refundCommandService.complete(REFUND_ID, "cancellation-1", PaymentChangedBy.WEBHOOK))
@@ -250,7 +250,7 @@ class RefundFacadeTest {
 
     @Test
     @DisplayName("환불은 끝났는데 결제 완료로 남은 주문을 판단대로 주문 쪽에서 전액 환불·구매 확정한다")
-    void syncOrderStatuses_changesByStatus() {
+    void syncOrderStatuses_changeOrderStatusByRefundResult() {
         given(refundQueryService.findPaidOrderIdsFullyRefunded()).willReturn(List.of(1L, 2L, 3L));
         given(refundQueryService.findOrderStatusAfterRefund(1L)).willReturn(Optional.of(OrderStatus.REFUNDED));
         given(refundQueryService.findOrderStatusAfterRefund(2L)).willReturn(Optional.of(OrderStatus.CONFIRMED));
@@ -266,7 +266,7 @@ class RefundFacadeTest {
 
     @Test
     @DisplayName("한 주문의 상태 맞춤이 실패해도 나머지 주문은 계속 맞춘다")
-    void syncOrderStatuses_oneFailure_othersStillProcessed() {
+    void syncOrderStatuses_continueOthers_whenOneOrderFails() {
         given(refundQueryService.findPaidOrderIdsFullyRefunded()).willReturn(List.of(1L, 2L));
         given(refundQueryService.findOrderStatusAfterRefund(1L)).willReturn(Optional.of(OrderStatus.REFUNDED));
         given(refundQueryService.findOrderStatusAfterRefund(2L)).willReturn(Optional.of(OrderStatus.REFUNDED));
@@ -279,7 +279,7 @@ class RefundFacadeTest {
 
     @Test
     @DisplayName("PG에서 아직 취소되지 않았으면 기준 시각이 없을 때는 아무것도 바꾸지 않는다")
-    void sync_notCancelled_withoutDeadline_noChange() {
+    void syncWithPg_keepUnchanged_whenNotCancelledWithoutDeadline() {
         givenPg(2000L);
         givenState(true, List.of(requestedRefund(NOW.minusHours(1))));
 
@@ -289,7 +289,7 @@ class RefundFacadeTest {
 
     @Test
     @DisplayName("기준 시각보다 먼저 신청됐는데 PG에서 취소되지 않은 환불은 실패로 바꾼다")
-    void sync_staleNotCancelled_fails() {
+    void syncWithPg_markFailed_whenStaleAndNotCancelled() {
         givenPg(2000L);
         givenState(true, List.of(requestedRefund(NOW.minusMinutes(30))));
 
@@ -300,7 +300,7 @@ class RefundFacadeTest {
 
     @Test
     @DisplayName("기준 시각 이후에 신청된 환불은 아직 기다린다")
-    void sync_recentNotCancelled_waits() {
+    void syncWithPg_keepRequested_whenRecentAndNotCancelled() {
         givenPg(2000L);
         givenState(true, List.of(requestedRefund(NOW.minusMinutes(5))));
 
@@ -311,7 +311,7 @@ class RefundFacadeTest {
 
     @Test
     @DisplayName("진행 중 환불이 없는데 PG 취소 금액이 늘었으면 환불 기록 없는 취소로 결제 이력에만 남긴다")
-    void sync_unknownCancellation_recorded() {
+    void syncWithPg_recordUnknownCancellation_whenNoRequestedRefund() {
         givenPg(5000L, new PaymentGatewayResponse.Cancellation("console-1", 3000L, true));
         givenState(true, List.of());
 
@@ -321,7 +321,7 @@ class RefundFacadeTest {
 
     @Test
     @DisplayName("PG 취소 금액이 진행 중 환불 금액과 맞지 않으면 바꾸지 않는다")
-    void sync_mismatch_noChange() {
+    void syncWithPg_keepUnchanged_whenAmountMismatch() {
         givenPg(5000L);
         givenState(true, List.of(requestedRefund(NOW)));
 
@@ -332,7 +332,7 @@ class RefundFacadeTest {
 
     @Test
     @DisplayName("결제 완료가 아닌 결제는 환불 쪽에서 맞추지 않는다")
-    void sync_notPaid_noChange() {
+    void syncWithPg_keepUnchanged_whenNotPaid() {
         givenPg(10000L);
         givenState(false, List.of());
 
@@ -342,7 +342,7 @@ class RefundFacadeTest {
 
     @Test
     @DisplayName("PG에 결제가 없어도 기준 시각이 없으면 아무것도 바꾸지 않는다")
-    void sync_pgMissing_withoutDeadline_noChange() {
+    void syncWithPg_keepUnchanged_whenPgPaymentMissingWithoutDeadline() {
         given(paymentGateway.getPayment(PORTONE_PAYMENT_ID)).willReturn(Optional.empty());
         givenState(true, List.of(requestedRefund(NOW.minusHours(1))));
 
@@ -353,7 +353,7 @@ class RefundFacadeTest {
 
     @Test
     @DisplayName("PG에 결제가 없으면 취소될 수 없으므로 오래된 요청 상태 환불을 실패로 바꾼다")
-    void sync_pgMissing_staleFails() {
+    void syncWithPg_markFailed_whenPgPaymentMissingAndStale() {
         given(paymentGateway.getPayment(PORTONE_PAYMENT_ID)).willReturn(Optional.empty());
         givenState(true, List.of(requestedRefund(NOW.minusMinutes(30))));
 

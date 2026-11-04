@@ -20,14 +20,14 @@ class DailySalesTest {
 
     @Test
     @DisplayName("순매출은 결제 금액에서 환불 금액을 뺀 값이다")
-    void netAmount_isPaidMinusRefunded() {
+    void getNetAmount_returnPaidMinusRefunded() {
         assertThat(dailySales.getSalesDate()).isEqualTo(SALES_DATE);
         assertThat(dailySales.getNetAmount()).isEqualTo(25000L);
     }
 
     @Test
     @DisplayName("이미 집계한 날을 다시 집계하면 새로 계산한 합계로 바꾼다")
-    void reaggregate_replacesValues() {
+    void reaggregate_replaceValues() {
         dailySales.reaggregate(40000L, 10000L, 4, 2);
 
         assertThat(dailySales.getPaidAmount()).isEqualTo(40000L);
@@ -39,7 +39,7 @@ class DailySalesTest {
 
     @Test
     @DisplayName("환불이 그날 결제보다 많으면 순매출은 음수다")
-    void netAmount_canBeNegative() {
+    void getNetAmount_returnNegative_whenRefundExceedsPaid() {
         dailySales.reaggregate(10000L, 30000L, 1, 3);
 
         assertThat(dailySales.getNetAmount()).isEqualTo(-20000L);

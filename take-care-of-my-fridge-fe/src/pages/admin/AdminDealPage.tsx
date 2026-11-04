@@ -29,7 +29,7 @@ import type {
   DealEventRequestTypeEnum,
   Excluded,
 } from '@/common/api/clients';
-import { getErrorCode } from '@/common/api/errors';
+import { getErrorCode, getErrorMessage } from '@/common/api/errors';
 import { registerDealEvent, runDealAnalysis, saveDealReview } from '@/domains/deal/api';
 import { dealQueries } from '@/domains/deal/queries';
 import { DATE_TIME_FORMAT, REQUEST_TIME_FORMAT } from '@/domains/sale/format';
@@ -143,7 +143,7 @@ export default function AdminDealPage() {
     onError: (error) =>
       void message.error(
         getErrorCode(error) === 'D007'
-          ? '일반 특가 이력이 부족해 분석할 수 없습니다.'
+          ? getErrorMessage(error)
           : '할인 후보 분석을 실행하지 못했습니다.',
       ),
   });
@@ -157,7 +157,7 @@ export default function AdminDealPage() {
         discountRate: 20,
       }}
       onFinish={(values) => runAnalysis.mutate(values)}
-      className={styles.notice}
+      className={styles.analysisForm}
     >
       <Form.Item name="targetWeekStart" label="목표 주 월요일" rules={[{ required: true }]}>
         <DatePicker disabledDate={(date) => date.day() !== 1} />
@@ -189,6 +189,12 @@ export default function AdminDealPage() {
       {demo ? '최근 분석 보기' : '임의 할인 이벤트 추천 보기'}
     </Button>
   );
+  const analysisControls = (
+    <div className={styles.analysisControls}>
+      {runControls}
+      {demoToggle}
+    </div>
+  );
   const heading = (
     <div className={styles.heading}>
       <Typography.Title level={2} className={styles.headingTitle}>
@@ -206,7 +212,7 @@ export default function AdminDealPage() {
         >
           행사 관리
         </Button>
-        {demoToggle}
+        {isError && getErrorCode(error) !== 'D002' && demoToggle}
       </div>
     </div>
   );
@@ -215,7 +221,7 @@ export default function AdminDealPage() {
     return (
       <div className={styles.container}>
         {heading}
-        {runControls}
+        {analysisControls}
         <Skeleton active paragraph={{ rows: 8 }} />
       </div>
     );
@@ -225,10 +231,14 @@ export default function AdminDealPage() {
       return (
         <div className={styles.container}>
           {heading}
-          {runControls}
+          {analysisControls}
           <Empty
             description={
-              demo ? '시연 결과가 아직 없습니다.' : '아직 할인 후보 분석 결과가 없습니다.'
+              demo ? (
+                '시연 결과가 아직 없습니다.'
+              ) : (
+                <span className={styles.diagnostics}>{getErrorMessage(error)}</span>
+              )
             }
           />
         </div>
@@ -249,7 +259,7 @@ export default function AdminDealPage() {
   return (
     <section className={styles.container}>
       {heading}
-      {runControls}
+      {analysisControls}
       <Typography.Paragraph type="secondary">
         {analysis.targetWeekStart} 주 · {analysis.dayOfWeek ? dayLabels[analysis.dayOfWeek] : '-'}
         요일 · 분석 할인율 {analysis.discountRate}% · 최소 재고{' '}

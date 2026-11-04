@@ -32,7 +32,7 @@ class DailySalesRepositoryTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("시작일과 종료일을 포함한 기간 안의 집계된 날짜만 가져오고, 환불 건수 없이 집계된 예전 행은 뺀다")
-    void findSalesDatesBetween_returnsDatesInRange() {
+    void findSalesDatesBetween_returnDatesInRange() {
         save(LocalDate.of(2026, 9, 30));
         save(LocalDate.of(2026, 9, 28));
         save(LocalDate.of(2026, 10, 1));

@@ -105,16 +105,31 @@ class RecipeCandidateScorerTest {
         }
 
         @Test
-        @DisplayName("사용자 요청(포함 재료)이 맞은 레시피가 선택 재료가 겹친 레시피보다 앞선다")
+        @DisplayName("사용자 요청(분류)이 맞은 레시피가 선택 재료가 겹친 레시피보다 앞선다")
         void ranksRequestFirst_overSelected() {
             recipe(10L, "두부조림", "조림", 20, 5, TOFU);
             recipe(20L, "제육볶음", "볶음", 20, 5, PORK);
 
-            RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(TOFU), null, null, null, List.of(PORK), null);
-            RecipeCandidates result = rank(query, List.of(stock(TOFU, "두부", 10)), List.of());
+            RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(TOFU), null, List.of("볶음"), null, null, false);
+            RecipeCandidates result = rank(query, List.of(stock(TOFU, "두부", 10), stock(PORK, "돼지고기", 10)), List.of());
 
             assertThat(result.candidates()).extracting(RecipeCandidate::recipeId).containsExactly(20L, 10L);
-            assertThat(result.candidates().get(0).reason().matchedRequests()).containsExactly("재료: 돼지고기");
+            assertThat(result.candidates().get(0).reason().matchedRequests()).containsExactly("분류: 볶음");
+        }
+
+        @Test
+        @DisplayName("정렬 1단계(요청)는 원하는 맛과 분류만 세고, 선택 재료(말한 재료 포함)는 2단계에서만 센다")
+        void countsOnlyTasteAndCategory_inRequestStep() {
+            recipe(10L, "두부조림", "조림", 20, 1, TOFU);
+            tastes.put(10L, Set.of(Taste.SPICY));
+
+            RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(TOFU), List.of(Taste.SPICY), List.of("조림"), null, null, false);
+            RecipeCandidates result = rank(query, List.of(stock(TOFU, "두부", 10)), List.of());
+
+            RecipeCandidate candidate = result.candidates().get(0);
+            assertThat(candidate.ranking().requestMatches()).isEqualTo(2);
+            assertThat(candidate.ranking().selectedMatches()).isEqualTo(1);
+            assertThat(candidate.reason().matchedRequests()).containsExactly("맛: SPICY", "분류: 조림");
         }
 
         @Test
@@ -238,7 +253,7 @@ class RecipeCandidateScorerTest {
             recipe(10L, "계란찜", "찜", 20, 1, EGG);
             recipe(20L, "제육계란말이", "말이", 20, 2, EGG, PORK);
 
-            RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, null, null, null, List.of(PORK));
+            RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, null, null, List.of(PORK), false);
             RecipeCandidates result = rank(query, List.of(stock(EGG, "계란", 10)), List.of());
 
             assertThat(result.candidates()).extracting(RecipeCandidate::recipeId).containsExactly(10L);
@@ -251,7 +266,7 @@ class RecipeCandidateScorerTest {
             recipe(20L, "계란장조림", "조림", 40, 1, EGG);
             recipe(30L, "계란국", "국", null, 1, EGG);
 
-            RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, null, 30, null, null);
+            RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, null, 30, null, false);
             RecipeCandidates result = rank(query, List.of(stock(EGG, "계란", 10)), List.of());
 
             assertThat(result.candidates()).extracting(RecipeCandidate::recipeId).containsExactly(10L, 30L);
@@ -483,6 +498,59 @@ class RecipeCandidateScorerTest {
             assertThat(result.candidates()).extracting(RecipeCandidate::recipeId).containsExactly(10L, 20L);
             assertThat(result.candidates()).extracting(candidate -> candidate.reason().lacksManyIngredients())
                     .containsExactly(false, false);
+        }
+    }
+
+    @Nested
+    @DisplayName("선택 재료만 쓰기")
+    class SelectedOnly {
+
+        @Test
+        @DisplayName("선택 재료만 쓰기면 선택 재료를 하나도 쓰지 않는 레시피를 후보에서 뺀다")
+        void excludesRecipeWithoutSelected_whenUseSelectedOnly() {
+            recipe(10L, "두부조림", "조림", 20, 1, TOFU);
+            recipe(20L, "계란찜", "찜", 20, 1, EGG);
+            recipe(30L, "두부계란전", "전", 20, 2, TOFU, EGG);
+            List<FridgeStock> fridge = List.of(stock(EGG, "계란", 0), stock(TOFU, "두부", 10));
+
+            RecipeCandidates selectedOnly = rank(RecipeQuery.of(MEMBER_ID, List.of(TOFU), true), fridge, List.of());
+            RecipeCandidates all = rank(RecipeQuery.of(MEMBER_ID, List.of(TOFU), false), fridge, List.of());
+
+            assertThat(selectedOnly.candidates()).extracting(RecipeCandidate::recipeId).containsExactlyInAnyOrder(10L, 30L);
+            assertThat(all.candidates()).extracting(RecipeCandidate::recipeId).containsExactlyInAnyOrder(10L, 20L, 30L);
+        }
+
+        @Test
+        @DisplayName("선택 재료가 기본 양념뿐이면 선택 재료만 쓰기를 걸지 않는다")
+        void keepsAllRecipes_whenSelectedIsOnlyBasicSeasoning() {
+            recipe(10L, "계란찜", "찜", 20, 1, EGG);
+            rows.add(new RecipeCandidateIngredient(20L, SALT, "소금", true));
+            rows.add(new RecipeCandidateIngredient(20L, TOFU, "두부", false));
+            infos.put(20L, new RecipeCandidateInfo(20L, "두부소금구이", "구이", 20, 1));
+
+            RecipeCandidates result = rank(RecipeQuery.of(MEMBER_ID, List.of(SALT), true),
+                    List.of(stock(EGG, "계란", 10), stock(TOFU, "두부", 10)), List.of());
+
+            assertThat(result.candidates()).extracting(RecipeCandidate::recipeId).containsExactlyInAnyOrder(10L, 20L);
+        }
+
+        @Test
+        @DisplayName("냉장고에 없는 선택 재료도 후보를 모으는 데 쓰고, 그 재료는 부족한 재료로 나온다")
+        void collectsRecipeWithSelectedNotInFridge() {
+            recipe(10L, "제육볶음", "볶음", 20, 2, PORK, ONION);
+            recipe(20L, "계란찜", "찜", 20, 1, EGG);
+            List<FridgeStock> fridge = List.of(stock(EGG, "계란", 10), stock(ONION, "양파", 10));
+
+            RecipeCandidates ranked = rank(RecipeQuery.of(MEMBER_ID, List.of(PORK), true), fridge, List.of());
+            RecipeCandidates result = RecipeCandidateScorer.withMissingIngredients(ranked, fridge, List.of(
+                    new RecipeCandidateIngredient(10L, PORK, "돼지고기", false),
+                    new RecipeCandidateIngredient(10L, ONION, "양파", false)));
+
+            assertThat(result.candidates()).extracting(RecipeCandidate::recipeId).containsExactly(10L);
+            RecipeCandidate candidate = result.candidates().get(0);
+            assertThat(candidate.ranking().selectedMatches()).isEqualTo(1);
+            assertThat(candidate.ranking().ownedCount()).isEqualTo(1);
+            assertThat(candidate.reason().missingIngredients()).containsExactly(new MissingIngredient(PORK, "돼지고기"));
         }
     }
 

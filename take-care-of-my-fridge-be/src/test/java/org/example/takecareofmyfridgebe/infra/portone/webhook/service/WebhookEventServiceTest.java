@@ -47,7 +47,7 @@ class WebhookEventServiceTest {
 
     @Test
     @DisplayName("처음 받은 웹훅은 RECEIVED로 저장하고 이벤트 ID를 돌려준다")
-    void receive_new_saves() {
+    void receive_saveAsReceived_whenNewWebhook() {
         given(webhookEventRepository.findByWebhookId(WEBHOOK_ID)).willReturn(Optional.empty());
         given(webhookEventRepository.save(any(WebhookEvent.class))).willAnswer(invocation -> {
             WebhookEvent saved = invocation.getArgument(0);
@@ -62,7 +62,7 @@ class WebhookEventServiceTest {
 
     @Test
     @DisplayName("이미 처리가 끝난 웹훅이면 빈 값을 돌려준다")
-    void receive_completed_skips() {
+    void receive_returnEmpty_whenAlreadyCompleted() {
         WebhookEvent event = newEvent();
         event.process(null);
         given(webhookEventRepository.findByWebhookId(WEBHOOK_ID)).willReturn(Optional.of(event));
@@ -73,7 +73,7 @@ class WebhookEventServiceTest {
 
     @Test
     @DisplayName("이전 처리가 실패한 웹훅은 같은 이벤트로 다시 처리한다")
-    void receive_failed_retries() {
+    void receive_returnSameEventId_whenPreviouslyFailed() {
         WebhookEvent event = newEvent();
         event.fail(null, "PG 오류");
         given(webhookEventRepository.findByWebhookId(WEBHOOK_ID)).willReturn(Optional.of(event));
@@ -84,7 +84,7 @@ class WebhookEventServiceTest {
 
     @Test
     @DisplayName("처리 완료로 기록하면 결제와 처리 시각이 남는다")
-    void markProcessed_setsPaymentAndProcessedAt() {
+    void markProcessed_recordPaymentAndProcessedAt() {
         WebhookEvent event = newEvent();
         Payment payment = mock(Payment.class);
         given(webhookEventRepository.findById(EVENT_ID)).willReturn(Optional.of(event));
@@ -99,7 +99,7 @@ class WebhookEventServiceTest {
 
     @Test
     @DisplayName("실패로 기록하면 사유를 500자로 잘라 남긴다")
-    void markFailed_truncatesReason() {
+    void markFailed_truncateReasonTo500() {
         WebhookEvent event = newEvent();
         given(webhookEventRepository.findById(EVENT_ID)).willReturn(Optional.of(event));
 

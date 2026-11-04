@@ -87,7 +87,7 @@ class PaymentCommandServiceConcurrencyTest {
 
     @Test
     @DisplayName("같은 주문의 결제 두 건을 동시에 승인하면 하나만 승인되고 다른 하나는 ORDER_NOT_PAYABLE로 실패한다")
-    void approveTwoPaymentsOfSameOrder_onlyOneApproved() throws Exception {
+    void approve_approveOnlyOne_whenSameOrderApprovedConcurrently() throws Exception {
         Order order = saveOrder();
         Payment first = savePayment(order, "payment-a");
         Payment second = savePayment(order, "payment-b");
@@ -110,7 +110,7 @@ class PaymentCommandServiceConcurrencyTest {
 
     @Test
     @DisplayName("결제 생성을 동시에 여러 번 요청하면 한 건만 만들어지고 나머지는 PAYMENT_IN_PROGRESS로 거절된다")
-    void createConcurrently_onlyOneReadyPayment() throws Exception {
+    void create_createOnlyOne_whenRequestedConcurrently() throws Exception {
         Order order = saveOrder();
 
         List<Object> results = runConcurrently(IntStream.range(0, 5)
@@ -133,7 +133,7 @@ class PaymentCommandServiceConcurrencyTest {
 
     @Test
     @DisplayName("결제를 읽은 뒤 주문이 취소됐으면 승인하지 않고 ORDER_NOT_PAYABLE로 실패 처리한다")
-    void approveAfterOrderCancelled_rejected() {
+    void approve_failAndReject_whenOrderCancelledAfterRead() {
         Order order = saveOrder();
         Payment payment = savePayment(order, "payment-a");
         transactionTemplate.executeWithoutResult(status ->
@@ -150,7 +150,7 @@ class PaymentCommandServiceConcurrencyTest {
 
     @Test
     @DisplayName("결제를 실패 처리해도 주문은 PENDING으로 남아 같은 주문에 새 결제를 만들 수 있다")
-    void failThenCreateAgain_newPaymentForSameOrder() {
+    void create_createNewPayment_whenPreviousPaymentFailed() {
         Order order = saveOrder();
         Payment first = paymentCommandService.create(order.getId(), PgProvider.KAKAOPAY);
 

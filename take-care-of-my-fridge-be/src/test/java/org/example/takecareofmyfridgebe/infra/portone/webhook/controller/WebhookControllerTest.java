@@ -7,6 +7,7 @@ import org.example.takecareofmyfridgebe.infra.portone.dto.PortOneWebhook;
 import org.example.takecareofmyfridgebe.infra.portone.webhook.PortOneWebhookVerifier;
 import org.example.takecareofmyfridgebe.infra.portone.webhook.service.WebhookHandler;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
@@ -42,11 +43,9 @@ class WebhookControllerTest {
                 .build();
     }
 
-    /**
-     * 본문 원문과 서명 헤더를 그대로 검증기에 넘기고, 검증된 웹훅을 핸들러에 전달하는지 검증한다.
-     */
     @Test
-    void passesRawBodyAndHeadersToVerifierAndHandler() throws Exception {
+    @DisplayName("웹훅을 받으면 본문 원문과 서명 헤더를 그대로 검증기에 넘기고 검증된 웹훅을 핸들러에 전달한다")
+    void handlePortOneWebhook_success() throws Exception {
         PortOneWebhook webhook = new PortOneWebhook("Transaction.Paid", "payment-1");
         when(verifier.verify(BODY, "webhook-1", "v1,sig", "1760000000")).thenReturn(webhook);
 
@@ -62,11 +61,9 @@ class WebhookControllerTest {
         verify(webhookHandler).handle("webhook-1", webhook, BODY);
     }
 
-    /**
-     * 서명 헤더가 없거나 서명이 틀려 검증에 실패하면 401(WEBHOOK_001)로 응답하고 핸들러를 호출하지 않는지 검증한다.
-     */
     @Test
-    void invalidSignatureReturnsUnauthorized() throws Exception {
+    @DisplayName("서명 헤더가 없거나 서명이 틀려 검증에 실패하면 핸들러를 호출하지 않고 401(WEBHOOK_001)로 응답한다")
+    void handlePortOneWebhook_returnUnauthorized_whenInvalidSignature() throws Exception {
         when(verifier.verify(any(), isNull(), isNull(), isNull()))
                 .thenThrow(new BusinessException(ErrorCode.INVALID_WEBHOOK_SIGNATURE));
 

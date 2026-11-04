@@ -61,7 +61,7 @@ class SettlementControllerTest {
 
     @Test
     @DisplayName("관리자는 단위·기간으로 정산을 조회한다")
-    void adminGetsSettlement() throws Exception {
+    void getSettlement_success() throws Exception {
         LocalDate start = TODAY.minusDays(1);
         SettlementSearchRequest request = new SettlementSearchRequest(SalesPeriodUnit.DAY, start, TODAY);
         SalesAmountResponse sales = SalesAmountResponse.of(30000, 10000, 2, 1);
@@ -84,7 +84,7 @@ class SettlementControllerTest {
 
     @Test
     @DisplayName("종료일이 내일 이후면 400으로 막는다")
-    void endDateAfterToday_returnsBadRequest() throws Exception {
+    void getSettlement_returnBadRequest_whenEndDateAfterToday() throws Exception {
         mvc.perform(get("/api/admin/settlements")
                         .param("unit", "DAY")
                         .param("startDate", TODAY.toString())
@@ -99,7 +99,7 @@ class SettlementControllerTest {
 
     @Test
     @DisplayName("조회 기간이 3개월을 넘으면 400으로 막는다")
-    void overThreeMonths_returnsBadRequest() throws Exception {
+    void getSettlement_returnBadRequest_whenPeriodOverThreeMonths() throws Exception {
         mvc.perform(get("/api/admin/settlements")
                         .param("unit", "MONTH")
                         .param("startDate", TODAY.minusMonths(3).toString())
@@ -113,7 +113,7 @@ class SettlementControllerTest {
 
     @Test
     @DisplayName("관리자가 아니면 정산을 조회할 수 없다")
-    void userCannotGetSettlement() throws Exception {
+    void getSettlement_returnForbidden_whenNotAdmin() throws Exception {
         mvc.perform(get("/api/admin/settlements")
                         .param("unit", "DAY")
                         .param("startDate", TODAY.toString())
@@ -126,7 +126,7 @@ class SettlementControllerTest {
 
     @Test
     @DisplayName("관리자는 오늘 지금까지의 매출을 조회한다")
-    void adminGetsTodaySales() throws Exception {
+    void getTodaySales_success() throws Exception {
         when(settlementQueryFacade.getTodaySales())
                 .thenReturn(new TodaySalesResponse(TODAY, SalesAmountResponse.of(5000, 0, 1, 0)));
 
@@ -138,7 +138,7 @@ class SettlementControllerTest {
 
     @Test
     @DisplayName("관리자는 기간 안의 결제를 한 건씩 페이지로 조회한다")
-    void adminGetsPayments() throws Exception {
+    void getPayments_success() throws Exception {
         SettlementPaymentSearchRequest request = new SettlementPaymentSearchRequest(TODAY, TODAY, 2, 10);
         SettlementPaymentResponse payment = new SettlementPaymentResponse(41L, TODAY.atTime(13, 12),
                 "20261030-000001", "구매자", 12000L, 3000L, 9000L);
@@ -162,7 +162,7 @@ class SettlementControllerTest {
 
     @Test
     @DisplayName("결제 건별 조회도 정산 조회와 같은 기간 규칙으로 막는다")
-    void paymentsOverThreeMonths_returnsBadRequest() throws Exception {
+    void getPayments_returnBadRequest_whenPeriodOverThreeMonths() throws Exception {
         mvc.perform(get("/api/admin/settlements/payments")
                         .param("startDate", TODAY.minusMonths(3).toString())
                         .param("endDate", TODAY.toString())

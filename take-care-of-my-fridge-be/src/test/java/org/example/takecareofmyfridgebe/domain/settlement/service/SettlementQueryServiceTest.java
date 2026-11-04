@@ -40,7 +40,7 @@ class SettlementQueryServiceTest {
 
     @Test
     @DisplayName("시작일부터 종료일까지 중 daily_sales 행이 없는 날만 날짜순으로 돌려준다")
-    void findMissingDates_returnsDatesWithoutRow() {
+    void findMissingDates_returnDatesWithoutRow() {
         given(dailySalesRepository.findSalesDatesBetween(START, END))
                 .willReturn(List.of(LocalDate.of(2026, 10, 2), LocalDate.of(2026, 10, 3)));
 
@@ -50,7 +50,7 @@ class SettlementQueryServiceTest {
 
     @Test
     @DisplayName("모든 날이 집계돼 있으면 빈 목록이다")
-    void findMissingDates_allAggregated_isEmpty() {
+    void findMissingDates_returnEmpty_whenAllAggregated() {
         given(dailySalesRepository.findSalesDatesBetween(START, END))
                 .willReturn(START.datesUntil(END.plusDays(1)).toList());
 
@@ -59,7 +59,7 @@ class SettlementQueryServiceTest {
 
     @Test
     @DisplayName("결제 이력 합계를 매출 금액으로 바꾸고 순매출을 계산한다")
-    void getSales_mapsSumToAmounts() {
+    void getSales_mapSumToAmounts() {
         LocalDateTime from = LocalDateTime.of(2026, 10, 30, 0, 0);
         LocalDateTime to = LocalDateTime.of(2026, 10, 30, 15, 0);
         given(salesHistoryRepository.sumSalesBetween(from, to)).willReturn(new DailySalesSum(10000L, 2L, 15000L, 1L));
@@ -70,7 +70,7 @@ class SettlementQueryServiceTest {
 
     @Test
     @DisplayName("결제 건별 목록은 1부터 센 페이지를 바꿔 읽고 순매출을 계산한다")
-    void getPayments_mapsRowsWithNetAmount() {
+    void getPayments_mapRowsWithNetAmount() {
         LocalDateTime from = LocalDateTime.of(2026, 10, 1, 0, 0);
         LocalDateTime to = LocalDateTime.of(2026, 10, 31, 0, 0);
         PageRequest pageable = PageRequest.of(1, 20);

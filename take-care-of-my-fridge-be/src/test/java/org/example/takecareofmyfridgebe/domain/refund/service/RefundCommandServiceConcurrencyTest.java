@@ -79,7 +79,7 @@ class RefundCommandServiceConcurrencyTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("같은 환불을 동시에 여러 번 완료해도 한 번만 완료돼 재고·결제 이력이 한 번만 남고 주문은 전액 환불이 된다")
-    void completeConcurrently_completesOnce() throws Exception {
+    void complete_completeOnce_whenCalledConcurrently() throws Exception {
         Fixture fixture = saveRequestedRefund();
 
         List<Callable<RefundResponse>> tasks = new ArrayList<>();
@@ -102,7 +102,7 @@ class RefundCommandServiceConcurrencyTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("환불만 완료하는 처리와 주문 상태까지 묶은 완료가 겹쳐도 한 번만 완료된다")
-    void completeAndCompleteWithoutOrderStatus_completesOnce() throws Exception {
+    void complete_completeOnce_whenOverlappingCompleteWithoutOrderStatus() throws Exception {
         Fixture fixture = saveRequestedRefund();
 
         List<RefundResponse> responses = runConcurrently(List.of(

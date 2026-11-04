@@ -79,7 +79,7 @@ class RefundQueryServiceTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("환불이 없으면 일반 상품은 주문 수량 전부, 특가·번개 드롭 상품은 0개를 주문 상품 순서대로 돌려준다")
-    void noRefunds() {
+    void getRefundableItems_returnAllQuantity_whenNoRefund() {
         List<RefundableItemResponse> items = refundQueryService.getRefundableItems(MEMBER_ID, order.getId());
 
         assertThat(items)
@@ -99,7 +99,7 @@ class RefundQueryServiceTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("요청·완료된 환불 수량은 빼고, 실패한 환불 수량은 다시 환불할 수 있게 둔다")
-    void subtractsCountedRefunds() {
+    void getRefundableItems_subtractRequestedAndCompletedQuantity() {
         refund(itemA, 2);                    // 요청 상태
         refund(itemA, 1).complete("cancellation-1", LocalDateTime.now());
         refund(itemB, 3).fail("PG 거절");     // 실패 상태
@@ -117,7 +117,7 @@ class RefundQueryServiceTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("주문 수량을 모두 환불했으면 남은 수량 0개, 환불 불가로 돌려준다")
-    void fullyRefunded() {
+    void getRefundableItems_returnNotRefundable_whenFullyRefunded() {
         refund(itemB, 3).complete("cancellation-1", LocalDateTime.now());
         flushAndClear();
 
@@ -131,7 +131,7 @@ class RefundQueryServiceTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("구매 확정된 주문은 조회를 거절한다")
-    void confirmedOrder() {
+    void getRefundableItems_throwException_whenOrderConfirmed() {
         entityManager.find(Order.class, order.getId()).confirm(LocalDateTime.now());
         flushAndClear();
 
@@ -141,7 +141,7 @@ class RefundQueryServiceTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("결제 전 주문은 조회를 거절한다")
-    void pendingOrder() {
+    void getRefundableItems_throwException_whenOrderPending() {
         Order pending = order("20261023-000002");
         orderItem(pending, 10L, 1, 3000, SaleType.NONE);
         flushAndClear();
@@ -152,14 +152,14 @@ class RefundQueryServiceTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("다른 회원의 주문은 없는 주문처럼 거절한다")
-    void otherMembersOrder() {
+    void getRefundableItems_throwException_whenOtherMembersOrder() {
         assertError(() -> refundQueryService.getRefundableItems(OTHER_MEMBER_ID, order.getId()),
                 ErrorCode.ORDER_NOT_FOUND);
     }
 
     @Test
     @DisplayName("환불 내역은 상태와 관계없이 최신순으로, 환불마다 자기 상품만 묶어 돌려준다")
-    void history_latestFirstWithItems() {
+    void getRefundHistory_returnLatestFirstWithItems() {
         Refund first = refund(payment, itemA, 2);
         addItem(first, itemB, 1);
         first.complete("cancellation-1", LocalDateTime.now());
@@ -194,7 +194,7 @@ class RefundQueryServiceTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("다른 주문의 환불은 내역에 넣지 않는다")
-    void history_onlyThisOrder() {
+    void getRefundHistory_returnOnlyThisOrder() {
         Order other = order("20261023-000003");
         OrderItem otherItem = orderItem(other, 10L, 1, 3000, SaleType.NONE);
         Payment otherPayment = pay(other);
@@ -209,13 +209,13 @@ class RefundQueryServiceTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("환불이 없으면 빈 내역을 돌려준다")
-    void history_empty() {
+    void getRefundHistory_returnEmpty_whenNoRefund() {
         assertThat(refundQueryService.getRefundHistory(MEMBER_ID, order.getId())).isEmpty();
     }
 
     @Test
     @DisplayName("구매 확정된 주문도 지난 환불 내역을 보여준다")
-    void history_confirmedOrder() {
+    void getRefundHistory_success_whenOrderConfirmed() {
         refund(payment, itemA, 1).complete("cancellation-1", LocalDateTime.now());
         flushAndClear();
         entityManager.find(Order.class, order.getId()).confirm(LocalDateTime.now());
@@ -226,14 +226,14 @@ class RefundQueryServiceTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("다른 회원의 주문 환불 내역은 없는 주문처럼 거절한다")
-    void history_otherMembersOrder() {
+    void getRefundHistory_throwException_whenOtherMembersOrder() {
         assertError(() -> refundQueryService.getRefundHistory(OTHER_MEMBER_ID, order.getId()),
                 ErrorCode.ORDER_NOT_FOUND);
     }
 
     @Test
     @DisplayName("환불 요약: 완료된 환불이 없으면 NONE, 일부만 환불했으면 PARTIAL과 완료 금액을 요청한 주문 순서대로 돌려준다")
-    void summaries_noneAndPartial() {
+    void getRefundSummaries_returnNoneAndPartial() {
         Order other = order("20261023-000002");
         orderItem(other, 10L, 1, 3000, SaleType.NONE);
         pay(other);
@@ -250,7 +250,7 @@ class RefundQueryServiceTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("환불 요약: 특가·번개 드롭을 뺀 환불 가능한 상품을 모두 환불했으면 FULL이다")
-    void summaries_full() {
+    void getRefundSummaries_returnFull_whenAllRefundableItemsRefunded() {
         complete(refund(itemA, 5));
         complete(refund(itemB, 3));
         flushAndClear();
@@ -262,7 +262,7 @@ class RefundQueryServiceTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("환불 요약: 완료된 환불이 있어도 진행 중 환불이 있으면 PARTIAL보다 IN_PROGRESS가 먼저다. 금액은 완료된 환불만 세고 실패한 환불은 세지 않는다")
-    void summaries_inProgressBeforePartial() {
+    void getRefundSummaries_returnInProgress_whenRequestedRefundExists() {
         complete(refund(itemA, 1));
         refund(itemB, 1).fail("PG 거절");
         refund(itemA, 2);
@@ -275,13 +275,13 @@ class RefundQueryServiceTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("환불 요약: 다른 회원의 주문과 없는 주문은 빼고 돌려준다")
-    void summaries_otherMembersOrderExcluded() {
+    void getRefundSummaries_excludeOrder_whenOtherMembersOrNotFound() {
         assertThat(refundQueryService.getRefundSummaries(OTHER_MEMBER_ID, List.of(order.getId(), 999_999L))).isEmpty();
     }
 
     @Test
     @DisplayName("환불 요약: 고유 주문 ID가 없거나 50건을 넘으면 거절한다")
-    void summaries_invalidSize() {
+    void getRefundSummaries_throwException_whenInvalidSize() {
         assertError(() -> refundQueryService.getRefundSummaries(MEMBER_ID, List.of()),
                 ErrorCode.INVALID_REFUND_SUMMARY_REQUEST);
         assertError(() -> refundQueryService.getRefundSummaries(MEMBER_ID, Arrays.asList(null, null)),
@@ -292,7 +292,7 @@ class RefundQueryServiceTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("환불 요약: 같은 주문 ID를 50번 넘게 보내도 고유 주문 기준으로 받고, 빈 값은 빼고 한 번만 돌려준다")
-    void summaries_duplicatesAndNullsIgnored() {
+    void getRefundSummaries_ignoreDuplicatesAndNulls() {
         List<Long> requested = new ArrayList<>(Collections.nCopies(60, order.getId()));
         requested.add(null);
 
@@ -351,8 +351,7 @@ class RefundQueryServiceTest extends MySqlContainerSupport {
     private void assertError(Runnable action, ErrorCode expected) {
         assertThatThrownBy(action::run)
                 .isInstanceOf(BusinessException.class)
-                .extracting(e -> ((BusinessException) e).getErrorCode())
-                .isEqualTo(expected);
+                .extracting("errorCode").isEqualTo(expected);
     }
 
     private void flushAndClear() {

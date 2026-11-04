@@ -20,7 +20,8 @@ class DealAnalysisReadServiceTest {
 
     private final DealAnalysisRepository analyses = mock(DealAnalysisRepository.class);
     private final DealCandidateRepository candidates = mock(DealCandidateRepository.class);
-    private final DealAnalysisReadService service = new DealAnalysisReadService(analyses, candidates);
+    private final DealAnalysisDiagnosticsService diagnostics = mock(DealAnalysisDiagnosticsService.class);
+    private final DealAnalysisReadService service = new DealAnalysisReadService(analyses, candidates, diagnostics);
 
     @Test
     void readsAnalysisAndItsItems() {
@@ -58,11 +59,13 @@ class DealAnalysisReadServiceTest {
     void memberWithoutAnalysisReturnsD002() {
         when(analyses.findTopByMemberIdOrderByCreatedAtDescIdDesc(7L))
                 .thenReturn(Optional.empty());
+        when(diagnostics.describeMissing()).thenReturn("학습 표본: 0건 (부족)");
 
         assertThatThrownBy(() -> service.getLatestForMember(7L))
-                .isInstanceOfSatisfying(BusinessException.class,
-                        error -> assertThat(error.getErrorCode())
-                                .isEqualTo(ErrorCode.DEAL_ANALYSIS_NOT_FOUND));
+                .isInstanceOfSatisfying(BusinessException.class, error -> {
+                    assertThat(error.getErrorCode()).isEqualTo(ErrorCode.DEAL_ANALYSIS_NOT_FOUND);
+                    assertThat(error.getMessage()).contains("학습 표본: 0건 (부족)");
+                });
         verifyNoInteractions(candidates);
     }
 }

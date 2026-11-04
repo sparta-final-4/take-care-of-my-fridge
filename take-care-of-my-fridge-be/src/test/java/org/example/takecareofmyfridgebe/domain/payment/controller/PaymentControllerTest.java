@@ -15,6 +15,7 @@ import org.example.takecareofmyfridgebe.global.config.SecurityConfig;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -67,11 +68,9 @@ class PaymentControllerTest {
         reset(paymentFacade);
     }
 
-    /**
-     * 비로그인 상태로 결제 확정을 요청하면 Facade를 호출하지 않고 401(A003)을 반환하는지 검증한다.
-     */
     @Test
-    void confirmWithoutLoginReturnsUnauthorized() throws Exception {
+    @DisplayName("비로그인 상태로 결제 확정을 요청하면 Facade를 호출하지 않고 401(A003)을 반환한다")
+    void confirm_returnUnauthorized_whenNotLoggedIn() throws Exception {
         mvc.perform(post("/api/payments/confirm")
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -83,12 +82,9 @@ class PaymentControllerTest {
         verifyNoInteractions(paymentFacade);
     }
 
-    /**
-     * 결제 확정 요청 시 토큰의 회원 ID와 요청 본문이 Facade로 전달되고,
-     * 응답 DTO가 규격대로 직렬화되는지 검증한다.
-     */
     @Test
-    void confirmPassesTokenMemberIdAndReturnsResponse() throws Exception {
+    @DisplayName("결제 확정을 요청하면 토큰의 회원 ID와 요청 본문을 Facade로 넘기고 응답 DTO를 규격대로 직렬화해 반환한다")
+    void confirm_success() throws Exception {
         PaymentConfirmRequest request = new PaymentConfirmRequest(1L, PORTONE_PAYMENT_ID);
         PaymentConfirmResponse response = new PaymentConfirmResponse(
                 10L, 1L, PORTONE_PAYMENT_ID, 15000L, PaymentStatus.PAID,
@@ -112,11 +108,9 @@ class PaymentControllerTest {
         verify(paymentFacade).confirmPayment(MEMBER_ID, request);
     }
 
-    /**
-     * orderId 누락 또는 portonePaymentId 공백이면 Facade를 호출하지 않고 400(C001)을 반환하는지 검증한다.
-     */
     @Test
-    void confirmWithInvalidBodyReturnsBadRequest() throws Exception {
+    @DisplayName("orderId가 없거나 portonePaymentId가 공백이면 Facade를 호출하지 않고 400(C001)을 반환한다")
+    void confirm_returnBadRequest_whenInvalidBody() throws Exception {
         for (String body : List.of(
                 confirmBody("null", "\"" + PORTONE_PAYMENT_ID + "\""),
                 confirmBody("1", "\" \""))) {
@@ -133,11 +127,9 @@ class PaymentControllerTest {
         verifyNoInteractions(paymentFacade);
     }
 
-    /**
-     * 결제 확정 중 금액 불일치 예외가 발생하면 해당 ErrorCode의 상태와 코드로 응답하는지 검증한다.
-     */
     @Test
-    void confirmAmountMismatchReturnsErrorCode() throws Exception {
+    @DisplayName("결제 확정 중 금액 불일치 예외가 나면 해당 ErrorCode의 상태와 코드로 응답한다")
+    void confirm_returnBadRequest_whenAmountMismatch() throws Exception {
         when(paymentFacade.confirmPayment(anyLong(), any()))
                 .thenThrow(new BusinessException(ErrorCode.PAYMENT_AMOUNT_MISMATCH));
 
@@ -151,11 +143,9 @@ class PaymentControllerTest {
                 .andExpect(jsonPath("$.error.code").value(ErrorCode.PAYMENT_AMOUNT_MISMATCH.getCode()));
     }
 
-    /**
-     * 비로그인 상태로 결제 실패 처리를 요청하면 Facade를 호출하지 않고 401(A003)을 반환하는지 검증한다.
-     */
     @Test
-    void failWithoutLoginReturnsUnauthorized() throws Exception {
+    @DisplayName("비로그인 상태로 결제 실패 처리를 요청하면 Facade를 호출하지 않고 401(A003)을 반환한다")
+    void fail_returnUnauthorized_whenNotLoggedIn() throws Exception {
         mvc.perform(post("/api/payments/{portonePaymentId}/fail", PORTONE_PAYMENT_ID)
                         .with(csrf()))
                 .andExpect(status().isUnauthorized())
@@ -165,11 +155,9 @@ class PaymentControllerTest {
         verifyNoInteractions(paymentFacade);
     }
 
-    /**
-     * 결제 실패 처리 요청 시 토큰의 회원 ID와 경로의 결제 ID로 Facade를 호출하고 빈 성공 응답을 반환하는지 검증한다.
-     */
     @Test
-    void failPassesTokenMemberIdAndPaymentId() throws Exception {
+    @DisplayName("결제 실패 처리를 요청하면 토큰의 회원 ID와 경로의 결제 ID로 Facade를 호출하고 빈 성공 응답을 반환한다")
+    void fail_success() throws Exception {
         mvc.perform(post("/api/payments/{portonePaymentId}/fail", PORTONE_PAYMENT_ID)
                         .with(csrf())
                         .with(loginUser()))
@@ -180,11 +168,9 @@ class PaymentControllerTest {
         verify(paymentFacade).failByUser(MEMBER_ID, PORTONE_PAYMENT_ID);
     }
 
-    /**
-     * 이미 처리된 결제를 실패 처리하려 하면 409(PAYMENT_005)로 응답하는지 검증한다.
-     */
     @Test
-    void failAlreadyProcessedReturnsConflict() throws Exception {
+    @DisplayName("이미 처리된 결제를 실패 처리하려 하면 409(PAYMENT_005)로 응답한다")
+    void fail_returnConflict_whenAlreadyProcessed() throws Exception {
         doThrow(new BusinessException(ErrorCode.ALREADY_PROCESSED_PAYMENT))
                 .when(paymentFacade).failByUser(eq(MEMBER_ID), eq(PORTONE_PAYMENT_ID));
 
@@ -196,11 +182,9 @@ class PaymentControllerTest {
                 .andExpect(jsonPath("$.error.code").value(ErrorCode.ALREADY_PROCESSED_PAYMENT.getCode()));
     }
 
-    /**
-     * 비로그인 상태로 결제 준비를 요청하면 Facade를 호출하지 않고 401(A003)을 반환하는지 검증한다.
-     */
     @Test
-    void prepareWithoutLoginReturnsUnauthorized() throws Exception {
+    @DisplayName("비로그인 상태로 결제 준비를 요청하면 Facade를 호출하지 않고 401(A003)을 반환한다")
+    void prepare_returnUnauthorized_whenNotLoggedIn() throws Exception {
         mvc.perform(post("/api/orders/{orderId}/payments", 1L)
                         .with(csrf()))
                 .andExpect(status().isUnauthorized())
@@ -209,12 +193,9 @@ class PaymentControllerTest {
         verifyNoInteractions(paymentFacade);
     }
 
-    /**
-     * 결제 준비 요청 시 토큰의 회원 ID, 경로의 주문 ID, 고른 결제대행사로 Facade를 호출하고,
-     * 결제창을 띄울 정보가 규격대로 직렬화되는지 검증한다.
-     */
     @Test
-    void preparePassesTokenMemberIdAndReturnsResponse() throws Exception {
+    @DisplayName("결제 준비를 요청하면 토큰의 회원 ID, 경로의 주문 ID, 고른 결제대행사로 Facade를 호출하고 결제창 정보를 규격대로 직렬화해 반환한다")
+    void prepare_success() throws Exception {
         PaymentPrepareResponse response = new PaymentPrepareResponse(
                 1L, PORTONE_PAYMENT_ID, "대파 외 1건", 15000L, LocalDateTime.of(2026, 10, 20, 10, 10),
                 PgProvider.KAKAOPAY, "channel-kakaopay", "EASY_PAY", "KAKAOPAY");
@@ -239,11 +220,9 @@ class PaymentControllerTest {
                 .andExpect(jsonPath("$.data.easyPayProvider").value("KAKAOPAY"));
     }
 
-    /**
-     * 결제대행사를 고르지 않으면 400(C001)으로 응답하고 Facade를 호출하지 않는지 검증한다.
-     */
     @Test
-    void prepareWithoutPgProviderReturnsBadRequest() throws Exception {
+    @DisplayName("결제대행사를 고르지 않으면 Facade를 호출하지 않고 400(C001)으로 응답한다")
+    void prepare_returnBadRequest_whenPgProviderMissing() throws Exception {
         mvc.perform(post("/api/orders/{orderId}/payments", 1L)
                         .with(csrf())
                         .with(loginUser())
@@ -255,11 +234,9 @@ class PaymentControllerTest {
         verifyNoInteractions(paymentFacade);
     }
 
-    /**
-     * 이미 결제됐거나 취소된 주문이면 409(PAYMENT_007)로 응답하는지 검증한다.
-     */
     @Test
-    void prepareOrderNotPayableReturnsConflict() throws Exception {
+    @DisplayName("이미 결제됐거나 취소된 주문이면 409(PAYMENT_007)로 응답한다")
+    void prepare_returnConflict_whenOrderNotPayable() throws Exception {
         when(paymentFacade.preparePayment(MEMBER_ID, 1L, new PaymentPrepareRequest(PgProvider.KAKAOPAY)))
                 .thenThrow(new BusinessException(ErrorCode.PAYMENT_ORDER_NOT_PAYABLE));
 

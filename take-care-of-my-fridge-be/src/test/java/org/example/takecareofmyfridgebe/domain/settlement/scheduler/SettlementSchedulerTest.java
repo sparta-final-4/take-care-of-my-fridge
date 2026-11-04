@@ -28,7 +28,7 @@ class SettlementSchedulerTest {
 
     @Test
     @DisplayName("어제 날짜로 집계한다")
-    void aggregateYesterday_aggregatesYesterday() {
+    void aggregateYesterday_aggregatePreviousDay() {
         settlementScheduler.aggregateYesterday(TODAY);
 
         verify(settlementFacade).aggregate(YESTERDAY);
@@ -36,7 +36,7 @@ class SettlementSchedulerTest {
 
     @Test
     @DisplayName("월초에는 지난달 말일을 집계한다")
-    void aggregateYesterday_firstDayOfMonth_aggregatesLastDayOfPreviousMonth() {
+    void aggregateYesterday_aggregateLastDayOfPreviousMonth_whenFirstDayOfMonth() {
         settlementScheduler.aggregateYesterday(LocalDate.of(2026, 11, 1));
 
         verify(settlementFacade).aggregate(LocalDate.of(2026, 10, 31));
@@ -44,7 +44,7 @@ class SettlementSchedulerTest {
 
     @Test
     @DisplayName("집계에 실패해도 예외를 밖으로 던지지 않는다")
-    void aggregateYesterday_failure_doesNotThrow() {
+    void aggregateYesterday_notThrowException_whenAggregationFails() {
         willThrow(new IllegalStateException("DB 오류")).given(settlementFacade).aggregate(YESTERDAY);
 
         assertThatCode(() -> settlementScheduler.aggregateYesterday(TODAY)).doesNotThrowAnyException();
