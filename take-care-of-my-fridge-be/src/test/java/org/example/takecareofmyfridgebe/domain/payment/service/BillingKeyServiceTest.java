@@ -261,4 +261,68 @@ class BillingKeyServiceTest extends MySqlContainerSupport {
         entityManager.persist(member);
         return member.getId();
     }
+
+    private BillingKeyInfo cardInfo(String billingKey, String numberMasked, String issuerCode) {
+        return new BillingKeyInfo(billingKey, true, "member-" + memberId, "신한카드 Deep Dream", numberMasked,
+                CardType.CREDIT, issuerCode);
+    }
+
+    @Test
+    @DisplayName("카드를 등록하면 마스킹 번호와 발급사 코드도 저장한다")
+    void register_saveNumberMaskedAndIssuerCode() {
+        BillingKeyResponse saved = billingKeyService.register(memberId,
+                cardInfo("billing-key-1", "53275012****1234", "SHINHAN_CARD"));
+
+        BillingKey card = entityManager.find(BillingKey.class, saved.cardId());
+        assertThat(card.getCardNumberMasked()).isEqualTo("53275012****1234");
+        assertThat(card.getCardIssuerCode()).isEqualTo("SHINHAN_CARD");
+    }
+
+    @Test
+    @DisplayName("같은 카드(마스킹 번호·발급사 같음)를 새 빌링키로 다시 등록하면 이미 등록된 카드로 거절한다")
+    void register_throwException_whenSameCardRegistered() {
+        billingKeyService.register(memberId, cardInfo("billing-key-1", "53275012****1234", "SHINHAN_CARD"));
+
+        assertThatThrownBy(() -> billingKeyService.register(memberId,
+                cardInfo("billing-key-2", "53275012****1234", "SHINHAN_CARD")))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode").isEqualTo(ErrorCode.BILLING_KEY_DUPLICATED);
+        assertThat(billingKeyService.getCards(memberId)).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("마스킹 번호나 발급사가 다르면 다른 카드로 보고 등록한다")
+    void register_success_whenDifferentCard() {
+        billingKeyService.register(memberId, cardInfo("billing-key-1", "53275012****1234", "SHINHAN_CARD"));
+
+        billingKeyService.register(memberId, cardInfo("billing-key-2", "53275012****5678", "SHINHAN_CARD"));
+        billingKeyService.register(memberId, cardInfo("billing-key-3", "53275012****1234", "KOOKMIN_CARD"));
+
+        assertThat(billingKeyService.getCards(memberId)).hasSize(3);
+    }
+
+    @Test
+    @DisplayName("삭제한 카드와 같은 카드나 다른 회원이 등록한 같은 카드는 다시 등록할 수 있다")
+    void register_success_whenSameCardDeletedOrOtherMember() {
+        BillingKeyResponse first = billingKeyService.register(memberId,
+                cardInfo("billing-key-1", "53275012****1234", "SHINHAN_CARD"));
+        billingKeyService.delete(memberId, first.cardId(), NOW);
+
+        billingKeyService.register(memberId, cardInfo("billing-key-2", "53275012****1234", "SHINHAN_CARD"));
+        billingKeyService.register(otherMemberId, new BillingKeyInfo("billing-key-3", true, "member-" + otherMemberId,
+                "신한카드 Deep Dream", "53275012****1234", CardType.CREDIT, "SHINHAN_CARD"));
+
+        assertThat(billingKeyService.getCards(memberId)).hasSize(1);
+        assertThat(billingKeyService.getCards(otherMemberId)).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("마스킹 번호를 모르는 카드끼리는 같은 카드로 보지 않는다")
+    void register_success_whenNumberUnknown() {
+        billingKeyService.register(memberId, cardInfo("billing-key-1", null, null));
+
+        billingKeyService.register(memberId, cardInfo("billing-key-2", null, null));
+
+        assertThat(billingKeyService.getCards(memberId)).hasSize(2);
+    }
 }

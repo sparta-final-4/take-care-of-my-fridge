@@ -61,7 +61,7 @@ class PortOneBillingKeyClientTest {
     }
 
     @Test
-    @DisplayName("발급된 카드 빌링키를 조회하면 상태·고객 ID·카드 상품명·마스킹 번호·카드 종류로 바꾼다")
+    @DisplayName("발급된 카드 빌링키를 조회하면 상태·고객 ID·카드 상품명·마스킹 번호·카드 종류·발급사 코드로 바꾼다")
     void getBillingKey_mapIssuedCard() {
         server.expect(requestTo(GET_URL))
                 .andExpect(method(HttpMethod.GET))
@@ -76,7 +76,8 @@ class PortOneBillingKeyClientTest {
         Optional<BillingKeyInfo> result = client.getBillingKey(BILLING_KEY);
 
         assertThat(result).contains(new BillingKeyInfo(
-                "billing-key-1", true, "member-7", "신한카드 Deep Dream", "53275012****1234", CardType.CREDIT));
+                "billing-key-1", true, "member-7", "신한카드 Deep Dream", "53275012****1234", CardType.CREDIT,
+                "SHINHAN_CARD"));
         assertThat(result.orElseThrow().cardLast4()).isEqualTo("1234");
         server.verify();
     }

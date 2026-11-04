@@ -104,6 +104,7 @@ public enum ErrorCode {
     BILLING_KEY_LIMIT_EXCEEDED(HttpStatus.CONFLICT, "BILLING_002", "카드는 최대 5장까지 등록할 수 있습니다."),
     BILLING_KEY_NOT_VERIFIED(HttpStatus.CONFLICT, "BILLING_003", "카드 등록을 확인하지 못했습니다. 다시 시도해 주세요."),
     BILLING_KEY_NOT_FOUND(HttpStatus.NOT_FOUND, "BILLING_004", "등록된 카드를 찾을 수 없습니다."),
+    BILLING_KEY_DUPLICATED(HttpStatus.CONFLICT, "BILLING_005", "이미 등록된 카드예요."),
 
     // Payment PIN (등록 카드 결제 비밀번호)
     PAYMENT_PIN_LOCKED(HttpStatus.CONFLICT, "PIN_001", "결제 비밀번호를 5번 틀려 잠겼어요. 로그인 비밀번호로 확인한 뒤 다시 설정해 주세요."),
