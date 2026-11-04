@@ -15,7 +15,8 @@ import tools.jackson.databind.jsontype.PolymorphicTypeValidator;
 /**
  * Redis 인프라 공통 설정 클래스.
  * 키 규칙: {도메인}:{목적}:{식별자} (예: chat:memory:15, notification:push)
- * 상담: chat:limit:{memberId}:{yyyyMMdd} 하루 질문 수, chat:streaming:{sessionId} 답 받기 잠금(값은 요청 토큰, TTL app.chat.reply-lock-ttl)
+ * 상담: chat:limit:{memberId}:{yyyyMMdd} 하루 질문 수, chat:streaming:{sessionId} 답 받기 잠금(값은 요청 토큰, TTL app.chat.reply-lock-ttl),
+ *       chat:context:{sessionId} 직전 추천 조건·카드 레시피 ID(JSON, TTL app.chat.session-timeout, 답을 저장할 때마다 다시 늘림)
  * Pub/Sub 채널: notification:push 알림 저장 신호, chat:push 상담 바뀜 신호({memberId, sessionId, status}, 메시지 내용 없음)
  * 캐시·임시 데이터는 TTL 필수
  */

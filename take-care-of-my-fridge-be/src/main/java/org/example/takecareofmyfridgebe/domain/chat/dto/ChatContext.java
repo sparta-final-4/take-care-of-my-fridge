@@ -5,13 +5,17 @@ import org.example.takecareofmyfridgebe.domain.chat.entity.ChatMessageRole;
 import java.util.List;
 
 /**
- * 이번 메시지를 처리할 때 쓰는 상담 문맥: 최근 대화(최대 3턴)와 AI 답에 붙었던 카드 이름.
+ * 이번 메시지를 처리할 때 쓰는 상담 문맥: 최근 대화(최대 3턴)와 AI 답에 붙었던 카드 이름, 직전 추천.
  * 이전 대화는 AI에 그대로 넘기므로, AI 답은 소개만 저장돼 있어도 보여 준 카드 이름을 함께 둔다.
  *
- * @param recentMessages 최근 메시지 (오래된 것부터, 최대 6개)
+ * @param recentMessages     최근 메시지 (오래된 것부터, 최대 6개)
+ * @param lastRecommendation 직전 추천 조건·카드 (Redis). 없거나 Redis 장애면 null
+ * @param lastCards          직전 추천 카드 이름 (보여 준 순서). Redis에 없으면 최근 대화에서 카드가 붙은 마지막 AI 답의 카드
  */
 public record ChatContext(
-        List<ContextMessage> recentMessages
+        List<ContextMessage> recentMessages,
+        LastRecommendation lastRecommendation,
+        List<CardName> lastCards
 ) {
 
     // AI 답 하나를 이전 대화로 넣을 때 최대 글자 수 (긴 레시피 자세히 답이 쌓이지 않게)
@@ -19,10 +23,20 @@ public record ChatContext(
 
     public ChatContext {
         recentMessages = recentMessages == null ? List.of() : List.copyOf(recentMessages);
+        lastCards = lastCards == null ? List.of() : List.copyOf(lastCards);
+    }
+
+    public ChatContext(List<ContextMessage> recentMessages) {
+        this(recentMessages, null, null);
     }
 
     public static ChatContext empty() {
         return new ChatContext(List.of());
+    }
+
+    // 이어지는 말(다시 추천·레시피 자세히)을 알아들을 직전 추천 카드가 있는지
+    public boolean hasLastCards() {
+        return !lastCards.isEmpty();
     }
 
     /**

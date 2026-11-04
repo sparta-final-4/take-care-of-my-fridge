@@ -47,6 +47,7 @@ public class ChatStreamService {
     private final ChatIntentFacade chatIntentFacade;
     private final ChatRecommendationFacade chatRecommendationFacade;
     private final ChatContextFacade chatContextFacade;
+    private final ChatContextStore chatContextStore;
     private final ObjectMapper objectMapper;
 
     /**
@@ -84,8 +85,8 @@ public class ChatStreamService {
 
         StringBuilder accumulated = new StringBuilder();
         AtomicBoolean firstChunkReceived = new AtomicBoolean(false);
-        // 이 답에 붙은 추천 카드와 카드별 설명. 답이 끝나면 AI 메시지와 함께 저장한다
-        AtomicReference<RecommendationReply> recommendationRef = new AtomicReference<>();
+        // 이 답의 계획(추천이면 조건·카드)과 카드별 설명. 답이 끝나면 AI 메시지와 함께 저장한다
+        AtomicReference<ReplyPlan> planRef = new AtomicReference<>();
         List<StringBuilder> descriptions = new ArrayList<>();
 
         // 4. 의도·조건 뽑기 → (추천이면) 후보 검색 → 카드 (event: recommendations) → 답변 스트리밍 조각 (event: message)
@@ -94,7 +95,7 @@ public class ChatStreamService {
         Flux<ServerSentEvent<String>> messageStream = Mono.fromCallable(() -> planReply(memberId, sessionId, request))
                 .subscribeOn(Schedulers.boundedElastic())
                 .flatMapMany(plan -> {
-                    recommendationRef.set(plan.recommendation());
+                    planRef.set(plan);
                     Flux<String> reply = replyText(memberId, sessionId, content, plan);
                     if (plan.recommendation() == null) {
                         return reply
@@ -126,7 +127,7 @@ public class ChatStreamService {
                 log.warn("상담 답이 비어 있음 - memberId: {}, sessionId: {}", memberId, sessionId);
                 return Mono.error(new BusinessException(ErrorCode.CHAT_AI_UNAVAILABLE));
             }
-            return saveExchange(sessionId, content, accumulated, recommendationRef.get(), descriptions);
+            return saveExchange(sessionId, content, accumulated, planRef.get(), descriptions);
         });
 
         // 6. 실패 시 에러 이벤트 (event: error) 및 로깅. 첫 조각 전 실패면 하루 횟수를 돌려준다
@@ -154,7 +155,7 @@ public class ChatStreamService {
                     .withAlreadyRecommended(chatMessageService.findRecommendedRecipeIds(sessionId));
             RecommendationReply recommendation = chatRecommendationFacade.recommend(request.content(), query);
             // 고른 레시피·맞은 방식·카드 이유는 ChatRecommendationFacade가 "상담 추천 후보 -"로 남긴다
-            return new ReplyPlan(context, recommendation);
+            return new ReplyPlan(context, recommendation, resolution.recipeQuery());
         } catch (RuntimeException e) {
             log.warn("상담 추천 후보 검색 실패, 일반 답으로 - memberId: {}, sessionId: {}", memberId, sessionId, e);
             return ReplyPlan.general(context);
@@ -173,10 +174,10 @@ public class ChatStreamService {
         return chatReplyGenerator.generateRecommendation(memberId, sessionId, content, plan.recommendation().candidateInfo());
     }
 
-    // recommendation이 null이면 일반 답
-    private record ReplyPlan(ChatContext context, RecommendationReply recommendation) {
+    // recommendation이 null이면 일반 답. query는 추천에 쓴 조건 (직전 추천으로 Redis에 둔다)
+    private record ReplyPlan(ChatContext context, RecommendationReply recommendation, RecipeQuery query) {
         private static ReplyPlan general(ChatContext context) {
-            return new ReplyPlan(context, null);
+            return new ReplyPlan(context, null, null);
         }
     }
 
@@ -231,8 +232,9 @@ public class ChatStreamService {
     }
 
     private Mono<ServerSentEvent<String>> saveExchange(Long sessionId, String content, StringBuilder accumulated,
-                                                       RecommendationReply recommendation, List<StringBuilder> descriptions) {
+                                                       ReplyPlan plan, List<StringBuilder> descriptions) {
         return Mono.fromCallable(() -> {
+            RecommendationReply recommendation = plan == null ? null : plan.recommendation();
             List<RecommendedRecipe> recipes = recommendation == null ? List.of() : recommendation.event().recipes();
             List<RecommendationToSave> cards = new ArrayList<>();
             List<Integer> receivedNumbers = new ArrayList<>();
@@ -251,12 +253,23 @@ public class ChatStreamService {
             List<ChatMessageResponse> saved = cards.isEmpty()
                     ? chatMessageService.saveExchange(sessionId, content, accumulated.toString())
                     : chatMessageService.saveExchange(sessionId, content, accumulated.toString(), cards);
+            rememberContext(sessionId, plan, recipes);
             String doneJson = toJson(new ChatDoneEventResponse(saved.get(0).id(), saved.get(1).id()));
             return ServerSentEvent.<String>builder()
                     .event("done")
                     .data(doneJson)
                     .build();
         }).subscribeOn(Schedulers.boundedElastic());
+    }
+
+    // 카드가 있는 추천 답이면 그 조건·카드를 직전 추천으로 두고, 그 밖의 답은 직전 추천을 그대로 두고 유지 시간만 늘린다
+    private void rememberContext(Long sessionId, ReplyPlan plan, List<RecommendedRecipe> recipes) {
+        if (plan != null && plan.query() != null && !recipes.isEmpty()) {
+            chatContextStore.saveRecommendation(sessionId, plan.query(),
+                    recipes.stream().map(RecommendedRecipe::recipeId).toList());
+        } else {
+            chatContextStore.touch(sessionId);
+        }
     }
 
     private ServerSentEvent<String> errorEvent(Long sessionId, Throwable e) {

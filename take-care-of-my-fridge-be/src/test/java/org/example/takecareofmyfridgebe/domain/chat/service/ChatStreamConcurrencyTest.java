@@ -87,6 +87,9 @@ class ChatStreamConcurrencyTest extends RedisContainerSupport {
     @MockitoBean
     private ChatContextFacade chatContextFacade;
 
+    @MockitoBean
+    private ChatContextStore chatContextStore;
+
     @BeforeEach
     void clearKeys() {
         given(chatContextFacade.load(any())).willReturn(ChatContext.empty());

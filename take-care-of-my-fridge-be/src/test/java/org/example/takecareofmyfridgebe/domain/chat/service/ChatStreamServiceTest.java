@@ -80,6 +80,9 @@ class ChatStreamServiceTest {
     @Mock
     private ChatContextFacade chatContextFacade;
 
+    @Mock
+    private ChatContextStore chatContextStore;
+
     @Spy
     private ObjectMapper objectMapper = new ObjectMapper();
 
@@ -766,6 +769,43 @@ class ChatStreamServiceTest {
         assertThat(events.get(1).data()).isEqualTo("{\"text\":\"" + notice + ".\"}");
         assertThat(events.get(2).data()).isEqualTo("{\"text\":\" 버섯과 두부를\"}");
         verify(chatMessageService).saveExchange(sessionId, "버섯 두부로 할 수 있는 요리", savedIntro, expectedCards);
+    }
+
+    @Test
+    @DisplayName("카드가 있는 추천 답을 저장하면 그 조건과 카드를 직전 추천으로 Redis에 둔다")
+    void savesLastRecommendation_whenRecommendationIsSaved() {
+        Long sessionId = 10L;
+        ChatMessageCreateRequest request = ChatMessageCreateRequest.of("두부로 뭐 해 먹지?");
+        RecipeQuery query = RecipeQuery.of(1L, List.of(21L));
+        givenRecommend(sessionId, request, query, new RecommendationReply(
+                ChatRecommendationsEventResponse.of(List.of(card(314L, "두부조림"), card(315L, "두부전"))), "후보"));
+        when(chatReplyGenerator.generateRecommendation(1L, sessionId, "두부로 뭐 해 먹지?", "후보"))
+                .thenReturn(Flux.just("[소개] 두부 요리예요.\n[1] 졸여요.\n[2] 부쳐요."));
+        when(chatMessageService.saveExchange(any(), any(), any(), any())).thenReturn(List.of(
+                new ChatMessageResponse(100L, 1, ChatMessageRole.USER, "두부로 뭐 해 먹지?", LocalDateTime.now()),
+                new ChatMessageResponse(101L, 2, ChatMessageRole.ASSISTANT, "두부 요리예요.", LocalDateTime.now())));
+
+        chatStreamService.streamMessage(1L, sessionId, request).collectList().block();
+
+        verify(chatContextStore).saveRecommendation(sessionId, query, List.of(314L, 315L));
+        verify(chatContextStore, never()).touch(any());
+    }
+
+    @Test
+    @DisplayName("일반 답을 저장하면 직전 추천은 그대로 두고 유지 시간만 늘린다")
+    void touchesContext_whenGeneralReplyIsSaved() {
+        Long sessionId = 10L;
+        ChatMessageCreateRequest request = ChatMessageCreateRequest.of("두부 보관은?");
+        when(chatIntentFacade.resolve(1L, sessionId, request)).thenReturn(ChatIntentResolution.general(Source.AI));
+        when(chatReplyGenerator.generate(1L, sessionId, "두부 보관은?", List.of())).thenReturn(Flux.just("냉장 보관"));
+        when(chatMessageService.saveExchange(sessionId, "두부 보관은?", "냉장 보관")).thenReturn(List.of(
+                new ChatMessageResponse(100L, 1, ChatMessageRole.USER, "두부 보관은?", LocalDateTime.now()),
+                new ChatMessageResponse(101L, 2, ChatMessageRole.ASSISTANT, "냉장 보관", LocalDateTime.now())));
+
+        chatStreamService.streamMessage(1L, sessionId, request).collectList().block();
+
+        verify(chatContextStore).touch(sessionId);
+        verify(chatContextStore, never()).saveRecommendation(any(), any(), any());
     }
 
     private void givenRecommend(Long sessionId, ChatMessageCreateRequest request, RecipeQuery query, RecommendationReply reply) {
