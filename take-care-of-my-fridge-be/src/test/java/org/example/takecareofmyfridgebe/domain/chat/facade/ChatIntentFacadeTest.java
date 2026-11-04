@@ -53,7 +53,7 @@ class ChatIntentFacadeTest {
         facade = new ChatIntentFacade(extractor, recipeService, ingredientMatcher,
                 new ChatCandidateProperties(List.of("양념", "음료"), 0.4));
         when(recipeService.getClassifications())
-                .thenReturn(new RecipeClassificationResponse(List.of("한식"), List.of("국", "샐러드", "양념", "음료", "찌개")));
+                .thenReturn(new RecipeClassificationResponse(List.of("한식"), List.of("국", "기타", "샐러드", "양념", "음료", "찌개")));
     }
 
     @Nested
@@ -98,7 +98,7 @@ class ChatIntentFacadeTest {
         }
 
         @Test
-        @DisplayName("AI에 넘기는 분류 목록은 레시피 분류에서 후보 제외 분류(양념·음료)를 뺀 것이다")
+        @DisplayName("AI에 넘기는 분류 목록은 레시피 분류에서 후보 제외 분류(양념·음료)와 기타를 뺀 것이다")
         void passesCategoriesWithoutExcluded() {
             givenExtracted(IntentResult.general());
 

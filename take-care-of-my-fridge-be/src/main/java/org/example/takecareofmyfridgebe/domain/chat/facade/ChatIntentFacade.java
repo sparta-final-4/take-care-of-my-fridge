@@ -38,6 +38,9 @@ import java.util.stream.Stream;
 @RequiredArgsConstructor
 public class ChatIntentFacade {
 
+    // AI가 고를 분류 목록에서만 뺄 분류. 뜻이 없어 조건으로 쓸 수 없다 (레시피 후보에서는 빼지 않는다)
+    private static final Set<String> PROMPT_EXCLUDED_CATEGORIES = Set.of("기타");
+
     private final ChatIntentExtractor chatIntentExtractor;
     private final RecipeService recipeService;
     private final IngredientMatcher ingredientMatcher;
@@ -76,11 +79,11 @@ public class ChatIntentFacade {
         return ChatIntentResolution.recommend(Source.AI, toRecipeQuery(memberId, sessionId, request, result));
     }
 
-    // 고를 수 있는 레시피 분류: 레시피에 있는 분류(레시피 분류 캐시)에서 후보 제외 분류를 뺀 것
+    // AI가 고를 수 있는 레시피 분류: 레시피에 있는 분류(레시피 분류 캐시)에서 후보 제외 분류와 "기타"를 뺀 것
     private List<String> categories() {
         Set<String> excluded = Set.copyOf(chatCandidateProperties.excludedCategories());
         return recipeService.getClassifications().categories().stream()
-                .filter(category -> !excluded.contains(category))
+                .filter(category -> !excluded.contains(category) && !PROMPT_EXCLUDED_CATEGORIES.contains(category))
                 .toList();
     }
 
