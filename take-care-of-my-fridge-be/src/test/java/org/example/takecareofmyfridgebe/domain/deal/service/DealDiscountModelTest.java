@@ -27,8 +27,10 @@ class DealDiscountModelTest {
     void rejectsInsufficientActualEventHistory() {
         assertThatThrownBy(() -> DealDiscountModel.train(List.of(
                 new Observation(10, 100, 120), new Observation(10, 100, 110))))
-                .isInstanceOfSatisfying(BusinessException.class, error ->
-                        assertThat(error.getErrorCode()).isEqualTo(ErrorCode.DEAL_TRAINING_DATA_INSUFFICIENT));
+                .isInstanceOfSatisfying(BusinessException.class, error -> {
+                    assertThat(error.getErrorCode()).isEqualTo(ErrorCode.DEAL_TRAINING_DATA_INSUFFICIENT);
+                    assertThat(error.getMessage()).contains("종료 일반 특가 2/3건", "할인율 종류 1/2개");
+                });
     }
 
     @Test

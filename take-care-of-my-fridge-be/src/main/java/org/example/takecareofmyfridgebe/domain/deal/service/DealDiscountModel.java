@@ -1,5 +1,6 @@
 package org.example.takecareofmyfridgebe.domain.deal.service;
 
+import java.util.ArrayList;
 import java.util.List;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
@@ -14,9 +15,15 @@ public final class DealDiscountModel {
     }
 
     public static DealDiscountModel train(List<Observation> observations) {
-        if (observations == null || observations.size() < 3
-                || observations.stream().map(Observation::discountRate).distinct().count() < 2) {
-            throw new BusinessException(ErrorCode.DEAL_TRAINING_DATA_INSUFFICIENT);
+        int sampleCount = observations == null ? 0 : observations.size();
+        long rateCount = observations == null ? 0
+                : observations.stream().map(Observation::discountRate).distinct().count();
+        if (sampleCount < 3 || rateCount < 2) {
+            List<String> missing = new ArrayList<>();
+            if (sampleCount < 3) missing.add("종료 일반 특가 " + sampleCount + "/3건");
+            if (rateCount < 2) missing.add("할인율 종류 " + rateCount + "/2개");
+            throw new BusinessException(ErrorCode.DEAL_TRAINING_DATA_INSUFFICIENT,
+                    "할인 효과 학습 자료 부족: " + String.join(", ", missing));
         }
         double numerator = 0;
         double denominator = 0;
