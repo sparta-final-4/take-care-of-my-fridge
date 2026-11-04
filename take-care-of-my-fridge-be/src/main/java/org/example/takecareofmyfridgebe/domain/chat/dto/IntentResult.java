@@ -12,13 +12,15 @@ import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
 
 /**
- * 상담 메시지에서 AI가 뽑은 의도와 추천 조건. 사용자가 말하지 않은 칸은 null이다.
+ * 상담 메시지에서 AI가 뽑은 의도와 추천 조건.
+ * 응답 JSON 스키마가 null을 허용하지 않아, 사용자가 말하지 않은 조건은 시간 0·빈 목록·false로 온다 (프롬프트로 정함).
+ * 0은 sanitize에서 null로 바꾸고, 빈 목록은 말하지 않은 것과 같게 다룬다. 테스트·스텁에서는 null로 올 수도 있다.
  * AI 응답을 그대로 받는 모양이라 값이 틀릴 수 있으므로 sanitize로 정리해서 쓴다.
  *
  * @param intent             RECOMMEND / GENERAL
  * @param wantedTastes       원하는 맛 (Member.Taste 이름)
  * @param moodCategories     원하는 레시피 분류 (recipes.category 값)
- * @param maxMinutes         최대 조리 시간(분)
+ * @param maxMinutes         최대 조리 시간(분). 말하지 않았으면 0
  * @param includeIngredients 꼭 넣고 싶은 재료 이름 (말한 그대로)
  * @param excludeIngredients 빼고 싶은 재료 이름 (말한 그대로)
  * @param useSelectedOnly    고른·말한 재료를 꼭 쓰는 레시피만 원하는지

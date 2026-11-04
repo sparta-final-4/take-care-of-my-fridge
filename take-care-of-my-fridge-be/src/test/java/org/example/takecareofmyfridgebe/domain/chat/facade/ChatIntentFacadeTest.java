@@ -81,6 +81,18 @@ class ChatIntentFacadeTest {
     class AutoMode {
 
         @Test
+        @DisplayName("말하지 않은 조건이 시간 0·빈 목록·false로 오면 시간은 null, 나머지는 조건 없음으로 만든다")
+        void leavesConditionsEmpty_whenAiReturnsZeroAndEmptyLists() {
+            givenExtracted(new IntentResult(ChatIntent.RECOMMEND, List.of(), List.of(), 0, List.of(), List.of(), false));
+
+            RecipeQuery query = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("뭐 먹지?")).recipeQuery();
+
+            assertThat(query).isEqualTo(RecipeQuery.of(MEMBER_ID, List.of()));
+            assertThat(query.maxMinutes()).isNull();
+            verify(ingredientMatcher, never()).matchAll(anyList());
+        }
+
+        @Test
         @DisplayName("AI가 RECOMMEND라고 하면 정리한 맛·분류·시간으로 검색 조건을 만든다")
         void buildsRecipeQuery_whenIntentIsRecommend() {
             givenExtracted(new IntentResult(ChatIntent.RECOMMEND,
