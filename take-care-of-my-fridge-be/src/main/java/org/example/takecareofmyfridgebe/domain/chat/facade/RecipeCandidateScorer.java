@@ -34,6 +34,7 @@ import java.util.stream.Stream;
  * 정렬은 점수를 합산하지 않고, 앞 단계가 같을 때만 다음 단계로 비교한다.
  * 1. 사용자 요청 일치 수(요리 이름 키워드·원하는 맛·분류) → 2. 선택 재료 겹친 수 → (선택 재료가 있을 때만) 재료 많이 모자람이 아닌 것 먼저
  * → 3. 임박 점수 합 → 4. 선호 맛 겹친 수 → 5. 보유 비율 → 6. 없는 재료 수 적은 순 → 7. 레시피 id.
+ * 같은 상담에서 이미 추천한 레시피(RecipeQuery.alreadyRecommendedIds)는 요청 바로 뒤 단계에서 뒤로 보내 같은 조건이면 다른 레시피가 위로 온다.
  * 선택 재료가 같으면 바로 만들 수 있는 레시피를 먼저 둔다. 임박 재료 하나 때문에 부족한 재료가 많은 레시피가 위로 오지 않게 하려는 것이다.
  * 임박을 선호 맛보다 앞에 둔다. 회원 선호 맛은 대부분 레시피와 1~2개씩 겹쳐서, 뒤에 두지 않으면 임박 재료가 순위에 거의 반영되지 않는다.
  * <p>
@@ -57,13 +58,13 @@ public class RecipeCandidateScorer {
     private static final int IMMINENT_BASE_SCORE = 12;
     private static final int IMMINENT_STEP = 2;
 
-    private static final Comparator<RecipeCandidate> ORDER = order(false);
-    // 선택 재료가 있을 때: 선택 재료 겹친 수 바로 뒤에 "재료 많이 모자람이 아닌 것 먼저"
-    private static final Comparator<RecipeCandidate> ORDER_WITH_SELECTED = order(true);
 
-    private static Comparator<RecipeCandidate> order(boolean selectedFirstReady) {
+    // 요청 > (이 상담에서 추천하지 않은 것 먼저) > 선택 재료 > (선택 재료가 있으면 모자람 아님) > 임박 > 맛 > 보유 비율 > 없는 재료 수 > id
+    private static Comparator<RecipeCandidate> order(boolean selectedFirstReady, Set<Long> alreadyRecommended) {
         Comparator<RecipeCandidate> order = Comparator
                 .comparingInt((RecipeCandidate c) -> c.ranking().requestMatches()).reversed()
+                // false(아직 추천하지 않음)가 앞
+                .thenComparing(c -> alreadyRecommended.contains(c.recipeId()))
                 .thenComparing(Comparator.comparingInt((RecipeCandidate c) -> c.ranking().selectedMatches()).reversed());
         if (selectedFirstReady) {
             // false(모자라지 않음)가 앞
@@ -187,7 +188,7 @@ public class RecipeCandidateScorer {
                 || scored.stream().allMatch(candidate -> candidate.ranking().selectedMatches() == 0);
 
         // 1차: 보유 비율 기준 이상이거나 선택 재료(2개 이상)를 전부 쓰는 레시피, 2차: 나머지. 각각 같은 정렬 순서
-        Comparator<RecipeCandidate> order = selectedCount > 0 ? ORDER_WITH_SELECTED : ORDER;
+        Comparator<RecipeCandidate> order = order(selectedCount > 0, query.alreadyRecommendedIds());
         List<RecipeCandidate> top = Stream.concat(
                         scored.stream().filter(candidate -> isFirstTier(query, candidate, selectedCount)).sorted(order),
                         scored.stream().filter(candidate -> !isFirstTier(query, candidate, selectedCount)).sorted(order))

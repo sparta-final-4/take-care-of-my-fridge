@@ -22,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -143,6 +144,11 @@ public class ChatMessageService {
         return chatRecommendationRepository.findRecipeRecommendationsByMessageIds(messageIds).stream()
                 .map(SavedRecommendation::from)
                 .toList();
+    }
+
+    // 이 상담에서 이미 추천한 레시피 ID (다음 추천에서 뒤로 보낸다)
+    public Set<Long> findRecommendedRecipeIds(Long sessionId) {
+        return Set.copyOf(chatRecommendationRepository.findRecipeIdsBySessionId(sessionId));
     }
 
     public List<ChatMessageResponse> getMessages(Long memberId, Long sessionId) {

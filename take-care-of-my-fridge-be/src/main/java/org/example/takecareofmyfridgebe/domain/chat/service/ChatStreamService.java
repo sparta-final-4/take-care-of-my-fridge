@@ -11,6 +11,7 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageEventResponse
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageResponse;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationTextEventResponse;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse.RecommendedRecipe;
+import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeQuery;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecommendationReply;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecommendationToSave;
 import org.example.takecareofmyfridgebe.domain.chat.facade.ChatIntentFacade;
@@ -144,7 +145,10 @@ public class ChatStreamService {
             return ReplyPlan.GENERAL;
         }
         try {
-            RecommendationReply recommendation = chatRecommendationFacade.recommend(request.content(), resolution.recipeQuery());
+            // 같은 상담에서 이미 추천한 레시피는 뒤로 보낸다
+            RecipeQuery query = resolution.recipeQuery()
+                    .withAlreadyRecommended(chatMessageService.findRecommendedRecipeIds(sessionId));
+            RecommendationReply recommendation = chatRecommendationFacade.recommend(request.content(), query);
             // 고른 레시피·맞은 방식·카드 이유는 ChatRecommendationFacade가 "상담 추천 후보 -"로 남긴다
             return new ReplyPlan(recommendation);
         } catch (RuntimeException e) {

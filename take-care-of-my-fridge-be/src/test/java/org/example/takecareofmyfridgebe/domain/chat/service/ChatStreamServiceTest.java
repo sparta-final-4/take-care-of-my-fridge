@@ -30,6 +30,7 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -602,7 +603,7 @@ class ChatStreamServiceTest {
         ChatMessageCreateRequest request = ChatMessageCreateRequest.of("뭐 먹지?");
         RecipeQuery query = RecipeQuery.of(1L, List.of());
         when(chatIntentFacade.resolve(1L, sessionId, request)).thenReturn(ChatIntentResolution.recommend(Source.AI, query));
-        when(chatRecommendationFacade.recommend("뭐 먹지?", query)).thenThrow(new RuntimeException("db down"));
+        when(chatRecommendationFacade.recommend(any(), any())).thenThrow(new RuntimeException("db down"));
         when(chatReplyGenerator.generate(1L, sessionId, "뭐 먹지?")).thenReturn(Flux.just("답"));
         when(chatMessageService.saveExchange(sessionId, "뭐 먹지?", "답")).thenReturn(List.of(
                 new ChatMessageResponse(100L, 1, ChatMessageRole.USER, "뭐 먹지?", LocalDateTime.now()),
@@ -663,7 +664,27 @@ class ChatStreamServiceTest {
 
     private void givenRecommend(Long sessionId, ChatMessageCreateRequest request, RecipeQuery query, RecommendationReply reply) {
         when(chatIntentFacade.resolve(1L, sessionId, request)).thenReturn(ChatIntentResolution.recommend(Source.AI, query));
-        when(chatRecommendationFacade.recommend(request.content(), query)).thenReturn(reply);
+        when(chatMessageService.findRecommendedRecipeIds(sessionId)).thenReturn(Set.of());
+        when(chatRecommendationFacade.recommend(request.content(), query.withAlreadyRecommended(Set.of()))).thenReturn(reply);
+    }
+
+    @Test
+    @DisplayName("추천할 때 이 상담에서 이미 추천한 레시피 ID를 검색 조건에 넣는다")
+    void passesAlreadyRecommendedRecipes() {
+        Long sessionId = 10L;
+        ChatMessageCreateRequest request = ChatMessageCreateRequest.of("뭐 먹지?");
+        RecipeQuery query = RecipeQuery.of(1L, List.of());
+        when(chatIntentFacade.resolve(1L, sessionId, request)).thenReturn(ChatIntentResolution.recommend(Source.AI, query));
+        when(chatMessageService.findRecommendedRecipeIds(sessionId)).thenReturn(Set.of(314L, 315L));
+        when(chatRecommendationFacade.recommend(any(), any())).thenThrow(new RuntimeException("stop"));
+        when(chatReplyGenerator.generate(1L, sessionId, "뭐 먹지?")).thenReturn(Flux.just("답"));
+        when(chatMessageService.saveExchange(sessionId, "뭐 먹지?", "답")).thenReturn(List.of(
+                new ChatMessageResponse(100L, 1, ChatMessageRole.USER, "뭐 먹지?", LocalDateTime.now()),
+                new ChatMessageResponse(101L, 2, ChatMessageRole.ASSISTANT, "답", LocalDateTime.now())));
+
+        chatStreamService.streamMessage(1L, sessionId, request).collectList().block();
+
+        verify(chatRecommendationFacade).recommend("뭐 먹지?", query.withAlreadyRecommended(Set.of(314L, 315L)));
     }
 
     private static RecommendedRecipe card(Long recipeId, String name) {

@@ -163,4 +163,18 @@ class ChatMessageRepositoryAndServiceTest extends MySqlContainerSupport {
         assertThat(chatMessageService.findRecipeRecommendations(List.of(saved.get(1).id()))).isEmpty();
         assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM chat_recommendations", Long.class)).isZero();
     }
+
+    @Test
+    @DisplayName("이 상담에서 추천한 레시피 ID를 중복 없이 읽고, 다른 상담의 추천은 넣지 않는다")
+    void findsRecommendedRecipeIdsOfSession() {
+        ChatSession session = chatSessionRepository.saveAndFlush(ChatSession.builder().memberId(103L).build());
+        ChatSession other = chatSessionRepository.saveAndFlush(ChatSession.builder().memberId(104L).build());
+        chatMessageService.saveExchange(session.getId(), "뭐 먹지?", "소개",
+                List.of(new RecommendationToSave(10L, null), new RecommendationToSave(20L, null)));
+        chatMessageService.saveExchange(session.getId(), "또 추천", "소개",
+                List.of(new RecommendationToSave(20L, null), new RecommendationToSave(30L, null)));
+        chatMessageService.saveExchange(other.getId(), "다른 상담", "소개", List.of(new RecommendationToSave(99L, null)));
+
+        assertThat(chatMessageService.findRecommendedRecipeIds(session.getId())).containsExactlyInAnyOrder(10L, 20L, 30L);
+    }
 }
