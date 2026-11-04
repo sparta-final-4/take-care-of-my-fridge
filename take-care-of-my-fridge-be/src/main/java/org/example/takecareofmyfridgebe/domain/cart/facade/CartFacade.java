@@ -44,8 +44,18 @@ public class CartFacade {
         return CartItemsResponse.from(items, productsById, saleEventReader.findSellingPrices(products));
     }
 
+    // 같은 회원의 담기가 겹쳐 장바구니나 항목이 먼저 생기면 뒤의 담기는 충돌로 실패한다. 이 퍼사드는 트랜잭션 밖이라
+    // 한 번만 새 트랜잭션으로 다시 시도하면 이미 생긴 항목의 수량을 올려 성공한다. 다시 시도해도 충돌이면 그대로 던진다.
     public AddCartItemResult addItem(Long memberId, AddCartItemRequest request) {
-        return cartService.addItem(memberId, request, getQuantityLimit(request.productId()));
+        CartQuantityLimit limit = getQuantityLimit(request.productId());
+        try {
+            return cartService.addItem(memberId, request, limit);
+        } catch (BusinessException e) {
+            if (e.getErrorCode() != ErrorCode.CART_ADD_CONFLICT) {
+                throw e;
+            }
+            return cartService.addItem(memberId, request, limit);
+        }
     }
 
     // 장바구니 항목을 먼저 읽어야 어느 상품의 한도를 읽을지 안다.
