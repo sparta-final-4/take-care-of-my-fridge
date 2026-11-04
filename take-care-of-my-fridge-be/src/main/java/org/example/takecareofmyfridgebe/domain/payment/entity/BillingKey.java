@@ -19,6 +19,7 @@ import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 
 import java.time.LocalDateTime;
+import java.util.Objects;
 
 // 회원이 등록한 카드. 카드 정보는 PortOne이 보관하고 우리는 빌링키와 화면 표시용 정보만 저장한다
 @Entity
@@ -95,10 +96,12 @@ public class BillingKey extends BaseTimeEntity {
         return status == BillingKeyStatus.ACTIVE;
     }
 
-    // 같은 실물 카드인지. 마스킹 번호나 발급사 코드를 모르는 카드(이 값이 생기기 전에 등록한 카드)는 비교하지 않는다
+    // 같은 실물 카드인지. 마스킹 번호가 같고 발급사 코드도 같아야 한다(둘 다 비어 있어도 같은 값으로 본다).
+    // 마스킹 번호를 모르는 카드(이 값이 생기기 전에 등록한 카드)는 비교하지 않는다
     public boolean isSameCard(String otherNumberMasked, String otherIssuerCode) {
-        return cardNumberMasked != null && cardIssuerCode != null
-                && cardNumberMasked.equals(otherNumberMasked) && cardIssuerCode.equals(otherIssuerCode);
+        return cardNumberMasked != null
+                && cardNumberMasked.equals(otherNumberMasked)
+                && Objects.equals(cardIssuerCode, otherIssuerCode);
     }
 
     public void markDefault() {

@@ -14,11 +14,6 @@ public record BillingKeyInfo(
 ) {
     private static final int LAST_DIGITS = 4;
 
-    public BillingKeyInfo(String billingKey, boolean issued, String customerId, String cardName, String cardNumber,
-                          CardType cardType) {
-        this(billingKey, issued, customerId, cardName, cardNumber, cardType, null);
-    }
-
     // 마스킹된 번호의 마지막 4글자가 모두 숫자일 때만 끝 4자리로 본다
     public String cardLast4() {
         if (cardNumber == null || cardNumber.length() < LAST_DIGITS) {

@@ -132,4 +132,15 @@ class BillingKeyTest {
         assertThat(card.isSameCard("53275012****1234", "KOOKMIN_CARD")).isFalse();
         assertThat(unknown.isSameCard(null, null)).isFalse();
     }
+
+    @Test
+    @DisplayName("발급사 코드를 모르면 마스킹 번호가 같고 상대도 발급사를 모를 때만 같은 카드다")
+    void isSameCard_compareNumberOnly_whenIssuerUnknown() {
+        BillingKey noIssuer = BillingKey.builder().memberId(1L).billingKey("billing-key-9")
+                .cardNumberMasked("53275012****1234").build();
+
+        assertThat(noIssuer.isSameCard("53275012****1234", null)).isTrue();
+        assertThat(noIssuer.isSameCard("53275012****1234", "SHINHAN_CARD")).isFalse();
+        assertThat(noIssuer.isSameCard("53275012****5678", null)).isFalse();
+    }
 }

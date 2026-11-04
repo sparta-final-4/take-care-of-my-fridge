@@ -89,7 +89,7 @@ class BillingKeyFacadeTest {
     @DisplayName("삭제된 빌링키면 저장하지 않고 확인 실패로 거절한다")
     void register_throwException_whenDeletedAtPg() {
         given(billingKeyGateway.getBillingKey(BILLING_KEY)).willReturn(Optional.of(
-                new BillingKeyInfo(BILLING_KEY, false, "member-7", null, null, null)));
+                new BillingKeyInfo(BILLING_KEY, false, "member-7", null, null, null, null)));
 
         assertNotVerified();
         verify(billingKeyService, never()).register(anyLong(), any());
@@ -249,7 +249,7 @@ class BillingKeyFacadeTest {
         assertThat(billingKeyFacade.registerFromWebhook(BILLING_KEY)).isFalse();
 
         given(billingKeyGateway.getBillingKey(BILLING_KEY)).willReturn(Optional.of(
-                new BillingKeyInfo(BILLING_KEY, false, "member-7", null, null, null)));
+                new BillingKeyInfo(BILLING_KEY, false, "member-7", null, null, null, null)));
         assertThat(billingKeyFacade.registerFromWebhook(BILLING_KEY)).isFalse();
 
         given(billingKeyGateway.getBillingKey(BILLING_KEY)).willReturn(Optional.of(issued("other-service-1")));
@@ -303,7 +303,8 @@ class BillingKeyFacadeTest {
     }
 
     private BillingKeyInfo issued(String customerId) {
-        return new BillingKeyInfo(BILLING_KEY, true, customerId, "신한카드", "53275012****1234", CardType.CREDIT);
+        return new BillingKeyInfo(BILLING_KEY, true, customerId, "신한카드", "53275012****1234", CardType.CREDIT,
+                "SHINHAN_CARD");
     }
 
     @Test

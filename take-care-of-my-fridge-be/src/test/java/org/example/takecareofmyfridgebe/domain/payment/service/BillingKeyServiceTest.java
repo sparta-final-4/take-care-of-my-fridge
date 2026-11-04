@@ -252,8 +252,14 @@ class BillingKeyServiceTest extends MySqlContainerSupport {
     }
 
     private BillingKeyInfo info(String billingKey) {
-        return new BillingKeyInfo(billingKey, true, "member-" + memberId, "신한카드 Deep Dream", "53275012****1234",
-                CardType.CREDIT);
+        return new BillingKeyInfo(billingKey, true, "member-" + memberId, "신한카드 Deep Dream",
+                cardNumberOf(billingKey), CardType.CREDIT, "SHINHAN_CARD");
+    }
+
+    // 빌링키 끝 번호로 서로 다른 카드 번호를 만든다. billing-key-1이면 53275012****1234
+    private static String cardNumberOf(String billingKey) {
+        int seq = Integer.parseInt(billingKey.substring(billingKey.lastIndexOf('-') + 1));
+        return String.format("53275012****%04d", 1233 + seq);
     }
 
     private Long member(String email, String nickname) {
@@ -314,6 +320,17 @@ class BillingKeyServiceTest extends MySqlContainerSupport {
 
         assertThat(billingKeyService.getCards(memberId)).hasSize(1);
         assertThat(billingKeyService.getCards(otherMemberId)).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("발급사 코드를 받지 못해도 마스킹 번호가 같으면 이미 등록된 카드로 거절한다")
+    void register_throwException_whenSameNumberWithoutIssuer() {
+        billingKeyService.register(memberId, cardInfo("billing-key-1", "53275012****1234", null));
+
+        assertThatThrownBy(() -> billingKeyService.register(memberId,
+                cardInfo("billing-key-2", "53275012****1234", null)))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode").isEqualTo(ErrorCode.BILLING_KEY_DUPLICATED);
     }
 
     @Test
