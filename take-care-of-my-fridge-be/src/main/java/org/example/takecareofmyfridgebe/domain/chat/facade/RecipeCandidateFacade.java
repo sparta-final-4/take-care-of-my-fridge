@@ -8,6 +8,8 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeQuery;
 import org.example.takecareofmyfridgebe.domain.chat.facade.RecipeCandidateScorer.FridgeStock;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeSortType;
 import org.example.takecareofmyfridgebe.domain.fridge.service.FridgeService;
+import org.example.takecareofmyfridgebe.domain.ingredient.entity.Ingredient;
+import org.example.takecareofmyfridgebe.domain.ingredient.service.IngredientService;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 import org.example.takecareofmyfridgebe.domain.member.service.MemberService;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeCandidateIngredient;
@@ -15,6 +17,8 @@ import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeCandidateInfo;
 import org.example.takecareofmyfridgebe.domain.recipe.service.RecipeService;
 import org.springframework.stereotype.Component;
 
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -22,6 +26,7 @@ import java.util.Set;
 /**
  * AI 상담 추천에 쓸 레시피 후보를 고른다 (AI 없이 규칙으로).
  * 냉장고·회원·레시피 서비스에서 필요한 값을 모으고, 거르기·정렬은 RecipeCandidateScorer에 맡긴다.
+ * 선택 재료는 재료 서비스로 같은 종류 재료를 찾아 묶는다 (예: 버섯 → 표고버섯·양송이버섯, 후보 검색에서만).
  */
 @Component
 @RequiredArgsConstructor
@@ -30,6 +35,7 @@ public class RecipeCandidateFacade {
     private final FridgeService fridgeService;
     private final MemberService memberService;
     private final RecipeService recipeService;
+    private final IngredientService ingredientService;
     private final ChatCandidateProperties chatCandidateProperties;
 
     /**
@@ -38,7 +44,8 @@ public class RecipeCandidateFacade {
      * @param query 회원 ID, 선택 재료, (나중에 AI가 채울) 요청 조건
      * @return 정렬된 후보와 fallback 여부 (선택 재료가 없거나 하나도 겹치지 않으면 true)
      */
-    public RecipeCandidates findCandidates(RecipeQuery query) {
+    public RecipeCandidates findCandidates(RecipeQuery request) {
+        RecipeQuery query = withSelectedIngredientGroups(request);
         RecipeCandidateScorer scorer = new RecipeCandidateScorer(
                 chatCandidateProperties.excludedCategories(), chatCandidateProperties.minOwnedRatio());
 
@@ -62,5 +69,20 @@ public class RecipeCandidateFacade {
         List<Long> topRecipeIds = ranked.candidates().stream().map(RecipeCandidate::recipeId).toList();
         return RecipeCandidateScorer.withMissingIngredients(
                 ranked, fridge, recipeService.findNonBasicIngredients(topRecipeIds));
+    }
+
+    // 선택 재료마다 이름이 그 이름으로 끝나는 같은 종류 재료를 묶는다. 이름을 모르는 ID는 자신만 쓴다
+    private RecipeQuery withSelectedIngredientGroups(RecipeQuery query) {
+        if (query.selectedIngredientIds().isEmpty()) {
+            return query;
+        }
+        Map<Long, Ingredient> selected = ingredientService.getIngredientsByIds(query.selectedIngredientIds());
+        Map<String, List<Long>> sameKindByName = ingredientService.findSameKindIdsByNames(
+                selected.values().stream().map(Ingredient::getName).toList());
+
+        Map<Long, Set<Long>> groups = new HashMap<>();
+        selected.forEach((id, ingredient) -> groups.put(id,
+                new HashSet<>(sameKindByName.getOrDefault(ingredient.getName().trim(), List.of()))));
+        return query.withSelectedIngredientGroups(groups);
     }
 }

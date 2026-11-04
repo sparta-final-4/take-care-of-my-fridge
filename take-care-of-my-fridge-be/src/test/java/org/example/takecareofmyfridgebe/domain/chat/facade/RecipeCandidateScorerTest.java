@@ -40,6 +40,8 @@ class RecipeCandidateScorerTest {
     private static final long ONION = 4L;
     private static final long PORK = 5L;
     private static final long SALT = 90L;
+    private static final long MUSHROOM = 45L;
+    private static final long SHIITAKE = 161L;
 
     // 정렬·거르기 테스트는 보유 비율 기준 없이(0) 단계별 순서만 확인한다
     private final RecipeCandidateScorer scorer = new RecipeCandidateScorer(List.of("양념", "음료"), 0);
@@ -551,6 +553,55 @@ class RecipeCandidateScorerTest {
             assertThat(candidate.ranking().selectedMatches()).isEqualTo(1);
             assertThat(candidate.ranking().ownedCount()).isEqualTo(1);
             assertThat(candidate.reason().missingIngredients()).containsExactly(new MissingIngredient(PORK, "돼지고기"));
+        }
+    }
+
+    @Nested
+    @DisplayName("같은 종류 묶음")
+    class SameKindGroups {
+
+        @Test
+        @DisplayName("선택 재료(버섯)의 같은 종류 재료(표고버섯)를 쓰는 레시피도 후보로 모으고 선택 재료를 쓴 것으로 센다")
+        void countsSelected_whenRecipeUsesSameKindIngredient() {
+            recipe(10L, "표고버섯볶음", "볶음", 20, 1, SHIITAKE);
+            recipe(20L, "계란찜", "찜", 20, 1, EGG);
+            RecipeQuery query = RecipeQuery.of(MEMBER_ID, List.of(MUSHROOM), true)
+                    .withSelectedIngredientGroups(Map.of(MUSHROOM, Set.of(MUSHROOM, SHIITAKE)));
+
+            RecipeCandidates result = rank(query, List.of(stock(EGG, "계란", 10)), List.of());
+
+            assertThat(scorer.lookupIngredientIds(query, List.of())).contains(MUSHROOM, SHIITAKE);
+            assertThat(result.candidates()).extracting(RecipeCandidate::recipeId).containsExactly(10L);
+            assertThat(result.candidates().get(0).ranking().selectedMatches()).isEqualTo(1);
+            assertThat(result.fallback()).isFalse();
+        }
+
+        @Test
+        @DisplayName("묶음이 없으면 선택 재료 자신만 센다")
+        void countsOnlySelf_whenNoGroup() {
+            recipe(10L, "표고버섯볶음", "볶음", 20, 1, SHIITAKE);
+            recipe(20L, "버섯전", "전", 20, 1, MUSHROOM);
+
+            RecipeCandidates result = rank(RecipeQuery.of(MEMBER_ID, List.of(MUSHROOM), true),
+                    List.of(stock(SHIITAKE, "표고버섯", 10)), List.of());
+
+            assertThat(result.candidates()).extracting(RecipeCandidate::recipeId).containsExactly(20L);
+        }
+
+        @Test
+        @DisplayName("선택 재료 2개를 같은 종류 재료로 모두 쓰면 보유 비율이 낮아도 먼저 고른다")
+        void ranksFirstTier_whenUsesAllSelectedThroughGroup() {
+            recipe(10L, "표고두부전골", "전골", 20, 10, SHIITAKE, TOFU);
+            recipe(20L, "계란찜", "찜", 20, 1, EGG);
+            RecipeQuery query = RecipeQuery.of(MEMBER_ID, List.of(MUSHROOM, TOFU), false)
+                    .withSelectedIngredientGroups(Map.of(MUSHROOM, Set.of(SHIITAKE)));
+
+            RecipeCandidates result = rank(ratioScorer, query,
+                    List.of(stock(EGG, "계란", 10), stock(TOFU, "두부", 10)), List.of());
+
+            assertThat(result.candidates()).extracting(RecipeCandidate::recipeId).containsExactly(10L, 20L);
+            assertThat(result.candidates().get(0).ranking().selectedMatches()).isEqualTo(2);
+            assertThat(result.candidates().get(0).reason().lacksManyIngredients()).isTrue();
         }
     }
 

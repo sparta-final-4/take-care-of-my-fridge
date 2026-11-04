@@ -40,6 +40,8 @@ import java.util.stream.Stream;
  * 단, 선택 재료가 기본 양념을 빼고 2개 이상이고 레시피가 그 재료를 전부 쓰면 기준 미만이어도 먼저 고른다 (모자람 표시는 그대로 남는다).
  * 메시지에서 말한 재료는 선택 재료로 합쳐서 오므로 1단계에서 세지 않고 2단계에서 센다.
  * useSelectedOnly면 선택 재료(기본 양념 제외)를 하나도 쓰지 않는 레시피는 뺀다.
+ * 선택 재료는 같은 종류 묶음(RecipeQuery.selectedIngredientGroups, 예: 버섯 → 표고버섯·양송이버섯)으로 센다.
+ * 묶음 안의 재료를 하나라도 쓰면 그 선택 재료를 쓴 것으로 보고, 후보도 묶음 안의 재료로 모은다.
  * 냉장고 수량은 재료마다 단위(g·개·대…)가 달라 비교하지 않는다. 기본 양념은 어느 단계에서도 세지 않는다.
  */
 public class RecipeCandidateScorer {
@@ -103,7 +105,7 @@ public class RecipeCandidateScorer {
     }
 
     /**
-     * 레시피 재료를 조회할 재료 ID: 냉장고·선택 재료(후보를 모으는 재료)와 제외 재료(필터용).
+     * 레시피 재료를 조회할 재료 ID: 냉장고·선택 재료와 그 같은 종류 묶음(후보를 모으는 재료), 제외 재료(필터용).
      */
     public Set<Long> lookupIngredientIds(RecipeQuery query, List<FridgeStock> fridge) {
         Set<Long> ids = new LinkedHashSet<>(matchIngredientIds(query, fridge));
@@ -112,7 +114,7 @@ public class RecipeCandidateScorer {
     }
 
     /**
-     * 냉장고·선택 재료 중 기본 양념이 아닌 재료가 하나라도 들어간 레시피 ID.
+     * 냉장고·선택 재료(같은 종류 묶음 포함) 중 기본 양념이 아닌 재료가 하나라도 들어간 레시피 ID.
      * 냉장고에 없는 선택 재료도 포함한다. 기본 양념만 겹치는 레시피는 후보가 아니다.
      */
     public Set<Long> candidateRecipeIds(RecipeQuery query, List<FridgeStock> fridge, List<RecipeCandidateIngredient> rows) {
@@ -147,19 +149,19 @@ public class RecipeCandidateScorer {
         Set<Member.Taste> preferred = toTasteSet(memberTastes);
 
         // 선택 재료만 쓰기는 기본 양념 뺀 선택 재료가 있을 때만 건다 (없으면 모든 레시피가 빠지므로)
-        int selectedCount = countNonBasicSelected(query, rows);
+        List<Long> nonBasicSelected = nonBasicSelectedIds(query, rows);
+        int selectedCount = nonBasicSelected.size();
         boolean selectedOnly = query.useSelectedOnly() && selectedCount > 0;
-        Set<Long> selectedIds = Set.copyOf(query.selectedIngredientIds());
 
         List<RecipeCandidate> scored = new ArrayList<>();
         for (Long recipeId : candidateRecipeIds(query, fridge, rows)) {
             RecipeCandidateInfo info = infos.get(recipeId);
             List<RecipeCandidateIngredient> recipeRows = rowsByRecipe.getOrDefault(recipeId, List.of());
             if (info == null || isFilteredOut(query, info, recipeRows)
-                    || (selectedOnly && !usesAnySelected(recipeRows, selectedIds))) {
+                    || (selectedOnly && countSelectedMatches(query, nonBasicSelected, recipeRows) == 0)) {
                 continue;
             }
-            scored.add(score(query, info, recipeRows, fridgeById, preferred,
+            scored.add(score(query, nonBasicSelected, info, recipeRows, fridgeById, preferred,
                     recipeTastes.getOrDefault(recipeId, Set.of())));
         }
 
@@ -183,22 +185,32 @@ public class RecipeCandidateScorer {
         return usesAllSelected || !candidate.reason().lacksManyIngredients();
     }
 
-    private static boolean usesAnySelected(List<RecipeCandidateIngredient> recipeRows, Set<Long> selectedIds) {
-        return recipeRows.stream()
-                .anyMatch(row -> !row.basicSeasoning() && selectedIds.contains(row.ingredientId()));
+    // 레시피가 쓰는 선택 재료 수. 선택 재료의 같은 종류 묶음 안 재료(기본 양념 제외)를 하나라도 쓰면 쓴 것으로 센다
+    private static int countSelectedMatches(
+            RecipeQuery query,
+            List<Long> nonBasicSelected,
+            List<RecipeCandidateIngredient> recipeRows
+    ) {
+        Set<Long> recipeIngredientIds = recipeRows.stream()
+                .filter(row -> !row.basicSeasoning())
+                .map(RecipeCandidateIngredient::ingredientId)
+                .collect(Collectors.toSet());
+        return (int) nonBasicSelected.stream()
+                .filter(selectedId -> query.selectedGroupOf(selectedId).stream().anyMatch(recipeIngredientIds::contains))
+                .count();
     }
 
-    // 기본 양념을 뺀 선택 재료 수. 레시피 재료 줄에서 기본 양념으로 확인된 재료만 뺀다
+    // 기본 양념을 뺀 선택 재료 (중복 제거). 레시피 재료 줄에서 기본 양념으로 확인된 재료만 뺀다
     // (어느 레시피에도 없는 재료는 기본 양념이 아닌 것으로 센다. 그런 재료를 전부 쓰는 레시피는 없으므로 예외도 생기지 않는다)
-    private static int countNonBasicSelected(RecipeQuery query, List<RecipeCandidateIngredient> rows) {
+    private static List<Long> nonBasicSelectedIds(RecipeQuery query, List<RecipeCandidateIngredient> rows) {
         Set<Long> basicIds = rows.stream()
                 .filter(RecipeCandidateIngredient::basicSeasoning)
                 .map(RecipeCandidateIngredient::ingredientId)
                 .collect(Collectors.toSet());
-        return (int) query.selectedIngredientIds().stream()
+        return query.selectedIngredientIds().stream()
                 .distinct()
                 .filter(id -> !basicIds.contains(id))
-                .count();
+                .toList();
     }
 
     /**
@@ -254,14 +266,13 @@ public class RecipeCandidateScorer {
 
     private RecipeCandidate score(
             RecipeQuery query,
+            List<Long> nonBasicSelected,
             RecipeCandidateInfo info,
             List<RecipeCandidateIngredient> recipeRows,
             Map<Long, FridgeStock> fridgeById,
             Set<Member.Taste> preferred,
             Set<Member.Taste> tastes
     ) {
-        Set<Long> selectedIds = Set.copyOf(query.selectedIngredientIds());
-
         List<RecipeCandidateIngredient> nonBasic = recipeRows.stream()
                 .filter(row -> !row.basicSeasoning())
                 .toList();
@@ -274,11 +285,7 @@ public class RecipeCandidateScorer {
                 .sorted(Comparator.comparingLong(FridgeStock::dDay).thenComparing(FridgeStock::name))
                 .toList();
 
-        int selectedMatches = (int) nonBasic.stream()
-                .map(RecipeCandidateIngredient::ingredientId)
-                .filter(selectedIds::contains)
-                .distinct()
-                .count();
+        int selectedMatches = countSelectedMatches(query, nonBasicSelected, recipeRows);
 
         // 1단계: 사용자 요청 (원하는 맛 + 분류 일치). 말한 재료는 선택 재료로 합쳐져 2단계에서 센다
         List<String> matchedRequests = new ArrayList<>();
@@ -341,7 +348,7 @@ public class RecipeCandidateScorer {
     private static Set<Long> matchIngredientIds(RecipeQuery query, List<FridgeStock> fridge) {
         Set<Long> ids = new HashSet<>();
         fridge.forEach(stock -> ids.add(stock.ingredientId()));
-        ids.addAll(query.selectedIngredientIds());
+        query.selectedIngredientIds().forEach(selectedId -> ids.addAll(query.selectedGroupOf(selectedId)));
         return ids;
     }
 

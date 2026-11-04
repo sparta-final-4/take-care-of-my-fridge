@@ -1,6 +1,7 @@
 package org.example.takecareofmyfridgebe.domain.ingredient.service;
 
 import lombok.RequiredArgsConstructor;
+import org.example.takecareofmyfridgebe.domain.ingredient.config.IngredientMatchProperties;
 import org.example.takecareofmyfridgebe.domain.ingredient.dto.IngredientIndexSource;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.Ingredient;
 import org.example.takecareofmyfridgebe.domain.ingredient.repository.IngredientRepository;
@@ -11,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collection;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -24,6 +26,7 @@ import java.util.stream.Collectors;
 public class IngredientService {
 
     private final IngredientRepository ingredientRepository;
+    private final IngredientMatchProperties matchProperties;
 
     /**
      * 재료 ID 목록 중 요리 차감에서 제외해야 할 재료 ID(기본 양념, 직접 입력 ING_CUSTOM, 밀키트 ING_MEALKIT) 목록을 조회한다.
@@ -69,6 +72,41 @@ public class IngredientService {
         }
         return ingredientRepository.findAllById(ingredientIds).stream()
                 .collect(Collectors.toMap(Ingredient::getId, Function.identity()));
+    }
+
+    /**
+     * 다른 도메인(chat 레시피 후보 검색)에서 쓰는 조회.
+     * 이름마다 "이름이 그 이름으로 끝나는 재료"를 같은 종류로 묶어 ID를 돌려준다 (예: 버섯 → 버섯, 표고버섯, 양송이버섯).
+     * 한국어 재료명은 종류가 끝에 오므로 끝부분이 같은 재료를 같은 종류로 본다 (IngredientMatcher의 끝부분 규칙과 같은 기준).
+     * 이름이 suffix-min-length(공백 제외 2글자)보다 짧으면("파", "무") 너무 많은 재료와 겹치므로 이름이 같은 재료만 묶는다.
+     * 직접 입력(ING_CUSTOM)·밀키트(ING_MEALKIT)는 빼고, 같은 이름의 재료가 없으면 빈 목록이다.
+     * 냉장고 등록 매칭(IngredientMatcher)에는 쓰지 않는다.
+     *
+     * @param names 재료 이름 목록 (앞뒤 공백은 지운다)
+     * @return 이름(정리한 것)을 키로 하는 같은 종류 재료 ID (ID 오름차순)
+     */
+    public Map<String, List<Long>> findSameKindIdsByNames(Collection<String> names) {
+        if (names == null || names.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        Map<String, List<Long>> result = new LinkedHashMap<>();
+        names.stream()
+                .filter(name -> name != null && !name.isBlank())
+                .map(String::trim)
+                .distinct()
+                .forEach(name -> result.put(name, findSameKind(name).stream()
+                        .filter(ingredient -> !ingredient.isCustom() && !ingredient.isMealkit())
+                        .map(Ingredient::getId)
+                        .sorted()
+                        .toList()));
+        return result;
+    }
+
+    private List<Ingredient> findSameKind(String name) {
+        if (name.replace(" ", "").length() < matchProperties.suffixMinLength()) {
+            return ingredientRepository.findByNameIn(List.of(name));
+        }
+        return ingredientRepository.findByNameEndingWith(name);
     }
 
     /**
