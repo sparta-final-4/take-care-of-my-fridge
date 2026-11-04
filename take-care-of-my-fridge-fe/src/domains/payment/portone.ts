@@ -1,5 +1,7 @@
 import * as PortOne from '@portone/browser-sdk/v2';
 
+import type { BillingKeyPrepareResponse } from '@/common/api/clients';
+
 import type { PaymentPrepareResponse } from './api';
 
 // 결제창에 넘기는 구매자 정보
@@ -31,4 +33,21 @@ export async function openPaymentWindow(
     });
   }
   return PortOne.requestPayment({ ...request, payMethod: 'CARD' });
+}
+
+// 서버가 준 정기결제 채널 값으로 PortOne 카드 등록 창을 띄운다. 카드 정보는 결제대행사 창에서만 입력한다.
+// 모바일은 창 대신 결제대행사 페이지로 이동했다가 redirectUrl로 돌아오며, 그때는 결과가 주소의 쿼리로 온다.
+export async function openCardRegistrationWindow(
+  prepared: BillingKeyPrepareResponse,
+  redirectUrl: string,
+) {
+  return PortOne.requestIssueBillingKey({
+    storeId: import.meta.env.VITE_PORTONE_STORE_ID,
+    channelKey: prepared.channelKey,
+    billingKeyMethod: 'CARD',
+    issueId: prepared.issueId,
+    issueName: prepared.issueName,
+    customer: { customerId: prepared.customerId },
+    redirectUrl,
+  });
 }

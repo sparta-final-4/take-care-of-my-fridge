@@ -8,6 +8,7 @@ import {
   AdminProductControllerApi,
   AdminSaleEventControllerApi,
   AuthControllerApi,
+  BillingKeyControllerApi,
   CartControllerApi,
   ChatMessageControllerApi,
   ChatSessionControllerApi,
@@ -39,6 +40,7 @@ import {
 const basePath = import.meta.env.VITE_API_BASE_URL ?? '';
 
 export const authApi = new AuthControllerApi(undefined, basePath, axiosInstance);
+export const billingKeyApi = new BillingKeyControllerApi(undefined, basePath, axiosInstance);
 export const cartApi = new CartControllerApi(undefined, basePath, axiosInstance);
 export const chatMessageApi = new ChatMessageControllerApi(undefined, basePath, axiosInstance);
 export const chatSessionApi = new ChatSessionControllerApi(undefined, basePath, axiosInstance);

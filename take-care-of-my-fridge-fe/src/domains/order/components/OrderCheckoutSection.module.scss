@@ -82,6 +82,16 @@
   margin-top: var(--ant-margin-lg);
 }
 
+.methodGroupTitle {
+  display: block;
+  margin-top: var(--ant-margin-sm);
+}
+
+// 등록 카드를 불러오는 중·실패 안내
+.cardsStatus {
+  margin-top: var(--ant-margin-sm);
+}
+
 // 결제 수단 4개를 2열 격자로 놓는다. 좁은 화면에서도 이름이 잘리지 않는다.
 .methods {
   display: grid;

@@ -1,5 +1,11 @@
 import { axiosInstance } from '@/common/api/axiosInstance';
-import { paymentApi, type PaymentConfirmResponse } from '@/common/api/clients';
+import {
+  billingKeyApi,
+  type BillingKeyPrepareResponse,
+  type BillingKeyResponse,
+  paymentApi,
+  type PaymentConfirmResponse,
+} from '@/common/api/clients';
 import type { ApiResponse } from '@/common/api/types';
 import { unwrap } from '@/common/api/unwrap';
 
@@ -38,4 +44,37 @@ export async function confirmPayment(
   portonePaymentId: string,
 ): Promise<PaymentConfirmResponse> {
   return unwrap(paymentApi.confirm({ paymentConfirmRequest: { orderId, portonePaymentId } }));
+}
+
+// 등록 카드 목록. 대표 카드가 먼저, 그다음 최근 등록순이다. 빌링키 값은 오지 않는다.
+export async function getCards(signal?: AbortSignal): Promise<BillingKeyResponse[]> {
+  return unwrap(billingKeyApi.getCards({ signal }));
+}
+
+// 카드 등록 창을 열기 전에 호출한다. 카드가 5장이면 서버가 거절한다(BILLING_002).
+export async function prepareCardRegistration(): Promise<BillingKeyPrepareResponse> {
+  return unwrap(billingKeyApi.prepare1());
+}
+
+// 카드 등록 창에서 받은 빌링키를 넘긴다. 서버가 PortOne에서 다시 확인한 뒤 저장한다.
+export async function registerCard(billingKey: string): Promise<BillingKeyResponse> {
+  return unwrap(billingKeyApi.register({ billingKeyRegisterRequest: { billingKey } }));
+}
+
+// 대표 카드를 바꾸고 바뀐 카드 목록을 받는다.
+export async function setDefaultCard(cardId: number): Promise<BillingKeyResponse[]> {
+  return unwrap(billingKeyApi.setDefault({ cardId }));
+}
+
+export async function deleteCard(cardId: number): Promise<void> {
+  await unwrap(billingKeyApi._delete({ cardId }));
+}
+
+// 등록 카드로 결제창 없이 결제한다. 금액은 서버가 주문 금액으로 정하고, 결제 확정과 같은 응답을 준다.
+// 카드 거절은 PAYMENT_010, 결과 확인 중(결제 대기로 남음)은 PAYMENT_011이다.
+export async function payWithCard(
+  orderId: number,
+  cardId: number,
+): Promise<PaymentConfirmResponse> {
+  return unwrap(paymentApi.payWithBillingKey({ orderId, billingKeyPaymentRequest: { cardId } }));
 }

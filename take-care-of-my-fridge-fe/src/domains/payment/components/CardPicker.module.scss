@@ -1,0 +1,87 @@
+@use '@/styles/variables' as *;
+@use '@/styles/mixins' as *;
+
+// 모바일은 화살표 없이 밀어서 넘기고, md부터 양옆에 화살표를 둔다
+.picker {
+  display: flex;
+  align-items: center;
+  gap: var(--ant-margin-xs);
+  margin-top: var(--ant-margin-sm);
+}
+
+.arrow {
+  display: none;
+  flex: none;
+
+  @include from(md) {
+    display: inline-flex;
+  }
+}
+
+.track {
+  display: flex;
+  flex: 1;
+  gap: var(--ant-margin-sm);
+  min-width: 0;
+  padding: var(--ant-padding-xxs) 0;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+// 카드 한 장이 칸을 거의 채우고 다음 카드가 살짝 보여 넘길 수 있음을 알린다
+.card {
+  display: flex;
+  flex: 0 0 80%;
+  flex-direction: column;
+  gap: var(--ant-margin-xxs);
+  min-height: $touch-target-size * 2;
+  padding: var(--ant-padding-sm) var(--ant-padding);
+  border: 1px solid var(--ant-color-border);
+  border-radius: var(--ant-border-radius-lg);
+  background: var(--ant-color-bg-container);
+  text-align: left;
+  cursor: pointer;
+  scroll-snap-align: start;
+
+  &:focus-visible {
+    outline: 2px solid var(--ant-color-primary);
+    outline-offset: 2px;
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+}
+
+.selected {
+  border-color: var(--ant-color-primary);
+  box-shadow: 0 0 0 1px var(--ant-color-primary);
+}
+
+.cardTop {
+  display: flex;
+  align-items: center;
+  gap: var(--ant-margin-xs);
+  min-width: 0;
+}
+
+.name {
+  min-width: 0;
+}
+
+.number {
+  font-variant-numeric: tabular-nums;
+}
+
+.add {
+  align-items: center;
+  justify-content: center;
+  border-style: dashed;
+  color: var(--ant-color-text-secondary);
+}

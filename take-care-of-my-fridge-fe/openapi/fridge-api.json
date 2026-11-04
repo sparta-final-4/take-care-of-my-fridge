@@ -1086,6 +1086,136 @@
         ]
       }
     },
+    "/api/billing-keys": {
+      "get": {
+        "operationId": "getCards",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListBillingKeyResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "billing-key-controller"
+        ]
+      },
+      "post": {
+        "operationId": "register",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BillingKeyRegisterRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseBillingKeyResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "billing-key-controller"
+        ]
+      }
+    },
+    "/api/billing-keys/prepare": {
+      "post": {
+        "operationId": "prepare_1",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseBillingKeyPrepareResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "billing-key-controller"
+        ]
+      }
+    },
+    "/api/billing-keys/{cardId}": {
+      "delete": {
+        "operationId": "delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "cardId",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "billing-key-controller"
+        ]
+      }
+    },
+    "/api/billing-keys/{cardId}/default": {
+      "patch": {
+        "operationId": "setDefault",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "cardId",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListBillingKeyResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "billing-key-controller"
+        ]
+      }
+    },
     "/api/cart-items": {
       "delete": {
         "operationId": "removeItems",
@@ -2309,6 +2439,47 @@
         ]
       }
     },
+    "/api/orders/{orderId}/payments/billing-key": {
+      "post": {
+        "operationId": "payWithBillingKey",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "orderId",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BillingKeyPaymentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePaymentConfirmResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "payment-controller"
+        ]
+      }
+    },
     "/api/payments/confirm": {
       "post": {
         "operationId": "confirm",
@@ -3163,6 +3334,34 @@
           }
         }
       },
+      "ApiResponseBillingKeyPrepareResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/BillingKeyPrepareResponse"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorResponse"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ApiResponseBillingKeyResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/BillingKeyResponse"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorResponse"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
       "ApiResponseCartItemsResponse": {
         "type": "object",
         "properties": {
@@ -3378,6 +3577,23 @@
         "properties": {
           "data": {
             "$ref": "#/components/schemas/ImageUploadUrlResponse"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorResponse"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ApiResponseListBillingKeyResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BillingKeyResponse"
+            }
           },
           "error": {
             "$ref": "#/components/schemas/ErrorResponse"
@@ -4109,6 +4325,77 @@
           "to": {
             "type": "string",
             "format": "date"
+          }
+        }
+      },
+      "BillingKeyPaymentRequest": {
+        "type": "object",
+        "properties": {
+          "cardId": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "required": [
+          "cardId"
+        ]
+      },
+      "BillingKeyPrepareResponse": {
+        "type": "object",
+        "properties": {
+          "channelKey": {
+            "type": "string"
+          },
+          "customerId": {
+            "type": "string"
+          },
+          "issueId": {
+            "type": "string"
+          },
+          "issueName": {
+            "type": "string"
+          }
+        }
+      },
+      "BillingKeyRegisterRequest": {
+        "type": "object",
+        "properties": {
+          "billingKey": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "billingKey"
+        ]
+      },
+      "BillingKeyResponse": {
+        "type": "object",
+        "properties": {
+          "cardId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "cardLast4": {
+            "type": "string"
+          },
+          "cardName": {
+            "type": "string"
+          },
+          "cardType": {
+            "type": "string",
+            "enum": [
+              "CREDIT",
+              "DEBIT",
+              "GIFT"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "isDefault": {
+            "type": "boolean"
           }
         }
       },
