@@ -8,6 +8,7 @@ import org.example.takecareofmyfridgebe.domain.product.dto.ProductListRequest;
 import org.example.takecareofmyfridgebe.domain.product.entity.ProductType;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeListItemResponse;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeListRequest;
+import org.example.takecareofmyfridgebe.domain.search.dto.PopularKeywordsResponse;
 import org.example.takecareofmyfridgebe.domain.search.dto.SearchClickRequest;
 import org.example.takecareofmyfridgebe.domain.search.dto.SearchFridgeMatchRequest;
 import org.example.takecareofmyfridgebe.domain.search.dto.SearchFridgeMatchResponse;
@@ -16,6 +17,7 @@ import org.example.takecareofmyfridgebe.domain.search.facade.ProductSearchFacade
 import org.example.takecareofmyfridgebe.domain.search.facade.RecipeSearchFacade;
 import org.example.takecareofmyfridgebe.domain.search.facade.SearchFridgeMatchFacade;
 import org.example.takecareofmyfridgebe.domain.search.service.SearchClickHistoryService;
+import org.example.takecareofmyfridgebe.domain.search.service.SearchPopularKeywordService;
 import org.example.takecareofmyfridgebe.global.config.SecurityConfig;
 import org.example.takecareofmyfridgebe.global.error.GlobalExceptionHandler;
 import org.example.takecareofmyfridgebe.global.response.PageResponse;
@@ -40,6 +42,7 @@ import java.util.stream.IntStream;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
@@ -79,9 +82,13 @@ class SearchControllerTest {
     @Autowired
     private SearchFridgeMatchFacade searchFridgeMatchFacade;
 
+    @Autowired
+    private SearchPopularKeywordService searchPopularKeywordService;
+
     @BeforeEach
     void resetMock() {
-        reset(recipeSearchFacade, productSearchFacade, searchClickHistoryService, searchFridgeMatchFacade);
+        reset(recipeSearchFacade, productSearchFacade, searchClickHistoryService, searchFridgeMatchFacade,
+                searchPopularKeywordService);
     }
 
     @Test
@@ -89,7 +96,7 @@ class SearchControllerTest {
     void searchRecipes_returnsOk_whenUnauthenticated() throws Exception {
         // Given
         PageResponse<RecipeListItemResponse> page = new PageResponse<>(List.of(), 1, 20, 0, 0, true);
-        when(recipeSearchFacade.getRecipes(any(RecipeListRequest.class))).thenReturn(page);
+        when(recipeSearchFacade.getRecipes(any(RecipeListRequest.class), isNull())).thenReturn(page);
 
         // When & Then
         mvc.perform(get("/api/search/recipes").param("keyword", "계란").param("cuisineType", "한식"))
@@ -99,7 +106,7 @@ class SearchControllerTest {
                 .andExpect(jsonPath("$.data.pageNumber").value(1));
 
         ArgumentCaptor<RecipeListRequest> captor = ArgumentCaptor.forClass(RecipeListRequest.class);
-        verify(recipeSearchFacade).getRecipes(captor.capture());
+        verify(recipeSearchFacade).getRecipes(captor.capture(), isNull());
         assertThat(captor.getValue().keyword()).isEqualTo("계란");
         assertThat(captor.getValue().cuisineType()).isEqualTo("한식");
     }
@@ -264,6 +271,33 @@ class SearchControllerTest {
     }
 
     @Test
+    @DisplayName("로그인 회원이 레시피를 검색하면 회원 ID를 함께 넘긴다")
+    void searchRecipes_passesMemberId_whenAuthenticated() throws Exception {
+        // Given
+        PageResponse<RecipeListItemResponse> page = new PageResponse<>(List.of(), 1, 20, 0, 0, true);
+        when(recipeSearchFacade.getRecipes(any(RecipeListRequest.class), eq(7L))).thenReturn(page);
+
+        // When & Then
+        mvc.perform(get("/api/search/recipes").with(loginAsMember7()).param("keyword", "계란"))
+                .andExpect(status().isOk());
+        verify(recipeSearchFacade).getRecipes(any(RecipeListRequest.class), eq(7L));
+    }
+
+    @Test
+    @DisplayName("비로그인 상태에서 인기 검색어를 요청하면 200 OK와 검색어 목록을 반환한다")
+    void getPopularKeywords_returnsOk_whenUnauthenticated() throws Exception {
+        // Given
+        when(searchPopularKeywordService.getTopKeywords())
+                .thenReturn(new PopularKeywordsResponse(List.of("김치찌개", "두부")));
+
+        // When & Then
+        mvc.perform(get("/api/search/popular"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.keywords[0]").value("김치찌개"))
+                .andExpect(jsonPath("$.data.keywords[1]").value("두부"));
+    }
+
+    @Test
     @DisplayName("로그인 회원이 냉장고 비교를 요청하면 회원 ID와 레시피 ID·검색어를 넘겨 레시피별 보유 재료 수를 반환한다")
     void matchFridge_returnsOk_whenAuthenticated() throws Exception {
         // Given
@@ -327,6 +361,11 @@ class SearchControllerTest {
         @Bean
         SearchClickHistoryService searchClickHistoryService() {
             return mock(SearchClickHistoryService.class);
+        }
+
+        @Bean
+        SearchPopularKeywordService searchPopularKeywordService() {
+            return mock(SearchPopularKeywordService.class);
         }
 
         @Bean

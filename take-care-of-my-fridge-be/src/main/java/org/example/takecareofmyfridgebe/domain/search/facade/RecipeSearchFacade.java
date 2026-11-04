@@ -9,6 +9,7 @@ import org.example.takecareofmyfridgebe.domain.search.config.RecipeSearchPropert
 import org.example.takecareofmyfridgebe.domain.search.dto.RecipeSearchResult;
 import org.example.takecareofmyfridgebe.domain.search.entity.SearchTarget;
 import org.example.takecareofmyfridgebe.domain.search.service.RecipeSearchService;
+import org.example.takecareofmyfridgebe.domain.search.service.SearchPopularKeywordService;
 import org.example.takecareofmyfridgebe.domain.search.service.SearchZeroResultService;
 import org.example.takecareofmyfridgebe.global.response.PageResponse;
 import org.springframework.stereotype.Component;
@@ -27,14 +28,21 @@ public class RecipeSearchFacade {
     private final RecipeSearchService recipeSearchService;
     private final RecipeSearchProperties searchProperties;
     private final SearchZeroResultService searchZeroResultService;
+    private final SearchPopularKeywordService searchPopularKeywordService;
 
     /**
-     * 레시피 검색
+     * 레시피 검색. 비로그인이면 memberId는 null이다
+     * <br>
+     * 필터 없는 첫 페이지만 기록한다. 0건이면 0건 검색어로, 결과가 있으면 인기 검색어로 센다
      */
-    public PageResponse<RecipeListItemResponse> getRecipes(RecipeListRequest request) {
+    public PageResponse<RecipeListItemResponse> getRecipes(RecipeListRequest request, Long memberId) {
         PageResponse<RecipeListItemResponse> response = search(request);
-        if (response.totalElements() == 0 && isPlainFirstPage(request)) {
-            searchZeroResultService.record(SearchTarget.RECIPE, request.keyword());
+        if (isPlainFirstPage(request)) {
+            if (response.totalElements() == 0) {
+                searchZeroResultService.record(SearchTarget.RECIPE, request.keyword());
+            } else {
+                searchPopularKeywordService.record(memberId, request.keyword());
+            }
         }
         return response;
     }
@@ -73,7 +81,8 @@ public class RecipeSearchFacade {
         }
     }
 
-    // 필터 때문에 0건이 된 경우와 2페이지 이후는 사전 보강 근거가 아니라서 기록하지 않는다
+    // 필터 때문에 0건이 된 경우와 2페이지 이후는 사전 보강 근거가 아니고,
+    // 페이지·필터를 바꿀 때마다 인기 검색어 점수가 오르면 안 되므로 기록하지 않는다
     private boolean isPlainFirstPage(RecipeListRequest request) {
         return request.keyword() != null
                 && request.page() == 1
