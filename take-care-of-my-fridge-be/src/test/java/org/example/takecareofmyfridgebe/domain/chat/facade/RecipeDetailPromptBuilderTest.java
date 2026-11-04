@@ -83,7 +83,8 @@ class RecipeDetailPromptBuilderTest {
         assertThat(lines).startsWith("1. " + "가".repeat(120) + "…\n2. 2단계\n")
                 .contains("10. 10단계\n")
                 .doesNotContain("11단계")
-                .endsWith("(뒤 7단계 생략, 레시피 화면에 있음)\n");
+                .endsWith("나머지 단계: 7단계가 레시피 화면에 더 있음\n")
+                .doesNotContain("생략");
         assertThat(RecipeDetailPromptBuilder.MAX_STEPS).isEqualTo(10);
     }
 
@@ -118,5 +119,22 @@ class RecipeDetailPromptBuilderTest {
 
     private static StepItem step(int no, String description) {
         return new StepItem(no, description, null, null);
+    }
+
+    @Test
+    @DisplayName("4단계 레시피는 자르지 않았으니 나머지 단계 줄도 생략 표시도 넣지 않는다")
+    void addsNoRemainingLine_whenNotCut() {
+        String lines = RecipeDetailPromptBuilder.stepLines(IntStream.rangeClosed(1, 4).mapToObj(no -> step(no, no + "단계")).toList());
+
+        assertThat(lines).isEqualTo("1. 1단계\n2. 2단계\n3. 3단계\n4. 4단계\n").doesNotContain("생략", "나머지 단계");
+    }
+
+    @Test
+    @DisplayName("12단계 레시피는 10단계로 자르고 나머지 2단계가 레시피 화면에 있다고 알린다")
+    void cutsTwelveStepsToTen() {
+        String lines = RecipeDetailPromptBuilder.stepLines(IntStream.rangeClosed(1, 12).mapToObj(no -> step(no, no + "단계")).toList());
+
+        assertThat(lines).contains("10. 10단계\n").doesNotContain("11. ")
+                .endsWith("나머지 단계: 2단계가 레시피 화면에 더 있음\n");
     }
 }

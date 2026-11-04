@@ -32,10 +32,11 @@ class ChatRecipeDetailPromptTest {
     }
 
     @Test
-    @DisplayName("단계는 레시피대로 모두 한 줄씩 10줄까지, 생략된 뒤 단계는 지어내지 않고 카드를 보라고 하며, 냉장고 기준은 물었을 때만 말하게 한다")
+    @DisplayName("단계는 레시피대로 모두 한 줄씩 10줄까지, 다 썼으면 그냥 끝내고 잘린 경우만 카드를 보라고 하며, 냉장고 기준은 물었을 때만 말하게 한다")
     void instructsStepsAndFridge() {
         assertThat(prompt).contains("단계는 레시피대로 모두 \"1. …\"처럼 한 줄씩, 10줄까지 쓴다. 단계를 빼거나 합치지 않는다",
-                "\"(뒤 n단계 생략)\"이 있으면 뒤 단계를 지어내지 말고 카드를 눌러 보라고 말한다",
+                "단계를 다 썼으면 그냥 끝낸다. 끝에 괄호 안내나 덧붙이는 말을 쓰지 않는다",
+                "[레시피 정보]에 \"나머지 단계:\" 줄이 있을 때만 마지막에 \"나머지 단계는 카드를 눌러 확인해 주세요.\"를 한 번 쓴다",
                 "[냉장고 기준]은 냉장고에 있는지, 장볼 게 있는지, 만들 수 있는지 물었을 때만 말한다");
     }
 
@@ -43,5 +44,11 @@ class ChatRecipeDetailPromptTest {
     @DisplayName("질문의 번호는 레시피를 가리키는 말이라 단계 번호로 해석하지 않게 한다")
     void forbidsReadingOrdinalAsStep() {
         assertThat(prompt).contains("질문에 나온 번호(\"두 번째\")는 레시피를 가리키는 말이다. 단계 번호로 해석하지 않는다");
+    }
+
+    @Test
+    @DisplayName("프롬프트에 AI가 따라 쓸 수 있는 \"생략\"이라는 말이 없다")
+    void hasNoOmissionWord() {
+        assertThat(prompt).doesNotContain("생략");
     }
 }

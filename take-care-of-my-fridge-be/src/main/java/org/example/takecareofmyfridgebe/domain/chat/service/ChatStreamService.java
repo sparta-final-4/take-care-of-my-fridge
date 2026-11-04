@@ -107,12 +107,15 @@ public class ChatStreamService {
                                 .event("recommendations")
                                 .data(toJson(plan.detail().event()))
                                 .build();
-                        return Flux.concat(Mono.just(card), reply
-                                .doOnNext(chunk -> {
-                                    firstChunkReceived.set(true);
-                                    accumulated.append(chunk);
-                                })
-                                .map(this::messageEvent));
+                        // 생략 괄호 글("(뒤 단계 생략)")은 화면·저장 모두에서 지운다
+                        OmissionNoteFilter omissionFilter = new OmissionNoteFilter();
+                        Flux<String> text = reply
+                                .doOnNext(chunk -> firstChunkReceived.set(true))
+                                .map(omissionFilter::feed)
+                                .concatWith(Flux.defer(() -> Flux.just(omissionFilter.finish())))
+                                .filter(piece -> !piece.isEmpty())
+                                .doOnNext(accumulated::append);
+                        return Flux.concat(Mono.just(card), text.map(this::messageEvent));
                     }
                     if (plan.recommendation() == null) {
                         return reply

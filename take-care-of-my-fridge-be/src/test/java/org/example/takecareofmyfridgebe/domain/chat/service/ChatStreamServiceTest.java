@@ -867,6 +867,27 @@ class ChatStreamServiceTest {
     }
 
     @Test
+    @DisplayName("레시피 자세히 답 끝의 \"(뒤 단계 생략)\"은 화면에 보내지도 저장하지도 않는다")
+    void dropsOmissionNote_fromRecipeDetailAnswer() {
+        Long sessionId = 10L;
+        ChatMessageCreateRequest request = ChatMessageCreateRequest.of("두 번째 거 어떻게 만들어?");
+        when(chatIntentFacade.resolve(eq(1L), eq(sessionId), eq(request), any()))
+                .thenReturn(ChatIntentResolution.recipeDetail(Source.AI, 315L, DetailQuestion.HOW_TO));
+        when(chatRecommendationFacade.describe(1L, 315L)).thenReturn(Optional.of(
+                new RecipeDetailReply(ChatRecommendationsEventResponse.of(List.of(card(315L, "모듬전"))), "[레시피 정보]")));
+        when(chatReplyGenerator.generateRecipeDetail(any(), any(), any(), any()))
+                .thenReturn(Flux.just("1. 부친다.\n4. 담는다.", "\n(뒤 단", "계 생략)"));
+        when(chatMessageService.saveExchange(any(), any(), any(), any())).thenReturn(List.of(
+                new ChatMessageResponse(100L, 1, ChatMessageRole.USER, "두 번째 거 어떻게 만들어?", LocalDateTime.now()),
+                new ChatMessageResponse(101L, 2, ChatMessageRole.ASSISTANT, "1. 부친다.\n4. 담는다.", LocalDateTime.now())));
+
+        List<ServerSentEvent<String>> events = chatStreamService.streamMessage(1L, sessionId, request).collectList().block();
+
+        assertThat(events).extracting(ServerSentEvent::data).noneMatch(data -> data != null && data.contains("생략"));
+        verify(chatMessageService).saveExchange(eq(sessionId), eq("두 번째 거 어떻게 만들어?"), eq("1. 부친다.\n4. 담는다."), any());
+    }
+
+    @Test
     @DisplayName("물어본 레시피가 지워졌으면 AI를 부르지 않고 카드 없이 정해진 답을 보낸다")
     void sendsFixedReply_whenRecipeIsGone() {
         Long sessionId = 10L;

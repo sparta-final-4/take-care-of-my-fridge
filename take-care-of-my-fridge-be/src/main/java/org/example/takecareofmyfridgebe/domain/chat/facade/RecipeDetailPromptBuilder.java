@@ -41,6 +41,8 @@ public final class RecipeDetailPromptBuilder {
     private static final String NONE = "없음";
     private static final String ELLIPSIS = "…";
     static final String NO_COOK_TIME = "레시피에 없음";
+    // 단계를 잘랐을 때 단계 목록 끝에 붙이는 줄의 머리 (프롬프트가 이 줄이 있을 때만 카드를 눌러 보라고 한다)
+    static final String REMAINING_STEPS = "나머지 단계: ";
 
     private RecipeDetailPromptBuilder() {
     }
@@ -107,8 +109,9 @@ public final class RecipeDetailPromptBuilder {
             String description = oneLine(steps.get(i).description());
             text.append(i + 1).append(". ").append(cut(description, STEP_MAX_LENGTH)).append('\n');
         }
+        // 실제로 단계를 잘랐을 때만 알린다. AI가 따라 쓰지 않게 괄호·"생략" 같은 표현은 쓰지 않는다
         if (steps.size() > MAX_STEPS) {
-            text.append("(뒤 ").append(steps.size() - MAX_STEPS).append("단계 생략, 레시피 화면에 있음)\n");
+            text.append(REMAINING_STEPS).append(steps.size() - MAX_STEPS).append("단계가 레시피 화면에 더 있음\n");
         }
         return text.toString();
     }
