@@ -30,6 +30,8 @@ import java.util.Set;
  */
 public final class RecommendationReasonWriter {
 
+    static final String ALTERNATIVE_REASON = "색다르게 골라 봤어요";
+
     private static final String CATEGORY_PREFIX = "분류: ";
     private static final int MAX_TASTES = 2;
 
@@ -42,7 +44,7 @@ public final class RecommendationReasonWriter {
      * @param dishText 사용자가 말한 요리 이름 (없으면 null)
      */
     public static String write(RecipeCandidate candidate, String dishText) {
-        return options(candidate, dishText).get(0);
+        return options(candidate, dishText, true).get(0);
     }
 
     /**
@@ -50,10 +52,17 @@ public final class RecommendationReasonWriter {
      * (예: 고추 → 다른 임박 재료 깻잎 → 겹친 맛 → 냉장고 재료 수). 다 겹치면 마지막 이유를 그대로 쓴다.
      */
     public static List<String> writeDistinct(List<RecipeCandidate> candidates, String dishText) {
+        return writeDistinct(candidates, dishText, true);
+    }
+
+    /**
+     * @param memberTastes 회원 선호 맛과 겹친 맛을 이유로 쓸지. 사용자 요청(키워드·분류·요리 이름)이 있으면 false
+     */
+    public static List<String> writeDistinct(List<RecipeCandidate> candidates, String dishText, boolean memberTastes) {
         Set<String> used = new HashSet<>();
         List<String> reasons = new ArrayList<>();
         for (RecipeCandidate candidate : candidates) {
-            List<String> options = options(candidate, dishText);
+            List<String> options = options(candidate, dishText, memberTastes);
             String chosen = options.stream()
                     .filter(option -> !used.contains(option))
                     .findFirst()
@@ -64,19 +73,25 @@ public final class RecommendationReasonWriter {
         return reasons;
     }
 
-    // 쓸 수 있는 이유를 우선순위대로: 키워드 > 요청(맛·분류) > 선택 재료 > 임박 재료(급한 순, 재료마다) > 겹친 맛 > 냉장고 재료 수.
+    // 쓸 수 있는 이유를 우선순위대로: 다른 제안 > 키워드 > 요청(맛·분류) > 선택 재료 > 임박 재료(급한 순, 재료마다) > 겹친 맛 > 냉장고 재료 수.
     // 벡터 검색으로만 찾은 레시피는 키워드·요청 이유를 쓰지 않는다
-    private static List<String> options(RecipeCandidate candidate, String dishText) {
+    private static List<String> options(RecipeCandidate candidate, String dishText, boolean memberTastes) {
         Reason reason = candidate.reason();
         KeywordMatch keywordMatch = reason.keywordMatch();
         List<String> options = new ArrayList<>();
+        // 다른 분류로 바꿔 넣은 카드는 요청과 다른 제안이라고 먼저 말한다
+        if (candidate.alternative()) {
+            options.add(ALTERNATIVE_REASON);
+        }
         if (keywordMatch == null || keywordMatch.type() != KeywordMatch.Type.VECTOR) {
             keywordReason(keywordMatch, dishText, candidate.category()).ifPresent(options::add);
             requestReason(reason).ifPresent(options::add);
         }
         selectedReason(reason).ifPresent(options::add);
         options.addAll(imminentReasons(reason));
-        tasteReason(reason.matchedTastes()).ifPresent(options::add);
+        if (memberTastes) {
+            tasteReason(reason.matchedTastes()).ifPresent(options::add);
+        }
         options.add(reason.usedFridgeIngredients().isEmpty()
                 ? "새로 만들어 볼 만한 요리예요"
                 : "냉장고 재료 " + reason.usedFridgeIngredients().size() + "가지를 써요");

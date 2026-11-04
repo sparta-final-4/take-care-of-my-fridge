@@ -5,7 +5,7 @@ import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.auth.service.AuthSessionService.AuthPrincipal;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageCreateRequest;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageResponse;
-import org.example.takecareofmyfridgebe.domain.chat.service.ChatMessageService;
+import org.example.takecareofmyfridgebe.domain.chat.facade.ChatMessageQueryFacade;
 import org.example.takecareofmyfridgebe.domain.chat.service.ChatStreamService;
 import org.example.takecareofmyfridgebe.global.response.ApiResponse;
 import org.springframework.http.MediaType;
@@ -29,7 +29,7 @@ import java.util.List;
 public class ChatMessageController {
 
     private final ChatStreamService chatStreamService;
-    private final ChatMessageService chatMessageService;
+    private final ChatMessageQueryFacade chatMessageQueryFacade;
 
     /**
      * 상담 세션에 사용자 메시지를 전송하고 SSE 스트리밍으로 응답을 수신한다.
@@ -50,12 +50,13 @@ public class ChatMessageController {
 
     /**
      * 상담 세션의 모든 메시지 기록을 sequence 오름차순으로 조회한다. (끝난 세션도 조회 가능)
+     * AI 메시지에는 저장된 추천 카드(recommendations)를 지금 레시피·냉장고 기준으로 다시 계산해 붙인다.
      */
     @GetMapping
     public ResponseEntity<ApiResponse<List<ChatMessageResponse>>> getMessages(
             @AuthenticationPrincipal AuthPrincipal principal,
             @PathVariable Long sessionId) {
-        List<ChatMessageResponse> messages = chatMessageService.getMessages(principal.memberId(), sessionId);
+        List<ChatMessageResponse> messages = chatMessageQueryFacade.getMessages(principal.memberId(), sessionId);
         return ResponseEntity.ok(ApiResponse.ok(messages));
     }
 }

@@ -19,6 +19,7 @@ class RecommendationPickerTest {
                 candidate(1L, "국"), candidate(2L, "찜"), candidate(3L, "국"), candidate(4L, "볶음")));
 
         assertThat(picked).extracting(RecipeCandidate::recipeId).containsExactly(1L, 2L, 3L);
+        assertThat(picked).noneMatch(RecipeCandidate::alternative);
     }
 
     @Test
@@ -29,6 +30,8 @@ class RecommendationPickerTest {
                 candidate(4L, "국"), candidate(5L, null), candidate(6L, "볶음"), candidate(7L, "찜")));
 
         assertThat(picked).extracting(RecipeCandidate::recipeId).containsExactly(1L, 2L, 6L);
+        // 바꿔 넣은 카드만 다른 제안으로 표시한다
+        assertThat(picked).extracting(RecipeCandidate::alternative).containsExactly(false, false, true);
     }
 
     @Test

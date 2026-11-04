@@ -5,7 +5,13 @@ import org.example.takecareofmyfridgebe.domain.chat.entity.ChatSession;
 import org.example.takecareofmyfridgebe.domain.chat.entity.ChatSessionStatus;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
+/**
+ * 상담 내역 목록 한 줄.
+ *
+ * @param recommendedRecipes 이 상담에서 최근에 추천한 레시피 (최대 3개, 최근 답부터·카드 순서). 지워진 레시피는 빠진다
+ */
 public record ChatSessionSummaryResponse(
         Long sessionId,
         ChatSessionStatus status,
@@ -15,9 +21,22 @@ public record ChatSessionSummaryResponse(
         LocalDateTime lastMessageAt,
         long messageCount,
         String firstQuestion,
-        String lastMessagePreview
+        String lastMessagePreview,
+        List<RecommendedRecipeName> recommendedRecipes
 ) {
     static final int PREVIEW_MAX_LENGTH = 50;
+
+    public ChatSessionSummaryResponse {
+        recommendedRecipes = recommendedRecipes == null ? List.of() : List.copyOf(recommendedRecipes);
+    }
+
+    public record RecommendedRecipeName(Long recipeId, String name) {
+    }
+
+    public ChatSessionSummaryResponse withRecommendedRecipes(List<RecommendedRecipeName> recipes) {
+        return new ChatSessionSummaryResponse(sessionId, status, startedAt, lastMessageAt, messageCount, firstQuestion,
+                lastMessagePreview, recipes);
+    }
 
     /**
      * @param status 화면에 보일 상태. 시간 초과로 아직 ACTIVE인 상담은 서비스가 EXPIRED로 넘긴다.
@@ -30,7 +49,8 @@ public record ChatSessionSummaryResponse(
                 session.getLastMessageAt(),
                 stats == null ? 0 : stats.messageCount(),
                 truncate(stats == null ? null : stats.firstQuestion()),
-                truncate(stats == null ? null : stats.lastMessage())
+                truncate(stats == null ? null : stats.lastMessage()),
+                List.of()
         );
     }
 

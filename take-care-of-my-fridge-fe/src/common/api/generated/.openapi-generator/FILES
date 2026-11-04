@@ -155,6 +155,7 @@ models/fridge-item-take-out-response.ts
 models/fridge-item-update-request.ts
 models/image-upload-url-request.ts
 models/image-upload-url-response.ts
+models/imminent-ingredient.ts
 models/index.ts
 models/ingredient-deduction-response.ts
 models/ingredient-detail.ts
@@ -168,6 +169,7 @@ models/mealkit-info.ts
 models/mealkit-update.ts
 models/member-list-request.ts
 models/member-summary-response.ts
+models/missing-ingredient.ts
 models/most-cooked-recipe-response.ts
 models/my-info-response.ts
 models/my-recipe-list-response.ts
@@ -226,6 +228,8 @@ models/recipe-match.ts
 models/recipe-nutrition-request.ts
 models/recipe-step-request.ts
 models/recipe-update-request.ts
+models/recommended-recipe-name.ts
+models/recommended-recipe.ts
 models/refund-create-request.ts
 models/refund-history-item-response.ts
 models/refund-history-response.ts

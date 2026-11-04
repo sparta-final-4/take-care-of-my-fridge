@@ -4640,6 +4640,12 @@
             "type": "integer",
             "format": "int64"
           },
+          "recommendations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RecommendedRecipe"
+            }
+          },
           "role": {
             "type": "string",
             "enum": [
@@ -4746,6 +4752,12 @@
           "messageCount": {
             "type": "integer",
             "format": "int64"
+          },
+          "recommendedRecipes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RecommendedRecipeName"
+            }
           },
           "sessionId": {
             "type": "integer",
@@ -5681,6 +5693,18 @@
           }
         }
       },
+      "ImminentIngredient": {
+        "type": "object",
+        "properties": {
+          "dDay": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
       "IngredientDeductionResponse": {
         "type": "object",
         "properties": {
@@ -5913,6 +5937,18 @@
               "ACTIVE",
               "SUSPENDED"
             ]
+          }
+        }
+      },
+      "MissingIngredient": {
+        "type": "object",
+        "properties": {
+          "ingredientId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "name": {
+            "type": "string"
           }
         }
       },
@@ -7787,6 +7823,79 @@
             "type": "string",
             "maxLength": 2000,
             "minLength": 0
+          }
+        }
+      },
+      "RecommendedRecipe": {
+        "type": "object",
+        "properties": {
+          "category": {
+            "type": "string"
+          },
+          "cookTimeMin": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "description": {
+            "type": "string"
+          },
+          "imageUrl": {
+            "type": "string"
+          },
+          "imminentIngredients": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ImminentIngredient"
+            }
+          },
+          "lacksManyIngredients": {
+            "type": "boolean"
+          },
+          "matchedTastes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "missingIngredients": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MissingIngredient"
+            }
+          },
+          "missingSelectedIngredients": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "name": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "recipeId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "usedIngredients": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "RecommendedRecipeName": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "recipeId": {
+            "type": "integer",
+            "format": "int64"
           }
         }
       },

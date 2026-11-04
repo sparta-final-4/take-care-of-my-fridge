@@ -19,7 +19,7 @@ import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 
 /**
- * AI 상담 답변에 붙는 레시피·상품 추천. 아직 쓰는 곳이 없으며 AI 상담 추천 단계에서 사용 예정이다.
+ * AI 상담 답변(AI 메시지)에 붙는 레시피·상품 추천. 레시피 추천 카드는 display_order 순서로 보여 준다.
  */
 @Entity
 @Table(
@@ -55,18 +55,24 @@ public class ChatRecommendation extends BaseTimeEntity {
     @Column(name = "display_order", nullable = false)
     private int displayOrder;
 
+    // 카드 아래 AI 설명 (레시피 추천만, 상품 추천·표시를 빼먹은 답은 null)
+    @Column(name = "description", columnDefinition = "TEXT")
+    private String description;
+
     @Builder
     private ChatRecommendation(
         ChatMessage message,
         Long recipeId,
         Long productId,
-        int displayOrder
+        int displayOrder,
+        String description
     ) {
         validateSingleTarget(recipeId, productId);
         this.message = message;
         this.recipeId = recipeId;
         this.productId = productId;
         this.displayOrder = displayOrder;
+        this.description = description;
     }
 
     // recipeId와 productId 중 정확히 하나만 존재해야 함

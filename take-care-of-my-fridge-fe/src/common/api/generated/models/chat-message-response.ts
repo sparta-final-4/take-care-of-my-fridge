@@ -14,11 +14,15 @@
  */
 
 
+// May contain unused imports in some cases
+// @ts-ignore
+import type { RecommendedRecipe } from './recommended-recipe';
 
 export interface ChatMessageResponse {
     'content'?: string;
     'createdAt'?: string;
     'id'?: number;
+    'recommendations'?: Array<RecommendedRecipe>;
     'role'?: ChatMessageResponseRoleEnum;
     'sequence'?: number;
 }

@@ -9,6 +9,7 @@ import java.util.List;
  *
  * @param category    레시피 분류 (recipes.category, 없을 수 있음)
  * @param cookTimeMin 조리 시간(분). 출처에 따라 없을 수 있음
+ * @param alternative 위 3개가 같은 분류라 3위를 다른 분류로 바꿔 넣은 카드인지 (요청과 다른 제안)
  */
 public record RecipeCandidate(
         Long recipeId,
@@ -16,11 +17,21 @@ public record RecipeCandidate(
         String category,
         Integer cookTimeMin,
         Ranking ranking,
-        Reason reason
+        Reason reason,
+        boolean alternative
 ) {
 
+    public RecipeCandidate(Long recipeId, String name, String category, Integer cookTimeMin, Ranking ranking, Reason reason) {
+        this(recipeId, name, category, cookTimeMin, ranking, reason, false);
+    }
+
     public RecipeCandidate withReason(Reason newReason) {
-        return new RecipeCandidate(recipeId, name, category, cookTimeMin, ranking, newReason);
+        return new RecipeCandidate(recipeId, name, category, cookTimeMin, ranking, newReason, alternative);
+    }
+
+    // 다른 분류로 바꿔 넣은 카드로 표시한다
+    public RecipeCandidate asAlternative() {
+        return new RecipeCandidate(recipeId, name, category, cookTimeMin, ranking, reason, true);
     }
 
     /**

@@ -4,6 +4,7 @@ import {
   formatImminentLabel,
   parseChatRecommendations,
   summarizeImminent,
+  toChatRecommendedRecipes,
 } from './recommendations';
 
 describe('parseChatRecommendations', () => {
@@ -23,6 +24,7 @@ describe('parseChatRecommendations', () => {
           missingSelectedIngredients: ['두부'],
           lacksManyIngredients: true,
           reason: '느타리버섯·두부가 주재료예요',
+          description: null,
         },
       ],
       relaxed: [],
@@ -44,6 +46,7 @@ describe('parseChatRecommendations', () => {
           missingSelectedIngredients: ['두부'],
           lacksManyIngredients: true,
           reason: '느타리버섯·두부가 주재료예요',
+          description: null,
         },
       ],
       relaxed: [],
@@ -75,6 +78,7 @@ describe('parseChatRecommendations', () => {
       missingSelectedIngredients: [],
       lacksManyIngredients: false,
       reason: '',
+      description: null,
     });
   });
 
@@ -106,5 +110,33 @@ describe('summarizeImminent', () => {
 
   it('임박 재료가 없으면 null을 돌려준다', () => {
     expect(summarizeImminent([])).toBeNull();
+  });
+});
+
+describe('toChatRecommendedRecipes', () => {
+  it('메시지 조회의 카드를 그릴 모양으로 바꾸고, 설명을 담고, 빠진 목록은 빈 목록으로 채운다', () => {
+    const cards = toChatRecommendedRecipes([
+      {
+        recipeId: 30,
+        name: '두부조림',
+        category: '조림',
+        description: '두부를 졸여요',
+        reason: '이유',
+      },
+      { name: 'id 없음' },
+    ]);
+
+    expect(cards).toHaveLength(1);
+    expect(cards[0]).toMatchObject({
+      recipeId: 30,
+      description: '두부를 졸여요',
+      cookTimeMin: null,
+      missingSelectedIngredients: [],
+      imminentIngredients: [],
+    });
+  });
+
+  it('카드가 없으면 빈 목록을 돌려준다', () => {
+    expect(toChatRecommendedRecipes(undefined)).toEqual([]);
   });
 });
