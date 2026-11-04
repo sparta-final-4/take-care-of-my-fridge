@@ -53,7 +53,8 @@ class PortOneClientTest {
         RestClient.Builder builder = RestClient.builder().baseUrl(BASE_URL);
         server = MockRestServiceServer.bindTo(builder).build();
         client = new PortOneClient(builder.build(),
-                new PortOneProperties(BASE_URL, "secret", "store-1", CHANNELS, "whsec_dGVzdA=="));
+                new PortOneProperties(BASE_URL, "secret", "store-1", CHANNELS, "channel-billing",
+                        "whsec_dGVzdA=="));
     }
 
     @Test
@@ -78,7 +79,8 @@ class PortOneClientTest {
                 PgProvider.TOSSPAYMENTS, " ",
                 PgProvider.TOSSPAY, "channel-tosspay");
 
-        assertThatThrownBy(() -> new PortOneProperties(BASE_URL, "secret", "store-1", missingInicis, "whsec_dGVzdA=="))
+        assertThatThrownBy(() -> new PortOneProperties(BASE_URL, "secret", "store-1", missingInicis, "channel-billing",
+                "whsec_dGVzdA=="))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("INICIS")
                 .hasMessageContaining("TOSSPAYMENTS");

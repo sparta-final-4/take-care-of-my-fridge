@@ -98,6 +98,8 @@ public enum ErrorCode {
 
     // Billing Key (등록 카드)
     INVALID_BILLING_KEY_STATUS(HttpStatus.CONFLICT, "BILLING_001", "유효하지 않은 카드 상태 변경입니다."),
+    BILLING_KEY_LIMIT_EXCEEDED(HttpStatus.CONFLICT, "BILLING_002", "카드는 최대 5장까지 등록할 수 있습니다."),
+    BILLING_KEY_NOT_VERIFIED(HttpStatus.CONFLICT, "BILLING_003", "카드 등록을 확인하지 못했습니다. 다시 시도해 주세요."),
 
     // Webhook
     INVALID_WEBHOOK_SIGNATURE(HttpStatus.UNAUTHORIZED, "WEBHOOK_001", "웹훅 서명이 유효하지 않습니다."),
