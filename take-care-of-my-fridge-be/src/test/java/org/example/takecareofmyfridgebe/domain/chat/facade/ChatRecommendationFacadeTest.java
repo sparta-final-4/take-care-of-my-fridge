@@ -49,7 +49,7 @@ class ChatRecommendationFacadeTest {
     void buildsCardsFromTopThree() {
         Reason wanted = new Reason(List.of("양파", "두부"), List.of(new ImminentIngredient("양파", 0)),
                 List.of(Taste.SALTY), List.of(Taste.SPICY), List.of(), false, true,
-                List.of(new MissingIngredient(5L, "돼지고기")));
+                List.of(new MissingIngredient(5L, "돼지고기")), List.of("돼지고기"));
         when(recipeCandidateFacade.findCandidates(any())).thenReturn(new RecipeCandidates(List.of(
                 candidate(10L, "두부찌개", "찌개", 25, wanted),
                 candidate(20L, "두부조림", "조림", null, reason(List.of(Taste.SALTY))),
@@ -72,6 +72,7 @@ class ChatRecommendationFacadeTest {
         assertThat(first.imminentIngredients()).containsExactly(new ChatRecommendationsEventResponse.ImminentIngredient("양파", 0));
         assertThat(first.matchedTastes()).containsExactly("매운맛");
         assertThat(first.missingIngredients()).containsExactly(new ChatRecommendationsEventResponse.MissingIngredient(5L, "돼지고기"));
+        assertThat(first.missingSelectedIngredients()).containsExactly("돼지고기");
         assertThat(first.lacksManyIngredients()).isTrue();
         assertThat(event.recipes().get(1).imageUrl()).isNull();
         assertThat(event.recipes().get(1).cookTimeMin()).isNull();
@@ -98,7 +99,7 @@ class ChatRecommendationFacadeTest {
         ChatRecommendationsEventResponse event = ChatRecommendationsEventResponse.of(List.of(new RecommendedRecipe(
                 10L, "두부찌개", null, "찌개", null, List.of("양파"),
                 List.of(new ChatRecommendationsEventResponse.ImminentIngredient("양파", 0)), List.of("매운맛"),
-                List.of(), false)));
+                List.of(), List.of(), false)));
 
         String json = new ObjectMapper().writeValueAsString(event);
 
@@ -111,6 +112,6 @@ class ChatRecommendationFacadeTest {
     }
 
     private static Reason reason(List<Taste> tastes) {
-        return new Reason(List.of(), List.of(), tastes, List.of(), List.of(), false, false, List.of());
+        return new Reason(List.of(), List.of(), tastes, List.of(), List.of(), false, false, List.of(), List.of());
     }
 }

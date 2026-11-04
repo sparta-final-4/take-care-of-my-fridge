@@ -31,8 +31,9 @@ import java.util.stream.Stream;
  * AI 없이 규칙으로 레시피 후보를 고르고 정렬한다. 스프링에 의존하지 않는 순수 클래스.
  * <p>
  * 정렬은 점수를 합산하지 않고, 앞 단계가 같을 때만 다음 단계로 비교한다.
- * 1. 사용자 요청 일치 수(원하는 맛·분류) → 2. 선택 재료 겹친 수 → 3. 임박 점수 합 → 4. 선호 맛 겹친 수
- * → 5. 보유 비율 → 6. 없는 재료 수 적은 순 → 7. 레시피 id.
+ * 1. 사용자 요청 일치 수(원하는 맛·분류) → 2. 선택 재료 겹친 수 → (선택 재료가 있을 때만) 재료 많이 모자람이 아닌 것 먼저
+ * → 3. 임박 점수 합 → 4. 선호 맛 겹친 수 → 5. 보유 비율 → 6. 없는 재료 수 적은 순 → 7. 레시피 id.
+ * 선택 재료가 같으면 바로 만들 수 있는 레시피를 먼저 둔다. 임박 재료 하나 때문에 부족한 재료가 많은 레시피가 위로 오지 않게 하려는 것이다.
  * 임박을 선호 맛보다 앞에 둔다. 회원 선호 맛은 대부분 레시피와 1~2개씩 겹쳐서, 뒤에 두지 않으면 임박 재료가 순위에 거의 반영되지 않는다.
  * <p>
  * 보유 비율이 기준(minOwnedRatio) 미만인 레시피는 기준 이상 레시피를 위 순서로 먼저 고른 뒤, 10개가 안 차면 같은 순서로 채운다.
@@ -52,14 +53,25 @@ public class RecipeCandidateScorer {
     private static final int IMMINENT_BASE_SCORE = 12;
     private static final int IMMINENT_STEP = 2;
 
-    private static final Comparator<RecipeCandidate> ORDER = Comparator
-            .comparingInt((RecipeCandidate c) -> c.ranking().requestMatches()).reversed()
-            .thenComparing(Comparator.comparingInt((RecipeCandidate c) -> c.ranking().selectedMatches()).reversed())
-            .thenComparing(Comparator.comparingInt((RecipeCandidate c) -> c.ranking().imminentScore()).reversed())
-            .thenComparing(Comparator.comparingInt((RecipeCandidate c) -> c.ranking().tasteMatches()).reversed())
-            .thenComparing(RecipeCandidateScorer::compareOwnedRatioDesc)
-            .thenComparingInt(c -> c.ranking().missingCount())
-            .thenComparingLong(RecipeCandidate::recipeId);
+    private static final Comparator<RecipeCandidate> ORDER = order(false);
+    // 선택 재료가 있을 때: 선택 재료 겹친 수 바로 뒤에 "재료 많이 모자람이 아닌 것 먼저"
+    private static final Comparator<RecipeCandidate> ORDER_WITH_SELECTED = order(true);
+
+    private static Comparator<RecipeCandidate> order(boolean selectedFirstReady) {
+        Comparator<RecipeCandidate> order = Comparator
+                .comparingInt((RecipeCandidate c) -> c.ranking().requestMatches()).reversed()
+                .thenComparing(Comparator.comparingInt((RecipeCandidate c) -> c.ranking().selectedMatches()).reversed());
+        if (selectedFirstReady) {
+            // false(모자라지 않음)가 앞
+            order = order.thenComparing(c -> c.reason().lacksManyIngredients());
+        }
+        return order
+                .thenComparing(Comparator.comparingInt((RecipeCandidate c) -> c.ranking().imminentScore()).reversed())
+                .thenComparing(Comparator.comparingInt((RecipeCandidate c) -> c.ranking().tasteMatches()).reversed())
+                .thenComparing(RecipeCandidateScorer::compareOwnedRatioDesc)
+                .thenComparingInt(c -> c.ranking().missingCount())
+                .thenComparingLong(RecipeCandidate::recipeId);
+    }
 
     // 선택 재료 전부를 쓰는 레시피를 보유 비율 기준에서 빼는 최소 선택 재료 수 (기본 양념 제외)
     private static final int MIN_SELECTED_FOR_EXCEPTION = 2;
@@ -169,9 +181,10 @@ public class RecipeCandidateScorer {
                 || scored.stream().allMatch(candidate -> candidate.ranking().selectedMatches() == 0);
 
         // 1차: 보유 비율 기준 이상이거나 선택 재료(2개 이상)를 전부 쓰는 레시피, 2차: 나머지. 각각 같은 정렬 순서
+        Comparator<RecipeCandidate> order = selectedCount > 0 ? ORDER_WITH_SELECTED : ORDER;
         List<RecipeCandidate> top = Stream.concat(
-                        scored.stream().filter(candidate -> isFirstTier(candidate, selectedCount)).sorted(ORDER),
-                        scored.stream().filter(candidate -> !isFirstTier(candidate, selectedCount)).sorted(ORDER))
+                        scored.stream().filter(candidate -> isFirstTier(candidate, selectedCount)).sorted(order),
+                        scored.stream().filter(candidate -> !isFirstTier(candidate, selectedCount)).sorted(order))
                 .limit(LIMIT)
                 .toList();
         return new RecipeCandidates(top, fallback);
@@ -198,6 +211,28 @@ public class RecipeCandidateScorer {
         return (int) nonBasicSelected.stream()
                 .filter(selectedId -> query.selectedGroupOf(selectedId).stream().anyMatch(recipeIngredientIds::contains))
                 .count();
+    }
+
+    // 레시피가 쓰는 선택 재료 중 냉장고에 없는 것의 이름. 같은 종류 묶음에서 레시피에 쓰인 재료가 하나라도 냉장고에 있으면 가진 것으로 본다.
+    // 이름은 레시피에 실제로 쓰인 재료 이름이다 (예: 선택 "버섯" → 레시피의 "표고버섯")
+    private static List<String> missingSelectedNames(
+            RecipeQuery query,
+            List<Long> nonBasicSelected,
+            List<RecipeCandidateIngredient> nonBasic,
+            Map<Long, FridgeStock> fridgeById
+    ) {
+        Set<String> names = new LinkedHashSet<>();
+        for (Long selectedId : nonBasicSelected) {
+            Set<Long> group = query.selectedGroupOf(selectedId);
+            List<RecipeCandidateIngredient> used = nonBasic.stream()
+                    .filter(row -> group.contains(row.ingredientId()))
+                    .toList();
+            if (used.isEmpty() || used.stream().anyMatch(row -> fridgeById.containsKey(row.ingredientId()))) {
+                continue;
+            }
+            used.forEach(row -> names.add(row.ingredientName()));
+        }
+        return List.copyOf(names);
     }
 
     // 기본 양념을 뺀 선택 재료 (중복 제거). 레시피 재료 줄에서 기본 양념으로 확인된 재료만 뺀다
@@ -282,6 +317,7 @@ public class RecipeCandidateScorer {
                 .toList();
 
         int selectedMatches = countSelectedMatches(query, nonBasicSelected, recipeRows);
+        List<String> missingSelected = missingSelectedNames(query, nonBasicSelected, nonBasic, fridgeById);
 
         // 1단계: 사용자 요청 (원하는 맛 + 분류 일치). 말한 재료는 선택 재료로 합쳐져 2단계에서 센다
         List<String> matchedRequests = new ArrayList<>();
@@ -326,7 +362,8 @@ public class RecipeCandidateScorer {
                 List.copyOf(matchedRequests),
                 info.cookTimeMin() == null,
                 ranking.ownedRatio() + RATIO_EPSILON < minOwnedRatio,
-                List.of()
+                List.of(),
+                missingSelected
         );
         return new RecipeCandidate(info.recipeId(), info.name(), info.category(), info.cookTimeMin(), ranking, reason);
     }

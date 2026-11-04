@@ -75,6 +75,19 @@ class RecommendationPromptBuilderTest {
     }
 
     @Test
+    @DisplayName("냉장고에 없는 선택 재료가 있으면 후보 줄에 따로 쓴다")
+    void writesMissingSelected() {
+        RecipeCandidate candidate = candidate(1L, "표고두부전골", "전골", 30,
+                new Reason(List.of("대파"), List.of(), List.of(), List.of(), List.of(), false, false,
+                        List.of(missing(161L, "표고버섯"), missing(TOFU, "두부")), List.of("표고버섯", "두부")));
+
+        String text = RecommendationPromptBuilder.build("버섯 두부로", RecipeQuery.of(MEMBER_ID, List.of(MUSHROOM, TOFU)),
+                NAMES, List.of(candidate));
+
+        assertThat(text).contains("1. 표고두부전골 | 전골 | 조리 시간 30분 | 쓰는 냉장고 재료: 대파 | 냉장고에 없는 선택 재료: 표고버섯, 두부 | 부족한 재료: 표고버섯, 두부");
+    }
+
+    @Test
     @DisplayName("소비기한은 D-0 오늘까지, D-1 내일까지, D-2 모레까지, D-3 3일 남음으로 쓴다")
     void writesDdayInWords() {
         assertThat(RecommendationPromptBuilder.dDayLabel(0)).isEqualTo("오늘까지");
@@ -89,7 +102,7 @@ class RecommendationPromptBuilderTest {
 
     private static Reason reason(List<String> used, List<ImminentIngredient> imminent, List<Taste> tastes,
                                  List<Taste> wantedTastes, List<MissingIngredient> missing, boolean lacks) {
-        return new Reason(used, imminent, tastes, wantedTastes, List.of(), false, lacks, missing);
+        return new Reason(used, imminent, tastes, wantedTastes, List.of(), false, lacks, missing, List.of());
     }
 
     private static MissingIngredient missing(Long id, String name) {

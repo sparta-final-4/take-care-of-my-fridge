@@ -22,7 +22,7 @@ import java.util.stream.Collectors;
  * 선택 재료: 버섯, 두부 (이 재료를 꼭 쓰는 레시피만)
  * 조건: 원하는 맛 매운맛 / 분류 국, 찌개 / 30분 이내 / 뺄 재료 오이
  * [추천 후보]
- * 1. 제육배추찜 | 찜 | 조리 시간 40분 | 쓰는 냉장고 재료: 양파(오늘까지), 고추(모레까지), 배추 | 원하는 맛과 맞음: 매운맛 | 부족한 재료: 돼지고기, 부추, 당근 외 3개 | 재료 많이 모자람
+ * 1. 제육배추찜 | 찜 | 조리 시간 40분 | 쓰는 냉장고 재료: 양파(오늘까지), 고추(모레까지), 배추 | 냉장고에 없는 선택 재료: 두부 | 원하는 맛과 맞음: 매운맛 | 부족한 재료: 돼지고기, 부추, 당근 외 3개 | 재료 많이 모자람
  * </pre>
  * 후보가 없으면 [추천 후보] 아래에 "후보 없음"을 쓴다. 맛은 한글로 쓰고, 중괄호({})는 괄호로 바꿔 넣지 않는다.
  */
@@ -93,6 +93,9 @@ public final class RecommendationPromptBuilder {
         fields.add(candidate.category() == null ? "분류 없음" : candidate.category());
         fields.add(candidate.cookTimeMin() == null ? "조리 시간 정보 없음" : "조리 시간 " + candidate.cookTimeMin() + "분");
         fields.add("쓰는 냉장고 재료: " + usedLine(reason));
+        if (!reason.missingSelectedIngredients().isEmpty()) {
+            fields.add("냉장고에 없는 선택 재료: " + String.join(NAME_DELIMITER, reason.missingSelectedIngredients()));
+        }
         if (!reason.matchedWantedTastes().isEmpty()) {
             fields.add("원하는 맛과 맞음: " + tastes(reason.matchedWantedTastes()));
         } else if (!reason.matchedTastes().isEmpty()) {

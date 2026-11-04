@@ -59,6 +59,9 @@ public record RecipeCandidate(
      * @param cookTimeUnknown       조리 시간 정보가 없어 시간 조건을 확인하지 못함
      * @param lacksManyIngredients  보유 비율이 기준 미만 (재료를 많이 사야 함). 선택 재료(2개 이상)를 전부 써서 앞에 온 레시피도 표시한다
      * @param missingIngredients    냉장고에 없는 재료 (기본 양념 제외, 레시피에 나온 순)
+     * @param missingSelectedIngredients 레시피가 쓰는 선택 재료(말한 재료·같은 종류 묶음 포함) 중 냉장고에 없는 것의 이름.
+     *                                   같은 종류 묶음이면 레시피에 실제로 쓰인 재료 이름이다 (예: 버섯 → 표고버섯).
+     *                                   missingIngredients에도 들어 있다 (보유 비율은 없는 재료로 센다)
      */
     public record Reason(
             List<String> usedFridgeIngredients,
@@ -68,11 +71,12 @@ public record RecipeCandidate(
             List<String> matchedRequests,
             boolean cookTimeUnknown,
             boolean lacksManyIngredients,
-            List<MissingIngredient> missingIngredients
+            List<MissingIngredient> missingIngredients,
+            List<String> missingSelectedIngredients
     ) {
         public Reason withMissingIngredients(List<MissingIngredient> missing) {
             return new Reason(usedFridgeIngredients, imminentIngredients, matchedTastes, matchedWantedTastes, matchedRequests,
-                    cookTimeUnknown, lacksManyIngredients, List.copyOf(missing));
+                    cookTimeUnknown, lacksManyIngredients, List.copyOf(missing), missingSelectedIngredients);
         }
     }
 

@@ -43,4 +43,10 @@ class ChatRecommendPromptTest {
     void instructsSelectedFirstAndNoInternalReasoning() {
         assertThat(prompt).contains("그 선택 재료를 어떻게 쓰는지", "내부 조건이나 판단 과정은 말하지 않는다");
     }
+
+    @Test
+    @DisplayName("냉장고에 없는 선택 재료는 답 맨 앞에서 한 번만 말하고 레시피마다 반복하지 말라고 지시한다")
+    void instructsMissingSelectedOnceAtFront() {
+        assertThat(prompt).contains("냉장고에 없는 선택 재료", "맨 앞", "한 번만 말한다", "레시피마다 반복하지 않고");
+    }
 }

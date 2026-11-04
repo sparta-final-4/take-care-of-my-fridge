@@ -27,6 +27,8 @@ public record ChatRecommendationsEventResponse(
      * @param imminentIngredients  그중 소비기한 임박(D-3 이내) 재료
      * @param matchedTastes        겹친 맛(한글). 사용자가 메시지로 맛을 말했으면 그 맛, 아니면 회원 선호 맛
      * @param missingIngredients   냉장고에 없는 재료 (기본 양념 제외, 구매 상품은 아직 없음)
+     * @param missingSelectedIngredients 선택 재료(말한 재료 포함) 중 냉장고에 없는 것의 이름. 같은 종류면 레시피에 쓰인 이름.
+     *                                   missingIngredients에도 들어 있다
      * @param lacksManyIngredients 재료를 많이 사야 하는지 (보유 비율 기준 미만)
      */
     public record RecommendedRecipe(
@@ -39,6 +41,7 @@ public record ChatRecommendationsEventResponse(
             List<ImminentIngredient> imminentIngredients,
             List<String> matchedTastes,
             List<MissingIngredient> missingIngredients,
+            List<String> missingSelectedIngredients,
             boolean lacksManyIngredients
     ) {
     }

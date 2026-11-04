@@ -1,6 +1,7 @@
 package org.example.takecareofmyfridgebe.domain.chat.facade;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse.ImminentIngredient;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse.MissingIngredient;
@@ -26,6 +27,7 @@ import java.util.stream.Stream;
  * 상담 추천 답을 만들 재료를 모은다: 레시피 후보 검색 → 3개 고르기 → 카드 이벤트와 설명용 후보 정보.
  * 카드 이미지는 레시피 요약 조회(findSummaries)로 한 번에 가져온다. 구매 상품·저장은 아직 하지 않는다.
  */
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class ChatRecommendationFacade {
@@ -40,7 +42,9 @@ public class ChatRecommendationFacade {
      * @return 카드 이벤트(후보가 없으면 empty=true)와 설명용 후보 정보
      */
     public RecommendationReply recommend(String content, RecipeQuery query) {
-        List<RecipeCandidate> picked = RecommendationPicker.pick(recipeCandidateFacade.findCandidates(query).candidates());
+        List<RecipeCandidate> candidates = recipeCandidateFacade.findCandidates(query).candidates();
+        logCandidates(query, candidates);
+        List<RecipeCandidate> picked = RecommendationPicker.pick(candidates);
 
         Map<Long, RecipeSummary> summaries = recipeService.findSummaries(
                 picked.stream().map(RecipeCandidate::recipeId).toList());
@@ -50,6 +54,25 @@ public class ChatRecommendationFacade {
 
         String candidateInfo = RecommendationPromptBuilder.build(content, query, ingredientNames(query), picked);
         return new RecommendationReply(ChatRecommendationsEventResponse.of(recipes), candidateInfo);
+    }
+
+    // 후보 10개의 정렬 단계별 값 (DEBUG). 정렬 순서: 요청 > 선택 > (선택이 있으면) 모자람 아님 > 임박 > 맛 > 보유 비율 > 없는 재료 수 > id
+    private static void logCandidates(RecipeQuery query, List<RecipeCandidate> candidates) {
+        if (!log.isDebugEnabled()) {
+            return;
+        }
+        StringBuilder text = new StringBuilder();
+        for (int i = 0; i < candidates.size(); i++) {
+            RecipeCandidate candidate = candidates.get(i);
+            RecipeCandidate.Ranking ranking = candidate.ranking();
+            text.append(String.format("%n  %2d. %d %s [%s] | 요청 %d | 선택 %d | 모자람 %s | 임박 %d | 맛 %d | 보유 %d/%d | 없는 재료 %d | 냉장고에 없는 선택 %s",
+                    i + 1, candidate.recipeId(), candidate.name(), candidate.category(),
+                    ranking.requestMatches(), ranking.selectedMatches(), candidate.reason().lacksManyIngredients() ? "Y" : "N",
+                    ranking.imminentScore(), ranking.tasteMatches(), ranking.ownedCount(), ranking.nonBasicIngredientCount(),
+                    ranking.missingCount(), candidate.reason().missingSelectedIngredients()));
+        }
+        log.debug("상담 추천 후보 정렬 - memberId: {}, 선택 재료: {}, 선택 재료만: {}, 후보 {}개:{}",
+                query.memberId(), query.selectedIngredientIds(), query.useSelectedOnly(), candidates.size(), text);
     }
 
     // 프롬프트에 쓸 선택·뺄 재료 이름
@@ -81,6 +104,7 @@ public class ChatRecommendationFacade {
                 reason.missingIngredients().stream()
                         .map(missing -> new MissingIngredient(missing.ingredientId(), missing.name()))
                         .toList(),
+                reason.missingSelectedIngredients(),
                 reason.lacksManyIngredients()
         );
     }

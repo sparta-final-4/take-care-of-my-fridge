@@ -606,6 +606,97 @@ class RecipeCandidateScorerTest {
     }
 
     @Nested
+    @DisplayName("냉장고에 없는 선택 재료")
+    class MissingSelected {
+
+        @Test
+        @DisplayName("냉장고에 없는 선택 재료는 따로 표시하고, 부족한 재료·보유 비율에서는 없는 재료로 센다")
+        void marksMissingSelected_andCountsAsMissing() {
+            recipe(10L, "두부계란전", "전", 20, 2, TOFU, EGG);
+            List<FridgeStock> fridge = List.of(stock(EGG, "계란", 10));
+
+            RecipeCandidates ranked = rank(RecipeQuery.of(MEMBER_ID, List.of(TOFU), true), fridge, List.of());
+            RecipeCandidates result = RecipeCandidateScorer.withMissingIngredients(ranked, fridge, List.of(
+                    new RecipeCandidateIngredient(10L, TOFU, "두부", false),
+                    new RecipeCandidateIngredient(10L, EGG, "계란", false)));
+
+            RecipeCandidate candidate = result.candidates().get(0);
+            assertThat(candidate.reason().missingSelectedIngredients()).containsExactly("두부");
+            assertThat(candidate.reason().missingIngredients()).containsExactly(new MissingIngredient(TOFU, "두부"));
+            assertThat(candidate.ranking().ownedCount()).isEqualTo(1);
+            assertThat(candidate.ranking().ownedRatio()).isEqualTo(0.5);
+        }
+
+        @Test
+        @DisplayName("같은 종류로 넓힌 선택 재료는 레시피에 실제로 쓰인 재료 이름으로 표시한다 (버섯 → 표고버섯)")
+        void marksRecipeIngredientName_whenSelectedByGroup() {
+            recipe(10L, "표고버섯볶음", "볶음", 20, 1, SHIITAKE);
+            rows.set(0, new RecipeCandidateIngredient(10L, SHIITAKE, "표고버섯", false));
+            RecipeQuery query = RecipeQuery.of(MEMBER_ID, List.of(MUSHROOM), true)
+                    .withSelectedIngredientGroups(Map.of(MUSHROOM, Set.of(SHIITAKE)));
+
+            RecipeCandidates result = rank(query, List.of(stock(EGG, "계란", 10)), List.of());
+
+            assertThat(result.candidates().get(0).reason().missingSelectedIngredients()).containsExactly("표고버섯");
+        }
+
+        @Test
+        @DisplayName("같은 종류 재료 중 레시피에 쓰인 것이 냉장고에 있으면 냉장고에 없는 선택 재료로 표시하지 않는다")
+        void skipsMissingSelected_whenSameKindIsOwned() {
+            recipe(10L, "표고버섯볶음", "볶음", 20, 1, SHIITAKE);
+            RecipeQuery query = RecipeQuery.of(MEMBER_ID, List.of(MUSHROOM), true)
+                    .withSelectedIngredientGroups(Map.of(MUSHROOM, Set.of(SHIITAKE)));
+
+            RecipeCandidates result = rank(query, List.of(stock(SHIITAKE, "표고버섯", 10)), List.of());
+
+            assertThat(result.candidates().get(0).reason().missingSelectedIngredients()).isEmpty();
+        }
+    }
+
+    @Nested
+    @DisplayName("선택 재료가 있을 때 바로 만들 수 있는 레시피 먼저")
+    class ReadyFirstWithSelected {
+
+        @Test
+        @DisplayName("선택 재료 겹친 수가 같으면 재료 많이 모자람이 아닌 레시피가 임박 점수가 낮아도 앞에 온다")
+        void ranksReadyFirst_whenSelectedMatchesAreEqual() {
+            recipe(10L, "두부제육전골", "전골", 20, 10, TOFU, ONION);
+            recipe(20L, "두부조림", "조림", 20, 2, TOFU);
+            List<FridgeStock> fridge = List.of(stock(TOFU, "두부", 10), stock(ONION, "양파", 0));
+
+            RecipeCandidates result = rank(ratioScorer, RecipeQuery.of(MEMBER_ID, List.of(TOFU)), fridge, List.of());
+
+            assertThat(result.candidates()).extracting(RecipeCandidate::recipeId).containsExactly(20L, 10L);
+            assertThat(result.candidates().get(1).ranking().imminentScore())
+                    .isGreaterThan(result.candidates().get(0).ranking().imminentScore());
+        }
+
+        @Test
+        @DisplayName("선택 재료 2개를 모두 쓰는 레시피끼리도 모자람이 아닌 레시피가 앞에 온다")
+        void ranksReadyFirst_amongRecipesUsingAllSelected() {
+            recipe(10L, "버섯두부전골", "전골", 20, 16, MUSHROOM, TOFU, ONION);
+            recipe(20L, "버섯두부조림", "조림", 20, 3, MUSHROOM, TOFU);
+            List<FridgeStock> fridge = List.of(stock(MUSHROOM, "버섯", 10), stock(TOFU, "두부", 10), stock(ONION, "양파", 0));
+
+            RecipeCandidates result = rank(ratioScorer, RecipeQuery.of(MEMBER_ID, List.of(MUSHROOM, TOFU)), fridge, List.of());
+
+            assertThat(result.candidates()).extracting(RecipeCandidate::recipeId).containsExactly(20L, 10L);
+        }
+
+        @Test
+        @DisplayName("선택 재료가 없으면 지금처럼 임박 점수 순서를 따른다 (모자람은 보유 비율 1차·2차로만)")
+        void keepsImminentOrder_whenNoSelected() {
+            recipe(10L, "양파볶음", "볶음", 20, 2, ONION);
+            recipe(20L, "두부조림", "조림", 20, 2, TOFU);
+            List<FridgeStock> fridge = List.of(stock(TOFU, "두부", 10), stock(ONION, "양파", 0));
+
+            RecipeCandidates result = rank(ratioScorer, RecipeQuery.of(MEMBER_ID, List.of()), fridge, List.of());
+
+            assertThat(result.candidates()).extracting(RecipeCandidate::recipeId).containsExactly(10L, 20L);
+        }
+    }
+
+    @Nested
     @DisplayName("부족한 재료")
     class MissingIngredients {
 
