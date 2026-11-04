@@ -41,9 +41,9 @@ class ChatRecommendPromptTest {
     }
 
     @Test
-    @DisplayName("마크다운을 쓰지 말고 번호와 줄바꿈으로만 나누라고 지시한다")
-    void forbidsMarkdown() {
-        assertThat(prompt).contains("마크다운을 쓰지 않는다", "번호와 줄바꿈으로만");
+    @DisplayName("마크다운 금지는 공통 프롬프트에 두고 추천 프롬프트에는 다시 쓰지 않는다")
+    void leavesMarkdownRuleToSystemPrompt() {
+        assertThat(prompt).doesNotContain("마크다운").contains("번호와 줄바꿈으로 나눈다");
     }
 
     @Test
