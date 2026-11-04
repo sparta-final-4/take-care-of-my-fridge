@@ -29,7 +29,7 @@ import type {
   DealEventRequestTypeEnum,
   Excluded,
 } from '@/common/api/clients';
-import { getErrorCode } from '@/common/api/errors';
+import { getErrorCode, getErrorMessage } from '@/common/api/errors';
 import { registerDealEvent, runDealAnalysis, saveDealReview } from '@/domains/deal/api';
 import { dealQueries } from '@/domains/deal/queries';
 import { DATE_TIME_FORMAT, REQUEST_TIME_FORMAT } from '@/domains/sale/format';
@@ -143,7 +143,7 @@ export default function AdminDealPage() {
     onError: (error) =>
       void message.error(
         getErrorCode(error) === 'D007'
-          ? '일반 특가 이력이 부족해 분석할 수 없습니다.'
+          ? getErrorMessage(error)
           : '할인 후보 분석을 실행하지 못했습니다.',
       ),
   });
@@ -234,7 +234,11 @@ export default function AdminDealPage() {
           {analysisControls}
           <Empty
             description={
-              demo ? '시연 결과가 아직 없습니다.' : '아직 할인 후보 분석 결과가 없습니다.'
+              demo ? (
+                '시연 결과가 아직 없습니다.'
+              ) : (
+                <span className={styles.diagnostics}>{getErrorMessage(error)}</span>
+              )
             }
           />
         </div>
