@@ -49,7 +49,7 @@ class RecommendationPromptBuilderTest {
                 조건: 원하는 맛 매운맛 / 분류 찌개, 국 / 30분 이내 / 뺄 재료 오이
                 [추천 후보]
                 후보: 두부버섯찌개 | 찌개 | 조리 시간 25분 | 카드 이유: 매콤한 요리예요 | 쓰는 냉장고 재료: 오늘까지인 양파, 3일 남은 대파, 두부 | 원하는 맛과 맞음: 매운맛 | 장볼 재료: 돼지고기, 부추, 당근 외 2개 | 재료 많이 모자람
-                후보: 버섯전 | 전 | 조리 시간 정보 없음 | 카드 이유: 짭짤하고 감칠맛 나요 | 쓰는 냉장고 재료: 없음 | 좋아하는 맛과 맞음: 짠맛, 감칠맛 | 장볼 재료: 없음""");
+                후보: 버섯전 | 전 | 조리 시간 정보 없음 | 카드 이유: 새로 만들어 볼 만한 요리예요 | 쓰는 냉장고 재료: 없음 | 장볼 재료: 없음""");
     }
 
     @Test
@@ -219,22 +219,67 @@ class RecommendationPromptBuilderTest {
     }
 
     @Test
-    @DisplayName("비슷한 탕수육을 찾았어도 말한 김피탕이 이름에 든 레시피가 없으면 김피탕은 찾지 못했다고 넣는다")
-    void writesDishNotFound_whenOnlySimilarFound() {
-        RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, List.of("튀김"), null, null, false,
-                List.of("김피탕", "탕수육", "깐풍기"), "김피탕", "김피탕 같은 요리")
-                .withKeywordMatches(Map.of(10L, new KeywordMatch(KeywordMatch.Type.EXPANDED, "탕수육", null)));
-        RecipeCandidate sweetSour = new RecipeCandidate(10L, "탕수육", "튀김", 40, new Ranking(2, 0, 0, 0, 1, 1, 0),
-                reason(List.of(), List.of(), List.of(), List.of(), List.of(), false));
+    @DisplayName("말한 김피탕이 이름에 든 레시피가 없으면 키워드로 맞은 비슷한 요리 이름을 최대 2개, 비슷한 이름은 하나로 넣는다")
+    void writesDishNotFound_withSimilarNames() {
+        RecipeQuery query = kimpiQuery(Map.of(
+                10L, new KeywordMatch(KeywordMatch.Type.EXPANDED, "탕수육", null),
+                11L, new KeywordMatch(KeywordMatch.Type.INGREDIENT, "탕수육", "돼지고기"),
+                12L, new KeywordMatch(KeywordMatch.Type.EXPANDED, "깐풍기", null),
+                13L, new KeywordMatch(KeywordMatch.Type.EXPANDED, "꿔바로우", null)));
+        List<RecipeCandidate> picked = List.of(
+                keywordCandidate(10L, "탕수육", query), keywordCandidate(11L, "찹쌀탕수육", query),
+                keywordCandidate(12L, "깐풍기", query), keywordCandidate(13L, "꿔바로우", query));
 
-        String text = RecommendationPromptBuilder.build("김피탕같은 요리 추천해줘", query, NAMES, List.of(sweetSour),
+        String text = RecommendationPromptBuilder.build("김피탕같은 요리 추천해줘", query, NAMES, picked,
                 query.keywordsNotFound());
 
         assertThat(query.keywordsNotFound()).isTrue();
         assertThat(text).startsWith("""
                 [먼저 말할 것]
-                말씀하신 김피탕은 찾지 못해서 비슷한 걸 골랐어요
+                김피탕 레시피는 없어서, 비슷한 탕수육과 깐풍기를 골랐어요
                 [사용자 요청]""");
+    }
+
+    @Test
+    @DisplayName("비슷한 요리가 하나면 그 이름만, 키워드로 맞은 요리가 없으면 찾지 못했다고만 넣는다")
+    void writesDishNotFound_withOneOrNoSimilarName() {
+        RecipeQuery query = kimpiQuery(Map.of(10L, new KeywordMatch(KeywordMatch.Type.EXPANDED, "탕수육", null)));
+        RecipeCandidate sweetSour = keywordCandidate(10L, "탕수육", query);
+        RecipeCandidate vector = new RecipeCandidate(20L, "닭강정", "튀김", 30, new Ranking(1, 0, 0, 0, 1, 1, 0),
+                new Reason(List.of(), List.of(), List.of(), List.of(), List.of(), false, false, List.of(), List.of(),
+                        List.of(), KeywordMatch.of(KeywordMatch.Type.VECTOR)));
+
+        assertThat(RecommendationPromptBuilder.keywordNotFoundNotice(query, List.of(sweetSour, vector)))
+                .isEqualTo("김피탕 레시피는 없어서, 비슷한 탕수육을 골랐어요");
+        assertThat(RecommendationPromptBuilder.keywordNotFoundNotice(query, List.of(vector)))
+                .isEqualTo("말씀하신 김피탕은 찾지 못해서 비슷한 걸 골랐어요");
+    }
+
+    @Test
+    @DisplayName("요청(키워드·분류·요리 이름)이 있으면 회원이 좋아하는 맛을 후보 줄·카드 이유에 넣지 않는다")
+    void omitsMemberTastes_whenRequested() {
+        RecipeCandidate candidate = candidate(1L, "버섯전", "전", null,
+                reason(List.of("버섯"), List.of(), List.of(Taste.SALTY, Taste.UMAMI), List.of(), List.of(), false));
+        RecipeQuery requested = new RecipeQuery(MEMBER_ID, List.of(), null, List.of("전"), null, null, false);
+
+        String withRequest = RecommendationPromptBuilder.build("전 요리 추천해줘", requested, NAMES, List.of(candidate), false);
+        String withoutRequest = RecommendationPromptBuilder.build("뭐 먹지?", RecipeQuery.of(MEMBER_ID, List.of()), NAMES,
+                List.of(candidate), false);
+
+        assertThat(withRequest).doesNotContain("좋아하는 맛과 맞음", "감칠맛", "짭짤");
+        assertThat(withoutRequest).contains("카드 이유: 짭짤하고 감칠맛 나요", "좋아하는 맛과 맞음: 짠맛, 감칠맛");
+    }
+
+    private static RecipeQuery kimpiQuery(Map<Long, KeywordMatch> matches) {
+        return new RecipeQuery(MEMBER_ID, List.of(), null, List.of("튀김"), null, null, false,
+                List.of("김피탕", "탕수육", "깐풍기"), "김피탕", "김피탕 같은 요리")
+                .withKeywordMatches(matches);
+    }
+
+    private static RecipeCandidate keywordCandidate(Long id, String name, RecipeQuery query) {
+        return new RecipeCandidate(id, name, "튀김", 40, new Ranking(2, 0, 0, 0, 1, 1, 0),
+                new Reason(List.of(), List.of(), List.of(), List.of(), List.of(), false, false, List.of(), List.of(),
+                        List.of(), query.keywordMatches().get(id)));
     }
 
     @Test

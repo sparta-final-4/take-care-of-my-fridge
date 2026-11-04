@@ -130,6 +130,11 @@ public record RecipeQuery(
         return keywordMatches.values().stream().noneMatch(KeywordMatch::strong);
     }
 
+    // 사용자 요청 조건(요리 이름 키워드·분류·요리 이름)이 있는지. 있으면 회원 선호 맛은 말하지 않는다
+    public boolean hasRequest() {
+        return !keywords.isEmpty() || !moodCategories.isEmpty() || keywordText != null;
+    }
+
     // 선택 재료 하나의 같은 종류 재료 ID (선택 재료 자신 포함)
     public Set<Long> selectedGroupOf(Long selectedId) {
         Set<Long> group = new LinkedHashSet<>();

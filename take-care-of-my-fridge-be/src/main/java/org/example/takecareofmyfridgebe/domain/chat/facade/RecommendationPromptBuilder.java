@@ -1,5 +1,6 @@
 package org.example.takecareofmyfridgebe.domain.chat.facade;
 
+import org.example.takecareofmyfridgebe.domain.chat.dto.KeywordMatch;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate.ImminentIngredient;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate.MissingIngredient;
@@ -33,6 +34,8 @@ import java.util.stream.Collectors;
 public final class RecommendationPromptBuilder {
 
     static final String NO_CANDIDATES = "후보 없음";
+    // 못 찾았다는 안내에 넣을 비슷한 요리 이름 수
+    private static final int SIMILAR_NAMES_SHOWN = 2;
     private static final int MISSING_SHOWN = 3;
     private static final String NONE = "없음";
     private static final String FIELD_DELIMITER = " | ";
@@ -57,7 +60,7 @@ public final class RecommendationPromptBuilder {
         if (preferenceUnmet(query, picked)) {
             notices.add(preferenceUnmetNotice(query.preferenceText()));
         } else if (keywordsNotFound) {
-            notices.add(keywordNotFoundNotice(query));
+            notices.add(keywordNotFoundNotice(query, picked));
         }
         String missingNotice = missingSelectedNotice(picked);
         if (missingNotice != null) {
@@ -75,9 +78,11 @@ public final class RecommendationPromptBuilder {
             text.append(NO_CANDIDATES).append('\n');
         }
         // 번호를 붙이면 AI가 번호 목록으로 답해서 "후보:"로 시작한다
-        List<String> reasons = RecommendationReasonWriter.writeDistinct(picked, query.keywordText());
+        // 사용자 요청(키워드·분류·요리 이름)이 있으면 회원 선호 맛은 근거로 넘기지 않는다
+        boolean memberTastes = !query.hasRequest();
+        List<String> reasons = RecommendationReasonWriter.writeDistinct(picked, query.keywordText(), memberTastes);
         for (int i = 0; i < picked.size(); i++) {
-            text.append("후보: ").append(candidateLine(picked.get(i), reasons.get(i))).append('\n');
+            text.append("후보: ").append(candidateLine(picked.get(i), reasons.get(i), memberTastes)).append('\n');
         }
         return withoutBraces(text.toString().stripTrailing());
     }
@@ -99,15 +104,46 @@ public final class RecommendationPromptBuilder {
         return "말씀하신 " + subject + " 찾지 못해서 냉장고 재료로 만들 수 있는 요리를 골랐어요";
     }
 
-    // 말한 요리를 못 찾았을 때 안내. 요리 이름을 말했으면 "말씀하신 김피탕은", 없으면 첫 키워드로 "말씀하신 냉면 요리는"
-    static String keywordNotFoundNotice(RecipeQuery query) {
+    // 말한 요리를 못 찾았을 때 안내.
+    // 요리 이름을 말했고 고른 카드 중 키워드로 맞은 요리가 있으면 "김피탕 레시피는 없어서, 비슷한 탕수육과 깐풍기를 골랐어요",
+    // 맞은 요리가 없으면 "말씀하신 김피탕은 찾지 못해서 비슷한 걸 골랐어요", 요리 이름 없이 키워드만 있으면 "말씀하신 냉면 요리는 …"
+    static String keywordNotFoundNotice(RecipeQuery query, List<RecipeCandidate> picked) {
         if (query.keywordText() != null) {
             String dish = query.keywordText();
+            List<String> similar = similarDishNames(picked);
+            if (!similar.isEmpty()) {
+                String last = similar.get(similar.size() - 1);
+                String names = similar.size() == 1
+                        ? last
+                        : similar.get(0) + withParticle(similar.get(0)) + " " + last;
+                return dish + " 레시피는 없어서, 비슷한 " + names + objectParticle(last) + " 골랐어요";
+            }
             return "말씀하신 " + dish + topicParticle(dish) + " 찾지 못해서 비슷한 걸 골랐어요";
         }
         String dish = query.keywords().get(0);
         String dishPhrase = dish.endsWith("요리") ? dish : dish + " 요리";
         return "말씀하신 " + dishPhrase + "는 찾지 못해서 비슷한 걸 골랐어요";
+    }
+
+    // 고른 카드 중 키워드로 맞은 요리 이름 (최대 2개). 늘린 이름으로 맞았으면 그 키워드(탕수육), 재료로 맞았으면 레시피 이름.
+    // 한쪽이 다른 쪽을 담는 비슷한 이름("탕수육", "황태탕수육")은 하나만 남긴다
+    static List<String> similarDishNames(List<RecipeCandidate> picked) {
+        List<String> names = new ArrayList<>();
+        for (RecipeCandidate candidate : picked) {
+            KeywordMatch match = candidate.reason().keywordMatch();
+            if (match == null || !match.strong() || match.type() == KeywordMatch.Type.NAME) {
+                continue;
+            }
+            String name = match.type() == KeywordMatch.Type.EXPANDED ? match.keyword() : candidate.name();
+            boolean similar = names.stream().anyMatch(existing -> existing.contains(name) || name.contains(existing));
+            if (!similar) {
+                names.add(name);
+            }
+            if (names.size() == SIMILAR_NAMES_SHOWN) {
+                break;
+            }
+        }
+        return names;
     }
 
     // 고른 후보들의 냉장고에 없는 선택 재료를 모아 안내 문장을 만든다. 없으면 null
@@ -121,6 +157,19 @@ public final class RecommendationPromptBuilder {
         }
         String last = names.get(names.size() - 1);
         return "말씀하신 " + String.join(NAME_DELIMITER, names) + topicParticle(last) + " 지금 냉장고에 없어서 준비가 필요해요";
+    }
+
+    private static String withParticle(String word) {
+        return hasFinalConsonant(word) ? "과" : "와";
+    }
+
+    private static String objectParticle(String word) {
+        return hasFinalConsonant(word) ? "을" : "를";
+    }
+
+    private static boolean hasFinalConsonant(String word) {
+        char last = word.charAt(word.length() - 1);
+        return last >= '가' && last <= '힣' && (last - '가') % 28 != 0;
     }
 
     // 받침이 있으면 "은", 없으면 "는" (한글이 아니면 "는")
@@ -158,7 +207,7 @@ public final class RecommendationPromptBuilder {
         return conditions.isEmpty() ? NONE : String.join(" / ", conditions);
     }
 
-    private static String candidateLine(RecipeCandidate candidate, String cardReason) {
+    private static String candidateLine(RecipeCandidate candidate, String cardReason, boolean memberTastes) {
         Reason reason = candidate.reason();
         List<String> fields = new ArrayList<>();
         fields.add(candidate.name());
@@ -174,7 +223,7 @@ public final class RecommendationPromptBuilder {
         }
         if (!reason.matchedWantedTastes().isEmpty()) {
             fields.add("원하는 맛과 맞음: " + tastes(reason.matchedWantedTastes()));
-        } else if (!reason.matchedTastes().isEmpty()) {
+        } else if (memberTastes && !reason.matchedTastes().isEmpty()) {
             fields.add("좋아하는 맛과 맞음: " + tastes(reason.matchedTastes()));
         }
         // 카드·설명과 같은 말로 "장볼 재료"라고 쓴다 (기본 양념 제외)

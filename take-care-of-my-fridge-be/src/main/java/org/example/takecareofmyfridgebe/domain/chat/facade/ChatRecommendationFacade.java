@@ -56,7 +56,7 @@ public class ChatRecommendationFacade {
         Map<Long, RecipeSummary> summaries = recipeService.findSummaries(
                 picked.stream().map(RecipeCandidate::recipeId).toList());
         // 카드 이유는 앞 카드와 겹치지 않게 고른다 (프롬프트 후보 줄도 같은 이유를 쓴다)
-        List<String> reasons = RecommendationReasonWriter.writeDistinct(picked, query.keywordText());
+        List<String> reasons = RecommendationReasonWriter.writeDistinct(picked, query.keywordText(), !query.hasRequest());
         List<RecommendedRecipe> recipes = new ArrayList<>();
         for (int i = 0; i < picked.size(); i++) {
             RecipeCandidate candidate = picked.get(i);
