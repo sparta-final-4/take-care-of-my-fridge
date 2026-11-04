@@ -1,0 +1,57 @@
+@use '@/styles/mixins' as *;
+
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+// 모바일은 아이콘·카드 정보 / 버튼 두 단, md부터 한 행에 둔다
+.card {
+  display: grid;
+  grid-template-areas:
+    'icon info'
+    'icon actions';
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--ant-margin-sm) var(--ant-margin);
+  padding: var(--ant-padding) 0;
+  border-bottom: 1px solid var(--ant-color-border-secondary);
+
+  @include from(md) {
+    grid-template-areas: 'icon info actions';
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+}
+
+.icon {
+  grid-area: icon;
+  font-size: var(--ant-font-size-heading-3);
+  color: var(--ant-color-primary);
+}
+
+.info {
+  grid-area: info;
+  min-width: 0;
+}
+
+.name {
+  max-width: 100%;
+}
+
+.meta {
+  font-variant-numeric: tabular-nums;
+}
+
+.actions {
+  grid-area: actions;
+  justify-content: flex-start;
+
+  @include from(md) {
+    justify-content: flex-end;
+  }
+}
+
+.registerButton {
+  min-height: var(--ant-control-height-lg);
+}

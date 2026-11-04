@@ -29,6 +29,8 @@ import type { ApiResponsePaymentPrepareResponse } from '../models';
 // @ts-ignore
 import type { ApiResponseVoid } from '../models';
 // @ts-ignore
+import type { BillingKeyPaymentRequest } from '../models';
+// @ts-ignore
 import type { PaymentConfirmRequest } from '../models';
 // @ts-ignore
 import type { PaymentPrepareRequest } from '../models';
@@ -98,6 +100,44 @@ export const PaymentControllerApiAxiosParamCreator = function (configuration?: C
             setSearchParams(localVarUrlObj, localVarQueryParameter);
             let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
             localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @param {number} orderId 
+         * @param {BillingKeyPaymentRequest} billingKeyPaymentRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        payWithBillingKey: async (orderId: number, billingKeyPaymentRequest: BillingKeyPaymentRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'orderId' is not null or undefined
+            assertParamExists('payWithBillingKey', 'orderId', orderId)
+            // verify required parameter 'billingKeyPaymentRequest' is not null or undefined
+            assertParamExists('payWithBillingKey', 'billingKeyPaymentRequest', billingKeyPaymentRequest)
+            const localVarPath = `/api/orders/{orderId}/payments/billing-key`
+                .replace('{orderId}', encodeURIComponent(String(orderId)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+            localVarHeaderParameter['Accept'] = '*/*';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(billingKeyPaymentRequest, localVarRequestOptions, configuration)
 
             return {
                 url: toPathString(localVarUrlObj),
@@ -178,6 +218,19 @@ export const PaymentControllerApiFp = function(configuration?: Configuration) {
         /**
          * 
          * @param {number} orderId 
+         * @param {BillingKeyPaymentRequest} billingKeyPaymentRequest 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async payWithBillingKey(orderId: number, billingKeyPaymentRequest: BillingKeyPaymentRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ApiResponsePaymentConfirmResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.payWithBillingKey(orderId, billingKeyPaymentRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['PaymentControllerApi.payWithBillingKey']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @param {number} orderId 
          * @param {PaymentPrepareRequest} paymentPrepareRequest 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
@@ -217,6 +270,15 @@ export const PaymentControllerApiFactory = function (configuration?: Configurati
         },
         /**
          * 
+         * @param {PaymentControllerApiPayWithBillingKeyRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        payWithBillingKey(requestParameters: PaymentControllerApiPayWithBillingKeyRequest, options?: RawAxiosRequestConfig): AxiosPromise<ApiResponsePaymentConfirmResponse> {
+            return localVarFp.payWithBillingKey(requestParameters.orderId, requestParameters.billingKeyPaymentRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
          * @param {PaymentControllerApiPrepareRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
@@ -249,6 +311,14 @@ export interface PaymentControllerApiInterface {
 
     /**
      * 
+     * @param {PaymentControllerApiPayWithBillingKeyRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    payWithBillingKey(requestParameters: PaymentControllerApiPayWithBillingKeyRequest, options?: RawAxiosRequestConfig): AxiosPromise<ApiResponsePaymentConfirmResponse>;
+
+    /**
+     * 
      * @param {PaymentControllerApiPrepareRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
@@ -269,6 +339,15 @@ export interface PaymentControllerApiConfirmRequest {
  */
 export interface PaymentControllerApiFailRequest {
     readonly portonePaymentId: string
+}
+
+/**
+ * Request parameters for payWithBillingKey operation in PaymentControllerApi.
+ */
+export interface PaymentControllerApiPayWithBillingKeyRequest {
+    readonly orderId: number
+
+    readonly billingKeyPaymentRequest: BillingKeyPaymentRequest
 }
 
 /**
@@ -302,6 +381,16 @@ export class PaymentControllerApi extends BaseAPI implements PaymentControllerAp
      */
     public fail(requestParameters: PaymentControllerApiFailRequest, options?: RawAxiosRequestConfig) {
         return PaymentControllerApiFp(this.configuration).fail(requestParameters.portonePaymentId, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @param {PaymentControllerApiPayWithBillingKeyRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public payWithBillingKey(requestParameters: PaymentControllerApiPayWithBillingKeyRequest, options?: RawAxiosRequestConfig) {
+        return PaymentControllerApiFp(this.configuration).payWithBillingKey(requestParameters.orderId, requestParameters.billingKeyPaymentRequest, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**

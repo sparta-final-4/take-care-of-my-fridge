@@ -1,5 +1,11 @@
 import type { ReactNode } from 'react';
-import { BookOutlined, MessageOutlined, ShoppingOutlined, UserOutlined } from '@ant-design/icons';
+import {
+  BookOutlined,
+  CreditCardOutlined,
+  MessageOutlined,
+  ShoppingOutlined,
+  UserOutlined,
+} from '@ant-design/icons';
 import { NavLink, Outlet, useMatches } from 'react-router';
 
 import { ROUTES } from '@/app/paths';
@@ -19,6 +25,7 @@ const MYPAGE_NAV_ITEMS: readonly MyPageNavItem[] = [
   { key: 'chats', label: 'AI 상담 내역', to: ROUTES.mypageChats, icon: <MessageOutlined /> },
   { key: 'profile', label: '내 정보 수정', to: ROUTES.mypageProfile, icon: <UserOutlined /> },
   { key: 'orders', label: '주문 내역', to: ROUTES.mypageOrders, icon: <ShoppingOutlined /> },
+  { key: 'cards', label: '카드 관리', to: ROUTES.mypageCards, icon: <CreditCardOutlined /> },
 ] as const;
 
 export function MyPageLayout() {

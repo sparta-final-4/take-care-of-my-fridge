@@ -102,6 +102,7 @@ models/api-response-unread-notification-count-response.ts
 models/api-response-void.ts
 models/audit-log-response.ts
 models/audit-log-search-request.ts
+models/billing-key-payment-request.ts
 models/billing-key-prepare-response.ts
 models/billing-key-register-request.ts
 models/billing-key-response.ts

@@ -14,6 +14,7 @@ export const ROUTES = {
   mypageOrderDetail: '/mypage/orders/:orderId',
   mypageOrderRefund: '/mypage/orders/:orderId/refund',
   mypageOrderRefunds: '/mypage/orders/:orderId/refunds',
+  mypageCards: '/mypage/cards',
   recipes: '/recipes',
   recipeDetail: '/recipes/:recipeId',
   products: '/products',

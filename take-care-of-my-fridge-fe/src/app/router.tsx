@@ -72,6 +72,10 @@ export const router = createBrowserRouter([
                 path: ROUTES.mypageOrderRefunds,
                 lazy: page(() => import('@/pages/mypage/MyPageRefundDetailPage')),
               },
+              {
+                path: ROUTES.mypageCards,
+                lazy: page(() => import('@/pages/mypage/MyPageCardsPage')),
+              },
             ],
           },
           { path: ROUTES.cart, lazy: page(() => import('@/pages/order/CartPage')) },

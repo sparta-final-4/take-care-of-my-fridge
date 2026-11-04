@@ -66,6 +66,7 @@ export * from './api-response-unread-notification-count-response';
 export * from './api-response-void';
 export * from './audit-log-response';
 export * from './audit-log-search-request';
+export * from './billing-key-payment-request';
 export * from './billing-key-prepare-response';
 export * from './billing-key-register-request';
 export * from './billing-key-response';

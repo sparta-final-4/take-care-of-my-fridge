@@ -2439,6 +2439,47 @@
         ]
       }
     },
+    "/api/orders/{orderId}/payments/billing-key": {
+      "post": {
+        "operationId": "payWithBillingKey",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "orderId",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BillingKeyPaymentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePaymentConfirmResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "payment-controller"
+        ]
+      }
+    },
     "/api/payments/confirm": {
       "post": {
         "operationId": "confirm",
@@ -4286,6 +4327,18 @@
             "format": "date"
           }
         }
+      },
+      "BillingKeyPaymentRequest": {
+        "type": "object",
+        "properties": {
+          "cardId": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "required": [
+          "cardId"
+        ]
       },
       "BillingKeyPrepareResponse": {
         "type": "object",
