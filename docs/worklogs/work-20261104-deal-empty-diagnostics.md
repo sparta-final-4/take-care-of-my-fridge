@@ -24,4 +24,3 @@
 ## 연결과 남은 작업
 - PR: `feat/deal-empty-diagnostics` → `dev`
 - 프론트 빈 화면에서 D002 상세 문구를 표시하는 변경은 별도 PR.
-
