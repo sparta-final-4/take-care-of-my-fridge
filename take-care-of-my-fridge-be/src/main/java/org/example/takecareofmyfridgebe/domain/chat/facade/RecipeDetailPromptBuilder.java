@@ -17,7 +17,7 @@ import java.util.stream.Collectors;
  * 레시피 자세히 답에 넣을 [레시피 정보] 줄 글을 만든다. 스프링에 의존하지 않는 순수 클래스.
  * <pre>
  * [레시피 정보]
- * 이름: 깐풍기 | 분류: 튀김 | 조리 시간: 40분 | 2인분 | 난이도 2
+ * 이름: 깐풍기 | 분류: 튀김 | 조리 시간: 40분 | 2인분 | 난이도 2   (조리 시간이 없으면 "조리 시간: 레시피에 없음")
  * 재료: 닭다리살 300g, 전분 1/2컵, 대파 1대
  * 기본 양념: 간장 2큰술, 설탕 1큰술
  * 단계:
@@ -40,6 +40,7 @@ public final class RecipeDetailPromptBuilder {
     private static final String NAME_DELIMITER = ", ";
     private static final String NONE = "없음";
     private static final String ELLIPSIS = "…";
+    static final String NO_COOK_TIME = "레시피에 없음";
 
     private RecipeDetailPromptBuilder() {
     }
@@ -72,7 +73,8 @@ public final class RecipeDetailPromptBuilder {
         List<String> fields = new ArrayList<>();
         fields.add("이름: " + recipe.name());
         fields.add("분류: " + (recipe.category() == null ? "분류 없음" : recipe.category()));
-        fields.add(recipe.cookTimeMin() == null ? "조리 시간 정보 없음" : "조리 시간: " + recipe.cookTimeMin() + "분");
+        // 조리 시간이 없는 레시피가 많다 (dev 레시피는 대부분 비어 있음). 없다는 걸 분명히 써서 AI가 "단계"까지 없다고 말하지 않게 한다
+        fields.add("조리 시간: " + (recipe.cookTimeMin() == null ? NO_COOK_TIME : recipe.cookTimeMin() + "분"));
         if (recipe.servings() != null) {
             fields.add(recipe.servings() + "인분");
         }

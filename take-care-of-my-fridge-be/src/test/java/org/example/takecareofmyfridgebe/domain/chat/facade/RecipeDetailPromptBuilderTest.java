@@ -43,6 +43,35 @@ class RecipeDetailPromptBuilderTest {
     }
 
     @Test
+    @DisplayName("실제 레시피 상세 응답 모양(조리 시간 없음, 줄바꿈·번호 기호가 든 단계, 팁 원문만)으로도 시간·재료·단계가 모두 들어간다")
+    void buildsRecipeInfo_fromRealResponseShape() {
+        // dev 레시피 722 황태탕수육 응답 모양 (조리 시간·인분·팁 요약 없음, 단계 6개)
+        RecipeDetailResponse recipe = RecipeDetailResponse.builder()
+                .recipeId(722L).name("황태탕수육").category("튀김").difficulty(3)
+                .tip("황태는 물기를 주면 부드러워요.")
+                .ingredients(List.of(
+                        new IngredientItem(1, 101L, "황태", "50g", null, "주재료", null, false),
+                        new IngredientItem(2, 102L, "녹말가루", "3큰술(30g)", null, "주재료", null, false),
+                        new IngredientItem(3, 103L, "저염간장", "1큰술", null, "양념", null, true)))
+                .steps(List.of(
+                        new StepItem(1, "황태는 가위로 약 3cm 길이로 잘라\n스프레이로 물기를 준다.", "https://img/1.jpg", null),
+                        new StepItem(2, "튀김 반죽(③)에 황태(①)를 넣어 섞은 후,\n170℃에서 약 1분 튀긴다.", null, null)))
+                .build();
+
+        String text = RecipeDetailPromptBuilder.build(recipe, null);
+
+        assertThat(text).isEqualTo("""
+                [레시피 정보]
+                이름: 황태탕수육 | 분류: 튀김 | 조리 시간: 레시피에 없음 | 난이도 3
+                재료: 황태 50g, 녹말가루 3큰술(30g)
+                기본 양념: 저염간장 1큰술
+                단계:
+                1. 황태는 가위로 약 3cm 길이로 잘라 스프레이로 물기를 준다.
+                2. 튀김 반죽(③)에 황태(①)를 넣어 섞은 후, 170℃에서 약 1분 튀긴다.
+                팁: 황태는 물기를 주면 부드러워요.""");
+    }
+
+    @Test
     @DisplayName("단계는 단계마다 120자까지 자르고 10단계까지만 넣은 뒤 뺀 단계 수를 쓴다")
     void cutsLongSteps() {
         List<StepItem> steps = IntStream.rangeClosed(1, 17)

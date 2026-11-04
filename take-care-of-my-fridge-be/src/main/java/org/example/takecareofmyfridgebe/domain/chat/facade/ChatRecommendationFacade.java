@@ -47,6 +47,8 @@ public class ChatRecommendationFacade {
 
     // 레시피 자세히 답에 붙는 카드 한 줄 이유 (설명 글이 없어 이 줄이 보인다)
     static final String DETAIL_CARD_REASON = "물어보신 레시피예요";
+    // 레시피 정보 DEBUG 로그에 남길 앞부분 글자 수
+    private static final int RECIPE_INFO_LOG_LENGTH = 300;
 
     private final RecipeCandidateFacade recipeCandidateFacade;
     private final RecipeService recipeService;
@@ -140,6 +142,10 @@ public class ChatRecommendationFacade {
         }
         RecipeCandidate candidate = recipeCandidateFacade.describeRecipes(memberId, List.of(recipeId)).get(recipeId);
         String recipeInfo = RecipeDetailPromptBuilder.build(recipe, candidate);
+        if (log.isDebugEnabled()) {
+            log.debug("상담 레시피 정보 - recipeId: {}, 글자 수: {}, 앞 300자: {}", recipeId, recipeInfo.length(),
+                    recipeInfo.substring(0, Math.min(RECIPE_INFO_LOG_LENGTH, recipeInfo.length())));
+        }
         RecommendedRecipe card = candidate == null
                 ? new RecommendedRecipe(recipe.recipeId(), recipe.name(), recipe.imageUrl(), recipe.category(),
                 recipe.cookTimeMin(), List.of(), List.of(), List.of(), List.of(), List.of(), false, DETAIL_CARD_REASON, null)
