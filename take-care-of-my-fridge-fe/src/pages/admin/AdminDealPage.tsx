@@ -147,6 +147,17 @@ export default function AdminDealPage() {
           : '할인 후보 분석을 실행하지 못했습니다.',
       ),
   });
+  const demoToggle = demoAvailable && (
+    <Button
+      className={styles.demoAction}
+      onClick={() => {
+        setSelectedCandidateIds([]);
+        setSearchParams(demo ? {} : { demo: '1' });
+      }}
+    >
+      {demo ? '최근 분석 보기' : '임의 할인 이벤트 추천 보기'}
+    </Button>
+  );
   const runControls = (
     <Form<AnalysisFormValues>
       form={analysisForm}
@@ -176,24 +187,8 @@ export default function AdminDealPage() {
           분석 실행
         </Button>
       </Form.Item>
+      {demoAvailable && <Form.Item className={styles.demoItem}>{demoToggle}</Form.Item>}
     </Form>
-  );
-  const demoToggle = demoAvailable && (
-    <Button
-      className={styles.demoAction}
-      onClick={() => {
-        setSelectedCandidateIds([]);
-        setSearchParams(demo ? {} : { demo: '1' });
-      }}
-    >
-      {demo ? '최근 분석 보기' : '임의 할인 이벤트 추천 보기'}
-    </Button>
-  );
-  const analysisControls = (
-    <div className={styles.analysisControls}>
-      {runControls}
-      {demoToggle}
-    </div>
   );
   const heading = (
     <div className={styles.heading}>
@@ -221,7 +216,7 @@ export default function AdminDealPage() {
     return (
       <div className={styles.container}>
         {heading}
-        {analysisControls}
+        {runControls}
         <Skeleton active paragraph={{ rows: 8 }} />
       </div>
     );
@@ -231,7 +226,7 @@ export default function AdminDealPage() {
       return (
         <div className={styles.container}>
           {heading}
-          {analysisControls}
+          {runControls}
           <Empty
             description={
               demo ? (
@@ -259,7 +254,7 @@ export default function AdminDealPage() {
   return (
     <section className={styles.container}>
       {heading}
-      {analysisControls}
+      {runControls}
       <Typography.Paragraph type="secondary">
         {analysis.targetWeekStart} 주 · {analysis.dayOfWeek ? dayLabels[analysis.dayOfWeek] : '-'}
         요일 · 분석 할인율 {analysis.discountRate}% · 최소 재고{' '}

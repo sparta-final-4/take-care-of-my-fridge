@@ -21,16 +21,14 @@
   margin-bottom: var(--ant-margin-xl);
 }
 
-.analysisControls {
-  display: flex;
-  align-items: flex-start;
-  flex-wrap: wrap;
-  gap: var(--ant-margin-sm);
+.analysisForm {
+  width: 100%;
   margin-bottom: var(--ant-margin-lg);
 }
 
-.analysisForm {
-  flex: 1 1 640px;
+.demoItem {
+  margin-inline-start: auto;
+  margin-inline-end: 0;
 }
 
 .headingTitle {
@@ -62,7 +60,6 @@
 
 .demoAction {
   width: 100%;
-  margin-left: auto;
 
   @include from(sm) {
     width: auto;
