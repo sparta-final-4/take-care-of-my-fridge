@@ -18,6 +18,7 @@ function recipe(overrides: Partial<ChatRecommendedRecipe>): ChatRecommendedRecip
     missingIngredients: [],
     missingSelectedIngredients: [],
     lacksManyIngredients: false,
+    reason: '감자를 쓸 수 있어요',
     ...overrides,
   };
 }
@@ -44,7 +45,14 @@ describe('ChatRecommendationCards', () => {
     expect(html).toContain('aria-label="참치김치찌개 레시피 보기"');
   });
 
-  it('둘째 줄에 가장 급한 임박 재료 하나, 냉장고에 없는 선택 재료, 장볼 재료 수, 장보기 필요를 보여 준다', () => {
+  it('둘째 줄에 추천 이유 한 줄을 보여 주고, 이유가 없으면 그 줄을 그리지 않는다', () => {
+    expect(render([recipe({ reason: '버섯·두부가 주재료예요' })])).toContain(
+      '버섯·두부가 주재료예요',
+    );
+    expect(render([recipe({ reason: '' })])).not.toContain('감자를 쓸 수 있어요');
+  });
+
+  it('셋째 줄에 가장 급한 임박 재료 하나, 냉장고에 없는 선택 재료, 장볼 재료 수, 장보기 필요를 보여 준다', () => {
     const html = render([
       recipe({
         imminentIngredients: [

@@ -37,12 +37,12 @@
   }
 }
 
-// 이미지 48px + 위아래 12px = 약 72px
+// 이미지 48px 옆에 세 줄(이름 · 이유 · 태그), 카드 한 장 약 80px
 .row {
   display: flex;
   align-items: center;
   gap: var(--ant-margin-sm);
-  padding: var(--ant-padding-sm);
+  padding: var(--ant-padding-xs) var(--ant-padding-sm);
   pointer-events: none;
 }
 
@@ -72,6 +72,10 @@
 .name {
   min-width: 0;
   font-size: var(--ant-font-size);
+}
+
+.reason {
+  font-size: var(--ant-font-size-sm);
 }
 
 .meta {

@@ -16,7 +16,7 @@ interface ChatRecommendationCardsProps {
   onNavigate?: () => void;
 }
 
-// AI 상담 추천 카드 (최대 3개). 설명 말풍선 아래에 작은 카드(약 72px)를 세로로 쌓는다.
+// AI 상담 추천 카드 (최대 3개). 소개 말풍선 아래에 작은 카드(약 80px, 세 줄)를 세로로 쌓는다.
 export function ChatRecommendationCards({ recipes, onNavigate }: ChatRecommendationCardsProps) {
   if (recipes.length === 0) return null;
   return (
@@ -68,6 +68,11 @@ function RecommendationCard({ recipe, onNavigate }: RecommendationCardProps) {
             </Typography.Text>
             <span className={styles.meta}>{meta}</span>
           </div>
+          {recipe.reason && (
+            <Typography.Text type="secondary" ellipsis className={styles.reason}>
+              {recipe.reason}
+            </Typography.Text>
+          )}
           <div className={styles.infoLine}>
             {imminent && (
               <Tag variant="filled" color={ddayTagColor(imminent.dDay)} className={styles.tag}>

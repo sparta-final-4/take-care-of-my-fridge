@@ -22,6 +22,7 @@ describe('parseChatRecommendations', () => {
           missingIngredients: [{ ingredientId: 21, name: '두부' }],
           missingSelectedIngredients: ['두부'],
           lacksManyIngredients: true,
+          reason: '느타리버섯·두부가 주재료예요',
         },
       ],
       relaxed: [],
@@ -42,6 +43,7 @@ describe('parseChatRecommendations', () => {
           missingIngredients: [{ ingredientId: 21, name: '두부' }],
           missingSelectedIngredients: ['두부'],
           lacksManyIngredients: true,
+          reason: '느타리버섯·두부가 주재료예요',
         },
       ],
       relaxed: [],
@@ -72,6 +74,7 @@ describe('parseChatRecommendations', () => {
       missingIngredients: [],
       missingSelectedIngredients: [],
       lacksManyIngredients: false,
+      reason: '',
     });
   });
 

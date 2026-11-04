@@ -30,6 +30,8 @@ export interface ChatRecommendedRecipe {
   missingSelectedIngredients: string[];
   // 재료를 많이 사야 함
   lacksManyIngredients: boolean;
+  // 추천 이유 한 줄 (예: "버섯·두부가 주재료예요"). 없으면 빈 문자열
+  reason: string;
 }
 
 export interface ChatRecommendations {
@@ -77,6 +79,7 @@ function toRecipe(value: Record<string, unknown>): ChatRecommendedRecipe | null 
     ),
     missingSelectedIngredients: strings(value.missingSelectedIngredients),
     lacksManyIngredients: value.lacksManyIngredients === true,
+    reason: typeof value.reason === 'string' ? value.reason : '',
   };
 }
 
