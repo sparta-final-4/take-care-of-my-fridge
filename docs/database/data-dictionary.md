@@ -292,6 +292,7 @@
 | 컬럼 | 타입 | NULL | 기본값 | 제약 | 의미 |
 |---|---|---|---|---|---|
 | order_id | BIGINT | 불가 | | FK | 결제할 주문 |
+| billing_key_id | BIGINT | 허용 | NULL | FK `fk_payments_billing_key`, 인덱스 | 등록 카드로 결제했으면 그 카드([billing_keys](#billing_keys--등록-카드)). 결제창 결제는 NULL |
 | portone_payment_id | VARCHAR(100) | 불가 | | UK | PortOne 결제 ID. 서버가 `payment-` + 하이픈 없는 UUID로 만든 40자. PortOne 결제의 멱등 키 역할 |
 | amount | BIGINT | 불가 | | | 결제 금액(원). 클라이언트 값이 아니라 주문 금액(`orders.total_amount`) |
 | pg_provider | ENUM('KAKAOPAY','KICC','INICIS','TOSSPAYMENTS','TOSSPAY') | 불가 | | | 결제대행사. 결제 준비 때 고른 값이고, 승인할 때 PG 조회로 확인한 실제 결제대행사가 다르면 그 값으로 고침 |
@@ -301,6 +302,25 @@
 | fail_reason | ENUM('PG_FAILED','USER_CANCELLED','AMOUNT_MISMATCH','TIMEOUT','ORDER_NOT_PAYABLE','SUPERSEDED') | 허용 | NULL | | 실패 사유. PG 실패·결제창 닫기·금액 불일치·만료·결제할 수 없는 주문·새 결제로 정리. 실패가 아니면 NULL |
 
 - 실행용 DDL 초안은 [payment.sql](payment.sql)에 있습니다. `pg_provider`와 `idx_payment_histories_created_at`은 아직 이 초안에 없고, 위 정의는 엔티티 기준입니다.
+
+## billing_keys — 등록 카드
+
+- 회원이 등록한 카드입니다. 카드 번호·유효기간은 PG가 보관하고 우리는 PortOne 빌링키와 화면 표시용 정보만 저장합니다. 설계는 [등록 카드 결제 설계](../architecture/domains/payment-card.md).
+- 삭제해도 행은 지우지 않고 `DELETED`로 남깁니다. 결제(`payments.billing_key_id`)가 카드를 참조하기 때문입니다.
+- 대표 카드는 회원당 사용 중 카드 중 하나이며, DB 제약이 아니라 회원 행 잠금 뒤 서비스 로직으로 지킵니다.
+- 제약 이름: UK `uk_billing_keys_billing_key`. 인덱스 `idx_billing_keys_member_status`(member_id, status), `idx_billing_keys_status_pg_deleted_at`(status, pg_deleted_at). FK `fk_billing_keys_member`.
+
+| 컬럼 | 타입 | NULL | 기본값 | 제약 | 의미 |
+|---|---|---|---|---|---|
+| member_id | BIGINT | 불가 | | FK, 인덱스 | 카드 주인 |
+| billing_key | VARCHAR(200) | 불가 | | UK | PortOne 빌링키. 응답으로 내려주지 않음 |
+| card_name | VARCHAR(100) | 허용 | NULL | | 카드 상품명(PortOne 빌링키 조회 `card.name`). 카드사 이름이 아님 |
+| card_last4 | CHAR(4) | 허용 | NULL | | 카드 번호 끝 4자리(PortOne 마스킹 번호 `card.number`에서 추출) |
+| card_type | ENUM('CREDIT','DEBIT','GIFT') | 허용 | NULL | | 신용·체크·기프트. PortOne이 주지 않으면 NULL |
+| is_default | BOOLEAN | 불가 | FALSE | | 대표 카드 여부 |
+| status | ENUM('ACTIVE','DELETED') | 불가 | 'ACTIVE' | 인덱스 | 사용 중·삭제 |
+| deleted_at | DATETIME(6) | 허용 | NULL | | 삭제 시각 |
+| pg_deleted_at | DATETIME(6) | 허용 | NULL | 인덱스 | PortOne 빌링키 삭제 확인 시각. 삭제 상태인데 NULL이면 PortOne 삭제 재시도 대상 |
 
 ## payment_histories — 결제 이력
 

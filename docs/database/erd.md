@@ -292,11 +292,13 @@ erDiagram
 
 ## 결제 테이블 관계
 
-결제 테이블 3개입니다. 컬럼 정의는 [데이터 사전](data-dictionary.md#payments--결제)에 있습니다.
+결제 테이블 4개입니다. 컬럼 정의는 [데이터 사전](data-dictionary.md#payments--결제)에 있습니다.
 
 ```mermaid
 erDiagram
     orders ||--o{ payments : "결제 시도"
+    members ||--o{ billing_keys : "등록 카드"
+    billing_keys |o--o{ payments : "등록 카드 결제"
     payments ||--o{ payment_histories : "이력"
     payments |o--o{ webhook_events : "웹훅"
 
@@ -305,9 +307,21 @@ erDiagram
         enum status
         bigint total_amount
     }
+    billing_keys {
+        bigint id PK
+        bigint member_id FK
+        varchar billing_key UK
+        varchar card_name
+        char card_last4
+        enum card_type
+        boolean is_default
+        enum status
+        datetime pg_deleted_at
+    }
     payments {
         bigint id PK
         bigint order_id FK
+        bigint billing_key_id FK
         varchar portone_payment_id UK
         bigint amount
         enum pg_provider
