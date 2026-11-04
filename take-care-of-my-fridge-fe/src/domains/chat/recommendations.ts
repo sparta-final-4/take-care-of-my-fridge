@@ -1,0 +1,106 @@
+// AI 상담 추천 카드 SSE 이벤트(event: recommendations)의 data.
+// SSE 이벤트 data는 OpenAPI 스펙에 나오지 않아 생성 타입이 없다. 그래서 백엔드 DTO
+// ChatRecommendationsEventResponse(domain/chat/dto)와 같은 모양으로 여기에 둔다. 필드를 바꾸면 둘 다 고친다.
+
+export interface ChatRecommendationImminentIngredient {
+  name: string;
+  // 오늘 기준 소비기한까지 남은 일수 (0이면 오늘까지)
+  dDay: number;
+}
+
+export interface ChatRecommendationMissingIngredient {
+  ingredientId: number;
+  name: string;
+}
+
+export interface ChatRecommendedRecipe {
+  recipeId: number;
+  name: string;
+  imageUrl: string | null;
+  category: string | null;
+  cookTimeMin: number | null;
+  // 쓰는 냉장고 재료 이름 (임박한 순)
+  usedIngredients: string[];
+  imminentIngredients: ChatRecommendationImminentIngredient[];
+  // 겹친 맛 (한글)
+  matchedTastes: string[];
+  // 냉장고에 없는 재료 (기본 양념 제외). 구매 링크는 아직 없다
+  missingIngredients: ChatRecommendationMissingIngredient[];
+  // 고른·말한 재료 중 냉장고에 없는 것의 이름 (missingIngredients에도 들어 있다)
+  missingSelectedIngredients: string[];
+  // 재료를 많이 사야 함
+  lacksManyIngredients: boolean;
+}
+
+export interface ChatRecommendations {
+  recipes: ChatRecommendedRecipe[];
+  // 후보를 찾으려고 푼 조건 (아직 항상 빈 목록)
+  relaxed: string[];
+  // 조건에 맞는 후보가 없음 (recipes는 빈 목록)
+  empty: boolean;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function strings(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === 'string')
+    : [];
+}
+
+function records(value: unknown): Record<string, unknown>[] {
+  return Array.isArray(value) ? value.filter(isRecord) : [];
+}
+
+function toRecipe(value: Record<string, unknown>): ChatRecommendedRecipe | null {
+  const { recipeId, name } = value;
+  if (typeof recipeId !== 'number' || typeof name !== 'string') return null;
+  return {
+    recipeId,
+    name,
+    imageUrl: typeof value.imageUrl === 'string' ? value.imageUrl : null,
+    category: typeof value.category === 'string' ? value.category : null,
+    cookTimeMin: typeof value.cookTimeMin === 'number' ? value.cookTimeMin : null,
+    usedIngredients: strings(value.usedIngredients),
+    imminentIngredients: records(value.imminentIngredients).flatMap((item) =>
+      typeof item.name === 'string' && typeof item.dDay === 'number'
+        ? [{ name: item.name, dDay: item.dDay }]
+        : [],
+    ),
+    matchedTastes: strings(value.matchedTastes),
+    missingIngredients: records(value.missingIngredients).flatMap((item) =>
+      typeof item.ingredientId === 'number' && typeof item.name === 'string'
+        ? [{ ingredientId: item.ingredientId, name: item.name }]
+        : [],
+    ),
+    missingSelectedIngredients: strings(value.missingSelectedIngredients),
+    lacksManyIngredients: value.lacksManyIngredients === true,
+  };
+}
+
+// 이벤트 data(JSON)를 읽는다. 모양이 다르면 null, 레시피 중 필수 값(id·이름)이 없는 것은 뺀다.
+export function parseChatRecommendations(data: string): ChatRecommendations | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(data);
+  } catch {
+    return null;
+  }
+  if (!isRecord(parsed) || !Array.isArray(parsed.recipes)) return null;
+  const recipes = records(parsed.recipes).flatMap((recipe) => toRecipe(recipe) ?? []);
+  return {
+    recipes,
+    relaxed: strings(parsed.relaxed),
+    empty: parsed.empty === true || recipes.length === 0,
+  };
+}
+
+// 임박 재료 태그 문구. 백엔드 추천 설명과 같은 말을 쓴다.
+export function formatImminentLabel(dDay: number): string {
+  if (dDay <= 0) return '오늘까지';
+  if (dDay === 1) return '내일까지';
+  if (dDay === 2) return '모레까지';
+  return `${dDay}일 남음`;
+}

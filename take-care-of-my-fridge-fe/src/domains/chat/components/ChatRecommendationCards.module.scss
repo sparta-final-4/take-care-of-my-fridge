@@ -1,0 +1,83 @@
+@use '@/styles/mixins' as *;
+@use '@/styles/variables' as *;
+
+.cards {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ant-margin-xs);
+  margin: 0 0 var(--ant-margin-xs);
+  padding: 0;
+  list-style: none;
+}
+
+.card {
+  border: 1px solid var(--ant-color-border-secondary);
+  border-radius: var(--ant-border-radius-lg);
+  background: var(--ant-color-bg-container);
+  overflow: hidden;
+}
+
+// 카드 전체가 레시피 상세로 가는 링크 (클릭 영역 44px 이상)
+.link {
+  display: flex;
+  gap: var(--ant-margin-sm);
+  padding: var(--ant-padding-xs);
+  color: inherit;
+
+  &:hover {
+    background: var(--ant-color-fill-quaternary);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--ant-color-primary);
+    outline-offset: -2px;
+  }
+}
+
+.thumb {
+  flex-shrink: 0;
+  width: $chat-recommend-thumb-size;
+  height: $chat-recommend-thumb-size;
+  border-radius: var(--ant-border-radius);
+  object-fit: cover;
+}
+
+.body {
+  min-width: 0;
+  flex: 1;
+}
+
+.name {
+  font-size: var(--ant-font-size);
+}
+
+.meta {
+  font-size: var(--ant-font-size-sm);
+}
+
+.tag {
+  margin-inline-end: 0;
+  font-size: var(--ant-font-size-sm);
+}
+
+.missing {
+  display: flex;
+  flex-direction: column;
+  padding: 0 var(--ant-padding-xs) var(--ant-padding-xs);
+}
+
+// 모바일은 터치 영역 44px, md부터는 글자 크기만큼
+.missingToggle {
+  align-self: flex-start;
+  min-height: 44px;
+  padding-inline: 0;
+  font-size: var(--ant-font-size-sm);
+
+  @include from(md) {
+    min-height: 0;
+  }
+}
+
+.missingNames {
+  font-size: var(--ant-font-size-sm);
+}
