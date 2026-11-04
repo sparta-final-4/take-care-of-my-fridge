@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -25,7 +26,7 @@ class RecommendationPromptBuilderTest {
     private static final Map<Long, String> NAMES = Map.of(TOFU, "두부", MUSHROOM, "버섯", CUCUMBER, "오이");
 
     @Test
-    @DisplayName("사용자 요청과 후보를 줄 글로 만들고 맛은 한글, 임박 재료는 오늘까지인 양파처럼 말 순서로 쓴다")
+    @DisplayName("사용자 요청과 후보를 줄 글로 만들고 맛은 한글로, 쓰는 냉장고 재료는 이름만 쓰며 임박 재료는 첫 추천 안내 문장으로 넣는다")
     void buildsCandidateLines() {
         RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(MUSHROOM, TOFU), List.of(Taste.SPICY), List.of("찌개", "국"),
                 30, List.of(CUCUMBER), true);
@@ -43,12 +44,14 @@ class RecommendationPromptBuilderTest {
         String text = RecommendationPromptBuilder.build("버섯 두부로 매운 찌개", query, NAMES, List.of(first, second), false);
 
         assertThat(text).isEqualTo("""
+                [이미 안내한 말]
+                오늘까지인 양파를 같이 쓸 수 있어요
                 [사용자 요청]
                 메시지: 버섯 두부로 매운 찌개
                 선택 재료: 버섯, 두부 (이 재료를 꼭 쓰는 레시피만)
                 조건: 원하는 맛 매운맛 / 분류 찌개, 국 / 30분 이내 / 뺄 재료 오이
                 [추천 후보]
-                후보: 두부버섯찌개 | 찌개 | 조리 시간 25분 | 카드 이유: 매콤한 요리예요 | 쓰는 냉장고 재료: 오늘까지인 양파, 3일 남은 대파, 두부 | 원하는 맛과 맞음: 매운맛 | 장볼 재료: 돼지고기, 부추, 당근 외 2개 | 재료 많이 모자람
+                후보: 두부버섯찌개 | 찌개 | 조리 시간 25분 | 카드 이유: 매콤한 요리예요 | 쓰는 냉장고 재료: 양파, 대파, 두부 | 원하는 맛과 맞음: 매운맛 | 장볼 재료: 돼지고기, 부추, 당근 외 2개 | 재료 많이 모자람
                 후보: 버섯전 | 전 | 조리 시간 정보 없음 | 카드 이유: 새로 만들어 볼 만한 요리예요 | 쓰는 냉장고 재료: 없음 | 장볼 재료: 없음""");
     }
 
@@ -96,8 +99,9 @@ class RecommendationPromptBuilderTest {
         assertThat(text).startsWith("""
                 [이미 안내한 말]
                 말씀하신 표고버섯, 두부, 팽이버섯은 지금 냉장고에 없어서 준비가 필요해요
+                내일까지인 대파를 같이 쓸 수 있어요
                 [사용자 요청]""");
-        assertThat(text).contains("후보: 표고두부전골 | 전골 | 조리 시간 30분 | 카드 이유: 표고버섯·두부가 주재료예요 | 선택 재료 쓰임: 표고버섯, 두부 | 쓰는 냉장고 재료: 내일까지인 대파 | 냉장고에 없는 선택 재료: 표고버섯, 두부 | 장볼 재료: 표고버섯, 두부");
+        assertThat(text).contains("후보: 표고두부전골 | 전골 | 조리 시간 30분 | 카드 이유: 표고버섯·두부가 주재료예요 | 선택 재료 쓰임: 표고버섯, 두부 | 쓰는 냉장고 재료: 대파 | 냉장고에 없는 선택 재료: 표고버섯, 두부 | 장볼 재료: 표고버섯, 두부");
     }
 
     @Test
@@ -298,6 +302,49 @@ class RecommendationPromptBuilderTest {
         assertThat(RecommendationPromptBuilder.build("김피탕같은 요리", query, NAMES, picked, true))
                 .startsWith("[이미 안내한 말]\n김피탕 레시피는 없어서, 비슷한 탕수육을 골랐어요\n[사용자 요청]");
         assertThat(RecommendationPromptBuilder.notices(RecipeQuery.of(MEMBER_ID, List.of()), picked, false)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("이 상담에서 처음 추천할 때만 가장 급한 임박 재료(같은 소비기한이면 2개까지)로 문장을 붙이고, 이미 추천한 뒤(다시 추천 포함)에는 붙이지 않는다")
+    void addsImminentNotice_onlyOnFirstRecommendation() {
+        RecipeCandidate first = candidate(1L, "고추전", "전", null, reason(List.of("고추", "깻잎", "양파"),
+                List.of(new ImminentIngredient("고추", 1), new ImminentIngredient("깻잎", 1), new ImminentIngredient("양파", 2)),
+                List.of(), List.of(), List.of(), false));
+        RecipeCandidate second = candidate(2L, "양파볶음", "볶음", null, reason(List.of("양파", "대파"),
+                List.of(new ImminentIngredient("양파", 2), new ImminentIngredient("대파", 1)), List.of(), List.of(), List.of(), false));
+        RecipeQuery firstQuery = RecipeQuery.of(MEMBER_ID, List.of());
+
+        assertThat(RecommendationPromptBuilder.notices(firstQuery, List.of(first, second), false))
+                .containsExactly("내일까지인 고추와 깻잎을 같이 쓸 수 있어요");
+        assertThat(RecommendationPromptBuilder.notices(firstQuery.withAlreadyRecommended(Set.of(99L)), List.of(first, second), false))
+                .isEmpty();
+        assertThat(RecommendationPromptBuilder.build("다른 거 없어?", firstQuery.withAlreadyRecommended(Set.of(99L)), NAMES,
+                List.of(first), false)).doesNotContain("[이미 안내한 말]", "같이 쓸 수 있어요");
+    }
+
+    @Test
+    @DisplayName("순한 맛을 원하면 고추·청양고추 같은 매운 재료는 임박 문장에서 빼고, 남는 재료가 없으면 문장을 붙이지 않는다")
+    void dropsSpicyImminent_whenMildWanted() {
+        RecipeQuery mild = new RecipeQuery(MEMBER_ID, List.of(), List.of(Taste.MILD), null, null, null, false);
+        RecipeCandidate spicyOnly = candidate(1L, "고추전", "전", null, reason(List.of("청양고추", "고춧가루"),
+                List.of(new ImminentIngredient("청양고추", 0), new ImminentIngredient("고춧가루", 0)), List.of(), List.of(), List.of(), false));
+        RecipeCandidate withOnion = candidate(2L, "양파볶음", "볶음", null, reason(List.of("고추", "양파"),
+                List.of(new ImminentIngredient("고추", 0), new ImminentIngredient("양파", 1)), List.of(), List.of(), List.of(), false));
+
+        // 순한 맛(요청)에 맞은 후보라 "조건에 맞는 레시피를 찾지 못해서" 안내는 붙지 않는다
+        spicyOnly = requestMatched(spicyOnly);
+        withOnion = requestMatched(withOnion);
+
+        assertThat(RecommendationPromptBuilder.notices(mild, List.of(spicyOnly), false)).isEmpty();
+        assertThat(RecommendationPromptBuilder.notices(mild, List.of(withOnion), false))
+                .containsExactly("내일까지인 양파를 같이 쓸 수 있어요");
+        assertThat(RecommendationPromptBuilder.notices(RecipeQuery.of(MEMBER_ID, List.of()), List.of(withOnion), false))
+                .containsExactly("오늘까지인 고추를 같이 쓸 수 있어요");
+    }
+
+    private static RecipeCandidate requestMatched(RecipeCandidate candidate) {
+        return new RecipeCandidate(candidate.recipeId(), candidate.name(), candidate.category(), candidate.cookTimeMin(),
+                new Ranking(1, 0, 0, 0, 1, 1, 0), candidate.reason());
     }
 
     private static RecipeQuery kimpiQuery(Map<Long, KeywordMatch> matches) {

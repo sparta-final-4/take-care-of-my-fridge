@@ -25,7 +25,7 @@ import java.util.stream.Collectors;
  * 선택 재료: 버섯, 두부 (이 재료를 꼭 쓰는 레시피만)
  * 조건: 원하는 맛 매운맛 / 분류 국, 찌개 / 30분 이내 / 뺄 재료 오이
  * [추천 후보]
- * 후보: 두부제육찜 | 찜 | 조리 시간 40분 | 카드 이유: 두부가 주재료예요 | 선택 재료 쓰임: 두부 | 쓰는 냉장고 재료: 오늘까지인 양파, 모레까지인 고추, 배추 | 냉장고에 없는 선택 재료: 두부 | 원하는 맛과 맞음: 매운맛 | 장볼 재료: 돼지고기, 부추, 당근 외 3개 | 재료 많이 모자람
+ * 후보: 두부제육찜 | 찜 | 조리 시간 40분 | 카드 이유: 두부가 주재료예요 | 선택 재료 쓰임: 두부 | 쓰는 냉장고 재료: 양파, 고추, 배추 | 냉장고에 없는 선택 재료: 두부 | 원하는 맛과 맞음: 매운맛 | 장볼 재료: 돼지고기, 부추, 당근 외 3개 | 재료 많이 모자람
  * </pre>
  * 안내 문장({@link #notices})은 원한 표현이 있는데 고른 레시피가 요청에 하나도 안 맞거나, 요리 이름 키워드로 레시피를 못 찾았거나,
  * 고른 후보 중 냉장고에 없는 선택 재료가 있을 때만 만든다 (AI가 판단하지 않게 서버가 정한다).
@@ -40,6 +40,10 @@ public final class RecommendationPromptBuilder {
     static final String ALTERNATIVE_MARK = "[다른 제안]";
     // 못 찾았다는 안내에 넣을 비슷한 요리 이름 수
     private static final int SIMILAR_NAMES_SHOWN = 2;
+    // 임박 재료 문장에 넣을 재료 수
+    private static final int IMMINENT_NAMES_SHOWN = 2;
+    // 이름에 들어 있으면 매운 재료로 보는 말 (고추·청양고추·홍고추·고춧가루 등)
+    private static final List<String> SPICY_NAME_PARTS = List.of("고추", "고춧", "청양", "할라피뇨", "페퍼론치노");
     private static final int MISSING_SHOWN = 3;
     private static final String NONE = "없음";
     private static final String FIELD_DELIMITER = " | ";
@@ -83,7 +87,9 @@ public final class RecommendationPromptBuilder {
     /**
      * 소개 맨 앞에 서버가 붙일 안내 문장. 없으면 빈 목록.
      * 원한 게 있었는데 고른 레시피가 요청(키워드·분류·맛)에 하나도 안 맞으면 그렇다고 먼저 말하고,
-     * 그렇지 않고 키워드로 이름·재료가 맞은 레시피만 없으면 비슷한 걸 골랐다고 말한다. 냉장고에 없는 선택 재료 안내는 따로 붙인다
+     * 그렇지 않고 키워드로 이름·재료가 맞은 레시피만 없으면 비슷한 걸 골랐다고 말한다. 냉장고에 없는 선택 재료 안내는 따로 붙인다.
+     * 임박 재료 문장("내일까지인 고추를 같이 쓸 수 있어요")은 이 상담에서 처음 추천할 때만 붙인다 (이미 추천한 레시피가 없을 때).
+     * 다시 추천은 늘 직전 추천 뒤라 붙지 않고, 이후 추천도 카드의 임박 태그로 충분하다
      */
     public static List<String> notices(RecipeQuery query, List<RecipeCandidate> picked, boolean keywordsNotFound) {
         List<String> notices = new ArrayList<>();
@@ -96,7 +102,44 @@ public final class RecommendationPromptBuilder {
         if (missingNotice != null) {
             notices.add(missingNotice);
         }
+        if (query.alreadyRecommendedIds().isEmpty()) {
+            String imminent = imminentNotice(picked, query.wantedTastes().contains(Member.Taste.MILD));
+            if (imminent != null) {
+                notices.add(imminent);
+            }
+        }
         return notices;
+    }
+
+    /**
+     * 고른 카드들이 쓰는 임박 재료 중 가장 급한 것(같은 소비기한이면 2개까지)으로 문장을 만든다. 없으면 null.
+     * 예: "내일까지인 고추를 같이 쓸 수 있어요", "오늘까지인 양파와 대파를 같이 쓸 수 있어요"
+     *
+     * @param avoidSpicy 순한 맛을 원했으면 true. 고추·청양고추 같은 매운 재료는 문장에서 뺀다
+     */
+    static String imminentNotice(List<RecipeCandidate> picked, boolean avoidSpicy) {
+        List<ImminentIngredient> imminent = picked.stream()
+                .flatMap(candidate -> candidate.reason().imminentIngredients().stream())
+                .filter(ingredient -> !avoidSpicy || !isSpicy(ingredient.name()))
+                .toList();
+        if (imminent.isEmpty()) {
+            return null;
+        }
+        long mostUrgent = imminent.stream().mapToLong(ImminentIngredient::dDay).min().orElseThrow();
+        List<String> names = imminent.stream()
+                .filter(ingredient -> ingredient.dDay() == mostUrgent)
+                .map(ImminentIngredient::name)
+                .distinct()
+                .limit(IMMINENT_NAMES_SHOWN)
+                .toList();
+        String last = names.get(names.size() - 1);
+        String joined = names.size() == 1 ? last : names.get(0) + withParticle(names.get(0)) + " " + last;
+        return dDayLabel(mostUrgent) + " " + joined + objectParticle(last) + " 같이 쓸 수 있어요";
+    }
+
+    // 매운 재료인지 (순한 맛을 원하면 임박 문장에서 뺀다)
+    static boolean isSpicy(String name) {
+        return SPICY_NAME_PARTS.stream().anyMatch(name::contains);
     }
 
     // 원한 표현이나 요청 조건(키워드·분류·맛)이 있는데 고른 레시피 중 요청에 맞은 것이 하나도 없는지
@@ -247,16 +290,12 @@ public final class RecommendationPromptBuilder {
         return String.join(FIELD_DELIMITER, fields);
     }
 
-    // 쓰는 냉장고 재료. 임박 재료는 말 순서대로 앞에 소비기한을 붙인다 ("내일까지인 고추")
+    // 쓰는 냉장고 재료 이름만. 임박 재료 이야기는 서버가 [이미 안내한 말]로 하고 AI는 하지 않으므로 소비기한은 붙이지 않는다
     private static String usedLine(Reason reason) {
         if (reason.usedFridgeIngredients().isEmpty()) {
             return NONE;
         }
-        Map<String, Long> dDays = reason.imminentIngredients().stream()
-                .collect(Collectors.toMap(ImminentIngredient::name, ImminentIngredient::dDay, (a, b) -> a));
-        return reason.usedFridgeIngredients().stream()
-                .map(name -> dDays.containsKey(name) ? dDayLabel(dDays.get(name)) + " " + name : name)
-                .collect(Collectors.joining(NAME_DELIMITER));
+        return String.join(NAME_DELIMITER, reason.usedFridgeIngredients());
     }
 
     // 소비기한을 재료 이름 앞에 붙일 말로 쓴다 (AI가 D-1을 "오늘까지"로 잘못 읽거나 괄호째 옮겨 쓰지 않게)

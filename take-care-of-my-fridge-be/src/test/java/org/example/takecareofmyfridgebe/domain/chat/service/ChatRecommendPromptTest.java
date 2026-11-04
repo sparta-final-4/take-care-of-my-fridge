@@ -54,9 +54,18 @@ class ChatRecommendPromptTest {
     }
 
     @Test
-    @DisplayName("소비기한 재료는 소개에서 한 번만 말하게 한다")
-    void allowsImminentOnceInIntro() {
-        assertThat(prompt).contains("소개에서 \"내일까지인 고추를 같이 쓸 수 있어요\"처럼 한 번만 말해도 된다");
+    @DisplayName("임박 재료·소비기한 이야기는 소개·카드 설명 모두 쓰지 않게 하고(서버가 붙임), 출력 예시에도 없다")
+    void forbidsImminentTalk() {
+        assertThat(prompt).contains("소개·카드 설명 모두 임박 재료·소비기한 이야기",
+                "필요하면 서버가 [이미 안내한 말]로 이미 했다. 카드 이유가 임박 재료 이야기여도 옮기지 않는다")
+                .doesNotContain("[소개] 냉면처럼 즐길 수 있는 면 요리를 골랐어요. 내일까지인 고추", "한 번만 말해도 된다");
+    }
+
+    @Test
+    @DisplayName("소개는 사용자 요청을 되풀이하거나 요약하지 않고 고른 요리 자체를 소개하게 한다")
+    void forbidsRepeatingRequest() {
+        assertThat(prompt).contains("사용자 요청을 되풀이하거나 요약하지 않는다",
+                "\"매운 요리를 제외하고 다양한 요리를 추천해 드릴게요\", \"○○로 추천해 드릴게요\" 같은 말은 쓰지 않는다");
     }
 
     @Test
@@ -70,12 +79,11 @@ class ChatRecommendPromptTest {
     }
 
     @Test
-    @DisplayName("임박은 짧게·말 그대로, 선택 재료는 주재료로, 장볼 재료 표현, 카드 정보에 없는 특징·찾았다는 단정 금지는 그대로다")
+    @DisplayName("선택 재료는 주재료로, 장볼 재료 표현, 카드 정보에 없는 특징·찾았다는 단정 금지는 그대로다")
     void keepsExistingRules() {
-        assertThat(prompt).contains("내일까지인 고추", "적힌 그대로 쓰고 바꾸지 않는다", "쓰는 냉장고 재료를 전부 나열하지 않는다",
+        assertThat(prompt).contains("쓰는 냉장고 재료를 나열하지 않는다",
                 "그 재료가 주재료로 들어간다고 말할 수 있다", "\"부족한 재료\"라고 하지 않고 \"장볼 재료\"로 말한다",
                 "카드 정보에 없는 특징(차가운, 따뜻한, 매운, 바삭한 등)을 붙여 단정하지 않는다",
-                "사용자 요청을 되풀이해서 \"○○로 추천해 드릴게요\"라고 하지 않는다",
                 "\"찾지 못했어요\", \"조건을 바꿔 보세요\"");
     }
 
