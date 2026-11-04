@@ -1,0 +1,56 @@
+.bar {
+  display: flex;
+  align-items: center;
+  gap: var(--ant-margin);
+  padding: var(--ant-padding-sm) var(--ant-padding-lg);
+  background: var(--ant-color-bg-container);
+  border: 1px solid var(--ant-color-border-secondary);
+  border-radius: var(--ant-border-radius-lg);
+}
+
+.label {
+  flex-shrink: 0;
+}
+
+// 데스크톱 폭에서 10개가 한 줄에 들어가게 간격을 좁게 둔다. 좁은 화면에서는 옆으로 넘겨 본다.
+.list {
+  display: flex;
+  gap: var(--ant-margin-xs);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  overflow-x: auto;
+  list-style: none;
+  scrollbar-width: none;
+}
+
+.item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ant-margin-xxs);
+  padding: var(--ant-padding-xxs) var(--ant-padding-xs);
+  color: inherit;
+  white-space: nowrap;
+  text-decoration: none;
+  border-radius: var(--ant-border-radius);
+  transition: background-color var(--ant-motion-duration-mid);
+
+  &:hover {
+    color: inherit;
+    background-color: var(--ant-color-fill-quaternary);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--ant-color-primary);
+    outline-offset: -2px;
+  }
+}
+
+.rank {
+  font-weight: var(--ant-font-weight-strong);
+  color: var(--ant-color-text-tertiary);
+
+  &.topRank {
+    color: var(--ant-color-primary);
+  }
+}

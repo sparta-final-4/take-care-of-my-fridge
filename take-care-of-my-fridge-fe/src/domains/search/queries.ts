@@ -6,7 +6,13 @@ import type {
   SearchFridgeMatchRequest,
 } from '@/common/api/clients';
 
-import { matchSearchFridge, searchProducts, searchRecipes, suggestSearchKeywords } from './api';
+import {
+  getPopularSearchKeywords,
+  matchSearchFridge,
+  searchProducts,
+  searchRecipes,
+  suggestSearchKeywords,
+} from './api';
 
 export const searchQueries = {
   all: ['search'] as const,
@@ -30,6 +36,13 @@ export const searchQueries = {
       queryFn: ({ signal }) => suggestSearchKeywords(keyword, signal),
       staleTime: 5 * 60 * 1000,
       placeholderData: keepPreviousData,
+    }),
+  // 순위가 몇 분 늦게 바뀌어도 괜찮으므로 화면을 옮길 때마다 다시 받지 않는다.
+  popular: () =>
+    queryOptions({
+      queryKey: [...searchQueries.all, 'popular'],
+      queryFn: ({ signal }) => getPopularSearchKeywords(signal),
+      staleTime: 5 * 60 * 1000,
     }),
   fridgeMatch: (request: SearchFridgeMatchRequest) =>
     queryOptions({
