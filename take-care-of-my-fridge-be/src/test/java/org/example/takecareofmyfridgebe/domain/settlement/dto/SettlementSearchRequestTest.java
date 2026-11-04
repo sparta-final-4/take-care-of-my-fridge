@@ -35,19 +35,19 @@ class SettlementSearchRequestTest {
 
     @Test
     @DisplayName("오늘까지 고른 기간은 통과한다")
-    void endDateToday_passes() {
+    void validate_success_whenEndDateIsToday() {
         assertThat(messages(TODAY.minusDays(7), TODAY)).isEmpty();
     }
 
     @Test
     @DisplayName("종료일이 내일 이후면 막는다")
-    void endDateAfterToday_fails() {
+    void validate_fail_whenEndDateAfterToday() {
         assertThat(messages(TODAY, TODAY.plusDays(1))).containsExactly("종료일은 오늘까지 선택할 수 있습니다.");
     }
 
     @Test
     @DisplayName("시작일부터 3개월 전날까지는 고를 수 있다")
-    void withinThreeMonths_passes() {
+    void validate_success_whenPeriodWithinThreeMonths() {
         LocalDate start = TODAY.minusMonths(4);
 
         assertThat(messages(start, start.plusMonths(3).minusDays(1))).isEmpty();
@@ -55,7 +55,7 @@ class SettlementSearchRequestTest {
 
     @Test
     @DisplayName("조회 기간이 3개월을 넘으면 막는다")
-    void overThreeMonths_fails() {
+    void validate_fail_whenPeriodOverThreeMonths() {
         LocalDate start = TODAY.minusMonths(4);
 
         assertThat(messages(start, start.plusMonths(3))).containsExactly("조회 기간은 최대 3개월입니다.");
@@ -63,7 +63,7 @@ class SettlementSearchRequestTest {
 
     @Test
     @DisplayName("종료일이 시작일보다 빠르면 막는다")
-    void endBeforeStart_fails() {
+    void validate_fail_whenEndDateBeforeStartDate() {
         assertThat(messages(TODAY, TODAY.minusDays(1))).containsExactly("종료일은 시작일과 같거나 늦어야 합니다.");
     }
 

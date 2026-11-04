@@ -36,7 +36,7 @@ class RefundReconcileSchedulerTest {
 
     @Test
     @DisplayName("서버가 여러 대여도 한 대만 실행하도록 서버 간 잠금을 건다")
-    void locksAcrossServers() throws NoSuchMethodException {
+    void reconcileStaleRefunds_haveSchedulerLock() throws NoSuchMethodException {
         SchedulerLock lock = RefundReconcileScheduler.class.getMethod("reconcileStaleRefunds")
                 .getAnnotation(SchedulerLock.class);
 
@@ -46,7 +46,7 @@ class RefundReconcileSchedulerTest {
 
     @Test
     @DisplayName("10분 넘게 요청 상태인 환불의 결제를 같은 기준 시각으로 PG와 맞춘다")
-    void reconcilesWithStaleDeadline() {
+    void reconcileStaleRefunds_syncWithPgByStaleDeadline() {
         LocalDateTime before = LocalDateTime.now();
         given(refundQueryService.findPaymentsWithRequestedBefore(any())).willReturn(List.of("payment-1"));
 
@@ -63,7 +63,7 @@ class RefundReconcileSchedulerTest {
 
     @Test
     @DisplayName("한 결제의 정리가 실패해도 나머지 결제는 계속 정리한다")
-    void oneFailure_othersStillProcessed() {
+    void reconcileStaleRefunds_continueOthers_whenOnePaymentFails() {
         given(refundQueryService.findPaymentsWithRequestedBefore(any())).willReturn(List.of("payment-1", "payment-2"));
         willThrow(new IllegalStateException("PG 오류")).given(refundFacade)
                 .syncWithPg(eq("payment-1"), eq(PaymentChangedBy.SCHEDULER), any());
@@ -76,7 +76,7 @@ class RefundReconcileSchedulerTest {
 
     @Test
     @DisplayName("주문 상태 맞춤이 실패해도 스케줄러 밖으로 예외를 던지지 않는다")
-    void syncOrderStatusesFailure_isCaught() {
+    void reconcileStaleRefunds_catchException_whenSyncOrderStatusesFails() {
         given(refundQueryService.findPaymentsWithRequestedBefore(any())).willReturn(List.of());
         willThrow(new IllegalStateException("DB 오류")).given(refundFacade).syncOrderStatuses();
 

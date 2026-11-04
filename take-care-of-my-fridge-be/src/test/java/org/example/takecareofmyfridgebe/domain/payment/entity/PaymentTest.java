@@ -16,14 +16,14 @@ class PaymentTest {
 
     @Test
     @DisplayName("만료 시각 이전이나 같은 시각에 결제가 끝났으면 기한 내다")
-    void paidOnOrBeforeExpiry_isInTime() {
+    void isPaidAfterExpiry_returnFalse_whenPaidOnOrBeforeExpiry() {
         assertThat(payment.isPaidAfterExpiry(EXPIRES_AT.minusSeconds(1))).isFalse();
         assertThat(payment.isPaidAfterExpiry(EXPIRES_AT)).isFalse();
     }
 
     @Test
     @DisplayName("만료 시각보다 늦게 결제가 끝났으면 만료 후 결제다")
-    void paidAfterExpiry_isExpired() {
+    void isPaidAfterExpiry_returnTrue_whenPaidAfterExpiry() {
         assertThat(payment.isPaidAfterExpiry(EXPIRES_AT.plusNanos(1))).isTrue();
     }
 }

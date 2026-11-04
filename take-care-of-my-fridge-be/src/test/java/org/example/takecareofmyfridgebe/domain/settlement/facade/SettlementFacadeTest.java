@@ -30,7 +30,7 @@ class SettlementFacadeTest {
 
     @Test
     @DisplayName("집계는 한 번만 실행한다")
-    void aggregate_runsOnce() {
+    void aggregate_callServiceOnce() {
         settlementFacade.aggregate(SALES_DATE);
 
         verify(settlementCommandService, times(1)).aggregate(SALES_DATE);
@@ -38,7 +38,7 @@ class SettlementFacadeTest {
 
     @Test
     @DisplayName("같은 날 행을 동시에 만들어 UNIQUE 충돌이 나면 한 번 더 집계해 덮어쓴다")
-    void aggregate_salesDateConflict_retriesOnce() {
+    void aggregate_retryOnce_whenSalesDateConflicts() {
         willThrow(conflict("Duplicate entry '2026-10-28' for key 'daily_sales.uk_daily_sales_sales_date'"))
                 .willDoNothing()
                 .given(settlementCommandService).aggregate(SALES_DATE);
@@ -50,7 +50,7 @@ class SettlementFacadeTest {
 
     @Test
     @DisplayName("다른 제약 위반은 다시 시도하지 않고 그대로 던진다")
-    void aggregate_otherViolation_rethrows() {
+    void aggregate_throwException_whenOtherConstraintViolated() {
         DataIntegrityViolationException exception = conflict("Column 'sales_date' cannot be null");
         willThrow(exception).given(settlementCommandService).aggregate(SALES_DATE);
 

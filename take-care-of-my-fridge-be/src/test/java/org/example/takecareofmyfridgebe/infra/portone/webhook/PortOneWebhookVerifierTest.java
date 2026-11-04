@@ -40,7 +40,7 @@ class PortOneWebhookVerifierTest {
 
     @Test
     @DisplayName("서명이 맞으면 type과 paymentId를 꺼낸다")
-    void verify_validSignature() throws Exception {
+    void verify_success_whenValidSignature() throws Exception {
         String timestamp = now();
 
         PortOneWebhook webhook = verifier.verify(PAID_BODY, WEBHOOK_ID, sign(WEBHOOK_ID, timestamp, PAID_BODY), timestamp);
@@ -51,7 +51,7 @@ class PortOneWebhookVerifierTest {
 
     @Test
     @DisplayName("SDK가 모르는 type도 원문 type을 그대로 돌려준다")
-    void verify_unknownType() throws Exception {
+    void verify_returnRawType_whenUnknownType() throws Exception {
         String body = "{\"type\":\"Transaction.Unknown\",\"data\":{}}";
         String timestamp = now();
 
@@ -63,7 +63,7 @@ class PortOneWebhookVerifierTest {
 
     @Test
     @DisplayName("본문이 바뀌면 서명 검증에 실패한다")
-    void verify_tamperedBody() throws Exception {
+    void verify_throwException_whenBodyTampered() throws Exception {
         String timestamp = now();
         String signature = sign(WEBHOOK_ID, timestamp, PAID_BODY);
         String tampered = PAID_BODY.replace("payment-1", "payment-2");
@@ -75,7 +75,7 @@ class PortOneWebhookVerifierTest {
 
     @Test
     @DisplayName("서명 헤더가 없으면 검증에 실패한다")
-    void verify_missingHeaders() {
+    void verify_throwException_whenHeadersMissing() {
         assertThatThrownBy(() -> verifier.verify(PAID_BODY, null, null, null))
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode").isEqualTo(ErrorCode.INVALID_WEBHOOK_SIGNATURE);
@@ -83,7 +83,7 @@ class PortOneWebhookVerifierTest {
 
     @Test
     @DisplayName("5분이 넘은 웹훅은 서명이 맞아도 거절한다")
-    void verify_oldTimestamp() throws Exception {
+    void verify_throwException_whenTimestampTooOld() throws Exception {
         String timestamp = String.valueOf(System.currentTimeMillis() / 1000 - 600);
         String signature = sign(WEBHOOK_ID, timestamp, PAID_BODY);
 

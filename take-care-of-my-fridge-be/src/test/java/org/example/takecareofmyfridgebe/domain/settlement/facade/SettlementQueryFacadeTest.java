@@ -49,7 +49,7 @@ class SettlementQueryFacadeTest {
 
     @Test
     @DisplayName("집계되지 않은 날을 먼저 집계한 뒤 기간의 일별 매출을 읽는다")
-    void getSettlement_aggregatesMissingDatesBeforeReading() {
+    void getSettlement_aggregateMissingDatesBeforeReading() {
         LocalDate start = date(10, 1);
         LocalDate end = date(10, 3);
         given(settlementQueryService.findMissingDates(start, end)).willReturn(List.of(date(10, 1), date(10, 3)));
@@ -70,7 +70,7 @@ class SettlementQueryFacadeTest {
 
     @Test
     @DisplayName("기간에 오늘이 있으면 어제까지는 일별 매출을 읽고 오늘은 지금까지의 매출을 붙인다")
-    void getSettlement_includesToday_appendsLiveSales() {
+    void getSettlement_appendTodaySales_whenPeriodIncludesToday() {
         LocalDate start = date(10, 28);
         given(settlementQueryService.findMissingDates(start, YESTERDAY)).willReturn(List.of());
         given(settlementQueryService.getDailySales(start, YESTERDAY))
@@ -88,7 +88,7 @@ class SettlementQueryFacadeTest {
 
     @Test
     @DisplayName("오늘만 조회하면 daily_sales는 보지 않고 지금까지의 매출만 센다")
-    void getSettlement_onlyToday_skipsDailySales() {
+    void getSettlement_skipDailySales_whenOnlyToday() {
         given(settlementQueryService.getSales(TODAY.atStartOfDay(), NOW)).willReturn(SalesAmountResponse.of(500, 0, 1, 0));
 
         SettlementResponse response = settlementQueryFacade.getSettlement(request(SalesPeriodUnit.DAY, TODAY, TODAY), NOW);
@@ -102,7 +102,7 @@ class SettlementQueryFacadeTest {
 
     @Test
     @DisplayName("주 단위는 월~일로 묶고, 기간에서 잘린 주는 기간 안의 날만 더한다")
-    void getSettlement_week_groupsMondayToSundayWithinRange() {
+    void getSettlement_groupByMondayToSunday_whenUnitIsWeek() {
         // 10/7(수) ~ 10/14(수): 10/5 주는 10/7~10/11, 10/12 주는 10/12~10/14만 들어온다
         LocalDate start = date(10, 7);
         LocalDate end = date(10, 14);
@@ -121,7 +121,7 @@ class SettlementQueryFacadeTest {
 
     @Test
     @DisplayName("월 단위는 1일~말일로 묶고, 오늘이 든 달에는 오늘 지금까지의 매출도 더한다")
-    void getSettlement_month_groupsCalendarMonthIncludingToday() {
+    void getSettlement_groupByCalendarMonth_whenUnitIsMonth() {
         LocalDate start = date(9, 15);
         given(settlementQueryService.findMissingDates(start, YESTERDAY)).willReturn(List.of());
         given(settlementQueryService.getDailySales(start, YESTERDAY))
@@ -138,7 +138,7 @@ class SettlementQueryFacadeTest {
 
     @Test
     @DisplayName("결제 건별 조회는 시작일 0시부터 종료일 다음 날 0시 전까지를 읽는다")
-    void getPayments_usesWholeDays() {
+    void getPayments_readWholeDays() {
         PageResponse<SettlementPaymentResponse> page = new PageResponse<>(List.of(), 1, 20, 0, 0, true);
         given(settlementQueryService.getPayments(date(10, 1).atStartOfDay(), TODAY.plusDays(1).atStartOfDay(), 1, 20))
                 .willReturn(page);

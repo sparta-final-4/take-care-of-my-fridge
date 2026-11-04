@@ -17,7 +17,7 @@ class RefundItemTest {
 
     @Test
     @DisplayName("주문 당시 단가를 복사하고 금액은 단가 × 수량이다")
-    void copiesUnitPriceAndCalculatesAmount() {
+    void build_copyUnitPriceAndCalculateAmount() {
         RefundItem refundItem = RefundItem.builder().orderItem(orderItem).quantity(2).build();
 
         assertThat(refundItem.getUnitPrice()).isEqualTo(9000);
@@ -26,7 +26,7 @@ class RefundItemTest {
 
     @Test
     @DisplayName("단가 × 수량이 int 범위를 넘어도 금액이 넘치지 않는다")
-    void amount_doesNotOverflow() {
+    void getAmount_avoidOverflow_whenExceedIntRange() {
         OrderItem expensive = OrderItem.builder().quantity(3).unitPrice(Integer.MAX_VALUE).build();
 
         RefundItem refundItem = RefundItem.builder().orderItem(expensive).quantity(2).build();
@@ -37,10 +37,9 @@ class RefundItemTest {
     @ParameterizedTest
     @ValueSource(ints = {0, -1})
     @DisplayName("환불 수량이 1보다 작으면 만들 수 없다")
-    void quantityLessThanOne_isRejected(int quantity) {
+    void build_throwException_whenQuantityLessThanOne(int quantity) {
         assertThatThrownBy(() -> RefundItem.builder().orderItem(orderItem).quantity(quantity).build())
                 .isInstanceOf(BusinessException.class)
-                .extracting(e -> ((BusinessException) e).getErrorCode())
-                .isEqualTo(ErrorCode.INVALID_REFUND_QUANTITY);
+                .extracting("errorCode").isEqualTo(ErrorCode.INVALID_REFUND_QUANTITY);
     }
 }

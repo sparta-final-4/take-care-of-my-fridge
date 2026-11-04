@@ -61,7 +61,7 @@ class SalesHistoryRepositoryTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("시작 시각 이상 종료 시각 미만의 결제 이력만 합산한다")
-    void sumBetween_onlyInRange() {
+    void sumSalesBetween_sumOnlyInRange() {
         history(paidPayment(10000L), PaymentEventType.PAID, 10000L, FROM);
         history(paidPayment(20000L), PaymentEventType.PAID, 20000L, TO.minusSeconds(1));
         history(paidPayment(40000L), PaymentEventType.PAID, 40000L, FROM.minusSeconds(1));
@@ -73,7 +73,7 @@ class SalesHistoryRepositoryTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("환불과 콘솔 취소의 부분·전액 취소를 모두 환불 금액·건수로 합산한다")
-    void sumBetween_sumsAllCancellations() {
+    void sumSalesBetween_sumAllCancellationsAsRefunds() {
         Payment refunded = paidPayment(30000L);
         history(refunded, PaymentEventType.PAID, 30000L, FROM.plusHours(1));
         history(refunded, PaymentEventType.PARTIAL_CANCELLED, 10000L, FROM.plusHours(2));
@@ -88,7 +88,7 @@ class SalesHistoryRepositoryTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("받지 않은 결제의 PG 승인과 보상 취소, 금액 없는 이력은 합산하지 않는다")
-    void sumBetween_excludesUnacceptedAndNonMoneyEvents() {
+    void sumSalesBetween_excludeUnacceptedAndNonMoneyEvents() {
         Payment unaccepted = payment(7000L);
         unaccepted.fail(FailReason.TIMEOUT);
         history(unaccepted, PaymentEventType.PAID, 7000L, FROM.plusHours(1));
@@ -103,13 +103,13 @@ class SalesHistoryRepositoryTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("이력이 없으면 모두 0이다")
-    void sumBetween_noHistory_isZero() {
+    void sumSalesBetween_returnZero_whenNoHistory() {
         assertThat(sum()).isEqualTo(new DailySalesSum(0L, 0L, 0L, 0L));
     }
 
     @Test
     @DisplayName("결제 건별 목록은 기간 안의 결제·환불을 결제마다 묶어 마지막 사건이 최근인 순으로 주고, 모두 더하면 기간 합계와 같다")
-    void findPaymentSales_groupsByPaymentAndMatchesSum() {
+    void findPaymentSalesBetween_groupByPaymentAndMatchSum() {
         Payment partlyRefunded = paidPayment(10000L, FROM.plusHours(1));
         history(partlyRefunded, PaymentEventType.PAID, 10000L, FROM.plusHours(1));
         history(partlyRefunded, PaymentEventType.PARTIAL_CANCELLED, 3000L, FROM.plusHours(2));
@@ -136,7 +136,7 @@ class SalesHistoryRepositoryTest extends MySqlContainerSupport {
 
     @Test
     @DisplayName("결제 건별 목록은 페이지 크기만큼 나누고 전체 결제 수를 센다")
-    void findPaymentSales_paginates() {
+    void findPaymentSalesBetween_paginate() {
         for (int hour = 1; hour <= 3; hour++) {
             Payment paid = paidPayment(1000L, FROM.plusHours(hour));
             history(paid, PaymentEventType.PAID, 1000L, FROM.plusHours(hour));

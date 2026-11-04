@@ -46,7 +46,7 @@ class SettlementCommandServiceTest {
 
     @Test
     @DisplayName("집계한 적 없는 날이면 그날 0시부터 다음 날 0시 전까지의 합계로 새 행을 만든다")
-    void aggregate_newDate_savesRow() {
+    void aggregate_saveNewRow_whenNotAggregated() {
         given(dailySalesRepository.findBySalesDate(SALES_DATE)).willReturn(Optional.empty());
 
         settlementCommandService.aggregate(SALES_DATE);
@@ -64,7 +64,7 @@ class SettlementCommandServiceTest {
 
     @Test
     @DisplayName("이미 집계한 날이면 새로 계산한 합계로 바꾸고 행을 새로 만들지 않는다")
-    void aggregate_existingDate_reaggregates() {
+    void aggregate_reaggregate_whenRowExists() {
         DailySales existing = DailySales.builder().salesDate(SALES_DATE)
                 .paidAmount(10000L).refundedAmount(0L).paidCount(1).build();
         given(dailySalesRepository.findBySalesDate(SALES_DATE)).willReturn(Optional.of(existing));

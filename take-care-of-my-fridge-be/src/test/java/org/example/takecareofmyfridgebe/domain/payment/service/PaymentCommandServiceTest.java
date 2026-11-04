@@ -87,7 +87,7 @@ class PaymentCommandServiceTest {
 
     @Test
     @DisplayName("고른 결제대행사와 다른 결제대행사로 결제됐으면 승인하고 실제 결제대행사를 남긴다")
-    void approve_differentPgProvider_recordsActual() {
+    void approve_recordActualPgProvider_whenPgProviderDiffers() {
         Payment payment = givenLockedPayment();
 
         PaymentApproveResult result = paymentCommandService.approve(payment, PgProvider.INICIS, PaymentChangedBy.USER);
@@ -99,7 +99,7 @@ class PaymentCommandServiceTest {
 
     @Test
     @DisplayName("PG 조회로 결제대행사를 확인하지 못했으면 고른 결제대행사를 그대로 둔다")
-    void approve_unknownPgProvider_keepsChosen() {
+    void approve_keepChosenPgProvider_whenPgProviderUnknown() {
         Payment payment = givenLockedPayment();
 
         PaymentApproveResult result = paymentCommandService.approve(payment, null, PaymentChangedBy.USER);
@@ -110,7 +110,7 @@ class PaymentCommandServiceTest {
 
     @Test
     @DisplayName("승인하면 결제와 주문이 함께 PAID가 된다")
-    void approve_marksPaymentAndOrderPaid() {
+    void approve_markPaymentAndOrderPaid() {
         Payment payment = givenLockedPayment();
 
         PaymentApproveResult result = paymentCommandService.approve(payment, PgProvider.KAKAOPAY, PaymentChangedBy.USER);
@@ -126,7 +126,7 @@ class PaymentCommandServiceTest {
 
     @Test
     @DisplayName("이미 PAID면 상태를 바꾸지 않고 같은 결과를 돌려준다")
-    void approve_alreadyPaid_returnsSameResult() {
+    void approve_returnSameResult_whenAlreadyPaid() {
         Payment payment = givenLockedPayment();
         payment.complete(PAID_AT, PgProvider.KAKAOPAY);
         payment.getOrder().markPaid(PAID_AT);
@@ -140,7 +140,7 @@ class PaymentCommandServiceTest {
 
     @Test
     @DisplayName("이미 FAILED면 상태를 바꾸지 않고 PAYMENT_ALREADY_FAILED로 거절한다")
-    void approve_alreadyFailed_rejected() {
+    void approve_reject_whenAlreadyFailed() {
         Payment payment = givenLockedPayment();
         payment.fail(FailReason.TIMEOUT);
 
@@ -154,7 +154,7 @@ class PaymentCommandServiceTest {
 
     @Test
     @DisplayName("같은 주문의 다른 결제가 먼저 승인됐으면 이 결제를 ORDER_NOT_PAYABLE로 실패 처리하고 거절한다")
-    void approve_orderAlreadyPaid_rejectedAsOrderNotPayable() {
+    void approve_failAndReject_whenOrderAlreadyPaid() {
         Payment payment = givenLockedPayment();
         payment.getOrder().markPaid(PAID_AT);
 
@@ -168,7 +168,7 @@ class PaymentCommandServiceTest {
 
     @Test
     @DisplayName("주문이 취소됐으면 이 결제를 ORDER_NOT_PAYABLE로 실패 처리하고 거절한다")
-    void approve_orderCancelled_rejectedAsOrderNotPayable() {
+    void approve_failAndReject_whenOrderCancelled() {
         Payment payment = givenLockedPayment();
         payment.getOrder().cancel();
 
@@ -181,7 +181,7 @@ class PaymentCommandServiceTest {
 
     @Test
     @DisplayName("결제가 없으면 PAYMENT_NOT_FOUND")
-    void approve_notFound_throws() {
+    void approve_throwException_whenPaymentNotFound() {
         Payment payment = newPayment(newOrder());
         given(orderRepository.findByIdForUpdate(ORDER_ID)).willReturn(Optional.of(payment.getOrder()));
         given(paymentRepository.findWithOrderByPortonePaymentIdForUpdate(PORTONE_PAYMENT_ID))
@@ -196,7 +196,7 @@ class PaymentCommandServiceTest {
 
     @Test
     @DisplayName("실패 처리하면 결제만 FAILED가 되고 주문은 다시 결제할 수 있게 PENDING으로 남는다")
-    void fail_marksPaymentFailedAndKeepsOrderPending() {
+    void fail_markFailedAndKeepOrderPending() {
         Payment payment = givenLockedPayment();
 
         boolean failed = paymentCommandService.fail(payment, FailReason.USER_CANCELLED, PaymentChangedBy.USER);
@@ -209,7 +209,7 @@ class PaymentCommandServiceTest {
 
     @Test
     @DisplayName("이미 처리된 결제는 실패 처리 요청을 무시한다")
-    void fail_alreadyProcessed_ignored() {
+    void fail_ignore_whenAlreadyProcessed() {
         Payment payment = givenLockedPayment();
         payment.complete(PAID_AT, PgProvider.KAKAOPAY);
         payment.getOrder().markPaid(PAID_AT);
@@ -224,7 +224,7 @@ class PaymentCommandServiceTest {
 
     @Test
     @DisplayName("주문을 먼저 잠그고 flush·refresh한 뒤 결제를 잠그고 refresh한다")
-    void locksOrderBeforePayment() {
+    void fail_lockOrderBeforePayment() {
         Payment payment = givenLockedPayment();
 
         paymentCommandService.fail(payment, FailReason.USER_CANCELLED, PaymentChangedBy.USER);
@@ -241,7 +241,7 @@ class PaymentCommandServiceTest {
 
     @Test
     @DisplayName("주문 금액, 고른 결제대행사, 10분 뒤 만료 시각으로 READY 결제를 만든다")
-    void create_usesOrderAmount() {
+    void create_success() {
         Order order = newOrder();
         given(orderRepository.findByIdForUpdate(ORDER_ID)).willReturn(Optional.of(order));
         given(paymentRepository.findByOrderIdAndStatus(ORDER_ID, PaymentStatus.READY)).willReturn(List.of());
@@ -263,7 +263,7 @@ class PaymentCommandServiceTest {
 
     @Test
     @DisplayName("결제마다 다른 PortOne 결제 ID를 만든다")
-    void create_generatesUniqueId() {
+    void create_generateUniquePortonePaymentId() {
         given(orderRepository.findByIdForUpdate(ORDER_ID)).willReturn(Optional.of(newOrder()));
         given(paymentRepository.findByOrderIdAndStatus(ORDER_ID, PaymentStatus.READY)).willReturn(List.of());
         given(paymentRepository.save(any(Payment.class))).willAnswer(returnsFirstArg());
@@ -276,7 +276,7 @@ class PaymentCommandServiceTest {
 
     @Test
     @DisplayName("동시에 들어온 요청이 먼저 만든 결제 대기 건이 있으면 재사용하지 않고 PAYMENT_IN_PROGRESS로 거절한다")
-    void create_readyExists_rejected() {
+    void create_throwException_whenReadyPaymentExists() {
         Order order = newOrder();
         given(orderRepository.findByIdForUpdate(ORDER_ID)).willReturn(Optional.of(order));
         given(paymentRepository.findByOrderIdAndStatus(ORDER_ID, PaymentStatus.READY))
@@ -290,7 +290,7 @@ class PaymentCommandServiceTest {
 
     @Test
     @DisplayName("주문이 PENDING이 아니면 PAYMENT_ORDER_NOT_PAYABLE, 결제를 만들지 않는다")
-    void create_orderNotPending_rejected() {
+    void create_throwException_whenOrderNotPending() {
         Order order = newOrder();
         order.markPaid(PAID_AT);
         given(orderRepository.findByIdForUpdate(ORDER_ID)).willReturn(Optional.of(order));
@@ -303,7 +303,7 @@ class PaymentCommandServiceTest {
 
     @Test
     @DisplayName("주문이 없으면 ORDER_NOT_FOUND")
-    void create_orderNotFound() {
+    void create_throwException_whenOrderNotFound() {
         given(orderRepository.findByIdForUpdate(ORDER_ID)).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> paymentCommandService.create(ORDER_ID, PgProvider.KAKAOPAY))

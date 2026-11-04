@@ -66,7 +66,7 @@ class WebhookHandlerTest {
 
     @Test
     @DisplayName("이미 처리가 끝난 웹훅이 다시 오면 아무것도 하지 않는다")
-    void handle_duplicate_skipped() {
+    void handle_skip_whenAlreadyProcessed() {
         given(webhookEventService.receive(WEBHOOK_ID, "Transaction.Paid", BODY)).willReturn(Optional.empty());
 
         webhookHandler.handle(WEBHOOK_ID, new PortOneWebhook("Transaction.Paid", PORTONE_PAYMENT_ID), BODY);
@@ -77,7 +77,7 @@ class WebhookHandlerTest {
 
     @Test
     @DisplayName("처리 대상이 아닌 이벤트는 결제를 조회하지 않고 IGNORED로 기록한다")
-    void handle_unhandledType_ignored() {
+    void handle_markIgnored_whenUnhandledType() {
         PortOneWebhook webhook = givenReceived("Transaction.Ready");
 
         webhookHandler.handle(WEBHOOK_ID, webhook, BODY);
@@ -88,7 +88,7 @@ class WebhookHandlerTest {
 
     @Test
     @DisplayName("부분 취소 웹훅은 환불을 PG와 맞추고, 바뀐 것이 있으면 PROCESSED로 기록한다")
-    void handle_partialCancelled_syncsRefund() {
+    void handle_syncRefund_whenPartialCancelled() {
         PortOneWebhook webhook = givenReceived("Transaction.PartialCancelled");
         Payment payment = givenPayment();
         given(paymentFacade.syncWithPg(payment, PaymentChangedBy.WEBHOOK)).willReturn(false);
@@ -101,7 +101,7 @@ class WebhookHandlerTest {
 
     @Test
     @DisplayName("결제 완료 웹훅은 환불 쪽을 부르지 않는다")
-    void handle_paid_doesNotSyncRefund() {
+    void handle_skipRefundSync_whenPaid() {
         PortOneWebhook webhook = givenReceived("Transaction.Paid");
         Payment payment = givenPayment();
         given(paymentFacade.syncWithPg(payment, PaymentChangedBy.WEBHOOK)).willReturn(true);
@@ -113,7 +113,7 @@ class WebhookHandlerTest {
 
     @Test
     @DisplayName("결제를 찾을 수 없으면 IGNORED로 기록한다")
-    void handle_paymentNotFound_ignored() {
+    void handle_markIgnored_whenPaymentNotFound() {
         PortOneWebhook webhook = givenReceived("Transaction.Paid");
         given(paymentService.findWithOrder(PORTONE_PAYMENT_ID)).willReturn(Optional.empty());
 
@@ -125,7 +125,7 @@ class WebhookHandlerTest {
 
     @Test
     @DisplayName("결제 상태를 바꿨으면 결제와 함께 PROCESSED로 기록한다")
-    void handle_synced_processed() {
+    void handle_markProcessed_whenPaymentSynced() {
         PortOneWebhook webhook = givenReceived("Transaction.Paid");
         Payment payment = givenPayment();
         given(paymentFacade.syncWithPg(payment, PaymentChangedBy.WEBHOOK)).willReturn(true);
@@ -137,7 +137,7 @@ class WebhookHandlerTest {
 
     @Test
     @DisplayName("바꿀 상태가 없으면 결제와 함께 IGNORED로 기록한다")
-    void handle_notSynced_ignored() {
+    void handle_markIgnored_whenNothingSynced() {
         PortOneWebhook webhook = givenReceived("Transaction.Cancelled");
         Payment payment = givenPayment();
         given(paymentFacade.syncWithPg(payment, PaymentChangedBy.WEBHOOK)).willReturn(false);
@@ -150,7 +150,7 @@ class WebhookHandlerTest {
 
     @Test
     @DisplayName("처리 중 오류가 나면 FAILED로 기록하고 예외를 던져 재전송을 받는다")
-    void handle_error_markedFailedAndRethrown() {
+    void handle_markFailedAndThrowException_whenSyncFails() {
         PortOneWebhook webhook = givenReceived("Transaction.Paid");
         Payment payment = givenPayment();
         given(paymentFacade.syncWithPg(payment, PaymentChangedBy.WEBHOOK)).willThrow(new IllegalStateException("PG 오류"));
@@ -164,7 +164,7 @@ class WebhookHandlerTest {
 
     @Test
     @DisplayName("같은 웹훅이 동시에 들어와 다른 요청이 먼저 저장했으면 처리를 건너뛴다")
-    void handle_concurrentDuplicate_skipped() {
+    void handle_skip_whenConcurrentDuplicate() {
         given(webhookEventService.receive(WEBHOOK_ID, "Transaction.Paid", BODY))
                 .willThrow(new DataIntegrityViolationException("uk_webhook_events_webhook_id"));
         given(webhookEventService.isReceived(WEBHOOK_ID)).willReturn(true);
@@ -176,7 +176,7 @@ class WebhookHandlerTest {
 
     @Test
     @DisplayName("중복이 아닌 제약 위반으로 저장에 실패하면 예외를 다시 던져 재전송을 받는다")
-    void handle_otherConstraintViolation_rethrown() {
+    void handle_throwException_whenOtherConstraintViolation() {
         DataIntegrityViolationException violation = new DataIntegrityViolationException("Data too long for column");
         given(webhookEventService.receive(WEBHOOK_ID, "Transaction.Paid", BODY)).willThrow(violation);
         given(webhookEventService.isReceived(WEBHOOK_ID)).willReturn(false);
@@ -188,7 +188,7 @@ class WebhookHandlerTest {
 
     @Test
     @DisplayName("실패 기록이 실패해도 원래 예외를 던지고 기록 오류는 suppressed로 남긴다")
-    void handle_markFailedFails_keepsOriginalException() {
+    void handle_throwOriginalException_whenMarkFailedFails() {
         PortOneWebhook webhook = givenReceived("Transaction.Paid");
         Payment payment = givenPayment();
         IllegalStateException original = new IllegalStateException("PG 오류");
