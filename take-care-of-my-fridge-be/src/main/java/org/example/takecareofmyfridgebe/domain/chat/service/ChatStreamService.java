@@ -2,6 +2,7 @@ package org.example.takecareofmyfridgebe.domain.chat.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatDoneEventResponse;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatErrorEventResponse;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntent;
@@ -14,6 +15,7 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEvent
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeQuery;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecommendationReply;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecommendationToSave;
+import org.example.takecareofmyfridgebe.domain.chat.facade.ChatContextFacade;
 import org.example.takecareofmyfridgebe.domain.chat.facade.ChatIntentFacade;
 import org.example.takecareofmyfridgebe.domain.chat.facade.ChatRecommendationFacade;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
@@ -44,6 +46,7 @@ public class ChatStreamService {
     private final ChatReplyGenerator chatReplyGenerator;
     private final ChatIntentFacade chatIntentFacade;
     private final ChatRecommendationFacade chatRecommendationFacade;
+    private final ChatContextFacade chatContextFacade;
     private final ObjectMapper objectMapper;
 
     /**
@@ -138,11 +141,12 @@ public class ChatStreamService {
                 .doFinally(signal -> chatStreamLockService.release(sessionId, lockToken));
     }
 
-    // 답 방식 정하기: 의도가 추천이면 후보를 찾아 카드·설명 재료를 만든다. 후보 검색이 실패하면 일반 답
+    // 답 방식 정하기: 상담 문맥(최근 대화)을 읽고, 의도가 추천이면 후보를 찾아 카드·설명 재료를 만든다. 후보 검색이 실패하면 일반 답
     private ReplyPlan planReply(Long memberId, Long sessionId, ChatMessageCreateRequest request) {
+        ChatContext context = chatContextFacade.load(sessionId);
         ChatIntentResolution resolution = chatIntentFacade.resolve(memberId, sessionId, request);
         if (resolution == null || resolution.intent() != ChatIntent.RECOMMEND || resolution.recipeQuery() == null) {
-            return ReplyPlan.GENERAL;
+            return ReplyPlan.general(context);
         }
         try {
             // 같은 상담에서 이미 추천한 레시피는 뒤로 보낸다
@@ -150,16 +154,17 @@ public class ChatStreamService {
                     .withAlreadyRecommended(chatMessageService.findRecommendedRecipeIds(sessionId));
             RecommendationReply recommendation = chatRecommendationFacade.recommend(request.content(), query);
             // 고른 레시피·맞은 방식·카드 이유는 ChatRecommendationFacade가 "상담 추천 후보 -"로 남긴다
-            return new ReplyPlan(recommendation);
+            return new ReplyPlan(context, recommendation);
         } catch (RuntimeException e) {
             log.warn("상담 추천 후보 검색 실패, 일반 답으로 - memberId: {}, sessionId: {}", memberId, sessionId, e);
-            return ReplyPlan.GENERAL;
+            return ReplyPlan.general(context);
         }
     }
 
     private Flux<String> replyText(Long memberId, Long sessionId, String content, ReplyPlan plan) {
         if (plan.recommendation() == null) {
-            return chatReplyGenerator.generate(memberId, sessionId, content);
+            // 일반 답에만 이전 대화(최근 3턴)를 넣는다. 추천 설명은 후보 정보로 충분하다
+            return chatReplyGenerator.generate(memberId, sessionId, content, plan.context().recentMessages());
         }
         // 카드가 0개면 AI를 부르지 않고 정해진 답을 보낸다. "찾지 못했어요"는 카드가 없을 때만 나간다
         if (plan.recommendation().event().empty()) {
@@ -169,8 +174,10 @@ public class ChatStreamService {
     }
 
     // recommendation이 null이면 일반 답
-    private record ReplyPlan(RecommendationReply recommendation) {
-        private static final ReplyPlan GENERAL = new ReplyPlan(null);
+    private record ReplyPlan(ChatContext context, RecommendationReply recommendation) {
+        private static ReplyPlan general(ChatContext context) {
+            return new ReplyPlan(context, null);
+        }
     }
 
     // 추천 답을 표시로 나눠 [소개]는 message, [n]은 recommendation_text 이벤트로 보낸다.

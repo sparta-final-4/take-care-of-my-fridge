@@ -7,6 +7,9 @@ import ch.qos.logback.core.read.ListAppender;
 import com.openai.core.http.Headers;
 import com.openai.errors.RateLimitException;
 import com.openai.models.ErrorObject;
+import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext.CardName;
+import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext.ContextMessage;
+import org.example.takecareofmyfridgebe.domain.chat.entity.ChatMessageRole;
 import org.example.takecareofmyfridgebe.global.config.ai.LlmCostCalculator;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
@@ -14,9 +17,13 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.messages.Message;
+import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.metadata.ChatGenerationMetadata;
 import org.springframework.ai.chat.metadata.ChatResponseMetadata;
 import org.springframework.ai.chat.metadata.DefaultUsage;
@@ -33,6 +40,10 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class OpenAiChatReplyGeneratorTest {
@@ -73,6 +84,38 @@ class OpenAiChatReplyGeneratorTest {
     }
 
     @Test
+    @DisplayName("이전 대화가 있으면 이번 메시지 앞에 사용자·AI 메시지로 넣고, AI 메시지에는 보여 준 카드 이름을 붙인다")
+    void sendsHistoryBeforeUserMessage() {
+        when(requestSpec.messages(anyList())).thenReturn(requestSpec);
+        when(streamSpec.chatResponse()).thenReturn(Flux.just(textChunk("답")));
+        List<ContextMessage> history = List.of(
+                new ContextMessage(ChatMessageRole.USER, "김피탕 같은 요리", null),
+                new ContextMessage(ChatMessageRole.ASSISTANT, "비슷한 걸 골랐어요.",
+                        List.of(new CardName(10L, "탕수육"), new CardName(20L, "깐풍기"))));
+
+        generator.generate(MEMBER_ID, SESSION_ID, "그거 보관은?", history).collectList().block();
+
+        ArgumentCaptor<List<Message>> sent = ArgumentCaptor.captor();
+        InOrder order = inOrder(requestSpec);
+        order.verify(requestSpec).messages(sent.capture());
+        order.verify(requestSpec).user("그거 보관은?");
+        assertThat(sent.getValue()).extracting(Message::getText)
+                .containsExactly("김피탕 같은 요리", "비슷한 걸 골랐어요.\n(보여 준 카드: 1. 탕수육 2. 깐풍기)");
+        assertThat(sent.getValue().get(0)).isInstanceOf(UserMessage.class);
+        assertThat(sent.getValue().get(1)).isInstanceOf(AssistantMessage.class);
+    }
+
+    @Test
+    @DisplayName("이전 대화가 없으면 이번 메시지만 보낸다")
+    void sendsOnlyUserMessage_whenNoHistory() {
+        when(streamSpec.chatResponse()).thenReturn(Flux.just(textChunk("답")));
+
+        generator.generate(MEMBER_ID, SESSION_ID, "질문", List.of()).collectList().block();
+
+        verify(requestSpec, never()).messages(anyList());
+    }
+
+    @Test
     @DisplayName("응답 조각에서 글자만 꺼내 순서대로 보내고 빈 글자와 사용량만 있는 조각은 거른다")
     void emitsTextOnlyAndSkipsEmptyChunks() {
         when(streamSpec.chatResponse()).thenReturn(Flux.just(
@@ -83,7 +126,7 @@ class OpenAiChatReplyGeneratorTest {
                 usageChunk(100, 50)
         ));
 
-        StepVerifier.create(generator.generate(MEMBER_ID, SESSION_ID, "된장찌개 알려줘"))
+        StepVerifier.create(generator.generate(MEMBER_ID, SESSION_ID, "된장찌개 알려줘", List.of()))
                 .expectNext("된장", "찌개")
                 .verifyComplete();
     }
@@ -93,7 +136,7 @@ class OpenAiChatReplyGeneratorTest {
     void logsUsageAndCost_whenUsageChunkArrives() {
         when(streamSpec.chatResponse()).thenReturn(Flux.just(textChunk("답"), finishChunk("STOP"), usageChunk(1000, 500)));
 
-        StepVerifier.create(generator.generate(MEMBER_ID, SESSION_ID, "질문"))
+        StepVerifier.create(generator.generate(MEMBER_ID, SESSION_ID, "질문", List.of()))
                 .expectNext("답")
                 .verifyComplete();
 
@@ -116,7 +159,7 @@ class OpenAiChatReplyGeneratorTest {
                 usageChunk(163, 37)
         ));
 
-        StepVerifier.create(generator.generate(MEMBER_ID, SESSION_ID, "계란찜"))
+        StepVerifier.create(generator.generate(MEMBER_ID, SESSION_ID, "계란찜", List.of()))
                 .expectNext("계란", "찜은", " 쉬워요")
                 .verifyComplete();
 
@@ -134,7 +177,7 @@ class OpenAiChatReplyGeneratorTest {
     void logsWarn_whenUsageNeverArrives() {
         when(streamSpec.chatResponse()).thenReturn(Flux.just(zeroUsageChunk("답"), finishChunk("STOP")));
 
-        StepVerifier.create(generator.generate(MEMBER_ID, SESSION_ID, "질문"))
+        StepVerifier.create(generator.generate(MEMBER_ID, SESSION_ID, "질문", List.of()))
                 .expectNext("답")
                 .verifyComplete();
 
@@ -153,7 +196,7 @@ class OpenAiChatReplyGeneratorTest {
         when(streamSpec.chatResponse()).thenReturn(Flux.just(
                 textChunk("잘린"), textChunk(" 답"), finishChunk("LENGTH"), usageChunk(100, 800)));
 
-        StepVerifier.create(generator.generate(MEMBER_ID, SESSION_ID, "질문"))
+        StepVerifier.create(generator.generate(MEMBER_ID, SESSION_ID, "질문", List.of()))
                 .expectNext("잘린", " 답")
                 .verifyComplete();
 
@@ -171,7 +214,7 @@ class OpenAiChatReplyGeneratorTest {
         when(streamSpec.chatResponse()).thenReturn(Flux.error(
                 new IllegalStateException("Stream processing failed", rateLimit())));
 
-        StepVerifier.create(generator.generate(MEMBER_ID, SESSION_ID, "질문"))
+        StepVerifier.create(generator.generate(MEMBER_ID, SESSION_ID, "질문", List.of()))
                 .expectErrorSatisfies(error -> assertThat(error)
                         .isInstanceOf(BusinessException.class)
                         .extracting("errorCode").isEqualTo(ErrorCode.CHAT_AI_BUSY))
@@ -186,7 +229,7 @@ class OpenAiChatReplyGeneratorTest {
                 Flux.just(textChunk("조각")),
                 Flux.error(rateLimit())));
 
-        StepVerifier.create(generator.generate(MEMBER_ID, SESSION_ID, "질문"))
+        StepVerifier.create(generator.generate(MEMBER_ID, SESSION_ID, "질문", List.of()))
                 .expectNext("조각")
                 .expectErrorSatisfies(error -> assertThat(error)
                         .isInstanceOf(BusinessException.class)
@@ -199,7 +242,7 @@ class OpenAiChatReplyGeneratorTest {
     void treatsAsBeforeFirstChunk_whenOnlyEmptyChunksArrived() {
         when(streamSpec.chatResponse()).thenReturn(Flux.concat(Flux.just(textChunk("")), Flux.error(rateLimit())));
 
-        StepVerifier.create(generator.generate(MEMBER_ID, SESSION_ID, "질문"))
+        StepVerifier.create(generator.generate(MEMBER_ID, SESSION_ID, "질문", List.of()))
                 .expectErrorSatisfies(error -> assertThat(error)
                         .isInstanceOf(BusinessException.class)
                         .extracting("errorCode").isEqualTo(ErrorCode.CHAT_AI_BUSY))

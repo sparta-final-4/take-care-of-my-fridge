@@ -1,6 +1,9 @@
 package org.example.takecareofmyfridgebe.domain.chat.service;
 
+import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext.ContextMessage;
 import reactor.core.publisher.Flux;
+
+import java.util.List;
 
 public interface ChatReplyGenerator {
 
@@ -11,9 +14,10 @@ public interface ChatReplyGenerator {
      * @param memberId    회원 ID (로그용)
      * @param sessionId   세션 ID
      * @param userMessage 사용자 입력 메시지
+     * @param history     이전 대화 (오래된 것부터, 최대 3턴). 없으면 빈 목록
      * @return AI 상담 답변 문자열 스트림
      */
-    Flux<String> generate(Long memberId, Long sessionId, String userMessage);
+    Flux<String> generate(Long memberId, Long sessionId, String userMessage, List<ContextMessage> history);
 
     /**
      * 추천 답을 스트리밍으로 생성한다. 공통 시스템 프롬프트에 추천 규칙(prompts/chat-recommend.txt)을 더하고,

@@ -1,5 +1,8 @@
 package org.example.takecareofmyfridgebe.domain.chat.service;
 
+import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext;
+import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext.CardName;
+import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext.ContextMessage;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntentResolution;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntentResolution.Source;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageCreateRequest;
@@ -11,10 +14,12 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeQuery;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecommendationReply;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecommendationToSave;
 import org.example.takecareofmyfridgebe.domain.chat.entity.ChatMessageRole;
+import org.example.takecareofmyfridgebe.domain.chat.facade.ChatContextFacade;
 import org.example.takecareofmyfridgebe.domain.chat.facade.ChatIntentFacade;
 import org.example.takecareofmyfridgebe.domain.chat.facade.ChatRecommendationFacade;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -41,6 +46,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.times;
@@ -71,11 +77,40 @@ class ChatStreamServiceTest {
     @Mock
     private ChatRecommendationFacade chatRecommendationFacade;
 
+    @Mock
+    private ChatContextFacade chatContextFacade;
+
     @Spy
     private ObjectMapper objectMapper = new ObjectMapper();
 
     @InjectMocks
     private ChatStreamService chatStreamService;
+
+    // 상담 문맥은 기본으로 비어 있다 (이전 대화가 필요한 테스트만 따로 정한다)
+    @BeforeEach
+    void setUpContext() {
+        lenient().when(chatContextFacade.load(any())).thenReturn(ChatContext.empty());
+    }
+
+    @Test
+    @DisplayName("일반 답에는 상담 문맥의 최근 대화를 이전 대화로 넘긴다")
+    void passesRecentMessagesToGeneralReply() {
+        Long sessionId = 10L;
+        ChatMessageCreateRequest request = ChatMessageCreateRequest.of("그거 보관은 어떻게 해?");
+        List<ContextMessage> history = List.of(
+                new ContextMessage(ChatMessageRole.USER, "두부조림 알려줘", null),
+                new ContextMessage(ChatMessageRole.ASSISTANT, "두부를 졸여요.", List.of(new CardName(314L, "두부조림"))));
+        when(chatContextFacade.load(sessionId)).thenReturn(new ChatContext(history));
+        when(chatIntentFacade.resolve(1L, sessionId, request)).thenReturn(ChatIntentResolution.general(Source.AI));
+        when(chatReplyGenerator.generate(1L, sessionId, "그거 보관은 어떻게 해?", history)).thenReturn(Flux.just("냉장 보관"));
+        when(chatMessageService.saveExchange(sessionId, "그거 보관은 어떻게 해?", "냉장 보관")).thenReturn(List.of(
+                new ChatMessageResponse(100L, 5, ChatMessageRole.USER, "그거 보관은 어떻게 해?", LocalDateTime.now()),
+                new ChatMessageResponse(101L, 6, ChatMessageRole.ASSISTANT, "냉장 보관", LocalDateTime.now())));
+
+        chatStreamService.streamMessage(1L, sessionId, request).collectList().block();
+
+        verify(chatReplyGenerator).generate(1L, sessionId, "그거 보관은 어떻게 해?", history);
+    }
 
     @Test
     @DisplayName("정상: message 조각들이 방출되고 saveExchange가 boundedElastic 스레드에서 실행된 후 done 이벤트가 온다")
@@ -84,7 +119,7 @@ class ChatStreamServiceTest {
         Long sessionId = 10L;
         String userContent = "된장찌개 레시피 알려줘";
 
-        when(chatReplyGenerator.generate(1L, sessionId, userContent))
+        when(chatReplyGenerator.generate(1L, sessionId, userContent, List.of()))
                 .thenReturn(Flux.just("된장", "찌개", " 레시피"));
 
         AtomicReference<String> executedThreadName = new AtomicReference<>();
@@ -130,7 +165,7 @@ class ChatStreamServiceTest {
         Long sessionId = 10L;
         String userContent = "질문";
 
-        when(chatReplyGenerator.generate(1L, sessionId, userContent))
+        when(chatReplyGenerator.generate(1L, sessionId, userContent, List.of()))
                 .thenReturn(Flux.error(new BusinessException(ErrorCode.INVALID_CHAT_ROOM_STATUS)));
 
         Flux<ServerSentEvent<String>> stream = chatStreamService.streamMessage(memberId, sessionId, ChatMessageCreateRequest.of(userContent));
@@ -151,7 +186,7 @@ class ChatStreamServiceTest {
         Long sessionId = 10L;
         String userContent = "질문";
 
-        when(chatReplyGenerator.generate(1L, sessionId, userContent))
+        when(chatReplyGenerator.generate(1L, sessionId, userContent, List.of()))
                 .thenReturn(Flux.error(new RuntimeException("AI API Connection Timeout")));
 
         Flux<ServerSentEvent<String>> stream = chatStreamService.streamMessage(memberId, sessionId, ChatMessageCreateRequest.of(userContent));
@@ -172,7 +207,7 @@ class ChatStreamServiceTest {
         Long sessionId = 10L;
         String userContent = "질문";
 
-        when(chatReplyGenerator.generate(1L, sessionId, userContent))
+        when(chatReplyGenerator.generate(1L, sessionId, userContent, List.of()))
                 .thenReturn(Flux.just("조각1", "조각2", "조각3"));
 
         Flux<ServerSentEvent<String>> stream = chatStreamService.streamMessage(memberId, sessionId, ChatMessageCreateRequest.of(userContent));
@@ -200,7 +235,7 @@ class ChatStreamServiceTest {
                 .extracting(e -> ((BusinessException) e).getErrorCode())
                 .isEqualTo(ErrorCode.CHAT_ROOM_NOT_FOUND);
 
-        verify(chatReplyGenerator, never()).generate(any(), any(), any());
+        verify(chatReplyGenerator, never()).generate(any(), any(), any(), any());
         verify(chatDailyLimitService, never()).checkAndIncrement(any());
         verify(chatStreamLockService, never()).acquire(any());
     }
@@ -219,7 +254,7 @@ class ChatStreamServiceTest {
                 .extracting(e -> ((BusinessException) e).getErrorCode())
                 .isEqualTo(ErrorCode.CHAT_DAILY_LIMIT_EXCEEDED);
 
-        verify(chatReplyGenerator, never()).generate(any(), any(), any());
+        verify(chatReplyGenerator, never()).generate(any(), any(), any(), any());
         verify(chatMessageService, never()).saveExchange(any(), any(), any());
     }
 
@@ -230,7 +265,7 @@ class ChatStreamServiceTest {
         Long sessionId = 10L;
         String userContent = "재료 뭐 있어?";
 
-        when(chatReplyGenerator.generate(1L, sessionId, userContent))
+        when(chatReplyGenerator.generate(1L, sessionId, userContent, List.of()))
                 .thenReturn(Flux.just(" 계란", " 양파 "));
 
         when(chatMessageService.saveExchange(eq(sessionId), eq(userContent), eq(" 계란 양파 ")))
@@ -264,7 +299,7 @@ class ChatStreamServiceTest {
                 .isEqualTo(ErrorCode.CHAT_REPLY_IN_PROGRESS);
 
         verify(chatDailyLimitService, never()).checkAndIncrement(any());
-        verify(chatReplyGenerator, never()).generate(any(), any(), any());
+        verify(chatReplyGenerator, never()).generate(any(), any(), any(), any());
         verify(chatStreamLockService, never()).release(any(), any());
     }
 
@@ -284,7 +319,7 @@ class ChatStreamServiceTest {
                 .isEqualTo(ErrorCode.CHAT_DAILY_LIMIT_EXCEEDED);
 
         verify(chatStreamLockService, timeout(1_000).times(1)).release(sessionId, LOCK_TOKEN);
-        verify(chatReplyGenerator, never()).generate(any(), any(), any());
+        verify(chatReplyGenerator, never()).generate(any(), any(), any(), any());
     }
 
     @Test
@@ -292,7 +327,7 @@ class ChatStreamServiceTest {
     void releasesLock_whenStreamCompletes() {
         Long sessionId = 10L;
         when(chatStreamLockService.acquire(sessionId)).thenReturn(LOCK_TOKEN);
-        when(chatReplyGenerator.generate(1L, sessionId, "질문")).thenReturn(Flux.just("답"));
+        when(chatReplyGenerator.generate(1L, sessionId, "질문", List.of())).thenReturn(Flux.just("답"));
         when(chatMessageService.saveExchange(sessionId, "질문", "답")).thenReturn(List.of(
                 new ChatMessageResponse(100L, 1, ChatMessageRole.USER, "질문", LocalDateTime.now()),
                 new ChatMessageResponse(101L, 2, ChatMessageRole.ASSISTANT, "답", LocalDateTime.now())
@@ -314,7 +349,7 @@ class ChatStreamServiceTest {
     void releasesLock_whenStreamErrors() {
         Long sessionId = 10L;
         when(chatStreamLockService.acquire(sessionId)).thenReturn(LOCK_TOKEN);
-        when(chatReplyGenerator.generate(1L, sessionId, "질문"))
+        when(chatReplyGenerator.generate(1L, sessionId, "질문", List.of()))
                 .thenReturn(Flux.error(new RuntimeException("AI API Connection Timeout")));
 
         StepVerifier.create(chatStreamService.streamMessage(1L, sessionId, ChatMessageCreateRequest.of("질문")))
@@ -329,7 +364,7 @@ class ChatStreamServiceTest {
     void releasesLock_whenStreamIsCancelled() {
         Long sessionId = 10L;
         when(chatStreamLockService.acquire(sessionId)).thenReturn(LOCK_TOKEN);
-        when(chatReplyGenerator.generate(1L, sessionId, "질문"))
+        when(chatReplyGenerator.generate(1L, sessionId, "질문", List.of()))
                 .thenReturn(Flux.concat(Flux.just("조각1"), Flux.never()));
 
         StepVerifier.create(chatStreamService.streamMessage(1L, sessionId, ChatMessageCreateRequest.of("질문")))
@@ -346,7 +381,7 @@ class ChatStreamServiceTest {
     void refundsDailyCount_whenFailsBeforeFirstChunk() {
         Long sessionId = 10L;
         when(chatDailyLimitService.checkAndIncrement(1L)).thenReturn(LIMIT_KEY);
-        when(chatReplyGenerator.generate(1L, sessionId, "질문"))
+        when(chatReplyGenerator.generate(1L, sessionId, "질문", List.of()))
                 .thenReturn(Flux.error(new BusinessException(ErrorCode.CHAT_AI_UNAVAILABLE)));
 
         StepVerifier.create(chatStreamService.streamMessage(1L, sessionId, ChatMessageCreateRequest.of("질문")))
@@ -363,7 +398,7 @@ class ChatStreamServiceTest {
     void keepsDailyCount_whenInterruptedAfterFirstChunk() {
         Long sessionId = 10L;
         when(chatDailyLimitService.checkAndIncrement(1L)).thenReturn(LIMIT_KEY);
-        when(chatReplyGenerator.generate(1L, sessionId, "질문")).thenReturn(Flux.concat(
+        when(chatReplyGenerator.generate(1L, sessionId, "질문", List.of())).thenReturn(Flux.concat(
                 Flux.just("조각"),
                 Flux.error(new BusinessException(ErrorCode.CHAT_REPLY_INTERRUPTED))));
 
@@ -383,7 +418,7 @@ class ChatStreamServiceTest {
         Long sessionId = 10L;
         when(chatStreamLockService.acquire(sessionId)).thenReturn(LOCK_TOKEN);
         when(chatDailyLimitService.checkAndIncrement(1L)).thenReturn(LIMIT_KEY);
-        when(chatReplyGenerator.generate(1L, sessionId, "질문")).thenReturn(Flux.empty());
+        when(chatReplyGenerator.generate(1L, sessionId, "질문", List.of())).thenReturn(Flux.empty());
 
         StepVerifier.create(chatStreamService.streamMessage(1L, sessionId, ChatMessageCreateRequest.of("질문")))
                 .expectNextMatches(event -> "error".equals(event.event())
@@ -400,11 +435,11 @@ class ChatStreamServiceTest {
     void keepsDailyCount_whenUserCancelsBeforeFirstChunk() {
         Long sessionId = 10L;
         when(chatDailyLimitService.checkAndIncrement(1L)).thenReturn(LIMIT_KEY);
-        when(chatReplyGenerator.generate(1L, sessionId, "질문")).thenReturn(Flux.never());
+        when(chatReplyGenerator.generate(1L, sessionId, "질문", List.of())).thenReturn(Flux.never());
 
         // 의도 판단은 다른 스레드에서 돌므로, 답 생성을 시작한 뒤(첫 조각 전)에 끊는다
         StepVerifier.create(chatStreamService.streamMessage(1L, sessionId, ChatMessageCreateRequest.of("질문")))
-                .then(() -> verify(chatReplyGenerator, timeout(1_000)).generate(1L, sessionId, "질문"))
+                .then(() -> verify(chatReplyGenerator, timeout(1_000)).generate(1L, sessionId, "질문", List.of()))
                 .thenCancel()
                 .verify();
 
@@ -416,7 +451,7 @@ class ChatStreamServiceTest {
     void keepsDailyCount_whenStreamCompletes() {
         Long sessionId = 10L;
         when(chatDailyLimitService.checkAndIncrement(1L)).thenReturn(LIMIT_KEY);
-        when(chatReplyGenerator.generate(1L, sessionId, "질문")).thenReturn(Flux.just("답"));
+        when(chatReplyGenerator.generate(1L, sessionId, "질문", List.of())).thenReturn(Flux.just("답"));
         when(chatMessageService.saveExchange(sessionId, "질문", "답")).thenReturn(List.of(
                 new ChatMessageResponse(100L, 1, ChatMessageRole.USER, "질문", LocalDateTime.now()),
                 new ChatMessageResponse(101L, 2, ChatMessageRole.ASSISTANT, "답", LocalDateTime.now())
@@ -436,7 +471,7 @@ class ChatStreamServiceTest {
         Long sessionId = 10L;
         ChatMessageCreateRequest request = ChatMessageCreateRequest.of("매운 거 먹고 싶어");
         when(chatIntentFacade.resolve(1L, sessionId, request)).thenReturn(ChatIntentResolution.general(Source.AI));
-        when(chatReplyGenerator.generate(1L, sessionId, "매운 거 먹고 싶어")).thenReturn(Flux.just("답"));
+        when(chatReplyGenerator.generate(1L, sessionId, "매운 거 먹고 싶어", List.of())).thenReturn(Flux.just("답"));
         when(chatMessageService.saveExchange(sessionId, "매운 거 먹고 싶어", "답")).thenReturn(List.of(
                 new ChatMessageResponse(100L, 1, ChatMessageRole.USER, "매운 거 먹고 싶어", LocalDateTime.now()),
                 new ChatMessageResponse(101L, 2, ChatMessageRole.ASSISTANT, "답", LocalDateTime.now())
@@ -450,7 +485,7 @@ class ChatStreamServiceTest {
         InOrder order = inOrder(chatDailyLimitService, chatIntentFacade, chatReplyGenerator);
         order.verify(chatDailyLimitService).checkAndIncrement(1L);
         order.verify(chatIntentFacade).resolve(1L, sessionId, request);
-        order.verify(chatReplyGenerator).generate(1L, sessionId, "매운 거 먹고 싶어");
+        order.verify(chatReplyGenerator).generate(1L, sessionId, "매운 거 먹고 싶어", List.of());
         verify(chatDailyLimitService, times(1)).checkAndIncrement(1L);
         verify(chatDailyLimitService, never()).refund(any());
     }
@@ -461,7 +496,7 @@ class ChatStreamServiceTest {
         Long sessionId = 10L;
         ChatMessageCreateRequest request = new ChatMessageCreateRequest(
                 "두부로 추천해줘", ChatMessageMode.RECOMMEND, List.of(21L), true);
-        when(chatReplyGenerator.generate(1L, sessionId, "두부로 추천해줘")).thenReturn(Flux.just("답"));
+        when(chatReplyGenerator.generate(1L, sessionId, "두부로 추천해줘", List.of())).thenReturn(Flux.just("답"));
         when(chatMessageService.saveExchange(sessionId, "두부로 추천해줘", "답")).thenReturn(List.of(
                 new ChatMessageResponse(100L, 1, ChatMessageRole.USER, "두부로 추천해줘", LocalDateTime.now()),
                 new ChatMessageResponse(101L, 2, ChatMessageRole.ASSISTANT, "답", LocalDateTime.now())
@@ -482,7 +517,7 @@ class ChatStreamServiceTest {
         ChatMessageCreateRequest request = ChatMessageCreateRequest.of("뭐 먹지?");
         when(chatDailyLimitService.checkAndIncrement(1L)).thenReturn(LIMIT_KEY);
         when(chatIntentFacade.resolve(1L, sessionId, request)).thenReturn(ChatIntentResolution.general(Source.AI));
-        when(chatReplyGenerator.generate(1L, sessionId, "뭐 먹지?"))
+        when(chatReplyGenerator.generate(1L, sessionId, "뭐 먹지?", List.of()))
                 .thenReturn(Flux.error(new BusinessException(ErrorCode.CHAT_AI_UNAVAILABLE)));
 
         StepVerifier.create(chatStreamService.streamMessage(1L, sessionId, request))
@@ -506,7 +541,7 @@ class ChatStreamServiceTest {
                 .expectNextMatches(event -> "error".equals(event.event()))
                 .verifyComplete();
 
-        verify(chatReplyGenerator, never()).generate(any(), any(), any());
+        verify(chatReplyGenerator, never()).generate(any(), any(), any(), any());
         verify(chatDailyLimitService, times(1)).refund(LIMIT_KEY);
     }
 
@@ -531,7 +566,7 @@ class ChatStreamServiceTest {
         assertThat(events).extracting(ServerSentEvent::event)
                 .containsExactly("recommendations", "message", "message", "done");
         assertThat(events.get(0).data()).contains("\"recipeId\":314", "\"name\":\"두부조림\"", "\"empty\":false");
-        verify(chatReplyGenerator, never()).generate(any(), any(), any());
+        verify(chatReplyGenerator, never()).generate(any(), any(), any(), any());
         verify(chatMessageService).saveExchange(sessionId, "두부로 뭐 해 먹지?", "두부조림을 추천해요",
                 List.of(new RecommendationToSave(314L, null)));
     }
@@ -542,7 +577,7 @@ class ChatStreamServiceTest {
         Long sessionId = 10L;
         ChatMessageCreateRequest request = ChatMessageCreateRequest.of("두부 보관 어떻게 해?");
         when(chatIntentFacade.resolve(1L, sessionId, request)).thenReturn(ChatIntentResolution.general(Source.AI));
-        when(chatReplyGenerator.generate(1L, sessionId, "두부 보관 어떻게 해?")).thenReturn(Flux.just("냉장 보관"));
+        when(chatReplyGenerator.generate(1L, sessionId, "두부 보관 어떻게 해?", List.of())).thenReturn(Flux.just("냉장 보관"));
         when(chatMessageService.saveExchange(sessionId, "두부 보관 어떻게 해?", "냉장 보관")).thenReturn(List.of(
                 new ChatMessageResponse(100L, 1, ChatMessageRole.USER, "두부 보관 어떻게 해?", LocalDateTime.now()),
                 new ChatMessageResponse(101L, 2, ChatMessageRole.ASSISTANT, "냉장 보관", LocalDateTime.now())
@@ -606,7 +641,7 @@ class ChatStreamServiceTest {
         RecipeQuery query = RecipeQuery.of(1L, List.of());
         when(chatIntentFacade.resolve(1L, sessionId, request)).thenReturn(ChatIntentResolution.recommend(Source.AI, query));
         when(chatRecommendationFacade.recommend(any(), any())).thenThrow(new RuntimeException("db down"));
-        when(chatReplyGenerator.generate(1L, sessionId, "뭐 먹지?")).thenReturn(Flux.just("답"));
+        when(chatReplyGenerator.generate(1L, sessionId, "뭐 먹지?", List.of())).thenReturn(Flux.just("답"));
         when(chatMessageService.saveExchange(sessionId, "뭐 먹지?", "답")).thenReturn(List.of(
                 new ChatMessageResponse(100L, 1, ChatMessageRole.USER, "뭐 먹지?", LocalDateTime.now()),
                 new ChatMessageResponse(101L, 2, ChatMessageRole.ASSISTANT, "답", LocalDateTime.now())
@@ -748,7 +783,7 @@ class ChatStreamServiceTest {
         when(chatIntentFacade.resolve(1L, sessionId, request)).thenReturn(ChatIntentResolution.recommend(Source.AI, query));
         when(chatMessageService.findRecommendedRecipeIds(sessionId)).thenReturn(Set.of(314L, 315L));
         when(chatRecommendationFacade.recommend(any(), any())).thenThrow(new RuntimeException("stop"));
-        when(chatReplyGenerator.generate(1L, sessionId, "뭐 먹지?")).thenReturn(Flux.just("답"));
+        when(chatReplyGenerator.generate(1L, sessionId, "뭐 먹지?", List.of())).thenReturn(Flux.just("답"));
         when(chatMessageService.saveExchange(sessionId, "뭐 먹지?", "답")).thenReturn(List.of(
                 new ChatMessageResponse(100L, 1, ChatMessageRole.USER, "뭐 먹지?", LocalDateTime.now()),
                 new ChatMessageResponse(101L, 2, ChatMessageRole.ASSISTANT, "답", LocalDateTime.now())));

@@ -51,7 +51,7 @@ class OpenAiChatRecommendationReplyTest {
         OpenAiChatReplyGenerator generator = new OpenAiChatReplyGenerator(chatClient, new LlmCostCalculator(0.15, 0.60),
                 new ChatReplyErrorTranslator(), resource("공통 규칙"), resource("추천 규칙"));
 
-        generator.generate(1L, 10L, "두부 보관 어떻게 해?").collectList().block();
+        generator.generate(1L, 10L, "두부 보관 어떻게 해?", List.of()).collectList().block();
 
         assertThat(model.lastPrompt.getInstructions()).extracting(Message::getText)
                 .containsExactly("기본 시스템", "두부 보관 어떻게 해?");

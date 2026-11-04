@@ -1,11 +1,16 @@
 package org.example.takecareofmyfridgebe.domain.chat.service;
 
 import lombok.extern.slf4j.Slf4j;
+import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext.ContextMessage;
+import org.example.takecareofmyfridgebe.domain.chat.entity.ChatMessageRole;
 import org.example.takecareofmyfridgebe.global.config.ai.LlmCost;
 import org.example.takecareofmyfridgebe.global.config.ai.LlmCostCalculator;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.ChatClient.ChatClientRequestSpec;
+import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.SystemMessage;
+import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.openai.OpenAiChatOptions;
@@ -19,6 +24,7 @@ import reactor.core.publisher.Flux;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
@@ -60,8 +66,23 @@ public class OpenAiChatReplyGenerator implements ChatReplyGenerator {
      * 오류는 첫 조각을 보냈는지에 따라 상담 에러 코드로 바꾼다.
      */
     @Override
-    public Flux<String> generate(Long memberId, Long sessionId, String userMessage) {
-        return stream(memberId, sessionId, "상담 답", () -> chatClient.prompt().user(userMessage));
+    public Flux<String> generate(Long memberId, Long sessionId, String userMessage, List<ContextMessage> history) {
+        return stream(memberId, sessionId, "상담 답", () -> {
+            ChatClientRequestSpec spec = chatClient.prompt();
+            // 이전 대화는 시스템 프롬프트 뒤, 이번 메시지 앞에 사용자·AI 메시지로 넣는다
+            if (!history.isEmpty()) {
+                spec = spec.messages(toMessages(history));
+            }
+            return spec.user(userMessage);
+        });
+    }
+
+    private static List<Message> toMessages(List<ContextMessage> history) {
+        return history.stream()
+                .<Message>map(message -> message.role() == ChatMessageRole.ASSISTANT
+                        ? new AssistantMessage(message.promptText())
+                        : new UserMessage(message.promptText()))
+                .toList();
     }
 
     /**
