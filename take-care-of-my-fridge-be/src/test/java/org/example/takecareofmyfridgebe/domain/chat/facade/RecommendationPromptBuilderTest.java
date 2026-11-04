@@ -24,7 +24,7 @@ class RecommendationPromptBuilderTest {
     private static final Map<Long, String> NAMES = Map.of(TOFU, "두부", MUSHROOM, "버섯", CUCUMBER, "오이");
 
     @Test
-    @DisplayName("사용자 요청과 후보를 줄 글로 만들고 맛은 한글, 임박 재료는 오늘까지·D-n으로 쓴다")
+    @DisplayName("사용자 요청과 후보를 줄 글로 만들고 맛은 한글, 임박 재료는 오늘까지·3일 남음처럼 말로 쓴다")
     void buildsCandidateLines() {
         RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(MUSHROOM, TOFU), List.of(Taste.SPICY), List.of("찌개", "국"),
                 30, List.of(CUCUMBER), true);
@@ -44,7 +44,7 @@ class RecommendationPromptBuilderTest {
                 선택 재료: 버섯, 두부 (이 재료를 꼭 쓰는 레시피만)
                 조건: 원하는 맛 매운맛 / 분류 찌개, 국 / 30분 이내 / 뺄 재료 오이
                 [추천 후보]
-                1. 두부버섯찌개 | 찌개 | 조리 시간 25분 | 쓰는 냉장고 재료: 양파(오늘까지), 대파(D-3), 두부 | 원하는 맛과 맞음: 매운맛 | 부족한 재료: 돼지고기, 부추, 당근 외 2개 | 재료 많이 모자람
+                1. 두부버섯찌개 | 찌개 | 조리 시간 25분 | 쓰는 냉장고 재료: 양파(오늘까지), 대파(3일 남음), 두부 | 원하는 맛과 맞음: 매운맛 | 부족한 재료: 돼지고기, 부추, 당근 외 2개 | 재료 많이 모자람
                 2. 버섯전 | 전 | 조리 시간 정보 없음 | 쓰는 냉장고 재료: 없음 | 좋아하는 맛과 맞음: 짠맛, 감칠맛 | 부족한 재료: 없음""");
     }
 
@@ -72,6 +72,15 @@ class RecommendationPromptBuilderTest {
                 List.of(candidate));
 
         assertThat(text).doesNotContain("{", "}").contains("메시지: (name) 추천", "1. (특제) 찌개");
+    }
+
+    @Test
+    @DisplayName("소비기한은 D-0 오늘까지, D-1 내일까지, D-2 모레까지, D-3 3일 남음으로 쓴다")
+    void writesDdayInWords() {
+        assertThat(RecommendationPromptBuilder.dDayLabel(0)).isEqualTo("오늘까지");
+        assertThat(RecommendationPromptBuilder.dDayLabel(1)).isEqualTo("내일까지");
+        assertThat(RecommendationPromptBuilder.dDayLabel(2)).isEqualTo("모레까지");
+        assertThat(RecommendationPromptBuilder.dDayLabel(3)).isEqualTo("3일 남음");
     }
 
     private static RecipeCandidate candidate(Long id, String name, String category, Integer cookTimeMin, Reason reason) {

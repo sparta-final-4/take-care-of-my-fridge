@@ -22,7 +22,7 @@ import java.util.stream.Collectors;
  * 선택 재료: 버섯, 두부 (이 재료를 꼭 쓰는 레시피만)
  * 조건: 원하는 맛 매운맛 / 분류 국, 찌개 / 30분 이내 / 뺄 재료 오이
  * [추천 후보]
- * 1. 제육배추찜 | 찜 | 조리 시간 40분 | 쓰는 냉장고 재료: 양파(오늘까지), 고추(D-2), 배추 | 원하는 맛과 맞음: 매운맛 | 부족한 재료: 돼지고기, 부추, 당근 외 3개 | 재료 많이 모자람
+ * 1. 제육배추찜 | 찜 | 조리 시간 40분 | 쓰는 냉장고 재료: 양파(오늘까지), 고추(모레까지), 배추 | 원하는 맛과 맞음: 매운맛 | 부족한 재료: 돼지고기, 부추, 당근 외 3개 | 재료 많이 모자람
  * </pre>
  * 후보가 없으면 [추천 후보] 아래에 "후보 없음"을 쓴다. 맛은 한글로 쓰고, 중괄호({})는 괄호로 바꿔 넣지 않는다.
  */
@@ -105,7 +105,7 @@ public final class RecommendationPromptBuilder {
         return String.join(FIELD_DELIMITER, fields);
     }
 
-    // 쓰는 냉장고 재료. 임박 재료는 이름 뒤에 (오늘까지)·(D-2)를 붙인다
+    // 쓰는 냉장고 재료. 임박 재료는 이름 뒤에 (오늘까지)·(내일까지)·(모레까지)·(3일 남음)을 붙인다
     private static String usedLine(Reason reason) {
         if (reason.usedFridgeIngredients().isEmpty()) {
             return NONE;
@@ -117,8 +117,14 @@ public final class RecommendationPromptBuilder {
                 .collect(Collectors.joining(NAME_DELIMITER));
     }
 
-    private static String dDayLabel(long dDay) {
-        return dDay == 0 ? "오늘까지" : "D-" + dDay;
+    // 소비기한을 말로 쓴다 (AI가 D-1을 "오늘까지"로 잘못 읽지 않게)
+    static String dDayLabel(long dDay) {
+        return switch ((int) dDay) {
+            case 0 -> "오늘까지";
+            case 1 -> "내일까지";
+            case 2 -> "모레까지";
+            default -> dDay + "일 남음";
+        };
     }
 
     private static String missingLine(List<MissingIngredient> missing) {
