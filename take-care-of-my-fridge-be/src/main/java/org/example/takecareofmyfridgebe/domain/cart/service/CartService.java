@@ -4,6 +4,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
+import org.hibernate.exception.ConstraintViolationException;
 import org.example.takecareofmyfridgebe.domain.cart.dto.AddCartItemRequest;
 import org.example.takecareofmyfridgebe.domain.cart.dto.AddCartItemResponse;
 import org.example.takecareofmyfridgebe.domain.cart.dto.AddCartItemResult;
@@ -18,6 +19,7 @@ import org.example.takecareofmyfridgebe.domain.cart.repository.CartRepository;
 import org.example.takecareofmyfridgebe.domain.sale.entity.SaleEvent;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,6 +29,9 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class CartService {
+
+    private static final String CART_MEMBER_UNIQUE = "uk_carts_member_id";
+    private static final String CART_ITEM_UNIQUE = "uk_cart_items_cart_id_product_id";
 
     private final CartRepository cartRepository;
     private final CartItemRepository cartItemRepository;
@@ -56,7 +61,7 @@ public class CartService {
     @Transactional
     public AddCartItemResult addItem(Long memberId, AddCartItemRequest request, CartQuantityLimit limit) {
         Cart cart = cartRepository.findByMemberId(memberId)
-                .orElseGet(() -> cartRepository.save(Cart.builder().memberId(memberId).build()));
+                .orElseGet(() -> saveCart(memberId));
 
         Optional<CartItem> existing = cartItemRepository.findByCartAndProductId(cart, request.productId());
         // 기존 수량 + 요청 수량은 int를 넘칠 수 있어 long으로 더한다.
@@ -64,7 +69,7 @@ public class CartService {
         validateQuantity(limit, total);
 
         if (existing.isEmpty()) {
-            CartItem saved = cartItemRepository.save(request.toEntity(cart));
+            CartItem saved = saveCartItem(cart, request);
             return new AddCartItemResult(AddCartItemResponse.from(saved), true);
         }
 
@@ -99,6 +104,40 @@ public class CartService {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void removePaidItems(Long memberId, Long orderId) {
         cartItemRepository.deleteAllOrderedByMemberId(orderId, memberId);
+    }
+
+    // 같은 회원의 담기가 동시에 오면 둘 다 장바구니가 없다고 보고 저장하려 해 유니크 제약이 두 번째를 막는다.
+    // 이 트랜잭션은 이미 실패 상태라 이어서 진행하지 않고, 충돌 예외로 바꿔 던져 호출한 쪽이 새 트랜잭션으로 다시 시도하게 한다.
+    private Cart saveCart(Long memberId) {
+        try {
+            return cartRepository.save(Cart.builder().memberId(memberId).build());
+        } catch (DataIntegrityViolationException e) {
+            throw toAddConflict(e);
+        }
+    }
+
+    private CartItem saveCartItem(Cart cart, AddCartItemRequest request) {
+        try {
+            return cartItemRepository.save(request.toEntity(cart));
+        } catch (DataIntegrityViolationException e) {
+            throw toAddConflict(e);
+        }
+    }
+
+    // 장바구니와 항목의 유니크 제약만 충돌로 보고, 그 밖의 제약 위반은 원인을 가리지 않도록 그대로 던진다.
+    private RuntimeException toAddConflict(DataIntegrityViolationException e) {
+        String constraint = constraintName(e);
+        if (constraint.contains(CART_MEMBER_UNIQUE) || constraint.contains(CART_ITEM_UNIQUE)) {
+            return new BusinessException(ErrorCode.CART_ADD_CONFLICT);
+        }
+        return e;
+    }
+
+    private String constraintName(DataIntegrityViolationException e) {
+        if (e.getCause() instanceof ConstraintViolationException cause && cause.getConstraintName() != null) {
+            return cause.getConstraintName();
+        }
+        return "";
     }
 
     // 번개 드롭은 합친 수량이 1을 넘을 수 없고, 어떤 상품이든 재고보다 많이 담을 수 없다.
