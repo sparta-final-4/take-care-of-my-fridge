@@ -137,6 +137,38 @@ class ChatRecommendationFacadeTest {
         verify(recipeCandidateFacade, times(1)).describeRecipes(any(), any());
     }
 
+    @Test
+    @DisplayName("다시 추천이면 직전 카드 3개를 후보에서 빼고 그다음 후보로 카드를 만든다")
+    void dropsPreviousCards_whenRefine() {
+        when(recipeCandidateFacade.findCandidates(any())).thenReturn(new RecipeCandidates(List.of(
+                candidate(10L, "김치찌개", "찌개", 20, reason(List.of())),
+                candidate(20L, "순두부찌개", "찌개", 20, reason(List.of())),
+                candidate(30L, "두부국", "국", 20, reason(List.of())),
+                candidate(40L, "부대찌개", "찌개", 20, reason(List.of())),
+                candidate(50L, "된장국", "국", 20, reason(List.of())),
+                candidate(60L, "제육볶음", "볶음", 20, reason(List.of()))), false));
+        when(recipeService.findSummaries(any())).thenReturn(Map.of());
+
+        RecommendationReply reply = facade.recommend("다른 거 없어?", RecipeQuery.of(MEMBER_ID, List.of()), List.of(10L, 20L, 30L));
+
+        assertThat(reply.event().recipes()).extracting(RecommendedRecipe::recipeId).containsExactly(40L, 50L, 60L);
+    }
+
+    @Test
+    @DisplayName("직전 카드를 빼서 후보가 3개보다 적어지면 그때만 직전 카드를 정렬 순서대로 뒤에 다시 넣는다")
+    void putsPreviousCardsBack_whenTooFew() {
+        List<RecipeCandidate> candidates = List.of(
+                candidate(10L, "김치찌개", "찌개", 20, reason(List.of())),
+                candidate(40L, "부대찌개", "찌개", 20, reason(List.of())),
+                candidate(20L, "순두부찌개", "찌개", 20, reason(List.of())),
+                candidate(30L, "두부국", "국", 20, reason(List.of())));
+
+        assertThat(ChatRecommendationFacade.withoutPrevious(candidates, List.of(10L, 20L, 30L)))
+                .extracting(RecipeCandidate::recipeId).containsExactly(40L, 10L, 20L, 30L);
+        assertThat(ChatRecommendationFacade.withoutPrevious(candidates, List.of()))
+                .extracting(RecipeCandidate::recipeId).containsExactly(10L, 40L, 20L, 30L);
+    }
+
     private static RecipeCandidate candidate(Long id, String name, String category, Integer cookTimeMin, Reason reason) {
         return new RecipeCandidate(id, name, category, cookTimeMin, new Ranking(0, 0, 0, 0, 1, 1, 0), reason);
     }

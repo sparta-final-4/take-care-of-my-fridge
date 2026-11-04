@@ -22,10 +22,12 @@ import org.example.takecareofmyfridgebe.domain.recipe.service.RecipeService;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -48,8 +50,18 @@ public class ChatRecommendationFacade {
      * @return 카드 이벤트(후보가 없으면 empty=true)와 설명용 후보 정보
      */
     public RecommendationReply recommend(String content, RecipeQuery query) {
+        return recommend(content, query, List.of());
+    }
+
+    /**
+     * 다시 추천. 직전 카드(previousCardIds)는 후보에서 빼고 고른다. 빼서 후보가 3개보다 적어지면 그때만 뒤에 다시 넣는다.
+     * 새 추천은 previousCardIds 없이 부르고, 이미 추천한 레시피는 정렬에서 뒤로 간다 (RecipeQuery.alreadyRecommendedIds).
+     *
+     * @param previousCardIds 직전 추천 카드 레시피 ID ("다른 거 없어?"에서 같은 카드가 다시 나오지 않게)
+     */
+    public RecommendationReply recommend(String content, RecipeQuery query, Collection<Long> previousCardIds) {
         RecipeCandidates found = recipeCandidateFacade.findCandidates(query);
-        List<RecipeCandidate> candidates = found.candidates();
+        List<RecipeCandidate> candidates = withoutPrevious(found.candidates(), previousCardIds);
         logCandidates(query, candidates);
         List<RecipeCandidate> picked = RecommendationPicker.pick(candidates);
 
@@ -102,6 +114,20 @@ public class ChatRecommendationFacade {
                     + "] " + recipes.get(i).reason());
         }
         log.info("상담 추천 후보 - memberId: {}, 키워드: {}, 고른 레시피: {}", query.memberId(), query.keywords(), lines);
+    }
+
+    // 직전 카드를 뺀 후보. 빼서 3개보다 적어지면 직전 카드를 정렬 순서대로 뒤에 다시 붙인다
+    static List<RecipeCandidate> withoutPrevious(List<RecipeCandidate> candidates, Collection<Long> previousCardIds) {
+        if (previousCardIds.isEmpty()) {
+            return candidates;
+        }
+        Set<Long> previous = Set.copyOf(previousCardIds);
+        List<RecipeCandidate> fresh = candidates.stream().filter(candidate -> !previous.contains(candidate.recipeId())).toList();
+        if (fresh.size() >= RecommendationPicker.PICK_COUNT) {
+            return fresh;
+        }
+        return Stream.concat(fresh.stream(), candidates.stream().filter(candidate -> previous.contains(candidate.recipeId())))
+                .toList();
     }
 
     // 프롬프트에 쓸 선택·뺄 재료 이름

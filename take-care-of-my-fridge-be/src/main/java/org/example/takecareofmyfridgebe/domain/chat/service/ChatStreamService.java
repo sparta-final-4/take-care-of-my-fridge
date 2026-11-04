@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatDoneEventResponse;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatErrorEventResponse;
+import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntent;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntentResolution;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageCreateRequest;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageEventResponse;
@@ -153,7 +154,10 @@ public class ChatStreamService {
             // 같은 상담에서 이미 추천한 레시피는 뒤로 보낸다
             RecipeQuery query = resolution.recipeQuery()
                     .withAlreadyRecommended(chatMessageService.findRecommendedRecipeIds(sessionId));
-            RecommendationReply recommendation = chatRecommendationFacade.recommend(request.content(), query);
+            // 다시 추천이면 직전 카드는 후보에서 뺀다 (모자라면 뒤에 다시 넣는다)
+            RecommendationReply recommendation = resolution.intent() == ChatIntent.REFINE && context.lastRecommendation() != null
+                    ? chatRecommendationFacade.recommend(request.content(), query, context.lastRecommendation().recipeIds())
+                    : chatRecommendationFacade.recommend(request.content(), query);
             // 고른 레시피·맞은 방식·카드 이유는 ChatRecommendationFacade가 "상담 추천 후보 -"로 남긴다
             return new ReplyPlan(context, recommendation, resolution.recipeQuery());
         } catch (RuntimeException e) {

@@ -10,6 +10,7 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageMode;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageResponse;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse.RecommendedRecipe;
+import org.example.takecareofmyfridgebe.domain.chat.dto.LastRecommendation;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeQuery;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecommendationReply;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecommendationToSave;
@@ -806,6 +807,30 @@ class ChatStreamServiceTest {
 
         verify(chatContextStore).touch(sessionId);
         verify(chatContextStore, never()).saveRecommendation(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("다시 추천이면 직전 카드(Redis)를 후보에서 빼도록 넘기고, 새 추천은 넘기지 않는다")
+    void passesPreviousCards_whenRefine() {
+        Long sessionId = 10L;
+        ChatMessageCreateRequest request = ChatMessageCreateRequest.of("다른 거 없어?");
+        RecipeQuery query = RecipeQuery.of(1L, List.of(21L));
+        ChatContext context = new ChatContext(List.of(), LastRecommendation.of(query, List.of(314L, 315L, 316L)),
+                List.of(new CardName(314L, "두부조림"), new CardName(315L, "두부전"), new CardName(316L, "두부국")));
+        when(chatContextFacade.load(sessionId)).thenReturn(context);
+        when(chatIntentFacade.resolve(1L, sessionId, request, context)).thenReturn(ChatIntentResolution.refine(Source.AI, query));
+        when(chatMessageService.findRecommendedRecipeIds(sessionId)).thenReturn(Set.of(314L, 315L, 316L));
+        when(chatRecommendationFacade.recommend(any(), any(), any())).thenThrow(new RuntimeException("stop"));
+        when(chatReplyGenerator.generate(1L, sessionId, "다른 거 없어?", List.of())).thenReturn(Flux.just("답"));
+        when(chatMessageService.saveExchange(sessionId, "다른 거 없어?", "답")).thenReturn(List.of(
+                new ChatMessageResponse(100L, 1, ChatMessageRole.USER, "다른 거 없어?", LocalDateTime.now()),
+                new ChatMessageResponse(101L, 2, ChatMessageRole.ASSISTANT, "답", LocalDateTime.now())));
+
+        chatStreamService.streamMessage(1L, sessionId, request).collectList().block();
+
+        verify(chatRecommendationFacade).recommend("다른 거 없어?", query.withAlreadyRecommended(Set.of(314L, 315L, 316L)),
+                List.of(314L, 315L, 316L));
+        verify(chatRecommendationFacade, never()).recommend(any(), any());
     }
 
     private void givenRecommend(Long sessionId, ChatMessageCreateRequest request, RecipeQuery query, RecommendationReply reply) {

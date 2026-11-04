@@ -441,6 +441,87 @@ class ChatIntentFacadeTest {
         }
     }
 
+    @Nested
+    @DisplayName("다시 추천 조건 합치기")
+    class Refine {
+
+        // 직전 조건: 두부를 꼭 쓰는 매운 국·찌개, 오이 빼기
+        private final RecipeQuery previous = new RecipeQuery(MEMBER_ID, List.of(TOFU), List.of(Taste.SPICY), List.of("국", "찌개"),
+                null, List.of(CUCUMBER), true, List.of("김치찌개"), "김치찌개", null);
+        private final ChatContext context = new ChatContext(List.of(), LastRecommendation.of(previous, List.of(10L, 20L, 30L)),
+                List.of(new CardName(10L, "김치찌개"), new CardName(20L, "순두부찌개"), new CardName(30L, "두부국")));
+
+        @Test
+        @DisplayName("\"좀 더 매운 걸로\"는 AI가 낸 맛으로 바꾸고 분류·키워드·재료 같은 나머지 조건은 직전 그대로 둔다")
+        void changesTasteOnly_whenMoreSpicy() {
+            givenExtracted(refine(List.of("SPICY", "SALTY"), null));
+
+            RecipeQuery query = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("좀 더 매운 걸로"), context)
+                    .recipeQuery();
+
+            assertThat(query.wantedTastes()).containsExactly(Taste.SPICY, Taste.SALTY);
+            assertThat(query.moodCategories()).containsExactly("국", "찌개");
+            assertThat(query.keywords()).containsExactly("김치찌개");
+            assertThat(query.selectedIngredientIds()).containsExactly(TOFU);
+            assertThat(query.excludeIngredientIds()).containsExactly(CUCUMBER);
+            assertThat(query.useSelectedOnly()).isTrue();
+        }
+
+        @Test
+        @DisplayName("\"국물 말고 볶음으로\"는 분류만 볶음으로 바꾸고 맛·재료는 직전 그대로 둔다")
+        void changesCategoryOnly_whenStirFryInstead() {
+            when(recipeService.getClassifications())
+                    .thenReturn(new RecipeClassificationResponse(List.of("한식"), List.of("국", "볶음", "찌개")));
+            givenExtracted(refine(null, List.of("볶음")));
+
+            RecipeQuery query = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("국물 말고 볶음으로"), context)
+                    .recipeQuery();
+
+            assertThat(query.moodCategories()).containsExactly("볶음");
+            assertThat(query.wantedTastes()).containsExactly(Taste.SPICY);
+            assertThat(query.selectedIngredientIds()).containsExactly(TOFU);
+        }
+
+        @Test
+        @DisplayName("\"다른 거 없어?\"처럼 AI 조건이 모두 비면 직전 조건을 그대로 쓴다")
+        void keepsPreviousQuery_whenNothingChanged() {
+            givenExtracted(refine(null, null));
+
+            ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("다른 거 없어?"), context);
+
+            assertThat(resolution.intent()).isEqualTo(ChatIntent.REFINE);
+            assertThat(resolution.recipeQuery()).isEqualTo(previous);
+        }
+
+        @Test
+        @DisplayName("재료는 서버가 이어 간다: 직전 선택 재료에 이번에 고른 재료를 더하고, 뺄 재료는 합쳐 선택 재료에서 뺀다")
+        void carriesIngredients() {
+            RecipeQuery current = new RecipeQuery(MEMBER_ID, List.of(MUSHROOM, CUCUMBER), null, null, null, List.of(TOFU), false);
+
+            RecipeQuery merged = ChatIntentFacade.mergeRefine(previous, current);
+
+            assertThat(merged.selectedIngredientIds()).containsExactly(MUSHROOM);
+            assertThat(merged.excludeIngredientIds()).containsExactly(CUCUMBER, TOFU);
+            assertThat(merged.useSelectedOnly()).isTrue();
+        }
+
+        @Test
+        @DisplayName("이번에 칩으로 고른 재료도 직전 선택 재료에 더한다")
+        void addsSelectedChips() {
+            givenExtracted(refine(null, null));
+            ChatMessageCreateRequest request = new ChatMessageCreateRequest("이것도 넣어서 다른 거", ChatMessageMode.AUTO,
+                    List.of(MUSHROOM), false);
+
+            RecipeQuery query = facade.resolve(MEMBER_ID, SESSION_ID, request, context).recipeQuery();
+
+            assertThat(query.selectedIngredientIds()).containsExactly(TOFU, MUSHROOM);
+        }
+
+        private static IntentResult refine(List<String> tastes, List<String> categories) {
+            return new IntentResult(ChatIntent.REFINE, tastes, categories, null, null, null, null, null, null, null);
+        }
+    }
+
     private void givenExtracted(IntentResult result) {
         when(extractor.extract(eq(MEMBER_ID), eq(SESSION_ID), any(), any(), any())).thenReturn(result);
     }
