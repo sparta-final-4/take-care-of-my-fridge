@@ -125,4 +125,24 @@ class RecommendationReasonWriterTest {
         return new Reason(List.of("양파"), imminent, tastes, wantedTastes, requests, false, false, List.of(), List.of(),
                 usedSelected, null);
     }
+
+    @Test
+    @DisplayName("고른 카드끼리 이유가 겹치면 다음 카드는 다른 임박 재료, 겹친 맛, 냉장고 재료 수 순으로 바꾼다")
+    void writesDistinctReasons() {
+        List<ImminentIngredient> imminent = List.of(new ImminentIngredient("고추", 1), new ImminentIngredient("깻잎", 1));
+        List<String> used = List.of("고추", "깻잎", "대파", "양파");
+        RecipeCandidate eel = candidate("조림", new Reason(used, imminent, List.of(), List.of(), List.of(), false, false,
+                List.of(), List.of(), List.of(), null));
+        RecipeCandidate kimchi = candidate("김치", new Reason(used, imminent, List.of(), List.of(), List.of(), false, false,
+                List.of(), List.of(), List.of(), null));
+        RecipeCandidate rice = candidate("밥", new Reason(used, imminent, List.of(Taste.SALTY, Taste.UMAMI), List.of(),
+                List.of(), false, false, List.of(), List.of(), List.of(), null));
+        RecipeCandidate plain = candidate("밥", new Reason(used, imminent, List.of(), List.of(), List.of(), false, false,
+                List.of(), List.of(), List.of(), null));
+
+        assertThat(RecommendationReasonWriter.writeDistinct(List.of(eel, kimchi, rice), null)).containsExactly(
+                "내일까지인 고추를 쓸 수 있어요", "내일까지인 깻잎을 쓸 수 있어요", "짭짤하고 감칠맛 나요");
+        assertThat(RecommendationReasonWriter.writeDistinct(List.of(eel, kimchi, plain), null).get(2))
+                .isEqualTo("냉장고 재료 4가지를 써요");
+    }
 }

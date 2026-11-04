@@ -52,9 +52,13 @@ public class ChatRecommendationFacade {
 
         Map<Long, RecipeSummary> summaries = recipeService.findSummaries(
                 picked.stream().map(RecipeCandidate::recipeId).toList());
-        List<RecommendedRecipe> recipes = picked.stream()
-                .map(candidate -> toCard(candidate, summaries.get(candidate.recipeId()), query.keywordText()))
-                .toList();
+        // 카드 이유는 앞 카드와 겹치지 않게 고른다 (프롬프트 후보 줄도 같은 이유를 쓴다)
+        List<String> reasons = RecommendationReasonWriter.writeDistinct(picked, query.keywordText());
+        List<RecommendedRecipe> recipes = new ArrayList<>();
+        for (int i = 0; i < picked.size(); i++) {
+            RecipeCandidate candidate = picked.get(i);
+            recipes.add(toCard(candidate, summaries.get(candidate.recipeId()), reasons.get(i)));
+        }
         logPicked(query, picked, recipes);
 
         String candidateInfo = RecommendationPromptBuilder.build(
@@ -102,7 +106,7 @@ public class ChatRecommendationFacade {
                 .collect(Collectors.toMap(Ingredient::getId, Ingredient::getName));
     }
 
-    private static RecommendedRecipe toCard(RecipeCandidate candidate, RecipeSummary summary, String dishText) {
+    private static RecommendedRecipe toCard(RecipeCandidate candidate, RecipeSummary summary, String cardReason) {
         Reason reason = candidate.reason();
         // 원한 맛을 말했으면 그 맛, 아니면 회원 선호 맛과 겹친 맛
         List<Member.Taste> tastes = reason.matchedWantedTastes().isEmpty()
@@ -124,7 +128,7 @@ public class ChatRecommendationFacade {
                         .toList(),
                 reason.missingSelectedIngredients(),
                 reason.lacksManyIngredients(),
-                RecommendationReasonWriter.write(candidate, dishText)
+                cardReason
         );
     }
 }

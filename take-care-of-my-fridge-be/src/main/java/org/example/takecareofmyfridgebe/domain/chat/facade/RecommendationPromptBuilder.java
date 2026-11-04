@@ -75,22 +75,28 @@ public final class RecommendationPromptBuilder {
             text.append(NO_CANDIDATES).append('\n');
         }
         // 번호를 붙이면 AI가 번호 목록으로 답해서 "후보:"로 시작한다
-        for (RecipeCandidate candidate : picked) {
-            text.append("후보: ").append(candidateLine(candidate, query.keywordText())).append('\n');
+        List<String> reasons = RecommendationReasonWriter.writeDistinct(picked, query.keywordText());
+        for (int i = 0; i < picked.size(); i++) {
+            text.append("후보: ").append(candidateLine(picked.get(i), reasons.get(i))).append('\n');
         }
         return withoutBraces(text.toString().stripTrailing());
     }
 
-    // 원한 표현이 있는데 고른 레시피 중 요청 조건(키워드·분류·맛)에 맞은 것이 하나도 없는지
+    // 원한 표현이나 요청 조건(키워드·분류·맛)이 있는데 고른 레시피 중 요청에 맞은 것이 하나도 없는지
     static boolean preferenceUnmet(RecipeQuery query, List<RecipeCandidate> picked) {
-        return query.preferenceText() != null
+        boolean asked = query.preferenceText() != null || !query.keywords().isEmpty()
+                || !query.moodCategories().isEmpty() || !query.wantedTastes().isEmpty();
+        return asked
                 && !picked.isEmpty()
                 && picked.stream().allMatch(candidate -> candidate.ranking().requestMatches() == 0);
     }
 
+    // 원한 표현이 있으면 그 말로, 없으면 "조건에 맞는 레시피"로
     static String preferenceUnmetNotice(String preferenceText) {
-        return "말씀하신 " + preferenceText + topicParticle(preferenceText)
-                + " 찾지 못해서 냉장고 재료로 만들 수 있는 요리를 골랐어요";
+        String subject = preferenceText != null
+                ? preferenceText + topicParticle(preferenceText)
+                : "조건에 맞는 레시피는";
+        return "말씀하신 " + subject + " 찾지 못해서 냉장고 재료로 만들 수 있는 요리를 골랐어요";
     }
 
     // 키워드로 이름·재료가 맞은 레시피가 없을 때 안내. 사용자가 말한 요리 이름을 쓰고, 없으면 첫 키워드를 쓴다
@@ -148,13 +154,13 @@ public final class RecommendationPromptBuilder {
         return conditions.isEmpty() ? NONE : String.join(" / ", conditions);
     }
 
-    private static String candidateLine(RecipeCandidate candidate, String dishText) {
+    private static String candidateLine(RecipeCandidate candidate, String cardReason) {
         Reason reason = candidate.reason();
         List<String> fields = new ArrayList<>();
         fields.add(candidate.name());
         fields.add(candidate.category() == null ? "분류 없음" : candidate.category());
         fields.add(candidate.cookTimeMin() == null ? "조리 시간 정보 없음" : "조리 시간 " + candidate.cookTimeMin() + "분");
-        fields.add("카드 이유: " + RecommendationReasonWriter.write(candidate, dishText));
+        fields.add("카드 이유: " + cardReason);
         if (!reason.usedSelectedIngredients().isEmpty()) {
             fields.add("선택 재료 쓰임: " + String.join(NAME_DELIMITER, reason.usedSelectedIngredients()));
         }

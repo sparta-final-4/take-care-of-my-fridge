@@ -29,6 +29,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 @RequiredArgsConstructor
 public class ChatStreamService {
 
+    // 추천 후보가 하나도 없을 때 답 (AI를 부르지 않는다)
+    static final String NO_RECIPE_REPLY = "조건에 맞는 레시피를 찾지 못했어요. 시간을 늘리거나, 선택 재료를 줄이거나, 다른 요리 종류로 다시 물어봐 주세요.";
+
     private final ChatMessageService chatMessageService;
     private final ChatStreamLockService chatStreamLockService;
     private final ChatDailyLimitService chatDailyLimitService;
@@ -140,6 +143,10 @@ public class ChatStreamService {
     private Flux<String> replyText(Long memberId, Long sessionId, String content, ReplyPlan plan) {
         if (plan.recommendation() == null) {
             return chatReplyGenerator.generate(memberId, sessionId, content);
+        }
+        // 카드가 0개면 AI를 부르지 않고 정해진 답을 보낸다. "찾지 못했어요"는 카드가 없을 때만 나간다
+        if (plan.recommendation().event().empty()) {
+            return Flux.just(NO_RECIPE_REPLY);
         }
         return chatReplyGenerator.generateRecommendation(memberId, sessionId, content, plan.recommendation().candidateInfo());
     }

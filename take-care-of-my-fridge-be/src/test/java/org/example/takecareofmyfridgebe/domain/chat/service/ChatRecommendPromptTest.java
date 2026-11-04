@@ -69,4 +69,11 @@ class ChatRecommendPromptTest {
     void forbidsInternalReasoning() {
         assertThat(prompt).contains("내부 조건이나 판단 과정은 말하지 않는다").doesNotContain("마크다운");
     }
+
+    @Test
+    @DisplayName("후보가 있을 때 못 찾았다·조건을 바꾸라는 말을 쓰지 말라고 하고, 후보 없음 지시는 두지 않는다 (카드 0개는 서버가 답함)")
+    void forbidsNotFoundWording_whenCandidatesExist() {
+        assertThat(prompt).contains("[추천 후보]가 있으므로 \"찾지 못했어요\", \"조건을 바꿔 보세요\"")
+                .doesNotContain("\"후보 없음\"이면");
+    }
 }

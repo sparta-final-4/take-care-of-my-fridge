@@ -33,6 +33,9 @@ class RecommendationPromptBuilderTest {
                         List.of(), List.of(Taste.SPICY),
                         List.of(missing(1L, "돼지고기"), missing(2L, "부추"), missing(3L, "당근"), missing(4L, "애호박"), missing(5L, "고추")),
                         true));
+        // 원하는 맛이 맞은 후보라 요청 일치 1
+        first = new RecipeCandidate(first.recipeId(), first.name(), first.category(), first.cookTimeMin(),
+                new Ranking(1, 0, 0, 0, 1, 1, 0), first.reason());
         RecipeCandidate second = candidate(2L, "버섯전", "전", null,
                 reason(List.of(), List.of(), List.of(Taste.SALTY, Taste.UMAMI), List.of(), List.of(), false));
 
@@ -196,5 +199,21 @@ class RecommendationPromptBuilderTest {
 
     private static MissingIngredient missing(Long id, String name) {
         return new MissingIngredient(id, name);
+    }
+
+    @Test
+    @DisplayName("원한 표현 없이 조건(분류·맛·키워드)만 있어도 고른 레시피가 하나도 안 맞으면 조건에 맞는 레시피를 못 찾았다고 넣는다")
+    void writesConditionUnmetNotice_whenNoPreferenceText() {
+        RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, List.of("면류"), 10, null, false,
+                List.of("밀키트"), null, null);
+        RecipeCandidate unmatched = candidate(992L, "장어조림", "조림", null,
+                reason(List.of("고추"), List.of(), List.of(), List.of(), List.of(), false));
+
+        String text = RecommendationPromptBuilder.build("밀키트 중에 제일 빨리", query, NAMES, List.of(unmatched), true);
+
+        assertThat(text).startsWith("""
+                [먼저 말할 것]
+                말씀하신 조건에 맞는 레시피는 찾지 못해서 냉장고 재료로 만들 수 있는 요리를 골랐어요
+                [사용자 요청]""");
     }
 }
