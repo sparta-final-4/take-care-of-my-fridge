@@ -34,6 +34,7 @@ import java.util.stream.Collectors;
 public final class RecommendationPromptBuilder {
 
     static final String NO_CANDIDATES = "후보 없음";
+    static final String ALTERNATIVE_MARK = "[다른 제안]";
     // 못 찾았다는 안내에 넣을 비슷한 요리 이름 수
     private static final int SIMILAR_NAMES_SHOWN = 2;
     private static final int MISSING_SHOWN = 3;
@@ -210,7 +211,8 @@ public final class RecommendationPromptBuilder {
     private static String candidateLine(RecipeCandidate candidate, String cardReason, boolean memberTastes) {
         Reason reason = candidate.reason();
         List<String> fields = new ArrayList<>();
-        fields.add(candidate.name());
+        // 다른 분류로 바꿔 넣은 카드는 요청과 다른 제안이라고 알린다
+        fields.add(candidate.alternative() ? ALTERNATIVE_MARK + " " + candidate.name() : candidate.name());
         fields.add(candidate.category() == null ? "분류 없음" : candidate.category());
         fields.add(candidate.cookTimeMin() == null ? "조리 시간 정보 없음" : "조리 시간 " + candidate.cookTimeMin() + "분");
         fields.add("카드 이유: " + cardReason);

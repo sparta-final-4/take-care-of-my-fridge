@@ -213,9 +213,17 @@ public class ChatStreamService {
         return Mono.fromCallable(() -> {
             List<RecommendedRecipe> recipes = recommendation == null ? List.of() : recommendation.event().recipes();
             List<RecommendationToSave> cards = new ArrayList<>();
+            List<Integer> receivedNumbers = new ArrayList<>();
             for (int i = 0; i < recipes.size(); i++) {
                 String description = i < descriptions.size() ? descriptions.get(i).toString().strip() : "";
                 cards.add(new RecommendationToSave(recipes.get(i).recipeId(), description.isEmpty() ? null : description));
+                if (!description.isEmpty()) {
+                    receivedNumbers.add(i + 1);
+                }
+            }
+            // 설명이 빠진 카드는 화면에서 카드 이유 한 줄로 대신한다. 빠진 걸 알 수 있게 남긴다
+            if (!cards.isEmpty() && receivedNumbers.size() < cards.size()) {
+                log.warn("카드 설명 누락 - sessionId: {}, 카드 수: {}, 받은 번호: {}", sessionId, cards.size(), receivedNumbers);
             }
             // 카드가 없으면 기존처럼 메시지만 저장한다
             List<ChatMessageResponse> saved = cards.isEmpty()

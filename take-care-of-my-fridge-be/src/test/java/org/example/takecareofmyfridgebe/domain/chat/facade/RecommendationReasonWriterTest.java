@@ -127,6 +127,18 @@ class RecommendationReasonWriterTest {
     }
 
     @Test
+    @DisplayName("다른 분류로 바꿔 넣은 카드(다른 제안)는 키워드·임박 재료보다 먼저 색다르게 골라 봤다고 쓴다")
+    void writesAlternativeReason_whenAlternative() {
+        RecipeCandidate alternative = candidate("전", new Reason(List.of("고추"), List.of(new ImminentIngredient("고추", 1)),
+                List.of(), List.of(), List.of(), false, false, List.of(), List.of(), List.of(),
+                new KeywordMatch(Type.EXPANDED, "탕수육", null))).asAlternative();
+
+        assertThat(RecommendationReasonWriter.write(alternative, "김피탕")).isEqualTo("색다르게 골라 봤어요");
+        assertThat(RecommendationReasonWriter.writeDistinct(List.of(alternative), "김피탕", false))
+                .containsExactly("색다르게 골라 봤어요");
+    }
+
+    @Test
     @DisplayName("고른 카드끼리 이유가 겹치면 다음 카드는 다른 임박 재료, 겹친 맛, 냉장고 재료 수 순으로 바꾼다")
     void writesDistinctReasons() {
         List<ImminentIngredient> imminent = List.of(new ImminentIngredient("고추", 1), new ImminentIngredient("깻잎", 1));

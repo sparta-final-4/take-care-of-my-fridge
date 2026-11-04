@@ -270,6 +270,22 @@ class RecommendationPromptBuilderTest {
         assertThat(withoutRequest).contains("카드 이유: 짭짤하고 감칠맛 나요", "좋아하는 맛과 맞음: 짠맛, 감칠맛");
     }
 
+    @Test
+    @DisplayName("다른 분류로 바꿔 넣은 카드는 후보 줄 이름 앞에 [다른 제안]을 붙이고 카드 이유도 색다르게 골라 봤다고 쓴다")
+    void marksAlternativeCandidate() {
+        RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, List.of("튀김"), null, null, false);
+        RecipeCandidate fried = candidate(1L, "탕수육", "튀김", 40,
+                reason(List.of(), List.of(), List.of(), List.of(), List.of(), false));
+        RecipeCandidate pancake = candidate(2L, "돼지고기 찹쌀부침", "전", 30,
+                reason(List.of("고추"), List.of(new ImminentIngredient("고추", 1)), List.of(), List.of(), List.of(), false))
+                .asAlternative();
+
+        String text = RecommendationPromptBuilder.build("튀김 요리 추천해줘", query, NAMES, List.of(fried, pancake), false);
+
+        assertThat(text).contains("후보: 탕수육 | 튀김")
+                .contains("후보: [다른 제안] 돼지고기 찹쌀부침 | 전 | 조리 시간 30분 | 카드 이유: 색다르게 골라 봤어요 |");
+    }
+
     private static RecipeQuery kimpiQuery(Map<Long, KeywordMatch> matches) {
         return new RecipeQuery(MEMBER_ID, List.of(), null, List.of("튀김"), null, null, false,
                 List.of("김피탕", "탕수육", "깐풍기"), "김피탕", "김피탕 같은 요리")

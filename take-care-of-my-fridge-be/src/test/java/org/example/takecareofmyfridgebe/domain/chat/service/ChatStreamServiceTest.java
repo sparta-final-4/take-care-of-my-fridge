@@ -23,6 +23,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.http.codec.ServerSentEvent;
 import reactor.core.publisher.Flux;
 import reactor.test.StepVerifier;
@@ -45,7 +47,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({MockitoExtension.class, OutputCaptureExtension.class})
 class ChatStreamServiceTest {
 
     private static final String LOCK_TOKEN = "lock-token";
@@ -660,6 +662,48 @@ class ChatStreamServiceTest {
         assertThat(events.get(2).data()).isEqualTo("{\"index\":0,\"text\":\"두부를 졸여요.\"}");
         assertThat(events.get(3).data()).isEqualTo("{\"index\":1,\"text\":\"두부를 부쳐요.\"}");
         verify(chatMessageService).saveExchange(sessionId, "두부로 뭐 해 먹지?", "두부 요리를 골랐어요.", expectedCards);
+    }
+
+    @Test
+    @DisplayName("답이 끝났는데 카드 설명이 빠진 번호가 있으면 받은 번호를 WARN 한 줄로 남기고, 빠진 카드는 설명 없이 저장한다")
+    void warnsMissingDescriptions(CapturedOutput output) {
+        Long sessionId = 10L;
+        ChatMessageCreateRequest request = ChatMessageCreateRequest.of("튀김 요리 추천해줘");
+        RecipeQuery query = RecipeQuery.of(1L, List.of());
+        givenRecommend(sessionId, request, query, new RecommendationReply(ChatRecommendationsEventResponse.of(List.of(
+                card(1L, "탕수육"), card(2L, "깐풍기"), card(3L, "돼지고기 찹쌀부침"))), "후보"));
+        when(chatReplyGenerator.generateRecommendation(1L, sessionId, "튀김 요리 추천해줘", "후보"))
+                .thenReturn(Flux.just("[소개] 튀김 요리를 골랐어요.\n[1] 새콤달콤해요.\n[2] 매콤달콤해요."));
+        List<RecommendationToSave> expectedCards = List.of(new RecommendationToSave(1L, "새콤달콤해요."),
+                new RecommendationToSave(2L, "매콤달콤해요."), new RecommendationToSave(3L, null));
+        when(chatMessageService.saveExchange(sessionId, "튀김 요리 추천해줘", "튀김 요리를 골랐어요.", expectedCards))
+                .thenReturn(List.of(
+                        new ChatMessageResponse(100L, 1, ChatMessageRole.USER, "튀김 요리 추천해줘", LocalDateTime.now()),
+                        new ChatMessageResponse(101L, 2, ChatMessageRole.ASSISTANT, "튀김 요리를 골랐어요.", LocalDateTime.now())));
+
+        chatStreamService.streamMessage(1L, sessionId, request).collectList().block();
+
+        verify(chatMessageService).saveExchange(sessionId, "튀김 요리 추천해줘", "튀김 요리를 골랐어요.", expectedCards);
+        assertThat(output).contains("카드 설명 누락 - sessionId: 10, 카드 수: 3, 받은 번호: [1, 2]");
+    }
+
+    @Test
+    @DisplayName("카드 설명을 모두 받으면 누락 WARN을 남기지 않는다")
+    void doesNotWarn_whenAllDescriptionsReceived(CapturedOutput output) {
+        Long sessionId = 10L;
+        ChatMessageCreateRequest request = ChatMessageCreateRequest.of("두부로 뭐 해 먹지?");
+        RecipeQuery query = RecipeQuery.of(1L, List.of(21L));
+        givenRecommend(sessionId, request, query, new RecommendationReply(
+                ChatRecommendationsEventResponse.of(List.of(card(314L, "두부조림"))), "후보"));
+        when(chatReplyGenerator.generateRecommendation(1L, sessionId, "두부로 뭐 해 먹지?", "후보"))
+                .thenReturn(Flux.just("[소개] 두부 요리예요.\n[1] 짭조름해요."));
+        when(chatMessageService.saveExchange(any(), any(), any(), any())).thenReturn(List.of(
+                new ChatMessageResponse(100L, 1, ChatMessageRole.USER, "두부로 뭐 해 먹지?", LocalDateTime.now()),
+                new ChatMessageResponse(101L, 2, ChatMessageRole.ASSISTANT, "두부 요리예요.", LocalDateTime.now())));
+
+        chatStreamService.streamMessage(1L, sessionId, request).collectList().block();
+
+        assertThat(output).doesNotContain("카드 설명 누락");
     }
 
     private void givenRecommend(Long sessionId, ChatMessageCreateRequest request, RecipeQuery query, RecommendationReply reply) {

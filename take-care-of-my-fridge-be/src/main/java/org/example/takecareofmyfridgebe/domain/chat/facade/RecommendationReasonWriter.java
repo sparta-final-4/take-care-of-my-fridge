@@ -30,6 +30,8 @@ import java.util.Set;
  */
 public final class RecommendationReasonWriter {
 
+    static final String ALTERNATIVE_REASON = "색다르게 골라 봤어요";
+
     private static final String CATEGORY_PREFIX = "분류: ";
     private static final int MAX_TASTES = 2;
 
@@ -71,12 +73,16 @@ public final class RecommendationReasonWriter {
         return reasons;
     }
 
-    // 쓸 수 있는 이유를 우선순위대로: 키워드 > 요청(맛·분류) > 선택 재료 > 임박 재료(급한 순, 재료마다) > 겹친 맛 > 냉장고 재료 수.
+    // 쓸 수 있는 이유를 우선순위대로: 다른 제안 > 키워드 > 요청(맛·분류) > 선택 재료 > 임박 재료(급한 순, 재료마다) > 겹친 맛 > 냉장고 재료 수.
     // 벡터 검색으로만 찾은 레시피는 키워드·요청 이유를 쓰지 않는다
     private static List<String> options(RecipeCandidate candidate, String dishText, boolean memberTastes) {
         Reason reason = candidate.reason();
         KeywordMatch keywordMatch = reason.keywordMatch();
         List<String> options = new ArrayList<>();
+        // 다른 분류로 바꿔 넣은 카드는 요청과 다른 제안이라고 먼저 말한다
+        if (candidate.alternative()) {
+            options.add(ALTERNATIVE_REASON);
+        }
         if (keywordMatch == null || keywordMatch.type() != KeywordMatch.Type.VECTOR) {
             keywordReason(keywordMatch, dishText, candidate.category()).ifPresent(options::add);
             requestReason(reason).ifPresent(options::add);
