@@ -21,9 +21,17 @@ class ChatRecommendPromptTest {
     }
 
     @Test
-    @DisplayName("임박 표시는 오늘까지·내일까지·모레까지·3일 남음을 그대로 말하라고 지시한다")
-    void instructsDdayInWords() {
-        assertThat(prompt).contains("(오늘까지)", "(내일까지)", "(모레까지)", "(3일 남음)", "괄호 표시를 다른 날짜로 바꿔 말하지 않는다");
+    @DisplayName("소비기한이 붙은 재료만 한 번 짧게 말하고, 소비기한 말을 바꾸지 말고, 쓰는 재료를 전부 나열하지 말라고 지시한다")
+    void instructsImminentBriefly() {
+        assertThat(prompt).contains("내일까지인 고추", "그 재료만 레시피마다 한 번 짧게 말한다", "적힌 그대로 쓰고 바꾸지 않는다",
+                "쓰는 냉장고 재료를 전부 나열하지 않는다");
+    }
+
+    @Test
+    @DisplayName("선택 재료 쓰임이 있으면 레시피마다 첫 문장을 주재료로 들어간다는 말로 시작하라고 지시한다")
+    void instructsSelectedAsMainIngredient() {
+        assertThat(prompt).contains("선택 재료 쓰임", "첫 문장을 그 재료가 요리의 주재료로 들어간다는 말로 시작한다",
+                "넣어도 되고 안 넣어도 되는 재료처럼 말하지 않는다");
     }
 
     @Test
@@ -39,14 +47,15 @@ class ChatRecommendPromptTest {
     }
 
     @Test
-    @DisplayName("선택 재료를 어떻게 쓰는지 먼저 말하고, 내부 조건·판단 과정은 말하지 않으라고 지시한다")
-    void instructsSelectedFirstAndNoInternalReasoning() {
-        assertThat(prompt).contains("그 선택 재료를 어떻게 쓰는지", "내부 조건이나 판단 과정은 말하지 않는다");
+    @DisplayName("내부 조건·판단 과정은 말하지 않으라고 지시한다")
+    void forbidsInternalReasoning() {
+        assertThat(prompt).contains("내부 조건이나 판단 과정은 말하지 않는다");
     }
 
     @Test
-    @DisplayName("냉장고에 없는 선택 재료는 답 맨 앞에서 한 번만 말하고 레시피마다 반복하지 말라고 지시한다")
-    void instructsMissingSelectedOnceAtFront() {
-        assertThat(prompt).contains("냉장고에 없는 선택 재료", "맨 앞", "한 번만 말한다", "레시피마다 반복하지 않고");
+    @DisplayName("[먼저 말할 것]이 있을 때만 그 문장을 맨 앞에 쓰고, 예시 재료 이름은 넣지 않는다")
+    void instructsNoticeOnlyWhenGiven() {
+        assertThat(prompt).contains("[먼저 말할 것]이 있으면 그 문장을", "[먼저 말할 것]이 없으면 냉장고에 없는 재료 이야기를 하지 않는다")
+                .doesNotContain("말씀하신 버섯");
     }
 }

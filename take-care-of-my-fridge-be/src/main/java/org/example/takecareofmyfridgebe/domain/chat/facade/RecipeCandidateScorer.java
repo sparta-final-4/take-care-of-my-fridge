@@ -213,6 +213,21 @@ public class RecipeCandidateScorer {
                 .count();
     }
 
+    // 레시피가 쓰는 선택 재료(같은 종류 묶음 포함)의 이름. 레시피에 나온 순서이고 레시피에 실제로 쓰인 이름이다
+    private static List<String> usedSelectedNames(
+            RecipeQuery query,
+            List<Long> nonBasicSelected,
+            List<RecipeCandidateIngredient> nonBasic
+    ) {
+        Set<Long> groupIds = new HashSet<>();
+        nonBasicSelected.forEach(selectedId -> groupIds.addAll(query.selectedGroupOf(selectedId)));
+        return nonBasic.stream()
+                .filter(row -> groupIds.contains(row.ingredientId()))
+                .map(RecipeCandidateIngredient::ingredientName)
+                .distinct()
+                .toList();
+    }
+
     // 레시피가 쓰는 선택 재료 중 냉장고에 없는 것의 이름. 같은 종류 묶음에서 레시피에 쓰인 재료가 하나라도 냉장고에 있으면 가진 것으로 본다.
     // 이름은 레시피에 실제로 쓰인 재료 이름이다 (예: 선택 "버섯" → 레시피의 "표고버섯")
     private static List<String> missingSelectedNames(
@@ -318,6 +333,7 @@ public class RecipeCandidateScorer {
 
         int selectedMatches = countSelectedMatches(query, nonBasicSelected, recipeRows);
         List<String> missingSelected = missingSelectedNames(query, nonBasicSelected, nonBasic, fridgeById);
+        List<String> usedSelected = usedSelectedNames(query, nonBasicSelected, nonBasic);
 
         // 1단계: 사용자 요청 (원하는 맛 + 분류 일치). 말한 재료는 선택 재료로 합쳐져 2단계에서 센다
         List<String> matchedRequests = new ArrayList<>();
@@ -363,7 +379,8 @@ public class RecipeCandidateScorer {
                 info.cookTimeMin() == null,
                 ranking.ownedRatio() + RATIO_EPSILON < minOwnedRatio,
                 List.of(),
-                missingSelected
+                missingSelected,
+                usedSelected
         );
         return new RecipeCandidate(info.recipeId(), info.name(), info.category(), info.cookTimeMin(), ranking, reason);
     }

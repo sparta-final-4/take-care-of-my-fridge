@@ -17,13 +17,16 @@ import java.util.stream.Collectors;
 /**
  * 추천 설명 AI에 넘길 후보 정보를 줄 글로 만든다. 스프링에 의존하지 않는 순수 클래스.
  * <pre>
+ * [먼저 말할 것]
+ * 말씀하신 표고버섯, 두부는 지금 냉장고에 없어서 준비가 필요해요
  * [사용자 요청]
  * 메시지: 버섯 두부로 할 수 있는 요리 추천해줘
  * 선택 재료: 버섯, 두부 (이 재료를 꼭 쓰는 레시피만)
  * 조건: 원하는 맛 매운맛 / 분류 국, 찌개 / 30분 이내 / 뺄 재료 오이
  * [추천 후보]
- * 1. 제육배추찜 | 찜 | 조리 시간 40분 | 쓰는 냉장고 재료: 양파(오늘까지), 고추(모레까지), 배추 | 냉장고에 없는 선택 재료: 두부 | 원하는 맛과 맞음: 매운맛 | 부족한 재료: 돼지고기, 부추, 당근 외 3개 | 재료 많이 모자람
+ * 1. 두부제육찜 | 찜 | 조리 시간 40분 | 선택 재료 쓰임: 두부 | 쓰는 냉장고 재료: 오늘까지인 양파, 모레까지인 고추, 배추 | 냉장고에 없는 선택 재료: 두부 | 원하는 맛과 맞음: 매운맛 | 부족한 재료: 돼지고기, 부추, 당근 외 3개 | 재료 많이 모자람
  * </pre>
+ * [먼저 말할 것]은 고른 후보 중 냉장고에 없는 선택 재료가 있을 때만 넣는다 (AI가 판단하지 않게 서버가 정한다).
  * 후보가 없으면 [추천 후보] 아래에 "후보 없음"을 쓴다. 맛은 한글로 쓰고, 중괄호({})는 괄호로 바꿔 넣지 않는다.
  */
 public final class RecommendationPromptBuilder {
@@ -46,6 +49,10 @@ public final class RecommendationPromptBuilder {
     public static String build(String content, RecipeQuery query, Map<Long, String> ingredientNames,
                                List<RecipeCandidate> picked) {
         StringBuilder text = new StringBuilder();
+        String missingNotice = missingSelectedNotice(picked);
+        if (missingNotice != null) {
+            text.append("[먼저 말할 것]\n").append(missingNotice).append('\n');
+        }
         text.append("[사용자 요청]\n");
         text.append("메시지: ").append(content.strip()).append('\n');
         text.append("선택 재료: ").append(selectedLine(query, ingredientNames)).append('\n');
@@ -58,6 +65,28 @@ public final class RecommendationPromptBuilder {
             text.append(i + 1).append(". ").append(candidateLine(picked.get(i))).append('\n');
         }
         return withoutBraces(text.toString().stripTrailing());
+    }
+
+    // 고른 후보들의 냉장고에 없는 선택 재료를 모아 안내 문장을 만든다. 없으면 null
+    static String missingSelectedNotice(List<RecipeCandidate> picked) {
+        List<String> names = picked.stream()
+                .flatMap(candidate -> candidate.reason().missingSelectedIngredients().stream())
+                .distinct()
+                .toList();
+        if (names.isEmpty()) {
+            return null;
+        }
+        String last = names.get(names.size() - 1);
+        return "말씀하신 " + String.join(NAME_DELIMITER, names) + topicParticle(last) + " 지금 냉장고에 없어서 준비가 필요해요";
+    }
+
+    // 받침이 있으면 "은", 없으면 "는" (한글이 아니면 "는")
+    private static String topicParticle(String word) {
+        char last = word.charAt(word.length() - 1);
+        if (last < '가' || last > '힣') {
+            return "는";
+        }
+        return (last - '가') % 28 == 0 ? "는" : "은";
     }
 
     private static String selectedLine(RecipeQuery query, Map<Long, String> ingredientNames) {
@@ -92,6 +121,9 @@ public final class RecommendationPromptBuilder {
         fields.add(candidate.name());
         fields.add(candidate.category() == null ? "분류 없음" : candidate.category());
         fields.add(candidate.cookTimeMin() == null ? "조리 시간 정보 없음" : "조리 시간 " + candidate.cookTimeMin() + "분");
+        if (!reason.usedSelectedIngredients().isEmpty()) {
+            fields.add("선택 재료 쓰임: " + String.join(NAME_DELIMITER, reason.usedSelectedIngredients()));
+        }
         fields.add("쓰는 냉장고 재료: " + usedLine(reason));
         if (!reason.missingSelectedIngredients().isEmpty()) {
             fields.add("냉장고에 없는 선택 재료: " + String.join(NAME_DELIMITER, reason.missingSelectedIngredients()));
@@ -108,7 +140,7 @@ public final class RecommendationPromptBuilder {
         return String.join(FIELD_DELIMITER, fields);
     }
 
-    // 쓰는 냉장고 재료. 임박 재료는 이름 뒤에 (오늘까지)·(내일까지)·(모레까지)·(3일 남음)을 붙인다
+    // 쓰는 냉장고 재료. 임박 재료는 말 순서대로 앞에 소비기한을 붙인다 ("내일까지인 고추")
     private static String usedLine(Reason reason) {
         if (reason.usedFridgeIngredients().isEmpty()) {
             return NONE;
@@ -116,17 +148,17 @@ public final class RecommendationPromptBuilder {
         Map<String, Long> dDays = reason.imminentIngredients().stream()
                 .collect(Collectors.toMap(ImminentIngredient::name, ImminentIngredient::dDay, (a, b) -> a));
         return reason.usedFridgeIngredients().stream()
-                .map(name -> dDays.containsKey(name) ? name + "(" + dDayLabel(dDays.get(name)) + ")" : name)
+                .map(name -> dDays.containsKey(name) ? dDayLabel(dDays.get(name)) + " " + name : name)
                 .collect(Collectors.joining(NAME_DELIMITER));
     }
 
-    // 소비기한을 말로 쓴다 (AI가 D-1을 "오늘까지"로 잘못 읽지 않게)
+    // 소비기한을 재료 이름 앞에 붙일 말로 쓴다 (AI가 D-1을 "오늘까지"로 잘못 읽거나 괄호째 옮겨 쓰지 않게)
     static String dDayLabel(long dDay) {
         return switch ((int) dDay) {
-            case 0 -> "오늘까지";
-            case 1 -> "내일까지";
-            case 2 -> "모레까지";
-            default -> dDay + "일 남음";
+            case 0 -> "오늘까지인";
+            case 1 -> "내일까지인";
+            case 2 -> "모레까지인";
+            default -> dDay + "일 남은";
         };
     }
 

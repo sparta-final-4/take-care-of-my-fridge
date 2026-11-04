@@ -51,6 +51,6 @@ class RecommendationPickerTest {
     private static RecipeCandidate candidate(Long id, String category) {
         return new RecipeCandidate(id, "레시피" + id, category, 20,
                 new Ranking(0, 0, 0, 0, 1, 1, 0),
-                new Reason(List.of(), List.of(), List.of(), List.of(), List.of(), false, false, List.of(), List.of()));
+                new Reason(List.of(), List.of(), List.of(), List.of(), List.of(), false, false, List.of(), List.of(), List.of()));
     }
 }

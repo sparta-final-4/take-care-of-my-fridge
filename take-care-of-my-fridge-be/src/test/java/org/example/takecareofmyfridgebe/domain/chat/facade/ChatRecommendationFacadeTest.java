@@ -49,7 +49,7 @@ class ChatRecommendationFacadeTest {
     void buildsCardsFromTopThree() {
         Reason wanted = new Reason(List.of("양파", "두부"), List.of(new ImminentIngredient("양파", 0)),
                 List.of(Taste.SALTY), List.of(Taste.SPICY), List.of(), false, true,
-                List.of(new MissingIngredient(5L, "돼지고기")), List.of("돼지고기"));
+                List.of(new MissingIngredient(5L, "돼지고기")), List.of("돼지고기"), List.of());
         when(recipeCandidateFacade.findCandidates(any())).thenReturn(new RecipeCandidates(List.of(
                 candidate(10L, "두부찌개", "찌개", 25, wanted),
                 candidate(20L, "두부조림", "조림", null, reason(List.of(Taste.SALTY))),
@@ -112,6 +112,6 @@ class ChatRecommendationFacadeTest {
     }
 
     private static Reason reason(List<Taste> tastes) {
-        return new Reason(List.of(), List.of(), tastes, List.of(), List.of(), false, false, List.of(), List.of());
+        return new Reason(List.of(), List.of(), tastes, List.of(), List.of(), false, false, List.of(), List.of(), List.of());
     }
 }
