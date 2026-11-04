@@ -186,7 +186,7 @@ class ChatIntentFacadeTest {
             RecipeQuery query = facade.resolve(MEMBER_ID, SESSION_ID,
                     ChatMessageCreateRequest.of("두부랑 용과즙으로 할 수 있는 거, 오이는 빼고")).recipeQuery();
 
-            assertThat(query.includeIngredientIds()).containsExactly(TOFU);
+            assertThat(query.selectedIngredientIds()).containsExactly(TOFU);
             assertThat(query.excludeIngredientIds()).containsExactly(CUCUMBER);
             assertThat(query.useSelectedOnly()).isTrue();
         }
@@ -201,8 +201,53 @@ class ChatIntentFacadeTest {
             RecipeQuery query = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("두부도 넣어서 매운 거"))
                     .recipeQuery();
 
-            assertThat(query.includeIngredientIds()).containsExactly(TOFU);
+            assertThat(query.selectedIngredientIds()).containsExactly(TOFU);
             assertThat(query.useSelectedOnly()).isFalse();
+        }
+
+        @Test
+        @DisplayName("칩 없이 말로만 재료를 정하면 그 재료가 선택 재료가 된다")
+        void usesSpokenIngredientsAsSelected_whenNoChip() {
+            givenExtracted(new IntentResult(ChatIntent.RECOMMEND, null, null, null, List.of("버섯", "두부"), null, true));
+            when(ingredientMatcher.matchAll(List.of("버섯", "두부"))).thenReturn(Map.of(
+                    "버섯", ingredient(MUSHROOM, "ING_MUSHROOM", "표고버섯"),
+                    "두부", ingredient(TOFU, "ING_TOFU", "두부")));
+
+            RecipeQuery query = facade.resolve(MEMBER_ID, SESSION_ID,
+                    ChatMessageCreateRequest.of("버섯 두부로 할 수 있는 요리 추천해줘")).recipeQuery();
+
+            assertThat(query.selectedIngredientIds()).containsExactly(MUSHROOM, TOFU);
+            assertThat(query.useSelectedOnly()).isTrue();
+        }
+
+        @Test
+        @DisplayName("칩으로 고른 재료와 말한 재료를 합치고 중복은 뺀다 (고른 재료가 앞)")
+        void mergesChipAndSpokenIngredients_withoutDuplicates() {
+            givenExtracted(new IntentResult(ChatIntent.RECOMMEND, null, null, null, List.of("두부", "버섯"), null, null));
+            when(ingredientMatcher.matchAll(List.of("두부", "버섯"))).thenReturn(Map.of(
+                    "두부", ingredient(TOFU, "ING_TOFU", "두부"),
+                    "버섯", ingredient(MUSHROOM, "ING_MUSHROOM", "표고버섯")));
+
+            RecipeQuery query = facade.resolve(MEMBER_ID, SESSION_ID,
+                    new ChatMessageCreateRequest("두부랑 버섯도 넣어서", ChatMessageMode.AUTO, List.of(CUCUMBER, TOFU), false))
+                    .recipeQuery();
+
+            assertThat(query.selectedIngredientIds()).containsExactly(CUCUMBER, TOFU, MUSHROOM);
+            assertThat(query.useSelectedOnly()).isFalse();
+        }
+
+        @Test
+        @DisplayName("빼달라고 한 재료는 고른 재료에 있어도 선택 재료에서 뺀다")
+        void removesExcludedFromSelected() {
+            givenExtracted(new IntentResult(ChatIntent.RECOMMEND, null, null, null, null, List.of("오이"), null));
+            when(ingredientMatcher.matchAll(List.of("오이"))).thenReturn(Map.of("오이", ingredient(CUCUMBER, "ING_CUCUMBER", "오이")));
+
+            RecipeQuery query = facade.resolve(MEMBER_ID, SESSION_ID,
+                    new ChatMessageCreateRequest("오이는 빼고", ChatMessageMode.AUTO, List.of(CUCUMBER, TOFU), false))
+                    .recipeQuery();
+
+            assertThat(query.selectedIngredientIds()).containsExactly(TOFU);
+            assertThat(query.excludeIngredientIds()).containsExactly(CUCUMBER);
         }
 
         @Test
@@ -215,7 +260,7 @@ class ChatIntentFacadeTest {
             ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("두부로 매운 거"));
 
             assertThat(resolution.intent()).isEqualTo(ChatIntent.RECOMMEND);
-            assertThat(resolution.recipeQuery().includeIngredientIds()).isEmpty();
+            assertThat(resolution.recipeQuery().selectedIngredientIds()).isEmpty();
             assertThat(resolution.recipeQuery().wantedTastes()).containsExactly(Taste.SPICY);
         }
     }

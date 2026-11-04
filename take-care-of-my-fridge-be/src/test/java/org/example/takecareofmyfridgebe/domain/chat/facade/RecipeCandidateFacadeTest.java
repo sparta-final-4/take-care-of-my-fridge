@@ -40,7 +40,7 @@ class RecipeCandidateFacadeTest {
     @Test
     @DisplayName("원하는 맛을 말했으면 회원 선호 맛을 조회하지 않는다")
     void skipsMemberTastes_whenWantedTastesExist() {
-        RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), List.of(Taste.SPICY), null, null, null, null, false);
+        RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), List.of(Taste.SPICY), null, null, null, false);
 
         facade.findCandidates(query);
 

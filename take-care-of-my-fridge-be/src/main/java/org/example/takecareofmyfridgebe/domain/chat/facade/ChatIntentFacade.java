@@ -30,6 +30,8 @@ import java.util.stream.Stream;
  *   <li>AI 실패(시간 초과·오류·JSON 깨짐): 선택 재료가 있으면 추천, 없으면 일반. 에러로 끝내지 않는다</li>
  * </ul>
  * 말한 재료 이름은 IngredientMatcher로 재료 ID로 바꾸고, 못 찾은 이름(ING_CUSTOM)은 버린다.
+ * 말한 재료(includeIngredients)는 고른 재료와 합쳐 선택 재료로 쓴다 (중복 제거, 빼달라고 한 재료는 뺀다).
+ * 그래서 "버섯 두부로 할 수 있는"처럼 말로만 재료를 정해도 칩으로 고른 것과 같은 규칙(선택 재료만 쓰기, 2개 이상 다 쓰면 보유 비율 예외)이 적용된다.
  */
 @Slf4j
 @Component
@@ -88,15 +90,20 @@ public class ChatIntentFacade {
         Map<String, Long> idsByName = matchIngredientIds(memberId, sessionId,
                 Stream.concat(includeNames.stream(), excludeNames.stream()).distinct().toList());
 
+        List<Long> excludeIds = toIds(excludeNames, idsByName);
+        List<Long> selectedIds = Stream.concat(request.selectedIngredientIds().stream(), toIds(includeNames, idsByName).stream())
+                .distinct()
+                .filter(id -> !excludeIds.contains(id))
+                .toList();
+
         boolean useSelectedOnly = request.useSelectedOnly() || Boolean.TRUE.equals(result.useSelectedOnly());
         return new RecipeQuery(
                 memberId,
-                request.selectedIngredientIds(),
+                selectedIds,
                 result.tastes(),
                 result.moodCategories(),
                 result.maxMinutes(),
-                toIds(includeNames, idsByName),
-                toIds(excludeNames, idsByName),
+                excludeIds,
                 useSelectedOnly
         );
     }
@@ -141,7 +148,6 @@ public class ChatIntentFacade {
                 + ", 원하는 맛=" + query.wantedTastes()
                 + ", 분류=" + query.moodCategories()
                 + ", 최대 시간=" + query.maxMinutes()
-                + ", 포함 재료=" + query.includeIngredientIds()
                 + ", 제외 재료=" + query.excludeIngredientIds()
                 + ", 선택 재료만=" + query.useSelectedOnly();
     }
