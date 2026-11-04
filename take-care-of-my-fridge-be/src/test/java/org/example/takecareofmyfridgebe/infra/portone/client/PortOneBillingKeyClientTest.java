@@ -150,11 +150,23 @@ class PortOneBillingKeyClientTest {
     }
 
     @Test
-    @DisplayName("그 밖의 이유로 삭제가 거절되면 예외를 던진다")
-    void deleteBillingKey_throwException_whenRejected() {
+    @DisplayName("PortOne에 없는 빌링키를 삭제하면 이미 없는 것으로 보고 성공으로 본다")
+    void deleteBillingKey_success_whenNotFound() {
         server.expect(requestTo(startsWith(BASE_URL + "/billing-keys/" + BILLING_KEY)))
                 .andRespond(withStatus(HttpStatus.NOT_FOUND).contentType(MediaType.APPLICATION_JSON)
                         .body("{\"type\":\"BILLING_KEY_NOT_FOUND\",\"message\":\"없음\"}"));
+
+        client.deleteBillingKey(BILLING_KEY, "사용자 삭제");
+
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("그 밖의 이유로 삭제가 거절되면 예외를 던진다")
+    void deleteBillingKey_throwException_whenRejected() {
+        server.expect(requestTo(startsWith(BASE_URL + "/billing-keys/" + BILLING_KEY)))
+                .andRespond(withStatus(HttpStatus.FORBIDDEN).contentType(MediaType.APPLICATION_JSON)
+                        .body("{\"type\":\"FORBIDDEN\",\"message\":\"권한 없음\"}"));
 
         assertThatThrownBy(() -> client.deleteBillingKey(BILLING_KEY, "사용자 삭제"))
                 .isInstanceOf(HttpClientErrorException.class);
