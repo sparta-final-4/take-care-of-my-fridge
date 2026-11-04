@@ -108,7 +108,8 @@ public class ChatRecommendationFacade {
                         .map(missing -> new MissingIngredient(missing.ingredientId(), missing.name()))
                         .toList(),
                 reason.missingSelectedIngredients(),
-                reason.lacksManyIngredients()
+                reason.lacksManyIngredients(),
+                RecommendationReasonWriter.write(candidate)
         );
     }
 }

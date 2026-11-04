@@ -616,6 +616,6 @@ class ChatStreamServiceTest {
     }
 
     private static RecommendedRecipe card(Long recipeId, String name) {
-        return new RecommendedRecipe(recipeId, name, null, "조림", 20, List.of(), List.of(), List.of(), List.of(), List.of(), false);
+        return new RecommendedRecipe(recipeId, name, null, "조림", 20, List.of(), List.of(), List.of(), List.of(), List.of(), false, "이유");
     }
 }
