@@ -22,9 +22,11 @@ import org.springframework.ai.chat.metadata.ChatResponseMetadata;
 import org.springframework.ai.chat.metadata.DefaultUsage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
+import org.springframework.core.io.ByteArrayResource;
 import reactor.core.publisher.Flux;
 import reactor.test.StepVerifier;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Optional;
 
@@ -45,7 +47,9 @@ class OpenAiChatReplyGeneratorTest {
     private final OpenAiChatReplyGenerator generator = new OpenAiChatReplyGenerator(
             chatClient,
             new LlmCostCalculator(0.15, 0.60),
-            new ChatReplyErrorTranslator()
+            new ChatReplyErrorTranslator(),
+            new ByteArrayResource("공통".getBytes(StandardCharsets.UTF_8)),
+            new ByteArrayResource("추천".getBytes(StandardCharsets.UTF_8))
     );
 
     private Logger logger;

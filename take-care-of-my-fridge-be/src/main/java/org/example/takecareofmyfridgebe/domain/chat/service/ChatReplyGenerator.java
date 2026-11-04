@@ -14,4 +14,16 @@ public interface ChatReplyGenerator {
      * @return AI 상담 답변 문자열 스트림
      */
     Flux<String> generate(Long memberId, Long sessionId, String userMessage);
+
+    /**
+     * 추천 답을 스트리밍으로 생성한다. 공통 시스템 프롬프트에 추천 규칙(prompts/chat-recommend.txt)을 더하고,
+     * 후보 정보는 사용자 메시지 앞에 별도 메시지로 넣는다.
+     *
+     * @param memberId      회원 ID (로그용)
+     * @param sessionId     세션 ID
+     * @param userMessage   사용자 입력 메시지
+     * @param candidateInfo 사용자 요청·추천 후보 줄 글 (RecommendationPromptBuilder)
+     * @return 추천 설명 문자열 스트림
+     */
+    Flux<String> generateRecommendation(Long memberId, Long sessionId, String userMessage, String candidateInfo);
 }

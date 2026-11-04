@@ -10,6 +10,7 @@ import org.example.takecareofmyfridgebe.domain.fridge.repository.FridgeRepositor
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.Ingredient;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.StorageType;
 import org.example.takecareofmyfridgebe.domain.ingredient.repository.IngredientRepository;
+import org.example.takecareofmyfridgebe.domain.ingredient.config.IngredientMatchProperties;
 import org.example.takecareofmyfridgebe.domain.ingredient.service.IngredientService;
 import org.example.takecareofmyfridgebe.global.config.JpaAuditingConfig;
 import org.example.takecareofmyfridgebe.global.config.QueryDslConfig;
@@ -21,6 +22,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.context.annotation.Import;
@@ -48,6 +50,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({JpaAuditingConfig.class, QueryDslConfig.class, FridgeService.class, IngredientService.class})
+@EnableConfigurationProperties(IngredientMatchProperties.class)
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class FridgeServiceConcurrencyTest extends MySqlContainerSupport {
 

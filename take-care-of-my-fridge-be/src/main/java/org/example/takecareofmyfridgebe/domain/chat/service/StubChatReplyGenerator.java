@@ -18,7 +18,16 @@ public class StubChatReplyGenerator implements ChatReplyGenerator {
 
     @Override
     public Flux<String> generate(Long memberId, Long sessionId, String userMessage) {
-        String fullReply = "아직 AI 연결 전이에요. 받은 메시지: " + userMessage;
+        return chunked("아직 AI 연결 전이에요. 받은 메시지: " + userMessage);
+    }
+
+    // 추천 후보 정보를 그대로 보여 준다 (카드 이벤트와 같이 흐름만 확인)
+    @Override
+    public Flux<String> generateRecommendation(Long memberId, Long sessionId, String userMessage, String candidateInfo) {
+        return chunked("아직 AI 연결 전이에요. 추천 후보: " + candidateInfo);
+    }
+
+    private static Flux<String> chunked(String fullReply) {
         List<String> chunks = new ArrayList<>();
         for (int i = 0; i < fullReply.length(); i += CHUNK_SIZE) {
             chunks.add(fullReply.substring(i, Math.min(i + CHUNK_SIZE, fullReply.length())));
