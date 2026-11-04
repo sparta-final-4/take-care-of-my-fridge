@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.takecareofmyfridgebe.domain.payment.entity.Payment;
 import org.example.takecareofmyfridgebe.domain.payment.entity.PaymentChangedBy;
+import org.example.takecareofmyfridgebe.domain.payment.facade.BillingKeyFacade;
 import org.example.takecareofmyfridgebe.domain.payment.facade.PaymentFacade;
 import org.example.takecareofmyfridgebe.domain.payment.service.PaymentService;
 import org.example.takecareofmyfridgebe.domain.refund.facade.RefundFacade;
@@ -24,10 +25,12 @@ public class WebhookHandler {
     private static final Set<String> HANDLED_TYPES = Set.of(
             "Transaction.Paid", "Transaction.Failed", "Transaction.Cancelled", "Transaction.PartialCancelled");
     private static final Set<String> CANCEL_TYPES = Set.of("Transaction.Cancelled", "Transaction.PartialCancelled");
+    private static final String BILLING_KEY_ISSUED_TYPE = "BillingKey.Issued";
 
     private final PaymentService paymentService;
     private final PaymentFacade paymentFacade;
     private final RefundFacade refundFacade;
+    private final BillingKeyFacade billingKeyFacade;
     private final WebhookEventService webhookEventService;
 
     public void handle(String webhookId, PortOneWebhook webhook, String rawPayload) {
@@ -50,6 +53,15 @@ public class WebhookHandler {
 
         Long paymentId = null;
         try {
+            // 카드 등록 창이 끝났는데 프론트가 빌링키를 넘기지 못한 경우를 서버끼리 마무리한다
+            if (BILLING_KEY_ISSUED_TYPE.equals(webhook.type())) {
+                if (billingKeyFacade.registerFromWebhook(webhook.billingKey())) {
+                    webhookEventService.markProcessed(eventId.get(), null);
+                } else {
+                    webhookEventService.markIgnored(eventId.get(), null);
+                }
+                return;
+            }
             if (!HANDLED_TYPES.contains(webhook.type())) {
                 webhookEventService.markIgnored(eventId.get(), null);
                 return;

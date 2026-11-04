@@ -96,6 +96,8 @@ public enum ErrorCode {
     PAYMENT_ORDER_NOT_PAYABLE(HttpStatus.CONFLICT, "PAYMENT_007", "이미 결제됐거나 취소된 주문입니다."),
     PAYMENT_IN_PROGRESS(HttpStatus.CONFLICT, "PAYMENT_008", "이미 진행 중인 결제가 있습니다. 잠시 후 다시 시도해 주세요."),
     PG_CANCEL_REJECTED(HttpStatus.BAD_GATEWAY, "PAYMENT_009", "PG사가 결제 취소를 거절했습니다."),
+    BILLING_PAYMENT_REJECTED(HttpStatus.CONFLICT, "PAYMENT_010", "카드 결제가 거절되었습니다. 다른 카드나 결제 수단으로 다시 시도해 주세요."),
+    PAYMENT_RESULT_PENDING(HttpStatus.CONFLICT, "PAYMENT_011", "결제 결과를 확인하고 있습니다. 잠시 후 주문 내역에서 확인해 주세요."),
 
     // Billing Key (등록 카드)
     INVALID_BILLING_KEY_STATUS(HttpStatus.CONFLICT, "BILLING_001", "유효하지 않은 카드 상태 변경입니다."),

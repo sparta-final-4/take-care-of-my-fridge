@@ -9,6 +9,7 @@ import org.example.takecareofmyfridgebe.domain.order.repository.OrderRepository;
 import org.example.takecareofmyfridgebe.domain.payment.dto.PaymentApproveResult;
 import org.example.takecareofmyfridgebe.domain.payment.dto.PaymentApproveResult.Rejection;
 import org.example.takecareofmyfridgebe.domain.payment.dto.PaymentConfirmResponse;
+import org.example.takecareofmyfridgebe.domain.payment.entity.BillingKey;
 import org.example.takecareofmyfridgebe.domain.payment.entity.FailReason;
 import org.example.takecareofmyfridgebe.domain.payment.entity.Payment;
 import org.example.takecareofmyfridgebe.domain.payment.entity.PaymentChangedBy;
@@ -48,6 +49,12 @@ public class PaymentCommandService {
     // 동시에 들어온 다른 요청이 방금 만든 것이다. 만료됐을 수도 있는 결제를 재사용하지 않고 거절한다
     @Transactional
     public Payment create(Long orderId, PgProvider pgProvider) {
+        return create(orderId, pgProvider, null);
+    }
+
+    // billingKey가 있으면 등록 카드 결제, 없으면 결제창 결제다
+    @Transactional
+    public Payment create(Long orderId, PgProvider pgProvider, BillingKey billingKey) {
         Order order = lockOrder(orderId);
         if (order.getStatus() != OrderStatus.PENDING) {
             throw new BusinessException(ErrorCode.PAYMENT_ORDER_NOT_PAYABLE);
@@ -58,6 +65,7 @@ public class PaymentCommandService {
 
         Payment payment = Payment.builder()
                 .order(order)
+                .billingKey(billingKey)
                 // KG이니시스는 주문번호(oid)를 40자까지만 받으므로 UUID의 하이픈을 빼 8 + 32 = 40자로 만든다
                 .portonePaymentId(PORTONE_PAYMENT_ID_PREFIX + UUID.randomUUID().toString().replace("-", ""))
                 .amount(order.getTotalAmount())

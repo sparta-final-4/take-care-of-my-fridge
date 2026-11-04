@@ -3,6 +3,7 @@ package org.example.takecareofmyfridgebe.domain.payment.controller;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.auth.service.AuthSessionService.AuthPrincipal;
+import org.example.takecareofmyfridgebe.domain.payment.dto.BillingKeyPaymentRequest;
 import org.example.takecareofmyfridgebe.domain.payment.dto.PaymentConfirmRequest;
 import org.example.takecareofmyfridgebe.domain.payment.dto.PaymentConfirmResponse;
 import org.example.takecareofmyfridgebe.domain.payment.dto.PaymentPrepareRequest;
@@ -31,6 +32,16 @@ public class PaymentController {
             @PathVariable Long orderId,
             @Valid @RequestBody PaymentPrepareRequest request) {
         return ResponseEntity.ok(ApiResponse.ok(paymentFacade.preparePayment(principal.memberId(), orderId, request)));
+    }
+
+    // 주문 확인 화면에서 등록 카드를 고르고 결제하기를 누를 때 호출한다. 결제창 없이 결제하고 결제 확정과 같은 응답을 준다
+    @PostMapping("/orders/{orderId}/payments/billing-key")
+    public ResponseEntity<ApiResponse<PaymentConfirmResponse>> payWithBillingKey(
+            @AuthenticationPrincipal AuthPrincipal principal,
+            @PathVariable Long orderId,
+            @Valid @RequestBody BillingKeyPaymentRequest request) {
+        return ResponseEntity.ok(ApiResponse.ok(
+                paymentFacade.payWithBillingKey(principal.memberId(), orderId, request)));
     }
 
     @PostMapping("/payments/confirm")

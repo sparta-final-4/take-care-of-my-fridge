@@ -3,6 +3,7 @@ package org.example.takecareofmyfridgebe.infra.portone.client;
 import org.example.takecareofmyfridgebe.domain.payment.entity.CardType;
 import org.example.takecareofmyfridgebe.domain.payment.entity.PgProvider;
 import org.example.takecareofmyfridgebe.domain.payment.port.BillingKeyInfo;
+import org.example.takecareofmyfridgebe.domain.payment.port.BillingKeyPayResult;
 import org.example.takecareofmyfridgebe.infra.portone.config.PortOneProperties;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -15,6 +16,7 @@ import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.RestClient;
 
+import java.net.SocketTimeoutException;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Optional;
@@ -24,6 +26,7 @@ import java.util.stream.Collectors;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.hamcrest.Matchers.startsWith;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.jsonPath;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.queryParam;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
@@ -170,5 +173,76 @@ class PortOneBillingKeyClientTest {
 
         assertThatThrownBy(() -> client.deleteBillingKey(BILLING_KEY, "사용자 삭제"))
                 .isInstanceOf(HttpClientErrorException.class);
+    }
+
+    private static final String PAY_URL = BASE_URL + "/payments/payment-1/billing-key";
+
+    private BillingKeyPayResult pay() {
+        return client.pay("payment-1", BILLING_KEY, "대파 외 1건", 10000L, "member-7");
+    }
+
+    @Test
+    @DisplayName("빌링키 결제가 성공하면 결제됨을 돌려주고, 상점 ID·빌링키·주문명·금액·통화·고객 ID를 보낸다")
+    void pay_returnPaid() {
+        server.expect(requestTo(PAY_URL))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(jsonPath("$.storeId").value("store-1"))
+                .andExpect(jsonPath("$.billingKey").value(BILLING_KEY))
+                .andExpect(jsonPath("$.orderName").value("대파 외 1건"))
+                .andExpect(jsonPath("$.amount.total").value(10000))
+                .andExpect(jsonPath("$.currency").value("KRW"))
+                .andExpect(jsonPath("$.customer.id").value("member-7"))
+                .andRespond(withSuccess("{\"payment\":{\"pgTxId\":\"tx-1\",\"paidAt\":\"2026-11-04T01:00:00Z\"}}",
+                        MediaType.APPLICATION_JSON));
+
+        assertThat(pay()).isEqualTo(BillingKeyPayResult.PAID);
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("같은 결제 ID로 이미 결제됐으면 결제됨으로 본다")
+    void pay_returnPaid_whenAlreadyPaid() {
+        server.expect(requestTo(PAY_URL)).andRespond(withStatus(HttpStatus.CONFLICT)
+                .contentType(MediaType.APPLICATION_JSON).body("{\"type\":\"ALREADY_PAID\",\"message\":\"이미 결제됨\"}"));
+
+        assertThat(pay()).isEqualTo(BillingKeyPayResult.PAID);
+    }
+
+    @Test
+    @DisplayName("PG가 카드를 거절(502 PG_PROVIDER)하거나 빌링키가 없으면 거절로 본다")
+    void pay_returnRejected_whenPgRejectsOrBillingKeyMissing() {
+        server.expect(requestTo(PAY_URL)).andRespond(withStatus(HttpStatus.BAD_GATEWAY)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body("{\"type\":\"PG_PROVIDER\",\"pgCode\":\"REJECT\",\"pgMessage\":\"한도 초과\"}"));
+        assertThat(pay()).isEqualTo(BillingKeyPayResult.REJECTED);
+
+        server.reset();
+        server.expect(requestTo(PAY_URL)).andRespond(withStatus(HttpStatus.NOT_FOUND)
+                .contentType(MediaType.APPLICATION_JSON).body("{\"type\":\"BILLING_KEY_NOT_FOUND\"}"));
+        assertThat(pay()).isEqualTo(BillingKeyPayResult.REJECTED);
+    }
+
+    @Test
+    @DisplayName("요청 시간 초과(408)나 요청 과다(429)면 결과를 모르는 것으로 본다")
+    void pay_returnUnknown_whenRequestTimeoutOrTooMany() {
+        server.expect(requestTo(PAY_URL)).andRespond(withStatus(HttpStatus.REQUEST_TIMEOUT));
+        assertThat(pay()).isEqualTo(BillingKeyPayResult.UNKNOWN);
+
+        server.reset();
+        server.expect(requestTo(PAY_URL)).andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS));
+        assertThat(pay()).isEqualTo(BillingKeyPayResult.UNKNOWN);
+    }
+
+    @Test
+    @DisplayName("PortOne 서버 오류나 타임아웃이면 결과를 모르는 것으로 본다")
+    void pay_returnUnknown_whenServerErrorOrTimeout() {
+        server.expect(requestTo(PAY_URL)).andRespond(withStatus(HttpStatus.SERVICE_UNAVAILABLE));
+        assertThat(pay()).isEqualTo(BillingKeyPayResult.UNKNOWN);
+
+        server.reset();
+        server.expect(requestTo(PAY_URL)).andRespond(request -> {
+            throw new SocketTimeoutException("read timed out");
+        });
+        assertThat(pay()).isEqualTo(BillingKeyPayResult.UNKNOWN);
     }
 }

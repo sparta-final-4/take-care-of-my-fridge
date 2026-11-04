@@ -3,6 +3,7 @@ package org.example.takecareofmyfridgebe.infra.portone.webhook.service;
 import org.example.takecareofmyfridgebe.domain.order.entity.Order;
 import org.example.takecareofmyfridgebe.domain.payment.entity.Payment;
 import org.example.takecareofmyfridgebe.domain.payment.entity.PaymentChangedBy;
+import org.example.takecareofmyfridgebe.domain.payment.facade.BillingKeyFacade;
 import org.example.takecareofmyfridgebe.domain.payment.facade.PaymentFacade;
 import org.example.takecareofmyfridgebe.domain.payment.service.PaymentService;
 import org.example.takecareofmyfridgebe.domain.refund.facade.RefundFacade;
@@ -47,6 +48,9 @@ class WebhookHandlerTest {
 
     @Mock
     private WebhookEventService webhookEventService;
+
+    @Mock
+    private BillingKeyFacade billingKeyFacade;
 
     @InjectMocks
     private WebhookHandler webhookHandler;
@@ -199,5 +203,41 @@ class WebhookHandlerTest {
         assertThatThrownBy(() -> webhookHandler.handle(WEBHOOK_ID, webhook, BODY))
                 .isSameAs(original)
                 .satisfies(e -> assertThat(e.getSuppressed()).containsExactly(recordError));
+    }
+
+    private PortOneWebhook givenBillingKeyIssued() {
+        given(webhookEventService.receive(WEBHOOK_ID, "BillingKey.Issued", BODY)).willReturn(Optional.of(EVENT_ID));
+        return new PortOneWebhook("BillingKey.Issued", null, "billing-key-1");
+    }
+
+    @Test
+    @DisplayName("빌링키 발급 웹훅으로 카드를 저장하면 처리 완료로 기록하고 결제는 찾지 않는다")
+    void handle_markProcessed_whenBillingKeyRegistered() {
+        given(billingKeyFacade.registerFromWebhook("billing-key-1")).willReturn(true);
+
+        webhookHandler.handle(WEBHOOK_ID, givenBillingKeyIssued(), BODY);
+
+        verify(webhookEventService).markProcessed(EVENT_ID, null);
+        verifyNoInteractions(paymentService, paymentFacade, refundFacade);
+    }
+
+    @Test
+    @DisplayName("빌링키 발급 웹훅이 저장 대상이 아니면 무시로 기록한다")
+    void handle_markIgnored_whenBillingKeyNotRegistered() {
+        given(billingKeyFacade.registerFromWebhook("billing-key-1")).willReturn(false);
+
+        webhookHandler.handle(WEBHOOK_ID, givenBillingKeyIssued(), BODY);
+
+        verify(webhookEventService).markIgnored(EVENT_ID, null);
+    }
+
+    @Test
+    @DisplayName("빌링키 발급 웹훅 처리가 실패하면 실패로 기록하고 예외를 다시 던져 재전송을 받는다")
+    void handle_markFailedAndThrowException_whenBillingKeyRegisterFails() {
+        willThrow(new RuntimeException("PortOne 조회 실패")).given(billingKeyFacade).registerFromWebhook("billing-key-1");
+
+        assertThatThrownBy(() -> webhookHandler.handle(WEBHOOK_ID, givenBillingKeyIssued(), BODY))
+                .isInstanceOf(RuntimeException.class);
+        verify(webhookEventService).markFailed(EVENT_ID, null, "PortOne 조회 실패");
     }
 }

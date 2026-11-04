@@ -10,6 +10,7 @@ import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 import org.example.takecareofmyfridgebe.infra.portone.dto.PortOneWebhook;
 import org.springframework.stereotype.Component;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 @Slf4j
@@ -33,8 +34,11 @@ public class PortOneWebhookVerifier {
         String paymentId = webhook instanceof WebhookTransaction transaction
                 ? transaction.getData().getPaymentId()
                 : null;
-        // SDK가 모르는 type은 Unrecognized로 바뀌므로 원문의 type을 그대로 기록한다
-        String type = objectMapper.readTree(body).path("type").asString();
-        return new PortOneWebhook(type, paymentId);
+        // SDK가 모르는 type은 Unrecognized로 바뀌므로 원문의 type을 그대로 기록한다.
+        // 빌링키 웹훅의 빌링키도 원문에서 읽는다(data.billingKey)
+        JsonNode root = objectMapper.readTree(body);
+        String type = root.path("type").asString();
+        JsonNode billingKey = root.path("data").path("billingKey");
+        return new PortOneWebhook(type, paymentId, billingKey.isString() ? billingKey.asString() : null);
     }
 }

@@ -15,6 +15,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 // PortOne 빌링키 조회·삭제는 트랜잭션 밖에서 하고, 카드 저장은 BillingKeyService에 맡긴다
@@ -25,9 +26,9 @@ public class BillingKeyFacade {
 
     private static final String ISSUE_ID_PREFIX = "billing-";
     private static final String ISSUE_NAME = "카드 등록";
-    private static final String CUSTOMER_ID_PREFIX = "member-";
     private static final String LIMIT_EXCEEDED_DELETE_REASON = "카드 등록 한도 초과로 저장하지 않은 빌링키 삭제";
     private static final String CUSTOMER_DELETE_REASON = "회원이 등록 카드 삭제";
+    private static final String MEMBER_NOT_FOUND_DELETE_REASON = "없는 회원의 빌링키 삭제";
     static final int PG_DELETE_BATCH_SIZE = 100;
 
     private final BillingKeyService billingKeyService;
@@ -59,6 +60,46 @@ public class BillingKeyFacade {
             // DB 오류처럼 저장됐는지 모르는 실패에서 지우면 저장된 카드가 결제에 쓸 수 없게 되므로 지우지 않는다(남은 빌링키는 결제에 쓰이지 않는다)
             if (e.getErrorCode() == ErrorCode.BILLING_KEY_LIMIT_EXCEEDED) {
                 deleteQuietly(info.billingKey(), LIMIT_EXCEEDED_DELETE_REASON);
+            }
+            throw e;
+        }
+    }
+
+    // BillingKey.Issued 웹훅으로 호출된다. 프론트가 빌링키를 넘기지 못해도(창 닫기·네트워크) 서버끼리 등록을 마무리한다.
+    // 저장했으면 true, 등록할 대상이 아니면 false. PortOne 조회 실패는 예외를 던져 웹훅 재전송으로 다시 시도한다
+    public boolean registerFromWebhook(String billingKey) {
+        if (billingKey == null) {
+            return false;
+        }
+        Optional<BillingKeyInfo> found = billingKeyGateway.getBillingKey(billingKey);
+        if (found.isEmpty() || !found.get().issued()) {
+            return false;
+        }
+        BillingKeyInfo info = found.get();
+        // 우리가 만든 고객 ID가 아니면 다른 서비스가 같은 상점에서 발급한 빌링키다
+        Optional<Long> memberId = BillingKeyService.memberIdOf(info.customerId());
+        if (memberId.isEmpty()) {
+            log.warn("고객 ID가 회원 형식이 아닌 빌링키 발급 웹훅");
+            return false;
+        }
+        try {
+            billingKeyService.register(memberId.get(), info);
+            return true;
+        } catch (BusinessException e) {
+            if (e.getErrorCode() == ErrorCode.BILLING_KEY_LIMIT_EXCEEDED) {
+                deleteQuietly(info.billingKey(), LIMIT_EXCEEDED_DELETE_REASON);
+                return false;
+            }
+            // 회원이 없으면 쓸 사람이 없는 빌링키라 PortOne에서도 지운다
+            if (e.getErrorCode() == ErrorCode.MEMBER_NOT_FOUND) {
+                log.warn("없는 회원의 빌링키 발급 웹훅, PortOne에서 삭제: memberId={}", memberId.get());
+                deleteQuietly(info.billingKey(), MEMBER_NOT_FOUND_DELETE_REASON);
+                return false;
+            }
+            // 다른 회원이 이미 저장한 빌링키처럼 저장할 수 없는 경우는 다시 보내도 결과가 같으므로 재전송을 받지 않는다
+            if (e.getErrorCode() == ErrorCode.BILLING_KEY_NOT_VERIFIED) {
+                log.warn("빌링키 발급 웹훅을 저장하지 않음: memberId={}, reason={}", memberId.get(), e.getErrorCode());
+                return false;
             }
             throw e;
         }
@@ -136,6 +177,6 @@ public class BillingKeyFacade {
     }
 
     private static String customerId(Long memberId) {
-        return CUSTOMER_ID_PREFIX + memberId;
+        return BillingKeyService.customerIdOf(memberId);
     }
 }

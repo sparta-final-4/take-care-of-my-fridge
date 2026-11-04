@@ -230,6 +230,65 @@ class BillingKeyFacadeTest {
         assertThat(billingKeyFacade.setDefault(MEMBER_ID, 2L)).isEqualTo(cards);
     }
 
+    @Test
+    @DisplayName("빌링키 발급 웹훅이 오면 PortOne에서 확인하고 고객 ID의 회원으로 카드를 저장한다")
+    void registerFromWebhook_success() {
+        BillingKeyInfo info = issued("member-7");
+        given(billingKeyGateway.getBillingKey(BILLING_KEY)).willReturn(Optional.of(info));
+
+        assertThat(billingKeyFacade.registerFromWebhook(BILLING_KEY)).isTrue();
+        verify(billingKeyService).register(MEMBER_ID, info);
+    }
+
+    @Test
+    @DisplayName("빌링키가 없거나 PortOne에 없거나 삭제됐거나 회원 형식이 아닌 고객 ID면 저장하지 않는다")
+    void registerFromWebhook_returnFalse_whenNotRegistrable() {
+        assertThat(billingKeyFacade.registerFromWebhook(null)).isFalse();
+
+        given(billingKeyGateway.getBillingKey(BILLING_KEY)).willReturn(Optional.empty());
+        assertThat(billingKeyFacade.registerFromWebhook(BILLING_KEY)).isFalse();
+
+        given(billingKeyGateway.getBillingKey(BILLING_KEY)).willReturn(Optional.of(
+                new BillingKeyInfo(BILLING_KEY, false, "member-7", null, null, null)));
+        assertThat(billingKeyFacade.registerFromWebhook(BILLING_KEY)).isFalse();
+
+        given(billingKeyGateway.getBillingKey(BILLING_KEY)).willReturn(Optional.of(issued("other-service-1")));
+        assertThat(billingKeyFacade.registerFromWebhook(BILLING_KEY)).isFalse();
+
+        verify(billingKeyService, never()).register(anyLong(), any());
+    }
+
+    @Test
+    @DisplayName("빌링키 발급 웹훅에서 5장을 넘으면 저장하지 않고 PortOne 빌링키를 지운다")
+    void registerFromWebhook_deletePgBillingKey_whenLimitExceeded() {
+        BillingKeyInfo info = issued("member-7");
+        given(billingKeyGateway.getBillingKey(BILLING_KEY)).willReturn(Optional.of(info));
+        given(billingKeyService.register(MEMBER_ID, info))
+                .willThrow(new BusinessException(ErrorCode.BILLING_KEY_LIMIT_EXCEEDED));
+
+        assertThat(billingKeyFacade.registerFromWebhook(BILLING_KEY)).isFalse();
+        verify(billingKeyGateway).deleteBillingKey(eq(BILLING_KEY), anyString());
+    }
+
+    @Test
+    @DisplayName("빌링키 발급 웹훅의 회원이 없으면 저장하지 않고 쓸 사람이 없는 빌링키를 PortOne에서 지운다")
+    void registerFromWebhook_deletePgBillingKey_whenMemberNotFound() {
+        BillingKeyInfo info = issued("member-7");
+        given(billingKeyGateway.getBillingKey(BILLING_KEY)).willReturn(Optional.of(info));
+        given(billingKeyService.register(MEMBER_ID, info)).willThrow(new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
+
+        assertThat(billingKeyFacade.registerFromWebhook(BILLING_KEY)).isFalse();
+        verify(billingKeyGateway).deleteBillingKey(eq(BILLING_KEY), anyString());
+    }
+
+    @Test
+    @DisplayName("빌링키 발급 웹훅에서 PortOne 조회가 실패하면 예외를 던져 웹훅 재전송으로 다시 시도한다")
+    void registerFromWebhook_throwException_whenPgLookupFails() {
+        willThrow(new RuntimeException("timeout")).given(billingKeyGateway).getBillingKey(BILLING_KEY);
+
+        assertThatThrownBy(() -> billingKeyFacade.registerFromWebhook(BILLING_KEY)).isInstanceOf(RuntimeException.class);
+    }
+
     private BillingKey deletedCard(Long id) {
         BillingKey card = BillingKey.builder().memberId(MEMBER_ID).billingKey(BILLING_KEY).build();
         ReflectionTestUtils.setField(card, "id", id);
