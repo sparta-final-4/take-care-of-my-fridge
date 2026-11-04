@@ -39,24 +39,31 @@ public class OpenAiChatReplyGenerator implements ChatReplyGenerator {
     private static final String PROMPT_SEPARATOR = "\n\n";
     // 추천 답은 소개 한 문장 + 카드 설명 3개(각 한두 문장)라 약 200~250토큰. 넉넉히 320 (일반 답은 빈에 정한 800)
     static final int RECOMMEND_MAX_TOKENS = 320;
+    // 레시피 자세히 답은 단계 8줄 안팎(약 400~600토큰). 넉넉히 700. dev 레시피 단계 길이를 보고 조정한다
+    static final int RECIPE_DETAIL_MAX_TOKENS = 700;
 
     private final ChatClient chatClient;
     private final LlmCostCalculator llmCostCalculator;
     private final ChatReplyErrorTranslator chatReplyErrorTranslator;
     // 추천 답의 시스템 프롬프트: 공통(chat-system.txt) + 추천 규칙(chat-recommend.txt)
     private final String recommendSystemPrompt;
+    // 레시피 자세히 답의 시스템 프롬프트: 공통(chat-system.txt) + 레시피 답 규칙(chat-recipe-detail.txt)
+    private final String recipeDetailSystemPrompt;
 
     public OpenAiChatReplyGenerator(
             @Qualifier("chatReplyChatClient") ChatClient chatClient,
             LlmCostCalculator llmCostCalculator,
             ChatReplyErrorTranslator chatReplyErrorTranslator,
             @Value("classpath:prompts/chat-system.txt") Resource systemPrompt,
-            @Value("classpath:prompts/chat-recommend.txt") Resource recommendPrompt
+            @Value("classpath:prompts/chat-recommend.txt") Resource recommendPrompt,
+            @Value("classpath:prompts/chat-recipe-detail.txt") Resource recipeDetailPrompt
     ) {
         this.chatClient = chatClient;
         this.llmCostCalculator = llmCostCalculator;
         this.chatReplyErrorTranslator = chatReplyErrorTranslator;
-        this.recommendSystemPrompt = read(systemPrompt).strip() + PROMPT_SEPARATOR + read(recommendPrompt).strip();
+        String common = read(systemPrompt).strip();
+        this.recommendSystemPrompt = common + PROMPT_SEPARATOR + read(recommendPrompt).strip();
+        this.recipeDetailSystemPrompt = common + PROMPT_SEPARATOR + read(recipeDetailPrompt).strip();
     }
 
     /**
@@ -95,6 +102,18 @@ public class OpenAiChatReplyGenerator implements ChatReplyGenerator {
                 .options(OpenAiChatOptions.builder().maxTokens(RECOMMEND_MAX_TOKENS))
                 .system(recommendSystemPrompt)
                 .messages(new SystemMessage(candidateInfo))
+                .user(userMessage));
+    }
+
+    /**
+     * 레시피 자세히 답. 공통 + 레시피 답 규칙을 system으로, 레시피 정보는 별도 system 메시지로 사용자 메시지 앞에 넣는다.
+     */
+    @Override
+    public Flux<String> generateRecipeDetail(Long memberId, Long sessionId, String userMessage, String recipeInfo) {
+        return stream(memberId, sessionId, "상담 레시피 자세히 답", () -> chatClient.prompt()
+                .options(OpenAiChatOptions.builder().maxTokens(RECIPE_DETAIL_MAX_TOKENS))
+                .system(recipeDetailSystemPrompt)
+                .messages(new SystemMessage(recipeInfo))
                 .user(userMessage));
     }
 

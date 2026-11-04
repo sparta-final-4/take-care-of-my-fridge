@@ -30,4 +30,13 @@ public interface ChatReplyGenerator {
      * @return 추천 설명 문자열 스트림
      */
     Flux<String> generateRecommendation(Long memberId, Long sessionId, String userMessage, String candidateInfo);
+
+    /**
+     * 추천한 레시피 하나에 대한 질문의 답을 스트리밍으로 생성한다. 공통 시스템 프롬프트에 레시피 답 규칙(prompts/chat-recipe-detail.txt)을 더하고,
+     * 레시피 정보는 사용자 메시지 앞에 별도 메시지로 넣는다. 레시피 정보에 없는 내용은 지어내지 않게 한다.
+     *
+     * @param recipeInfo [레시피 정보] 줄 글 (RecipeDetailPromptBuilder)
+     * @return 답 문자열 스트림
+     */
+    Flux<String> generateRecipeDetail(Long memberId, Long sessionId, String userMessage, String recipeInfo);
 }

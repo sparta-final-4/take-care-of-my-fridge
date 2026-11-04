@@ -60,7 +60,8 @@ class OpenAiChatReplyGeneratorTest {
             new LlmCostCalculator(0.15, 0.60),
             new ChatReplyErrorTranslator(),
             new ByteArrayResource("공통".getBytes(StandardCharsets.UTF_8)),
-            new ByteArrayResource("추천".getBytes(StandardCharsets.UTF_8))
+            new ByteArrayResource("추천".getBytes(StandardCharsets.UTF_8)),
+            new ByteArrayResource("레시피".getBytes(StandardCharsets.UTF_8))
     );
 
     private Logger logger;

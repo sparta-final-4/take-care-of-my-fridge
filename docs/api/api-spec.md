@@ -207,12 +207,19 @@ HTTP 메서드·경로·DTO 이름은 구현 전 합의합니다.
 - 쿼리: 세션 목록 1회 + 세션 ID 목록으로 메시지 수·첫 질문·마지막 메시지 1회(그룹 집계 + 상관 서브쿼리) + 탭 건수 1회(조건 합계). 전체 개수가 필요할 때만 count 1회 추가.
 - 메시지 보내기 순서(2026-11-02 추가): 세션 검증 → 답 받기 잠금(`chat:streaming:{sessionId}`, SET NX + 요청 토큰, 유지 `app.chat.reply-lock-ttl` 150초) → 하루 횟수 차감 → 스트림. 잠금에 실패하면 409 `CHAT_009`이고 하루 횟수를 쓰지 않습니다. 하루 횟수에서 실패하면 잠금을 풀고 그 오류를 돌려줍니다. 잠금은 스트림이 완료·오류·끊김 중 어느 쪽으로 끝나도 풀고, 토큰이 같을 때만 지웁니다. Redis 장애면 503 `CHAT_008`.
 - 종료·만료된 상담도 본인 것이면 기존 메시지 조회 API로 대화를 볼 수 있습니다.
-- 추천 요청 필드(2026-11-04 추가): `mode=RECOMMEND`는 칩([알아서 추천해줘]·[이 재료로 추천받기])으로 AI 의도 판단 없이 추천합니다. `AUTO`(기본)는 AI가 메시지를 읽어 추천(RECOMMEND)인지 일반 질문(GENERAL)인지 정합니다. `selectedIngredientIds`는 내 냉장고에서 고른 재료 ID(null·중복 제거), `useSelectedOnly=true`면 고른 재료를 하나도 안 쓰는 레시피는 추천하지 않습니다. 필드를 보내지 않으면 기존과 같습니다.
+- 추천 요청 필드(2026-11-04 추가): `mode=RECOMMEND`는 칩([알아서 추천해줘]·[이 재료로 추천받기])으로 AI 의도 판단 없이 추천합니다. `AUTO`(기본)는 AI가 메시지를 읽어 추천(RECOMMEND)인지 일반 질문(GENERAL)인지 정합니다(직전 추천이 있으면 다시 추천·레시피 자세히도, 아래 "이전 대화와 이어지는 말"). `selectedIngredientIds`는 내 냉장고에서 고른 재료 ID(null·중복 제거), `useSelectedOnly=true`면 고른 재료를 하나도 안 쓰는 레시피는 추천하지 않습니다. 필드를 보내지 않으면 기존과 같습니다.
 - 추천 카드 이벤트(2026-11-04 추가): 추천이면 설명 글(`message`)보다 먼저 `event: recommendations`를 한 번 보냅니다. 일반 질문이면 보내지 않습니다. 카드는 아직 저장하지 않아 메시지 조회 API에는 나오지 않고, 저장되는 AI 메시지는 설명 글만입니다.
   - `data`: `{ recipes: RecommendedRecipe[] (최대 3개), relaxed: string[] (지금은 항상 빈 목록), empty: boolean (조건에 맞는 후보가 없으면 true, 이때 recipes는 빈 목록) }`
   - `RecommendedRecipe`: recipeId, name, imageUrl(없으면 null), category, cookTimeMin(없으면 null), usedIngredients(쓰는 냉장고 재료 이름, 임박한 순), imminentIngredients(`{ name, dDay }`, D-3 이내, dDay 0은 오늘까지), matchedTastes(겹친 맛 한글: 메시지로 말한 맛, 없으면 회원 선호 맛), missingIngredients(`{ ingredientId, name }`, 기본 양념 제외), missingSelectedIngredients(고른·말한 재료 중 냉장고에 없는 것의 이름. 같은 종류로 넓혔으면 레시피에 쓰인 이름, 예: 버섯 → 표고버섯. missingIngredients에도 들어 있음), lacksManyIngredients(재료를 많이 사야 함), reason(카드에 보여 줄 추천 이유 한 줄, 25자 안팎. 우선순위: 요리 이름 키워드·요청 일치 > 선택 재료 > 임박 재료 > 겹친 맛, 예: "찾으신 냉면 요리예요", "버섯·두부가 주재료예요", "내일까지인 고추를 쓸 수 있어요")
   - 카드 설명 이벤트(2026-11-05 추가): 추천 답은 `[소개]`·`[1]`~`[3]` 표시로 나눠 보냅니다. 소개 글은 `message`, 카드 설명 글은 `event: recommendation_text`로 옵니다. `data`: `{ index: number (카드 순서, 0부터), text: string (그 카드 설명의 이어지는 글) }`. AI가 표시를 빼먹으면 전체가 `message`(소개)로 오고 카드 설명은 비어 있습니다. 저장은 소개가 AI 메시지 content, 카드 설명이 카드의 description이고, 메시지 조회의 `recommendations[].description`으로 다시 받습니다.
   - 하루 횟수: `recommendations`는 첫 조각으로 치지 않습니다. 카드를 보낸 뒤 설명 글 첫 조각 전에 실패해도 하루 횟수를 돌려줍니다. 후보 검색이 실패하면 카드 없이 일반 답을 합니다.
+- 이전 대화와 이어지는 말(2026-11-05 추가): 메시지를 보낼 때 같은 상담의 최근 3턴(메시지 6개)과 직전 추천을 읽어 의도를 정합니다. 요청·응답 모양은 그대로이고, 의도마다 SSE 이벤트 순서가 다릅니다.
+  - 의도 종류: `RECOMMEND`(새 추천), `GENERAL`(일반 질문), `REFINE`(다시 추천: "좀 더 매운 걸로", "다른 거 없어?", "국물 말고 볶음으로"), `RECIPE_DETAIL`(추천한 레시피 하나 자세히: "두 번째 거 어떻게 만들어?", "아까 그 깐풍기 시간 얼마나 걸려?"). REFINE·RECIPE_DETAIL은 직전 추천 카드가 있을 때만 나옵니다.
+  - GENERAL: 최근 3턴을 이전 대화로 넣어 답합니다(AI 답은 300자까지, 보여 준 카드 이름 포함). 이벤트는 기존과 같이 `message` 조각 → `done`.
+  - REFINE: 직전 추천 조건에 이번 말을 합쳐 다시 추천합니다. 맛·분류·시간·키워드는 AI가 낸 최종값(비운 칸은 직전 값), 재료는 직전 선택 재료를 이어 갑니다. 직전 카드는 후보에서 빼고, 빼서 3개보다 적으면 뒤에 다시 넣습니다. 직전 조건이 없으면(Redis 만료·장애) 이번 말만으로 새 추천합니다. 이벤트는 추천과 같습니다(`recommendations` → `message`/`recommendation_text` → `done`).
+  - RECIPE_DETAIL: 물어본 레시피를 직전 카드 이름 → 직전 카드 번호 → 상담 전체 추천(최근부터) 이름 순으로 찾고, 못 찾으면 GENERAL로 답합니다. 이벤트는 `recommendations`(그 레시피 카드 1개, `reason`은 "물어보신 레시피예요", `description`은 null) → `message` 조각(표시 없이 글 그대로, 레시피 정보에 있는 내용만, 단계는 "1. …" 한 줄씩) → `done`. 저장은 글이 AI 메시지 content, 카드 1개가 그 메시지의 `recommendations`입니다. 레시피가 지워졌으면 카드 없이 `message`("물어보신 레시피는 지금 볼 수 없어요. 다른 레시피를 물어봐 주세요.") → `done`.
+  - 직전 추천은 Redis `chat:context:{sessionId}`(조건과 카드 레시피 ID, TTL 30분, 답을 저장할 때마다 다시 늘림)에 둡니다. 새 추천·다시 추천 답을 저장하면 바뀌고, 일반·레시피 자세히 답은 바꾸지 않습니다(레시피 자세히 뒤의 "첫 번째 거는?"도 직전 추천 기준). Redis 장애면 문맥 없이 지금처럼 답합니다.
+  - 하루 횟수는 이어지는 말도 메시지 하나에 1번입니다. AI 호출은 메시지 하나에 의도 판단 1번 + 답 1번입니다(추천 칩은 의도 판단 없이, 정해진 답은 답 생성 없이).
 
 ## 후기 API
 

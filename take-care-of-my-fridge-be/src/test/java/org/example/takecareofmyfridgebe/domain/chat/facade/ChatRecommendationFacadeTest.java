@@ -8,13 +8,18 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate.MissingI
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate.Ranking;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate.Reason;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidates;
+import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeDetailReply;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeQuery;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecommendationReply;
 import org.example.takecareofmyfridgebe.domain.chat.dto.SavedRecommendation;
 import org.example.takecareofmyfridgebe.domain.ingredient.service.IngredientService;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member.Taste;
+import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeDetailResponse.StepItem;
+import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeDetailResponse;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeSummary;
 import org.example.takecareofmyfridgebe.domain.recipe.service.RecipeService;
+import org.example.takecareofmyfridgebe.global.error.BusinessException;
+import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -167,6 +172,35 @@ class ChatRecommendationFacadeTest {
                 .extracting(RecipeCandidate::recipeId).containsExactly(40L, 10L, 20L, 30L);
         assertThat(ChatRecommendationFacade.withoutPrevious(candidates, List.of()))
                 .extracting(RecipeCandidate::recipeId).containsExactly(10L, 40L, 20L, 30L);
+    }
+
+    @Test
+    @DisplayName("레시피 자세히는 지금 냉장고 기준 카드 하나(이유: 물어보신 레시피예요)와 레시피 정보를 만든다")
+    void describesRecipeWithOneCard() {
+        RecipeDetailResponse recipe = RecipeDetailResponse.builder()
+                .recipeId(20L).name("깐풍기").category("튀김").cookTimeMin(40).imageUrl("https://img/20.jpg")
+                .ingredients(List.of()).steps(List.of(new StepItem(1, "닭을 튀긴다.", null, null))).build();
+        when(recipeService.getRecipe(20L)).thenReturn(recipe);
+        when(recipeCandidateFacade.describeRecipes(MEMBER_ID, List.of(20L))).thenReturn(Map.of(
+                20L, candidate(20L, "깐풍기", "튀김", 40, reason(List.of()))));
+
+        RecipeDetailReply reply = facade.describe(MEMBER_ID, 20L).orElseThrow();
+
+        assertThat(reply.event().recipes()).hasSize(1);
+        RecommendedRecipe card = reply.event().recipes().get(0);
+        assertThat(card.recipeId()).isEqualTo(20L);
+        assertThat(card.imageUrl()).isEqualTo("https://img/20.jpg");
+        assertThat(card.reason()).isEqualTo("물어보신 레시피예요");
+        assertThat(card.description()).isNull();
+        assertThat(reply.recipeInfo()).startsWith("[레시피 정보]\n이름: 깐풍기").contains("1. 닭을 튀긴다.", "[냉장고 기준]");
+    }
+
+    @Test
+    @DisplayName("레시피가 지워졌으면 빈 값을 돌려준다")
+    void returnsEmpty_whenRecipeIsDeleted() {
+        when(recipeService.getRecipe(20L)).thenThrow(new BusinessException(ErrorCode.RECIPE_NOT_FOUND));
+
+        assertThat(facade.describe(MEMBER_ID, 20L)).isEmpty();
     }
 
     private static RecipeCandidate candidate(Long id, String name, String category, Integer cookTimeMin, Reason reason) {

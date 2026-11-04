@@ -29,6 +29,12 @@ public class StubChatReplyGenerator implements ChatReplyGenerator {
         return chunked("아직 AI 연결 전이에요. 추천 후보: " + candidateInfo);
     }
 
+    // 레시피 정보를 그대로 보여 준다 (카드 하나와 같이 흐름만 확인)
+    @Override
+    public Flux<String> generateRecipeDetail(Long memberId, Long sessionId, String userMessage, String recipeInfo) {
+        return chunked("아직 AI 연결 전이에요. 레시피 정보: " + recipeInfo);
+    }
+
     private static Flux<String> chunked(String fullReply) {
         List<String> chunks = new ArrayList<>();
         for (int i = 0; i < fullReply.length(); i += CHUNK_SIZE) {
