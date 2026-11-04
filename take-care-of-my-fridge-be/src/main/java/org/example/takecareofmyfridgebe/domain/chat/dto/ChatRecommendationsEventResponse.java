@@ -30,6 +30,7 @@ public record ChatRecommendationsEventResponse(
      * @param missingSelectedIngredients 선택 재료(말한 재료 포함) 중 냉장고에 없는 것의 이름. 같은 종류면 레시피에 쓰인 이름.
      *                                   missingIngredients에도 들어 있다
      * @param lacksManyIngredients 재료를 많이 사야 하는지 (보유 비율 기준 미만)
+     * @param reason               카드에 보여 줄 추천 이유 한 줄 (25자 안팎, 예: "버섯·두부가 주재료예요")
      */
     public record RecommendedRecipe(
             Long recipeId,
@@ -42,7 +43,8 @@ public record ChatRecommendationsEventResponse(
             List<String> matchedTastes,
             List<MissingIngredient> missingIngredients,
             List<String> missingSelectedIngredients,
-            boolean lacksManyIngredients
+            boolean lacksManyIngredients,
+            String reason
     ) {
     }
 

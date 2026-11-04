@@ -1,5 +1,6 @@
 package org.example.takecareofmyfridgebe.domain.chat.facade;
 
+import org.example.takecareofmyfridgebe.domain.chat.dto.KeywordMatch;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate.ImminentIngredient;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate.MissingIngredient;
@@ -31,7 +32,7 @@ import java.util.stream.Stream;
  * AI 없이 규칙으로 레시피 후보를 고르고 정렬한다. 스프링에 의존하지 않는 순수 클래스.
  * <p>
  * 정렬은 점수를 합산하지 않고, 앞 단계가 같을 때만 다음 단계로 비교한다.
- * 1. 사용자 요청 일치 수(원하는 맛·분류) → 2. 선택 재료 겹친 수 → (선택 재료가 있을 때만) 재료 많이 모자람이 아닌 것 먼저
+ * 1. 사용자 요청 일치 수(요리 이름 키워드·원하는 맛·분류) → 2. 선택 재료 겹친 수 → (선택 재료가 있을 때만) 재료 많이 모자람이 아닌 것 먼저
  * → 3. 임박 점수 합 → 4. 선호 맛 겹친 수 → 5. 보유 비율 → 6. 없는 재료 수 적은 순 → 7. 레시피 id.
  * 선택 재료가 같으면 바로 만들 수 있는 레시피를 먼저 둔다. 임박 재료 하나 때문에 부족한 재료가 많은 레시피가 위로 오지 않게 하려는 것이다.
  * 임박을 선호 맛보다 앞에 둔다. 회원 선호 맛은 대부분 레시피와 1~2개씩 겹쳐서, 뒤에 두지 않으면 임박 재료가 순위에 거의 반영되지 않는다.
@@ -40,6 +41,9 @@ import java.util.stream.Stream;
  * 흔한 임박 재료(양파·대파 등)만 겹치고 나머지를 거의 사야 하는 레시피가 위로 올라오지 않게 하려는 것이다.
  * 단, 선택 재료가 기본 양념을 빼고 2개 이상이고 레시피가 그 재료를 전부 쓰면 기준 미만이어도 먼저 고른다 (모자람 표시는 그대로 남는다).
  * 메시지에서 말한 재료는 선택 재료로 합쳐서 오므로 1단계에서 세지 않고 2단계에서 센다.
+ * 요리 이름 키워드("냉면")로 레시피 검색에서 찾은 레시피(RecipeQuery.keywordMatches)는 냉장고 재료와 겹치지 않아도 후보에 넣는다.
+ * 그중 이름·재료로 맞은 레시피(KeywordMatch.strong)만 1단계 키워드 일치를 주고, 재료를 많이 사야 해도 1차 후보로 둔다.
+ * 단어가 쪼개져 걸리거나 벡터 검색으로만 찾은 레시피는 키워드 일치로 치지 않는다.
  * useSelectedOnly면 선택 재료(기본 양념 제외)를 하나도 쓰지 않는 레시피는 뺀다.
  * 선택 재료는 같은 종류 묶음(RecipeQuery.selectedIngredientGroups, 예: 버섯 → 표고버섯·양송이버섯)으로 센다.
  * 묶음 안의 재료를 하나라도 쓰면 그 선택 재료를 쓴 것으로 보고, 후보도 묶음 안의 재료로 모은다.
@@ -131,10 +135,12 @@ public class RecipeCandidateScorer {
      */
     public Set<Long> candidateRecipeIds(RecipeQuery query, List<FridgeStock> fridge, List<RecipeCandidateIngredient> rows) {
         Set<Long> matchIds = matchIngredientIds(query, fridge);
-        return rows.stream()
+        Set<Long> recipeIds = rows.stream()
                 .filter(row -> !row.basicSeasoning() && matchIds.contains(row.ingredientId()))
                 .map(RecipeCandidateIngredient::recipeId)
                 .collect(Collectors.toCollection(LinkedHashSet::new));
+        recipeIds.addAll(query.keywordMatches().keySet());
+        return recipeIds;
     }
 
     /**
@@ -183,8 +189,8 @@ public class RecipeCandidateScorer {
         // 1차: 보유 비율 기준 이상이거나 선택 재료(2개 이상)를 전부 쓰는 레시피, 2차: 나머지. 각각 같은 정렬 순서
         Comparator<RecipeCandidate> order = selectedCount > 0 ? ORDER_WITH_SELECTED : ORDER;
         List<RecipeCandidate> top = Stream.concat(
-                        scored.stream().filter(candidate -> isFirstTier(candidate, selectedCount)).sorted(order),
-                        scored.stream().filter(candidate -> !isFirstTier(candidate, selectedCount)).sorted(order))
+                        scored.stream().filter(candidate -> isFirstTier(query, candidate, selectedCount)).sorted(order),
+                        scored.stream().filter(candidate -> !isFirstTier(query, candidate, selectedCount)).sorted(order))
                 .limit(LIMIT)
                 .toList();
         return new RecipeCandidates(top, fallback);
@@ -192,7 +198,12 @@ public class RecipeCandidateScorer {
 
     // 사용자가 고른 재료(기본 양념 제외 2개 이상)를 전부 쓰는 레시피는 재료를 많이 사야 해도 1차 후보로 둔다 (구매 링크로 보완).
     // 선택이 1개면 그 재료를 쓰면서 기준 이상인 레시피가 충분히 많아 예외를 두지 않는다
-    private static boolean isFirstTier(RecipeCandidate candidate, int selectedCount) {
+    // 요리 이름 키워드로 이름·재료가 맞은 레시피도 사용자가 말한 요리라 1차 후보로 둔다
+    private static boolean isFirstTier(RecipeQuery query, RecipeCandidate candidate, int selectedCount) {
+        KeywordMatch keywordMatch = query.keywordMatches().get(candidate.recipeId());
+        if (keywordMatch != null && keywordMatch.strong()) {
+            return true;
+        }
         boolean usesAllSelected = selectedCount >= MIN_SELECTED_FOR_EXCEPTION
                 && candidate.ranking().selectedMatches() == selectedCount;
         return usesAllSelected || !candidate.reason().lacksManyIngredients();
@@ -335,12 +346,16 @@ public class RecipeCandidateScorer {
         List<String> missingSelected = missingSelectedNames(query, nonBasicSelected, nonBasic, fridgeById);
         List<String> usedSelected = usedSelectedNames(query, nonBasicSelected, nonBasic);
 
-        // 1단계: 사용자 요청 (원하는 맛 + 분류 일치). 말한 재료는 선택 재료로 합쳐져 2단계에서 센다
+        // 1단계: 사용자 요청 (요리 이름 키워드 + 원하는 맛 + 분류 일치). 말한 재료는 선택 재료로 합쳐져 2단계에서 센다
         List<String> matchedRequests = new ArrayList<>();
         List<Member.Taste> matchedWantedTastes = query.wantedTastes().stream()
                 .distinct()
                 .filter(tastes::contains)
                 .toList();
+        KeywordMatch keywordMatch = query.keywordMatches().get(info.recipeId());
+        if (keywordMatch != null && keywordMatch.strong()) {
+            matchedRequests.add("키워드: " + keywordMatch.type().label());
+        }
         matchedWantedTastes.forEach(taste -> matchedRequests.add("맛: " + taste));
         if (info.category() != null && query.moodCategories().contains(info.category())) {
             matchedRequests.add("분류: " + info.category());
@@ -380,7 +395,8 @@ public class RecipeCandidateScorer {
                 ranking.ownedRatio() + RATIO_EPSILON < minOwnedRatio,
                 List.of(),
                 missingSelected,
-                usedSelected
+                usedSelected,
+                keywordMatch
         );
         return new RecipeCandidate(info.recipeId(), info.name(), info.category(), info.cookTimeMin(), ranking, reason);
     }

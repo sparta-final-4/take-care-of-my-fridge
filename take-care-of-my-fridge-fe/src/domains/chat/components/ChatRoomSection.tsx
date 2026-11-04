@@ -1,11 +1,13 @@
 import { CloseOutlined, DownOutlined, RobotOutlined, SendOutlined } from '@ant-design/icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { App, Button, Flex, Input, type InputRef, Result, Spin, Typography } from 'antd';
+import { App, Button, Flex, Grid, Input, type InputRef, Result, Spin, Tag, Typography } from 'antd';
 import {
+  Fragment,
   type KeyboardEvent,
   type ReactNode,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -16,14 +18,32 @@ import { ROUTES } from '@/app/paths';
 import { getChatErrorInfo, getErrorCode, type ChatErrorInfo } from '@/common/api/errors';
 import { useAuthStore } from '@/common/auth/authStore';
 import { streamMessage } from '../api';
+import { useChatModalStore } from '../model/useChatModalStore';
 import { useChatStreamingStore } from '../model/useChatStreamingStore';
 import { chatQueries, useCompleteChatSession, useStartChatSession } from '../queries';
+import type { ChatRecommendations } from '../recommendations';
+import { selectedRecommendMessage } from '../selectedIngredients';
 import { ChatEndedNotice } from './ChatEndedNotice';
 import { ChatMessageBubble } from './ChatMessageBubble';
+import { ChatRecommendationCards } from './ChatRecommendationCards';
 import styles from './ChatRoomSection.module.scss';
 
 // 백엔드 ChatMessageCreateRequest의 @Size(max = 500)와 같은 값
 const CHAT_MESSAGE_MAX_LENGTH = 500;
+
+const AUTO_RECOMMEND_MESSAGE = '알아서 추천해줘';
+
+// 맨 아래에서 이만큼 넘게 위에 있으면 "최신 메시지" 버튼을 보여 준다
+const SCROLL_BOTTOM_THRESHOLD = 80;
+// 보낸 질문 말풍선을 대화 영역 위쪽에 둘 때 위 여백
+const QUESTION_TOP_GAP = 8;
+
+// 보낼 메시지. 칩은 mode=RECOMMEND로 AI 의도 판단 없이 추천을 받는다.
+interface OutgoingMessage {
+  content: string;
+  mode: 'AUTO' | 'RECOMMEND';
+  useSelectedOnly: boolean;
+}
 
 export interface ChatRoomSectionProps {
   onStreamingChange?: (streaming: boolean) => void;
@@ -55,6 +75,10 @@ export function ChatRoomSection({
   const { modal } = App.useApp();
   const queryClient = useQueryClient();
 
+  // 내 냉장고에서 넘긴 선택 재료. 보낸 뒤에도 그대로 두고, 사용자가 ✕로 뺀다.
+  const selectedIngredients = useChatModalStore((state) => state.selectedIngredients);
+  const removeSelectedIngredient = useChatModalStore((state) => state.removeSelectedIngredient);
+
   const authStatus = useAuthStore((state) => state.status);
   const isAuthenticated = authStatus === 'authenticated';
 
@@ -65,9 +89,26 @@ export function ChatRoomSection({
   const [sendLimitExceeded, setSendLimitExceeded] = useState(false);
   const [visibleSendError, setVisibleSendError] = useState<string | null>(null);
   const [showScrollBottom, setShowScrollBottom] = useState(false);
+  // 받는 중인 답의 추천 카드와, 첫 이벤트(카드·글) 전에 보여 줄 안내
+  const [streamingRecommendations, setStreamingRecommendations] =
+    useState<ChatRecommendations | null>(null);
+  const [pendingText, setPendingText] = useState<string | null>(null);
+  // 답이 끝난 추천 카드. 기록을 다시 받아도(이 창의 완료·다른 창의 상담 신호) 그 AI 메시지(assistantMessageId) 위에 계속 보인다.
+  // 카드는 아직 서버에 저장하지 않아(PR 6) 채팅창을 닫았다 열거나 새로고침하면 사라진다.
+  const [recommendationsByMessageId, setRecommendationsByMessageId] = useState<
+    Record<number, ChatRecommendations>
+  >({});
+  const screens = Grid.useBreakpoint();
 
   const containerRef = useRef<HTMLDivElement>(null);
-  const isScrolledUpRef = useRef<boolean>(false);
+  // 보낸 질문 말풍선. 답을 받는 동안 이 말풍선이 대화 영역 위쪽에 올 때까지만 따라 내려간다.
+  const questionAnchorRef = useRef<HTMLDivElement>(null);
+  // 따라 내려갈 목표 위치(질문이 위쪽에 오는 scrollTop). 사용자가 직접 스크롤하면 null로 멈춘다.
+  const followTargetRef = useRef<number | null>(null);
+  // 코드가 마지막으로 맞춘 scrollTop. onScroll이 코드 때문인지 사용자 때문인지 가른다.
+  const programmaticTopRef = useRef<number | null>(null);
+  // 맨 아래로 한 번 내린 상담. 처음 열 때만 내리고, 그 뒤 기록을 다시 받아도 위치를 지킨다.
+  const initialScrolledSessionRef = useRef<number | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const inputRef = useRef<InputRef>(null);
   const errorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -155,35 +196,92 @@ export function ChatRoomSection({
     prevDisabledRef.current = isInputDisabled;
   }, [isInputDisabled]);
 
-  // 스크롤 최하단 이동 함수
+  // 스크롤 규칙
+  // - 상담을 처음 보여 줄 때(채팅창 열기·새로고침·새 상담): 한 번 맨 아래로
+  // - 보낸 뒤 답을 받는 동안: 내 질문이 대화 영역 위쪽에 올 때까지만 따라 내려가고, 그 뒤로는 따라가지 않는다
+  //   (질문+답이 화면보다 짧으면 맨 아래에서 멈추므로 위에 빈 공간이 생기지 않는다)
+  // - 기록을 다시 받을 때(답 완료·다른 창 신호): 위치를 그대로 두고 "최신 메시지" 버튼만 맞춘다
+  const updateScrollBottomButton = useCallback(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const { scrollTop, scrollHeight, clientHeight } = container;
+    setShowScrollBottom(scrollHeight - scrollTop - clientHeight > SCROLL_BOTTOM_THRESHOLD);
+  }, []);
+
   const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
-    if (containerRef.current) {
-      containerRef.current.scrollTo({
-        top: containerRef.current.scrollHeight,
-        behavior,
-      });
-      setShowScrollBottom(false);
-      isScrolledUpRef.current = false;
+    const container = containerRef.current;
+    if (!container) return;
+    followTargetRef.current = null;
+    container.scrollTo({ top: container.scrollHeight, behavior });
+    setShowScrollBottom(false);
+  }, []);
+
+  // 답을 받는 동안 목표 위치(질문이 위쪽)까지만 내려간다. 내용이 짧으면 갈 수 있는 맨 아래까지만.
+  const followQuestion = useCallback(() => {
+    const container = containerRef.current;
+    const target = followTargetRef.current;
+    if (!container || target === null) return;
+    const top = Math.min(target, container.scrollHeight - container.clientHeight);
+    if (top > container.scrollTop) {
+      programmaticTopRef.current = top;
+      container.scrollTop = top;
     }
   }, []);
 
-  // 스크롤 이벤트 감지
   const handleScroll = useCallback(() => {
-    if (!containerRef.current) return;
-    const { scrollTop, scrollHeight, clientHeight } = containerRef.current;
-    const isUp = scrollHeight - scrollTop - clientHeight > 80;
-    isScrolledUpRef.current = isUp;
-    setShowScrollBottom(isUp);
-  }, []);
-
-  // 새 메시지 및 스트리밍 조각 수신 시 스크롤 처리
-  useEffect(() => {
-    if (!isScrolledUpRef.current) {
-      scrollToBottom('auto');
-    } else {
-      setShowScrollBottom(true);
+    const container = containerRef.current;
+    if (!container) return;
+    // 코드가 맞춘 위치와 다르면 사용자가 스크롤한 것이다. 그때부터는 따라 내려가지 않는다.
+    if (
+      programmaticTopRef.current !== null &&
+      Math.abs(container.scrollTop - programmaticTopRef.current) > 2
+    ) {
+      followTargetRef.current = null;
+      programmaticTopRef.current = null;
     }
-  }, [messagesData, streamingUserMessage, streamingAssistantMessage, scrollToBottom]);
+    updateScrollBottomButton();
+  }, [updateScrollBottomButton]);
+
+  // 상담을 처음 보여 줄 때 한 번 맨 아래로
+  useLayoutEffect(() => {
+    if (sessionId <= 0 || !messagesData || initialScrolledSessionRef.current === sessionId) return;
+    initialScrolledSessionRef.current = sessionId;
+    scrollToBottom('auto');
+  }, [sessionId, messagesData, scrollToBottom]);
+
+  // 보낸 질문이 그려지면 목표 위치를 정하고 따라 내려가기 시작한다
+  useLayoutEffect(() => {
+    const container = containerRef.current;
+    const question = questionAnchorRef.current;
+    if (!streamingUserMessage || !container || !question) {
+      followTargetRef.current = null;
+      programmaticTopRef.current = null;
+      return;
+    }
+    followTargetRef.current =
+      question.getBoundingClientRect().top -
+      container.getBoundingClientRect().top +
+      container.scrollTop -
+      QUESTION_TOP_GAP;
+    followQuestion();
+  }, [streamingUserMessage, followQuestion]);
+
+  // 답 조각·카드·안내가 바뀌면 목표 위치까지 따라 내려가고 버튼을 맞춘다
+  useLayoutEffect(() => {
+    followQuestion();
+    updateScrollBottomButton();
+  }, [
+    streamingAssistantMessage,
+    streamingRecommendations,
+    pendingText,
+    followQuestion,
+    updateScrollBottomButton,
+  ]);
+
+  // 기록을 다시 받으면(답 완료·다른 창 신호) 위치는 그대로 두고 버튼만 맞춘다
+  useEffect(() => {
+    updateScrollBottomButton();
+  }, [messagesData, recommendationsByMessageId, updateScrollBottomButton]);
 
   // 새 상담 시작 핸들러
   const handleStartNewSession = () => {
@@ -193,6 +291,8 @@ export function ChatRoomSection({
     setInputText('');
     setStreamingUserMessage(null);
     setStreamingAssistantMessage(null);
+    setStreamingRecommendations(null);
+    setPendingText(null);
 
     startSessionMutation.mutate(undefined, {
       onError: (err) => {
@@ -223,12 +323,44 @@ export function ChatRoomSection({
     });
   };
 
-  // 메시지 전송 핸들러
+  // 카드를 눌러 레시피 상세로 갈 때, 모바일 전체 화면 채팅창은 닫아 상세가 보이게 한다.
+  // md 이상(380px 떠 있는 창)과 마이페이지 오른쪽 칸은 그대로 둔다.
+  const closeOnNavigate = screens.md ? undefined : onCloseModal;
+
+  // 메시지 전송 핸들러 (직접 입력). 선택 재료가 있으면 같이 보내고, AI가 추천인지 판단한다.
   const handleSendMessage = async () => {
     const text = inputText.trim();
-    if (!text || isInputDisabled || sessionId <= 0) return;
-
+    if (!text) return;
     setInputText('');
+    await sendMessage({ content: text, mode: 'AUTO', useSelectedOnly: false });
+  };
+
+  // [알아서 추천해줘] 칩
+  const handleAutoRecommend = () => {
+    void sendMessage({
+      content: AUTO_RECOMMEND_MESSAGE,
+      mode: 'RECOMMEND',
+      useSelectedOnly: false,
+    });
+  };
+
+  // [이 재료로 추천받기] 칩. 선택 재료를 꼭 쓰는 레시피만 받는다.
+  const handleSelectedRecommend = () => {
+    if (selectedIngredients.length === 0) return;
+    void sendMessage({
+      content: selectedRecommendMessage(selectedIngredients),
+      mode: 'RECOMMEND',
+      useSelectedOnly: true,
+    });
+  };
+
+  const sendMessage = async ({ content: text, mode, useSelectedOnly }: OutgoingMessage) => {
+    if (!text || isInputDisabled || sessionId <= 0) return;
+    // 의도 판단·후보 검색으로 첫 이벤트까지 2초쯤 걸린다. 칩은 추천이 확실하므로 레시피를 찾는다고 알린다.
+    setPendingText(mode === 'RECOMMEND' ? '레시피를 찾고 있어요…' : '답을 준비하고 있어요…');
+    setStreamingRecommendations(null);
+    let receivedRecommendations: ChatRecommendations | null = null;
+
     setSendErrorInfo(null);
     setVisibleSendError(null);
     setStreamingUserMessage(text);
@@ -241,11 +373,25 @@ export function ChatRoomSection({
       await streamMessage({
         sessionId,
         content: text,
+        mode,
+        selectedIngredientIds: selectedIngredients.map((ingredient) => ingredient.ingredientId),
+        useSelectedOnly,
         signal: controller.signal,
+        onRecommendations: (recommendations) => {
+          receivedRecommendations = recommendations;
+          setStreamingRecommendations(recommendations);
+          setPendingText(null);
+        },
         onChunk: (chunk: string) => {
+          setPendingText(null);
           setStreamingAssistantMessage((prev) => (prev ?? '') + chunk);
         },
-        onDone: async () => {
+        onDone: async ({ assistantMessageId }) => {
+          // 기록을 다시 받기 전에 카드를 그 AI 메시지에 붙여 두어 깜빡이지 않게 한다
+          const cards = receivedRecommendations;
+          if (cards && !cards.empty && assistantMessageId !== undefined) {
+            setRecommendationsByMessageId((prev) => ({ ...prev, [assistantMessageId]: cards }));
+          }
           try {
             await queryClient.refetchQueries({ queryKey: chatQueries.messages(sessionId) });
             // 상담 내역의 메시지 수·마지막 시각이 바뀌므로 다시 받게 한다.
@@ -253,6 +399,8 @@ export function ChatRoomSection({
           } finally {
             setStreamingUserMessage(null);
             setStreamingAssistantMessage(null);
+            setStreamingRecommendations(null);
+            setPendingText(null);
           }
         },
         onError: (chatError) => {
@@ -265,19 +413,23 @@ export function ChatRoomSection({
           if (errorInfo.action === 'restart') {
             setSendErrorInfo(errorInfo);
           }
-          // 다시 보낼 수 있는 실패(다른 창에서 답을 받는 중 등)는 보내려던 내용을 입력창에 되돌린다.
-          if (errorInfo.action === 'restoreInput') {
+          // 다시 보낼 수 있는 실패(다른 창에서 답을 받는 중 등)는 직접 입력한 내용을 입력창에 되돌린다.
+          if (errorInfo.action === 'restoreInput' && mode === 'AUTO') {
             setInputText(text);
           }
 
           setStreamingUserMessage(null);
           setStreamingAssistantMessage(null);
+          setStreamingRecommendations(null);
+          setPendingText(null);
         },
       });
     } catch {
       triggerSendError('답변 생성 중 문제가 발생했습니다.');
       setStreamingUserMessage(null);
       setStreamingAssistantMessage(null);
+      setStreamingRecommendations(null);
+      setPendingText(null);
     } finally {
       abortControllerRef.current = null;
     }
@@ -421,14 +573,21 @@ export function ChatRoomSection({
               <Spin description="대화 기록을 불러오는 중..." />
             </Flex>
           ) : messagesData && messagesData.length > 0 ? (
-            messagesData.map((msg) => (
-              <ChatMessageBubble
-                key={msg.id ?? msg.sequence}
-                senderRole={msg.role === 'USER' ? 'USER' : 'ASSISTANT'}
-                content={msg.content ?? ''}
-                createdAt={msg.createdAt}
-              />
-            ))
+            messagesData.map((msg) => {
+              const cards = msg.id !== undefined ? recommendationsByMessageId[msg.id] : undefined;
+              return (
+                <Fragment key={msg.id ?? msg.sequence}>
+                  <ChatMessageBubble
+                    senderRole={msg.role === 'USER' ? 'USER' : 'ASSISTANT'}
+                    content={msg.content ?? ''}
+                    createdAt={msg.createdAt}
+                  />
+                  {cards && (
+                    <ChatRecommendationCards recipes={cards.recipes} onNavigate={closeOnNavigate} />
+                  )}
+                </Fragment>
+              );
+            })
           ) : (
             !streamingUserMessage && (
               <div className={styles.emptyArea}>
@@ -438,21 +597,48 @@ export function ChatRoomSection({
                   <br />
                   요리 고민을 편하게 물어보세요!
                 </Typography.Text>
+                {!isSessionEnded && (
+                  <Flex wrap justify="center" gap="small" className={styles.recommendChips}>
+                    <Button shape="round" onClick={handleAutoRecommend} disabled={isInputDisabled}>
+                      알아서 추천해줘
+                    </Button>
+                    {selectedIngredients.length > 0 && (
+                      <Button
+                        shape="round"
+                        onClick={handleSelectedRecommend}
+                        disabled={isInputDisabled}
+                      >
+                        이 재료로 추천받기
+                      </Button>
+                    )}
+                  </Flex>
+                )}
               </div>
             )
           )}
 
-          {/* 스트리밍 중인 사용자 질문 */}
+          {/* 스트리밍 중인 사용자 질문 (보낸 뒤 이 말풍선이 위쪽에 오도록 스크롤한다) */}
           {streamingUserMessage && (
-            <ChatMessageBubble senderRole="USER" content={streamingUserMessage} />
+            <div ref={questionAnchorRef}>
+              <ChatMessageBubble senderRole="USER" content={streamingUserMessage} />
+            </div>
           )}
 
-          {/* 스트리밍 중인 AI 답변 */}
+          {/* 스트리밍 중인 AI 답변. 첫 글 조각 전에는 안내 문구("레시피를 찾고 있어요…")를 보여 준다 */}
           {streamingAssistantMessage !== null && (
             <ChatMessageBubble
               senderRole="ASSISTANT"
               content={streamingAssistantMessage}
+              pendingText={pendingText ?? undefined}
               isStreaming={true}
+            />
+          )}
+
+          {/* 스트리밍 중인 추천 카드. 설명보다 먼저 와도 말풍선 아래에 둔다 (후보 없음이면 없음) */}
+          {streamingRecommendations && !streamingRecommendations.empty && (
+            <ChatRecommendationCards
+              recipes={streamingRecommendations.recipes}
+              onNavigate={closeOnNavigate}
             />
           )}
         </div>
@@ -478,6 +664,26 @@ export function ChatRoomSection({
             <span className={styles.errorDot} />
             <span>{visibleSendError}</span>
           </div>
+        )}
+
+        {/* 선택 재료 줄. 끝난 상담에는 보이지 않는다. */}
+        {!isSessionEnded && selectedIngredients.length > 0 && (
+          <Flex align="center" wrap gap="small" className={styles.selectedRow}>
+            <Typography.Text type="secondary" className={styles.selectedLabel}>
+              선택한 재료
+            </Typography.Text>
+            {selectedIngredients.map((ingredient) => (
+              <Tag
+                key={ingredient.ingredientId}
+                closable
+                onClose={() => removeSelectedIngredient(ingredient.ingredientId)}
+                closeIcon={<CloseOutlined aria-label={`${ingredient.name} 빼기`} />}
+                className={styles.selectedTag}
+              >
+                {ingredient.name}
+              </Tag>
+            ))}
+          </Flex>
         )}
 
         <div className={styles.inputForm}>

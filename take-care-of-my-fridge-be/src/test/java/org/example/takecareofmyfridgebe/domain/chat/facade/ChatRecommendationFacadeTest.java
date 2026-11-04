@@ -49,7 +49,7 @@ class ChatRecommendationFacadeTest {
     void buildsCardsFromTopThree() {
         Reason wanted = new Reason(List.of("양파", "두부"), List.of(new ImminentIngredient("양파", 0)),
                 List.of(Taste.SALTY), List.of(Taste.SPICY), List.of(), false, true,
-                List.of(new MissingIngredient(5L, "돼지고기")), List.of("돼지고기"), List.of());
+                List.of(new MissingIngredient(5L, "돼지고기")), List.of("돼지고기"), List.of(), null);
         when(recipeCandidateFacade.findCandidates(any())).thenReturn(new RecipeCandidates(List.of(
                 candidate(10L, "두부찌개", "찌개", 25, wanted),
                 candidate(20L, "두부조림", "조림", null, reason(List.of(Taste.SALTY))),
@@ -74,10 +74,12 @@ class ChatRecommendationFacadeTest {
         assertThat(first.missingIngredients()).containsExactly(new ChatRecommendationsEventResponse.MissingIngredient(5L, "돼지고기"));
         assertThat(first.missingSelectedIngredients()).containsExactly("돼지고기");
         assertThat(first.lacksManyIngredients()).isTrue();
+        // 원한 맛(매운맛)이 맞아 임박 재료보다 먼저 쓴다
+        assertThat(first.reason()).isEqualTo("매콤한 요리예요");
         assertThat(event.recipes().get(1).imageUrl()).isNull();
         assertThat(event.recipes().get(1).cookTimeMin()).isNull();
         assertThat(event.recipes().get(1).matchedTastes()).containsExactly("짠맛");
-        assertThat(reply.candidateInfo()).contains("1. 두부찌개", "2. 두부조림", "3. 두부전").doesNotContain("두부국");
+        assertThat(reply.candidateInfo()).contains("후보: 두부찌개", "후보: 두부조림", "후보: 두부전").doesNotContain("두부국");
     }
 
     @Test
@@ -99,12 +101,12 @@ class ChatRecommendationFacadeTest {
         ChatRecommendationsEventResponse event = ChatRecommendationsEventResponse.of(List.of(new RecommendedRecipe(
                 10L, "두부찌개", null, "찌개", null, List.of("양파"),
                 List.of(new ChatRecommendationsEventResponse.ImminentIngredient("양파", 0)), List.of("매운맛"),
-                List.of(), List.of(), false)));
+                List.of(), List.of(), false, "이유")));
 
         String json = new ObjectMapper().writeValueAsString(event);
 
         assertThat(json).contains("\"recipes\":[", "\"relaxed\":[]", "\"empty\":false",
-                "\"imminentIngredients\":[{\"name\":\"양파\",\"dDay\":0}]", "\"cookTimeMin\":null", "\"imageUrl\":null");
+                "\"imminentIngredients\":[{\"name\":\"양파\",\"dDay\":0}]", "\"cookTimeMin\":null", "\"imageUrl\":null", "\"reason\":\"이유\"");
     }
 
     private static RecipeCandidate candidate(Long id, String name, String category, Integer cookTimeMin, Reason reason) {
@@ -112,6 +114,6 @@ class ChatRecommendationFacadeTest {
     }
 
     private static Reason reason(List<Taste> tastes) {
-        return new Reason(List.of(), List.of(), tastes, List.of(), List.of(), false, false, List.of(), List.of(), List.of());
+        return new Reason(List.of(), List.of(), tastes, List.of(), List.of(), false, false, List.of(), List.of(), List.of(), null);
     }
 }

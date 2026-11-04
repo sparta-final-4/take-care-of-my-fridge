@@ -334,4 +334,92 @@ describe('streamMessage', () => {
       message: '인증이 필요합니다.',
     });
   });
+
+  it('추천 모드·선택 재료·선택 재료만 쓰기를 요청 본문에 담아 보낸다', async () => {
+    const fetchMock = vi.fn().mockImplementation(async (url: string) => {
+      if (url.includes('/api/auth/csrf')) {
+        return { ok: true, status: 200, headers: { get: () => 'application/json' } };
+      }
+      const encoder = new TextEncoder();
+      return {
+        ok: true,
+        status: 200,
+        headers: { get: () => 'text/event-stream' },
+        body: new ReadableStream({
+          start(controller) {
+            controller.enqueue(encoder.encode('event:done\ndata:{}\n\n'));
+            controller.close();
+          },
+        }),
+      };
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await streamMessage({
+      sessionId: 1,
+      content: '배추, 버섯으로 추천해줘',
+      mode: 'RECOMMEND',
+      selectedIngredientIds: [10, 20],
+      useSelectedOnly: true,
+      onChunk: vi.fn(),
+      onDone: vi.fn(),
+      onError: vi.fn(),
+    });
+
+    const messageCall = fetchMock.mock.calls.find(([url]) => String(url).includes('/messages'));
+    expect(JSON.parse(messageCall?.[1]?.body as string)).toEqual({
+      content: '배추, 버섯으로 추천해줘',
+      mode: 'RECOMMEND',
+      selectedIngredientIds: [10, 20],
+      useSelectedOnly: true,
+    });
+  });
+
+  it('recommendations 이벤트를 글 조각보다 먼저 onRecommendations로 넘긴다', async () => {
+    const sseData =
+      'event:recommendations\ndata:{"recipes":[{"recipeId":631,"name":"감자느타리버섯국"}],"relaxed":[],"empty":false}\n\n' +
+      'event:message\ndata:{"text":"추천해요"}\n\n' +
+      'event:done\ndata:{"userMessageId":10,"assistantMessageId":11}\n\n';
+    const encoder = new TextEncoder();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation(async (url: string) => {
+        if (url.includes('/api/auth/csrf')) {
+          return { ok: true, status: 200, headers: { get: () => 'application/json' } };
+        }
+        return {
+          ok: true,
+          status: 200,
+          headers: { get: () => 'text/event-stream' },
+          body: new ReadableStream({
+            start(controller) {
+              controller.enqueue(encoder.encode(sseData));
+              controller.close();
+            },
+          }),
+        };
+      }),
+    );
+    const calls: string[] = [];
+    const onRecommendations = vi.fn(() => calls.push('recommendations'));
+    const onChunk = vi.fn(() => calls.push('chunk'));
+    const onDone = vi.fn(() => calls.push('done'));
+
+    await streamMessage({
+      sessionId: 1,
+      content: '뭐 먹지?',
+      onChunk,
+      onRecommendations,
+      onDone,
+      onError: vi.fn(),
+    });
+
+    expect(calls).toEqual(['recommendations', 'chunk', 'done']);
+    expect(onRecommendations).toHaveBeenCalledWith(
+      expect.objectContaining({
+        empty: false,
+        recipes: [expect.objectContaining({ recipeId: 631, name: '감자느타리버섯국' })],
+      }),
+    );
+  });
 });

@@ -1,15 +1,24 @@
+import type { ChatMessageCreateRequest } from '@/common/api/clients';
 import { getErrorCode } from '@/common/api/errors';
 import { useAuthStore } from '@/common/auth/authStore';
 import { setSession } from '@/common/auth/session';
 import { refresh } from '@/domains/auth/api';
+
+import { type ChatRecommendations, parseChatRecommendations } from '../recommendations';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '';
 
 export interface StreamMessageOptions {
   sessionId: number;
   content: string;
+  // 추천 요청 필드. 비우면 서버 기본값(AUTO, 선택 재료 없음, false)
+  mode?: ChatMessageCreateRequest['mode'];
+  selectedIngredientIds?: number[];
+  useSelectedOnly?: boolean;
   signal?: AbortSignal;
   onChunk: (chunk: string) => void;
+  // 추천이면 글 조각보다 먼저 한 번 온다 (event: recommendations). 일반 질문이면 오지 않는다
+  onRecommendations?: (recommendations: ChatRecommendations) => void;
   onDone: (data: { userMessageId?: number; assistantMessageId?: number }) => void;
   onError: (error: { code?: string; message?: string }) => void;
 }
@@ -37,17 +46,28 @@ async function ensureXsrfToken(): Promise<string | undefined> {
  * 상담 메시지를 전송하고 SSE 스트림으로 AI 답변 조각을 수신한다.
  * - 401 Unauthorized 수신 시 refresh() 호출 후 1회 재시도 (세션 만료 대응)
  * - JSON 에러 응답 수신 시 onError({ code, message }) 호출
- * - text/event-stream 수신 시 청크 단위로 SSE 파싱하여 onChunk / onDone / onError 호출
+ * - text/event-stream 수신 시 청크 단위로 SSE 파싱하여 onRecommendations / onChunk / onDone / onError 호출
  * - 스트림이 done/error 없이 비정상 종료되면 onError("답을 끝까지 받지 못했어요") 호출
  */
 export async function streamMessage({
   sessionId,
   content,
+  mode,
+  selectedIngredientIds,
+  useSelectedOnly,
   signal,
   onChunk,
+  onRecommendations,
   onDone,
   onError,
 }: StreamMessageOptions): Promise<void> {
+  const requestBody: ChatMessageCreateRequest = {
+    content,
+    mode,
+    selectedIngredientIds,
+    useSelectedOnly,
+  };
+
   async function executeRequest(isRetry = false): Promise<Response | null> {
     const xsrfToken = await ensureXsrfToken();
 
@@ -66,7 +86,7 @@ export async function streamMessage({
         method: 'POST',
         headers,
         credentials: 'include',
-        body: JSON.stringify({ content }),
+        body: JSON.stringify(requestBody),
         signal,
       });
     } catch (err: unknown) {
@@ -171,6 +191,9 @@ export async function streamMessage({
             // plain text chunk fallback
           }
           onChunk(text);
+        } else if (eventType === 'recommendations') {
+          const recommendations = parseChatRecommendations(data);
+          if (recommendations) onRecommendations?.(recommendations);
         } else if (eventType === 'done') {
           isStreamCompleted = true;
           let parsed = {};

@@ -1,0 +1,124 @@
+@use '@/styles/variables' as *;
+
+// AI 말풍선 내용과 같은 들여쓰기
+.cards {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ant-margin-xxs);
+  margin: 0 0 var(--ant-margin-sm) $chat-assistant-indent;
+  padding: 0;
+  list-style: none;
+}
+
+.card {
+  position: relative;
+  border: 1px solid var(--ant-color-border-secondary);
+  border-radius: var(--ant-border-radius-lg);
+  background: var(--ant-color-bg-container);
+
+  &:hover {
+    background: var(--ant-color-fill-quaternary);
+  }
+
+  &:has(.cardLink:focus-visible) {
+    outline: 2px solid var(--ant-color-primary);
+    outline-offset: -2px;
+  }
+}
+
+// 카드 전체를 덮는 레시피 상세 링크
+.cardLink {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+
+  &:focus-visible {
+    outline: none;
+  }
+}
+
+// 이미지 48px 옆에 세 줄(이름 · 이유 · 태그), 카드 한 장 약 80px
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--ant-margin-sm);
+  padding: var(--ant-padding-xs) var(--ant-padding-sm);
+  pointer-events: none;
+}
+
+.thumb {
+  flex-shrink: 0;
+  width: $chat-recommend-thumb-size;
+  height: $chat-recommend-thumb-size;
+  border-radius: var(--ant-border-radius);
+  object-fit: cover;
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ant-margin-xxs);
+  min-width: 0;
+  flex: 1;
+}
+
+.titleLine {
+  display: flex;
+  align-items: baseline;
+  gap: var(--ant-margin-xs);
+  min-width: 0;
+}
+
+.name {
+  min-width: 0;
+  font-size: var(--ant-font-size);
+}
+
+.reason {
+  font-size: var(--ant-font-size-sm);
+}
+
+.meta {
+  flex-shrink: 0;
+  font-size: var(--ant-font-size-sm);
+  color: var(--ant-color-text-tertiary);
+}
+
+.infoLine {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ant-margin-xxs) var(--ant-margin-xs);
+}
+
+.tag {
+  margin-inline-end: 0;
+  font-size: var(--ant-font-size-sm);
+}
+
+// 링크 위에 올려 따로 누른다
+.shoppingToggle {
+  position: relative;
+  z-index: 1;
+  height: auto;
+  padding: 0;
+  font-size: var(--ant-font-size-sm);
+  pointer-events: auto;
+}
+
+.shopping {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--ant-margin-xxs);
+  padding: 0 var(--ant-padding-sm) var(--ant-padding-sm);
+}
+
+.shoppingNames {
+  font-size: var(--ant-font-size-sm);
+}
+
+.shoppingNote {
+  font-size: var(--ant-font-size-sm);
+}

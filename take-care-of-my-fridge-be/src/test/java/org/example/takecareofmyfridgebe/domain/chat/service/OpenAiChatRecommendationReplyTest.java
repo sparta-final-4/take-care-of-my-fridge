@@ -23,7 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class OpenAiChatRecommendationReplyTest {
 
     @Test
-    @DisplayName("추천 답은 공통+추천 규칙을 system으로, 후보 정보를 별도 메시지로, 사용자 메시지를 마지막에 그대로 보낸다")
+    @DisplayName("추천 답은 공통+추천 규칙을 system으로, 후보 정보를 별도 메시지로, 사용자 메시지를 마지막에 보내고 최대 토큰을 120으로 줄인다")
     void sendsRecommendSystemAndCandidateMessage() {
         CapturingStreamModel model = new CapturingStreamModel();
         ChatClient chatClient = ChatClient.builder(model).defaultSystem("기본 {시스템}").build();
@@ -40,10 +40,11 @@ class OpenAiChatRecommendationReplyTest {
         assertThat(messages.get(0).getText()).isEqualTo("공통 규칙\n\n추천 규칙 {예시}");
         assertThat(messages.get(1).getText()).isEqualTo("[추천 후보]\n1. 두부조림");
         assertThat(messages.get(2).getText()).isEqualTo("{두부} 추천해줘");
+        assertThat(model.lastPrompt.getOptions().getMaxTokens()).isEqualTo(OpenAiChatReplyGenerator.RECOMMEND_MAX_TOKENS);
     }
 
     @Test
-    @DisplayName("일반 답은 지금처럼 빈의 기본 system과 사용자 메시지만 보낸다")
+    @DisplayName("일반 답은 지금처럼 빈의 기본 system과 사용자 메시지만 보내고 최대 토큰을 줄이지 않는다")
     void sendsDefaultSystem_whenGeneral() {
         CapturingStreamModel model = new CapturingStreamModel();
         ChatClient chatClient = ChatClient.builder(model).defaultSystem("기본 시스템").build();
@@ -54,6 +55,8 @@ class OpenAiChatRecommendationReplyTest {
 
         assertThat(model.lastPrompt.getInstructions()).extracting(Message::getText)
                 .containsExactly("기본 시스템", "두부 보관 어떻게 해?");
+        Integer maxTokens = model.lastPrompt.getOptions() == null ? null : model.lastPrompt.getOptions().getMaxTokens();
+        assertThat(maxTokens).isNotEqualTo(Integer.valueOf(OpenAiChatReplyGenerator.RECOMMEND_MAX_TOKENS));
     }
 
     private static ByteArrayResource resource(String text) {

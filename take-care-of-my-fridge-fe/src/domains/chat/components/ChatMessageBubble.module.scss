@@ -88,6 +88,10 @@
   user-select: none;
 }
 
+.pending {
+  color: var(--ant-color-text-secondary);
+}
+
 .cursor {
   display: inline-block;
   width: 2px;

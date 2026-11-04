@@ -1,5 +1,6 @@
 package org.example.takecareofmyfridgebe.domain.chat.facade;
 
+import org.example.takecareofmyfridgebe.domain.chat.dto.KeywordMatch;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate.ImminentIngredient;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate.MissingIngredient;
@@ -693,6 +694,60 @@ class RecipeCandidateScorerTest {
             RecipeCandidates result = rank(ratioScorer, RecipeQuery.of(MEMBER_ID, List.of()), fridge, List.of());
 
             assertThat(result.candidates()).extracting(RecipeCandidate::recipeId).containsExactly(10L, 20L);
+        }
+    }
+
+    @Nested
+    @DisplayName("요리 이름 키워드")
+    class KeywordMatches {
+
+        @Test
+        @DisplayName("키워드로 찾은 레시피는 냉장고 재료와 겹치지 않아도 후보에 넣고, 요청 일치에 키워드를 더한다")
+        void collectsKeywordRecipe_andCountsAsRequest() {
+            recipe(10L, "수제비", "면류", 20, 2, EGG);
+            recipe(20L, "물냉면", "면류", 20, 8, PORK);
+            RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, List.of("면류"), null, null, false,
+                    List.of("냉면"), "냉면").withKeywordMatches(Map.of(20L, KeywordMatch.of(KeywordMatch.Type.NAME)));
+
+            RecipeCandidates result = rank(ratioScorer, query, List.of(stock(EGG, "계란", 10)), List.of());
+
+            assertThat(result.candidates()).extracting(RecipeCandidate::recipeId).containsExactly(20L, 10L);
+            RecipeCandidate coldNoodle = result.candidates().get(0);
+            assertThat(coldNoodle.ranking().requestMatches()).isEqualTo(2);
+            assertThat(coldNoodle.reason().matchedRequests()).containsExactly("키워드: 이름", "분류: 면류");
+            assertThat(coldNoodle.reason().lacksManyIngredients()).isTrue();
+        }
+
+        @Test
+        @DisplayName("키워드로 찾은 레시피는 재료를 많이 사야 해도 1차 후보로 둔다")
+        void keepsKeywordRecipeInFirstTier_whenLacksMany() {
+            recipe(10L, "계란국", "국", 20, 1, EGG);
+            recipe(20L, "물냉면", "면류", 20, 8, PORK);
+            RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, null, null, null, false,
+                    List.of("냉면"), "냉면").withKeywordMatches(Map.of(20L, KeywordMatch.of(KeywordMatch.Type.NAME)));
+
+            RecipeCandidates result = rank(ratioScorer, query, List.of(stock(EGG, "계란", 0)), List.of());
+
+            assertThat(result.candidates()).extracting(RecipeCandidate::recipeId).containsExactly(20L, 10L);
+        }
+
+        @Test
+        @DisplayName("벡터 검색으로만 찾거나 단어가 쪼개져 걸린 레시피는 후보에는 넣지만 키워드 일치·1차 후보로 치지 않는다")
+        void skipsKeywordCredit_whenVectorOrSplit() {
+            recipe(10L, "계란국", "국", 20, 1, EGG);
+            recipe(20L, "들깨 냉채", "면류", 20, 8, PORK);
+            recipe(30L, "비빔쌀국수", "면류", 20, 8, PORK);
+            RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, null, null, null, false,
+                    List.of("냉면", "비빔국수"), "냉면").withKeywordMatches(Map.of(
+                    20L, KeywordMatch.of(KeywordMatch.Type.VECTOR),
+                    30L, KeywordMatch.of(KeywordMatch.Type.SPLIT)));
+
+            RecipeCandidates result = rank(ratioScorer, query, List.of(stock(EGG, "계란", 0)), List.of());
+
+            assertThat(result.candidates()).extracting(RecipeCandidate::recipeId).containsExactly(10L, 20L, 30L);
+            assertThat(result.candidates().get(1).ranking().requestMatches()).isZero();
+            assertThat(result.candidates().get(1).reason().keywordMatch().type()).isEqualTo(KeywordMatch.Type.VECTOR);
+            assertThat(query.keywordsNotFound()).isTrue();
         }
     }
 

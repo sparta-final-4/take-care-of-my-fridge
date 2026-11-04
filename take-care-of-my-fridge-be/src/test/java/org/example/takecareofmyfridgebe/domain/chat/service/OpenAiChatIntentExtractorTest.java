@@ -28,7 +28,8 @@ class OpenAiChatIntentExtractorTest {
     private static final String PROMPT = "규칙 {예시}는 그대로 둔다. 분류 목록: %CATEGORIES%";
     private static final String RECOMMEND_JSON = """
             {"intent":"RECOMMEND","wantedTastes":["SPICY"],"moodCategories":["국"],"maxMinutes":30,
-             "includeIngredients":["두부"],"excludeIngredients":null,"useSelectedOnly":true}
+             "includeIngredients":["두부"],"excludeIngredients":null,"useSelectedOnly":true,
+             "keywords":["냉면"],"dishText":"냉면","preferenceText":"냉면 같은 면 요리"}
             """;
 
     private CapturingChatModel chatModel;
@@ -90,7 +91,7 @@ class OpenAiChatIntentExtractorTest {
         IntentResult result = extractor.extract(1L, 10L, "두부로 할 수 있는 매운 국 30분 안에", List.of("국"));
 
         assertThat(result).isEqualTo(new IntentResult(ChatIntent.RECOMMEND, List.of("SPICY"), List.of("국"), 30,
-                List.of("두부"), null, true));
+                List.of("두부"), null, true, List.of("냉면"), "냉면", "냉면 같은 면 요리"));
     }
 
     @Test

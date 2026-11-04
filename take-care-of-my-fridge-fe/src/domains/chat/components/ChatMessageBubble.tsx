@@ -11,6 +11,8 @@ export interface ChatMessageBubbleProps {
   content: string;
   createdAt?: string;
   isStreaming?: boolean;
+  // 글이 아직 없을 때 보여 줄 안내 (예: "레시피를 찾고 있어요…")
+  pendingText?: string;
 }
 
 export function ChatMessageBubble({
@@ -18,6 +20,7 @@ export function ChatMessageBubble({
   content,
   createdAt,
   isStreaming = false,
+  pendingText,
 }: ChatMessageBubbleProps) {
   const isUser = senderRole === 'USER';
   const timeText = createdAt ? dayjs(createdAt).format('HH:mm') : dayjs().format('HH:mm');
@@ -41,7 +44,11 @@ export function ChatMessageBubble({
         </div>
         <div className={styles.assistantContent}>
           <div className={`${styles.bubble} ${styles.assistantBubble}`}>
-            {content}
+            {!content && pendingText ? (
+              <span className={styles.pending}>{pendingText}</span>
+            ) : (
+              content
+            )}
             {isStreaming && <span className={styles.cursor} />}
           </div>
           <span className={styles.time}>{timeText}</span>

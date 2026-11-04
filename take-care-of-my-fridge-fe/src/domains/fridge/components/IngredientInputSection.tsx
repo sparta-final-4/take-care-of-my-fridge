@@ -223,7 +223,7 @@ export function IngredientInputSection() {
         </Flex>
 
         <Flex justify="flex-end" wrap gap="small" className={styles.footerActions}>
-          <Button className={styles.actionButton} onClick={openChat}>
+          <Button className={styles.actionButton} onClick={() => openChat()}>
             AI 상담
           </Button>
           <Button

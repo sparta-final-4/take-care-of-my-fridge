@@ -62,7 +62,8 @@ public class RecipeSearchService {
             }
             long embedMs = (System.nanoTime() - started) / 1_000_000;
 
-            RecipeSearchResult result = toResult(esClient.search(vectorRequest(request, vector.get()), Void.class));
+            RecipeSearchResult result = toResult(esClient.search(vectorRequest(request, vector.get()), Void.class))
+                    .asVectorFallback();
             // 기준선(min-similarity)과 k를 정하는 근거로 쓴다
             log.info("레시피 벡터 폴백: keyword={}, bm25Total=0, vectorTotal={}, embedMs={}",
                     request.keyword(), result.total(), embedMs);

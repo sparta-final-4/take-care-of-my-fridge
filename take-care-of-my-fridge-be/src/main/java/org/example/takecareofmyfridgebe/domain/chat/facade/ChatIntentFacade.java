@@ -107,7 +107,10 @@ public class ChatIntentFacade {
                 result.moodCategories(),
                 result.maxMinutes(),
                 excludeIds,
-                useSelectedOnly
+                useSelectedOnly,
+                result.keywords(),
+                result.dishText(),
+                result.preferenceText()
         );
     }
 
@@ -152,6 +155,9 @@ public class ChatIntentFacade {
                 + ", 분류=" + query.moodCategories()
                 + ", 최대 시간=" + query.maxMinutes()
                 + ", 제외 재료=" + query.excludeIngredientIds()
-                + ", 선택 재료만=" + query.useSelectedOnly();
+                + ", 선택 재료만=" + query.useSelectedOnly()
+                + ", 키워드=" + query.keywords()
+                + ", 요리 이름=" + query.keywordText()
+                + ", 원한 표현=" + query.preferenceText();
     }
 }

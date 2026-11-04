@@ -24,6 +24,9 @@ import java.util.stream.Collectors;
  * @param includeIngredients 꼭 넣고 싶은 재료 이름 (말한 그대로)
  * @param excludeIngredients 빼고 싶은 재료 이름 (말한 그대로)
  * @param useSelectedOnly    고른·말한 재료를 꼭 쓰는 레시피만 원하는지
+ * @param keywords           레시피 이름에 나올 만한 구체적인 요리 이름 (예: 냉면, 막국수). 특징("차가운")도 요리 이름으로 바꾼 것
+ * @param dishText           사용자가 말한 요리 이름 (예: "냉면"). 레시피 이름 비교와 카드 이유에 쓴다
+ * @param preferenceText     사용자가 원한 특징·요리 표현 그대로 (예: "차가운 요리", "냉면 같은 면 요리"). 요청에 못 맞췄을 때 안내에 쓴다
  */
 public record IntentResult(
         ChatIntent intent,
@@ -32,8 +35,14 @@ public record IntentResult(
         Integer maxMinutes,
         List<String> includeIngredients,
         List<String> excludeIngredients,
-        Boolean useSelectedOnly
+        Boolean useSelectedOnly,
+        List<String> keywords,
+        String dishText,
+        String preferenceText
 ) {
+
+    // 레시피 검색에 쓸 요리 이름 키워드 최대 개수
+    public static final int MAX_KEYWORDS = 6;
 
     private static final Set<String> TASTE_NAMES = Arrays.stream(Member.Taste.values())
             .map(Enum::name)
@@ -41,13 +50,14 @@ public record IntentResult(
 
     // 의도만 있고 조건은 하나도 말하지 않은 결과
     public static IntentResult general() {
-        return new IntentResult(ChatIntent.GENERAL, null, null, null, null, null, null);
+        return new IntentResult(ChatIntent.GENERAL, null, null, null, null, null, null, null, null, null);
     }
 
     /**
      * 값을 정리한다. 말하지 않은 칸(null)은 null로 둔다.
      * 의도가 없으면 GENERAL, 맛은 Member.Taste에 있는 값만, 분류는 allowedCategories에 있는 값만 남긴다.
-     * 조리 시간이 0 이하면 null, 재료 이름은 앞뒤 공백을 지우고 빈 이름을 뺀다. 목록은 중복을 뺀다.
+     * 조리 시간이 0 이하면 null, 재료 이름·키워드는 앞뒤 공백을 지우고 빈 이름을 뺀다. 목록은 중복을 빼고, 키워드는 6개까지.
+     * 요리 이름(dishText)·원한 표현(preferenceText)이 비어 있으면 null.
      *
      * @param allowedCategories 고를 수 있는 레시피 분류
      */
@@ -60,7 +70,10 @@ public record IntentResult(
                 maxMinutes == null || maxMinutes <= 0 ? null : maxMinutes,
                 cleanNames(includeIngredients, name -> name, null),
                 cleanNames(excludeIngredients, name -> name, null),
-                useSelectedOnly
+                useSelectedOnly,
+                keywords == null ? null : cleanNames(keywords, name -> name, null).stream().limit(MAX_KEYWORDS).toList(),
+                dishText == null || dishText.isBlank() ? null : dishText.strip(),
+                preferenceText == null || preferenceText.isBlank() ? null : preferenceText.strip()
         );
     }
 

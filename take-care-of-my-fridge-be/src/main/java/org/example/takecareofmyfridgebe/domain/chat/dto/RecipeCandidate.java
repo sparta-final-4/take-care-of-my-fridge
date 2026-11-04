@@ -63,6 +63,7 @@ public record RecipeCandidate(
      *                                   같은 종류 묶음이면 레시피에 실제로 쓰인 재료 이름이다 (예: 버섯 → 표고버섯).
      *                                   missingIngredients에도 들어 있다 (보유 비율은 없는 재료로 센다)
      * @param usedSelectedIngredients    레시피가 쓰는 선택 재료(같은 종류 묶음 포함)의 이름. 레시피에 실제로 쓰인 이름이다
+     * @param keywordMatch               요리 이름 키워드 검색으로 찾았으면 어떻게 맞았는지, 아니면 null
      */
     public record Reason(
             List<String> usedFridgeIngredients,
@@ -74,12 +75,13 @@ public record RecipeCandidate(
             boolean lacksManyIngredients,
             List<MissingIngredient> missingIngredients,
             List<String> missingSelectedIngredients,
-            List<String> usedSelectedIngredients
+            List<String> usedSelectedIngredients,
+            KeywordMatch keywordMatch
     ) {
         public Reason withMissingIngredients(List<MissingIngredient> missing) {
             return new Reason(usedFridgeIngredients, imminentIngredients, matchedTastes, matchedWantedTastes, matchedRequests,
                     cookTimeUnknown, lacksManyIngredients, List.copyOf(missing), missingSelectedIngredients,
-                    usedSelectedIngredients);
+                    usedSelectedIngredients, keywordMatch);
         }
     }
 

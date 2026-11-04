@@ -550,25 +550,46 @@ class ChatStreamServiceTest {
     }
 
     @Test
-    @DisplayName("후보가 0개여도 empty=true인 recommendations 이벤트를 보내고 설명을 받는다")
-    void sendsEmptyRecommendations_whenNoCandidates() {
+    @DisplayName("후보가 0개면 empty=true 이벤트와 정해진 \"찾지 못했어요\" 답을 보내고 AI를 부르지 않는다")
+    void sendsFixedNotFoundReply_whenNoCandidates() {
         Long sessionId = 10L;
         ChatMessageCreateRequest request = ChatMessageCreateRequest.of("10분 안에 되는 그라탕");
         RecipeQuery query = RecipeQuery.of(1L, List.of());
         givenRecommend(sessionId, request, query,
                 new RecommendationReply(ChatRecommendationsEventResponse.of(List.of()), "[추천 후보]\n후보 없음"));
-        when(chatReplyGenerator.generateRecommendation(1L, sessionId, "10분 안에 되는 그라탕", "[추천 후보]\n후보 없음"))
-                .thenReturn(Flux.just("조건에 맞는 레시피를 못 찾았어요"));
-        when(chatMessageService.saveExchange(sessionId, "10분 안에 되는 그라탕", "조건에 맞는 레시피를 못 찾았어요")).thenReturn(List.of(
+        when(chatMessageService.saveExchange(sessionId, "10분 안에 되는 그라탕", ChatStreamService.NO_RECIPE_REPLY)).thenReturn(List.of(
                 new ChatMessageResponse(100L, 1, ChatMessageRole.USER, "10분 안에 되는 그라탕", LocalDateTime.now()),
-                new ChatMessageResponse(101L, 2, ChatMessageRole.ASSISTANT, "조건에 맞는 레시피를 못 찾았어요", LocalDateTime.now())
+                new ChatMessageResponse(101L, 2, ChatMessageRole.ASSISTANT, ChatStreamService.NO_RECIPE_REPLY, LocalDateTime.now())
         ));
 
         List<ServerSentEvent<String>> events = chatStreamService.streamMessage(1L, sessionId, request).collectList().block();
 
         assertThat(events).extracting(ServerSentEvent::event).containsExactly("recommendations", "message", "done");
         assertThat(events.get(0).data()).isEqualTo("{\"recipes\":[],\"relaxed\":[],\"empty\":true}");
+        assertThat(events.get(1).data()).contains("찾지 못했어요");
+        verify(chatReplyGenerator, never()).generateRecommendation(any(), any(), any(), any());
         verify(chatDailyLimitService, never()).refund(any());
+    }
+
+    @Test
+    @DisplayName("카드가 있으면 AI 소개를 받고, 정해진 \"찾지 못했어요\" 답은 카드와 같이 나가지 않는다")
+    void neverSendsNotFoundReply_whenCardsExist() {
+        Long sessionId = 10L;
+        ChatMessageCreateRequest request = ChatMessageCreateRequest.of("밀키트 중에 제일 빨리 되는 거");
+        RecipeQuery query = RecipeQuery.of(1L, List.of());
+        givenRecommend(sessionId, request, query, new RecommendationReply(
+                ChatRecommendationsEventResponse.of(List.of(card(992L, "장어조림"))), "후보"));
+        when(chatReplyGenerator.generateRecommendation(1L, sessionId, "밀키트 중에 제일 빨리 되는 거", "후보"))
+                .thenReturn(Flux.just("냉장고 재료로 만들 수 있는 요리를 골랐어요."));
+        when(chatMessageService.saveExchange(any(), any(), any())).thenReturn(List.of(
+                new ChatMessageResponse(100L, 1, ChatMessageRole.USER, "q", LocalDateTime.now()),
+                new ChatMessageResponse(101L, 2, ChatMessageRole.ASSISTANT, "a", LocalDateTime.now())
+        ));
+
+        List<ServerSentEvent<String>> events = chatStreamService.streamMessage(1L, sessionId, request).collectList().block();
+
+        assertThat(events).extracting(ServerSentEvent::event).containsExactly("recommendations", "message", "done");
+        assertThat(events).extracting(ServerSentEvent::data).noneMatch(data -> data.contains(ChatStreamService.NO_RECIPE_REPLY));
     }
 
     @Test
@@ -616,6 +637,6 @@ class ChatStreamServiceTest {
     }
 
     private static RecommendedRecipe card(Long recipeId, String name) {
-        return new RecommendedRecipe(recipeId, name, null, "조림", 20, List.of(), List.of(), List.of(), List.of(), List.of(), false);
+        return new RecommendedRecipe(recipeId, name, null, "조림", 20, List.of(), List.of(), List.of(), List.of(), List.of(), false, "이유");
     }
 }

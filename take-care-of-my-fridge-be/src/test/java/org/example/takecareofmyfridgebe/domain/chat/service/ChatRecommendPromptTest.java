@@ -21,41 +21,59 @@ class ChatRecommendPromptTest {
     }
 
     @Test
-    @DisplayName("소비기한이 붙은 재료만 한 번 짧게 말하고, 소비기한 말을 바꾸지 말고, 쓰는 재료를 전부 나열하지 말라고 지시한다")
-    void instructsImminentBriefly() {
-        assertThat(prompt).contains("내일까지인 고추", "그 재료만 레시피마다 한 번 짧게 말한다", "적힌 그대로 쓰고 바꾸지 않는다",
-                "쓰는 냉장고 재료를 전부 나열하지 않는다");
+    @DisplayName("형식 규칙(소개 한두 문장, 번호 목록·레시피별 문장·카드 안내 금지)을 맨 위에 두고 출력 예시를 넣는다")
+    void putsFormatRuleFirstWithExamples() {
+        assertThat(prompt).startsWith("[추천 답 형식] 가장 먼저 지킨다.");
+        assertThat(prompt).contains("소개 한두 문장만 쓴다. 번호 목록, 레시피별 문장, \"카드를 눌러…\" 같은 마무리는 쓰지 않는다",
+                "예) 냉면처럼 즐길 수 있는 면 요리를 골랐어요. 내일까지인 고추와 깻잎을 같이 쓸 수 있어요.",
+                "예) 말씀하신 냉면 요리는 찾지 못해서 비슷한 면 요리를 골랐어요.");
     }
 
     @Test
-    @DisplayName("선택 재료 쓰임이 있으면 레시피마다 첫 문장을 주재료로 들어간다는 말로 시작하라고 지시한다")
-    void instructsSelectedAsMainIngredient() {
-        assertThat(prompt).contains("선택 재료 쓰임", "첫 문장을 그 재료가 요리의 주재료로 들어간다는 말로 시작한다",
-                "넣어도 되고 안 넣어도 되는 재료처럼 말하지 않는다");
+    @DisplayName("맨 위에 한두 문장만, 레시피 이름을 하나씩 소개하지 말라고 쓰고, 요청을 되풀이해 추천한다고 하지 말라고 지시한다")
+    void putsShortRuleOnTopAndForbidsEcho() {
+        assertThat(prompt.lines().skip(1).findFirst()).contains("- 한두 문장만. 레시피 이름을 하나씩 소개하지 않는다.");
+        assertThat(prompt).contains("사용자 요청을 되풀이해서 \"○○로 추천해 드릴게요\"라고 하지 않는다");
     }
 
     @Test
-    @DisplayName("카드의 후보를 하나도 빼지 않고 모두 소개하고, 조리 시간이 없으면 그렇다고만 말하라고 지시한다")
-    void instructsToIntroduceAllCards() {
-        assertThat(prompt).contains("후보를 하나도 빼지 않고 모두 번호 순서대로 소개한다", "조리 시간 정보가 없어요");
+    @DisplayName("카드 정보에 없는 특징을 단정하지 말고, 찾았다고 단정하지 말고, 카드 이유의 사실만 쓰라고 지시한다")
+    void forbidsUnfoundedClaims() {
+        assertThat(prompt).contains("카드 정보에 없는 특징(차가운, 따뜻한, 매운, 바삭한 등)을 레시피에 붙여 단정하지 않는다",
+                "사용자가 말한 요리를 찾았다고 단정하지 않고", "\"카드 이유\"에 있는 사실만 근거로 쓴다");
     }
 
     @Test
-    @DisplayName("마크다운 금지는 공통 프롬프트에 두고 추천 프롬프트에는 다시 쓰지 않는다")
-    void leavesMarkdownRuleToSystemPrompt() {
-        assertThat(prompt).doesNotContain("마크다운").contains("번호와 줄바꿈으로 나눈다");
+    @DisplayName("[먼저 말할 것]이 있으면 그 문장으로 시작하고, 없으면 냉장고에 없는 재료 이야기를 하지 않는다")
+    void instructsNoticeFirst() {
+        assertThat(prompt).contains("[먼저 말할 것]이 있으면 그 문장으로 시작하고",
+                "[먼저 말할 것]이 없으면 냉장고에 없는 재료 이야기를 하지 않는다").doesNotContain("말씀하신 버섯");
     }
 
     @Test
-    @DisplayName("내부 조건·판단 과정은 말하지 않으라고 지시한다")
+    @DisplayName("임박 재료는 한 번 짧게, 소비기한 말은 바꾸지 말고, 선택 재료는 주재료로 먼저 말하라고 지시한다")
+    void keepsImminentAndSelectedRules() {
+        assertThat(prompt).contains("내일까지인 고추", "적힌 그대로 쓰고 바꾸지 않는다", "쓰는 냉장고 재료를 전부 나열하지 않는다",
+                "선택 재료가 주재료로 들어간다는 말을 먼저 한다", "넣어도 되고 안 넣어도 되는 재료처럼 말하지 않는다");
+    }
+
+    @Test
+    @DisplayName("부족한 재료 대신 장볼 재료로 말하고, 카드에 있는 정보는 반복하지 말라고 지시한다")
+    void instructsShoppingWordingAndNoRepeat() {
+        assertThat(prompt).contains("\"부족한 재료\"라고 하지 않고 \"장볼 재료\"로 말한다", "장볼 재료 목록을 나열하지 않는다",
+                "분류·조리 시간·카드 이유를 레시피마다 다시 말하지 않는다");
+    }
+
+    @Test
+    @DisplayName("내부 조건·판단 과정은 말하지 말고, 마크다운 금지는 공통 프롬프트에 둔다")
     void forbidsInternalReasoning() {
-        assertThat(prompt).contains("내부 조건이나 판단 과정은 말하지 않는다");
+        assertThat(prompt).contains("내부 조건이나 판단 과정은 말하지 않는다").doesNotContain("마크다운");
     }
 
     @Test
-    @DisplayName("[먼저 말할 것]이 있을 때만 그 문장을 맨 앞에 쓰고, 예시 재료 이름은 넣지 않는다")
-    void instructsNoticeOnlyWhenGiven() {
-        assertThat(prompt).contains("[먼저 말할 것]이 있으면 그 문장을", "[먼저 말할 것]이 없으면 냉장고에 없는 재료 이야기를 하지 않는다")
-                .doesNotContain("말씀하신 버섯");
+    @DisplayName("후보가 있을 때 못 찾았다·조건을 바꾸라는 말을 쓰지 말라고 하고, 후보 없음 지시는 두지 않는다 (카드 0개는 서버가 답함)")
+    void forbidsNotFoundWording_whenCandidatesExist() {
+        assertThat(prompt).contains("[추천 후보]가 있으므로 \"찾지 못했어요\", \"조건을 바꿔 보세요\"")
+                .doesNotContain("\"후보 없음\"이면");
     }
 }
