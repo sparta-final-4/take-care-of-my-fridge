@@ -44,8 +44,11 @@ public class RecipeCandidateFacade {
 
         List<FridgeStock> fridge = RecipeCandidateScorer.prepareFridge(
                 fridgeService.getItems(query.memberId(), FridgeSortType.EXPIRATION));
+        // 원하는 맛을 말했으면 회원 선호 맛은 쓰지 않는다 (원하는 맛은 1단계 요청에서만 센다)
         // 회원 도메인에 맛만 조회하는 메서드가 없어 내 정보 조회를 쓴다
-        List<Member.Taste> memberTastes = memberService.getMyInfo(query.memberId()).tastes();
+        List<Member.Taste> memberTastes = query.wantedTastes().isEmpty()
+                ? memberService.getMyInfo(query.memberId()).tastes()
+                : List.of();
 
         List<RecipeCandidateIngredient> rows =
                 recipeService.findCandidateIngredients(scorer.lookupIngredientIds(query, fridge));

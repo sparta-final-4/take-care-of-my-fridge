@@ -7,6 +7,7 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.ChatErrorEventResponse;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageCreateRequest;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageEventResponse;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageResponse;
+import org.example.takecareofmyfridgebe.domain.chat.facade.ChatIntentFacade;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 import org.springframework.http.codec.ServerSentEvent;
@@ -28,13 +29,15 @@ public class ChatStreamService {
     private final ChatStreamLockService chatStreamLockService;
     private final ChatDailyLimitService chatDailyLimitService;
     private final ChatReplyGenerator chatReplyGenerator;
+    private final ChatIntentFacade chatIntentFacade;
     private final ObjectMapper objectMapper;
 
     /**
      * 상담 세션의 메시지 전송 및 답변 생성 과정을 SSE 스트림으로 조립한다.
      * 세션 사전 검증, 답 받기 잠금, 일일 메시지 제한 검증은 스트림 생성 전에 동기로 실행되며,
+     * 의도·조건 뽑기는 답 생성 전에 boundedElastic에서 실행된다.
      * 답변 완료 후 DB 저장은 boundedElastic 스케줄러에서 비동기 I/O로 격리된다.
-     * 답 조각을 하나도 못 받고 실패하거나 빈 답으로 끝나면 하루 횟수를 돌려준다.
+     * 의도 판단을 포함해 메시지 하나를 하루 1회로 센다. 답 조각을 하나도 못 받고 실패하거나 빈 답으로 끝나면 하루 횟수를 돌려준다.
      * 첫 조각 뒤에 실패하거나 사용자가 끊으면(cancel) 돌려주지 않는다.
      *
      * @param memberId  회원 ID
@@ -63,8 +66,13 @@ public class ChatStreamService {
         StringBuilder accumulated = new StringBuilder();
         AtomicBoolean firstChunkReceived = new AtomicBoolean(false);
 
-        // 4. 답변 스트리밍 조각 (event: message)
-        Flux<ServerSentEvent<String>> messageStream = chatReplyGenerator.generate(memberId, sessionId, content)
+        // 4. 의도·조건 뽑기 후 답변 스트리밍 조각 (event: message)
+        // 의도 판단은 AI·DB·검색을 부르는 블로킹 작업이라 boundedElastic에서 실행한다. 실패해도 일반 답으로 넘어가며(ChatIntentFacade),
+        // 하루 횟수는 위에서 센 1회에 포함된다. 지금은 판단 결과를 로그로만 남기고 답은 그대로 일반 답을 만든다
+        Flux<String> replyStream = Mono.fromRunnable(() -> chatIntentFacade.resolve(memberId, sessionId, request))
+                .subscribeOn(Schedulers.boundedElastic())
+                .thenMany(Flux.defer(() -> chatReplyGenerator.generate(memberId, sessionId, content)));
+        Flux<ServerSentEvent<String>> messageStream = replyStream
                 .doOnNext(chunk -> {
                     firstChunkReceived.set(true);
                     accumulated.append(chunk);

@@ -110,7 +110,7 @@ class RecipeCandidateScorerTest {
             recipe(10L, "두부조림", "조림", 20, 5, TOFU);
             recipe(20L, "제육볶음", "볶음", 20, 5, PORK);
 
-            RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(TOFU), null, null, null, List.of(PORK), null);
+            RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(TOFU), null, null, null, List.of(PORK), null, false);
             RecipeCandidates result = rank(query, List.of(stock(TOFU, "두부", 10)), List.of());
 
             assertThat(result.candidates()).extracting(RecipeCandidate::recipeId).containsExactly(20L, 10L);
@@ -238,7 +238,7 @@ class RecipeCandidateScorerTest {
             recipe(10L, "계란찜", "찜", 20, 1, EGG);
             recipe(20L, "제육계란말이", "말이", 20, 2, EGG, PORK);
 
-            RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, null, null, null, List.of(PORK));
+            RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, null, null, null, List.of(PORK), false);
             RecipeCandidates result = rank(query, List.of(stock(EGG, "계란", 10)), List.of());
 
             assertThat(result.candidates()).extracting(RecipeCandidate::recipeId).containsExactly(10L);
@@ -251,7 +251,7 @@ class RecipeCandidateScorerTest {
             recipe(20L, "계란장조림", "조림", 40, 1, EGG);
             recipe(30L, "계란국", "국", null, 1, EGG);
 
-            RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, null, 30, null, null);
+            RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, null, 30, null, null, false);
             RecipeCandidates result = rank(query, List.of(stock(EGG, "계란", 10)), List.of());
 
             assertThat(result.candidates()).extracting(RecipeCandidate::recipeId).containsExactly(10L, 30L);
