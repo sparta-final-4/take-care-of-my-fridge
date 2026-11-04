@@ -107,4 +107,11 @@ class ChatRecommendPromptTest {
     void forbidsAvoidedTasteTalk() {
         assertThat(prompt).contains("조건에 \"피할 맛\"이 있으면 그 맛 이야기(\"매콤한\", \"얼큰한\", \"달콤한\")를 소개·카드 설명 어디에도 쓰지 않는다");
     }
+
+    @Test
+    @DisplayName("카드 정보에 없는 맛을 꾸며 말하지 않고, 후보 줄에 매운맛이 맞지 않으면 매운맛 이야기를 하지 않게 한다")
+    void forbidsMadeUpTastes() {
+        assertThat(prompt).contains("카드 정보에 없는 맛을 꾸며 말하지 않는다. \"매콤한\", \"매운 고추와 함께\"처럼 맛을 덧붙이지 않는다",
+                "후보 줄에 \"원하는 맛과 맞음: 매운맛\"이나 \"좋아하는 맛과 맞음: 매운맛\"이 없으면 매운맛 이야기를 하지 않는다");
+    }
 }

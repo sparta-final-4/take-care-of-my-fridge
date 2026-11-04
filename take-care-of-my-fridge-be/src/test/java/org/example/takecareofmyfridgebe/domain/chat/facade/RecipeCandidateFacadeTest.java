@@ -65,7 +65,9 @@ class RecipeCandidateFacadeTest {
         ingredientService = mock(IngredientService.class);
         recipeSearchService = mock(RecipeSearchService.class);
         facade = new RecipeCandidateFacade(fridgeService, memberService, recipeService, ingredientService, recipeSearchService,
-                new ChatCandidateProperties(List.of("양념", "음료"), 0.4, List.of("청양고추", "홍고추", "청고추", "고춧가루", "고추장", "건고추", "베트남고추", "페퍼론치노", "핫소스", "고추기름", "김치", "깍두기"), List.of("백김치", "물김치", "동치미", "나박김치")));
+                new ChatCandidateProperties(List.of("양념", "음료"), 0.4,
+                List.of("청양고추", "고춧가루", "고추장", "고추기름", "건고추", "베트남고추", "페퍼론치노", "핫소스", "김치", "깍두기"),
+                List.of("백김치", "물김치", "동치미", "나박김치"), List.of("홍고추", "청고추")));
         when(fridgeService.getItems(any(), any())).thenReturn(List.of());
     }
 
@@ -289,6 +291,48 @@ class RecipeCandidateFacadeTest {
         facade.findCandidates(new RecipeQuery(MEMBER_ID, List.of(), null, null, null, null, false, List.of("튀김"), null));
 
         verify(recipeService, never()).findIngredientTexts(any());
+    }
+
+    @Test
+    @DisplayName("홍고추만 든 레시피는 매울 수 있음: \"매운 걸로\"에는 원하는 맛과 맞지 않고, \"매운 거 말고\"에는 빠진다")
+    void treatsRedChiliOnlyAsMaybeSpicy() throws Exception {
+        MyInfoResponse myInfo = mock(MyInfoResponse.class);
+        when(memberService.getMyInfo(MEMBER_ID)).thenReturn(myInfo);
+        givenKeywordRecipes(Map.of(
+                10L, recipe(10L, "소고기채소불고기", Set.of(Taste.SWEET), List.of("소고기", "고추", "홍고추")),
+                20L, recipe(20L, "탕수육", Set.of(Taste.SWEET), List.of("돼지고기")),
+                30L, recipe(30L, "닭강정", Set.of(Taste.SWEET), List.of("닭고기")),
+                40L, recipe(40L, "꿔바로우", Set.of(Taste.SWEET), List.of("돼지고기"))));
+        RecipeQuery wantSpicy = new RecipeQuery(MEMBER_ID, List.of(), List.of(Taste.SPICY), null, null, null, false,
+                List.of("고기"), null);
+
+        RecipeCandidate bulgogi = facade.findCandidates(wantSpicy).candidates().stream()
+                .filter(candidate -> candidate.recipeId() == 10L).findFirst().orElseThrow();
+        RecipeCandidates avoiding = facade.findCandidates(avoidSpicy(List.of("고기")));
+
+        assertThat(bulgogi.reason().matchedWantedTastes()).isEmpty();
+        assertThat(avoiding.candidates()).extracting(RecipeCandidate::recipeId).doesNotContain(10L);
+    }
+
+    @Test
+    @DisplayName("고춧가루가 든 레시피는 확실히 매움: \"매운 걸로\"에는 원하는 맛과 맞고, \"매운 거 말고\"에는 빠진다")
+    void treatsRedPepperPowderAsDefinitelySpicy() throws Exception {
+        MyInfoResponse myInfo = mock(MyInfoResponse.class);
+        when(memberService.getMyInfo(MEMBER_ID)).thenReturn(myInfo);
+        givenKeywordRecipes(Map.of(
+                10L, recipe(10L, "제육볶음", Set.of(Taste.SWEET), List.of("돼지고기", "고춧가루")),
+                20L, recipe(20L, "탕수육", Set.of(Taste.SWEET), List.of("돼지고기")),
+                30L, recipe(30L, "닭강정", Set.of(Taste.SWEET), List.of("닭고기")),
+                40L, recipe(40L, "꿔바로우", Set.of(Taste.SWEET), List.of("돼지고기"))));
+        RecipeQuery wantSpicy = new RecipeQuery(MEMBER_ID, List.of(), List.of(Taste.SPICY), null, null, null, false,
+                List.of("고기"), null);
+
+        RecipeCandidate first = facade.findCandidates(wantSpicy).candidates().get(0);
+        RecipeCandidates avoiding = facade.findCandidates(avoidSpicy(List.of("고기")));
+
+        assertThat(first.recipeId()).isEqualTo(10L);
+        assertThat(first.reason().matchedWantedTastes()).containsExactly(Taste.SPICY);
+        assertThat(avoiding.candidates()).extracting(RecipeCandidate::recipeId).doesNotContain(10L);
     }
 
     private RecipeQuery avoidSpicy(List<String> keywords) {

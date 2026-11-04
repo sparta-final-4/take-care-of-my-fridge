@@ -256,7 +256,8 @@ public class ChatStreamService {
         for (int i = 0; i < cardCount; i++) {
             descriptions.add(new StringBuilder());
         }
-        RecommendationTextSplitter splitter = new RecommendationTextSplitter(cardCount, recommendation.notices());
+        RecommendationTextSplitter splitter = new RecommendationTextSplitter(cardCount, recommendation.notices(),
+                recommendation.event().recipes().stream().map(RecommendedRecipe::name).toList());
         String noticeText = recommendation.noticeText();
         boolean dropIntro = !noticeText.isEmpty();
         Flux<ServerSentEvent<String>> notice = Flux.defer(() -> {

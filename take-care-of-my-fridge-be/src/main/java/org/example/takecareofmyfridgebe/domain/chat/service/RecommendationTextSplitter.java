@@ -13,6 +13,8 @@ import java.util.regex.Pattern;
  *   <li>어떤 표시도 끝까지 나오지 않으면 전체가 소개가 된다 (카드 설명은 비움)</li>
  *   <li>나누고 남은 대괄호 표시([다른 제안], [이미 안내한 말] 등)는 지우고 보낸다</li>
  *   <li>서버가 이미 보낸 안내 문장을 AI가 소개 첫머리에 되풀이하면 그 문장은 뺀다</li>
+ *   <li>카드 설명이 그 카드 레시피 이름으로 시작하면 이름을 지운다 ("소고기채소불고기예요. 달콤…" → "달콤…",
+ *       "깐풍기는 바삭…" → "바삭…"). 공백은 빼고 비교하고, 가를 수 있을 때까지 칸 첫머리를 보내지 않고 모아 둔다</li>
  *   <li>카드 수보다 큰 번호의 글은 버린다. 표시 바로 뒤 공백·줄바꿈과 다음 표시 바로 앞 공백·줄바꿈은 보내지 않는다</li>
  * </ul>
  */
@@ -28,9 +30,19 @@ public class RecommendationTextSplitter {
     private static final int MAX_PARTIAL_MARKER = 11;
     // 되풀이한 안내 문장 뒤에 붙은 문장부호·공백
     private static final Pattern SENTENCE_END = Pattern.compile("^[.!?。\\s]*");
+    // 설명 첫머리의 레시피 이름 뒤: 이름만 있는 첫 문장("…예요.")이면 그 문장째, 주어("…는 ")면 조사까지 지운다
+    private static final Pattern NAME_SENTENCE_END = Pattern.compile("^\\s*(이에요|예요|에요|입니다|이죠|죠)[.!~]*\\s*");
+    private static final Pattern NAME_SUBJECT = Pattern.compile("^(은|는|이|가)\\s+");
+    // 이름 뒤로 몇 글자까지 받아 보고 이름을 지울지 정할지 (공백 뺀 글 기준, "예요." 정도)
+    private static final int NAME_LOOKAHEAD = 4;
 
     private final int cardCount;
     private final List<String> alreadySaid;
+    // 카드 레시피 이름 (공백 뺀 것, 카드 순서)
+    private final List<String> cardNames;
+    // 지금 카드 칸 첫머리에서 레시피 이름을 다 확인했는지, 확인 전까지 모아 둔 글
+    private boolean nameChecked = true;
+    private final StringBuilder cardHead = new StringBuilder();
     private final StringBuilder buffer = new StringBuilder();
     private int section = INTRO;
     // 지금 칸에서 글을 하나라도 보냈는지 (칸 첫머리의 공백·줄바꿈은 보내지 않는다)
@@ -46,9 +58,17 @@ public class RecommendationTextSplitter {
      * @param alreadySaid 서버가 소개 앞에 이미 보낸 안내 문장 (AI가 되풀이하면 뺀다)
      */
     public RecommendationTextSplitter(int cardCount, List<String> alreadySaid) {
+        this(cardCount, alreadySaid, List.of());
+    }
+
+    /**
+     * @param cardNames 카드 레시피 이름 (카드 순서). 설명이 이 이름으로 시작하면 지운다
+     */
+    public RecommendationTextSplitter(int cardCount, List<String> alreadySaid, List<String> cardNames) {
         this.cardCount = cardCount;
         this.alreadySaid = alreadySaid.stream().map(String::strip).filter(line -> !line.isEmpty()).toList();
         this.repeatChecked = this.alreadySaid.isEmpty();
+        this.cardNames = cardNames.stream().map(name -> name == null ? "" : compact(name)).toList();
     }
 
     /**
@@ -122,6 +142,52 @@ public class RecommendationTextSplitter {
         return INTRO_MARKER.startsWith(rest) ? -1 : start;
     }
 
+    // 모아 둔 첫머리로 이름을 지울지 정할 수 있는지: 이름과 다르게 시작하거나, 이름 뒤로 몇 글자를 받았으면 정할 수 있다
+    private boolean nameDecidable(String name) {
+        String head = compact(cardHead.toString());
+        if (head.isEmpty() || name.startsWith(head)) {
+            return false;
+        }
+        return !head.startsWith(name) || head.length() >= name.length() + NAME_LOOKAHEAD;
+    }
+
+    /**
+     * 설명 첫머리의 레시피 이름을 지운다. 공백은 빼고 비교한다.
+     * 이름만 있는 첫 문장("소고기채소불고기예요.")은 문장째, 주어("깐풍기는 ")는 조사까지 지우고, 그 밖("두부조림처럼")은 그대로 둔다.
+     */
+    static String withoutLeadingName(String text, String compactName) {
+        int start = skipSpaces(text, 0);
+        int at = start;
+        int matched = 0;
+        while (at < text.length() && matched < compactName.length()) {
+            char c = text.charAt(at);
+            if (!Character.isWhitespace(c)) {
+                if (c != compactName.charAt(matched)) {
+                    return text;
+                }
+                matched++;
+            }
+            at++;
+        }
+        if (matched < compactName.length()) {
+            return text;
+        }
+        String rest = text.substring(at);
+        Matcher sentence = NAME_SENTENCE_END.matcher(rest);
+        if (sentence.find()) {
+            return rest.substring(sentence.end());
+        }
+        Matcher subject = NAME_SUBJECT.matcher(rest);
+        if (subject.find()) {
+            return rest.substring(subject.end());
+        }
+        return text;
+    }
+
+    private static String compact(String text) {
+        return text.replaceAll("\\s+", "");
+    }
+
     private static int skipSpaces(String text, int from) {
         int at = from;
         while (at < text.length() && Character.isWhitespace(text.charAt(at))) {
@@ -150,6 +216,8 @@ public class RecommendationTextSplitter {
                 } else {
                     section = next;
                     sectionStarted = false;
+                    cardHead.setLength(0);
+                    nameChecked = next == INTRO || next >= cardNames.size() || cardNames.get(next).isEmpty();
                 }
                 continue;
             }
@@ -190,6 +258,16 @@ public class RecommendationTextSplitter {
     // 남은 표시를 지우고, 칸 첫머리 공백은 빼고, holdTrailing이면 끝 공백·줄바꿈은 다음 글이 올 때까지 버퍼 앞에 되돌려 둔다
     private void emit(List<Piece> pieces, int index, String text, boolean holdTrailing) {
         String cleaned = LEFTOVER_MARKER.matcher(text).replaceAll("");
+        if (!nameChecked) {
+            // 카드 칸 첫머리: 레시피 이름으로 시작하는지 가를 수 있을 때까지 모아 둔다 (칸이 끝나면 바로 가른다)
+            cardHead.append(cleaned);
+            if (holdTrailing && !nameDecidable(cardNames.get(index))) {
+                return;
+            }
+            cleaned = withoutLeadingName(cardHead.toString(), cardNames.get(index));
+            cardHead.setLength(0);
+            nameChecked = true;
+        }
         String out = sectionStarted ? cleaned : cleaned.stripLeading();
         if (holdTrailing || !out.isEmpty()) {
             String stripped = out.stripTrailing();

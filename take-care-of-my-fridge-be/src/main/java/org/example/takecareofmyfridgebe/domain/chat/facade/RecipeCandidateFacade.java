@@ -90,10 +90,10 @@ public class RecipeCandidateFacade {
                 .toList();
         Set<Long> recipeIds = scorer.candidateRecipeIds(query, fridge, rows);
         Map<Long, RecipeCandidateInfo> infos = recipeService.findCandidateInfos(recipeIds);
-        Map<Long, Set<Member.Taste>> recipeTastes = withSpicyIngredients(
-                recipeService.findTastesByRecipeIds(recipeIds), recipeIds, query, memberTastes);
+        SpicyRecipes spicy = spicyRecipes(recipeIds, query, memberTastes);
+        Map<Long, Set<Member.Taste>> recipeTastes = withDefinitelySpicy(recipeService.findTastesByRecipeIds(recipeIds), spicy);
 
-        RecipeCandidates ranked = rankAvoiding(scorer, query, fridge, memberTastes, rows, infos, recipeTastes);
+        RecipeCandidates ranked = rankAvoiding(scorer, query, fridge, memberTastes, rows, infos, recipeTastes, spicy);
 
         // 부족한 재료는 고른 10개만 조회한다
         List<Long> topRecipeIds = ranked.candidates().stream().map(RecipeCandidate::recipeId).toList();
@@ -131,15 +131,19 @@ public class RecipeCandidateFacade {
 
     /**
      * 피할 맛인 레시피는 빼고 순위를 매긴다. 빼서 3개가 안 되면 그때만 피할 맛 레시피를 순위대로 뒤에 채운다.
+     * 피할 맛이 매운맛이면 확실히 매운 레시피에 더해 매울 수 있는 레시피(홍고추·청고추)까지 뺀다.
      */
     private static RecipeCandidates rankAvoiding(RecipeCandidateScorer scorer, RecipeQuery query, List<FridgeStock> fridge,
                                                  List<Member.Taste> memberTastes, List<RecipeCandidateIngredient> rows,
-                                                 Map<Long, RecipeCandidateInfo> infos, Map<Long, Set<Member.Taste>> recipeTastes) {
+                                                 Map<Long, RecipeCandidateInfo> infos, Map<Long, Set<Member.Taste>> recipeTastes,
+                                                 SpicyRecipes spicy) {
         if (query.avoidTastes().isEmpty()) {
             return scorer.rank(query, fridge, memberTastes, rows, infos, recipeTastes);
         }
+        boolean avoidSpicy = query.avoidTastes().contains(Member.Taste.SPICY);
         Set<Long> avoided = infos.keySet().stream()
-                .filter(id -> recipeTastes.getOrDefault(id, Set.of()).stream().anyMatch(query.avoidTastes()::contains))
+                .filter(id -> recipeTastes.getOrDefault(id, Set.of()).stream().anyMatch(query.avoidTastes()::contains)
+                        || (avoidSpicy && spicy.maybe().contains(id)))
                 .collect(Collectors.toSet());
         Map<Long, RecipeCandidateInfo> kept = new HashMap<>(infos);
         kept.keySet().removeAll(avoided);
@@ -158,22 +162,38 @@ public class RecipeCandidateFacade {
     }
 
     /**
-     * 맛 데이터에 매운맛이 없어도 매운 재료(설정값)가 들어 있으면 매운맛을 더한다. 원하는 맛·피할 맛·회원 선호 맛 어디에도
-     * 매운맛이 없으면 조회하지 않는다 (재료 이름 조회 1번).
+     * 재료로 가른 매운 레시피 두 단계.
+     *
+     * @param definite 확실히 매운 레시피 (청양고추·고춧가루·고추장·김치류 등). 원하는 맛 매운맛과 맞은 것으로 센다
+     * @param maybe    매울 수 있는 레시피 (확실히 매운 것 + 홍고추·청고추). 피할 맛 매운맛이면 이것까지 뺀다
      */
-    private Map<Long, Set<Member.Taste>> withSpicyIngredients(Map<Long, Set<Member.Taste>> recipeTastes, Set<Long> recipeIds,
-                                                              RecipeQuery query, List<Member.Taste> memberTastes) {
+    private record SpicyRecipes(Set<Long> definite, Set<Long> maybe) {
+        private static final SpicyRecipes NONE = new SpicyRecipes(Set.of(), Set.of());
+    }
+
+    // 원하는 맛·피할 맛·회원 선호 맛 어디에도 매운맛이 없으면 조회하지 않는다 (재료 이름 조회 1번)
+    private SpicyRecipes spicyRecipes(Set<Long> recipeIds, RecipeQuery query, List<Member.Taste> memberTastes) {
         boolean spicyMatters = query.wantedTastes().contains(Member.Taste.SPICY)
                 || query.avoidTastes().contains(Member.Taste.SPICY)
                 || memberTastes.contains(Member.Taste.SPICY);
         if (!spicyMatters || recipeIds.isEmpty()) {
+            return SpicyRecipes.NONE;
+        }
+        Map<Long, List<String>> texts = recipeService.findIngredientTexts(recipeIds);
+        List<String> definiteWords = chatCandidateProperties.spicyIngredients();
+        List<String> maybeWords = Stream.concat(definiteWords.stream(), chatCandidateProperties.mildSpicyIngredients().stream()).toList();
+        return new SpicyRecipes(
+                SpicyRecipeDetector.spicyRecipeIds(texts, definiteWords, chatCandidateProperties.spicyExclusions()),
+                SpicyRecipeDetector.spicyRecipeIds(texts, maybeWords, chatCandidateProperties.spicyExclusions()));
+    }
+
+    // 맛 데이터에 매운맛이 없어도 확실히 매운 재료가 들어 있으면 매운맛을 더한다 (매울 수 있는 것은 더하지 않는다)
+    private static Map<Long, Set<Member.Taste>> withDefinitelySpicy(Map<Long, Set<Member.Taste>> recipeTastes, SpicyRecipes spicy) {
+        if (spicy.definite().isEmpty()) {
             return recipeTastes;
         }
-        Set<Long> spicyIds = SpicyRecipeDetector.spicyRecipeIds(
-                recipeService.findIngredientTexts(recipeIds), chatCandidateProperties.spicyIngredients(),
-                chatCandidateProperties.spicyExclusions());
         Map<Long, Set<Member.Taste>> merged = new HashMap<>(recipeTastes);
-        for (Long id : spicyIds) {
+        for (Long id : spicy.definite()) {
             Set<Member.Taste> tastes = new HashSet<>(merged.getOrDefault(id, Set.of()));
             tastes.add(Member.Taste.SPICY);
             merged.put(id, tastes);

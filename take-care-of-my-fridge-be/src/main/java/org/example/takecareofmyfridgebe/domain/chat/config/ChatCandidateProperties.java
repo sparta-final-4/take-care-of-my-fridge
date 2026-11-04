@@ -11,9 +11,11 @@ import java.util.List;
  * @param excludedCategories 후보에서 뺄 레시피 분류(recipes.category 값). 요리 추천에 맞지 않는 양념·음료 등
  * @param minOwnedRatio      보유 비율(가진 재료 / 기본 양념 뺀 재료) 기준. 미만인 레시피는 기준 이상 레시피로
  *                           10개가 안 찰 때만 뒤에 채운다(선택 재료 2개 이상을 전부 쓰는 레시피는 예외). 0이면 기준 없이 정렬 순서대로 고른다
- * @param spicyIngredients   이 재료가 들어 있으면 매운 레시피로 본다 (맛 데이터에 매운맛이 빠진 레시피 보완). 공백 빼고 이름에 들어 있으면 해당.
- *                           그냥 "고추"는 넣지 않는다 (풋고추·꽈리고추·고명으로 조금 들어가는 경우가 많아서). 김치류는 넣는다
- * @param spicyExclusions    이름에 매운 재료가 들어 있어도 이 이름이면 매운 재료로 보지 않는다 (안 매운 김치: 백김치·물김치·동치미·나박김치)
+ * @param spicyIngredients     이 재료가 들어 있으면 "확실히 매운" 레시피다 (맛 데이터에 매운맛이 빠진 레시피 보완). 공백 빼고 이름에 들어 있으면 해당.
+ *                             원하는 맛 매운맛("매운 걸로")은 이 기준만 센다. 그냥 "고추"는 넣지 않는다. 김치류는 넣는다
+ * @param spicyExclusions      이름에 매운 재료가 들어 있어도 이 이름이면 매운 재료로 보지 않는다 (안 매운 김치: 백김치·물김치·동치미·나박김치)
+ * @param mildSpicyIngredients 이 재료가 들어 있으면 "매울 수 있는" 레시피다 (홍고추·청고추처럼 조금 들어가는 경우가 많은 것).
+ *                             피할 맛 매운맛("매운 거 말고")은 확실히 매운 레시피와 함께 이것까지 뺀다
  */
 @ConfigurationProperties(prefix = "app.chat.candidate")
 public record ChatCandidateProperties(
@@ -21,10 +23,12 @@ public record ChatCandidateProperties(
         List<String> excludedCategories,
         @DefaultValue("0.4")
         double minOwnedRatio,
-        @DefaultValue({"청양고추", "홍고추", "청고추", "고춧가루", "고추장", "건고추", "베트남고추", "페퍼론치노", "핫소스", "고추기름",
+        @DefaultValue({"청양고추", "고춧가루", "고추장", "고추기름", "건고추", "베트남고추", "페퍼론치노", "핫소스",
                 "김치", "배추김치", "깍두기", "열무김치", "총각김치", "파김치", "갓김치"})
         List<String> spicyIngredients,
         @DefaultValue({"백김치", "물김치", "동치미", "나박김치"})
-        List<String> spicyExclusions
+        List<String> spicyExclusions,
+        @DefaultValue({"홍고추", "청고추"})
+        List<String> mildSpicyIngredients
 ) {
 }
