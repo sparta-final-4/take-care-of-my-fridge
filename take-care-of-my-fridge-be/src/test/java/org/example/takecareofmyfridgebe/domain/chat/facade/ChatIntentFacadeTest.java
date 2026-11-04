@@ -69,7 +69,8 @@ class ChatIntentFacadeTest {
         ingredientMatcher = mock(IngredientMatcher.class);
         chatMessageService = mock(ChatMessageService.class);
         facade = new ChatIntentFacade(extractor, recipeService, ingredientMatcher,
-                new ChatCandidateProperties(List.of("양념", "음료"), 0.4, List.of(), List.of("백김치", "물김치", "동치미", "나박김치")), chatMessageService);
+                new ChatCandidateProperties(List.of("양념", "음료"), 0.4, List.of(), List.of("백김치", "물김치", "동치미", "나박김치")),
+                chatMessageService, TasteWordCheckerTest.WORDS);
         when(recipeService.getClassifications())
                 .thenReturn(new RecipeClassificationResponse(List.of("한식"), List.of("국", "기타", "샐러드", "양념", "음료", "찌개")));
     }
@@ -663,6 +664,45 @@ class ChatIntentFacadeTest {
 
             assertThat(query.wantedTastes()).containsExactly(Taste.SPICY);
             assertThat(query.avoidTastes()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("\"뭐 먹지?\" 다음 \"좀 더 매운 걸로\"는 AI가 피할 맛으로 줘도 서버가 원하는 맛 매운맛으로 고친다")
+        void correctsMoreSpicy_whenAiPutsItInAvoid() {
+            RecipeQuery anything = RecipeQuery.of(MEMBER_ID, List.of());
+            ChatContext afterAnything = new ChatContext(List.of(), LastRecommendation.of(anything, List.of(10L)), context.lastCards());
+            givenExtracted(avoid(null, List.of("SPICY")));
+
+            RecipeQuery query = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("좀 더 매운 걸로"), afterAnything)
+                    .recipeQuery();
+
+            assertThat(query.wantedTastes()).containsExactly(Taste.SPICY);
+            assertThat(query.avoidTastes()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("\"매운 거 말고\"·\"덜 맵게\"는 AI가 원하는 맛으로 줘도 서버가 피할 맛 매운맛으로 고친다")
+        void correctsToAvoid_whenNegated() {
+            for (String message : List.of("매운 거 말고", "덜 맵게")) {
+                givenExtracted(avoid(List.of("SPICY"), null));
+
+                RecipeQuery query = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of(message), context).recipeQuery();
+
+                assertThat(query.avoidTastes()).as(message).containsExactly(Taste.SPICY);
+                assertThat(query.wantedTastes()).as(message).isEmpty();
+            }
+        }
+
+        @Test
+        @DisplayName("\"매운 거 말고 짭짤하게\"는 피할 맛 매운맛, 원하는 맛 짠맛이다")
+        void avoidsSpicyAndWantsSalty() {
+            givenExtracted(avoid(List.of("SALTY"), null));
+
+            RecipeQuery query = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("매운 거 말고 짭짤하게"), context)
+                    .recipeQuery();
+
+            assertThat(query.avoidTastes()).containsExactly(Taste.SPICY);
+            assertThat(query.wantedTastes()).containsExactly(Taste.SALTY);
         }
 
         private static IntentResult avoid(List<String> tastes, List<String> avoidTastes) {

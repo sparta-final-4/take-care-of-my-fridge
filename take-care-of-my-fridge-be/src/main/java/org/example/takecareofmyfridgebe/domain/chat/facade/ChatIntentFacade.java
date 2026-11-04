@@ -3,6 +3,7 @@ package org.example.takecareofmyfridgebe.domain.chat.facade;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatCandidateProperties;
+import org.example.takecareofmyfridgebe.domain.chat.config.ChatTasteWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext.CardName;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntentResolution;
@@ -69,6 +70,7 @@ public class ChatIntentFacade {
     private final IngredientMatcher ingredientMatcher;
     private final ChatCandidateProperties chatCandidateProperties;
     private final ChatMessageService chatMessageService;
+    private final ChatTasteWordProperties chatTasteWordProperties;
 
     // 상담 문맥 없이 (첫 질문과 같게) 정한다
     public ChatIntentResolution resolve(Long memberId, Long sessionId, ChatMessageCreateRequest request) {
@@ -76,39 +78,82 @@ public class ChatIntentFacade {
     }
 
     public ChatIntentResolution resolve(Long memberId, Long sessionId, ChatMessageCreateRequest request, ChatContext context) {
-        ChatIntentResolution resolution = decide(memberId, sessionId, request, context);
-        log.info("상담 의도 - memberId: {}, sessionId: {}, 의도: {}, 출처: {}, 조건: {}, 대상 레시피: {}",
+        Decision decision = decide(memberId, sessionId, request, context);
+        ChatIntentResolution resolution = decision.resolution();
+        log.info("상담 의도 - memberId: {}, sessionId: {}, 의도: {}, 출처: {}, 조건: {}, 지울 조건(removed): {}, 대상 레시피: {}",
                 memberId, sessionId, resolution.intent(), resolution.source(), summarize(resolution.recipeQuery()),
-                resolution.targetRecipeId());
+                decision.removed(), resolution.targetRecipeId());
         return resolution;
     }
 
-    private ChatIntentResolution decide(Long memberId, Long sessionId, ChatMessageCreateRequest request, ChatContext context) {
+    // 정한 결과와 로그에 남길 지울 조건(removed, AI 결과)
+    private record Decision(ChatIntentResolution resolution, List<String> removed) {
+        private Decision(ChatIntentResolution resolution) {
+            this(resolution, List.of());
+        }
+    }
+
+    private Decision decide(Long memberId, Long sessionId, ChatMessageCreateRequest request, ChatContext context) {
         if (request.mode() == ChatMessageMode.RECOMMEND) {
-            return ChatIntentResolution.recommend(Source.MODE,
-                    RecipeQuery.of(memberId, request.selectedIngredientIds(), request.useSelectedOnly()));
+            return new Decision(ChatIntentResolution.recommend(Source.MODE,
+                    RecipeQuery.of(memberId, request.selectedIngredientIds(), request.useSelectedOnly())));
         }
 
         IntentResult result;
         try {
             List<String> categories = categories();
-            result = chatIntentExtractor.extract(memberId, sessionId, request.content(), categories, followUp(context))
-                    .sanitize(categories);
+            IntentResult raw = chatIntentExtractor.extract(memberId, sessionId, request.content(), categories, followUp(context));
+            log.debug("상담 의도 AI 원본 - memberId: {}, sessionId: {}, 의도: {}, 원하는 맛: {}, 피할 맛: {}, removed: {}",
+                    memberId, sessionId, raw.intent(), raw.wantedTastes(), raw.avoidTastes(), raw.removed());
+            result = correctTastes(memberId, sessionId, request.content(), raw.sanitize(categories));
         } catch (RuntimeException e) {
             log.warn("상담 의도 뽑기 실패, 선택 재료 유무로 정함 - memberId: {}, sessionId: {}, 선택 재료 수: {}, 원인: {}",
                     memberId, sessionId, request.selectedIngredientIds().size(), e.toString());
-            return request.selectedIngredientIds().isEmpty()
+            return new Decision(request.selectedIngredientIds().isEmpty()
                     ? ChatIntentResolution.general(Source.FALLBACK)
                     : ChatIntentResolution.recommend(Source.FALLBACK,
-                    RecipeQuery.of(memberId, request.selectedIngredientIds(), request.useSelectedOnly()));
+                    RecipeQuery.of(memberId, request.selectedIngredientIds(), request.useSelectedOnly())));
         }
 
-        return switch (result.intent()) {
+        ChatIntentResolution resolution = switch (result.intent()) {
             case RECOMMEND -> ChatIntentResolution.recommend(Source.AI, toRecipeQuery(memberId, sessionId, request, result));
             case REFINE -> refine(memberId, sessionId, request, result, context);
             case RECIPE_DETAIL -> recipeDetail(memberId, sessionId, result, context);
             case GENERAL -> ChatIntentResolution.general(Source.AI);
         };
+        return new Decision(resolution, result.removed() == null ? List.of() : result.removed());
+    }
+
+    /**
+     * 메시지의 맛 단어로 원하는 맛·피할 맛을 한 번 더 정한다 (TasteWordChecker). 맛 단어가 있는 맛만 바꾸고,
+     * AI 결과와 다르면 서버 판단을 쓰고 DEBUG로 남긴다. "좀 더 매운 걸로"가 피할 맛으로 가는 것을 막는다.
+     */
+    IntentResult correctTastes(Long memberId, Long sessionId, String message, IntentResult result) {
+        List<String> wanted = new ArrayList<>(result.wantedTastes() == null ? List.of() : result.wantedTastes());
+        List<String> avoid = new ArrayList<>(result.avoidTastes() == null ? List.of() : result.avoidTastes());
+        for (TasteWordChecker.TasteStance stance : TasteWordChecker.check(message, chatTasteWordProperties)) {
+            String taste = stance.taste().name();
+            boolean want = stance.stance() == TasteWordChecker.Stance.WANT;
+            // 이미 맞는 쪽에 있으면 순서를 건드리지 않는다
+            List<String> keep = want ? wanted : avoid;
+            (want ? avoid : wanted).remove(taste);
+            if (!keep.contains(taste)) {
+                keep.add(taste);
+            }
+        }
+        if (sameTastes(wanted, result.wantedTastes()) && sameTastes(avoid, result.avoidTastes())) {
+            return result;
+        }
+        log.debug("상담 맛 단어로 맛 조건 바꿈 - memberId: {}, sessionId: {}, AI 원하는 맛: {}, AI 피할 맛: {}, 바꾼 원하는 맛: {}, 바꾼 피할 맛: {}",
+                memberId, sessionId, result.wantedTastes(), result.avoidTastes(), wanted, avoid);
+        return new IntentResult(result.intent(), wanted, result.moodCategories(), result.maxMinutes(), result.includeIngredients(),
+                result.excludeIngredients(), result.useSelectedOnly(), result.keywords(), result.dishText(),
+                result.preferenceText(), result.targetIndex(), result.targetName(), result.removed(), avoid);
+    }
+
+    private static boolean sameTastes(List<String> corrected, List<String> original) {
+        List<String> before = original == null ? List.of() : original;
+        return Set.copyOf(corrected).equals(Set.copyOf(before));
     }
 
     // 다시 추천: 직전 조건과 이번 말을 합친다. 직전 조건이 없으면(Redis 만료·장애, 첫 질문) 이번 말만으로 새 추천
@@ -378,6 +423,7 @@ public class ChatIntentFacade {
         }
         return "선택 재료=" + query.selectedIngredientIds()
                 + ", 원하는 맛=" + query.wantedTastes()
+                + ", 피할 맛=" + query.avoidTastes()
                 + ", 분류=" + query.moodCategories()
                 + ", 최대 시간=" + query.maxMinutes()
                 + ", 제외 재료=" + query.excludeIngredientIds()

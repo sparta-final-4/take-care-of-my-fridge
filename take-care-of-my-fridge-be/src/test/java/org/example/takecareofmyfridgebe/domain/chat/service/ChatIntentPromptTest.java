@@ -57,7 +57,9 @@ class ChatIntentPromptTest {
                 "RECIPE_DETAIL: 이 상담에서 추천했던 레시피 하나",
                 "[직전 추천]·[이전 추천]에 없어도 \"아까 그 ○○\"처럼 앞서 추천받은 레시피 이름을 말하면 RECIPE_DETAIL이다",
                 "targetIndex: [직전 추천] 번호(1부터)", "targetName: 말한 레시피 이름",
-                "\"매운 거 말고\", \"안 매운 걸로\" → avoidTastes: SPICY", "\"시간 상관없이\" → removed: MAX_MINUTES",
+                "\"좀 더 매운 걸로\", \"칼칼한 거\" → wantedTastes: SPICY, avoidTastes에서 SPICY를 뺀다 (피할 맛이 아니다)",
+                "\"매운 거 말고\", \"안 맵게\", \"덜 맵게\" → avoidTastes: SPICY, wantedTastes에서 SPICY를 뺀다",
+                "\"시간 상관없이\" → removed: MAX_MINUTES",
                 "맛을 피하는 말(\"~ 말고\"가 맛이면)은 removed가 아니라 avoidTastes에 쓴다",
                 "[직전 조건]의 피할 맛은 그대로 이어 쓰고, 이번에 그 맛을 원하면 뺀다",
                 "REFINE이 아니면 removed는 빈 목록",
@@ -65,10 +67,12 @@ class ChatIntentPromptTest {
     }
 
     @Test
-    @DisplayName("첫 질문 프롬프트에 피할 맛 칸과 예시(매운 거 말고 → SPICY, 단 거 싫어 → SWEET)가 있다")
+    @DisplayName("첫 질문 프롬프트에 원하는 맛과 피할 맛 예시를 나란히 둔다 (좀 더 매운 걸로 → wanted, 매운 거 말고 → avoid)")
     void instructsAvoidTastes() {
         assertThat(prompt).contains("avoidTastes: 피하고 싶다고 말한 맛",
-                "\"매운 거 말고\", \"안 매운 걸로\", \"맵지 않게\" → SPICY", "\"단 거 싫어\", \"안 달게\" → SWEET",
+                "\"좀 더 매운 걸로\", \"매운 거 먹고 싶어\", \"칼칼한 거\" → wantedTastes: SPICY, avoidTastes: 빈 목록",
+                "\"매운 거 말고\", \"안 맵게\", \"덜 맵게\" → avoidTastes: SPICY, wantedTastes: 빈 목록",
+                "\"매운 거 말고 짭짤하게\" → avoidTastes: SPICY, wantedTastes: SALTY",
                 "피하고 싶다는 맛은 wantedTastes에 넣지 않는다");
     }
 }

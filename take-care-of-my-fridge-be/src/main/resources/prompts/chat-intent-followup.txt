@@ -5,7 +5,9 @@
   "~ 말고 ~로"는 앞 조건을 빼고 뒤 조건으로 바꾼다. "다른 거"는 조건을 바꾸지 않는다.
   includeIngredients·excludeIngredients에는 이번에 말한 재료만 쓴다 (이전 재료는 서버가 이어 간다).
   avoidTastes: 맛을 피하는 말("~ 말고"가 맛이면)은 removed가 아니라 avoidTastes에 쓴다. [직전 조건]의 피할 맛은 그대로 이어 쓰고, 이번에 그 맛을 원하면 뺀다.
-  예) "매운 거 말고", "안 매운 걸로" → avoidTastes: SPICY / "단 거 싫어" → avoidTastes: SWEET / "다시 매운 걸로" → wantedTastes: SPICY, avoidTastes에서 SPICY를 뺀다
+  예) "좀 더 매운 걸로", "칼칼한 거" → wantedTastes: SPICY, avoidTastes에서 SPICY를 뺀다 (피할 맛이 아니다)
+  예) "매운 거 말고", "안 맵게", "덜 맵게" → avoidTastes: SPICY, wantedTastes에서 SPICY를 뺀다
+  예) "단 거 싫어" → avoidTastes: SWEET
   removed: 조건을 지우라는 말일 때만 쓴다. TASTE(원하는 맛), CATEGORY(요리 종류), MAX_MINUTES(조리 시간), KEYWORD(요리 이름), INCLUDE(넣고 싶다던 재료), EXCLUDE(빼 달라던 재료) 중에서 고른다. 없으면 빈 목록.
   예) "맛은 상관없어" → removed: TASTE / "시간 상관없이" → removed: MAX_MINUTES / "두부 안 넣어도 돼" → removed: INCLUDE / "오이 넣어도 돼" → removed: EXCLUDE
   예) "국물 말고 볶음으로" → moodCategories: 볶음, removed: 빈 목록 / "다른 거 없어?" → removed: 빈 목록
