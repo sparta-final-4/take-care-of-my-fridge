@@ -243,7 +243,7 @@ public class ChatStreamService {
     }
 
     // 추천 답을 표시로 나눠 [소개]는 message, [n]은 recommendation_text 이벤트로 보낸다.
-    // 안내 문장이 있으면 서버가 소개 맨 앞에 먼저 보내고(message), 저장할 소개에도 앞에 붙인다. AI가 되풀이한 안내는 뺀다.
+    // 안내 문장이 있으면 그 안내가 소개다: 서버가 먼저 보내고(message) 저장할 소개도 안내뿐이며, AI가 쓴 소개 글은 버린다.
     // 표시를 빼먹은 답은 전체를 소개로 보낸다. "첫 조각"은 AI에게서 처음 내보낸 글(소개든 카드 설명이든)이다 (안내 문장은 세지 않음)
     private Flux<ServerSentEvent<String>> splitRecommendationText(
             Flux<String> reply,
@@ -258,8 +258,7 @@ public class ChatStreamService {
         }
         RecommendationTextSplitter splitter = new RecommendationTextSplitter(cardCount, recommendation.notices());
         String noticeText = recommendation.noticeText();
-        // 안내 뒤 첫 소개 글은 한 칸 띄운다
-        AtomicBoolean needsSpace = new AtomicBoolean(!noticeText.isEmpty());
+        boolean dropIntro = !noticeText.isEmpty();
         Flux<ServerSentEvent<String>> notice = Flux.defer(() -> {
             if (noticeText.isEmpty()) {
                 return Flux.empty();
@@ -269,13 +268,10 @@ public class ChatStreamService {
         });
         Flux<ServerSentEvent<String>> text = reply.concatMapIterable(splitter::feed)
                 .concatWith(Flux.defer(() -> Flux.fromIterable(splitter.finish())))
-                .map(piece -> piece.intro() && needsSpace.getAndSet(false)
-                        ? new RecommendationTextSplitter.Piece(piece.index(), " " + piece.text())
-                        : piece)
-                .doOnNext(piece -> {
-                    firstChunkReceived.set(true);
-                    (piece.intro() ? intro : descriptions.get(piece.index())).append(piece.text());
-                })
+                // 버리는 소개 글도 AI 답을 받은 것이므로 첫 조각으로 센다 (하루 횟수 돌려주기 기준)
+                .doOnNext(piece -> firstChunkReceived.set(true))
+                .filter(piece -> !(dropIntro && piece.intro()))
+                .doOnNext(piece -> (piece.intro() ? intro : descriptions.get(piece.index())).append(piece.text()))
                 .map(piece -> piece.intro()
                         ? messageEvent(piece.text())
                         : ServerSentEvent.<String>builder()

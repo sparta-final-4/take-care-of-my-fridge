@@ -748,8 +748,8 @@ class ChatStreamServiceTest {
     }
 
     @Test
-    @DisplayName("안내 문장이 있으면 서버가 소개 맨 앞에 message로 먼저 보내고 저장할 소개에도 붙이며, AI가 되풀이한 안내는 빼서 한 번만 나간다")
-    void sendsNoticeBeforeIntro_withoutRepeating() {
+    @DisplayName("안내 문장이 있으면 안내가 소개다: 서버가 message로 먼저 보내고 저장할 소개도 안내뿐이며, AI가 쓴 소개 글은 버린다")
+    void sendsNoticeAsIntro_andDropsAiIntro() {
         Long sessionId = 10L;
         ChatMessageCreateRequest request = ChatMessageCreateRequest.of("버섯 두부로 할 수 있는 요리");
         RecipeQuery query = RecipeQuery.of(1L, List.of(21L));
@@ -758,7 +758,7 @@ class ChatStreamServiceTest {
                 ChatRecommendationsEventResponse.of(List.of(card(314L, "된장국"))), "후보", List.of(notice)));
         when(chatReplyGenerator.generateRecommendation(1L, sessionId, "버섯 두부로 할 수 있는 요리", "후보"))
                 .thenReturn(Flux.just(notice + ".\n[소개] 버섯과 두부를 ", "활용한 요리예요.\n[1] 구수한 국이에요."));
-        String savedIntro = notice + ". 버섯과 두부를 활용한 요리예요.";
+        String savedIntro = notice + ".";
         List<RecommendationToSave> expectedCards = List.of(new RecommendationToSave(314L, "구수한 국이에요."));
         when(chatMessageService.saveExchange(sessionId, "버섯 두부로 할 수 있는 요리", savedIntro, expectedCards))
                 .thenReturn(List.of(
@@ -768,9 +768,9 @@ class ChatStreamServiceTest {
         List<ServerSentEvent<String>> events = chatStreamService.streamMessage(1L, sessionId, request).collectList().block();
 
         assertThat(events).extracting(ServerSentEvent::event)
-                .containsExactly("recommendations", "message", "message", "message", "recommendation_text", "done");
+                .containsExactly("recommendations", "message", "recommendation_text", "done");
         assertThat(events.get(1).data()).isEqualTo("{\"text\":\"" + notice + ".\"}");
-        assertThat(events.get(2).data()).isEqualTo("{\"text\":\" 버섯과 두부를\"}");
+        assertThat(events).extracting(ServerSentEvent::data).noneMatch(data -> data != null && data.contains("버섯과 두부를"));
         verify(chatMessageService).saveExchange(sessionId, "버섯 두부로 할 수 있는 요리", savedIntro, expectedCards);
     }
 

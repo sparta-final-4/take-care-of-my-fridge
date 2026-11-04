@@ -62,6 +62,14 @@ class ChatRecommendPromptTest {
     }
 
     @Test
+    @DisplayName("카드 설명은 레시피 이름으로 시작하지 않고 바로 맛·식감·팁으로 쓰게 하며, 출력 예시도 이름으로 시작하지 않는다")
+    void forbidsStartingWithRecipeName() {
+        assertThat(prompt).contains("레시피 이름으로 시작하지 않는다. 이름은 카드에 있다",
+                "\"깐풍기예요. 바삭하게…\"처럼 쓰지 말고 바로 맛·식감·팁으로 시작한다")
+                .doesNotContain("[2] 찾으신 냉면이에요.");
+    }
+
+    @Test
     @DisplayName("소개는 사용자 요청을 되풀이하거나 요약하지 않고 고른 요리 자체를 소개하게 한다")
     void forbidsRepeatingRequest() {
         assertThat(prompt).contains("사용자 요청을 되풀이하거나 요약하지 않는다",
@@ -72,7 +80,8 @@ class ChatRecommendPromptTest {
     @DisplayName("안내 문장은 서버가 이미 보냈으니 [이미 안내한 말]을 반복하지 말고, 답은 [소개]로 시작하며 다른 대괄호 표시는 쓰지 않게 한다")
     void instructsNotRepeatingNotice() {
         assertThat(prompt).contains("답은 반드시 [소개]로 시작한다. [소개] 앞에 아무 글도 쓰지 않는다",
-                "[이미 안내한 말]이 있으면 그 문장은 화면에서 소개 맨 앞에 이미 나갔다. 같은 말을 반복하지 말고",
+                "[이미 안내한 말]이 있으면 그 문장이 화면에서 소개로 이미 나갔다. [소개] 표시만 쓰고 소개 글은 쓰지 않는다",
+                "[이미 안내한 말]이 없으면 [소개]에 한 문장을 쓴다",
                 "다른 대괄호 표시([다른 제안], [이미 안내한 말] 등)는 답에 쓰지 않는다",
                 "냉장고에 없는 재료 이야기는 하지 않는다")
                 .doesNotContain("먼저 말할 것", "말씀하신 버섯");
