@@ -6,11 +6,13 @@ import java.util.List;
 
 /**
  * 레시피 후보 검색 조건.
- * wantedTastes 이하는 나중에 AI 조건 뽑기가 채울 칸으로, 지금은 빈 목록·null로 온다.
+ * wantedTastes부터 excludeIngredientIds까지는 AI 상담 의도·조건 뽑기(ChatIntentFacade)가 채운다. 말하지 않은 조건은 빈 목록·null이다.
  *
- * @param selectedIngredientIds 내 냉장고에서 체크한 재료 ID (없으면 빈 목록)
+ * @param selectedIngredientIds 선택 재료 ID: 내 냉장고에서 체크한 재료와 메시지에서 말한 재료를 합친 것 (없으면 빈 목록).
+ *                              냉장고에 없는 재료여도 후보를 모으는 데 쓰고, 레시피에서는 부족한 재료로 나온다
  * @param moodCategories        원하는 레시피 분류 (recipes.category 값)
  * @param maxMinutes            최대 조리 시간(분). 조리 시간이 비어 있는 레시피는 거르지 않는다
+ * @param useSelectedOnly       선택 재료를 꼭 쓰는 레시피만 원하는지 ("이 재료로", 칩 [이 재료로 추천받기])
  */
 public record RecipeQuery(
         Long memberId,
@@ -18,20 +20,23 @@ public record RecipeQuery(
         List<Member.Taste> wantedTastes,
         List<String> moodCategories,
         Integer maxMinutes,
-        List<Long> includeIngredientIds,
-        List<Long> excludeIngredientIds
+        List<Long> excludeIngredientIds,
+        boolean useSelectedOnly
 ) {
     public RecipeQuery {
         selectedIngredientIds = orEmpty(selectedIngredientIds);
         wantedTastes = orEmpty(wantedTastes);
         moodCategories = orEmpty(moodCategories);
-        includeIngredientIds = orEmpty(includeIngredientIds);
         excludeIngredientIds = orEmpty(excludeIngredientIds);
     }
 
     // AI 조건 없이 회원과 선택 재료만으로 검색할 때
     public static RecipeQuery of(Long memberId, List<Long> selectedIngredientIds) {
-        return new RecipeQuery(memberId, selectedIngredientIds, null, null, null, null, null);
+        return of(memberId, selectedIngredientIds, false);
+    }
+
+    public static RecipeQuery of(Long memberId, List<Long> selectedIngredientIds, boolean useSelectedOnly) {
+        return new RecipeQuery(memberId, selectedIngredientIds, null, null, null, null, useSelectedOnly);
     }
 
     private static <T> List<T> orEmpty(List<T> values) {
