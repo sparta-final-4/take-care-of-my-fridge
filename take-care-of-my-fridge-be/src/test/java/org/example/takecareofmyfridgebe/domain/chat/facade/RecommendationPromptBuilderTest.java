@@ -36,7 +36,7 @@ class RecommendationPromptBuilderTest {
         RecipeCandidate second = candidate(2L, "버섯전", "전", null,
                 reason(List.of(), List.of(), List.of(Taste.SALTY, Taste.UMAMI), List.of(), List.of(), false));
 
-        String text = RecommendationPromptBuilder.build("버섯 두부로 매운 찌개", query, NAMES, List.of(first, second));
+        String text = RecommendationPromptBuilder.build("버섯 두부로 매운 찌개", query, NAMES, List.of(first, second), false);
 
         assertThat(text).isEqualTo("""
                 [사용자 요청]
@@ -51,7 +51,7 @@ class RecommendationPromptBuilderTest {
     @Test
     @DisplayName("후보가 없으면 [추천 후보] 아래에 후보 없음을 쓰고, 조건이 없으면 없음으로 쓴다")
     void writesNoCandidates_whenEmpty() {
-        String text = RecommendationPromptBuilder.build("뭐 먹지?", RecipeQuery.of(MEMBER_ID, List.of()), NAMES, List.of());
+        String text = RecommendationPromptBuilder.build("뭐 먹지?", RecipeQuery.of(MEMBER_ID, List.of()), NAMES, List.of(), false);
 
         assertThat(text).isEqualTo("""
                 [사용자 요청]
@@ -69,7 +69,7 @@ class RecommendationPromptBuilderTest {
                 reason(List.of(), List.of(), List.of(), List.of(), List.of(), false));
 
         String text = RecommendationPromptBuilder.build("{name} 추천", RecipeQuery.of(MEMBER_ID, List.of()), NAMES,
-                List.of(candidate));
+                List.of(candidate), false);
 
         assertThat(text).doesNotContain("{", "}").contains("메시지: (name) 추천", "1. (특제) 찌개");
     }
@@ -87,13 +87,27 @@ class RecommendationPromptBuilderTest {
                         List.of("팽이버섯", "두부")));
 
         String text = RecommendationPromptBuilder.build("버섯 두부로", RecipeQuery.of(MEMBER_ID, List.of(MUSHROOM, TOFU)),
-                NAMES, List.of(first, second));
+                NAMES, List.of(first, second), false);
 
         assertThat(text).startsWith("""
                 [먼저 말할 것]
                 말씀하신 표고버섯, 두부, 팽이버섯은 지금 냉장고에 없어서 준비가 필요해요
                 [사용자 요청]""");
         assertThat(text).contains("1. 표고두부전골 | 전골 | 조리 시간 30분 | 선택 재료 쓰임: 표고버섯, 두부 | 쓰는 냉장고 재료: 내일까지인 대파 | 냉장고에 없는 선택 재료: 표고버섯, 두부 | 장볼 재료: 표고버섯, 두부");
+    }
+
+    @Test
+    @DisplayName("키워드로 레시피를 못 찾았으면 [먼저 말할 것]에 사용자가 말한 요리 표현으로 안내를 넣는다")
+    void writesKeywordNotFoundNotice() {
+        RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, List.of("면류"), null, null, false,
+                List.of("냉파스타"), "냉파스타");
+
+        String text = RecommendationPromptBuilder.build("냉파스타 먹고 싶어", query, NAMES, List.of(), true);
+
+        assertThat(text).startsWith("""
+                [먼저 말할 것]
+                말씀하신 냉파스타 레시피는 찾지 못해서 비슷한 걸 골랐어요
+                [사용자 요청]""");
     }
 
     @Test
@@ -104,7 +118,7 @@ class RecommendationPromptBuilderTest {
                         List.of(), List.of(), List.of("두부")));
 
         String text = RecommendationPromptBuilder.build("두부로", RecipeQuery.of(MEMBER_ID, List.of(TOFU)), NAMES,
-                List.of(candidate));
+                List.of(candidate), false);
 
         assertThat(text).startsWith("[사용자 요청]").doesNotContain("[먼저 말할 것]", "냉장고에 없는 선택 재료");
         assertThat(text).contains("선택 재료 쓰임: 두부");

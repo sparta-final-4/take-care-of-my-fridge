@@ -26,7 +26,8 @@ import java.util.stream.Collectors;
  * [추천 후보]
  * 1. 두부제육찜 | 찜 | 조리 시간 40분 | 선택 재료 쓰임: 두부 | 쓰는 냉장고 재료: 오늘까지인 양파, 모레까지인 고추, 배추 | 냉장고에 없는 선택 재료: 두부 | 원하는 맛과 맞음: 매운맛 | 장볼 재료: 돼지고기, 부추, 당근 외 3개 | 재료 많이 모자람
  * </pre>
- * [먼저 말할 것]은 고른 후보 중 냉장고에 없는 선택 재료가 있을 때만 넣는다 (AI가 판단하지 않게 서버가 정한다).
+ * [먼저 말할 것]은 요리 이름 키워드로 레시피를 못 찾았거나, 고른 후보 중 냉장고에 없는 선택 재료가 있을 때만 넣는다
+ * (AI가 판단하지 않게 서버가 정한다).
  * 후보가 없으면 [추천 후보] 아래에 "후보 없음"을 쓴다. 맛은 한글로 쓰고, 중괄호({})는 괄호로 바꿔 넣지 않는다.
  */
 public final class RecommendationPromptBuilder {
@@ -45,13 +46,21 @@ public final class RecommendationPromptBuilder {
      * @param query           추천 조건
      * @param ingredientNames 선택·뺄 재료 ID별 이름 (없는 ID는 건너뛴다)
      * @param picked          추천할 레시피 (RecommendationPicker가 고른 순서)
+     * @param keywordsNotFound 요리 이름 키워드로 레시피를 하나도 찾지 못했는지
      */
     public static String build(String content, RecipeQuery query, Map<Long, String> ingredientNames,
-                               List<RecipeCandidate> picked) {
+                               List<RecipeCandidate> picked, boolean keywordsNotFound) {
         StringBuilder text = new StringBuilder();
+        List<String> notices = new ArrayList<>();
+        if (keywordsNotFound) {
+            notices.add(keywordNotFoundNotice(query));
+        }
         String missingNotice = missingSelectedNotice(picked);
         if (missingNotice != null) {
-            text.append("[먼저 말할 것]\n").append(missingNotice).append('\n');
+            notices.add(missingNotice);
+        }
+        if (!notices.isEmpty()) {
+            text.append("[먼저 말할 것]\n").append(String.join("\n", notices)).append('\n');
         }
         text.append("[사용자 요청]\n");
         text.append("메시지: ").append(content.strip()).append('\n');
@@ -65,6 +74,12 @@ public final class RecommendationPromptBuilder {
             text.append(i + 1).append(". ").append(candidateLine(picked.get(i))).append('\n');
         }
         return withoutBraces(text.toString().stripTrailing());
+    }
+
+    // 키워드로 레시피를 못 찾았을 때 안내. 사용자가 말한 요리 표현을 쓰고, 없으면 키워드를 쓴다
+    static String keywordNotFoundNotice(RecipeQuery query) {
+        String dish = query.keywordText() != null ? query.keywordText() : String.join(NAME_DELIMITER, query.keywords());
+        return "말씀하신 " + dish + " 레시피는 찾지 못해서 비슷한 걸 골랐어요";
     }
 
     // 고른 후보들의 냉장고에 없는 선택 재료를 모아 안내 문장을 만든다. 없으면 null

@@ -8,6 +8,7 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEvent
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse.RecommendedRecipe;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate.Reason;
+import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidates;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeQuery;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecommendationReply;
 import org.example.takecareofmyfridgebe.domain.chat.dto.TasteLabel;
@@ -42,7 +43,8 @@ public class ChatRecommendationFacade {
      * @return 카드 이벤트(후보가 없으면 empty=true)와 설명용 후보 정보
      */
     public RecommendationReply recommend(String content, RecipeQuery query) {
-        List<RecipeCandidate> candidates = recipeCandidateFacade.findCandidates(query).candidates();
+        RecipeCandidates found = recipeCandidateFacade.findCandidates(query);
+        List<RecipeCandidate> candidates = found.candidates();
         logCandidates(query, candidates);
         List<RecipeCandidate> picked = RecommendationPicker.pick(candidates);
 
@@ -52,7 +54,8 @@ public class ChatRecommendationFacade {
                 .map(candidate -> toCard(candidate, summaries.get(candidate.recipeId())))
                 .toList();
 
-        String candidateInfo = RecommendationPromptBuilder.build(content, query, ingredientNames(query), picked);
+        String candidateInfo = RecommendationPromptBuilder.build(
+                content, query, ingredientNames(query), picked, found.keywordsNotFound());
         return new RecommendationReply(ChatRecommendationsEventResponse.of(recipes), candidateInfo);
     }
 

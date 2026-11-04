@@ -697,6 +697,41 @@ class RecipeCandidateScorerTest {
     }
 
     @Nested
+    @DisplayName("요리 이름 키워드")
+    class KeywordMatches {
+
+        @Test
+        @DisplayName("키워드로 찾은 레시피는 냉장고 재료와 겹치지 않아도 후보에 넣고, 요청 일치에 키워드를 더한다")
+        void collectsKeywordRecipe_andCountsAsRequest() {
+            recipe(10L, "수제비", "면류", 20, 2, EGG);
+            recipe(20L, "물냉면", "면류", 20, 8, PORK);
+            RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, List.of("면류"), null, null, false,
+                    List.of("냉면"), "냉면").withKeywordMatches(Map.of(20L, List.of("냉면")));
+
+            RecipeCandidates result = rank(ratioScorer, query, List.of(stock(EGG, "계란", 10)), List.of());
+
+            assertThat(result.candidates()).extracting(RecipeCandidate::recipeId).containsExactly(20L, 10L);
+            RecipeCandidate coldNoodle = result.candidates().get(0);
+            assertThat(coldNoodle.ranking().requestMatches()).isEqualTo(2);
+            assertThat(coldNoodle.reason().matchedRequests()).containsExactly("키워드: 냉면", "분류: 면류");
+            assertThat(coldNoodle.reason().lacksManyIngredients()).isTrue();
+        }
+
+        @Test
+        @DisplayName("키워드로 찾은 레시피는 재료를 많이 사야 해도 1차 후보로 둔다")
+        void keepsKeywordRecipeInFirstTier_whenLacksMany() {
+            recipe(10L, "계란국", "국", 20, 1, EGG);
+            recipe(20L, "물냉면", "면류", 20, 8, PORK);
+            RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, null, null, null, false,
+                    List.of("냉면"), "냉면").withKeywordMatches(Map.of(20L, List.of("냉면")));
+
+            RecipeCandidates result = rank(ratioScorer, query, List.of(stock(EGG, "계란", 0)), List.of());
+
+            assertThat(result.candidates()).extracting(RecipeCandidate::recipeId).containsExactly(20L, 10L);
+        }
+    }
+
+    @Nested
     @DisplayName("부족한 재료")
     class MissingIngredients {
 
