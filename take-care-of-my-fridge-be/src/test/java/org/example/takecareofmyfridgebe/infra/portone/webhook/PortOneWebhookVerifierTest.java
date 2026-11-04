@@ -50,6 +50,20 @@ class PortOneWebhookVerifierTest {
     }
 
     @Test
+    @DisplayName("빌링키 발급 웹훅이면 원문에서 빌링키를 꺼낸다")
+    void verify_returnBillingKey_whenBillingKeyIssued() throws Exception {
+        String body = "{\"type\":\"BillingKey.Issued\",\"timestamp\":\"2026-11-04T01:00:00Z\","
+                + "\"data\":{\"storeId\":\"store-1\",\"billingKey\":\"billing-key-1\"}}";
+        String timestamp = now();
+
+        PortOneWebhook webhook = verifier.verify(body, WEBHOOK_ID, sign(WEBHOOK_ID, timestamp, body), timestamp);
+
+        assertThat(webhook.type()).isEqualTo("BillingKey.Issued");
+        assertThat(webhook.billingKey()).isEqualTo("billing-key-1");
+        assertThat(webhook.paymentId()).isNull();
+    }
+
+    @Test
     @DisplayName("SDK가 모르는 type도 원문 type을 그대로 돌려준다")
     void verify_returnRawType_whenUnknownType() throws Exception {
         String body = "{\"type\":\"Transaction.Unknown\",\"data\":{}}";

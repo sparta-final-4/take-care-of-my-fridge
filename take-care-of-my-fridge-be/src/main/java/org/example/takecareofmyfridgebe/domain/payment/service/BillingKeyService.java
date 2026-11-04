@@ -23,6 +23,7 @@ import java.util.Optional;
 public class BillingKeyService {
 
     static final int MAX_CARDS = 5;
+    private static final String CUSTOMER_ID_PREFIX = "member-";
 
     private final BillingKeyRepository billingKeyRepository;
     private final MemberRepository memberRepository;
@@ -101,6 +102,28 @@ public class BillingKeyService {
 
     public List<BillingKey> findPgDeletePending(Long afterId, int size) {
         return billingKeyRepository.findPgDeletePending(BillingKeyStatus.DELETED, afterId, PageRequest.of(0, size));
+    }
+
+    // 등록 카드 결제에 쓸 카드. 남의 카드·삭제한 카드·없는 카드는 거절한다
+    public BillingKey getUsableCard(Long memberId, Long cardId) {
+        return getActiveCard(memberId, cardId);
+    }
+
+    // PortOne 빌링키 발급·결제에 넘기는 고객 ID. 등록 때 본인 카드인지 이 값으로 확인한다
+    public static String customerIdOf(Long memberId) {
+        return CUSTOMER_ID_PREFIX + memberId;
+    }
+
+    // 고객 ID에서 회원 ID를 꺼낸다. 우리가 만든 형식이 아니면 빈 값
+    public static Optional<Long> memberIdOf(String customerId) {
+        if (customerId == null || !customerId.startsWith(CUSTOMER_ID_PREFIX)) {
+            return Optional.empty();
+        }
+        try {
+            return Optional.of(Long.parseLong(customerId.substring(CUSTOMER_ID_PREFIX.length())));
+        } catch (NumberFormatException e) {
+            return Optional.empty();
+        }
     }
 
     // 회원 단위로 카드 변경을 하나씩 처리한다. 잠금이 트랜잭션의 첫 조회라 뒤의 조회는 최신 값을 읽는다

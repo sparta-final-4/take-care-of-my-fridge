@@ -4,6 +4,7 @@ import org.example.takecareofmyfridgebe.domain.auth.service.AuthSessionService;
 import org.example.takecareofmyfridgebe.domain.auth.service.AuthSessionService.AuthPrincipal;
 import org.example.takecareofmyfridgebe.domain.auth.service.JwtTokenService;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
+import org.example.takecareofmyfridgebe.domain.payment.dto.BillingKeyPaymentRequest;
 import org.example.takecareofmyfridgebe.domain.payment.dto.PaymentConfirmRequest;
 import org.example.takecareofmyfridgebe.domain.payment.dto.PaymentConfirmResponse;
 import org.example.takecareofmyfridgebe.domain.payment.dto.PaymentPrepareRequest;
@@ -247,6 +248,52 @@ class PaymentControllerTest {
                         .content(prepareBody("\"KAKAOPAY\"")))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.error.code").value(ErrorCode.PAYMENT_ORDER_NOT_PAYABLE.getCode()));
+    }
+
+    @Test
+    @DisplayName("등록 카드로 결제하면 토큰의 회원 ID, 경로의 주문 ID, 고른 카드로 Facade를 호출하고 결제 확정 응답을 반환한다")
+    void payWithBillingKey_success() throws Exception {
+        PaymentConfirmResponse response = new PaymentConfirmResponse(10L, 1L, PORTONE_PAYMENT_ID, 15000L,
+                PaymentStatus.PAID, LocalDateTime.of(2026, 11, 4, 10, 0), PgProvider.TOSSPAYMENTS);
+        when(paymentFacade.payWithBillingKey(MEMBER_ID, 1L, new BillingKeyPaymentRequest(7L))).thenReturn(response);
+
+        mvc.perform(post("/api/orders/1/payments/billing-key")
+                        .with(csrf())
+                        .with(loginUser())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"cardId\":7}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("PAID"))
+                .andExpect(jsonPath("$.data.pgProvider").value("TOSSPAYMENTS"));
+    }
+
+    @Test
+    @DisplayName("결제할 카드를 고르지 않으면 Facade를 호출하지 않고 400(C001)을 반환한다")
+    void payWithBillingKey_returnBadRequest_whenCardIdMissing() throws Exception {
+        mvc.perform(post("/api/orders/1/payments/billing-key")
+                        .with(csrf())
+                        .with(loginUser())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value(ErrorCode.INVALID_INPUT_VALUE.getCode()));
+
+        verifyNoInteractions(paymentFacade);
+    }
+
+    @Test
+    @DisplayName("카드가 거절되면 409(PAYMENT_010)로 응답한다")
+    void payWithBillingKey_returnConflict_whenRejected() throws Exception {
+        when(paymentFacade.payWithBillingKey(anyLong(), anyLong(), any()))
+                .thenThrow(new BusinessException(ErrorCode.BILLING_PAYMENT_REJECTED));
+
+        mvc.perform(post("/api/orders/1/payments/billing-key")
+                        .with(csrf())
+                        .with(loginUser())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"cardId\":7}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value(ErrorCode.BILLING_PAYMENT_REJECTED.getCode()));
     }
 
     private static RequestPostProcessor loginUser() {

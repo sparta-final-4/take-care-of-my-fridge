@@ -2,19 +2,25 @@ package org.example.takecareofmyfridgebe.domain.payment.facade;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.example.takecareofmyfridgebe.domain.payment.dto.BillingKeyPaymentRequest;
 import org.example.takecareofmyfridgebe.domain.payment.dto.PaymentApproveResult;
 import org.example.takecareofmyfridgebe.domain.payment.dto.PaymentApproveResult.Rejection;
 import org.example.takecareofmyfridgebe.domain.payment.dto.PaymentConfirmRequest;
 import org.example.takecareofmyfridgebe.domain.payment.dto.PaymentConfirmResponse;
 import org.example.takecareofmyfridgebe.domain.payment.dto.PaymentPrepareRequest;
 import org.example.takecareofmyfridgebe.domain.payment.dto.PaymentPrepareResponse;
+import org.example.takecareofmyfridgebe.domain.payment.entity.BillingKey;
 import org.example.takecareofmyfridgebe.domain.payment.entity.FailReason;
 import org.example.takecareofmyfridgebe.domain.payment.entity.Payment;
 import org.example.takecareofmyfridgebe.domain.payment.entity.PaymentChangedBy;
 import org.example.takecareofmyfridgebe.domain.payment.entity.PaymentStatus;
+import org.example.takecareofmyfridgebe.domain.payment.entity.PgProvider;
+import org.example.takecareofmyfridgebe.domain.payment.port.BillingKeyGateway;
+import org.example.takecareofmyfridgebe.domain.payment.port.BillingKeyPayResult;
 import org.example.takecareofmyfridgebe.domain.payment.port.PaymentCheckout;
 import org.example.takecareofmyfridgebe.domain.payment.port.PaymentGateway;
 import org.example.takecareofmyfridgebe.domain.payment.port.PaymentGatewayResponse;
+import org.example.takecareofmyfridgebe.domain.payment.service.BillingKeyService;
 import org.example.takecareofmyfridgebe.domain.payment.service.PaymentCommandService;
 import org.example.takecareofmyfridgebe.domain.payment.service.PaymentHistoryRecorder;
 import org.example.takecareofmyfridgebe.domain.payment.service.PaymentService;
@@ -39,6 +45,8 @@ public class PaymentFacade {
     private final PaymentCommandService paymentCommandService;
     private final PaymentGateway paymentGateway;
     private final PaymentHistoryRecorder paymentHistoryRecorder;
+    private final BillingKeyService billingKeyService;
+    private final BillingKeyGateway billingKeyGateway;
 
     // 결제하기를 누를 때 프론트가 호출한다. 응답의 portonePaymentId와 고른 결제대행사의 채널 값으로 결제창을 띄운다.
     // 창 닫기 요청이 오지 않아 결제 대기로 남은 이전 결제가 있으면 정리한 뒤 새 결제를 만든다.
@@ -47,14 +55,7 @@ public class PaymentFacade {
     //  서버는 "다른 탭에서 결제 중"과 "브라우저 종료로 버려진 창"을 구분할 수 없어, 버려진 창 때문에 재결제가 막히지 않도록 이렇게 정했다
     public PaymentPrepareResponse preparePayment(Long memberId, Long orderId, PaymentPrepareRequest request) {
         paymentService.validatePayableOrder(memberId, orderId);
-
-        // 이전 결제가 PG에서 끝났으면 웹훅과 같은 규칙으로 처리한다. 승인됐으면 주문이 PAID라 아래 생성이 거절된다.
-        // PG 조회가 실패하면 예외를 그대로 던져 새 결제를 만들지 않는다
-        for (Payment previous : paymentService.findReady(orderId)) {
-            if (closeReady(previous, FailReason.SUPERSEDED, PaymentChangedBy.USER)) {
-                log.info("이전 결제 대기 정리: portonePaymentId={}", previous.getPortonePaymentId());
-            }
-        }
+        closePreviousReady(orderId);
 
         // 결제창 값을 만들지 못하면 결제창을 열 수 없는 결제가 남지 않도록 결제를 만들기 전에 구한다
         PaymentCheckout checkout = paymentGateway.getCheckout(request.pgProvider());
@@ -77,9 +78,76 @@ public class PaymentFacade {
         if (payment.getStatus() == PaymentStatus.FAILED) {
             throw new BusinessException(errorCodeOf(payment.getFailReason()));
         }
+        return confirmWithPg(payment);
+    }
 
+    // 등록 카드 결제. 결제창 없이 서버가 PortOne에 청구하고, 결제됐으면 결제창 결제 확정과 같은 규칙으로 승인한다
+    public PaymentConfirmResponse payWithBillingKey(Long memberId, Long orderId, BillingKeyPaymentRequest request) {
+        paymentService.validatePayableOrder(memberId, orderId);
+        BillingKey card = billingKeyService.getUsableCard(memberId, request.cardId());
+        closePreviousReady(orderId);
+
+        // 빌링키는 토스페이먼츠 정기결제 채널로 발급했다. 승인할 때 PG가 알려 준 실제 결제대행사로 고친다
+        Payment payment = paymentCommandService.create(orderId, PgProvider.TOSSPAYMENTS, card);
+        BillingKeyPayResult result = billingKeyGateway.pay(payment.getPortonePaymentId(), card.getBillingKey(),
+                paymentService.getOrderName(orderId), payment.getAmount(), BillingKeyService.customerIdOf(memberId));
+
+        if (result == BillingKeyPayResult.PAID) {
+            return confirmWithPg(payment);
+        }
+        return settleByPg(payment, result);
+    }
+
+    // 결제되지 않았거나(거절) 결과를 모를 때 PG를 한 번 조회해 실제 상태로 정한다.
+    // 결제됐으면 승인한다. 거절이면서 PG에도 결제가 없거나, PG가 실패로 확정했으면 실패 처리하고 거절로 답한다.
+    // 그 밖(결과 모름이면서 PG에 아직 결제 없음, 조회 실패)은 결제 대기로 두고 웹훅·만료 스케줄러가 마무리한다
+    private PaymentConfirmResponse settleByPg(Payment payment, BillingKeyPayResult result) {
+        Optional<PaymentGatewayResponse> found;
+        try {
+            found = paymentGateway.getPayment(payment.getPortonePaymentId());
+        } catch (RuntimeException e) {
+            log.warn("등록 카드 결제 결과 조회 실패, 웹훅·만료 스케줄러가 마무리: portonePaymentId={}",
+                    payment.getPortonePaymentId(), e);
+            throw new BusinessException(ErrorCode.PAYMENT_RESULT_PENDING);
+        }
+        if (found.isPresent() && found.get().isPaid()) {
+            return confirmWithPg(payment, found.get());
+        }
+        boolean pgFailed = found.isPresent() && found.get().isFailed();
+        if (pgFailed || (result == BillingKeyPayResult.REJECTED && found.isEmpty())) {
+            // 주문은 결제 대기로 남아 다른 카드나 결제 수단으로 다시 결제할 수 있다
+            paymentCommandService.fail(payment, FailReason.PG_FAILED, PaymentChangedBy.USER);
+            throw new BusinessException(ErrorCode.BILLING_PAYMENT_REJECTED);
+        }
+        throw new BusinessException(ErrorCode.PAYMENT_RESULT_PENDING);
+    }
+
+    // 이전 결제가 PG에서 끝났으면 웹훅과 같은 규칙으로 처리한다. 승인됐으면 주문이 PAID라 뒤의 결제 생성이 거절된다.
+    // PG 조회가 실패하면 예외를 그대로 던져 새 결제를 만들지 않는다
+    // 등록 카드 결제는 버려진 결제창이 없고 서버가 PG에 청구 중일 수 있다. 밀어내면 같은 주문이 두 번 청구되므로
+    // PG에서 이미 끝났으면 그 결과로 처리하고, 아니면 진행 중으로 거절한다. 남은 건은 웹훅·만료 스케줄러가 마무리한다
+    private void closePreviousReady(Long orderId) {
+        for (Payment previous : paymentService.findReady(orderId)) {
+            if (previous.getBillingKey() != null) {
+                if (!syncWithPg(previous, PaymentChangedBy.USER)) {
+                    throw new BusinessException(ErrorCode.PAYMENT_IN_PROGRESS);
+                }
+                continue;
+            }
+            if (closeReady(previous, FailReason.SUPERSEDED, PaymentChangedBy.USER)) {
+                log.info("이전 결제 대기 정리: portonePaymentId={}", previous.getPortonePaymentId());
+            }
+        }
+    }
+
+    // PG를 다시 조회해 결제 완료·금액·만료를 확인하고 승인한다. 받지 않을 결제는 실패 처리 후 PG를 취소한다
+    private PaymentConfirmResponse confirmWithPg(Payment payment) {
         PaymentGatewayResponse pgPayment = paymentGateway.getPayment(payment.getPortonePaymentId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.PAYMENT_NOT_PAID));
+        return confirmWithPg(payment, pgPayment);
+    }
+
+    private PaymentConfirmResponse confirmWithPg(Payment payment, PaymentGatewayResponse pgPayment) {
 
         if (!pgPayment.isPaid()) {
             // PG가 실패로 확정한 결제는 바로 실패 처리로 상태 변경
