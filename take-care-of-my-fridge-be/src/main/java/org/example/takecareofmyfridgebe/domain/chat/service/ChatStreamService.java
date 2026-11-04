@@ -9,6 +9,8 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntentResolution;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageCreateRequest;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageEventResponse;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageResponse;
+import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationTextEventResponse;
+import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse.RecommendedRecipe;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecommendationReply;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecommendationToSave;
 import org.example.takecareofmyfridgebe.domain.chat.facade.ChatIntentFacade;
@@ -22,6 +24,7 @@ import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 import tools.jackson.databind.ObjectMapper;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -77,8 +80,9 @@ public class ChatStreamService {
 
         StringBuilder accumulated = new StringBuilder();
         AtomicBoolean firstChunkReceived = new AtomicBoolean(false);
-        // 이 답에 붙은 추천 카드. 답이 끝나면 AI 메시지와 함께 저장한다
+        // 이 답에 붙은 추천 카드와 카드별 설명. 답이 끝나면 AI 메시지와 함께 저장한다
         AtomicReference<RecommendationReply> recommendationRef = new AtomicReference<>();
+        List<StringBuilder> descriptions = new ArrayList<>();
 
         // 4. 의도·조건 뽑기 → (추천이면) 후보 검색 → 카드 (event: recommendations) → 답변 스트리밍 조각 (event: message)
         // 의도 판단·후보 검색은 AI·DB·검색을 부르는 블로킹 작업이라 boundedElastic에서 실행한다.
@@ -87,18 +91,22 @@ public class ChatStreamService {
                 .subscribeOn(Schedulers.boundedElastic())
                 .flatMapMany(plan -> {
                     recommendationRef.set(plan.recommendation());
-                    Flux<ServerSentEvent<String>> textEvents = replyText(memberId, sessionId, content, plan)
-                            .doOnNext(chunk -> {
+                    Flux<String> reply = replyText(memberId, sessionId, content, plan);
+                    if (plan.recommendation() == null) {
+                        return reply
+                                .doOnNext(chunk -> {
+                                    firstChunkReceived.set(true);
+                                    accumulated.append(chunk);
+                                })
+                                .map(this::messageEvent);
+                    }
+                    Flux<ServerSentEvent<String>> textEvents = plan.recommendation().event().empty()
+                            ? reply.doOnNext(chunk -> {
                                 firstChunkReceived.set(true);
                                 accumulated.append(chunk);
-                            })
-                            .map(chunk -> ServerSentEvent.<String>builder()
-                                    .event("message")
-                                    .data(toJson(new ChatMessageEventResponse(chunk)))
-                                    .build());
-                    if (plan.recommendation() == null) {
-                        return textEvents;
-                    }
+                            }).map(this::messageEvent)
+                            : splitRecommendationText(reply, plan.recommendation(), descriptions, accumulated,
+                            firstChunkReceived);
                     ServerSentEvent<String> cards = ServerSentEvent.<String>builder()
                             .event("recommendations")
                             .data(toJson(plan.recommendation().event()))
@@ -114,7 +122,7 @@ public class ChatStreamService {
                 log.warn("상담 답이 비어 있음 - memberId: {}, sessionId: {}", memberId, sessionId);
                 return Mono.error(new BusinessException(ErrorCode.CHAT_AI_UNAVAILABLE));
             }
-            return saveExchange(sessionId, content, accumulated, recommendationRef.get());
+            return saveExchange(sessionId, content, accumulated, recommendationRef.get(), descriptions);
         });
 
         // 6. 실패 시 에러 이벤트 (event: error) 및 로깅. 첫 조각 전 실패면 하루 횟수를 돌려준다
@@ -161,14 +169,50 @@ public class ChatStreamService {
         private static final ReplyPlan GENERAL = new ReplyPlan(null);
     }
 
+    // 추천 답을 표시로 나눠 [소개]는 message, [n]은 recommendation_text 이벤트로 보낸다.
+    // 표시를 빼먹은 답은 전체를 소개로 보낸다. "첫 조각"은 처음 내보낸 글(소개든 카드 설명이든)이다
+    private Flux<ServerSentEvent<String>> splitRecommendationText(
+            Flux<String> reply,
+            RecommendationReply recommendation,
+            List<StringBuilder> descriptions,
+            StringBuilder intro,
+            AtomicBoolean firstChunkReceived
+    ) {
+        int cardCount = recommendation.event().recipes().size();
+        for (int i = 0; i < cardCount; i++) {
+            descriptions.add(new StringBuilder());
+        }
+        RecommendationTextSplitter splitter = new RecommendationTextSplitter(cardCount);
+        return reply.concatMapIterable(splitter::feed)
+                .concatWith(Flux.defer(() -> Flux.fromIterable(splitter.finish())))
+                .doOnNext(piece -> {
+                    firstChunkReceived.set(true);
+                    (piece.intro() ? intro : descriptions.get(piece.index())).append(piece.text());
+                })
+                .map(piece -> piece.intro()
+                        ? messageEvent(piece.text())
+                        : ServerSentEvent.<String>builder()
+                        .event("recommendation_text")
+                        .data(toJson(new ChatRecommendationTextEventResponse(piece.index(), piece.text())))
+                        .build());
+    }
+
+    private ServerSentEvent<String> messageEvent(String text) {
+        return ServerSentEvent.<String>builder()
+                .event("message")
+                .data(toJson(new ChatMessageEventResponse(text)))
+                .build();
+    }
+
     private Mono<ServerSentEvent<String>> saveExchange(Long sessionId, String content, StringBuilder accumulated,
-                                                       RecommendationReply recommendation) {
+                                                       RecommendationReply recommendation, List<StringBuilder> descriptions) {
         return Mono.fromCallable(() -> {
-            List<RecommendationToSave> cards = recommendation == null
-                    ? List.of()
-                    : recommendation.event().recipes().stream()
-                    .map(recipe -> new RecommendationToSave(recipe.recipeId(), recipe.description()))
-                    .toList();
+            List<RecommendedRecipe> recipes = recommendation == null ? List.of() : recommendation.event().recipes();
+            List<RecommendationToSave> cards = new ArrayList<>();
+            for (int i = 0; i < recipes.size(); i++) {
+                String description = i < descriptions.size() ? descriptions.get(i).toString().strip() : "";
+                cards.add(new RecommendationToSave(recipes.get(i).recipeId(), description.isEmpty() ? null : description));
+            }
             // 카드가 없으면 기존처럼 메시지만 저장한다
             List<ChatMessageResponse> saved = cards.isEmpty()
                     ? chatMessageService.saveExchange(sessionId, content, accumulated.toString())

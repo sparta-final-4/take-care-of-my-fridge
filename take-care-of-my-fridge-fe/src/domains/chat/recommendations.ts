@@ -116,6 +116,25 @@ export function parseChatRecommendations(data: string): ChatRecommendations | nu
   };
 }
 
+// 카드 설명 조각 SSE 이벤트(event: recommendation_text)의 data. 백엔드 ChatRecommendationTextEventResponse와 같은 모양
+export interface ChatRecommendationText {
+  // 카드 순서 (0부터)
+  index: number;
+  text: string;
+}
+
+export function parseChatRecommendationText(data: string): ChatRecommendationText | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(data);
+  } catch {
+    return null;
+  }
+  if (!isRecord(parsed) || typeof parsed.index !== 'number' || typeof parsed.text !== 'string')
+    return null;
+  return { index: parsed.index, text: parsed.text };
+}
+
 // 임박 재료 태그 문구. 백엔드 추천 설명과 같은 말을 쓴다.
 export function formatImminentLabel(dDay: number): string {
   if (dDay <= 0) return '오늘까지';

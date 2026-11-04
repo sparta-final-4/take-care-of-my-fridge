@@ -31,8 +31,8 @@ public class OpenAiChatReplyGenerator implements ChatReplyGenerator {
 
     private static final String FINISH_REASON_LENGTH = "length";
     private static final String PROMPT_SEPARATOR = "\n\n";
-    // 추천 답은 카드가 있으므로 소개 한두 문장만 받는다 (일반 답은 빈에 정한 800)
-    static final int RECOMMEND_MAX_TOKENS = 120;
+    // 추천 답은 소개 한 문장 + 카드 설명 3개(각 한두 문장)라 약 200~250토큰. 넉넉히 320 (일반 답은 빈에 정한 800)
+    static final int RECOMMEND_MAX_TOKENS = 320;
 
     private final ChatClient chatClient;
     private final LlmCostCalculator llmCostCalculator;

@@ -422,4 +422,46 @@ describe('streamMessage', () => {
       }),
     );
   });
+
+  it('recommendation_text 이벤트를 카드 순서와 글로 onRecommendationText에 넘기고, 소개는 onChunk로 넘긴다', async () => {
+    const sseData =
+      'event:recommendations\ndata:{"recipes":[{"recipeId":1,"name":"두부조림"}],"relaxed":[],"empty":false}\n\n' +
+      'event:message\ndata:{"text":"두부 요리예요."}\n\n' +
+      'event:recommendation_text\ndata:{"index":0,"text":"두부를 졸여요."}\n\n' +
+      'event:done\ndata:{"userMessageId":10,"assistantMessageId":11}\n\n';
+    const encoder = new TextEncoder();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation(async (url: string) => {
+        if (url.includes('/api/auth/csrf')) {
+          return { ok: true, status: 200, headers: { get: () => 'application/json' } };
+        }
+        return {
+          ok: true,
+          status: 200,
+          headers: { get: () => 'text/event-stream' },
+          body: new ReadableStream({
+            start(controller) {
+              controller.enqueue(encoder.encode(sseData));
+              controller.close();
+            },
+          }),
+        };
+      }),
+    );
+    const onChunk = vi.fn();
+    const onRecommendationText = vi.fn();
+
+    await streamMessage({
+      sessionId: 1,
+      content: '두부',
+      onChunk,
+      onRecommendationText,
+      onDone: vi.fn(),
+      onError: vi.fn(),
+    });
+
+    expect(onChunk).toHaveBeenCalledWith('두부 요리예요.');
+    expect(onRecommendationText).toHaveBeenCalledWith({ index: 0, text: '두부를 졸여요.' });
+  });
 });

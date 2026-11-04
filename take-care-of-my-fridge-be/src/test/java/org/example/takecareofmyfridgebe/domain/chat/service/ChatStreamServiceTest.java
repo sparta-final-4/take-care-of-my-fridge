@@ -634,6 +634,33 @@ class ChatStreamServiceTest {
         verify(chatMessageService, never()).saveExchange(any(), any(), any());
     }
 
+    @Test
+    @DisplayName("추천 답을 표시로 나눠 소개는 message, 카드 설명은 recommendation_text로 보내고, 소개는 content·설명은 카드에 저장한다")
+    void splitsIntroAndCardDescriptions_andSavesThem() {
+        Long sessionId = 10L;
+        ChatMessageCreateRequest request = ChatMessageCreateRequest.of("두부로 뭐 해 먹지?");
+        RecipeQuery query = RecipeQuery.of(1L, List.of(21L));
+        givenRecommend(sessionId, request, query, new RecommendationReply(
+                ChatRecommendationsEventResponse.of(List.of(card(314L, "두부조림"), card(315L, "두부전"))), "후보"));
+        when(chatReplyGenerator.generateRecommendation(1L, sessionId, "두부로 뭐 해 먹지?", "후보"))
+                .thenReturn(Flux.just("[소개] 두부 요리를 골랐어요.\n[", "1] 두부를 졸여요.\n[2] 두부를 부쳐요."));
+        List<RecommendationToSave> expectedCards = List.of(
+                new RecommendationToSave(314L, "두부를 졸여요."), new RecommendationToSave(315L, "두부를 부쳐요."));
+        when(chatMessageService.saveExchange(sessionId, "두부로 뭐 해 먹지?", "두부 요리를 골랐어요.", expectedCards))
+                .thenReturn(List.of(
+                        new ChatMessageResponse(100L, 1, ChatMessageRole.USER, "두부로 뭐 해 먹지?", LocalDateTime.now()),
+                        new ChatMessageResponse(101L, 2, ChatMessageRole.ASSISTANT, "두부 요리를 골랐어요.", LocalDateTime.now())));
+
+        List<ServerSentEvent<String>> events = chatStreamService.streamMessage(1L, sessionId, request).collectList().block();
+
+        assertThat(events).extracting(ServerSentEvent::event)
+                .containsExactly("recommendations", "message", "recommendation_text", "recommendation_text", "done");
+        assertThat(events.get(1).data()).isEqualTo("{\"text\":\"두부 요리를 골랐어요.\"}");
+        assertThat(events.get(2).data()).isEqualTo("{\"index\":0,\"text\":\"두부를 졸여요.\"}");
+        assertThat(events.get(3).data()).isEqualTo("{\"index\":1,\"text\":\"두부를 부쳐요.\"}");
+        verify(chatMessageService).saveExchange(sessionId, "두부로 뭐 해 먹지?", "두부 요리를 골랐어요.", expectedCards);
+    }
+
     private void givenRecommend(Long sessionId, ChatMessageCreateRequest request, RecipeQuery query, RecommendationReply reply) {
         when(chatIntentFacade.resolve(1L, sessionId, request)).thenReturn(ChatIntentResolution.recommend(Source.AI, query));
         when(chatRecommendationFacade.recommend(request.content(), query)).thenReturn(reply);

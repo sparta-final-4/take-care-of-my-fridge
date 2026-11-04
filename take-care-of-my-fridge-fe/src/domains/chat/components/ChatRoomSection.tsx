@@ -93,6 +93,8 @@ export function ChatRoomSection({
   const [streamingRecommendations, setStreamingRecommendations] =
     useState<ChatRecommendations | null>(null);
   const [pendingText, setPendingText] = useState<string | null>(null);
+  // 받는 중인 카드 설명 (카드 순서). recommendation_text 이벤트로 채운다
+  const [streamingDescriptions, setStreamingDescriptions] = useState<string[]>([]);
   const screens = Grid.useBreakpoint();
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -268,6 +270,7 @@ export function ChatRoomSection({
   }, [
     streamingAssistantMessage,
     streamingRecommendations,
+    streamingDescriptions,
     pendingText,
     followQuestion,
     updateScrollBottomButton,
@@ -287,6 +290,7 @@ export function ChatRoomSection({
     setStreamingUserMessage(null);
     setStreamingAssistantMessage(null);
     setStreamingRecommendations(null);
+    setStreamingDescriptions([]);
     setPendingText(null);
 
     startSessionMutation.mutate(undefined, {
@@ -375,6 +379,14 @@ export function ChatRoomSection({
           setStreamingRecommendations(recommendations);
           setPendingText(null);
         },
+        onRecommendationText: ({ index, text: piece }) => {
+          setPendingText(null);
+          setStreamingDescriptions((prev) => {
+            const next = [...prev];
+            next[index] = (next[index] ?? '') + piece;
+            return next;
+          });
+        },
         onChunk: (chunk: string) => {
           setPendingText(null);
           setStreamingAssistantMessage((prev) => (prev ?? '') + chunk);
@@ -390,6 +402,7 @@ export function ChatRoomSection({
             setStreamingUserMessage(null);
             setStreamingAssistantMessage(null);
             setStreamingRecommendations(null);
+            setStreamingDescriptions([]);
             setPendingText(null);
           }
         },
@@ -411,6 +424,7 @@ export function ChatRoomSection({
           setStreamingUserMessage(null);
           setStreamingAssistantMessage(null);
           setStreamingRecommendations(null);
+          setStreamingDescriptions([]);
           setPendingText(null);
         },
       });
@@ -419,6 +433,7 @@ export function ChatRoomSection({
       setStreamingUserMessage(null);
       setStreamingAssistantMessage(null);
       setStreamingRecommendations(null);
+      setStreamingDescriptions([]);
       setPendingText(null);
     } finally {
       abortControllerRef.current = null;
@@ -628,6 +643,7 @@ export function ChatRoomSection({
           {streamingRecommendations && !streamingRecommendations.empty && (
             <ChatRecommendationCards
               recipes={streamingRecommendations.recipes}
+              descriptions={streamingDescriptions}
               onNavigate={closeOnNavigate}
             />
           )}
