@@ -39,6 +39,11 @@ public class Payment extends BaseTimeEntity {
     @JoinColumn(name = "order_id", nullable = false)
     private Order order;
 
+    // 등록 카드로 결제했으면 그 카드. 결제창 결제는 null
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "billing_key_id")
+    private BillingKey billingKey;
+
     @Column(name = "portone_payment_id", nullable = false, unique = true, length = 100)
     private String portonePaymentId;
 
@@ -66,9 +71,10 @@ public class Payment extends BaseTimeEntity {
     private FailReason failReason;
 
     @Builder
-    private Payment(Order order, String portonePaymentId, Long amount, PgProvider pgProvider,
+    private Payment(Order order, BillingKey billingKey, String portonePaymentId, Long amount, PgProvider pgProvider,
                     LocalDateTime expiresAt) {
         this.order = order;
+        this.billingKey = billingKey;
         this.portonePaymentId = portonePaymentId;
         this.amount = amount;
         this.pgProvider = pgProvider;
