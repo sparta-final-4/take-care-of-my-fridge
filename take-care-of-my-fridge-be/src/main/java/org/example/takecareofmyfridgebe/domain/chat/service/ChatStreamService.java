@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatDoneEventResponse;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatErrorEventResponse;
+import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageCreateRequest;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageEventResponse;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageResponse;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
@@ -38,10 +39,12 @@ public class ChatStreamService {
      *
      * @param memberId  회원 ID
      * @param sessionId 세션 ID
-     * @param content   사용자 질문 내용
+     * @param request   사용자 질문 내용과 추천 조건(모드·선택 재료)
      * @return SSE 스트림 Flux
      */
-    public Flux<ServerSentEvent<String>> streamMessage(Long memberId, Long sessionId, String content) {
+    public Flux<ServerSentEvent<String>> streamMessage(Long memberId, Long sessionId, ChatMessageCreateRequest request) {
+        String content = request.content();
+
         // 1. 세션 사전 검증 (스트림 시작 전에 동기 검증하여 실패 시 일반 JSON 에러로 즉시 처리)
         chatMessageService.validateSessionForSending(memberId, sessionId);
 

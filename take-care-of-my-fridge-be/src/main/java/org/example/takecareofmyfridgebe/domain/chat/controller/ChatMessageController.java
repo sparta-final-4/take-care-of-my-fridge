@@ -33,17 +33,14 @@ public class ChatMessageController {
 
     /**
      * 상담 세션에 사용자 메시지를 전송하고 SSE 스트리밍으로 응답을 수신한다.
+     * mode·selectedIngredientIds·useSelectedOnly는 추천용이며 비우면 일반 메시지(AUTO)로 처리한다.
      */
     @PostMapping(produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public ResponseEntity<Flux<ServerSentEvent<String>>> sendMessage(
             @AuthenticationPrincipal AuthPrincipal principal,
             @PathVariable Long sessionId,
             @Valid @RequestBody ChatMessageCreateRequest request) {
-        Flux<ServerSentEvent<String>> stream = chatStreamService.streamMessage(
-                principal.memberId(),
-                sessionId,
-                request.content()
-        );
+        Flux<ServerSentEvent<String>> stream = chatStreamService.streamMessage(principal.memberId(), sessionId, request);
 
         return ResponseEntity.ok()
                 .contentType(new MediaType("text", "event-stream", StandardCharsets.UTF_8))

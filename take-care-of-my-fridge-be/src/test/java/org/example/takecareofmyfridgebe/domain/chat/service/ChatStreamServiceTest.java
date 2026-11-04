@@ -1,5 +1,6 @@
 package org.example.takecareofmyfridgebe.domain.chat.service;
 
+import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageCreateRequest;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageResponse;
 import org.example.takecareofmyfridgebe.domain.chat.entity.ChatMessageRole;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
@@ -75,7 +76,7 @@ class ChatStreamServiceTest {
                     return List.of(userMsg, assistantMsg);
                 });
 
-        Flux<ServerSentEvent<String>> stream = chatStreamService.streamMessage(memberId, sessionId, userContent);
+        Flux<ServerSentEvent<String>> stream = chatStreamService.streamMessage(memberId, sessionId, ChatMessageCreateRequest.of(userContent));
 
         List<ServerSentEvent<String>> events = stream.collectList().block();
 
@@ -111,7 +112,7 @@ class ChatStreamServiceTest {
         when(chatReplyGenerator.generate(1L, sessionId, userContent))
                 .thenReturn(Flux.error(new BusinessException(ErrorCode.INVALID_CHAT_ROOM_STATUS)));
 
-        Flux<ServerSentEvent<String>> stream = chatStreamService.streamMessage(memberId, sessionId, userContent);
+        Flux<ServerSentEvent<String>> stream = chatStreamService.streamMessage(memberId, sessionId, ChatMessageCreateRequest.of(userContent));
 
         List<ServerSentEvent<String>> events = stream.collectList().block();
 
@@ -132,7 +133,7 @@ class ChatStreamServiceTest {
         when(chatReplyGenerator.generate(1L, sessionId, userContent))
                 .thenReturn(Flux.error(new RuntimeException("AI API Connection Timeout")));
 
-        Flux<ServerSentEvent<String>> stream = chatStreamService.streamMessage(memberId, sessionId, userContent);
+        Flux<ServerSentEvent<String>> stream = chatStreamService.streamMessage(memberId, sessionId, ChatMessageCreateRequest.of(userContent));
 
         List<ServerSentEvent<String>> events = stream.collectList().block();
 
@@ -153,7 +154,7 @@ class ChatStreamServiceTest {
         when(chatReplyGenerator.generate(1L, sessionId, userContent))
                 .thenReturn(Flux.just("조각1", "조각2", "조각3"));
 
-        Flux<ServerSentEvent<String>> stream = chatStreamService.streamMessage(memberId, sessionId, userContent);
+        Flux<ServerSentEvent<String>> stream = chatStreamService.streamMessage(memberId, sessionId, ChatMessageCreateRequest.of(userContent));
 
         // 첫 번째 조각만 받고 즉시 cancel
         ServerSentEvent<String> firstEvent = stream.take(1).blockLast();
@@ -173,7 +174,7 @@ class ChatStreamServiceTest {
         doThrow(new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND))
                 .when(chatMessageService).validateSessionForSending(memberId, sessionId);
 
-        assertThatThrownBy(() -> chatStreamService.streamMessage(memberId, sessionId, "안녕"))
+        assertThatThrownBy(() -> chatStreamService.streamMessage(memberId, sessionId, ChatMessageCreateRequest.of("안녕")))
                 .isInstanceOf(BusinessException.class)
                 .extracting(e -> ((BusinessException) e).getErrorCode())
                 .isEqualTo(ErrorCode.CHAT_ROOM_NOT_FOUND);
@@ -192,7 +193,7 @@ class ChatStreamServiceTest {
         doThrow(new BusinessException(ErrorCode.CHAT_DAILY_LIMIT_EXCEEDED))
                 .when(chatDailyLimitService).checkAndIncrement(memberId);
 
-        assertThatThrownBy(() -> chatStreamService.streamMessage(memberId, sessionId, "안녕"))
+        assertThatThrownBy(() -> chatStreamService.streamMessage(memberId, sessionId, ChatMessageCreateRequest.of("안녕")))
                 .isInstanceOf(BusinessException.class)
                 .extracting(e -> ((BusinessException) e).getErrorCode())
                 .isEqualTo(ErrorCode.CHAT_DAILY_LIMIT_EXCEEDED);
@@ -217,7 +218,7 @@ class ChatStreamServiceTest {
                         new ChatMessageResponse(101L, 2, ChatMessageRole.ASSISTANT, " 계란 양파 ", LocalDateTime.now())
                 ));
 
-        Flux<ServerSentEvent<String>> stream = chatStreamService.streamMessage(memberId, sessionId, userContent);
+        Flux<ServerSentEvent<String>> stream = chatStreamService.streamMessage(memberId, sessionId, ChatMessageCreateRequest.of(userContent));
         List<ServerSentEvent<String>> events = stream.collectList().block();
 
         assertThat(events).isNotNull().hasSize(3);
@@ -236,7 +237,7 @@ class ChatStreamServiceTest {
         when(chatStreamLockService.acquire(sessionId))
                 .thenThrow(new BusinessException(ErrorCode.CHAT_REPLY_IN_PROGRESS));
 
-        assertThatThrownBy(() -> chatStreamService.streamMessage(memberId, sessionId, "안녕"))
+        assertThatThrownBy(() -> chatStreamService.streamMessage(memberId, sessionId, ChatMessageCreateRequest.of("안녕")))
                 .isInstanceOf(BusinessException.class)
                 .extracting(e -> ((BusinessException) e).getErrorCode())
                 .isEqualTo(ErrorCode.CHAT_REPLY_IN_PROGRESS);
@@ -256,7 +257,7 @@ class ChatStreamServiceTest {
         doThrow(new BusinessException(ErrorCode.CHAT_DAILY_LIMIT_EXCEEDED))
                 .when(chatDailyLimitService).checkAndIncrement(memberId);
 
-        assertThatThrownBy(() -> chatStreamService.streamMessage(memberId, sessionId, "안녕"))
+        assertThatThrownBy(() -> chatStreamService.streamMessage(memberId, sessionId, ChatMessageCreateRequest.of("안녕")))
                 .isInstanceOf(BusinessException.class)
                 .extracting(e -> ((BusinessException) e).getErrorCode())
                 .isEqualTo(ErrorCode.CHAT_DAILY_LIMIT_EXCEEDED);
@@ -276,7 +277,7 @@ class ChatStreamServiceTest {
                 new ChatMessageResponse(101L, 2, ChatMessageRole.ASSISTANT, "답", LocalDateTime.now())
         ));
 
-        Flux<ServerSentEvent<String>> stream = chatStreamService.streamMessage(1L, sessionId, "질문");
+        Flux<ServerSentEvent<String>> stream = chatStreamService.streamMessage(1L, sessionId, ChatMessageCreateRequest.of("질문"));
         verify(chatStreamLockService, never()).release(any(), any());
 
         StepVerifier.create(stream)
@@ -295,7 +296,7 @@ class ChatStreamServiceTest {
         when(chatReplyGenerator.generate(1L, sessionId, "질문"))
                 .thenReturn(Flux.error(new RuntimeException("AI API Connection Timeout")));
 
-        StepVerifier.create(chatStreamService.streamMessage(1L, sessionId, "질문"))
+        StepVerifier.create(chatStreamService.streamMessage(1L, sessionId, ChatMessageCreateRequest.of("질문")))
                 .expectNextMatches(event -> "error".equals(event.event()))
                 .verifyComplete();
 
@@ -310,7 +311,7 @@ class ChatStreamServiceTest {
         when(chatReplyGenerator.generate(1L, sessionId, "질문"))
                 .thenReturn(Flux.concat(Flux.just("조각1"), Flux.never()));
 
-        StepVerifier.create(chatStreamService.streamMessage(1L, sessionId, "질문"))
+        StepVerifier.create(chatStreamService.streamMessage(1L, sessionId, ChatMessageCreateRequest.of("질문")))
                 .expectNextMatches(event -> "message".equals(event.event()))
                 .thenCancel()
                 .verify();
@@ -327,7 +328,7 @@ class ChatStreamServiceTest {
         when(chatReplyGenerator.generate(1L, sessionId, "질문"))
                 .thenReturn(Flux.error(new BusinessException(ErrorCode.CHAT_AI_UNAVAILABLE)));
 
-        StepVerifier.create(chatStreamService.streamMessage(1L, sessionId, "질문"))
+        StepVerifier.create(chatStreamService.streamMessage(1L, sessionId, ChatMessageCreateRequest.of("질문")))
                 .expectNextMatches(event -> "error".equals(event.event())
                         && event.data().contains("\"code\":\"CHAT_010\""))
                 .verifyComplete();
@@ -345,7 +346,7 @@ class ChatStreamServiceTest {
                 Flux.just("조각"),
                 Flux.error(new BusinessException(ErrorCode.CHAT_REPLY_INTERRUPTED))));
 
-        StepVerifier.create(chatStreamService.streamMessage(1L, sessionId, "질문"))
+        StepVerifier.create(chatStreamService.streamMessage(1L, sessionId, ChatMessageCreateRequest.of("질문")))
                 .expectNextMatches(event -> "message".equals(event.event()))
                 .expectNextMatches(event -> "error".equals(event.event())
                         && event.data().contains("\"code\":\"CHAT_012\""))
@@ -363,7 +364,7 @@ class ChatStreamServiceTest {
         when(chatDailyLimitService.checkAndIncrement(1L)).thenReturn(LIMIT_KEY);
         when(chatReplyGenerator.generate(1L, sessionId, "질문")).thenReturn(Flux.empty());
 
-        StepVerifier.create(chatStreamService.streamMessage(1L, sessionId, "질문"))
+        StepVerifier.create(chatStreamService.streamMessage(1L, sessionId, ChatMessageCreateRequest.of("질문")))
                 .expectNextMatches(event -> "error".equals(event.event())
                         && event.data().contains("\"code\":\"CHAT_010\""))
                 .verifyComplete();
@@ -380,7 +381,7 @@ class ChatStreamServiceTest {
         when(chatDailyLimitService.checkAndIncrement(1L)).thenReturn(LIMIT_KEY);
         when(chatReplyGenerator.generate(1L, sessionId, "질문")).thenReturn(Flux.never());
 
-        StepVerifier.create(chatStreamService.streamMessage(1L, sessionId, "질문"))
+        StepVerifier.create(chatStreamService.streamMessage(1L, sessionId, ChatMessageCreateRequest.of("질문")))
                 .thenCancel()
                 .verify();
 
@@ -398,7 +399,7 @@ class ChatStreamServiceTest {
                 new ChatMessageResponse(101L, 2, ChatMessageRole.ASSISTANT, "답", LocalDateTime.now())
         ));
 
-        StepVerifier.create(chatStreamService.streamMessage(1L, sessionId, "질문"))
+        StepVerifier.create(chatStreamService.streamMessage(1L, sessionId, ChatMessageCreateRequest.of("질문")))
                 .expectNextMatches(event -> "message".equals(event.event()))
                 .expectNextMatches(event -> "done".equals(event.event()))
                 .verifyComplete();

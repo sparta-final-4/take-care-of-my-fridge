@@ -1,6 +1,7 @@
 package org.example.takecareofmyfridgebe.domain.chat.service;
 
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatProperties;
+import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageCreateRequest;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageResponse;
 import org.example.takecareofmyfridgebe.domain.chat.entity.ChatMessageRole;
 import org.example.takecareofmyfridgebe.global.config.RedisConfig;
@@ -99,7 +100,7 @@ class ChatStreamConcurrencyTest extends RedisContainerSupport {
                 Callable<Flux<ServerSentEvent<String>>> send = () -> {
                     ready.countDown();
                     start.await();
-                    return chatStreamService.streamMessage(MEMBER_ID, SESSION_ID, "질문");
+                    return chatStreamService.streamMessage(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("질문"));
                 };
                 futures.add(executor.submit(send));
             }
@@ -143,26 +144,26 @@ class ChatStreamConcurrencyTest extends RedisContainerSupport {
         );
 
         // 완료
-        StepVerifier.create(chatStreamService.streamMessage(MEMBER_ID, SESSION_ID, "질문"))
+        StepVerifier.create(chatStreamService.streamMessage(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("질문")))
                 .expectNextMatches(event -> "message".equals(event.event()))
                 .expectNextMatches(event -> "done".equals(event.event()))
                 .verifyComplete();
         awaitUnlocked();
 
         // 오류
-        StepVerifier.create(chatStreamService.streamMessage(MEMBER_ID, SESSION_ID, "질문"))
+        StepVerifier.create(chatStreamService.streamMessage(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("질문")))
                 .expectNextMatches(event -> "error".equals(event.event()))
                 .verifyComplete();
         awaitUnlocked();
 
         // 취소 (연결 끊김)
-        StepVerifier.create(chatStreamService.streamMessage(MEMBER_ID, SESSION_ID, "질문"))
+        StepVerifier.create(chatStreamService.streamMessage(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("질문")))
                 .expectNextMatches(event -> "message".equals(event.event()))
                 .thenCancel()
                 .verify();
         awaitUnlocked();
 
-        StepVerifier.create(chatStreamService.streamMessage(MEMBER_ID, SESSION_ID, "질문"))
+        StepVerifier.create(chatStreamService.streamMessage(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("질문")))
                 .expectNextMatches(event -> "message".equals(event.event()))
                 .expectNextMatches(event -> "done".equals(event.event()))
                 .verifyComplete();

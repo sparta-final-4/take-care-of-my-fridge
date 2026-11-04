@@ -2,6 +2,8 @@ package org.example.takecareofmyfridgebe.domain.chat.controller;
 
 import org.example.takecareofmyfridgebe.domain.auth.service.AuthSessionService;
 import org.example.takecareofmyfridgebe.domain.auth.service.JwtTokenService;
+import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageCreateRequest;
+import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageMode;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageResponse;
 import org.example.takecareofmyfridgebe.domain.chat.entity.ChatMessageRole;
 import org.example.takecareofmyfridgebe.domain.chat.service.ChatMessageService;
@@ -29,10 +31,14 @@ import reactor.core.publisher.Flux;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.LongStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -87,7 +93,7 @@ class ChatMessageControllerTest {
                 ServerSentEvent.<String>builder().event("done").data("{\"userMessageId\":100,\"assistantMessageId\":101}").build()
         );
 
-        when(chatStreamService.streamMessage(eq(memberId), eq(sessionId), eq(userContent)))
+        when(chatStreamService.streamMessage(eq(memberId), eq(sessionId), eq(ChatMessageCreateRequest.of(userContent))))
                 .thenReturn(mockStream);
 
         MvcResult mvcResult = mvc.perform(post("/api/chat-sessions/{sessionId}/messages", sessionId)
@@ -106,7 +112,64 @@ class ChatMessageControllerTest {
         assertThat(responseContent).contains("event:message\ndata:{\"text\":\"된장\"}");
         assertThat(responseContent).contains("event:done\ndata:{\"userMessageId\":100,\"assistantMessageId\":101}");
 
-        verify(chatStreamService).streamMessage(memberId, sessionId, userContent);
+        verify(chatStreamService).streamMessage(memberId, sessionId, ChatMessageCreateRequest.of(userContent));
+    }
+
+    @Test
+    @DisplayName("추천 모드·선택 재료·선택 재료만 쓰기를 보내면 중복과 null을 뺀 값으로 서비스에 넘긴다")
+    void passesRecommendOptions_whenOptionsAreSent() throws Exception {
+        Long memberId = 1L;
+        Long sessionId = 10L;
+        ChatMessageCreateRequest expected = new ChatMessageCreateRequest(
+                "이 재료로 추천해줘", ChatMessageMode.RECOMMEND, List.of(3L, 5L), true);
+        when(chatStreamService.streamMessage(eq(memberId), eq(sessionId), eq(expected)))
+                .thenReturn(Flux.empty());
+
+        mvc.perform(post("/api/chat-sessions/{sessionId}/messages", sessionId)
+                        .with(csrf())
+                        .with(authentication(authenticationFor(memberId)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"content\": \"이 재료로 추천해줘\", \"mode\": \"RECOMMEND\","
+                                + " \"selectedIngredientIds\": [3, 5, 3, null], \"useSelectedOnly\": true}"))
+                .andExpect(request().asyncStarted());
+
+        verify(chatStreamService).streamMessage(memberId, sessionId, expected);
+    }
+
+    @Test
+    @DisplayName("내용만 보내면 AUTO, 선택 재료 빈 목록, 선택 재료만 쓰기 false로 넘긴다")
+    void passesDefaultOptions_whenOnlyContentIsSent() throws Exception {
+        Long memberId = 1L;
+        Long sessionId = 10L;
+        ChatMessageCreateRequest expected = new ChatMessageCreateRequest(
+                "뭐 먹지?", ChatMessageMode.AUTO, List.of(), false);
+        when(chatStreamService.streamMessage(eq(memberId), eq(sessionId), eq(expected)))
+                .thenReturn(Flux.empty());
+
+        mvc.perform(post("/api/chat-sessions/{sessionId}/messages", sessionId)
+                        .with(csrf())
+                        .with(authentication(authenticationFor(memberId)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"content\": \"뭐 먹지?\"}"))
+                .andExpect(request().asyncStarted());
+
+        verify(chatStreamService).streamMessage(memberId, sessionId, expected);
+    }
+
+    @Test
+    @DisplayName("선택 재료를 50개 넘게 보내면 400 Bad Request를 반환한다")
+    void returnsBadRequest_whenSelectedIngredientsExceed50() throws Exception {
+        String ids = LongStream.rangeClosed(1, 51).mapToObj(String::valueOf).collect(Collectors.joining(","));
+
+        mvc.perform(post("/api/chat-sessions/{sessionId}/messages", 10L)
+                        .with(csrf())
+                        .with(authentication(authenticationFor(1L)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"content\": \"추천해줘\", \"selectedIngredientIds\": [" + ids + "]}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false));
+
+        verify(chatStreamService, never()).streamMessage(any(), any(), any());
     }
 
     @Test
@@ -131,7 +194,7 @@ class ChatMessageControllerTest {
         Long sessionId = 10L;
         String content500 = "a".repeat(500);
 
-        when(chatStreamService.streamMessage(eq(memberId), eq(sessionId), eq(content500)))
+        when(chatStreamService.streamMessage(eq(memberId), eq(sessionId), eq(ChatMessageCreateRequest.of(content500))))
                 .thenReturn(Flux.empty());
 
         mvc.perform(post("/api/chat-sessions/{sessionId}/messages", sessionId)
@@ -164,7 +227,7 @@ class ChatMessageControllerTest {
         Long memberId = 1L;
         Long sessionId = 10L;
 
-        when(chatStreamService.streamMessage(eq(memberId), eq(sessionId), eq("안녕하세요")))
+        when(chatStreamService.streamMessage(eq(memberId), eq(sessionId), eq(ChatMessageCreateRequest.of("안녕하세요"))))
                 .thenThrow(new BusinessException(ErrorCode.CHAT_SESSION_EXPIRED));
 
         mvc.perform(post("/api/chat-sessions/{sessionId}/messages", sessionId)
@@ -183,7 +246,7 @@ class ChatMessageControllerTest {
         Long memberId = 1L;
         Long sessionId = 10L;
 
-        when(chatStreamService.streamMessage(eq(memberId), eq(sessionId), eq("안녕하세요")))
+        when(chatStreamService.streamMessage(eq(memberId), eq(sessionId), eq(ChatMessageCreateRequest.of("안녕하세요"))))
                 .thenThrow(new BusinessException(ErrorCode.CHAT_DAILY_LIMIT_EXCEEDED));
 
         mvc.perform(post("/api/chat-sessions/{sessionId}/messages", sessionId)
@@ -202,7 +265,7 @@ class ChatMessageControllerTest {
         Long memberId = 1L;
         Long sessionId = 10L;
 
-        when(chatStreamService.streamMessage(eq(memberId), eq(sessionId), eq("안녕하세요")))
+        when(chatStreamService.streamMessage(eq(memberId), eq(sessionId), eq(ChatMessageCreateRequest.of("안녕하세요"))))
                 .thenThrow(new BusinessException(ErrorCode.CHAT_SERVICE_UNAVAILABLE));
 
         mvc.perform(post("/api/chat-sessions/{sessionId}/messages", sessionId)
@@ -221,7 +284,7 @@ class ChatMessageControllerTest {
         Long memberId = 1L;
         Long sessionId = 999L;
 
-        when(chatStreamService.streamMessage(eq(memberId), eq(sessionId), eq("안녕하세요")))
+        when(chatStreamService.streamMessage(eq(memberId), eq(sessionId), eq(ChatMessageCreateRequest.of("안녕하세요"))))
                 .thenThrow(new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND));
 
         mvc.perform(post("/api/chat-sessions/{sessionId}/messages", sessionId)
@@ -240,7 +303,7 @@ class ChatMessageControllerTest {
         Long memberId = 1L;
         Long sessionId = 10L;
 
-        when(chatStreamService.streamMessage(eq(memberId), eq(sessionId), eq("안녕하세요")))
+        when(chatStreamService.streamMessage(eq(memberId), eq(sessionId), eq(ChatMessageCreateRequest.of("안녕하세요"))))
                 .thenThrow(new BusinessException(ErrorCode.CHAT_ROOM_ALREADY_COMPLETED));
 
         mvc.perform(post("/api/chat-sessions/{sessionId}/messages", sessionId)
