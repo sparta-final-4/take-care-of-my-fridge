@@ -1,3 +1,4 @@
+import { ArrowRightOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Alert,
@@ -12,7 +13,6 @@ import {
   Result,
   Select,
   Skeleton,
-  Space,
   Table,
   Tag,
   Typography,
@@ -180,6 +180,7 @@ export default function AdminDealPage() {
   );
   const demoToggle = demoAvailable && (
     <Button
+      className={styles.demoAction}
       onClick={() => {
         setSelectedCandidateIds([]);
         setSearchParams(demo ? {} : { demo: '1' });
@@ -189,11 +190,25 @@ export default function AdminDealPage() {
     </Button>
   );
   const heading = (
-    <Space className={styles.heading}>
-      <Typography.Title level={2}>할인 후보</Typography.Title>
-      {demoToggle}
-      <Button onClick={() => navigate(ROUTES.adminSaleEventNew)}>행사 관리</Button>
-    </Space>
+    <div className={styles.heading}>
+      <Typography.Title level={2} className={styles.headingTitle}>
+        할인 후보
+      </Typography.Title>
+      <div className={styles.headingActions}>
+        <Button
+          color="primary"
+          variant="outlined"
+          size="large"
+          icon={<ArrowRightOutlined />}
+          iconPlacement="end"
+          className={styles.pageAction}
+          onClick={() => navigate(ROUTES.adminSaleEventNew)}
+        >
+          행사 관리
+        </Button>
+        {demoToggle}
+      </div>
+    </div>
   );
 
   if (isPending) {

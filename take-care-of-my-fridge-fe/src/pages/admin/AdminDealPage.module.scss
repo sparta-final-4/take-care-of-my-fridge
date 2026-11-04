@@ -1,3 +1,5 @@
+@use '@/styles/mixins' as *;
+
 .container {
   width: 100%;
   max-width: 1200px;
@@ -11,8 +13,46 @@
 
 .heading {
   display: flex;
+  align-items: flex-start;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--ant-margin-md);
   width: 100%;
+}
+
+.headingTitle {
+  margin: 0 !important;
+}
+
+.headingActions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ant-margin-xs);
+  width: 100%;
+
+  @include from(sm) {
+    align-items: flex-end;
+    width: auto;
+  }
+}
+
+.pageAction {
+  width: 100%;
+  min-height: 44px;
+  font-weight: var(--ant-font-weight-strong);
+
+  @include from(sm) {
+    width: auto;
+    min-width: 160px;
+  }
+}
+
+.demoAction {
+  width: 100%;
+
+  @include from(sm) {
+    width: auto;
+  }
 }
 
 .dateTime {
