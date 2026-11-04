@@ -4,6 +4,7 @@ import jakarta.persistence.EntityManager;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 import org.example.takecareofmyfridgebe.domain.payment.dto.BillingKeyResponse;
 import org.example.takecareofmyfridgebe.domain.payment.entity.BillingKey;
+import org.example.takecareofmyfridgebe.domain.payment.entity.BillingKeyStatus;
 import org.example.takecareofmyfridgebe.domain.payment.entity.CardType;
 import org.example.takecareofmyfridgebe.domain.payment.port.BillingKeyInfo;
 import org.example.takecareofmyfridgebe.global.config.JpaAuditingConfig;
@@ -24,11 +25,14 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({JpaAuditingConfig.class, QueryDslConfig.class, BillingKeyService.class})
 class BillingKeyServiceTest extends MySqlContainerSupport {
+
+    private static final LocalDateTime NOW = LocalDateTime.of(2026, 11, 4, 12, 0);
 
     private final BillingKeyService billingKeyService;
     private final EntityManager entityManager;
@@ -143,6 +147,108 @@ class BillingKeyServiceTest extends MySqlContainerSupport {
         assertThatThrownBy(() -> billingKeyService.register(-1L, info("billing-key-1")))
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode").isEqualTo(ErrorCode.MEMBER_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("대표가 아닌 카드를 대표로 지정하면 기존 대표 카드는 해제되고 바뀐 목록을 대표 먼저 돌려준다")
+    void setDefault_switchDefault() {
+        BillingKeyResponse first = billingKeyService.register(memberId, info("billing-key-1"));
+        BillingKeyResponse second = billingKeyService.register(memberId, info("billing-key-2"));
+
+        List<BillingKeyResponse> cards = billingKeyService.setDefault(memberId, second.cardId());
+
+        assertThat(cards).extracting(BillingKeyResponse::cardId, BillingKeyResponse::isDefault)
+                .containsExactly(tuple(second.cardId(), true), tuple(first.cardId(), false));
+    }
+
+    @Test
+    @DisplayName("이미 대표인 카드를 다시 대표로 지정해도 대표 카드는 하나다")
+    void setDefault_keepSingleDefault_whenAlreadyDefault() {
+        BillingKeyResponse first = billingKeyService.register(memberId, info("billing-key-1"));
+        billingKeyService.register(memberId, info("billing-key-2"));
+
+        List<BillingKeyResponse> cards = billingKeyService.setDefault(memberId, first.cardId());
+
+        assertThat(cards).filteredOn(BillingKeyResponse::isDefault).extracting(BillingKeyResponse::cardId)
+                .containsExactly(first.cardId());
+    }
+
+    @Test
+    @DisplayName("다른 회원의 카드나 삭제한 카드를 대표로 지정하거나 삭제하면 카드 없음 오류가 난다")
+    void setDefaultAndDelete_throwException_whenNotOwnActiveCard() {
+        BillingKeyResponse others = billingKeyService.register(otherMemberId, info("billing-key-9"));
+        BillingKeyResponse mine = billingKeyService.register(memberId, info("billing-key-1"));
+        billingKeyService.delete(memberId, mine.cardId(), NOW);
+
+        for (Long cardId : List.of(others.cardId(), mine.cardId(), -1L)) {
+            assertThatThrownBy(() -> billingKeyService.setDefault(memberId, cardId))
+                    .isInstanceOf(BusinessException.class)
+                    .extracting("errorCode").isEqualTo(ErrorCode.BILLING_KEY_NOT_FOUND);
+            assertThatThrownBy(() -> billingKeyService.delete(memberId, cardId, NOW))
+                    .isInstanceOf(BusinessException.class)
+                    .extracting("errorCode").isEqualTo(ErrorCode.BILLING_KEY_NOT_FOUND);
+        }
+    }
+
+    @Test
+    @DisplayName("대표 카드를 삭제하면 삭제 상태가 되고 남은 카드 중 가장 최근에 등록한 카드가 대표가 된다")
+    void delete_passDefaultToLatest_whenDefaultDeleted() {
+        BillingKeyResponse first = billingKeyService.register(memberId, info("billing-key-1"));
+        billingKeyService.register(memberId, info("billing-key-2"));
+        BillingKeyResponse third = billingKeyService.register(memberId, info("billing-key-3"));
+
+        BillingKey deleted = billingKeyService.delete(memberId, first.cardId(), NOW);
+
+        assertThat(deleted.getStatus()).isEqualTo(BillingKeyStatus.DELETED);
+        assertThat(deleted.getDeletedAt()).isEqualTo(NOW);
+        assertThat(billingKeyService.getCards(memberId)).hasSize(2)
+                .filteredOn(BillingKeyResponse::isDefault).extracting(BillingKeyResponse::cardId)
+                .containsExactly(third.cardId());
+    }
+
+    @Test
+    @DisplayName("대표가 아닌 카드를 삭제하면 대표 카드는 그대로다")
+    void delete_keepDefault_whenNotDefaultDeleted() {
+        BillingKeyResponse first = billingKeyService.register(memberId, info("billing-key-1"));
+        BillingKeyResponse second = billingKeyService.register(memberId, info("billing-key-2"));
+
+        billingKeyService.delete(memberId, second.cardId(), NOW);
+
+        assertThat(billingKeyService.getCards(memberId)).extracting(BillingKeyResponse::cardId, BillingKeyResponse::isDefault)
+                .containsExactly(tuple(first.cardId(), true));
+    }
+
+    @Test
+    @DisplayName("마지막 카드를 삭제하면 카드 목록이 비고 PortOne 삭제 대상에 오른다")
+    void delete_addPgDeletePending_whenLastCardDeleted() {
+        BillingKeyResponse only = billingKeyService.register(memberId, info("billing-key-1"));
+
+        billingKeyService.delete(memberId, only.cardId(), NOW);
+
+        assertThat(billingKeyService.getCards(memberId)).isEmpty();
+        assertThat(billingKeyService.findPgDeletePending(0L, 100)).extracting(BillingKey::getId)
+                .containsExactly(only.cardId());
+    }
+
+    @Test
+    @DisplayName("PortOne 삭제를 기록한 카드는 재시도 대상에서 빠지고, 재시도 대상은 지정한 id 뒤부터 읽는다")
+    void findPgDeletePending_excludeConfirmedAndReadAfterId() {
+        BillingKeyResponse first = billingKeyService.register(memberId, info("billing-key-1"));
+        BillingKeyResponse second = billingKeyService.register(memberId, info("billing-key-2"));
+        BillingKeyResponse third = billingKeyService.register(memberId, info("billing-key-3"));
+        billingKeyService.register(memberId, info("billing-key-4"));
+        for (BillingKeyResponse card : List.of(first, second, third)) {
+            billingKeyService.delete(memberId, card.cardId(), NOW);
+        }
+
+        billingKeyService.markPgDeleted(second.cardId(), NOW.plusMinutes(1));
+
+        assertThat(billingKeyService.findPgDeletePending(0L, 100)).extracting(BillingKey::getId)
+                .containsExactly(first.cardId(), third.cardId());
+        assertThat(billingKeyService.findPgDeletePending(first.cardId(), 100)).extracting(BillingKey::getId)
+                .containsExactly(third.cardId());
+        assertThat(billingKeyService.findPgDeletePending(0L, 1)).extracting(BillingKey::getId)
+                .containsExactly(first.cardId());
     }
 
     private BillingKeyInfo info(String billingKey) {

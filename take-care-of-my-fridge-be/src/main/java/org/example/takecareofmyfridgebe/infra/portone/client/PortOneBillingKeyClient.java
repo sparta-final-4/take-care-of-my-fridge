@@ -20,6 +20,7 @@ import java.util.Optional;
 public class PortOneBillingKeyClient implements BillingKeyGateway {
 
     private static final String ALREADY_DELETED_ERROR_TYPE = "BILLING_KEY_ALREADY_DELETED";
+    private static final String NOT_FOUND_ERROR_TYPE = "BILLING_KEY_NOT_FOUND";
     private static final String DELETE_REQUESTER = "CUSTOMER";
 
     private final RestClient portOneRestClient;
@@ -59,9 +60,11 @@ public class PortOneBillingKeyClient implements BillingKeyGateway {
                     .retrieve()
                     .toBodilessEntity();
         } catch (HttpClientErrorException e) {
-            // 다른 요청이 먼저 지웠어도 원하는 결과(삭제됨)가 이뤄졌으므로 성공으로 본다
-            if (ALREADY_DELETED_ERROR_TYPE.equals(errorType(e))) {
-                log.info("PortOne 빌링키가 이미 삭제됨");
+            // 이미 삭제됐거나 PortOne에 없는 빌링키는 원하는 결과(남아 있지 않음)가 이뤄졌으므로 성공으로 본다.
+            // 없는 빌링키를 실패로 두면 재시도 스케줄러가 끝없이 다시 지우려 한다
+            String errorType = errorType(e);
+            if (ALREADY_DELETED_ERROR_TYPE.equals(errorType) || NOT_FOUND_ERROR_TYPE.equals(errorType)) {
+                log.info("PortOne 빌링키가 이미 없음: type={}", errorType);
                 return;
             }
             log.warn("PortOne 빌링키 삭제 거절: status={}, body={}", e.getStatusCode(), e.getResponseBodyAsString());

@@ -3,6 +3,7 @@ package org.example.takecareofmyfridgebe.domain.payment.facade;
 import org.example.takecareofmyfridgebe.domain.payment.dto.BillingKeyPrepareResponse;
 import org.example.takecareofmyfridgebe.domain.payment.dto.BillingKeyRegisterRequest;
 import org.example.takecareofmyfridgebe.domain.payment.dto.BillingKeyResponse;
+import org.example.takecareofmyfridgebe.domain.payment.entity.BillingKey;
 import org.example.takecareofmyfridgebe.domain.payment.entity.CardType;
 import org.example.takecareofmyfridgebe.domain.payment.port.BillingKeyGateway;
 import org.example.takecareofmyfridgebe.domain.payment.port.BillingKeyInfo;
@@ -12,8 +13,11 @@ import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -26,6 +30,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 class BillingKeyFacadeTest {
@@ -147,6 +152,89 @@ class BillingKeyFacadeTest {
 
         assertNotVerified();
         verify(billingKeyGateway, never()).deleteBillingKey(anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("카드를 삭제하면 우리 쪽 삭제 뒤 PortOne 빌링키를 지우고 삭제 확인 시각을 기록한다")
+    void delete_deletePgBillingKeyAndRecord() {
+        given(billingKeyService.delete(eq(MEMBER_ID), eq(1L), any())).willReturn(deletedCard(1L));
+
+        billingKeyFacade.delete(MEMBER_ID, 1L);
+
+        verify(billingKeyGateway).deleteBillingKey(eq(BILLING_KEY), anyString());
+        verify(billingKeyService).markPgDeleted(eq(1L), any());
+    }
+
+    @Test
+    @DisplayName("PortOne 빌링키 삭제가 실패해도 카드 삭제는 성공으로 끝나고 확인 시각은 남기지 않는다")
+    void delete_success_whenPgDeleteFails() {
+        given(billingKeyService.delete(eq(MEMBER_ID), eq(1L), any())).willReturn(deletedCard(1L));
+        willThrow(new RuntimeException("PG 오류")).given(billingKeyGateway).deleteBillingKey(anyString(), anyString());
+
+        billingKeyFacade.delete(MEMBER_ID, 1L);
+
+        verify(billingKeyService, never()).markPgDeleted(anyLong(), any());
+    }
+
+    @Test
+    @DisplayName("PortOne 삭제 뒤 확인 기록이 실패해도 카드 삭제는 성공으로 끝난다")
+    void delete_success_whenMarkPgDeletedFails() {
+        given(billingKeyService.delete(eq(MEMBER_ID), eq(1L), any())).willReturn(deletedCard(1L));
+        willThrow(new RuntimeException("DB 오류")).given(billingKeyService).markPgDeleted(eq(1L), any());
+
+        billingKeyFacade.delete(MEMBER_ID, 1L);
+
+        verify(billingKeyGateway).deleteBillingKey(eq(BILLING_KEY), anyString());
+    }
+
+    @Test
+    @DisplayName("우리 쪽 삭제가 거절되면 PortOne 빌링키는 지우지 않는다")
+    void delete_keepPgBillingKey_whenNotFound() {
+        given(billingKeyService.delete(eq(MEMBER_ID), eq(1L), any()))
+                .willThrow(new BusinessException(ErrorCode.BILLING_KEY_NOT_FOUND));
+
+        assertThatThrownBy(() -> billingKeyFacade.delete(MEMBER_ID, 1L))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode").isEqualTo(ErrorCode.BILLING_KEY_NOT_FOUND);
+        verify(billingKeyGateway, never()).deleteBillingKey(anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("PortOne 삭제 재시도는 대상을 끝까지 이어 읽고, 한 건이 실패해도 나머지를 지운다")
+    void retryPgDeletes_continueOthers_whenOneFails() {
+        List<BillingKey> fullPage = new ArrayList<>();
+        for (long id = 1; id <= BillingKeyFacade.PG_DELETE_BATCH_SIZE; id++) {
+            fullPage.add(deletedCard(id));
+        }
+        given(billingKeyService.findPgDeletePending(0L, BillingKeyFacade.PG_DELETE_BATCH_SIZE)).willReturn(fullPage);
+        given(billingKeyService.findPgDeletePending((long) BillingKeyFacade.PG_DELETE_BATCH_SIZE,
+                BillingKeyFacade.PG_DELETE_BATCH_SIZE)).willReturn(List.of(deletedCard(101L)));
+        willThrow(new RuntimeException("PG 오류")).willDoNothing()
+                .given(billingKeyGateway).deleteBillingKey(anyString(), anyString());
+
+        billingKeyFacade.retryPgDeletes();
+
+        verify(billingKeyGateway, times(101)).deleteBillingKey(anyString(), anyString());
+        verify(billingKeyService, never()).markPgDeleted(eq(1L), any());
+        verify(billingKeyService).markPgDeleted(eq(2L), any());
+        verify(billingKeyService).markPgDeleted(eq(101L), any());
+    }
+
+    @Test
+    @DisplayName("대표 카드 지정은 서비스 결과를 그대로 돌려준다")
+    void setDefault_success() {
+        List<BillingKeyResponse> cards = List.of(new BillingKeyResponse(2L, "국민카드", "5678", CardType.DEBIT, true,
+                LocalDateTime.of(2026, 11, 4, 10, 0)));
+        given(billingKeyService.setDefault(MEMBER_ID, 2L)).willReturn(cards);
+
+        assertThat(billingKeyFacade.setDefault(MEMBER_ID, 2L)).isEqualTo(cards);
+    }
+
+    private BillingKey deletedCard(Long id) {
+        BillingKey card = BillingKey.builder().memberId(MEMBER_ID).billingKey(BILLING_KEY).build();
+        ReflectionTestUtils.setField(card, "id", id);
+        card.delete(LocalDateTime.of(2026, 11, 4, 10, 0));
+        return card;
     }
 
     private void assertNotVerified() {

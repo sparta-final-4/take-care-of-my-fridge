@@ -31,6 +31,7 @@ import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
@@ -38,7 +39,9 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -170,6 +173,57 @@ class BillingKeyControllerTest {
                 .andExpect(status().isUnauthorized());
 
         verifyNoInteractions(billingKeyFacade);
+    }
+
+    @Test
+    @DisplayName("대표 카드를 지정하면 토큰의 회원 ID와 경로의 카드 ID로 Facade를 호출하고 바뀐 카드 목록을 반환한다")
+    void setDefault_success() throws Exception {
+        when(billingKeyFacade.setDefault(MEMBER_ID, 1L)).thenReturn(List.of(CARD));
+
+        mvc.perform(patch("/api/billing-keys/1/default").with(csrf()).with(loginUser()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].cardId").value(1))
+                .andExpect(jsonPath("$.data[0].isDefault").value(true));
+    }
+
+    @Test
+    @DisplayName("내 카드가 아니면 대표 지정을 404(BILLING_004)로 응답한다")
+    void setDefault_returnNotFound_whenNotOwnCard() throws Exception {
+        when(billingKeyFacade.setDefault(MEMBER_ID, 9L))
+                .thenThrow(new BusinessException(ErrorCode.BILLING_KEY_NOT_FOUND));
+
+        mvc.perform(patch("/api/billing-keys/9/default").with(csrf()).with(loginUser()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error.code").value(ErrorCode.BILLING_KEY_NOT_FOUND.getCode()));
+    }
+
+    @Test
+    @DisplayName("카드를 삭제하면 토큰의 회원 ID와 경로의 카드 ID로 Facade를 호출하고 빈 성공 응답을 반환한다")
+    void delete_success() throws Exception {
+        mvc.perform(delete("/api/billing-keys/1").with(csrf()).with(loginUser()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+
+        verify(billingKeyFacade).delete(MEMBER_ID, 1L);
+    }
+
+    @Test
+    @DisplayName("비로그인 상태로 카드를 삭제하면 Facade를 호출하지 않고 401을 반환한다")
+    void delete_returnUnauthorized_whenNotLoggedIn() throws Exception {
+        mvc.perform(delete("/api/billing-keys/1").with(csrf()))
+                .andExpect(status().isUnauthorized());
+
+        verifyNoInteractions(billingKeyFacade);
+    }
+
+    @Test
+    @DisplayName("내 카드가 아니면 삭제를 404(BILLING_004)로 응답한다")
+    void delete_returnNotFound_whenNotOwnCard() throws Exception {
+        doThrow(new BusinessException(ErrorCode.BILLING_KEY_NOT_FOUND)).when(billingKeyFacade).delete(MEMBER_ID, 9L);
+
+        mvc.perform(delete("/api/billing-keys/9").with(csrf()).with(loginUser()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error.code").value(ErrorCode.BILLING_KEY_NOT_FOUND.getCode()));
     }
 
     private static RequestPostProcessor loginUser() {
