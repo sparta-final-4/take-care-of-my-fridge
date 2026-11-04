@@ -54,7 +54,8 @@ class ChatIntentPromptTest {
         assertThat(prompt).doesNotContain("REFINE", "RECIPE_DETAIL", "[직전 추천]");
         assertThat(followUp).contains("REFINE: 직전 추천을 조건을 바꿔 다시 받고 싶은 말",
                 "바꾸라고 하지 않은 조건은 [직전 조건] 그대로 쓴다",
-                "RECIPE_DETAIL: [직전 추천]이나 [이전 추천]에 있는 레시피 하나",
+                "RECIPE_DETAIL: 이 상담에서 추천했던 레시피 하나",
+                "[직전 추천]·[이전 추천]에 없어도 \"아까 그 ○○\"처럼 앞서 추천받은 레시피 이름을 말하면 RECIPE_DETAIL이다",
                 "targetIndex: [직전 추천] 번호(1부터)", "targetName: 말한 레시피 이름",
                 "\"매운 거 말고\" → removed: TASTE", "\"시간 상관없이\" → removed: MAX_MINUTES",
                 "REFINE이 아니면 removed는 빈 목록",

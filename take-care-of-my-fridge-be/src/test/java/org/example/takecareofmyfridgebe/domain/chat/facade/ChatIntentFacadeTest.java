@@ -32,6 +32,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -383,6 +384,42 @@ class ChatIntentFacadeTest {
 
             assertThat(resolution.intent()).isEqualTo(ChatIntent.RECIPE_DETAIL);
             assertThat(resolution.targetRecipeId()).isEqualTo(20L);
+        }
+
+        @Test
+        @DisplayName("띄어 쓴 이름(\"장어 조림\")도 붙여 쓴 레시피 이름(\"장어조림\")을 상담 전체 추천에서 찾는다")
+        void findsSpacedName_againstJoinedRecipeName() {
+            givenExtracted(detail(null, "장어 조림"));
+            givenSessionRecipes(Map.of(60L, "장어조림", 61L, "두부조림"), List.of(61L, 60L));
+
+            ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID,
+                    ChatMessageCreateRequest.of("아까 그 장어 조림 자세히"), context);
+
+            assertThat(resolution.intent()).isEqualTo(ChatIntent.RECIPE_DETAIL);
+            assertThat(resolution.targetRecipeId()).isEqualTo(60L);
+        }
+
+        @Test
+        @DisplayName("붙여 쓴 이름(\"장어조림\")도 띄어 쓴 레시피 이름(\"장어 조림\")을 찾고, 직전 카드에 있으면 직전 카드에서 찾는다")
+        void findsJoinedName_againstSpacedRecipeName() {
+            givenExtracted(detail(null, "장어조림"));
+            givenSessionRecipes(Map.of(60L, "장어 조림"), List.of(60L));
+
+            assertThat(facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("아까 그 장어조림 자세히"), context)
+                    .targetRecipeId()).isEqualTo(60L);
+
+            ChatContext spacedInLast = new ChatContext(List.of(), lastRecommendation, List.of(new CardName(70L, "돼지고기 찹쌀 부침")));
+            givenExtracted(detail(null, "돼지고기찹쌀부침"));
+            assertThat(facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("돼지고기찹쌀부침 어떻게 해?"), spacedInLast)
+                    .targetRecipeId()).isEqualTo(70L);
+        }
+
+        private void givenSessionRecipes(Map<Long, String> names, List<Long> recentFirst) {
+            when(chatMessageService.findRecentRecommendedRecipeIds(List.of(SESSION_ID), 30))
+                    .thenReturn(Map.of(SESSION_ID, recentFirst));
+            Map<Long, RecipeSummary> summaries = new HashMap<>();
+            names.forEach((id, name) -> summaries.put(id, new RecipeSummary(id, name, null, null)));
+            when(recipeService.findSummaries(recentFirst)).thenReturn(summaries);
         }
 
         @Test

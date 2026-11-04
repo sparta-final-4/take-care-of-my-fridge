@@ -216,7 +216,7 @@ public class ChatIntentFacade {
         return matchName(sessionCards, name).orElse(null);
     }
 
-    // 띄어쓰기를 빼고 한쪽 이름이 다른 쪽을 담으면 같은 레시피로 본다 ("깐풍기" ↔ "매콤 깐풍기")
+    // 양쪽 모두 띄어쓰기를 빼고 한쪽 이름이 다른 쪽을 담으면 같은 레시피로 본다 ("장어 조림" = "장어조림", "깐풍기" ↔ "매콤 깐풍기")
     private static Optional<Long> matchName(List<CardName> cards, String name) {
         if (name == null) {
             return Optional.empty();
