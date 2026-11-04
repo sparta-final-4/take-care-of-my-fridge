@@ -99,9 +99,13 @@ public final class RecommendationPromptBuilder {
         return "말씀하신 " + subject + " 찾지 못해서 냉장고 재료로 만들 수 있는 요리를 골랐어요";
     }
 
-    // 키워드로 이름·재료가 맞은 레시피가 없을 때 안내. 사용자가 말한 요리 이름을 쓰고, 없으면 첫 키워드를 쓴다
+    // 말한 요리를 못 찾았을 때 안내. 요리 이름을 말했으면 "말씀하신 김피탕은", 없으면 첫 키워드로 "말씀하신 냉면 요리는"
     static String keywordNotFoundNotice(RecipeQuery query) {
-        String dish = query.keywordText() != null ? query.keywordText() : query.keywords().get(0);
+        if (query.keywordText() != null) {
+            String dish = query.keywordText();
+            return "말씀하신 " + dish + topicParticle(dish) + " 찾지 못해서 비슷한 걸 골랐어요";
+        }
+        String dish = query.keywords().get(0);
         String dishPhrase = dish.endsWith("요리") ? dish : dish + " 요리";
         return "말씀하신 " + dishPhrase + "는 찾지 못해서 비슷한 걸 골랐어요";
     }

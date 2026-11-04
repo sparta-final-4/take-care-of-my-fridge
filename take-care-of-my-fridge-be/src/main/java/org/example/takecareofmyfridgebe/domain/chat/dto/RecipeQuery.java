@@ -105,9 +105,17 @@ public record RecipeQuery(
                 excludeIngredientIds, useSelectedOnly, keywords, keywordText, preferenceText, selectedIngredientGroups, matches);
     }
 
-    // 키워드를 말했는데 이름·재료로 맞은 레시피가 하나도 없는지 (쪼개짐·벡터로만 찾은 것은 맞은 것으로 치지 않는다)
+    // 말한 요리를 찾지 못했는지.
+    // 요리 이름(keywordText)을 말했으면 그 이름이 들어간 레시피가 하나도 없을 때 (비슷한 탕수육을 찾았어도 김피탕이 없으면 못 찾음).
+    // 이름 없이 키워드만 있으면 이름·재료로 맞은 레시피가 하나도 없을 때 (쪼개짐·벡터로만 찾은 것은 맞은 것으로 치지 않는다)
     public boolean keywordsNotFound() {
-        return !keywords.isEmpty() && keywordMatches.values().stream().noneMatch(KeywordMatch::strong);
+        if (keywords.isEmpty()) {
+            return false;
+        }
+        if (keywordText != null) {
+            return keywordMatches.values().stream().noneMatch(match -> match.type() == KeywordMatch.Type.NAME);
+        }
+        return keywordMatches.values().stream().noneMatch(KeywordMatch::strong);
     }
 
     // 선택 재료 하나의 같은 종류 재료 ID (선택 재료 자신 포함)

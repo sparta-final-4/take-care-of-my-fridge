@@ -36,4 +36,13 @@ class ChatIntentPromptTest {
     void instructsPreferenceText() {
         assertThat(prompt).contains("- preferenceText:", "\"차가운 요리 추천해줘\" → \"차가운 요리\"", "\"뭐 먹지?\" → 빈 문자열");
     }
+
+    @Test
+    @DisplayName("요리 이름을 말하면 그 이름과 비슷한 요리를 키워드에 먼저 넣고, 탕이 붙은 튀김 요리를 국으로 보지 말라고 지시한다")
+    void instructsDishNameFirst_andTangIsNotAlwaysSoup() {
+        assertThat(prompt).contains("그 이름을 맨 앞에, 이어서 비슷한 요리 이름을 넣는다",
+                "moodCategories는 그 요리의 분류가 확실할 때만 넣는다",
+                "탕수육·김피탕·깐풍기는 튀김 요리다",
+                "\"김피탕 같은 요리 추천해줘\" → keywords: 김피탕, 탕수육, 깐풍기 / moodCategories: 튀김 / dishText: 김피탕");
+    }
 }

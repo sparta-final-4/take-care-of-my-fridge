@@ -1,5 +1,6 @@
 package org.example.takecareofmyfridgebe.domain.chat.facade;
 
+import org.example.takecareofmyfridgebe.domain.chat.dto.KeywordMatch;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate.ImminentIngredient;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate.MissingIngredient;
@@ -109,7 +110,7 @@ class RecommendationPromptBuilderTest {
 
         assertThat(text).startsWith("""
                 [먼저 말할 것]
-                말씀하신 냉파스타 요리는 찾지 못해서 비슷한 걸 골랐어요
+                말씀하신 냉파스타는 찾지 못해서 비슷한 걸 골랐어요
                 [사용자 요청]""");
     }
 
@@ -215,5 +216,34 @@ class RecommendationPromptBuilderTest {
                 [먼저 말할 것]
                 말씀하신 조건에 맞는 레시피는 찾지 못해서 냉장고 재료로 만들 수 있는 요리를 골랐어요
                 [사용자 요청]""");
+    }
+
+    @Test
+    @DisplayName("비슷한 탕수육을 찾았어도 말한 김피탕이 이름에 든 레시피가 없으면 김피탕은 찾지 못했다고 넣는다")
+    void writesDishNotFound_whenOnlySimilarFound() {
+        RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, List.of("튀김"), null, null, false,
+                List.of("김피탕", "탕수육", "깐풍기"), "김피탕", "김피탕 같은 요리")
+                .withKeywordMatches(Map.of(10L, new KeywordMatch(KeywordMatch.Type.EXPANDED, "탕수육", null)));
+        RecipeCandidate sweetSour = new RecipeCandidate(10L, "탕수육", "튀김", 40, new Ranking(2, 0, 0, 0, 1, 1, 0),
+                reason(List.of(), List.of(), List.of(), List.of(), List.of(), false));
+
+        String text = RecommendationPromptBuilder.build("김피탕같은 요리 추천해줘", query, NAMES, List.of(sweetSour),
+                query.keywordsNotFound());
+
+        assertThat(query.keywordsNotFound()).isTrue();
+        assertThat(text).startsWith("""
+                [먼저 말할 것]
+                말씀하신 김피탕은 찾지 못해서 비슷한 걸 골랐어요
+                [사용자 요청]""");
+    }
+
+    @Test
+    @DisplayName("말한 요리 이름이 든 레시피가 있으면 못 찾았다는 안내를 넣지 않는다")
+    void omitsDishNotFound_whenNameMatched() {
+        RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, List.of("튀김"), null, null, false,
+                List.of("탕수육"), "탕수육", "탕수육 같은 요리")
+                .withKeywordMatches(Map.of(10L, KeywordMatch.of(KeywordMatch.Type.NAME)));
+
+        assertThat(query.keywordsNotFound()).isFalse();
     }
 }
