@@ -9,6 +9,7 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEvent
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse.RecommendedRecipe;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeQuery;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecommendationReply;
+import org.example.takecareofmyfridgebe.domain.chat.dto.RecommendationToSave;
 import org.example.takecareofmyfridgebe.domain.chat.entity.ChatMessageRole;
 import org.example.takecareofmyfridgebe.domain.chat.facade.ChatIntentFacade;
 import org.example.takecareofmyfridgebe.domain.chat.facade.ChatRecommendationFacade;
@@ -507,7 +508,7 @@ class ChatStreamServiceTest {
     }
 
     @Test
-    @DisplayName("추천이면 recommendations 이벤트를 먼저 보내고 설명 글 조각, done 순서로 보내며 설명 글만 저장한다")
+    @DisplayName("추천이면 recommendations 이벤트를 먼저 보내고 설명 글 조각, done 순서로 보내며 AI 메시지와 카드를 함께 저장한다")
     void sendsRecommendationsBeforeText_whenIntentIsRecommend() {
         Long sessionId = 10L;
         ChatMessageCreateRequest request = ChatMessageCreateRequest.of("두부로 뭐 해 먹지?");
@@ -516,7 +517,8 @@ class ChatStreamServiceTest {
                 ChatRecommendationsEventResponse.of(List.of(card(314L, "두부조림"))), "후보 정보"));
         when(chatReplyGenerator.generateRecommendation(1L, sessionId, "두부로 뭐 해 먹지?", "후보 정보"))
                 .thenReturn(Flux.just("두부조림을", " 추천해요"));
-        when(chatMessageService.saveExchange(sessionId, "두부로 뭐 해 먹지?", "두부조림을 추천해요")).thenReturn(List.of(
+        when(chatMessageService.saveExchange(sessionId, "두부로 뭐 해 먹지?", "두부조림을 추천해요",
+                List.of(new RecommendationToSave(314L, null)))).thenReturn(List.of(
                 new ChatMessageResponse(100L, 1, ChatMessageRole.USER, "두부로 뭐 해 먹지?", LocalDateTime.now()),
                 new ChatMessageResponse(101L, 2, ChatMessageRole.ASSISTANT, "두부조림을 추천해요", LocalDateTime.now())
         ));
@@ -527,7 +529,8 @@ class ChatStreamServiceTest {
                 .containsExactly("recommendations", "message", "message", "done");
         assertThat(events.get(0).data()).contains("\"recipeId\":314", "\"name\":\"두부조림\"", "\"empty\":false");
         verify(chatReplyGenerator, never()).generate(any(), any(), any());
-        verify(chatMessageService).saveExchange(sessionId, "두부로 뭐 해 먹지?", "두부조림을 추천해요");
+        verify(chatMessageService).saveExchange(sessionId, "두부로 뭐 해 먹지?", "두부조림을 추천해요",
+                List.of(new RecommendationToSave(314L, null)));
     }
 
     @Test
@@ -581,7 +584,7 @@ class ChatStreamServiceTest {
                 ChatRecommendationsEventResponse.of(List.of(card(992L, "장어조림"))), "후보"));
         when(chatReplyGenerator.generateRecommendation(1L, sessionId, "밀키트 중에 제일 빨리 되는 거", "후보"))
                 .thenReturn(Flux.just("냉장고 재료로 만들 수 있는 요리를 골랐어요."));
-        when(chatMessageService.saveExchange(any(), any(), any())).thenReturn(List.of(
+        when(chatMessageService.saveExchange(any(), any(), any(), any())).thenReturn(List.of(
                 new ChatMessageResponse(100L, 1, ChatMessageRole.USER, "q", LocalDateTime.now()),
                 new ChatMessageResponse(101L, 2, ChatMessageRole.ASSISTANT, "a", LocalDateTime.now())
         ));
@@ -637,6 +640,6 @@ class ChatStreamServiceTest {
     }
 
     private static RecommendedRecipe card(Long recipeId, String name) {
-        return new RecommendedRecipe(recipeId, name, null, "조림", 20, List.of(), List.of(), List.of(), List.of(), List.of(), false, "이유");
+        return new RecommendedRecipe(recipeId, name, null, "조림", 20, List.of(), List.of(), List.of(), List.of(), List.of(), false, "이유", null);
     }
 }

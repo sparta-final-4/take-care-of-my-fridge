@@ -1086,6 +1086,136 @@
         ]
       }
     },
+    "/api/billing-keys": {
+      "get": {
+        "operationId": "getCards",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListBillingKeyResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "billing-key-controller"
+        ]
+      },
+      "post": {
+        "operationId": "register",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BillingKeyRegisterRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseBillingKeyResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "billing-key-controller"
+        ]
+      }
+    },
+    "/api/billing-keys/prepare": {
+      "post": {
+        "operationId": "prepare_1",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseBillingKeyPrepareResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "billing-key-controller"
+        ]
+      }
+    },
+    "/api/billing-keys/{cardId}": {
+      "delete": {
+        "operationId": "delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "cardId",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "billing-key-controller"
+        ]
+      }
+    },
+    "/api/billing-keys/{cardId}/default": {
+      "patch": {
+        "operationId": "setDefault",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "cardId",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListBillingKeyResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "billing-key-controller"
+        ]
+      }
+    },
     "/api/cart-items": {
       "delete": {
         "operationId": "removeItems",
@@ -3163,6 +3293,34 @@
           }
         }
       },
+      "ApiResponseBillingKeyPrepareResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/BillingKeyPrepareResponse"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorResponse"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ApiResponseBillingKeyResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/BillingKeyResponse"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorResponse"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
       "ApiResponseCartItemsResponse": {
         "type": "object",
         "properties": {
@@ -3378,6 +3536,23 @@
         "properties": {
           "data": {
             "$ref": "#/components/schemas/ImageUploadUrlResponse"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorResponse"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ApiResponseListBillingKeyResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BillingKeyResponse"
+            }
           },
           "error": {
             "$ref": "#/components/schemas/ErrorResponse"
@@ -4112,6 +4287,65 @@
           }
         }
       },
+      "BillingKeyPrepareResponse": {
+        "type": "object",
+        "properties": {
+          "channelKey": {
+            "type": "string"
+          },
+          "customerId": {
+            "type": "string"
+          },
+          "issueId": {
+            "type": "string"
+          },
+          "issueName": {
+            "type": "string"
+          }
+        }
+      },
+      "BillingKeyRegisterRequest": {
+        "type": "object",
+        "properties": {
+          "billingKey": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "billingKey"
+        ]
+      },
+      "BillingKeyResponse": {
+        "type": "object",
+        "properties": {
+          "cardId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "cardLast4": {
+            "type": "string"
+          },
+          "cardName": {
+            "type": "string"
+          },
+          "cardType": {
+            "type": "string",
+            "enum": [
+              "CREDIT",
+              "DEBIT",
+              "GIFT"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "isDefault": {
+            "type": "boolean"
+          }
+        }
+      },
       "Candidate": {
         "type": "object",
         "properties": {
@@ -4352,6 +4586,12 @@
           "id": {
             "type": "integer",
             "format": "int64"
+          },
+          "recommendations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RecommendedRecipe"
+            }
           },
           "role": {
             "type": "string",
@@ -5394,6 +5634,18 @@
           }
         }
       },
+      "ImminentIngredient": {
+        "type": "object",
+        "properties": {
+          "dDay": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
       "IngredientDeductionResponse": {
         "type": "object",
         "properties": {
@@ -5626,6 +5878,18 @@
               "ACTIVE",
               "SUSPENDED"
             ]
+          }
+        }
+      },
+      "MissingIngredient": {
+        "type": "object",
+        "properties": {
+          "ingredientId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "name": {
+            "type": "string"
           }
         }
       },
@@ -7500,6 +7764,67 @@
             "type": "string",
             "maxLength": 2000,
             "minLength": 0
+          }
+        }
+      },
+      "RecommendedRecipe": {
+        "type": "object",
+        "properties": {
+          "category": {
+            "type": "string"
+          },
+          "cookTimeMin": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "description": {
+            "type": "string"
+          },
+          "imageUrl": {
+            "type": "string"
+          },
+          "imminentIngredients": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ImminentIngredient"
+            }
+          },
+          "lacksManyIngredients": {
+            "type": "boolean"
+          },
+          "matchedTastes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "missingIngredients": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MissingIngredient"
+            }
+          },
+          "missingSelectedIngredients": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "name": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "recipeId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "usedIngredients": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         }
       },

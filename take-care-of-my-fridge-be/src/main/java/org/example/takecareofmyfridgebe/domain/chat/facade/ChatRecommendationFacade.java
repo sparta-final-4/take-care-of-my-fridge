@@ -12,6 +12,7 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate.Reason;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidates;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeQuery;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecommendationReply;
+import org.example.takecareofmyfridgebe.domain.chat.dto.SavedRecommendation;
 import org.example.takecareofmyfridgebe.domain.chat.dto.TasteLabel;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.Ingredient;
 import org.example.takecareofmyfridgebe.domain.ingredient.service.IngredientService;
@@ -21,6 +22,8 @@ import org.example.takecareofmyfridgebe.domain.recipe.service.RecipeService;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -57,7 +60,7 @@ public class ChatRecommendationFacade {
         List<RecommendedRecipe> recipes = new ArrayList<>();
         for (int i = 0; i < picked.size(); i++) {
             RecipeCandidate candidate = picked.get(i);
-            recipes.add(toCard(candidate, summaries.get(candidate.recipeId()), reasons.get(i)));
+            recipes.add(toCard(candidate, summaries.get(candidate.recipeId()), reasons.get(i), null));
         }
         logPicked(query, picked, recipes);
 
@@ -106,7 +109,43 @@ public class ChatRecommendationFacade {
                 .collect(Collectors.toMap(Ingredient::getId, Ingredient::getName));
     }
 
-    private static RecommendedRecipe toCard(RecipeCandidate candidate, RecipeSummary summary, String cardReason) {
+    /**
+     * 저장된 추천 카드를 다시 만든다. 순서·설명은 저장값, 이름·이미지·분류·시간은 지금 레시피, 임박·장볼 재료·이유는 지금 냉장고 기준.
+     * 지워진 레시피는 빼고, "냉장고에 없는 선택 재료"는 고른 재료를 저장하지 않으므로 비운다. 레시피 조회는 메시지 수와 상관없이 한 번씩이다.
+     *
+     * @return AI 메시지 ID별 카드 (보여 준 순서)
+     */
+    public Map<Long, List<RecommendedRecipe>> rebuildCards(Long memberId, List<SavedRecommendation> saved) {
+        if (saved.isEmpty()) {
+            return Map.of();
+        }
+        List<Long> recipeIds = saved.stream().map(SavedRecommendation::recipeId).distinct().toList();
+        Map<Long, RecipeCandidate> candidates = recipeCandidateFacade.describeRecipes(memberId, recipeIds);
+        Map<Long, RecipeSummary> summaries = recipeService.findSummaries(recipeIds);
+
+        Map<Long, List<SavedRecommendation>> byMessage = saved.stream()
+                .collect(Collectors.groupingBy(SavedRecommendation::messageId, LinkedHashMap::new, Collectors.toList()));
+        Map<Long, List<RecommendedRecipe>> cards = new LinkedHashMap<>();
+        byMessage.forEach((messageId, recommendations) -> {
+            List<SavedRecommendation> alive = recommendations.stream()
+                    .sorted(Comparator.comparingInt(SavedRecommendation::displayOrder))
+                    .filter(recommendation -> candidates.containsKey(recommendation.recipeId()))
+                    .toList();
+            List<RecipeCandidate> picked = alive.stream().map(r -> candidates.get(r.recipeId())).toList();
+            List<String> reasons = RecommendationReasonWriter.writeDistinct(picked, null);
+            List<RecommendedRecipe> messageCards = new ArrayList<>();
+            for (int i = 0; i < alive.size(); i++) {
+                RecipeCandidate candidate = picked.get(i);
+                messageCards.add(toCard(candidate, summaries.get(candidate.recipeId()), reasons.get(i),
+                        alive.get(i).description()));
+            }
+            cards.put(messageId, messageCards);
+        });
+        return cards;
+    }
+
+    private static RecommendedRecipe toCard(RecipeCandidate candidate, RecipeSummary summary, String cardReason,
+                                            String description) {
         Reason reason = candidate.reason();
         // 원한 맛을 말했으면 그 맛, 아니면 회원 선호 맛과 겹친 맛
         List<Member.Taste> tastes = reason.matchedWantedTastes().isEmpty()
@@ -128,7 +167,8 @@ public class ChatRecommendationFacade {
                         .toList(),
                 reason.missingSelectedIngredients(),
                 reason.lacksManyIngredients(),
-                cardReason
+                cardReason,
+                description
         );
     }
 }

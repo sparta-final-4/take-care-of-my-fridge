@@ -10,6 +10,7 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageCreateRequest
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageEventResponse;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageResponse;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecommendationReply;
+import org.example.takecareofmyfridgebe.domain.chat.dto.RecommendationToSave;
 import org.example.takecareofmyfridgebe.domain.chat.facade.ChatIntentFacade;
 import org.example.takecareofmyfridgebe.domain.chat.facade.ChatRecommendationFacade;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
@@ -23,6 +24,7 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 @Slf4j
 @Service
@@ -75,6 +77,8 @@ public class ChatStreamService {
 
         StringBuilder accumulated = new StringBuilder();
         AtomicBoolean firstChunkReceived = new AtomicBoolean(false);
+        // 이 답에 붙은 추천 카드. 답이 끝나면 AI 메시지와 함께 저장한다
+        AtomicReference<RecommendationReply> recommendationRef = new AtomicReference<>();
 
         // 4. 의도·조건 뽑기 → (추천이면) 후보 검색 → 카드 (event: recommendations) → 답변 스트리밍 조각 (event: message)
         // 의도 판단·후보 검색은 AI·DB·검색을 부르는 블로킹 작업이라 boundedElastic에서 실행한다.
@@ -82,6 +86,7 @@ public class ChatStreamService {
         Flux<ServerSentEvent<String>> messageStream = Mono.fromCallable(() -> planReply(memberId, sessionId, request))
                 .subscribeOn(Schedulers.boundedElastic())
                 .flatMapMany(plan -> {
+                    recommendationRef.set(plan.recommendation());
                     Flux<ServerSentEvent<String>> textEvents = replyText(memberId, sessionId, content, plan)
                             .doOnNext(chunk -> {
                                 firstChunkReceived.set(true);
@@ -109,7 +114,7 @@ public class ChatStreamService {
                 log.warn("상담 답이 비어 있음 - memberId: {}, sessionId: {}", memberId, sessionId);
                 return Mono.error(new BusinessException(ErrorCode.CHAT_AI_UNAVAILABLE));
             }
-            return saveExchange(sessionId, content, accumulated);
+            return saveExchange(sessionId, content, accumulated, recommendationRef.get());
         });
 
         // 6. 실패 시 에러 이벤트 (event: error) 및 로깅. 첫 조각 전 실패면 하루 횟수를 돌려준다
@@ -156,13 +161,18 @@ public class ChatStreamService {
         private static final ReplyPlan GENERAL = new ReplyPlan(null);
     }
 
-    private Mono<ServerSentEvent<String>> saveExchange(Long sessionId, String content, StringBuilder accumulated) {
+    private Mono<ServerSentEvent<String>> saveExchange(Long sessionId, String content, StringBuilder accumulated,
+                                                       RecommendationReply recommendation) {
         return Mono.fromCallable(() -> {
-            List<ChatMessageResponse> saved = chatMessageService.saveExchange(
-                    sessionId,
-                    content,
-                    accumulated.toString()
-            );
+            List<RecommendationToSave> cards = recommendation == null
+                    ? List.of()
+                    : recommendation.event().recipes().stream()
+                    .map(recipe -> new RecommendationToSave(recipe.recipeId(), recipe.description()))
+                    .toList();
+            // 카드가 없으면 기존처럼 메시지만 저장한다
+            List<ChatMessageResponse> saved = cards.isEmpty()
+                    ? chatMessageService.saveExchange(sessionId, content, accumulated.toString())
+                    : chatMessageService.saveExchange(sessionId, content, accumulated.toString(), cards);
             String doneJson = toJson(new ChatDoneEventResponse(saved.get(0).id(), saved.get(1).id()));
             return ServerSentEvent.<String>builder()
                     .event("done")

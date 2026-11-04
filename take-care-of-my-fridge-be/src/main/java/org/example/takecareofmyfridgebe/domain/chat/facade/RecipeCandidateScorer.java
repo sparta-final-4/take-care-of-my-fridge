@@ -196,6 +196,37 @@ public class RecipeCandidateScorer {
         return new RecipeCandidates(top, fallback);
     }
 
+    /**
+     * 정해진 레시피를 거르기·정렬 없이 계산한다 (요청 조건·선택 재료 없음). 저장된 추천 카드를 지금 냉장고 기준으로 다시 보여 줄 때 쓴다.
+     * 정보가 없는(지워진) 레시피는 건너뛴다. 결과는 recipeIds 순서다.
+     */
+    public List<RecipeCandidate> scoreAll(
+            Long memberId,
+            List<FridgeStock> fridge,
+            Collection<Member.Taste> memberTastes,
+            List<RecipeCandidateIngredient> rows,
+            Map<Long, RecipeCandidateInfo> infos,
+            Map<Long, Set<Member.Taste>> recipeTastes,
+            Collection<Long> recipeIds
+    ) {
+        RecipeQuery query = RecipeQuery.of(memberId, List.of());
+        Map<Long, FridgeStock> fridgeById = fridge.stream()
+                .collect(Collectors.toMap(FridgeStock::ingredientId, stock -> stock, (a, b) -> a, LinkedHashMap::new));
+        Map<Long, List<RecipeCandidateIngredient>> rowsByRecipe = rows.stream()
+                .collect(Collectors.groupingBy(RecipeCandidateIngredient::recipeId, LinkedHashMap::new, Collectors.toList()));
+        Set<Member.Taste> preferred = toTasteSet(memberTastes);
+        List<RecipeCandidate> scored = new ArrayList<>();
+        for (Long recipeId : recipeIds) {
+            RecipeCandidateInfo info = infos.get(recipeId);
+            if (info == null) {
+                continue;
+            }
+            scored.add(score(query, List.of(), info, rowsByRecipe.getOrDefault(recipeId, List.of()), fridgeById, preferred,
+                    recipeTastes.getOrDefault(recipeId, Set.of())));
+        }
+        return scored;
+    }
+
     // 사용자가 고른 재료(기본 양념 제외 2개 이상)를 전부 쓰는 레시피는 재료를 많이 사야 해도 1차 후보로 둔다 (구매 링크로 보완).
     // 선택이 1개면 그 재료를 쓰면서 기준 이상인 레시피가 충분히 많아 예외를 두지 않는다
     // 요리 이름 키워드로 이름·재료가 맞은 레시피도 사용자가 말한 요리라 1차 후보로 둔다

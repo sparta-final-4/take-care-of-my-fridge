@@ -1,6 +1,10 @@
+import type { RecommendedRecipe } from '@/common/api/clients';
+
 // AI 상담 추천 카드 SSE 이벤트(event: recommendations)의 data.
 // SSE 이벤트 data는 OpenAPI 스펙에 나오지 않아 생성 타입이 없다. 그래서 백엔드 DTO
 // ChatRecommendationsEventResponse(domain/chat/dto)와 같은 모양으로 여기에 둔다. 필드를 바꾸면 둘 다 고친다.
+// 메시지 조회(ChatMessageResponse.recommendations)의 카드는 생성 타입 RecommendedRecipe로 오고,
+// toChatRecommendedRecipes로 같은 모양으로 바꿔 그린다.
 
 export interface ChatRecommendationImminentIngredient {
   name: string;
@@ -32,6 +36,8 @@ export interface ChatRecommendedRecipe {
   lacksManyIngredients: boolean;
   // 추천 이유 한 줄 (예: "버섯·두부가 주재료예요"). 없으면 빈 문자열
   reason: string;
+  // 카드 아래 AI 설명. 저장된 기록에만 있고, 없으면 null
+  description: string | null;
 }
 
 export interface ChatRecommendations {
@@ -80,7 +86,17 @@ function toRecipe(value: Record<string, unknown>): ChatRecommendedRecipe | null 
     missingSelectedIngredients: strings(value.missingSelectedIngredients),
     lacksManyIngredients: value.lacksManyIngredients === true,
     reason: typeof value.reason === 'string' ? value.reason : '',
+    description:
+      typeof value.description === 'string' && value.description ? value.description : null,
   };
+}
+
+// 메시지 조회로 받은 카드(생성 타입)를 그릴 모양으로 바꾼다. id·이름이 없는 카드는 뺀다.
+// 기록에서 다시 그린 카드는 "냉장고에 없는 선택 재료"를 다시 계산하지 않아 빈 목록으로 온다(그 태그만 안 보인다).
+export function toChatRecommendedRecipes(
+  cards: RecommendedRecipe[] | undefined,
+): ChatRecommendedRecipe[] {
+  return (cards ?? []).flatMap((card) => toRecipe({ ...card }) ?? []);
 }
 
 // 이벤트 data(JSON)를 읽는다. 모양이 다르면 null, 레시피 중 필수 값(id·이름)이 없는 것은 뺀다.

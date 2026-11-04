@@ -21,7 +21,7 @@ import { streamMessage } from '../api';
 import { useChatModalStore } from '../model/useChatModalStore';
 import { useChatStreamingStore } from '../model/useChatStreamingStore';
 import { chatQueries, useCompleteChatSession, useStartChatSession } from '../queries';
-import type { ChatRecommendations } from '../recommendations';
+import { type ChatRecommendations, toChatRecommendedRecipes } from '../recommendations';
 import { selectedRecommendMessage } from '../selectedIngredients';
 import { ChatEndedNotice } from './ChatEndedNotice';
 import { ChatMessageBubble } from './ChatMessageBubble';
@@ -93,11 +93,6 @@ export function ChatRoomSection({
   const [streamingRecommendations, setStreamingRecommendations] =
     useState<ChatRecommendations | null>(null);
   const [pendingText, setPendingText] = useState<string | null>(null);
-  // 답이 끝난 추천 카드. 기록을 다시 받아도(이 창의 완료·다른 창의 상담 신호) 그 AI 메시지(assistantMessageId) 위에 계속 보인다.
-  // 카드는 아직 서버에 저장하지 않아(PR 6) 채팅창을 닫았다 열거나 새로고침하면 사라진다.
-  const [recommendationsByMessageId, setRecommendationsByMessageId] = useState<
-    Record<number, ChatRecommendations>
-  >({});
   const screens = Grid.useBreakpoint();
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -281,7 +276,7 @@ export function ChatRoomSection({
   // 기록을 다시 받으면(답 완료·다른 창 신호) 위치는 그대로 두고 버튼만 맞춘다
   useEffect(() => {
     updateScrollBottomButton();
-  }, [messagesData, recommendationsByMessageId, updateScrollBottomButton]);
+  }, [messagesData, updateScrollBottomButton]);
 
   // 새 상담 시작 핸들러
   const handleStartNewSession = () => {
@@ -359,7 +354,6 @@ export function ChatRoomSection({
     // 의도 판단·후보 검색으로 첫 이벤트까지 2초쯤 걸린다. 칩은 추천이 확실하므로 레시피를 찾는다고 알린다.
     setPendingText(mode === 'RECOMMEND' ? '레시피를 찾고 있어요…' : '답을 준비하고 있어요…');
     setStreamingRecommendations(null);
-    let receivedRecommendations: ChatRecommendations | null = null;
 
     setSendErrorInfo(null);
     setVisibleSendError(null);
@@ -378,7 +372,6 @@ export function ChatRoomSection({
         useSelectedOnly,
         signal: controller.signal,
         onRecommendations: (recommendations) => {
-          receivedRecommendations = recommendations;
           setStreamingRecommendations(recommendations);
           setPendingText(null);
         },
@@ -386,12 +379,9 @@ export function ChatRoomSection({
           setPendingText(null);
           setStreamingAssistantMessage((prev) => (prev ?? '') + chunk);
         },
-        onDone: async ({ assistantMessageId }) => {
-          // 기록을 다시 받기 전에 카드를 그 AI 메시지에 붙여 두어 깜빡이지 않게 한다
-          const cards = receivedRecommendations;
-          if (cards && !cards.empty && assistantMessageId !== undefined) {
-            setRecommendationsByMessageId((prev) => ({ ...prev, [assistantMessageId]: cards }));
-          }
+        onDone: async () => {
+          // 카드는 AI 메시지와 함께 저장됐으므로 기록을 다시 받으면 기록의 카드로 그린다.
+          // 다시 받기가 끝난 뒤에 받는 중인 카드를 지워 깜빡이지 않게 한다
           try {
             await queryClient.refetchQueries({ queryKey: chatQueries.messages(sessionId) });
             // 상담 내역의 메시지 수·마지막 시각이 바뀌므로 다시 받게 한다.
@@ -574,7 +564,7 @@ export function ChatRoomSection({
             </Flex>
           ) : messagesData && messagesData.length > 0 ? (
             messagesData.map((msg) => {
-              const cards = msg.id !== undefined ? recommendationsByMessageId[msg.id] : undefined;
+              const cards = toChatRecommendedRecipes(msg.recommendations);
               return (
                 <Fragment key={msg.id ?? msg.sequence}>
                   <ChatMessageBubble
@@ -582,8 +572,8 @@ export function ChatRoomSection({
                     content={msg.content ?? ''}
                     createdAt={msg.createdAt}
                   />
-                  {cards && (
-                    <ChatRecommendationCards recipes={cards.recipes} onNavigate={closeOnNavigate} />
+                  {cards.length > 0 && (
+                    <ChatRecommendationCards recipes={cards} onNavigate={closeOnNavigate} />
                   )}
                 </Fragment>
               );

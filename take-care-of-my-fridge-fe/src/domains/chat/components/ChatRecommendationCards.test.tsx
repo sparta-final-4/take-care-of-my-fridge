@@ -19,6 +19,7 @@ function recipe(overrides: Partial<ChatRecommendedRecipe>): ChatRecommendedRecip
     missingSelectedIngredients: [],
     lacksManyIngredients: false,
     reason: '감자를 쓸 수 있어요',
+    description: null,
     ...overrides,
   };
 }

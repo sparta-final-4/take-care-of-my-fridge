@@ -24,6 +24,7 @@ export * from './apis/admin-product-controller-api';
 export * from './apis/admin-recipe-controller-api';
 export * from './apis/admin-sale-event-controller-api';
 export * from './apis/auth-controller-api';
+export * from './apis/billing-key-controller-api';
 export * from './apis/cart-controller-api';
 export * from './apis/chat-message-controller-api';
 export * from './apis/chat-session-controller-api';

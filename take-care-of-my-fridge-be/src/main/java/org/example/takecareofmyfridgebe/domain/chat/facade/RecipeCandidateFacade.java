@@ -25,6 +25,7 @@ import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -95,6 +96,33 @@ public class RecipeCandidateFacade {
         RecipeCandidates result = RecipeCandidateScorer.withMissingIngredients(
                 ranked, fridge, recipeService.findNonBasicIngredients(topRecipeIds));
         return new RecipeCandidates(result.candidates(), result.fallback(), query.keywordsNotFound());
+    }
+
+    /**
+     * 정해진 레시피들을 지금 냉장고·회원 선호 맛 기준으로 계산한다 (거르기·정렬 없이). 저장된 추천 카드를 다시 보여 줄 때 쓴다.
+     * 레시피 정보·재료·맛·냉장고·회원 조회는 레시피 수와 상관없이 한 번씩이다. 없는(지워진) 레시피는 결과에서 빠진다.
+     *
+     * @return 레시피 ID별 후보 (임박·쓰는 재료·장볼 재료·모자람이 채워짐)
+     */
+    public Map<Long, RecipeCandidate> describeRecipes(Long memberId, Collection<Long> recipeIds) {
+        if (recipeIds.isEmpty()) {
+            return Map.of();
+        }
+        RecipeCandidateScorer scorer = new RecipeCandidateScorer(
+                chatCandidateProperties.excludedCategories(), chatCandidateProperties.minOwnedRatio());
+        List<FridgeStock> fridge = RecipeCandidateScorer.prepareFridge(
+                fridgeService.getItems(memberId, FridgeSortType.EXPIRATION));
+        List<Member.Taste> memberTastes = memberService.getMyInfo(memberId).tastes();
+        List<RecipeCandidateIngredient> rows = recipeService.findNonBasicIngredients(recipeIds);
+        Map<Long, RecipeCandidateInfo> infos = recipeService.findCandidateInfos(recipeIds);
+        Map<Long, Set<Member.Taste>> recipeTastes = recipeService.findTastesByRecipeIds(recipeIds);
+
+        List<RecipeCandidate> scored = scorer.scoreAll(memberId, fridge, memberTastes, rows, infos, recipeTastes, recipeIds);
+        RecipeCandidates withMissing = RecipeCandidateScorer.withMissingIngredients(
+                new RecipeCandidates(scored, false), fridge, rows);
+        Map<Long, RecipeCandidate> byId = new LinkedHashMap<>();
+        withMissing.candidates().forEach(candidate -> byId.put(candidate.recipeId(), candidate));
+        return byId;
     }
 
     // 키워드마다 레시피 검색(관련도 순)으로 레시피를 찾는다. 레시피 ID별로 벡터 검색으로만 찾았는지(true)를 돌려준다.

@@ -1,12 +1,14 @@
 import { useQuery } from '@tanstack/react-query';
 import { Button, Empty, Flex, Result, Spin, Typography } from 'antd';
-import { useEffect, useRef } from 'react';
+import { Fragment, useEffect, useRef } from 'react';
 
 import type { ChatSessionSummaryResponse } from '@/common/api/clients';
 
 import { formatChatDateTime } from '../format';
 import { chatQueries } from '../queries';
+import { toChatRecommendedRecipes } from '../recommendations';
 import { ChatMessageBubble } from './ChatMessageBubble';
+import { ChatRecommendationCards } from './ChatRecommendationCards';
 import { ChatSessionStatusTag } from './ChatSessionStatusTag';
 import styles from './ChatSessionConversation.module.scss';
 
@@ -49,14 +51,19 @@ export function ChatSessionConversation({ session }: ChatSessionConversationProp
         ) : data.length === 0 ? (
           <Empty description="대화 기록이 없습니다." />
         ) : (
-          data.map((message) => (
-            <ChatMessageBubble
-              key={message.id ?? message.sequence}
-              senderRole={message.role === 'USER' ? 'USER' : 'ASSISTANT'}
-              content={message.content ?? ''}
-              createdAt={message.createdAt}
-            />
-          ))
+          data.map((message) => {
+            const cards = toChatRecommendedRecipes(message.recommendations);
+            return (
+              <Fragment key={message.id ?? message.sequence}>
+                <ChatMessageBubble
+                  senderRole={message.role === 'USER' ? 'USER' : 'ASSISTANT'}
+                  content={message.content ?? ''}
+                  createdAt={message.createdAt}
+                />
+                {cards.length > 0 && <ChatRecommendationCards recipes={cards} />}
+              </Fragment>
+            );
+          })
         )}
       </div>
 
