@@ -9,6 +9,7 @@ import org.example.takecareofmyfridgebe.domain.ingredient.service.IngredientServ
 import org.example.takecareofmyfridgebe.domain.member.dto.MyInfoResponse;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member.Taste;
 import org.example.takecareofmyfridgebe.domain.member.service.MemberService;
+import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeCandidateInfo;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeListRequest;
 import org.example.takecareofmyfridgebe.domain.recipe.service.RecipeService;
 import org.example.takecareofmyfridgebe.domain.search.dto.RecipeSearchResult;
@@ -89,7 +90,7 @@ class RecipeCandidateFacadeTest {
     }
 
     @Test
-    @DisplayName("키워드마다 레시피 검색으로 레시피를 찾아 그 레시피의 재료까지 받아 후보로 넣는다")
+    @DisplayName("키워드마다 레시피 검색으로 레시피를 찾아 재료까지 받고, 이름이 맞은 레시피가 있으면 못 찾음이 아니다")
     void searchesRecipesByKeywords() throws Exception {
         when(memberService.getMyInfo(MEMBER_ID)).thenReturn(mock(MyInfoResponse.class));
         when(recipeSearchService.search(any(RecipeListRequest.class))).thenAnswer(invocation -> {
@@ -100,6 +101,9 @@ class RecipeCandidateFacadeTest {
                 default -> new RecipeSearchResult(List.of(), 0);
             };
         });
+        when(recipeService.findCandidateInfos(Set.of(20L, 30L))).thenReturn(Map.of(
+                20L, new RecipeCandidateInfo(20L, "물냉면", "면류", 30, 5),
+                30L, new RecipeCandidateInfo(30L, "들기름 막국수", "면류", 20, 4)));
         RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, null, null, null, false,
                 List.of("냉면", "막국수"), "냉면");
 
@@ -133,5 +137,21 @@ class RecipeCandidateFacadeTest {
 
         verify(recipeSearchService, never()).search(any());
         assertThat(result.keywordsNotFound()).isFalse();
+    }
+
+    @Test
+    @DisplayName("벡터 검색으로만 찾은 레시피뿐이면 이름·재료가 맞은 레시피가 없어 keywordsNotFound가 true다")
+    void marksKeywordsNotFound_whenOnlyVectorFound() throws Exception {
+        when(memberService.getMyInfo(MEMBER_ID)).thenReturn(mock(MyInfoResponse.class));
+        when(recipeSearchService.search(any(RecipeListRequest.class)))
+                .thenReturn(new RecipeSearchResult(List.of(40L), 1, true));
+        when(recipeService.findCandidateInfos(Set.of(40L)))
+                .thenReturn(Map.of(40L, new RecipeCandidateInfo(40L, "들깨 칼국수", "면류", 30, 5)));
+        RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, null, null, null, false,
+                List.of("냉파스타"), "냉파스타");
+
+        RecipeCandidates result = facade.findCandidates(query);
+
+        assertThat(result.keywordsNotFound()).isTrue();
     }
 }

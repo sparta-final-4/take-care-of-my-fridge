@@ -20,7 +20,7 @@ import java.util.Set;
  * @param keywordText              사용자가 말한 요리 표현 그대로 (예: "냉면"). 키워드로 레시피를 못 찾았을 때 안내에 쓴다
  * @param selectedIngredientGroups 선택 재료별 같은 종류 재료 ID (예: 버섯 → 표고버섯·양송이버섯). 묶음 안의 재료를 하나라도 쓰면
  *                                 그 선택 재료를 쓴 것으로 센다. 후보 검색(RecipeCandidateFacade)이 채우며, 없으면 선택 재료 자신만이다
- * @param keywordMatches           키워드 검색으로 찾은 레시피 ID별 맞은 키워드. 후보 검색(RecipeCandidateFacade)이 채운다
+ * @param keywordMatches           키워드 검색으로 찾은 레시피 ID별 맞은 방식(이름·늘린 이름·재료·쪼개짐·벡터). 후보 검색(RecipeCandidateFacade)이 채운다
  */
 public record RecipeQuery(
         Long memberId,
@@ -33,7 +33,7 @@ public record RecipeQuery(
         List<String> keywords,
         String keywordText,
         Map<Long, Set<Long>> selectedIngredientGroups,
-        Map<Long, List<String>> keywordMatches
+        Map<Long, KeywordMatch> keywordMatches
 ) {
     public RecipeQuery {
         selectedIngredientIds = orEmpty(selectedIngredientIds);
@@ -81,9 +81,14 @@ public record RecipeQuery(
     }
 
     // 키워드 검색 결과를 채운 검색 조건
-    public RecipeQuery withKeywordMatches(Map<Long, List<String>> matches) {
+    public RecipeQuery withKeywordMatches(Map<Long, KeywordMatch> matches) {
         return new RecipeQuery(memberId, selectedIngredientIds, wantedTastes, moodCategories, maxMinutes,
                 excludeIngredientIds, useSelectedOnly, keywords, keywordText, selectedIngredientGroups, matches);
+    }
+
+    // 키워드를 말했는데 이름·재료로 맞은 레시피가 하나도 없는지 (쪼개짐·벡터로만 찾은 것은 맞은 것으로 치지 않는다)
+    public boolean keywordsNotFound() {
+        return !keywords.isEmpty() && keywordMatches.values().stream().noneMatch(KeywordMatch::strong);
     }
 
     // 선택 재료 하나의 같은 종류 재료 ID (선택 재료 자신 포함)

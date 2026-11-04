@@ -44,8 +44,8 @@ class RecommendationPromptBuilderTest {
                 선택 재료: 버섯, 두부 (이 재료를 꼭 쓰는 레시피만)
                 조건: 원하는 맛 매운맛 / 분류 찌개, 국 / 30분 이내 / 뺄 재료 오이
                 [추천 후보]
-                1. 두부버섯찌개 | 찌개 | 조리 시간 25분 | 쓰는 냉장고 재료: 오늘까지인 양파, 3일 남은 대파, 두부 | 원하는 맛과 맞음: 매운맛 | 장볼 재료: 돼지고기, 부추, 당근 외 2개 | 재료 많이 모자람
-                2. 버섯전 | 전 | 조리 시간 정보 없음 | 쓰는 냉장고 재료: 없음 | 좋아하는 맛과 맞음: 짠맛, 감칠맛 | 장볼 재료: 없음""");
+                후보: 두부버섯찌개 | 찌개 | 조리 시간 25분 | 카드 이유: 매콤한 요리예요 | 쓰는 냉장고 재료: 오늘까지인 양파, 3일 남은 대파, 두부 | 원하는 맛과 맞음: 매운맛 | 장볼 재료: 돼지고기, 부추, 당근 외 2개 | 재료 많이 모자람
+                후보: 버섯전 | 전 | 조리 시간 정보 없음 | 카드 이유: 짭짤하고 감칠맛 나요 | 쓰는 냉장고 재료: 없음 | 좋아하는 맛과 맞음: 짠맛, 감칠맛 | 장볼 재료: 없음""");
     }
 
     @Test
@@ -71,7 +71,7 @@ class RecommendationPromptBuilderTest {
         String text = RecommendationPromptBuilder.build("{name} 추천", RecipeQuery.of(MEMBER_ID, List.of()), NAMES,
                 List.of(candidate), false);
 
-        assertThat(text).doesNotContain("{", "}").contains("메시지: (name) 추천", "1. (특제) 찌개");
+        assertThat(text).doesNotContain("{", "}").contains("메시지: (name) 추천", "후보: (특제) 찌개");
     }
 
     @Test
@@ -80,11 +80,11 @@ class RecommendationPromptBuilderTest {
         RecipeCandidate first = candidate(1L, "표고두부전골", "전골", 30,
                 new Reason(List.of("대파"), List.of(new ImminentIngredient("대파", 1)), List.of(), List.of(), List.of(), false, false,
                         List.of(missing(161L, "표고버섯"), missing(TOFU, "두부")), List.of("표고버섯", "두부"),
-                        List.of("표고버섯", "두부")));
+                        List.of("표고버섯", "두부"), null));
         RecipeCandidate second = candidate(2L, "팽이두부국", "국", 20,
                 new Reason(List.of(), List.of(), List.of(), List.of(), List.of(), false, false,
                         List.of(missing(185L, "팽이버섯"), missing(TOFU, "두부")), List.of("팽이버섯", "두부"),
-                        List.of("팽이버섯", "두부")));
+                        List.of("팽이버섯", "두부"), null));
 
         String text = RecommendationPromptBuilder.build("버섯 두부로", RecipeQuery.of(MEMBER_ID, List.of(MUSHROOM, TOFU)),
                 NAMES, List.of(first, second), false);
@@ -93,11 +93,11 @@ class RecommendationPromptBuilderTest {
                 [먼저 말할 것]
                 말씀하신 표고버섯, 두부, 팽이버섯은 지금 냉장고에 없어서 준비가 필요해요
                 [사용자 요청]""");
-        assertThat(text).contains("1. 표고두부전골 | 전골 | 조리 시간 30분 | 선택 재료 쓰임: 표고버섯, 두부 | 쓰는 냉장고 재료: 내일까지인 대파 | 냉장고에 없는 선택 재료: 표고버섯, 두부 | 장볼 재료: 표고버섯, 두부");
+        assertThat(text).contains("후보: 표고두부전골 | 전골 | 조리 시간 30분 | 카드 이유: 표고버섯·두부가 주재료예요 | 선택 재료 쓰임: 표고버섯, 두부 | 쓰는 냉장고 재료: 내일까지인 대파 | 냉장고에 없는 선택 재료: 표고버섯, 두부 | 장볼 재료: 표고버섯, 두부");
     }
 
     @Test
-    @DisplayName("키워드로 레시피를 못 찾았으면 [먼저 말할 것]에 사용자가 말한 요리 표현으로 안내를 넣는다")
+    @DisplayName("키워드로 이름·재료가 맞은 레시피가 없으면 [먼저 말할 것]에 사용자가 말한 요리 이름으로 안내를 넣는다")
     void writesKeywordNotFoundNotice() {
         RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, List.of("면류"), null, null, false,
                 List.of("냉파스타"), "냉파스타");
@@ -106,7 +106,7 @@ class RecommendationPromptBuilderTest {
 
         assertThat(text).startsWith("""
                 [먼저 말할 것]
-                말씀하신 냉파스타 레시피는 찾지 못해서 비슷한 걸 골랐어요
+                말씀하신 냉파스타 요리는 찾지 못해서 비슷한 걸 골랐어요
                 [사용자 요청]""");
     }
 
@@ -115,7 +115,7 @@ class RecommendationPromptBuilderTest {
     void omitsNotice_whenNoSelectedIsMissing() {
         RecipeCandidate candidate = candidate(1L, "두부조림", "조림", 20,
                 new Reason(List.of("두부"), List.of(), List.of(), List.of(), List.of(), false, false,
-                        List.of(), List.of(), List.of("두부")));
+                        List.of(), List.of(), List.of("두부"), null));
 
         String text = RecommendationPromptBuilder.build("두부로", RecipeQuery.of(MEMBER_ID, List.of(TOFU)), NAMES,
                 List.of(candidate), false);
@@ -129,11 +129,11 @@ class RecommendationPromptBuilderTest {
     void choosesTopicParticleByLastName() {
         assertThat(RecommendationPromptBuilder.missingSelectedNotice(List.of(candidate(1L, "a", "국", 10,
                 new Reason(List.of(), List.of(), List.of(), List.of(), List.of(), false, false, List.of(),
-                        List.of("두부"), List.of())))))
+                        List.of("두부"), List.of(), null)))))
                 .isEqualTo("말씀하신 두부는 지금 냉장고에 없어서 준비가 필요해요");
         assertThat(RecommendationPromptBuilder.missingSelectedNotice(List.of(candidate(1L, "a", "국", 10,
                 new Reason(List.of(), List.of(), List.of(), List.of(), List.of(), false, false, List.of(),
-                        List.of("표고버섯"), List.of())))))
+                        List.of("표고버섯"), List.of(), null)))))
                 .isEqualTo("말씀하신 표고버섯은 지금 냉장고에 없어서 준비가 필요해요");
     }
 
@@ -152,7 +152,7 @@ class RecommendationPromptBuilderTest {
 
     private static Reason reason(List<String> used, List<ImminentIngredient> imminent, List<Taste> tastes,
                                  List<Taste> wantedTastes, List<MissingIngredient> missing, boolean lacks) {
-        return new Reason(used, imminent, tastes, wantedTastes, List.of(), false, lacks, missing, List.of(), List.of());
+        return new Reason(used, imminent, tastes, wantedTastes, List.of(), false, lacks, missing, List.of(), List.of(), null);
     }
 
     private static MissingIngredient missing(Long id, String name) {

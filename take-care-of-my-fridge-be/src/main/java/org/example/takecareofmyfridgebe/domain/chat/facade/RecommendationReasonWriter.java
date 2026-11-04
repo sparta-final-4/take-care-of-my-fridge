@@ -1,5 +1,6 @@
 package org.example.takecareofmyfridgebe.domain.chat.facade;
 
+import org.example.takecareofmyfridgebe.domain.chat.dto.KeywordMatch;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate.ImminentIngredient;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate.Reason;
@@ -12,8 +13,11 @@ import java.util.Optional;
 /**
  * 추천 카드에 넣을 이유 한 줄(25자 안팎)을 만든다. 스프링에 의존하지 않는 순수 클래스.
  * 우선순위: 사용자 요청(요리 이름 키워드·원하는 맛·분류) > 선택 재료 > 임박 재료 > 겹친 맛 > 쓰는 냉장고 재료 수.
+ * 요리 이름 키워드는 어떻게 맞았는지(KeywordMatch)대로 쓴다. 사용자가 말한 요리 이름(dishText)이 없으면 분류 이름을 쓴다.
+ * 벡터 검색으로만 찾은 레시피는 "찾으신·비슷한"을 쓰지 않고 선택 재료·임박·맛으로 쓴다.
  * <pre>
- * 찾으신 냉면 요리예요 / 매콤한 찌개 요리예요
+ * 찾으신 냉면이에요 / 냉면과 비슷한 막국수예요 / 냉면처럼 메밀면을 쓰는 요리예요 / 냉면과 비슷한 면 요리예요
+ * 매콤한 찌개 요리예요
  * 버섯·두부가 주재료예요
  * 내일까지인 고추를 쓸 수 있어요
  * 짭짤하고 감칠맛 나요
@@ -22,16 +26,29 @@ import java.util.Optional;
  */
 public final class RecommendationReasonWriter {
 
-    private static final String KEYWORD_PREFIX = "키워드: ";
     private static final String CATEGORY_PREFIX = "분류: ";
     private static final int MAX_TASTES = 2;
 
     private RecommendationReasonWriter() {
     }
 
-    public static String write(RecipeCandidate candidate) {
+    /**
+     * @param dishText 사용자가 말한 요리 이름 (없으면 null)
+     */
+    public static String write(RecipeCandidate candidate, String dishText) {
         Reason reason = candidate.reason();
-        return requestReason(reason)
+        KeywordMatch keywordMatch = reason.keywordMatch();
+        if (keywordMatch != null && keywordMatch.type() == KeywordMatch.Type.VECTOR) {
+            return otherReason(reason);
+        }
+        return keywordReason(keywordMatch, dishText, candidate.category())
+                .or(() -> requestReason(reason))
+                .orElseGet(() -> otherReason(reason));
+    }
+
+    // 선택 재료 > 임박 > 맛 > 쓰는 냉장고 재료 수
+    private static String otherReason(Reason reason) {
+        return selectedReason(reason)
                 .or(() -> selectedReason(reason))
                 .or(() -> imminentReason(reason))
                 .or(() -> tasteReason(reason.matchedTastes()))
@@ -40,13 +57,32 @@ public final class RecommendationReasonWriter {
                         : "냉장고 재료 " + reason.usedFridgeIngredients().size() + "가지를 써요");
     }
 
-    // 요리 이름 키워드가 맞으면 그 이름으로, 아니면 원하는 맛·분류로
-    private static Optional<String> requestReason(Reason reason) {
-        Optional<String> keyword = findRequest(reason, KEYWORD_PREFIX)
-                .map(keywords -> keywords.split(", ")[0]);
-        if (keyword.isPresent()) {
-            return Optional.of("찾으신 " + keyword.get() + " 요리예요");
+    // 요리 이름 키워드가 어떻게 맞았는지대로 쓴다. 사용자가 말한 이름이 없으면 분류 이름("면 요리")으로
+    private static Optional<String> keywordReason(KeywordMatch match, String dishText, String category) {
+        if (match == null) {
+            return Optional.empty();
         }
+        String kind = kindOf(category);
+        String dish = dishText != null ? dishText : kind;
+        return Optional.of(switch (match.type()) {
+            case NAME -> "찾으신 " + dish + copula(dish);
+            case EXPANDED -> dish + withParticle(dish) + " 비슷한 " + match.keyword() + copula(match.keyword());
+            case INGREDIENT -> dish + "처럼 " + match.ingredientName() + objectParticle(match.ingredientName()) + " 쓰는 요리예요";
+            case SPLIT, VECTOR -> dish + withParticle(dish) + " 비슷한 " + kind + "예요";
+        });
+    }
+
+    // 분류 이름을 요리 종류 말로 ("면류" → "면 요리", 없으면 "요리")
+    private static String kindOf(String category) {
+        if (category == null || category.isBlank()) {
+            return "요리";
+        }
+        String base = category.endsWith("류") ? category.substring(0, category.length() - 1) : category;
+        return base + " 요리";
+    }
+
+    // 원하는 맛·분류로
+    private static Optional<String> requestReason(Reason reason) {
         Optional<String> category = findRequest(reason, CATEGORY_PREFIX);
         List<Member.Taste> tastes = reason.matchedWantedTastes();
         if (tastes.isEmpty() && category.isEmpty()) {
@@ -121,6 +157,15 @@ public final class RecommendationReasonWriter {
             case UMAMI -> "감칠맛 나요";
             case MILD -> "담백해요";
         };
+    }
+
+    // "냉면이에요" / "막국수예요"
+    private static String copula(String word) {
+        return hasFinalConsonant(word) ? "이에요" : "예요";
+    }
+
+    private static String withParticle(String word) {
+        return hasFinalConsonant(word) ? "과" : "와";
     }
 
     private static String subjectParticle(String word) {

@@ -21,10 +21,19 @@ class ChatRecommendPromptTest {
     }
 
     @Test
-    @DisplayName("소개 한두 문장만 쓰고 레시피별 설명·번호 목록·카드 안내 마무리는 쓰지 말라고 지시한다")
-    void instructsIntroOnly() {
-        assertThat(prompt).contains("소개 한두 문장만 쓴다", "레시피별 설명, 번호 목록, \"카드를 눌러…\" 같은 마무리는 쓰지 않는다",
-                "사용자 말에 맞춰 후보 전체를 소개한다");
+    @DisplayName("형식 규칙(소개 한두 문장, 번호 목록·레시피별 문장·카드 안내 금지)을 맨 위에 두고 출력 예시를 넣는다")
+    void putsFormatRuleFirstWithExamples() {
+        assertThat(prompt).startsWith("[추천 답 형식] 가장 먼저 지킨다.");
+        assertThat(prompt).contains("소개 한두 문장만 쓴다. 번호 목록, 레시피별 문장, \"카드를 눌러…\" 같은 마무리는 쓰지 않는다",
+                "예) 냉면처럼 즐길 수 있는 면 요리를 골랐어요. 내일까지인 고추와 깻잎을 같이 쓸 수 있어요.",
+                "예) 말씀하신 냉면 요리는 찾지 못해서 비슷한 면 요리를 골랐어요.");
+    }
+
+    @Test
+    @DisplayName("카드 정보에 없는 특징을 단정하지 말고, 찾았다고 단정하지 말고, 카드 이유의 사실만 쓰라고 지시한다")
+    void forbidsUnfoundedClaims() {
+        assertThat(prompt).contains("카드 정보에 없는 특징(차가운, 따뜻한, 매운, 바삭한 등)을 레시피에 붙여 단정하지 않는다",
+                "사용자가 말한 요리를 찾았다고 단정하지 않고", "\"카드 이유\"에 있는 사실만 근거로 쓴다");
     }
 
     @Test
@@ -45,7 +54,7 @@ class ChatRecommendPromptTest {
     @DisplayName("부족한 재료 대신 장볼 재료로 말하고, 카드에 있는 정보는 반복하지 말라고 지시한다")
     void instructsShoppingWordingAndNoRepeat() {
         assertThat(prompt).contains("\"부족한 재료\"라고 하지 않고 \"장볼 재료\"로 말한다", "장볼 재료 목록을 나열하지 않는다",
-                "분류·조리 시간·추천 이유를 레시피마다 다시 말하지 않는다");
+                "분류·조리 시간·카드 이유를 레시피마다 다시 말하지 않는다");
     }
 
     @Test

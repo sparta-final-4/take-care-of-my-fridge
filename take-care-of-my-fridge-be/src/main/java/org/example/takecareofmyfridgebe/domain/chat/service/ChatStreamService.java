@@ -129,8 +129,7 @@ public class ChatStreamService {
         }
         try {
             RecommendationReply recommendation = chatRecommendationFacade.recommend(request.content(), resolution.recipeQuery());
-            log.info("상담 추천 후보 - memberId: {}, sessionId: {}, 레시피: {}", memberId, sessionId,
-                    recommendation.event().recipes().stream().map(recipe -> recipe.recipeId() + " " + recipe.name()).toList());
+            // 고른 레시피·맞은 방식·카드 이유는 ChatRecommendationFacade가 "상담 추천 후보 -"로 남긴다
             return new ReplyPlan(recommendation);
         } catch (RuntimeException e) {
             log.warn("상담 추천 후보 검색 실패, 일반 답으로 - memberId: {}, sessionId: {}", memberId, sessionId, e);

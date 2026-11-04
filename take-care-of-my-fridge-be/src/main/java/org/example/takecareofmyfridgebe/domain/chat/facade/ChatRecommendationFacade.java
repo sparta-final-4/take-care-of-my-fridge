@@ -6,6 +6,7 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEvent
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse.ImminentIngredient;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse.MissingIngredient;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse.RecommendedRecipe;
+import org.example.takecareofmyfridgebe.domain.chat.dto.KeywordMatch;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate.Reason;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidates;
@@ -19,6 +20,7 @@ import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeSummary;
 import org.example.takecareofmyfridgebe.domain.recipe.service.RecipeService;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -51,8 +53,9 @@ public class ChatRecommendationFacade {
         Map<Long, RecipeSummary> summaries = recipeService.findSummaries(
                 picked.stream().map(RecipeCandidate::recipeId).toList());
         List<RecommendedRecipe> recipes = picked.stream()
-                .map(candidate -> toCard(candidate, summaries.get(candidate.recipeId())))
+                .map(candidate -> toCard(candidate, summaries.get(candidate.recipeId()), query.keywordText()))
                 .toList();
+        logPicked(query, picked, recipes);
 
         String candidateInfo = RecommendationPromptBuilder.build(
                 content, query, ingredientNames(query), picked, found.keywordsNotFound());
@@ -78,6 +81,18 @@ public class ChatRecommendationFacade {
                 query.memberId(), query.selectedIngredientIds(), query.useSelectedOnly(), candidates.size(), text);
     }
 
+    // 고른 레시피마다 어떻게 맞았는지(이름·늘린 이름·재료·쪼개짐·벡터·없음)와 카드 이유
+    private static void logPicked(RecipeQuery query, List<RecipeCandidate> picked, List<RecommendedRecipe> recipes) {
+        List<String> lines = new ArrayList<>();
+        for (int i = 0; i < picked.size(); i++) {
+            RecipeCandidate candidate = picked.get(i);
+            KeywordMatch match = candidate.reason().keywordMatch();
+            lines.add(candidate.recipeId() + " " + candidate.name() + " [" + (match == null ? "없음" : match.type().label())
+                    + "] " + recipes.get(i).reason());
+        }
+        log.info("상담 추천 후보 - memberId: {}, 키워드: {}, 고른 레시피: {}", query.memberId(), query.keywords(), lines);
+    }
+
     // 프롬프트에 쓸 선택·뺄 재료 이름
     private Map<Long, String> ingredientNames(RecipeQuery query) {
         List<Long> ids = Stream.concat(query.selectedIngredientIds().stream(), query.excludeIngredientIds().stream())
@@ -87,7 +102,7 @@ public class ChatRecommendationFacade {
                 .collect(Collectors.toMap(Ingredient::getId, Ingredient::getName));
     }
 
-    private static RecommendedRecipe toCard(RecipeCandidate candidate, RecipeSummary summary) {
+    private static RecommendedRecipe toCard(RecipeCandidate candidate, RecipeSummary summary, String dishText) {
         Reason reason = candidate.reason();
         // 원한 맛을 말했으면 그 맛, 아니면 회원 선호 맛과 겹친 맛
         List<Member.Taste> tastes = reason.matchedWantedTastes().isEmpty()
@@ -109,7 +124,7 @@ public class ChatRecommendationFacade {
                         .toList(),
                 reason.missingSelectedIngredients(),
                 reason.lacksManyIngredients(),
-                RecommendationReasonWriter.write(candidate)
+                RecommendationReasonWriter.write(candidate, dishText)
         );
     }
 }
