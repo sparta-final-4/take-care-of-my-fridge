@@ -4314,6 +4314,25 @@
             "type": "string",
             "maxLength": 500,
             "minLength": 0
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "AUTO",
+              "RECOMMEND"
+            ]
+          },
+          "selectedIngredientIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "maxItems": 50,
+            "minItems": 0
+          },
+          "useSelectedOnly": {
+            "type": "boolean"
           }
         },
         "required": [

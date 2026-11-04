@@ -17,5 +17,16 @@
 
 export interface ChatMessageCreateRequest {
     'content': string;
+    'mode'?: ChatMessageCreateRequestModeEnum;
+    'selectedIngredientIds'?: Array<number>;
+    'useSelectedOnly'?: boolean;
 }
+
+export const ChatMessageCreateRequestModeEnum = {
+    Auto: 'AUTO',
+    Recommend: 'RECOMMEND',
+} as const;
+
+export type ChatMessageCreateRequestModeEnum = typeof ChatMessageCreateRequestModeEnum[keyof typeof ChatMessageCreateRequestModeEnum];
+
 
