@@ -45,4 +45,17 @@ class ChatIntentPromptTest {
                 "탕수육·김피탕·깐풍기는 튀김 요리다",
                 "\"김피탕 같은 요리 추천해줘\" → keywords: 김피탕, 탕수육, 깐풍기 / moodCategories: 튀김 / dishText: 김피탕");
     }
+
+    @Test
+    @DisplayName("첫 질문용 고정 프롬프트에는 이어지는 말 규칙이 없고, 이어지는 말 규칙은 따로 다시 추천·레시피 자세히·대상 칸을 지시한다")
+    void keepsFollowUpRulesSeparate() throws IOException {
+        String followUp = new ClassPathResource("prompts/chat-intent-followup.txt").getContentAsString(StandardCharsets.UTF_8);
+
+        assertThat(prompt).doesNotContain("REFINE", "RECIPE_DETAIL", "[직전 추천]");
+        assertThat(followUp).contains("REFINE: 직전 추천을 조건을 바꿔 다시 받고 싶은 말",
+                "바꾸라고 하지 않은 조건은 [직전 조건] 그대로 쓴다",
+                "RECIPE_DETAIL: [직전 추천]이나 [이전 추천]에 있는 레시피 하나",
+                "targetIndex: [직전 추천] 번호(1부터)", "targetName: 말한 레시피 이름",
+                "새 요리 이름이나 새 조건으로 처음부터 추천해 달라는 말(\"김치찌개 먹고 싶어\")은 RECOMMEND");
+    }
 }

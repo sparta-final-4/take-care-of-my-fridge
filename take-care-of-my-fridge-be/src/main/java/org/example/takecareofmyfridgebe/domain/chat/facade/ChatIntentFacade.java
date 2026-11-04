@@ -3,23 +3,31 @@ package org.example.takecareofmyfridgebe.domain.chat.facade;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatCandidateProperties;
-import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntent;
+import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext;
+import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext.CardName;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntentResolution;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntentResolution.Source;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageCreateRequest;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageMode;
 import org.example.takecareofmyfridgebe.domain.chat.dto.IntentResult;
+import org.example.takecareofmyfridgebe.domain.chat.dto.LastRecommendation;
+import org.example.takecareofmyfridgebe.domain.chat.dto.LastRecommendation.QuerySnapshot;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeQuery;
 import org.example.takecareofmyfridgebe.domain.chat.service.ChatIntentExtractor;
+import org.example.takecareofmyfridgebe.domain.chat.service.ChatMessageService;
 import org.example.takecareofmyfridgebe.domain.ingredient.service.IngredientMatcher;
+import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeSummary;
 import org.example.takecareofmyfridgebe.domain.recipe.service.RecipeService;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
@@ -32,6 +40,13 @@ import java.util.stream.Stream;
  * 말한 재료 이름은 IngredientMatcher로 재료 ID로 바꾸고, 못 찾은 이름(ING_CUSTOM)은 버린다.
  * 말한 재료(includeIngredients)는 고른 재료와 합쳐 선택 재료로 쓴다 (중복 제거, 빼달라고 한 재료는 뺀다).
  * 그래서 "버섯 두부로 할 수 있는"처럼 말로만 재료를 정해도 칩으로 고른 것과 같은 규칙(선택 재료만 쓰기, 2개 이상 다 쓰면 보유 비율 예외)이 적용된다.
+ * <p>
+ * 직전 추천 카드가 있으면 의도 판단에 [직전 추천]·[이전 추천]·[직전 조건]을 별도 메시지로 넘겨 이어지는 말을 알아듣는다.
+ * <ul>
+ *   <li>REFINE(다시 추천): 직전 조건이 없으면(Redis 만료·장애) 이번 말만으로 새 추천</li>
+ *   <li>RECIPE_DETAIL(레시피 자세히): 이름이 직전 카드에 있으면 그 카드, 다음은 직전 카드 번호, 다음은 상담 전체 추천에서 이름으로 찾는다.
+ *       못 찾으면 일반 답(이전 대화를 보고 AI가 되묻는다)</li>
+ * </ul>
  */
 @Slf4j
 @Component
@@ -40,20 +55,33 @@ public class ChatIntentFacade {
 
     // AI가 고를 분류 목록에서만 뺄 분류. 뜻이 없어 조건으로 쓸 수 없다 (레시피 후보에서는 빼지 않는다)
     private static final Set<String> PROMPT_EXCLUDED_CATEGORIES = Set.of("기타");
+    // 의도 판단에 넘길 [이전 추천] 이름 수
+    private static final int EARLIER_CARDS_SHOWN = 6;
+    // 레시피 자세히 대상을 이름으로 찾을 상담 전체 추천 수 (최근 추천부터)
+    private static final int SESSION_RECIPES_SEARCHED = 30;
+    private static final String NAME_DELIMITER = ", ";
+    private static final String NONE = "없음";
 
     private final ChatIntentExtractor chatIntentExtractor;
     private final RecipeService recipeService;
     private final IngredientMatcher ingredientMatcher;
     private final ChatCandidateProperties chatCandidateProperties;
+    private final ChatMessageService chatMessageService;
 
+    // 상담 문맥 없이 (첫 질문과 같게) 정한다
     public ChatIntentResolution resolve(Long memberId, Long sessionId, ChatMessageCreateRequest request) {
-        ChatIntentResolution resolution = decide(memberId, sessionId, request);
-        log.info("상담 의도 - memberId: {}, sessionId: {}, 의도: {}, 출처: {}, 조건: {}",
-                memberId, sessionId, resolution.intent(), resolution.source(), summarize(resolution.recipeQuery()));
+        return resolve(memberId, sessionId, request, ChatContext.empty());
+    }
+
+    public ChatIntentResolution resolve(Long memberId, Long sessionId, ChatMessageCreateRequest request, ChatContext context) {
+        ChatIntentResolution resolution = decide(memberId, sessionId, request, context);
+        log.info("상담 의도 - memberId: {}, sessionId: {}, 의도: {}, 출처: {}, 조건: {}, 대상 레시피: {}",
+                memberId, sessionId, resolution.intent(), resolution.source(), summarize(resolution.recipeQuery()),
+                resolution.targetRecipeId());
         return resolution;
     }
 
-    private ChatIntentResolution decide(Long memberId, Long sessionId, ChatMessageCreateRequest request) {
+    private ChatIntentResolution decide(Long memberId, Long sessionId, ChatMessageCreateRequest request, ChatContext context) {
         if (request.mode() == ChatMessageMode.RECOMMEND) {
             return ChatIntentResolution.recommend(Source.MODE,
                     RecipeQuery.of(memberId, request.selectedIngredientIds(), request.useSelectedOnly()));
@@ -62,7 +90,7 @@ public class ChatIntentFacade {
         IntentResult result;
         try {
             List<String> categories = categories();
-            result = chatIntentExtractor.extract(memberId, sessionId, request.content(), categories)
+            result = chatIntentExtractor.extract(memberId, sessionId, request.content(), categories, followUp(context))
                     .sanitize(categories);
         } catch (RuntimeException e) {
             log.warn("상담 의도 뽑기 실패, 선택 재료 유무로 정함 - memberId: {}, sessionId: {}, 선택 재료 수: {}, 원인: {}",
@@ -73,10 +101,146 @@ public class ChatIntentFacade {
                     RecipeQuery.of(memberId, request.selectedIngredientIds(), request.useSelectedOnly()));
         }
 
-        if (result.intent() != ChatIntent.RECOMMEND) {
+        return switch (result.intent()) {
+            case RECOMMEND -> ChatIntentResolution.recommend(Source.AI, toRecipeQuery(memberId, sessionId, request, result));
+            case REFINE -> refine(memberId, sessionId, request, result, context);
+            case RECIPE_DETAIL -> recipeDetail(memberId, sessionId, result, context);
+            case GENERAL -> ChatIntentResolution.general(Source.AI);
+        };
+    }
+
+    // 다시 추천. 직전 조건이 없으면(Redis 만료·장애, 첫 질문) 이번 말만으로 새 추천
+    private ChatIntentResolution refine(Long memberId, Long sessionId, ChatMessageCreateRequest request, IntentResult result,
+                                        ChatContext context) {
+        RecipeQuery current = toRecipeQuery(memberId, sessionId, request, result);
+        if (context.lastRecommendation() == null) {
+            log.info("상담 다시 추천인데 직전 조건이 없어 새 추천으로 - memberId: {}, sessionId: {}", memberId, sessionId);
+            return ChatIntentResolution.recommend(Source.AI, current);
+        }
+        return ChatIntentResolution.refine(Source.AI, current);
+    }
+
+    // 레시피 자세히. 물어본 레시피를 못 찾으면 일반 답
+    private ChatIntentResolution recipeDetail(Long memberId, Long sessionId, IntentResult result, ChatContext context) {
+        Long recipeId = findTarget(sessionId, result, context);
+        if (recipeId == null) {
+            log.info("상담 레시피 자세히 대상을 못 찾아 일반 답으로 - memberId: {}, sessionId: {}, 번호: {}, 이름: {}",
+                    memberId, sessionId, result.targetIndex(), result.targetName());
             return ChatIntentResolution.general(Source.AI);
         }
-        return ChatIntentResolution.recommend(Source.AI, toRecipeQuery(memberId, sessionId, request, result));
+        return ChatIntentResolution.recipeDetail(Source.AI, recipeId);
+    }
+
+    /**
+     * 물어본 레시피 ID. 이름이 직전 카드에 있으면 그 카드 → 직전 카드 번호 → 상담 전체 추천(최근부터)에서 이름 순으로 찾는다.
+     * 상담 전체 추천은 앞에서 못 찾았을 때만 읽는다 (추천 1번, 이름 1번).
+     */
+    Long findTarget(Long sessionId, IntentResult result, ChatContext context) {
+        List<CardName> lastCards = context.lastCards();
+        String name = result.targetName();
+        Optional<Long> inLast = matchName(lastCards, name);
+        if (inLast.isPresent()) {
+            return inLast.get();
+        }
+        Integer index = result.targetIndex();
+        if (index != null && index <= lastCards.size()) {
+            return lastCards.get(index - 1).recipeId();
+        }
+        if (name == null) {
+            return null;
+        }
+        List<Long> sessionRecipeIds = chatMessageService
+                .findRecentRecommendedRecipeIds(List.of(sessionId), SESSION_RECIPES_SEARCHED)
+                .getOrDefault(sessionId, List.of());
+        if (sessionRecipeIds.isEmpty()) {
+            return null;
+        }
+        Map<Long, RecipeSummary> summaries = recipeService.findSummaries(sessionRecipeIds);
+        List<CardName> sessionCards = sessionRecipeIds.stream()
+                .map(summaries::get)
+                .filter(Objects::nonNull)
+                .map(summary -> new CardName(summary.recipeId(), summary.name()))
+                .toList();
+        return matchName(sessionCards, name).orElse(null);
+    }
+
+    // 띄어쓰기를 빼고 한쪽 이름이 다른 쪽을 담으면 같은 레시피로 본다 ("깐풍기" ↔ "매콤 깐풍기")
+    private static Optional<Long> matchName(List<CardName> cards, String name) {
+        if (name == null) {
+            return Optional.empty();
+        }
+        String target = compact(name);
+        return cards.stream()
+                .filter(card -> {
+                    String cardName = compact(card.name());
+                    return cardName.contains(target) || target.contains(cardName);
+                })
+                .map(CardName::recipeId)
+                .findFirst();
+    }
+
+    private static String compact(String text) {
+        return text.replaceAll("\\s+", "");
+    }
+
+    /**
+     * 의도 판단에 별도 메시지로 넘길 직전 추천 정보. 직전 카드가 없으면(첫 질문) null이라 프롬프트는 지금 크기 그대로다.
+     * <pre>
+     * [직전 추천] 1. 탕수육 / 2. 깐풍기 / 3. 돼지고기 찹쌀부침
+     * [이전 추천] 두부조림, 버섯전
+     * [직전 조건] 원하는 맛 SPICY / 분류 튀김 / 키워드 김피탕, 탕수육 / 요리 이름 김피탕
+     * </pre>
+     * [이전 추천]은 최근 대화의 다른 카드(최대 6개), [직전 조건]은 Redis에 직전 추천이 있을 때만 넣는다.
+     */
+    static String followUp(ChatContext context) {
+        if (!context.hasLastCards()) {
+            return null;
+        }
+        StringBuilder text = new StringBuilder("[직전 추천] ");
+        List<CardName> lastCards = context.lastCards();
+        for (int i = 0; i < lastCards.size(); i++) {
+            text.append(i == 0 ? "" : " / ").append(i + 1).append(". ").append(lastCards.get(i).name());
+        }
+        Set<Long> lastIds = lastCards.stream().map(CardName::recipeId).collect(Collectors.toSet());
+        List<String> earlier = context.recentMessages().stream()
+                .flatMap(message -> message.cards().stream())
+                .filter(card -> !lastIds.contains(card.recipeId()))
+                .map(CardName::name)
+                .distinct()
+                .limit(EARLIER_CARDS_SHOWN)
+                .toList();
+        if (!earlier.isEmpty()) {
+            text.append("\n[이전 추천] ").append(String.join(NAME_DELIMITER, earlier));
+        }
+        LastRecommendation last = context.lastRecommendation();
+        if (last != null) {
+            text.append("\n[직전 조건] ").append(conditionLine(last.query()));
+        }
+        return text.toString();
+    }
+
+    // 직전 조건 한 줄. 맛은 응답 값과 같은 이름(SPICY)으로 쓴다. 재료 조건은 서버가 이어 가므로 넣지 않는다
+    private static String conditionLine(QuerySnapshot query) {
+        List<String> parts = new ArrayList<>();
+        if (!query.wantedTastes().isEmpty()) {
+            parts.add("원하는 맛 " + query.wantedTastes().stream().map(Enum::name).collect(Collectors.joining(NAME_DELIMITER)));
+        }
+        if (!query.moodCategories().isEmpty()) {
+            parts.add("분류 " + String.join(NAME_DELIMITER, query.moodCategories()));
+        }
+        if (query.maxMinutes() != null) {
+            parts.add("최대 " + query.maxMinutes() + "분");
+        }
+        if (!query.keywords().isEmpty()) {
+            parts.add("키워드 " + String.join(NAME_DELIMITER, query.keywords()));
+        }
+        if (query.keywordText() != null) {
+            parts.add("요리 이름 " + query.keywordText());
+        }
+        if (query.preferenceText() != null) {
+            parts.add("원한 표현 " + query.preferenceText());
+        }
+        return parts.isEmpty() ? NONE : String.join(" / ", parts);
     }
 
     // AI가 고를 수 있는 레시피 분류: 레시피에 있는 분류(레시피 분류 캐시)에서 후보 제외 분류와 "기타"를 뺀 것

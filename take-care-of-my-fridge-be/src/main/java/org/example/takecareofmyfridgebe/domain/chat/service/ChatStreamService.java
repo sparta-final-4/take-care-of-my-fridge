@@ -5,7 +5,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatDoneEventResponse;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatErrorEventResponse;
-import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntent;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntentResolution;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageCreateRequest;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageEventResponse;
@@ -145,8 +144,9 @@ public class ChatStreamService {
     // 답 방식 정하기: 상담 문맥(최근 대화)을 읽고, 의도가 추천이면 후보를 찾아 카드·설명 재료를 만든다. 후보 검색이 실패하면 일반 답
     private ReplyPlan planReply(Long memberId, Long sessionId, ChatMessageCreateRequest request) {
         ChatContext context = chatContextFacade.load(sessionId);
-        ChatIntentResolution resolution = chatIntentFacade.resolve(memberId, sessionId, request);
-        if (resolution == null || resolution.intent() != ChatIntent.RECOMMEND || resolution.recipeQuery() == null) {
+        ChatIntentResolution resolution = chatIntentFacade.resolve(memberId, sessionId, request, context);
+        // 레시피 자세히는 아직 일반 답으로 (이전 대화를 보고 답한다)
+        if (resolution == null || !resolution.recommends()) {
             return ReplyPlan.general(context);
         }
         try {

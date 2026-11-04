@@ -77,4 +77,18 @@ class IntentResultTest {
         assertThat(result.dishText()).isNull();
         assertThat(result.preferenceText()).isNull();
     }
+
+    @Test
+    @DisplayName("레시피 자세히 대상은 카드 번호가 0 이하면 null, 이름이 비어 있으면 null로 정리한다")
+    void sanitizesTargetFields() {
+        IntentResult picked = new IntentResult(ChatIntent.RECIPE_DETAIL, null, null, null, null, null, null, null, null, null,
+                2, " 깐풍기 ").sanitize(CATEGORIES);
+        IntentResult empty = new IntentResult(ChatIntent.RECIPE_DETAIL, null, null, null, null, null, null, null, null, null,
+                0, " ").sanitize(CATEGORIES);
+
+        assertThat(picked.targetIndex()).isEqualTo(2);
+        assertThat(picked.targetName()).isEqualTo("깐풍기");
+        assertThat(empty.targetIndex()).isNull();
+        assertThat(empty.targetName()).isNull();
+    }
 }

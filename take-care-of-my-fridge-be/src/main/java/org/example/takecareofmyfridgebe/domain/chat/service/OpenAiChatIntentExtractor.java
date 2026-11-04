@@ -6,6 +6,7 @@ import org.example.takecareofmyfridgebe.global.config.ai.LlmCostCalculator;
 import org.springframework.ai.chat.client.AdvisorParams;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.ResponseEntity;
+import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
@@ -33,25 +34,38 @@ public class OpenAiChatIntentExtractor implements ChatIntentExtractor {
     static final String CATEGORIES_PLACEHOLDER = "%CATEGORIES%";
     private static final String CATEGORY_DELIMITER = ", ";
 
+    private static final String FOLLOW_UP_SEPARATOR = "\n\n";
+
     private final ChatClient chatClient;
     private final LlmCostCalculator llmCostCalculator;
     private final String promptTemplate;
+    // 직전 추천이 있을 때만 붙이는 이어지는 말 판단 규칙 (prompts/chat-intent-followup.txt)
+    private final String followUpRules;
 
     public OpenAiChatIntentExtractor(
             @Qualifier("chatIntentChatClient") ChatClient chatClient,
             LlmCostCalculator llmCostCalculator,
-            @Value("classpath:prompts/chat-intent.txt") Resource prompt
+            @Value("classpath:prompts/chat-intent.txt") Resource prompt,
+            @Value("classpath:prompts/chat-intent-followup.txt") Resource followUpPrompt
     ) {
         this.chatClient = chatClient;
         this.llmCostCalculator = llmCostCalculator;
         this.promptTemplate = read(prompt);
+        this.followUpRules = read(followUpPrompt).strip();
     }
 
+    /**
+     * 고정 시스템 프롬프트(의도 규칙 + 분류 목록)를 맨 앞에 두어 OpenAI 프롬프트 캐시가 되게 하고,
+     * 직전 추천이 있을 때만 그 정보와 이어지는 말 판단 규칙을 별도 system 메시지로 사용자 메시지 앞에 넣는다.
+     */
     @Override
-    public IntentResult extract(Long memberId, Long sessionId, String message, List<String> categories) {
+    public IntentResult extract(Long memberId, Long sessionId, String message, List<String> categories, String followUp) {
         long startedAt = System.nanoTime();
-        ResponseEntity<ChatResponse, IntentResult> response = chatClient.prompt()
-                .system(systemPrompt(categories))
+        ChatClient.ChatClientRequestSpec spec = chatClient.prompt().system(systemPrompt(categories));
+        if (followUp != null) {
+            spec = spec.messages(new SystemMessage(followUpMessage(followUp)));
+        }
+        ResponseEntity<ChatResponse, IntentResult> response = spec
                 .user(message)
                 .advisors(AdvisorParams.ENABLE_NATIVE_STRUCTURED_OUTPUT)
                 .call()
@@ -68,6 +82,10 @@ public class OpenAiChatIntentExtractor implements ChatIntentExtractor {
 
     String systemPrompt(List<String> categories) {
         return promptTemplate.replace(CATEGORIES_PLACEHOLDER, String.join(CATEGORY_DELIMITER, categories));
+    }
+
+    String followUpMessage(String followUp) {
+        return followUp.strip() + FOLLOW_UP_SEPARATOR + followUpRules;
     }
 
     private void logUsage(Long memberId, Long sessionId, ChatResponse response, long elapsedMs) {

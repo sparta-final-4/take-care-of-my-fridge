@@ -1,18 +1,25 @@
 package org.example.takecareofmyfridgebe.domain.chat.facade;
 
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatCandidateProperties;
+import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext.CardName;
+import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext.ContextMessage;
+import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntent;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntentResolution;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntentResolution.Source;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageCreateRequest;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageMode;
 import org.example.takecareofmyfridgebe.domain.chat.dto.IntentResult;
+import org.example.takecareofmyfridgebe.domain.chat.dto.LastRecommendation;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeQuery;
+import org.example.takecareofmyfridgebe.domain.chat.entity.ChatMessageRole;
 import org.example.takecareofmyfridgebe.domain.chat.service.ChatIntentExtractor;
+import org.example.takecareofmyfridgebe.domain.chat.service.ChatMessageService;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.Ingredient;
 import org.example.takecareofmyfridgebe.domain.ingredient.service.IngredientMatcher;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member.Taste;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeClassificationResponse;
+import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeSummary;
 import org.example.takecareofmyfridgebe.domain.recipe.service.RecipeService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -25,8 +32,10 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -43,6 +52,7 @@ class ChatIntentFacadeTest {
     private ChatIntentExtractor extractor;
     private RecipeService recipeService;
     private IngredientMatcher ingredientMatcher;
+    private ChatMessageService chatMessageService;
     private ChatIntentFacade facade;
 
     @BeforeEach
@@ -50,8 +60,9 @@ class ChatIntentFacadeTest {
         extractor = mock(ChatIntentExtractor.class);
         recipeService = mock(RecipeService.class);
         ingredientMatcher = mock(IngredientMatcher.class);
+        chatMessageService = mock(ChatMessageService.class);
         facade = new ChatIntentFacade(extractor, recipeService, ingredientMatcher,
-                new ChatCandidateProperties(List.of("양념", "음료"), 0.4));
+                new ChatCandidateProperties(List.of("양념", "음료"), 0.4), chatMessageService);
         when(recipeService.getClassifications())
                 .thenReturn(new RecipeClassificationResponse(List.of("한식"), List.of("국", "기타", "샐러드", "양념", "음료", "찌개")));
     }
@@ -71,7 +82,7 @@ class ChatIntentFacadeTest {
             assertThat(resolution.intent()).isEqualTo(ChatIntent.RECOMMEND);
             assertThat(resolution.source()).isEqualTo(Source.MODE);
             assertThat(resolution.recipeQuery()).isEqualTo(RecipeQuery.of(MEMBER_ID, List.of(TOFU, MUSHROOM), true));
-            verify(extractor, never()).extract(any(), any(), any(), any());
+            verify(extractor, never()).extract(any(), any(), any(), any(), any());
             verify(ingredientMatcher, never()).matchAll(anyList());
         }
     }
@@ -116,7 +127,7 @@ class ChatIntentFacadeTest {
 
             facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("뭐 먹지?"));
 
-            verify(extractor).extract(MEMBER_ID, SESSION_ID, "뭐 먹지?", List.of("국", "샐러드", "찌개"));
+            verify(extractor).extract(MEMBER_ID, SESSION_ID, "뭐 먹지?", List.of("국", "샐러드", "찌개"), null);
         }
 
         @Test
@@ -135,7 +146,7 @@ class ChatIntentFacadeTest {
         @Test
         @DisplayName("AI 호출이 실패하고 선택 재료가 있으면 선택 재료로 추천한다")
         void recommendsWithSelected_whenExtractorFailsWithSelected() {
-            when(extractor.extract(any(), any(), any(), any())).thenThrow(new RuntimeException("timeout"));
+            when(extractor.extract(any(), any(), any(), any(), any())).thenThrow(new RuntimeException("timeout"));
 
             ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID,
                     new ChatMessageCreateRequest("이걸로", ChatMessageMode.AUTO, List.of(TOFU), true));
@@ -148,7 +159,7 @@ class ChatIntentFacadeTest {
         @Test
         @DisplayName("AI 호출이 실패하고 선택 재료가 없으면 일반 답으로 정한다")
         void returnsGeneral_whenExtractorFailsWithoutSelected() {
-            when(extractor.extract(any(), any(), any(), any())).thenThrow(new IllegalStateException("broken json"));
+            when(extractor.extract(any(), any(), any(), any(), any())).thenThrow(new IllegalStateException("broken json"));
 
             ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("뭐 먹지?"));
 
@@ -166,7 +177,7 @@ class ChatIntentFacadeTest {
 
             assertThat(resolution.intent()).isEqualTo(ChatIntent.GENERAL);
             assertThat(resolution.source()).isEqualTo(Source.FALLBACK);
-            verify(extractor, never()).extract(any(), any(), any(), any());
+            verify(extractor, never()).extract(any(), any(), any(), any(), any());
         }
 
         @Test
@@ -296,8 +307,142 @@ class ChatIntentFacadeTest {
         }
     }
 
+    @Nested
+    @DisplayName("이어지는 말 (직전 추천이 있을 때)")
+    class FollowUp {
+
+        private final LastRecommendation lastRecommendation = LastRecommendation.of(
+                new RecipeQuery(MEMBER_ID, List.of(TOFU), List.of(Taste.SPICY), List.of("튀김"), null, null, false,
+                        List.of("김피탕", "탕수육"), "김피탕", "김피탕 같은 요리"),
+                List.of(10L, 20L, 30L));
+        private final List<CardName> lastCards = List.of(
+                new CardName(10L, "탕수육"), new CardName(20L, "깐풍기"), new CardName(30L, "돼지고기 찹쌀부침"));
+        private final ChatContext context = new ChatContext(List.of(
+                new ContextMessage(ChatMessageRole.USER, "두부 요리", null),
+                new ContextMessage(ChatMessageRole.ASSISTANT, "골랐어요.", List.of(new CardName(5L, "두부조림"))),
+                new ContextMessage(ChatMessageRole.USER, "김피탕 같은 요리", null),
+                new ContextMessage(ChatMessageRole.ASSISTANT, "비슷한 걸 골랐어요.", lastCards)),
+                lastRecommendation, lastCards);
+
+        @Test
+        @DisplayName("직전 추천이 없으면(첫 질문) 의도 판단에 직전 추천 정보를 넘기지 않는다")
+        void passesNoFollowUp_whenNoLastCards() {
+            givenExtracted(IntentResult.general());
+
+            facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("뭐 먹지?"), ChatContext.empty());
+
+            verify(extractor).extract(eq(MEMBER_ID), eq(SESSION_ID), eq("뭐 먹지?"), anyList(), isNull());
+        }
+
+        @Test
+        @DisplayName("직전 추천이 있으면 직전 카드 번호·이름, 최근 대화의 다른 카드, 직전 조건을 줄 글로 넘긴다")
+        void passesFollowUpLines_whenLastCardsExist() {
+            givenExtracted(IntentResult.general());
+
+            facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("고마워"), context);
+
+            verify(extractor).extract(eq(MEMBER_ID), eq(SESSION_ID), eq("고마워"), anyList(), eq("""
+                    [직전 추천] 1. 탕수육 / 2. 깐풍기 / 3. 돼지고기 찹쌀부침
+                    [이전 추천] 두부조림
+                    [직전 조건] 원하는 맛 SPICY / 분류 튀김 / 키워드 김피탕, 탕수육 / 요리 이름 김피탕 / 원한 표현 김피탕 같은 요리"""));
+        }
+
+        @Test
+        @DisplayName("\"두 번째 거\"는 직전 카드 2번 레시피를 자세히 답한다")
+        void picksSecondLastCard_whenTargetIndexIsTwo() {
+            givenExtracted(detail(2, null));
+
+            ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID,
+                    ChatMessageCreateRequest.of("두 번째 거 어떻게 만들어?"), context);
+
+            assertThat(resolution.intent()).isEqualTo(ChatIntent.RECIPE_DETAIL);
+            assertThat(resolution.targetRecipeId()).isEqualTo(20L);
+            verify(chatMessageService, never()).findRecentRecommendedRecipeIds(any(), anyInt());
+        }
+
+        @Test
+        @DisplayName("\"아까 그 깐풍기\"처럼 직전 카드에 없는 이름은 상담 전체 추천(최근부터)에서 띄어쓰기 없이 이름으로 찾는다")
+        void findsByNameInSessionRecommendations_whenNotInLastCards() {
+            ChatContext afterOtherRecommendation = new ChatContext(List.of(), lastRecommendation,
+                    List.of(new CardName(40L, "두부조림"), new CardName(50L, "버섯전")));
+            givenExtracted(detail(null, "깐풍기"));
+            when(chatMessageService.findRecentRecommendedRecipeIds(List.of(SESSION_ID), 30))
+                    .thenReturn(Map.of(SESSION_ID, List.of(40L, 50L, 20L)));
+            when(recipeService.findSummaries(List.of(40L, 50L, 20L))).thenReturn(Map.of(
+                    40L, new RecipeSummary(40L, "두부조림", null, null), 50L, new RecipeSummary(50L, "버섯전", null, null),
+                    20L, new RecipeSummary(20L, "매콤 깐풍 기", null, null)));
+
+            ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID,
+                    ChatMessageCreateRequest.of("아까 그 깐풍기 시간 얼마나 걸려?"), afterOtherRecommendation);
+
+            assertThat(resolution.intent()).isEqualTo(ChatIntent.RECIPE_DETAIL);
+            assertThat(resolution.targetRecipeId()).isEqualTo(20L);
+        }
+
+        @Test
+        @DisplayName("물어본 레시피를 직전 카드에서도 상담 전체 추천에서도 못 찾으면 일반 답으로 한다")
+        void answersGeneral_whenTargetNotFound() {
+            givenExtracted(detail(5, "마파두부"));
+            when(chatMessageService.findRecentRecommendedRecipeIds(List.of(SESSION_ID), 30))
+                    .thenReturn(Map.of(SESSION_ID, List.of(10L)));
+            when(recipeService.findSummaries(List.of(10L))).thenReturn(Map.of(10L, new RecipeSummary(10L, "탕수육", null, null)));
+
+            ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID,
+                    ChatMessageCreateRequest.of("마파두부 어떻게 해?"), context);
+
+            assertThat(resolution.intent()).isEqualTo(ChatIntent.GENERAL);
+            assertThat(resolution.targetRecipeId()).isNull();
+        }
+
+        @Test
+        @DisplayName("레시피 자세히 답 뒤에도 \"첫 번째 거는?\"은 최근 대화의 카드 하나가 아니라 직전 추천(Redis) 카드 1번으로 잡는다")
+        void picksFromLastRecommendation_afterRecipeDetail() {
+            ChatContext afterDetail = new ChatContext(List.of(
+                    new ContextMessage(ChatMessageRole.USER, "두 번째 거 어떻게 만들어?", null),
+                    new ContextMessage(ChatMessageRole.ASSISTANT, "깐풍기는 이렇게 만들어요.", List.of(new CardName(20L, "깐풍기")))),
+                    lastRecommendation, lastCards);
+            givenExtracted(detail(1, null));
+
+            ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID,
+                    ChatMessageCreateRequest.of("첫 번째 거는?"), afterDetail);
+
+            assertThat(resolution.targetRecipeId()).isEqualTo(10L);
+        }
+
+        @Test
+        @DisplayName("다시 추천인데 직전 조건이 없으면(Redis가 비었음) 이번 말만으로 새 추천을 한다")
+        void recommendsNew_whenRefineWithoutLastRecommendation() {
+            ChatContext withoutRedis = new ChatContext(context.recentMessages(), null, lastCards);
+            givenExtracted(new IntentResult(ChatIntent.REFINE, List.of("SPICY"), null, null, null, null, null, null, null, null));
+
+            ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID,
+                    ChatMessageCreateRequest.of("좀 더 매운 걸로"), withoutRedis);
+
+            assertThat(resolution.intent()).isEqualTo(ChatIntent.RECOMMEND);
+            assertThat(resolution.recipeQuery().wantedTastes()).containsExactly(Taste.SPICY);
+            assertThat(resolution.recipeQuery().moodCategories()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("다시 추천이고 직전 조건이 있으면 다시 추천으로 정한다")
+        void resolvesRefine_whenLastRecommendationExists() {
+            givenExtracted(new IntentResult(ChatIntent.REFINE, List.of("SPICY"), List.of("튀김"), null, null, null, null,
+                    null, null, null));
+
+            ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID,
+                    ChatMessageCreateRequest.of("좀 더 매운 걸로"), context);
+
+            assertThat(resolution.intent()).isEqualTo(ChatIntent.REFINE);
+            assertThat(resolution.recommends()).isTrue();
+        }
+
+        private static IntentResult detail(Integer index, String name) {
+            return new IntentResult(ChatIntent.RECIPE_DETAIL, null, null, null, null, null, null, null, null, null, index, name);
+        }
+    }
+
     private void givenExtracted(IntentResult result) {
-        when(extractor.extract(eq(MEMBER_ID), eq(SESSION_ID), any(), any())).thenReturn(result);
+        when(extractor.extract(eq(MEMBER_ID), eq(SESSION_ID), any(), any(), any())).thenReturn(result);
     }
 
     private static Ingredient ingredient(Long id, String code, String name) {
