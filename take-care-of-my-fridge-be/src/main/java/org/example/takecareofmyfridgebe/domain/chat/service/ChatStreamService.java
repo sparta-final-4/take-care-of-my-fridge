@@ -174,7 +174,8 @@ public class ChatStreamService {
     }
 
     // 추천 답을 표시로 나눠 [소개]는 message, [n]은 recommendation_text 이벤트로 보낸다.
-    // 표시를 빼먹은 답은 전체를 소개로 보낸다. "첫 조각"은 처음 내보낸 글(소개든 카드 설명이든)이다
+    // 안내 문장이 있으면 서버가 소개 맨 앞에 먼저 보내고(message), 저장할 소개에도 앞에 붙인다. AI가 되풀이한 안내는 뺀다.
+    // 표시를 빼먹은 답은 전체를 소개로 보낸다. "첫 조각"은 AI에게서 처음 내보낸 글(소개든 카드 설명이든)이다 (안내 문장은 세지 않음)
     private Flux<ServerSentEvent<String>> splitRecommendationText(
             Flux<String> reply,
             RecommendationReply recommendation,
@@ -186,9 +187,22 @@ public class ChatStreamService {
         for (int i = 0; i < cardCount; i++) {
             descriptions.add(new StringBuilder());
         }
-        RecommendationTextSplitter splitter = new RecommendationTextSplitter(cardCount);
-        return reply.concatMapIterable(splitter::feed)
+        RecommendationTextSplitter splitter = new RecommendationTextSplitter(cardCount, recommendation.notices());
+        String noticeText = recommendation.noticeText();
+        // 안내 뒤 첫 소개 글은 한 칸 띄운다
+        AtomicBoolean needsSpace = new AtomicBoolean(!noticeText.isEmpty());
+        Flux<ServerSentEvent<String>> notice = Flux.defer(() -> {
+            if (noticeText.isEmpty()) {
+                return Flux.empty();
+            }
+            intro.append(noticeText);
+            return Flux.just(messageEvent(noticeText));
+        });
+        Flux<ServerSentEvent<String>> text = reply.concatMapIterable(splitter::feed)
                 .concatWith(Flux.defer(() -> Flux.fromIterable(splitter.finish())))
+                .map(piece -> piece.intro() && needsSpace.getAndSet(false)
+                        ? new RecommendationTextSplitter.Piece(piece.index(), " " + piece.text())
+                        : piece)
                 .doOnNext(piece -> {
                     firstChunkReceived.set(true);
                     (piece.intro() ? intro : descriptions.get(piece.index())).append(piece.text());
@@ -199,6 +213,7 @@ public class ChatStreamService {
                         .event("recommendation_text")
                         .data(toJson(new ChatRecommendationTextEventResponse(piece.index(), piece.text())))
                         .build());
+        return Flux.concat(notice, text);
     }
 
     private ServerSentEvent<String> messageEvent(String text) {

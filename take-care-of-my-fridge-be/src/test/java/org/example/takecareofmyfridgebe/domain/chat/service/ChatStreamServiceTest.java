@@ -706,6 +706,33 @@ class ChatStreamServiceTest {
         assertThat(output).doesNotContain("카드 설명 누락");
     }
 
+    @Test
+    @DisplayName("안내 문장이 있으면 서버가 소개 맨 앞에 message로 먼저 보내고 저장할 소개에도 붙이며, AI가 되풀이한 안내는 빼서 한 번만 나간다")
+    void sendsNoticeBeforeIntro_withoutRepeating() {
+        Long sessionId = 10L;
+        ChatMessageCreateRequest request = ChatMessageCreateRequest.of("버섯 두부로 할 수 있는 요리");
+        RecipeQuery query = RecipeQuery.of(1L, List.of(21L));
+        String notice = "말씀하신 두부는 지금 냉장고에 없어서 준비가 필요해요";
+        givenRecommend(sessionId, request, query, new RecommendationReply(
+                ChatRecommendationsEventResponse.of(List.of(card(314L, "된장국"))), "후보", List.of(notice)));
+        when(chatReplyGenerator.generateRecommendation(1L, sessionId, "버섯 두부로 할 수 있는 요리", "후보"))
+                .thenReturn(Flux.just(notice + ".\n[소개] 버섯과 두부를 ", "활용한 요리예요.\n[1] 구수한 국이에요."));
+        String savedIntro = notice + ". 버섯과 두부를 활용한 요리예요.";
+        List<RecommendationToSave> expectedCards = List.of(new RecommendationToSave(314L, "구수한 국이에요."));
+        when(chatMessageService.saveExchange(sessionId, "버섯 두부로 할 수 있는 요리", savedIntro, expectedCards))
+                .thenReturn(List.of(
+                        new ChatMessageResponse(100L, 1, ChatMessageRole.USER, "버섯 두부로 할 수 있는 요리", LocalDateTime.now()),
+                        new ChatMessageResponse(101L, 2, ChatMessageRole.ASSISTANT, savedIntro, LocalDateTime.now())));
+
+        List<ServerSentEvent<String>> events = chatStreamService.streamMessage(1L, sessionId, request).collectList().block();
+
+        assertThat(events).extracting(ServerSentEvent::event)
+                .containsExactly("recommendations", "message", "message", "message", "recommendation_text", "done");
+        assertThat(events.get(1).data()).isEqualTo("{\"text\":\"" + notice + ".\"}");
+        assertThat(events.get(2).data()).isEqualTo("{\"text\":\" 버섯과 두부를\"}");
+        verify(chatMessageService).saveExchange(sessionId, "버섯 두부로 할 수 있는 요리", savedIntro, expectedCards);
+    }
+
     private void givenRecommend(Long sessionId, ChatMessageCreateRequest request, RecipeQuery query, RecommendationReply reply) {
         when(chatIntentFacade.resolve(1L, sessionId, request)).thenReturn(ChatIntentResolution.recommend(Source.AI, query));
         when(chatMessageService.findRecommendedRecipeIds(sessionId)).thenReturn(Set.of());

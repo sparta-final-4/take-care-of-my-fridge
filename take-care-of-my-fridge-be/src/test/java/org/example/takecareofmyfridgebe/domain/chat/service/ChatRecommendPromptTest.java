@@ -60,10 +60,13 @@ class ChatRecommendPromptTest {
     }
 
     @Test
-    @DisplayName("[먼저 말할 것]이 있으면 [소개]를 그 문장으로 시작하고, 없으면 냉장고에 없는 재료 이야기를 하지 않는다")
-    void instructsNoticeFirst() {
-        assertThat(prompt).contains("[먼저 말할 것]이 있으면 [소개]를 그 문장으로 시작한다",
-                "[먼저 말할 것]이 없으면 냉장고에 없는 재료 이야기를 하지 않는다").doesNotContain("말씀하신 버섯");
+    @DisplayName("안내 문장은 서버가 이미 보냈으니 [이미 안내한 말]을 반복하지 말고, 답은 [소개]로 시작하며 다른 대괄호 표시는 쓰지 않게 한다")
+    void instructsNotRepeatingNotice() {
+        assertThat(prompt).contains("답은 반드시 [소개]로 시작한다. [소개] 앞에 아무 글도 쓰지 않는다",
+                "[이미 안내한 말]이 있으면 그 문장은 화면에서 소개 맨 앞에 이미 나갔다. 같은 말을 반복하지 말고",
+                "다른 대괄호 표시([다른 제안], [이미 안내한 말] 등)는 답에 쓰지 않는다",
+                "냉장고에 없는 재료 이야기는 하지 않는다")
+                .doesNotContain("먼저 말할 것", "말씀하신 버섯");
     }
 
     @Test

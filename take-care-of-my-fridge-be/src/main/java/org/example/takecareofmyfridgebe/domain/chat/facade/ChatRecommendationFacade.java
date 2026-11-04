@@ -66,7 +66,11 @@ public class ChatRecommendationFacade {
 
         String candidateInfo = RecommendationPromptBuilder.build(
                 content, query, ingredientNames(query), picked, found.keywordsNotFound());
-        return new RecommendationReply(ChatRecommendationsEventResponse.of(recipes), candidateInfo);
+        // 안내 문장은 AI가 아니라 서버가 소개 맨 앞에 직접 보낸다 (후보가 없으면 정해진 답만 나가므로 붙이지 않는다)
+        List<String> notices = picked.isEmpty()
+                ? List.of()
+                : RecommendationPromptBuilder.notices(query, picked, found.keywordsNotFound());
+        return new RecommendationReply(ChatRecommendationsEventResponse.of(recipes), candidateInfo, notices);
     }
 
     // 후보 10개의 정렬 단계별 값 (DEBUG). 정렬 순서: 요청 > 선택 > (선택이 있으면) 모자람 아님 > 임박 > 맛 > 보유 비율 > 없는 재료 수 > id

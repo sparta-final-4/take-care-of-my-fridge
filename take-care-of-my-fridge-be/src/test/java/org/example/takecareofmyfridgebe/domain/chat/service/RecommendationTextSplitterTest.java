@@ -40,11 +40,60 @@ class RecommendationTextSplitterTest {
     }
 
     @Test
-    @DisplayName("첫머리에 [소개]가 없으면 표시를 빼먹은 답으로 보고 전체를 소개로 보낸다")
-    void sendsEverythingAsIntro_whenFirstMarkerMissing() {
-        Map<Integer, String> result = split(3, "면 요리를 ", "골랐어요. [1] 이건 그대로예요.");
+    @DisplayName("어떤 표시도 끝까지 나오지 않으면 전체를 소개로 보낸다")
+    void sendsEverythingAsIntro_whenNoMarker() {
+        Map<Integer, String> result = split(3, "면 요리를 ", "골랐어요. 맛있게 ", "드세요.");
 
-        assertThat(result).containsExactly(Map.entry(-1, "면 요리를 골랐어요. [1] 이건 그대로예요."));
+        assertThat(result).containsExactly(Map.entry(-1, "면 요리를 골랐어요. 맛있게 드세요."));
+    }
+
+    @Test
+    @DisplayName("[소개] 앞에 글이 있으면 버리지 않고 소개에 합치고, [1]~[3]은 글 어디서든 찾아 나눈다")
+    void mergesTextBeforeIntroMarker() {
+        Map<Integer, String> result = split(3, "말씀하신 두부는 지금 냉장고에 없어서 준비가 필요해요.\n[소", "개] 버섯과 두부를 활용한 요리예요.",
+                " [1] 된장국이에요. [", "2] 두부조림이에요.", " [3", "] 버섯전이에요.");
+
+        assertThat(result).containsExactly(
+                Map.entry(-1, "말씀하신 두부는 지금 냉장고에 없어서 준비가 필요해요. 버섯과 두부를 활용한 요리예요."),
+                Map.entry(0, "된장국이에요."),
+                Map.entry(1, "두부조림이에요."),
+                Map.entry(2, "버섯전이에요."));
+    }
+
+    @Test
+    @DisplayName("[소개] 없이 [1]부터 써도 앞 글은 소개, 표시 뒤 글은 카드 설명으로 나눈다")
+    void splitsCards_whenIntroMarkerMissing() {
+        Map<Integer, String> result = split(2, "면 요리를 골랐어요.\n[1] 냉면이에요.\n[2] 막국수예요.");
+
+        assertThat(result).containsExactly(
+                Map.entry(-1, "면 요리를 골랐어요."), Map.entry(0, "냉면이에요."), Map.entry(1, "막국수예요."));
+    }
+
+    @Test
+    @DisplayName("설명 안에 남은 [다른 제안] 같은 대괄호 표시는 조각 경계에서 쪼개져 와도 지우고 보낸다")
+    void removesLeftoverMarkers() {
+        Map<Integer, String> result = split(3, "[소개] [이미 안내한 말] 튀김을 골랐어요.\n[1] 새콤해요.\n[2] 매콤해요.\n[3] [다른",
+                " 제안] 색다르게 장어조림도 곁들여 보세요. [다른 제안]");
+
+        assertThat(result).containsExactly(
+                Map.entry(-1, "튀김을 골랐어요."),
+                Map.entry(0, "새콤해요."),
+                Map.entry(1, "매콤해요."),
+                Map.entry(2, "색다르게 장어조림도 곁들여 보세요."));
+        assertThat(allText(3, "[소개] 소개.\n[1] 하나. [다른 제안] 둘.")).doesNotContain("[", "]").contains("하나. 둘.");
+    }
+
+    @Test
+    @DisplayName("서버가 이미 보낸 안내 문장을 AI가 소개 첫머리에 되풀이하면 뺀다")
+    void dropsRepeatedNotice() {
+        List<String> notices = List.of("말씀하신 두부는 지금 냉장고에 없어서 준비가 필요해요");
+
+        assertThat(split(1, notices, "말씀하신 두부는 지금 ", "냉장고에 없어서 준비가 필요해요.\n[소개] 버섯 요리예요.\n[1] 된장국이에요."))
+                .containsExactly(Map.entry(-1, "버섯 요리예요."), Map.entry(0, "된장국이에요."));
+        assertThat(split(1, notices, "[소개] 말씀하신 두부는 지금 냉장고에 없어서 준비가 필요해요. 버섯 요리예요."))
+                .containsExactly(Map.entry(-1, "버섯 요리예요."));
+        assertThat(split(1, notices, "[소개] 말씀하신 버섯 요리예요."))
+                .containsExactly(Map.entry(-1, "말씀하신 버섯 요리예요."));
     }
 
     @Test
@@ -63,16 +112,20 @@ class RecommendationTextSplitterTest {
     }
 
     private static Map<Integer, String> split(int cardCount, String... chunks) {
-        return pieces(cardCount, chunks).stream()
+        return split(cardCount, List.of(), chunks);
+    }
+
+    private static Map<Integer, String> split(int cardCount, List<String> notices, String... chunks) {
+        return pieces(cardCount, notices, chunks).stream()
                 .collect(Collectors.groupingBy(Piece::index, TreeMap::new, Collectors.mapping(Piece::text, Collectors.joining())));
     }
 
     private static String allText(int cardCount, String... chunks) {
-        return pieces(cardCount, chunks).stream().map(Piece::text).collect(Collectors.joining());
+        return pieces(cardCount, List.of(), chunks).stream().map(Piece::text).collect(Collectors.joining());
     }
 
-    private static List<Piece> pieces(int cardCount, String... chunks) {
-        RecommendationTextSplitter splitter = new RecommendationTextSplitter(cardCount);
+    private static List<Piece> pieces(int cardCount, List<String> notices, String... chunks) {
+        RecommendationTextSplitter splitter = new RecommendationTextSplitter(cardCount, notices);
         List<Piece> pieces = new ArrayList<>();
         for (String chunk : chunks) {
             pieces.addAll(splitter.feed(chunk));

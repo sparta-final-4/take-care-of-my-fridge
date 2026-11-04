@@ -79,7 +79,7 @@ class RecommendationPromptBuilderTest {
     }
 
     @Test
-    @DisplayName("고른 후보에 냉장고에 없는 선택 재료가 있으면 맨 위 [먼저 말할 것]에 모아 넣고, 후보 줄에 선택 재료 쓰임을 쓴다")
+    @DisplayName("고른 후보에 냉장고에 없는 선택 재료가 있으면 맨 위 [이미 안내한 말]에 모아 넣고, 후보 줄에 선택 재료 쓰임을 쓴다")
     void writesNoticeFirst_whenSelectedIsMissing() {
         RecipeCandidate first = candidate(1L, "표고두부전골", "전골", 30,
                 new Reason(List.of("대파"), List.of(new ImminentIngredient("대파", 1)), List.of(), List.of(), List.of(), false, false,
@@ -94,14 +94,14 @@ class RecommendationPromptBuilderTest {
                 NAMES, List.of(first, second), false);
 
         assertThat(text).startsWith("""
-                [먼저 말할 것]
+                [이미 안내한 말]
                 말씀하신 표고버섯, 두부, 팽이버섯은 지금 냉장고에 없어서 준비가 필요해요
                 [사용자 요청]""");
         assertThat(text).contains("후보: 표고두부전골 | 전골 | 조리 시간 30분 | 카드 이유: 표고버섯·두부가 주재료예요 | 선택 재료 쓰임: 표고버섯, 두부 | 쓰는 냉장고 재료: 내일까지인 대파 | 냉장고에 없는 선택 재료: 표고버섯, 두부 | 장볼 재료: 표고버섯, 두부");
     }
 
     @Test
-    @DisplayName("키워드로 이름·재료가 맞은 레시피가 없으면 [먼저 말할 것]에 사용자가 말한 요리 이름으로 안내를 넣는다")
+    @DisplayName("키워드로 이름·재료가 맞은 레시피가 없으면 [이미 안내한 말]에 사용자가 말한 요리 이름으로 안내를 넣는다")
     void writesKeywordNotFoundNotice() {
         RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, List.of("면류"), null, null, false,
                 List.of("냉파스타"), "냉파스타");
@@ -109,13 +109,13 @@ class RecommendationPromptBuilderTest {
         String text = RecommendationPromptBuilder.build("냉파스타 먹고 싶어", query, NAMES, List.of(), true);
 
         assertThat(text).startsWith("""
-                [먼저 말할 것]
+                [이미 안내한 말]
                 말씀하신 냉파스타는 찾지 못해서 비슷한 걸 골랐어요
                 [사용자 요청]""");
     }
 
     @Test
-    @DisplayName("원한 표현이 있는데 고른 레시피가 요청(키워드·분류·맛)에 하나도 안 맞으면 [먼저 말할 것]에 솔직하게 넣는다")
+    @DisplayName("원한 표현이 있는데 고른 레시피가 요청(키워드·분류·맛)에 하나도 안 맞으면 [이미 안내한 말]에 솔직하게 넣는다")
     void writesPreferenceUnmetNotice() {
         RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, null, null, null, false,
                 List.of("샐러드", "냉채"), null, "차가운 요리");
@@ -125,7 +125,7 @@ class RecommendationPromptBuilderTest {
         String text = RecommendationPromptBuilder.build("차가운 요리 추천해줘", query, NAMES, List.of(unmatched), true);
 
         assertThat(text).startsWith("""
-                [먼저 말할 것]
+                [이미 안내한 말]
                 말씀하신 차가운 요리는 찾지 못해서 냉장고 재료로 만들 수 있는 요리를 골랐어요
                 [사용자 요청]""");
         assertThat(text).doesNotContain("비슷한 걸 골랐어요");
@@ -140,21 +140,21 @@ class RecommendationPromptBuilderTest {
                 reason(List.of(), List.of(), List.of(), List.of(), List.of(), false));
 
         assertThat(RecommendationPromptBuilder.build("냉면", query, NAMES, List.of(matched), false))
-                .doesNotContain("[먼저 말할 것]");
+                .doesNotContain("[이미 안내한 말]");
     }
 
     @Test
-    @DisplayName("원한 표현이 없으면(뭐 먹지?) 요청에 안 맞아도 [먼저 말할 것]을 넣지 않는다")
+    @DisplayName("원한 표현이 없으면(뭐 먹지?) 요청에 안 맞아도 [이미 안내한 말]을 넣지 않는다")
     void omitsNotice_whenNoPreference() {
         RecipeCandidate candidate = candidate(1L, "장어조림", "조림", null,
                 reason(List.of("고추"), List.of(), List.of(), List.of(), List.of(), false));
 
         assertThat(RecommendationPromptBuilder.build("뭐 먹지?", RecipeQuery.of(MEMBER_ID, List.of()), NAMES,
-                List.of(candidate), false)).doesNotContain("[먼저 말할 것]");
+                List.of(candidate), false)).doesNotContain("[이미 안내한 말]");
     }
 
     @Test
-    @DisplayName("고른 후보에 냉장고에 없는 선택 재료가 없으면 [먼저 말할 것]을 넣지 않는다")
+    @DisplayName("고른 후보에 냉장고에 없는 선택 재료가 없으면 [이미 안내한 말]을 넣지 않는다")
     void omitsNotice_whenNoSelectedIsMissing() {
         RecipeCandidate candidate = candidate(1L, "두부조림", "조림", 20,
                 new Reason(List.of("두부"), List.of(), List.of(), List.of(), List.of(), false, false,
@@ -163,7 +163,7 @@ class RecommendationPromptBuilderTest {
         String text = RecommendationPromptBuilder.build("두부로", RecipeQuery.of(MEMBER_ID, List.of(TOFU)), NAMES,
                 List.of(candidate), false);
 
-        assertThat(text).startsWith("[사용자 요청]").doesNotContain("[먼저 말할 것]", "냉장고에 없는 선택 재료");
+        assertThat(text).startsWith("[사용자 요청]").doesNotContain("[이미 안내한 말]", "냉장고에 없는 선택 재료");
         assertThat(text).contains("선택 재료 쓰임: 두부");
     }
 
@@ -213,7 +213,7 @@ class RecommendationPromptBuilderTest {
         String text = RecommendationPromptBuilder.build("밀키트 중에 제일 빨리", query, NAMES, List.of(unmatched), true);
 
         assertThat(text).startsWith("""
-                [먼저 말할 것]
+                [이미 안내한 말]
                 말씀하신 조건에 맞는 레시피는 찾지 못해서 냉장고 재료로 만들 수 있는 요리를 골랐어요
                 [사용자 요청]""");
     }
@@ -235,7 +235,7 @@ class RecommendationPromptBuilderTest {
 
         assertThat(query.keywordsNotFound()).isTrue();
         assertThat(text).startsWith("""
-                [먼저 말할 것]
+                [이미 안내한 말]
                 김피탕 레시피는 없어서, 비슷한 탕수육과 깐풍기를 골랐어요
                 [사용자 요청]""");
     }
@@ -284,6 +284,20 @@ class RecommendationPromptBuilderTest {
 
         assertThat(text).contains("후보: 탕수육 | 튀김")
                 .contains("후보: [다른 제안] 돼지고기 찹쌀부침 | 전 | 조리 시간 30분 | 카드 이유: 색다르게 골라 봤어요 |");
+    }
+
+    @Test
+    @DisplayName("서버가 소개 앞에 붙일 안내 문장을 프롬프트와 같은 내용으로 따로 꺼낸다")
+    void extractsNotices() {
+        RecipeQuery query = kimpiQuery(Map.of(10L, new KeywordMatch(KeywordMatch.Type.EXPANDED, "탕수육", null)));
+        List<RecipeCandidate> picked = List.of(keywordCandidate(10L, "탕수육", query));
+
+        List<String> notices = RecommendationPromptBuilder.notices(query, picked, true);
+
+        assertThat(notices).containsExactly("김피탕 레시피는 없어서, 비슷한 탕수육을 골랐어요");
+        assertThat(RecommendationPromptBuilder.build("김피탕같은 요리", query, NAMES, picked, true))
+                .startsWith("[이미 안내한 말]\n김피탕 레시피는 없어서, 비슷한 탕수육을 골랐어요\n[사용자 요청]");
+        assertThat(RecommendationPromptBuilder.notices(RecipeQuery.of(MEMBER_ID, List.of()), picked, false)).isEmpty();
     }
 
     private static RecipeQuery kimpiQuery(Map<Long, KeywordMatch> matches) {
