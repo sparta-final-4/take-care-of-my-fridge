@@ -57,15 +57,23 @@ class ChatIntentPromptTest {
                 "RECIPE_DETAIL: 이 상담에서 추천했던 레시피 하나",
                 "[직전 추천]·[이전 추천]에 없어도 \"아까 그 ○○\"처럼 앞서 추천받은 레시피 이름을 말하면 RECIPE_DETAIL이다",
                 "targetIndex: [직전 추천] 번호(1부터)", "targetName: 말한 레시피 이름",
-                "\"좀 더 매운 걸로\", \"칼칼한 거\" → wantedTastes: SPICY, avoidTastes에서 SPICY를 뺀다 (피할 맛이 아니다)",
-                "\"매운 거 말고\", \"안 맵게\", \"덜 맵게\" → avoidTastes: SPICY, wantedTastes에서 SPICY를 뺀다",
-                "\"시간 상관없이\" → removed: MAX_MINUTES",
-                "맛을 피하는 말(\"~ 말고\"가 맛이면)은 removed가 아니라 avoidTastes에 쓴다",
-                "[직전 조건]의 피할 맛은 그대로 이어 쓰고, 이번에 그 맛을 원하면 뺀다",
+                "맛은 첫 질문 규칙대로 쓰고, 피할 맛은 [직전 조건]의 피할 맛을 이어 쓴다",
+                "\"시간 상관없이\" → removed: MAX_MINUTES / \"오이 넣어도 돼\" → removed: EXCLUDE",
                 "REFINE이 아니면 removed는 빈 목록",
-                "detailQuestion: 무엇을 묻는지. HOW_TO(만드는 법), TIME(조리 시간), INGREDIENTS(재료), TIP(팁·요령), OTHER(그 밖)",
-                "\"두 번째 거 어떻게 만들어?\" → HOW_TO",
+                "detailQuestion: HOW_TO(만드는 법), TIME(조리 시간), INGREDIENTS(재료), TIP(팁), OTHER 중 하나",
+                "\"두 번째 거 어떻게 만들어?\" → targetIndex: 2, HOW_TO",
                 "새 요리 이름이나 새 조건으로 처음부터 추천해 달라는 말(\"김치찌개 먹고 싶어\")은 RECOMMEND");
+    }
+
+    @Test
+    @DisplayName("후속 규칙은 서버가 확인하는 맛 예시를 빼고 removed·detailQuestion 예시를 줄여 짧게 두며, 화면에 나오면 안 되는 말은 예시에 없다")
+    void keepsFollowUpRulesShort() throws IOException {
+        String followUp = new ClassPathResource("prompts/chat-intent-followup.txt").getContentAsString(StandardCharsets.UTF_8);
+
+        assertThat(followUp).doesNotContain("wantedTastes: SPICY", "avoidTastes: SPICY", "\"맛은 상관없어\"", "\"두부 안 넣어도 돼\"",
+                "\"맛있게 하는 팁\"", "생략", "[다른 제안]", "[이미 안내한 말]");
+        assertThat(followUp.lines().filter(line -> line.contains("예)"))).hasSize(3);
+        assertThat(followUp.length()).isLessThan(1_300);
     }
 
     @Test

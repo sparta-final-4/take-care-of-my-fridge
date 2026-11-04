@@ -1,23 +1,15 @@
 [이어지는 말 판단] 위 [직전 추천]이 있으므로 이번 말이 그 추천에 이어지는 말인지 먼저 본다.
-- REFINE: 직전 추천을 조건을 바꿔 다시 받고 싶은 말.
-  예) "좀 더 매운 걸로", "다른 거 없어?", "국물 말고 볶음으로", "더 빨리 되는 걸로"
+- REFINE: 직전 추천을 조건을 바꿔 다시 받고 싶은 말. 예) "좀 더 매운 걸로", "다른 거 없어?", "국물 말고 볶음으로"
   조건 칸에는 [직전 조건]에 이번 말을 반영한 최종 조건을 쓴다. 바꾸라고 하지 않은 조건은 [직전 조건] 그대로 쓴다.
   "~ 말고 ~로"는 앞 조건을 빼고 뒤 조건으로 바꾼다. "다른 거"는 조건을 바꾸지 않는다.
-  includeIngredients·excludeIngredients에는 이번에 말한 재료만 쓴다 (이전 재료는 서버가 이어 간다).
-  avoidTastes: 맛을 피하는 말("~ 말고"가 맛이면)은 removed가 아니라 avoidTastes에 쓴다. [직전 조건]의 피할 맛은 그대로 이어 쓰고, 이번에 그 맛을 원하면 뺀다.
-  예) "좀 더 매운 걸로", "칼칼한 거" → wantedTastes: SPICY, avoidTastes에서 SPICY를 뺀다 (피할 맛이 아니다)
-  예) "매운 거 말고", "안 맵게", "덜 맵게" → avoidTastes: SPICY, wantedTastes에서 SPICY를 뺀다
-  예) "단 거 싫어" → avoidTastes: SWEET
-  removed: 조건을 지우라는 말일 때만 쓴다. TASTE(원하는 맛), CATEGORY(요리 종류), MAX_MINUTES(조리 시간), KEYWORD(요리 이름), INCLUDE(넣고 싶다던 재료), EXCLUDE(빼 달라던 재료) 중에서 고른다. 없으면 빈 목록.
-  예) "맛은 상관없어" → removed: TASTE / "시간 상관없이" → removed: MAX_MINUTES / "두부 안 넣어도 돼" → removed: INCLUDE / "오이 넣어도 돼" → removed: EXCLUDE
-  예) "국물 말고 볶음으로" → moodCategories: 볶음, removed: 빈 목록 / "다른 거 없어?" → removed: 빈 목록
+  includeIngredients·excludeIngredients에는 이번에 말한 재료만 쓴다.
+  맛은 첫 질문 규칙대로 쓰고, 피할 맛은 [직전 조건]의 피할 맛을 이어 쓴다.
+  removed: 조건을 지우라는 말일 때만 TASTE, CATEGORY, MAX_MINUTES, KEYWORD, INCLUDE, EXCLUDE 중에서 고른다. 없으면 빈 목록.
+  예) "시간 상관없이" → removed: MAX_MINUTES / "오이 넣어도 돼" → removed: EXCLUDE
 - RECIPE_DETAIL: 이 상담에서 추천했던 레시피 하나의 만드는 법·시간·재료·팁을 묻는 말.
-  [직전 추천]·[이전 추천]에 없어도 "아까 그 ○○"처럼 앞서 추천받은 레시피 이름을 말하면 RECIPE_DETAIL이다 (서버가 상담 전체 추천에서 찾는다).
-  예) "두 번째 거 어떻게 만들어?", "그거 자세히 알려줘", "아까 그 깐풍기 시간 얼마나 걸려?", "아까 그 장어 조림 자세히"
-  targetIndex: [직전 추천] 번호(1부터). "그거"이고 직전 추천이 하나면 1, 번호를 알 수 없으면 0.
-  targetName: 말한 레시피 이름을 말한 그대로(예: "깐풍기", "장어 조림"). 이름을 말하지 않았으면 빈 문자열.
-  detailQuestion: 무엇을 묻는지. HOW_TO(만드는 법), TIME(조리 시간), INGREDIENTS(재료), TIP(팁·요령), OTHER(그 밖) 중에서 고른다.
-  예) "두 번째 거 어떻게 만들어?" → HOW_TO / "첫 번째 거는 시간 얼마나 걸려?" → TIME / "그거 재료 뭐 들어가?" → INGREDIENTS / "맛있게 하는 팁" → TIP
-- 새 요리 이름이나 새 조건으로 처음부터 추천해 달라는 말("김치찌개 먹고 싶어")은 RECOMMEND.
-- 레시피와 상관없는 질문(보관법·손질법·인사)은 GENERAL.
+  [직전 추천]·[이전 추천]에 없어도 "아까 그 ○○"처럼 앞서 추천받은 레시피 이름을 말하면 RECIPE_DETAIL이다.
+  targetIndex: [직전 추천] 번호(1부터). "그거"이고 직전 추천이 하나면 1, 모르면 0. targetName: 말한 레시피 이름 그대로, 없으면 빈 문자열.
+  detailQuestion: HOW_TO(만드는 법), TIME(조리 시간), INGREDIENTS(재료), TIP(팁), OTHER 중 하나.
+  예) "두 번째 거 어떻게 만들어?" → targetIndex: 2, HOW_TO / "아까 그 장어 조림 시간 얼마나 걸려?" → targetName: 장어 조림, TIME / "그거 재료 뭐 들어가?" → INGREDIENTS
+- 새 요리 이름이나 새 조건으로 처음부터 추천해 달라는 말("김치찌개 먹고 싶어")은 RECOMMEND. 레시피와 상관없는 질문(보관법·손질법·인사)은 GENERAL.
 - RECIPE_DETAIL이 아니면 targetIndex는 0, targetName과 detailQuestion은 빈 문자열. REFINE이 아니면 removed는 빈 목록.
