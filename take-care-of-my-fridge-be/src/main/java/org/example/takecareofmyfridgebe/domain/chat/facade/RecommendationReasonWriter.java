@@ -13,7 +13,8 @@ import java.util.Optional;
 /**
  * 추천 카드에 넣을 이유 한 줄(25자 안팎)을 만든다. 스프링에 의존하지 않는 순수 클래스.
  * 우선순위: 사용자 요청(요리 이름 키워드·원하는 맛·분류) > 선택 재료 > 임박 재료 > 겹친 맛 > 쓰는 냉장고 재료 수.
- * 요리 이름 키워드는 어떻게 맞았는지(KeywordMatch)대로 쓴다. 사용자가 말한 요리 이름(dishText)이 없으면 분류 이름을 쓴다.
+ * 요리 이름 키워드는 어떻게 맞았는지(KeywordMatch)대로 쓴다. 사용자가 요리 이름(dishText) 없이 특징만 말했으면("차가운 요리")
+ * 비교 없이 "냉면 요리예요", "메밀면을 쓰는 요리예요", "면 요리예요"처럼 쓴다.
  * 벡터 검색으로만 찾은 레시피는 "찾으신·비슷한"을 쓰지 않고 선택 재료·임박·맛으로 쓴다.
  * <pre>
  * 찾으신 냉면이에요 / 냉면과 비슷한 막국수예요 / 냉면처럼 메밀면을 쓰는 요리예요 / 냉면과 비슷한 면 요리예요
@@ -63,7 +64,15 @@ public final class RecommendationReasonWriter {
             return Optional.empty();
         }
         String kind = kindOf(category);
-        String dish = dishText != null ? dishText : kind;
+        if (dishText == null) {
+            // 사용자가 요리 이름을 말하지 않았으면("차가운 요리") 비교할 이름 없이 맞은 것만 쓴다
+            return Optional.of(switch (match.type()) {
+                case NAME, SPLIT, VECTOR -> kind + "예요";
+                case EXPANDED -> match.keyword() + " 요리예요";
+                case INGREDIENT -> match.ingredientName() + objectParticle(match.ingredientName()) + " 쓰는 요리예요";
+            });
+        }
+        String dish = dishText;
         return Optional.of(switch (match.type()) {
             case NAME -> "찾으신 " + dish + copula(dish);
             case EXPANDED -> dish + withParticle(dish) + " 비슷한 " + match.keyword() + copula(match.keyword());

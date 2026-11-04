@@ -18,7 +18,7 @@ class IntentResultTest {
     void dropsUnknownTastesAndCategories() {
         IntentResult raw = new IntentResult(ChatIntent.RECOMMEND,
                 List.of("spicy", "HOT", "SALTY", "SPICY"), List.of("국", "양념", "스튜", "국"), 30,
-                null, null, true, null, null);
+                null, null, true, null, null, null);
 
         IntentResult result = raw.sanitize(CATEGORIES);
 
@@ -32,7 +32,7 @@ class IntentResultTest {
     @Test
     @DisplayName("말하지 않은 칸(null)은 정리한 뒤에도 null로 두고, 의도가 없으면 GENERAL로 본다")
     void keepsNull_whenFieldIsNotSaid() {
-        IntentResult result = new IntentResult(null, null, null, null, null, null, null, null, null).sanitize(CATEGORIES);
+        IntentResult result = new IntentResult(null, null, null, null, null, null, null, null, null, null).sanitize(CATEGORIES);
 
         assertThat(result.intent()).isEqualTo(ChatIntent.GENERAL);
         assertThat(result.wantedTastes()).isNull();
@@ -47,7 +47,7 @@ class IntentResultTest {
     @Test
     @DisplayName("조리 시간이 0 이하면 null로 바꾼다")
     void returnsNullMaxMinutes_whenNotPositive() {
-        IntentResult result = new IntentResult(ChatIntent.RECOMMEND, null, null, 0, null, null, null, null, null)
+        IntentResult result = new IntentResult(ChatIntent.RECOMMEND, null, null, 0, null, null, null, null, null, null)
                 .sanitize(CATEGORIES);
 
         assertThat(result.maxMinutes()).isNull();
@@ -57,7 +57,7 @@ class IntentResultTest {
     @DisplayName("재료 이름은 앞뒤 공백을 지우고 빈 이름·null·중복을 뺀다")
     void trimsIngredientNames() {
         IntentResult raw = new IntentResult(ChatIntent.RECOMMEND, null, null, null,
-                Arrays.asList(" 두부 ", "", null, "두부", "버섯"), List.of("오이 "), null, null, null);
+                Arrays.asList(" 두부 ", "", null, "두부", "버섯"), List.of("오이 "), null, null, null, null);
 
         IntentResult result = raw.sanitize(CATEGORIES);
 
@@ -69,11 +69,12 @@ class IntentResultTest {
     @DisplayName("키워드는 앞뒤 공백·빈 값·중복을 빼고 6개까지만 남기고, 빈 요리 표현은 null로 바꾼다")
     void trimsKeywordsToSix() {
         IntentResult raw = new IntentResult(ChatIntent.RECOMMEND, null, null, null, null, null, null,
-                List.of(" 냉면 ", "막국수", "", "냉면", "콩국수", "냉메밀", "냉파스타", "비빔국수", "물회"), "  ");
+                List.of(" 냉면 ", "막국수", "", "냉면", "콩국수", "냉메밀", "냉파스타", "비빔국수", "물회"), "  ", " ");
 
         IntentResult result = raw.sanitize(CATEGORIES);
 
         assertThat(result.keywords()).containsExactly("냉면", "막국수", "콩국수", "냉메밀", "냉파스타", "비빔국수");
         assertThat(result.dishText()).isNull();
+        assertThat(result.preferenceText()).isNull();
     }
 }

@@ -53,9 +53,12 @@ class RecommendationReasonWriterTest {
     }
 
     @Test
-    @DisplayName("사용자가 말한 이름이 없으면 분류 이름으로 쓴다")
-    void writesCategory_whenNoDishText() {
-        assertThat(writeKeyword(KeywordMatch.of(Type.NAME), null, "면류")).isEqualTo("찾으신 면 요리예요");
+    @DisplayName("요리 이름 없이 특징만 말했으면(차가운 요리) 비교 없이 맞은 키워드·재료·분류만 쓴다")
+    void writesWithoutComparison_whenNoDishText() {
+        assertThat(writeKeyword(new KeywordMatch(Type.EXPANDED, "냉국", null), null, "국")).isEqualTo("냉국 요리예요");
+        assertThat(writeKeyword(new KeywordMatch(Type.INGREDIENT, "냉메밀", "메밀면"), null, "면류"))
+                .isEqualTo("메밀면을 쓰는 요리예요");
+        assertThat(writeKeyword(KeywordMatch.of(Type.SPLIT), null, "면류")).isEqualTo("면 요리예요");
     }
 
     @Test

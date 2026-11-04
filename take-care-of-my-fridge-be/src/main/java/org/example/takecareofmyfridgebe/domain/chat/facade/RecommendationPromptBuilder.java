@@ -26,7 +26,7 @@ import java.util.stream.Collectors;
  * [추천 후보]
  * 후보: 두부제육찜 | 찜 | 조리 시간 40분 | 카드 이유: 두부가 주재료예요 | 선택 재료 쓰임: 두부 | 쓰는 냉장고 재료: 오늘까지인 양파, 모레까지인 고추, 배추 | 냉장고에 없는 선택 재료: 두부 | 원하는 맛과 맞음: 매운맛 | 장볼 재료: 돼지고기, 부추, 당근 외 3개 | 재료 많이 모자람
  * </pre>
- * [먼저 말할 것]은 요리 이름 키워드로 레시피를 못 찾았거나, 고른 후보 중 냉장고에 없는 선택 재료가 있을 때만 넣는다
+ * [먼저 말할 것]은 원한 표현이 있는데 고른 레시피가 요청에 하나도 안 맞거나, 요리 이름 키워드로 레시피를 못 찾았거나, 고른 후보 중 냉장고에 없는 선택 재료가 있을 때만 넣는다
  * (AI가 판단하지 않게 서버가 정한다).
  * 후보가 없으면 [추천 후보] 아래에 "후보 없음"을 쓴다. 맛은 한글로 쓰고, 중괄호({})는 괄호로 바꿔 넣지 않는다.
  */
@@ -52,7 +52,11 @@ public final class RecommendationPromptBuilder {
                                List<RecipeCandidate> picked, boolean keywordsNotFound) {
         StringBuilder text = new StringBuilder();
         List<String> notices = new ArrayList<>();
-        if (keywordsNotFound) {
+        // 원한 게 있었는데 고른 레시피가 요청(키워드·분류·맛)에 하나도 안 맞으면 그렇다고 먼저 말한다.
+        // 그렇지 않고 키워드로 이름·재료가 맞은 레시피만 없으면 비슷한 걸 골랐다고 말한다
+        if (preferenceUnmet(query, picked)) {
+            notices.add(preferenceUnmetNotice(query.preferenceText()));
+        } else if (keywordsNotFound) {
             notices.add(keywordNotFoundNotice(query));
         }
         String missingNotice = missingSelectedNotice(picked);
@@ -75,6 +79,18 @@ public final class RecommendationPromptBuilder {
             text.append("후보: ").append(candidateLine(candidate, query.keywordText())).append('\n');
         }
         return withoutBraces(text.toString().stripTrailing());
+    }
+
+    // 원한 표현이 있는데 고른 레시피 중 요청 조건(키워드·분류·맛)에 맞은 것이 하나도 없는지
+    static boolean preferenceUnmet(RecipeQuery query, List<RecipeCandidate> picked) {
+        return query.preferenceText() != null
+                && !picked.isEmpty()
+                && picked.stream().allMatch(candidate -> candidate.ranking().requestMatches() == 0);
+    }
+
+    static String preferenceUnmetNotice(String preferenceText) {
+        return "말씀하신 " + preferenceText + topicParticle(preferenceText)
+                + " 찾지 못해서 냉장고 재료로 만들 수 있는 요리를 골랐어요";
     }
 
     // 키워드로 이름·재료가 맞은 레시피가 없을 때 안내. 사용자가 말한 요리 이름을 쓰고, 없으면 첫 키워드를 쓴다

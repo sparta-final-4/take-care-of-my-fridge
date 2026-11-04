@@ -109,7 +109,8 @@ public class ChatIntentFacade {
                 excludeIds,
                 useSelectedOnly,
                 result.keywords(),
-                result.dishText()
+                result.dishText(),
+                result.preferenceText()
         );
     }
 
@@ -156,6 +157,7 @@ public class ChatIntentFacade {
                 + ", 제외 재료=" + query.excludeIngredientIds()
                 + ", 선택 재료만=" + query.useSelectedOnly()
                 + ", 키워드=" + query.keywords()
-                + ", 요리 표현=" + query.keywordText();
+                + ", 요리 이름=" + query.keywordText()
+                + ", 원한 표현=" + query.preferenceText();
     }
 }

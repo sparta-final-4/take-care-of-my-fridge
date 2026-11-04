@@ -9,7 +9,7 @@ import java.util.Set;
 
 /**
  * 레시피 후보 검색 조건.
- * wantedTastes부터 keywordText까지는 AI 상담 의도·조건 뽑기(ChatIntentFacade)가 채운다. 말하지 않은 조건은 빈 목록·null이다.
+ * wantedTastes부터 preferenceText까지는 AI 상담 의도·조건 뽑기(ChatIntentFacade)가 채운다. 말하지 않은 조건은 빈 목록·null이다.
  *
  * @param selectedIngredientIds    선택 재료 ID: 내 냉장고에서 체크한 재료와 메시지에서 말한 재료를 합친 것 (없으면 빈 목록).
  *                                 냉장고에 없는 재료여도 후보를 모으는 데 쓰고, 레시피에서는 부족한 재료로 나온다
@@ -17,7 +17,8 @@ import java.util.Set;
  * @param maxMinutes               최대 조리 시간(분). 조리 시간이 비어 있는 레시피는 거르지 않는다
  * @param useSelectedOnly          선택 재료를 꼭 쓰는 레시피만 원하는지 ("이 재료로", 칩 [이 재료로 추천받기])
  * @param keywords                 레시피 이름에 나올 만한 요리 이름 (예: 냉면, 막국수). 레시피 검색(ES)으로 후보를 더 모은다
- * @param keywordText              사용자가 말한 요리 표현 그대로 (예: "냉면"). 키워드로 레시피를 못 찾았을 때 안내에 쓴다
+ * @param keywordText              사용자가 말한 요리 이름 (예: "냉면"). 레시피 이름에 통째로 있는지 볼 때와 카드 이유에 쓴다
+ * @param preferenceText           사용자가 원한 특징·요리 표현 그대로 (예: "차가운 요리"). 고른 레시피가 요청에 하나도 안 맞으면 안내에 쓴다
  * @param selectedIngredientGroups 선택 재료별 같은 종류 재료 ID (예: 버섯 → 표고버섯·양송이버섯). 묶음 안의 재료를 하나라도 쓰면
  *                                 그 선택 재료를 쓴 것으로 센다. 후보 검색(RecipeCandidateFacade)이 채우며, 없으면 선택 재료 자신만이다
  * @param keywordMatches           키워드 검색으로 찾은 레시피 ID별 맞은 방식(이름·늘린 이름·재료·쪼개짐·벡터). 후보 검색(RecipeCandidateFacade)이 채운다
@@ -32,6 +33,7 @@ public record RecipeQuery(
         boolean useSelectedOnly,
         List<String> keywords,
         String keywordText,
+        String preferenceText,
         Map<Long, Set<Long>> selectedIngredientGroups,
         Map<Long, KeywordMatch> keywordMatches
 ) {
@@ -42,8 +44,25 @@ public record RecipeQuery(
         excludeIngredientIds = orEmpty(excludeIngredientIds);
         keywords = orEmpty(keywords);
         keywordText = keywordText == null || keywordText.isBlank() ? null : keywordText.strip();
+        preferenceText = preferenceText == null || preferenceText.isBlank() ? null : preferenceText.strip();
         selectedIngredientGroups = selectedIngredientGroups == null ? Map.of() : Map.copyOf(selectedIngredientGroups);
         keywordMatches = keywordMatches == null ? Map.of() : Map.copyOf(keywordMatches);
+    }
+
+    public RecipeQuery(
+            Long memberId,
+            List<Long> selectedIngredientIds,
+            List<Member.Taste> wantedTastes,
+            List<String> moodCategories,
+            Integer maxMinutes,
+            List<Long> excludeIngredientIds,
+            boolean useSelectedOnly,
+            List<String> keywords,
+            String keywordText,
+            String preferenceText
+    ) {
+        this(memberId, selectedIngredientIds, wantedTastes, moodCategories, maxMinutes, excludeIngredientIds,
+                useSelectedOnly, keywords, keywordText, preferenceText, null, null);
     }
 
     public RecipeQuery(
@@ -58,7 +77,7 @@ public record RecipeQuery(
             String keywordText
     ) {
         this(memberId, selectedIngredientIds, wantedTastes, moodCategories, maxMinutes, excludeIngredientIds,
-                useSelectedOnly, keywords, keywordText, null, null);
+                useSelectedOnly, keywords, keywordText, null);
     }
 
     public RecipeQuery(
@@ -77,13 +96,13 @@ public record RecipeQuery(
     // 선택 재료 묶음을 채운 검색 조건
     public RecipeQuery withSelectedIngredientGroups(Map<Long, Set<Long>> groups) {
         return new RecipeQuery(memberId, selectedIngredientIds, wantedTastes, moodCategories, maxMinutes,
-                excludeIngredientIds, useSelectedOnly, keywords, keywordText, groups, keywordMatches);
+                excludeIngredientIds, useSelectedOnly, keywords, keywordText, preferenceText, groups, keywordMatches);
     }
 
     // 키워드 검색 결과를 채운 검색 조건
     public RecipeQuery withKeywordMatches(Map<Long, KeywordMatch> matches) {
         return new RecipeQuery(memberId, selectedIngredientIds, wantedTastes, moodCategories, maxMinutes,
-                excludeIngredientIds, useSelectedOnly, keywords, keywordText, selectedIngredientGroups, matches);
+                excludeIngredientIds, useSelectedOnly, keywords, keywordText, preferenceText, selectedIngredientGroups, matches);
     }
 
     // 키워드를 말했는데 이름·재료로 맞은 레시피가 하나도 없는지 (쪼개짐·벡터로만 찾은 것은 맞은 것으로 치지 않는다)

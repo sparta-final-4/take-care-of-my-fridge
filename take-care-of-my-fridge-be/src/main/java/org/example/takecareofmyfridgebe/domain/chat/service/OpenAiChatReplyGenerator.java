@@ -8,6 +8,7 @@ import org.springframework.ai.chat.client.ChatClient.ChatClientRequestSpec;
 import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
+import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -30,6 +31,8 @@ public class OpenAiChatReplyGenerator implements ChatReplyGenerator {
 
     private static final String FINISH_REASON_LENGTH = "length";
     private static final String PROMPT_SEPARATOR = "\n\n";
+    // 추천 답은 카드가 있으므로 소개 한두 문장만 받는다 (일반 답은 빈에 정한 800)
+    static final int RECOMMEND_MAX_TOKENS = 120;
 
     private final ChatClient chatClient;
     private final LlmCostCalculator llmCostCalculator;
@@ -68,6 +71,7 @@ public class OpenAiChatReplyGenerator implements ChatReplyGenerator {
     @Override
     public Flux<String> generateRecommendation(Long memberId, Long sessionId, String userMessage, String candidateInfo) {
         return stream(memberId, sessionId, "상담 추천 답", () -> chatClient.prompt()
+                .options(OpenAiChatOptions.builder().maxTokens(RECOMMEND_MAX_TOKENS))
                 .system(recommendSystemPrompt)
                 .messages(new SystemMessage(candidateInfo))
                 .user(userMessage));

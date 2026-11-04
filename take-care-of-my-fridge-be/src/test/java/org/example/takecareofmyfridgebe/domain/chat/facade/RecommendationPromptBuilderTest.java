@@ -111,6 +111,45 @@ class RecommendationPromptBuilderTest {
     }
 
     @Test
+    @DisplayName("원한 표현이 있는데 고른 레시피가 요청(키워드·분류·맛)에 하나도 안 맞으면 [먼저 말할 것]에 솔직하게 넣는다")
+    void writesPreferenceUnmetNotice() {
+        RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, null, null, null, false,
+                List.of("샐러드", "냉채"), null, "차가운 요리");
+        RecipeCandidate unmatched = candidate(1L, "장어조림", "조림", null,
+                reason(List.of("고추"), List.of(), List.of(), List.of(), List.of(), false));
+
+        String text = RecommendationPromptBuilder.build("차가운 요리 추천해줘", query, NAMES, List.of(unmatched), true);
+
+        assertThat(text).startsWith("""
+                [먼저 말할 것]
+                말씀하신 차가운 요리는 찾지 못해서 냉장고 재료로 만들 수 있는 요리를 골랐어요
+                [사용자 요청]""");
+        assertThat(text).doesNotContain("비슷한 걸 골랐어요");
+    }
+
+    @Test
+    @DisplayName("고른 레시피 중 하나라도 요청에 맞으면 원한 표현 안내를 넣지 않는다")
+    void omitsPreferenceNotice_whenAnyPickedMatchesRequest() {
+        RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, null, null, null, false,
+                List.of("냉면"), "냉면", "냉면 같은 면 요리");
+        RecipeCandidate matched = new RecipeCandidate(1L, "열무김치냉면", "면류", 20, new Ranking(1, 0, 0, 0, 1, 1, 0),
+                reason(List.of(), List.of(), List.of(), List.of(), List.of(), false));
+
+        assertThat(RecommendationPromptBuilder.build("냉면", query, NAMES, List.of(matched), false))
+                .doesNotContain("[먼저 말할 것]");
+    }
+
+    @Test
+    @DisplayName("원한 표현이 없으면(뭐 먹지?) 요청에 안 맞아도 [먼저 말할 것]을 넣지 않는다")
+    void omitsNotice_whenNoPreference() {
+        RecipeCandidate candidate = candidate(1L, "장어조림", "조림", null,
+                reason(List.of("고추"), List.of(), List.of(), List.of(), List.of(), false));
+
+        assertThat(RecommendationPromptBuilder.build("뭐 먹지?", RecipeQuery.of(MEMBER_ID, List.of()), NAMES,
+                List.of(candidate), false)).doesNotContain("[먼저 말할 것]");
+    }
+
+    @Test
     @DisplayName("고른 후보에 냉장고에 없는 선택 재료가 없으면 [먼저 말할 것]을 넣지 않는다")
     void omitsNotice_whenNoSelectedIsMissing() {
         RecipeCandidate candidate = candidate(1L, "두부조림", "조림", 20,

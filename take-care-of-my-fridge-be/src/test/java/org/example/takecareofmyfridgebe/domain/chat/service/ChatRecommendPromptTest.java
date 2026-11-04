@@ -30,6 +30,13 @@ class ChatRecommendPromptTest {
     }
 
     @Test
+    @DisplayName("맨 위에 한두 문장만, 레시피 이름을 하나씩 소개하지 말라고 쓰고, 요청을 되풀이해 추천한다고 하지 말라고 지시한다")
+    void putsShortRuleOnTopAndForbidsEcho() {
+        assertThat(prompt.lines().skip(1).findFirst()).contains("- 한두 문장만. 레시피 이름을 하나씩 소개하지 않는다.");
+        assertThat(prompt).contains("사용자 요청을 되풀이해서 \"○○로 추천해 드릴게요\"라고 하지 않는다");
+    }
+
+    @Test
     @DisplayName("카드 정보에 없는 특징을 단정하지 말고, 찾았다고 단정하지 말고, 카드 이유의 사실만 쓰라고 지시한다")
     void forbidsUnfoundedClaims() {
         assertThat(prompt).contains("카드 정보에 없는 특징(차가운, 따뜻한, 매운, 바삭한 등)을 레시피에 붙여 단정하지 않는다",
