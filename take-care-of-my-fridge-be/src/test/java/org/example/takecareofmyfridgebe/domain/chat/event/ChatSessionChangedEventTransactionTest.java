@@ -77,6 +77,7 @@ class ChatSessionChangedEventTransactionTest extends MySqlContainerSupport {
 
     @BeforeEach
     void cleanUp() {
+        jdbcTemplate.execute("DELETE FROM chat_recommendations");
         jdbcTemplate.execute("DELETE FROM chat_messages");
         jdbcTemplate.execute("DELETE FROM chat_sessions");
     }

@@ -58,6 +58,8 @@ class ChatSessionExpiryIntegrationTest extends MySqlContainerSupport {
             // 이미 추가되어 있는 경우 무시
         }
 
+        jdbcTemplate.execute("DELETE FROM chat_recommendations");
+
         jdbcTemplate.execute("DELETE FROM chat_messages");
         jdbcTemplate.execute("DELETE FROM chat_sessions");
     }

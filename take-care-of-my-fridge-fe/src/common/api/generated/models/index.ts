@@ -191,6 +191,7 @@ export * from './recipe-nutrition-request';
 export * from './recipe-step-request';
 export * from './recipe-update-request';
 export * from './recommended-recipe';
+export * from './recommended-recipe-name';
 export * from './refund-create-request';
 export * from './refund-history-item-response';
 export * from './refund-history-response';

@@ -4700,6 +4700,12 @@
             "type": "integer",
             "format": "int64"
           },
+          "recommendedRecipes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RecommendedRecipeName"
+            }
+          },
           "sessionId": {
             "type": "integer",
             "format": "int64"
@@ -7825,6 +7831,18 @@
             "items": {
               "type": "string"
             }
+          }
+        }
+      },
+      "RecommendedRecipeName": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "recipeId": {
+            "type": "integer",
+            "format": "int64"
           }
         }
       },

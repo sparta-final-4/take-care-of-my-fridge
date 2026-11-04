@@ -15,6 +15,11 @@ public interface ChatRecommendationRepository extends JpaRepository<ChatRecommen
             + "ORDER BY r.message.id ASC, r.displayOrder ASC")
     List<ChatRecommendation> findRecipeRecommendationsByMessageIds(@Param("messageIds") Collection<Long> messageIds);
 
+    // 상담 여러 개의 레시피 추천을 한 번에 (상담별, 최근 답부터, 카드 순서). 메시지는 함께 읽는다
+    @Query("SELECT r FROM ChatRecommendation r JOIN FETCH r.message m WHERE m.session.id IN :sessionIds AND r.recipeId IS NOT NULL "
+            + "ORDER BY m.session.id ASC, m.sequence DESC, r.displayOrder ASC")
+    List<ChatRecommendation> findRecipeRecommendationsBySessionIds(@Param("sessionIds") Collection<Long> sessionIds);
+
     // 한 상담에서 추천한 레시피 ID
     @Query("SELECT DISTINCT r.recipeId FROM ChatRecommendation r WHERE r.message.session.id = :sessionId AND r.recipeId IS NOT NULL")
     List<Long> findRecipeIdsBySessionId(@Param("sessionId") Long sessionId);

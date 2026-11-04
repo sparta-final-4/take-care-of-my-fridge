@@ -20,8 +20,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 @Service
@@ -144,6 +147,23 @@ public class ChatMessageService {
         return chatRecommendationRepository.findRecipeRecommendationsByMessageIds(messageIds).stream()
                 .map(SavedRecommendation::from)
                 .toList();
+    }
+
+    /**
+     * 상담마다 최근에 추천한 레시피 ID를 limit개까지 (최근 답부터, 카드 순서, 중복 제외). 상담 수와 상관없이 쿼리 한 번이다.
+     */
+    public Map<Long, List<Long>> findRecentRecommendedRecipeIds(Collection<Long> sessionIds, int limit) {
+        if (sessionIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<Long, List<Long>> bySession = new LinkedHashMap<>();
+        for (ChatRecommendation recommendation : chatRecommendationRepository.findRecipeRecommendationsBySessionIds(sessionIds)) {
+            List<Long> ids = bySession.computeIfAbsent(recommendation.getMessage().getSession().getId(), id -> new ArrayList<>());
+            if (ids.size() < limit && !ids.contains(recommendation.getRecipeId())) {
+                ids.add(recommendation.getRecipeId());
+            }
+        }
+        return bySession;
     }
 
     // 이 상담에서 이미 추천한 레시피 ID (다음 추천에서 뒤로 보낸다)

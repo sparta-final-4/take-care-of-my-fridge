@@ -227,6 +227,7 @@ models/recipe-match.ts
 models/recipe-nutrition-request.ts
 models/recipe-step-request.ts
 models/recipe-update-request.ts
+models/recommended-recipe-name.ts
 models/recommended-recipe.ts
 models/refund-create-request.ts
 models/refund-history-item-response.ts
