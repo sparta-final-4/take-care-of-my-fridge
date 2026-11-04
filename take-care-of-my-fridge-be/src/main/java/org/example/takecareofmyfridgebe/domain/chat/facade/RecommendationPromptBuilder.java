@@ -24,7 +24,7 @@ import java.util.stream.Collectors;
  * 선택 재료: 버섯, 두부 (이 재료를 꼭 쓰는 레시피만)
  * 조건: 원하는 맛 매운맛 / 분류 국, 찌개 / 30분 이내 / 뺄 재료 오이
  * [추천 후보]
- * 1. 두부제육찜 | 찜 | 조리 시간 40분 | 선택 재료 쓰임: 두부 | 쓰는 냉장고 재료: 오늘까지인 양파, 모레까지인 고추, 배추 | 냉장고에 없는 선택 재료: 두부 | 원하는 맛과 맞음: 매운맛 | 부족한 재료: 돼지고기, 부추, 당근 외 3개 | 재료 많이 모자람
+ * 1. 두부제육찜 | 찜 | 조리 시간 40분 | 선택 재료 쓰임: 두부 | 쓰는 냉장고 재료: 오늘까지인 양파, 모레까지인 고추, 배추 | 냉장고에 없는 선택 재료: 두부 | 원하는 맛과 맞음: 매운맛 | 장볼 재료: 돼지고기, 부추, 당근 외 3개 | 재료 많이 모자람
  * </pre>
  * [먼저 말할 것]은 고른 후보 중 냉장고에 없는 선택 재료가 있을 때만 넣는다 (AI가 판단하지 않게 서버가 정한다).
  * 후보가 없으면 [추천 후보] 아래에 "후보 없음"을 쓴다. 맛은 한글로 쓰고, 중괄호({})는 괄호로 바꿔 넣지 않는다.
@@ -133,7 +133,8 @@ public final class RecommendationPromptBuilder {
         } else if (!reason.matchedTastes().isEmpty()) {
             fields.add("좋아하는 맛과 맞음: " + tastes(reason.matchedTastes()));
         }
-        fields.add("부족한 재료: " + missingLine(reason.missingIngredients()));
+        // 카드·설명과 같은 말로 "장볼 재료"라고 쓴다 (기본 양념 제외)
+        fields.add("장볼 재료: " + missingLine(reason.missingIngredients()));
         if (reason.lacksManyIngredients()) {
             fields.add("재료 많이 모자람");
         }

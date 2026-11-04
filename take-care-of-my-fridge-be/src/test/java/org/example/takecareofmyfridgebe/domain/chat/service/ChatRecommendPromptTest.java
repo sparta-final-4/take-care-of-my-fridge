@@ -28,22 +28,36 @@ class ChatRecommendPromptTest {
     }
 
     @Test
-    @DisplayName("선택 재료 쓰임이 있으면 레시피마다 첫 문장을 주재료로 들어간다는 말로 시작하라고 지시한다")
+    @DisplayName("선택 재료 쓰임이 있으면 레시피 문장을 주재료로 들어간다는 말로 시작하라고 지시한다")
     void instructsSelectedAsMainIngredient() {
-        assertThat(prompt).contains("선택 재료 쓰임", "첫 문장을 그 재료가 요리의 주재료로 들어간다는 말로 시작한다",
+        assertThat(prompt).contains("선택 재료 쓰임", "문장을 그 재료가 요리의 주재료로 들어간다는 말로 시작한다",
                 "넣어도 되고 안 넣어도 되는 재료처럼 말하지 않는다");
     }
 
     @Test
-    @DisplayName("카드의 후보를 하나도 빼지 않고 모두 소개하고, 조리 시간이 없으면 그렇다고만 말하라고 지시한다")
-    void instructsToIntroduceAllCards() {
-        assertThat(prompt).contains("후보를 하나도 빼지 않고 모두 번호 순서대로 소개한다", "조리 시간 정보가 없어요");
+    @DisplayName("첫 줄 한 문장, 레시피마다 한 줄, 마지막 줄 카드 안내로 짧게 쓰고 후보를 모두 소개하라고 지시한다")
+    void instructsShortShapeWithAllCards() {
+        assertThat(prompt).contains("첫 줄: 전체를 소개하는 한 문장", "레시피마다 한 줄: \"1. 이름 - 한 문장\"",
+                "후보를 하나도 빼지 않고 모두 번호 순서대로 쓴다", "마지막 줄: \"카드를 눌러 레시피를 확인해 보세요.\"");
+    }
+
+    @Test
+    @DisplayName("카드에 있는 분류·조리 시간·장볼 재료 목록은 설명에서 반복하지 말라고 지시한다")
+    void forbidsRepeatingCardInfo() {
+        assertThat(prompt).contains("그 정보는 설명에서 반복하지 않는다", "장볼 재료 목록을 나열하지 않는다",
+                "분류·조리 시간(시간 정보가 없다는 말 포함)을 레시피마다 말하지 않는다");
+    }
+
+    @Test
+    @DisplayName("부족한 재료 대신 장볼 재료로 말하라고 지시한다")
+    void instructsShoppingWording() {
+        assertThat(prompt).contains("\"부족한 재료\"라고 하지 않고 \"장볼 재료\"로 말한다", "장어만 사면 돼요", "장볼 재료가 조금 있어요");
     }
 
     @Test
     @DisplayName("마크다운 금지는 공통 프롬프트에 두고 추천 프롬프트에는 다시 쓰지 않는다")
     void leavesMarkdownRuleToSystemPrompt() {
-        assertThat(prompt).doesNotContain("마크다운").contains("번호와 줄바꿈으로 나눈다");
+        assertThat(prompt).doesNotContain("마크다운");
     }
 
     @Test
@@ -55,7 +69,7 @@ class ChatRecommendPromptTest {
     @Test
     @DisplayName("[먼저 말할 것]이 있을 때만 그 문장을 맨 앞에 쓰고, 예시 재료 이름은 넣지 않는다")
     void instructsNoticeOnlyWhenGiven() {
-        assertThat(prompt).contains("[먼저 말할 것]이 있으면 그 문장을", "[먼저 말할 것]이 없으면 냉장고에 없는 재료 이야기를 하지 않는다")
+        assertThat(prompt).contains("[먼저 말할 것]이 있으면 그 문장을 첫 줄 앞에", "[먼저 말할 것]이 없으면 냉장고에 없는 재료 이야기를 하지 않는다")
                 .doesNotContain("말씀하신 버섯");
     }
 }
