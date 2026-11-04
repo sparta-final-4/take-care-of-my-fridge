@@ -1,3 +1,4 @@
+import type { ChatMessageCreateRequest } from '@/common/api/clients';
 import { getErrorCode } from '@/common/api/errors';
 import { useAuthStore } from '@/common/auth/authStore';
 import { setSession } from '@/common/auth/session';
@@ -8,6 +9,10 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '';
 export interface StreamMessageOptions {
   sessionId: number;
   content: string;
+  // 추천 요청 필드. 비우면 서버 기본값(AUTO, 선택 재료 없음, false)
+  mode?: ChatMessageCreateRequest['mode'];
+  selectedIngredientIds?: number[];
+  useSelectedOnly?: boolean;
   signal?: AbortSignal;
   onChunk: (chunk: string) => void;
   onDone: (data: { userMessageId?: number; assistantMessageId?: number }) => void;
@@ -43,11 +48,21 @@ async function ensureXsrfToken(): Promise<string | undefined> {
 export async function streamMessage({
   sessionId,
   content,
+  mode,
+  selectedIngredientIds,
+  useSelectedOnly,
   signal,
   onChunk,
   onDone,
   onError,
 }: StreamMessageOptions): Promise<void> {
+  const requestBody: ChatMessageCreateRequest = {
+    content,
+    mode,
+    selectedIngredientIds,
+    useSelectedOnly,
+  };
+
   async function executeRequest(isRetry = false): Promise<Response | null> {
     const xsrfToken = await ensureXsrfToken();
 
@@ -66,7 +81,7 @@ export async function streamMessage({
         method: 'POST',
         headers,
         credentials: 'include',
-        body: JSON.stringify({ content }),
+        body: JSON.stringify(requestBody),
         signal,
       });
     } catch (err: unknown) {

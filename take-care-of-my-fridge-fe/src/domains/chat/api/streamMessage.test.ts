@@ -334,4 +334,44 @@ describe('streamMessage', () => {
       message: '인증이 필요합니다.',
     });
   });
+
+  it('추천 모드·선택 재료·선택 재료만 쓰기를 요청 본문에 담아 보낸다', async () => {
+    const fetchMock = vi.fn().mockImplementation(async (url: string) => {
+      if (url.includes('/api/auth/csrf')) {
+        return { ok: true, status: 200, headers: { get: () => 'application/json' } };
+      }
+      const encoder = new TextEncoder();
+      return {
+        ok: true,
+        status: 200,
+        headers: { get: () => 'text/event-stream' },
+        body: new ReadableStream({
+          start(controller) {
+            controller.enqueue(encoder.encode('event:done\ndata:{}\n\n'));
+            controller.close();
+          },
+        }),
+      };
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await streamMessage({
+      sessionId: 1,
+      content: '배추, 버섯으로 추천해줘',
+      mode: 'RECOMMEND',
+      selectedIngredientIds: [10, 20],
+      useSelectedOnly: true,
+      onChunk: vi.fn(),
+      onDone: vi.fn(),
+      onError: vi.fn(),
+    });
+
+    const messageCall = fetchMock.mock.calls.find(([url]) => String(url).includes('/messages'));
+    expect(JSON.parse(messageCall?.[1]?.body as string)).toEqual({
+      content: '배추, 버섯으로 추천해줘',
+      mode: 'RECOMMEND',
+      selectedIngredientIds: [10, 20],
+      useSelectedOnly: true,
+    });
+  });
 });

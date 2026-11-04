@@ -228,3 +228,21 @@
     transform: translateY(0);
   }
 }
+
+// 상담 시작 칩 ([알아서 추천해줘] / [이 재료로 추천받기])
+.recommendChips {
+  margin-top: var(--ant-margin-xs);
+}
+
+// 입력창 위 선택 재료 줄
+.selectedRow {
+  margin-bottom: var(--ant-margin-xs);
+}
+
+.selectedLabel {
+  font-size: var(--ant-font-size-sm);
+}
+
+.selectedTag {
+  margin-inline-end: 0;
+}

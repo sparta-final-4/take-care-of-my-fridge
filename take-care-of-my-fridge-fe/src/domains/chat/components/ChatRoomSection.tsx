@@ -1,6 +1,6 @@
 import { CloseOutlined, DownOutlined, RobotOutlined, SendOutlined } from '@ant-design/icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { App, Button, Flex, Input, type InputRef, Result, Spin, Typography } from 'antd';
+import { App, Button, Flex, Input, type InputRef, Result, Spin, Tag, Typography } from 'antd';
 import {
   type KeyboardEvent,
   type ReactNode,
@@ -16,14 +16,25 @@ import { ROUTES } from '@/app/paths';
 import { getChatErrorInfo, getErrorCode, type ChatErrorInfo } from '@/common/api/errors';
 import { useAuthStore } from '@/common/auth/authStore';
 import { streamMessage } from '../api';
+import { useChatModalStore } from '../model/useChatModalStore';
 import { useChatStreamingStore } from '../model/useChatStreamingStore';
 import { chatQueries, useCompleteChatSession, useStartChatSession } from '../queries';
+import { selectedRecommendMessage } from '../selectedIngredients';
 import { ChatEndedNotice } from './ChatEndedNotice';
 import { ChatMessageBubble } from './ChatMessageBubble';
 import styles from './ChatRoomSection.module.scss';
 
 // 백엔드 ChatMessageCreateRequest의 @Size(max = 500)와 같은 값
 const CHAT_MESSAGE_MAX_LENGTH = 500;
+
+const AUTO_RECOMMEND_MESSAGE = '알아서 추천해줘';
+
+// 보낼 메시지. 칩은 mode=RECOMMEND로 AI 의도 판단 없이 추천을 받는다.
+interface OutgoingMessage {
+  content: string;
+  mode: 'AUTO' | 'RECOMMEND';
+  useSelectedOnly: boolean;
+}
 
 export interface ChatRoomSectionProps {
   onStreamingChange?: (streaming: boolean) => void;
@@ -54,6 +65,10 @@ export function ChatRoomSection({
   const navigate = useNavigate();
   const { modal } = App.useApp();
   const queryClient = useQueryClient();
+
+  // 내 냉장고에서 넘긴 선택 재료. 보낸 뒤에도 그대로 두고, 사용자가 ✕로 뺀다.
+  const selectedIngredients = useChatModalStore((state) => state.selectedIngredients);
+  const removeSelectedIngredient = useChatModalStore((state) => state.removeSelectedIngredient);
 
   const authStatus = useAuthStore((state) => state.status);
   const isAuthenticated = authStatus === 'authenticated';
@@ -223,12 +238,36 @@ export function ChatRoomSection({
     });
   };
 
-  // 메시지 전송 핸들러
+  // 메시지 전송 핸들러 (직접 입력). 선택 재료가 있으면 같이 보내고, AI가 추천인지 판단한다.
   const handleSendMessage = async () => {
     const text = inputText.trim();
+    if (!text) return;
+    setInputText('');
+    await sendMessage({ content: text, mode: 'AUTO', useSelectedOnly: false });
+  };
+
+  // [알아서 추천해줘] 칩
+  const handleAutoRecommend = () => {
+    void sendMessage({
+      content: AUTO_RECOMMEND_MESSAGE,
+      mode: 'RECOMMEND',
+      useSelectedOnly: false,
+    });
+  };
+
+  // [이 재료로 추천받기] 칩. 선택 재료를 꼭 쓰는 레시피만 받는다.
+  const handleSelectedRecommend = () => {
+    if (selectedIngredients.length === 0) return;
+    void sendMessage({
+      content: selectedRecommendMessage(selectedIngredients),
+      mode: 'RECOMMEND',
+      useSelectedOnly: true,
+    });
+  };
+
+  const sendMessage = async ({ content: text, mode, useSelectedOnly }: OutgoingMessage) => {
     if (!text || isInputDisabled || sessionId <= 0) return;
 
-    setInputText('');
     setSendErrorInfo(null);
     setVisibleSendError(null);
     setStreamingUserMessage(text);
@@ -241,6 +280,9 @@ export function ChatRoomSection({
       await streamMessage({
         sessionId,
         content: text,
+        mode,
+        selectedIngredientIds: selectedIngredients.map((ingredient) => ingredient.ingredientId),
+        useSelectedOnly,
         signal: controller.signal,
         onChunk: (chunk: string) => {
           setStreamingAssistantMessage((prev) => (prev ?? '') + chunk);
@@ -265,8 +307,8 @@ export function ChatRoomSection({
           if (errorInfo.action === 'restart') {
             setSendErrorInfo(errorInfo);
           }
-          // 다시 보낼 수 있는 실패(다른 창에서 답을 받는 중 등)는 보내려던 내용을 입력창에 되돌린다.
-          if (errorInfo.action === 'restoreInput') {
+          // 다시 보낼 수 있는 실패(다른 창에서 답을 받는 중 등)는 직접 입력한 내용을 입력창에 되돌린다.
+          if (errorInfo.action === 'restoreInput' && mode === 'AUTO') {
             setInputText(text);
           }
 
@@ -438,6 +480,22 @@ export function ChatRoomSection({
                   <br />
                   요리 고민을 편하게 물어보세요!
                 </Typography.Text>
+                {!isSessionEnded && (
+                  <Flex wrap justify="center" gap="small" className={styles.recommendChips}>
+                    <Button shape="round" onClick={handleAutoRecommend} disabled={isInputDisabled}>
+                      알아서 추천해줘
+                    </Button>
+                    {selectedIngredients.length > 0 && (
+                      <Button
+                        shape="round"
+                        onClick={handleSelectedRecommend}
+                        disabled={isInputDisabled}
+                      >
+                        이 재료로 추천받기
+                      </Button>
+                    )}
+                  </Flex>
+                )}
               </div>
             )
           )}
@@ -478,6 +536,26 @@ export function ChatRoomSection({
             <span className={styles.errorDot} />
             <span>{visibleSendError}</span>
           </div>
+        )}
+
+        {/* 선택 재료 줄. 끝난 상담에는 보이지 않는다. */}
+        {!isSessionEnded && selectedIngredients.length > 0 && (
+          <Flex align="center" wrap gap="small" className={styles.selectedRow}>
+            <Typography.Text type="secondary" className={styles.selectedLabel}>
+              선택한 재료
+            </Typography.Text>
+            {selectedIngredients.map((ingredient) => (
+              <Tag
+                key={ingredient.ingredientId}
+                closable
+                onClose={() => removeSelectedIngredient(ingredient.ingredientId)}
+                closeIcon={<CloseOutlined aria-label={`${ingredient.name} 빼기`} />}
+                className={styles.selectedTag}
+              >
+                {ingredient.name}
+              </Tag>
+            ))}
+          </Flex>
         )}
 
         <div className={styles.inputForm}>

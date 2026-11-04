@@ -6,6 +6,7 @@ import { useLocation, useNavigate, useSearchParams } from 'react-router';
 import { ROUTES } from '@/app/paths';
 import { SectionCard } from '@/common/components/SectionCard';
 import { useChatModalStore } from '@/domains/chat/model/useChatModalStore';
+import { toChatSelectedIngredients } from '@/domains/chat/selectedIngredients';
 
 import type { FridgeItemResponse, FridgeSortType } from '../api';
 import { FRIDGE_TABS, isFridgeTab, matchesFridgeTab, type FridgeTab } from '../filter';
@@ -232,8 +233,11 @@ export function FridgeItemListSection() {
               <CheckOutlined /> {checkedItems.length}개 선택됨 ·{' '}
               {checkedItems.map((item) => item.rawName).join(', ')}
             </Typography.Text>
-            {/* TODO: AI 상담 기능이 생기면 선택한 재료로 추천을 요청한다. */}
-            <Button className={styles.selectionButton} onClick={openChat}>
+            {/* 체크한 재료 중 추천에 쓸 수 있는 것만 넘긴다. 남는 게 없으면 선택 없이 연다. */}
+            <Button
+              className={styles.selectionButton}
+              onClick={() => openChat(toChatSelectedIngredients(checkedItems))}
+            >
               이 재료 위주로 AI 추천
             </Button>
           </Flex>

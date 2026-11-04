@@ -156,7 +156,7 @@ export function ChatHistorySection() {
         >
           {/* 상담 시작은 openChat을 거쳐 이 화면의 대화 칸으로 온다(isNewLive). */}
           {tab === 'ALL' && (
-            <Button type="primary" onClick={openChat}>
+            <Button type="primary" onClick={() => openChat()}>
               AI 상담 시작하기
             </Button>
           )}

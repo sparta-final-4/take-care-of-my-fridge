@@ -36,7 +36,7 @@ export function FridgeAiConsultSection() {
         <Typography.Text type="secondary" className={styles.hint}>
           목록에서 재료를 골라 추천받을 수도 있어요.
         </Typography.Text>
-        <Button type="primary" size="large" onClick={openChat} block>
+        <Button type="primary" size="large" onClick={() => openChat()} block>
           AI 상담 시작하기
         </Button>
       </Flex>
