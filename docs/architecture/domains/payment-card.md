@@ -1,6 +1,6 @@
 # 등록 카드 결제 설계
 
-상태: 확정(2026-11-03 사용자 승인) · 구현: 예정 · 담당: 결제·환불 · 관련 화면: 7-6 카드 관리, 9 주문 확인(결제 수단)
+상태: 확정(2026-11-03 사용자 승인, 2026-11-04 결제대행사·카드 정보 필드 확정) · 구현: 진행 중(엔티티) · 담당: 결제·환불 · 관련 화면: 7-6 카드 관리, 9 주문 확인(결제 수단)
 
 결제 도메인의 하위 기능입니다. 결제 시도·승인·실패·보상 취소 규칙은 [결제 설계](payment.md)를 그대로 따르고, 이 문서는 카드 등록과 등록 카드로 결제하는 부분만 다룹니다.
 
@@ -8,7 +8,7 @@
 - 해결할 사용자 문제: 카드를 한 번 등록해 두면 다음 주문부터 결제창 없이 주문 확인 화면에서 바로 결제한다. 등록한 카드는 마이페이지 카드 관리에서 등록·삭제·대표 카드 지정을 한다.
 - 이 도메인이 소유하는 데이터와 정책: 등록 카드(billing_keys), 회원당 카드 수 제한, 대표 카드, 등록 카드 결제 요청.
 - 다른 도메인에 맡기는 책임: 카드 번호·유효기간·인증 정보 보관(PortOne·카드사), 주문 상태·재고(주문), 환불(환불), 매출 집계(정산).
-- 카드 정보는 우리 서버에 저장하지 않습니다. PortOne이 발급한 빌링키와 화면 표시용 정보(카드사, 끝 4자리, 신용·체크 구분)만 저장합니다. 빌링키 값은 응답으로 내려주지 않습니다.
+- 카드 정보는 우리 서버에 저장하지 않습니다. PortOne이 발급한 빌링키와 화면 표시용 정보(카드 상품명, 끝 4자리, 신용·체크 구분)만 저장합니다. 카드 정보가 우리 서버를 거치지 않도록 결제창 방식으로 발급합니다. 빌링키 값은 응답으로 내려주지 않습니다.
 - 지금 결제와 같이 PortOne 테스트 채널로 결제합니다. 실제 돈은 나가지 않습니다.
 
 ## 범위
@@ -21,7 +21,7 @@
 ## 기능·정책
 | 기능 | 정책·제약 | 근거 | 확정 상태 |
 |---|---|---|---|
-| 빌링키 채널 | 빌링키 발급·결제는 일반 결제 채널과 별도인 빌링용 테스트 채널 하나만 씁니다. 채널 키는 설정 `portone.channels.billing`(환경변수 `PORTONE_CHANNEL_BILLING`)으로 읽습니다. 어느 결제대행사의 빌링 채널을 쓸지는 PortOne 콘솔에서 테스트 채널 지원 여부를 확인해 정합니다 | 2026-11-03 사용자 결정 | 결정(채널 종류는 미정) |
+| 빌링키 채널 | 토스페이먼츠 빌링용 테스트 채널 하나를 결제창 방식(`requestIssueBillingKey`, `billingKeyMethod: CARD`)으로 씁니다. 일반 결제 채널과 별도로 PortOne 콘솔에 추가합니다. 채널 키는 설정 `portone.billing-channel-key`(환경변수 `PORTONE_CHANNEL_BILLING`)로 읽습니다. `portone.channels`는 결제대행사별 맵이라 따로 둡니다. 카카오페이·토스페이 직연동은 빌링키를 지원하지 않고, 토스페이먼츠는 KG이니시스·이지페이보다 발급 필수 값이 적어 골랐습니다(모바일은 `redirectUrl` 필요) | 2026-11-04 사용자 결정, PortOne PG별 V2 가이드 | 결정 |
 | 카드 등록 준비 | 서버가 채널 키, 발급 ID(`issueId`), 고객 ID(회원 ID)를 내려줍니다. 프론트는 이 값으로 PortOne 빌링키 발급 창을 엽니다 | | 결정 |
 | 카드 등록 확정 | 프론트가 받은 빌링키를 그대로 믿지 않고 서버가 PortOne에서 빌링키를 조회합니다. 발급 상태이고 고객 ID가 본인이면 저장합니다. 다르면 저장하지 않습니다 | 결제 확정과 같은 원칙 | 결정 |
 | 카드 수 제한 | 회원당 등록 카드(삭제되지 않은 카드)는 최대 5장입니다. 넘으면 등록 준비 단계에서 거절합니다 | 2026-11-03 사용자 결정 | 결정 |
@@ -127,7 +127,7 @@ sequenceDiagram
 ```
 
 ## 데이터·API·이벤트
-- ERD·데이터 사전: 새 테이블 `billing_keys`, `payments.billing_key_id` 컬럼 추가. 아래 표는 구현 전 설계이며, 구현 때 [data-dictionary.md](../../database/data-dictionary.md)와 [erd.md](../../database/erd.md)에 옮깁니다.
+- ERD·데이터 사전: 새 테이블 `billing_keys`, `payments.billing_key_id` 컬럼 추가. 컬럼 정의는 [data-dictionary.md](../../database/data-dictionary.md#billing_keys--등록-카드), 관계는 [erd.md](../../database/erd.md#결제-테이블-관계), DDL은 [payment.sql](../../database/payment.sql)에 있습니다.
 
 `billing_keys` — 등록 카드
 
@@ -136,7 +136,7 @@ sequenceDiagram
 | id | BIGINT | 불가 | AUTO_INCREMENT | PK | |
 | member_id | BIGINT | 불가 | | FK `fk_billing_keys_member`, 인덱스 | 카드 주인 |
 | billing_key | VARCHAR(200) | 불가 | | UK `uk_billing_keys_billing_key` | PortOne 빌링키. 응답으로 내려주지 않음 |
-| card_issuer | VARCHAR(50) | 허용 | NULL | | 카드사 이름(PortOne 조회 값) |
+| card_name | VARCHAR(100) | 허용 | NULL | | 카드 상품명(PortOne 빌링키 조회 `card.name`). PortOne은 카드사를 이름이 아닌 코드(`card.issuer`)로만 줍니다 |
 | card_last4 | CHAR(4) | 허용 | NULL | | 카드 번호 끝 4자리 |
 | card_type | ENUM('CREDIT','DEBIT','GIFT') | 허용 | NULL | | 신용·체크·기프트. PortOne이 주지 않으면 NULL |
 | is_default | BOOLEAN | 불가 | FALSE | | 대표 카드. 회원당 사용 중 카드 중 하나 |
@@ -162,11 +162,15 @@ sequenceDiagram
 | 카드 삭제 | DELETE /billing-keys/{cardId} | Path cardId | 200(데이터 없음) |
 | 등록 카드 결제 | POST /orders/{orderId}/payments/billing-key | Body cardId | 200. 결제 확정 응답(PaymentConfirmResponse)과 같음 |
 
-카드 응답 필드: cardId, cardIssuer, cardLast4, cardType, isDefault, createdAt. 빌링키 값은 넣지 않습니다.
+카드 응답 필드: cardId, cardName, cardLast4, cardType, isDefault, createdAt. 빌링키 값은 넣지 않습니다.
 
 오류 코드(제안, 번호는 구현 때 ErrorCode에 맞춰 확정): 카드 5장 초과, 없는 카드·남의 카드(404), 삭제된 카드, 빌링키 확인 실패(조회 실패·발급 상태 아님·본인 아님). 결제 오류는 기존 `PAYMENT_00x`를 그대로 씁니다.
 
-- PortOne 호출: 빌링키 발급 창(브라우저 SDK `requestIssueBillingKey`), 빌링키 조회·삭제, 빌링키 결제. 실제 요청·응답 필드는 구현 때 PortOne V2 문서와 테스트 응답으로 확인합니다.
+- PortOne 호출(공식 OpenAPI 스펙 v1.16.0 기준):
+  - 빌링키 조회 `GET /billing-keys/{billingKey}?storeId=`: `status`(`ISSUED`·`DELETED`), `customer.id`, `methods[].card`(`name` 상품명, `number` 마스킹 번호, `type` `CREDIT`·`DEBIT`·`GIFT`, `issuer`·`publisher` 코드, `brand`, `ownerType`, `bin`, 모두 선택값), `channels[].pgProvider`. 없으면 404 `BillingKeyNotFoundError`.
+  - 빌링키 삭제 `DELETE /billing-keys/{billingKey}?storeId=&reason=&requester=`: 응답 `deletedAt`. 409 `BillingKeyAlreadyDeletedError`는 이미 삭제된 것으로 보고 성공 처리, 502 `PgProviderError`·`ChannelSpecificError`는 재시도 대상.
+  - 빌링키 결제 `POST /payments/{paymentId}/billing-key`: `billingKey`, `orderName`, `amount.total`, `currency: KRW`, `customer`. 응답 `payment.pgTxId`·`paidAt`. 502 `PgProviderError`(`pgCode`·`pgMessage`)는 카드 거절로 `PG_FAILED`, 409 `AlreadyPaidError`는 PG 재조회 후 승인, 404 `BillingKeyNotFoundError`·409 `BillingKeyAlreadyDeletedError`는 쓸 수 없는 카드 오류.
+  - 테스트 채널에서 실제 카드가 필요한지, 기프트카드 발급이 되는지는 PortOne 문서에 없어 채널 추가 뒤 직접 발급해 확인합니다.
 - 수신 이벤트: 등록 카드 결제의 결제 완료·취소 웹훅은 기존 `Transaction.*` 처리로 받습니다. 빌링키 웹훅(`BillingKey.*`)은 이번 범위에서 처리하지 않습니다.
 - 보관 기간·삭제 정책: 등록 카드 행은 삭제 상태로 남기고 지우지 않습니다. 결제가 카드를 참조하기 때문입니다.
 
@@ -180,7 +184,7 @@ sequenceDiagram
 ## 화면
 화면 명세에 반영할 내용입니다(구현 때 [screens.md](../../requirements/screens.md)에 옮깁니다).
 
-- 7-6 카드 관리 `/mypage/cards`(새 화면, 로그인 필요): 등록 카드 목록(카드사, 끝 4자리, 신용·체크, 등록일, 대표 표시), "카드 등록" 버튼, 카드별 "대표 카드로" 버튼과 "삭제"(확인 후). 카드가 없으면 빈 상태와 카드 등록 버튼. 5장이면 카드 등록 버튼을 막고 안내합니다.
+- 7-6 카드 관리 `/mypage/cards`(새 화면, 로그인 필요): 등록 카드 목록(카드 상품명, 끝 4자리, 신용·체크, 등록일, 대표 표시), "카드 등록" 버튼, 카드별 "대표 카드로" 버튼과 "삭제"(확인 후). 카드가 없으면 빈 상태와 카드 등록 버튼. 5장이면 카드 등록 버튼을 막고 안내합니다.
 - 9 주문 확인 결제 수단: 맨 앞에 "등록 카드"를 두고 카드를 옆으로 넘겨 고릅니다(모바일 스와이프, 데스크톱 화살표·점 표시). 마지막 칸은 "+ 카드 등록"입니다. 대표 카드가 처음 선택돼 있습니다. 등록이 끝나면 화면에 머물고 새 카드가 선택됩니다. 주문 확인 화면에서는 삭제하지 않습니다. 결제 중에는 카드를 바꿀 수 없습니다. 나머지 결제 수단(카카오페이 등)은 지금과 같습니다.
 
 ## 연동 계약
@@ -195,4 +199,4 @@ sequenceDiagram
 ## 검증과 증거
 - 필수 시나리오(구현 때 [test-strategy.md](../../testing/test-strategy.md)에 ID를 붙여 옮김): 카드 등록 성공(첫 카드 대표), 6번째 카드 거절, 남의 빌링키·조회 실패 시 저장 안 함, 등록 확정 중복 요청 한 번만 저장, 동시 등록 5장 넘지 않음, 대표 카드 지정·대표 삭제 시 다음 카드 대표, 남의 카드 404, 삭제된 카드로 결제 거절, 등록 카드 결제 성공, 카드 거절 시 `PG_FAILED`와 재결제, 결제 결과 모름 → 웹훅·만료 스케줄러 마무리, 금액 불일치 보상 취소, 카드 삭제 후 환불 가능, PortOne 빌링키 삭제 실패 재시도.
 - 관련 작업 기록: 구현 때 작성.
-- 미결정 사항: 빌링 테스트 채널의 결제대행사, PortOne 빌링키 조회 응답의 카드 정보 필드, 저장되지 않은 빌링키 정리(빌링키 웹훅 처리 여부), 회원 행 잠금에 대한 회원 담당 합의.
+- 미결정 사항: 토스페이먼츠 빌링 테스트 채널의 테스트 조건(실제 카드 필요 여부), 저장되지 않은 빌링키 정리(빌링키 웹훅 `BillingKey.*` 처리 여부), 회원 행 잠금에 대한 회원 담당 합의. 회원 잠금은 기존 `MemberRepository.findByIdForUpdate`를 씁니다.
