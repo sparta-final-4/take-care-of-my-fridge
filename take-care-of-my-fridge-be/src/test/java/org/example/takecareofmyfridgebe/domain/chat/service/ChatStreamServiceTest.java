@@ -5,9 +5,13 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntentResolution.Sou
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageCreateRequest;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageMode;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageResponse;
+import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse;
+import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse.RecommendedRecipe;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeQuery;
+import org.example.takecareofmyfridgebe.domain.chat.dto.RecommendationReply;
 import org.example.takecareofmyfridgebe.domain.chat.entity.ChatMessageRole;
 import org.example.takecareofmyfridgebe.domain.chat.facade.ChatIntentFacade;
+import org.example.takecareofmyfridgebe.domain.chat.facade.ChatRecommendationFacade;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 import org.junit.jupiter.api.DisplayName;
@@ -59,6 +63,9 @@ class ChatStreamServiceTest {
 
     @Mock
     private ChatIntentFacade chatIntentFacade;
+
+    @Mock
+    private ChatRecommendationFacade chatRecommendationFacade;
 
     @Spy
     private ObjectMapper objectMapper = new ObjectMapper();
@@ -424,8 +431,7 @@ class ChatStreamServiceTest {
     void resolvesIntentBeforeReply_andCountsOnce() {
         Long sessionId = 10L;
         ChatMessageCreateRequest request = ChatMessageCreateRequest.of("매운 거 먹고 싶어");
-        when(chatIntentFacade.resolve(1L, sessionId, request))
-                .thenReturn(ChatIntentResolution.recommend(Source.AI, RecipeQuery.of(1L, List.of())));
+        when(chatIntentFacade.resolve(1L, sessionId, request)).thenReturn(ChatIntentResolution.general(Source.AI));
         when(chatReplyGenerator.generate(1L, sessionId, "매운 거 먹고 싶어")).thenReturn(Flux.just("답"));
         when(chatMessageService.saveExchange(sessionId, "매운 거 먹고 싶어", "답")).thenReturn(List.of(
                 new ChatMessageResponse(100L, 1, ChatMessageRole.USER, "매운 거 먹고 싶어", LocalDateTime.now()),
@@ -498,5 +504,118 @@ class ChatStreamServiceTest {
 
         verify(chatReplyGenerator, never()).generate(any(), any(), any());
         verify(chatDailyLimitService, times(1)).refund(LIMIT_KEY);
+    }
+
+    @Test
+    @DisplayName("추천이면 recommendations 이벤트를 먼저 보내고 설명 글 조각, done 순서로 보내며 설명 글만 저장한다")
+    void sendsRecommendationsBeforeText_whenIntentIsRecommend() {
+        Long sessionId = 10L;
+        ChatMessageCreateRequest request = ChatMessageCreateRequest.of("두부로 뭐 해 먹지?");
+        RecipeQuery query = RecipeQuery.of(1L, List.of(21L));
+        givenRecommend(sessionId, request, query, new RecommendationReply(
+                ChatRecommendationsEventResponse.of(List.of(card(314L, "두부조림"))), "후보 정보"));
+        when(chatReplyGenerator.generateRecommendation(1L, sessionId, "두부로 뭐 해 먹지?", "후보 정보"))
+                .thenReturn(Flux.just("두부조림을", " 추천해요"));
+        when(chatMessageService.saveExchange(sessionId, "두부로 뭐 해 먹지?", "두부조림을 추천해요")).thenReturn(List.of(
+                new ChatMessageResponse(100L, 1, ChatMessageRole.USER, "두부로 뭐 해 먹지?", LocalDateTime.now()),
+                new ChatMessageResponse(101L, 2, ChatMessageRole.ASSISTANT, "두부조림을 추천해요", LocalDateTime.now())
+        ));
+
+        List<ServerSentEvent<String>> events = chatStreamService.streamMessage(1L, sessionId, request).collectList().block();
+
+        assertThat(events).extracting(ServerSentEvent::event)
+                .containsExactly("recommendations", "message", "message", "done");
+        assertThat(events.get(0).data()).contains("\"recipeId\":314", "\"name\":\"두부조림\"", "\"empty\":false");
+        verify(chatReplyGenerator, never()).generate(any(), any(), any());
+        verify(chatMessageService).saveExchange(sessionId, "두부로 뭐 해 먹지?", "두부조림을 추천해요");
+    }
+
+    @Test
+    @DisplayName("일반 질문이면 후보를 찾지 않고 recommendations 이벤트도 보내지 않는다")
+    void skipsRecommendations_whenIntentIsGeneral() {
+        Long sessionId = 10L;
+        ChatMessageCreateRequest request = ChatMessageCreateRequest.of("두부 보관 어떻게 해?");
+        when(chatIntentFacade.resolve(1L, sessionId, request)).thenReturn(ChatIntentResolution.general(Source.AI));
+        when(chatReplyGenerator.generate(1L, sessionId, "두부 보관 어떻게 해?")).thenReturn(Flux.just("냉장 보관"));
+        when(chatMessageService.saveExchange(sessionId, "두부 보관 어떻게 해?", "냉장 보관")).thenReturn(List.of(
+                new ChatMessageResponse(100L, 1, ChatMessageRole.USER, "두부 보관 어떻게 해?", LocalDateTime.now()),
+                new ChatMessageResponse(101L, 2, ChatMessageRole.ASSISTANT, "냉장 보관", LocalDateTime.now())
+        ));
+
+        List<ServerSentEvent<String>> events = chatStreamService.streamMessage(1L, sessionId, request).collectList().block();
+
+        assertThat(events).extracting(ServerSentEvent::event).containsExactly("message", "done");
+        verify(chatRecommendationFacade, never()).recommend(any(), any());
+        verify(chatReplyGenerator, never()).generateRecommendation(any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("후보가 0개여도 empty=true인 recommendations 이벤트를 보내고 설명을 받는다")
+    void sendsEmptyRecommendations_whenNoCandidates() {
+        Long sessionId = 10L;
+        ChatMessageCreateRequest request = ChatMessageCreateRequest.of("10분 안에 되는 그라탕");
+        RecipeQuery query = RecipeQuery.of(1L, List.of());
+        givenRecommend(sessionId, request, query,
+                new RecommendationReply(ChatRecommendationsEventResponse.of(List.of()), "[추천 후보]\n후보 없음"));
+        when(chatReplyGenerator.generateRecommendation(1L, sessionId, "10분 안에 되는 그라탕", "[추천 후보]\n후보 없음"))
+                .thenReturn(Flux.just("조건에 맞는 레시피를 못 찾았어요"));
+        when(chatMessageService.saveExchange(sessionId, "10분 안에 되는 그라탕", "조건에 맞는 레시피를 못 찾았어요")).thenReturn(List.of(
+                new ChatMessageResponse(100L, 1, ChatMessageRole.USER, "10분 안에 되는 그라탕", LocalDateTime.now()),
+                new ChatMessageResponse(101L, 2, ChatMessageRole.ASSISTANT, "조건에 맞는 레시피를 못 찾았어요", LocalDateTime.now())
+        ));
+
+        List<ServerSentEvent<String>> events = chatStreamService.streamMessage(1L, sessionId, request).collectList().block();
+
+        assertThat(events).extracting(ServerSentEvent::event).containsExactly("recommendations", "message", "done");
+        assertThat(events.get(0).data()).isEqualTo("{\"recipes\":[],\"relaxed\":[],\"empty\":true}");
+        verify(chatDailyLimitService, never()).refund(any());
+    }
+
+    @Test
+    @DisplayName("후보 검색이 실패하면 recommendations 없이 일반 답으로 넘어간다")
+    void fallsBackToGeneral_whenRecommendFails() {
+        Long sessionId = 10L;
+        ChatMessageCreateRequest request = ChatMessageCreateRequest.of("뭐 먹지?");
+        RecipeQuery query = RecipeQuery.of(1L, List.of());
+        when(chatIntentFacade.resolve(1L, sessionId, request)).thenReturn(ChatIntentResolution.recommend(Source.AI, query));
+        when(chatRecommendationFacade.recommend("뭐 먹지?", query)).thenThrow(new RuntimeException("db down"));
+        when(chatReplyGenerator.generate(1L, sessionId, "뭐 먹지?")).thenReturn(Flux.just("답"));
+        when(chatMessageService.saveExchange(sessionId, "뭐 먹지?", "답")).thenReturn(List.of(
+                new ChatMessageResponse(100L, 1, ChatMessageRole.USER, "뭐 먹지?", LocalDateTime.now()),
+                new ChatMessageResponse(101L, 2, ChatMessageRole.ASSISTANT, "답", LocalDateTime.now())
+        ));
+
+        List<ServerSentEvent<String>> events = chatStreamService.streamMessage(1L, sessionId, request).collectList().block();
+
+        assertThat(events).extracting(ServerSentEvent::event).containsExactly("message", "done");
+        verify(chatReplyGenerator, never()).generateRecommendation(any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("recommendations 이벤트 뒤 설명 글 첫 조각 전에 실패하면 하루 횟수를 돌려준다 (카드는 첫 조각으로 치지 않음)")
+    void refundsDailyCount_whenTextFailsAfterRecommendations() {
+        Long sessionId = 10L;
+        ChatMessageCreateRequest request = ChatMessageCreateRequest.of("뭐 먹지?");
+        RecipeQuery query = RecipeQuery.of(1L, List.of());
+        when(chatDailyLimitService.checkAndIncrement(1L)).thenReturn(LIMIT_KEY);
+        givenRecommend(sessionId, request, query, new RecommendationReply(
+                ChatRecommendationsEventResponse.of(List.of(card(1L, "두부조림"))), "후보"));
+        when(chatReplyGenerator.generateRecommendation(1L, sessionId, "뭐 먹지?", "후보"))
+                .thenReturn(Flux.error(new BusinessException(ErrorCode.CHAT_AI_UNAVAILABLE)));
+
+        List<ServerSentEvent<String>> events = chatStreamService.streamMessage(1L, sessionId, request).collectList().block();
+
+        assertThat(events).extracting(ServerSentEvent::event).containsExactly("recommendations", "error");
+        verify(chatDailyLimitService, times(1)).refund(LIMIT_KEY);
+        verify(chatMessageService, never()).saveExchange(any(), any(), any());
+    }
+
+    private void givenRecommend(Long sessionId, ChatMessageCreateRequest request, RecipeQuery query, RecommendationReply reply) {
+        when(chatIntentFacade.resolve(1L, sessionId, request)).thenReturn(ChatIntentResolution.recommend(Source.AI, query));
+        when(chatRecommendationFacade.recommend(request.content(), query)).thenReturn(reply);
+    }
+
+    private static RecommendedRecipe card(Long recipeId, String name) {
+        return new RecommendedRecipe(recipeId, name, null, "조림", 20, List.of(), List.of(), List.of(), List.of(), false);
     }
 }

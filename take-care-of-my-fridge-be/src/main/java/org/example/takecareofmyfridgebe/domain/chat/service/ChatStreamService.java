@@ -4,10 +4,14 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatDoneEventResponse;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatErrorEventResponse;
+import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntent;
+import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntentResolution;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageCreateRequest;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageEventResponse;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageResponse;
+import org.example.takecareofmyfridgebe.domain.chat.dto.RecommendationReply;
 import org.example.takecareofmyfridgebe.domain.chat.facade.ChatIntentFacade;
+import org.example.takecareofmyfridgebe.domain.chat.facade.ChatRecommendationFacade;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 import org.springframework.http.codec.ServerSentEvent;
@@ -30,12 +34,15 @@ public class ChatStreamService {
     private final ChatDailyLimitService chatDailyLimitService;
     private final ChatReplyGenerator chatReplyGenerator;
     private final ChatIntentFacade chatIntentFacade;
+    private final ChatRecommendationFacade chatRecommendationFacade;
     private final ObjectMapper objectMapper;
 
     /**
      * 상담 세션의 메시지 전송 및 답변 생성 과정을 SSE 스트림으로 조립한다.
      * 세션 사전 검증, 답 받기 잠금, 일일 메시지 제한 검증은 스트림 생성 전에 동기로 실행되며,
-     * 의도·조건 뽑기는 답 생성 전에 boundedElastic에서 실행된다.
+     * 의도·조건 뽑기와 (추천이면) 레시피 후보 검색은 답 생성 전에 boundedElastic에서 실행된다.
+     * 추천이면 recommendations 이벤트(카드)를 설명 글보다 먼저 보내고, 저장하는 AI 메시지는 설명 글만이다.
+     * recommendations 이벤트는 "첫 조각"으로 치지 않는다 (하루 횟수 돌려주기는 설명 글 첫 조각 기준).
      * 답변 완료 후 DB 저장은 boundedElastic 스케줄러에서 비동기 I/O로 격리된다.
      * 의도 판단을 포함해 메시지 하나를 하루 1회로 센다. 답 조각을 하나도 못 받고 실패하거나 빈 답으로 끝나면 하루 횟수를 돌려준다.
      * 첫 조각 뒤에 실패하거나 사용자가 끊으면(cancel) 돌려주지 않는다.
@@ -66,21 +73,30 @@ public class ChatStreamService {
         StringBuilder accumulated = new StringBuilder();
         AtomicBoolean firstChunkReceived = new AtomicBoolean(false);
 
-        // 4. 의도·조건 뽑기 후 답변 스트리밍 조각 (event: message)
-        // 의도 판단은 AI·DB·검색을 부르는 블로킹 작업이라 boundedElastic에서 실행한다. 실패해도 일반 답으로 넘어가며(ChatIntentFacade),
-        // 하루 횟수는 위에서 센 1회에 포함된다. 지금은 판단 결과를 로그로만 남기고 답은 그대로 일반 답을 만든다
-        Flux<String> replyStream = Mono.fromRunnable(() -> chatIntentFacade.resolve(memberId, sessionId, request))
+        // 4. 의도·조건 뽑기 → (추천이면) 후보 검색 → 카드 (event: recommendations) → 답변 스트리밍 조각 (event: message)
+        // 의도 판단·후보 검색은 AI·DB·검색을 부르는 블로킹 작업이라 boundedElastic에서 실행한다.
+        // 의도 판단이 실패하면 일반 답(ChatIntentFacade), 후보 검색이 실패하면 일반 답으로 넘어간다. 하루 횟수는 위에서 센 1회에 포함된다
+        Flux<ServerSentEvent<String>> messageStream = Mono.fromCallable(() -> planReply(memberId, sessionId, request))
                 .subscribeOn(Schedulers.boundedElastic())
-                .thenMany(Flux.defer(() -> chatReplyGenerator.generate(memberId, sessionId, content)));
-        Flux<ServerSentEvent<String>> messageStream = replyStream
-                .doOnNext(chunk -> {
-                    firstChunkReceived.set(true);
-                    accumulated.append(chunk);
-                })
-                .map(chunk -> ServerSentEvent.<String>builder()
-                        .event("message")
-                        .data(toJson(new ChatMessageEventResponse(chunk)))
-                        .build());
+                .flatMapMany(plan -> {
+                    Flux<ServerSentEvent<String>> textEvents = replyText(memberId, sessionId, content, plan)
+                            .doOnNext(chunk -> {
+                                firstChunkReceived.set(true);
+                                accumulated.append(chunk);
+                            })
+                            .map(chunk -> ServerSentEvent.<String>builder()
+                                    .event("message")
+                                    .data(toJson(new ChatMessageEventResponse(chunk)))
+                                    .build());
+                    if (plan.recommendation() == null) {
+                        return textEvents;
+                    }
+                    ServerSentEvent<String> cards = ServerSentEvent.<String>builder()
+                            .event("recommendations")
+                            .data(toJson(plan.recommendation().event()))
+                            .build();
+                    return Flux.concat(Mono.just(cards), textEvents);
+                });
 
         // 5. 스트림 정상 완료 시 DB 저장 후 종료 이벤트 (event: done)
         // 블로킹 I/O(DB 저장)가 Reactor 계산/이벤트루프 스레드를 점유하지 않도록 Schedulers.boundedElastic()에서 실행
@@ -103,6 +119,35 @@ public class ChatStreamService {
                 })
                 // 7. 완료·오류·끊김(cancel) 어느 쪽으로 끝나도 잠금을 푼다
                 .doFinally(signal -> chatStreamLockService.release(sessionId, lockToken));
+    }
+
+    // 답 방식 정하기: 의도가 추천이면 후보를 찾아 카드·설명 재료를 만든다. 후보 검색이 실패하면 일반 답
+    private ReplyPlan planReply(Long memberId, Long sessionId, ChatMessageCreateRequest request) {
+        ChatIntentResolution resolution = chatIntentFacade.resolve(memberId, sessionId, request);
+        if (resolution == null || resolution.intent() != ChatIntent.RECOMMEND || resolution.recipeQuery() == null) {
+            return ReplyPlan.GENERAL;
+        }
+        try {
+            RecommendationReply recommendation = chatRecommendationFacade.recommend(request.content(), resolution.recipeQuery());
+            log.info("상담 추천 후보 - memberId: {}, sessionId: {}, 레시피: {}", memberId, sessionId,
+                    recommendation.event().recipes().stream().map(recipe -> recipe.recipeId() + " " + recipe.name()).toList());
+            return new ReplyPlan(recommendation);
+        } catch (RuntimeException e) {
+            log.warn("상담 추천 후보 검색 실패, 일반 답으로 - memberId: {}, sessionId: {}", memberId, sessionId, e);
+            return ReplyPlan.GENERAL;
+        }
+    }
+
+    private Flux<String> replyText(Long memberId, Long sessionId, String content, ReplyPlan plan) {
+        if (plan.recommendation() == null) {
+            return chatReplyGenerator.generate(memberId, sessionId, content);
+        }
+        return chatReplyGenerator.generateRecommendation(memberId, sessionId, content, plan.recommendation().candidateInfo());
+    }
+
+    // recommendation이 null이면 일반 답
+    private record ReplyPlan(RecommendationReply recommendation) {
+        private static final ReplyPlan GENERAL = new ReplyPlan(null);
     }
 
     private Mono<ServerSentEvent<String>> saveExchange(Long sessionId, String content, StringBuilder accumulated) {

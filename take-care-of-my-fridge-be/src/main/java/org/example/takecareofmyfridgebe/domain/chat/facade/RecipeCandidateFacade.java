@@ -41,7 +41,7 @@ public class RecipeCandidateFacade {
     /**
      * 회원 냉장고와 선택 재료·선호 맛·임박 재료로 레시피 후보를 최대 10개 고른다.
      *
-     * @param query 회원 ID, 선택 재료, (나중에 AI가 채울) 요청 조건
+     * @param request 회원 ID, 선택 재료, 의도 판단에서 뽑은 요청 조건 (선택 재료 묶음은 여기서 채운다)
      * @return 정렬된 후보와 fallback 여부 (선택 재료가 없거나 하나도 겹치지 않으면 true)
      */
     public RecipeCandidates findCandidates(RecipeQuery request) {

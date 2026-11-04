@@ -198,7 +198,7 @@ HTTP 메서드·경로·DTO 이름은 구현 전 합의합니다.
 |---|---|---|---|---|---|
 | 내 상담 목록 | GET /chat-sessions | 로그인 | Query: page(기본 1), size(기본 10, 최대 100), status(ALL/ACTIVE/ENDED, 기본 ALL) | 200, `ChatSessionListResponse` | 400 page/size/status 오류, 401 |
 | 상담 메시지 조회(기존) | GET /chat-sessions/{sessionId}/messages | 로그인 | Path: sessionId | 200, `ChatMessageResponse[]` | 401, 404 없음/타인 상담 |
-| 상담 메시지 보내기(기존) | POST /chat-sessions/{sessionId}/messages | 로그인 | Path: sessionId, Body: content(최대 500자) | 200, `text/event-stream` (`message` 조각 → `done`, 실패 시 `error`) | 스트림 전 JSON 오류: 401, 404, 409 `CHAT_005` 끝난 상담·`CHAT_006` 만료·`CHAT_009` 다른 창에서 답을 받는 중, 429 `CHAT_007` 하루 횟수, 503 `CHAT_008` |
+| 상담 메시지 보내기(기존) | POST /chat-sessions/{sessionId}/messages | 로그인 | Path: sessionId, Body: content(최대 500자), mode(AUTO/RECOMMEND, 기본 AUTO), selectedIngredientIds(최대 50개), useSelectedOnly(기본 false) | 200, `text/event-stream` (추천이면 `recommendations` → `message` 조각 → `done`, 실패 시 `error`) | 스트림 전 JSON 오류: 401, 404, 409 `CHAT_005` 끝난 상담·`CHAT_006` 만료·`CHAT_009` 다른 창에서 답을 받는 중, 429 `CHAT_007` 하루 횟수, 503 `CHAT_008` |
 
 - `ChatSessionListResponse`: `counts`(`ChatSessionStatusCounts`: total, active, ended — 상태 필터와 상관없는 탭 건수), `sessions`(`PageResponse<ChatSessionSummaryResponse>`, 다음 페이지 여부는 공통 `isLast`).
 - `ChatSessionSummaryResponse`: sessionId, status(ACTIVE/COMPLETED/EXPIRED), startedAt(세션 생성 시각), lastMessageAt, messageCount, firstQuestion(첫 USER 메시지 앞 50자), lastMessagePreview(마지막 메시지 앞 50자, 역할 무관). 자르기는 코드 포인트 기준. 시각은 `yyyy-MM-dd HH:mm:ss`.
@@ -207,6 +207,11 @@ HTTP 메서드·경로·DTO 이름은 구현 전 합의합니다.
 - 쿼리: 세션 목록 1회 + 세션 ID 목록으로 메시지 수·첫 질문·마지막 메시지 1회(그룹 집계 + 상관 서브쿼리) + 탭 건수 1회(조건 합계). 전체 개수가 필요할 때만 count 1회 추가.
 - 메시지 보내기 순서(2026-11-02 추가): 세션 검증 → 답 받기 잠금(`chat:streaming:{sessionId}`, SET NX + 요청 토큰, 유지 `app.chat.reply-lock-ttl` 150초) → 하루 횟수 차감 → 스트림. 잠금에 실패하면 409 `CHAT_009`이고 하루 횟수를 쓰지 않습니다. 하루 횟수에서 실패하면 잠금을 풀고 그 오류를 돌려줍니다. 잠금은 스트림이 완료·오류·끊김 중 어느 쪽으로 끝나도 풀고, 토큰이 같을 때만 지웁니다. Redis 장애면 503 `CHAT_008`.
 - 종료·만료된 상담도 본인 것이면 기존 메시지 조회 API로 대화를 볼 수 있습니다.
+- 추천 요청 필드(2026-11-04 추가): `mode=RECOMMEND`는 칩([알아서 추천해줘]·[이 재료로 추천받기])으로 AI 의도 판단 없이 추천합니다. `AUTO`(기본)는 AI가 메시지를 읽어 추천(RECOMMEND)인지 일반 질문(GENERAL)인지 정합니다. `selectedIngredientIds`는 내 냉장고에서 고른 재료 ID(null·중복 제거), `useSelectedOnly=true`면 고른 재료를 하나도 안 쓰는 레시피는 추천하지 않습니다. 필드를 보내지 않으면 기존과 같습니다.
+- 추천 카드 이벤트(2026-11-04 추가): 추천이면 설명 글(`message`)보다 먼저 `event: recommendations`를 한 번 보냅니다. 일반 질문이면 보내지 않습니다. 카드는 아직 저장하지 않아 메시지 조회 API에는 나오지 않고, 저장되는 AI 메시지는 설명 글만입니다.
+  - `data`: `{ recipes: RecommendedRecipe[] (최대 3개), relaxed: string[] (지금은 항상 빈 목록), empty: boolean (조건에 맞는 후보가 없으면 true, 이때 recipes는 빈 목록) }`
+  - `RecommendedRecipe`: recipeId, name, imageUrl(없으면 null), category, cookTimeMin(없으면 null), usedIngredients(쓰는 냉장고 재료 이름, 임박한 순), imminentIngredients(`{ name, dDay }`, D-3 이내, dDay 0은 오늘까지), matchedTastes(겹친 맛 한글: 메시지로 말한 맛, 없으면 회원 선호 맛), missingIngredients(`{ ingredientId, name }`, 기본 양념 제외), lacksManyIngredients(재료를 많이 사야 함)
+  - 하루 횟수: `recommendations`는 첫 조각으로 치지 않습니다. 카드를 보낸 뒤 설명 글 첫 조각 전에 실패해도 하루 횟수를 돌려줍니다. 후보 검색이 실패하면 카드 없이 일반 답을 합니다.
 
 ## 후기 API
 

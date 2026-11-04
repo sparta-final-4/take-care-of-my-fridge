@@ -240,12 +240,8 @@ public class RecipeCandidateScorer {
         }
 
         List<RecipeCandidate> candidates = result.candidates().stream()
-                .map(candidate -> new RecipeCandidate(
-                        candidate.recipeId(),
-                        candidate.name(),
-                        candidate.ranking(),
-                        candidate.reason().withMissingIngredients(
-                                missingByRecipe.getOrDefault(candidate.recipeId(), List.of()))))
+                .map(candidate -> candidate.withReason(candidate.reason().withMissingIngredients(
+                        missingByRecipe.getOrDefault(candidate.recipeId(), List.of()))))
                 .toList();
         return new RecipeCandidates(candidates, result.fallback());
     }
@@ -289,10 +285,11 @@ public class RecipeCandidateScorer {
 
         // 1단계: 사용자 요청 (원하는 맛 + 분류 일치). 말한 재료는 선택 재료로 합쳐져 2단계에서 센다
         List<String> matchedRequests = new ArrayList<>();
-        query.wantedTastes().stream()
+        List<Member.Taste> matchedWantedTastes = query.wantedTastes().stream()
                 .distinct()
                 .filter(tastes::contains)
-                .forEach(taste -> matchedRequests.add("맛: " + taste));
+                .toList();
+        matchedWantedTastes.forEach(taste -> matchedRequests.add("맛: " + taste));
         if (info.category() != null && query.moodCategories().contains(info.category())) {
             matchedRequests.add("분류: " + info.category());
         }
@@ -325,12 +322,13 @@ public class RecipeCandidateScorer {
                 owned.stream().map(FridgeStock::name).toList(),
                 imminent,
                 matchedTastes,
+                matchedWantedTastes,
                 List.copyOf(matchedRequests),
                 info.cookTimeMin() == null,
                 ranking.ownedRatio() + RATIO_EPSILON < minOwnedRatio,
                 List.of()
         );
-        return new RecipeCandidate(info.recipeId(), info.name(), ranking, reason);
+        return new RecipeCandidate(info.recipeId(), info.name(), info.category(), info.cookTimeMin(), ranking, reason);
     }
 
     // D-0 12, D-1 10, D-2 8, D-3 6. 임박 목록에는 D-3 이내만 들어온다

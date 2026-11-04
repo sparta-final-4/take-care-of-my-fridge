@@ -1,0 +1,83 @@
+package org.example.takecareofmyfridgebe.domain.chat.service;
+
+import org.example.takecareofmyfridgebe.global.config.ai.LlmCostCalculator;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.messages.Message;
+import org.springframework.ai.chat.messages.MessageType;
+import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.chat.model.Generation;
+import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.core.io.ByteArrayResource;
+import reactor.core.publisher.Flux;
+
+import java.nio.charset.StandardCharsets;
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+// 추천 답 프롬프트 구성 (실제 ChatClient + 가짜 모델)
+class OpenAiChatRecommendationReplyTest {
+
+    @Test
+    @DisplayName("추천 답은 공통+추천 규칙을 system으로, 후보 정보를 별도 메시지로, 사용자 메시지를 마지막에 그대로 보낸다")
+    void sendsRecommendSystemAndCandidateMessage() {
+        CapturingStreamModel model = new CapturingStreamModel();
+        ChatClient chatClient = ChatClient.builder(model).defaultSystem("기본 {시스템}").build();
+        OpenAiChatReplyGenerator generator = new OpenAiChatReplyGenerator(chatClient, new LlmCostCalculator(0.15, 0.60),
+                new ChatReplyErrorTranslator(), resource("공통 규칙"), resource("추천 규칙 {예시}"));
+
+        List<String> chunks = generator.generateRecommendation(1L, 10L, "{두부} 추천해줘", "[추천 후보]\n1. 두부조림")
+                .collectList().block();
+
+        assertThat(chunks).containsExactly("추천", "합니다");
+        List<Message> messages = model.lastPrompt.getInstructions();
+        assertThat(messages).extracting(Message::getMessageType)
+                .containsExactly(MessageType.SYSTEM, MessageType.SYSTEM, MessageType.USER);
+        assertThat(messages.get(0).getText()).isEqualTo("공통 규칙\n\n추천 규칙 {예시}");
+        assertThat(messages.get(1).getText()).isEqualTo("[추천 후보]\n1. 두부조림");
+        assertThat(messages.get(2).getText()).isEqualTo("{두부} 추천해줘");
+    }
+
+    @Test
+    @DisplayName("일반 답은 지금처럼 빈의 기본 system과 사용자 메시지만 보낸다")
+    void sendsDefaultSystem_whenGeneral() {
+        CapturingStreamModel model = new CapturingStreamModel();
+        ChatClient chatClient = ChatClient.builder(model).defaultSystem("기본 시스템").build();
+        OpenAiChatReplyGenerator generator = new OpenAiChatReplyGenerator(chatClient, new LlmCostCalculator(0.15, 0.60),
+                new ChatReplyErrorTranslator(), resource("공통 규칙"), resource("추천 규칙"));
+
+        generator.generate(1L, 10L, "두부 보관 어떻게 해?").collectList().block();
+
+        assertThat(model.lastPrompt.getInstructions()).extracting(Message::getText)
+                .containsExactly("기본 시스템", "두부 보관 어떻게 해?");
+    }
+
+    private static ByteArrayResource resource(String text) {
+        return new ByteArrayResource(text.getBytes(StandardCharsets.UTF_8));
+    }
+
+    // 마지막 프롬프트를 기억하고 정해 둔 두 조각을 스트리밍하는 가짜 모델
+    private static class CapturingStreamModel implements ChatModel {
+
+        private Prompt lastPrompt;
+
+        @Override
+        public ChatResponse call(Prompt prompt) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Flux<ChatResponse> stream(Prompt prompt) {
+            lastPrompt = prompt;
+            return Flux.just(chunk("추천"), chunk("합니다"));
+        }
+
+        private static ChatResponse chunk(String text) {
+            return new ChatResponse(List.of(new Generation(new AssistantMessage(text))));
+        }
+    }
+}

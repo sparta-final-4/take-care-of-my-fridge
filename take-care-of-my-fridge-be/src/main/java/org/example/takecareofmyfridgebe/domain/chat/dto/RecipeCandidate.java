@@ -6,13 +6,22 @@ import java.util.List;
 
 /**
  * 레시피 후보 하나. 정렬 단계별 값과 고른 근거를 함께 담는다.
+ *
+ * @param category    레시피 분류 (recipes.category, 없을 수 있음)
+ * @param cookTimeMin 조리 시간(분). 출처에 따라 없을 수 있음
  */
 public record RecipeCandidate(
         Long recipeId,
         String name,
+        String category,
+        Integer cookTimeMin,
         Ranking ranking,
         Reason reason
 ) {
+
+    public RecipeCandidate withReason(Reason newReason) {
+        return new RecipeCandidate(recipeId, name, category, cookTimeMin, ranking, newReason);
+    }
 
     /**
      * 정렬 단계별 값. 앞 단계가 같을 때만 다음 단계로 비교한다.
@@ -45,6 +54,7 @@ public record RecipeCandidate(
      * @param usedFridgeIngredients 레시피에 쓰이는 냉장고 재료 이름 (임박한 순)
      * @param imminentIngredients   그중 소비기한 임박(D-3 이내) 재료
      * @param matchedTastes         회원 선호 맛과 겹친 레시피 맛
+     * @param matchedWantedTastes   사용자가 메시지로 원한 맛과 겹친 레시피 맛 (원한 맛이 있으면 회원 선호 맛은 쓰지 않는다)
      * @param matchedRequests       맞은 사용자 요청 (예: "분류: 찌개", "맛: SPICY")
      * @param cookTimeUnknown       조리 시간 정보가 없어 시간 조건을 확인하지 못함
      * @param lacksManyIngredients  보유 비율이 기준 미만 (재료를 많이 사야 함). 선택 재료(2개 이상)를 전부 써서 앞에 온 레시피도 표시한다
@@ -54,13 +64,14 @@ public record RecipeCandidate(
             List<String> usedFridgeIngredients,
             List<ImminentIngredient> imminentIngredients,
             List<Member.Taste> matchedTastes,
+            List<Member.Taste> matchedWantedTastes,
             List<String> matchedRequests,
             boolean cookTimeUnknown,
             boolean lacksManyIngredients,
             List<MissingIngredient> missingIngredients
     ) {
         public Reason withMissingIngredients(List<MissingIngredient> missing) {
-            return new Reason(usedFridgeIngredients, imminentIngredients, matchedTastes, matchedRequests,
+            return new Reason(usedFridgeIngredients, imminentIngredients, matchedTastes, matchedWantedTastes, matchedRequests,
                     cookTimeUnknown, lacksManyIngredients, List.copyOf(missing));
         }
     }

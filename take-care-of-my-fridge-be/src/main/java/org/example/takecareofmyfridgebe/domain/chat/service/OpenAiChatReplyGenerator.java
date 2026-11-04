@@ -4,15 +4,23 @@ import lombok.extern.slf4j.Slf4j;
 import org.example.takecareofmyfridgebe.global.config.ai.LlmCost;
 import org.example.takecareofmyfridgebe.global.config.ai.LlmCostCalculator;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.client.ChatClient.ChatClientRequestSpec;
+import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 
 // OpenAI(Spring AI) 스트리밍으로 상담 답을 만든다. app.chat.reply-generator=openai일 때만 빈이 된다
 @Slf4j
@@ -21,19 +29,25 @@ import java.util.concurrent.atomic.AtomicReference;
 public class OpenAiChatReplyGenerator implements ChatReplyGenerator {
 
     private static final String FINISH_REASON_LENGTH = "length";
+    private static final String PROMPT_SEPARATOR = "\n\n";
 
     private final ChatClient chatClient;
     private final LlmCostCalculator llmCostCalculator;
     private final ChatReplyErrorTranslator chatReplyErrorTranslator;
+    // 추천 답의 시스템 프롬프트: 공통(chat-system.txt) + 추천 규칙(chat-recommend.txt)
+    private final String recommendSystemPrompt;
 
     public OpenAiChatReplyGenerator(
             @Qualifier("chatReplyChatClient") ChatClient chatClient,
             LlmCostCalculator llmCostCalculator,
-            ChatReplyErrorTranslator chatReplyErrorTranslator
+            ChatReplyErrorTranslator chatReplyErrorTranslator,
+            @Value("classpath:prompts/chat-system.txt") Resource systemPrompt,
+            @Value("classpath:prompts/chat-recommend.txt") Resource recommendPrompt
     ) {
         this.chatClient = chatClient;
         this.llmCostCalculator = llmCostCalculator;
         this.chatReplyErrorTranslator = chatReplyErrorTranslator;
+        this.recommendSystemPrompt = read(systemPrompt).strip() + PROMPT_SEPARATOR + read(recommendPrompt).strip();
     }
 
     /**
@@ -44,11 +58,26 @@ public class OpenAiChatReplyGenerator implements ChatReplyGenerator {
      */
     @Override
     public Flux<String> generate(Long memberId, Long sessionId, String userMessage) {
+        return stream(memberId, sessionId, "상담 답", () -> chatClient.prompt().user(userMessage));
+    }
+
+    /**
+     * 추천 답. 빈에 고정된 공통 시스템 프롬프트 대신 공통 + 추천 규칙을 system으로 보내고,
+     * 후보 정보는 별도 system 메시지로 사용자 메시지 앞에 넣는다. 템플릿 매개변수를 쓰지 않으므로 글이 그대로 간다.
+     */
+    @Override
+    public Flux<String> generateRecommendation(Long memberId, Long sessionId, String userMessage, String candidateInfo) {
+        return stream(memberId, sessionId, "상담 추천 답", () -> chatClient.prompt()
+                .system(recommendSystemPrompt)
+                .messages(new SystemMessage(candidateInfo))
+                .user(userMessage));
+    }
+
+    private Flux<String> stream(Long memberId, Long sessionId, String label, Supplier<ChatClientRequestSpec> prompt) {
         return Flux.defer(() -> {
             AtomicBoolean firstChunkSent = new AtomicBoolean(false);
             AtomicReference<ReplyUsage> lastUsage = new AtomicReference<>();
-            return chatClient.prompt()
-                    .user(userMessage)
+            return prompt.get()
                     .stream()
                     .chatResponse()
                     .doOnNext(response -> {
@@ -58,7 +87,7 @@ public class OpenAiChatReplyGenerator implements ChatReplyGenerator {
                     .map(this::textOf)
                     .filter(text -> !text.isEmpty())
                     .doOnNext(text -> firstChunkSent.set(true))
-                    .doOnComplete(() -> logUsage(memberId, sessionId, lastUsage.get()))
+                    .doOnComplete(() -> logUsage(label, memberId, sessionId, lastUsage.get()))
                     .onErrorMap(error -> chatReplyErrorTranslator.translate(error, firstChunkSent.get()));
         });
     }
@@ -79,14 +108,14 @@ public class OpenAiChatReplyGenerator implements ChatReplyGenerator {
                 .ifPresent(cost -> lastUsage.set(new ReplyUsage(response.getMetadata().getModel(), cost)));
     }
 
-    private void logUsage(Long memberId, Long sessionId, ReplyUsage usage) {
+    private void logUsage(String label, Long memberId, Long sessionId, ReplyUsage usage) {
         if (usage == null) {
-            log.warn("상담 답 LLM 사용량을 받지 못함 - memberId: {}, sessionId: {}", memberId, sessionId);
+            log.warn("{} LLM 사용량을 받지 못함 - memberId: {}, sessionId: {}", label, memberId, sessionId);
             return;
         }
         LlmCost cost = usage.cost();
-        log.info("상담 답 LLM 사용량 - memberId: {}, sessionId: {}, 모델: {}, 입력: {}, 출력: {}, 비용: ${}",
-                memberId, sessionId, usage.model(), cost.inputTokens(), cost.outputTokens(),
+        log.info("{} LLM 사용량 - memberId: {}, sessionId: {}, 모델: {}, 입력: {}, 출력: {}, 비용: ${}",
+                label, memberId, sessionId, usage.model(), cost.inputTokens(), cost.outputTokens(),
                 String.format("%.6f", cost.costUsd()));
     }
 
@@ -96,6 +125,14 @@ public class OpenAiChatReplyGenerator implements ChatReplyGenerator {
                 && FINISH_REASON_LENGTH.equalsIgnoreCase(result.getMetadata().getFinishReason())) {
             log.warn("상담 답이 최대 토큰에 걸려 잘림 - memberId: {}, sessionId: {}, 모델: {}",
                     memberId, sessionId, response.getMetadata().getModel());
+        }
+    }
+
+    private static String read(Resource resource) {
+        try {
+            return resource.getContentAsString(StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            throw new UncheckedIOException("상담 프롬프트를 읽지 못함: " + resource.getDescription(), e);
         }
     }
 
