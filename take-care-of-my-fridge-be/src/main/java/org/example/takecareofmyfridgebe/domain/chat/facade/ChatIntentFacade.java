@@ -13,6 +13,7 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.IntentResult;
 import org.example.takecareofmyfridgebe.domain.chat.dto.LastRecommendation;
 import org.example.takecareofmyfridgebe.domain.chat.dto.LastRecommendation.QuerySnapshot;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeQuery;
+import org.example.takecareofmyfridgebe.domain.chat.dto.RefineCondition;
 import org.example.takecareofmyfridgebe.domain.chat.service.ChatIntentExtractor;
 import org.example.takecareofmyfridgebe.domain.chat.service.ChatMessageService;
 import org.example.takecareofmyfridgebe.domain.ingredient.service.IngredientMatcher;
@@ -118,41 +119,57 @@ public class ChatIntentFacade {
             return ChatIntentResolution.recommend(Source.AI, current);
         }
         RecipeQuery previous = context.lastRecommendation().query().toRecipeQuery(memberId);
-        return ChatIntentResolution.refine(Source.AI, mergeRefine(previous, current));
+        Set<RefineCondition> removed = result.removedConditions();
+        if (!removed.isEmpty()) {
+            log.info("상담 다시 추천에서 뺄 조건 - memberId: {}, sessionId: {}, 조건: {}", memberId, sessionId, removed);
+        }
+        return ChatIntentResolution.refine(Source.AI, mergeRefine(previous, current, removed));
     }
 
     /**
      * 직전 조건과 이번 말(다시 추천)을 합친다.
      * <ul>
-     *   <li>맛·분류·시간·키워드·요리 이름·원한 표현: AI가 [직전 조건]에 이번 말을 반영한 최종값을 낸다. AI가 비워 둔 칸은 직전 값을 쓴다
-     *       ("좀 더 매운 걸로" → 맛만 바뀌고 분류·키워드는 그대로, "국물 말고 볶음으로" → 분류만 바뀜, "다른 거 없어?" → 모두 그대로)</li>
-     *   <li>재료: AI에 넘기지 않으므로 서버가 이어 간다. 직전 선택 재료 + 이번에 고르거나 말한 재료, 뺄 재료는 합친 뒤 선택 재료에서 뺀다</li>
+     *   <li>맛·분류·시간·키워드: AI가 [직전 조건]에 이번 말을 반영한 최종값을 낸다. AI가 비워 둔 칸은 직전 값을 쓴다
+     *       ("좀 더 매운 걸로" → 맛만 바뀌고 분류·키워드는 그대로, "국물 말고 볶음으로" → 분류만 바뀜, "다른 거 없어?" → 모두 그대로).
+     *       removed에 있는 조건은 직전 값을 지우고 이번 말의 값만 쓴다 ("매운 거 말고" → 맛 조건 없음, "시간 상관없이" → 시간 조건 없음)</li>
+     *   <li>요리 이름·원한 표현: 이어 가지 않는다 (다시 추천에서 "김피탕 레시피는 없어서…" 같은 안내가 다시 나오지 않게)</li>
+     *   <li>재료: AI에 넘기지 않으므로 서버가 이어 간다. 직전 선택 재료 + 이번에 고르거나 말한 재료, 뺄 재료는 합친 뒤 선택 재료에서 뺀다.
+     *       removed에 INCLUDE면 직전 선택 재료(와 선택 재료만 쓰기)를, EXCLUDE면 직전 뺄 재료를 지운다</li>
      * </ul>
      */
-    static RecipeQuery mergeRefine(RecipeQuery previous, RecipeQuery current) {
-        List<Long> excludeIds = Stream.concat(previous.excludeIngredientIds().stream(), current.excludeIngredientIds().stream())
+    static RecipeQuery mergeRefine(RecipeQuery previous, RecipeQuery current, Set<RefineCondition> removed) {
+        List<Long> excludeIds = removed.contains(RefineCondition.EXCLUDE)
+                ? current.excludeIngredientIds()
+                : Stream.concat(previous.excludeIngredientIds().stream(), current.excludeIngredientIds().stream())
                 .distinct()
                 .toList();
-        List<Long> selectedIds = Stream.concat(previous.selectedIngredientIds().stream(), current.selectedIngredientIds().stream())
+        List<Long> selected = removed.contains(RefineCondition.INCLUDE)
+                ? current.selectedIngredientIds()
+                : Stream.concat(previous.selectedIngredientIds().stream(), current.selectedIngredientIds().stream()).toList();
+        List<Long> selectedIds = selected.stream()
                 .distinct()
                 .filter(id -> !excludeIds.contains(id))
                 .toList();
+        boolean useSelectedOnly = removed.contains(RefineCondition.INCLUDE)
+                ? current.useSelectedOnly()
+                : previous.useSelectedOnly() || current.useSelectedOnly();
         return new RecipeQuery(
                 previous.memberId(),
                 selectedIds,
-                orPrevious(current.wantedTastes(), previous.wantedTastes()),
-                orPrevious(current.moodCategories(), previous.moodCategories()),
-                current.maxMinutes() != null ? current.maxMinutes() : previous.maxMinutes(),
+                merged(current.wantedTastes(), previous.wantedTastes(), removed.contains(RefineCondition.TASTE)),
+                merged(current.moodCategories(), previous.moodCategories(), removed.contains(RefineCondition.CATEGORY)),
+                current.maxMinutes() != null || removed.contains(RefineCondition.MAX_MINUTES) ? current.maxMinutes() : previous.maxMinutes(),
                 excludeIds,
-                previous.useSelectedOnly() || current.useSelectedOnly(),
-                orPrevious(current.keywords(), previous.keywords()),
-                current.keywordText() != null ? current.keywordText() : previous.keywordText(),
-                current.preferenceText() != null ? current.preferenceText() : previous.preferenceText()
+                useSelectedOnly,
+                merged(current.keywords(), previous.keywords(), removed.contains(RefineCondition.KEYWORD)),
+                null,
+                null
         );
     }
 
-    private static <T> List<T> orPrevious(List<T> current, List<T> previous) {
-        return current.isEmpty() ? previous : current;
+    // 뺄 조건이면 이번 값만, 아니면 이번 값이 비었을 때 직전 값
+    private static <T> List<T> merged(List<T> current, List<T> previous, boolean removed) {
+        return removed || !current.isEmpty() ? current : previous;
     }
 
     // 레시피 자세히. 물어본 레시피를 못 찾으면 일반 답
@@ -269,12 +286,7 @@ public class ChatIntentFacade {
         if (!query.keywords().isEmpty()) {
             parts.add("키워드 " + String.join(NAME_DELIMITER, query.keywords()));
         }
-        if (query.keywordText() != null) {
-            parts.add("요리 이름 " + query.keywordText());
-        }
-        if (query.preferenceText() != null) {
-            parts.add("원한 표현 " + query.preferenceText());
-        }
+        // 요리 이름·원한 표현은 다시 추천에서 이어 가지 않으므로 넘기지 않는다
         return parts.isEmpty() ? NONE : String.join(" / ", parts);
     }
 

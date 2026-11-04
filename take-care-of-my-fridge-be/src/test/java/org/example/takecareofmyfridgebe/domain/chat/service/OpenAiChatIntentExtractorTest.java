@@ -142,7 +142,7 @@ class OpenAiChatIntentExtractorTest {
         extractor.extract(1L, 10L, "매운 국", List.of("국"), null);
 
         String schema = ((StructuredOutputChatOptions) chatModel.lastPrompt.getOptions()).getOutputSchema();
-        assertThat(schema).contains("\"targetIndex\"", "\"targetName\"", "RECIPE_DETAIL", "REFINE");
+        assertThat(schema).contains("\"targetIndex\"", "\"targetName\"", "\"removed\"", "RECIPE_DETAIL", "REFINE");
     }
 
     // 마지막으로 받은 프롬프트를 기억하고 정해 둔 글을 답하는 가짜 모델

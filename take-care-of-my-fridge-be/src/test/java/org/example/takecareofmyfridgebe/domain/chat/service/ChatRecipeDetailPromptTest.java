@@ -29,9 +29,9 @@ class ChatRecipeDetailPromptTest {
     }
 
     @Test
-    @DisplayName("단계는 한 줄씩 8줄 안으로, 생략된 뒤 단계는 지어내지 않고 카드를 보라고 하며, 냉장고 기준은 물었을 때만 말하게 한다")
+    @DisplayName("단계는 레시피대로 모두 한 줄씩 10줄까지, 생략된 뒤 단계는 지어내지 않고 카드를 보라고 하며, 냉장고 기준은 물었을 때만 말하게 한다")
     void instructsStepsAndFridge() {
-        assertThat(prompt).contains("8단계가 넘으면 비슷한 단계를 묶어 8줄 안으로",
+        assertThat(prompt).contains("단계는 레시피대로 모두 \"1. …\"처럼 한 줄씩, 10줄까지 쓴다. 단계를 빼거나 합치지 않는다",
                 "\"(뒤 n단계 생략)\"이 있으면 뒤 단계를 지어내지 말고 카드를 눌러 보라고 말한다",
                 "[냉장고 기준]은 냉장고에 있는지, 장볼 게 있는지, 만들 수 있는지 물었을 때만 말한다");
     }

@@ -10,8 +10,13 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntentResolution.Sou
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageCreateRequest;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageMode;
 import org.example.takecareofmyfridgebe.domain.chat.dto.IntentResult;
+import org.example.takecareofmyfridgebe.domain.chat.dto.KeywordMatch;
 import org.example.takecareofmyfridgebe.domain.chat.dto.LastRecommendation;
+import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate.Ranking;
+import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate.Reason;
+import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeQuery;
+import org.example.takecareofmyfridgebe.domain.chat.dto.RefineCondition;
 import org.example.takecareofmyfridgebe.domain.chat.entity.ChatMessageRole;
 import org.example.takecareofmyfridgebe.domain.chat.service.ChatIntentExtractor;
 import org.example.takecareofmyfridgebe.domain.chat.service.ChatMessageService;
@@ -29,6 +34,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -344,7 +350,7 @@ class ChatIntentFacadeTest {
             verify(extractor).extract(eq(MEMBER_ID), eq(SESSION_ID), eq("고마워"), anyList(), eq("""
                     [직전 추천] 1. 탕수육 / 2. 깐풍기 / 3. 돼지고기 찹쌀부침
                     [이전 추천] 두부조림
-                    [직전 조건] 원하는 맛 SPICY / 분류 튀김 / 키워드 김피탕, 탕수육 / 요리 이름 김피탕 / 원한 표현 김피탕 같은 요리"""));
+                    [직전 조건] 원하는 맛 SPICY / 분류 튀김 / 키워드 김피탕, 탕수육"""));
         }
 
         @Test
@@ -490,7 +496,70 @@ class ChatIntentFacadeTest {
             ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("다른 거 없어?"), context);
 
             assertThat(resolution.intent()).isEqualTo(ChatIntent.REFINE);
-            assertThat(resolution.recipeQuery()).isEqualTo(previous);
+            // 요리 이름·원한 표현만 이어 가지 않고 나머지는 직전 그대로
+            assertThat(resolution.recipeQuery()).isEqualTo(new RecipeQuery(MEMBER_ID, List.of(TOFU), List.of(Taste.SPICY),
+                    List.of("국", "찌개"), null, List.of(CUCUMBER), true, List.of("김치찌개"), null, null));
+        }
+
+        @Test
+        @DisplayName("\"매운 거 말고\"처럼 removed에 맛이 있으면 직전 맛 조건을 지우고 나머지는 직전 그대로 둔다")
+        void removesTaste_whenNotSpicy() {
+            givenExtracted(refine(null, null, List.of("TASTE")));
+
+            RecipeQuery query = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("매운 거 말고"), context)
+                    .recipeQuery();
+
+            assertThat(query.wantedTastes()).isEmpty();
+            assertThat(query.moodCategories()).containsExactly("국", "찌개");
+            assertThat(query.keywords()).containsExactly("김치찌개");
+        }
+
+        @Test
+        @DisplayName("removed 없이 맛 칸만 비어 있으면 직전 맛을 그대로 둔다")
+        void keepsTaste_whenOnlyEmptyWithoutRemoved() {
+            givenExtracted(refine(List.of(), List.of("국"), List.of()));
+
+            RecipeQuery query = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("국으로만"), context)
+                    .recipeQuery();
+
+            assertThat(query.wantedTastes()).containsExactly(Taste.SPICY);
+            assertThat(query.moodCategories()).containsExactly("국");
+        }
+
+        @Test
+        @DisplayName("removed의 시간·재료 조건은 직전 값을 지운다 (\"시간 상관없이\", \"두부 안 넣어도 돼\", \"오이 넣어도 돼\")")
+        void removesTimeAndIngredients() {
+            RecipeQuery withTime = new RecipeQuery(MEMBER_ID, List.of(TOFU), null, null, 20, List.of(CUCUMBER), true);
+            RecipeQuery current = RecipeQuery.of(MEMBER_ID, List.of());
+
+            RecipeQuery merged = ChatIntentFacade.mergeRefine(withTime, current,
+                    Set.of(RefineCondition.MAX_MINUTES, RefineCondition.INCLUDE, RefineCondition.EXCLUDE));
+
+            assertThat(merged.maxMinutes()).isNull();
+            assertThat(merged.selectedIngredientIds()).isEmpty();
+            assertThat(merged.useSelectedOnly()).isFalse();
+            assertThat(merged.excludeIngredientIds()).isEmpty();
+            assertThat(ChatIntentFacade.mergeRefine(withTime, current, Set.of()).maxMinutes()).isEqualTo(20);
+        }
+
+        @Test
+        @DisplayName("다시 추천은 요리 이름·원한 표현을 이어 가지 않아 \"김피탕 레시피는 없어서\" 안내가 다시 나오지 않는다")
+        void doesNotRepeatDishNotice_whenRefine() {
+            RecipeQuery kimpi = new RecipeQuery(MEMBER_ID, List.of(), null, List.of("튀김"), null, null, false,
+                    List.of("김피탕", "탕수육", "깐풍기"), "김피탕", "김피탕 같은 요리");
+            RecipeQuery merged = ChatIntentFacade.mergeRefine(kimpi, RecipeQuery.of(MEMBER_ID, List.of()), Set.of())
+                    .withKeywordMatches(Map.of(10L, new KeywordMatch(KeywordMatch.Type.EXPANDED, "탕수육", null)));
+            RecipeCandidate sweetSour = new RecipeCandidate(10L, "탕수육", "튀김", 40, new Ranking(2, 0, 0, 0, 1, 1, 0),
+                    new Reason(List.of(), List.of(), List.of(), List.of(), List.of(), false, false, List.of(), List.of(),
+                            List.of(), merged.keywordMatches().get(10L)));
+            RecipeQuery original = kimpi.withKeywordMatches(merged.keywordMatches());
+
+            assertThat(merged.keywordText()).isNull();
+            assertThat(merged.preferenceText()).isNull();
+            assertThat(merged.keywords()).containsExactly("김피탕", "탕수육", "깐풍기");
+            assertThat(RecommendationPromptBuilder.notices(merged, List.of(sweetSour), merged.keywordsNotFound())).isEmpty();
+            assertThat(RecommendationPromptBuilder.notices(original, List.of(sweetSour), original.keywordsNotFound()))
+                    .containsExactly("김피탕 레시피는 없어서, 비슷한 탕수육을 골랐어요");
         }
 
         @Test
@@ -498,7 +567,7 @@ class ChatIntentFacadeTest {
         void carriesIngredients() {
             RecipeQuery current = new RecipeQuery(MEMBER_ID, List.of(MUSHROOM, CUCUMBER), null, null, null, List.of(TOFU), false);
 
-            RecipeQuery merged = ChatIntentFacade.mergeRefine(previous, current);
+            RecipeQuery merged = ChatIntentFacade.mergeRefine(previous, current, Set.of());
 
             assertThat(merged.selectedIngredientIds()).containsExactly(MUSHROOM);
             assertThat(merged.excludeIngredientIds()).containsExactly(CUCUMBER, TOFU);
@@ -518,7 +587,12 @@ class ChatIntentFacadeTest {
         }
 
         private static IntentResult refine(List<String> tastes, List<String> categories) {
-            return new IntentResult(ChatIntent.REFINE, tastes, categories, null, null, null, null, null, null, null);
+            return refine(tastes, categories, null);
+        }
+
+        private static IntentResult refine(List<String> tastes, List<String> categories, List<String> removed) {
+            return new IntentResult(ChatIntent.REFINE, tastes, categories, null, null, null, null, null, null, null,
+                    null, null, removed);
         }
     }
 

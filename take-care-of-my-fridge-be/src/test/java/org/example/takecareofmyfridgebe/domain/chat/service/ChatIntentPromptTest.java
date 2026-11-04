@@ -56,6 +56,8 @@ class ChatIntentPromptTest {
                 "바꾸라고 하지 않은 조건은 [직전 조건] 그대로 쓴다",
                 "RECIPE_DETAIL: [직전 추천]이나 [이전 추천]에 있는 레시피 하나",
                 "targetIndex: [직전 추천] 번호(1부터)", "targetName: 말한 레시피 이름",
+                "\"매운 거 말고\" → removed: TASTE", "\"시간 상관없이\" → removed: MAX_MINUTES",
+                "REFINE이 아니면 removed는 빈 목록",
                 "새 요리 이름이나 새 조건으로 처음부터 추천해 달라는 말(\"김치찌개 먹고 싶어\")은 RECOMMEND");
     }
 }

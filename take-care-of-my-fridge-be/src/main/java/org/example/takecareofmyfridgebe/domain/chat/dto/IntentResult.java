@@ -29,6 +29,7 @@ import java.util.stream.Collectors;
  * @param preferenceText     사용자가 원한 특징·요리 표현 그대로 (예: "차가운 요리", "냉면 같은 면 요리"). 요청에 못 맞췄을 때 안내에 쓴다
  * @param targetIndex        RECIPE_DETAIL일 때 직전 추천 카드 번호(1부터). 모르면 0
  * @param targetName         RECIPE_DETAIL일 때 말한 레시피 이름 (예: "깐풍기"). 없으면 빈 문자열
+ * @param removed            REFINE일 때 빼라고 한 조건 종류 (RefineCondition 이름, "매운 거 말고" → TASTE). 없으면 빈 목록
  */
 public record IntentResult(
         ChatIntent intent,
@@ -42,7 +43,8 @@ public record IntentResult(
         String dishText,
         String preferenceText,
         Integer targetIndex,
-        String targetName
+        String targetName,
+        List<String> removed
 ) {
 
     // 레시피 검색에 쓸 요리 이름 키워드 최대 개수
@@ -52,11 +54,22 @@ public record IntentResult(
             .map(Enum::name)
             .collect(Collectors.toUnmodifiableSet());
 
+    private static final Set<String> CONDITION_NAMES = Arrays.stream(RefineCondition.values())
+            .map(Enum::name)
+            .collect(Collectors.toUnmodifiableSet());
+
     public IntentResult(ChatIntent intent, List<String> wantedTastes, List<String> moodCategories, Integer maxMinutes,
                         List<String> includeIngredients, List<String> excludeIngredients, Boolean useSelectedOnly,
                         List<String> keywords, String dishText, String preferenceText) {
         this(intent, wantedTastes, moodCategories, maxMinutes, includeIngredients, excludeIngredients, useSelectedOnly,
                 keywords, dishText, preferenceText, null, null);
+    }
+
+    public IntentResult(ChatIntent intent, List<String> wantedTastes, List<String> moodCategories, Integer maxMinutes,
+                        List<String> includeIngredients, List<String> excludeIngredients, Boolean useSelectedOnly,
+                        List<String> keywords, String dishText, String preferenceText, Integer targetIndex, String targetName) {
+        this(intent, wantedTastes, moodCategories, maxMinutes, includeIngredients, excludeIngredients, useSelectedOnly,
+                keywords, dishText, preferenceText, targetIndex, targetName, null);
     }
 
     // 의도만 있고 조건은 하나도 말하지 않은 결과
@@ -69,6 +82,7 @@ public record IntentResult(
      * 의도가 없으면 GENERAL, 맛은 Member.Taste에 있는 값만, 분류는 allowedCategories에 있는 값만 남긴다.
      * 조리 시간이 0 이하면 null, 재료 이름·키워드는 앞뒤 공백을 지우고 빈 이름을 뺀다. 목록은 중복을 빼고, 키워드는 6개까지.
      * 요리 이름(dishText)·원한 표현(preferenceText)·대상 레시피 이름(targetName)이 비어 있으면 null, 대상 카드 번호가 0 이하면 null.
+     * 뺄 조건(removed)은 RefineCondition에 있는 이름만 남긴다 (소문자는 대문자로).
      *
      * @param allowedCategories 고를 수 있는 레시피 분류
      */
@@ -86,8 +100,20 @@ public record IntentResult(
                 dishText == null || dishText.isBlank() ? null : dishText.strip(),
                 preferenceText == null || preferenceText.isBlank() ? null : preferenceText.strip(),
                 targetIndex == null || targetIndex <= 0 ? null : targetIndex,
-                targetName == null || targetName.isBlank() ? null : targetName.strip()
+                targetName == null || targetName.isBlank() ? null : targetName.strip(),
+                cleanNames(removed, name -> name.toUpperCase(Locale.ROOT), CONDITION_NAMES)
         );
+    }
+
+    // 빼라고 한 조건 종류. sanitize한 뒤에 쓴다 (없으면 빈 집합)
+    public Set<RefineCondition> removedConditions() {
+        if (removed == null) {
+            return Set.of();
+        }
+        return removed.stream()
+                .filter(CONDITION_NAMES::contains)
+                .map(RefineCondition::valueOf)
+                .collect(Collectors.toUnmodifiableSet());
     }
 
     // 맛 이름을 Member.Taste로 바꾼다. sanitize한 뒤에 쓴다 (말하지 않았으면 빈 목록)

@@ -60,7 +60,7 @@ class OpenAiChatRecommendationReplyTest {
     }
 
     @Test
-    @DisplayName("레시피 자세히 답은 공통+레시피 답 규칙을 system으로, 레시피 정보를 별도 메시지로, 사용자 메시지를 마지막에 보내고 최대 토큰을 700으로 둔다")
+    @DisplayName("레시피 자세히 답은 공통+레시피 답 규칙을 system으로, 레시피 정보를 별도 메시지로, 사용자 메시지를 마지막에 보내고 최대 토큰을 600으로 둔다")
     void sendsRecipeDetailSystemAndRecipeInfo() {
         CapturingStreamModel model = new CapturingStreamModel();
         ChatClient chatClient = ChatClient.builder(model).defaultSystem("기본 시스템").build();
@@ -76,7 +76,7 @@ class OpenAiChatRecommendationReplyTest {
         assertThat(messages.get(1).getText()).isEqualTo("[레시피 정보]\n이름: 깐풍기");
         assertThat(messages.get(2).getText()).isEqualTo("두 번째 거 어떻게 만들어?");
         assertThat(model.lastPrompt.getOptions().getMaxTokens()).isEqualTo(OpenAiChatReplyGenerator.RECIPE_DETAIL_MAX_TOKENS);
-        assertThat(OpenAiChatReplyGenerator.RECIPE_DETAIL_MAX_TOKENS).isEqualTo(700);
+        assertThat(OpenAiChatReplyGenerator.RECIPE_DETAIL_MAX_TOKENS).isEqualTo(600);
     }
 
     private static ByteArrayResource resource(String text) {

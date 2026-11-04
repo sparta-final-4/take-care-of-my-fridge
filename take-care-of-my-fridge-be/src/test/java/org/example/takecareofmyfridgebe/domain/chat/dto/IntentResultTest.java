@@ -91,4 +91,15 @@ class IntentResultTest {
         assertThat(empty.targetIndex()).isNull();
         assertThat(empty.targetName()).isNull();
     }
+
+    @Test
+    @DisplayName("뺄 조건(removed)은 정해진 종류만 남기고 소문자는 대문자로 맞추며, 없으면 빈 집합이다")
+    void sanitizesRemovedConditions() {
+        IntentResult result = new IntentResult(ChatIntent.REFINE, null, null, null, null, null, null, null, null, null,
+                null, null, List.of("taste", "MAX_MINUTES", "없는 조건")).sanitize(CATEGORIES);
+
+        assertThat(result.removed()).containsExactly("TASTE", "MAX_MINUTES");
+        assertThat(result.removedConditions()).containsExactlyInAnyOrder(RefineCondition.TASTE, RefineCondition.MAX_MINUTES);
+        assertThat(IntentResult.general().removedConditions()).isEmpty();
+    }
 }

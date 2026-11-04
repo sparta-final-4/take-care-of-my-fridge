@@ -43,7 +43,7 @@ class RecipeDetailPromptBuilderTest {
     }
 
     @Test
-    @DisplayName("단계는 단계마다 120자까지 자르고 15단계까지만 넣은 뒤 뺀 단계 수를 쓴다")
+    @DisplayName("단계는 단계마다 120자까지 자르고 10단계까지만 넣은 뒤 뺀 단계 수를 쓴다")
     void cutsLongSteps() {
         List<StepItem> steps = IntStream.rangeClosed(1, 17)
                 .mapToObj(no -> step(no, no == 1 ? "가".repeat(130) : no + "단계"))
@@ -52,9 +52,10 @@ class RecipeDetailPromptBuilderTest {
         String lines = RecipeDetailPromptBuilder.stepLines(steps);
 
         assertThat(lines).startsWith("1. " + "가".repeat(120) + "…\n2. 2단계\n")
-                .contains("15. 15단계\n")
-                .doesNotContain("16단계")
-                .endsWith("(뒤 2단계 생략, 레시피 화면에 있음)\n");
+                .contains("10. 10단계\n")
+                .doesNotContain("11단계")
+                .endsWith("(뒤 7단계 생략, 레시피 화면에 있음)\n");
+        assertThat(RecipeDetailPromptBuilder.MAX_STEPS).isEqualTo(10);
     }
 
     @Test

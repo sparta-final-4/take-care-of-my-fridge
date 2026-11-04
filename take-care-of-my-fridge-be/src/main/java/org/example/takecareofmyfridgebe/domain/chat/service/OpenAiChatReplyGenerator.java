@@ -39,8 +39,8 @@ public class OpenAiChatReplyGenerator implements ChatReplyGenerator {
     private static final String PROMPT_SEPARATOR = "\n\n";
     // 추천 답은 소개 한 문장 + 카드 설명 3개(각 한두 문장)라 약 200~250토큰. 넉넉히 320 (일반 답은 빈에 정한 800)
     static final int RECOMMEND_MAX_TOKENS = 320;
-    // 레시피 자세히 답은 단계 8줄 안팎(약 400~600토큰). 넉넉히 700. dev 레시피 단계 길이를 보고 조정한다
-    static final int RECIPE_DETAIL_MAX_TOKENS = 700;
+    // 레시피 자세히 답은 단계 최대 10줄(dev 레시피 단계 글자 합 최대 587자, 평균 217자)이라 약 300~500토큰. 넉넉히 600
+    static final int RECIPE_DETAIL_MAX_TOKENS = 600;
 
     private final ChatClient chatClient;
     private final LlmCostCalculator llmCostCalculator;

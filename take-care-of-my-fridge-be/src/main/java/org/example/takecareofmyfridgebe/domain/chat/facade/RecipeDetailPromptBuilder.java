@@ -30,9 +30,10 @@ import java.util.stream.Collectors;
  */
 public final class RecipeDetailPromptBuilder {
 
-    // 단계 하나의 최대 글자 수와 넣을 최대 단계 수. dev 레시피 단계 길이를 보고 조정한다
+    // 단계 하나의 최대 글자 수와 넣을 최대 단계 수.
+    // dev 레시피: 평균 5.7단계·최대 10단계, 단계 글자 합 평균 217자(단계당 약 38자)·최대 587자라 거의 자르지 않는다
     static final int STEP_MAX_LENGTH = 120;
-    static final int MAX_STEPS = 15;
+    static final int MAX_STEPS = 10;
     // 팁 요약이 없을 때 팁 원문에서 넣을 최대 글자 수
     static final int TIP_MAX_LENGTH = 200;
     private static final String FIELD_DELIMITER = " | ";
