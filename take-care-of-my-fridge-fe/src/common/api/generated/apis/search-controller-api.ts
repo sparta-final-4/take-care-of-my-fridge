@@ -29,6 +29,8 @@ import type { ApiResponsePageResponseProductListItemResponse } from '../models';
 // @ts-ignore
 import type { ApiResponsePageResponseRecipeListItemResponse } from '../models';
 // @ts-ignore
+import type { ApiResponsePopularKeywordsResponse } from '../models';
+// @ts-ignore
 import type { ApiResponseSearchFridgeMatchResponse } from '../models';
 // @ts-ignore
 import type { ApiResponseVoid } from '../models';
@@ -49,6 +51,35 @@ import type { SearchSuggestionRequest } from '../models';
  */
 export const SearchControllerApiAxiosParamCreator = function (configuration?: Configuration) {
     return {
+        /**
+         * 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        getPopularKeywords: async (options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/api/search/popular`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            localVarHeaderParameter['Accept'] = '*/*';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
         /**
          * 
          * @param {SearchFridgeMatchRequest} request 
@@ -280,6 +311,17 @@ export const SearchControllerApiFp = function(configuration?: Configuration) {
     return {
         /**
          * 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async getPopularKeywords(options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ApiResponsePopularKeywordsResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.getPopularKeywords(options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['SearchControllerApi.getPopularKeywords']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
          * @param {SearchFridgeMatchRequest} request 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
@@ -361,6 +403,14 @@ export const SearchControllerApiFactory = function (configuration?: Configuratio
     return {
         /**
          * 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        getPopularKeywords(options?: RawAxiosRequestConfig): AxiosPromise<ApiResponsePopularKeywordsResponse> {
+            return localVarFp.getPopularKeywords(options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
          * @param {SearchControllerApiMatchFridgeRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
@@ -420,6 +470,13 @@ export const SearchControllerApiFactory = function (configuration?: Configuratio
  * SearchControllerApi - interface
  */
 export interface SearchControllerApiInterface {
+    /**
+     * 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    getPopularKeywords(options?: RawAxiosRequestConfig): AxiosPromise<ApiResponsePopularKeywordsResponse>;
+
     /**
      * 
      * @param {SearchControllerApiMatchFridgeRequest} requestParameters Request parameters.
@@ -516,6 +573,15 @@ export interface SearchControllerApiSuggestRequest {
  * SearchControllerApi - object-oriented interface
  */
 export class SearchControllerApi extends BaseAPI implements SearchControllerApiInterface {
+    /**
+     * 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public getPopularKeywords(options?: RawAxiosRequestConfig) {
+        return SearchControllerApiFp(this.configuration).getPopularKeywords(options).then((request) => request(this.axios, this.basePath));
+    }
+
     /**
      * 
      * @param {SearchControllerApiMatchFridgeRequest} requestParameters Request parameters.

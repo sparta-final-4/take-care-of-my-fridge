@@ -86,6 +86,7 @@ models/api-response-page-response-sale-event-list-response.ts
 models/api-response-page-response-settlement-payment-response.ts
 models/api-response-payment-confirm-response.ts
 models/api-response-payment-prepare-response.ts
+models/api-response-popular-keywords-response.ts
 models/api-response-product-detail-response.ts
 models/api-response-recipe-classification-response.ts
 models/api-response-recipe-detail-response.ts
@@ -209,6 +210,7 @@ models/payment-confirm-request.ts
 models/payment-confirm-response.ts
 models/payment-prepare-request.ts
 models/payment-prepare-response.ts
+models/popular-keywords-response.ts
 models/popular-recipe-request.ts
 models/popular-recipe-response.ts
 models/popular-sale-response.ts
