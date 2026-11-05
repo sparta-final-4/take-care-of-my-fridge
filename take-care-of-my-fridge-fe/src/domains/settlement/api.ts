@@ -2,6 +2,7 @@ import {
   adminSettlementApi,
   type PageResponseSettlementPaymentResponse,
   type SalesAmountResponse,
+  type SettlementMethodResponse,
   type SettlementPaymentResponse,
   type SettlementPeriodResponse,
   type SettlementResponse,
@@ -13,6 +14,7 @@ import { unwrap } from '@/common/api/unwrap';
 export type {
   PageResponseSettlementPaymentResponse,
   SalesAmountResponse,
+  SettlementMethodResponse,
   SettlementPaymentResponse,
   SettlementPeriodResponse,
   SettlementResponse,

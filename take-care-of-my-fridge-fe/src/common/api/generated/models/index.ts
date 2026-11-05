@@ -231,6 +231,7 @@ export * from './search-fridge-match-request';
 export * from './search-fridge-match-response';
 export * from './search-recipe-click-request';
 export * from './search-suggestion-request';
+export * from './settlement-method-response';
 export * from './settlement-payment-response';
 export * from './settlement-payment-search-request';
 export * from './settlement-period-response';

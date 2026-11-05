@@ -19,9 +19,13 @@
 import type { SalesAmountResponse } from './sales-amount-response';
 // May contain unused imports in some cases
 // @ts-ignore
+import type { SettlementMethodResponse } from './settlement-method-response';
+// May contain unused imports in some cases
+// @ts-ignore
 import type { SettlementPeriodResponse } from './settlement-period-response';
 
 export interface SettlementResponse {
+    'methods'?: Array<SettlementMethodResponse>;
     'periods'?: Array<SettlementPeriodResponse>;
     'summary'?: SalesAmountResponse;
 }

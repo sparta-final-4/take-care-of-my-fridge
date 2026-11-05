@@ -1,4 +1,4 @@
-// 백엔드 PgProvider. 주문 확인 화면에서 고르는 결제 수단(결제대행사)
+// 백엔드 PgProvider. 주문 확인 화면에서 고르는 결제 수단(결제대행사)이고, 정산 화면의 결제 수단 이름에도 쓴다
 export type PgProvider = 'KAKAOPAY' | 'TOSSPAY' | 'KICC' | 'INICIS' | 'TOSSPAYMENTS';
 
 // 화면에 보여 줄 순서와 이름
