@@ -5,12 +5,15 @@ import { PopularRecipeSection } from '@/domains/cooking/components/PopularRecipe
 import { IngredientInputSection } from '@/domains/fridge/components/IngredientInputSection';
 import { MyFridgeSection } from '@/domains/fridge/components/MyFridgeSection';
 import { PopularSaleSection } from '@/domains/sale/components/PopularSaleSection';
+import { PopularKeywordBar } from '@/domains/search/components/PopularKeywordBar';
 
 import styles from './MainPage.module.scss';
 
 export default function MainPage() {
   return (
     <div className={styles.page}>
+      <PopularKeywordBar />
+
       <div className={styles.row}>
         <div className={styles.leftCol}>
           <IngredientInputSection />

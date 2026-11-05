@@ -51,3 +51,9 @@ export async function matchSearchFridge(
 ): Promise<SearchFridgeMatchResponse> {
   return unwrap(searchApi.matchFridge({ request }, { signal }));
 }
+
+// 오늘 로그인 회원이 많이 검색한 검색어 상위 10개. 비로그인도 조회한다.
+export async function getPopularSearchKeywords(signal?: AbortSignal): Promise<string[]> {
+  const response = await unwrap(searchApi.getPopularKeywords({ signal }));
+  return response.keywords ?? [];
+}
