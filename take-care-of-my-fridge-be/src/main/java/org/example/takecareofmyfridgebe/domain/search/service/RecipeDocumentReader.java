@@ -2,9 +2,13 @@ package org.example.takecareofmyfridgebe.domain.search.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.example.takecareofmyfridgebe.domain.chat.config.ChatCandidateProperties;
+import org.example.takecareofmyfridgebe.domain.chat.facade.SpicyRecipeDetector;
+import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeIndexSource;
 import org.example.takecareofmyfridgebe.domain.recipe.service.RecipeIndexSourceService;
 import org.example.takecareofmyfridgebe.domain.search.config.RecipeSearchProperties;
+import org.example.takecareofmyfridgebe.domain.search.dto.RecipeSpicyLevel;
 import org.example.takecareofmyfridgebe.infra.elasticsearch.dto.EsDocument;
 import org.example.takecareofmyfridgebe.infra.elasticsearch.index.EsDocumentReader;
 import org.springframework.stereotype.Component;
@@ -12,6 +16,7 @@ import org.springframework.stereotype.Component;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -31,6 +36,8 @@ public class RecipeDocumentReader implements EsDocumentReader {
     private final RecipeIndexSourceService recipeIndexSourceService;
     private final RecipeEmbedder embedder;
     private final RecipeSearchProperties properties;
+    // 매운 재료 목록은 AI 상담 후보 검색과 같은 기준을 쓴다
+    private final ChatCandidateProperties spicyProperties;
 
     @Override
     public List<EsDocument> readAll() {
@@ -91,6 +98,12 @@ public class RecipeDocumentReader implements EsDocumentReader {
         doc.put("ingredient_count", ingredientNames.size());
         doc.put("steps_text", String.join("\n", recipe.steps()));
         doc.put("step_count", recipe.steps().size());
+
+        RecipeSpicyLevel spicyLevel = spicyLevel(recipe);
+        doc.put("ingredient_ids", ingredientIds(recipe.ingredients(), false));
+        doc.put("non_basic_ingredient_count", ingredientIds(recipe.ingredients(), true).size());
+        doc.put("tastes", tastes(recipe.tastes(), spicyLevel));
+        doc.put("spicy_level", spicyLevel.name());
 
         return doc;
     }
@@ -154,6 +167,46 @@ public class RecipeDocumentReader implements EsDocumentReader {
                 .filter(t -> !t.isEmpty())
                 .forEach(unique::add);
         return List.copyOf(unique);
+    }
+
+    private static List<Long> ingredientIds(List<RecipeIndexSource.Ingredient> ingredients, boolean nonBasicOnly) {
+        Set<Long> unique = new LinkedHashSet<>();
+        for (RecipeIndexSource.Ingredient ingredient : ingredients) {
+            if (ingredient.id() != null && (!nonBasicOnly || !ingredient.basicSeasoning())) {
+                unique.add(ingredient.id());
+            }
+        }
+        return List.copyOf(unique);
+    }
+
+    /**
+     * 재료 사전 이름과 레시피에 적힌 이름을 모두 본다 (사전 정리로 홍고추가 "고추"로 합쳐졌어도 원문 이름으로 잡히게).
+     */
+    RecipeSpicyLevel spicyLevel(RecipeIndexSource recipe) {
+        List<String> texts = recipe.ingredients().stream()
+                .flatMap(ingredient -> Stream.of(ingredient.name(), ingredient.displayName()))
+                .filter(name -> name != null && !name.isBlank())
+                .toList();
+        Map<Long, List<String>> textsById = Map.of(recipe.id(), texts);
+        List<String> hot = spicyProperties.spicyIngredients();
+        if (!SpicyRecipeDetector.spicyRecipeIds(textsById, hot, spicyProperties.spicyExclusions()).isEmpty()) {
+            return RecipeSpicyLevel.HOT;
+        }
+        List<String> mild = spicyProperties.mildSpicyIngredients();
+        if (!SpicyRecipeDetector.spicyRecipeIds(textsById, mild, spicyProperties.spicyExclusions()).isEmpty()) {
+            return RecipeSpicyLevel.MILD;
+        }
+        return RecipeSpicyLevel.NONE;
+    }
+
+    // 레시피 맛 데이터에 매운맛이 빠진 레시피가 많아, 확실히 매운 재료가 있으면 매운맛을 더한다
+    private static List<String> tastes(Set<Member.Taste> tastes, RecipeSpicyLevel spicyLevel) {
+        Set<Member.Taste> result = EnumSet.noneOf(Member.Taste.class);
+        result.addAll(tastes);
+        if (spicyLevel == RecipeSpicyLevel.HOT) {
+            result.add(Member.Taste.SPICY);
+        }
+        return result.stream().map(Enum::name).toList();
     }
 
     private static List<String> uniqueNames(List<RecipeIndexSource.Ingredient> ingredients, boolean mainOnly) {

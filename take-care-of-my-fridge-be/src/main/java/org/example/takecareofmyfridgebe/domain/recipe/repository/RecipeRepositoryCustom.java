@@ -25,7 +25,7 @@ public interface RecipeRepositoryCustom {
     List<String> findNamesContaining(String keyword, int limit);
 
     /**
-     * 색인용: 레시피별 재료명,역할을 seq 순으로 조회한다. recipeId가 null이면 전체 레시피
+     * 색인용: 레시피별 재료 id·사전 이름·레시피에 적힌 이름·역할·기본 양념 여부를 seq 순으로 조회한다. recipeId가 null이면 전체 레시피
      */
     List<RecipeIngredientNameDto> findIngredientNames(Long recipeIdOrNull);
 

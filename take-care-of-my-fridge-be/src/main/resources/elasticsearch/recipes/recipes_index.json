@@ -96,6 +96,10 @@
       "ingredient_count":         { "type": "short" },
       "steps_text":               { "type": "text", "analyzer": "korean", "search_analyzer": "korean_search" },
       "step_count":               { "type": "short" },
+      "ingredient_ids":             { "type": "long" },
+      "non_basic_ingredient_count": { "type": "short" },
+      "tastes":                     { "type": "keyword" },
+      "spicy_level":                { "type": "keyword" },
       "created_at":               { "type": "date", "format": "yyyy-MM-dd HH:mm:ss.SSSSSS||yyyy-MM-dd HH:mm:ss||strict_date_optional_time" },
       "embedding":                { "type": "dense_vector", "dims": 1536, "similarity": "cosine" }
     }

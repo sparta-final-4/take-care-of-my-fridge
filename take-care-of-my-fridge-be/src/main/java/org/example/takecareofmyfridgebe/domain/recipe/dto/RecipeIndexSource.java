@@ -1,10 +1,12 @@
 package org.example.takecareofmyfridgebe.domain.recipe.dto;
 
+import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 import org.example.takecareofmyfridgebe.domain.recipe.entity.Recipe;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 
 public record RecipeIndexSource(
         Long id,
@@ -30,16 +32,25 @@ public record RecipeIndexSource(
         String imageUrl,
         LocalDateTime createdAt,
         List<Ingredient> ingredients,
-        List<String> steps
+        List<String> steps,
+        Set<Member.Taste> tastes
 ) {
 
+    /**
+     * @param name        재료 사전 이름
+     * @param displayName 레시피에 적힌 이름 (사전 정리로 합쳐지기 전 원문)
+     */
     public record Ingredient(
+            Long id,
             String name,
-            String role
+            String displayName,
+            String role,
+            boolean basicSeasoning
     ) {
     }
 
-    public static RecipeIndexSource from(Recipe recipe, List<Ingredient> ingredients, List<String> steps) {
+    public static RecipeIndexSource from(Recipe recipe, List<Ingredient> ingredients, List<String> steps,
+                                         Set<Member.Taste> tastes) {
         return new RecipeIndexSource(
                 recipe.getId(),
                 recipe.getSource(),
@@ -64,7 +75,8 @@ public record RecipeIndexSource(
                 recipe.getImageUrl(),
                 recipe.getCreatedAt(),
                 ingredients,
-                steps
+                steps,
+                tastes
         );
     }
 }

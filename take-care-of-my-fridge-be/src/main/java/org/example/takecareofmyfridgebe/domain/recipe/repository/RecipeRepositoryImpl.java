@@ -79,8 +79,11 @@ public class RecipeRepositoryImpl implements RecipeRepositoryCustom {
         return queryFactory
                 .select(Projections.constructor(RecipeIngredientNameDto.class,
                         recipeIngredient.recipe.id,
+                        recipeIngredient.ingredientId,
                         ingredient.name,
-                        recipeIngredient.role
+                        recipeIngredient.displayName,
+                        recipeIngredient.role,
+                        ingredient.basicSeasoning
                 ))
                 .from(recipeIngredient)
                 .join(ingredient).on(ingredient.id.eq(recipeIngredient.ingredientId))
