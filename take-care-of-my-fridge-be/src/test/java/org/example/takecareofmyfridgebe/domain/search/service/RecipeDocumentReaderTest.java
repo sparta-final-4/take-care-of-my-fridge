@@ -1,11 +1,14 @@
 package org.example.takecareofmyfridgebe.domain.search.service;
 
 import jakarta.persistence.EntityManager;
+import org.example.takecareofmyfridgebe.domain.chat.config.ChatCandidateProperties;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.Ingredient;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.StorageType;
+import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 import org.example.takecareofmyfridgebe.domain.recipe.entity.Recipe;
 import org.example.takecareofmyfridgebe.domain.recipe.entity.RecipeIngredient;
 import org.example.takecareofmyfridgebe.domain.recipe.entity.RecipeStep;
+import org.example.takecareofmyfridgebe.domain.recipe.entity.RecipeTaste;
 import org.example.takecareofmyfridgebe.domain.recipe.service.RecipeIndexSourceService;
 import org.example.takecareofmyfridgebe.domain.search.config.RecipeSearchProperties;
 import org.example.takecareofmyfridgebe.domain.search.config.RecipeSearchProperties.IndexProperties;
@@ -40,6 +43,11 @@ class RecipeDocumentReaderTest extends MySqlContainerSupport {
     // 임베딩은 RecipeDocumentReaderEmbeddingTest에서 본다. 여기서는 DB에서 읽은 필드만 확인한다
     @TestConfiguration
     static class EmbeddingDisabled {
+        @Bean
+        ChatCandidateProperties chatCandidateProperties() {
+            return new ChatCandidateProperties(List.of(), 0.4, List.of("청양고추"), List.of(), List.of("홍고추"));
+        }
+
         @Bean
         RecipeSearchProperties recipeSearchProperties() {
             return new RecipeSearchProperties(
@@ -198,5 +206,43 @@ class RecipeDocumentReaderTest extends MySqlContainerSupport {
         assertThat(docs.get(1).id()).isEqualTo(second.getId());
         assertThat(docs.get(1).source().get("ingredients")).isEqualTo(List.of(egg.getName()));
         assertThat(docs.get(1).source().get("steps_text")).isEqualTo("달걀을 푼다\n말아 굽는다");
+    }
+
+    @Test
+    @DisplayName("readOne은 재료 id, 기본 양념 뺀 재료 수, 레시피 맛, 레시피에 적힌 이름으로 가른 매운 정도를 넣는다")
+    void readOne_putsCandidateSearchFields() {
+        // Given: 사전 이름은 "고추"지만 레시피에는 "청양고추"로 적혀 있다
+        Ingredient pork = createIngredient("돼지고기_" + System.nanoTime());
+        Ingredient pepper = createIngredient("고추_" + System.nanoTime());
+        Ingredient salt = Ingredient.builder()
+                .ingredientCode("ING_" + System.nanoTime())
+                .name("소금_" + System.nanoTime())
+                .baseUnit("g")
+                .defaultStorage(StorageType.ROOM_TEMP)
+                .defaultShelfDays(365)
+                .basicSeasoning(true)
+                .build();
+        em.persist(salt);
+        Recipe recipe = createRecipe("제육볶음", null);
+        addIngredient(recipe, pork, 1, "주재료");
+        em.persist(RecipeIngredient.builder()
+                .recipe(recipe)
+                .ingredientId(pepper.getId())
+                .seq(2)
+                .displayName("청양고추")
+                .role("부재료")
+                .build());
+        addIngredient(recipe, salt, 3, "양념");
+        em.persist(RecipeTaste.builder().recipe(recipe).taste(Member.Taste.SWEET).build());
+        flushAndClear();
+
+        // When
+        Map<String, Object> doc = recipeDocumentReader.readOne(recipe.getId()).orElseThrow().source();
+
+        // Then
+        assertThat(doc.get("ingredient_ids")).isEqualTo(List.of(pork.getId(), pepper.getId(), salt.getId()));
+        assertThat(doc.get("non_basic_ingredient_count")).isEqualTo(2);
+        assertThat(doc.get("spicy_level")).isEqualTo("HOT");
+        assertThat(doc.get("tastes")).isEqualTo(List.of("SWEET", "SPICY"));
     }
 }

@@ -14,4 +14,9 @@ public interface RecipeTasteRepository extends JpaRepository<RecipeTaste, Long> 
     @Query("SELECT new org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeTasteDto(rt.recipe.id, rt.taste) " +
             "FROM RecipeTaste rt WHERE rt.recipe.id IN :recipeIds")
     List<RecipeTasteDto> findTastesByRecipeIdIn(@Param("recipeIds") Collection<Long> recipeIds);
+
+    // 전체 재색인용
+    @Query("SELECT new org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeTasteDto(rt.recipe.id, rt.taste) " +
+            "FROM RecipeTaste rt")
+    List<RecipeTasteDto> findAllTastes();
 }
