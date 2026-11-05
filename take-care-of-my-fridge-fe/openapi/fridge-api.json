@@ -3075,6 +3075,26 @@
         ]
       }
     },
+    "/api/search/popular": {
+      "get": {
+        "operationId": "getPopularKeywords",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePopularKeywordsResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "search-controller"
+        ]
+      }
+    },
     "/api/search/products": {
       "get": {
         "operationId": "searchProducts",
@@ -4010,6 +4030,20 @@
         "properties": {
           "data": {
             "$ref": "#/components/schemas/PaymentPrepareResponse"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorResponse"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ApiResponsePopularKeywordsResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/PopularKeywordsResponse"
           },
           "error": {
             "$ref": "#/components/schemas/ErrorResponse"
@@ -7018,6 +7052,17 @@
           },
           "portonePaymentId": {
             "type": "string"
+          }
+        }
+      },
+      "PopularKeywordsResponse": {
+        "type": "object",
+        "properties": {
+          "keywords": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         }
       },
