@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { generatePath, useNavigate } from 'react-router';
 
 import { ROUTES } from '@/app/paths';
-import { getErrorCode, getErrorMessage } from '@/common/api/errors';
+import { getErrorCode, getErrorMessage, isPaymentPinError } from '@/common/api/errors';
 import { useAuthStore } from '@/common/auth/authStore';
 import { formatPrice } from '@/domains/cart/format';
 import { cartQueries } from '@/domains/cart/queries';
@@ -13,10 +13,11 @@ import { orderQueries } from '@/domains/order/queries';
 import { confirmPayment, payWithCard, preparePayment } from '@/domains/payment/api';
 import { cardName, maskedCardNumber } from '@/domains/payment/cardFormat';
 import { CardPicker } from '@/domains/payment/components/CardPicker';
+import { PaymentPinPayModal } from '@/domains/payment/components/PaymentPinPayModal';
 import { useCardRegistration } from '@/domains/payment/hooks/useCardRegistration';
 import { PG_PROVIDER_OPTIONS, type PgProvider } from '@/domains/payment/pgProvider';
 import { openPaymentWindow, type PaymentCustomer } from '@/domains/payment/portone';
-import { billingKeyQueries } from '@/domains/payment/queries';
+import { billingKeyQueries, paymentPinQueries } from '@/domains/payment/queries';
 
 import { OrderItemRow } from './OrderItemRow';
 import styles from './OrderCheckoutSection.module.scss';
@@ -88,12 +89,18 @@ export function OrderCheckoutSection({ orderId }: OrderCheckoutSectionProps) {
     },
     meta: { skipGlobalError: true },
   });
-  // 등록 카드 결제는 결제창이 없고 서버가 PG에 청구한 뒤 결제 확정과 같은 규칙으로 승인한다
+  // 등록 카드 결제는 결제창이 없고 서버가 결제 비밀번호를 확인하고 PG에 청구한 뒤 결제 확정과 같은 규칙으로 승인한다
   const cardPayMutation = useMutation({
-    mutationFn: (cardId: number) => payWithCard(orderId, cardId),
+    mutationFn: ({ cardId, pin }: { cardId: number; pin: string }) =>
+      payWithCard(orderId, cardId, pin),
     meta: { skipGlobalError: true },
-    // 다른 탭에서 삭제한 카드처럼 쓸 수 없는 카드가 선택된 채 남지 않게 카드 목록을 다시 불러온다
-    onError: () => queryClient.invalidateQueries({ queryKey: billingKeyQueries.all }),
+    // 다른 탭에서 삭제한 카드처럼 쓸 수 없는 카드가 선택된 채 남지 않게 카드 목록을 다시 불러온다.
+    // 비밀번호를 틀렸으면 잠김·미설정이 바뀌었을 수 있으므로 결제 비밀번호 상태도 다시 받는다
+    onError: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: billingKeyQueries.all }),
+        queryClient.invalidateQueries({ queryKey: paymentPinQueries.all }),
+      ]),
   });
   const paying = payMutation.isPending || cardPayMutation.isPending;
 
@@ -124,19 +131,32 @@ export function OrderCheckoutSection({ orderId }: OrderCheckoutSectionProps) {
     message.error(getErrorMessage(error));
   };
 
-  const handlePayWithCard = () => {
+  // 결제 비밀번호 오류는 창을 닫지 않고 다시 입력받는다. 그 밖의 결과는 창을 닫고 처리한다
+  const handlePayWithCard = (pin: string, onPinError: (message: string) => void) => {
     if (method?.kind !== 'card') return;
-    cardPayMutation.mutate(method.cardId, {
-      onSuccess: finishPaid,
-      onError: handlePayError,
-      onSettled: () => setCardConfirmOpen(false),
-    });
+    cardPayMutation.mutate(
+      { cardId: method.cardId, pin },
+      {
+        onSuccess: () => {
+          setCardConfirmOpen(false);
+          finishPaid();
+        },
+        onError: (error) => {
+          if (isPaymentPinError(error)) {
+            onPinError(getErrorMessage(error));
+            return;
+          }
+          setCardConfirmOpen(false);
+          handlePayError(error);
+        },
+      },
+    );
   };
 
   // 결제사에 보낼 연락처는 회원 가입 때 받은 휴대폰 번호를 쓴다.
   const handlePay = () => {
     if (!method) return;
-    // 등록 카드는 결제창이 없어 결제 전에 한 번 확인한다
+    // 등록 카드는 결제창이 없어 결제 전에 결제 비밀번호로 확인한다
     if (method.kind === 'card') {
       setCardConfirmOpen(true);
       return;
@@ -323,19 +343,17 @@ export function OrderCheckoutSection({ orderId }: OrderCheckoutSectionProps) {
           </Button>
         </section>
       </div>
-      <Modal
+      <PaymentPinPayModal
         open={cardConfirmOpen}
-        title="등록 카드로 결제할까요?"
-        okText="결제"
-        cancelText="닫기"
-        confirmLoading={cardPayMutation.isPending}
-        onOk={handlePayWithCard}
+        summary={
+          selectedCard
+            ? `${cardName(selectedCard)} ${maskedCardNumber(selectedCard)}로 ${formatPrice(order.payAmount ?? 0)}을 결제해요.`
+            : '고른 카드로 결제해요.'
+        }
+        paying={cardPayMutation.isPending}
+        onPay={handlePayWithCard}
         onCancel={() => setCardConfirmOpen(false)}
-      >
-        {selectedCard
-          ? `${cardName(selectedCard)} ${maskedCardNumber(selectedCard)}로 ${formatPrice(order.payAmount ?? 0)}을 결제해요.`
-          : '고른 카드로 결제해요.'}
-      </Modal>
+      />
       <Modal
         open={isConfirmOpen}
         title={isLeaving ? '나가면 주문이 취소됩니다.' : '주문을 취소할까요?'}

@@ -21,6 +21,7 @@ apis/my-recipe-controller-api.ts
 apis/notification-controller-api.ts
 apis/order-controller-api.ts
 apis/payment-controller-api.ts
+apis/payment-pin-controller-api.ts
 apis/popular-recipe-controller-api.ts
 apis/product-controller-api.ts
 apis/recipe-controller-api.ts
@@ -85,6 +86,7 @@ models/api-response-page-response-sale-candidate-product-response.ts
 models/api-response-page-response-sale-event-list-response.ts
 models/api-response-page-response-settlement-payment-response.ts
 models/api-response-payment-confirm-response.ts
+models/api-response-payment-pin-status-response.ts
 models/api-response-payment-prepare-response.ts
 models/api-response-popular-keywords-response.ts
 models/api-response-product-detail-response.ts
@@ -208,6 +210,10 @@ models/page-response-sale-event-list-response.ts
 models/page-response-settlement-payment-response.ts
 models/payment-confirm-request.ts
 models/payment-confirm-response.ts
+models/payment-pin-change-request.ts
+models/payment-pin-reset-request.ts
+models/payment-pin-set-request.ts
+models/payment-pin-status-response.ts
 models/payment-prepare-request.ts
 models/payment-prepare-response.ts
 models/popular-keywords-response.ts

@@ -37,6 +37,7 @@ export * from './apis/my-recipe-controller-api';
 export * from './apis/notification-controller-api';
 export * from './apis/order-controller-api';
 export * from './apis/payment-controller-api';
+export * from './apis/payment-pin-controller-api';
 export * from './apis/popular-recipe-controller-api';
 export * from './apis/product-controller-api';
 export * from './apis/recipe-controller-api';

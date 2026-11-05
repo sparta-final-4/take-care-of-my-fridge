@@ -17,5 +17,6 @@
 
 export interface BillingKeyPaymentRequest {
     'cardId': number;
+    'pin': string;
 }
 
