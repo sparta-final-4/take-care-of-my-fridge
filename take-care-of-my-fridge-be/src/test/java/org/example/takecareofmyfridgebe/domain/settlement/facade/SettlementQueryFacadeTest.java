@@ -1,7 +1,9 @@
 package org.example.takecareofmyfridgebe.domain.settlement.facade;
 
+import org.example.takecareofmyfridgebe.domain.payment.entity.PgProvider;
 import org.example.takecareofmyfridgebe.domain.settlement.dto.SalesAmountResponse;
 import org.example.takecareofmyfridgebe.domain.settlement.dto.SalesPeriodUnit;
+import org.example.takecareofmyfridgebe.domain.settlement.dto.SettlementMethodResponse;
 import org.example.takecareofmyfridgebe.domain.settlement.dto.SettlementPaymentResponse;
 import org.example.takecareofmyfridgebe.domain.settlement.dto.SettlementPaymentSearchRequest;
 import org.example.takecareofmyfridgebe.domain.settlement.dto.SettlementPeriodResponse;
@@ -134,6 +136,52 @@ class SettlementQueryFacadeTest {
                 SettlementPeriodResponse.of(date(9, 15), date(9, 30), SalesAmountResponse.of(3000, 0, 2, 0)),
                 SettlementPeriodResponse.of(date(10, 1), TODAY, SalesAmountResponse.of(12500, 300, 3, 1)));
         assertThat(response.summary()).isEqualTo(SalesAmountResponse.of(15500, 300, 5, 1));
+    }
+
+    @Test
+    @DisplayName("지난 기간의 결제 수단별 합계는 시작일 0시부터 종료일 다음 날 0시 전까지 센다")
+    void getSettlement_sumMethodsForWholeDays_whenPeriodIsPast() {
+        LocalDate start = date(10, 1);
+        LocalDate end = date(10, 3);
+        List<SettlementMethodResponse> methods = List.of(
+                new SettlementMethodResponse(true, PgProvider.TOSSPAYMENTS, 6000L, 0L, 6000L, 3, 0));
+        given(settlementQueryService.findMissingDates(start, end)).willReturn(List.of());
+        given(settlementQueryService.getDailySales(start, end)).willReturn(List.of(daily(10, 1, 6000)));
+        given(settlementQueryService.getMethodSales(start.atStartOfDay(), date(10, 4).atStartOfDay()))
+                .willReturn(methods);
+
+        SettlementResponse response = settlementQueryFacade.getSettlement(request(SalesPeriodUnit.DAY, start, end), NOW);
+
+        assertThat(response.methods()).isEqualTo(methods);
+    }
+
+    @Test
+    @DisplayName("기간에 오늘이 있으면 결제 수단별 합계는 지금까지 센다")
+    void getSettlement_sumMethodsUntilNow_whenPeriodIncludesToday() {
+        LocalDate start = date(10, 28);
+        List<SettlementMethodResponse> methods = List.of(
+                new SettlementMethodResponse(false, PgProvider.KAKAOPAY, 500L, 0L, 500L, 1, 0));
+        given(settlementQueryService.findMissingDates(start, YESTERDAY)).willReturn(List.of());
+        given(settlementQueryService.getDailySales(start, YESTERDAY)).willReturn(List.of());
+        given(settlementQueryService.getSales(TODAY.atStartOfDay(), NOW)).willReturn(SalesAmountResponse.of(500, 0, 1, 0));
+        given(settlementQueryService.getMethodSales(start.atStartOfDay(), NOW)).willReturn(methods);
+
+        SettlementResponse response = settlementQueryFacade.getSettlement(request(SalesPeriodUnit.DAY, start, TODAY), NOW);
+
+        assertThat(response.methods()).isEqualTo(methods);
+    }
+
+    @Test
+    @DisplayName("오늘만 조회하면 결제 수단별 합계는 오늘 0시부터 지금까지 센다")
+    void getSettlement_sumMethodsFromTodayStart_whenOnlyToday() {
+        List<SettlementMethodResponse> methods = List.of(
+                new SettlementMethodResponse(false, PgProvider.KAKAOPAY, 500L, 0L, 500L, 1, 0));
+        given(settlementQueryService.getSales(TODAY.atStartOfDay(), NOW)).willReturn(SalesAmountResponse.of(500, 0, 1, 0));
+        given(settlementQueryService.getMethodSales(TODAY.atStartOfDay(), NOW)).willReturn(methods);
+
+        SettlementResponse response = settlementQueryFacade.getSettlement(request(SalesPeriodUnit.DAY, TODAY, TODAY), NOW);
+
+        assertThat(response.methods()).isEqualTo(methods);
     }
 
     @Test

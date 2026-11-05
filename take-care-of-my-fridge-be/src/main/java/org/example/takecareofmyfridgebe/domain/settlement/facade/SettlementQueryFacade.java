@@ -3,6 +3,7 @@ package org.example.takecareofmyfridgebe.domain.settlement.facade;
 import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.settlement.dto.SalesAmountResponse;
 import org.example.takecareofmyfridgebe.domain.settlement.dto.SalesPeriodUnit;
+import org.example.takecareofmyfridgebe.domain.settlement.dto.SettlementMethodResponse;
 import org.example.takecareofmyfridgebe.domain.settlement.dto.SettlementPaymentResponse;
 import org.example.takecareofmyfridgebe.domain.settlement.dto.SettlementPaymentSearchRequest;
 import org.example.takecareofmyfridgebe.domain.settlement.dto.SettlementPeriodResponse;
@@ -37,7 +38,8 @@ public class SettlementQueryFacade {
         return getSettlement(request, LocalDateTime.now(ZONE));
     }
 
-    // 어제까지는 daily_sales를 읽고(빈 날은 먼저 집계해 채운다), 오늘은 지금까지의 매출을 바로 세어 붙인다
+    // 어제까지는 daily_sales를 읽고(빈 날은 먼저 집계해 채운다), 오늘은 지금까지의 매출을 바로 세어 붙인다.
+    // 결제 수단별 합계는 저장하지 않고 기간 전체(오늘이 들어 있으면 지금까지)의 결제 이력을 바로 센다
     SettlementResponse getSettlement(SettlementSearchRequest request, LocalDateTime now) {
         LocalDate today = now.toLocalDate();
         LocalDate startDate = request.startDate();
@@ -53,7 +55,9 @@ public class SettlementQueryFacade {
         if (!endDate.isBefore(today)) {
             days.add(new DailyAmount(today, settlementQueryService.getSales(today.atStartOfDay(), now)));
         }
-        return group(request.unit(), startDate, endDate, days);
+        LocalDateTime to = endDate.isBefore(today) ? endDate.plusDays(1).atStartOfDay() : now;
+        List<SettlementMethodResponse> methods = settlementQueryService.getMethodSales(startDate.atStartOfDay(), to);
+        return group(request.unit(), startDate, endDate, days, methods);
     }
 
     // 건별 조회는 결제 이력을 바로 읽으므로 빈 날 집계가 필요 없다. 오늘이 들어 있으면 지금까지의 결제·환불이 나온다
@@ -70,7 +74,7 @@ public class SettlementQueryFacade {
 
     // 주는 월~일, 월은 1일~말일로 묶는다. 조회 기간이 주·월 중간에서 잘리면 기간 안의 날만 더하고 그 날짜를 내려준다
     private SettlementResponse group(SalesPeriodUnit unit, LocalDate startDate, LocalDate endDate,
-                                     List<DailyAmount> days) {
+                                     List<DailyAmount> days, List<SettlementMethodResponse> methods) {
         Map<LocalDate, List<SalesAmountResponse>> byPeriodStart = new LinkedHashMap<>();
         for (DailyAmount day : days) {
             byPeriodStart.computeIfAbsent(periodStart(unit, day.date()), key -> new ArrayList<>()).add(day.sales());
@@ -82,7 +86,7 @@ public class SettlementQueryFacade {
                         min(periodEnd(unit, entry.getKey()), endDate),
                         sum(entry.getValue())))
                 .toList();
-        return new SettlementResponse(sum(days.stream().map(DailyAmount::sales).toList()), periods);
+        return new SettlementResponse(sum(days.stream().map(DailyAmount::sales).toList()), periods, methods);
     }
 
     private LocalDate periodStart(SalesPeriodUnit unit, LocalDate date) {

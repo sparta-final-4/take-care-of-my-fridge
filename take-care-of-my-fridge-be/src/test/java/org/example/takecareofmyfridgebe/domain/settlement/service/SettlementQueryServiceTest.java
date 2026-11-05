@@ -1,8 +1,11 @@
 package org.example.takecareofmyfridgebe.domain.settlement.service;
 
+import org.example.takecareofmyfridgebe.domain.payment.entity.PgProvider;
 import org.example.takecareofmyfridgebe.domain.settlement.dto.DailySalesSum;
+import org.example.takecareofmyfridgebe.domain.settlement.dto.PaymentMethodSalesSum;
 import org.example.takecareofmyfridgebe.domain.settlement.dto.PaymentSalesRow;
 import org.example.takecareofmyfridgebe.domain.settlement.dto.SalesAmountResponse;
+import org.example.takecareofmyfridgebe.domain.settlement.dto.SettlementMethodResponse;
 import org.example.takecareofmyfridgebe.domain.settlement.dto.SettlementPaymentResponse;
 import org.example.takecareofmyfridgebe.domain.settlement.repository.DailySalesRepository;
 import org.example.takecareofmyfridgebe.domain.settlement.repository.SalesHistoryRepository;
@@ -76,13 +79,33 @@ class SettlementQueryServiceTest {
         PageRequest pageable = PageRequest.of(1, 20);
         LocalDateTime paidAt = LocalDateTime.of(2026, 10, 5, 12, 0);
         given(salesHistoryRepository.findPaymentSalesBetween(from, to, pageable)).willReturn(new PageImpl<>(
-                List.of(new PaymentSalesRow(41L, paidAt, "20261005-000001", "구매자", 0L, 3000L)), pageable, 21));
+                List.of(new PaymentSalesRow(41L, paidAt, "20261005-000001", "구매자", true, PgProvider.TOSSPAYMENTS,
+                        0L, 3000L)), pageable, 21));
 
         PageResponse<SettlementPaymentResponse> response = settlementQueryService.getPayments(from, to, 2, 20);
 
         assertThat(response.content()).containsExactly(
-                new SettlementPaymentResponse(41L, paidAt, "20261005-000001", "구매자", 0L, 3000L, -3000L));
+                new SettlementPaymentResponse(41L, paidAt, "20261005-000001", "구매자", true, PgProvider.TOSSPAYMENTS,
+                        0L, 3000L, -3000L));
         assertThat(response.pageNumber()).isEqualTo(2);
         assertThat(response.totalElements()).isEqualTo(21);
+    }
+
+    @Test
+    @DisplayName("결제 수단별 합계는 결제금액이 큰 순으로, 같으면 등록 카드, 그다음 결제대행사 선언 순으로 주고 순매출을 계산한다")
+    void getMethodSales_sortByPaidAmountAndMapNetAmount() {
+        LocalDateTime from = LocalDateTime.of(2026, 10, 1, 0, 0);
+        LocalDateTime to = LocalDateTime.of(2026, 10, 31, 0, 0);
+        given(salesHistoryRepository.sumSalesByMethodBetween(from, to)).willReturn(List.of(
+                new PaymentMethodSalesSum(false, PgProvider.KAKAOPAY, 0L, 0L, 8000L, 1L),
+                new PaymentMethodSalesSum(false, PgProvider.TOSSPAYMENTS, 20000L, 1L, 0L, 0L),
+                new PaymentMethodSalesSum(false, PgProvider.KICC, 20000L, 1L, 0L, 0L),
+                new PaymentMethodSalesSum(true, PgProvider.TOSSPAYMENTS, 20000L, 2L, 5000L, 1L)));
+
+        assertThat(settlementQueryService.getMethodSales(from, to)).containsExactly(
+                new SettlementMethodResponse(true, PgProvider.TOSSPAYMENTS, 20000L, 5000L, 15000L, 2, 1),
+                new SettlementMethodResponse(false, PgProvider.KICC, 20000L, 0L, 20000L, 1, 0),
+                new SettlementMethodResponse(false, PgProvider.TOSSPAYMENTS, 20000L, 0L, 20000L, 1, 0),
+                new SettlementMethodResponse(false, PgProvider.KAKAOPAY, 0L, 8000L, -8000L, 0, 1));
     }
 }

@@ -2,6 +2,7 @@ package org.example.takecareofmyfridgebe.domain.settlement.repository;
 
 import org.example.takecareofmyfridgebe.domain.payment.entity.PaymentHistory;
 import org.example.takecareofmyfridgebe.domain.settlement.dto.DailySalesSum;
+import org.example.takecareofmyfridgebe.domain.settlement.dto.PaymentMethodSalesSum;
 import org.example.takecareofmyfridgebe.domain.settlement.dto.PaymentSalesRow;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -10,6 +11,7 @@ import org.springframework.data.repository.Repository;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 // 정산 집계가 결제 이력을 읽기만 하는 조회 전용 리포지토리. 결제·환불 코드는 고치지 않는다
 public interface SalesHistoryRepository extends Repository<PaymentHistory, Long> {
@@ -43,6 +45,7 @@ public interface SalesHistoryRepository extends Repository<PaymentHistory, Long>
     @Query(value = """
         select new org.example.takecareofmyfridgebe.domain.settlement.dto.PaymentSalesRow(
             p.id, p.paidAt, o.orderNumber, m.nickname,
+            case when p.billingKey is null then false else true end, p.pgProvider,
             coalesce(sum(case when h.eventType = org.example.takecareofmyfridgebe.domain.payment.entity.PaymentEventType.PAID
                 then h.amount else 0 end), 0),
             coalesce(sum(case when h.eventType in (
@@ -59,7 +62,7 @@ public interface SalesHistoryRepository extends Repository<PaymentHistory, Long>
               org.example.takecareofmyfridgebe.domain.payment.entity.PaymentEventType.PAID,
               org.example.takecareofmyfridgebe.domain.payment.entity.PaymentEventType.PARTIAL_CANCELLED,
               org.example.takecareofmyfridgebe.domain.payment.entity.PaymentEventType.CANCELLED)
-        group by p.id, p.paidAt, o.orderNumber, m.nickname
+        group by p.id, p.paidAt, o.orderNumber, m.nickname, case when p.billingKey is null then false else true end, p.pgProvider
         order by max(h.createdAt) desc, p.id desc
         """,
             countQuery = """
@@ -76,4 +79,34 @@ public interface SalesHistoryRepository extends Repository<PaymentHistory, Long>
         """)
     Page<PaymentSalesRow> findPaymentSalesBetween(@Param("from") LocalDateTime from, @Param("to") LocalDateTime to,
                                                   Pageable pageable);
+
+    // sumSalesBetween을 결제 수단별로 나눈 합계. 같은 조건으로 세므로 모든 행을 더하면 sumSalesBetween과 같다.
+    // 등록 카드 결제는 결제창 결제와 따로 묶고, 환불은 원래 결제의 수단으로 센다. 결제·환불이 없는 수단은 행이 없다
+    @Query("""
+        select new org.example.takecareofmyfridgebe.domain.settlement.dto.PaymentMethodSalesSum(
+            case when p.billingKey is null then false else true end, p.pgProvider,
+            coalesce(sum(case when h.eventType = org.example.takecareofmyfridgebe.domain.payment.entity.PaymentEventType.PAID
+                then h.amount else 0 end), 0),
+            coalesce(sum(case when h.eventType = org.example.takecareofmyfridgebe.domain.payment.entity.PaymentEventType.PAID
+                then 1 else 0 end), 0),
+            coalesce(sum(case when h.eventType in (
+                    org.example.takecareofmyfridgebe.domain.payment.entity.PaymentEventType.PARTIAL_CANCELLED,
+                    org.example.takecareofmyfridgebe.domain.payment.entity.PaymentEventType.CANCELLED)
+                then h.amount else 0 end), 0),
+            coalesce(sum(case when h.eventType in (
+                    org.example.takecareofmyfridgebe.domain.payment.entity.PaymentEventType.PARTIAL_CANCELLED,
+                    org.example.takecareofmyfridgebe.domain.payment.entity.PaymentEventType.CANCELLED)
+                then 1 else 0 end), 0))
+        from PaymentHistory h
+        join h.payment p
+        where p.status = org.example.takecareofmyfridgebe.domain.payment.entity.PaymentStatus.PAID
+          and h.createdAt >= :from and h.createdAt < :to
+          and h.eventType in (
+              org.example.takecareofmyfridgebe.domain.payment.entity.PaymentEventType.PAID,
+              org.example.takecareofmyfridgebe.domain.payment.entity.PaymentEventType.PARTIAL_CANCELLED,
+              org.example.takecareofmyfridgebe.domain.payment.entity.PaymentEventType.CANCELLED)
+        group by case when p.billingKey is null then false else true end, p.pgProvider
+        """)
+    List<PaymentMethodSalesSum> sumSalesByMethodBetween(@Param("from") LocalDateTime from,
+                                                        @Param("to") LocalDateTime to);
 }

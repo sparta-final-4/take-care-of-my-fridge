@@ -3,6 +3,8 @@ package org.example.takecareofmyfridgebe.domain.settlement.repository;
 import jakarta.persistence.EntityManager;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 import org.example.takecareofmyfridgebe.domain.order.entity.Order;
+import org.example.takecareofmyfridgebe.domain.payment.entity.BillingKey;
+import org.example.takecareofmyfridgebe.domain.payment.entity.CardType;
 import org.example.takecareofmyfridgebe.domain.payment.entity.FailReason;
 import org.example.takecareofmyfridgebe.domain.payment.entity.Payment;
 import org.example.takecareofmyfridgebe.domain.payment.entity.PgProvider;
@@ -10,6 +12,7 @@ import org.example.takecareofmyfridgebe.domain.payment.entity.PaymentChangedBy;
 import org.example.takecareofmyfridgebe.domain.payment.entity.PaymentEventType;
 import org.example.takecareofmyfridgebe.domain.payment.entity.PaymentHistory;
 import org.example.takecareofmyfridgebe.domain.settlement.dto.DailySalesSum;
+import org.example.takecareofmyfridgebe.domain.settlement.dto.PaymentMethodSalesSum;
 import org.example.takecareofmyfridgebe.domain.settlement.dto.PaymentSalesRow;
 import org.example.takecareofmyfridgebe.global.config.JpaAuditingConfig;
 import org.example.takecareofmyfridgebe.global.config.QueryDslConfig;
@@ -25,6 +28,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -41,6 +45,7 @@ class SalesHistoryRepositoryTest extends MySqlContainerSupport {
     private final SalesHistoryRepository salesHistoryRepository;
     private final EntityManager entityManager;
 
+    private Member member;
     private Order order;
     private int sequence;
 
@@ -52,7 +57,7 @@ class SalesHistoryRepositoryTest extends MySqlContainerSupport {
 
     @BeforeEach
     void setUp() {
-        Member member = Member.builder().email("buyer@example.com").passwordHash("hash").nickname(BUYER)
+        member = Member.builder().email("buyer@example.com").passwordHash("hash").nickname(BUYER)
                 .phone("01012345678").build();
         entityManager.persist(member);
         order = Order.builder().orderNumber(ORDER_NUMBER).memberId(member.getId()).totalAmount(50000L).build();
@@ -128,9 +133,9 @@ class SalesHistoryRepositoryTest extends MySqlContainerSupport {
 
         assertThat(page.getTotalElements()).isEqualTo(3);
         assertThat(page.getContent()).containsExactly(
-                new PaymentSalesRow(paidLater.getId(), FROM.plusHours(5), ORDER_NUMBER, BUYER, 7000L, 0L),
-                new PaymentSalesRow(paidYesterday.getId(), FROM.minusHours(1), ORDER_NUMBER, BUYER, 0L, 5000L),
-                new PaymentSalesRow(partlyRefunded.getId(), FROM.plusHours(1), ORDER_NUMBER, BUYER, 10000L, 3000L));
+                row(paidLater, FROM.plusHours(5), 7000L, 0L),
+                row(paidYesterday, FROM.minusHours(1), 0L, 5000L),
+                row(partlyRefunded, FROM.plusHours(1), 10000L, 3000L));
         assertThat(sum()).isEqualTo(new DailySalesSum(17000L, 2L, 8000L, 2L));
     }
 
@@ -148,6 +153,88 @@ class SalesHistoryRepositoryTest extends MySqlContainerSupport {
 
         assertThat(page.getTotalElements()).isEqualTo(3);
         assertThat(page.getContent()).extracting(PaymentSalesRow::paidAt).containsExactly(FROM.plusHours(1));
+    }
+
+    @Test
+    @DisplayName("결제 건별 목록은 등록 카드 결제 여부와 실제로 승인한 결제대행사를 함께 준다")
+    void findPaymentSalesBetween_includePaymentMethod() {
+        Payment cardPayment = paidPayment(registeredCard(), PgProvider.TOSSPAYMENTS, 12000L);
+        history(cardPayment, PaymentEventType.PAID, 12000L, FROM.plusHours(1));
+        flushAndClear();
+
+        Page<PaymentSalesRow> page = salesHistoryRepository.findPaymentSalesBetween(FROM, TO, PageRequest.of(0, 10));
+
+        assertThat(page.getContent()).containsExactly(new PaymentSalesRow(cardPayment.getId(), FROM, ORDER_NUMBER,
+                BUYER, true, PgProvider.TOSSPAYMENTS, 12000L, 0L));
+    }
+
+    @Test
+    @DisplayName("결제 수단별 합계는 등록 카드 결제를 결제창 결제와 따로 묶고, 환불은 원래 결제의 수단으로 세며, 모두 더하면 기간 합계와 같다")
+    void sumSalesByMethodBetween_groupByMethodAndMatchSum() {
+        BillingKey card = registeredCard();
+        Payment cardPaid = paidPayment(card, PgProvider.TOSSPAYMENTS, 30000L);
+        history(cardPaid, PaymentEventType.PAID, 30000L, FROM.plusHours(1));
+        history(cardPaid, PaymentEventType.PARTIAL_CANCELLED, 5000L, FROM.plusHours(2));
+        Payment cardPaidAgain = paidPayment(card, PgProvider.TOSSPAYMENTS, 10000L);
+        history(cardPaidAgain, PaymentEventType.PAID, 10000L, FROM.plusHours(3));
+        Payment windowToss = paidPayment(null, PgProvider.TOSSPAYMENTS, 20000L);
+        history(windowToss, PaymentEventType.PAID, 20000L, FROM.plusHours(4));
+        Payment kakaoYesterday = paidPayment(null, PgProvider.KAKAOPAY, 8000L);
+        history(kakaoYesterday, PaymentEventType.PAID, 8000L, FROM.minusHours(1));
+        history(kakaoYesterday, PaymentEventType.CANCELLED, 8000L, FROM.plusHours(5));
+        Payment unaccepted = payment(9000L);
+        unaccepted.fail(FailReason.TIMEOUT);
+        history(unaccepted, PaymentEventType.PAID, 9000L, FROM.plusHours(6));
+        flushAndClear();
+
+        List<PaymentMethodSalesSum> sums = salesHistoryRepository.sumSalesByMethodBetween(FROM, TO);
+
+        assertThat(sums).containsExactlyInAnyOrder(
+                new PaymentMethodSalesSum(true, PgProvider.TOSSPAYMENTS, 40000L, 2L, 5000L, 1L),
+                new PaymentMethodSalesSum(false, PgProvider.TOSSPAYMENTS, 20000L, 1L, 0L, 0L),
+                new PaymentMethodSalesSum(false, PgProvider.KAKAOPAY, 0L, 0L, 8000L, 1L));
+        assertThat(sum()).isEqualTo(new DailySalesSum(60000L, 3L, 13000L, 2L));
+    }
+
+    @Test
+    @DisplayName("등록 카드 결제는 만들 때의 결제대행사가 아니라 승인할 때 PG가 알려 준 결제대행사로 묶는다")
+    void sumSalesByMethodBetween_groupByApprovedPgProvider() {
+        Payment cardPaid = Payment.builder().order(order).billingKey(registeredCard())
+                .portonePaymentId("payment-" + ++sequence).amount(15000L).pgProvider(PgProvider.TOSSPAYMENTS)
+                .expiresAt(FROM.plusDays(1)).build();
+        entityManager.persist(cardPaid);
+        cardPaid.complete(FROM, PgProvider.KICC);
+        history(cardPaid, PaymentEventType.PAID, 15000L, FROM.plusHours(1));
+        flushAndClear();
+
+        assertThat(salesHistoryRepository.sumSalesByMethodBetween(FROM, TO))
+                .containsExactly(new PaymentMethodSalesSum(true, PgProvider.KICC, 15000L, 1L, 0L, 0L));
+    }
+
+    @Test
+    @DisplayName("결제 수단별 합계는 기간 안에 결제·환불이 없으면 빈 목록이다")
+    void sumSalesByMethodBetween_returnEmpty_whenNoHistory() {
+        assertThat(salesHistoryRepository.sumSalesByMethodBetween(FROM, TO)).isEmpty();
+    }
+
+    private PaymentSalesRow row(Payment payment, LocalDateTime paidAt, long paidAmount, long refundedAmount) {
+        return new PaymentSalesRow(payment.getId(), paidAt, ORDER_NUMBER, BUYER, false, PgProvider.KAKAOPAY,
+                paidAmount, refundedAmount);
+    }
+
+    private BillingKey registeredCard() {
+        BillingKey card = BillingKey.builder().memberId(member.getId()).billingKey("billing-key-" + ++sequence)
+                .cardName("농협카드").cardType(CardType.CREDIT).isDefault(true).build();
+        entityManager.persist(card);
+        return card;
+    }
+
+    private Payment paidPayment(BillingKey card, PgProvider pgProvider, long amount) {
+        Payment payment = Payment.builder().order(order).billingKey(card).portonePaymentId("payment-" + ++sequence)
+                .amount(amount).pgProvider(pgProvider).expiresAt(FROM.plusDays(1)).build();
+        entityManager.persist(payment);
+        payment.complete(FROM, pgProvider);
+        return payment;
     }
 
     private DailySalesSum sum() {
