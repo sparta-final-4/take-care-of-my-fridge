@@ -19,9 +19,10 @@
 
 **캐시**
 
-- `SaleEventFacade.getPopularSales`에 `@Cacheable`을 붙였다. 캐시 이름은 `sale:popular`, 키는 `all`, TTL은 1분이다.
+- `SaleEventFacade.getPopularSales`에 `@Cacheable`을 붙였다. 캐시 이름은 `sale:popular`, 키는 `all`, TTL은 10초다.
 - 비우는 시점은 두지 않고 TTL로만 바꾼다. 번개 드롭은 시작 시각이 되면 보이므로, 등록할 때 비워도 그 시각을 맞출 수 없다.
-- 대가로 품절과 할인 종료가 메인 화면에 최대 1분 늦게 반영된다. 상품 상세와 주문은 캐시를 거치지 않고 판매가와 남은 수량을 실시간으로 확인한다.
+- 대가로 품절, 할인 종료, 번개 드롭 남은 수량("N/M개 남음")이 메인 화면에 최대 10초 늦게 반영된다. 상품 상세와 주문은 캐시를 거치지 않고 판매가와 남은 수량을 실시간으로 확인한다.
+- TTL을 짧게 둔 이유: 부하가 줄어드는 것은 요청마다 하던 집계를 TTL마다 한 번으로 바꾼 데서 오므로, TTL을 더 길게 둬도 DB 부하는 거의 줄지 않는다. 반면 번개 드롭 남은 수량은 몰릴 때 몇 초 단위로 바뀐다.
 - 진행 중 할인이 없는 빈 결과도 캐시한다. 할인이 없는 상태도 정상이라, 빼면 그동안 요청마다 다시 계산한다.
 - 목록은 `PopularSaleList` record로 감싸 캐시한다. 컨트롤러는 `.sales()`로 꺼내므로 API 응답 형식은 바뀌지 않는다.
 - `SaleResponse.endsAt`에 `@JsonFormat(without = ADJUST_DATES_TO_CONTEXT_TIME_ZONE)`을 붙였다. Redis에서 꺼낼 때 Jackson이 `OffsetDateTime`을 UTC로 바꿔, 캐시 적중 응답만 `+09:00` 대신 `Z`로 나가던 것을 막는다. 응답을 만들 때는 영향이 없다.
