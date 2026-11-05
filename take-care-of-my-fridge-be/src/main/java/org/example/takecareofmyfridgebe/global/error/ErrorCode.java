@@ -108,6 +108,14 @@ public enum ErrorCode {
 
     // Payment PIN (등록 카드 결제 비밀번호)
     PAYMENT_PIN_LOCKED(HttpStatus.CONFLICT, "PIN_001", "결제 비밀번호를 5번 틀려 잠겼어요. 로그인 비밀번호로 확인한 뒤 다시 설정해 주세요."),
+    PAYMENT_PIN_NOT_SET(HttpStatus.CONFLICT, "PIN_002", "결제 비밀번호를 먼저 설정해 주세요."),
+    PAYMENT_PIN_MISMATCH(HttpStatus.BAD_REQUEST, "PIN_003", "결제 비밀번호가 맞지 않아요."),
+    PAYMENT_PIN_WEAK(HttpStatus.BAD_REQUEST, "PIN_004", "같은 숫자나 연속된 숫자는 결제 비밀번호로 쓸 수 없어요."),
+    PAYMENT_PIN_ALREADY_SET(HttpStatus.CONFLICT, "PIN_005", "결제 비밀번호가 이미 설정돼 있어요."),
+    LOGIN_PASSWORD_MISMATCH(HttpStatus.BAD_REQUEST, "PIN_006", "로그인 비밀번호가 맞지 않아요."),
+    PAYMENT_PIN_RESET_LIMITED(HttpStatus.TOO_MANY_REQUESTS, "PIN_007", "로그인 비밀번호를 5번 틀렸어요. 최대 30분 뒤에 다시 재설정할 수 있어요."),
+    PAYMENT_PIN_SAME_AS_CURRENT(HttpStatus.BAD_REQUEST, "PIN_008", "현재 결제 비밀번호와 다른 비밀번호를 입력해 주세요."),
+    PAYMENT_PIN_RESET_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "PIN_009", "지금은 결제 비밀번호를 재설정할 수 없어요. 잠시 후 다시 시도해 주세요."),
 
     // Webhook
     INVALID_WEBHOOK_SIGNATURE(HttpStatus.UNAUTHORIZED, "WEBHOOK_001", "웹훅 서명이 유효하지 않습니다."),

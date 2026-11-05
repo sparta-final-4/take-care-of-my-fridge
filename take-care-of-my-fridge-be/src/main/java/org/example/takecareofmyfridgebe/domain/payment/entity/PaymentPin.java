@@ -16,6 +16,7 @@ import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 
 import java.time.LocalDateTime;
+import java.util.stream.IntStream;
 
 // 등록 카드 결제 비밀번호. 회원당 하나이고 원래 값은 저장하지 않고 해시만 둔다.
 // 비밀번호가 맞는지 비교는 서비스가 해시로 하고, 엔티티는 틀린 횟수와 잠김만 관리한다
@@ -87,6 +88,19 @@ public class PaymentPin extends BaseTimeEntity {
         this.pinHash = newPinHash;
         this.failedCount = 0;
         this.lockedAt = null;
+    }
+
+    // 같은 숫자만 쓰거나(111111) 1씩 오르내리는 숫자(123456, 654321)는 쉽게 맞힐 수 있어 거절한다.
+    // 숫자 6자리인지는 요청 DTO가 확인한다
+    public static void validateStrength(String rawPin) {
+        boolean sameDigits = rawPin.chars().distinct().count() == 1;
+        boolean ascending = IntStream.range(1, rawPin.length())
+                .allMatch(i -> rawPin.charAt(i) - rawPin.charAt(i - 1) == 1);
+        boolean descending = IntStream.range(1, rawPin.length())
+                .allMatch(i -> rawPin.charAt(i) - rawPin.charAt(i - 1) == -1);
+        if (sameDigits || ascending || descending) {
+            throw new BusinessException(ErrorCode.PAYMENT_PIN_WEAK);
+        }
     }
 
     private void validateNotLocked() {

@@ -1,7 +1,6 @@
 package org.example.takecareofmyfridgebe.domain.payment.service;
 
 import lombok.RequiredArgsConstructor;
-import org.example.takecareofmyfridgebe.domain.member.repository.MemberRepository;
 import org.example.takecareofmyfridgebe.domain.payment.dto.BillingKeyResponse;
 import org.example.takecareofmyfridgebe.domain.payment.entity.BillingKey;
 import org.example.takecareofmyfridgebe.domain.payment.entity.BillingKeyStatus;
@@ -26,7 +25,7 @@ public class BillingKeyService {
     private static final String CUSTOMER_ID_PREFIX = "member-";
 
     private final BillingKeyRepository billingKeyRepository;
-    private final MemberRepository memberRepository;
+    private final MemberRowLocker memberRowLocker;
 
     // 등록 창을 열기 전에 막는다. 동시 등록은 저장할 때 회원 행 잠금으로 다시 막는다
     public void validateRegistrable(Long memberId) {
@@ -37,7 +36,7 @@ public class BillingKeyService {
     // 카드가 0장이어도 동시 등록을 하나씩 처리하도록 카드 행이 아니라 회원 행을 잠근다. 잠금이 트랜잭션의 첫 조회라 뒤의 조회는 최신 값을 읽는다
     @Transactional
     public BillingKeyResponse register(Long memberId, BillingKeyInfo info) {
-        lockMember(memberId);
+        memberRowLocker.lock(memberId);
 
         // 같은 등록 확정이 두 번 오면 처음 저장한 카드를 돌려준다
         Optional<BillingKey> existing = billingKeyRepository.findByBillingKey(info.billingKey());
@@ -72,7 +71,7 @@ public class BillingKeyService {
     // 대표 카드는 회원당 하나다. 회원 행을 잠가 동시에 지정해도 대표가 둘이 되지 않게 한다
     @Transactional
     public List<BillingKeyResponse> setDefault(Long memberId, Long cardId) {
-        lockMember(memberId);
+        memberRowLocker.lock(memberId);
         BillingKey target = getActiveCard(memberId, cardId);
         if (!target.isDefault()) {
             billingKeyRepository.findCards(memberId, BillingKeyStatus.ACTIVE).stream()
@@ -87,7 +86,7 @@ public class BillingKeyService {
     // 대표 카드를 지웠으면 남은 카드 중 가장 최근에 등록한 카드가 대표를 이어받는다. 삭제한 카드를 돌려준다
     @Transactional
     public BillingKey delete(Long memberId, Long cardId, LocalDateTime deletedAt) {
-        lockMember(memberId);
+        memberRowLocker.lock(memberId);
         BillingKey card = getActiveCard(memberId, cardId);
         boolean wasDefault = card.isDefault();
         card.delete(deletedAt);
@@ -131,12 +130,6 @@ public class BillingKeyService {
         } catch (NumberFormatException e) {
             return Optional.empty();
         }
-    }
-
-    // 회원 단위로 카드 변경을 하나씩 처리한다. 잠금이 트랜잭션의 첫 조회라 뒤의 조회는 최신 값을 읽는다
-    private void lockMember(Long memberId) {
-        memberRepository.findByIdForUpdate(memberId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
     }
 
     // 남의 카드·삭제한 카드·없는 카드는 구분하지 않고 같은 오류로 답한다

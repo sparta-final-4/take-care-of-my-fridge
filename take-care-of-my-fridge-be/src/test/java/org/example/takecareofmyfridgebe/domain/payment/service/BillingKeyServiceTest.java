@@ -29,7 +29,7 @@ import static org.assertj.core.api.Assertions.tuple;
 
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({JpaAuditingConfig.class, QueryDslConfig.class, BillingKeyService.class})
+@Import({JpaAuditingConfig.class, QueryDslConfig.class, BillingKeyService.class, MemberRowLocker.class})
 class BillingKeyServiceTest extends MySqlContainerSupport {
 
     private static final LocalDateTime NOW = LocalDateTime.of(2026, 11, 4, 12, 0);

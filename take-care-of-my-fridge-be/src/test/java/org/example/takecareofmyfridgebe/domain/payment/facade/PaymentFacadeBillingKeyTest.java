@@ -16,6 +16,7 @@ import org.example.takecareofmyfridgebe.domain.payment.port.PaymentGatewayRespon
 import org.example.takecareofmyfridgebe.domain.payment.service.BillingKeyService;
 import org.example.takecareofmyfridgebe.domain.payment.service.PaymentCommandService;
 import org.example.takecareofmyfridgebe.domain.payment.service.PaymentHistoryRecorder;
+import org.example.takecareofmyfridgebe.domain.payment.service.PaymentPinService;
 import org.example.takecareofmyfridgebe.domain.payment.service.PaymentService;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
@@ -23,6 +24,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -43,6 +45,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -59,7 +62,7 @@ class PaymentFacadeBillingKeyTest {
     private static final String BILLING_KEY = "billing-key-1";
     private static final long AMOUNT = 10000L;
     private static final LocalDateTime EXPIRES_AT = LocalDateTime.now().plusMinutes(10);
-    private static final BillingKeyPaymentRequest REQUEST = new BillingKeyPaymentRequest(CARD_ID);
+    private static final BillingKeyPaymentRequest REQUEST = new BillingKeyPaymentRequest(CARD_ID, "271828");
 
     @Mock
     private PaymentService paymentService;
@@ -78,6 +81,9 @@ class PaymentFacadeBillingKeyTest {
 
     @Mock
     private BillingKeyGateway billingKeyGateway;
+
+    @Mock
+    private PaymentPinService paymentPinService;
 
     @InjectMocks
     private PaymentFacade paymentFacade;
@@ -245,5 +251,33 @@ class PaymentFacadeBillingKeyTest {
         assertError(ErrorCode.PAYMENT_ORDER_NOT_PAYABLE);
         verify(billingKeyService, never()).getUsableCard(anyLong(), anyLong());
         verify(paymentCommandService, never()).create(anyLong(), any(), any());
+    }
+
+    @Test
+    @DisplayName("결제 비밀번호를 확인한 뒤에 결제를 만들고 PortOne에 청구한다")
+    void payWithBillingKey_verifyPinBeforeCharge() {
+        givenPay(BillingKeyPayResult.PAID);
+        givenPgPaid(AMOUNT);
+        givenApproved();
+
+        paymentFacade.payWithBillingKey(MEMBER_ID, ORDER_ID, REQUEST);
+
+        InOrder inOrder = inOrder(paymentPinService, paymentCommandService,
+                billingKeyGateway);
+        inOrder.verify(paymentPinService).verify(MEMBER_ID, "271828");
+        inOrder.verify(paymentCommandService).create(ORDER_ID, PgProvider.TOSSPAYMENTS, card);
+        inOrder.verify(billingKeyGateway).pay(anyString(), anyString(), anyString(), anyLong(), anyString());
+    }
+
+    @Test
+    @DisplayName("결제 비밀번호가 틀리면 결제를 만들지 않고 PortOne에도 청구하지 않는다")
+    void payWithBillingKey_notCharge_whenPinMismatch() {
+        willThrow(new BusinessException(ErrorCode.PAYMENT_PIN_MISMATCH))
+                .given(paymentPinService).verify(MEMBER_ID, "271828");
+
+        assertError(ErrorCode.PAYMENT_PIN_MISMATCH);
+
+        verify(paymentCommandService, never()).create(anyLong(), any(), any());
+        verify(billingKeyGateway, never()).pay(anyString(), anyString(), anyString(), anyLong(), anyString());
     }
 }
