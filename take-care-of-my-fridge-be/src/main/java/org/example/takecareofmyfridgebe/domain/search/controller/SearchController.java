@@ -7,6 +7,7 @@ import org.example.takecareofmyfridgebe.domain.product.dto.ProductListItemRespon
 import org.example.takecareofmyfridgebe.domain.product.dto.ProductListRequest;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeListItemResponse;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeListRequest;
+import org.example.takecareofmyfridgebe.domain.search.dto.PopularKeywordsResponse;
 import org.example.takecareofmyfridgebe.domain.search.dto.SearchClickRequest;
 import org.example.takecareofmyfridgebe.domain.search.dto.SearchFridgeMatchRequest;
 import org.example.takecareofmyfridgebe.domain.search.dto.SearchFridgeMatchResponse;
@@ -16,6 +17,7 @@ import org.example.takecareofmyfridgebe.domain.search.facade.ProductSearchFacade
 import org.example.takecareofmyfridgebe.domain.search.facade.RecipeSearchFacade;
 import org.example.takecareofmyfridgebe.domain.search.facade.SearchFridgeMatchFacade;
 import org.example.takecareofmyfridgebe.domain.search.service.SearchClickHistoryService;
+import org.example.takecareofmyfridgebe.domain.search.service.SearchPopularKeywordService;
 import org.example.takecareofmyfridgebe.global.response.ApiResponse;
 import org.example.takecareofmyfridgebe.global.response.PageResponse;
 import org.springframework.http.ResponseEntity;
@@ -38,12 +40,15 @@ public class SearchController {
     private final ProductSearchFacade productSearchFacade;
     private final SearchClickHistoryService searchClickHistoryService;
     private final SearchFridgeMatchFacade searchFridgeMatchFacade;
+    private final SearchPopularKeywordService searchPopularKeywordService;
 
     @GetMapping("/recipes")
     public ResponseEntity<ApiResponse<PageResponse<RecipeListItemResponse>>> searchRecipes(
+            @AuthenticationPrincipal AuthSessionService.AuthPrincipal principal,
             @Valid @ModelAttribute RecipeListRequest request
     ) {
-        PageResponse<RecipeListItemResponse> recipes = recipeSearchFacade.getRecipes(request);
+        PageResponse<RecipeListItemResponse> recipes =
+                recipeSearchFacade.getRecipes(request, principal == null ? null : principal.memberId());
         return ResponseEntity.ok(ApiResponse.ok(recipes));
     }
 
@@ -61,6 +66,12 @@ public class SearchController {
     ) {
         List<String> suggestions = recipeSearchFacade.suggestNames(request.keyword());
         return ResponseEntity.ok(ApiResponse.ok(suggestions));
+    }
+
+    @GetMapping("/popular")
+    public ResponseEntity<ApiResponse<PopularKeywordsResponse>> getPopularKeywords() {
+        PopularKeywordsResponse keywords = searchPopularKeywordService.getTopKeywords();
+        return ResponseEntity.ok(ApiResponse.ok(keywords));
     }
 
     // 로그인 회원만 (SecurityConfig)

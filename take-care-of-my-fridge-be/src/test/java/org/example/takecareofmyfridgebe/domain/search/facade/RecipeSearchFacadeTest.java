@@ -7,6 +7,7 @@ import org.example.takecareofmyfridgebe.domain.search.config.RecipeSearchPropert
 import org.example.takecareofmyfridgebe.domain.search.dto.RecipeSearchResult;
 import org.example.takecareofmyfridgebe.domain.search.entity.SearchTarget;
 import org.example.takecareofmyfridgebe.domain.search.service.RecipeSearchService;
+import org.example.takecareofmyfridgebe.domain.search.service.SearchPopularKeywordService;
 import org.example.takecareofmyfridgebe.domain.search.service.SearchZeroResultService;
 import org.example.takecareofmyfridgebe.global.response.PageResponse;
 import org.junit.jupiter.api.DisplayName;
@@ -41,6 +42,8 @@ class RecipeSearchFacadeTest {
     private RecipeSearchProperties searchProperties;
     @Mock
     private SearchZeroResultService searchZeroResultService;
+    @Mock
+    private SearchPopularKeywordService searchPopularKeywordService;
     @InjectMocks
     private RecipeSearchFacade facade;
 
@@ -60,7 +63,7 @@ class RecipeSearchFacadeTest {
         when(recipeService.getRecipes(request)).thenReturn(page);
 
         // When & Then
-        assertThat(facade.getRecipes(request)).isSameAs(page);
+        assertThat(facade.getRecipes(request, null)).isSameAs(page);
         verify(recipeSearchService, never()).search(any());
     }
 
@@ -72,7 +75,7 @@ class RecipeSearchFacadeTest {
         when(recipeService.getRecipes(request)).thenReturn(page);
 
         // When & Then
-        assertThat(facade.getRecipes(request)).isSameAs(page);
+        assertThat(facade.getRecipes(request, null)).isSameAs(page);
         verify(recipeSearchService, never()).search(any());
     }
 
@@ -86,7 +89,7 @@ class RecipeSearchFacadeTest {
         when(recipeService.getRecipesByIds(List.of(5L, 2L), 12, request)).thenReturn(page);
 
         // When & Then
-        assertThat(facade.getRecipes(request)).isSameAs(page);
+        assertThat(facade.getRecipes(request, null)).isSameAs(page);
         verify(recipeService, never()).getRecipes(any());
     }
 
@@ -100,7 +103,7 @@ class RecipeSearchFacadeTest {
         when(recipeService.getRecipes(request)).thenReturn(page);
 
         // When & Then
-        assertThat(facade.getRecipes(request)).isSameAs(page);
+        assertThat(facade.getRecipes(request, null)).isSameAs(page);
         verify(recipeService, never()).getRecipesByIds(anyList(), anyLong(), any());
     }
 
@@ -112,7 +115,7 @@ class RecipeSearchFacadeTest {
         when(recipeService.getRecipes(request)).thenReturn(emptyPage(1));
 
         // When
-        facade.getRecipes(request);
+        facade.getRecipes(request, null);
 
         // Then
         verify(searchZeroResultService).record(SearchTarget.RECIPE, "김치");
@@ -126,7 +129,7 @@ class RecipeSearchFacadeTest {
         when(recipeService.getRecipes(request)).thenReturn(new PageResponse<>(List.of(), 1, 20, 3, 1, true));
 
         // When
-        facade.getRecipes(request);
+        facade.getRecipes(request, null);
 
         // Then
         verifyNoInteractions(searchZeroResultService);
@@ -140,7 +143,7 @@ class RecipeSearchFacadeTest {
         when(recipeService.getRecipes(request)).thenReturn(emptyPage(1));
 
         // When
-        facade.getRecipes(request);
+        facade.getRecipes(request, null);
 
         // Then
         verifyNoInteractions(searchZeroResultService);
@@ -154,10 +157,45 @@ class RecipeSearchFacadeTest {
         when(recipeService.getRecipes(request)).thenReturn(emptyPage(2));
 
         // When
-        facade.getRecipes(request);
+        facade.getRecipes(request, null);
 
         // Then
         verifyNoInteractions(searchZeroResultService);
+    }
+
+    @Test
+    @DisplayName("필터 없이 첫 페이지 결과가 있으면 회원 ID와 검색어로 인기 검색어를 센다")
+    void getRecipes_recordsPopularKeyword_whenHitsExist() {
+        // Given
+        RecipeListRequest request = request("김치");
+        when(recipeService.getRecipes(request)).thenReturn(new PageResponse<>(List.of(), 1, 20, 3, 1, true));
+
+        // When
+        facade.getRecipes(request, 7L);
+
+        // Then
+        verify(searchPopularKeywordService).record(7L, "김치");
+    }
+
+    @Test
+    @DisplayName("결과가 0건이거나 필터를 걸었거나 2페이지 이후면 인기 검색어로 세지 않는다")
+    void getRecipes_skipsPopularKeyword_whenZeroOrFilteredOrNotFirstPage() {
+        // Given
+        RecipeListRequest zero = request("김치");
+        RecipeListRequest filtered = new RecipeListRequest(null, "김치", "한식", null, null, null, null, null);
+        RecipeListRequest secondPage = new RecipeListRequest(null, "김치", null, null, null, null, 2, null);
+        PageResponse<RecipeListItemResponse> hits = new PageResponse<>(List.of(), 1, 20, 3, 1, true);
+        when(recipeService.getRecipes(zero)).thenReturn(emptyPage(1));
+        when(recipeService.getRecipes(filtered)).thenReturn(hits);
+        when(recipeService.getRecipes(secondPage)).thenReturn(hits);
+
+        // When
+        facade.getRecipes(zero, 7L);
+        facade.getRecipes(filtered, 7L);
+        facade.getRecipes(secondPage, 7L);
+
+        // Then
+        verifyNoInteractions(searchPopularKeywordService);
     }
 
     @Test
