@@ -6,6 +6,9 @@ import {
   getErrorCode,
   getErrorMessage,
   getImageUploadErrorMessage,
+  getPaymentPinErrorField,
+  getPaymentPinErrorMessage,
+  isPaymentPinError,
 } from './errors';
 
 function responseError(status: number, data: unknown) {
@@ -102,5 +105,40 @@ describe('getChatErrorInfo', () => {
     expect(getChatErrorInfo('CHAT_012')).toEqual({
       message: '답을 받다가 끊겼어요. 다시 보내 주세요',
     });
+  });
+});
+
+describe('결제 비밀번호 오류', () => {
+  const pinError = (code: string) =>
+    responseError(400, { success: false, data: null, error: { code, message: '오류' } });
+
+  it('PIN_ 코드만 결제 비밀번호 오류로 본다', () => {
+    expect(isPaymentPinError(pinError('PIN_003'))).toBe(true);
+    expect(isPaymentPinError(pinError('PAYMENT_010'))).toBe(false);
+    expect(isPaymentPinError(new Error('failed'))).toBe(false);
+  });
+
+  it('서버 오류를 보여 줄 입력 칸을 고른다', () => {
+    expect(getPaymentPinErrorField(pinError('PIN_003'))).toBe('currentPin');
+    expect(getPaymentPinErrorField(pinError('PIN_004'))).toBe('newPin');
+    expect(getPaymentPinErrorField(pinError('PIN_008'))).toBe('newPin');
+    expect(getPaymentPinErrorField(pinError('PIN_006'))).toBe('loginPassword');
+  });
+
+  it('잠김·재설정 제한처럼 칸에 붙일 수 없는 오류는 칸을 고르지 않는다', () => {
+    expect(getPaymentPinErrorField(pinError('PIN_001'))).toBeUndefined();
+    expect(getPaymentPinErrorField(pinError('PIN_007'))).toBeUndefined();
+  });
+
+  it('PIN_009(503)는 공통 서버 오류 대신 재설정 안내를 쓴다', () => {
+    const error = responseError(503, {
+      success: false,
+      data: null,
+      error: { code: 'PIN_009', message: '지금은 재설정할 수 없어요.' },
+    });
+    expect(getPaymentPinErrorMessage(error)).toBe(
+      '지금은 결제 비밀번호를 재설정할 수 없어요. 잠시 후 다시 시도해 주세요.',
+    );
+    expect(getPaymentPinErrorMessage(pinError('PIN_003'))).toBe('오류');
   });
 });

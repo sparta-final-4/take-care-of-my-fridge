@@ -2480,6 +2480,112 @@
         ]
       }
     },
+    "/api/payment-pin": {
+      "get": {
+        "operationId": "getStatus",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePaymentPinStatusResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "payment-pin-controller"
+        ]
+      },
+      "patch": {
+        "operationId": "change",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PaymentPinChangeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "payment-pin-controller"
+        ]
+      },
+      "post": {
+        "operationId": "set",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PaymentPinSetRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "payment-pin-controller"
+        ]
+      }
+    },
+    "/api/payment-pin/reset": {
+      "post": {
+        "operationId": "reset",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PaymentPinResetRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "payment-pin-controller"
+        ]
+      }
+    },
     "/api/payments/confirm": {
       "post": {
         "operationId": "confirm",
@@ -4025,6 +4131,20 @@
           }
         }
       },
+      "ApiResponsePaymentPinStatusResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/PaymentPinStatusResponse"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorResponse"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
       "ApiResponsePaymentPrepareResponse": {
         "type": "object",
         "properties": {
@@ -4368,10 +4488,15 @@
           "cardId": {
             "type": "integer",
             "format": "int64"
+          },
+          "pin": {
+            "type": "string",
+            "pattern": "\\d{6}"
           }
         },
         "required": [
-          "cardId"
+          "cardId",
+          "pin"
         ]
       },
       "BillingKeyPrepareResponse": {
@@ -6992,6 +7117,67 @@
               "PAID",
               "FAILED"
             ]
+          }
+        }
+      },
+      "PaymentPinChangeRequest": {
+        "type": "object",
+        "properties": {
+          "currentPin": {
+            "type": "string",
+            "pattern": "\\d{6}"
+          },
+          "newPin": {
+            "type": "string",
+            "pattern": "\\d{6}"
+          }
+        },
+        "required": [
+          "currentPin",
+          "newPin"
+        ]
+      },
+      "PaymentPinResetRequest": {
+        "type": "object",
+        "properties": {
+          "loginPassword": {
+            "type": "string",
+            "minLength": 1
+          },
+          "newPin": {
+            "type": "string",
+            "pattern": "\\d{6}"
+          }
+        },
+        "required": [
+          "loginPassword",
+          "newPin"
+        ]
+      },
+      "PaymentPinSetRequest": {
+        "type": "object",
+        "properties": {
+          "pin": {
+            "type": "string",
+            "pattern": "\\d{6}"
+          }
+        },
+        "required": [
+          "pin"
+        ]
+      },
+      "PaymentPinStatusResponse": {
+        "type": "object",
+        "properties": {
+          "isLocked": {
+            "type": "boolean"
+          },
+          "isSet": {
+            "type": "boolean"
+          },
+          "remainingAttempts": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },

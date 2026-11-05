@@ -21,6 +21,7 @@ import {
   NotificationControllerApi,
   OrderControllerApi,
   PaymentControllerApi,
+  PaymentPinControllerApi,
   PopularRecipeControllerApi,
   ProductControllerApi,
   RecipeControllerApi,
@@ -54,6 +55,7 @@ export const myRecipeApi = new MyRecipeControllerApi(undefined, basePath, axiosI
 export const notificationApi = new NotificationControllerApi(undefined, basePath, axiosInstance);
 export const orderApi = new OrderControllerApi(undefined, basePath, axiosInstance);
 export const paymentApi = new PaymentControllerApi(undefined, basePath, axiosInstance);
+export const paymentPinApi = new PaymentPinControllerApi(undefined, basePath, axiosInstance);
 export const popularRecipeApi = new PopularRecipeControllerApi(undefined, basePath, axiosInstance);
 export const productApi = new ProductControllerApi(undefined, basePath, axiosInstance);
 export const recipeApi = new RecipeControllerApi(undefined, basePath, axiosInstance);

@@ -1,6 +1,17 @@
 import { CreditCardOutlined, PlusOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { App, Button, Empty, Flex, Popconfirm, Result, Skeleton, Tag, Typography } from 'antd';
+import {
+  App,
+  Button,
+  Divider,
+  Empty,
+  Flex,
+  Popconfirm,
+  Result,
+  Skeleton,
+  Tag,
+  Typography,
+} from 'antd';
 import dayjs from 'dayjs';
 
 import { ROUTES } from '@/app/paths';
@@ -16,9 +27,10 @@ import {
 import { useCardRegistration } from '@/domains/payment/hooks/useCardRegistration';
 import { billingKeyQueries } from '@/domains/payment/queries';
 
+import { PaymentPinSetting } from './PaymentPinSetting';
 import styles from './CardManageSection.module.scss';
 
-// 등록 카드 목록과 카드 등록·대표 카드 지정·삭제. 카드 번호는 결제대행사 창에서만 입력하고 우리는 빌링키만 넘긴다.
+// 등록 카드 목록과 카드 등록·대표 카드 지정·삭제, 결제 비밀번호 설정. 카드 번호는 결제대행사 창에서만 입력하고 우리는 빌링키만 넘긴다.
 export function CardManageSection() {
   const { message } = App.useApp();
   const queryClient = useQueryClient();
@@ -137,6 +149,8 @@ export function CardManageSection() {
           )}
         </Flex>
       )}
+      <Divider />
+      <PaymentPinSetting />
     </SectionCard>
   );
 }

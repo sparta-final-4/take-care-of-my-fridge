@@ -1,0 +1,23 @@
+@use '@/styles/mixins' as *;
+
+// 모바일은 상태 / 버튼 두 단, md부터 한 행에 둔다
+.setting {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ant-margin-sm);
+
+  @include from(md) {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--ant-margin);
+  }
+}
+
+.info {
+  min-width: 0;
+}
+
+.actions {
+  flex-shrink: 0;
+}

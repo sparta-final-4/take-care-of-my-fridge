@@ -46,6 +46,36 @@ export function getImageUploadErrorMessage(error: unknown) {
   return '이미지를 올리지 못했습니다. 잠시 후 다시 시도해 주세요.';
 }
 
+// 결제 비밀번호 오류(PIN_*). 등록 카드 결제에서는 결제 창을 닫지 않고 비밀번호 입력 칸에 보여 준다
+export function isPaymentPinError(error: unknown) {
+  return getErrorCode(error)?.startsWith('PIN_') ?? false;
+}
+
+// 결제 비밀번호 요청 오류 문구. PIN_009(재설정 횟수를 셀 수 없음)는 503이라 공통 서버 오류 대신 재설정 안내를 쓴다
+export function getPaymentPinErrorMessage(error: unknown) {
+  if (getErrorCode(error) === 'PIN_009') {
+    return '지금은 결제 비밀번호를 재설정할 수 없어요. 잠시 후 다시 시도해 주세요.';
+  }
+  return getErrorMessage(error);
+}
+
+// 결제 비밀번호 설정·변경·재설정 폼에서 서버 오류를 보여 줄 입력 칸. 칸에 붙일 수 없는 오류(잠김·재설정 제한 등)는 undefined다
+export function getPaymentPinErrorField(
+  error: unknown,
+): 'currentPin' | 'newPin' | 'loginPassword' | undefined {
+  switch (getErrorCode(error)) {
+    case 'PIN_003': // 현재 결제 비밀번호 틀림
+      return 'currentPin';
+    case 'PIN_004': // 같은 숫자·연속된 숫자
+    case 'PIN_008': // 현재와 같은 비밀번호
+      return 'newPin';
+    case 'PIN_006': // 로그인 비밀번호 틀림
+      return 'loginPassword';
+    default:
+      return undefined;
+  }
+}
+
 export function getErrorMessage(error: unknown) {
   if (!isAxiosError(error)) return DEFAULT_MESSAGE;
 
