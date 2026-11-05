@@ -6,8 +6,10 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class PaymentPinTest {
@@ -95,5 +97,18 @@ class PaymentPinTest {
         assertThat(pin.getLockedAt()).isNull();
         assertThat(pin.getPinHash()).isEqualTo("hash-3");
         assertThat(pin.getFailedCount()).isZero();
+    }
+
+    @Test
+    @DisplayName("같은 숫자만 쓰거나 1씩 오르내리는 숫자는 쉬운 비밀번호로 거절하고 그 밖은 받는다")
+    void validateStrength_throwException_whenWeak() {
+        for (String weak : List.of("000000", "123456", "345678", "654321", "987654")) {
+            assertThatThrownBy(() -> PaymentPin.validateStrength(weak))
+                    .isInstanceOf(BusinessException.class)
+                    .extracting("errorCode").isEqualTo(ErrorCode.PAYMENT_PIN_WEAK);
+        }
+        for (String ok : List.of("271828", "112233", "098765", "135790")) {
+            assertThatCode(() -> PaymentPin.validateStrength(ok)).doesNotThrowAnyException();
+        }
     }
 }

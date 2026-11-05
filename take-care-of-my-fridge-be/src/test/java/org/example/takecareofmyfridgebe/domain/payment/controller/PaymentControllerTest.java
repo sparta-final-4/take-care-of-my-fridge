@@ -255,13 +255,13 @@ class PaymentControllerTest {
     void payWithBillingKey_success() throws Exception {
         PaymentConfirmResponse response = new PaymentConfirmResponse(10L, 1L, PORTONE_PAYMENT_ID, 15000L,
                 PaymentStatus.PAID, LocalDateTime.of(2026, 11, 4, 10, 0), PgProvider.TOSSPAYMENTS);
-        when(paymentFacade.payWithBillingKey(MEMBER_ID, 1L, new BillingKeyPaymentRequest(7L))).thenReturn(response);
+        when(paymentFacade.payWithBillingKey(MEMBER_ID, 1L, new BillingKeyPaymentRequest(7L, "271828"))).thenReturn(response);
 
         mvc.perform(post("/api/orders/1/payments/billing-key")
                         .with(csrf())
                         .with(loginUser())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"cardId\":7}"))
+                        .content("{\"cardId\":7,\"pin\":\"271828\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value("PAID"))
                 .andExpect(jsonPath("$.data.pgProvider").value("TOSSPAYMENTS"));
@@ -291,9 +291,23 @@ class PaymentControllerTest {
                         .with(csrf())
                         .with(loginUser())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"cardId\":7}"))
+                        .content("{\"cardId\":7,\"pin\":\"271828\"}"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.error.code").value(ErrorCode.BILLING_PAYMENT_REJECTED.getCode()));
+    }
+
+    @Test
+    @DisplayName("결제 비밀번호가 숫자 6자리가 아니면 Facade를 호출하지 않고 400(C001)을 반환한다")
+    void payWithBillingKey_returnBadRequest_whenPinInvalid() throws Exception {
+        mvc.perform(post("/api/orders/1/payments/billing-key")
+                        .with(csrf())
+                        .with(loginUser())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"cardId\":7,\"pin\":\"1234\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value(ErrorCode.INVALID_INPUT_VALUE.getCode()));
+
+        verifyNoInteractions(paymentFacade);
     }
 
     private static RequestPostProcessor loginUser() {

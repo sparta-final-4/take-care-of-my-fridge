@@ -35,7 +35,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 // 테스트 자체 트랜잭션을 끄고(NOT_SUPPORTED) 서비스의 트랜잭션 경계로 커밋된 상태를 다시 읽어 확인한다.
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({JpaAuditingConfig.class, QueryDslConfig.class, BillingKeyService.class})
+@Import({JpaAuditingConfig.class, QueryDslConfig.class, BillingKeyService.class, MemberRowLocker.class})
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class BillingKeyServiceConcurrencyTest extends MySqlContainerSupport {
 

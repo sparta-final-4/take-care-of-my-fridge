@@ -23,6 +23,7 @@ import org.example.takecareofmyfridgebe.domain.payment.port.PaymentGatewayRespon
 import org.example.takecareofmyfridgebe.domain.payment.service.BillingKeyService;
 import org.example.takecareofmyfridgebe.domain.payment.service.PaymentCommandService;
 import org.example.takecareofmyfridgebe.domain.payment.service.PaymentHistoryRecorder;
+import org.example.takecareofmyfridgebe.domain.payment.service.PaymentPinService;
 import org.example.takecareofmyfridgebe.domain.payment.service.PaymentService;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
@@ -47,6 +48,7 @@ public class PaymentFacade {
     private final PaymentHistoryRecorder paymentHistoryRecorder;
     private final BillingKeyService billingKeyService;
     private final BillingKeyGateway billingKeyGateway;
+    private final PaymentPinService paymentPinService;
 
     // 결제하기를 누를 때 프론트가 호출한다. 응답의 portonePaymentId와 고른 결제대행사의 채널 값으로 결제창을 띄운다.
     // 창 닫기 요청이 오지 않아 결제 대기로 남은 이전 결제가 있으면 정리한 뒤 새 결제를 만든다.
@@ -85,6 +87,8 @@ public class PaymentFacade {
     public PaymentConfirmResponse payWithBillingKey(Long memberId, Long orderId, BillingKeyPaymentRequest request) {
         paymentService.validatePayableOrder(memberId, orderId);
         BillingKey card = billingKeyService.getUsableCard(memberId, request.cardId());
+        // PortOne에 청구하기 전에 확인한다. 틀리면 결제를 만들지 않고, 틀린 횟수는 따로 커밋된다
+        paymentPinService.verify(memberId, request.pin());
         closePreviousReady(orderId);
 
         // 빌링키는 토스페이먼츠 정기결제 채널로 발급했다. 승인할 때 PG가 알려 준 실제 결제대행사로 고친다
