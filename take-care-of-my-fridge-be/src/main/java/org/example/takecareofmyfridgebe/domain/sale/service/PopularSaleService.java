@@ -9,11 +9,10 @@ import org.example.takecareofmyfridgebe.domain.sale.dto.ActiveSale;
 import org.example.takecareofmyfridgebe.domain.sale.dto.PopularSaleProduct;
 import org.example.takecareofmyfridgebe.domain.sale.dto.SellingPrice;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 // 메인 화면에 보여 줄 인기 특가를 고른다. 진행 중인 특가·번개 드롭 중 지금 살 수 있는 상품을 최근 검색 클릭이 많은 순으로 둔다.
+// DB를 읽지 않고 넘겨받은 값으로 계산만 하므로 트랜잭션을 두지 않는다.
 @Service
-@Transactional(readOnly = true)
 public class PopularSaleService {
 
     private static final int LIMIT = 6;

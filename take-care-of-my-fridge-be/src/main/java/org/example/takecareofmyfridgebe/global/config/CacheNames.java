@@ -8,6 +8,7 @@ public final class CacheNames {
 
     public static final String RECIPE_CLASSIFICATIONS = "recipe:classifications";
     public static final String POPULAR_RECIPES = "recipe:popular";
+    public static final String POPULAR_SALES = "sale:popular";
 
     private CacheNames() {
     }
