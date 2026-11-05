@@ -12,6 +12,7 @@ import java.time.ZoneOffset;
 import java.util.List;
 import org.example.takecareofmyfridgebe.domain.auth.service.AuthSessionService;
 import org.example.takecareofmyfridgebe.domain.auth.service.JwtTokenService;
+import org.example.takecareofmyfridgebe.domain.sale.dto.PopularSaleList;
 import org.example.takecareofmyfridgebe.domain.sale.dto.PopularSaleResponse;
 import org.example.takecareofmyfridgebe.domain.sale.dto.SaleResponse;
 import org.example.takecareofmyfridgebe.domain.sale.entity.SaleEventType;
@@ -50,7 +51,7 @@ class SaleControllerTest {
         SaleResponse sale = new SaleResponse(SaleEventType.SPECIAL, 1600, 20,
                 OffsetDateTime.of(2026, 11, 1, 18, 0, 0, 0, ZoneOffset.ofHours(9)), null, null);
         when(saleEventFacade.getPopularSales())
-                .thenReturn(List.of(new PopularSaleResponse(1L, "두부", "https://img.test/tofu.png", 2000, sale)));
+                .thenReturn(new PopularSaleList(List.of(new PopularSaleResponse(1L, "두부", "https://img.test/tofu.png", 2000, sale))));
 
         // when & then
         mvc.perform(get("/api/sales/popular"))
