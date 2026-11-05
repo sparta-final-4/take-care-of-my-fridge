@@ -76,7 +76,7 @@ class SaleEventFacadeCacheIntegrationTest extends RedisContainerSupport {
 
     @Test
     @DisplayName("두 번째 호출은 캐시에서 꺼내므로 진행 중 할인·상품·검색 클릭을 다시 읽지 않는다")
-    void readsOnceWhenCalledTwice() {
+    void readsOnce_whenCalledTwice() {
         // given
         givenOneActiveSale();
 
@@ -93,7 +93,7 @@ class SaleEventFacadeCacheIntegrationTest extends RedisContainerSupport {
 
     @Test
     @DisplayName("캐시에서 꺼낸 결과는 첫 호출과 같고, 종료 시각이 +09:00으로 남는다")
-    void keepsSameResultFromCache() {
+    void keepsSameResultAndOffset_whenReadFromCache() {
         // given
         givenOneActiveSale();
 
@@ -110,7 +110,7 @@ class SaleEventFacadeCacheIntegrationTest extends RedisContainerSupport {
 
     @Test
     @DisplayName("진행 중 할인이 없는 빈 결과도 캐시해 두 번째 호출은 진행 중 할인을 다시 읽지 않는다")
-    void cachesEmptyResult() {
+    void cachesEmptyResult_whenNoActiveSale() {
         // given
         when(saleEventReader.findAllActiveSales()).thenReturn(Map.of());
 
