@@ -30,6 +30,9 @@ public class SaleEventFacade {
     // 메인 화면 인기 특가. 진행 중인 할인, 상품, 최근 검색 클릭을 모아 인기 특가 서비스에 넘기고 특가 카드 모양으로 내려 준다.
     public List<PopularSaleResponse> getPopularSales() {
         Map<Long, ActiveSale> salesByProductId = saleEventReader.findAllActiveSales();
+        if (salesByProductId.isEmpty()) {
+            return List.of();
+        }
         List<Product> products = productService.getProductsByIds(List.copyOf(salesByProductId.keySet()));
         LocalDateTime now = LocalDateTime.now(SaleEvent.ZONE);
         LocalDate today = now.toLocalDate();
