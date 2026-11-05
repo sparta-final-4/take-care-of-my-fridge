@@ -269,6 +269,7 @@ models/search-fridge-match-request.ts
 models/search-fridge-match-response.ts
 models/search-recipe-click-request.ts
 models/search-suggestion-request.ts
+models/settlement-method-response.ts
 models/settlement-payment-response.ts
 models/settlement-payment-search-request.ts
 models/settlement-period-response.ts

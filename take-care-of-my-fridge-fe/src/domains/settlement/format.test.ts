@@ -2,7 +2,15 @@ import dayjs from 'dayjs';
 import 'dayjs/locale/ko';
 import { beforeAll, describe, expect, it } from 'vitest';
 
-import { formatCount, formatPeriod, formatPeriodShort, formatWon } from './format';
+import type { PgProvider } from '@/domains/payment/pgProvider';
+
+import {
+  formatCount,
+  formatPaymentMethod,
+  formatPeriod,
+  formatPeriodShort,
+  formatWon,
+} from './format';
 
 const week = { startDate: '2026-10-12', endDate: '2026-10-18' };
 
@@ -32,5 +40,30 @@ describe('정산 표기', () => {
       '10.07',
     );
     expect(formatPeriodShort('WEEK', week)).toBe('10.12~');
+  });
+});
+
+describe('결제 수단 표기', () => {
+  it('등록 카드 결제는 결제대행사와 관계없이 등록 카드로 보인다', () => {
+    expect(formatPaymentMethod({ registeredCard: true, pgProvider: 'TOSSPAYMENTS' })).toBe(
+      '등록 카드',
+    );
+  });
+
+  it('결제창 결제는 결제대행사 이름으로 보인다', () => {
+    expect(formatPaymentMethod({ registeredCard: false, pgProvider: 'KAKAOPAY' })).toBe(
+      '카카오페이',
+    );
+    expect(formatPaymentMethod({ registeredCard: false, pgProvider: 'TOSSPAYMENTS' })).toBe(
+      '토스페이먼츠',
+    );
+  });
+
+  it('결제대행사가 없으면 빈칸(-)이다', () => {
+    expect(formatPaymentMethod({})).toBe('-');
+  });
+
+  it('이름을 모르는 결제대행사는 코드값을 그대로 보인다', () => {
+    expect(formatPaymentMethod({ pgProvider: 'NEWPG' as PgProvider })).toBe('NEWPG');
   });
 });

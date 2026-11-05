@@ -22,6 +22,19 @@ export interface SettlementPaymentResponse {
     'paidAmount'?: number;
     'paidAt'?: string;
     'paymentId'?: number;
+    'pgProvider'?: SettlementPaymentResponsePgProviderEnum;
     'refundedAmount'?: number;
+    'registeredCard'?: boolean;
 }
+
+export const SettlementPaymentResponsePgProviderEnum = {
+    Kakaopay: 'KAKAOPAY',
+    Kicc: 'KICC',
+    Inicis: 'INICIS',
+    Tosspayments: 'TOSSPAYMENTS',
+    Tosspay: 'TOSSPAY',
+} as const;
+
+export type SettlementPaymentResponsePgProviderEnum = typeof SettlementPaymentResponsePgProviderEnum[keyof typeof SettlementPaymentResponsePgProviderEnum];
+
 

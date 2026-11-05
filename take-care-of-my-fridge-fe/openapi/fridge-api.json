@@ -9071,6 +9071,44 @@
         ]
       },
       "ServerSentEventString": {},
+      "SettlementMethodResponse": {
+        "type": "object",
+        "properties": {
+          "netAmount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "paidAmount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "paidCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pgProvider": {
+            "type": "string",
+            "enum": [
+              "KAKAOPAY",
+              "KICC",
+              "INICIS",
+              "TOSSPAYMENTS",
+              "TOSSPAY"
+            ]
+          },
+          "refundedAmount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "refundedCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "registeredCard": {
+            "type": "boolean"
+          }
+        }
+      },
       "SettlementPaymentResponse": {
         "type": "object",
         "properties": {
@@ -9096,9 +9134,22 @@
             "type": "integer",
             "format": "int64"
           },
+          "pgProvider": {
+            "type": "string",
+            "enum": [
+              "KAKAOPAY",
+              "KICC",
+              "INICIS",
+              "TOSSPAYMENTS",
+              "TOSSPAY"
+            ]
+          },
           "refundedAmount": {
             "type": "integer",
             "format": "int64"
+          },
+          "registeredCard": {
+            "type": "boolean"
           }
         }
       },
@@ -9176,6 +9227,12 @@
       "SettlementResponse": {
         "type": "object",
         "properties": {
+          "methods": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SettlementMethodResponse"
+            }
+          },
           "periods": {
             "type": "array",
             "items": {

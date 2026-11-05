@@ -1,7 +1,13 @@
 import { Card, Empty, Typography } from 'antd';
 
-import type { SalesAmountResponse, SettlementPeriodResponse, SettlementUnit } from '../api';
+import type {
+  SalesAmountResponse,
+  SettlementMethodResponse,
+  SettlementPeriodResponse,
+  SettlementUnit,
+} from '../api';
 import { SettlementChart } from './SettlementChart';
+import { SettlementMethodTable } from './SettlementMethodTable';
 import { SettlementSalesStats } from './SettlementSalesStats';
 
 import styles from './SettlementSummarySection.module.scss';
@@ -10,13 +16,15 @@ interface SettlementSummarySectionProps {
   unit: SettlementUnit;
   summary?: SalesAmountResponse;
   periods: SettlementPeriodResponse[];
+  methods: SettlementMethodResponse[];
 }
 
-// 요약 탭의 조회 기간 부분: 기간 합계와 기간별 차트
+// 요약 탭의 조회 기간 부분: 기간 합계, 결제 수단별 합계, 기간별 차트. 결제·환불이 없으면 결제 수단별 표는 감춘다
 export function SettlementSummarySection({
   unit,
   summary,
   periods,
+  methods,
 }: SettlementSummarySectionProps) {
   const hasSales = periods.some((period) => period.paidAmount || period.refundedAmount);
 
@@ -26,6 +34,13 @@ export function SettlementSummarySection({
         <Typography.Title level={5}>조회 기간 합계</Typography.Title>
         <SettlementSalesStats sales={summary} bordered />
       </div>
+
+      {methods.length > 0 && (
+        <div className={styles.block}>
+          <Typography.Title level={5}>결제 수단별</Typography.Title>
+          <SettlementMethodTable methods={methods} />
+        </div>
+      )}
 
       <Card size="small">
         {hasSales ? (

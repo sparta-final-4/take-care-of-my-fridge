@@ -47,6 +47,7 @@ export default function AdminSettlementPage() {
 
   const summary = settlementQuery.data?.summary;
   const periods = settlementQuery.data?.periods ?? [];
+  const methods = settlementQuery.data?.methods ?? [];
 
   const renderTab = () => {
     if (tab === 'payments') {
@@ -85,7 +86,12 @@ export default function AdminSettlementPage() {
     return (
       <SectionLoading loading={settlementQuery.isFetching}>
         {tab === 'summary' ? (
-          <SettlementSummarySection unit={unit} summary={summary} periods={periods} />
+          <SettlementSummarySection
+            unit={unit}
+            summary={summary}
+            periods={periods}
+            methods={methods}
+          />
         ) : (
           <SettlementDailyTable unit={unit} summary={summary} periods={periods} />
         )}

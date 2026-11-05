@@ -6,7 +6,7 @@ import { getErrorMessage } from '@/common/api/errors';
 import { SectionLoading } from '@/common/components/SectionLoading';
 
 import type { SalesAmountResponse, SettlementPaymentResponse } from '../api';
-import { formatWon } from '../format';
+import { formatPaymentMethod, formatWon } from '../format';
 import { settlementQueries } from '../queries';
 import { SettlementNetAmount } from './SettlementNetAmount';
 
@@ -23,6 +23,11 @@ const columns: TableColumnsType<SettlementPaymentResponse> = [
   },
   { title: '주문번호', dataIndex: 'orderNumber', render: (value?: string) => value ?? '-' },
   { title: '구매자', dataIndex: 'buyerName', render: (value?: string) => value ?? '-' },
+  {
+    title: '결제 수단',
+    key: 'paymentMethod',
+    render: (_, payment) => formatPaymentMethod(payment),
+  },
   { title: '결제금액', dataIndex: 'paidAmount', align: 'right', render: wonOrDash },
   { title: '환불금액', dataIndex: 'refundedAmount', align: 'right', render: wonOrDash },
   {
@@ -99,7 +104,7 @@ export function SettlementPaymentTable({
           if (onRetrySummary) {
             return (
               <Table.Summary.Row>
-                <Table.Summary.Cell index={0} colSpan={6}>
+                <Table.Summary.Cell index={0} colSpan={7}>
                   <Typography.Text type="danger">
                     조회 기간 합계를 불러오지 못했습니다.
                   </Typography.Text>{' '}
@@ -113,16 +118,16 @@ export function SettlementPaymentTable({
           if (!summary) return null;
           return (
             <Table.Summary.Row>
-              <Table.Summary.Cell index={0} colSpan={3}>
+              <Table.Summary.Cell index={0} colSpan={4}>
                 <Typography.Text strong>조회 기간 합계</Typography.Text>
               </Table.Summary.Cell>
-              <Table.Summary.Cell index={3} align="right">
+              <Table.Summary.Cell index={4} align="right">
                 {formatWon(summary.paidAmount)}
               </Table.Summary.Cell>
-              <Table.Summary.Cell index={4} align="right">
+              <Table.Summary.Cell index={5} align="right">
                 {formatWon(summary.refundedAmount)}
               </Table.Summary.Cell>
-              <Table.Summary.Cell index={5} align="right">
+              <Table.Summary.Cell index={6} align="right">
                 <SettlementNetAmount value={summary.netAmount} />
               </Table.Summary.Cell>
             </Table.Summary.Row>
