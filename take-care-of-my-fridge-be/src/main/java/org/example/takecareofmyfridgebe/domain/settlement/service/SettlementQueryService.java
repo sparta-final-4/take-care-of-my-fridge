@@ -2,6 +2,7 @@ package org.example.takecareofmyfridgebe.domain.settlement.service;
 
 import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.settlement.dto.SalesAmountResponse;
+import org.example.takecareofmyfridgebe.domain.settlement.dto.SettlementMethodResponse;
 import org.example.takecareofmyfridgebe.domain.settlement.dto.SettlementPaymentResponse;
 import org.example.takecareofmyfridgebe.domain.settlement.entity.DailySales;
 import org.example.takecareofmyfridgebe.domain.settlement.repository.DailySalesRepository;
@@ -13,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -40,6 +42,16 @@ public class SettlementQueryService {
     // 아직 끝나지 않은 날의 from부터 to 전까지 매출. 저장하지 않고 결제 이력으로 바로 센다
     public SalesAmountResponse getSales(LocalDateTime from, LocalDateTime to) {
         return SalesAmountResponse.from(salesHistoryRepository.sumSalesBetween(from, to));
+    }
+
+    // from 이상 to 미만의 결제 수단별 매출. 결제금액이 큰 수단이 먼저 오고, 같으면 등록 카드, 그다음 PgProvider 선언 순이다
+    public List<SettlementMethodResponse> getMethodSales(LocalDateTime from, LocalDateTime to) {
+        return salesHistoryRepository.sumSalesByMethodBetween(from, to).stream()
+                .map(SettlementMethodResponse::from)
+                .sorted(Comparator.comparingLong(SettlementMethodResponse::paidAmount).reversed()
+                        .thenComparing(SettlementMethodResponse::registeredCard, Comparator.reverseOrder())
+                        .thenComparing(SettlementMethodResponse::pgProvider))
+                .toList();
     }
 
     // from 이상 to 미만에 결제·환불이 있었던 결제를 한 건씩. page는 1부터 센다

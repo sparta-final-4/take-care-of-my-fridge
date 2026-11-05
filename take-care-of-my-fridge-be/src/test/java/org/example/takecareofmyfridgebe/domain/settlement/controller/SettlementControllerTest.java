@@ -3,8 +3,10 @@ package org.example.takecareofmyfridgebe.domain.settlement.controller;
 import org.example.takecareofmyfridgebe.domain.auth.service.AuthSessionService;
 import org.example.takecareofmyfridgebe.domain.auth.service.JwtTokenService;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
+import org.example.takecareofmyfridgebe.domain.payment.entity.PgProvider;
 import org.example.takecareofmyfridgebe.domain.settlement.dto.SalesAmountResponse;
 import org.example.takecareofmyfridgebe.domain.settlement.dto.SalesPeriodUnit;
+import org.example.takecareofmyfridgebe.domain.settlement.dto.SettlementMethodResponse;
 import org.example.takecareofmyfridgebe.domain.settlement.dto.SettlementPaymentResponse;
 import org.example.takecareofmyfridgebe.domain.settlement.dto.SettlementPaymentSearchRequest;
 import org.example.takecareofmyfridgebe.domain.settlement.dto.SettlementPeriodResponse;
@@ -66,7 +68,8 @@ class SettlementControllerTest {
         SettlementSearchRequest request = new SettlementSearchRequest(SalesPeriodUnit.DAY, start, TODAY);
         SalesAmountResponse sales = SalesAmountResponse.of(30000, 10000, 2, 1);
         when(settlementQueryFacade.getSettlement(request)).thenReturn(new SettlementResponse(sales,
-                List.of(SettlementPeriodResponse.of(start, start, sales))));
+                List.of(SettlementPeriodResponse.of(start, start, sales)),
+                List.of(new SettlementMethodResponse(true, PgProvider.TOSSPAYMENTS, 30000L, 10000L, 20000L, 2, 1))));
 
         mvc.perform(get("/api/admin/settlements")
                         .param("unit", "DAY")
@@ -77,7 +80,10 @@ class SettlementControllerTest {
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.summary.netAmount").value(20000))
                 .andExpect(jsonPath("$.data.periods[0].startDate").value(start.toString()))
-                .andExpect(jsonPath("$.data.periods[0].paidCount").value(2));
+                .andExpect(jsonPath("$.data.periods[0].paidCount").value(2))
+                .andExpect(jsonPath("$.data.methods[0].registeredCard").value(true))
+                .andExpect(jsonPath("$.data.methods[0].pgProvider").value("TOSSPAYMENTS"))
+                .andExpect(jsonPath("$.data.methods[0].netAmount").value(20000));
 
         verify(settlementQueryFacade).getSettlement(request);
     }
@@ -141,7 +147,7 @@ class SettlementControllerTest {
     void getPayments_success() throws Exception {
         SettlementPaymentSearchRequest request = new SettlementPaymentSearchRequest(TODAY, TODAY, 2, 10);
         SettlementPaymentResponse payment = new SettlementPaymentResponse(41L, TODAY.atTime(13, 12),
-                "20261030-000001", "구매자", 12000L, 3000L, 9000L);
+                "20261030-000001", "구매자", false, PgProvider.KAKAOPAY, 12000L, 3000L, 9000L);
         when(settlementQueryFacade.getPayments(request))
                 .thenReturn(new PageResponse<>(List.of(payment), 2, 10, 11, 2, true));
 
@@ -154,6 +160,8 @@ class SettlementControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.content[0].orderNumber").value("20261030-000001"))
                 .andExpect(jsonPath("$.data.content[0].buyerName").value("구매자"))
+                .andExpect(jsonPath("$.data.content[0].registeredCard").value(false))
+                .andExpect(jsonPath("$.data.content[0].pgProvider").value("KAKAOPAY"))
                 .andExpect(jsonPath("$.data.content[0].netAmount").value(9000))
                 .andExpect(jsonPath("$.data.totalElements").value(11));
 
