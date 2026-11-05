@@ -19,6 +19,7 @@ import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 
 import java.time.LocalDateTime;
+import java.util.Objects;
 
 // 회원이 등록한 카드. 카드 정보는 PortOne이 보관하고 우리는 빌링키와 화면 표시용 정보만 저장한다
 @Entity
@@ -51,6 +52,13 @@ public class BillingKey extends BaseTimeEntity {
     @Column(name = "card_last4", columnDefinition = "CHAR(4)")
     private String cardLast4;
 
+    // 마스킹된 카드 번호와 발급사 코드(PortOne card.number, card.issuer). 같은 회원이 같은 카드를 다시 등록하는지 확인한다
+    @Column(name = "card_number_masked", length = 30)
+    private String cardNumberMasked;
+
+    @Column(name = "card_issuer_code", length = 30)
+    private String cardIssuerCode;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "card_type", length = 20)
     private CardType cardType;
@@ -71,12 +79,14 @@ public class BillingKey extends BaseTimeEntity {
     private LocalDateTime pgDeletedAt;
 
     @Builder
-    private BillingKey(Long memberId, String billingKey, String cardName, String cardLast4, CardType cardType,
-                       boolean isDefault) {
+    private BillingKey(Long memberId, String billingKey, String cardName, String cardLast4, String cardNumberMasked,
+                       String cardIssuerCode, CardType cardType, boolean isDefault) {
         this.memberId = memberId;
         this.billingKey = billingKey;
         this.cardName = cardName;
         this.cardLast4 = cardLast4;
+        this.cardNumberMasked = cardNumberMasked;
+        this.cardIssuerCode = cardIssuerCode;
         this.cardType = cardType;
         this.isDefault = isDefault;
         this.status = BillingKeyStatus.ACTIVE;
@@ -84,6 +94,14 @@ public class BillingKey extends BaseTimeEntity {
 
     public boolean isActive() {
         return status == BillingKeyStatus.ACTIVE;
+    }
+
+    // 같은 실물 카드인지. 마스킹 번호가 같고 발급사 코드도 같아야 한다(둘 다 비어 있어도 같은 값으로 본다).
+    // 마스킹 번호를 모르는 카드(이 값이 생기기 전에 등록한 카드)는 비교하지 않는다
+    public boolean isSameCard(String otherNumberMasked, String otherIssuerCode) {
+        return cardNumberMasked != null
+                && cardNumberMasked.equals(otherNumberMasked)
+                && Objects.equals(cardIssuerCode, otherIssuerCode);
     }
 
     public void markDefault() {

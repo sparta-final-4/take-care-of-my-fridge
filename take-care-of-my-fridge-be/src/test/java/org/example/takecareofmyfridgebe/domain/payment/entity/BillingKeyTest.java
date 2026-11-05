@@ -111,4 +111,36 @@ class BillingKeyTest {
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode").isEqualTo(ErrorCode.INVALID_BILLING_KEY_STATUS);
     }
+
+    @Test
+    @DisplayName("마스킹 번호와 발급사 코드가 모두 같으면 같은 카드다")
+    void isSameCard_returnTrue_whenNumberAndIssuerMatch() {
+        BillingKey card = BillingKey.builder().memberId(1L).billingKey("billing-key-9")
+                .cardNumberMasked("53275012****1234").cardIssuerCode("SHINHAN_CARD").build();
+
+        assertThat(card.isSameCard("53275012****1234", "SHINHAN_CARD")).isTrue();
+    }
+
+    @Test
+    @DisplayName("마스킹 번호나 발급사 코드가 다르거나, 두 값을 모르는 카드는 같은 카드로 보지 않는다")
+    void isSameCard_returnFalse_whenDifferentOrUnknown() {
+        BillingKey card = BillingKey.builder().memberId(1L).billingKey("billing-key-9")
+                .cardNumberMasked("53275012****1234").cardIssuerCode("SHINHAN_CARD").build();
+        BillingKey unknown = BillingKey.builder().memberId(1L).billingKey("billing-key-8").build();
+
+        assertThat(card.isSameCard("53275012****5678", "SHINHAN_CARD")).isFalse();
+        assertThat(card.isSameCard("53275012****1234", "KOOKMIN_CARD")).isFalse();
+        assertThat(unknown.isSameCard(null, null)).isFalse();
+    }
+
+    @Test
+    @DisplayName("발급사 코드를 모르면 마스킹 번호가 같고 상대도 발급사를 모를 때만 같은 카드다")
+    void isSameCard_compareNumberOnly_whenIssuerUnknown() {
+        BillingKey noIssuer = BillingKey.builder().memberId(1L).billingKey("billing-key-9")
+                .cardNumberMasked("53275012****1234").build();
+
+        assertThat(noIssuer.isSameCard("53275012****1234", null)).isTrue();
+        assertThat(noIssuer.isSameCard("53275012****1234", "SHINHAN_CARD")).isFalse();
+        assertThat(noIssuer.isSameCard("53275012****5678", null)).isFalse();
+    }
 }

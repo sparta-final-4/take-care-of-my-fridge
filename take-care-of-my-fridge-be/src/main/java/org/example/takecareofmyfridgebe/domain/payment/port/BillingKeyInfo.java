@@ -9,7 +9,8 @@ public record BillingKeyInfo(
         String customerId,  // 발급 때 넘긴 고객 ID
         String cardName,    // 카드 상품명
         String cardNumber,  // 마스킹된 카드 번호
-        CardType cardType
+        CardType cardType,
+        String cardIssuerCode // 발급사 코드. 같은 카드 중복 등록 확인에 쓴다
 ) {
     private static final int LAST_DIGITS = 4;
 

@@ -89,7 +89,7 @@ class BillingKeyFacadeTest {
     @DisplayName("삭제된 빌링키면 저장하지 않고 확인 실패로 거절한다")
     void register_throwException_whenDeletedAtPg() {
         given(billingKeyGateway.getBillingKey(BILLING_KEY)).willReturn(Optional.of(
-                new BillingKeyInfo(BILLING_KEY, false, "member-7", null, null, null)));
+                new BillingKeyInfo(BILLING_KEY, false, "member-7", null, null, null, null)));
 
         assertNotVerified();
         verify(billingKeyService, never()).register(anyLong(), any());
@@ -249,7 +249,7 @@ class BillingKeyFacadeTest {
         assertThat(billingKeyFacade.registerFromWebhook(BILLING_KEY)).isFalse();
 
         given(billingKeyGateway.getBillingKey(BILLING_KEY)).willReturn(Optional.of(
-                new BillingKeyInfo(BILLING_KEY, false, "member-7", null, null, null)));
+                new BillingKeyInfo(BILLING_KEY, false, "member-7", null, null, null, null)));
         assertThat(billingKeyFacade.registerFromWebhook(BILLING_KEY)).isFalse();
 
         given(billingKeyGateway.getBillingKey(BILLING_KEY)).willReturn(Optional.of(issued("other-service-1")));
@@ -303,6 +303,33 @@ class BillingKeyFacadeTest {
     }
 
     private BillingKeyInfo issued(String customerId) {
-        return new BillingKeyInfo(BILLING_KEY, true, customerId, "신한카드", "53275012****1234", CardType.CREDIT);
+        return new BillingKeyInfo(BILLING_KEY, true, customerId, "신한카드", "53275012****1234", CardType.CREDIT,
+                "SHINHAN_CARD");
+    }
+
+    @Test
+    @DisplayName("이미 등록된 카드면 방금 발급된 빌링키를 PortOne에서 지우고 이미 등록된 카드로 거절한다")
+    void register_deletePgBillingKey_whenDuplicated() {
+        BillingKeyInfo info = issued("member-7");
+        given(billingKeyGateway.getBillingKey(BILLING_KEY)).willReturn(Optional.of(info));
+        given(billingKeyService.register(MEMBER_ID, info))
+                .willThrow(new BusinessException(ErrorCode.BILLING_KEY_DUPLICATED));
+
+        assertThatThrownBy(() -> billingKeyFacade.register(MEMBER_ID, REQUEST))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode").isEqualTo(ErrorCode.BILLING_KEY_DUPLICATED);
+        verify(billingKeyGateway).deleteBillingKey(eq(BILLING_KEY), anyString());
+    }
+
+    @Test
+    @DisplayName("빌링키 발급 웹훅이 이미 등록된 카드면 저장하지 않고 PortOne 빌링키를 지운다")
+    void registerFromWebhook_deletePgBillingKey_whenDuplicated() {
+        BillingKeyInfo info = issued("member-7");
+        given(billingKeyGateway.getBillingKey(BILLING_KEY)).willReturn(Optional.of(info));
+        given(billingKeyService.register(MEMBER_ID, info))
+                .willThrow(new BusinessException(ErrorCode.BILLING_KEY_DUPLICATED));
+
+        assertThat(billingKeyFacade.registerFromWebhook(BILLING_KEY)).isFalse();
+        verify(billingKeyGateway).deleteBillingKey(eq(BILLING_KEY), anyString());
     }
 }

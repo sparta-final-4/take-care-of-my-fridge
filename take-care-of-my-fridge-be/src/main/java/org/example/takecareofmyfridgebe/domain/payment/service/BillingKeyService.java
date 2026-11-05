@@ -49,13 +49,20 @@ public class BillingKeyService {
             throw new BusinessException(ErrorCode.BILLING_KEY_NOT_VERIFIED);
         }
 
-        long activeCount = billingKeyRepository.countByMemberIdAndStatus(memberId, BillingKeyStatus.ACTIVE);
+        // 같은 실물 카드라도 등록할 때마다 새 빌링키가 나오므로, 마스킹 번호와 발급사로 이미 쓰는 카드인지 확인한다
+        List<BillingKey> activeCards = billingKeyRepository.findCards(memberId, BillingKeyStatus.ACTIVE);
+        if (activeCards.stream().anyMatch(card -> card.isSameCard(info.cardNumber(), info.cardIssuerCode()))) {
+            throw new BusinessException(ErrorCode.BILLING_KEY_DUPLICATED);
+        }
+        long activeCount = activeCards.size();
         validateLimit(activeCount);
         BillingKey card = billingKeyRepository.save(BillingKey.builder()
                 .memberId(memberId)
                 .billingKey(info.billingKey())
                 .cardName(info.cardName())
                 .cardLast4(info.cardLast4())
+                .cardNumberMasked(info.cardNumber())
+                .cardIssuerCode(info.cardIssuerCode())
                 .cardType(info.cardType())
                 .isDefault(activeCount == 0) // 첫 카드는 대표 카드
                 .build());

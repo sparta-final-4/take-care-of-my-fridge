@@ -110,8 +110,14 @@ class BillingKeyServiceConcurrencyTest extends MySqlContainerSupport {
     }
 
     private BillingKeyInfo info(Long memberId, String billingKey) {
-        return new BillingKeyInfo(billingKey, true, "member-" + memberId, "신한카드", "53275012****1234",
-                CardType.CREDIT);
+        return new BillingKeyInfo(billingKey, true, "member-" + memberId, "신한카드", cardNumberOf(billingKey),
+                CardType.CREDIT, "SHINHAN_CARD");
+    }
+
+    // 빌링키 끝 번호로 서로 다른 카드 번호를 만든다. billing-key-1이면 53275012****1234
+    private static String cardNumberOf(String billingKey) {
+        int seq = Integer.parseInt(billingKey.substring(billingKey.lastIndexOf('-') + 1));
+        return String.format("53275012****%04d", 1233 + seq);
     }
 
     private <T> List<T> runConcurrently(List<Callable<T>> tasks) throws Exception {

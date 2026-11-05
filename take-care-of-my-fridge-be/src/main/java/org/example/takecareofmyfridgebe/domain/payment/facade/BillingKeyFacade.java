@@ -27,6 +27,7 @@ public class BillingKeyFacade {
     private static final String ISSUE_ID_PREFIX = "billing-";
     private static final String ISSUE_NAME = "카드 등록";
     private static final String LIMIT_EXCEEDED_DELETE_REASON = "카드 등록 한도 초과로 저장하지 않은 빌링키 삭제";
+    private static final String DUPLICATED_DELETE_REASON = "이미 등록된 카드라 저장하지 않은 빌링키 삭제";
     private static final String CUSTOMER_DELETE_REASON = "회원이 등록 카드 삭제";
     private static final String MEMBER_NOT_FOUND_DELETE_REASON = "없는 회원의 빌링키 삭제";
     static final int PG_DELETE_BATCH_SIZE = 100;
@@ -56,11 +57,9 @@ public class BillingKeyFacade {
         try {
             return billingKeyService.register(memberId, info);
         } catch (BusinessException e) {
-            // 한도 초과로 저장하지 않은 것이 확실할 때만 방금 발급된 본인 빌링키를 PortOne에서 지운다.
+            // 한도 초과·이미 등록된 카드처럼 저장하지 않은 것이 확실할 때만 방금 발급된 본인 빌링키를 PortOne에서 지운다.
             // DB 오류처럼 저장됐는지 모르는 실패에서 지우면 저장된 카드가 결제에 쓸 수 없게 되므로 지우지 않는다(남은 빌링키는 결제에 쓰이지 않는다)
-            if (e.getErrorCode() == ErrorCode.BILLING_KEY_LIMIT_EXCEEDED) {
-                deleteQuietly(info.billingKey(), LIMIT_EXCEEDED_DELETE_REASON);
-            }
+            deleteIfNotSaved(info.billingKey(), e.getErrorCode());
             throw e;
         }
     }
@@ -86,8 +85,7 @@ public class BillingKeyFacade {
             billingKeyService.register(memberId.get(), info);
             return true;
         } catch (BusinessException e) {
-            if (e.getErrorCode() == ErrorCode.BILLING_KEY_LIMIT_EXCEEDED) {
-                deleteQuietly(info.billingKey(), LIMIT_EXCEEDED_DELETE_REASON);
+            if (deleteIfNotSaved(info.billingKey(), e.getErrorCode())) {
                 return false;
             }
             // 회원이 없으면 쓸 사람이 없는 빌링키라 PortOne에서도 지운다
@@ -165,6 +163,19 @@ public class BillingKeyFacade {
             // PortOne에서는 지웠다. 기록만 실패했으므로 재시도 때 PortOne이 "이미 없음"으로 답하면 그때 기록된다
             log.error("PortOne 빌링키는 삭제됐지만 삭제 확인 기록 실패: cardId={}", cardId, e);
         }
+    }
+
+    // 한도 초과·이미 등록된 카드로 저장하지 않은 빌링키면 PortOne에서 지우고 true
+    private boolean deleteIfNotSaved(String billingKey, ErrorCode errorCode) {
+        if (errorCode == ErrorCode.BILLING_KEY_LIMIT_EXCEEDED) {
+            deleteQuietly(billingKey, LIMIT_EXCEEDED_DELETE_REASON);
+            return true;
+        }
+        if (errorCode == ErrorCode.BILLING_KEY_DUPLICATED) {
+            deleteQuietly(billingKey, DUPLICATED_DELETE_REASON);
+            return true;
+        }
+        return false;
     }
 
     // 삭제가 실패해도 결제에 쓰이지 않는 빌링키라 돈 문제는 없다. 로그만 남긴다

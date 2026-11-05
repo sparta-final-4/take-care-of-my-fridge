@@ -30,7 +30,8 @@ public record PortOneBillingKeyResponse(
                 customer == null ? null : customer.id(),
                 card == null ? null : card.name(),
                 card == null ? null : card.number(),
-                card == null ? null : toCardType(card.type()));
+                card == null ? null : toCardType(card.type()),
+                card == null ? null : card.issuer());
     }
 
     // 우리가 모르는 카드 종류가 와도 등록은 막지 않고 종류만 비워 둔다
@@ -46,7 +47,7 @@ public record PortOneBillingKeyResponse(
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public record Card(String name, String number, String type) {
+    public record Card(String name, String number, String type, String issuer) {
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
