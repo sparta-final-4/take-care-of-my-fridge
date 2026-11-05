@@ -8,13 +8,18 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate.MissingI
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate.Ranking;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate.Reason;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidates;
+import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeDetailReply;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeQuery;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecommendationReply;
 import org.example.takecareofmyfridgebe.domain.chat.dto.SavedRecommendation;
 import org.example.takecareofmyfridgebe.domain.ingredient.service.IngredientService;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member.Taste;
+import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeDetailResponse.StepItem;
+import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeDetailResponse;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeSummary;
 import org.example.takecareofmyfridgebe.domain.recipe.service.RecipeService;
+import org.example.takecareofmyfridgebe.global.error.BusinessException;
+import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -135,6 +140,68 @@ class ChatRecommendationFacadeTest {
         assertThat(cards.get(2L).get(0).missingSelectedIngredients()).isEmpty();
         assertThat(cards.get(4L)).extracting(RecommendedRecipe::recipeId).containsExactly(30L);
         verify(recipeCandidateFacade, times(1)).describeRecipes(any(), any());
+    }
+
+    @Test
+    @DisplayName("다시 추천이면 직전 카드 3개를 후보에서 빼고 그다음 후보로 카드를 만든다")
+    void dropsPreviousCards_whenRefine() {
+        when(recipeCandidateFacade.findCandidates(any())).thenReturn(new RecipeCandidates(List.of(
+                candidate(10L, "김치찌개", "찌개", 20, reason(List.of())),
+                candidate(20L, "순두부찌개", "찌개", 20, reason(List.of())),
+                candidate(30L, "두부국", "국", 20, reason(List.of())),
+                candidate(40L, "부대찌개", "찌개", 20, reason(List.of())),
+                candidate(50L, "된장국", "국", 20, reason(List.of())),
+                candidate(60L, "제육볶음", "볶음", 20, reason(List.of()))), false));
+        when(recipeService.findSummaries(any())).thenReturn(Map.of());
+
+        RecommendationReply reply = facade.recommend("다른 거 없어?", RecipeQuery.of(MEMBER_ID, List.of()), List.of(10L, 20L, 30L));
+
+        assertThat(reply.event().recipes()).extracting(RecommendedRecipe::recipeId).containsExactly(40L, 50L, 60L);
+    }
+
+    @Test
+    @DisplayName("직전 카드를 빼서 후보가 3개보다 적어지면 그때만 직전 카드를 정렬 순서대로 뒤에 다시 넣는다")
+    void putsPreviousCardsBack_whenTooFew() {
+        List<RecipeCandidate> candidates = List.of(
+                candidate(10L, "김치찌개", "찌개", 20, reason(List.of())),
+                candidate(40L, "부대찌개", "찌개", 20, reason(List.of())),
+                candidate(20L, "순두부찌개", "찌개", 20, reason(List.of())),
+                candidate(30L, "두부국", "국", 20, reason(List.of())));
+
+        assertThat(ChatRecommendationFacade.withoutPrevious(candidates, List.of(10L, 20L, 30L)))
+                .extracting(RecipeCandidate::recipeId).containsExactly(40L, 10L, 20L, 30L);
+        assertThat(ChatRecommendationFacade.withoutPrevious(candidates, List.of()))
+                .extracting(RecipeCandidate::recipeId).containsExactly(10L, 40L, 20L, 30L);
+    }
+
+    @Test
+    @DisplayName("레시피 자세히는 지금 냉장고 기준 카드 하나(이유: 물어보신 레시피예요)와 레시피 정보를 만든다")
+    void describesRecipeWithOneCard() {
+        RecipeDetailResponse recipe = RecipeDetailResponse.builder()
+                .recipeId(20L).name("깐풍기").category("튀김").cookTimeMin(40).imageUrl("https://img/20.jpg")
+                .ingredients(List.of()).steps(List.of(new StepItem(1, "닭을 튀긴다.", null, null))).build();
+        when(recipeService.getRecipe(20L)).thenReturn(recipe);
+        when(recipeCandidateFacade.describeRecipes(MEMBER_ID, List.of(20L))).thenReturn(Map.of(
+                20L, candidate(20L, "깐풍기", "튀김", 40, reason(List.of()))));
+
+        RecipeDetailReply reply = facade.describe(MEMBER_ID, 20L).orElseThrow();
+
+        assertThat(reply.event().recipes()).hasSize(1);
+        RecommendedRecipe card = reply.event().recipes().get(0);
+        assertThat(card.recipeId()).isEqualTo(20L);
+        assertThat(card.imageUrl()).isEqualTo("https://img/20.jpg");
+        assertThat(card.reason()).isEqualTo("물어보신 레시피예요");
+        // 설명으로도 넣어 저장하므로 답 받을 때·다시 불러올 때 모두 이유 줄 대신 이 줄만 보인다
+        assertThat(card.description()).isEqualTo("물어보신 레시피예요");
+        assertThat(reply.recipeInfo()).startsWith("[레시피 정보]\n이름: 깐풍기").contains("1. 닭을 튀긴다.", "[냉장고 기준]");
+    }
+
+    @Test
+    @DisplayName("레시피가 지워졌으면 빈 값을 돌려준다")
+    void returnsEmpty_whenRecipeIsDeleted() {
+        when(recipeService.getRecipe(20L)).thenThrow(new BusinessException(ErrorCode.RECIPE_NOT_FOUND));
+
+        assertThat(facade.describe(MEMBER_ID, 20L)).isEmpty();
     }
 
     private static RecipeCandidate candidate(Long id, String name, String category, Integer cookTimeMin, Reason reason) {

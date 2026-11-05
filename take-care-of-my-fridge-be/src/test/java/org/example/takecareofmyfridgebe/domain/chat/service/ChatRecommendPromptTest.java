@@ -54,28 +54,45 @@ class ChatRecommendPromptTest {
     }
 
     @Test
-    @DisplayName("소비기한 재료는 소개에서 한 번만 말하게 한다")
-    void allowsImminentOnceInIntro() {
-        assertThat(prompt).contains("소개에서 \"내일까지인 고추를 같이 쓸 수 있어요\"처럼 한 번만 말해도 된다");
+    @DisplayName("임박 재료·소비기한 이야기는 소개·카드 설명 모두 쓰지 않게 하고(서버가 붙임), 출력 예시에도 없다")
+    void forbidsImminentTalk() {
+        assertThat(prompt).contains("소개·카드 설명 모두 임박 재료·소비기한 이야기",
+                "필요하면 서버가 [이미 안내한 말]로 이미 했다. 카드 이유가 임박 재료 이야기여도 옮기지 않는다")
+                .doesNotContain("[소개] 냉면처럼 즐길 수 있는 면 요리를 골랐어요. 내일까지인 고추", "한 번만 말해도 된다");
+    }
+
+    @Test
+    @DisplayName("카드 설명은 레시피 이름으로 시작하지 않고 바로 맛·식감·팁으로 쓰게 하며, 출력 예시도 이름으로 시작하지 않는다")
+    void forbidsStartingWithRecipeName() {
+        assertThat(prompt).contains("레시피 이름으로 시작하지 않는다. 이름은 카드에 있다",
+                "\"깐풍기예요. 바삭하게…\"처럼 쓰지 말고 바로 맛·식감·팁으로 시작한다")
+                .doesNotContain("[2] 찾으신 냉면이에요.");
+    }
+
+    @Test
+    @DisplayName("소개는 사용자 요청을 되풀이하거나 요약하지 않고 고른 요리 자체를 소개하게 한다")
+    void forbidsRepeatingRequest() {
+        assertThat(prompt).contains("사용자 요청을 되풀이하거나 요약하지 않는다",
+                "\"매운 요리를 제외하고 다양한 요리를 추천해 드릴게요\", \"○○로 추천해 드릴게요\" 같은 말은 쓰지 않는다");
     }
 
     @Test
     @DisplayName("안내 문장은 서버가 이미 보냈으니 [이미 안내한 말]을 반복하지 말고, 답은 [소개]로 시작하며 다른 대괄호 표시는 쓰지 않게 한다")
     void instructsNotRepeatingNotice() {
         assertThat(prompt).contains("답은 반드시 [소개]로 시작한다. [소개] 앞에 아무 글도 쓰지 않는다",
-                "[이미 안내한 말]이 있으면 그 문장은 화면에서 소개 맨 앞에 이미 나갔다. 같은 말을 반복하지 말고",
+                "[이미 안내한 말]이 있으면 그 문장이 화면에서 소개로 이미 나갔다. [소개] 표시만 쓰고 소개 글은 쓰지 않는다",
+                "[이미 안내한 말]이 없으면 [소개]에 한 문장을 쓴다",
                 "다른 대괄호 표시([다른 제안], [이미 안내한 말] 등)는 답에 쓰지 않는다",
                 "냉장고에 없는 재료 이야기는 하지 않는다")
                 .doesNotContain("먼저 말할 것", "말씀하신 버섯");
     }
 
     @Test
-    @DisplayName("임박은 짧게·말 그대로, 선택 재료는 주재료로, 장볼 재료 표현, 카드 정보에 없는 특징·찾았다는 단정 금지는 그대로다")
+    @DisplayName("선택 재료는 주재료로, 장볼 재료 표현, 카드 정보에 없는 특징·찾았다는 단정 금지는 그대로다")
     void keepsExistingRules() {
-        assertThat(prompt).contains("내일까지인 고추", "적힌 그대로 쓰고 바꾸지 않는다", "쓰는 냉장고 재료를 전부 나열하지 않는다",
+        assertThat(prompt).contains("쓰는 냉장고 재료를 나열하지 않는다",
                 "그 재료가 주재료로 들어간다고 말할 수 있다", "\"부족한 재료\"라고 하지 않고 \"장볼 재료\"로 말한다",
                 "카드 정보에 없는 특징(차가운, 따뜻한, 매운, 바삭한 등)을 붙여 단정하지 않는다",
-                "사용자 요청을 되풀이해서 \"○○로 추천해 드릴게요\"라고 하지 않는다",
                 "\"찾지 못했어요\", \"조건을 바꿔 보세요\"");
     }
 
@@ -83,5 +100,18 @@ class ChatRecommendPromptTest {
     @DisplayName("내부 조건·판단 과정은 말하지 말고, 마크다운 금지는 공통 프롬프트에 둔다")
     void forbidsInternalReasoning() {
         assertThat(prompt).contains("내부 조건이나 판단 과정은 말하지 않는다").doesNotContain("마크다운");
+    }
+
+    @Test
+    @DisplayName("조건에 피할 맛이 있으면 그 맛 이야기를 소개·카드 설명 어디에도 쓰지 않게 한다")
+    void forbidsAvoidedTasteTalk() {
+        assertThat(prompt).contains("조건에 \"피할 맛\"이 있으면 그 맛 이야기(\"매콤한\", \"얼큰한\", \"달콤한\")를 소개·카드 설명 어디에도 쓰지 않는다");
+    }
+
+    @Test
+    @DisplayName("카드 정보에 없는 맛을 꾸며 말하지 않고, 후보 줄에 매운맛이 맞지 않으면 매운맛 이야기를 하지 않게 한다")
+    void forbidsMadeUpTastes() {
+        assertThat(prompt).contains("카드 정보에 없는 맛을 꾸며 말하지 않는다. \"매콤한\", \"매운 고추와 함께\"처럼 맛을 덧붙이지 않는다",
+                "후보 줄에 \"원하는 맛과 맞음: 매운맛\"이나 \"좋아하는 맛과 맞음: 매운맛\"이 없으면 매운맛 이야기를 하지 않는다");
     }
 }

@@ -10,6 +10,7 @@ import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeClassificationRe
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeCreateRequest;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeDetailResponse;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeIngredientIdDto;
+import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeIngredientTextDto;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeListItemResponse;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeListRequest;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeIngredientCountDto;
@@ -38,9 +39,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -48,6 +51,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Service
 @RequiredArgsConstructor
@@ -279,6 +283,25 @@ public class RecipeService {
             return List.of();
         }
         return recipeRepository.findNonBasicIngredients(recipeIds);
+    }
+
+    /**
+     * 다른 도메인(chat 레시피 후보 검색)에서 쓰는 조회.
+     * 레시피별 재료 이름을 재료 사전 이름과 레시피에 적힌 이름 둘 다 담아 조회한다 (기본 양념 포함, 빈 이름은 뺀다).
+     * 사전 정리로 홍고추가 "고추"로 합쳐졌어도 원문 이름으로 매운 재료를 확인할 수 있다. 재료가 없는 레시피는 Map에서 빠진다.
+     */
+    public Map<Long, List<String>> findIngredientTexts(Collection<Long> recipeIds) {
+        if (recipeIds == null || recipeIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        Map<Long, List<String>> texts = new LinkedHashMap<>();
+        for (RecipeIngredientTextDto row : recipeRepository.findIngredientTexts(recipeIds)) {
+            List<String> names = texts.computeIfAbsent(row.recipeId(), id -> new ArrayList<>());
+            Stream.of(row.ingredientName(), row.displayName())
+                    .filter(name -> name != null && !name.isBlank())
+                    .forEach(names::add);
+        }
+        return texts;
     }
 
     /**

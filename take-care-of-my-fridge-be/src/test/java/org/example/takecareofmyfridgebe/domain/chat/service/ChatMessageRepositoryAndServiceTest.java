@@ -205,4 +205,19 @@ class ChatMessageRepositoryAndServiceTest extends MySqlContainerSupport {
         assertThat(result.get(session.getId())).containsExactly(30L, 10L, 40L);
         assertThat(result.get(other.getId())).containsExactly(99L);
     }
+
+    @Test
+    @DisplayName("최근 메시지는 6개(3턴)까지 오래된 것부터 읽는다")
+    void findsRecentSixMessagesInOrder() {
+        ChatSession session = chatSessionRepository.saveAndFlush(ChatSession.builder().memberId(107L).build());
+        for (int turn = 1; turn <= 4; turn++) {
+            chatMessageService.saveExchange(session.getId(), "질문" + turn, "답" + turn);
+        }
+
+        List<ChatMessageResponse> recent = chatMessageService.findRecentMessages(session.getId());
+
+        assertThat(recent).extracting(ChatMessageResponse::content)
+                .containsExactly("질문2", "답2", "질문3", "답3", "질문4", "답4");
+        assertThat(recent).extracting(ChatMessageResponse::role).startsWith(ChatMessageRole.USER, ChatMessageRole.ASSISTANT);
+    }
 }

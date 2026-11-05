@@ -77,4 +77,52 @@ class IntentResultTest {
         assertThat(result.dishText()).isNull();
         assertThat(result.preferenceText()).isNull();
     }
+
+    @Test
+    @DisplayName("레시피 자세히 대상은 카드 번호가 0 이하면 null, 이름이 비어 있으면 null로 정리한다")
+    void sanitizesTargetFields() {
+        IntentResult picked = new IntentResult(ChatIntent.RECIPE_DETAIL, null, null, null, null, null, null, null, null, null,
+                2, " 깐풍기 ").sanitize(CATEGORIES);
+        IntentResult empty = new IntentResult(ChatIntent.RECIPE_DETAIL, null, null, null, null, null, null, null, null, null,
+                0, " ").sanitize(CATEGORIES);
+
+        assertThat(picked.targetIndex()).isEqualTo(2);
+        assertThat(picked.targetName()).isEqualTo("깐풍기");
+        assertThat(empty.targetIndex()).isNull();
+        assertThat(empty.targetName()).isNull();
+    }
+
+    @Test
+    @DisplayName("뺄 조건(removed)은 정해진 종류만 남기고 소문자는 대문자로 맞추며, 없으면 빈 집합이다")
+    void sanitizesRemovedConditions() {
+        IntentResult result = new IntentResult(ChatIntent.REFINE, null, null, null, null, null, null, null, null, null,
+                null, null, List.of("taste", "MAX_MINUTES", "없는 조건")).sanitize(CATEGORIES);
+
+        assertThat(result.removed()).containsExactly("TASTE", "MAX_MINUTES");
+        assertThat(result.removedConditions()).containsExactlyInAnyOrder(RefineCondition.TASTE, RefineCondition.MAX_MINUTES);
+        assertThat(IntentResult.general().removedConditions()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("피할 맛(avoidTastes)은 정해진 맛 이름만 남기고 소문자는 대문자로 맞추며, 없으면 빈 목록이다")
+    void sanitizesAvoidTastes() {
+        IntentResult result = new IntentResult(ChatIntent.RECOMMEND, null, null, null, null, null, null, null, null, null,
+                null, null, null, List.of("spicy", "없는맛")).sanitize(CATEGORIES);
+
+        assertThat(result.avoidedTastes()).containsExactly(Taste.SPICY);
+        assertThat(IntentResult.general().avoidedTastes()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("레시피 자세히 질문 종류는 정해진 이름만 남기고 소문자는 대문자로 맞추며, 없거나 모르는 값이면 null이다")
+    void sanitizesDetailQuestion() {
+        IntentResult howTo = new IntentResult(ChatIntent.RECIPE_DETAIL, null, null, null, null, null, null, null, null, null,
+                2, null, null, null, " how_to ").sanitize(CATEGORIES);
+        IntentResult unknown = new IntentResult(ChatIntent.RECIPE_DETAIL, null, null, null, null, null, null, null, null, null,
+                2, null, null, null, "STEP").sanitize(CATEGORIES);
+
+        assertThat(howTo.question()).isEqualTo(DetailQuestion.HOW_TO);
+        assertThat(unknown.question()).isNull();
+        assertThat(IntentResult.general().question()).isNull();
+    }
 }

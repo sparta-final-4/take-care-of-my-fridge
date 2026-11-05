@@ -2,7 +2,6 @@ package org.example.takecareofmyfridgebe.domain.chat.facade;
 
 import org.example.takecareofmyfridgebe.domain.chat.dto.KeywordMatch;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate;
-import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate.ImminentIngredient;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate.MissingIngredient;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate.Reason;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeQuery;
@@ -25,7 +24,7 @@ import java.util.stream.Collectors;
  * 선택 재료: 버섯, 두부 (이 재료를 꼭 쓰는 레시피만)
  * 조건: 원하는 맛 매운맛 / 분류 국, 찌개 / 30분 이내 / 뺄 재료 오이
  * [추천 후보]
- * 후보: 두부제육찜 | 찜 | 조리 시간 40분 | 카드 이유: 두부가 주재료예요 | 선택 재료 쓰임: 두부 | 쓰는 냉장고 재료: 오늘까지인 양파, 모레까지인 고추, 배추 | 냉장고에 없는 선택 재료: 두부 | 원하는 맛과 맞음: 매운맛 | 장볼 재료: 돼지고기, 부추, 당근 외 3개 | 재료 많이 모자람
+ * 후보: 두부제육찜 | 찜 | 조리 시간 40분 | 카드 이유: 두부가 주재료예요 | 선택 재료 쓰임: 두부 | 쓰는 냉장고 재료: 양파, 고추, 배추 | 냉장고에 없는 선택 재료: 두부 | 원하는 맛과 맞음: 매운맛 | 장볼 재료: 돼지고기, 부추, 당근 외 3개 | 재료 많이 모자람
  * </pre>
  * 안내 문장({@link #notices})은 원한 표현이 있는데 고른 레시피가 요청에 하나도 안 맞거나, 요리 이름 키워드로 레시피를 못 찾았거나,
  * 고른 후보 중 냉장고에 없는 선택 재료가 있을 때만 만든다 (AI가 판단하지 않게 서버가 정한다).
@@ -83,7 +82,8 @@ public final class RecommendationPromptBuilder {
     /**
      * 소개 맨 앞에 서버가 붙일 안내 문장. 없으면 빈 목록.
      * 원한 게 있었는데 고른 레시피가 요청(키워드·분류·맛)에 하나도 안 맞으면 그렇다고 먼저 말하고,
-     * 그렇지 않고 키워드로 이름·재료가 맞은 레시피만 없으면 비슷한 걸 골랐다고 말한다. 냉장고에 없는 선택 재료 안내는 따로 붙인다
+     * 그렇지 않고 키워드로 이름·재료가 맞은 레시피만 없으면 비슷한 걸 골랐다고 말한다. 냉장고에 없는 선택 재료 안내는 따로 붙인다.
+     * 임박 재료는 카드의 임박 태그로 충분해 안내하지 않는다
      */
     public static List<String> notices(RecipeQuery query, List<RecipeCandidate> picked, boolean keywordsNotFound) {
         List<String> notices = new ArrayList<>();
@@ -206,6 +206,9 @@ public final class RecommendationPromptBuilder {
         if (!query.wantedTastes().isEmpty()) {
             conditions.add("원하는 맛 " + tastes(query.wantedTastes()));
         }
+        if (!query.avoidTastes().isEmpty()) {
+            conditions.add("피할 맛 " + tastes(query.avoidTastes()));
+        }
         if (!query.moodCategories().isEmpty()) {
             conditions.add("분류 " + String.join(NAME_DELIMITER, query.moodCategories()));
         }
@@ -247,16 +250,12 @@ public final class RecommendationPromptBuilder {
         return String.join(FIELD_DELIMITER, fields);
     }
 
-    // 쓰는 냉장고 재료. 임박 재료는 말 순서대로 앞에 소비기한을 붙인다 ("내일까지인 고추")
+    // 쓰는 냉장고 재료 이름만. 임박 재료 이야기는 서버가 [이미 안내한 말]로 하고 AI는 하지 않으므로 소비기한은 붙이지 않는다
     private static String usedLine(Reason reason) {
         if (reason.usedFridgeIngredients().isEmpty()) {
             return NONE;
         }
-        Map<String, Long> dDays = reason.imminentIngredients().stream()
-                .collect(Collectors.toMap(ImminentIngredient::name, ImminentIngredient::dDay, (a, b) -> a));
-        return reason.usedFridgeIngredients().stream()
-                .map(name -> dDays.containsKey(name) ? dDayLabel(dDays.get(name)) + " " + name : name)
-                .collect(Collectors.joining(NAME_DELIMITER));
+        return String.join(NAME_DELIMITER, reason.usedFridgeIngredients());
     }
 
     // 소비기한을 재료 이름 앞에 붙일 말로 쓴다 (AI가 D-1을 "오늘까지"로 잘못 읽거나 괄호째 옮겨 쓰지 않게)

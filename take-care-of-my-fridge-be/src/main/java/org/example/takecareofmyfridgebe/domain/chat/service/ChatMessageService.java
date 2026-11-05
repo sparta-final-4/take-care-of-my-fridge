@@ -22,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -164,6 +165,17 @@ public class ChatMessageService {
             }
         }
         return bySession;
+    }
+
+    /**
+     * 최근 메시지 최대 6개(3턴)를 오래된 것부터 읽는다. 이전 대화로 AI에 넘긴다.
+     */
+    public List<ChatMessageResponse> findRecentMessages(Long sessionId) {
+        List<ChatMessageResponse> recent = new ArrayList<>(chatMessageRepository.findTop6BySessionIdOrderBySequenceDesc(sessionId).stream()
+                .map(ChatMessageResponse::from)
+                .toList());
+        Collections.reverse(recent);
+        return recent;
     }
 
     // 이 상담에서 이미 추천한 레시피 ID (다음 추천에서 뒤로 보낸다)

@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -25,7 +26,7 @@ class RecommendationPromptBuilderTest {
     private static final Map<Long, String> NAMES = Map.of(TOFU, "두부", MUSHROOM, "버섯", CUCUMBER, "오이");
 
     @Test
-    @DisplayName("사용자 요청과 후보를 줄 글로 만들고 맛은 한글, 임박 재료는 오늘까지인 양파처럼 말 순서로 쓴다")
+    @DisplayName("사용자 요청과 후보를 줄 글로 만들고 맛은 한글로, 쓰는 냉장고 재료는 소비기한 없이 이름만 쓴다")
     void buildsCandidateLines() {
         RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(MUSHROOM, TOFU), List.of(Taste.SPICY), List.of("찌개", "국"),
                 30, List.of(CUCUMBER), true);
@@ -48,7 +49,7 @@ class RecommendationPromptBuilderTest {
                 선택 재료: 버섯, 두부 (이 재료를 꼭 쓰는 레시피만)
                 조건: 원하는 맛 매운맛 / 분류 찌개, 국 / 30분 이내 / 뺄 재료 오이
                 [추천 후보]
-                후보: 두부버섯찌개 | 찌개 | 조리 시간 25분 | 카드 이유: 매콤한 요리예요 | 쓰는 냉장고 재료: 오늘까지인 양파, 3일 남은 대파, 두부 | 원하는 맛과 맞음: 매운맛 | 장볼 재료: 돼지고기, 부추, 당근 외 2개 | 재료 많이 모자람
+                후보: 두부버섯찌개 | 찌개 | 조리 시간 25분 | 카드 이유: 매콤한 요리예요 | 쓰는 냉장고 재료: 양파, 대파, 두부 | 원하는 맛과 맞음: 매운맛 | 장볼 재료: 돼지고기, 부추, 당근 외 2개 | 재료 많이 모자람
                 후보: 버섯전 | 전 | 조리 시간 정보 없음 | 카드 이유: 새로 만들어 볼 만한 요리예요 | 쓰는 냉장고 재료: 없음 | 장볼 재료: 없음""");
     }
 
@@ -97,7 +98,7 @@ class RecommendationPromptBuilderTest {
                 [이미 안내한 말]
                 말씀하신 표고버섯, 두부, 팽이버섯은 지금 냉장고에 없어서 준비가 필요해요
                 [사용자 요청]""");
-        assertThat(text).contains("후보: 표고두부전골 | 전골 | 조리 시간 30분 | 카드 이유: 표고버섯·두부가 주재료예요 | 선택 재료 쓰임: 표고버섯, 두부 | 쓰는 냉장고 재료: 내일까지인 대파 | 냉장고에 없는 선택 재료: 표고버섯, 두부 | 장볼 재료: 표고버섯, 두부");
+        assertThat(text).contains("후보: 표고두부전골 | 전골 | 조리 시간 30분 | 카드 이유: 표고버섯·두부가 주재료예요 | 선택 재료 쓰임: 표고버섯, 두부 | 쓰는 냉장고 재료: 대파 | 냉장고에 없는 선택 재료: 표고버섯, 두부 | 장볼 재료: 표고버섯, 두부");
     }
 
     @Test
@@ -298,6 +299,27 @@ class RecommendationPromptBuilderTest {
         assertThat(RecommendationPromptBuilder.build("김피탕같은 요리", query, NAMES, picked, true))
                 .startsWith("[이미 안내한 말]\n김피탕 레시피는 없어서, 비슷한 탕수육을 골랐어요\n[사용자 요청]");
         assertThat(RecommendationPromptBuilder.notices(RecipeQuery.of(MEMBER_ID, List.of()), picked, false)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("첫 추천이어도 임박 재료 문장은 안내에 넣지 않는다 (카드의 임박 태그로 충분)")
+    void omitsImminentNotice_evenOnFirstRecommendation() {
+        RecipeCandidate pepper = candidate(1L, "고추전", "전", null, reason(List.of("고추", "깻잎"),
+                List.of(new ImminentIngredient("고추", 1), new ImminentIngredient("깻잎", 0)), List.of(), List.of(), List.of(), false));
+
+        assertThat(RecommendationPromptBuilder.notices(RecipeQuery.of(MEMBER_ID, List.of()), List.of(pepper), false)).isEmpty();
+        assertThat(RecommendationPromptBuilder.build("뭐 먹지?", RecipeQuery.of(MEMBER_ID, List.of()), NAMES, List.of(pepper), false))
+                .doesNotContain("[이미 안내한 말]", "같이 쓸 수 있어요");
+    }
+
+    @Test
+    @DisplayName("조건 줄에 피할 맛을 한글로 쓴다")
+    void writesAvoidTastesInConditionLine() {
+        RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, List.of("튀김"), null, null, false)
+                .withAvoidTastes(List.of(Taste.SPICY));
+
+        assertThat(RecommendationPromptBuilder.build("매운 거 말고", query, NAMES, List.of(), false))
+                .contains("조건: 피할 맛 매운맛 / 분류 튀김");
     }
 
     private static RecipeQuery kimpiQuery(Map<Long, KeywordMatch> matches) {

@@ -71,8 +71,11 @@ public class RecipeCandidateFacade {
                 fridgeService.getItems(grouped.memberId(), FridgeSortType.EXPIRATION));
         // 원하는 맛을 말했으면 회원 선호 맛은 쓰지 않는다 (원하는 맛은 1단계 요청에서만 센다)
         // 회원 도메인에 맛만 조회하는 메서드가 없어 내 정보 조회를 쓴다
+        // 피할 맛은 회원 선호 맛보다 앞선다 (선호 맛에 매운맛이 있어도 "매운 거 말고"면 매운맛을 세지 않는다)
         List<Member.Taste> memberTastes = grouped.wantedTastes().isEmpty()
-                ? memberService.getMyInfo(grouped.memberId()).tastes()
+                ? memberService.getMyInfo(grouped.memberId()).tastes().stream()
+                .filter(taste -> !grouped.avoidTastes().contains(taste))
+                .toList()
                 : List.of();
 
         // 키워드로 찾은 레시피는 냉장고 재료와 겹치지 않을 수 있어 기본 양념 뺀 재료 전체를 더 받고, 어떻게 맞았는지 가른다
@@ -87,9 +90,10 @@ public class RecipeCandidateFacade {
                 .toList();
         Set<Long> recipeIds = scorer.candidateRecipeIds(query, fridge, rows);
         Map<Long, RecipeCandidateInfo> infos = recipeService.findCandidateInfos(recipeIds);
-        Map<Long, Set<Member.Taste>> recipeTastes = recipeService.findTastesByRecipeIds(recipeIds);
+        SpicyRecipes spicy = spicyRecipes(recipeIds, query, memberTastes);
+        Map<Long, Set<Member.Taste>> recipeTastes = withDefinitelySpicy(recipeService.findTastesByRecipeIds(recipeIds), spicy);
 
-        RecipeCandidates ranked = scorer.rank(query, fridge, memberTastes, rows, infos, recipeTastes);
+        RecipeCandidates ranked = rankAvoiding(scorer, query, fridge, memberTastes, rows, infos, recipeTastes, spicy);
 
         // 부족한 재료는 고른 10개만 조회한다
         List<Long> topRecipeIds = ranked.candidates().stream().map(RecipeCandidate::recipeId).toList();
@@ -123,6 +127,78 @@ public class RecipeCandidateFacade {
         Map<Long, RecipeCandidate> byId = new LinkedHashMap<>();
         withMissing.candidates().forEach(candidate -> byId.put(candidate.recipeId(), candidate));
         return byId;
+    }
+
+    /**
+     * 피할 맛인 레시피는 빼고 순위를 매긴다. 빼서 3개가 안 되면 그때만 피할 맛 레시피를 순위대로 뒤에 채운다.
+     * 피할 맛이 매운맛이면 확실히 매운 레시피에 더해 매울 수 있는 레시피(홍고추·청고추)까지 뺀다.
+     */
+    private static RecipeCandidates rankAvoiding(RecipeCandidateScorer scorer, RecipeQuery query, List<FridgeStock> fridge,
+                                                 List<Member.Taste> memberTastes, List<RecipeCandidateIngredient> rows,
+                                                 Map<Long, RecipeCandidateInfo> infos, Map<Long, Set<Member.Taste>> recipeTastes,
+                                                 SpicyRecipes spicy) {
+        if (query.avoidTastes().isEmpty()) {
+            return scorer.rank(query, fridge, memberTastes, rows, infos, recipeTastes);
+        }
+        boolean avoidSpicy = query.avoidTastes().contains(Member.Taste.SPICY);
+        Set<Long> avoided = infos.keySet().stream()
+                .filter(id -> recipeTastes.getOrDefault(id, Set.of()).stream().anyMatch(query.avoidTastes()::contains)
+                        || (avoidSpicy && spicy.maybe().contains(id)))
+                .collect(Collectors.toSet());
+        Map<Long, RecipeCandidateInfo> kept = new HashMap<>(infos);
+        kept.keySet().removeAll(avoided);
+        RecipeCandidates ranked = scorer.rank(query, fridge, memberTastes, rows, kept, recipeTastes);
+        log.debug("상담 후보 피할 맛 - 맛: {}, 뺀 레시피 수: {}, 남은 후보 수: {}", query.avoidTastes(), avoided.size(),
+                ranked.candidates().size());
+        if (ranked.candidates().size() >= RecommendationPicker.PICK_COUNT || avoided.isEmpty()) {
+            return ranked;
+        }
+        Map<Long, RecipeCandidateInfo> onlyAvoided = new HashMap<>(infos);
+        onlyAvoided.keySet().retainAll(avoided);
+        List<RecipeCandidate> refill = scorer.rank(query, fridge, memberTastes, rows, onlyAvoided, recipeTastes).candidates();
+        return new RecipeCandidates(Stream.concat(ranked.candidates().stream(), refill.stream())
+                .limit(RecipeCandidateScorer.LIMIT)
+                .toList(), ranked.fallback());
+    }
+
+    /**
+     * 재료로 가른 매운 레시피 두 단계.
+     *
+     * @param definite 확실히 매운 레시피 (청양고추·고춧가루·고추장·김치류 등). 원하는 맛 매운맛과 맞은 것으로 센다
+     * @param maybe    매울 수 있는 레시피 (확실히 매운 것 + 홍고추·청고추). 피할 맛 매운맛이면 이것까지 뺀다
+     */
+    private record SpicyRecipes(Set<Long> definite, Set<Long> maybe) {
+        private static final SpicyRecipes NONE = new SpicyRecipes(Set.of(), Set.of());
+    }
+
+    // 원하는 맛·피할 맛·회원 선호 맛 어디에도 매운맛이 없으면 조회하지 않는다 (재료 이름 조회 1번)
+    private SpicyRecipes spicyRecipes(Set<Long> recipeIds, RecipeQuery query, List<Member.Taste> memberTastes) {
+        boolean spicyMatters = query.wantedTastes().contains(Member.Taste.SPICY)
+                || query.avoidTastes().contains(Member.Taste.SPICY)
+                || memberTastes.contains(Member.Taste.SPICY);
+        if (!spicyMatters || recipeIds.isEmpty()) {
+            return SpicyRecipes.NONE;
+        }
+        Map<Long, List<String>> texts = recipeService.findIngredientTexts(recipeIds);
+        List<String> definiteWords = chatCandidateProperties.spicyIngredients();
+        List<String> maybeWords = Stream.concat(definiteWords.stream(), chatCandidateProperties.mildSpicyIngredients().stream()).toList();
+        return new SpicyRecipes(
+                SpicyRecipeDetector.spicyRecipeIds(texts, definiteWords, chatCandidateProperties.spicyExclusions()),
+                SpicyRecipeDetector.spicyRecipeIds(texts, maybeWords, chatCandidateProperties.spicyExclusions()));
+    }
+
+    // 맛 데이터에 매운맛이 없어도 확실히 매운 재료가 들어 있으면 매운맛을 더한다 (매울 수 있는 것은 더하지 않는다)
+    private static Map<Long, Set<Member.Taste>> withDefinitelySpicy(Map<Long, Set<Member.Taste>> recipeTastes, SpicyRecipes spicy) {
+        if (spicy.definite().isEmpty()) {
+            return recipeTastes;
+        }
+        Map<Long, Set<Member.Taste>> merged = new HashMap<>(recipeTastes);
+        for (Long id : spicy.definite()) {
+            Set<Member.Taste> tastes = new HashSet<>(merged.getOrDefault(id, Set.of()));
+            tastes.add(Member.Taste.SPICY);
+            merged.put(id, tastes);
+        }
+        return merged;
     }
 
     // 키워드마다 레시피 검색(관련도 순)으로 레시피를 찾는다. 레시피 ID별로 벡터 검색으로만 찾았는지(true)를 돌려준다.

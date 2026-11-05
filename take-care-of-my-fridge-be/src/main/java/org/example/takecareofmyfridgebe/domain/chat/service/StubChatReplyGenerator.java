@@ -1,5 +1,6 @@
 package org.example.takecareofmyfridgebe.domain.chat.service;
 
+import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext.ContextMessage;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
@@ -17,14 +18,21 @@ public class StubChatReplyGenerator implements ChatReplyGenerator {
     private static final Duration CHUNK_DELAY = Duration.ofMillis(50);
 
     @Override
-    public Flux<String> generate(Long memberId, Long sessionId, String userMessage) {
-        return chunked("아직 AI 연결 전이에요. 받은 메시지: " + userMessage);
+    public Flux<String> generate(Long memberId, Long sessionId, String userMessage, List<ContextMessage> history) {
+        String historyNote = history.isEmpty() ? "" : "이전 대화 " + history.size() + "개, ";
+        return chunked("아직 AI 연결 전이에요. " + historyNote + "받은 메시지: " + userMessage);
     }
 
     // 추천 후보 정보를 그대로 보여 준다 (카드 이벤트와 같이 흐름만 확인)
     @Override
     public Flux<String> generateRecommendation(Long memberId, Long sessionId, String userMessage, String candidateInfo) {
         return chunked("아직 AI 연결 전이에요. 추천 후보: " + candidateInfo);
+    }
+
+    // 레시피 정보를 그대로 보여 준다 (카드 하나와 같이 흐름만 확인)
+    @Override
+    public Flux<String> generateRecipeDetail(Long memberId, Long sessionId, String userMessage, String recipeInfo) {
+        return chunked("아직 AI 연결 전이에요. 레시피 정보: " + recipeInfo);
     }
 
     private static Flux<String> chunked(String fullReply) {

@@ -2,18 +2,22 @@ package org.example.takecareofmyfridgebe.domain.chat.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatDoneEventResponse;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatErrorEventResponse;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntent;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntentResolution;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageCreateRequest;
+import org.example.takecareofmyfridgebe.domain.chat.dto.DetailQuestion;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageEventResponse;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageResponse;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationTextEventResponse;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse.RecommendedRecipe;
+import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeDetailReply;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeQuery;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecommendationReply;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecommendationToSave;
+import org.example.takecareofmyfridgebe.domain.chat.facade.ChatContextFacade;
 import org.example.takecareofmyfridgebe.domain.chat.facade.ChatIntentFacade;
 import org.example.takecareofmyfridgebe.domain.chat.facade.ChatRecommendationFacade;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
@@ -37,6 +41,8 @@ public class ChatStreamService {
 
     // 추천 후보가 하나도 없을 때 답 (AI를 부르지 않는다)
     static final String NO_RECIPE_REPLY = "조건에 맞는 레시피를 찾지 못했어요. 시간을 늘리거나, 선택 재료를 줄이거나, 다른 요리 종류로 다시 물어봐 주세요.";
+    // 물어본 레시피가 지워졌을 때 답 (AI를 부르지 않는다)
+    static final String RECIPE_GONE_REPLY = "물어보신 레시피는 지금 볼 수 없어요. 다른 레시피를 물어봐 주세요.";
 
     private final ChatMessageService chatMessageService;
     private final ChatStreamLockService chatStreamLockService;
@@ -44,6 +50,8 @@ public class ChatStreamService {
     private final ChatReplyGenerator chatReplyGenerator;
     private final ChatIntentFacade chatIntentFacade;
     private final ChatRecommendationFacade chatRecommendationFacade;
+    private final ChatContextFacade chatContextFacade;
+    private final ChatContextStore chatContextStore;
     private final ObjectMapper objectMapper;
 
     /**
@@ -81,8 +89,8 @@ public class ChatStreamService {
 
         StringBuilder accumulated = new StringBuilder();
         AtomicBoolean firstChunkReceived = new AtomicBoolean(false);
-        // 이 답에 붙은 추천 카드와 카드별 설명. 답이 끝나면 AI 메시지와 함께 저장한다
-        AtomicReference<RecommendationReply> recommendationRef = new AtomicReference<>();
+        // 이 답의 계획(추천이면 조건·카드)과 카드별 설명. 답이 끝나면 AI 메시지와 함께 저장한다
+        AtomicReference<ReplyPlan> planRef = new AtomicReference<>();
         List<StringBuilder> descriptions = new ArrayList<>();
 
         // 4. 의도·조건 뽑기 → (추천이면) 후보 검색 → 카드 (event: recommendations) → 답변 스트리밍 조각 (event: message)
@@ -91,8 +99,24 @@ public class ChatStreamService {
         Flux<ServerSentEvent<String>> messageStream = Mono.fromCallable(() -> planReply(memberId, sessionId, request))
                 .subscribeOn(Schedulers.boundedElastic())
                 .flatMapMany(plan -> {
-                    recommendationRef.set(plan.recommendation());
+                    planRef.set(plan);
                     Flux<String> reply = replyText(memberId, sessionId, content, plan);
+                    // 레시피 자세히: 그 레시피 카드 하나를 먼저 보내고 글은 표시 없이 그대로 message로 보낸다
+                    if (plan.detail() != null) {
+                        ServerSentEvent<String> card = ServerSentEvent.<String>builder()
+                                .event("recommendations")
+                                .data(toJson(plan.detail().event()))
+                                .build();
+                        // 생략 괄호 글("(뒤 단계 생략)")은 화면·저장 모두에서 지운다
+                        OmissionNoteFilter omissionFilter = new OmissionNoteFilter();
+                        Flux<String> text = reply
+                                .doOnNext(chunk -> firstChunkReceived.set(true))
+                                .map(omissionFilter::feed)
+                                .concatWith(Flux.defer(() -> Flux.just(omissionFilter.finish())))
+                                .filter(piece -> !piece.isEmpty())
+                                .doOnNext(accumulated::append);
+                        return Flux.concat(Mono.just(card), text.map(this::messageEvent));
+                    }
                     if (plan.recommendation() == null) {
                         return reply
                                 .doOnNext(chunk -> {
@@ -123,7 +147,7 @@ public class ChatStreamService {
                 log.warn("상담 답이 비어 있음 - memberId: {}, sessionId: {}", memberId, sessionId);
                 return Mono.error(new BusinessException(ErrorCode.CHAT_AI_UNAVAILABLE));
             }
-            return saveExchange(sessionId, content, accumulated, recommendationRef.get(), descriptions);
+            return saveExchange(sessionId, content, accumulated, planRef.get(), descriptions);
         });
 
         // 6. 실패 시 에러 이벤트 (event: error) 및 로깅. 첫 조각 전 실패면 하루 횟수를 돌려준다
@@ -138,28 +162,61 @@ public class ChatStreamService {
                 .doFinally(signal -> chatStreamLockService.release(sessionId, lockToken));
     }
 
-    // 답 방식 정하기: 의도가 추천이면 후보를 찾아 카드·설명 재료를 만든다. 후보 검색이 실패하면 일반 답
+    // 답 방식 정하기: 상담 문맥(최근 대화)을 읽고, 의도가 추천이면 후보를 찾아 카드·설명 재료를 만든다. 후보 검색이 실패하면 일반 답
     private ReplyPlan planReply(Long memberId, Long sessionId, ChatMessageCreateRequest request) {
-        ChatIntentResolution resolution = chatIntentFacade.resolve(memberId, sessionId, request);
-        if (resolution == null || resolution.intent() != ChatIntent.RECOMMEND || resolution.recipeQuery() == null) {
-            return ReplyPlan.GENERAL;
+        ChatContext context = chatContextFacade.load(sessionId);
+        ChatIntentResolution resolution = chatIntentFacade.resolve(memberId, sessionId, request, context);
+        if (resolution != null && resolution.intent() == ChatIntent.RECIPE_DETAIL) {
+            // 사용자 말 대신 질문 종류로 만든 질문을 넘긴다 ("두 번째 거"를 단계 번호로 알아듣지 않게). 저장하는 사용자 메시지는 원래 말
+            String question = DetailQuestion.questionFor(resolution.detailQuestion(), request.content());
+            return planRecipeDetail(memberId, sessionId, resolution.targetRecipeId(), question, context);
+        }
+        if (resolution == null || !resolution.recommends()) {
+            return ReplyPlan.general(context);
         }
         try {
             // 같은 상담에서 이미 추천한 레시피는 뒤로 보낸다
             RecipeQuery query = resolution.recipeQuery()
                     .withAlreadyRecommended(chatMessageService.findRecommendedRecipeIds(sessionId));
-            RecommendationReply recommendation = chatRecommendationFacade.recommend(request.content(), query);
+            // 다시 추천이면 직전 카드는 후보에서 뺀다 (모자라면 뒤에 다시 넣는다)
+            RecommendationReply recommendation = resolution.intent() == ChatIntent.REFINE && context.lastRecommendation() != null
+                    ? chatRecommendationFacade.recommend(request.content(), query, context.lastRecommendation().recipeIds())
+                    : chatRecommendationFacade.recommend(request.content(), query);
             // 고른 레시피·맞은 방식·카드 이유는 ChatRecommendationFacade가 "상담 추천 후보 -"로 남긴다
-            return new ReplyPlan(recommendation);
+            return new ReplyPlan(context, recommendation, resolution.recipeQuery());
         } catch (RuntimeException e) {
             log.warn("상담 추천 후보 검색 실패, 일반 답으로 - memberId: {}, sessionId: {}", memberId, sessionId, e);
-            return ReplyPlan.GENERAL;
+            return ReplyPlan.general(context);
+        }
+    }
+
+    // 레시피 자세히: 레시피 정보와 카드 하나를 만든다. 레시피가 지워졌으면 정해진 답, 읽다 실패하면 일반 답
+    private ReplyPlan planRecipeDetail(Long memberId, Long sessionId, Long recipeId, String question, ChatContext context) {
+        try {
+            return chatRecommendationFacade.describe(memberId, recipeId)
+                    .map(detail -> new ReplyPlan(context, null, null, detail.withQuestion(question), false))
+                    .orElseGet(() -> {
+                        log.info("상담 레시피 자세히 대상이 지워짐 - memberId: {}, sessionId: {}, recipeId: {}", memberId, sessionId, recipeId);
+                        return new ReplyPlan(context, null, null, null, true);
+                    });
+        } catch (RuntimeException e) {
+            log.warn("상담 레시피 자세히 정보 읽기 실패, 일반 답으로 - memberId: {}, sessionId: {}, recipeId: {}",
+                    memberId, sessionId, recipeId, e);
+            return ReplyPlan.general(context);
         }
     }
 
     private Flux<String> replyText(Long memberId, Long sessionId, String content, ReplyPlan plan) {
+        if (plan.recipeGone()) {
+            return Flux.just(RECIPE_GONE_REPLY);
+        }
+        if (plan.detail() != null) {
+            String question = plan.detail().question() == null ? content : plan.detail().question();
+            return chatReplyGenerator.generateRecipeDetail(memberId, sessionId, question, plan.detail().recipeInfo());
+        }
         if (plan.recommendation() == null) {
-            return chatReplyGenerator.generate(memberId, sessionId, content);
+            // 일반 답에만 이전 대화(최근 3턴)를 넣는다. 추천 설명은 후보 정보로 충분하다
+            return chatReplyGenerator.generate(memberId, sessionId, content, plan.context().recentMessages());
         }
         // 카드가 0개면 AI를 부르지 않고 정해진 답을 보낸다. "찾지 못했어요"는 카드가 없을 때만 나간다
         if (plan.recommendation().event().empty()) {
@@ -168,13 +225,32 @@ public class ChatStreamService {
         return chatReplyGenerator.generateRecommendation(memberId, sessionId, content, plan.recommendation().candidateInfo());
     }
 
-    // recommendation이 null이면 일반 답
-    private record ReplyPlan(RecommendationReply recommendation) {
-        private static final ReplyPlan GENERAL = new ReplyPlan(null);
+    /**
+     * 답 방식. recommendation이 있으면 추천(query는 추천에 쓴 조건, 직전 추천으로 Redis에 둔다),
+     * detail이 있으면 레시피 자세히, recipeGone이면 물어본 레시피가 지워져 정해진 답, 모두 없으면 일반 답.
+     */
+    private record ReplyPlan(ChatContext context, RecommendationReply recommendation, RecipeQuery query,
+                             RecipeDetailReply detail, boolean recipeGone) {
+
+        private ReplyPlan(ChatContext context, RecommendationReply recommendation, RecipeQuery query) {
+            this(context, recommendation, query, null, false);
+        }
+
+        private static ReplyPlan general(ChatContext context) {
+            return new ReplyPlan(context, null, null);
+        }
+
+        // 저장할 카드 (추천 카드 또는 레시피 자세히 카드 하나)
+        private List<RecommendedRecipe> cards() {
+            if (recommendation != null) {
+                return recommendation.event().recipes();
+            }
+            return detail != null ? detail.event().recipes() : List.of();
+        }
     }
 
     // 추천 답을 표시로 나눠 [소개]는 message, [n]은 recommendation_text 이벤트로 보낸다.
-    // 안내 문장이 있으면 서버가 소개 맨 앞에 먼저 보내고(message), 저장할 소개에도 앞에 붙인다. AI가 되풀이한 안내는 뺀다.
+    // 안내 문장이 있으면 그 안내가 소개다: 서버가 먼저 보내고(message) 저장할 소개도 안내뿐이며, AI가 쓴 소개 글은 버린다.
     // 표시를 빼먹은 답은 전체를 소개로 보낸다. "첫 조각"은 AI에게서 처음 내보낸 글(소개든 카드 설명이든)이다 (안내 문장은 세지 않음)
     private Flux<ServerSentEvent<String>> splitRecommendationText(
             Flux<String> reply,
@@ -187,10 +263,10 @@ public class ChatStreamService {
         for (int i = 0; i < cardCount; i++) {
             descriptions.add(new StringBuilder());
         }
-        RecommendationTextSplitter splitter = new RecommendationTextSplitter(cardCount, recommendation.notices());
+        RecommendationTextSplitter splitter = new RecommendationTextSplitter(cardCount, recommendation.notices(),
+                recommendation.event().recipes().stream().map(RecommendedRecipe::name).toList());
         String noticeText = recommendation.noticeText();
-        // 안내 뒤 첫 소개 글은 한 칸 띄운다
-        AtomicBoolean needsSpace = new AtomicBoolean(!noticeText.isEmpty());
+        boolean dropIntro = !noticeText.isEmpty();
         Flux<ServerSentEvent<String>> notice = Flux.defer(() -> {
             if (noticeText.isEmpty()) {
                 return Flux.empty();
@@ -200,13 +276,10 @@ public class ChatStreamService {
         });
         Flux<ServerSentEvent<String>> text = reply.concatMapIterable(splitter::feed)
                 .concatWith(Flux.defer(() -> Flux.fromIterable(splitter.finish())))
-                .map(piece -> piece.intro() && needsSpace.getAndSet(false)
-                        ? new RecommendationTextSplitter.Piece(piece.index(), " " + piece.text())
-                        : piece)
-                .doOnNext(piece -> {
-                    firstChunkReceived.set(true);
-                    (piece.intro() ? intro : descriptions.get(piece.index())).append(piece.text());
-                })
+                // 버리는 소개 글도 AI 답을 받은 것이므로 첫 조각으로 센다 (하루 횟수 돌려주기 기준)
+                .doOnNext(piece -> firstChunkReceived.set(true))
+                .filter(piece -> !(dropIntro && piece.intro()))
+                .doOnNext(piece -> (piece.intro() ? intro : descriptions.get(piece.index())).append(piece.text()))
                 .map(piece -> piece.intro()
                         ? messageEvent(piece.text())
                         : ServerSentEvent.<String>builder()
@@ -224,32 +297,45 @@ public class ChatStreamService {
     }
 
     private Mono<ServerSentEvent<String>> saveExchange(Long sessionId, String content, StringBuilder accumulated,
-                                                       RecommendationReply recommendation, List<StringBuilder> descriptions) {
+                                                       ReplyPlan plan, List<StringBuilder> descriptions) {
         return Mono.fromCallable(() -> {
-            List<RecommendedRecipe> recipes = recommendation == null ? List.of() : recommendation.event().recipes();
+            List<RecommendedRecipe> recipes = plan == null ? List.of() : plan.cards();
             List<RecommendationToSave> cards = new ArrayList<>();
             List<Integer> receivedNumbers = new ArrayList<>();
             for (int i = 0; i < recipes.size(); i++) {
                 String description = i < descriptions.size() ? descriptions.get(i).toString().strip() : "";
-                cards.add(new RecommendationToSave(recipes.get(i).recipeId(), description.isEmpty() ? null : description));
+                // AI 설명이 없으면 카드에 미리 정한 설명(레시피 자세히 카드의 "물어보신 레시피예요")을 저장한다
+                String saved = description.isEmpty() ? recipes.get(i).description() : description;
+                cards.add(new RecommendationToSave(recipes.get(i).recipeId(), saved));
                 if (!description.isEmpty()) {
                     receivedNumbers.add(i + 1);
                 }
             }
-            // 설명이 빠진 카드는 화면에서 카드 이유 한 줄로 대신한다. 빠진 걸 알 수 있게 남긴다
-            if (!cards.isEmpty() && receivedNumbers.size() < cards.size()) {
+            // 설명이 빠진 카드는 화면에서 카드 이유 한 줄로 대신한다. 빠진 걸 알 수 있게 남긴다 (레시피 자세히 카드는 설명이 없다)
+            if (plan.recommendation() != null && !cards.isEmpty() && receivedNumbers.size() < cards.size()) {
                 log.warn("카드 설명 누락 - sessionId: {}, 카드 수: {}, 받은 번호: {}", sessionId, cards.size(), receivedNumbers);
             }
             // 카드가 없으면 기존처럼 메시지만 저장한다
             List<ChatMessageResponse> saved = cards.isEmpty()
                     ? chatMessageService.saveExchange(sessionId, content, accumulated.toString())
                     : chatMessageService.saveExchange(sessionId, content, accumulated.toString(), cards);
+            rememberContext(sessionId, plan, recipes);
             String doneJson = toJson(new ChatDoneEventResponse(saved.get(0).id(), saved.get(1).id()));
             return ServerSentEvent.<String>builder()
                     .event("done")
                     .data(doneJson)
                     .build();
         }).subscribeOn(Schedulers.boundedElastic());
+    }
+
+    // 카드가 있는 추천 답이면 그 조건·카드를 직전 추천으로 두고, 그 밖의 답은 직전 추천을 그대로 두고 유지 시간만 늘린다
+    private void rememberContext(Long sessionId, ReplyPlan plan, List<RecommendedRecipe> recipes) {
+        if (plan != null && plan.query() != null && !recipes.isEmpty()) {
+            chatContextStore.saveRecommendation(sessionId, plan.query(),
+                    recipes.stream().map(RecommendedRecipe::recipeId).toList());
+        } else {
+            chatContextStore.touch(sessionId);
+        }
     }
 
     private ServerSentEvent<String> errorEvent(Long sessionId, Throwable e) {

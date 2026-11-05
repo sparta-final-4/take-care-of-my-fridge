@@ -111,6 +111,42 @@ class RecommendationTextSplitterTest {
         assertThat(split(1, "짧은 답")).containsExactly(Map.entry(-1, "짧은 답"));
     }
 
+    @Test
+    @DisplayName("카드 설명 첫 문장이 레시피 이름뿐이면(\"소고기채소불고기예요.\") 공백을 무시하고 문장째 지운다, 조각이 쪼개져 와도")
+    void dropsLeadingNameSentence() {
+        List<Piece> pieces = piecesWithNames(List.of("소고기채소불고기", "깐풍기"),
+                "[소개] 골랐어요.\n[1] 소고기 채소", "불고기예요. 달", "콤하게 볶아요.\n[2] 깐풍기는 바삭해요.");
+
+        assertThat(group(pieces)).containsExactly(
+                Map.entry(-1, "골랐어요."), Map.entry(0, "달콤하게 볶아요."), Map.entry(1, "바삭해요."));
+        assertThat(pieces).extracting(Piece::text).noneMatch(text -> text.contains("불고기") || text.contains("깐풍기"));
+    }
+
+    @Test
+    @DisplayName("이름 뒤가 문장 끝이나 주어 조사가 아니면(\"두부조림처럼\") 지우지 않고, 이름으로 시작하지 않는 설명은 바로 보낸다")
+    void keepsDescription_whenNotStartingWithNameSentence() {
+        assertThat(group(piecesWithNames(List.of("두부조림"), "[1] 두부조림처럼 짭조름해요.")))
+                .containsExactly(Map.entry(0, "두부조림처럼 짭조름해요."));
+
+        RecommendationTextSplitter splitter = new RecommendationTextSplitter(1, List.of(), List.of("깐풍기"));
+        assertThat(splitter.feed("[1] 바삭하게 튀겨 ")).extracting(Piece::text).containsExactly("바삭하게 튀겨");
+    }
+
+    private static List<Piece> piecesWithNames(List<String> names, String... chunks) {
+        RecommendationTextSplitter splitter = new RecommendationTextSplitter(names.size(), List.of(), names);
+        List<Piece> pieces = new ArrayList<>();
+        for (String chunk : chunks) {
+            pieces.addAll(splitter.feed(chunk));
+        }
+        pieces.addAll(splitter.finish());
+        return pieces;
+    }
+
+    private static Map<Integer, String> group(List<Piece> pieces) {
+        return pieces.stream()
+                .collect(Collectors.groupingBy(Piece::index, TreeMap::new, Collectors.mapping(Piece::text, Collectors.joining())));
+    }
+
     private static Map<Integer, String> split(int cardCount, String... chunks) {
         return split(cardCount, List.of(), chunks);
     }

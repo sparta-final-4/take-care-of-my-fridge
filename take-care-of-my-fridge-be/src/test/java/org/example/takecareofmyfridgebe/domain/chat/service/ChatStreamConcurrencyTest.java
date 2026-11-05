@@ -1,9 +1,11 @@
 package org.example.takecareofmyfridgebe.domain.chat.service;
 
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatProperties;
+import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageCreateRequest;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageResponse;
 import org.example.takecareofmyfridgebe.domain.chat.entity.ChatMessageRole;
+import org.example.takecareofmyfridgebe.domain.chat.facade.ChatContextFacade;
 import org.example.takecareofmyfridgebe.domain.chat.facade.ChatIntentFacade;
 import org.example.takecareofmyfridgebe.domain.chat.facade.ChatRecommendationFacade;
 import org.example.takecareofmyfridgebe.global.config.RedisConfig;
@@ -82,8 +84,15 @@ class ChatStreamConcurrencyTest extends RedisContainerSupport {
     @MockitoBean
     private ChatRecommendationFacade chatRecommendationFacade;
 
+    @MockitoBean
+    private ChatContextFacade chatContextFacade;
+
+    @MockitoBean
+    private ChatContextStore chatContextStore;
+
     @BeforeEach
     void clearKeys() {
+        given(chatContextFacade.load(any())).willReturn(ChatContext.empty());
         for (String pattern : List.of("chat:streaming:*", "chat:limit:*")) {
             Set<String> keys = stringRedisTemplate.keys(pattern);
             if (keys != null && !keys.isEmpty()) {
@@ -96,7 +105,7 @@ class ChatStreamConcurrencyTest extends RedisContainerSupport {
     @DisplayName("같은 상담에 동시에 두 번 보내면 하나만 스트림을 받고 다른 하나는 409, 하루 횟수는 1만 오른다")
     void streamsOnlyOne_whenSentConcurrently() throws Exception {
         Sinks.Many<String> reply = Sinks.many().unicast().onBackpressureBuffer();
-        given(chatReplyGenerator.generate(anyLong(), anyLong(), any())).willReturn(reply.asFlux());
+        given(chatReplyGenerator.generate(anyLong(), anyLong(), any(), any())).willReturn(reply.asFlux());
 
         int requests = 2;
         ExecutorService executor = Executors.newFixedThreadPool(requests);
@@ -144,7 +153,7 @@ class ChatStreamConcurrencyTest extends RedisContainerSupport {
                 new ChatMessageResponse(1L, 1, ChatMessageRole.USER, "질문", LocalDateTime.now()),
                 new ChatMessageResponse(2L, 2, ChatMessageRole.ASSISTANT, "답", LocalDateTime.now())
         ));
-        given(chatReplyGenerator.generate(anyLong(), anyLong(), any())).willReturn(
+        given(chatReplyGenerator.generate(anyLong(), anyLong(), any(), any())).willReturn(
                 Flux.just("답"),
                 Flux.error(new RuntimeException("AI 연결 실패")),
                 Flux.concat(Flux.just("조각"), Flux.never()),

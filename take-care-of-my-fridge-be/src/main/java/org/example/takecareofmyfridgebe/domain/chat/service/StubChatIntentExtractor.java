@@ -12,7 +12,7 @@ import java.util.List;
 public class StubChatIntentExtractor implements ChatIntentExtractor {
 
     @Override
-    public IntentResult extract(Long memberId, Long sessionId, String message, List<String> categories) {
+    public IntentResult extract(Long memberId, Long sessionId, String message, List<String> categories, String followUp) {
         return IntentResult.general();
     }
 }

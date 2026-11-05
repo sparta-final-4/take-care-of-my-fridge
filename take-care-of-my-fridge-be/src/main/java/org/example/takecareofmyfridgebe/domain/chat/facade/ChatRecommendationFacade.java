@@ -10,6 +10,7 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.KeywordMatch;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate.Reason;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidates;
+import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeDetailReply;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeQuery;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecommendationReply;
 import org.example.takecareofmyfridgebe.domain.chat.dto.SavedRecommendation;
@@ -17,15 +18,21 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.TasteLabel;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.Ingredient;
 import org.example.takecareofmyfridgebe.domain.ingredient.service.IngredientService;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
+import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeDetailResponse;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeSummary;
 import org.example.takecareofmyfridgebe.domain.recipe.service.RecipeService;
+import org.example.takecareofmyfridgebe.global.error.BusinessException;
+import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -38,6 +45,12 @@ import java.util.stream.Stream;
 @RequiredArgsConstructor
 public class ChatRecommendationFacade {
 
+    // 레시피 자세히 답에 붙는 카드 한 줄. 카드 설명으로도 넣어 저장하므로(화면은 설명이 있으면 이유 줄을 숨김)
+    // 답 받을 때와 다시 불러올 때 모두 이 줄만 보이고, 지금 냉장고 기준 이유("내일까지인 깻잎…")는 보이지 않는다
+    static final String DETAIL_CARD_REASON = "물어보신 레시피예요";
+    // 레시피 정보 DEBUG 로그에 남길 앞부분 글자 수
+    private static final int RECIPE_INFO_LOG_LENGTH = 300;
+
     private final RecipeCandidateFacade recipeCandidateFacade;
     private final RecipeService recipeService;
     private final IngredientService ingredientService;
@@ -48,8 +61,18 @@ public class ChatRecommendationFacade {
      * @return 카드 이벤트(후보가 없으면 empty=true)와 설명용 후보 정보
      */
     public RecommendationReply recommend(String content, RecipeQuery query) {
+        return recommend(content, query, List.of());
+    }
+
+    /**
+     * 다시 추천. 직전 카드(previousCardIds)는 후보에서 빼고 고른다. 빼서 후보가 3개보다 적어지면 그때만 뒤에 다시 넣는다.
+     * 새 추천은 previousCardIds 없이 부르고, 이미 추천한 레시피는 정렬에서 뒤로 간다 (RecipeQuery.alreadyRecommendedIds).
+     *
+     * @param previousCardIds 직전 추천 카드 레시피 ID ("다른 거 없어?"에서 같은 카드가 다시 나오지 않게)
+     */
+    public RecommendationReply recommend(String content, RecipeQuery query, Collection<Long> previousCardIds) {
         RecipeCandidates found = recipeCandidateFacade.findCandidates(query);
-        List<RecipeCandidate> candidates = found.candidates();
+        List<RecipeCandidate> candidates = withoutPrevious(found.candidates(), previousCardIds);
         logCandidates(query, candidates);
         List<RecipeCandidate> picked = RecommendationPicker.pick(candidates);
 
@@ -102,6 +125,49 @@ public class ChatRecommendationFacade {
                     + "] " + recipes.get(i).reason());
         }
         log.info("상담 추천 후보 - memberId: {}, 키워드: {}, 고른 레시피: {}", query.memberId(), query.keywords(), lines);
+    }
+
+    /**
+     * 레시피 자세히 답을 만들 재료: 그 레시피 카드 하나와 [레시피 정보]. 레시피가 지워졌으면 빈 값.
+     * 카드의 임박·장볼 재료와 [냉장고 기준]은 지금 냉장고 기준으로 계산한다.
+     */
+    public Optional<RecipeDetailReply> describe(Long memberId, Long recipeId) {
+        RecipeDetailResponse recipe;
+        try {
+            recipe = recipeService.getRecipe(recipeId);
+        } catch (BusinessException e) {
+            if (e.getErrorCode() == ErrorCode.RECIPE_NOT_FOUND) {
+                return Optional.empty();
+            }
+            throw e;
+        }
+        RecipeCandidate candidate = recipeCandidateFacade.describeRecipes(memberId, List.of(recipeId)).get(recipeId);
+        String recipeInfo = RecipeDetailPromptBuilder.build(recipe, candidate);
+        if (log.isDebugEnabled()) {
+            log.debug("상담 레시피 정보 - recipeId: {}, 글자 수: {}, 앞 300자: {}", recipeId, recipeInfo.length(),
+                    recipeInfo.substring(0, Math.min(RECIPE_INFO_LOG_LENGTH, recipeInfo.length())));
+        }
+        RecommendedRecipe card = candidate == null
+                ? new RecommendedRecipe(recipe.recipeId(), recipe.name(), recipe.imageUrl(), recipe.category(),
+                recipe.cookTimeMin(), List.of(), List.of(), List.of(), List.of(), List.of(), false, DETAIL_CARD_REASON,
+                DETAIL_CARD_REASON)
+                : toCard(candidate, new RecipeSummary(recipe.recipeId(), recipe.name(), recipe.imageUrl(), recipe.tipSummary()),
+                DETAIL_CARD_REASON, DETAIL_CARD_REASON);
+        return Optional.of(new RecipeDetailReply(ChatRecommendationsEventResponse.of(List.of(card)), recipeInfo));
+    }
+
+    // 직전 카드를 뺀 후보. 빼서 3개보다 적어지면 직전 카드를 정렬 순서대로 뒤에 다시 붙인다
+    static List<RecipeCandidate> withoutPrevious(List<RecipeCandidate> candidates, Collection<Long> previousCardIds) {
+        if (previousCardIds.isEmpty()) {
+            return candidates;
+        }
+        Set<Long> previous = Set.copyOf(previousCardIds);
+        List<RecipeCandidate> fresh = candidates.stream().filter(candidate -> !previous.contains(candidate.recipeId())).toList();
+        if (fresh.size() >= RecommendationPicker.PICK_COUNT) {
+            return fresh;
+        }
+        return Stream.concat(fresh.stream(), candidates.stream().filter(candidate -> previous.contains(candidate.recipeId())))
+                .toList();
     }
 
     // 프롬프트에 쓸 선택·뺄 재료 이름
