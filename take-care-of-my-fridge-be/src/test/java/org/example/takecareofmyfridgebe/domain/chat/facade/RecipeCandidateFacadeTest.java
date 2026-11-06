@@ -1,6 +1,7 @@
 package org.example.takecareofmyfridgebe.domain.chat.facade;
 
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatCandidateProperties;
+import org.example.takecareofmyfridgebe.domain.chat.dto.KeywordMatch;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate.ImminentIngredient;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate.MissingIngredient;
@@ -512,6 +513,38 @@ class RecipeCandidateFacadeTest {
 
         assertThat(result.candidates()).hasSize(3);
         verify(candidateSearchService, times(1)).search(any());
+    }
+
+    @Test
+    @DisplayName("ES 경로: 키워드로 맞은 레시피가 없으면 레시피 검색(벡터 보충)으로 찾은 레시피를 더하고 벡터로 찾은 것으로 표시한다")
+    void addsVectorHits_whenNoKeywordMatch() throws Exception {
+        when(memberService.getMyInfo(MEMBER_ID)).thenReturn(mock(MyInfoResponse.class));
+        when(candidateSearchService.search(any())).thenReturn(List.of());
+        when(recipeSearchService.search(any(RecipeListRequest.class))).thenReturn(new RecipeSearchResult(List.of(40L), 1, true));
+        givenEsRecipes(Map.of(40L, new RecipeCandidateInfo(40L, "탕수육", "튀김", 40, 1)));
+        RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, null, null, null, false, List.of("김피탕"), "김피탕");
+
+        RecipeCandidates result = esFacade.findCandidates(query);
+
+        assertThat(result.candidates()).extracting(RecipeCandidate::recipeId).containsExactly(40L);
+        assertThat(result.candidates().get(0).reason().keywordMatch().type()).isEqualTo(KeywordMatch.Type.VECTOR);
+        assertThat(result.keywordsNotFound()).isTrue();
+        verify(recipeService, times(1)).findNonBasicIngredients(Set.of(40L));
+    }
+
+    @Test
+    @DisplayName("ES 경로: 키워드로 맞은 레시피가 있으면 벡터 보충을 하지 않고, 이름이 맞은 것은 이름으로 가른다")
+    void skipsVectorSearch_whenKeywordMatched() throws Exception {
+        when(memberService.getMyInfo(MEMBER_ID)).thenReturn(mock(MyInfoResponse.class));
+        when(candidateSearchService.search(any())).thenReturn(List.of(hit(20L, RecipeCandidateSearchService.MATCH_KEYWORD)));
+        givenEsRecipes(Map.of(20L, new RecipeCandidateInfo(20L, "물냉면", "면류", 30, 1)));
+        RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, null, null, null, false, List.of("냉면"), "냉면");
+
+        RecipeCandidates result = esFacade.findCandidates(query);
+
+        assertThat(result.candidates().get(0).reason().keywordMatch().type()).isEqualTo(KeywordMatch.Type.NAME);
+        assertThat(result.keywordsNotFound()).isFalse();
+        verify(recipeSearchService, never()).search(any());
     }
 
     // ES로 찾히는 레시피들. 모두 두부(1번)를 쓰고, 정보·재료는 요청한 ID만 돌려준다

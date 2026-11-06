@@ -238,6 +238,8 @@ public class RecipeCandidateFacade {
 
     /**
      * ES 후보 검색으로 모은다. 분류·키워드가 있으면 요청 조건만 넣은 검색을 한 번 더 해서 합친다 (각 최대 100건).
+     * 키워드로 맞은 레시피가 없으면 레시피 검색(벡터 보충)으로 키워드 후보를 더한다. 이 후보는 ES 거르기(시간·피할 맛 등)를 거치지 않아
+     * 정렬(isFilteredOut)과 피할 맛 처리에서 다시 거른다.
      * 재료는 합친 후보 전체를 한 번에 읽는다 (기본 양념 뺀 재료).
      *
      * @param withoutAvoidTastes 피할 맛 없이 검색할지 (피할 맛 레시피로 다시 채울 때)
@@ -262,6 +264,15 @@ public class RecipeCandidateFacade {
             if (hit.matched(RecipeCandidateSearchService.MATCH_KEYWORD)) {
                 keywordHits.put(hit.recipeId(), false);
             }
+        }
+        // 키워드로 맞은 레시피가 하나도 없을 때만 레시피 검색(글자가 0건이면 벡터 검색)으로 비슷한 요리를 더한다 ("김피탕" → 탕수육)
+        if (!withoutAvoidTastes && !query.keywords().isEmpty() && keywordHits.isEmpty()) {
+            searchKeywords(query).forEach((recipeId, vectorOnly) -> {
+                if (!skipIds.contains(recipeId)) {
+                    recipeIds.add(recipeId);
+                    keywordHits.putIfAbsent(recipeId, vectorOnly);
+                }
+            });
         }
         return new CandidatePool(recipeIds, recipeService.findNonBasicIngredients(recipeIds), keywordHits, true);
     }
