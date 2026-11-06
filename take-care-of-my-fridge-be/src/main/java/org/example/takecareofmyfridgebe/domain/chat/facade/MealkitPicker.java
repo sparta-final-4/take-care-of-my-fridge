@@ -7,6 +7,7 @@ import org.example.takecareofmyfridgebe.domain.product.entity.MealkitProduct;
 import org.example.takecareofmyfridgebe.domain.product.entity.Product;
 import org.example.takecareofmyfridgebe.domain.sale.dto.SellingPrice;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
@@ -24,6 +25,7 @@ import java.util.stream.Collectors;
  * 냉장고 재료와 겹치는 수(레시피 재료 기준) → 할인 중 → 판매 단가 낮은 순 → 상품 ID.
  * 안 보여 준 것을 레시피 연결보다 앞에 둔다: "밀키트 뭐 있어"를 다시 물으면 레시피 연결이 없는 밀키트라도 새 것을 먼저 보여 준다.
  * 레시피 연결이 없거나 연결된 레시피가 지워진 밀키트는 요청 조건을 상품 이름 키워드로만 센다.
+ * 레시피 연결도 없고 요청 조건도 안 맞는 밀키트는 {@value #MAX_UNRELATED}장까지만 고르고, 3장이 안 차면 빈자리로 둔다.
  * 기준이 바뀌면 일반 답 프롬프트(prompts/chat-general.txt)의 추천 기준 문장도 같이 고친다.
  */
 public final class MealkitPicker {
@@ -35,6 +37,9 @@ public final class MealkitPicker {
             .thenComparing((Option option) -> option.price().sale().isEmpty())
             .thenComparingInt(option -> option.price().unitPrice())
             .thenComparing(option -> option.mealkit().getProduct().getId());
+
+    // 레시피 연결도 없고 요청 조건도 안 맞는 밀키트를 보여 줄 최대 수. 어떤 요리인지 몰라 고른 이유를 댈 수 없어 한 장으로 줄인다
+    static final int MAX_UNRELATED = 1;
 
     private MealkitPicker() {
     }
@@ -77,16 +82,30 @@ public final class MealkitPicker {
         Set<Long> cardRecipeIds = Set.copyOf(input.cardRecipeIds());
         Set<Long> shown = Set.copyOf(input.shownProductIds());
         RecipeQuery query = input.query();
-        return input.mealkits().stream()
+        List<Option> sorted = input.mealkits().stream()
                 .filter(mealkit -> !fridgeNames.contains(compact(mealkit.getProduct().getName())))
                 .filter(mealkit -> mealkit.getRecipeId() == null || !cardRecipeIds.contains(mealkit.getRecipeId()))
                 .map(mealkit -> toOption(mealkit, input, shown))
                 .filter(option -> option.price() != null && !option.price().soldOut())
                 .filter(option -> !avoided(option, input.recipeTastes(), query))
                 .sorted(ORDER)
-                .limit(limit)
-                .map(option -> new Picked(option.mealkit(), option.price(), option.recipe(), option.requestMatches()))
                 .toList();
+        List<Picked> picked = new ArrayList<>();
+        int unrelated = 0;
+        for (Option option : sorted) {
+            if (picked.size() >= limit) {
+                break;
+            }
+            // 레시피 연결도 없고 요청 조건도 안 맞는 밀키트는 한 장까지만 (나머지 자리는 비운다)
+            if (option.recipe() == null && option.requestMatches() == 0) {
+                if (unrelated >= MAX_UNRELATED) {
+                    continue;
+                }
+                unrelated++;
+            }
+            picked.add(new Picked(option.mealkit(), option.price(), option.recipe(), option.requestMatches()));
+        }
+        return List.copyOf(picked);
     }
 
     private static Option toOption(MealkitProduct mealkit, Input input, Set<Long> shown) {

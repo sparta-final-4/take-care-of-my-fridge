@@ -128,6 +128,23 @@ class MealkitPickerTest {
         assertThat(picked).extracting(p -> p.mealkit().getProduct().getId()).containsExactly(24L, 13L);
     }
 
+    @Test
+    @DisplayName("레시피 연결도 없고 요청 조건도 안 맞는 밀키트는 한 장까지만 고르고 남는 자리는 비우며, 이름이 요청과 맞으면 이 제한을 받지 않는다")
+    void picksAtMostOneUnrelatedMealkit() {
+        mealkit(24L, "된장국 밀키트", 9000, recipe(544L, "된장국", "국", 3));
+        mealkit(29L, "부하 테스트용 상품1", 1000, null);
+        mealkit(31L, "부하 테스트용 분산 상품 01", 1000, null);
+        mealkit(32L, "부하 테스트용 분산 상품 02", 1000, null);
+
+        List<Picked> shownAll = MealkitPicker.pick(
+                input(query(List.of(), List.of()), Set.of(), Set.of(), Set.of(24L)), 3);
+        List<Picked> named = MealkitPicker.pick(
+                input(query(List.of(), List.of("분산")), Set.of(), Set.of(), Set.of()), 3);
+
+        assertThat(shownAll).extracting(p -> p.mealkit().getProduct().getId()).containsExactly(29L, 24L);
+        assertThat(named).extracting(p -> p.mealkit().getProduct().getId()).containsExactly(31L, 32L, 24L);
+    }
+
     private Input input(RecipeQuery query, Set<Long> cardRecipeIds, Set<String> fridgeNames, Set<Long> shown) {
         return new Input(mealkits, prices, recipes, tastes, query, cardRecipeIds, fridgeNames, shown);
     }
