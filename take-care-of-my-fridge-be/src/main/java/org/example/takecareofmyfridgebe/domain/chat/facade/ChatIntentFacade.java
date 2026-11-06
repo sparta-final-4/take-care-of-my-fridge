@@ -8,6 +8,7 @@ import org.example.takecareofmyfridgebe.domain.chat.config.ChatMealkitWordProper
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatTasteWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext.CardName;
+import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntent;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntentResolution;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntentResolution.Source;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageCreateRequest;
@@ -104,13 +105,13 @@ public class ChatIntentFacade {
         }
 
         IntentResult result;
+        List<String> categories;
         try {
-            List<String> categories = categories();
+            categories = categories();
             IntentResult raw = chatIntentExtractor.extract(memberId, sessionId, request.content(), categories, followUp(context));
             log.debug("상담 의도 AI 원본 - memberId: {}, sessionId: {}, 의도: {}, 원하는 맛: {}, 피할 맛: {}, removed: {}",
                     memberId, sessionId, raw.intent(), raw.wantedTastes(), raw.avoidTastes(), raw.removed());
-            result = correctCategories(memberId, sessionId, request.content(), categories, context,
-                    correctTastes(memberId, sessionId, request.content(), raw.sanitize(categories)));
+            result = raw.sanitize(categories);
         } catch (RuntimeException e) {
             log.warn("상담 의도 뽑기 실패, 선택 재료 유무로 정함 - memberId: {}, sessionId: {}, 선택 재료 수: {}, 원인: {}",
                     memberId, sessionId, request.selectedIngredientIds().size(), e.toString());
@@ -126,11 +127,18 @@ public class ChatIntentFacade {
                     RecipeQuery.of(memberId, request.selectedIngredientIds(), request.useSelectedOnly())));
         }
 
+        boolean mealkitRecommend = result.intent() == ChatIntent.GENERAL
+                && mealkitRequested(memberId, sessionId, request.content());
+        // 맛·분류 단어로 조건을 고치는 것은 추천·다시 추천일 때만 한다. 일반 답·레시피 자세히는 AI 결과를 그대로 쓴다
+        if (result.intent() == ChatIntent.RECOMMEND || result.intent() == ChatIntent.REFINE || mealkitRecommend) {
+            result = correctCategories(memberId, sessionId, request.content(), categories, context,
+                    correctTastes(memberId, sessionId, request.content(), result));
+        }
         ChatIntentResolution resolution = switch (result.intent()) {
             case RECOMMEND -> ChatIntentResolution.recommend(Source.AI, toRecipeQuery(memberId, sessionId, request, result));
             case REFINE -> refine(memberId, sessionId, request, result, context);
             case RECIPE_DETAIL -> recipeDetail(memberId, sessionId, result, context);
-            case GENERAL -> mealkitRequested(memberId, sessionId, request.content())
+            case GENERAL -> mealkitRecommend
                     ? ChatIntentResolution.recommend(Source.AI, toRecipeQuery(memberId, sessionId, request, result))
                     : ChatIntentResolution.general(Source.AI);
         };

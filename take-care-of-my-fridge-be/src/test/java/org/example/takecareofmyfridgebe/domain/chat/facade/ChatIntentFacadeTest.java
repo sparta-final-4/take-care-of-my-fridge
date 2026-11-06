@@ -46,6 +46,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -180,6 +181,26 @@ class ChatIntentFacadeTest {
                 assertThat(resolution.intent()).as(message).isEqualTo(ChatIntent.GENERAL);
                 assertThat(resolution.recipeQuery()).as(message).isNull();
             }
+        }
+
+        @Test
+        @DisplayName("일반 대화·레시피 자세히면 맛·분류 단어로 조건을 고치지 않고, 추천이면 지금처럼 고친다")
+        void correctsConditions_onlyWhenRecommend() {
+            ChatIntentFacade spied = spy(facade);
+            givenExtracted(IntentResult.general());
+            spied.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("찌개는 어떻게 골라? 매운 거 기준은?"));
+            givenExtracted(new IntentResult(ChatIntent.RECIPE_DETAIL, null, null, null, null, null, null, null, null, null,
+                    null, "김치찌개", null, null, null));
+            spied.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("매운 김치찌개 어떻게 만들어?"));
+
+            verify(spied, never()).correctTastes(any(), any(), any(), any());
+            verify(spied, never()).correctCategories(any(), any(), any(), any(), any(), any());
+
+            givenExtracted(new IntentResult(ChatIntent.RECOMMEND, null, null, null, null, null, false, null, null, null));
+            ChatIntentResolution recommend = spied.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("매운 찌개 추천해줘"));
+
+            assertThat(recommend.recipeQuery().moodCategories()).containsExactly("찌개");
+            assertThat(recommend.recipeQuery().wantedTastes()).containsExactly(Taste.SPICY);
         }
 
         @Test
