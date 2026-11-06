@@ -83,7 +83,7 @@ public class ChatRecommendationFacade {
         }
         List<RecipeCandidate> candidates = withoutPrevious(found.candidates(), previousCardIds);
         logCandidates(query, candidates);
-        List<RecipeCandidate> picked = RecommendationPicker.pick(candidates);
+        List<RecipeCandidate> picked = RecommendationPicker.pick(candidates, query.keywords());
 
         Map<Long, RecipeSummary> summaries = recipeService.findSummaries(
                 picked.stream().map(RecipeCandidate::recipeId).toList());
