@@ -143,6 +143,8 @@ class FridgeFacadeTest {
         assertThat(first.getStorage()).isEqualTo(StorageType.REFRIGERATED);
         assertThat(first.getExpirationDate()).isEqualTo(today.plusDays(5));
         assertThat(first.getSource()).isEqualTo(FridgeSource.MANUAL);
+        // 직접 등록한 줄은 상품 ID가 없다
+        assertThat(first.getProductId()).isNull();
 
         // 두 번째 재료: 원문 rawName 유지 + 사용자가 직접 입력한 보관방식(FROZEN) 및 소비기한(오늘+14일) 적용 확인
         Fridge second = savedFridges.get(1);
@@ -320,6 +322,7 @@ class FridgeFacadeTest {
         assertThat(onionFridge.getRawName()).isEqualTo("양파 1kg");
         assertThat(onionFridge.getSource()).isEqualTo(FridgeSource.COMMERCE);
         assertThat(onionFridge.getOrderItemId()).isEqualTo(101L);
+        assertThat(onionFridge.getProductId()).isEqualTo(1L);
         assertThat(onionFridge.getMemberId()).isEqualTo(7L);
 
         Fridge tofuFridge = fridges.get(1);
@@ -401,6 +404,7 @@ class FridgeFacadeTest {
         assertThat(fridge.getRawName()).isEqualTo("된장찌개 밀키트");
         assertThat(fridge.getExpirationDate()).isEqualTo(LocalDate.of(2026, 11, 13));
         assertThat(fridge.getSource()).isEqualTo(FridgeSource.COMMERCE);
+        assertThat(fridge.getProductId()).isEqualTo(3L);
     }
 
     /**

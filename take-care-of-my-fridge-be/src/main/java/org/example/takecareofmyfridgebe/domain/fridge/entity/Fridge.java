@@ -49,6 +49,11 @@ public class Fridge extends BaseTimeEntity {
     @Column(name = "order_item_id", nullable = true)
     private Long orderItemId;
 
+    // 구매 확정으로 들어온 줄의 상품 ID (주문 상품의 product_id). 직접 등록한 줄은 null
+    // 타 도메인(Product)과의 결합도를 낮추기 위해 연관관계 대신 ID로만 참조
+    @Column(name = "product_id", nullable = true)
+    private Long productId;
+
     @Column(name = "raw_name", length = 200, nullable = false)
     private String rawName;
 
@@ -71,6 +76,7 @@ public class Fridge extends BaseTimeEntity {
         Long memberId,
         Ingredient ingredient,
         Long orderItemId,
+        Long productId,
         String rawName,
         BigDecimal quantity,
         StorageType storage,
@@ -84,6 +90,7 @@ public class Fridge extends BaseTimeEntity {
         this.memberId = memberId;
         this.ingredient = ingredient;
         this.orderItemId = orderItemId;
+        this.productId = productId;
         this.rawName = rawName;
         this.quantity = quantity;
         this.storage = storage;

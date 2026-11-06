@@ -178,6 +178,7 @@ class PurchaseConfirmedConsumerTest extends MySqlContainerSupport {
 
         Fridge onionFridge = saved.get(0);
         assertThat(onionFridge.getOrderItemId()).isEqualTo(910101L);
+        assertThat(onionFridge.getProductId()).isEqualTo(onionProduct.getId());
         assertThat(onionFridge.getRawName()).isEqualTo("양파 1kg");
         // 확정 수량 2 × 상품 1개의 기본 단위 수량 5
         assertThat(onionFridge.getQuantity()).isEqualByComparingTo("10");
@@ -187,6 +188,7 @@ class PurchaseConfirmedConsumerTest extends MySqlContainerSupport {
 
         Fridge mealkitFridge = saved.get(1);
         assertThat(mealkitFridge.getOrderItemId()).isEqualTo(910102L);
+        assertThat(mealkitFridge.getProductId()).isEqualTo(mealkitProduct.getId());
         assertThat(mealkitFridge.getQuantity()).isEqualByComparingTo("1");
         assertThat(mealkitFridge.getStorage()).isEqualTo(StorageType.REFRIGERATED);
         assertThat(mealkitFridge.getExpirationDate()).isEqualTo(LocalDate.of(2026, 11, 2));

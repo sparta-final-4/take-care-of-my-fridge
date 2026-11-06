@@ -43,3 +43,20 @@
 - 판단: 상품 쪽 변경은 대부분 잘못된 연결·보관 정보를 바로잡는 것(예: dev의 감자 상품 재료 연결 수정)이라 최근 값이 맞는 경우가 많다. 주문 상품에 입고용 값을 남기는 방법(a)은 주문 도메인(준혁님) 변경이 필요해 하지 않았다.
 - 반영: `stockPurchasedItems` Javadoc에 정책을 적고, 판매 중지·이름이 바뀐 상품도 주문 당시 이름과 확정 시점 상품 정보로 입고되는 테스트로 고정했다.
 - 리뷰 1(주문 쪽 재발행 없음)과의 관계: 발행이 실패하면 그 주문은 입고되지 않는다. 입고 쪽은 이미 입고된 주문 상품을 거르므로(`getStockedOrderItemIds`) 주문 쪽이 다시 발행해도 두 번 들어가지 않는다.
+
+## 냉장고 줄 상품 ID (fridge.product_id)
+
+- 구매 확정으로 들어온 줄에 상품 ID를 남긴다. 입고 메시지의 productId(주문 상품의 product_id)로 채우고, 직접 등록한 줄은 NULL이다.
+- `Fridge.productId`(BIGINT NULL, 물리 FK 없이 ID만, `order_item_id`와 같은 방식). 응답(`FridgeItemResponse`)은 바꾸지 않았다.
+- SQL: `docs/database/fridge-product-id.sql` (ALTER, 기존 커머스 입고 줄을 `order_items.product_id`로 채우기, 실행 전·후 확인 SELECT, product_id가 빈 줄만 채워 다시 실행해도 같다). dev는 ddl-auto=validate라 앱을 새 코드로 띄우기 전에 ALTER를 먼저 실행한다.
+- 인덱스는 두지 않았다. 지금 냉장고를 읽는 곳(목록, 상담 후보)은 회원의 냉장고 전체를 읽고 메모리에서 거른다. "회원 + 상품"으로 찾는 쿼리가 생기면 그때 `idx_fridge_member_id_product_id (member_id, product_id)`를 둔다.
+- 테스트: 입고 때 재료 상품·밀키트 줄에 상품 ID 저장(단위, Kafka·MySQL 통합), 직접 등록한 줄은 NULL.
+
+## 검증
+- `./gradlew clean test` 2,034개 통과, 실패 0, 건너뜀 1(기존 수동 테스트).
+- 실제 Redis·dev DB에서의 동작과 SQL 실행은 하지 않았다.
+
+## 나중에 할 것
+- 상담 밀키트의 "냉장고에 같은 밀키트" 판단(`MealkitPicker`, 지금은 raw_name 비교)을 product_id 비교로 바꾼다. 냉장고 목록 응답(`FridgeItemResponse`)에 productId를 더하고, product_id가 없는 예전 줄은 raw_name으로 보완한다.
+- 후기 테이블에 `recipe_reviews(recipe_id)` 인덱스 제안 (평점 집계가 전체를 훑음, 후기 담당 확인).
+- 주문 쪽 구매 확정 재발행(리뷰 1)은 주문 담당. 입고 쪽은 중복 입고를 막아 두었다.

@@ -26,7 +26,7 @@ public record PurchaseConfirmedMessage(
             int confirmedQuantity
     ) {
 
-        // 표시 이름은 상품명을 그대로 쓰고, 주문 상품 ID로 입고 출처를 남긴다
+        // 표시 이름은 주문 당시 상품명을 그대로 쓰고, 주문 상품 ID와 상품 ID로 입고 출처를 남긴다
         public Fridge toEntity(
                 Long memberId,
                 Ingredient ingredient,
@@ -38,6 +38,7 @@ public record PurchaseConfirmedMessage(
                     .memberId(memberId)
                     .ingredient(ingredient)
                     .orderItemId(orderItemId)
+                    .productId(productId)
                     .rawName(productName)
                     .quantity(quantity)
                     .storage(storage)
