@@ -131,14 +131,14 @@
   display: flex;
   flex-direction: column;
   gap: var(--ant-margin-xxs);
-  padding: 0 var(--ant-padding-sm) var(--ant-padding-sm);
+  padding: 0 var(--ant-padding-sm) var(--ant-padding-xs);
 }
 
-// 장볼 재료 한 줄: 재료·상품 이름 | 가격 | [담기]
+// 장볼 재료 한 줄: 재료 이름 / 상품 이름 | 가격 | 담기 아이콘. 좁으면 상품 이름부터 줄어든다
 .shoppingList {
   display: flex;
   flex-direction: column;
-  gap: var(--ant-margin-xs);
+  gap: var(--ant-margin-xxs);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -149,6 +149,7 @@
   gap: var(--ant-margin-xs);
   align-items: center;
   font-size: var(--ant-font-size-sm);
+  line-height: var(--ant-line-height-sm);
 }
 
 .shoppingName {
@@ -158,6 +159,10 @@
   min-width: 0;
 }
 
+.shoppingIngredient {
+  font-size: var(--ant-font-size);
+}
+
 .shoppingProduct {
   font-size: var(--ant-font-size-sm);
 }
@@ -165,12 +170,30 @@
 .shoppingPrice {
   display: flex;
   flex-direction: column;
+  flex-shrink: 0;
   align-items: flex-end;
   white-space: nowrap;
 }
 
 .shoppingListPrice {
   font-size: var(--ant-font-size-sm);
+}
+
+// 보이는 크기는 기본 버튼 높이(32px)로 두고, 누르는 영역만 44px로 넓힌다
+.shoppingAdd {
+  position: relative;
+  flex-shrink: 0;
+  font-size: var(--ant-font-size-sm);
+
+  &::after {
+    position: absolute;
+    inset: calc(($touch-target-size - var(--ant-control-height)) / -2);
+    content: '';
+  }
+}
+
+.shoppingAddIcon {
+  font-size: var(--ant-font-size-xl);
 }
 
 .shoppingNote {

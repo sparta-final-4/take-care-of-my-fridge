@@ -30,14 +30,14 @@ function render(ingredients: ChatRecommendationMissingIngredient[], pendingProdu
 }
 
 describe('ChatShoppingList', () => {
-  it('상품이 있으면 재료·상품 이름, 정가와 [담기]를 보여 준다', () => {
+  it('상품이 있으면 재료·상품 이름, 정가와 장바구니 아이콘 버튼을 보여 준다', () => {
     const html = render([{ ingredientId: 3, name: '대파', product: product({}) }]);
 
     expect(html).toContain('대파');
     expect(html).toContain('대파 1단');
     expect(html).toContain('3,000원');
     expect(html).toContain('aria-label="대파 1단 장바구니에 담기"');
-    expect(html).toContain('담기');
+    expect(html).toContain('shopping-cart');
     expect(html).not.toContain('disabled');
   });
 
@@ -60,20 +60,40 @@ describe('ChatShoppingList', () => {
     expect(html).toMatch(/<del>2,000원<\/del>/);
   });
 
-  it('품절이면 [담기]를 막고 품절로 보여 준다', () => {
+  it('품절이면 버튼을 막고 품절로 보여 준다', () => {
     const html = render([{ ingredientId: 3, name: '대파', product: product({ soldOut: true }) }]);
 
-    expect(html).toContain('품절');
-    expect(html).toContain('aria-label="대파 품절"');
-    expect(html).toContain('disabled');
+    const button = html.match(/<button[^>]*aria-label="대파 품절"[^>]*>.*?<\/button>/)?.[0];
+    expect(button).toContain('disabled');
+    expect(button).toContain('품절');
     expect(html).not.toContain('장바구니에 담기');
   });
 
-  it('판매 상품이 없으면 재료 이름만 흐리게 "판매 상품 없음"으로 보여 주고 [담기]를 그리지 않는다', () => {
-    const html = render([{ ingredientId: 5, name: '배추', product: null }]);
+  it('살 수 있는 상품 → 품절 → 판매 상품 없음 순서로 보여 준다', () => {
+    const html = render([
+      { ingredientId: 1, name: '양배추', product: null },
+      { ingredientId: 2, name: '대파', product: product({ soldOut: true }) },
+      { ingredientId: 3, name: '두부', product: product({ productId: 22, name: '두부 1모' }) },
+    ]);
 
-    expect(html).toContain('배추');
-    expect(html).toContain('판매 상품 없음');
+    const buyable = html.indexOf('두부 1모 장바구니에 담기');
+    const soldOut = html.indexOf('대파 품절');
+    const none = html.indexOf('판매 상품 없음');
+    expect(buyable).toBeGreaterThan(-1);
+    expect(buyable).toBeLessThan(soldOut);
+    expect(soldOut).toBeLessThan(none);
+  });
+
+  it('판매 상품이 없는 재료는 한 줄로 묶어 "판매 상품 없음"으로 보여 주고 버튼을 그리지 않는다', () => {
+    const html = render([
+      { ingredientId: 1, name: '양배추', product: null },
+      { ingredientId: 2, name: '미나리', product: null },
+      { ingredientId: 3, name: '느타리버섯', product: null },
+    ]);
+
+    expect(html).toContain('양배추 · 미나리 · 느타리버섯');
+    expect(html.match(/판매 상품 없음/g)).toHaveLength(1);
+    expect(html.match(/<li/g)).toHaveLength(1);
     expect(html).not.toContain('<button');
   });
 
