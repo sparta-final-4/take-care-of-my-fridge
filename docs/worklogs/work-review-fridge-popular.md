@@ -25,10 +25,14 @@
 | 캐시 없음 (집계 + 레시피 + 평점) | 3 | 21.05ms | 16.53ms | 43.30ms |
 | 전 캐시 (응답 전체, Redis만) | 0 | 1.21ms | 0.81ms | 2.40ms |
 | B 캐시 (순위만, 레시피·평점 매번) | 2 | 11.33ms | 7.22ms | 36.63ms |
-| B 캐시 + `recipe_reviews(recipe_id)` 인덱스 | 2 | 6.55ms | 4.40ms | 20.40ms |
+| B 캐시 + 엔티티에 선언한 `idx_recipe_reviews_recipe_id_created_at` (1회차) | 2 | 10.55ms | 5.88ms | 30.63ms |
+| 같은 조건 (2회차) | 2 | 6.31ms | 4.56ms | 17.06ms |
 
 - B는 바로 반영되는 대신 요청마다 쿼리 2번이 늘어 전 캐시보다 느리고, 캐시 없음보다는 빠르다(평균 약 절반).
-- 평점 집계(`findRatingStatsByRecipeIds`)가 `recipe_reviews` 전체를 훑는다(EXPLAIN type=ALL). 유니크 인덱스가 `(member_id, recipe_id)`라 recipe_id로 시작하는 인덱스가 없다. 인덱스를 두면 range 조회(rows 5,137 → 114)로 바뀐다. 후기 테이블은 이번 범위가 아니라 제안만 한다.
+- 평점 집계(`findRatingStatsByRecipeIds`): 처음 측정 때는 Testcontainers에 recipe_id로 시작하는 인덱스가 없어 `recipe_reviews` 전체를 훑었다(EXPLAIN type=ALL, rows 5,137). 운영 schema.sql과 dev DB에는 이미 `idx_recipe_reviews_recipe_id_created_at (recipe_id, created_at)`이 있는데 엔티티에 선언이 없어서였다.
+  - dev DB(읽기 전용 확인): 인덱스가 있고 집계가 이 인덱스를 쓴다. 후기가 75건뿐이라 옵티마이저가 인덱스 전체 스캔(type=index, rows 74)을 골랐다.
+  - `RecipeReview`에 `@Table(indexes)`로 같은 인덱스를 선언해 Testcontainers에도 생기게 했다. 집계가 range 조회(key=idx_recipe_reviews_recipe_id_created_at, rows 114)로 바뀐다.
+  - 남은 시간은 쿼리 2번 왕복과 읽기 전용 트랜잭션 비용이다. 같은 조건에서도 회차마다 평균이 4ms 넘게 흔들렸다.
 - 측정 테스트는 커밋하지 않았다.
 
 ## 리뷰 2. 구매 확정 냉장고 입고 (FridgeFacade#stockPurchasedItems)
@@ -53,10 +57,9 @@
 - 테스트: 입고 때 재료 상품·밀키트 줄에 상품 ID 저장(단위, Kafka·MySQL 통합), 직접 등록한 줄은 NULL.
 
 ## 검증
-- `./gradlew clean test` 2,034개 통과, 실패 0, 건너뜀 1(기존 수동 테스트).
+- `./gradlew clean test` 2,034개 통과, 실패 0, 건너뜀 1(기존 수동 테스트). 후기 인덱스 선언 뒤에도 같다.
 - 실제 Redis·dev DB에서의 동작과 SQL 실행은 하지 않았다.
 
 ## 나중에 할 것
 - 상담 밀키트의 "냉장고에 같은 밀키트" 판단(`MealkitPicker`, 지금은 raw_name 비교)을 product_id 비교로 바꾼다. 냉장고 목록 응답(`FridgeItemResponse`)에 productId를 더하고, product_id가 없는 예전 줄은 raw_name으로 보완한다.
-- 후기 테이블에 `recipe_reviews(recipe_id)` 인덱스 제안 (평점 집계가 전체를 훑음, 후기 담당 확인).
 - 주문 쪽 구매 확정 재발행(리뷰 1)은 주문 담당. 입고 쪽은 중복 입고를 막아 두었다.
