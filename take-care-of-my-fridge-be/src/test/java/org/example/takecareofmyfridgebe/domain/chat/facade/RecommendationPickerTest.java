@@ -109,6 +109,18 @@ class RecommendationPickerTest {
                 .extracting(RecipeCandidate::recipeId).containsExactly(1L, 2L, 3L);
     }
 
+    @Test
+    @DisplayName("같은 분류 3개라 3위를 바꿀 때 키워드로 맞은 레시피가 들어오면 다른 제안으로 표시하지 않는다")
+    void keepsKeywordMatchNotAlternative_whenReplaced() {
+        List<RecipeCandidate> ranked = List.of(
+                keyword(1L, "면류", "볶음면"), keyword(2L, "면류", "볶음면"), keyword(3L, "면류", "볶음면"), keyword(4L, "튀김", "탕수육"));
+
+        List<RecipeCandidate> picked = RecommendationPicker.pick(ranked);
+
+        assertThat(picked).extracting(RecipeCandidate::recipeId).containsExactly(1L, 2L, 4L);
+        assertThat(picked.get(2).alternative()).isFalse();
+    }
+
     // 늘린 이름(키워드)으로 맞은 후보
     private static RecipeCandidate keyword(Long id, String category, String keyword) {
         return new RecipeCandidate(id, "레시피" + id, category, 20, new Ranking(1, 0, 0, 0, 1, 1, 0),

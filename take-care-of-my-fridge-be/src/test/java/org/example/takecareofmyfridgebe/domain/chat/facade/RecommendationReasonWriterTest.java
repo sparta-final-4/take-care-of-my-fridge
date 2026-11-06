@@ -127,15 +127,25 @@ class RecommendationReasonWriterTest {
     }
 
     @Test
-    @DisplayName("다른 분류로 바꿔 넣은 카드(다른 제안)는 키워드·임박 재료보다 먼저 색다르게 골라 봤다고 쓴다")
+    @DisplayName("다른 분류로 바꿔 넣은 카드(다른 제안)는 임박 재료보다 먼저 색다르게 골라 봤다고 쓴다")
     void writesAlternativeReason_whenAlternative() {
         RecipeCandidate alternative = candidate("전", new Reason(List.of("고추"), List.of(new ImminentIngredient("고추", 1)),
-                List.of(), List.of(), List.of(), false, false, List.of(), List.of(), List.of(),
-                new KeywordMatch(Type.EXPANDED, "탕수육", null))).asAlternative();
+                List.of(), List.of(), List.of(), false, false, List.of(), List.of(), List.of(), null)).asAlternative();
 
         assertThat(RecommendationReasonWriter.write(alternative, "김피탕")).isEqualTo("색다르게 골라 봤어요");
         assertThat(RecommendationReasonWriter.writeDistinct(List.of(alternative), "김피탕", false))
                 .containsExactly("색다르게 골라 봤어요");
+    }
+
+    @Test
+    @DisplayName("키워드로 맞은 카드는 다른 제안으로 들어왔어도 색다르게가 아니라 맞은 방식대로 쓴다")
+    void writesKeywordReason_whenAlternativeMatchedKeyword() {
+        RecipeCandidate tangsuyuk = candidate("튀김", new Reason(List.of("고추"), List.of(new ImminentIngredient("고추", 1)),
+                List.of(), List.of(), List.of(), false, false, List.of(), List.of(), List.of(),
+                new KeywordMatch(Type.EXPANDED, "탕수육", null))).asAlternative();
+
+        assertThat(RecommendationReasonWriter.write(tangsuyuk, null)).isEqualTo("탕수육 요리예요");
+        assertThat(RecommendationReasonWriter.write(tangsuyuk, "탕짜면")).isEqualTo("탕짜면과 비슷한 탕수육이에요");
     }
 
     @Test

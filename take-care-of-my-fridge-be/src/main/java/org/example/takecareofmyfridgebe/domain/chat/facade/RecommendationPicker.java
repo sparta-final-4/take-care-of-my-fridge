@@ -20,6 +20,7 @@ import java.util.Objects;
  *       정렬 순서로 채운 자리 중 마지막 것만 바꾼다 (키워드별로 이미 고르게 골랐으므로)</li>
  * </ol>
  * 바꿔 넣은 카드는 alternative(다른 제안)로 표시해 AI 설명·카드 이유가 요청과 다른 제안이라고 말하게 한다.
+ * 단 키워드로 맞은(이름·늘린 이름·재료) 레시피는 사용자가 말한 요리라 다른 제안으로 표시하지 않는다.
  * 후보가 3개보다 적으면 있는 만큼 고른다.
  */
 public final class RecommendationPicker {
@@ -58,7 +59,8 @@ public final class RecommendationPicker {
                 .filter(candidate -> !picked.contains(candidate))
                 .filter(candidate -> candidate.category() != null && !candidate.category().equals(category))
                 .findFirst()
-                .ifPresent(other -> picked.set(PICK_COUNT - 1, other.asAlternative()));
+                // 키워드로 맞은 레시피는 사용자가 말한 요리라 다른 제안으로 표시하지 않는다
+                .ifPresent(other -> picked.set(PICK_COUNT - 1, isKeywordMatch(other) ? other : other.asAlternative()));
         return List.copyOf(picked);
     }
 
