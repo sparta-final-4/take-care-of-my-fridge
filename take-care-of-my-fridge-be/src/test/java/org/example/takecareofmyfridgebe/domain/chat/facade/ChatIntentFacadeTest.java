@@ -71,7 +71,7 @@ class ChatIntentFacadeTest {
         chatMessageService = mock(ChatMessageService.class);
         facade = new ChatIntentFacade(extractor, recipeService, ingredientMatcher,
                 new ChatCandidateProperties(List.of("양념", "음료"), 0.4, List.of(), List.of("백김치", "물김치", "동치미", "나박김치"), List.of()),
-                chatMessageService, TasteWordCheckerTest.WORDS, MealkitWordCheckerTest.WORDS);
+                chatMessageService, TasteWordCheckerTest.WORDS, MealkitWordCheckerTest.WORDS, AskWordCheckerTest.WORDS);
         when(recipeService.getClassifications())
                 .thenReturn(new RecipeClassificationResponse(List.of("한식"), List.of("국", "기타", "샐러드", "양념", "음료", "찌개")));
     }
@@ -165,6 +165,33 @@ class ChatIntentFacadeTest {
             assertThat(mealkit.intent()).isEqualTo(ChatIntent.RECOMMEND);
             assertThat(mealkit.recipeQuery()).isNotNull();
             assertThat(notMealkit.intent()).isEqualTo(ChatIntent.GENERAL);
+        }
+
+        @Test
+        @DisplayName("AI가 GENERAL이라고 한 묻는 말(추천 기준·어떻게·보관)은 밀키트·분류·맛 단어가 있어도 서버가 추천으로 바꾸지 않는다")
+        void keepsGeneral_whenQuestionMessages() {
+            givenExtracted(IntentResult.general());
+
+            for (String message : List.of("밀키트 추천 기준이 뭐야?", "레시피 추천 기준이 뭐야?", "디저트는 어떻게 골라?",
+                    "매운 거 기준이 뭐야?", "두부 얼마나 보관돼?", "김치찌개 어떻게 만들어?", "국물 밀키트")) {
+                ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID,
+                        new ChatMessageCreateRequest(message, ChatMessageMode.AUTO, List.of(TOFU), false));
+
+                assertThat(resolution.intent()).as(message).isEqualTo(ChatIntent.GENERAL);
+                assertThat(resolution.recipeQuery()).as(message).isNull();
+            }
+        }
+
+        @Test
+        @DisplayName("AI 호출이 실패하면 선택 재료가 있어도 묻는 말(두부 얼마나 보관돼?)은 일반 답으로 둔다")
+        void returnsGeneral_whenExtractorFailsWithSelectedAndQuestion() {
+            when(extractor.extract(any(), any(), any(), any(), any())).thenThrow(new RuntimeException("timeout"));
+
+            ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID,
+                    new ChatMessageCreateRequest("두부 얼마나 보관돼?", ChatMessageMode.AUTO, List.of(TOFU), false));
+
+            assertThat(resolution.intent()).isEqualTo(ChatIntent.GENERAL);
+            assertThat(resolution.source()).isEqualTo(Source.FALLBACK);
         }
 
         @Test

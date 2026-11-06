@@ -3,6 +3,7 @@ package org.example.takecareofmyfridgebe.domain.chat.facade;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatCandidateProperties;
+import org.example.takecareofmyfridgebe.domain.chat.config.ChatAskWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatMealkitWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatTasteWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext;
@@ -73,6 +74,7 @@ public class ChatIntentFacade {
     private final ChatMessageService chatMessageService;
     private final ChatTasteWordProperties chatTasteWordProperties;
     private final ChatMealkitWordProperties chatMealkitWordProperties;
+    private final ChatAskWordProperties chatAskWordProperties;
 
     // 상담 문맥 없이 (첫 질문과 같게) 정한다
     public ChatIntentResolution resolve(Long memberId, Long sessionId, ChatMessageCreateRequest request) {
@@ -112,9 +114,15 @@ public class ChatIntentFacade {
         } catch (RuntimeException e) {
             log.warn("상담 의도 뽑기 실패, 선택 재료 유무로 정함 - memberId: {}, sessionId: {}, 선택 재료 수: {}, 원인: {}",
                     memberId, sessionId, request.selectedIngredientIds().size(), e.toString());
-            return new Decision(request.selectedIngredientIds().isEmpty()
-                    ? ChatIntentResolution.general(Source.FALLBACK)
-                    : ChatIntentResolution.recommend(Source.FALLBACK,
+            if (request.selectedIngredientIds().isEmpty()) {
+                return new Decision(ChatIntentResolution.general(Source.FALLBACK));
+            }
+            // 선택 재료가 있어도 "두부 얼마나 보관돼?"처럼 묻는 말이면 추천으로 바꾸지 않는다
+            if (AskWordChecker.asks(request.content(), chatAskWordProperties)) {
+                log.info("상담 의도 뽑기 실패, 묻는 말이라 추천으로 바꾸지 않음 - memberId: {}, sessionId: {}", memberId, sessionId);
+                return new Decision(ChatIntentResolution.general(Source.FALLBACK));
+            }
+            return new Decision(ChatIntentResolution.recommend(Source.FALLBACK,
                     RecipeQuery.of(memberId, request.selectedIngredientIds(), request.useSelectedOnly())));
         }
 
@@ -122,21 +130,31 @@ public class ChatIntentFacade {
             case RECOMMEND -> ChatIntentResolution.recommend(Source.AI, toRecipeQuery(memberId, sessionId, request, result));
             case REFINE -> refine(memberId, sessionId, request, result, context);
             case RECIPE_DETAIL -> recipeDetail(memberId, sessionId, result, context);
-            case GENERAL -> mealkitOnly(memberId, sessionId, request.content())
+            case GENERAL -> mealkitRequested(memberId, sessionId, request.content())
                     ? ChatIntentResolution.recommend(Source.AI, toRecipeQuery(memberId, sessionId, request, result))
                     : ChatIntentResolution.general(Source.AI);
         };
         return new Decision(resolution, result.removed() == null ? List.of() : result.removed());
     }
 
-    // "밀키트 뭐 있어"처럼 밀키트를 직접 말했는데 AI가 일반 대화로 본 말은 추천으로 바꾼다 (밀키트 카드는 추천 답에만 붙는다)
-    private boolean mealkitOnly(Long memberId, Long sessionId, String message) {
-        boolean only = MealkitWordChecker.check(message, chatMealkitWordProperties, chatTasteWordProperties)
+    /**
+     * "밀키트 뭐 있어"처럼 밀키트를 달라는 말인데 AI가 일반 대화로 본 말은 추천으로 바꾼다 (밀키트 카드는 추천 답에만 붙는다).
+     * 달라는 말이 있고 묻는 말이 없을 때만 바꾼다 (AskWordChecker). "밀키트 추천 기준이 뭐야?"는 묻는 말이라 일반 답 그대로다.
+     * "국물 밀키트"처럼 달라는 말이 없는 짧은 말은 AI 판단을 따른다.
+     */
+    private boolean mealkitRequested(Long memberId, Long sessionId, String message) {
+        boolean mealkit = MealkitWordChecker.check(message, chatMealkitWordProperties, chatTasteWordProperties)
                 == MealkitWordChecker.Mode.ONLY;
-        if (only) {
-            log.info("상담 밀키트를 말해 일반 대화를 추천으로 - memberId: {}, sessionId: {}", memberId, sessionId);
+        if (!mealkit) {
+            return false;
         }
-        return only;
+        if (AskWordChecker.requests(message, chatAskWordProperties)) {
+            log.info("상담 밀키트를 달라고 해 일반 대화를 추천으로 - memberId: {}, sessionId: {}", memberId, sessionId);
+            return true;
+        }
+        log.info("상담 밀키트를 말했지만 묻는 말이거나 달라는 말이 없어 일반 대화 그대로 - memberId: {}, sessionId: {}, 묻는 말: {}",
+                memberId, sessionId, AskWordChecker.asks(message, chatAskWordProperties));
+        return false;
     }
 
     /**
