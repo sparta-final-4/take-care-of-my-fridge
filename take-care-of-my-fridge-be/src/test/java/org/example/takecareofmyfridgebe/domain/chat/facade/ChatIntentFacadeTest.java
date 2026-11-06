@@ -207,6 +207,26 @@ class ChatIntentFacadeTest {
         }
 
         @Test
+        @DisplayName("인사·지난 일을 묻는 짧은 말(밥 먹었어?, 안녕 밥은?)은 재료 이름이 있어도 일반 답 그대로 두고, \"밥 추천\"은 추천으로 바꾼다")
+        void keepsGeneral_whenGreetingOrPastQuestion() {
+            Ingredient rice = ingredient(70L, "ING_RICE", "밥");
+            when(ingredientMatcher.matchAll(anyList())).thenAnswer(invocation -> {
+                List<String> names = invocation.getArgument(0);
+                return names.contains("밥") ? Map.of("밥", rice) : Map.of();
+            });
+            givenExtracted(IntentResult.general());
+
+            for (String message : List.of("밥 먹었어?", "안녕 밥은?")) {
+                assertThat(facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of(message)).intent())
+                        .as(message).isEqualTo(ChatIntent.GENERAL);
+            }
+            ChatIntentResolution recommend = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("밥 추천"));
+
+            assertThat(recommend.intent()).isEqualTo(ChatIntent.RECOMMEND);
+            assertThat(recommend.recipeQuery().selectedIngredientIds()).containsExactly(70L);
+        }
+
+        @Test
         @DisplayName("묻는 말, 음식 말이 없는 말(안녕), 긴 말은 이름만 말한 말로 보지 않고 일반 답 그대로 둔다")
         void keepsGeneral_whenNotNameOnly() {
             givenExtracted(IntentResult.general());

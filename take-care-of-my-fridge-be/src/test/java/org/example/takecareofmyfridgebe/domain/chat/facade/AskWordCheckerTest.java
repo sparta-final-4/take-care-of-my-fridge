@@ -11,9 +11,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 class AskWordCheckerTest {
 
     static final ChatAskWordProperties WORDS = new ChatAskWordProperties(
-            List.of("기준", "어떻게", "왜", "방법", "얼마나", "보관", "가격", "차이", "뭐가달라", "뭐가다른"),
+            List.of("기준", "어떻게", "왜", "방법", "얼마나", "보관", "가격", "차이", "뭐가달라", "뭐가다른",
+                    "먹었어", "먹었니", "먹었냐", "했어", "했니"),
             List.of("추천", "뭐있", "보여줘", "먹고싶", "사고싶", "골라줘"),
-            List.of("있어", "있나", "있을까", "없어", "뭐가좋아", "살만한"));
+            List.of("있어", "있나", "있을까", "없어", "뭐가좋아", "살만한"),
+            List.of("안녕", "반가워", "반갑", "고마워", "고맙", "감사", "잘지내", "잘자", "좋은아침"));
 
     @Test
     @DisplayName("달라는 말만 있으면 달라는 말이다 (밀키트 뭐 있어, 디저트 추천해줘, 매운 거 먹고 싶어)")
@@ -42,6 +44,18 @@ class AskWordCheckerTest {
         }
         assertThat(AskWordChecker.requestsMealkit("밀키트 추천 기준 있어?", WORDS)).isFalse();
         assertThat(AskWordChecker.requests("국물 밀키트 있어?", WORDS)).isFalse();
+    }
+
+    @Test
+    @DisplayName("지난 일을 묻는 말(밥 먹었어?)은 묻는 말이고, 인사 말(안녕·고마워·잘 지내)을 찾는다")
+    void findsPastQuestionAndGreeting() {
+        for (String message : List.of("밥 먹었어?", "점심 먹었니", "저녁 먹었냐", "오늘 요리 했어?", "운동 했니")) {
+            assertThat(AskWordChecker.asks(message, WORDS)).as(message).isTrue();
+        }
+        for (String message : List.of("안녕 밥은?", "반가워요", "고마워", "감사합니다", "잘 지내?")) {
+            assertThat(AskWordChecker.greets(message, WORDS)).as(message).isTrue();
+        }
+        assertThat(AskWordChecker.greets("밥 추천", WORDS)).isFalse();
     }
 
     @Test

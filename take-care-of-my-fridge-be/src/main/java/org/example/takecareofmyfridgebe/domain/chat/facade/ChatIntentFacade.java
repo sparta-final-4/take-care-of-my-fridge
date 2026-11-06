@@ -184,11 +184,13 @@ public class ChatIntentFacade {
      *   <li>밀키트 단어, 분류 단어(묶음 말 포함), 재료 사전 이름, 레시피 이름 중 하나가 있으면 바꾼다 (앞에서 찾으면 뒤는 보지 않는다).
      *       재료 이름이면 그 재료를 말한 재료로, 레시피 이름이면 그 이름을 요리 이름 키워드로 채운다.
      *       분류·맛은 추천 조건 보정(correctCategories·correctTastes)이 채운다</li>
+     *   <li>인사 말("안녕 밥은?")이 있거나 지난 일을 묻는 말("밥 먹었어?")이면 바꾸지 않는다</li>
      *   <li>"안녕"처럼 음식 말이 없으면 그대로 일반 답이다</li>
      * </ul>
      */
     Optional<IntentResult> nameOnly(Long memberId, Long sessionId, String message, List<String> categories, IntentResult result) {
-        if (message == null || AskWordChecker.asks(message, chatAskWordProperties)) {
+        if (message == null || AskWordChecker.asks(message, chatAskWordProperties)
+                || AskWordChecker.greets(message, chatAskWordProperties)) {
             return Optional.empty();
         }
         String text = message.strip().replaceAll("[?!.~…,]+$", "").strip();
