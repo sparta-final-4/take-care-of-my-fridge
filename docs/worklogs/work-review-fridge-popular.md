@@ -30,3 +30,16 @@
 - B는 바로 반영되는 대신 요청마다 쿼리 2번이 늘어 전 캐시보다 느리고, 캐시 없음보다는 빠르다(평균 약 절반).
 - 평점 집계(`findRatingStatsByRecipeIds`)가 `recipe_reviews` 전체를 훑는다(EXPLAIN type=ALL). 유니크 인덱스가 `(member_id, recipe_id)`라 recipe_id로 시작하는 인덱스가 없다. 인덱스를 두면 range 조회(rows 5,137 → 114)로 바뀐다. 후기 테이블은 이번 범위가 아니라 제안만 한다.
 - 측정 테스트는 커밋하지 않았다.
+
+## 리뷰 2. 구매 확정 냉장고 입고 (FridgeFacade#stockPurchasedItems)
+
+- 지적: 입고할 상품을 구매 시점 정보가 아니라 입고 시점에 다시 조회해 정보가 어긋날 수 있다.
+- 결정: 정책 문서화(b). "구매 확정 시점 상품 정보로 입고, 이름만 주문 당시 값".
+- 조사:
+  - 흐름: `OrderStatusService.confirm`(`order/service/OrderStatusService.java:62`) → 커밋 뒤 Kafka `purchase-confirmed` → `PurchaseConfirmedConsumer` → `FridgeFacade.stockPurchasedItems`. 메시지에는 orderItemId·productId·productName(주문 당시)·확정 수량만 있다.
+  - 입고 때 다시 읽는 값: 상품 종류, 보관 방법, 보관 일수(소비기한 = 확정일 + 보관 일수), 재료 연결(ingredientId), 기본 수량(baseQuantity). `getProductDetailsByIds`는 상태를 거르지 않는다.
+  - 주문 상품(`order_items`)에는 product_id·product_name·product_image_url·가격·수량은 있지만 입고용 값(보관·재료·기본 수량)은 없다.
+  - 구매~확정(자동 확정은 결제 후 7일) 사이에 상품이 바뀌면: 보관 일수 → 소비기한, 보관 방법, 재료 연결 → 다른 재료, 기본 수량 → 수량이 새 값으로 들어간다. 이름은 영향 없다. 상품 삭제는 판매 중지(소프트 삭제)라 그대로 입고된다. 재료 연결 행이 없어지면 `PRODUCT_DETAIL_MISSING` → 재시도 2번 → DLT.
+- 판단: 상품 쪽 변경은 대부분 잘못된 연결·보관 정보를 바로잡는 것(예: dev의 감자 상품 재료 연결 수정)이라 최근 값이 맞는 경우가 많다. 주문 상품에 입고용 값을 남기는 방법(a)은 주문 도메인(준혁님) 변경이 필요해 하지 않았다.
+- 반영: `stockPurchasedItems` Javadoc에 정책을 적고, 판매 중지·이름이 바뀐 상품도 주문 당시 이름과 확정 시점 상품 정보로 입고되는 테스트로 고정했다.
+- 리뷰 1(주문 쪽 재발행 없음)과의 관계: 발행이 실패하면 그 주문은 입고되지 않는다. 입고 쪽은 이미 입고된 주문 상품을 거르므로(`getStockedOrderItemIds`) 주문 쪽이 다시 발행해도 두 번 들어가지 않는다.
