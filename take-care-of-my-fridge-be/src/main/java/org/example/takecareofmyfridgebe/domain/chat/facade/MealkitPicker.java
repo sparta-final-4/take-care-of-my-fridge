@@ -20,16 +20,16 @@ import java.util.stream.Collectors;
  * 거르기: 살 수 있는 것만(판매가가 있고 품절 아님), 레시피 카드와 같은 레시피는 빼고, 냉장고에 이름이 같은 밀키트가 있으면 빼고,
  * 연결된 레시피가 피할 맛이면 뺀다.
  * <p>
- * 정렬: 레시피 연결 있음 → 요청 조건 일치 수(분류·원하는 맛·요리 이름 키워드) → 이 상담에서 아직 안 보여 준 것 →
+ * 정렬: 요청 조건 일치 수(분류·원하는 맛·요리 이름 키워드) → 이 상담에서 아직 안 보여 준 것 → 레시피 연결 있음 →
  * 냉장고 재료와 겹치는 수(레시피 재료 기준) → 할인 중 → 판매 단가 낮은 순 → 상품 ID.
+ * 안 보여 준 것을 레시피 연결보다 앞에 둔다: "밀키트 뭐 있어"를 다시 물으면 레시피 연결이 없는 밀키트라도 새 것을 먼저 보여 준다.
  * 레시피 연결이 없거나 연결된 레시피가 지워진 밀키트는 요청 조건을 상품 이름 키워드로만 센다.
  */
 public final class MealkitPicker {
 
-    private static final Comparator<Option> ORDER = Comparator
-            .comparing((Option option) -> option.recipe() == null)
-            .thenComparing(Comparator.comparingInt(Option::requestMatches).reversed())
+    private static final Comparator<Option> ORDER = Comparator.comparingInt(Option::requestMatches).reversed()
             .thenComparing(Option::shown)
+            .thenComparing((Option option) -> option.recipe() == null)
             .thenComparing(Comparator.comparingInt(Option::ownedCount).reversed())
             .thenComparing((Option option) -> option.price().sale().isEmpty())
             .thenComparingInt(option -> option.price().unitPrice())

@@ -102,6 +102,32 @@ class MealkitPickerTest {
         assertThat(picked).extracting(p -> p.mealkit().getProduct().getId()).containsExactly(44L, 43L);
     }
 
+    @Test
+    @DisplayName("이 상담에서 안 보여 준 밀키트를 레시피 연결보다 먼저 고른다 (두 번째 \"밀키트 뭐 있어\"에 연결 없는 나베가 이미 보여 준 된장국보다 앞)")
+    void picksUnshownBeforeRecipeLinked() {
+        mealkit(13L, "나베", 9000, null);
+        mealkit(24L, "된장국 밀키트", 9000, recipe(544L, "된장국", "국", 3));
+        mealkit(25L, "황태해장국 밀키트", 9000, recipe(543L, "황태해장국", "국", 1));
+        mealkit(28L, "닭가슴살 브로콜리 만두 밀키트", 9000, recipe(555L, "닭가슴살 브로콜리 만두", "만두", 2));
+
+        List<Picked> picked = MealkitPicker.pick(
+                input(query(List.of(), List.of()), Set.of(), Set.of(), Set.of(24L)), 3);
+
+        assertThat(picked).extracting(p -> p.mealkit().getProduct().getId()).containsExactly(28L, 25L, 13L);
+    }
+
+    @Test
+    @DisplayName("요청 조건 일치는 안 보여 준 것보다 앞선다 (국을 말하면 이미 보여 준 국 밀키트가 안 보여 준 다른 밀키트보다 앞)")
+    void putsRequestMatchBeforeUnshown() {
+        mealkit(13L, "나베", 9000, null);
+        mealkit(24L, "된장국 밀키트", 9000, recipe(544L, "된장국", "국", 0));
+
+        List<Picked> picked = MealkitPicker.pick(
+                input(query(List.of("국"), List.of()), Set.of(), Set.of(), Set.of(24L)), 3);
+
+        assertThat(picked).extracting(p -> p.mealkit().getProduct().getId()).containsExactly(24L, 13L);
+    }
+
     private Input input(RecipeQuery query, Set<Long> cardRecipeIds, Set<String> fridgeNames, Set<Long> shown) {
         return new Input(mealkits, prices, recipes, tastes, query, cardRecipeIds, fridgeNames, shown);
     }
