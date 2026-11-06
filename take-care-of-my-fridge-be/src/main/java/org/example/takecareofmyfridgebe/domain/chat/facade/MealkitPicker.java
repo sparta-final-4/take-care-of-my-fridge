@@ -24,6 +24,7 @@ import java.util.stream.Collectors;
  * 냉장고 재료와 겹치는 수(레시피 재료 기준) → 할인 중 → 판매 단가 낮은 순 → 상품 ID.
  * 안 보여 준 것을 레시피 연결보다 앞에 둔다: "밀키트 뭐 있어"를 다시 물으면 레시피 연결이 없는 밀키트라도 새 것을 먼저 보여 준다.
  * 레시피 연결이 없거나 연결된 레시피가 지워진 밀키트는 요청 조건을 상품 이름 키워드로만 센다.
+ * 기준이 바뀌면 일반 답 프롬프트(prompts/chat-general.txt)의 추천 기준 문장도 같이 고친다.
  */
 public final class MealkitPicker {
 

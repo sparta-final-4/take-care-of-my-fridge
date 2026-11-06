@@ -45,6 +45,8 @@ public class OpenAiChatReplyGenerator implements ChatReplyGenerator {
     private final ChatClient chatClient;
     private final LlmCostCalculator llmCostCalculator;
     private final ChatReplyErrorTranslator chatReplyErrorTranslator;
+    // 일반 답의 시스템 프롬프트: 공통(chat-system.txt) + 실제 추천 기준(chat-general.txt). "추천 기준이 뭐야?"에 코드 기준대로 답하게
+    private final String generalSystemPrompt;
     // 추천 답의 시스템 프롬프트: 공통(chat-system.txt) + 추천 규칙(chat-recommend.txt)
     private final String recommendSystemPrompt;
     // 레시피 자세히 답의 시스템 프롬프트: 공통(chat-system.txt) + 레시피 답 규칙(chat-recipe-detail.txt)
@@ -56,7 +58,8 @@ public class OpenAiChatReplyGenerator implements ChatReplyGenerator {
             ChatReplyErrorTranslator chatReplyErrorTranslator,
             @Value("classpath:prompts/chat-system.txt") Resource systemPrompt,
             @Value("classpath:prompts/chat-recommend.txt") Resource recommendPrompt,
-            @Value("classpath:prompts/chat-recipe-detail.txt") Resource recipeDetailPrompt
+            @Value("classpath:prompts/chat-recipe-detail.txt") Resource recipeDetailPrompt,
+            @Value("classpath:prompts/chat-general.txt") Resource generalPrompt
     ) {
         this.chatClient = chatClient;
         this.llmCostCalculator = llmCostCalculator;
@@ -64,6 +67,7 @@ public class OpenAiChatReplyGenerator implements ChatReplyGenerator {
         String common = read(systemPrompt).strip();
         this.recommendSystemPrompt = common + PROMPT_SEPARATOR + read(recommendPrompt).strip();
         this.recipeDetailSystemPrompt = common + PROMPT_SEPARATOR + read(recipeDetailPrompt).strip();
+        this.generalSystemPrompt = common + PROMPT_SEPARATOR + read(generalPrompt).strip();
     }
 
     /**
@@ -75,7 +79,8 @@ public class OpenAiChatReplyGenerator implements ChatReplyGenerator {
     @Override
     public Flux<String> generate(Long memberId, Long sessionId, String userMessage, List<ContextMessage> history) {
         return stream(memberId, sessionId, "상담 답", () -> {
-            ChatClientRequestSpec spec = chatClient.prompt();
+            // 빈에 고정된 공통 시스템 프롬프트 대신 공통 + 추천 기준을 system으로 보낸다
+            ChatClientRequestSpec spec = chatClient.prompt().system(generalSystemPrompt);
             // 이전 대화는 시스템 프롬프트 뒤, 이번 메시지 앞에 사용자·AI 메시지로 넣는다
             if (!history.isEmpty()) {
                 spec = spec.messages(toMessages(history));

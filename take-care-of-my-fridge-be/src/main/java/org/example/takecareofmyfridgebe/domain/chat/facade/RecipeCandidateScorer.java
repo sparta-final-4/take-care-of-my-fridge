@@ -60,6 +60,7 @@ public class RecipeCandidateScorer {
 
 
     // 요청 > (이 상담에서 추천하지 않은 것 먼저) > 선택 재료 > (선택 재료가 있으면 모자람 아님) > 임박 > 맛 > 보유 비율 > 없는 재료 수 > id
+    // 기준이 바뀌면 일반 답 프롬프트(prompts/chat-general.txt)의 추천 기준 문장도 같이 고친다
     private static Comparator<RecipeCandidate> order(boolean selectedFirstReady, Set<Long> alreadyRecommended) {
         Comparator<RecipeCandidate> order = Comparator
                 .comparingInt((RecipeCandidate c) -> c.ranking().requestMatches()).reversed()

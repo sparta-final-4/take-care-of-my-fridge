@@ -22,6 +22,7 @@ import java.util.Objects;
  * 바꿔 넣은 카드는 alternative(다른 제안)로 표시해 AI 설명·카드 이유가 요청과 다른 제안이라고 말하게 한다.
  * 단 키워드로 맞은(이름·늘린 이름·재료) 레시피는 사용자가 말한 요리라 다른 제안으로 표시하지 않는다.
  * 후보가 3개보다 적으면 있는 만큼 고른다.
+ * 기준이 바뀌면 일반 답 프롬프트(prompts/chat-general.txt)의 추천 기준 문장도 같이 고친다.
  */
 public final class RecommendationPicker {
 
