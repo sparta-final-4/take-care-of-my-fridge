@@ -5,9 +5,15 @@ import { generatePath, Link } from 'react-router';
 
 import { ROUTES } from '@/app/paths';
 import { FallbackImage } from '@/common/components/FallbackImage';
+import { useAddToCart } from '@/domains/cart/hooks/useAddToCart';
 import { ddayTagColor } from '@/domains/fridge/format';
 
-import { type ChatRecommendedRecipe, summarizeImminent } from '../recommendations';
+import {
+  type ChatRecommendationMissingIngredient,
+  type ChatRecommendedRecipe,
+  summarizeImminent,
+} from '../recommendations';
+import { ChatShoppingList } from './ChatShoppingList';
 import styles from './ChatRecommendationCards.module.scss';
 
 interface ChatRecommendationCardsProps {
@@ -120,19 +126,34 @@ function RecommendationCard({ recipe, description, onNavigate }: RecommendationC
           </div>
         </div>
         {showShopping && (
-          <div id={shoppingListId} className={styles.shopping}>
-            <Typography.Text className={styles.shoppingNames}>
-              {recipe.missingIngredients.map((ingredient) => ingredient.name).join(', ')}
-            </Typography.Text>
-            <Typography.Text type="secondary" className={styles.shoppingNote}>
-              소금·간장 같은 기본 양념은 빼고 셌어요
-            </Typography.Text>
-          </div>
+          <ShoppingSection id={shoppingListId} ingredients={recipe.missingIngredients} />
         )}
       </div>
       {description && (
         <Typography.Paragraph className={styles.description}>{description}</Typography.Paragraph>
       )}
     </li>
+  );
+}
+
+interface ShoppingSectionProps {
+  id: string;
+  ingredients: ChatRecommendationMissingIngredient[];
+}
+
+// 펼친 장볼 재료. 담기는 상품 목록·상세와 같은 장바구니 담기를 쓰고, 상담 창은 그대로 둔다
+function ShoppingSection({ id, ingredients }: ShoppingSectionProps) {
+  const { addToCart, pendingProductId } = useAddToCart();
+  return (
+    <div id={id} className={styles.shopping}>
+      <ChatShoppingList
+        ingredients={ingredients}
+        onAdd={(productId) => addToCart(productId, 1)}
+        pendingProductId={pendingProductId}
+      />
+      <Typography.Text type="secondary" className={styles.shoppingNote}>
+        소금·간장 같은 기본 양념은 빼고 셌어요
+      </Typography.Text>
+    </div>
   );
 }

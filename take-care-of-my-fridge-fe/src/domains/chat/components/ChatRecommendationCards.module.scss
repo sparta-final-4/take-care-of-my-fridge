@@ -134,7 +134,42 @@
   padding: 0 var(--ant-padding-sm) var(--ant-padding-sm);
 }
 
-.shoppingNames {
+// 장볼 재료 한 줄: 재료·상품 이름 | 가격 | [담기]
+.shoppingList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ant-margin-xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.shoppingItem {
+  display: flex;
+  gap: var(--ant-margin-xs);
+  align-items: center;
+  font-size: var(--ant-font-size-sm);
+}
+
+.shoppingName {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.shoppingProduct {
+  font-size: var(--ant-font-size-sm);
+}
+
+.shoppingPrice {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  white-space: nowrap;
+}
+
+.shoppingListPrice {
   font-size: var(--ant-font-size-sm);
 }
 

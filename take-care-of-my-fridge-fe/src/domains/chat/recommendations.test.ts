@@ -42,7 +42,7 @@ describe('parseChatRecommendations', () => {
           usedIngredients: ['고추', '대파'],
           imminentIngredients: [{ name: '고추', dDay: 1 }],
           matchedTastes: ['감칠맛'],
-          missingIngredients: [{ ingredientId: 21, name: '두부' }],
+          missingIngredients: [{ ingredientId: 21, name: '두부', product: null }],
           missingSelectedIngredients: ['두부'],
           lacksManyIngredients: true,
           reason: '느타리버섯·두부가 주재료예요',
@@ -80,6 +80,59 @@ describe('parseChatRecommendations', () => {
       reason: '',
       description: null,
     });
+  });
+
+  it('장볼 재료의 담을 상품을 읽고, 상품이 없거나 id·이름·정가가 없으면 null로 둔다', () => {
+    const result = parseChatRecommendations(
+      JSON.stringify({
+        recipes: [
+          {
+            recipeId: 1,
+            name: '두부조림',
+            missingIngredients: [
+              {
+                ingredientId: 21,
+                name: '두부',
+                product: {
+                  productId: 22,
+                  name: '부침용 두부 1모',
+                  imageUrl: null,
+                  price: 2000,
+                  salePrice: 1500,
+                  saleType: 'SPECIAL',
+                  soldOut: false,
+                  unitAmount: 1,
+                  unit: '모',
+                },
+              },
+              { ingredientId: 5, name: '배추', product: null },
+              { ingredientId: 3, name: '대파', product: { name: '대파 1단' } },
+            ],
+          },
+        ],
+        empty: false,
+      }),
+    );
+
+    expect(result?.recipes[0].missingIngredients).toEqual([
+      {
+        ingredientId: 21,
+        name: '두부',
+        product: {
+          productId: 22,
+          name: '부침용 두부 1모',
+          imageUrl: null,
+          price: 2000,
+          salePrice: 1500,
+          saleType: 'SPECIAL',
+          soldOut: false,
+          unitAmount: 1,
+          unit: '모',
+        },
+      },
+      { ingredientId: 5, name: '배추', product: null },
+      { ingredientId: 3, name: '대파', product: null },
+    ]);
   });
 
   it('JSON이 아니거나 recipes가 없으면 null을 돌려준다', () => {
