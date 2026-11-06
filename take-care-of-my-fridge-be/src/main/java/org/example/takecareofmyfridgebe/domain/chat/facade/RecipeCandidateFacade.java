@@ -96,6 +96,9 @@ public class RecipeCandidateFacade {
 
         // ES 경로에서 키워드로 맞은(이름·늘린 이름·재료) 레시피가 하나도 없으면 레시피 검색으로 보충한다. 벡터 검색은 한 번만
         // ("탕짜면"처럼 ES가 글자 일부("짜")로만 걸어 온 레시피는 맞은 것으로 치지 않는다)
+        // 우회: ES가 키워드로 표시한 결과만 믿지 않고 쪼개짐(SPLIT)을 빼고 세는 것은, 레시피 인덱스 분석기가 키워드를 한 글자까지
+        // 쪼개 상관없는 레시피를 키워드 결과로 걸고(탕짜면 → "짜"), 키워드 _name이 겹쳐 표시도 빠지기 때문이다.
+        // 레시피 담당이 고치면 ES 키워드 표시만으로 정하도록 걷어낸다 ([이슈 번호])
         if (pool.rowsNonBasicComplete() && !grouped.keywords().isEmpty() && !hasStrongKeywordMatch(ranked.query())) {
             CandidatePool supplement = searchKeywordsOnce(grouped, pool.recipeIds());
             String route = pool.route() + "+벡터";
@@ -549,6 +552,8 @@ public class RecipeCandidateFacade {
         });
         // 키워드 결과로 표시되지 않은 후보도 이름에 요리 이름·키워드가 통째로 있으면 키워드로 맞은 것으로 본다
         // (ES는 같은 이름의 검색이 여럿이면 마지막 것만 맞았다고 돌려줘서 "탕수육"이 키워드 결과로 표시되지 않을 수 있다)
+        // 우회: 레시피 후보 검색(RecipeCandidateSearchService.keywordQuery)이 키워드마다 같은 _name("keyword")을 붙여서다.
+        // 레시피 담당이 키워드 검색 이름을 하나로 묶도록 고치면 이 이름 맞추기는 걷어낸다 ([이슈 번호])
         infos.forEach((recipeId, info) -> {
             if (matches.containsKey(recipeId)) {
                 return;

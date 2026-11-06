@@ -55,6 +55,10 @@ public final class KeywordMatchClassifier {
                 }
             }
         }
+        // 쪼개짐: 레시피 인덱스 분석기가 키워드를 글자 단위까지 쪼개 ES가 넓게 건 것("탕짜면" → "짜"로 간장게장,
+        // "중국음식" → "중국"으로 재료 중국부추)을 키워드 일치로 세지 않는다 ([이슈 번호]).
+        // 분석기가 고쳐져도 카드 이유를 맞은 방식대로 쓰려면 이 비교는 필요해서 남긴다.
+        // 걷어낼 것은 이 결과를 보고 벡터 보충을 정하는 우회(RecipeCandidateFacade.findCandidates)다
         return KeywordMatch.of(vectorOnly ? Type.VECTOR : Type.SPLIT);
     }
 
