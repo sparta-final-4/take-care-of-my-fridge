@@ -34,7 +34,8 @@ public class CacheConfig implements CachingConfigurer {
 
     // 레시피 등록, 수정 시 비우고, SQL로 직접 적재한 데이터는 TTL이 지나면 반영된다.
     private static final Duration RECIPE_CLASSIFICATIONS_TTL = Duration.ofHours(1);
-    private static final Duration POPULAR_RECIPES_TTL = Duration.ofHours(24);
+    // 인기 레시피 순위(30일 집계)가 늦게 바뀌어도 되는 최대 시간. 레시피 정보·평점은 캐시하지 않아 바로 반영된다.
+    private static final Duration POPULAR_RECIPE_RANKING_TTL = Duration.ofHours(24);
     // 비우지 않고 TTL로만 바꾼다. 품절, 할인 종료, 번개 드롭 남은 수량이 메인 화면에 늦게 보이는 최대 시간이라 짧게 둔다.
     private static final Duration POPULAR_SALES_TTL = Duration.ofSeconds(10);
 
@@ -55,7 +56,7 @@ public class CacheConfig implements CachingConfigurer {
                 .withInitialCacheConfigurations(
                         Map.of(
                                 CacheNames.RECIPE_CLASSIFICATIONS, defaults.entryTtl(RECIPE_CLASSIFICATIONS_TTL),
-                                CacheNames.POPULAR_RECIPES, defaults.entryTtl(POPULAR_RECIPES_TTL),
+                                CacheNames.POPULAR_RECIPE_RANKING, defaults.entryTtl(POPULAR_RECIPE_RANKING_TTL),
                                 CacheNames.POPULAR_SALES, defaults.entryTtl(POPULAR_SALES_TTL)
                         )
                 )

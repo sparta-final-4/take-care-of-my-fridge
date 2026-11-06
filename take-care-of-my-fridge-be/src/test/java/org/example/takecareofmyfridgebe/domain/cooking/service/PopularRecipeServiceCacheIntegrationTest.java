@@ -1,6 +1,7 @@
 package org.example.takecareofmyfridgebe.domain.cooking.service;
 
 import org.example.takecareofmyfridgebe.domain.cooking.dto.PopularRecipeCookingCount;
+import org.example.takecareofmyfridgebe.domain.cooking.dto.PopularRecipeRanking;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.PopularRecipeResponse;
 import org.example.takecareofmyfridgebe.domain.cooking.repository.CookingLogRepository;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeSummary;
@@ -21,6 +22,7 @@ import org.springframework.boot.data.redis.autoconfigure.DataRedisAutoConfigurat
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.util.List;
@@ -36,7 +38,8 @@ import static org.mockito.Mockito.when;
 @SpringBootTest(classes = {
         RedisConfig.class,
         CacheConfig.class,
-        PopularRecipeService.class
+        PopularRecipeService.class,
+        PopularRecipeRankingService.class
 })
 @ImportAutoConfiguration({
         DataRedisAutoConfiguration.class,
@@ -60,59 +63,45 @@ class PopularRecipeServiceCacheIntegrationTest extends RedisContainerSupport {
     private CacheManager cacheManager;
 
     @Autowired
-    private org.springframework.data.redis.core.StringRedisTemplate stringRedisTemplate;
+    private StringRedisTemplate stringRedisTemplate;
 
     @BeforeEach
     void clearCache() {
-        Cache cache = cacheManager.getCache(CacheNames.POPULAR_RECIPES);
+        Cache cache = cacheManager.getCache(CacheNames.POPULAR_RECIPE_RANKING);
         if (cache != null) {
-            cache.clear();
+            cache.invalidate();
         }
     }
 
     @Test
-    @DisplayName("같은 size로 두 번 호출하면 집계 조회가 1회만 실행되고 Redis 캐시에서 역직렬화되어 반환된다")
-    void returnsCachedResult_whenCalledTwiceWithSameSize() {
-        // Given
+    @DisplayName("같은 size로 두 번 호출하면 순위 집계는 1회만 하고 Redis 순위 캐시를 쓰지만, 레시피 정보·평점은 매번 읽어 바뀐 이름과 후기가 바로 반영된다")
+    void cachesRankingOnly_andReadsRecipeEveryTime() {
         int size = 6;
-        PopularRecipeCookingCount count = new PopularRecipeCookingCount(10L, 7L);
         when(cookingLogRepository.findPopularCookingCounts(any(), eq(size)))
-                .thenReturn(List.of(count));
-
-        RecipeSummary summary = new RecipeSummary(10L, "된장찌개", "https://img.com/10.jpg", "팁 요약");
+                .thenReturn(List.of(new PopularRecipeCookingCount(10L, 7L)));
         when(recipeService.findSummaries(List.of(10L)))
-                .thenReturn(Map.of(10L, summary));
-
-        RecipeRatingStat stat = new RecipeRatingStat(10L, 4.8, 15L);
+                .thenReturn(Map.of(10L, new RecipeSummary(10L, "된장찌개", "https://img.com/10.jpg", "팁 요약")))
+                .thenReturn(Map.of(10L, new RecipeSummary(10L, "차돌 된장찌개", "https://img.com/10-new.jpg", "새 팁 요약")));
         when(recipeReviewService.findRatingStats(List.of(10L)))
-                .thenReturn(Map.of(10L, stat));
+                .thenReturn(Map.of(10L, new RecipeRatingStat(10L, 4.8, 15L)))
+                .thenReturn(Map.of(10L, new RecipeRatingStat(10L, 4.5, 16L)));
 
-        // When: 첫 번째 호출 (캐시 미스 -> DB 조회 및 Redis 저장)
         List<PopularRecipeResponse> firstCall = popularRecipeService.getPopularRecipes(size);
-
-        System.out.println("DEBUG_REDIS_KEYS: " + stringRedisTemplate.keys("*"));
-        for (String k : stringRedisTemplate.keys("*")) {
-            System.out.println("DEBUG_REDIS_KEY[" + k + "] = " + stringRedisTemplate.opsForValue().get(k));
-        }
-        Object cachedValue = cacheManager.getCache(CacheNames.POPULAR_RECIPES).get(size);
-        System.out.println("DEBUG_CACHE_CHECK: cachedValue = " + cachedValue);
-
-        // Then
-        assertThat(firstCall.size()).isEqualTo(1);
-        assertThat(firstCall.get(0).recipeName()).isEqualTo("된장찌개");
-        assertThat(firstCall.get(0).averageRating()).isEqualTo(4.8);
-        assertThat(firstCall.get(0).reviewCount()).isEqualTo(15L);
-        verify(cookingLogRepository, times(1)).findPopularCookingCounts(any(), eq(size));
-
-        // When: 두 번째 호출 (캐시 히트 -> Redis에서 꺼내옴)
         List<PopularRecipeResponse> secondCall = popularRecipeService.getPopularRecipes(size);
 
-        // Then: DB 집계 메서드는 여전히 1회만 호출됨
-        assertThat(secondCall.size()).isEqualTo(1);
-        assertThat(secondCall.get(0).recipeName()).isEqualTo("된장찌개");
-        assertThat(secondCall.get(0).averageRating()).isEqualTo(4.8);
-        assertThat(secondCall.get(0).reviewCount()).isEqualTo(15L);
+        assertThat(firstCall).extracting(PopularRecipeResponse::recipeName).containsExactly("된장찌개");
+        assertThat(firstCall.get(0).reviewCount()).isEqualTo(15L);
+        assertThat(secondCall.get(0).recipeName()).isEqualTo("차돌 된장찌개");
+        assertThat(secondCall.get(0).imageUrl()).isEqualTo("https://img.com/10-new.jpg");
+        assertThat(secondCall.get(0).averageRating()).isEqualTo(4.5);
+        assertThat(secondCall.get(0).reviewCount()).isEqualTo(16L);
+        assertThat(secondCall.get(0).cookedMemberCount()).isEqualTo(7L);
         verify(cookingLogRepository, times(1)).findPopularCookingCounts(any(), eq(size));
+        verify(recipeService, times(2)).findSummaries(List.of(10L));
+        verify(recipeReviewService, times(2)).findRatingStats(List.of(10L));
+        assertThat(cacheManager.getCache(CacheNames.POPULAR_RECIPE_RANKING).get(size, PopularRecipeRanking.class))
+                .isEqualTo(new PopularRecipeRanking(List.of(new PopularRecipeCookingCount(10L, 7L))));
+        assertThat(stringRedisTemplate.keys("recipe:popular::*")).isEmpty();
     }
 
     @Test
