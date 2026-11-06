@@ -9,28 +9,46 @@ import { useAddToCart } from '@/domains/cart/hooks/useAddToCart';
 import { ddayTagColor } from '@/domains/fridge/format';
 
 import {
+  type ChatRecommendedMealkit,
   type ChatRecommendationMissingIngredient,
   type ChatRecommendedRecipe,
   summarizeImminent,
 } from '../recommendations';
+import { ChatMealkitCards } from './ChatMealkitCards';
 import { ChatShoppingList } from './ChatShoppingList';
 import styles from './ChatRecommendationCards.module.scss';
 
 interface ChatRecommendationCardsProps {
   recipes: ChatRecommendedRecipe[];
+  // 레시피 카드 아래 밀키트 카드 (밀키트만 보여 주는 답이면 recipes는 빈 목록)
+  mealkits?: ChatRecommendedMealkit[];
   // 받는 중인 카드 설명 (카드 순서). 있으면 저장된 설명(recipe.description) 대신 쓴다
   descriptions?: string[];
-  // 카드를 눌러 레시피 상세로 갈 때 (모바일 전체 화면 채팅창은 닫는다)
+  // 카드를 눌러 레시피·상품 상세로 갈 때 (모바일 전체 화면 채팅창은 닫는다)
   onNavigate?: () => void;
 }
 
-// AI 상담 추천 카드 (최대 3개). 소개 말풍선 아래에 카드 → 설명 → 카드 → 설명 순서로 쌓는다.
+// AI 상담 추천 카드 (최대 3개). 소개 말풍선 아래에 카드 → 설명 → 카드 → 설명 순서로 쌓고, 밀키트 카드는 그 아래에 둔다.
 export function ChatRecommendationCards({
   recipes,
+  mealkits = [],
   descriptions,
   onNavigate,
 }: ChatRecommendationCardsProps) {
-  if (recipes.length === 0) return null;
+  if (recipes.length === 0 && mealkits.length === 0) return null;
+  return (
+    <>
+      {recipes.length > 0 && (
+        <RecipeCards recipes={recipes} descriptions={descriptions} onNavigate={onNavigate} />
+      )}
+      {mealkits.length > 0 && <MealkitSection mealkits={mealkits} onNavigate={onNavigate} />}
+    </>
+  );
+}
+
+type RecipeCardsProps = Omit<ChatRecommendationCardsProps, 'mealkits'>;
+
+function RecipeCards({ recipes, descriptions, onNavigate }: RecipeCardsProps) {
   return (
     <ul className={styles.cards} aria-label="추천 레시피">
       {recipes.map((recipe, index) => (
@@ -155,5 +173,23 @@ function ShoppingSection({ id, ingredients }: ShoppingSectionProps) {
         소금·간장 같은 기본 양념은 빼고 셌어요
       </Typography.Text>
     </div>
+  );
+}
+
+interface MealkitSectionProps {
+  mealkits: ChatRecommendedMealkit[];
+  onNavigate?: () => void;
+}
+
+// 밀키트 카드. 담기는 상품 목록·상세와 같은 장바구니 담기를 쓰고, 상담 창은 그대로 둔다
+function MealkitSection({ mealkits, onNavigate }: MealkitSectionProps) {
+  const { addToCart, pendingProductId } = useAddToCart();
+  return (
+    <ChatMealkitCards
+      mealkits={mealkits}
+      onAdd={(productId) => addToCart(productId, 1)}
+      pendingProductId={pendingProductId}
+      onNavigate={onNavigate}
+    />
   );
 }

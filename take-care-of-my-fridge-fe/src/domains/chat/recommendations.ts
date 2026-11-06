@@ -1,10 +1,11 @@
-import type { RecommendedRecipe } from '@/common/api/clients';
+import type { RecommendedMealkit, RecommendedRecipe } from '@/common/api/clients';
 
 // AI 상담 추천 카드 SSE 이벤트(event: recommendations)의 data.
 // SSE 이벤트 data는 OpenAPI 스펙에 나오지 않아 생성 타입이 없다. 그래서 백엔드 DTO
 // ChatRecommendationsEventResponse(domain/chat/dto)와 같은 모양으로 여기에 둔다. 필드를 바꾸면 둘 다 고친다.
 // 메시지 조회(ChatMessageResponse.recommendations)의 카드는 생성 타입 RecommendedRecipe로 오고,
 // toChatRecommendedRecipes로 같은 모양으로 바꿔 그린다.
+// 밀키트 카드(mealkits)도 같다: 이벤트는 parseChatRecommendations, 메시지 조회는 toChatRecommendedMealkits.
 
 export interface ChatRecommendationImminentIngredient {
   name: string;
@@ -60,11 +61,26 @@ export interface ChatRecommendedRecipe {
   description: string | null;
 }
 
+// 추천 밀키트 카드. 누르면 상품 상세로 간다
+export interface ChatRecommendedMealkit {
+  // 담을 상품 (가격·할인가·품절은 카드를 만들 때 기준, 용량 칸은 null)
+  product: ChatShoppingProduct;
+  // 구성 인분
+  servings: number;
+  // 이 밀키트로 만드는 레시피. 연결이 없으면 null
+  recipeId: number | null;
+  recipeName: string | null;
+  // 카드 아래 서버 설명 ("요리하기 번거로우면 …"). 밀키트만 보여 주는 답이면 null
+  description: string | null;
+}
+
 export interface ChatRecommendations {
   recipes: ChatRecommendedRecipe[];
+  // 추천 밀키트. 밀키트를 말하면 최대 3개(레시피 카드 없음), 번거로워하는 말이면 레시피 카드 아래 1개
+  mealkits: ChatRecommendedMealkit[];
   // 후보를 찾으려고 푼 조건 (아직 항상 빈 목록)
   relaxed: string[];
-  // 조건에 맞는 후보가 없음 (recipes는 빈 목록)
+  // 보여 줄 레시피·밀키트가 없음
   empty: boolean;
 }
 
@@ -144,7 +160,29 @@ export function toChatRecommendedRecipes(
   return (cards ?? []).flatMap((card) => toRecipe({ ...card }) ?? []);
 }
 
+// 상품(id·이름·정가)이 없는 밀키트 카드는 뺀다
+function toMealkit(value: Record<string, unknown>): ChatRecommendedMealkit | null {
+  const product = toShoppingProduct(value.product);
+  if (!product) return null;
+  return {
+    product,
+    servings: typeof value.servings === 'number' ? value.servings : 0,
+    recipeId: typeof value.recipeId === 'number' ? value.recipeId : null,
+    recipeName: typeof value.recipeName === 'string' ? value.recipeName : null,
+    description:
+      typeof value.description === 'string' && value.description ? value.description : null,
+  };
+}
+
+// 메시지 조회로 받은 밀키트 카드(생성 타입)를 그릴 모양으로 바꾼다
+export function toChatRecommendedMealkits(
+  cards: RecommendedMealkit[] | undefined,
+): ChatRecommendedMealkit[] {
+  return (cards ?? []).flatMap((card) => toMealkit({ ...card }) ?? []);
+}
+
 // 이벤트 data(JSON)를 읽는다. 모양이 다르면 null, 레시피 중 필수 값(id·이름)이 없는 것은 뺀다.
+// 밀키트만 보여 주는 답은 recipes가 빈 목록이고 mealkits가 있다 (empty가 아니다).
 export function parseChatRecommendations(data: string): ChatRecommendations | null {
   let parsed: unknown;
   try {
@@ -154,10 +192,12 @@ export function parseChatRecommendations(data: string): ChatRecommendations | nu
   }
   if (!isRecord(parsed) || !Array.isArray(parsed.recipes)) return null;
   const recipes = records(parsed.recipes).flatMap((recipe) => toRecipe(recipe) ?? []);
+  const mealkits = records(parsed.mealkits).flatMap((mealkit) => toMealkit(mealkit) ?? []);
   return {
     recipes,
+    mealkits,
     relaxed: strings(parsed.relaxed),
-    empty: parsed.empty === true || recipes.length === 0,
+    empty: parsed.empty === true || (recipes.length === 0 && mealkits.length === 0),
   };
 }
 

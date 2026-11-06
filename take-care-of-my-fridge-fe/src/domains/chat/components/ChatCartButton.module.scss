@@ -1,0 +1,20 @@
+@use '@/styles/variables' as *;
+
+// 보이는 크기는 기본 버튼 높이(32px)로 두고, 누르는 영역만 44px로 넓힌다
+.button {
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+  pointer-events: auto;
+  font-size: var(--ant-font-size-sm);
+
+  &::after {
+    position: absolute;
+    inset: calc(($touch-target-size - var(--ant-control-height)) / -2);
+    content: '';
+  }
+}
+
+.icon {
+  font-size: var(--ant-font-size-xl);
+}
