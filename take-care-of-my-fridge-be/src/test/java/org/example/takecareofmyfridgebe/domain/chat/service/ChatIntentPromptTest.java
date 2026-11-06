@@ -47,6 +47,19 @@ class ChatIntentPromptTest {
     }
 
     @Test
+    @DisplayName("레시피에 없을 법한 요리 이름은 \"같은\"이 없어도 이루는 요리·비슷한 요리로 늘리고 세트 메뉴는 구성 요리를 모두 넣으며, 줄임말 목록은 두지 않는다")
+    void expandsUnlikelyDishNames_withoutAbbreviationList() throws IOException {
+        String followUp = new ClassPathResource("prompts/chat-intent-followup.txt").getContentAsString(StandardCharsets.UTF_8);
+
+        assertThat(prompt).contains(
+                "말한 이름이 레시피에 없을 법하면(줄임말·세트 메뉴·가게 메뉴·신조어) \"같은\"이 없어도 그 요리를 이루는 요리나 비슷한 요리로 늘린다",
+                "세트 메뉴면 구성 요리를 모두 넣는다",
+                "그 이름을 짧게 그대로 쓴다(레시피에 없을 법한 이름도)");
+        assertThat(prompt).doesNotContain("탕짜면", "짬짜면");
+        assertThat(followUp).contains("요리 이름·keywords·dishText는 첫 질문 규칙대로 뽑는다");
+    }
+
+    @Test
     @DisplayName("첫 질문용 고정 프롬프트에는 이어지는 말 규칙이 없고, 이어지는 말 규칙은 따로 다시 추천·레시피 자세히·대상 칸을 지시한다")
     void keepsFollowUpRulesSeparate() throws IOException {
         String followUp = new ClassPathResource("prompts/chat-intent-followup.txt").getContentAsString(StandardCharsets.UTF_8);
@@ -89,7 +102,7 @@ class ChatIntentPromptTest {
                 "\"맛있게 하는 팁\"", "생략", "[다른 제안]", "[이미 안내한 말]");
         assertThat(followUp.lines().filter(line -> line.contains("예)"))).hasSize(5);
         // 35% 줄이기 전(1,809자)보다 짧게 둔다
-        assertThat(followUp.length()).isLessThan(1_550);
+        assertThat(followUp.length()).isLessThan(1_600);
     }
 
     @Test
