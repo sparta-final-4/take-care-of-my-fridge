@@ -15,6 +15,8 @@ import org.example.takecareofmyfridgebe.domain.ingredient.service.IngredientServ
 import org.example.takecareofmyfridgebe.domain.product.dto.ProductDetail;
 import org.example.takecareofmyfridgebe.domain.product.entity.IngredientProduct;
 import org.example.takecareofmyfridgebe.domain.product.entity.Product;
+import org.example.takecareofmyfridgebe.domain.product.entity.ProductStatus;
+import org.example.takecareofmyfridgebe.domain.product.entity.ProductType;
 import org.example.takecareofmyfridgebe.domain.product.service.ProductService;
 import org.example.takecareofmyfridgebe.dummy.ProductFixture;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
@@ -141,6 +143,8 @@ class FridgeFacadeTest {
         assertThat(first.getStorage()).isEqualTo(StorageType.REFRIGERATED);
         assertThat(first.getExpirationDate()).isEqualTo(today.plusDays(5));
         assertThat(first.getSource()).isEqualTo(FridgeSource.MANUAL);
+        // 직접 등록한 줄은 상품 ID가 없다
+        assertThat(first.getProductId()).isNull();
 
         // 두 번째 재료: 원문 rawName 유지 + 사용자가 직접 입력한 보관방식(FROZEN) 및 소비기한(오늘+14일) 적용 확인
         Fridge second = savedFridges.get(1);
@@ -318,6 +322,7 @@ class FridgeFacadeTest {
         assertThat(onionFridge.getRawName()).isEqualTo("양파 1kg");
         assertThat(onionFridge.getSource()).isEqualTo(FridgeSource.COMMERCE);
         assertThat(onionFridge.getOrderItemId()).isEqualTo(101L);
+        assertThat(onionFridge.getProductId()).isEqualTo(1L);
         assertThat(onionFridge.getMemberId()).isEqualTo(7L);
 
         Fridge tofuFridge = fridges.get(1);
@@ -326,6 +331,44 @@ class FridgeFacadeTest {
         assertThat(tofuFridge.getOrderItemId()).isEqualTo(102L);
         // 밀키트가 없으면 밀키트용 기본 재료를 조회하지 않는다
         verify(ingredientService, never()).getMealkitIngredient();
+    }
+
+    /**
+     * 입고 정책: 이름만 주문 당시 값(메시지의 productName)이고, 보관 방법·보관 일수·재료 연결·기본 수량은 구매 확정 시점 상품 정보다.
+     * 판매 중지(삭제)된 상품도 이미 산 상품이라 그대로 넣는다.
+     */
+    @Test
+    @DisplayName("판매 중지된 상품도 입고하고, 이름은 주문 당시 이름을, 보관 방법·보관 일수·재료 연결·기본 수량은 확정 시점 상품 정보를 쓴다")
+    @SuppressWarnings("unchecked")
+    void stocksStoppedProduct_withOrderNameAndCurrentProductInfo() {
+        Product stopped = Product.builder()
+                .productType(ProductType.INGREDIENT)
+                .name("양파 1kg (이름 바뀜)")
+                .price(3900)
+                .stock(0)
+                .storage(StorageType.REFRIGERATED)
+                .shelfDays(3)
+                .status(ProductStatus.STOPPED)
+                .build();
+        ReflectionTestUtils.setField(stopped, "id", 1L);
+        Ingredient onion = ingredientWithId(10L, "ING_ONION", "양파");
+        PurchaseConfirmedMessage message = message(List.of(new PurchaseConfirmedMessage.Item(101L, 1L, "양파 1kg", 2)));
+
+        when(fridgeService.getStockedOrderItemIds(List.of(101L))).thenReturn(Set.of());
+        when(productService.getProductDetailsByIds(List.of(1L)))
+                .thenReturn(List.of(ProductDetail.ofIngredient(stopped, ingredientLink(stopped, 10L, "4"))));
+        when(ingredientService.getIngredientsByIds(Set.of(10L))).thenReturn(Map.of(10L, onion));
+
+        fridgeFacade.stockPurchasedItems(message);
+
+        ArgumentCaptor<List<Fridge>> captor = ArgumentCaptor.forClass(List.class);
+        verify(fridgeService).stockCommerceItems(captor.capture());
+        Fridge fridge = captor.getValue().get(0);
+        assertThat(fridge.getRawName()).isEqualTo("양파 1kg");
+        assertThat(fridge.getStorage()).isEqualTo(StorageType.REFRIGERATED);
+        assertThat(fridge.getExpirationDate()).isEqualTo(LocalDate.of(2026, 11, 2));
+        assertThat(fridge.getIngredient()).isSameAs(onion);
+        assertThat(new BigDecimal("8").compareTo(fridge.getQuantity())).isEqualTo(0);
     }
 
     /**
@@ -361,6 +404,7 @@ class FridgeFacadeTest {
         assertThat(fridge.getRawName()).isEqualTo("된장찌개 밀키트");
         assertThat(fridge.getExpirationDate()).isEqualTo(LocalDate.of(2026, 11, 13));
         assertThat(fridge.getSource()).isEqualTo(FridgeSource.COMMERCE);
+        assertThat(fridge.getProductId()).isEqualTo(3L);
     }
 
     /**

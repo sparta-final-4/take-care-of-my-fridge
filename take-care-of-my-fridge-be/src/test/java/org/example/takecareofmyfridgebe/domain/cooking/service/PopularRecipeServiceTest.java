@@ -2,7 +2,7 @@ package org.example.takecareofmyfridgebe.domain.cooking.service;
 
 import org.example.takecareofmyfridgebe.domain.cooking.dto.PopularRecipeCookingCount;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.PopularRecipeResponse;
-import org.example.takecareofmyfridgebe.domain.cooking.repository.CookingLogRepository;
+import org.example.takecareofmyfridgebe.domain.cooking.dto.PopularRecipeRanking;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeSummary;
 import org.example.takecareofmyfridgebe.domain.recipe.service.RecipeService;
 import org.example.takecareofmyfridgebe.domain.review.dto.RecipeRatingStat;
@@ -28,7 +28,7 @@ import static org.mockito.Mockito.when;
 class PopularRecipeServiceTest {
 
     @Mock
-    private CookingLogRepository cookingLogRepository;
+    private PopularRecipeRankingService popularRecipeRankingService;
 
     @Mock
     private RecipeService recipeService;
@@ -43,8 +43,7 @@ class PopularRecipeServiceTest {
     @DisplayName("최근 30일간 요리 기록이 없으면 추가 조회 없이 빈 목록을 반환한다")
     void returnsEmptyList_whenNoRecentCookingLogs() {
         // Given
-        when(cookingLogRepository.findPopularCookingCounts(any(), anyInt()))
-                .thenReturn(List.of());
+        when(popularRecipeRankingService.getRanking(anyInt())).thenReturn(new PopularRecipeRanking(List.of()));
 
         // When
         List<PopularRecipeResponse> result = popularRecipeService.getPopularRecipes(6);
@@ -61,8 +60,7 @@ class PopularRecipeServiceTest {
         // Given
         PopularRecipeCookingCount count1 = new PopularRecipeCookingCount(1L, 5L);
         PopularRecipeCookingCount count2 = new PopularRecipeCookingCount(2L, 3L);
-        when(cookingLogRepository.findPopularCookingCounts(any(), anyInt()))
-                .thenReturn(List.of(count1, count2));
+        when(popularRecipeRankingService.getRanking(anyInt())).thenReturn(new PopularRecipeRanking(List.of(count1, count2)));
 
         RecipeSummary summary1 = new RecipeSummary(1L, "된장찌개", "image1.jpg", "구수한 된장 팁");
         RecipeSummary summary2 = new RecipeSummary(2L, "김치찌개", "image2.jpg", null);

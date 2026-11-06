@@ -7,7 +7,8 @@ package org.example.takecareofmyfridgebe.global.config;
 public final class CacheNames {
 
     public static final String RECIPE_CLASSIFICATIONS = "recipe:classifications";
-    public static final String POPULAR_RECIPES = "recipe:popular";
+    // 인기 레시피 순위만 (레시피 정보는 담지 않음). 예전 "recipe:popular"(응답 전체)와 이름을 달리해 예전 값을 읽지 않는다
+    public static final String POPULAR_RECIPE_RANKING = "recipe:popular-ranking";
     public static final String POPULAR_SALES = "sale:popular";
 
     private CacheNames() {

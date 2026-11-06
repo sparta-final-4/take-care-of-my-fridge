@@ -6,6 +6,7 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
@@ -25,6 +26,10 @@ import org.example.takecareofmyfridgebe.global.entity.BaseTimeEntity;
             name = "uk_recipe_reviews_member_id_recipe_id",
             columnNames = {"member_id", "recipe_id"}
         )
+    },
+    indexes = {
+        // 레시피별 후기 목록(최신순)과 레시피별 평점 집계(인기 레시피 등)에 쓴다. 운영 DB(schema.sql)에 이미 있는 인덱스를 엔티티에도 맞춘다
+        @Index(name = "idx_recipe_reviews_recipe_id_created_at", columnList = "recipe_id, created_at")
     }
 )
 @Getter
