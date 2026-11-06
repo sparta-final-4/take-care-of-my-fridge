@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse.ImminentIngredient;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse.MissingIngredient;
+import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse.ShoppingProduct;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse.RecommendedRecipe;
 import org.example.takecareofmyfridgebe.domain.chat.dto.KeywordMatch;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate;
@@ -20,7 +21,10 @@ import org.example.takecareofmyfridgebe.domain.ingredient.service.IngredientServ
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeDetailResponse;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeSummary;
+import org.example.takecareofmyfridgebe.domain.product.entity.IngredientProduct;
+import org.example.takecareofmyfridgebe.domain.product.service.ProductService;
 import org.example.takecareofmyfridgebe.domain.recipe.service.RecipeService;
+import org.example.takecareofmyfridgebe.domain.sale.service.SaleEventReader;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 import org.springframework.stereotype.Component;
@@ -29,6 +33,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -38,7 +43,8 @@ import java.util.stream.Stream;
 
 /**
  * 상담 추천 답을 만들 재료를 모은다: 레시피 후보 검색 → 3개 고르기 → 카드 이벤트와 설명용 후보 정보.
- * 카드 이미지는 레시피 요약 조회(findSummaries)로 한 번에 가져온다. 구매 상품·저장은 아직 하지 않는다.
+ * 카드 이미지는 레시피 요약 조회(findSummaries)로 한 번에 가져온다.
+ * 장볼 재료에는 담을 상품을 붙인다 (고른 카드들의 장볼 재료를 모아 상품 조회·판매가 계산을 한 번씩, ShoppingProductPicker로 하나씩).
  */
 @Slf4j
 @Component
@@ -54,6 +60,8 @@ public class ChatRecommendationFacade {
     private final RecipeCandidateFacade recipeCandidateFacade;
     private final RecipeService recipeService;
     private final IngredientService ingredientService;
+    private final ProductService productService;
+    private final SaleEventReader saleEventReader;
 
     /**
      * @param content 사용자 메시지 원문 (설명 프롬프트에 넣는다)
@@ -89,10 +97,11 @@ public class ChatRecommendationFacade {
                 picked.stream().map(RecipeCandidate::recipeId).toList());
         // 카드 이유는 앞 카드와 겹치지 않게 고른다 (프롬프트 후보 줄도 같은 이유를 쓴다)
         List<String> reasons = RecommendationReasonWriter.writeDistinct(picked, query.keywordText(), !query.hasRequest());
+        Map<Long, ShoppingProduct> products = shoppingProducts(picked);
         List<RecommendedRecipe> recipes = new ArrayList<>();
         for (int i = 0; i < picked.size(); i++) {
             RecipeCandidate candidate = picked.get(i);
-            recipes.add(toCard(candidate, summaries.get(candidate.recipeId()), reasons.get(i), null));
+            recipes.add(toCard(candidate, summaries.get(candidate.recipeId()), reasons.get(i), null, products));
         }
         logPicked(query, picked, recipes);
 
@@ -181,7 +190,7 @@ public class ChatRecommendationFacade {
                 recipe.cookTimeMin(), List.of(), List.of(), List.of(), List.of(), List.of(), false, DETAIL_CARD_REASON,
                 DETAIL_CARD_REASON)
                 : toCard(candidate, new RecipeSummary(recipe.recipeId(), recipe.name(), recipe.imageUrl(), recipe.tipSummary()),
-                DETAIL_CARD_REASON, DETAIL_CARD_REASON);
+                DETAIL_CARD_REASON, DETAIL_CARD_REASON, shoppingProducts(List.of(candidate)));
         return Optional.of(new RecipeDetailReply(ChatRecommendationsEventResponse.of(List.of(card)), recipeInfo));
     }
 
@@ -221,6 +230,8 @@ public class ChatRecommendationFacade {
         List<Long> recipeIds = saved.stream().map(SavedRecommendation::recipeId).distinct().toList();
         Map<Long, RecipeCandidate> candidates = recipeCandidateFacade.describeRecipes(memberId, recipeIds);
         Map<Long, RecipeSummary> summaries = recipeService.findSummaries(recipeIds);
+        // 상품·판매가는 메시지 수와 상관없이 한 번씩, 지금 가격·품절 기준
+        Map<Long, ShoppingProduct> products = shoppingProducts(candidates.values());
 
         Map<Long, List<SavedRecommendation>> byMessage = saved.stream()
                 .collect(Collectors.groupingBy(SavedRecommendation::messageId, LinkedHashMap::new, Collectors.toList()));
@@ -236,15 +247,37 @@ public class ChatRecommendationFacade {
             for (int i = 0; i < alive.size(); i++) {
                 RecipeCandidate candidate = picked.get(i);
                 messageCards.add(toCard(candidate, summaries.get(candidate.recipeId()), reasons.get(i),
-                        alive.get(i).description()));
+                        alive.get(i).description(), products));
             }
             cards.put(messageId, messageCards);
         });
         return cards;
     }
 
+    /**
+     * 카드들의 장볼 재료마다 담을 상품. 장볼 재료 ID를 모아 상품 조회 한 번, 판매가 계산 한 번만 한다.
+     * 장볼 재료가 없거나 판매 상품이 없으면 조회를 줄이고 빈 맵을 돌려준다.
+     *
+     * @return 재료 ID별 담을 상품
+     */
+    private Map<Long, ShoppingProduct> shoppingProducts(Collection<RecipeCandidate> cards) {
+        Set<Long> ingredientIds = cards.stream()
+                .flatMap(card -> card.reason().missingIngredients().stream())
+                .map(RecipeCandidate.MissingIngredient::ingredientId)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        if (ingredientIds.isEmpty()) {
+            return Map.of();
+        }
+        List<IngredientProduct> links = productService.getPublicIngredientProducts(ingredientIds);
+        if (links.isEmpty()) {
+            return Map.of();
+        }
+        return ShoppingProductPicker.pick(links,
+                saleEventReader.findSellingPrices(links.stream().map(IngredientProduct::getProduct).distinct().toList()));
+    }
+
     private static RecommendedRecipe toCard(RecipeCandidate candidate, RecipeSummary summary, String cardReason,
-                                            String description) {
+                                            String description, Map<Long, ShoppingProduct> products) {
         Reason reason = candidate.reason();
         // 원한 맛을 말했으면 그 맛, 아니면 회원 선호 맛과 겹친 맛
         List<Member.Taste> tastes = reason.matchedWantedTastes().isEmpty()
@@ -262,7 +295,8 @@ public class ChatRecommendationFacade {
                         .toList(),
                 tastes.stream().map(TasteLabel::of).toList(),
                 reason.missingIngredients().stream()
-                        .map(missing -> new MissingIngredient(missing.ingredientId(), missing.name()))
+                        .map(missing -> new MissingIngredient(missing.ingredientId(), missing.name(),
+                                products.get(missing.ingredientId())))
                         .toList(),
                 reason.missingSelectedIngredients(),
                 reason.lacksManyIngredients(),
