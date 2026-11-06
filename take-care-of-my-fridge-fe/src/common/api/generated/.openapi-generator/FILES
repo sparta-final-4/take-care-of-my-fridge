@@ -275,6 +275,7 @@ models/settlement-payment-search-request.ts
 models/settlement-period-response.ts
 models/settlement-response.ts
 models/settlement-search-request.ts
+models/shopping-product.ts
 models/sign-up-request.ts
 models/sign-up-response.ts
 models/special-sale-create-request.ts

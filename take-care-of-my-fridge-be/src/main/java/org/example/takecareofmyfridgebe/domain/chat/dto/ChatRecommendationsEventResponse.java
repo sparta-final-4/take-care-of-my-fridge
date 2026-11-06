@@ -1,5 +1,8 @@
 package org.example.takecareofmyfridgebe.domain.chat.dto;
 
+import org.example.takecareofmyfridgebe.domain.sale.entity.SaleEventType;
+
+import java.math.BigDecimal;
 import java.util.List;
 
 /**
@@ -26,7 +29,7 @@ public record ChatRecommendationsEventResponse(
      * @param usedIngredients      쓰는 냉장고 재료 이름 (임박한 순)
      * @param imminentIngredients  그중 소비기한 임박(D-3 이내) 재료
      * @param matchedTastes        겹친 맛(한글). 사용자가 메시지로 맛을 말했으면 그 맛, 아니면 회원 선호 맛
-     * @param missingIngredients   냉장고에 없는 재료 (기본 양념 제외, 구매 상품은 아직 없음)
+     * @param missingIngredients   냉장고에 없는 재료 (기본 양념 제외). 재료마다 살 수 있는 상품을 하나 붙인다 (없으면 product가 null)
      * @param missingSelectedIngredients 선택 재료(말한 재료 포함) 중 냉장고에 없는 것의 이름. 같은 종류면 레시피에 쓰인 이름.
      *                                   missingIngredients에도 들어 있다
      * @param lacksManyIngredients 재료를 많이 사야 하는지 (보유 비율 기준 미만)
@@ -56,6 +59,36 @@ public record ChatRecommendationsEventResponse(
     public record ImminentIngredient(String name, long dDay) {
     }
 
-    public record MissingIngredient(Long ingredientId, String name) {
+    /**
+     * @param product 이 재료로 담을 상품. 판매 상품이 없으면 null
+     */
+    public record MissingIngredient(Long ingredientId, String name, ShoppingProduct product) {
+
+        public MissingIngredient(Long ingredientId, String name) {
+            this(ingredientId, name, null);
+        }
+    }
+
+    /**
+     * 장볼 재료로 담을 상품. 가격·품절은 카드를 만들 때(다시 불러올 때도) 기준이다.
+     *
+     * @param price      정가(원)
+     * @param salePrice  진행 중 할인의 판매가. 할인이 없으면 null
+     * @param saleType   할인 구분 (SPECIAL·FLASH_DROP). 할인이 없으면 null
+     * @param soldOut    지금 살 수 없는지 (상품 품절·번개 드롭 남은 수량 0)
+     * @param unitAmount 상품 용량 수치 (예: 300)
+     * @param unit       용량 단위 (g·개·단…)
+     */
+    public record ShoppingProduct(
+            Long productId,
+            String name,
+            String imageUrl,
+            int price,
+            Integer salePrice,
+            SaleEventType saleType,
+            boolean soldOut,
+            BigDecimal unitAmount,
+            String unit
+    ) {
     }
 }

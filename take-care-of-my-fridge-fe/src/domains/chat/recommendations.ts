@@ -12,9 +12,29 @@ export interface ChatRecommendationImminentIngredient {
   dDay: number;
 }
 
+// 장볼 재료로 담을 상품. 가격·품절은 카드를 만들 때(다시 불러올 때도) 기준이다
+export interface ChatShoppingProduct {
+  productId: number;
+  name: string;
+  imageUrl: string | null;
+  // 정가(원)
+  price: number;
+  // 진행 중 할인의 판매가. 할인이 없으면 null
+  salePrice: number | null;
+  // 할인 구분 (SPECIAL·FLASH_DROP). 할인이 없으면 null
+  saleType: string | null;
+  // 지금 살 수 없음 (상품 품절·번개 드롭 남은 수량 0)
+  soldOut: boolean;
+  // 상품 용량 (예: 300 g). 없으면 null
+  unitAmount: number | null;
+  unit: string | null;
+}
+
 export interface ChatRecommendationMissingIngredient {
   ingredientId: number;
   name: string;
+  // 이 재료로 담을 상품. 판매 상품이 없으면 null
+  product: ChatShoppingProduct | null;
 }
 
 export interface ChatRecommendedRecipe {
@@ -28,7 +48,7 @@ export interface ChatRecommendedRecipe {
   imminentIngredients: ChatRecommendationImminentIngredient[];
   // 겹친 맛 (한글)
   matchedTastes: string[];
-  // 냉장고에 없는 재료 (기본 양념 제외). 구매 링크는 아직 없다
+  // 냉장고에 없는 재료 (기본 양념 제외). 재료마다 담을 상품이 있으면 product에 온다
   missingIngredients: ChatRecommendationMissingIngredient[];
   // 고른·말한 재료 중 냉장고에 없는 것의 이름 (missingIngredients에도 들어 있다)
   missingSelectedIngredients: string[];
@@ -62,6 +82,25 @@ function records(value: unknown): Record<string, unknown>[] {
   return Array.isArray(value) ? value.filter(isRecord) : [];
 }
 
+// 상품 id·이름·정가가 없으면 상품이 없는 것으로 본다
+function toShoppingProduct(value: unknown): ChatShoppingProduct | null {
+  if (!isRecord(value)) return null;
+  const { productId, name, price } = value;
+  if (typeof productId !== 'number' || typeof name !== 'string' || typeof price !== 'number')
+    return null;
+  return {
+    productId,
+    name,
+    imageUrl: typeof value.imageUrl === 'string' ? value.imageUrl : null,
+    price,
+    salePrice: typeof value.salePrice === 'number' ? value.salePrice : null,
+    saleType: typeof value.saleType === 'string' ? value.saleType : null,
+    soldOut: value.soldOut === true,
+    unitAmount: typeof value.unitAmount === 'number' ? value.unitAmount : null,
+    unit: typeof value.unit === 'string' ? value.unit : null,
+  };
+}
+
 function toRecipe(value: Record<string, unknown>): ChatRecommendedRecipe | null {
   const { recipeId, name } = value;
   if (typeof recipeId !== 'number' || typeof name !== 'string') return null;
@@ -80,7 +119,13 @@ function toRecipe(value: Record<string, unknown>): ChatRecommendedRecipe | null 
     matchedTastes: strings(value.matchedTastes),
     missingIngredients: records(value.missingIngredients).flatMap((item) =>
       typeof item.ingredientId === 'number' && typeof item.name === 'string'
-        ? [{ ingredientId: item.ingredientId, name: item.name }]
+        ? [
+            {
+              ingredientId: item.ingredientId,
+              name: item.name,
+              product: toShoppingProduct(item.product),
+            },
+          ]
         : [],
     ),
     missingSelectedIngredients: strings(value.missingSelectedIngredients),

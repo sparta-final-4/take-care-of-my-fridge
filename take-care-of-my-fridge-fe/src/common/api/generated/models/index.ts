@@ -237,6 +237,7 @@ export * from './settlement-payment-search-request';
 export * from './settlement-period-response';
 export * from './settlement-response';
 export * from './settlement-search-request';
+export * from './shopping-product';
 export * from './sign-up-request';
 export * from './sign-up-response';
 export * from './special-sale-create-request';

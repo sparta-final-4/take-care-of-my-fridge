@@ -71,6 +71,25 @@ class ProductServiceTest {
     private ArgumentCaptor<Collection<ProductStatus>> statusCaptor;
 
     @Test
+    @DisplayName("재료 ID로 재료 상품을 찾을 때 판매 중지 상품은 빼고 판매 중·품절 상품을 찾는다")
+    void findsPublicIngredientProducts_byIngredientIds() {
+        when(ingredientProductRepository.findWithProductByIngredientIdIn(anyCollection(), anyCollection())).thenReturn(List.of());
+
+        service.getPublicIngredientProducts(List.of(3L, 21L));
+
+        verify(ingredientProductRepository).findWithProductByIngredientIdIn(eq(List.of(3L, 21L)), statusCaptor.capture());
+        assertThat(statusCaptor.getValue()).containsExactlyInAnyOrder(ProductStatus.ON_SALE, ProductStatus.SOLD_OUT);
+    }
+
+    @Test
+    @DisplayName("재료 ID가 비어 있으면 재료 상품을 조회하지 않고 빈 목록을 돌려준다")
+    void returnsEmpty_whenNoIngredientIds() {
+        assertThat(service.getPublicIngredientProducts(List.of())).isEmpty();
+
+        verify(ingredientProductRepository, never()).findWithProductByIngredientIdIn(anyCollection(), anyCollection());
+    }
+
+    @Test
     @DisplayName("판매 중지(STOPPED) 상품은 조회 대상에서 제외한다")
     void getProducts_excludesStopped() {
         // given

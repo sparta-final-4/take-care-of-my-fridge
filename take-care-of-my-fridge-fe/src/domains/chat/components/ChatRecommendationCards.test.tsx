@@ -63,8 +63,8 @@ describe('ChatRecommendationCards', () => {
         ],
         missingSelectedIngredients: ['두부'],
         missingIngredients: [
-          { ingredientId: 1, name: '장어' },
-          { ingredientId: 2, name: '생강' },
+          { ingredientId: 1, name: '장어', product: null },
+          { ingredientId: 2, name: '생강', product: null },
         ],
         lacksManyIngredients: true,
       }),
@@ -78,7 +78,9 @@ describe('ChatRecommendationCards', () => {
   });
 
   it('장볼 재료 이름과 기본 양념 안내는 펼쳐야 보인다', () => {
-    const html = render([recipe({ missingIngredients: [{ ingredientId: 1, name: '장어' }] })]);
+    const html = render([
+      recipe({ missingIngredients: [{ ingredientId: 1, name: '장어', product: null }] }),
+    ]);
 
     expect(html).toContain('aria-expanded="false"');
     expect(html).not.toContain('기본 양념은 빼고 셌어요');
@@ -119,7 +121,7 @@ describe('ChatRecommendationCards', () => {
     const html = render([
       recipe({
         missingSelectedIngredients: [],
-        missingIngredients: [{ ingredientId: 1, name: '두부' }],
+        missingIngredients: [{ ingredientId: 1, name: '두부', product: null }],
       }),
     ]);
 

@@ -6108,6 +6108,9 @@
           },
           "name": {
             "type": "string"
+          },
+          "product": {
+            "$ref": "#/components/schemas/ShoppingProduct"
           }
         }
       },
@@ -9278,6 +9281,45 @@
           "startDate",
           "unit"
         ]
+      },
+      "ShoppingProduct": {
+        "type": "object",
+        "properties": {
+          "imageUrl": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "price": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "productId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "salePrice": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "saleType": {
+            "type": "string",
+            "enum": [
+              "SPECIAL",
+              "FLASH_DROP"
+            ]
+          },
+          "soldOut": {
+            "type": "boolean"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "unitAmount": {
+            "type": "number"
+          }
+        }
       },
       "SignUpRequest": {
         "type": "object",
