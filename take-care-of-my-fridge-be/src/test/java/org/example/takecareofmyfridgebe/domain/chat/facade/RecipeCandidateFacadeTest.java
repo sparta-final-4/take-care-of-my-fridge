@@ -635,6 +635,52 @@ class RecipeCandidateFacadeTest {
         verify(recipeSearchService, never()).search(any());
     }
 
+    @Test
+    @DisplayName("ES 경로: 벡터 보충 후보도 ES와 같은 조건으로 걸러 양념·음료 분류, 뺄 재료(기본 양념 포함), 시간 초과, 피할 맛이면 카드에 오르지 않는다")
+    void filtersVectorSupplement_withSameConditionsAsEs() throws Exception {
+        long cucumber = 7L;
+        long garlic = 8L;
+        when(memberService.getMyInfo(MEMBER_ID)).thenReturn(mock(MyInfoResponse.class));
+        when(fridgeService.getItems(any(), any())).thenReturn(List.of(fridgeItem(1L, "두부", 5)));
+        // ES는 냉장고로만 맞은 후보 3개(키워드로 맞은 것 없음) → 벡터 보충
+        when(candidateSearchService.search(any())).thenReturn(List.of(
+                hit(10L, RecipeCandidateSearchService.MATCH_FRIDGE), hit(20L, RecipeCandidateSearchService.MATCH_FRIDGE),
+                hit(30L, RecipeCandidateSearchService.MATCH_FRIDGE)));
+        when(recipeSearchService.search(any(RecipeListRequest.class)))
+                .thenReturn(new RecipeSearchResult(List.of(90L, 91L, 92L, 93L, 94L, 95L), 6, true));
+        Map<Long, RecipeCandidateInfo> infos = Map.of(
+                10L, new RecipeCandidateInfo(10L, "두부부침", "전", 20, 1),
+                20L, new RecipeCandidateInfo(20L, "두부조림", "조림", 20, 1),
+                30L, new RecipeCandidateInfo(30L, "두부국", "국", 20, 1),
+                90L, new RecipeCandidateInfo(90L, "짜장 소스", "양념", 10, 1),
+                91L, new RecipeCandidateInfo(91L, "중국식 냉채", "무침", 20, 1),
+                92L, new RecipeCandidateInfo(92L, "짜장 덮밥", "밥", 90, 1),
+                93L, new RecipeCandidateInfo(93L, "짬뽕밥", "밥", 20, 1),
+                94L, new RecipeCandidateInfo(94L, "마늘 볶음밥", "밥", 20, 1),
+                95L, new RecipeCandidateInfo(95L, "중국식 음료", "음료", 5, 1));
+        when(recipeService.findCandidateInfos(any())).thenAnswer(invocation -> filter(infos, invocation.getArgument(0)));
+        when(recipeService.findNonBasicIngredients(any())).thenAnswer(invocation -> {
+            Collection<Long> ids = invocation.getArgument(0);
+            return ids.stream().filter(infos::containsKey)
+                    .map(id -> id == 91L
+                            ? new RecipeCandidateIngredient(id, cucumber, "오이", false)
+                            : new RecipeCandidateIngredient(id, 1L, "두부", false))
+                    .toList();
+        });
+        // 기본 양념인 뺄 재료(마늘)는 정렬 단계 재료 줄에 없어 따로 조회한다
+        when(recipeService.findCandidateIngredients(List.of(cucumber, garlic))).thenReturn(List.of(
+                new RecipeCandidateIngredient(91L, cucumber, "오이", false),
+                new RecipeCandidateIngredient(94L, garlic, "마늘", true)));
+        when(recipeService.findTastesByRecipeIds(any())).thenAnswer(invocation ->
+                filter(Map.of(93L, Set.of(Taste.SPICY)), invocation.getArgument(0)));
+        RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, null, 30, List.of(cucumber, garlic), false,
+                List.of("탕짜면"), null).withAvoidTastes(List.of(Taste.SPICY));
+
+        RecipeCandidates result = esFacade.findCandidates(query);
+
+        assertThat(result.candidates()).extracting(RecipeCandidate::recipeId).containsExactlyInAnyOrder(10L, 20L, 30L);
+    }
+
     // ES로 찾히는 레시피들. 모두 두부(1번)를 쓰고, 정보·재료는 요청한 ID만 돌려준다
     private void givenEsRecipes(Map<Long, RecipeCandidateInfo> infos) {
         when(recipeService.findCandidateInfos(any())).thenAnswer(invocation -> filter(infos, invocation.getArgument(0)));

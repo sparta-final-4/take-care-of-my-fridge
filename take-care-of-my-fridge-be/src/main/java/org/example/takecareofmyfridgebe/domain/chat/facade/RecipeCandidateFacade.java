@@ -314,7 +314,24 @@ public class RecipeCandidateFacade {
                 keywordHits.put(recipeId, vectorOnly);
             }
         });
+        // 레시피 검색으로 찾은 후보는 ES 후보 검색의 거르기를 거치지 않는다. 정렬 단계가 다시 거르는 것:
+        // 제외 분류·최대 시간(isFilteredOut), 선택 재료만 쓰기(rank), 피할 맛·매운 정도(rankAvoiding), 기본 양념이 아닌 뺄 재료(isFilteredOut).
+        // 정렬 단계의 재료 줄에는 기본 양념이 없어서, 뺄 재료가 기본 양념이면 여기서 뺀다
+        removeWithExcludedIngredients(query, recipeIds, keywordHits);
         return new CandidatePool(recipeIds, recipeService.findNonBasicIngredients(recipeIds), keywordHits, true, "", "");
+    }
+
+    // 뺄 재료(기본 양념 포함)가 들어간 레시피를 후보에서 뺀다. 뺄 재료가 없거나 후보가 없으면 조회하지 않는다
+    private void removeWithExcludedIngredients(RecipeQuery query, Set<Long> recipeIds, Map<Long, Boolean> keywordHits) {
+        if (recipeIds.isEmpty() || query.excludeIngredientIds().isEmpty()) {
+            return;
+        }
+        Set<Long> excluded = recipeService.findCandidateIngredients(query.excludeIngredientIds()).stream()
+                .map(RecipeCandidateIngredient::recipeId)
+                .filter(recipeIds::contains)
+                .collect(Collectors.toSet());
+        recipeIds.removeAll(excluded);
+        keywordHits.keySet().removeAll(excluded);
     }
 
     // 검색 결과를 후보에 더한다. 이미 모은 레시피(skipIds)는 뺀다. 키워드로 맞은 레시피는 키워드 결과로 표시한다
