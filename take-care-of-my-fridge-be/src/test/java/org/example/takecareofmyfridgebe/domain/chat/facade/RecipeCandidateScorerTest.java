@@ -746,6 +746,20 @@ class RecipeCandidateScorerTest {
         }
 
         @Test
+        @DisplayName("말한 분류가 맞은 레시피는 재료를 많이 사야 해도 1차 후보로 두어 보유 비율 기준 이상인 다른 레시피보다 앞선다")
+        void keepsCategoryRecipeInFirstTier_whenLacksMany() {
+            recipe(10L, "계란찜", "찜", 20, 1, EGG);
+            recipe(20L, "약과", "디저트", 40, 5, PORK);
+            RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, List.of("디저트"), null, null, false);
+
+            RecipeCandidates result = ratioScorer.rank(query, List.of(stock(EGG, "계란", 0)), List.of(), rows, infos, tastes,
+                    List.of(10L, 20L));
+
+            assertThat(result.candidates()).extracting(RecipeCandidate::recipeId).containsExactly(20L, 10L);
+            assertThat(result.candidates().get(0).reason().lacksManyIngredients()).isTrue();
+        }
+
+        @Test
         @DisplayName("벡터 검색으로만 찾거나 단어가 쪼개져 걸린 레시피는 후보에는 넣지만 키워드 일치·1차 후보로 치지 않는다")
         void skipsKeywordCredit_whenVectorOrSplit() {
             recipe(10L, "계란국", "국", 20, 1, EGG);
