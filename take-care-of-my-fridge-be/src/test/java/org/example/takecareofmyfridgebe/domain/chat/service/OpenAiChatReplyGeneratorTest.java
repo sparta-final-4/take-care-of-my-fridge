@@ -61,7 +61,8 @@ class OpenAiChatReplyGeneratorTest {
             new ChatReplyErrorTranslator(),
             new ByteArrayResource("공통".getBytes(StandardCharsets.UTF_8)),
             new ByteArrayResource("추천".getBytes(StandardCharsets.UTF_8)),
-            new ByteArrayResource("레시피".getBytes(StandardCharsets.UTF_8))
+            new ByteArrayResource("레시피".getBytes(StandardCharsets.UTF_8)),
+            new ByteArrayResource("추천 기준".getBytes(StandardCharsets.UTF_8))
     );
 
     private Logger logger;
@@ -71,6 +72,7 @@ class OpenAiChatReplyGeneratorTest {
     void setUp() {
         when(chatClient.prompt()).thenReturn(requestSpec);
         when(requestSpec.user(anyString())).thenReturn(requestSpec);
+        when(requestSpec.system(anyString())).thenReturn(requestSpec);
         when(requestSpec.stream()).thenReturn(streamSpec);
 
         logger = (Logger) LoggerFactory.getLogger(OpenAiChatReplyGenerator.class);

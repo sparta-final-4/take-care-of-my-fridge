@@ -38,6 +38,16 @@ class ChatIntentPromptTest {
     }
 
     @Test
+    @DisplayName("묻는 말 없이 이름만 말해도 보여 달라는 뜻이라 RECOMMEND라고 첫 질문·이어지는 말 모두 지시한다")
+    void instructsNameOnlyIsRecommend() throws IOException {
+        String followUp = new ClassPathResource("prompts/chat-intent-followup.txt").getContentAsString(StandardCharsets.UTF_8);
+
+        assertThat(prompt).contains("묻는 말 없이 음식·재료·요리 종류·밀키트 이름만 말해도 그걸 보여 달라는 뜻이라 RECOMMEND다",
+                "\"김치찌개\" → RECOMMEND, keywords: 김치찌개");
+        assertThat(followUp).contains("묻는 말 없이 이름만 말한 말(\"국물 밀키트\")");
+    }
+
+    @Test
     @DisplayName("요리 이름을 말하면 그 이름과 비슷한 요리를 키워드에 먼저 넣고, 탕이 붙은 튀김 요리를 국으로 보지 말라고 지시한다")
     void instructsDishNameFirst_andTangIsNotAlwaysSoup() {
         assertThat(prompt).contains("그 이름을 맨 앞에, 이어서 비슷한 요리 이름을 넣는다",
@@ -101,8 +111,8 @@ class ChatIntentPromptTest {
         assertThat(followUp).doesNotContain("wantedTastes: SPICY", "avoidTastes: SPICY", "\"맛은 상관없어\"", "\"두부 안 넣어도 돼\"",
                 "\"맛있게 하는 팁\"", "생략", "[다른 제안]", "[이미 안내한 말]");
         assertThat(followUp.lines().filter(line -> line.contains("예)"))).hasSize(5);
-        // 35% 줄이기 전(1,809자)보다 짧게 둔다
-        assertThat(followUp.length()).isLessThan(1_600);
+        // 35% 줄이기 전(1,809자)보다 짧게 둔다. 이름만 말한 말·새 추천의 맛 규칙을 더해 1,650자까지
+        assertThat(followUp.length()).isLessThan(1_650);
     }
 
     @Test

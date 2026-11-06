@@ -1,5 +1,6 @@
 package org.example.takecareofmyfridgebe.domain.chat.facade;
 
+import org.example.takecareofmyfridgebe.domain.chat.config.ChatCategoryWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.facade.CategoryWordChecker.CategoryStance;
 import org.example.takecareofmyfridgebe.domain.chat.facade.CategoryWordChecker.Stance;
 import org.junit.jupiter.api.DisplayName;
@@ -13,6 +14,11 @@ class CategoryWordCheckerTest {
 
     private static final List<String> CATEGORIES = List.of(
             "밥", "구이", "국", "면류", "볶음", "샐러드", "무침", "찜", "튀김", "김치", "디저트", "전", "찌개", "조림", "전골", "떡", "만두");
+
+    static final List<ChatCategoryWordProperties.Group> GROUPS = List.of(
+            new ChatCategoryWordProperties.Group("국물", List.of("국", "찌개", "전골", "수프", "스튜")),
+            new ChatCategoryWordProperties.Group("면", List.of("면류")),
+            new ChatCategoryWordProperties.Group("안주", List.of("구이", "전", "튀김")));
 
     private static List<CategoryStance> check(String message) {
         return CategoryWordChecker.check(message, CATEGORIES, TasteWordCheckerTest.WORDS);
@@ -71,5 +77,18 @@ class CategoryWordCheckerTest {
     @DisplayName("긴 분류 이름을 먼저 본다 (전골은 전이 아니라 전골)")
     void prefersLongerCategoryName() {
         assertThat(check("전골 추천해줘")).containsExactly(new CategoryStance("전골", Stance.WANT));
+    }
+
+    @Test
+    @DisplayName("묶음 말(국물·면·안주)은 그 묶음의 분류 중 실제 있는 분류를 모두 원하고, 국수는 국으로 보지 않는다")
+    void returnsGroupCategories_whenGroupWord() {
+        assertThat(CategoryWordChecker.check("국물 밀키트 있어?", CATEGORIES, TasteWordCheckerTest.WORDS, GROUPS))
+                .containsExactly(new CategoryStance("국", Stance.WANT), new CategoryStance("찌개", Stance.WANT),
+                        new CategoryStance("전골", Stance.WANT));
+        assertThat(CategoryWordChecker.check("면 요리 추천해줘", CATEGORIES, TasteWordCheckerTest.WORDS, GROUPS))
+                .containsExactly(new CategoryStance("면류", Stance.WANT));
+        assertThat(CategoryWordChecker.check("국수 추천해줘", CATEGORIES, TasteWordCheckerTest.WORDS, GROUPS)).isEmpty();
+        assertThat(CategoryWordChecker.check("국물 말고 안주로 볶음 추천", CATEGORIES, TasteWordCheckerTest.WORDS, GROUPS))
+                .contains(new CategoryStance("국", Stance.AVOID), new CategoryStance("볶음", Stance.WANT));
     }
 }

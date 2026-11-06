@@ -14,8 +14,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 class TasteWordCheckerTest {
 
     static final ChatTasteWordProperties WORDS = new ChatTasteWordProperties(
-            List.of("매운", "맵게", "맵지", "매콤", "얼큰", "칼칼"), List.of("달달", "달게", "단거"),
-            List.of("안", "덜"), List.of("말고", "빼고", "않", "싫", "없이"));
+            List.of("매운", "맵게", "맵지", "매콤", "얼큰", "칼칼"), List.of("달달", "달게", "단거", "단걸", "달콤", "단맛"),
+            List.of("안", "덜"), List.of("말고", "빼고", "않", "싫", "없이"),
+            List.of("짠", "짭짤", "짜게", "짭조름"), List.of("감칠", "고소"), List.of("순한", "담백", "슴슴", "심심", "자극적이지"));
 
     @Test
     @DisplayName("매운맛 단어만 있으면 원하는 맛이다 (좀 더 매운 걸로, 매운 거 먹고 싶어, 칼칼한 거)")
@@ -49,5 +50,14 @@ class TasteWordCheckerTest {
         assertThat(TasteWordChecker.check("매운 거 말고 달게", WORDS)).containsExactly(
                 new TasteStance(Taste.SPICY, Stance.AVOID), new TasteStance(Taste.SWEET, Stance.WANT));
         assertThat(TasteWordChecker.check("다른 거 없어?", WORDS)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("이번 말에 단어가 나온 맛을 원하든 피하든 모두 찾는다 (매운 거 말고 → 매운맛, 짭짤하게 → 짠맛, 김치찌개 → 없음)")
+    void findsMentionedTastes() {
+        assertThat(TasteWordChecker.mentioned("매운 거 말고", WORDS)).containsExactly(Taste.SPICY);
+        assertThat(TasteWordChecker.mentioned("짭짤하고 고소한 거", WORDS)).containsExactlyInAnyOrder(Taste.SALTY, Taste.UMAMI);
+        assertThat(TasteWordChecker.mentioned("담백한 거", WORDS)).containsExactly(Taste.MILD);
+        assertThat(TasteWordChecker.mentioned("김치찌개", WORDS)).isEmpty();
     }
 }

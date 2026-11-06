@@ -4,8 +4,10 @@ import org.example.takecareofmyfridgebe.domain.chat.config.ChatTasteWordProperti
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * 메시지의 맛 단어로 원하는 맛·피할 맛을 한 번 더 정한다. 스프링에 의존하지 않는 순수 클래스.
@@ -40,6 +42,28 @@ public final class TasteWordChecker {
     }
 
     public record TasteStance(Member.Taste taste, Stance stance) {
+    }
+
+    /**
+     * 메시지에 단어가 나온 맛 (원하든 피하든). 새 추천에서 이번 말에 없는 맛을 조건에서 뺄 때 쓴다.
+     * 매운맛·단맛은 맛 단어, 짠맛·감칠맛·순한맛은 그 맛을 말하는 단어로 본다.
+     */
+    public static Set<Member.Taste> mentioned(String message, ChatTasteWordProperties words) {
+        String text = compact(message);
+        Set<Member.Taste> tastes = EnumSet.noneOf(Member.Taste.class);
+        addIfAny(tastes, text, Member.Taste.SPICY, words.spicy());
+        addIfAny(tastes, text, Member.Taste.SWEET, words.sweet());
+        addIfAny(tastes, text, Member.Taste.SALTY, words.salty());
+        addIfAny(tastes, text, Member.Taste.UMAMI, words.umami());
+        addIfAny(tastes, text, Member.Taste.MILD, words.mild());
+        return tastes;
+    }
+
+    private static void addIfAny(Set<Member.Taste> tastes, String text, Member.Taste taste, List<String> tasteWords) {
+        if (tasteWords != null && tasteWords.stream().map(TasteWordChecker::compact)
+                .anyMatch(word -> !word.isEmpty() && text.contains(word))) {
+            tastes.add(taste);
+        }
     }
 
     // 맛 단어가 하나라도 부정어와 붙어 있으면 피함, 맛 단어만 있으면 원함

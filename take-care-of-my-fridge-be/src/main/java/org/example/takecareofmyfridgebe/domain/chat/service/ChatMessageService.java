@@ -79,9 +79,9 @@ public class ChatMessageService {
     }
 
     /**
-     * 사용자 메시지와 AI 답을 저장하고, AI 답에 붙은 레시피 추천 카드를 같은 트랜잭션에서 순서대로 저장한다 (카드가 없으면 저장하지 않음).
+     * 사용자 메시지와 AI 답을 저장하고, AI 답에 붙은 레시피·밀키트 추천 카드를 같은 트랜잭션에서 순서대로 저장한다 (카드가 없으면 저장하지 않음).
      *
-     * @param recommendations 보여 준 순서대로의 레시피 추천 (display_order 0부터)
+     * @param recommendations 보여 준 순서대로의 추천 (display_order 0부터, 레시피 카드 다음 밀키트)
      */
     @Transactional
     public List<ChatMessageResponse> saveExchange(Long sessionId, String userContent, String assistantContent,
@@ -121,6 +121,7 @@ public class ChatMessageService {
             chatRecommendationRepository.save(ChatRecommendation.builder()
                     .message(savedAssistant)
                     .recipeId(recommendation.recipeId())
+                    .productId(recommendation.productId())
                     .displayOrder(order)
                     .description(recommendation.description())
                     .build());
@@ -146,6 +147,18 @@ public class ChatMessageService {
             return List.of();
         }
         return chatRecommendationRepository.findRecipeRecommendationsByMessageIds(messageIds).stream()
+                .map(SavedRecommendation::from)
+                .toList();
+    }
+
+    /**
+     * AI 메시지 여러 개에 붙은 레시피·밀키트 추천을 한 번에 조회한다 (메시지 id, 보여 준 순서대로). 메시지 조회가 카드를 다시 만들 때 쓴다.
+     */
+    public List<SavedRecommendation> findRecommendations(Collection<Long> messageIds) {
+        if (messageIds.isEmpty()) {
+            return List.of();
+        }
+        return chatRecommendationRepository.findAllByMessageIds(messageIds).stream()
                 .map(SavedRecommendation::from)
                 .toList();
     }
@@ -181,6 +194,11 @@ public class ChatMessageService {
     // 이 상담에서 이미 추천한 레시피 ID (다음 추천에서 뒤로 보낸다)
     public Set<Long> findRecommendedRecipeIds(Long sessionId) {
         return Set.copyOf(chatRecommendationRepository.findRecipeIdsBySessionId(sessionId));
+    }
+
+    // 이 상담에서 이미 보여 준 밀키트 상품 ID (다음 밀키트 추천에서 뒤로 보낸다)
+    public Set<Long> findRecommendedProductIds(Long sessionId) {
+        return Set.copyOf(chatRecommendationRepository.findProductIdsBySessionId(sessionId));
     }
 
     public List<ChatMessageResponse> getMessages(Long memberId, Long sessionId) {

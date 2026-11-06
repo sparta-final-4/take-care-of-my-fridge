@@ -16,12 +16,16 @@
 
 // May contain unused imports in some cases
 // @ts-ignore
+import type { RecommendedMealkit } from './recommended-mealkit';
+// May contain unused imports in some cases
+// @ts-ignore
 import type { RecommendedRecipe } from './recommended-recipe';
 
 export interface ChatMessageResponse {
     'content'?: string;
     'createdAt'?: string;
     'id'?: number;
+    'mealkits'?: Array<RecommendedMealkit>;
     'recommendations'?: Array<RecommendedRecipe>;
     'role'?: ChatMessageResponseRoleEnum;
     'sequence'?: number;

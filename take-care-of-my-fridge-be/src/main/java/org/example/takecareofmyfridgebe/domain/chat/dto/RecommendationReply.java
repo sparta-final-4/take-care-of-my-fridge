@@ -1,5 +1,6 @@
 package org.example.takecareofmyfridgebe.domain.chat.dto;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -8,19 +9,43 @@ import java.util.List;
  * @param event         recommendations 이벤트 내용
  * @param candidateInfo 설명 프롬프트에 넣을 사용자 요청·추천 후보 (중괄호 없는 줄 글)
  * @param notices       소개 맨 앞에 서버가 붙일 안내 문장 ("말씀하신 두부는 지금 냉장고에 없어서 준비가 필요해요"). 없으면 빈 목록
+ * @param fixedReply    AI를 부르지 않고 서버가 보낼 답 전체 (밀키트만 보여 주는 답). AI가 설명하면 null
  */
 public record RecommendationReply(
         ChatRecommendationsEventResponse event,
         String candidateInfo,
-        List<String> notices
+        List<String> notices,
+        String fixedReply
 ) {
 
     public RecommendationReply {
         notices = notices == null ? List.of() : List.copyOf(notices);
     }
 
+    public RecommendationReply(ChatRecommendationsEventResponse event, String candidateInfo, List<String> notices) {
+        this(event, candidateInfo, notices, null);
+    }
+
     public RecommendationReply(ChatRecommendationsEventResponse event, String candidateInfo) {
         this(event, candidateInfo, List.of());
+    }
+
+    // 밀키트만 보여 주는 답: 레시피 카드가 없어 AI 설명 없이 서버 글만 보낸다
+    public static RecommendationReply fixed(ChatRecommendationsEventResponse event, String reply) {
+        return new RecommendationReply(event, null, List.of(), reply);
+    }
+
+    // 같은 답에 밀키트 카드를 붙인다
+    public RecommendationReply withEvent(ChatRecommendationsEventResponse changed) {
+        return new RecommendationReply(changed, candidateInfo, notices, fixedReply);
+    }
+
+    // 안내 문장을 맨 앞에 더한다
+    public RecommendationReply withNoticeFirst(String notice) {
+        List<String> merged = new ArrayList<>();
+        merged.add(notice);
+        merged.addAll(notices);
+        return new RecommendationReply(event, candidateInfo, merged, fixedReply);
     }
 
     /**

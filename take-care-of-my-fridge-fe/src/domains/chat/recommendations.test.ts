@@ -4,6 +4,7 @@ import {
   formatImminentLabel,
   parseChatRecommendations,
   summarizeImminent,
+  toChatRecommendedMealkits,
   toChatRecommendedRecipes,
 } from './recommendations';
 
@@ -49,6 +50,7 @@ describe('parseChatRecommendations', () => {
           description: null,
         },
       ],
+      mealkits: [],
       relaxed: [],
       empty: false,
     });
@@ -57,6 +59,7 @@ describe('parseChatRecommendations', () => {
   it('후보가 없으면 빈 목록과 empty=true를 돌려준다', () => {
     expect(parseChatRecommendations('{"recipes":[],"relaxed":[],"empty":true}')).toEqual({
       recipes: [],
+      mealkits: [],
       relaxed: [],
       empty: true,
     });
@@ -135,6 +138,64 @@ describe('parseChatRecommendations', () => {
     ]);
   });
 
+  it('밀키트 카드를 읽고, 레시피 카드가 없어도 밀키트가 있으면 empty가 아니며 상품이 없는 밀키트는 뺀다', () => {
+    const result = parseChatRecommendations(
+      JSON.stringify({
+        recipes: [],
+        mealkits: [
+          {
+            product: {
+              productId: 41,
+              name: '황태해장국',
+              imageUrl: null,
+              price: 12900,
+              salePrice: 9900,
+              saleType: 'SPECIAL',
+              soldOut: false,
+              unitAmount: null,
+              unit: null,
+            },
+            servings: 2,
+            recipeId: 543,
+            recipeName: '황태해장국',
+            description: null,
+          },
+          { product: null, servings: 2 },
+        ],
+        relaxed: [],
+        empty: false,
+      }),
+    );
+
+    expect(result?.empty).toBe(false);
+    expect(result?.recipes).toEqual([]);
+    expect(result?.mealkits).toEqual([
+      {
+        product: {
+          productId: 41,
+          name: '황태해장국',
+          imageUrl: null,
+          price: 12900,
+          salePrice: 9900,
+          saleType: 'SPECIAL',
+          soldOut: false,
+          unitAmount: null,
+          unit: null,
+        },
+        servings: 2,
+        recipeId: 543,
+        recipeName: '황태해장국',
+        description: null,
+      },
+    ]);
+  });
+
+  it('레시피·밀키트가 모두 없으면 empty다', () => {
+    expect(parseChatRecommendations('{"recipes":[],"mealkits":[],"empty":false}')?.empty).toBe(
+      true,
+    );
+  });
+
   it('JSON이 아니거나 recipes가 없으면 null을 돌려준다', () => {
     expect(parseChatRecommendations('not json')).toBeNull();
     expect(parseChatRecommendations('{"empty":true}')).toBeNull();
@@ -191,5 +252,28 @@ describe('toChatRecommendedRecipes', () => {
 
   it('카드가 없으면 빈 목록을 돌려준다', () => {
     expect(toChatRecommendedRecipes(undefined)).toEqual([]);
+  });
+});
+
+describe('toChatRecommendedMealkits', () => {
+  it('메시지 조회의 밀키트 카드를 그릴 모양으로 바꾸고, 상품이 없는 카드는 빼며 없으면 빈 목록이다', () => {
+    const mealkits = toChatRecommendedMealkits([
+      {
+        product: { productId: 40, name: '된장국', price: 9000, soldOut: true },
+        servings: 2,
+        recipeId: 544,
+        recipeName: '된장국',
+        description: '요리하기 번거로우면 된장국 밀키트로 간편하게 드셔 보세요.',
+      },
+      { servings: 1 },
+    ]);
+
+    expect(mealkits).toHaveLength(1);
+    expect(mealkits[0]).toMatchObject({
+      product: { productId: 40, salePrice: null, soldOut: true, imageUrl: null },
+      servings: 2,
+      description: '요리하기 번거로우면 된장국 밀키트로 간편하게 드셔 보세요.',
+    });
+    expect(toChatRecommendedMealkits(undefined)).toEqual([]);
   });
 });

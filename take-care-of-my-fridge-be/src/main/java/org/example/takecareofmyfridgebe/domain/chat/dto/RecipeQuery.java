@@ -2,10 +2,12 @@ package org.example.takecareofmyfridgebe.domain.chat.dto;
 
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -125,6 +127,31 @@ public record RecipeQuery(
         return new RecipeQuery(memberId, selectedIngredientIds, wantedTastes, moodCategories, maxMinutes,
                 excludeIngredientIds, useSelectedOnly, keywords, dishText, preferenceText, selectedIngredientGroups,
                 keywordMatches, alreadyRecommendedIds, avoidTastes);
+    }
+
+    /**
+     * 주어진 단어("밀키트")가 들어간 키워드·요리 이름을 뺀 검색 조건 (공백 무시).
+     * AI가 "밀키트 추천해줘"의 밀키트를 요리 이름으로 뽑아 레시피 검색이 "밀키트"를 찾거나 "밀키트 레시피는 없어서…" 안내가 나가지 않게 한다.
+     */
+    public RecipeQuery withoutKeywordsContaining(Collection<String> words) {
+        List<String> compactWords = words.stream().map(RecipeQuery::compact).filter(word -> !word.isEmpty()).toList();
+        if (compactWords.isEmpty()) {
+            return this;
+        }
+        List<String> kept = keywords.stream()
+                .filter(keyword -> compactWords.stream().noneMatch(compact(keyword)::contains))
+                .toList();
+        String dish = keywordText != null && compactWords.stream().anyMatch(compact(keywordText)::contains) ? null : keywordText;
+        if (kept.size() == keywords.size() && Objects.equals(dish, keywordText)) {
+            return this;
+        }
+        return new RecipeQuery(memberId, selectedIngredientIds, wantedTastes, moodCategories, maxMinutes,
+                excludeIngredientIds, useSelectedOnly, kept, dish, preferenceText, selectedIngredientGroups, keywordMatches,
+                alreadyRecommendedIds, avoidTastes);
+    }
+
+    private static String compact(String text) {
+        return text == null ? "" : text.replaceAll("\\s+", "");
     }
 
     // 키워드 검색 결과를 채운 검색 조건

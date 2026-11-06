@@ -90,6 +90,29 @@ class ProductServiceTest {
     }
 
     @Test
+    @DisplayName("판매 중 밀키트를 찾으면 판매 중(ON_SALE) 상태로만 조회한다")
+    void findsOnSaleMealkits_withOnSaleStatusOnly() {
+        when(mealkitProductRepository.findWithProductByStatusIn(anyCollection())).thenReturn(List.of());
+
+        service.getOnSaleMealkits();
+
+        verify(mealkitProductRepository).findWithProductByStatusIn(statusCaptor.capture());
+        assertThat(statusCaptor.getValue()).containsExactly(ProductStatus.ON_SALE);
+    }
+
+    @Test
+    @DisplayName("상품 ID로 밀키트를 찾으면 판매 중·품절 상태로 조회하고, ID가 비어 있으면 조회하지 않는다")
+    void findsPublicMealkits_byProductIds() {
+        when(mealkitProductRepository.findWithProductByProductIdIn(anyCollection(), anyCollection())).thenReturn(List.of());
+
+        service.getPublicMealkits(List.of(40L));
+        assertThat(service.getPublicMealkits(List.of())).isEmpty();
+
+        verify(mealkitProductRepository).findWithProductByProductIdIn(eq(List.of(40L)), statusCaptor.capture());
+        assertThat(statusCaptor.getValue()).containsExactlyInAnyOrder(ProductStatus.ON_SALE, ProductStatus.SOLD_OUT);
+    }
+
+    @Test
     @DisplayName("판매 중지(STOPPED) 상품은 조회 대상에서 제외한다")
     void getProducts_excludesStopped() {
         // given

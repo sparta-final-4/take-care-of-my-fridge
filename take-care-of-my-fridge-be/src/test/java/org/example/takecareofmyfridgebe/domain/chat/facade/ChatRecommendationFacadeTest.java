@@ -1,6 +1,7 @@
 package org.example.takecareofmyfridgebe.domain.chat.facade;
 
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse;
+import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse.RecommendedMealkit;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse.RecommendedRecipe;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse.ShoppingProduct;
 import org.example.takecareofmyfridgebe.domain.chat.dto.KeywordMatch;
@@ -14,6 +15,7 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeDetailReply;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeQuery;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecommendationReply;
 import org.example.takecareofmyfridgebe.domain.chat.dto.SavedRecommendation;
+import org.example.takecareofmyfridgebe.domain.chat.service.ChatMessageService;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.StorageType;
 import org.example.takecareofmyfridgebe.domain.ingredient.service.IngredientService;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member.Taste;
@@ -21,6 +23,7 @@ import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeDetailResponse.S
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeDetailResponse;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeSummary;
 import org.example.takecareofmyfridgebe.domain.product.entity.IngredientProduct;
+import org.example.takecareofmyfridgebe.domain.product.entity.MealkitProduct;
 import org.example.takecareofmyfridgebe.domain.product.entity.Product;
 import org.example.takecareofmyfridgebe.domain.product.entity.ProductStatus;
 import org.example.takecareofmyfridgebe.domain.product.entity.ProductType;
@@ -47,7 +50,9 @@ import java.util.Map;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -62,6 +67,7 @@ class ChatRecommendationFacadeTest {
     private RecipeService recipeService;
     private ProductService productService;
     private SaleEventReader saleEventReader;
+    private ChatMessageService chatMessageService;
     private ChatRecommendationFacade facade;
 
     @BeforeEach
@@ -71,7 +77,9 @@ class ChatRecommendationFacadeTest {
         IngredientService ingredientService = mock(IngredientService.class);
         productService = mock(ProductService.class);
         saleEventReader = mock(SaleEventReader.class);
-        facade = new ChatRecommendationFacade(recipeCandidateFacade, recipeService, ingredientService, productService, saleEventReader);
+        chatMessageService = mock(ChatMessageService.class);
+        facade = new ChatRecommendationFacade(recipeCandidateFacade, recipeService, ingredientService, productService,
+                saleEventReader, chatMessageService, MealkitWordCheckerTest.WORDS, TasteWordCheckerTest.WORDS);
         when(ingredientService.getIngredientsByIds(any())).thenReturn(Map.of());
     }
 
@@ -111,6 +119,25 @@ class ChatRecommendationFacadeTest {
         assertThat(event.recipes().get(1).cookTimeMin()).isNull();
         assertThat(event.recipes().get(1).matchedTastes()).containsExactly("짠맛");
         assertThat(reply.candidateInfo()).contains("후보: 두부찌개", "후보: 두부조림", "후보: 두부전").doesNotContain("두부국");
+    }
+
+    @Test
+    @DisplayName("피할 맛인데 콕 집어 남긴 요리 카드는 이유 뒤에 \"매운 요리예요\"를 붙이고, AI 후보 줄도 같은 이유를 쓰며 나머지 카드는 그대로다")
+    void notesAvoidedTaste_onKeptNamedDish() {
+        when(recipeCandidateFacade.findCandidates(any())).thenReturn(new RecipeCandidates(List.of(
+                candidate(10L, "김치찌개", "찌개", 25, reason(List.of())),
+                candidate(20L, "된장찌개", "찌개", 20, reason(List.of())),
+                candidate(40L, "청국장찌개", "찌개", 30, reason(List.of()))), false, false, Map.of(10L, List.of(Taste.SPICY))));
+        when(recipeService.findSummaries(any())).thenReturn(Map.of());
+
+        RecommendationReply reply = facade.recommend("매운 거 말고 김치찌개 줘", new RecipeQuery(MEMBER_ID, List.of(), null, null,
+                null, null, false, List.of("김치찌개"), "김치찌개").withAvoidTastes(List.of(Taste.SPICY)));
+
+        List<RecommendedRecipe> recipes = reply.event().recipes();
+        assertThat(recipes.get(0).reason()).endsWith(", 매운 요리예요");
+        assertThat(recipes.get(1).reason()).doesNotContain("매운 요리예요");
+        assertThat(recipes.get(2).reason()).doesNotContain("매운 요리예요");
+        assertThat(reply.candidateInfo()).contains(recipes.get(0).reason());
     }
 
     @Test
@@ -336,6 +363,193 @@ class ChatRecommendationFacadeTest {
         assertThat(ChatRecommendationFacade.spokenDishWithoutRecipe("김피탕 같은 메뉴 추천해줘",
                 new RecipeQuery(MEMBER_ID, List.of(), null, null, null, null, false, List.of("김피탕", "탕수육"), null),
                 List.of(keywordCandidate(10L, "탕수육", "튀김", "탕수육")))).contains("김피탕");
+    }
+
+    @Test
+    @DisplayName("\"밀키트 추천해줘\"면 레시피 카드 없이 밀키트를 최대 3장 고르고, 글은 AI 없이 서버가 쓰며, 이미 보여 준 밀키트를 읽는다")
+    void picksOnlyMealkits_whenMealkitWordSpoken() {
+        givenMealkits(
+                mealkit(40L, "된장국", 9000, 544L),
+                mealkit(41L, "황태해장국", 9000, 543L),
+                mealkit(42L, "사과 새우 북엇국", 9000, 542L),
+                mealkit(43L, "부추 콩가루 찜", 9000, 539L));
+        when(chatMessageService.findRecommendedProductIds(7L)).thenReturn(Set.of(40L));
+
+        RecommendationReply reply = facade.recommend("밀키트 추천해줘", RecipeQuery.of(MEMBER_ID, List.of()), List.of(), 7L);
+
+        assertThat(reply.event().recipes()).isEmpty();
+        assertThat(reply.event().empty()).isFalse();
+        assertThat(reply.event().mealkits()).hasSize(3);
+        assertThat(reply.event().mealkits()).extracting(m -> m.product().productId()).doesNotContain(40L);
+        assertThat(reply.event().mealkits()).allSatisfy(m -> assertThat(m.description()).isNull());
+        assertThat(reply.fixedReply()).startsWith("지금 살 수 있는 밀키트를 골라 봤어요.");
+        verify(recipeCandidateFacade, never()).findCandidates(any());
+    }
+
+    @Test
+    @DisplayName("\"국물 밀키트\"면 국 분류 레시피와 연결된 밀키트를 먼저 고르고, 서버 글은 조건에 맞춰 골랐다고 쓴다")
+    void picksSoupMealkitsFirst_whenSoupCategoryRequested() {
+        givenMealkits(
+                mealkit(43L, "부추 콩가루 찜", 8000, 539L),
+                mealkit(40L, "된장국", 9000, 544L),
+                mealkit(44L, "모둠 전골", 7000, null));
+        RecipeQuery soup = new RecipeQuery(MEMBER_ID, List.of(), List.of(), List.of("국"), null, List.of(), false,
+                List.of("밀키트"), "국물 밀키트");
+
+        RecommendationReply reply = facade.recommend("국물 밀키트", soup, List.of(), null);
+
+        assertThat(reply.event().mealkits()).extracting(m -> m.product().productId()).containsExactly(40L, 43L, 44L);
+        assertThat(reply.event().mealkits().get(0).recipeName()).isEqualTo("된장국");
+        assertThat(reply.event().mealkits().get(0).servings()).isEqualTo(2);
+        assertThat(reply.fixedReply()).startsWith("말씀하신 조건에 맞춰 밀키트를 골라 봤어요.");
+    }
+
+    @Test
+    @DisplayName("\"간단하게 먹을 거\"면 레시피 카드 3장 아래 카드와 다른 레시피의 밀키트 한 장을 서버 설명과 함께 붙인다")
+    void attachesOneMealkitBelowRecipes_whenEasyWordSpoken() {
+        when(recipeCandidateFacade.findCandidates(any())).thenReturn(new RecipeCandidates(List.of(
+                candidate(544L, "된장국", "국", 10, reason(List.of())),
+                candidate(20L, "두부조림", "조림", 20, reason(List.of())),
+                candidate(30L, "두부전", "전", 15, reason(List.of()))), false));
+        when(recipeService.findSummaries(any())).thenReturn(Map.of());
+        givenMealkits(
+                mealkit(40L, "된장국", 7000, 544L),
+                mealkit(41L, "황태해장국", 9000, 543L));
+
+        RecommendationReply reply = facade.recommend("간단하게 먹을 거", RecipeQuery.of(MEMBER_ID, List.of()), List.of(), null);
+
+        assertThat(reply.event().recipes()).hasSize(3);
+        assertThat(reply.event().mealkits()).extracting(m -> m.product().productId()).containsExactly(41L);
+        assertThat(reply.event().mealkits().get(0).description())
+                .isEqualTo("요리하기 번거로우면 황태해장국 밀키트로 간편하게 드셔 보세요.");
+        assertThat(reply.fixedReply()).isNull();
+        assertThat(reply.candidateInfo()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("밀키트를 말했는데 판매 중인 밀키트가 없으면 안내를 맨 앞에 두고 레시피 카드 3장을 보여 주며, 키워드에서 밀키트는 뺀다")
+    void showsRecipesWithNotice_whenNoMealkitOnSale() {
+        when(productService.getOnSaleMealkits()).thenReturn(List.of());
+        when(recipeCandidateFacade.findCandidates(any())).thenReturn(new RecipeCandidates(List.of(
+                candidate(10L, "두부찌개", "찌개", 25, reason(List.of())),
+                candidate(20L, "두부조림", "조림", 20, reason(List.of())),
+                candidate(30L, "두부전", "전", 15, reason(List.of()))), false));
+        when(recipeService.findSummaries(any())).thenReturn(Map.of());
+        RecipeQuery spoken = new RecipeQuery(MEMBER_ID, List.of(), List.of(), List.of(), null, List.of(), false,
+                List.of("밀키트"), "밀키트");
+
+        RecommendationReply reply = facade.recommend("밀키트 뭐 있어", spoken, List.of(), null);
+
+        assertThat(reply.event().recipes()).hasSize(3);
+        assertThat(reply.event().mealkits()).isEmpty();
+        assertThat(reply.notices()).first().isEqualTo(ChatRecommendationFacade.NO_MEALKIT_NOTICE);
+        assertThat(reply.fixedReply()).isNull();
+        verify(recipeCandidateFacade).findCandidates(argThat(
+                query -> query.keywords().isEmpty() && query.keywordText() == null));
+        verify(recipeCandidateFacade, never()).describeMealkitRecipes(any(), any());
+    }
+
+    @Test
+    @DisplayName("밀키트 단어가 없거나 \"밀키트 말고\"면 밀키트를 고르지 않는다")
+    void skipsMealkits_whenNoMealkitWordOrNegated() {
+        when(recipeCandidateFacade.findCandidates(any())).thenReturn(new RecipeCandidates(List.of(
+                candidate(10L, "두부찌개", "찌개", 25, reason(List.of()))), false));
+        when(recipeService.findSummaries(any())).thenReturn(Map.of());
+
+        assertThat(facade.recommend("두부로 뭐 먹지", RecipeQuery.of(MEMBER_ID, List.of()), List.of(), 7L)
+                .event().mealkits()).isEmpty();
+        assertThat(facade.recommend("밀키트 말고 레시피", RecipeQuery.of(MEMBER_ID, List.of()), List.of(), 7L)
+                .event().mealkits()).isEmpty();
+        verify(productService, never()).getOnSaleMealkits();
+        verify(chatMessageService, never()).findRecommendedProductIds(any());
+    }
+
+    @Test
+    @DisplayName("저장된 밀키트 카드를 메시지별 순서·설명 그대로 지금 가격으로 다시 만들고, 판매 중지된 밀키트는 빼며 조회는 한 번씩 한다")
+    void rebuildsMealkitCards_withCurrentPrice() {
+        List<SavedRecommendation> saved = List.of(
+                new SavedRecommendation(2L, 10L, null, 0, "레시피 설명"),
+                new SavedRecommendation(2L, null, 41L, 1, "요리하기 번거로우면 황태해장국 밀키트로 간편하게 드셔 보세요."),
+                new SavedRecommendation(4L, null, 43L, 1, null),
+                new SavedRecommendation(4L, null, 40L, 0, null),
+                new SavedRecommendation(4L, null, 99L, 2, null));
+        MealkitWithPrice hwangtae = mealkit(41L, "황태해장국", 9000, 543L);
+        MealkitWithPrice doenjang = mealkit(40L, "된장국", 7000, 544L);
+        MealkitWithPrice soldOut = soldOutMealkit(43L, "부추 콩가루 찜", 8000);
+        when(productService.getPublicMealkits(List.of(41L, 43L, 40L, 99L)))
+                .thenReturn(List.of(hwangtae.mealkit(), doenjang.mealkit(), soldOut.mealkit()));
+        when(saleEventReader.findSellingPrices(any())).thenReturn(Map.of(
+                41L, hwangtae.price(), 40L, doenjang.price(), 43L, soldOut.price()));
+        when(recipeService.findSummaries(any())).thenReturn(Map.of(
+                543L, new RecipeSummary(543L, "황태해장국", null, null),
+                544L, new RecipeSummary(544L, "된장국", null, null)));
+
+        Map<Long, List<RecommendedMealkit>> cards = facade.rebuildMealkitCards(saved);
+
+        assertThat(cards.get(2L)).extracting(m -> m.product().productId(), RecommendedMealkit::description)
+                .containsExactly(tuple(41L, "요리하기 번거로우면 황태해장국 밀키트로 간편하게 드셔 보세요."));
+        assertThat(cards.get(4L)).extracting(m -> m.product().productId()).containsExactly(40L, 43L);
+        assertThat(cards.get(4L).get(0).recipeName()).isEqualTo("된장국");
+        assertThat(cards.get(4L).get(1).product().soldOut()).isTrue();
+        verify(productService, times(1)).getPublicMealkits(any());
+    }
+
+    @Test
+    @DisplayName("레시피 카드를 다시 만들 때 밀키트 카드는 건너뛰고, 밀키트만 있는 답이면 레시피를 조회하지 않는다")
+    void skipsMealkitRows_whenRebuildingRecipeCards() {
+        Map<Long, List<RecommendedRecipe>> cards = facade.rebuildCards(1L, List.of(new SavedRecommendation(4L, null, 40L, 0, null)));
+
+        assertThat(cards).isEmpty();
+        verify(recipeCandidateFacade, never()).describeRecipes(any(), any());
+    }
+
+    @Test
+    @DisplayName("밀키트 제안 문장은 이름에 밀키트를 한 번만 붙이고 받침에 맞춰 으로/로를 쓴다")
+    void writesMealkitSuggestion_withParticle() {
+        assertThat(ChatRecommendationFacade.mealkitSuggestion("닭갈비"))
+                .isEqualTo("요리하기 번거로우면 닭갈비 밀키트로 간편하게 드셔 보세요.");
+        assertThat(ChatRecommendationFacade.mealkitSuggestion("된장찌개 밀키트 2인분"))
+                .isEqualTo("요리하기 번거로우면 된장찌개 밀키트 2인분으로 간편하게 드셔 보세요.");
+        assertThat(ChatRecommendationFacade.mealkitSuggestion("소불고기 밀키트 1팩 세트 750g"))
+                .endsWith("750g로 간편하게 드셔 보세요.");
+    }
+
+    // 판매 중인 밀키트와 판매가, 연결된 레시피(냉장고 기준 계산)를 돌려준다. 냉장고에 밀키트는 없다
+    private void givenMealkits(MealkitWithPrice... mealkits) {
+        when(productService.getOnSaleMealkits()).thenReturn(Arrays.stream(mealkits).map(MealkitWithPrice::mealkit).toList());
+        Map<Long, SellingPrice> prices = new HashMap<>();
+        Map<Long, RecipeCandidate> recipes = new HashMap<>();
+        for (MealkitWithPrice mealkit : mealkits) {
+            prices.put(mealkit.mealkit().getProduct().getId(), mealkit.price());
+            Long recipeId = mealkit.mealkit().getRecipeId();
+            if (recipeId != null) {
+                String category = mealkit.mealkit().getProduct().getName().endsWith("국") ? "국" : "찜";
+                recipes.put(recipeId, candidate(recipeId, mealkit.mealkit().getProduct().getName(), category, 20, reason(List.of())));
+            }
+        }
+        when(saleEventReader.findSellingPrices(any())).thenReturn(prices);
+        when(recipeCandidateFacade.describeMealkitRecipes(any(), any()))
+                .thenReturn(new RecipeCandidateFacade.MealkitRecipes(recipes, Map.of(), List.of()));
+    }
+
+    private record MealkitWithPrice(MealkitProduct mealkit, SellingPrice price) {
+    }
+
+    private static MealkitWithPrice mealkit(long productId, String name, int price, Long recipeId) {
+        return mealkitWith(productId, name, price, recipeId, ProductStatus.ON_SALE);
+    }
+
+    private static MealkitWithPrice soldOutMealkit(long productId, String name, int price) {
+        return mealkitWith(productId, name, price, 539L, ProductStatus.SOLD_OUT);
+    }
+
+    private static MealkitWithPrice mealkitWith(long productId, String name, int price, Long recipeId, ProductStatus status) {
+        Product product = Product.builder().productType(ProductType.MEALKIT).name(name).price(price)
+                .stock(status == ProductStatus.SOLD_OUT ? 0 : 10).storage(StorageType.REFRIGERATED).shelfDays(3).status(status)
+                .build();
+        ReflectionTestUtils.setField(product, "id", productId);
+        MealkitProduct mealkit = MealkitProduct.builder().product(product).servings(2).recipeId(recipeId).build();
+        return new MealkitWithPrice(mealkit, SellingPrice.of(product, null));
     }
 
     private void givenKeywordCandidates(RecipeCandidate... candidates) {

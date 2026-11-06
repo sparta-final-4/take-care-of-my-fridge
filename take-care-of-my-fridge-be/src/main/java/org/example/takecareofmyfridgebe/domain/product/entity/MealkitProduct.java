@@ -6,6 +6,7 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
@@ -21,6 +22,9 @@ import lombok.NoArgsConstructor;
     name = "mealkit_products",
     uniqueConstraints = {
         @UniqueConstraint(name = "uk_mealkit_products_product_id", columnNames = "product_id")
+    },
+    indexes = {
+        @Index(name = "idx_mealkit_products_recipe_id", columnList = "recipe_id")
     }
 )
 @Getter
@@ -40,10 +44,16 @@ public class MealkitProduct {
     @Column(name = "servings", nullable = false)
     private int servings;
 
+    // 이 밀키트로 만드는 레시피. 상담 밀키트 추천이 레시피 조건으로 고를 때 쓴다 (없으면 null)
+    // 타 도메인(Recipe)과의 결합도를 낮추기 위해 연관관계 대신 ID로만 참조
+    @Column(name = "recipe_id", nullable = true)
+    private Long recipeId;
+
     @Builder
-    private MealkitProduct(Product product, int servings) {
+    private MealkitProduct(Product product, int servings, Long recipeId) {
         this.product = product;
         this.servings = servings;
+        this.recipeId = recipeId;
     }
 
     public void changeServings(int servings) {

@@ -84,6 +84,25 @@ public class ProductService {
         return ingredientProductRepository.findWithProductByIngredientIdIn(ingredientIds, PUBLIC_STATUSES);
     }
 
+    /**
+     * 판매 중(ON_SALE)인 밀키트 전부를 상품과 함께 돌려준다 (인분·레시피 ID는 밀키트 행에 있다).
+     * AI 상담 밀키트 추천이 고를 후보로 쓴다. 번개 드롭 소진처럼 판매가 기준 품절은 호출하는 쪽이 판매가로 거른다.
+     */
+    public List<MealkitProduct> getOnSaleMealkits() {
+        return mealkitProductRepository.findWithProductByStatusIn(List.of(ProductStatus.ON_SALE));
+    }
+
+    /**
+     * 상품 ID들의 공개 밀키트를 상품과 함께 돌려준다. 판매 중지는 빼고 품절은 넣는다 (화면이 품절로 보여 준다).
+     * 빈 입력이면 조회하지 않는다. 저장된 상담 밀키트 카드를 다시 보여 줄 때 쓴다.
+     */
+    public List<MealkitProduct> getPublicMealkits(Collection<Long> productIds) {
+        if (productIds == null || productIds.isEmpty()) {
+            return List.of();
+        }
+        return mealkitProductRepository.findWithProductByProductIdIn(productIds, PUBLIC_STATUSES);
+    }
+
     // 전체 재색인용. 판매 중지 상품도 넣고, 검색할 때 상태로 거른다
     public List<ProductIndexSource> findIndexSources() {
         return productRepository.findAll(Sort.by("id")).stream()

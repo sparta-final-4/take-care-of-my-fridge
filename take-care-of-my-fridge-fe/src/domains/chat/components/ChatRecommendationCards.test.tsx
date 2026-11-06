@@ -1,8 +1,9 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { MemoryRouter } from 'react-router';
 import { describe, expect, it } from 'vitest';
 
-import type { ChatRecommendedRecipe } from '../recommendations';
+import type { ChatRecommendedMealkit, ChatRecommendedRecipe } from '../recommendations';
 import { ChatRecommendationCards } from './ChatRecommendationCards';
 
 function recipe(overrides: Partial<ChatRecommendedRecipe>): ChatRecommendedRecipe {
@@ -23,6 +24,24 @@ function recipe(overrides: Partial<ChatRecommendedRecipe>): ChatRecommendedRecip
     ...overrides,
   };
 }
+
+const mealkit: ChatRecommendedMealkit = {
+  product: {
+    productId: 40,
+    name: '된장국',
+    imageUrl: null,
+    price: 9000,
+    salePrice: null,
+    saleType: null,
+    soldOut: false,
+    unitAmount: null,
+    unit: null,
+  },
+  servings: 2,
+  recipeId: 544,
+  recipeName: '된장국',
+  description: null,
+};
 
 function render(recipes: ChatRecommendedRecipe[]) {
   return renderToStaticMarkup(
@@ -127,5 +146,23 @@ describe('ChatRecommendationCards', () => {
 
     expect(html).not.toContain('없음');
     expect(html).toContain('장볼 재료 1');
+  });
+
+  it('밀키트만 있는 답이면 레시피 카드 없이 밀키트 카드를 보여 준다', () => {
+    const html = renderToStaticMarkup(
+      <QueryClientProvider client={new QueryClient()}>
+        <MemoryRouter>
+          <ChatRecommendationCards recipes={[]} mealkits={[mealkit]} />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(html).not.toContain('추천 레시피');
+    expect(html).toContain('밀키트로 간편하게');
+    expect(html).toContain('aria-label="된장국 장바구니에 담기"');
+  });
+
+  it('레시피·밀키트가 모두 없으면 아무것도 그리지 않는다', () => {
+    expect(render([])).toBe('');
   });
 });

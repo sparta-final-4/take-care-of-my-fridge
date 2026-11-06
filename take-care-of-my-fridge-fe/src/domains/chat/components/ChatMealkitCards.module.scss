@@ -1,0 +1,114 @@
+@use '@/styles/variables' as *;
+
+// 레시피 카드와 같은 들여쓰기(AI 말풍선 내용)로 레시피 카드 아래에 둔다
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ant-margin-xxs);
+  margin: 0 0 var(--ant-margin-sm) $chat-assistant-indent;
+}
+
+.heading {
+  font-size: var(--ant-font-size-sm);
+  color: var(--ant-color-primary);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ant-margin-xxs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ant-margin-xxs);
+}
+
+// 레시피 카드(흰 바탕·회색 테두리)와 구분되게 옅은 primary 바탕과 테두리
+.card {
+  position: relative;
+  border: 1px solid var(--ant-color-primary-border);
+  border-radius: var(--ant-border-radius-lg);
+  background: var(--ant-color-primary-bg);
+
+  &:hover {
+    background: var(--ant-color-primary-bg-hover);
+  }
+
+  &:has(.cardLink:focus-visible) {
+    outline: 2px solid var(--ant-color-primary);
+    outline-offset: -2px;
+  }
+}
+
+// 카드 전체를 덮는 상품 상세 링크
+.cardLink {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+
+  &:focus-visible {
+    outline: none;
+  }
+}
+
+// 이미지 | 이름 · 인분 · 가격 | 담기 아이콘. 좁으면 이름부터 줄어든다
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--ant-margin-sm);
+  padding: var(--ant-padding-xs) var(--ant-padding-sm);
+  pointer-events: none;
+}
+
+.thumb {
+  flex-shrink: 0;
+  width: $chat-recommend-thumb-size;
+  height: $chat-recommend-thumb-size;
+  border-radius: var(--ant-border-radius);
+  object-fit: cover;
+}
+
+.body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  line-height: var(--ant-line-height-sm);
+}
+
+.name {
+  min-width: 0;
+  font-size: var(--ant-font-size);
+}
+
+.meta {
+  font-size: var(--ant-font-size-sm);
+  color: var(--ant-color-text-tertiary);
+}
+
+.price {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--ant-margin-xxs);
+  white-space: nowrap;
+}
+
+.listPrice {
+  font-size: var(--ant-font-size-sm);
+}
+
+.description {
+  margin: 0 0 var(--ant-margin-xs);
+  padding-inline: var(--ant-padding-xxs);
+  font-size: var(--ant-font-size-sm);
+
+  &:global(.ant-typography) {
+    margin-bottom: var(--ant-margin-xs);
+  }
+}

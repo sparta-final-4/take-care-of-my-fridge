@@ -3,9 +3,13 @@ package org.example.takecareofmyfridgebe.domain.chat.facade;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatCandidateProperties;
+import org.example.takecareofmyfridgebe.domain.chat.config.ChatAskWordProperties;
+import org.example.takecareofmyfridgebe.domain.chat.config.ChatCategoryWordProperties;
+import org.example.takecareofmyfridgebe.domain.chat.config.ChatMealkitWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatTasteWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext.CardName;
+import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntent;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntentResolution;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntentResolution.Source;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageCreateRequest;
@@ -64,6 +68,8 @@ public class ChatIntentFacade {
     private static final int SESSION_RECIPES_SEARCHED = 30;
     private static final String NAME_DELIMITER = ", ";
     private static final String NONE = "없음";
+    // 이름만 말한 말로 볼 최대 글자 수 (공백·끝 문장 부호 뺀 글). "닭가슴살 브로콜리 만두"(11자)·"매운 국물 밀키트"(7자)가 들어간다
+    static final int NAME_ONLY_MAX_LENGTH = 15;
 
     private final ChatIntentExtractor chatIntentExtractor;
     private final RecipeService recipeService;
@@ -71,6 +77,9 @@ public class ChatIntentFacade {
     private final ChatCandidateProperties chatCandidateProperties;
     private final ChatMessageService chatMessageService;
     private final ChatTasteWordProperties chatTasteWordProperties;
+    private final ChatMealkitWordProperties chatMealkitWordProperties;
+    private final ChatAskWordProperties chatAskWordProperties;
+    private final ChatCategoryWordProperties chatCategoryWordProperties;
 
     // 상담 문맥 없이 (첫 질문과 같게) 정한다
     public ChatIntentResolution resolve(Long memberId, Long sessionId, ChatMessageCreateRequest request) {
@@ -100,29 +109,145 @@ public class ChatIntentFacade {
         }
 
         IntentResult result;
+        List<String> categories;
         try {
-            List<String> categories = categories();
+            categories = categories();
             IntentResult raw = chatIntentExtractor.extract(memberId, sessionId, request.content(), categories, followUp(context));
             log.debug("상담 의도 AI 원본 - memberId: {}, sessionId: {}, 의도: {}, 원하는 맛: {}, 피할 맛: {}, removed: {}",
                     memberId, sessionId, raw.intent(), raw.wantedTastes(), raw.avoidTastes(), raw.removed());
-            result = correctCategories(memberId, sessionId, request.content(), categories, context,
-                    correctTastes(memberId, sessionId, request.content(), raw.sanitize(categories)));
+            result = raw.sanitize(categories);
         } catch (RuntimeException e) {
             log.warn("상담 의도 뽑기 실패, 선택 재료 유무로 정함 - memberId: {}, sessionId: {}, 선택 재료 수: {}, 원인: {}",
                     memberId, sessionId, request.selectedIngredientIds().size(), e.toString());
-            return new Decision(request.selectedIngredientIds().isEmpty()
-                    ? ChatIntentResolution.general(Source.FALLBACK)
-                    : ChatIntentResolution.recommend(Source.FALLBACK,
+            if (request.selectedIngredientIds().isEmpty()) {
+                return new Decision(ChatIntentResolution.general(Source.FALLBACK));
+            }
+            // 선택 재료가 있어도 "두부 얼마나 보관돼?"처럼 묻는 말이면 추천으로 바꾸지 않는다
+            if (AskWordChecker.asks(request.content(), chatAskWordProperties)) {
+                log.info("상담 의도 뽑기 실패, 묻는 말이라 추천으로 바꾸지 않음 - memberId: {}, sessionId: {}", memberId, sessionId);
+                return new Decision(ChatIntentResolution.general(Source.FALLBACK));
+            }
+            return new Decision(ChatIntentResolution.recommend(Source.FALLBACK,
                     RecipeQuery.of(memberId, request.selectedIngredientIds(), request.useSelectedOnly())));
         }
 
+        boolean mealkitRecommend = result.intent() == ChatIntent.GENERAL
+                && mealkitRequested(memberId, sessionId, request.content());
+        // "국물 밀키트", "김치찌개", "두부"처럼 이름만 말한 짧은 말은 보여 달라는 뜻으로 보고 추천으로 바꾼다
+        if (result.intent() == ChatIntent.GENERAL && !mealkitRecommend) {
+            Optional<IntentResult> named = nameOnly(memberId, sessionId, request.content(), categories, result);
+            if (named.isPresent()) {
+                result = named.get();
+            }
+        }
+        // 맛·분류 단어로 조건을 고치는 것은 추천·다시 추천일 때만 한다. 일반 답·레시피 자세히는 AI 결과를 그대로 쓴다
+        if (result.intent() == ChatIntent.RECOMMEND || result.intent() == ChatIntent.REFINE || mealkitRecommend) {
+            result = correctCategories(memberId, sessionId, request.content(), categories, context,
+                    correctTastes(memberId, sessionId, request.content(), result));
+        }
+        // 새 추천은 앞 대화의 맛을 잇지 않는다 (앞 조건 이어 가기는 다시 추천만). AI가 따라 넣은 맛은 이번 말에 없으면 뺀다
+        if (result.intent() == ChatIntent.RECOMMEND || mealkitRecommend) {
+            result = keepSpokenTastes(memberId, sessionId, request.content(), result);
+        }
         ChatIntentResolution resolution = switch (result.intent()) {
             case RECOMMEND -> ChatIntentResolution.recommend(Source.AI, toRecipeQuery(memberId, sessionId, request, result));
             case REFINE -> refine(memberId, sessionId, request, result, context);
             case RECIPE_DETAIL -> recipeDetail(memberId, sessionId, result, context);
-            case GENERAL -> ChatIntentResolution.general(Source.AI);
+            case GENERAL -> mealkitRecommend
+                    ? ChatIntentResolution.recommend(Source.AI, toRecipeQuery(memberId, sessionId, request, result))
+                    : ChatIntentResolution.general(Source.AI);
         };
         return new Decision(resolution, result.removed() == null ? List.of() : result.removed());
+    }
+
+    /**
+     * "밀키트 뭐 있어"처럼 밀키트를 달라는 말인데 AI가 일반 대화로 본 말은 추천으로 바꾼다 (밀키트 카드는 추천 답에만 붙는다).
+     * 달라는 말이 있고 묻는 말이 없을 때만 바꾼다 (AskWordChecker). 밀키트와 같이 쓴 "있어·있나·없어"도 달라는 말로 본다. "밀키트 추천 기준이 뭐야?"는 묻는 말이라 일반 답 그대로다.
+     * "국물 밀키트"처럼 달라는 말이 없는 짧은 말은 이름만 말한 말(nameOnly)에서 본다.
+     */
+    private boolean mealkitRequested(Long memberId, Long sessionId, String message) {
+        boolean mealkit = MealkitWordChecker.check(message, chatMealkitWordProperties, chatTasteWordProperties)
+                == MealkitWordChecker.Mode.ONLY;
+        if (!mealkit) {
+            return false;
+        }
+        if (AskWordChecker.requestsMealkit(message, chatAskWordProperties)) {
+            log.info("상담 밀키트를 달라고 해 일반 대화를 추천으로 - memberId: {}, sessionId: {}", memberId, sessionId);
+            return true;
+        }
+        if (AskWordChecker.asks(message, chatAskWordProperties)) {
+            log.info("상담 밀키트를 말했지만 묻는 말이라 일반 대화 그대로 - memberId: {}, sessionId: {}", memberId, sessionId);
+        }
+        return false;
+    }
+
+    /**
+     * 이름만 말한 짧은 말("국물 밀키트", "디저트", "두부", "김치찌개")은 그걸 보여 달라는 뜻이라 AI가 GENERAL이어도 추천으로 바꾼다.
+     * <ul>
+     *   <li>묻는 말이 없고(AskWordChecker), 공백·끝 문장 부호를 뺀 글이 {@value #NAME_ONLY_MAX_LENGTH}자 이하일 때만 본다</li>
+     *   <li>밀키트 단어, 분류 단어(묶음 말 포함), 재료 사전 이름, 레시피 이름 중 하나가 있으면 바꾼다 (앞에서 찾으면 뒤는 보지 않는다).
+     *       재료 이름이면 그 재료를 말한 재료로, 레시피 이름이면 그 이름을 요리 이름 키워드로 채운다.
+     *       분류·맛은 추천 조건 보정(correctCategories·correctTastes)이 채운다</li>
+     *   <li>인사 말("안녕 밥은?")이 있거나 지난 일을 묻는 말("밥 먹었어?")이면 바꾸지 않는다</li>
+     *   <li>"안녕"처럼 음식 말이 없으면 그대로 일반 답이다</li>
+     * </ul>
+     */
+    Optional<IntentResult> nameOnly(Long memberId, Long sessionId, String message, List<String> categories, IntentResult result) {
+        if (message == null || AskWordChecker.asks(message, chatAskWordProperties)
+                || AskWordChecker.greets(message, chatAskWordProperties)) {
+            return Optional.empty();
+        }
+        String text = message.strip().replaceAll("[?!.~…,]+$", "").strip();
+        String compact = text.replaceAll("\\s+", "");
+        if (compact.isEmpty() || compact.length() > NAME_ONLY_MAX_LENGTH) {
+            return Optional.empty();
+        }
+        String found = null;
+        List<String> includes = List.of();
+        List<String> keywords = List.of();
+        String dish = null;
+        if (MealkitWordChecker.check(message, chatMealkitWordProperties, chatTasteWordProperties) == MealkitWordChecker.Mode.ONLY) {
+            found = "밀키트";
+        } else if (CategoryWordChecker.check(message, categories, chatTasteWordProperties, chatCategoryWordProperties.groups())
+                .stream().anyMatch(stance -> stance.stance() == CategoryWordChecker.Stance.WANT)) {
+            found = "분류";
+        } else {
+            List<String> ingredients = ingredientNames(List.of(text.split("\\s+")));
+            if (!ingredients.isEmpty()) {
+                found = "재료";
+                includes = ingredients;
+            } else if (!recipeService.suggestNames(text, 1).isEmpty()) {
+                found = "레시피 이름";
+                keywords = List.of(text);
+                dish = text;
+            }
+        }
+        if (found == null) {
+            return Optional.empty();
+        }
+        log.info("상담 이름만 말해 일반 대화를 추천으로 - memberId: {}, sessionId: {}, 찾은 것: {}, 재료: {}, 키워드: {}",
+                memberId, sessionId, found, includes, keywords);
+        return Optional.of(new IntentResult(ChatIntent.RECOMMEND, result.wantedTastes(), result.moodCategories(),
+                result.maxMinutes(), includes.isEmpty() ? result.includeIngredients() : includes, result.excludeIngredients(),
+                result.useSelectedOnly(), keywords.isEmpty() ? result.keywords() : keywords,
+                dish == null ? result.dishText() : dish, result.preferenceText(), result.targetIndex(), result.targetName(),
+                result.removed(), result.avoidTastes(), result.detailQuestion()));
+    }
+
+    // 재료 사전에 있는 이름만 (직접 입력·밀키트 재료로 잡힌 이름은 뺀다). 매칭이 실패하면(DB·검색 장애) 빈 목록
+    private List<String> ingredientNames(List<String> words) {
+        try {
+            List<String> names = new ArrayList<>();
+            ingredientMatcher.matchAll(words).forEach((name, ingredient) -> {
+                if (ingredient != null && !ingredient.isCustom() && !ingredient.isMealkit()) {
+                    names.add(name);
+                }
+            });
+            return names;
+        } catch (RuntimeException e) {
+            log.warn("상담 이름만 말한 말의 재료 매칭 실패, 재료 없이 - 원인: {}", e.toString());
+            return List.of();
+        }
     }
 
     /**
@@ -154,6 +279,34 @@ public class ChatIntentFacade {
     }
 
     /**
+     * 새 추천의 원하는 맛·피할 맛은 이번 말에 그 맛 단어가 있을 때만 남긴다 (TasteWordChecker.mentioned).
+     * "매운 거 말고" 다음 "김치찌개"에서 AI가 앞의 피할 맛(매운맛)을 따라 넣어 김치찌개가 빠지는 것을 막는다. 비웠으면 INFO로 남긴다.
+     */
+    IntentResult keepSpokenTastes(Long memberId, Long sessionId, String message, IntentResult result) {
+        Set<Member.Taste> spoken = TasteWordChecker.mentioned(message, chatTasteWordProperties);
+        List<String> wanted = orEmpty(result.wantedTastes()).stream().filter(taste -> spokenTaste(spoken, taste)).toList();
+        List<String> avoid = orEmpty(result.avoidTastes()).stream().filter(taste -> spokenTaste(spoken, taste)).toList();
+        if (wanted.size() == orEmpty(result.wantedTastes()).size() && avoid.size() == orEmpty(result.avoidTastes()).size()) {
+            return result;
+        }
+        log.info("상담 새 추천이라 이번 말에 없는 맛을 뺌 - memberId: {}, sessionId: {}, 원하는 맛: {} → {}, 피할 맛: {} → {}",
+                memberId, sessionId, result.wantedTastes(), wanted, result.avoidTastes(), avoid);
+        return new IntentResult(result.intent(), wanted, result.moodCategories(), result.maxMinutes(), result.includeIngredients(),
+                result.excludeIngredients(), result.useSelectedOnly(), result.keywords(), result.dishText(),
+                result.preferenceText(), result.targetIndex(), result.targetName(), result.removed(), avoid,
+                result.detailQuestion());
+    }
+
+    // AI가 준 맛 이름(SPICY 등)이 이번 말에 나온 맛인지. 모르는 이름은 sanitize가 이미 걸렀다
+    private static boolean spokenTaste(Set<Member.Taste> spoken, String taste) {
+        try {
+            return spoken.contains(Member.Taste.valueOf(taste));
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
+    }
+
+    /**
      * 메시지에 분류 이름이 그대로 있으면 그 분류를 쓴다 (CategoryWordChecker). AI가 비웠거나 다른 분류를 넣었어도 이번 말이 앞선다.
      * <ul>
      *   <li>원하는 분류가 있으면 분류 조건은 그 분류만. 앞 대화에서 이어진 키워드·요리 이름(이번 말에 없는 것)은 뺀다
@@ -165,7 +318,8 @@ public class ChatIntentFacade {
      */
     IntentResult correctCategories(Long memberId, Long sessionId, String message, List<String> categories, ChatContext context,
                                    IntentResult result) {
-        List<CategoryWordChecker.CategoryStance> stances = CategoryWordChecker.check(message, categories, chatTasteWordProperties);
+        List<CategoryWordChecker.CategoryStance> stances = CategoryWordChecker.check(message, categories, chatTasteWordProperties,
+                chatCategoryWordProperties.groups());
         if (stances.isEmpty()) {
             return result;
         }

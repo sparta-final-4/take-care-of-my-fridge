@@ -4799,6 +4799,12 @@
             "type": "integer",
             "format": "int64"
           },
+          "mealkits": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RecommendedMealkit"
+            }
+          },
           "recommendations": {
             "type": "array",
             "items": {
@@ -8057,6 +8063,28 @@
             "type": "string",
             "maxLength": 2000,
             "minLength": 0
+          }
+        }
+      },
+      "RecommendedMealkit": {
+        "type": "object",
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "product": {
+            "$ref": "#/components/schemas/ShoppingProduct"
+          },
+          "recipeId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "recipeName": {
+            "type": "string"
+          },
+          "servings": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },

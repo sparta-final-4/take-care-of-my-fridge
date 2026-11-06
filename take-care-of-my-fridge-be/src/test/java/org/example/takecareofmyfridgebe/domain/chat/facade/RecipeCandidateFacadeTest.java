@@ -255,6 +255,26 @@ class RecipeCandidateFacadeTest {
     }
 
     @Test
+    @DisplayName("\"매운 거 말고 김치찌개 줘\"면 콕 집은 김치찌개는 매워도 남겨 첫 장에 두고 그 맛을 알리며, 나머지 매운 레시피는 뺀다")
+    void keepsNamedDish_whenAvoidingItsTaste() throws Exception {
+        when(memberService.getMyInfo(MEMBER_ID)).thenReturn(mock(MyInfoResponse.class));
+        givenKeywordRecipes(Map.of(
+                10L, recipe(10L, "김치찌개", Set.of(Taste.SPICY), List.of("김치", "돼지고기")),
+                20L, recipe(20L, "된장찌개", Set.of(Taste.SALTY), List.of("된장", "두부")),
+                30L, recipe(30L, "부대찌개", Set.of(Taste.SPICY), List.of("햄", "고춧가루")),
+                40L, recipe(40L, "청국장찌개", Set.of(Taste.MILD), List.of("청국장")),
+                50L, recipe(50L, "순두부찌개", Set.of(Taste.SALTY), List.of("순두부"))));
+        RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, null, null, null, false,
+                List.of("김치찌개"), "김치찌개").withAvoidTastes(List.of(Taste.SPICY));
+
+        RecipeCandidates result = facade.findCandidates(query);
+
+        assertThat(result.candidates()).extracting(RecipeCandidate::recipeId).startsWith(10L).doesNotContain(30L)
+                .containsExactlyInAnyOrder(10L, 20L, 40L, 50L);
+        assertThat(result.keptAvoidTastes()).containsExactly(Map.entry(10L, List.of(Taste.SPICY)));
+    }
+
+    @Test
     @DisplayName("매운 레시피를 빼서 3개보다 적으면 그때만 매운 레시피를 뒤에 채운다")
     void refillsSpicyRecipesAtEnd_whenTooFew() throws Exception {
         when(memberService.getMyInfo(MEMBER_ID)).thenReturn(mock(MyInfoResponse.class));
@@ -798,6 +818,42 @@ class RecipeCandidateFacadeTest {
             }
         });
         return result;
+    }
+
+    @Test
+    @DisplayName("밀키트 추천 재료는 냉장고를 한 번 읽어 기한이 남은 밀키트 줄 이름과 연결 레시피 계산·맛을 돌려주고, 레시피가 없으면 레시피를 조회하지 않는다")
+    void describesMealkitRecipes_withFridgeMealkitNames() {
+        when(memberService.getMyInfo(MEMBER_ID)).thenReturn(mock(MyInfoResponse.class));
+        when(fridgeService.getItems(any(), any())).thenReturn(List.of(
+                fridgeItem(1L, "두부", 5),
+                mealkitItem("황태해장국", 2),
+                mealkitItem("지난 된장국", -1)));
+        when(recipeService.findNonBasicIngredients(List.of(543L))).thenReturn(List.of(
+                new RecipeCandidateIngredient(543L, 1L, "두부", false),
+                new RecipeCandidateIngredient(543L, 4L, "황태", false)));
+        when(recipeService.findCandidateInfos(List.of(543L))).thenReturn(Map.of(
+                543L, new RecipeCandidateInfo(543L, "황태해장국", "국", 20, 2)));
+        when(recipeService.findTastesByRecipeIds(List.of(543L))).thenReturn(Map.of(543L, Set.of(Taste.UMAMI)));
+
+        RecipeCandidateFacade.MealkitRecipes found = facade.describeMealkitRecipes(MEMBER_ID, List.of(543L));
+        RecipeCandidateFacade.MealkitRecipes noRecipe = facade.describeMealkitRecipes(MEMBER_ID, List.of());
+
+        assertThat(found.fridgeMealkitNames()).containsExactly("황태해장국");
+        assertThat(found.recipes().get(543L).ranking().ownedCount()).isEqualTo(1);
+        assertThat(found.recipeTastes()).containsEntry(543L, Set.of(Taste.UMAMI));
+        assertThat(noRecipe.recipes()).isEmpty();
+        assertThat(noRecipe.fridgeMealkitNames()).containsExactly("황태해장국");
+        verify(recipeService, times(1)).findCandidateInfos(any());
+        verify(fridgeService, times(2)).getItems(any(), any());
+    }
+
+    private static FridgeItemResponse mealkitItem(String rawName, long dDay) {
+        FridgeItemStatus status = FridgeItemStatus.of(dDay);
+        return new FridgeItemResponse(
+                900L + dDay, 99L, "밀키트", "개", rawName, BigDecimal.ONE, StorageType.REFRIGERATED,
+                LocalDate.now().plusDays(dDay), FridgeSource.COMMERCE, 1L,
+                status == FridgeItemStatus.IMMINENT, status == FridgeItemStatus.EXPIRED, dDay, status,
+                IngredientType.MEALKIT, false, LocalDateTime.now(), LocalDateTime.now());
     }
 
     private static FridgeItemResponse fridgeItem(long ingredientId, String name, long dDay) {

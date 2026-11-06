@@ -1,10 +1,9 @@
-import { ShoppingCartOutlined } from '@ant-design/icons';
-import { Button, Typography } from 'antd';
-import type { MouseEvent } from 'react';
+import { Typography } from 'antd';
 
 import { formatPrice } from '@/domains/cart/format';
 
 import type { ChatRecommendationMissingIngredient, ChatShoppingProduct } from '../recommendations';
+import { ChatCartButton } from './ChatCartButton';
 import styles from './ChatRecommendationCards.module.scss';
 
 interface ChatShoppingListProps {
@@ -74,12 +73,6 @@ interface ShoppingItemProps {
 
 function ShoppingItem({ ingredient, product, onAdd, pending }: ShoppingItemProps) {
   const onSale = product.salePrice !== null;
-  // 카드 전체를 덮는 레시피 링크로 이어지지 않게 막고, 상담 창 안에서 담는다
-  const add = (event: MouseEvent) => {
-    event.preventDefault();
-    event.stopPropagation();
-    onAdd(product.productId);
-  };
   return (
     <li className={styles.shoppingItem}>
       <span className={styles.shoppingName}>
@@ -100,27 +93,14 @@ function ShoppingItem({ ingredient, product, onAdd, pending }: ShoppingItemProps
           </Typography.Text>
         )}
       </span>
-      {product.soldOut ? (
-        <Button
-          color="default"
-          variant="text"
-          disabled
-          aria-label={`${ingredient.name} 품절`}
-          className={styles.shoppingAdd}
-        >
-          품절
-        </Button>
-      ) : (
-        <Button
-          color="primary"
-          variant="text"
-          icon={<ShoppingCartOutlined className={styles.shoppingAddIcon} />}
-          loading={pending}
-          onClick={add}
-          aria-label={`${product.name} 장바구니에 담기`}
-          className={styles.shoppingAdd}
-        />
-      )}
+      <ChatCartButton
+        productId={product.productId}
+        productName={product.name}
+        soldOutLabel={ingredient.name}
+        soldOut={product.soldOut}
+        pending={pending}
+        onAdd={onAdd}
+      />
     </li>
   );
 }

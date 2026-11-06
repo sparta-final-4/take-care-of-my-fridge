@@ -1,6 +1,7 @@
 package org.example.takecareofmyfridgebe.domain.chat.facade;
 
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatCandidateProperties;
+import org.example.takecareofmyfridgebe.domain.chat.config.ChatCategoryWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext.CardName;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext.ContextMessage;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext;
@@ -46,6 +47,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -71,7 +73,8 @@ class ChatIntentFacadeTest {
         chatMessageService = mock(ChatMessageService.class);
         facade = new ChatIntentFacade(extractor, recipeService, ingredientMatcher,
                 new ChatCandidateProperties(List.of("양념", "음료"), 0.4, List.of(), List.of("백김치", "물김치", "동치미", "나박김치"), List.of()),
-                chatMessageService, TasteWordCheckerTest.WORDS);
+                chatMessageService, TasteWordCheckerTest.WORDS, MealkitWordCheckerTest.WORDS, AskWordCheckerTest.WORDS,
+                new ChatCategoryWordProperties(CategoryWordCheckerTest.GROUPS));
         when(recipeService.getClassifications())
                 .thenReturn(new RecipeClassificationResponse(List.of("한식"), List.of("국", "기타", "샐러드", "양념", "음료", "찌개")));
     }
@@ -150,6 +153,150 @@ class ChatIntentFacadeTest {
             assertThat(resolution.intent()).isEqualTo(ChatIntent.GENERAL);
             assertThat(resolution.source()).isEqualTo(Source.AI);
             assertThat(resolution.recipeQuery()).isNull();
+        }
+
+        @Test
+        @DisplayName("밀키트를 직접 말했는데 AI가 GENERAL이라고 하면 추천으로 바꾸고, 밀키트 말고면 일반 답 그대로 둔다")
+        void recommends_whenGeneralButMealkitSpoken() {
+            givenExtracted(IntentResult.general());
+
+            ChatIntentResolution mealkit = facade.resolve(MEMBER_ID, SESSION_ID,
+                    new ChatMessageCreateRequest("밀키트 뭐 있어?", ChatMessageMode.AUTO, List.of(), false));
+            ChatIntentResolution notMealkit = facade.resolve(MEMBER_ID, SESSION_ID,
+                    new ChatMessageCreateRequest("밀키트 말고 보관법 알려줘", ChatMessageMode.AUTO, List.of(), false));
+
+            assertThat(mealkit.intent()).isEqualTo(ChatIntent.RECOMMEND);
+            assertThat(mealkit.recipeQuery()).isNotNull();
+            assertThat(notMealkit.intent()).isEqualTo(ChatIntent.GENERAL);
+        }
+
+        @Test
+        @DisplayName("밀키트와 같이 \"있어·있나\"라고 하면 AI가 GENERAL이어도 추천으로 바꾸고, \"추천 기준 있어?\"는 일반 그대로 둔다")
+        void recommends_whenMealkitWithExistenceWord() {
+            givenExtracted(IntentResult.general());
+
+            for (String message : List.of("국물 밀키트 있어?", "밀키트 있나?")) {
+                assertThat(facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of(message)).intent())
+                        .as(message).isEqualTo(ChatIntent.RECOMMEND);
+            }
+            assertThat(facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("밀키트 추천 기준 있어?")).intent())
+                    .isEqualTo(ChatIntent.GENERAL);
+        }
+
+        @Test
+        @DisplayName("이름만 말한 짧은 말은 AI가 GENERAL이어도 추천으로 바꾼다: 국물 밀키트(국 계열), 디저트(분류), 두부(재료), 김치찌개(키워드)")
+        void recommends_whenNameOnly() {
+            when(recipeService.getClassifications()).thenReturn(
+                    new RecipeClassificationResponse(List.of("한식"), List.of("국", "디저트", "기타", "찌개")));
+            when(ingredientMatcher.matchAll(List.of("두부"))).thenReturn(Map.of("두부", ingredient(TOFU, "ING_TOFU", "두부")));
+            when(recipeService.suggestNames("김치찌개", 1)).thenReturn(List.of("김치찌개"));
+            givenExtracted(IntentResult.general());
+
+            ChatIntentResolution mealkit = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("국물 밀키트"));
+            ChatIntentResolution dessert = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("디저트"));
+            ChatIntentResolution tofu = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("두부"));
+            ChatIntentResolution stew = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("김치찌개"));
+
+            assertThat(List.of(mealkit, dessert, tofu, stew)).extracting(ChatIntentResolution::intent)
+                    .containsOnly(ChatIntent.RECOMMEND);
+            assertThat(mealkit.recipeQuery().moodCategories()).containsExactly("국", "찌개");
+            assertThat(dessert.recipeQuery().moodCategories()).containsExactly("디저트");
+            assertThat(tofu.recipeQuery().selectedIngredientIds()).containsExactly(TOFU);
+            assertThat(stew.recipeQuery().keywords()).containsExactly("김치찌개");
+            assertThat(stew.recipeQuery().keywordText()).isEqualTo("김치찌개");
+        }
+
+        @Test
+        @DisplayName("인사·지난 일을 묻는 짧은 말(밥 먹었어?, 안녕 밥은?)은 재료 이름이 있어도 일반 답 그대로 두고, \"밥 추천\"은 추천으로 바꾼다")
+        void keepsGeneral_whenGreetingOrPastQuestion() {
+            Ingredient rice = ingredient(70L, "ING_RICE", "밥");
+            when(ingredientMatcher.matchAll(anyList())).thenAnswer(invocation -> {
+                List<String> names = invocation.getArgument(0);
+                return names.contains("밥") ? Map.of("밥", rice) : Map.of();
+            });
+            givenExtracted(IntentResult.general());
+
+            for (String message : List.of("밥 먹었어?", "안녕 밥은?")) {
+                assertThat(facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of(message)).intent())
+                        .as(message).isEqualTo(ChatIntent.GENERAL);
+            }
+            ChatIntentResolution recommend = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("밥 추천"));
+
+            assertThat(recommend.intent()).isEqualTo(ChatIntent.RECOMMEND);
+            assertThat(recommend.recipeQuery().selectedIngredientIds()).containsExactly(70L);
+        }
+
+        @Test
+        @DisplayName("묻는 말, 음식 말이 없는 말(안녕), 긴 말은 이름만 말한 말로 보지 않고 일반 답 그대로 둔다")
+        void keepsGeneral_whenNotNameOnly() {
+            givenExtracted(IntentResult.general());
+
+            for (String message : List.of("밀키트 추천 기준이 뭐야?", "안녕", "오늘 날씨가 너무 좋아서 기분이 정말 좋아")) {
+                assertThat(facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of(message)).intent())
+                        .as(message).isEqualTo(ChatIntent.GENERAL);
+            }
+            verify(recipeService, never()).suggestNames("밀키트추천기준이뭐야", 1);
+        }
+
+        @Test
+        @DisplayName("\"국물\" 같은 묶음 말은 서버가 추천으로 바꾼 경우와 AI가 추천한 경우 모두 국 계열 분류로 채운다")
+        void fillsGroupCategories_whenGroupWordSpoken() {
+            givenExtracted(IntentResult.general());
+            ChatIntentResolution converted = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("국물 밀키트 있어?"));
+
+            givenExtracted(new IntentResult(ChatIntent.RECOMMEND, null, null, null, null, null, false, null, null, null));
+            ChatIntentResolution recommended = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("국물 요리 추천해줘"));
+
+            assertThat(converted.intent()).isEqualTo(ChatIntent.RECOMMEND);
+            assertThat(converted.recipeQuery().moodCategories()).containsExactly("국", "찌개");
+            assertThat(recommended.recipeQuery().moodCategories()).containsExactly("국", "찌개");
+        }
+
+        @Test
+        @DisplayName("AI가 GENERAL이라고 한 묻는 말(추천 기준·어떻게·보관)은 밀키트·분류·맛 단어가 있어도 서버가 추천으로 바꾸지 않는다")
+        void keepsGeneral_whenQuestionMessages() {
+            givenExtracted(IntentResult.general());
+
+            for (String message : List.of("밀키트 추천 기준이 뭐야?", "레시피 추천 기준이 뭐야?", "디저트는 어떻게 골라?",
+                    "매운 거 기준이 뭐야?", "두부 얼마나 보관돼?", "김치찌개 어떻게 만들어?")) {
+                ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID,
+                        new ChatMessageCreateRequest(message, ChatMessageMode.AUTO, List.of(TOFU), false));
+
+                assertThat(resolution.intent()).as(message).isEqualTo(ChatIntent.GENERAL);
+                assertThat(resolution.recipeQuery()).as(message).isNull();
+            }
+        }
+
+        @Test
+        @DisplayName("일반 대화·레시피 자세히면 맛·분류 단어로 조건을 고치지 않고, 추천이면 지금처럼 고친다")
+        void correctsConditions_onlyWhenRecommend() {
+            ChatIntentFacade spied = spy(facade);
+            givenExtracted(IntentResult.general());
+            spied.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("찌개는 어떻게 골라? 매운 거 기준은?"));
+            givenExtracted(new IntentResult(ChatIntent.RECIPE_DETAIL, null, null, null, null, null, null, null, null, null,
+                    null, "김치찌개", null, null, null));
+            spied.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("매운 김치찌개 어떻게 만들어?"));
+
+            verify(spied, never()).correctTastes(any(), any(), any(), any());
+            verify(spied, never()).correctCategories(any(), any(), any(), any(), any(), any());
+
+            givenExtracted(new IntentResult(ChatIntent.RECOMMEND, null, null, null, null, null, false, null, null, null));
+            ChatIntentResolution recommend = spied.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("매운 찌개 추천해줘"));
+
+            assertThat(recommend.recipeQuery().moodCategories()).containsExactly("찌개");
+            assertThat(recommend.recipeQuery().wantedTastes()).containsExactly(Taste.SPICY);
+        }
+
+        @Test
+        @DisplayName("AI 호출이 실패하면 선택 재료가 있어도 묻는 말(두부 얼마나 보관돼?)은 일반 답으로 둔다")
+        void returnsGeneral_whenExtractorFailsWithSelectedAndQuestion() {
+            when(extractor.extract(any(), any(), any(), any(), any())).thenThrow(new RuntimeException("timeout"));
+
+            ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID,
+                    new ChatMessageCreateRequest("두부 얼마나 보관돼?", ChatMessageMode.AUTO, List.of(TOFU), false));
+
+            assertThat(resolution.intent()).isEqualTo(ChatIntent.GENERAL);
+            assertThat(resolution.source()).isEqualTo(Source.FALLBACK);
         }
 
         @Test
@@ -672,6 +819,32 @@ class ChatIntentFacadeTest {
 
             assertThat(query.avoidTastes()).containsExactly(Taste.SPICY);
             assertThat(query.wantedTastes()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("\"매운 거 말고\" 뒤 \"김치찌개\"는 새 추천이라 AI가 따라 넣은 피할 맛을 빼고, 이번 말에 맛이 있으면 그 맛은 남긴다")
+        void dropsCarriedTastes_whenNewRecommend() {
+            RecipeQuery noSpicy = previous.withAvoidTastes(List.of(Taste.SPICY));
+            ChatContext afterAvoid = new ChatContext(List.of(), LastRecommendation.of(noSpicy, List.of(10L)), context.lastCards());
+            givenExtracted(new IntentResult(ChatIntent.RECOMMEND, List.of("SWEET"), List.of("찌개"), 0, List.of(), List.of(), false,
+                    List.of("김치찌개"), "김치찌개", null, null, null, List.of(), List.of("SPICY")));
+
+            RecipeQuery stew = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("김치찌개"), afterAvoid)
+                    .recipeQuery();
+
+            assertThat(stew.avoidTastes()).isEmpty();
+            assertThat(stew.wantedTastes()).isEmpty();
+            assertThat(stew.keywords()).containsExactly("김치찌개");
+
+            givenExtracted(new IntentResult(ChatIntent.RECOMMEND, List.of("SPICY"), null, 0, List.of(), List.of(), false,
+                    List.of(), null, null, null, null, List.of(), List.of()));
+            assertThat(facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("매운 거 추천해줘"), afterAvoid)
+                    .recipeQuery().wantedTastes()).containsExactly(Taste.SPICY);
+
+            givenExtracted(new IntentResult(ChatIntent.RECOMMEND, null, null, 0, List.of(), List.of(), false,
+                    List.of("김치찌개"), "김치찌개", null, null, null, List.of(), List.of("SPICY")));
+            assertThat(facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("매운 거 말고 김치찌개 줘"), afterAvoid)
+                    .recipeQuery().avoidTastes()).containsExactly(Taste.SPICY);
         }
 
         @Test

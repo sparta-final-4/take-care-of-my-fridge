@@ -21,7 +21,11 @@ import { streamMessage } from '../api';
 import { useChatModalStore } from '../model/useChatModalStore';
 import { useChatStreamingStore } from '../model/useChatStreamingStore';
 import { chatQueries, useCompleteChatSession, useStartChatSession } from '../queries';
-import { type ChatRecommendations, toChatRecommendedRecipes } from '../recommendations';
+import {
+  type ChatRecommendations,
+  toChatRecommendedMealkits,
+  toChatRecommendedRecipes,
+} from '../recommendations';
 import { selectedRecommendMessage } from '../selectedIngredients';
 import { ChatEndedNotice } from './ChatEndedNotice';
 import { ChatMessageBubble } from './ChatMessageBubble';
@@ -580,6 +584,7 @@ export function ChatRoomSection({
           ) : messagesData && messagesData.length > 0 ? (
             messagesData.map((msg) => {
               const cards = toChatRecommendedRecipes(msg.recommendations);
+              const mealkits = toChatRecommendedMealkits(msg.mealkits);
               return (
                 <Fragment key={msg.id ?? msg.sequence}>
                   <ChatMessageBubble
@@ -587,9 +592,11 @@ export function ChatRoomSection({
                     content={msg.content ?? ''}
                     createdAt={msg.createdAt}
                   />
-                  {cards.length > 0 && (
-                    <ChatRecommendationCards recipes={cards} onNavigate={closeOnNavigate} />
-                  )}
+                  <ChatRecommendationCards
+                    recipes={cards}
+                    mealkits={mealkits}
+                    onNavigate={closeOnNavigate}
+                  />
                 </Fragment>
               );
             })
@@ -643,6 +650,7 @@ export function ChatRoomSection({
           {streamingRecommendations && !streamingRecommendations.empty && (
             <ChatRecommendationCards
               recipes={streamingRecommendations.recipes}
+              mealkits={streamingRecommendations.mealkits}
               descriptions={streamingDescriptions}
               onNavigate={closeOnNavigate}
             />

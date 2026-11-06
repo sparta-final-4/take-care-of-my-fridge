@@ -12,6 +12,7 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.DetailQuestion;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageEventResponse;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageResponse;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationTextEventResponse;
+import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse.RecommendedMealkit;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse.RecommendedRecipe;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeDetailReply;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeQuery;
@@ -125,7 +126,9 @@ public class ChatStreamService {
                                 })
                                 .map(this::messageEvent);
                     }
+                    // 카드가 없거나(정해진 답) 밀키트만 보여 주는 답(서버 글)은 표시 없이 그대로 message로 보낸다
                     Flux<ServerSentEvent<String>> textEvents = plan.recommendation().event().empty()
+                            || plan.recommendation().fixedReply() != null
                             ? reply.doOnNext(chunk -> {
                                 firstChunkReceived.set(true);
                                 accumulated.append(chunk);
@@ -180,8 +183,8 @@ public class ChatStreamService {
                     .withAlreadyRecommended(chatMessageService.findRecommendedRecipeIds(sessionId));
             // 다시 추천이면 직전 카드는 후보에서 뺀다 (모자라면 뒤에 다시 넣는다)
             RecommendationReply recommendation = resolution.intent() == ChatIntent.REFINE && context.lastRecommendation() != null
-                    ? chatRecommendationFacade.recommend(request.content(), query, context.lastRecommendation().recipeIds())
-                    : chatRecommendationFacade.recommend(request.content(), query);
+                    ? chatRecommendationFacade.recommend(request.content(), query, context.lastRecommendation().recipeIds(), sessionId)
+                    : chatRecommendationFacade.recommend(request.content(), query, List.of(), sessionId);
             // 고른 레시피·맞은 방식·카드 이유는 ChatRecommendationFacade가 "상담 추천 후보 -"로 남긴다
             return new ReplyPlan(context, recommendation, resolution.recipeQuery());
         } catch (RuntimeException e) {
@@ -218,6 +221,10 @@ public class ChatStreamService {
             // 일반 답에만 이전 대화(최근 3턴)를 넣는다. 추천 설명은 후보 정보로 충분하다
             return chatReplyGenerator.generate(memberId, sessionId, content, plan.context().recentMessages());
         }
+        // 밀키트만 보여 주는 답은 AI를 부르지 않고 서버 글을 보낸다 (레시피 카드가 없어 AI가 레시피를 소개하지 않게)
+        if (plan.recommendation().fixedReply() != null) {
+            return Flux.just(plan.recommendation().fixedReply());
+        }
         // 카드가 0개면 AI를 부르지 않고 정해진 답을 보낸다. "찾지 못했어요"는 카드가 없을 때만 나간다
         if (plan.recommendation().event().empty()) {
             return Flux.just(NO_RECIPE_REPLY);
@@ -246,6 +253,11 @@ public class ChatStreamService {
                 return recommendation.event().recipes();
             }
             return detail != null ? detail.event().recipes() : List.of();
+        }
+
+        // 저장할 밀키트 카드 (추천 답에만 있다)
+        private List<RecommendedMealkit> mealkits() {
+            return recommendation != null ? recommendation.event().mealkits() : List.of();
         }
     }
 
@@ -312,8 +324,12 @@ public class ChatStreamService {
                 }
             }
             // 설명이 빠진 카드는 화면에서 카드 이유 한 줄로 대신한다. 빠진 걸 알 수 있게 남긴다 (레시피 자세히 카드는 설명이 없다)
-            if (plan.recommendation() != null && !cards.isEmpty() && receivedNumbers.size() < cards.size()) {
-                log.warn("카드 설명 누락 - sessionId: {}, 카드 수: {}, 받은 번호: {}", sessionId, cards.size(), receivedNumbers);
+            if (plan.recommendation() != null && !recipes.isEmpty() && receivedNumbers.size() < recipes.size()) {
+                log.warn("카드 설명 누락 - sessionId: {}, 카드 수: {}, 받은 번호: {}", sessionId, recipes.size(), receivedNumbers);
+            }
+            // 밀키트 카드는 레시피 카드 다음 순서로, 서버가 쓴 설명과 함께 저장한다
+            for (RecommendedMealkit mealkit : plan == null ? List.<RecommendedMealkit>of() : plan.mealkits()) {
+                cards.add(RecommendationToSave.mealkit(mealkit.product().productId(), mealkit.description()));
             }
             // 카드가 없으면 기존처럼 메시지만 저장한다
             List<ChatMessageResponse> saved = cards.isEmpty()
