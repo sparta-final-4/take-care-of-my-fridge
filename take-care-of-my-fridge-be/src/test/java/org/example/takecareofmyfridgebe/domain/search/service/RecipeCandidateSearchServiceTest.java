@@ -96,10 +96,11 @@ class RecipeCandidateSearchServiceTest {
 
         // Then
         assertThat(shoulds).extracting(this::queryName).containsExactly(
-                "category", "keyword", "keyword", "selected", "imminent", "fridge", "taste");
-        assertThat(shoulds.get(1).multiMatch().query()).isEqualTo("김치찌개");
-        assertThat(shoulds.get(1).multiMatch().boost()).isEqualTo(4.0f);
-        assertThat(termsValues(shoulds.get(6).bool().must().get(0))).containsExactly("SPICY");
+                "category", "keyword", "selected", "imminent", "fridge", "taste");
+        assertThat(shoulds.get(1).bool().boost()).isEqualTo(4.0f);
+        assertThat(shoulds.get(1).bool().should()).extracting(q -> q.multiMatch().query())
+                .containsExactly("김치찌개", "된장찌개");
+        assertThat(termsValues(shoulds.get(5).bool().must().get(0))).containsExactly("SPICY");
     }
 
     @Test

@@ -97,8 +97,11 @@ public class RecipeCandidateSearchService {
         if (!condition.categories().isEmpty()) {
             shoulds.add(named(stringTerms("category", condition.categories()), CATEGORY_BOOST, MATCH_CATEGORY));
         }
-        for (String keyword : condition.keywords()) {
-            shoulds.add(keywordQuery(keyword));
+        if (!condition.keywords().isEmpty()) {
+            List<Query> keywords = condition.keywords().stream()
+                    .map(RecipeCandidateSearchService::keywordQuery)
+                    .toList();
+            shoulds.add(Query.of(q -> q.bool(b -> b.should(keywords).boost(KEYWORD_BOOST).queryName(MATCH_KEYWORD))));
         }
         addEachIngredient(shoulds, condition.selectedIngredientIds(), SELECTED_BOOST, MATCH_SELECTED);
         addEachIngredient(shoulds, condition.imminentIngredientIds(), IMMINENT_BOOST, MATCH_IMMINENT);
@@ -136,9 +139,7 @@ public class RecipeCandidateSearchService {
                 .query(keyword)
                 .fields(KEYWORD_FIELDS)
                 .type(TextQueryType.CrossFields)
-                .operator(Operator.And)
-                .boost(KEYWORD_BOOST)
-                .queryName(MATCH_KEYWORD)));
+                .operator(Operator.And)));
     }
 
     // terms는 몇 개가 맞아도 점수가 같아서, 재료마다 term을 걸어 많이 겹칠수록 점수가 오르게 한다
