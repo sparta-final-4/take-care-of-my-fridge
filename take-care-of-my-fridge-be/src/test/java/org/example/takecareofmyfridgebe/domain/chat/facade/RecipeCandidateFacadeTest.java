@@ -681,6 +681,42 @@ class RecipeCandidateFacadeTest {
         assertThat(result.candidates()).extracting(RecipeCandidate::recipeId).containsExactlyInAnyOrder(10L, 20L, 30L);
     }
 
+    @Test
+    @DisplayName("ES 경로: 검색 결과가 하나도 없으면 레시피 재료·정보·맛을 조회하지 않고 빈 후보를 돌려준다")
+    void skipsRecipeLookups_whenNoCandidates() throws Exception {
+        when(memberService.getMyInfo(MEMBER_ID)).thenReturn(mock(MyInfoResponse.class));
+        when(fridgeService.getItems(any(), any())).thenReturn(List.of(fridgeItem(1L, "두부", 5)));
+        when(candidateSearchService.search(any())).thenReturn(List.of());
+
+        RecipeCandidates result = esFacade.findCandidates(
+                new RecipeQuery(MEMBER_ID, List.of(), null, List.of("디저트"), null, null, false));
+
+        assertThat(result.candidates()).isEmpty();
+        verify(recipeService, never()).findNonBasicIngredients(any());
+        verify(recipeService, never()).findCandidateInfos(any());
+        verify(recipeService, never()).findTastesByRecipeIds(any());
+    }
+
+    @Test
+    @DisplayName("ES 경로: 요청 조건만 넣은 검색이 0건이어도 예외 없이 전체 검색 결과로 고른다")
+    void continuesWithFullHits_whenRequestOnlyReturnsNothing() throws Exception {
+        when(memberService.getMyInfo(MEMBER_ID)).thenReturn(mock(MyInfoResponse.class));
+        when(fridgeService.getItems(any(), any())).thenReturn(List.of(fridgeItem(1L, "두부", 5)));
+        when(candidateSearchService.search(any())).thenAnswer(invocation -> {
+            Condition condition = invocation.getArgument(0);
+            return condition.fridgeIngredientIds().isEmpty()
+                    ? List.of()
+                    : List.of(hit(10L, RecipeCandidateSearchService.MATCH_FRIDGE));
+        });
+        givenEsRecipes(Map.of(10L, new RecipeCandidateInfo(10L, "두부조림", "조림", 20, 1)));
+
+        RecipeCandidates result = esFacade.findCandidates(
+                new RecipeQuery(MEMBER_ID, List.of(), null, List.of("디저트"), null, null, false));
+
+        assertThat(result.candidates()).extracting(RecipeCandidate::recipeId).containsExactly(10L);
+        verify(candidateSearchService, times(2)).search(any());
+    }
+
     // ES로 찾히는 레시피들. 모두 두부(1번)를 쓰고, 정보·재료는 요청한 ID만 돌려준다
     private void givenEsRecipes(Map<Long, RecipeCandidateInfo> infos) {
         when(recipeService.findCandidateInfos(any())).thenAnswer(invocation -> filter(infos, invocation.getArgument(0)));

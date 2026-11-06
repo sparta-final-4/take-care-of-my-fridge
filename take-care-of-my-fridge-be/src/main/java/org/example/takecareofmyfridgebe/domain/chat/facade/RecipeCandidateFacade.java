@@ -126,7 +126,7 @@ public class RecipeCandidateFacade {
         // 부족한 재료: ES 경로는 후보의 기본 양념 뺀 재료를 이미 다 읽었고, DB 경로는 고른 10개만 조회한다
         List<RecipeCandidateIngredient> nonBasicRows = pool.rowsNonBasicComplete()
                 ? pool.rows()
-                : recipeService.findNonBasicIngredients(
+                : readNonBasicRows(
                 ranked.candidates().candidates().stream().map(RecipeCandidate::recipeId).toList());
         RecipeCandidates result = RecipeCandidateScorer.withMissingIngredients(ranked.candidates(), fridge, nonBasicRows);
         return new RecipeCandidates(result.candidates(), result.fallback(), ranked.query().keywordsNotFound());
@@ -150,7 +150,11 @@ public class RecipeCandidateFacade {
     }
 
     // 레시피 정보·맛·재료 이름(매운 정도)을 한 번씩 읽는다
+    // 후보가 없으면 조회하지 않는다 (RecipeService도 빈 입력이면 빈 값을 돌려주지만 호출부에서 먼저 막는다)
     private PoolDetails loadDetails(Set<Long> recipeIds, RecipeQuery query, List<Member.Taste> memberTastes) {
+        if (recipeIds.isEmpty()) {
+            return new PoolDetails(Map.of(), Map.of(), SpicyRecipes.NONE);
+        }
         Map<Long, RecipeCandidateInfo> infos = recipeService.findCandidateInfos(recipeIds);
         SpicyRecipes spicy = spicyRecipes(recipeIds, query, memberTastes);
         Map<Long, Set<Member.Taste>> tastes = withDefinitelySpicy(recipeService.findTastesByRecipeIds(recipeIds), spicy);
@@ -291,7 +295,7 @@ public class RecipeCandidateFacade {
             route.add("요청만");
             counts.add("요청만 새로 " + (recipeIds.size() - before));
         }
-        return new CandidatePool(recipeIds, recipeService.findNonBasicIngredients(recipeIds), keywordHits, true,
+        return new CandidatePool(recipeIds, readNonBasicRows(recipeIds), keywordHits, true,
                 String.join("+", route), String.join(", ", counts));
     }
 
@@ -318,7 +322,12 @@ public class RecipeCandidateFacade {
         // 제외 분류·최대 시간(isFilteredOut), 선택 재료만 쓰기(rank), 피할 맛·매운 정도(rankAvoiding), 기본 양념이 아닌 뺄 재료(isFilteredOut).
         // 정렬 단계의 재료 줄에는 기본 양념이 없어서, 뺄 재료가 기본 양념이면 여기서 뺀다
         removeWithExcludedIngredients(query, recipeIds, keywordHits);
-        return new CandidatePool(recipeIds, recipeService.findNonBasicIngredients(recipeIds), keywordHits, true, "", "");
+        return new CandidatePool(recipeIds, readNonBasicRows(recipeIds), keywordHits, true, "", "");
+    }
+
+    // 기본 양념 뺀 재료 줄. 후보가 없으면 조회하지 않는다 (RecipeService도 빈 입력이면 빈 목록이지만 호출부에서 먼저 막는다)
+    private List<RecipeCandidateIngredient> readNonBasicRows(Collection<Long> recipeIds) {
+        return recipeIds.isEmpty() ? List.of() : recipeService.findNonBasicIngredients(recipeIds);
     }
 
     // 뺄 재료(기본 양념 포함)가 들어간 레시피를 후보에서 뺀다. 뺄 재료가 없거나 후보가 없으면 조회하지 않는다
@@ -354,9 +363,10 @@ public class RecipeCandidateFacade {
     private CandidatePool collectFromDb(RecipeQuery query, List<FridgeStock> fridge, RecipeCandidateScorer scorer) {
         // 키워드로 찾은 레시피는 냉장고 재료와 겹치지 않을 수 있어 기본 양념 뺀 재료 전체를 더 받는다
         Map<Long, Boolean> keywordHits = searchKeywords(query);
-        List<RecipeCandidateIngredient> keywordRows = recipeService.findNonBasicIngredients(keywordHits.keySet());
+        List<RecipeCandidateIngredient> keywordRows = readNonBasicRows(keywordHits.keySet());
+        Set<Long> lookupIds = scorer.lookupIngredientIds(query, fridge);
         List<RecipeCandidateIngredient> rows = Stream.concat(
-                        recipeService.findCandidateIngredients(scorer.lookupIngredientIds(query, fridge)).stream(),
+                        (lookupIds.isEmpty() ? List.<RecipeCandidateIngredient>of() : recipeService.findCandidateIngredients(lookupIds)).stream(),
                         keywordRows.stream())
                 .distinct()
                 .toList();
