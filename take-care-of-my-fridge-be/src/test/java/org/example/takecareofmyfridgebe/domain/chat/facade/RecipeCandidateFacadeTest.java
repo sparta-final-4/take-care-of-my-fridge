@@ -32,7 +32,10 @@ import org.example.takecareofmyfridgebe.domain.search.service.RecipeSearchServic
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.io.IOException;
@@ -54,6 +57,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+@ExtendWith(OutputCaptureExtension.class)
 class RecipeCandidateFacadeTest {
 
     private static final Long MEMBER_ID = 1L;
@@ -572,6 +576,63 @@ class RecipeCandidateFacadeTest {
 
         assertThat(second).extracting(RecipeCandidate::category).containsOnly("디저트");
         assertThat(second).extracting(RecipeCandidate::recipeId).doesNotContainAnyElementsOf(firstIds);
+    }
+
+    @Test
+    @DisplayName("ES 경로: \"탕짜면\"처럼 ES가 글자 일부로만 걸어 온 레시피뿐이면 키워드로 맞은 게 없으므로 벡터로 보충하고 경로 로그에 벡터를 남긴다")
+    void suppliesVector_whenEsKeywordHitsAreWeak(CapturedOutput output) throws Exception {
+        when(memberService.getMyInfo(MEMBER_ID)).thenReturn(mock(MyInfoResponse.class));
+        when(candidateSearchService.search(any())).thenReturn(List.of(
+                hit(70L, RecipeCandidateSearchService.MATCH_KEYWORD), hit(71L, RecipeCandidateSearchService.MATCH_KEYWORD)));
+        when(recipeSearchService.search(any(RecipeListRequest.class))).thenReturn(new RecipeSearchResult(List.of(80L), 1, true));
+        givenEsRecipes(Map.of(
+                70L, new RecipeCandidateInfo(70L, "간장게장", "절임", 30, 1),
+                71L, new RecipeCandidateInfo(71L, "볶음쌀국수", "면류", 30, 1),
+                80L, new RecipeCandidateInfo(80L, "유니짜장", "면류", 30, 1)));
+        RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, null, null, null, false, List.of("탕짜면"), null);
+
+        RecipeCandidates result = esFacade.findCandidates(query);
+
+        assertThat(result.candidates()).extracting(RecipeCandidate::recipeId).contains(80L);
+        verify(recipeSearchService, times(1)).search(any());
+        assertThat(output).contains("경로: ES+요청만+벡터");
+    }
+
+    @Test
+    @DisplayName("ES 경로: 글자로 0건인 키워드가 여럿이어도 벡터 검색은 앞의 1개만 한다")
+    void callsVectorOnce_whenManyKeywordsHaveNoHits() throws Exception {
+        when(memberService.getMyInfo(MEMBER_ID)).thenReturn(mock(MyInfoResponse.class));
+        when(candidateSearchService.search(any())).thenReturn(List.of());
+        when(recipeSearchService.search(any(RecipeListRequest.class))).thenReturn(new RecipeSearchResult(List.of(), 0, true));
+        RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, null, null, null, false,
+                List.of("탕짜면", "짜장면", "중화요리"), "탕짜면");
+
+        esFacade.findCandidates(query);
+
+        ArgumentCaptor<RecipeListRequest> request = ArgumentCaptor.forClass(RecipeListRequest.class);
+        verify(recipeSearchService, times(1)).search(request.capture());
+        assertThat(request.getValue().keyword()).isEqualTo("탕짜면");
+    }
+
+    @Test
+    @DisplayName("ES 경로: 키워드 결과로 표시되지 않은 후보도 이름에 키워드가 있으면 키워드로 맞은 것으로 보고 벡터 보충을 하지 않는다")
+    void countsNameMatch_whenEsDidNotMarkKeyword() throws Exception {
+        when(memberService.getMyInfo(MEMBER_ID)).thenReturn(mock(MyInfoResponse.class));
+        // ES는 키워드가 여럿이면 마지막 키워드(깐풍기)로 맞은 것만 표시한다. 탕수육은 표시 없이 온다
+        when(candidateSearchService.search(any())).thenReturn(List.of(
+                hit(433L, RecipeCandidateSearchService.MATCH_FRIDGE), hit(366L, RecipeCandidateSearchService.MATCH_KEYWORD)));
+        givenEsRecipes(Map.of(
+                433L, new RecipeCandidateInfo(433L, "탕수육", "튀김", 40, 1),
+                366L, new RecipeCandidateInfo(366L, "깐풍기", "튀김", 40, 1)));
+        RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, null, null, null, false,
+                List.of("김피탕", "탕수육", "깐풍기"), "김피탕");
+
+        RecipeCandidates result = esFacade.findCandidates(query);
+
+        RecipeCandidate tangsuyuk = result.candidates().stream().filter(c -> c.recipeId() == 433L).findFirst().orElseThrow();
+        assertThat(tangsuyuk.reason().keywordMatch().type()).isEqualTo(KeywordMatch.Type.EXPANDED);
+        assertThat(tangsuyuk.ranking().requestMatches()).isEqualTo(1);
+        verify(recipeSearchService, never()).search(any());
     }
 
     // ES로 찾히는 레시피들. 모두 두부(1번)를 쓰고, 정보·재료는 요청한 ID만 돌려준다
