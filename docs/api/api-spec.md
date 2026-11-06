@@ -209,12 +209,19 @@ HTTP 메서드·경로·DTO 이름은 구현 전 합의합니다.
 - 종료·만료된 상담도 본인 것이면 기존 메시지 조회 API로 대화를 볼 수 있습니다.
 - 추천 요청 필드(2026-11-04 추가): `mode=RECOMMEND`는 칩([알아서 추천해줘]·[이 재료로 추천받기])으로 AI 의도 판단 없이 추천합니다. `AUTO`(기본)는 AI가 메시지를 읽어 추천(RECOMMEND)인지 일반 질문(GENERAL)인지 정합니다(직전 추천이 있으면 다시 추천·레시피 자세히도, 아래 "이전 대화와 이어지는 말"). `selectedIngredientIds`는 내 냉장고에서 고른 재료 ID(null·중복 제거), `useSelectedOnly=true`면 고른 재료를 하나도 안 쓰는 레시피는 추천하지 않습니다. 필드를 보내지 않으면 기존과 같습니다.
 - 추천 카드 이벤트(2026-11-04 추가): 추천이면 설명 글(`message`)보다 먼저 `event: recommendations`를 한 번 보냅니다. 일반 질문이면 보내지 않습니다. 카드는 아직 저장하지 않아 메시지 조회 API에는 나오지 않고, 저장되는 AI 메시지는 설명 글만입니다.
-  - `data`: `{ recipes: RecommendedRecipe[] (최대 3개), relaxed: string[] (지금은 항상 빈 목록), empty: boolean (조건에 맞는 후보가 없으면 true, 이때 recipes는 빈 목록) }`
+  - `data`: `{ recipes: RecommendedRecipe[] (최대 3개), mealkits: RecommendedMealkit[] (2026-11-06 추가, 아래), relaxed: string[] (지금은 항상 빈 목록), empty: boolean (보여 줄 레시피·밀키트가 모두 없으면 true) }`
   - `RecommendedRecipe`: recipeId, name, imageUrl(없으면 null), category, cookTimeMin(없으면 null), usedIngredients(쓰는 냉장고 재료 이름, 임박한 순), imminentIngredients(`{ name, dDay }`, D-3 이내, dDay 0은 오늘까지), matchedTastes(겹친 맛 한글: 메시지로 말한 맛, 없으면 회원 선호 맛), missingIngredients(`{ ingredientId, name, product }`, 기본 양념 제외. product는 아래), missingSelectedIngredients(고른·말한 재료 중 냉장고에 없는 것의 이름. 같은 종류로 넓혔으면 레시피에 쓰인 이름, 예: 버섯 → 표고버섯. missingIngredients에도 들어 있음), lacksManyIngredients(재료를 많이 사야 함), reason(카드에 보여 줄 추천 이유 한 줄, 25자 안팎. 우선순위: 요리 이름 키워드·요청 일치 > 선택 재료 > 임박 재료 > 겹친 맛, 예: "찾으신 냉면 요리예요", "버섯·두부가 주재료예요", "내일까지인 고추를 쓸 수 있어요")
   - 장볼 재료 상품(2026-11-06 추가): `missingIngredients[].product`는 그 재료로 담을 상품이고, 판매 상품이 없으면 null입니다. `ShoppingProduct`: productId, name, imageUrl(없으면 null), price(정가), salePrice(진행 중 할인 판매가, 할인이 없으면 null), saleType(`SPECIAL`/`FLASH_DROP`, 할인이 없으면 null), soldOut(지금 살 수 없음: 상품 품절·번개 드롭 남은 수량 0), unitAmount·unit(상품 용량, 예: 300·g).
     - 판매 중지 상품은 넣지 않고 품절 상품은 soldOut=true로 넣습니다. 재료 하나에 상품이 여러 개면 살 수 있는 것 → 할인 중 → 판매 단가 낮은 순 → 상품 id 순으로 하나를 고릅니다. 가격·품절은 상품 목록·장바구니와 같은 판매가 계산을 씁니다.
     - 메시지 조회(`recommendations`)와 레시피 자세히 카드도 같은 모양이고, 다시 불러올 때는 지금 가격·품절 기준으로 다시 계산합니다.
     - 담기는 기존 장바구니 담기 API(`POST /api/cart-items`, productId·quantity)를 그대로 씁니다.
+  - 밀키트 카드(2026-11-06 추가): 사용자 말에 밀키트 단어가 있으면(`app.chat.mealkit-words`, 공백 무시, 부정어는 맛 단어와 같음) 밀키트를 함께 고릅니다. 의도 프롬프트는 바꾸지 않습니다.
+    - "밀키트"를 말함("밀키트 추천해줘", "국물 밀키트"): `recipes`는 빈 목록, `mealkits` 최대 3개. 글은 AI 없이 서버 문장 하나를 `message`로 보냅니다(`recommendation_text` 없음). 고를 밀키트가 없으면 "지금은 추천드릴 밀키트가 없어요." 안내를 맨 앞에 두고 레시피 카드를 보여 줍니다. AI가 일반 대화로 본 말도 밀키트를 말했으면 추천으로 바꿉니다.
+    - 번거로워하는 말만 있음("간단하게·간편·빨리·귀찮·요리하기 싫"): 레시피 카드 3장 + `mealkits` 1개(레시피 카드와 같은 레시피 밀키트는 뺌).
+    - "밀키트 말고"처럼 부정이면 밀키트를 고르지 않습니다. 밀키트를 보여 줄 때는 키워드·요리 이름에서 "밀키트"를 뺍니다.
+    - 고르기: 판매 중이고 살 수 있는 것만, 냉장고에 같은 이름의 밀키트 줄이 있으면 뺌, 연결된 레시피가 피할 맛이면 뺌. 레시피 연결 있음 → 요청 일치 수(연결된 레시피의 분류·원하는 맛·요리 이름) → 이 상담에서 아직 안 보여 준 것 → 냉장고 재료와 겹치는 수 → 할인 중 → 판매 단가 낮은 순 → 상품 id.
+    - `RecommendedMealkit`: product(`ShoppingProduct`, unitAmount·unit은 null), servings(인분), recipeId(연결 레시피, 없으면 null), recipeName(없으면 null), description(레시피 카드 아래 한 장이면 서버 문장 "요리하기 번거로우면 ○○ 밀키트로 간편하게 드셔 보세요.", 밀키트만 보여 주면 null).
+    - 저장: `chat_recommendations`에 레시피 카드 다음 순서로 product_id와 description을 저장합니다. 메시지 조회 `ChatMessageResponse.mealkits`로 다시 받고, 다시 불러올 때는 지금 가격·품절 기준이며 판매 중지된 밀키트는 빠집니다.
   - 카드 설명 이벤트(2026-11-05 추가): 추천 답은 `[소개]`·`[1]`~`[3]` 표시로 나눠 보냅니다. 소개 글은 `message`, 카드 설명 글은 `event: recommendation_text`로 옵니다. `data`: `{ index: number (카드 순서, 0부터), text: string (그 카드 설명의 이어지는 글) }`. AI가 표시를 빼먹으면 전체가 `message`(소개)로 오고 카드 설명은 비어 있습니다. 저장은 소개가 AI 메시지 content, 카드 설명이 카드의 description이고, 메시지 조회의 `recommendations[].description`으로 다시 받습니다.
   - 하루 횟수: `recommendations`는 첫 조각으로 치지 않습니다. 카드를 보낸 뒤 설명 글 첫 조각 전에 실패해도 하루 횟수를 돌려줍니다. 후보 검색이 실패하면 카드 없이 일반 답을 합니다.
 - 이전 대화와 이어지는 말(2026-11-05 추가): 메시지를 보낼 때 같은 상담의 최근 3턴(메시지 6개)과 직전 추천을 읽어 의도를 정합니다. 요청·응답 모양은 그대로이고, 의도마다 SSE 이벤트 순서가 다릅니다.
