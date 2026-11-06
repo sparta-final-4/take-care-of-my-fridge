@@ -120,6 +120,13 @@ public record RecipeQuery(
                 alreadyRecommendedIds, avoidTastes);
     }
 
+    // 요리 이름을 채운 검색 조건 (AI가 비웠을 때 서버가 채운다)
+    public RecipeQuery withKeywordText(String dishText) {
+        return new RecipeQuery(memberId, selectedIngredientIds, wantedTastes, moodCategories, maxMinutes,
+                excludeIngredientIds, useSelectedOnly, keywords, dishText, preferenceText, selectedIngredientGroups,
+                keywordMatches, alreadyRecommendedIds, avoidTastes);
+    }
+
     // 키워드 검색 결과를 채운 검색 조건
     public RecipeQuery withKeywordMatches(Map<Long, KeywordMatch> matches) {
         return new RecipeQuery(memberId, selectedIngredientIds, wantedTastes, moodCategories, maxMinutes,
