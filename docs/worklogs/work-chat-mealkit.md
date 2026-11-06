@@ -49,13 +49,14 @@
   - 상품 테이블 DDL·데이터 사전 문서가 없다 → 새 SQL 파일(`docs/database/product-mealkit-recipe.sql`)과 이 기록으로 대신한다
   - `chat_recommendations`에 이미 `product_id` 칸이 있다 (recipe_id·product_id 중 하나만). 테이블 변경 없음
   - 냉장고 밀키트 줄은 모두 밀키트 재료(ING_MEALKIT) 하나로 들어가고 상품 ID가 없다. `raw_name`(구매 때 상품 이름)으로 같은 밀키트를 가린다 (사용자 확인)
+  - dev 밀키트 상품 이름은 끝에 " 밀키트"가 붙어 있어("된장국 밀키트") 레시피 이름("된장국")과 이름으로 맞출 수 없다. 처음 쓴 이름 매칭 채우기 SQL은 dev에서 0건이었다. 조회 결과에 이미 " 밀키트"가 보였는데 대조하지 않았다. 상품 ID → 레시피 ID 직접 매핑(24→544, 25→543, 26→542, 27→539, 28→555)으로 바꿨다
 - 개발자 판단: 밀키트만 원하는 말일 때 밀키트만 최대 3장 (처음 제안은 레시피 3장 + 밀키트 1장이었으나 사용자가 바꿈)
 
 ## 구현 결과
 - 상품 도메인:
   - `MealkitProduct.recipeId`(null 허용, FK 없이 ID만, 인덱스 `idx_mealkit_products_recipe_id`)
   - `ProductService.getOnSaleMealkits()`(판매 중만), `getPublicMealkits(productIds)`(판매 중·품절, 판매 중지 제외)
-  - SQL: `docs/database/product-mealkit-recipe.sql`(ALTER + dev 채우기 5개), `docs/database/dev-product-cleanup.sql`(감자 상품 재료, 29·30 판매 중지, 배추·돼지고기 예시)
+  - SQL: `docs/database/product-mealkit-recipe.sql`(ALTER + dev 채우기 5개, 상품 ID → 레시피 ID 직접 매핑), `docs/database/dev-product-cleanup.sql`(감자 상품 재료, 29·30 판매 중지, 배추·돼지고기 예시)
 - 상담:
   - `MealkitWordChecker`, `ChatMealkitWordProperties`
   - `MealkitPicker`
