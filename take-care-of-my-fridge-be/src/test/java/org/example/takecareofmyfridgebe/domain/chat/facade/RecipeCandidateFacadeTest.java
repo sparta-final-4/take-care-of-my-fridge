@@ -595,7 +595,29 @@ class RecipeCandidateFacadeTest {
 
         assertThat(result.candidates()).extracting(RecipeCandidate::recipeId).contains(80L);
         verify(recipeSearchService, times(1)).search(any());
-        assertThat(output).contains("경로: ES+요청만+벡터");
+        assertThat(output).contains("경로: ES+요청만+벡터", "ES 호출 전체 1·요청만 1·피할 맛 재검색 0, 벡터 호출, ").containsPattern("벡터 호출, \\d+ms");
+    }
+
+    @Test
+    @DisplayName("ES 경로: 키워드가 겹쳐 와도 레시피 검색은 한 번씩만 하고, 벡터를 쓰면 생략한 키워드 수를 중복 없이 센다")
+    void searchesEachKeywordOnce_whenKeywordsDuplicated(CapturedOutput output) throws Exception {
+        when(memberService.getMyInfo(MEMBER_ID)).thenReturn(mock(MyInfoResponse.class));
+        when(candidateSearchService.search(any())).thenReturn(List.of());
+        when(recipeSearchService.search(any(RecipeListRequest.class))).thenAnswer(invocation -> {
+            RecipeListRequest request = invocation.getArgument(0);
+            return request.keyword().equals("짜장면")
+                    ? new RecipeSearchResult(List.of(), 0, true)
+                    : new RecipeSearchResult(List.of(), 0);
+        });
+        RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, null, null, null, false,
+                List.of("탕수육", "탕수육", "짜장면", "짜장면", "짬뽕", "짬뽕"), "탕짜면");
+
+        esFacade.findCandidates(query);
+
+        ArgumentCaptor<RecipeListRequest> requests = ArgumentCaptor.forClass(RecipeListRequest.class);
+        verify(recipeSearchService, times(2)).search(requests.capture());
+        assertThat(requests.getAllValues()).extracting(RecipeListRequest::keyword).containsExactly("탕수육", "짜장면");
+        assertThat(output).contains("짜장면 0건(벡터), 나머지 1개 생략");
     }
 
     @Test
