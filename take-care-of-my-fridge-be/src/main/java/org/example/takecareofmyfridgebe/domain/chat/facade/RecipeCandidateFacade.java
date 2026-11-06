@@ -8,9 +8,11 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidates;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeQuery;
 import org.example.takecareofmyfridgebe.domain.chat.facade.RecipeCandidateScorer.FridgeStock;
+import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemResponse;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeSortType;
 import org.example.takecareofmyfridgebe.domain.fridge.service.FridgeService;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.Ingredient;
+import org.example.takecareofmyfridgebe.domain.ingredient.entity.IngredientType;
 import org.example.takecareofmyfridgebe.domain.ingredient.service.IngredientService;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 import org.example.takecareofmyfridgebe.domain.member.service.MemberService;
@@ -213,14 +215,50 @@ public class RecipeCandidateFacade {
         if (recipeIds.isEmpty()) {
             return Map.of();
         }
-        RecipeCandidateScorer scorer = new RecipeCandidateScorer(
-                chatCandidateProperties.excludedCategories(), chatCandidateProperties.minOwnedRatio());
         List<FridgeStock> fridge = RecipeCandidateScorer.prepareFridge(
                 fridgeService.getItems(memberId, FridgeSortType.EXPIRATION));
+        return describe(memberId, fridge, recipeIds, recipeService.findTastesByRecipeIds(recipeIds));
+    }
+
+    /**
+     * 밀키트 추천 재료: 밀키트에 연결된 레시피의 지금 냉장고 기준 계산(가진 재료 수)과 레시피 맛, 냉장고 밀키트 줄 이름.
+     * 냉장고 조회는 한 번이고, 레시피가 없으면 레시피 조회를 하지 않는다.
+     * 냉장고 밀키트 줄은 상품 ID 없이 구매 때의 상품 이름(raw_name)만 있어 이름으로 같은 밀키트를 가린다. 기한이 지난 줄은 뺀다.
+     */
+    public MealkitRecipes describeMealkitRecipes(Long memberId, Collection<Long> recipeIds) {
+        List<FridgeItemResponse> items = fridgeService.getItems(memberId, FridgeSortType.EXPIRATION);
+        List<String> fridgeMealkitNames = items.stream()
+                .filter(item -> item.ingredientType() == IngredientType.MEALKIT && item.dDay() >= 0)
+                .map(FridgeItemResponse::rawName)
+                .toList();
+        if (recipeIds.isEmpty()) {
+            return new MealkitRecipes(Map.of(), Map.of(), fridgeMealkitNames);
+        }
+        Map<Long, Set<Member.Taste>> recipeTastes = recipeService.findTastesByRecipeIds(recipeIds);
+        Map<Long, RecipeCandidate> recipes = describe(memberId, RecipeCandidateScorer.prepareFridge(items), recipeIds,
+                recipeTastes);
+        return new MealkitRecipes(recipes, recipeTastes, fridgeMealkitNames);
+    }
+
+    /**
+     * @param recipes            레시피 ID별 지금 냉장고 기준 계산 (지워진 레시피는 없다)
+     * @param recipeTastes       레시피 ID별 맛
+     * @param fridgeMealkitNames 냉장고 밀키트 줄 이름 (기한 지난 줄 제외)
+     */
+    public record MealkitRecipes(
+            Map<Long, RecipeCandidate> recipes,
+            Map<Long, Set<Member.Taste>> recipeTastes,
+            List<String> fridgeMealkitNames
+    ) {
+    }
+
+    private Map<Long, RecipeCandidate> describe(Long memberId, List<FridgeStock> fridge, Collection<Long> recipeIds,
+                                                Map<Long, Set<Member.Taste>> recipeTastes) {
+        RecipeCandidateScorer scorer = new RecipeCandidateScorer(
+                chatCandidateProperties.excludedCategories(), chatCandidateProperties.minOwnedRatio());
         List<Member.Taste> memberTastes = memberService.getMyInfo(memberId).tastes();
         List<RecipeCandidateIngredient> rows = recipeService.findNonBasicIngredients(recipeIds);
         Map<Long, RecipeCandidateInfo> infos = recipeService.findCandidateInfos(recipeIds);
-        Map<Long, Set<Member.Taste>> recipeTastes = recipeService.findTastesByRecipeIds(recipeIds);
 
         List<RecipeCandidate> scored = scorer.scoreAll(memberId, fridge, memberTastes, rows, infos, recipeTastes, recipeIds);
         RecipeCandidates withMissing = RecipeCandidateScorer.withMissingIngredients(

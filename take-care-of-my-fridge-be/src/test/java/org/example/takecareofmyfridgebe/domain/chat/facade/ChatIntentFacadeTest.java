@@ -71,7 +71,7 @@ class ChatIntentFacadeTest {
         chatMessageService = mock(ChatMessageService.class);
         facade = new ChatIntentFacade(extractor, recipeService, ingredientMatcher,
                 new ChatCandidateProperties(List.of("양념", "음료"), 0.4, List.of(), List.of("백김치", "물김치", "동치미", "나박김치"), List.of()),
-                chatMessageService, TasteWordCheckerTest.WORDS);
+                chatMessageService, TasteWordCheckerTest.WORDS, MealkitWordCheckerTest.WORDS);
         when(recipeService.getClassifications())
                 .thenReturn(new RecipeClassificationResponse(List.of("한식"), List.of("국", "기타", "샐러드", "양념", "음료", "찌개")));
     }
@@ -150,6 +150,21 @@ class ChatIntentFacadeTest {
             assertThat(resolution.intent()).isEqualTo(ChatIntent.GENERAL);
             assertThat(resolution.source()).isEqualTo(Source.AI);
             assertThat(resolution.recipeQuery()).isNull();
+        }
+
+        @Test
+        @DisplayName("밀키트를 직접 말했는데 AI가 GENERAL이라고 하면 추천으로 바꾸고, 밀키트 말고면 일반 답 그대로 둔다")
+        void recommends_whenGeneralButMealkitSpoken() {
+            givenExtracted(IntentResult.general());
+
+            ChatIntentResolution mealkit = facade.resolve(MEMBER_ID, SESSION_ID,
+                    new ChatMessageCreateRequest("밀키트 뭐 있어?", ChatMessageMode.AUTO, List.of(), false));
+            ChatIntentResolution notMealkit = facade.resolve(MEMBER_ID, SESSION_ID,
+                    new ChatMessageCreateRequest("밀키트 말고 보관법 알려줘", ChatMessageMode.AUTO, List.of(), false));
+
+            assertThat(mealkit.intent()).isEqualTo(ChatIntent.RECOMMEND);
+            assertThat(mealkit.recipeQuery()).isNotNull();
+            assertThat(notMealkit.intent()).isEqualTo(ChatIntent.GENERAL);
         }
 
         @Test

@@ -3,6 +3,7 @@ package org.example.takecareofmyfridgebe.domain.chat.facade;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatCandidateProperties;
+import org.example.takecareofmyfridgebe.domain.chat.config.ChatMealkitWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatTasteWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext.CardName;
@@ -71,6 +72,7 @@ public class ChatIntentFacade {
     private final ChatCandidateProperties chatCandidateProperties;
     private final ChatMessageService chatMessageService;
     private final ChatTasteWordProperties chatTasteWordProperties;
+    private final ChatMealkitWordProperties chatMealkitWordProperties;
 
     // 상담 문맥 없이 (첫 질문과 같게) 정한다
     public ChatIntentResolution resolve(Long memberId, Long sessionId, ChatMessageCreateRequest request) {
@@ -120,9 +122,21 @@ public class ChatIntentFacade {
             case RECOMMEND -> ChatIntentResolution.recommend(Source.AI, toRecipeQuery(memberId, sessionId, request, result));
             case REFINE -> refine(memberId, sessionId, request, result, context);
             case RECIPE_DETAIL -> recipeDetail(memberId, sessionId, result, context);
-            case GENERAL -> ChatIntentResolution.general(Source.AI);
+            case GENERAL -> mealkitOnly(memberId, sessionId, request.content())
+                    ? ChatIntentResolution.recommend(Source.AI, toRecipeQuery(memberId, sessionId, request, result))
+                    : ChatIntentResolution.general(Source.AI);
         };
         return new Decision(resolution, result.removed() == null ? List.of() : result.removed());
+    }
+
+    // "밀키트 뭐 있어"처럼 밀키트를 직접 말했는데 AI가 일반 대화로 본 말은 추천으로 바꾼다 (밀키트 카드는 추천 답에만 붙는다)
+    private boolean mealkitOnly(Long memberId, Long sessionId, String message) {
+        boolean only = MealkitWordChecker.check(message, chatMealkitWordProperties, chatTasteWordProperties)
+                == MealkitWordChecker.Mode.ONLY;
+        if (only) {
+            log.info("상담 밀키트를 말해 일반 대화를 추천으로 - memberId: {}, sessionId: {}", memberId, sessionId);
+        }
+        return only;
     }
 
     /**

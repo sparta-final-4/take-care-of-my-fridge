@@ -164,6 +164,30 @@ class ChatMessageRepositoryAndServiceTest extends MySqlContainerSupport {
     }
 
     @Test
+    @DisplayName("saveExchange: 밀키트 카드를 레시피 카드 다음 순서로 상품 ID와 함께 저장하고, 레시피·밀키트를 한 번에 조회하며 레시피 추천 조회에는 넣지 않는다")
+    void savesMealkitsAfterRecipeCards() {
+        ChatSession session = chatSessionRepository.saveAndFlush(ChatSession.builder().memberId(111L).build());
+
+        List<ChatMessageResponse> saved = chatMessageService.saveExchange(session.getId(), "간단하게", "소개", List.of(
+                new RecommendationToSave(30L, "레시피 설명"),
+                RecommendationToSave.mealkit(41L, "요리하기 번거로우면 황태해장국 밀키트로 간편하게 드셔 보세요.")));
+        List<ChatMessageResponse> mealkitOnly = chatMessageService.saveExchange(session.getId(), "밀키트 추천해줘", "밀키트 소개",
+                List.of(RecommendationToSave.mealkit(40L, null), RecommendationToSave.mealkit(41L, null)));
+
+        Long assistantId = saved.get(1).id();
+        Long mealkitAnswerId = mealkitOnly.get(1).id();
+        assertThat(chatMessageService.findRecommendations(List.of(assistantId, mealkitAnswerId))).containsExactly(
+                new SavedRecommendation(assistantId, 30L, null, 0, "레시피 설명"),
+                new SavedRecommendation(assistantId, null, 41L, 1, "요리하기 번거로우면 황태해장국 밀키트로 간편하게 드셔 보세요."),
+                new SavedRecommendation(mealkitAnswerId, null, 40L, 0, null),
+                new SavedRecommendation(mealkitAnswerId, null, 41L, 1, null));
+        assertThat(chatMessageService.findRecipeRecommendations(List.of(assistantId, mealkitAnswerId)))
+                .extracting(SavedRecommendation::recipeId).containsExactly(30L);
+        assertThat(chatMessageService.findRecommendedRecipeIds(session.getId())).containsExactly(30L);
+        assertThat(chatMessageService.findRecommendedProductIds(session.getId())).containsExactlyInAnyOrder(40L, 41L);
+    }
+
+    @Test
     @DisplayName("saveExchange: 추천 카드가 없으면 추천을 저장하지 않는다")
     void savesNoRecommendations_whenNoCards() {
         ChatSession session = chatSessionRepository.saveAndFlush(ChatSession.builder().memberId(102L).build());

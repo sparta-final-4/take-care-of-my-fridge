@@ -9,7 +9,9 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageCreateRequest
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageMode;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageResponse;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse;
+import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse.RecommendedMealkit;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse.RecommendedRecipe;
+import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse.ShoppingProduct;
 import org.example.takecareofmyfridgebe.domain.chat.dto.DetailQuestion;
 import org.example.takecareofmyfridgebe.domain.chat.dto.LastRecommendation;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeDetailReply;
@@ -579,6 +581,59 @@ class ChatStreamServiceTest {
     }
 
     @Test
+    @DisplayName("밀키트만 보여 주는 답이면 밀키트 카드 이벤트와 서버 글을 보내고 AI를 부르지 않으며, 밀키트 카드를 저장하고 직전 추천은 그대로 둔다")
+    void sendsServerTextAndSavesMealkits_whenMealkitOnly() {
+        Long sessionId = 10L;
+        ChatMessageCreateRequest request = ChatMessageCreateRequest.of("밀키트 추천해줘");
+        RecipeQuery query = RecipeQuery.of(1L, List.of());
+        String text = "지금 살 수 있는 밀키트를 골라 봤어요.";
+        givenRecommend(sessionId, request, query, RecommendationReply.fixed(
+                ChatRecommendationsEventResponse.of(List.of(), List.of(mealkitCard(41L, null), mealkitCard(40L, null))), text));
+        List<RecommendationToSave> toSave = List.of(RecommendationToSave.mealkit(41L, null), RecommendationToSave.mealkit(40L, null));
+        when(chatMessageService.saveExchange(sessionId, "밀키트 추천해줘", text, toSave)).thenReturn(List.of(
+                new ChatMessageResponse(100L, 1, ChatMessageRole.USER, "밀키트 추천해줘", LocalDateTime.now()),
+                new ChatMessageResponse(101L, 2, ChatMessageRole.ASSISTANT, text, LocalDateTime.now())));
+
+        List<ServerSentEvent<String>> events = chatStreamService.streamMessage(1L, sessionId, request).collectList().block();
+
+        assertThat(events).extracting(ServerSentEvent::event).containsExactly("recommendations", "message", "done");
+        assertThat(events.get(0).data()).contains("\"recipes\":[]", "\"mealkits\":[{", "\"productId\":41", "\"servings\":2",
+                "\"empty\":false");
+        assertThat(events.get(1).data()).contains(text);
+        verify(chatReplyGenerator, never()).generateRecommendation(any(), any(), any(), any());
+        verify(chatMessageService).saveExchange(sessionId, "밀키트 추천해줘", text, toSave);
+        verify(chatContextStore, never()).saveRecommendation(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("레시피 카드 아래 밀키트가 붙으면 레시피 카드 다음 순서로 밀키트를 서버 설명과 함께 저장한다")
+    void savesMealkitAfterRecipeCards() {
+        Long sessionId = 10L;
+        ChatMessageCreateRequest request = ChatMessageCreateRequest.of("간단하게 먹을 거");
+        RecipeQuery query = RecipeQuery.of(1L, List.of());
+        String suggestion = "요리하기 번거로우면 황태해장국 밀키트로 간편하게 드셔 보세요.";
+        givenRecommend(sessionId, request, query, new RecommendationReply(
+                ChatRecommendationsEventResponse.of(List.of(card(314L, "두부조림")), List.of(mealkitCard(41L, suggestion))),
+                "후보 정보"));
+        when(chatReplyGenerator.generateRecommendation(1L, sessionId, "간단하게 먹을 거", "후보 정보"))
+                .thenReturn(Flux.just("두부조림을 추천해요"));
+        List<RecommendationToSave> toSave = List.of(new RecommendationToSave(314L, null),
+                RecommendationToSave.mealkit(41L, suggestion));
+        when(chatMessageService.saveExchange(sessionId, "간단하게 먹을 거", "두부조림을 추천해요", toSave)).thenReturn(List.of(
+                new ChatMessageResponse(100L, 1, ChatMessageRole.USER, "간단하게 먹을 거", LocalDateTime.now()),
+                new ChatMessageResponse(101L, 2, ChatMessageRole.ASSISTANT, "두부조림을 추천해요", LocalDateTime.now())));
+
+        chatStreamService.streamMessage(1L, sessionId, request).collectList().block();
+
+        verify(chatMessageService).saveExchange(sessionId, "간단하게 먹을 거", "두부조림을 추천해요", toSave);
+    }
+
+    private static RecommendedMealkit mealkitCard(Long productId, String description) {
+        return new RecommendedMealkit(new ShoppingProduct(productId, "밀키트 " + productId, null, 9000, null, null, false, null, null),
+                2, null, null, description);
+    }
+
+    @Test
     @DisplayName("일반 질문이면 후보를 찾지 않고 recommendations 이벤트도 보내지 않는다")
     void skipsRecommendations_whenIntentIsGeneral() {
         Long sessionId = 10L;
@@ -593,7 +648,7 @@ class ChatStreamServiceTest {
         List<ServerSentEvent<String>> events = chatStreamService.streamMessage(1L, sessionId, request).collectList().block();
 
         assertThat(events).extracting(ServerSentEvent::event).containsExactly("message", "done");
-        verify(chatRecommendationFacade, never()).recommend(any(), any());
+        verify(chatRecommendationFacade, never()).recommend(any(), any(), any(), any());
         verify(chatReplyGenerator, never()).generateRecommendation(any(), any(), any(), any());
     }
 
@@ -613,7 +668,7 @@ class ChatStreamServiceTest {
         List<ServerSentEvent<String>> events = chatStreamService.streamMessage(1L, sessionId, request).collectList().block();
 
         assertThat(events).extracting(ServerSentEvent::event).containsExactly("recommendations", "message", "done");
-        assertThat(events.get(0).data()).isEqualTo("{\"recipes\":[],\"relaxed\":[],\"empty\":true}");
+        assertThat(events.get(0).data()).isEqualTo("{\"recipes\":[],\"mealkits\":[],\"relaxed\":[],\"empty\":true}");
         assertThat(events.get(1).data()).contains("찾지 못했어요");
         verify(chatReplyGenerator, never()).generateRecommendation(any(), any(), any(), any());
         verify(chatDailyLimitService, never()).refund(any());
@@ -647,7 +702,7 @@ class ChatStreamServiceTest {
         ChatMessageCreateRequest request = ChatMessageCreateRequest.of("뭐 먹지?");
         RecipeQuery query = RecipeQuery.of(1L, List.of());
         when(chatIntentFacade.resolve(eq(1L), eq(sessionId), eq(request), any())).thenReturn(ChatIntentResolution.recommend(Source.AI, query));
-        when(chatRecommendationFacade.recommend(any(), any())).thenThrow(new RuntimeException("db down"));
+        when(chatRecommendationFacade.recommend(any(), any(), any(), any())).thenThrow(new RuntimeException("db down"));
         when(chatReplyGenerator.generate(1L, sessionId, "뭐 먹지?", List.of())).thenReturn(Flux.just("답"));
         when(chatMessageService.saveExchange(sessionId, "뭐 먹지?", "답")).thenReturn(List.of(
                 new ChatMessageResponse(100L, 1, ChatMessageRole.USER, "뭐 먹지?", LocalDateTime.now()),
@@ -823,7 +878,7 @@ class ChatStreamServiceTest {
         when(chatContextFacade.load(sessionId)).thenReturn(context);
         when(chatIntentFacade.resolve(1L, sessionId, request, context)).thenReturn(ChatIntentResolution.refine(Source.AI, query));
         when(chatMessageService.findRecommendedRecipeIds(sessionId)).thenReturn(Set.of(314L, 315L, 316L));
-        when(chatRecommendationFacade.recommend(any(), any(), any())).thenThrow(new RuntimeException("stop"));
+        when(chatRecommendationFacade.recommend(any(), any(), any(), any())).thenThrow(new RuntimeException("stop"));
         when(chatReplyGenerator.generate(1L, sessionId, "다른 거 없어?", List.of())).thenReturn(Flux.just("답"));
         when(chatMessageService.saveExchange(sessionId, "다른 거 없어?", "답")).thenReturn(List.of(
                 new ChatMessageResponse(100L, 1, ChatMessageRole.USER, "다른 거 없어?", LocalDateTime.now()),
@@ -832,8 +887,7 @@ class ChatStreamServiceTest {
         chatStreamService.streamMessage(1L, sessionId, request).collectList().block();
 
         verify(chatRecommendationFacade).recommend("다른 거 없어?", query.withAlreadyRecommended(Set.of(314L, 315L, 316L)),
-                List.of(314L, 315L, 316L));
-        verify(chatRecommendationFacade, never()).recommend(any(), any());
+                List.of(314L, 315L, 316L), sessionId);
     }
 
     @Test
@@ -910,7 +964,7 @@ class ChatStreamServiceTest {
     private void givenRecommend(Long sessionId, ChatMessageCreateRequest request, RecipeQuery query, RecommendationReply reply) {
         when(chatIntentFacade.resolve(eq(1L), eq(sessionId), eq(request), any())).thenReturn(ChatIntentResolution.recommend(Source.AI, query));
         when(chatMessageService.findRecommendedRecipeIds(sessionId)).thenReturn(Set.of());
-        when(chatRecommendationFacade.recommend(request.content(), query.withAlreadyRecommended(Set.of()))).thenReturn(reply);
+        when(chatRecommendationFacade.recommend(request.content(), query.withAlreadyRecommended(Set.of()), List.of(), sessionId)).thenReturn(reply);
     }
 
     @Test
@@ -921,7 +975,7 @@ class ChatStreamServiceTest {
         RecipeQuery query = RecipeQuery.of(1L, List.of());
         when(chatIntentFacade.resolve(eq(1L), eq(sessionId), eq(request), any())).thenReturn(ChatIntentResolution.recommend(Source.AI, query));
         when(chatMessageService.findRecommendedRecipeIds(sessionId)).thenReturn(Set.of(314L, 315L));
-        when(chatRecommendationFacade.recommend(any(), any())).thenThrow(new RuntimeException("stop"));
+        when(chatRecommendationFacade.recommend(any(), any(), any(), any())).thenThrow(new RuntimeException("stop"));
         when(chatReplyGenerator.generate(1L, sessionId, "뭐 먹지?", List.of())).thenReturn(Flux.just("답"));
         when(chatMessageService.saveExchange(sessionId, "뭐 먹지?", "답")).thenReturn(List.of(
                 new ChatMessageResponse(100L, 1, ChatMessageRole.USER, "뭐 먹지?", LocalDateTime.now()),
@@ -929,7 +983,7 @@ class ChatStreamServiceTest {
 
         chatStreamService.streamMessage(1L, sessionId, request).collectList().block();
 
-        verify(chatRecommendationFacade).recommend("뭐 먹지?", query.withAlreadyRecommended(Set.of(314L, 315L)));
+        verify(chatRecommendationFacade).recommend("뭐 먹지?", query.withAlreadyRecommended(Set.of(314L, 315L)), List.of(), sessionId);
     }
 
     private static RecommendedRecipe card(Long recipeId, String name) {
