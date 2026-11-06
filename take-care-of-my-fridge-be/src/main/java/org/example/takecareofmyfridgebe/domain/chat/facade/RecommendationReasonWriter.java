@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -206,6 +207,39 @@ public final class RecommendationReasonWriter {
             case SPICY -> "매콤해요";
             case UMAMI -> "감칠맛 나요";
             case MILD -> "담백해요";
+        };
+    }
+
+    /**
+     * 피할 맛인데 콕 집은 요리라 남긴 카드의 이유 뒤에 그 맛을 알린다 ("찾으신 김치찌개예요, 매운 요리예요").
+     *
+     * @param kept 레시피 ID별 남긴 피할 맛 (RecipeCandidates.keptAvoidTastes)
+     */
+    public static List<String> withAvoidedTastes(List<String> reasons, List<RecipeCandidate> picked,
+                                                 Map<Long, List<Member.Taste>> kept) {
+        if (kept.isEmpty()) {
+            return reasons;
+        }
+        List<String> result = new ArrayList<>(reasons);
+        for (int i = 0; i < picked.size() && i < result.size(); i++) {
+            List<Member.Taste> tastes = kept.get(picked.get(i).recipeId());
+            if (tastes == null || tastes.isEmpty()) {
+                continue;
+            }
+            String note = avoidedTasteNote(tastes.get(0));
+            String reason = result.get(i);
+            result.set(i, reason == null || reason.isBlank() ? note : reason + ", " + note);
+        }
+        return List.copyOf(result);
+    }
+
+    static String avoidedTasteNote(Member.Taste taste) {
+        return switch (taste) {
+            case SPICY -> "매운 요리예요";
+            case SWEET -> "단 요리예요";
+            case SALTY -> "짠 요리예요";
+            case UMAMI -> "감칠맛이 강한 요리예요";
+            case MILD -> "순한 요리예요";
         };
     }
 

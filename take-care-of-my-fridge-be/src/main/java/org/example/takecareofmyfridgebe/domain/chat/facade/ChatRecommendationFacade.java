@@ -225,7 +225,7 @@ public class ChatRecommendationFacade {
         Optional<String> spokenDish = spokenDishWithoutRecipe(content, request, found.candidates());
         if (spokenDish.isPresent()) {
             query = request.withKeywordText(spokenDish.get());
-            found = new RecipeCandidates(found.candidates(), found.fallback(), true);
+            found = new RecipeCandidates(found.candidates(), found.fallback(), true, found.keptAvoidTastes());
             log.info("상담 요리 이름 채움 - memberId: {}, 요리 이름: {} (AI가 비움, 레시피 이름에 없음)", request.memberId(), spokenDish.get());
         }
         List<RecipeCandidate> candidates = withoutPrevious(found.candidates(), previousCardIds);
@@ -235,7 +235,9 @@ public class ChatRecommendationFacade {
         Map<Long, RecipeSummary> summaries = recipeService.findSummaries(
                 picked.stream().map(RecipeCandidate::recipeId).toList());
         // 카드 이유는 앞 카드와 겹치지 않게 고른다 (프롬프트 후보 줄도 같은 이유를 쓴다)
-        List<String> reasons = RecommendationReasonWriter.writeDistinct(picked, query.keywordText(), !query.hasRequest());
+        List<String> reasons = RecommendationReasonWriter.withAvoidedTastes(
+                RecommendationReasonWriter.writeDistinct(picked, query.keywordText(), !query.hasRequest()), picked,
+                found.keptAvoidTastes());
         Map<Long, ShoppingProduct> products = shoppingProducts(picked);
         List<RecommendedRecipe> recipes = new ArrayList<>();
         for (int i = 0; i < picked.size(); i++) {
@@ -245,7 +247,7 @@ public class ChatRecommendationFacade {
         logPicked(query, picked, recipes);
 
         String candidateInfo = RecommendationPromptBuilder.build(
-                content, query, ingredientNames(query), picked, found.keywordsNotFound());
+                content, query, ingredientNames(query), picked, found.keywordsNotFound(), reasons);
         // 안내 문장은 AI가 아니라 서버가 소개 맨 앞에 직접 보낸다 (후보가 없으면 정해진 답만 나가므로 붙이지 않는다)
         List<String> notices = picked.isEmpty()
                 ? List.of()

@@ -122,6 +122,25 @@ class ChatRecommendationFacadeTest {
     }
 
     @Test
+    @DisplayName("피할 맛인데 콕 집어 남긴 요리 카드는 이유 뒤에 \"매운 요리예요\"를 붙이고, AI 후보 줄도 같은 이유를 쓰며 나머지 카드는 그대로다")
+    void notesAvoidedTaste_onKeptNamedDish() {
+        when(recipeCandidateFacade.findCandidates(any())).thenReturn(new RecipeCandidates(List.of(
+                candidate(10L, "김치찌개", "찌개", 25, reason(List.of())),
+                candidate(20L, "된장찌개", "찌개", 20, reason(List.of())),
+                candidate(40L, "청국장찌개", "찌개", 30, reason(List.of()))), false, false, Map.of(10L, List.of(Taste.SPICY))));
+        when(recipeService.findSummaries(any())).thenReturn(Map.of());
+
+        RecommendationReply reply = facade.recommend("매운 거 말고 김치찌개 줘", new RecipeQuery(MEMBER_ID, List.of(), null, null,
+                null, null, false, List.of("김치찌개"), "김치찌개").withAvoidTastes(List.of(Taste.SPICY)));
+
+        List<RecommendedRecipe> recipes = reply.event().recipes();
+        assertThat(recipes.get(0).reason()).endsWith(", 매운 요리예요");
+        assertThat(recipes.get(1).reason()).doesNotContain("매운 요리예요");
+        assertThat(recipes.get(2).reason()).doesNotContain("매운 요리예요");
+        assertThat(reply.candidateInfo()).contains(recipes.get(0).reason());
+    }
+
+    @Test
     @DisplayName("후보가 없으면 빈 카드와 empty=true, 프롬프트에는 후보 없음을 넣는다")
     void returnsEmpty_whenNoCandidates() {
         when(recipeCandidateFacade.findCandidates(any())).thenReturn(new RecipeCandidates(List.of(), true));

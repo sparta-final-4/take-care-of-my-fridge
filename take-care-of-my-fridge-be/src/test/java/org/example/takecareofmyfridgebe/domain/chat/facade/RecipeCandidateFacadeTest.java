@@ -255,6 +255,26 @@ class RecipeCandidateFacadeTest {
     }
 
     @Test
+    @DisplayName("\"매운 거 말고 김치찌개 줘\"면 콕 집은 김치찌개는 매워도 남겨 첫 장에 두고 그 맛을 알리며, 나머지 매운 레시피는 뺀다")
+    void keepsNamedDish_whenAvoidingItsTaste() throws Exception {
+        when(memberService.getMyInfo(MEMBER_ID)).thenReturn(mock(MyInfoResponse.class));
+        givenKeywordRecipes(Map.of(
+                10L, recipe(10L, "김치찌개", Set.of(Taste.SPICY), List.of("김치", "돼지고기")),
+                20L, recipe(20L, "된장찌개", Set.of(Taste.SALTY), List.of("된장", "두부")),
+                30L, recipe(30L, "부대찌개", Set.of(Taste.SPICY), List.of("햄", "고춧가루")),
+                40L, recipe(40L, "청국장찌개", Set.of(Taste.MILD), List.of("청국장")),
+                50L, recipe(50L, "순두부찌개", Set.of(Taste.SALTY), List.of("순두부"))));
+        RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, null, null, null, false,
+                List.of("김치찌개"), "김치찌개").withAvoidTastes(List.of(Taste.SPICY));
+
+        RecipeCandidates result = facade.findCandidates(query);
+
+        assertThat(result.candidates()).extracting(RecipeCandidate::recipeId).startsWith(10L).doesNotContain(30L)
+                .containsExactlyInAnyOrder(10L, 20L, 40L, 50L);
+        assertThat(result.keptAvoidTastes()).containsExactly(Map.entry(10L, List.of(Taste.SPICY)));
+    }
+
+    @Test
     @DisplayName("매운 레시피를 빼서 3개보다 적으면 그때만 매운 레시피를 뒤에 채운다")
     void refillsSpicyRecipesAtEnd_whenTooFew() throws Exception {
         when(memberService.getMyInfo(MEMBER_ID)).thenReturn(mock(MyInfoResponse.class));

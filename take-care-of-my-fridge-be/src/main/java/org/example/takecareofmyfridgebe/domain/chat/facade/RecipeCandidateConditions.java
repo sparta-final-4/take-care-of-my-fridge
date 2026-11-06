@@ -60,7 +60,9 @@ public final class RecipeCandidateConditions {
 
     /**
      * 분류·키워드만으로 점수를 내는 조건. 냉장고 재료가 많이 겹치는 레시피에 밀려 분류만 맞은 레시피가 100건 밖으로 빠지지 않게 한다.
-     * 거르는 조건(피할 맛·최대 시간·뺄 재료·뺄 분류)은 그대로 둔다. 선택 재료만 쓰기면 선택 재료도 남긴다 (꼭 들어 있어야 하므로).
+     * 거르는 조건(최대 시간·뺄 재료·뺄 분류)은 그대로 둔다. 선택 재료만 쓰기면 선택 재료도 남긴다 (꼭 들어 있어야 하므로).
+     * 피할 맛은 키워드가 없을 때만 둔다. 키워드(요리 이름)가 있으면 피할 맛 없이 찾아, "매운 거 말고 김치찌개"의 김치찌개가 검색에서 빠지지 않게 한다.
+     * 이렇게 들어온 피할 맛 레시피는 후보 정렬의 피할 맛 처리(rankAvoiding)가 다시 거르고, 요리 이름이 통째로 맞은 레시피만 남긴다.
      */
     public static Condition requestOnly(Condition condition) {
         return new Condition(
@@ -71,7 +73,7 @@ public final class RecipeCandidateConditions {
                 condition.categories(),
                 condition.keywords(),
                 List.of(),
-                condition.avoidTastes(),
+                condition.keywords().isEmpty() ? condition.avoidTastes() : List.of(),
                 condition.maxMinutes(),
                 condition.excludeIngredientIds(),
                 condition.excludeCategories(),

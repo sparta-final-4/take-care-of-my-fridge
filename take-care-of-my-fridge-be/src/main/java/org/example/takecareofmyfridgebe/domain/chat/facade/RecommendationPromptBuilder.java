@@ -56,6 +56,15 @@ public final class RecommendationPromptBuilder {
      */
     public static String build(String content, RecipeQuery query, Map<Long, String> ingredientNames,
                                List<RecipeCandidate> picked, boolean keywordsNotFound) {
+        return build(content, query, ingredientNames, picked, keywordsNotFound,
+                RecommendationReasonWriter.writeDistinct(picked, query.keywordText(), !query.hasRequest()));
+    }
+
+    /**
+     * @param reasons 카드 이유 (카드와 같은 문장. 콕 집어 남긴 피할 맛 요리의 "매운 요리예요"가 붙어 있다)
+     */
+    public static String build(String content, RecipeQuery query, Map<Long, String> ingredientNames,
+                               List<RecipeCandidate> picked, boolean keywordsNotFound, List<String> reasons) {
         StringBuilder text = new StringBuilder();
         List<String> notices = notices(query, picked, keywordsNotFound);
         if (!notices.isEmpty()) {
@@ -72,7 +81,6 @@ public final class RecommendationPromptBuilder {
         // 번호를 붙이면 AI가 번호 목록으로 답해서 "후보:"로 시작한다
         // 사용자 요청(키워드·분류·요리 이름)이 있으면 회원 선호 맛은 근거로 넘기지 않는다
         boolean memberTastes = !query.hasRequest();
-        List<String> reasons = RecommendationReasonWriter.writeDistinct(picked, query.keywordText(), memberTastes);
         for (int i = 0; i < picked.size(); i++) {
             text.append("후보: ").append(candidateLine(picked.get(i), reasons.get(i), memberTastes)).append('\n');
         }

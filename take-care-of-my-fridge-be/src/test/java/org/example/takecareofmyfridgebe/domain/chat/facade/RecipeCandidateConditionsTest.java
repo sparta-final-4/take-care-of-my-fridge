@@ -95,4 +95,15 @@ class RecipeCandidateConditionsTest {
         assertThat(requestOnly.selectedIngredientIds()).containsExactly(1L);
         assertThat(requestOnly.selectedOnly()).isTrue();
     }
+
+    @Test
+    @DisplayName("요리 이름 키워드가 있으면 요청만 검색은 피할 맛 없이 찾는다 (매운 거 말고 김치찌개의 김치찌개가 검색에서 빠지지 않게)")
+    void dropsAvoidTastes_whenRequestOnlyWithKeywords() {
+        RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, List.of("찌개"), null, null, false,
+                List.of("김치찌개"), "김치찌개").withAvoidTastes(List.of(Taste.SPICY));
+        Condition condition = RecipeCandidateConditions.from(query, List.of(), EXCLUDED);
+
+        assertThat(condition.avoidTastes()).containsExactly(Taste.SPICY);
+        assertThat(RecipeCandidateConditions.requestOnly(condition).avoidTastes()).isEmpty();
+    }
 }

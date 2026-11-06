@@ -143,7 +143,8 @@ public class RecipeCandidateFacade {
                 : readNonBasicRows(
                 ranked.candidates().candidates().stream().map(RecipeCandidate::recipeId).toList());
         RecipeCandidates result = RecipeCandidateScorer.withMissingIngredients(ranked.candidates(), fridge, nonBasicRows);
-        return new RecipeCandidates(result.candidates(), result.fallback(), ranked.query().keywordsNotFound());
+        return new RecipeCandidates(result.candidates(), result.fallback(), ranked.query().keywordsNotFound(),
+                ranked.candidates().keptAvoidTastes());
     }
 
     /**
@@ -439,6 +440,8 @@ public class RecipeCandidateFacade {
     /**
      * 피할 맛인 레시피는 빼고 순위를 매긴다. 빼서 3개가 안 되면 그때만 피할 맛 레시피를 순위대로 뒤에 채운다.
      * 피할 맛이 매운맛이면 확실히 매운 레시피에 더해 매울 수 있는 레시피(홍고추·청고추)까지 뺀다.
+     * 단 사용자가 콕 집은 요리(요리 이름이 레시피 이름에 통째로 맞음, KeywordMatch NAME)는 피할 맛이어도 빼지 않고 남기며,
+     * 남긴 레시피와 그 맛을 결과에 담아 카드 이유에 알린다 ("매운 거 말고 김치찌개 줘" → 김치찌개 카드 + "매운 요리예요").
      *
      * @param knownAvoided 검색에서 피할 맛 레시피로 판단한 레시피 (피할 맛 없이 다시 검색해서 새로 나온 것)
      */
@@ -455,9 +458,22 @@ public class RecipeCandidateFacade {
                         || recipeTastes.getOrDefault(id, Set.of()).stream().anyMatch(query.avoidTastes()::contains)
                         || (avoidSpicy && spicy.maybe().contains(id)))
                 .collect(Collectors.toSet());
+        // 콕 집은 요리는 피할 맛보다 앞선다
+        Map<Long, List<Member.Taste>> keptAvoid = new HashMap<>();
+        for (Long id : avoided) {
+            KeywordMatch match = query.keywordMatches().get(id);
+            if (match != null && match.type() == KeywordMatch.Type.NAME) {
+                keptAvoid.put(id, avoidedTastesOf(id, query, recipeTastes, spicy));
+            }
+        }
+        avoided.removeAll(keptAvoid.keySet());
+        if (!keptAvoid.isEmpty()) {
+            log.info("상담 후보 피할 맛이지만 콕 집은 요리라 남김 - 피할 맛: {}, 레시피: {}", query.avoidTastes(), keptAvoid);
+        }
         Map<Long, RecipeCandidateInfo> kept = new HashMap<>(infos);
         kept.keySet().removeAll(avoided);
-        RecipeCandidates ranked = scorer.rank(query, fridge, memberTastes, rows, kept, recipeTastes, candidateIds);
+        RecipeCandidates ranked = scorer.rank(query, fridge, memberTastes, rows, kept, recipeTastes, candidateIds)
+                .withKeptAvoidTastes(keptAvoid);
         log.debug("상담 후보 피할 맛 - 맛: {}, 뺀 레시피 수: {}, 남은 후보 수: {}", query.avoidTastes(), avoided.size(),
                 ranked.candidates().size());
         if (ranked.candidates().size() >= RecommendationPicker.PICK_COUNT || avoided.isEmpty()) {
@@ -469,7 +485,17 @@ public class RecipeCandidateFacade {
                 .candidates();
         return new RecipeCandidates(Stream.concat(ranked.candidates().stream(), refill.stream())
                 .limit(RecipeCandidateScorer.LIMIT)
-                .toList(), ranked.fallback());
+                .toList(), ranked.fallback(), false, keptAvoid);
+    }
+
+    // 콕 집어 남긴 레시피가 어떤 피할 맛인지. 맛 데이터·매운 재료로 모르면(피할 맛 없이 다시 검색해서 찾음) 피할 맛 전체
+    private static List<Member.Taste> avoidedTastesOf(Long id, RecipeQuery query, Map<Long, Set<Member.Taste>> recipeTastes,
+                                                      SpicyRecipes spicy) {
+        List<Member.Taste> tastes = query.avoidTastes().stream()
+                .filter(taste -> recipeTastes.getOrDefault(id, Set.of()).contains(taste)
+                        || (taste == Member.Taste.SPICY && spicy.maybe().contains(id)))
+                .toList();
+        return tastes.isEmpty() ? query.avoidTastes() : tastes;
     }
 
     /**
