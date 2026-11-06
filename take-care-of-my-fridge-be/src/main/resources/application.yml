@@ -107,6 +107,24 @@ app:
       negation-before: 안, 덜
       # 맛 단어 뒤 4글자 안에 오면 피함 ("매운 거 말고", "맵지 않게", "단 거 싫어")
       negation-after: 말고, 빼고, 않, 싫, 없이
+    # 분류 이름과 다른 흔한 말을 분류 묶음으로 본다 (추천·다시 추천의 분류 단어 보정). 분류는 실제 레시피 분류 이름만
+    # "국수"는 묶음 말이 아니다 (국으로 보지 않는다)
+    category-words:
+      groups:
+        - word: 국물
+          categories: 국, 찌개, 전골, 수프, 스튜
+        - word: 면
+          categories: 면류
+        - word: 반찬
+          categories: 무침, 조림, 볶음, 김치, 절임
+        - word: 후식
+          categories: 디저트
+        - word: 간식
+          categories: 디저트, 과자, 빵, 떡
+        - word: 안주
+          categories: 구이, 전, 튀김
+        - word: 술안주
+          categories: 구이, 전, 튀김
     # 서버가 AI 의도를 추천으로 바꿀 때 본다: 달라는 말이 있고 묻는 말이 없을 때만 바꾼다 (공백 빼고 비교)
     ask-words:
       # "추천 기준이 뭐야?"처럼 달라는 말과 같이 있으면 묻는 말이 이긴다

@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatCandidateProperties;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatAskWordProperties;
+import org.example.takecareofmyfridgebe.domain.chat.config.ChatCategoryWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatMealkitWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatTasteWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext;
@@ -76,6 +77,7 @@ public class ChatIntentFacade {
     private final ChatTasteWordProperties chatTasteWordProperties;
     private final ChatMealkitWordProperties chatMealkitWordProperties;
     private final ChatAskWordProperties chatAskWordProperties;
+    private final ChatCategoryWordProperties chatCategoryWordProperties;
 
     // 상담 문맥 없이 (첫 질문과 같게) 정한다
     public ChatIntentResolution resolve(Long memberId, Long sessionId, ChatMessageCreateRequest request) {
@@ -205,7 +207,8 @@ public class ChatIntentFacade {
      */
     IntentResult correctCategories(Long memberId, Long sessionId, String message, List<String> categories, ChatContext context,
                                    IntentResult result) {
-        List<CategoryWordChecker.CategoryStance> stances = CategoryWordChecker.check(message, categories, chatTasteWordProperties);
+        List<CategoryWordChecker.CategoryStance> stances = CategoryWordChecker.check(message, categories, chatTasteWordProperties,
+                chatCategoryWordProperties.groups());
         if (stances.isEmpty()) {
             return result;
         }

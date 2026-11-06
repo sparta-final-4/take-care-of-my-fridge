@@ -1,5 +1,6 @@
 package org.example.takecareofmyfridgebe.domain.chat.facade;
 
+import org.example.takecareofmyfridgebe.domain.chat.config.ChatCategoryWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatTasteWordProperties;
 
 import java.util.ArrayList;
@@ -20,6 +21,8 @@ import java.util.Set;
  *       "로·으로"는 재료로 쓰는 말("김치로", "떡으로")과 겹쳐 넣지 않는다</li>
  *   <li>다음 단어가 요청하는 말({@link #REQUEST_WORDS}로 시작: 추천·먹·만들·말고 …)이거나 메시지 끝이어야 한다.
  *       "김치 넣은 요리", "떡 썰어서"처럼 재료로 말한 것을 뺀다</li>
+ *   <li>분류 이름과 다른 흔한 말("국물" → 국·찌개·전골·수프·스튜, 설정 app.chat.category-words)도 같은 규칙으로 찾고, 맞으면 묶음의 분류를 모두 센다.
+ *       "국수"는 묶음 말이 아니어서 국으로 보지 않는다</li>
  *   <li>대명사·끼니와 겹치는 분류({@link #SKIPPED}: "전 매운 거 좋아해"의 전, "밥 뭐 먹지"의 밥)는 서버가 채우지 않고 AI에 맡긴다</li>
  *   <li>부정어는 맛 단어와 같은 기준이다(TasteWordChecker): 분류 이름 바로 앞 "안·덜", 뒤 4글자 안 "말고·빼고·않·싫·없이"면 피함
  *       ("디저트 말고 국" → 디저트 피함, 국 원함)</li>
@@ -33,7 +36,7 @@ public final class CategoryWordChecker {
     // 분류 이름 다음 단어가 이 말로 시작하면 요청으로 본다
     static final List<String> REQUEST_WORDS = List.of(
             "추천", "먹", "만들", "해", "할", "요리", "메뉴", "종류", "같은", "같이", "중", "뭐", "좀", "하나", "어때", "없", "있",
-            "말고", "빼고", "싫", "위주", "줘", "알려", "골라", "땡", "당기", "원해", "좋아", "찾아");
+            "말고", "빼고", "싫", "위주", "줘", "알려", "골라", "땡", "당기", "원해", "좋아", "찾아", "밀키트");
     // 대명사(전 = 저는)·끼니(밥 = 식사)로 흔히 쓰여 서버가 채우지 않는 분류
     static final Set<String> SKIPPED = Set.of("전", "밥");
 
@@ -53,12 +56,30 @@ public final class CategoryWordChecker {
      * @return 메시지에 나온 순서대로 분류마다 원하는지·피하는지. 같은 분류가 한 번이라도 부정어와 붙으면 피함
      */
     public static List<CategoryStance> check(String message, Collection<String> categories, ChatTasteWordProperties words) {
+        return check(message, categories, words, List.of());
+    }
+
+    /**
+     * @param groups 분류 이름과 다른 묶음 말 ("국물" → 국·찌개·전골·수프·스튜). 분류 이름과 같은 규칙으로 찾고, 맞으면 묶음의 분류 모두를 센다.
+     *               categories에 없는 분류는 뺀다
+     */
+    public static List<CategoryStance> check(String message, Collection<String> categories, ChatTasteWordProperties words,
+                                             List<ChatCategoryWordProperties.Group> groups) {
         if (message == null || message.isBlank()) {
             return List.of();
         }
-        // 긴 이름부터 본다 ("전골"을 "전"보다 먼저)
-        List<String> names = categories.stream()
+        // 말 → 분류. 긴 말부터 본다 ("전골"을 "전"보다, "국물"을 "국"보다 먼저)
+        Map<String, List<String>> terms = new LinkedHashMap<>();
+        categories.stream()
                 .filter(name -> name != null && !name.isBlank() && !SKIPPED.contains(name))
+                .forEach(name -> terms.put(name, List.of(name)));
+        for (ChatCategoryWordProperties.Group group : groups) {
+            List<String> mapped = group.categories().stream().filter(categories::contains).toList();
+            if (group.word() != null && !group.word().isBlank() && !mapped.isEmpty()) {
+                terms.putIfAbsent(group.word().strip(), mapped);
+            }
+        }
+        List<String> names = terms.keySet().stream()
                 .sorted(Comparator.comparingInt(String::length).reversed())
                 .toList();
         String compact = message.replaceAll("\\s+", "");
@@ -87,7 +108,10 @@ public final class CategoryWordChecker {
                         || TasteWordChecker.negatedBefore(compact.substring(0, start), words)
                         || TasteWordChecker.negatedAfter(compact, start + name.length(), words);
                 Stance stance = avoid ? Stance.AVOID : Stance.WANT;
-                stances.merge(name, stance, (before, now) -> before == Stance.AVOID || now == Stance.AVOID ? Stance.AVOID : Stance.WANT);
+                for (String category : terms.get(name)) {
+                    stances.merge(category, stance,
+                            (before, now) -> before == Stance.AVOID || now == Stance.AVOID ? Stance.AVOID : Stance.WANT);
+                }
                 // 한 단어에서는 가장 긴 분류 이름 하나만 센다
                 break;
             }

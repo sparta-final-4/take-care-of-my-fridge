@@ -1,6 +1,7 @@
 package org.example.takecareofmyfridgebe.domain.chat.facade;
 
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatCandidateProperties;
+import org.example.takecareofmyfridgebe.domain.chat.config.ChatCategoryWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext.CardName;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext.ContextMessage;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext;
@@ -72,7 +73,8 @@ class ChatIntentFacadeTest {
         chatMessageService = mock(ChatMessageService.class);
         facade = new ChatIntentFacade(extractor, recipeService, ingredientMatcher,
                 new ChatCandidateProperties(List.of("양념", "음료"), 0.4, List.of(), List.of("백김치", "물김치", "동치미", "나박김치"), List.of()),
-                chatMessageService, TasteWordCheckerTest.WORDS, MealkitWordCheckerTest.WORDS, AskWordCheckerTest.WORDS);
+                chatMessageService, TasteWordCheckerTest.WORDS, MealkitWordCheckerTest.WORDS, AskWordCheckerTest.WORDS,
+                new ChatCategoryWordProperties(CategoryWordCheckerTest.GROUPS));
         when(recipeService.getClassifications())
                 .thenReturn(new RecipeClassificationResponse(List.of("한식"), List.of("국", "기타", "샐러드", "양념", "음료", "찌개")));
     }
@@ -179,6 +181,20 @@ class ChatIntentFacadeTest {
             }
             assertThat(facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("밀키트 추천 기준 있어?")).intent())
                     .isEqualTo(ChatIntent.GENERAL);
+        }
+
+        @Test
+        @DisplayName("\"국물\" 같은 묶음 말은 서버가 추천으로 바꾼 경우와 AI가 추천한 경우 모두 국 계열 분류로 채운다")
+        void fillsGroupCategories_whenGroupWordSpoken() {
+            givenExtracted(IntentResult.general());
+            ChatIntentResolution converted = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("국물 밀키트 있어?"));
+
+            givenExtracted(new IntentResult(ChatIntent.RECOMMEND, null, null, null, null, null, false, null, null, null));
+            ChatIntentResolution recommended = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("국물 요리 추천해줘"));
+
+            assertThat(converted.intent()).isEqualTo(ChatIntent.RECOMMEND);
+            assertThat(converted.recipeQuery().moodCategories()).containsExactly("국", "찌개");
+            assertThat(recommended.recipeQuery().moodCategories()).containsExactly("국", "찌개");
         }
 
         @Test
