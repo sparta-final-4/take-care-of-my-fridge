@@ -74,6 +74,20 @@ class RecipeCandidateScorerTest {
         }
 
         @Test
+        @DisplayName("받은 후보 id는 냉장고·선택 재료와 겹치지 않아도 다시 거르지 않고 정렬한다")
+        void ranksGivenCandidates_whenNoFridgeOverlap() {
+            recipe(10L, "약과", "디저트", 40, 3, PORK);
+            recipe(20L, "계란찜", "찜", 20, 1, EGG);
+            RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, List.of("디저트"), null, null, false);
+
+            RecipeCandidates result = scorer.rank(query, List.of(stock(EGG, "계란", 10)), List.of(), rows, infos, tastes,
+                    List.of(10L, 20L));
+
+            assertThat(result.candidates()).extracting(RecipeCandidate::recipeId).containsExactly(10L, 20L);
+            assertThat(result.candidates().get(0).ranking().requestMatches()).isEqualTo(1);
+        }
+
+        @Test
         @DisplayName("임박 재료가 1개 들어간 레시피가 선호 맛이 2개 겹친 레시피보다 앞선다")
         void ranksImminentFirst_overTaste() {
             recipe(10L, "두부부침", "전", 20, 1, TOFU);
@@ -818,7 +832,7 @@ class RecipeCandidateScorerTest {
 
     private RecipeCandidates rank(RecipeCandidateScorer target, RecipeQuery query, List<FridgeStock> fridge,
                                   List<Taste> memberTastes) {
-        return target.rank(query, fridge, memberTastes, rows, infos, tastes);
+        return target.rank(query, fridge, memberTastes, rows, infos, tastes, target.candidateRecipeIds(query, fridge, rows));
     }
 
     // 레시피 하나를 등록한다. ingredientIds는 기본 양념이 아닌 재료이고, 이름은 재료 ID로 정한다

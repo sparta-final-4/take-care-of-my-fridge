@@ -93,7 +93,7 @@ public class RecipeCandidateFacade {
         SpicyRecipes spicy = spicyRecipes(recipeIds, query, memberTastes);
         Map<Long, Set<Member.Taste>> recipeTastes = withDefinitelySpicy(recipeService.findTastesByRecipeIds(recipeIds), spicy);
 
-        RecipeCandidates ranked = rankAvoiding(scorer, query, fridge, memberTastes, rows, infos, recipeTastes, spicy);
+        RecipeCandidates ranked = rankAvoiding(scorer, query, fridge, memberTastes, rows, infos, recipeTastes, spicy, recipeIds);
 
         // 부족한 재료는 고른 10개만 조회한다
         List<Long> topRecipeIds = ranked.candidates().stream().map(RecipeCandidate::recipeId).toList();
@@ -136,9 +136,9 @@ public class RecipeCandidateFacade {
     private static RecipeCandidates rankAvoiding(RecipeCandidateScorer scorer, RecipeQuery query, List<FridgeStock> fridge,
                                                  List<Member.Taste> memberTastes, List<RecipeCandidateIngredient> rows,
                                                  Map<Long, RecipeCandidateInfo> infos, Map<Long, Set<Member.Taste>> recipeTastes,
-                                                 SpicyRecipes spicy) {
+                                                 SpicyRecipes spicy, Set<Long> candidateIds) {
         if (query.avoidTastes().isEmpty()) {
-            return scorer.rank(query, fridge, memberTastes, rows, infos, recipeTastes);
+            return scorer.rank(query, fridge, memberTastes, rows, infos, recipeTastes, candidateIds);
         }
         boolean avoidSpicy = query.avoidTastes().contains(Member.Taste.SPICY);
         Set<Long> avoided = infos.keySet().stream()
@@ -147,7 +147,7 @@ public class RecipeCandidateFacade {
                 .collect(Collectors.toSet());
         Map<Long, RecipeCandidateInfo> kept = new HashMap<>(infos);
         kept.keySet().removeAll(avoided);
-        RecipeCandidates ranked = scorer.rank(query, fridge, memberTastes, rows, kept, recipeTastes);
+        RecipeCandidates ranked = scorer.rank(query, fridge, memberTastes, rows, kept, recipeTastes, candidateIds);
         log.debug("상담 후보 피할 맛 - 맛: {}, 뺀 레시피 수: {}, 남은 후보 수: {}", query.avoidTastes(), avoided.size(),
                 ranked.candidates().size());
         if (ranked.candidates().size() >= RecommendationPicker.PICK_COUNT || avoided.isEmpty()) {
@@ -155,7 +155,7 @@ public class RecipeCandidateFacade {
         }
         Map<Long, RecipeCandidateInfo> onlyAvoided = new HashMap<>(infos);
         onlyAvoided.keySet().retainAll(avoided);
-        List<RecipeCandidate> refill = scorer.rank(query, fridge, memberTastes, rows, onlyAvoided, recipeTastes).candidates();
+        List<RecipeCandidate> refill = scorer.rank(query, fridge, memberTastes, rows, onlyAvoided, recipeTastes, candidateIds).candidates();
         return new RecipeCandidates(Stream.concat(ranked.candidates().stream(), refill.stream())
                 .limit(RecipeCandidateScorer.LIMIT)
                 .toList(), ranked.fallback());
