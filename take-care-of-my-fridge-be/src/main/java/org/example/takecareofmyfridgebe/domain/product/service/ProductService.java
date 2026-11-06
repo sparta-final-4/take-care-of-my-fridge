@@ -72,6 +72,18 @@ public class ProductService {
                 .toList();
     }
 
+    /**
+     * 재료 ID들에 이어진 공개 재료 상품을 상품과 함께 돌려준다 (재료 ID·용량·단위는 연결 행에 있다).
+     * 판매 중지 상품은 빼고, 품절 상품은 넣는다 (화면이 품절로 보여 준다). 재료 하나에 상품이 여러 개면 모두 돌려준다.
+     * 빈 입력이면 조회하지 않는다. AI 상담 카드의 장볼 재료에 살 수 있는 상품을 붙일 때 쓴다.
+     */
+    public List<IngredientProduct> getPublicIngredientProducts(Collection<Long> ingredientIds) {
+        if (ingredientIds == null || ingredientIds.isEmpty()) {
+            return List.of();
+        }
+        return ingredientProductRepository.findWithProductByIngredientIdIn(ingredientIds, PUBLIC_STATUSES);
+    }
+
     // 전체 재색인용. 판매 중지 상품도 넣고, 검색할 때 상태로 거른다
     public List<ProductIndexSource> findIndexSources() {
         return productRepository.findAll(Sort.by("id")).stream()
