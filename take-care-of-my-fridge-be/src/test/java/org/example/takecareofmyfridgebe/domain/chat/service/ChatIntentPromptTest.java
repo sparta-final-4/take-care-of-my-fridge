@@ -47,12 +47,25 @@ class ChatIntentPromptTest {
     }
 
     @Test
+    @DisplayName("레시피에 없을 법한 요리 이름은 \"같은\"이 없어도 이루는 요리·비슷한 요리로 늘리고 세트 메뉴는 구성 요리를 모두 넣으며, 줄임말 목록은 두지 않는다")
+    void expandsUnlikelyDishNames_withoutAbbreviationList() throws IOException {
+        String followUp = new ClassPathResource("prompts/chat-intent-followup.txt").getContentAsString(StandardCharsets.UTF_8);
+
+        assertThat(prompt).contains(
+                "말한 이름이 레시피에 없을 법하면(줄임말·세트 메뉴·가게 메뉴·신조어) \"같은\"이 없어도 그 요리를 이루는 요리나 비슷한 요리로 늘린다",
+                "세트 메뉴면 구성 요리를 모두 넣는다",
+                "그 이름을 짧게 그대로 쓴다(레시피에 없을 법한 이름도)");
+        assertThat(prompt).doesNotContain("탕짜면", "짬짜면");
+        assertThat(followUp).contains("요리 이름·keywords·dishText는 첫 질문 규칙대로 뽑는다");
+    }
+
+    @Test
     @DisplayName("첫 질문용 고정 프롬프트에는 이어지는 말 규칙이 없고, 이어지는 말 규칙은 따로 다시 추천·레시피 자세히·대상 칸을 지시한다")
     void keepsFollowUpRulesSeparate() throws IOException {
         String followUp = new ClassPathResource("prompts/chat-intent-followup.txt").getContentAsString(StandardCharsets.UTF_8);
 
         assertThat(prompt).doesNotContain("REFINE", "RECIPE_DETAIL", "[직전 추천]");
-        assertThat(followUp).contains("REFINE: 직전 추천을 조건을 바꿔 다시 받고 싶은 말",
+        assertThat(followUp).contains("REFINE: 직전 추천을 바꿔 달라는 말(\"다른\", \"또\", \"말고 다른\")",
                 "바꾸라고 하지 않은 조건은 [직전 조건] 그대로 쓴다",
                 "RECIPE_DETAIL: 이 상담에서 추천했던 레시피 하나",
                 "[직전 추천]·[이전 추천]에 없어도 \"아까 그 ○○\"처럼 앞서 추천받은 레시피 이름을 말하면 RECIPE_DETAIL이다",
@@ -62,7 +75,22 @@ class ChatIntentPromptTest {
                 "REFINE이 아니면 removed는 빈 목록",
                 "detailQuestion: HOW_TO(만드는 법), TIME(조리 시간), INGREDIENTS(재료), TIP(팁), OTHER 중 하나",
                 "\"두 번째 거 어떻게 만들어?\" → targetIndex: 2, HOW_TO",
-                "새 요리 이름이나 새 조건으로 처음부터 추천해 달라는 말(\"김치찌개 먹고 싶어\")은 RECOMMEND");
+                "새 요리 이름이나 새 조건으로 처음부터 추천해 달라는 말(\"김치찌개 먹고 싶어\")");
+    }
+
+    @Test
+    @DisplayName("후속 규칙은 이번 말의 분류를 앞 대화보다 앞세우고, 같은 요청·코스 더하기는 새 추천, 다른 것 요청은 다시 추천으로 예시와 함께 지시한다")
+    void prefersCurrentCategory_inFollowUpRules() throws IOException {
+        String followUp = new ClassPathResource("prompts/chat-intent-followup.txt").getContentAsString(StandardCharsets.UTF_8);
+
+        assertThat(followUp).contains(
+                "이번 말의 분류·요리 이름이 [직전 조건]보다 앞선다",
+                "같은 요청을 다시 해도 조건을 비우지 않고 이번 말에서 뽑는다",
+                "코스를 더하는 말(\"디저트도\", \"후식으로\", \"국도 같이\")은 RECOMMEND이고 [직전 조건]을 잇지 않는다",
+                "직전이 김피탕일 때 \"디저트 추천해줘\" → RECOMMEND, 분류 디저트, 키워드 없음",
+                "\"다른 디저트\" → REFINE, 디저트",
+                "\"다른 거\" → REFINE, 분류 없음",
+                "\"디저트 말고 국\" → REFINE, 국, removed: CATEGORY");
     }
 
     @Test
@@ -72,8 +100,9 @@ class ChatIntentPromptTest {
 
         assertThat(followUp).doesNotContain("wantedTastes: SPICY", "avoidTastes: SPICY", "\"맛은 상관없어\"", "\"두부 안 넣어도 돼\"",
                 "\"맛있게 하는 팁\"", "생략", "[다른 제안]", "[이미 안내한 말]");
-        assertThat(followUp.lines().filter(line -> line.contains("예)"))).hasSize(3);
-        assertThat(followUp.length()).isLessThan(1_300);
+        assertThat(followUp.lines().filter(line -> line.contains("예)"))).hasSize(5);
+        // 35% 줄이기 전(1,809자)보다 짧게 둔다
+        assertThat(followUp.length()).isLessThan(1_600);
     }
 
     @Test

@@ -742,6 +742,138 @@ class ChatIntentFacadeTest {
         }
     }
 
+    @Nested
+    @DisplayName("분류 단어 확인 (후속 질문)")
+    class CategoryWords {
+
+        // 직전 추천: 김피탕 같은 메뉴 (분류 튀김, 키워드 김피탕·탕수육·깐풍기)
+        private final ChatContext afterKimpitang = new ChatContext(List.of(), LastRecommendation.of(
+                new RecipeQuery(MEMBER_ID, List.of(), null, List.of("튀김"), null, null, false,
+                        List.of("김피탕", "탕수육", "깐풍기"), "김피탕"), List.of(366L, 129L, 148L)),
+                List.of(new CardName(366L, "깐풍기"), new CardName(129L, "라조기"), new CardName(148L, "라조육")));
+        // 직전 추천: 디저트
+        private final ChatContext afterDessert = new ChatContext(List.of(), LastRecommendation.of(
+                new RecipeQuery(MEMBER_ID, List.of(), null, List.of("디저트"), null, null, false), List.of(1080L, 1493L, 1612L)),
+                List.of(new CardName(1080L, "단호박푸딩"), new CardName(1493L, "건강 마늘 꿀환"), new CardName(1612L, "자색고구마찹쌀푸딩")));
+
+        @BeforeEach
+        void setUpCategories() {
+            when(recipeService.getClassifications()).thenReturn(new RecipeClassificationResponse(List.of("한식"),
+                    List.of("국", "기타", "디저트", "면류", "샐러드", "양념", "음료", "찌개", "튀김")));
+        }
+
+        @Test
+        @DisplayName("김피탕 추천 뒤 \"디저트 추천해줘\"에 AI가 튀김·김피탕 키워드를 이어 와도 분류 디저트만 쓰고 키워드·요리 이름은 이어 가지 않는다")
+        void usesDessertOnly_whenAiDragsPreviousConditions() {
+            givenExtracted(new IntentResult(ChatIntent.RECOMMEND, null, List.of("튀김"), null, null, null, null,
+                    List.of("김피탕", "탕수육", "깐풍기"), "김피탕", null));
+
+            ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID,
+                    ChatMessageCreateRequest.of("디저트 추천해줘"), afterKimpitang);
+
+            assertThat(resolution.intent()).isEqualTo(ChatIntent.RECOMMEND);
+            assertThat(resolution.recipeQuery().moodCategories()).containsExactly("디저트");
+            assertThat(resolution.recipeQuery().keywords()).isEmpty();
+            assertThat(resolution.recipeQuery().keywordText()).isNull();
+        }
+
+        @Test
+        @DisplayName("김피탕 추천 뒤 \"디저트 추천해줘\"를 AI가 다시 추천으로 보고 분류를 비워도 분류 디저트로 쓰고 직전 키워드를 이어 가지 않는다")
+        void usesDessertWithoutPreviousKeywords_whenAiRefinesWithEmptyCategory() {
+            givenExtracted(new IntentResult(ChatIntent.REFINE, null, List.of(), null, null, null, null, null, null, null));
+
+            RecipeQuery query = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("디저트 추천해줘"), afterKimpitang)
+                    .recipeQuery();
+
+            assertThat(query.moodCategories()).containsExactly("디저트");
+            assertThat(query.keywords()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("디저트 추천 뒤 같은 말 \"디저트 추천해줘\"에 AI가 조건을 모두 비워도 분류 디저트로 채운다")
+        void fillsDessert_whenAiEmptiesSameRequest() {
+            givenExtracted(new IntentResult(ChatIntent.RECOMMEND, null, List.of(), null, null, null, null, List.of(), null, null));
+
+            RecipeQuery query = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("디저트 추천해줘"), afterDessert)
+                    .recipeQuery();
+
+            assertThat(query.moodCategories()).containsExactly("디저트");
+        }
+
+        @Test
+        @DisplayName("디저트 추천 뒤 \"다른 디저트 추천해줘\"는 다시 추천(직전 카드 빼기)이고 분류 디저트다")
+        void refinesWithDessert_whenAnotherDessert() {
+            givenExtracted(new IntentResult(ChatIntent.REFINE, null, List.of(), null, null, null, null, null, null, null));
+
+            ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID,
+                    ChatMessageCreateRequest.of("다른 디저트 추천해줘"), afterDessert);
+
+            assertThat(resolution.intent()).isEqualTo(ChatIntent.REFINE);
+            assertThat(resolution.recipeQuery().moodCategories()).containsExactly("디저트");
+        }
+
+        @Test
+        @DisplayName("디저트 추천 뒤 \"다른 거 추천해줘\"는 다시 추천이고 직전 분류 디저트를 이어 간다")
+        void keepsPreviousDessert_whenAnotherOne() {
+            givenExtracted(new IntentResult(ChatIntent.REFINE, null, List.of(), null, null, null, null, null, null, null));
+
+            ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID,
+                    ChatMessageCreateRequest.of("다른 거 추천해줘"), afterDessert);
+
+            assertThat(resolution.intent()).isEqualTo(ChatIntent.REFINE);
+            assertThat(resolution.recipeQuery().moodCategories()).containsExactly("디저트");
+        }
+
+        @Test
+        @DisplayName("디저트 추천 뒤 \"디저트 말고 국\"은 AI가 디저트를 남겨도 분류 국으로 바꾼다")
+        void changesToSoup_whenDessertAvoided() {
+            givenExtracted(new IntentResult(ChatIntent.REFINE, null, List.of("디저트", "국"), null, null, null, null, null, null, null));
+
+            RecipeQuery query = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("디저트 말고 국"), afterDessert)
+                    .recipeQuery();
+
+            assertThat(query.moodCategories()).containsExactly("국");
+        }
+
+        @Test
+        @DisplayName("\"디저트 말고 다른 거\"는 AI가 디저트를 넣어도 분류에 넣지 않고 직전 분류 디저트도 이어 가지 않는다")
+        void dropsDessert_whenOnlyAvoided() {
+            givenExtracted(new IntentResult(ChatIntent.REFINE, null, List.of("디저트"), null, null, null, null, null, null, null));
+
+            RecipeQuery query = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("디저트 말고 다른 거"), afterDessert)
+                    .recipeQuery();
+
+            assertThat(query.moodCategories()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("\"국수 먹고 싶어\"는 분류 국으로 채우지 않고 AI 결과를 그대로 쓴다")
+        void keepsAiResult_whenNoodleNotSoup() {
+            givenExtracted(new IntentResult(ChatIntent.RECOMMEND, null, List.of("면류"), null, null, null, null,
+                    List.of("국수", "잔치국수"), "국수", null));
+
+            RecipeQuery query = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("국수 먹고 싶어"), afterDessert)
+                    .recipeQuery();
+
+            assertThat(query.moodCategories()).containsExactly("면류");
+            assertThat(query.keywords()).containsExactly("국수", "잔치국수");
+        }
+
+        @Test
+        @DisplayName("이번 말로 AI가 늘린 키워드는 분류를 채워도 그대로 둔다 (\"냉면 같은 면류 추천해줘\")")
+        void keepsExpandedKeywords_whenCategoryFilled() {
+            givenExtracted(new IntentResult(ChatIntent.RECOMMEND, null, List.of(), null, null, null, null,
+                    List.of("냉면", "막국수"), "냉면", null));
+
+            RecipeQuery query = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("냉면 같은 면류 추천해줘"),
+                    afterKimpitang).recipeQuery();
+
+            assertThat(query.moodCategories()).containsExactly("면류");
+            assertThat(query.keywords()).containsExactly("냉면", "막국수");
+            assertThat(query.keywordText()).isEqualTo("냉면");
+        }
+    }
+
     @Test
     @DisplayName("새 추천에서 \"매운 거 말고\"면 피할 맛 매운맛으로 두고, 원하는 맛과 겹치면 피할 맛이 이긴다")
     void setsAvoidTastes_whenRecommend() {

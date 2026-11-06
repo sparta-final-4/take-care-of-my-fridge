@@ -145,13 +145,15 @@ public class RecipeCandidateScorer {
     }
 
     /**
-     * 후보를 거르고 정렬해 상위 10개를 고른다. useSelectedOnly면 선택 재료를 하나도 쓰지 않는 레시피는 뺀다.
+     * 받은 후보를 거르고 정렬해 상위 10개를 고른다. 후보는 다시 모으지 않는다 (냉장고와 겹치지 않는 후보도 그대로 센다).
+     * useSelectedOnly면 선택 재료를 하나도 쓰지 않는 레시피는 뺀다.
      * 보유 비율 기준 이상인 레시피와 선택 재료(기본 양념 제외 2개 이상)를 전부 쓰는 레시피를 먼저 고르고, 10개가 안 되면 나머지로 채운다.
      * 부족한 재료 목록은 비워 두고, withMissingIngredients로 채운다.
      *
-     * @param rows         lookupIngredientIds로 조회한 레시피 재료 줄
+     * @param rows         후보 레시피의 재료 줄
      * @param infos        후보 레시피 정보 (없는 레시피는 건너뛴다)
      * @param recipeTastes 레시피별 맛 (비어 있으면 맛 단계는 모두 0)
+     * @param candidateIds 정렬할 후보 레시피 ID (DB 경로는 candidateRecipeIds, ES 경로는 검색 결과)
      */
     public RecipeCandidates rank(
             RecipeQuery query,
@@ -159,7 +161,8 @@ public class RecipeCandidateScorer {
             Collection<Member.Taste> memberTastes,
             List<RecipeCandidateIngredient> rows,
             Map<Long, RecipeCandidateInfo> infos,
-            Map<Long, Set<Member.Taste>> recipeTastes
+            Map<Long, Set<Member.Taste>> recipeTastes,
+            Collection<Long> candidateIds
     ) {
         Map<Long, FridgeStock> fridgeById = fridge.stream()
                 .collect(Collectors.toMap(FridgeStock::ingredientId, stock -> stock, (a, b) -> a, LinkedHashMap::new));
@@ -173,7 +176,7 @@ public class RecipeCandidateScorer {
         boolean selectedOnly = query.useSelectedOnly() && selectedCount > 0;
 
         List<RecipeCandidate> scored = new ArrayList<>();
-        for (Long recipeId : candidateRecipeIds(query, fridge, rows)) {
+        for (Long recipeId : new LinkedHashSet<>(candidateIds)) {
             RecipeCandidateInfo info = infos.get(recipeId);
             List<RecipeCandidateIngredient> recipeRows = rowsByRecipe.getOrDefault(recipeId, List.of());
             if (info == null || isFilteredOut(query, info, recipeRows)
@@ -231,9 +234,13 @@ public class RecipeCandidateScorer {
     // 사용자가 고른 재료(기본 양념 제외 2개 이상)를 전부 쓰는 레시피는 재료를 많이 사야 해도 1차 후보로 둔다 (구매 링크로 보완).
     // 선택이 1개면 그 재료를 쓰면서 기준 이상인 레시피가 충분히 많아 예외를 두지 않는다
     // 요리 이름 키워드로 이름·재료가 맞은 레시피도 사용자가 말한 요리라 1차 후보로 둔다
+    // 말한 분류("디저트", "국")가 맞은 레시피도 같다. 냉장고와 거의 안 겹쳐도 보유 비율 기준 이상인 다른 분류 레시피에 밀리지 않게
     private static boolean isFirstTier(RecipeQuery query, RecipeCandidate candidate, int selectedCount) {
         KeywordMatch keywordMatch = query.keywordMatches().get(candidate.recipeId());
         if (keywordMatch != null && keywordMatch.strong()) {
+            return true;
+        }
+        if (candidate.category() != null && query.moodCategories().contains(candidate.category())) {
             return true;
         }
         boolean usesAllSelected = selectedCount >= MIN_SELECTED_FOR_EXCEPTION

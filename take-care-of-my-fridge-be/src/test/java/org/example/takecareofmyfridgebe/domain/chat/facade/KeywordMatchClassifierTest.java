@@ -29,12 +29,31 @@ class KeywordMatchClassifierTest {
     }
 
     @Test
-    @DisplayName("키워드와 레시피 재료가 두 글자 이상 겹치면 재료로 맞았고 그 재료 이름을 담는다")
-    void classifiesIngredient() {
-        KeywordMatch match = classify("들깨 삼계면", List.of("닭", "메밀면", "들깨"), false);
+    @DisplayName("키워드가 레시피 재료 이름과 같으면 재료로 맞았고 그 키워드와 재료 이름을 담는다")
+    void classifiesIngredient_whenSameName() {
+        KeywordMatch match = KeywordMatchClassifier.classify("냉면", List.of("냉면", "메밀면"), false,
+                "들깨 삼계면", List.of("닭", "메밀면", "들깨"));
 
         assertThat(match.type()).isEqualTo(Type.INGREDIENT);
+        assertThat(match.keyword()).isEqualTo("메밀면");
         assertThat(match.ingredientName()).isEqualTo("메밀면");
+    }
+
+    @Test
+    @DisplayName("키워드가 재료 이름에 통째로 들어 있으면 재료로 맞았다 (버섯 → 표고버섯)")
+    void classifiesIngredient_whenKeywordInsideIngredientName() {
+        KeywordMatch match = KeywordMatchClassifier.classify(null, List.of("버섯"), false, "들깨 수제비", List.of("표고버섯", "애호박"));
+
+        assertThat(match.type()).isEqualTo(Type.INGREDIENT);
+        assertThat(match.ingredientName()).isEqualTo("표고버섯");
+    }
+
+    @Test
+    @DisplayName("키워드와 재료 이름이 글자 일부만 겹치면 재료로 맞은 것으로 보지 않는다 (중국음식 ↔ 중국부추, 냉메밀 ↔ 메밀면)")
+    void classifiesSplit_whenOnlyPartOfKeywordOverlaps() {
+        assertThat(KeywordMatchClassifier.classify("탕짜면", List.of("탕짜면", "짜장면", "탕수육", "중국음식", "중화요리", "면요리"),
+                false, "기스면", List.of("닭다리살", "대파", "소면", "중국부추", "당근")).type()).isEqualTo(Type.SPLIT);
+        assertThat(classify("들깨 삼계면", List.of("닭", "메밀면", "들깨"), false).type()).isEqualTo(Type.SPLIT);
     }
 
     @Test

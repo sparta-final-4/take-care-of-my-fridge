@@ -79,8 +79,8 @@ public final class RecommendationReasonWriter {
         Reason reason = candidate.reason();
         KeywordMatch keywordMatch = reason.keywordMatch();
         List<String> options = new ArrayList<>();
-        // 다른 분류로 바꿔 넣은 카드는 요청과 다른 제안이라고 먼저 말한다
-        if (candidate.alternative()) {
+        // 다른 분류로 바꿔 넣은 카드는 요청과 다른 제안이라고 먼저 말한다. 키워드로 맞은 카드는 맞은 방식대로 쓴다
+        if (candidate.alternative() && (keywordMatch == null || !keywordMatch.strong())) {
             options.add(ALTERNATIVE_REASON);
         }
         if (keywordMatch == null || keywordMatch.type() != KeywordMatch.Type.VECTOR) {

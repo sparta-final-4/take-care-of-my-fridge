@@ -1,6 +1,7 @@
 package org.example.takecareofmyfridgebe.domain.chat.facade;
 
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatCandidateProperties;
+import org.example.takecareofmyfridgebe.domain.chat.dto.KeywordMatch;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate.ImminentIngredient;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate.MissingIngredient;
@@ -21,11 +22,20 @@ import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeCandidateIngredi
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeCandidateInfo;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeListRequest;
 import org.example.takecareofmyfridgebe.domain.recipe.service.RecipeService;
+import org.example.takecareofmyfridgebe.domain.search.config.RecipeSearchProperties;
+import org.example.takecareofmyfridgebe.domain.search.config.SearchEngine;
 import org.example.takecareofmyfridgebe.domain.search.dto.RecipeSearchResult;
+import org.example.takecareofmyfridgebe.domain.search.service.RecipeCandidateSearchService;
+import org.example.takecareofmyfridgebe.domain.search.service.RecipeCandidateSearchService.CandidateHit;
+import org.example.takecareofmyfridgebe.domain.search.service.RecipeCandidateSearchService.Condition;
 import org.example.takecareofmyfridgebe.domain.search.service.RecipeSearchService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.io.IOException;
@@ -37,6 +47,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -46,6 +57,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+@ExtendWith(OutputCaptureExtension.class)
 class RecipeCandidateFacadeTest {
 
     private static final Long MEMBER_ID = 1L;
@@ -55,7 +67,11 @@ class RecipeCandidateFacadeTest {
     private RecipeService recipeService;
     private IngredientService ingredientService;
     private RecipeSearchService recipeSearchService;
+    private RecipeCandidateSearchService candidateSearchService;
+    // DB 경로 (ES를 쓰지 않는 설정). 아래 테스트 대부분은 DB 경로의 거르기·정렬을 확인한다
     private RecipeCandidateFacade facade;
+    // ES 후보 검색 경로
+    private RecipeCandidateFacade esFacade;
 
     @BeforeEach
     void setUp() {
@@ -64,11 +80,18 @@ class RecipeCandidateFacadeTest {
         recipeService = mock(RecipeService.class);
         ingredientService = mock(IngredientService.class);
         recipeSearchService = mock(RecipeSearchService.class);
-        facade = new RecipeCandidateFacade(fridgeService, memberService, recipeService, ingredientService, recipeSearchService,
+        candidateSearchService = mock(RecipeCandidateSearchService.class);
+        facade = facadeWith(SearchEngine.MYSQL);
+        esFacade = facadeWith(SearchEngine.ELASTICSEARCH);
+        when(fridgeService.getItems(any(), any())).thenReturn(List.of());
+    }
+
+    private RecipeCandidateFacade facadeWith(SearchEngine engine) {
+        return new RecipeCandidateFacade(fridgeService, memberService, recipeService, ingredientService, recipeSearchService,
+                candidateSearchService, new RecipeSearchProperties(engine, null, null),
                 new ChatCandidateProperties(List.of("양념", "음료"), 0.4,
                 List.of("청양고추", "고춧가루", "고추장", "고추기름", "건고추", "베트남고추", "페퍼론치노", "핫소스", "김치", "깍두기"),
                 List.of("백김치", "물김치", "동치미", "나박김치"), List.of("홍고추", "청고추")));
-        when(fridgeService.getItems(any(), any())).thenReturn(List.of());
     }
 
     @Test
@@ -333,6 +356,409 @@ class RecipeCandidateFacadeTest {
         assertThat(first.recipeId()).isEqualTo(10L);
         assertThat(first.reason().matchedWantedTastes()).containsExactly(Taste.SPICY);
         assertThat(avoiding.candidates()).extracting(RecipeCandidate::recipeId).doesNotContain(10L);
+    }
+
+    @Test
+    @DisplayName("ES 경로: \"디저트\"처럼 분류만 말하면 냉장고와 겹치지 않는 디저트도 후보에 들어오고 요청 일치로 센다")
+    void includesCategoryRecipe_whenNoFridgeOverlap() throws Exception {
+        when(memberService.getMyInfo(MEMBER_ID)).thenReturn(mock(MyInfoResponse.class));
+        when(fridgeService.getItems(any(), any())).thenReturn(List.of(fridgeItem(1L, "계란", 5)));
+        when(candidateSearchService.search(any())).thenReturn(List.of(hit(10L, RecipeCandidateSearchService.MATCH_CATEGORY)));
+        when(recipeService.findNonBasicIngredients(Set.of(10L)))
+                .thenReturn(List.of(new RecipeCandidateIngredient(10L, 5L, "찹쌀가루", false)));
+        when(recipeService.findCandidateInfos(Set.of(10L)))
+                .thenReturn(Map.of(10L, new RecipeCandidateInfo(10L, "찹쌀떡", "디저트", 40, 1)));
+
+        RecipeCandidates result = esFacade.findCandidates(
+                new RecipeQuery(MEMBER_ID, List.of(), null, List.of("디저트"), null, null, false));
+
+        assertThat(result.candidates()).extracting(RecipeCandidate::recipeId).containsExactly(10L);
+        assertThat(result.candidates().get(0).ranking().requestMatches()).isEqualTo(1);
+        assertThat(result.candidates().get(0).reason().missingIngredients()).containsExactly(new MissingIngredient(5L, "찹쌀가루"));
+        verify(recipeService, never()).findCandidateIngredients(any());
+    }
+
+    @Test
+    @DisplayName("ES 경로: 분류를 말했으면 요청 조건만 넣은 검색을 한 번 더 해 합치고, 재료·정보는 합친 후보로 한 번씩 읽는다")
+    void mergesRequestOnlyHits_whenCategoryGiven() throws Exception {
+        when(memberService.getMyInfo(MEMBER_ID)).thenReturn(mock(MyInfoResponse.class));
+        when(fridgeService.getItems(any(), any())).thenReturn(List.of(fridgeItem(1L, "두부", 5), fridgeItem(2L, "양파", 5)));
+        // 전체 조건 검색은 냉장고 재료가 많이 겹치는 레시피만, 요청만 검색(냉장고 재료 없음)은 디저트를 돌려준다
+        when(candidateSearchService.search(any())).thenAnswer(invocation -> {
+            Condition condition = invocation.getArgument(0);
+            return condition.fridgeIngredientIds().isEmpty()
+                    ? List.of(hit(30L, RecipeCandidateSearchService.MATCH_CATEGORY))
+                    : List.of(hit(20L, RecipeCandidateSearchService.MATCH_FRIDGE), hit(21L, RecipeCandidateSearchService.MATCH_FRIDGE));
+        });
+        when(recipeService.findNonBasicIngredients(Set.of(20L, 21L, 30L))).thenReturn(List.of(
+                new RecipeCandidateIngredient(20L, 1L, "두부", false),
+                new RecipeCandidateIngredient(20L, 2L, "양파", false),
+                new RecipeCandidateIngredient(21L, 1L, "두부", false),
+                new RecipeCandidateIngredient(30L, 5L, "찹쌀가루", false)));
+        when(recipeService.findCandidateInfos(Set.of(20L, 21L, 30L))).thenReturn(Map.of(
+                20L, new RecipeCandidateInfo(20L, "두부조림", "조림", 20, 2),
+                21L, new RecipeCandidateInfo(21L, "두부부침", "전", 20, 1),
+                30L, new RecipeCandidateInfo(30L, "찹쌀떡", "디저트", 40, 1)));
+
+        RecipeCandidates result = esFacade.findCandidates(
+                new RecipeQuery(MEMBER_ID, List.of(), null, List.of("디저트"), null, null, false));
+
+        assertThat(result.candidates()).extracting(RecipeCandidate::recipeId).containsExactlyInAnyOrder(20L, 21L, 30L);
+        verify(candidateSearchService, times(2)).search(any());
+        verify(recipeService, times(1)).findNonBasicIngredients(any());
+        verify(recipeService, times(1)).findCandidateInfos(any());
+    }
+
+    @Test
+    @DisplayName("ES 경로: 분류·키워드를 말하지 않았으면 요청 조건만 넣은 검색은 하지 않는다")
+    void skipsRequestOnlySearch_whenNoRequest() throws Exception {
+        when(memberService.getMyInfo(MEMBER_ID)).thenReturn(mock(MyInfoResponse.class));
+        when(fridgeService.getItems(any(), any())).thenReturn(List.of(fridgeItem(1L, "두부", 5)));
+        when(candidateSearchService.search(any())).thenReturn(List.of());
+
+        esFacade.findCandidates(RecipeQuery.of(MEMBER_ID, List.of()));
+
+        verify(candidateSearchService, times(1)).search(any());
+    }
+
+    @Test
+    @DisplayName("ES 경로: 기본 양념인 선택 재료는 검색 조건에서 빼고, 같은 종류 묶음은 펼쳐서 넘긴다")
+    void dropsBasicSelectedAndExpandsGroups_whenBuildingCondition() throws Exception {
+        Ingredient mushroom = ingredient(45L, "버섯", false);
+        Ingredient salt = ingredient(90L, "소금", true);
+        when(ingredientService.getIngredientsByIds(List.of(45L, 90L))).thenReturn(Map.of(45L, mushroom, 90L, salt));
+        when(ingredientService.findSameKindIdsByNames(any())).thenReturn(Map.of("버섯", List.of(45L, 161L)));
+        when(memberService.getMyInfo(MEMBER_ID)).thenReturn(mock(MyInfoResponse.class));
+        when(candidateSearchService.search(any())).thenReturn(List.of());
+
+        esFacade.findCandidates(RecipeQuery.of(MEMBER_ID, List.of(45L, 90L), true));
+
+        ArgumentCaptor<Condition> condition = ArgumentCaptor.forClass(Condition.class);
+        verify(candidateSearchService).search(condition.capture());
+        assertThat(condition.getValue().selectedIngredientIds()).containsExactlyInAnyOrder(45L, 161L);
+        assertThat(condition.getValue().selectedOnly()).isTrue();
+        assertThat(condition.getValue().excludeCategories()).containsExactly("양념", "음료");
+    }
+
+    @Test
+    @DisplayName("ES 검색이 실패하면 DB 경로로 모아 ES를 쓰지 않을 때와 같은 순서로 정렬한다")
+    void fallsBackToDb_whenSearchFails() throws Exception {
+        when(memberService.getMyInfo(MEMBER_ID)).thenReturn(mock(MyInfoResponse.class));
+        when(fridgeService.getItems(any(), any())).thenReturn(List.of(fridgeItem(1L, "두부", 0), fridgeItem(2L, "양파", 5)));
+        when(candidateSearchService.search(any())).thenThrow(new IOException("es down"));
+        when(recipeService.findCandidateIngredients(any())).thenReturn(List.of(
+                new RecipeCandidateIngredient(10L, 2L, "양파", false),
+                new RecipeCandidateIngredient(20L, 1L, "두부", false),
+                new RecipeCandidateIngredient(20L, 2L, "양파", false)));
+        when(recipeService.findCandidateInfos(any())).thenReturn(Map.of(
+                10L, new RecipeCandidateInfo(10L, "양파볶음", "볶음", 10, 1),
+                20L, new RecipeCandidateInfo(20L, "두부조림", "조림", 20, 2)));
+
+        List<Long> fromFallback = esFacade.findCandidates(RecipeQuery.of(MEMBER_ID, List.of())).candidates().stream()
+                .map(RecipeCandidate::recipeId).toList();
+        List<Long> fromDb = facade.findCandidates(RecipeQuery.of(MEMBER_ID, List.of())).candidates().stream()
+                .map(RecipeCandidate::recipeId).toList();
+
+        assertThat(fromFallback).containsExactly(20L, 10L);
+        assertThat(fromFallback).isEqualTo(fromDb);
+    }
+
+    @Test
+    @DisplayName("ES를 쓰지 않는 설정이면 후보 검색을 부르지 않고 DB 경로로 모은다")
+    void fallsBackToDb_whenElasticsearchDisabled() throws Exception {
+        when(memberService.getMyInfo(MEMBER_ID)).thenReturn(mock(MyInfoResponse.class));
+        when(fridgeService.getItems(any(), any())).thenReturn(List.of(fridgeItem(1L, "두부", 5)));
+
+        facade.findCandidates(RecipeQuery.of(MEMBER_ID, List.of()));
+
+        verify(candidateSearchService, never()).search(any());
+        verify(recipeService).findCandidateIngredients(any());
+    }
+
+    @Test
+    @DisplayName("ES 경로: 피할 맛을 빼서 3개가 안 되면 피할 맛 없이 다시 검색해 새로 나온 레시피를 뒤에 채운다")
+    void refillsAvoidedRecipes_whenFewerThanThree() throws Exception {
+        when(memberService.getMyInfo(MEMBER_ID)).thenReturn(mock(MyInfoResponse.class));
+        when(fridgeService.getItems(any(), any())).thenReturn(List.of(fridgeItem(1L, "두부", 5)));
+        when(candidateSearchService.search(any())).thenAnswer(invocation -> {
+            Condition condition = invocation.getArgument(0);
+            return condition.avoidTastes().isEmpty()
+                    ? List.of(hit(20L, RecipeCandidateSearchService.MATCH_FRIDGE), hit(10L, RecipeCandidateSearchService.MATCH_FRIDGE),
+                    hit(30L, RecipeCandidateSearchService.MATCH_FRIDGE))
+                    : List.of(hit(20L, RecipeCandidateSearchService.MATCH_FRIDGE));
+        });
+        givenEsRecipes(Map.of(
+                10L, new RecipeCandidateInfo(10L, "마파두부", "볶음", 20, 1),
+                20L, new RecipeCandidateInfo(20L, "두부조림", "조림", 20, 1),
+                30L, new RecipeCandidateInfo(30L, "두부김치", "볶음", 20, 1)));
+
+        RecipeCandidates result = esFacade.findCandidates(RecipeQuery.of(MEMBER_ID, List.of()).withAvoidTastes(List.of(Taste.SPICY)));
+
+        assertThat(result.candidates()).extracting(RecipeCandidate::recipeId).containsExactly(20L, 10L, 30L);
+        verify(candidateSearchService, times(2)).search(any());
+        // 다시 검색에서 새로 나온 레시피만 더 읽는다
+        verify(recipeService).findNonBasicIngredients(Set.of(20L));
+        verify(recipeService).findNonBasicIngredients(Set.of(10L, 30L));
+    }
+
+    @Test
+    @DisplayName("ES 경로: 피할 맛을 빼도 3개 이상이면 다시 검색하지 않는다")
+    void skipsRefillSearch_whenEnoughCandidates() throws Exception {
+        when(memberService.getMyInfo(MEMBER_ID)).thenReturn(mock(MyInfoResponse.class));
+        when(fridgeService.getItems(any(), any())).thenReturn(List.of(fridgeItem(1L, "두부", 5)));
+        when(candidateSearchService.search(any())).thenReturn(List.of(
+                hit(10L, RecipeCandidateSearchService.MATCH_FRIDGE), hit(20L, RecipeCandidateSearchService.MATCH_FRIDGE),
+                hit(30L, RecipeCandidateSearchService.MATCH_FRIDGE)));
+        givenEsRecipes(Map.of(
+                10L, new RecipeCandidateInfo(10L, "두부부침", "전", 20, 1),
+                20L, new RecipeCandidateInfo(20L, "두부조림", "조림", 20, 1),
+                30L, new RecipeCandidateInfo(30L, "두부국", "국", 20, 1)));
+
+        RecipeCandidates result = esFacade.findCandidates(RecipeQuery.of(MEMBER_ID, List.of()).withAvoidTastes(List.of(Taste.SPICY)));
+
+        assertThat(result.candidates()).hasSize(3);
+        verify(candidateSearchService, times(1)).search(any());
+    }
+
+    @Test
+    @DisplayName("ES 경로: 키워드로 맞은 레시피가 없으면 레시피 검색(벡터 보충)으로 찾은 레시피를 더하고 벡터로 찾은 것으로 표시한다")
+    void addsVectorHits_whenNoKeywordMatch() throws Exception {
+        when(memberService.getMyInfo(MEMBER_ID)).thenReturn(mock(MyInfoResponse.class));
+        when(candidateSearchService.search(any())).thenReturn(List.of());
+        when(recipeSearchService.search(any(RecipeListRequest.class))).thenReturn(new RecipeSearchResult(List.of(40L), 1, true));
+        givenEsRecipes(Map.of(40L, new RecipeCandidateInfo(40L, "탕수육", "튀김", 40, 1)));
+        RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, null, null, null, false, List.of("김피탕"), "김피탕");
+
+        RecipeCandidates result = esFacade.findCandidates(query);
+
+        assertThat(result.candidates()).extracting(RecipeCandidate::recipeId).containsExactly(40L);
+        assertThat(result.candidates().get(0).reason().keywordMatch().type()).isEqualTo(KeywordMatch.Type.VECTOR);
+        assertThat(result.keywordsNotFound()).isTrue();
+        verify(recipeService, times(1)).findNonBasicIngredients(Set.of(40L));
+    }
+
+    @Test
+    @DisplayName("ES 경로: 키워드로 맞은 레시피가 있으면 벡터 보충을 하지 않고, 이름이 맞은 것은 이름으로 가른다")
+    void skipsVectorSearch_whenKeywordMatched() throws Exception {
+        when(memberService.getMyInfo(MEMBER_ID)).thenReturn(mock(MyInfoResponse.class));
+        when(candidateSearchService.search(any())).thenReturn(List.of(hit(20L, RecipeCandidateSearchService.MATCH_KEYWORD)));
+        givenEsRecipes(Map.of(20L, new RecipeCandidateInfo(20L, "물냉면", "면류", 30, 1)));
+        RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, null, null, null, false, List.of("냉면"), "냉면");
+
+        RecipeCandidates result = esFacade.findCandidates(query);
+
+        assertThat(result.candidates().get(0).reason().keywordMatch().type()).isEqualTo(KeywordMatch.Type.NAME);
+        assertThat(result.keywordsNotFound()).isFalse();
+        verify(recipeSearchService, never()).search(any());
+    }
+
+    @Test
+    @DisplayName("ES 경로: \"디저트 추천해줘\"를 두 번 하면 두 번째는 이미 추천한 디저트를 뒤로 보내 다른 디저트가 앞에 온다")
+    void ranksOtherDesserts_whenSameRequestAgain() throws Exception {
+        when(memberService.getMyInfo(MEMBER_ID)).thenReturn(mock(MyInfoResponse.class));
+        when(candidateSearchService.search(any())).thenReturn(List.of(
+                hit(10L, RecipeCandidateSearchService.MATCH_CATEGORY), hit(20L, RecipeCandidateSearchService.MATCH_CATEGORY),
+                hit(30L, RecipeCandidateSearchService.MATCH_CATEGORY), hit(40L, RecipeCandidateSearchService.MATCH_CATEGORY),
+                hit(50L, RecipeCandidateSearchService.MATCH_CATEGORY), hit(60L, RecipeCandidateSearchService.MATCH_CATEGORY)));
+        givenEsRecipes(Map.of(
+                10L, new RecipeCandidateInfo(10L, "단호박푸딩", "디저트", 30, 1),
+                20L, new RecipeCandidateInfo(20L, "건강 마늘 꿀환", "디저트", 30, 1),
+                30L, new RecipeCandidateInfo(30L, "자색고구마찹쌀푸딩", "디저트", 30, 1),
+                40L, new RecipeCandidateInfo(40L, "완두콩 롤", "디저트", 30, 1),
+                50L, new RecipeCandidateInfo(50L, "오이 소르베", "디저트", 30, 1),
+                60L, new RecipeCandidateInfo(60L, "현미 크레이프", "디저트", 30, 1)));
+        RecipeQuery dessert = new RecipeQuery(MEMBER_ID, List.of(), null, List.of("디저트"), null, null, false);
+
+        List<RecipeCandidate> first = RecommendationPicker.pick(esFacade.findCandidates(dessert).candidates());
+        Set<Long> firstIds = first.stream().map(RecipeCandidate::recipeId).collect(Collectors.toSet());
+        List<RecipeCandidate> second = RecommendationPicker.pick(
+                esFacade.findCandidates(dessert.withAlreadyRecommended(firstIds)).candidates());
+
+        assertThat(second).extracting(RecipeCandidate::category).containsOnly("디저트");
+        assertThat(second).extracting(RecipeCandidate::recipeId).doesNotContainAnyElementsOf(firstIds);
+    }
+
+    @Test
+    @DisplayName("ES 경로: \"탕짜면\"처럼 ES가 글자 일부로만 걸어 온 레시피뿐이면 키워드로 맞은 게 없으므로 벡터로 보충하고 경로 로그에 벡터를 남긴다")
+    void suppliesVector_whenEsKeywordHitsAreWeak(CapturedOutput output) throws Exception {
+        when(memberService.getMyInfo(MEMBER_ID)).thenReturn(mock(MyInfoResponse.class));
+        when(candidateSearchService.search(any())).thenReturn(List.of(
+                hit(70L, RecipeCandidateSearchService.MATCH_KEYWORD), hit(71L, RecipeCandidateSearchService.MATCH_KEYWORD)));
+        when(recipeSearchService.search(any(RecipeListRequest.class))).thenReturn(new RecipeSearchResult(List.of(80L), 1, true));
+        givenEsRecipes(Map.of(
+                70L, new RecipeCandidateInfo(70L, "간장게장", "절임", 30, 1),
+                71L, new RecipeCandidateInfo(71L, "볶음쌀국수", "면류", 30, 1),
+                80L, new RecipeCandidateInfo(80L, "유니짜장", "면류", 30, 1)));
+        RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, null, null, null, false, List.of("탕짜면"), null);
+
+        RecipeCandidates result = esFacade.findCandidates(query);
+
+        assertThat(result.candidates()).extracting(RecipeCandidate::recipeId).contains(80L);
+        verify(recipeSearchService, times(1)).search(any());
+        assertThat(output).contains("경로: ES+요청만+벡터", "ES 호출 전체 1·요청만 1·피할 맛 재검색 0, 벡터 호출, ").containsPattern("벡터 호출, \\d+ms");
+    }
+
+    @Test
+    @DisplayName("ES 경로: 키워드가 겹쳐 와도 레시피 검색은 한 번씩만 하고, 벡터를 쓰면 생략한 키워드 수를 중복 없이 센다")
+    void searchesEachKeywordOnce_whenKeywordsDuplicated(CapturedOutput output) throws Exception {
+        when(memberService.getMyInfo(MEMBER_ID)).thenReturn(mock(MyInfoResponse.class));
+        when(candidateSearchService.search(any())).thenReturn(List.of());
+        when(recipeSearchService.search(any(RecipeListRequest.class))).thenAnswer(invocation -> {
+            RecipeListRequest request = invocation.getArgument(0);
+            return request.keyword().equals("짜장면")
+                    ? new RecipeSearchResult(List.of(), 0, true)
+                    : new RecipeSearchResult(List.of(), 0);
+        });
+        RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, null, null, null, false,
+                List.of("탕수육", "탕수육", "짜장면", "짜장면", "짬뽕", "짬뽕"), "탕짜면");
+
+        esFacade.findCandidates(query);
+
+        ArgumentCaptor<RecipeListRequest> requests = ArgumentCaptor.forClass(RecipeListRequest.class);
+        verify(recipeSearchService, times(2)).search(requests.capture());
+        assertThat(requests.getAllValues()).extracting(RecipeListRequest::keyword).containsExactly("탕수육", "짜장면");
+        assertThat(output).contains("짜장면 0건(벡터), 나머지 1개 생략");
+    }
+
+    @Test
+    @DisplayName("ES 경로: 글자로 0건인 키워드가 여럿이어도 벡터 검색은 앞의 1개만 한다")
+    void callsVectorOnce_whenManyKeywordsHaveNoHits() throws Exception {
+        when(memberService.getMyInfo(MEMBER_ID)).thenReturn(mock(MyInfoResponse.class));
+        when(candidateSearchService.search(any())).thenReturn(List.of());
+        when(recipeSearchService.search(any(RecipeListRequest.class))).thenReturn(new RecipeSearchResult(List.of(), 0, true));
+        RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, null, null, null, false,
+                List.of("탕짜면", "짜장면", "중화요리"), "탕짜면");
+
+        esFacade.findCandidates(query);
+
+        ArgumentCaptor<RecipeListRequest> request = ArgumentCaptor.forClass(RecipeListRequest.class);
+        verify(recipeSearchService, times(1)).search(request.capture());
+        assertThat(request.getValue().keyword()).isEqualTo("탕짜면");
+    }
+
+    @Test
+    @DisplayName("ES 경로: 키워드 결과로 표시되지 않은 후보도 이름에 키워드가 있으면 키워드로 맞은 것으로 보고 벡터 보충을 하지 않는다")
+    void countsNameMatch_whenEsDidNotMarkKeyword() throws Exception {
+        when(memberService.getMyInfo(MEMBER_ID)).thenReturn(mock(MyInfoResponse.class));
+        // ES는 키워드가 여럿이면 마지막 키워드(깐풍기)로 맞은 것만 표시한다. 탕수육은 표시 없이 온다
+        when(candidateSearchService.search(any())).thenReturn(List.of(
+                hit(433L, RecipeCandidateSearchService.MATCH_FRIDGE), hit(366L, RecipeCandidateSearchService.MATCH_KEYWORD)));
+        givenEsRecipes(Map.of(
+                433L, new RecipeCandidateInfo(433L, "탕수육", "튀김", 40, 1),
+                366L, new RecipeCandidateInfo(366L, "깐풍기", "튀김", 40, 1)));
+        RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, null, null, null, false,
+                List.of("김피탕", "탕수육", "깐풍기"), "김피탕");
+
+        RecipeCandidates result = esFacade.findCandidates(query);
+
+        RecipeCandidate tangsuyuk = result.candidates().stream().filter(c -> c.recipeId() == 433L).findFirst().orElseThrow();
+        assertThat(tangsuyuk.reason().keywordMatch().type()).isEqualTo(KeywordMatch.Type.EXPANDED);
+        assertThat(tangsuyuk.ranking().requestMatches()).isEqualTo(1);
+        verify(recipeSearchService, never()).search(any());
+    }
+
+    @Test
+    @DisplayName("ES 경로: 벡터 보충 후보도 ES와 같은 조건으로 걸러 양념·음료 분류, 뺄 재료(기본 양념 포함), 시간 초과, 피할 맛이면 카드에 오르지 않는다")
+    void filtersVectorSupplement_withSameConditionsAsEs() throws Exception {
+        long cucumber = 7L;
+        long garlic = 8L;
+        when(memberService.getMyInfo(MEMBER_ID)).thenReturn(mock(MyInfoResponse.class));
+        when(fridgeService.getItems(any(), any())).thenReturn(List.of(fridgeItem(1L, "두부", 5)));
+        // ES는 냉장고로만 맞은 후보 3개(키워드로 맞은 것 없음) → 벡터 보충
+        when(candidateSearchService.search(any())).thenReturn(List.of(
+                hit(10L, RecipeCandidateSearchService.MATCH_FRIDGE), hit(20L, RecipeCandidateSearchService.MATCH_FRIDGE),
+                hit(30L, RecipeCandidateSearchService.MATCH_FRIDGE)));
+        when(recipeSearchService.search(any(RecipeListRequest.class)))
+                .thenReturn(new RecipeSearchResult(List.of(90L, 91L, 92L, 93L, 94L, 95L), 6, true));
+        Map<Long, RecipeCandidateInfo> infos = Map.of(
+                10L, new RecipeCandidateInfo(10L, "두부부침", "전", 20, 1),
+                20L, new RecipeCandidateInfo(20L, "두부조림", "조림", 20, 1),
+                30L, new RecipeCandidateInfo(30L, "두부국", "국", 20, 1),
+                90L, new RecipeCandidateInfo(90L, "짜장 소스", "양념", 10, 1),
+                91L, new RecipeCandidateInfo(91L, "중국식 냉채", "무침", 20, 1),
+                92L, new RecipeCandidateInfo(92L, "짜장 덮밥", "밥", 90, 1),
+                93L, new RecipeCandidateInfo(93L, "짬뽕밥", "밥", 20, 1),
+                94L, new RecipeCandidateInfo(94L, "마늘 볶음밥", "밥", 20, 1),
+                95L, new RecipeCandidateInfo(95L, "중국식 음료", "음료", 5, 1));
+        when(recipeService.findCandidateInfos(any())).thenAnswer(invocation -> filter(infos, invocation.getArgument(0)));
+        when(recipeService.findNonBasicIngredients(any())).thenAnswer(invocation -> {
+            Collection<Long> ids = invocation.getArgument(0);
+            return ids.stream().filter(infos::containsKey)
+                    .map(id -> id == 91L
+                            ? new RecipeCandidateIngredient(id, cucumber, "오이", false)
+                            : new RecipeCandidateIngredient(id, 1L, "두부", false))
+                    .toList();
+        });
+        // 기본 양념인 뺄 재료(마늘)는 정렬 단계 재료 줄에 없어 따로 조회한다
+        when(recipeService.findCandidateIngredients(List.of(cucumber, garlic))).thenReturn(List.of(
+                new RecipeCandidateIngredient(91L, cucumber, "오이", false),
+                new RecipeCandidateIngredient(94L, garlic, "마늘", true)));
+        when(recipeService.findTastesByRecipeIds(any())).thenAnswer(invocation ->
+                filter(Map.of(93L, Set.of(Taste.SPICY)), invocation.getArgument(0)));
+        RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, null, 30, List.of(cucumber, garlic), false,
+                List.of("탕짜면"), null).withAvoidTastes(List.of(Taste.SPICY));
+
+        RecipeCandidates result = esFacade.findCandidates(query);
+
+        assertThat(result.candidates()).extracting(RecipeCandidate::recipeId).containsExactlyInAnyOrder(10L, 20L, 30L);
+    }
+
+    @Test
+    @DisplayName("ES 경로: 검색 결과가 하나도 없으면 레시피 재료·정보·맛을 조회하지 않고 빈 후보를 돌려준다")
+    void skipsRecipeLookups_whenNoCandidates() throws Exception {
+        when(memberService.getMyInfo(MEMBER_ID)).thenReturn(mock(MyInfoResponse.class));
+        when(fridgeService.getItems(any(), any())).thenReturn(List.of(fridgeItem(1L, "두부", 5)));
+        when(candidateSearchService.search(any())).thenReturn(List.of());
+
+        RecipeCandidates result = esFacade.findCandidates(
+                new RecipeQuery(MEMBER_ID, List.of(), null, List.of("디저트"), null, null, false));
+
+        assertThat(result.candidates()).isEmpty();
+        verify(recipeService, never()).findNonBasicIngredients(any());
+        verify(recipeService, never()).findCandidateInfos(any());
+        verify(recipeService, never()).findTastesByRecipeIds(any());
+    }
+
+    @Test
+    @DisplayName("ES 경로: 요청 조건만 넣은 검색이 0건이어도 예외 없이 전체 검색 결과로 고른다")
+    void continuesWithFullHits_whenRequestOnlyReturnsNothing() throws Exception {
+        when(memberService.getMyInfo(MEMBER_ID)).thenReturn(mock(MyInfoResponse.class));
+        when(fridgeService.getItems(any(), any())).thenReturn(List.of(fridgeItem(1L, "두부", 5)));
+        when(candidateSearchService.search(any())).thenAnswer(invocation -> {
+            Condition condition = invocation.getArgument(0);
+            return condition.fridgeIngredientIds().isEmpty()
+                    ? List.of()
+                    : List.of(hit(10L, RecipeCandidateSearchService.MATCH_FRIDGE));
+        });
+        givenEsRecipes(Map.of(10L, new RecipeCandidateInfo(10L, "두부조림", "조림", 20, 1)));
+
+        RecipeCandidates result = esFacade.findCandidates(
+                new RecipeQuery(MEMBER_ID, List.of(), null, List.of("디저트"), null, null, false));
+
+        assertThat(result.candidates()).extracting(RecipeCandidate::recipeId).containsExactly(10L);
+        verify(candidateSearchService, times(2)).search(any());
+    }
+
+    // ES로 찾히는 레시피들. 모두 두부(1번)를 쓰고, 정보·재료는 요청한 ID만 돌려준다
+    private void givenEsRecipes(Map<Long, RecipeCandidateInfo> infos) {
+        when(recipeService.findCandidateInfos(any())).thenAnswer(invocation -> filter(infos, invocation.getArgument(0)));
+        when(recipeService.findNonBasicIngredients(any())).thenAnswer(invocation -> {
+            Collection<Long> ids = invocation.getArgument(0);
+            return ids.stream().filter(infos::containsKey)
+                    .map(id -> new RecipeCandidateIngredient(id, 1L, "두부", false))
+                    .toList();
+        });
+    }
+
+    private static CandidateHit hit(Long recipeId, String... matched) {
+        return new CandidateHit(recipeId, 1.0, Set.of(matched));
+    }
+
+    private static Ingredient ingredient(Long id, String name, boolean basicSeasoning) {
+        Ingredient ingredient = Ingredient.builder().ingredientCode("ING_" + id).name(name).baseUnit("g")
+                .basicSeasoning(basicSeasoning).build();
+        ReflectionTestUtils.setField(ingredient, "id", id);
+        return ingredient;
     }
 
     private RecipeQuery avoidSpicy(List<String> keywords) {

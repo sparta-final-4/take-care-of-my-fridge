@@ -105,7 +105,8 @@ public class ChatIntentFacade {
             IntentResult raw = chatIntentExtractor.extract(memberId, sessionId, request.content(), categories, followUp(context));
             log.debug("상담 의도 AI 원본 - memberId: {}, sessionId: {}, 의도: {}, 원하는 맛: {}, 피할 맛: {}, removed: {}",
                     memberId, sessionId, raw.intent(), raw.wantedTastes(), raw.avoidTastes(), raw.removed());
-            result = correctTastes(memberId, sessionId, request.content(), raw.sanitize(categories));
+            result = correctCategories(memberId, sessionId, request.content(), categories, context,
+                    correctTastes(memberId, sessionId, request.content(), raw.sanitize(categories)));
         } catch (RuntimeException e) {
             log.warn("상담 의도 뽑기 실패, 선택 재료 유무로 정함 - memberId: {}, sessionId: {}, 선택 재료 수: {}, 원인: {}",
                     memberId, sessionId, request.selectedIngredientIds().size(), e.toString());
@@ -150,6 +151,66 @@ public class ChatIntentFacade {
                 result.excludeIngredients(), result.useSelectedOnly(), result.keywords(), result.dishText(),
                 result.preferenceText(), result.targetIndex(), result.targetName(), result.removed(), avoid,
                 result.detailQuestion());
+    }
+
+    /**
+     * 메시지에 분류 이름이 그대로 있으면 그 분류를 쓴다 (CategoryWordChecker). AI가 비웠거나 다른 분류를 넣었어도 이번 말이 앞선다.
+     * <ul>
+     *   <li>원하는 분류가 있으면 분류 조건은 그 분류만. 앞 대화에서 이어진 키워드·요리 이름(이번 말에 없는 것)은 뺀다
+     *       (김피탕 추천 뒤 "디저트 추천해줘"가 김피탕·튀김을 이어 가지 않게)</li>
+     *   <li>원하는 분류가 직전 분류와 다르면 removed에 KEYWORD를 더한다 (다시 추천에서도 직전 키워드를 이어 가지 않게)</li>
+     *   <li>피하는 분류("디저트 말고")는 분류 조건에서 빼고, 원하는 분류가 없으면 removed에 CATEGORY를 더한다 (직전 분류를 이어 가지 않게)</li>
+     * </ul>
+     * 바꿨으면 INFO로 남긴다 (채움: AI가 비움, 바꿈: AI와 다름).
+     */
+    IntentResult correctCategories(Long memberId, Long sessionId, String message, List<String> categories, ChatContext context,
+                                   IntentResult result) {
+        List<CategoryWordChecker.CategoryStance> stances = CategoryWordChecker.check(message, categories, chatTasteWordProperties);
+        if (stances.isEmpty()) {
+            return result;
+        }
+        List<String> wanted = stances.stream()
+                .filter(stance -> stance.stance() == CategoryWordChecker.Stance.WANT)
+                .map(CategoryWordChecker.CategoryStance::category)
+                .toList();
+        List<String> avoided = stances.stream()
+                .filter(stance -> stance.stance() == CategoryWordChecker.Stance.AVOID)
+                .map(CategoryWordChecker.CategoryStance::category)
+                .toList();
+        List<String> aiCategories = orEmpty(result.moodCategories());
+        List<String> removed = new ArrayList<>(orEmpty(result.removed()));
+        List<String> keywords = result.keywords();
+        String dishText = result.dishText();
+        List<String> finalCategories;
+        if (!wanted.isEmpty()) {
+            finalCategories = wanted;
+            QuerySnapshot previous = context.lastRecommendation() == null ? null : context.lastRecommendation().query();
+            List<String> previousKeywords = previous == null ? List.of() : previous.keywords();
+            String compactMessage = compact(message);
+            // 직전 조건에서 끌려온 키워드(이번 말에 없는 것)만 뺀다. 이번 말로 AI가 늘린 키워드는 둔다
+            keywords = keywords == null ? null : keywords.stream()
+                    .filter(keyword -> !previousKeywords.contains(keyword) || compactMessage.contains(compact(keyword)))
+                    .toList();
+            dishText = dishText != null && compactMessage.contains(compact(dishText)) ? dishText : null;
+            if (previous == null || !previous.moodCategories().containsAll(wanted)) {
+                addOnce(removed, RefineCondition.KEYWORD.name());
+            }
+        } else {
+            finalCategories = aiCategories.stream().filter(category -> !avoided.contains(category)).toList();
+            addOnce(removed, RefineCondition.CATEGORY.name());
+        }
+        IntentResult corrected = result.withCategories(finalCategories, keywords, dishText, removed);
+        String change = finalCategories.equals(aiCategories) ? "그대로" : aiCategories.isEmpty() ? "채움" : "바꿈";
+        log.info("상담 분류 단어 확인 - memberId: {}, sessionId: {}, 분류 {}: AI {} → {}, 원하는 분류: {}, 피할 분류: {}, "
+                        + "키워드: AI {} → {}, removed: {}",
+                memberId, sessionId, change, aiCategories, finalCategories, wanted, avoided, result.keywords(), keywords, removed);
+        return corrected;
+    }
+
+    private static void addOnce(List<String> values, String value) {
+        if (!values.contains(value)) {
+            values.add(value);
+        }
     }
 
     private static boolean sameTastes(List<String> corrected, List<String> original) {

@@ -2,6 +2,7 @@ package org.example.takecareofmyfridgebe.domain.chat.facade;
 
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse.RecommendedRecipe;
+import org.example.takecareofmyfridgebe.domain.chat.dto.KeywordMatch;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate.ImminentIngredient;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate.MissingIngredient;
@@ -202,6 +203,59 @@ class ChatRecommendationFacadeTest {
         when(recipeService.getRecipe(20L)).thenThrow(new BusinessException(ErrorCode.RECIPE_NOT_FOUND));
 
         assertThat(facade.describe(MEMBER_ID, 20L)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("AI가 요리 이름을 비웠어도 말에 있는 키워드(탕짜면)가 레시피 이름에 없으면 요리 이름으로 채워 못 찾았다는 안내와 비슷한 요리 이유를 쓴다")
+    void fillsDishText_whenSpokenKeywordHasNoRecipe() {
+        givenKeywordCandidates(keywordCandidate(10L, "탕수육", "튀김", "탕수육"),
+                keywordCandidate(20L, "황태볶음면", "면류", "볶음면"));
+        RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, null, null, null, false,
+                List.of("탕짜면", "탕수육", "볶음면"), null);
+
+        RecommendationReply reply = facade.recommend("탕짜면 먹고 싶어", query);
+
+        assertThat(reply.notices()).containsExactly("탕짜면 레시피는 없어서, 비슷한 탕수육과 볶음면을 골랐어요");
+        assertThat(reply.event().recipes().get(0).reason()).isEqualTo("탕짜면과 비슷한 탕수육이에요");
+    }
+
+    @Test
+    @DisplayName("말에 있는 키워드가 레시피 이름에 있으면 요리 이름을 채우지 않고 못 찾았다는 안내도 붙이지 않는다")
+    void keepsDishTextEmpty_whenSpokenKeywordHasRecipe() {
+        givenKeywordCandidates(keywordCandidate(10L, "탕수육", "튀김", "탕수육"));
+        RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, null, null, null, false, List.of("탕수육"), null);
+
+        RecommendationReply reply = facade.recommend("탕수육 먹고 싶어", query);
+
+        assertThat(reply.notices()).isEmpty();
+        assertThat(reply.event().recipes().get(0).reason()).isEqualTo("탕수육 요리예요");
+    }
+
+    @Test
+    @DisplayName("말에 없는 키워드(AI가 늘린 이름)로는 요리 이름을 채우지 않는다")
+    void skipsFill_whenKeywordNotSpoken() {
+        assertThat(ChatRecommendationFacade.spokenDishWithoutRecipe("차가운 요리 추천해줘",
+                new RecipeQuery(MEMBER_ID, List.of(), null, null, null, null, false, List.of("냉면", "냉국"), null),
+                List.of())).isEmpty();
+        assertThat(ChatRecommendationFacade.spokenDishWithoutRecipe("김피탕 같은 메뉴 추천해줘",
+                new RecipeQuery(MEMBER_ID, List.of(), null, null, null, null, false, List.of("김피탕", "탕수육"), null),
+                List.of(keywordCandidate(10L, "탕수육", "튀김", "탕수육")))).contains("김피탕");
+    }
+
+    private void givenKeywordCandidates(RecipeCandidate... candidates) {
+        when(recipeCandidateFacade.findCandidates(any())).thenReturn(new RecipeCandidates(List.of(candidates), true));
+        when(recipeService.findSummaries(any())).thenReturn(Map.of());
+    }
+
+    // 늘린 이름(키워드)으로 맞은 후보 (요청 일치 1)
+    private static RecipeCandidate keywordCandidate(Long id, String name, String category, String keyword) {
+        return new RecipeCandidate(id, name, category, 30, new Ranking(1, 0, 0, 0, 0, 3, 3), expanded(keyword));
+    }
+
+    // 늘린 이름(키워드)으로 맞은 후보 근거
+    private static Reason expanded(String keyword) {
+        return new Reason(List.of(), List.of(), List.of(), List.of(), List.of("키워드: 늘린 이름"), false, true, List.of(),
+                List.of(), List.of(), new KeywordMatch(KeywordMatch.Type.EXPANDED, keyword, null));
     }
 
     private static RecipeCandidate candidate(Long id, String name, String category, Integer cookTimeMin, Reason reason) {

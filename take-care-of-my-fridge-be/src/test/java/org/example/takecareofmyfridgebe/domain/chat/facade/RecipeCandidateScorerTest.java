@@ -74,6 +74,20 @@ class RecipeCandidateScorerTest {
         }
 
         @Test
+        @DisplayName("받은 후보 id는 냉장고·선택 재료와 겹치지 않아도 다시 거르지 않고 정렬한다")
+        void ranksGivenCandidates_whenNoFridgeOverlap() {
+            recipe(10L, "약과", "디저트", 40, 3, PORK);
+            recipe(20L, "계란찜", "찜", 20, 1, EGG);
+            RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, List.of("디저트"), null, null, false);
+
+            RecipeCandidates result = scorer.rank(query, List.of(stock(EGG, "계란", 10)), List.of(), rows, infos, tastes,
+                    List.of(10L, 20L));
+
+            assertThat(result.candidates()).extracting(RecipeCandidate::recipeId).containsExactly(10L, 20L);
+            assertThat(result.candidates().get(0).ranking().requestMatches()).isEqualTo(1);
+        }
+
+        @Test
         @DisplayName("임박 재료가 1개 들어간 레시피가 선호 맛이 2개 겹친 레시피보다 앞선다")
         void ranksImminentFirst_overTaste() {
             recipe(10L, "두부부침", "전", 20, 1, TOFU);
@@ -732,6 +746,20 @@ class RecipeCandidateScorerTest {
         }
 
         @Test
+        @DisplayName("말한 분류가 맞은 레시피는 재료를 많이 사야 해도 1차 후보로 두어 보유 비율 기준 이상인 다른 레시피보다 앞선다")
+        void keepsCategoryRecipeInFirstTier_whenLacksMany() {
+            recipe(10L, "계란찜", "찜", 20, 1, EGG);
+            recipe(20L, "약과", "디저트", 40, 5, PORK);
+            RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, List.of("디저트"), null, null, false);
+
+            RecipeCandidates result = ratioScorer.rank(query, List.of(stock(EGG, "계란", 0)), List.of(), rows, infos, tastes,
+                    List.of(10L, 20L));
+
+            assertThat(result.candidates()).extracting(RecipeCandidate::recipeId).containsExactly(20L, 10L);
+            assertThat(result.candidates().get(0).reason().lacksManyIngredients()).isTrue();
+        }
+
+        @Test
         @DisplayName("벡터 검색으로만 찾거나 단어가 쪼개져 걸린 레시피는 후보에는 넣지만 키워드 일치·1차 후보로 치지 않는다")
         void skipsKeywordCredit_whenVectorOrSplit() {
             recipe(10L, "계란국", "국", 20, 1, EGG);
@@ -818,7 +846,7 @@ class RecipeCandidateScorerTest {
 
     private RecipeCandidates rank(RecipeCandidateScorer target, RecipeQuery query, List<FridgeStock> fridge,
                                   List<Taste> memberTastes) {
-        return target.rank(query, fridge, memberTastes, rows, infos, tastes);
+        return target.rank(query, fridge, memberTastes, rows, infos, tastes, target.candidateRecipeIds(query, fridge, rows));
     }
 
     // 레시피 하나를 등록한다. ingredientIds는 기본 양념이 아닌 재료이고, 이름은 재료 ID로 정한다

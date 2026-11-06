@@ -2,6 +2,7 @@ package org.example.takecareofmyfridgebe.domain.chat.dto;
 
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -104,6 +105,26 @@ public record RecipeQuery(
         return new RecipeQuery(memberId, selectedIngredientIds, wantedTastes, moodCategories, maxMinutes,
                 excludeIngredientIds, useSelectedOnly, keywords, keywordText, preferenceText, groups, keywordMatches,
                 alreadyRecommendedIds, avoidTastes);
+    }
+
+    // 선택 재료에서 주어진 재료(기본 양념 등)를 뺀 검색 조건. 그 재료의 같은 종류 묶음도 뺀다
+    public RecipeQuery withoutSelectedIngredients(Set<Long> ingredientIds) {
+        if (ingredientIds.isEmpty()) {
+            return this;
+        }
+        List<Long> selected = selectedIngredientIds.stream().filter(id -> !ingredientIds.contains(id)).toList();
+        Map<Long, Set<Long>> groups = new HashMap<>(selectedIngredientGroups);
+        groups.keySet().removeAll(ingredientIds);
+        return new RecipeQuery(memberId, selected, wantedTastes, moodCategories, maxMinutes,
+                excludeIngredientIds, useSelectedOnly, keywords, keywordText, preferenceText, groups, keywordMatches,
+                alreadyRecommendedIds, avoidTastes);
+    }
+
+    // 요리 이름을 채운 검색 조건 (AI가 비웠을 때 서버가 채운다)
+    public RecipeQuery withKeywordText(String dishText) {
+        return new RecipeQuery(memberId, selectedIngredientIds, wantedTastes, moodCategories, maxMinutes,
+                excludeIngredientIds, useSelectedOnly, keywords, dishText, preferenceText, selectedIngredientGroups,
+                keywordMatches, alreadyRecommendedIds, avoidTastes);
     }
 
     // 키워드 검색 결과를 채운 검색 조건

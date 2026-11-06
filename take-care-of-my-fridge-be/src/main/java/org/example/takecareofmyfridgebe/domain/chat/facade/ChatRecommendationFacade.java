@@ -70,11 +70,20 @@ public class ChatRecommendationFacade {
      *
      * @param previousCardIds 직전 추천 카드 레시피 ID ("다른 거 없어?"에서 같은 카드가 다시 나오지 않게)
      */
-    public RecommendationReply recommend(String content, RecipeQuery query, Collection<Long> previousCardIds) {
-        RecipeCandidates found = recipeCandidateFacade.findCandidates(query);
+    public RecommendationReply recommend(String content, RecipeQuery request, Collection<Long> previousCardIds) {
+        RecipeCandidates found = recipeCandidateFacade.findCandidates(request);
+        RecipeQuery query = request;
+        // AI가 요리 이름을 비웠는데 말에 그대로 있는 키워드가 레시피 이름에 하나도 없으면 그 이름을 요리 이름으로 쓴다
+        // ("탕짜면 먹고 싶어" → "탕짜면 레시피는 없어서…" 안내, 카드 이유 "탕짜면과 비슷한 탕수육이에요")
+        Optional<String> spokenDish = spokenDishWithoutRecipe(content, request, found.candidates());
+        if (spokenDish.isPresent()) {
+            query = request.withKeywordText(spokenDish.get());
+            found = new RecipeCandidates(found.candidates(), found.fallback(), true);
+            log.info("상담 요리 이름 채움 - memberId: {}, 요리 이름: {} (AI가 비움, 레시피 이름에 없음)", request.memberId(), spokenDish.get());
+        }
         List<RecipeCandidate> candidates = withoutPrevious(found.candidates(), previousCardIds);
         logCandidates(query, candidates);
-        List<RecipeCandidate> picked = RecommendationPicker.pick(candidates);
+        List<RecipeCandidate> picked = RecommendationPicker.pick(candidates, query.keywords());
 
         Map<Long, RecipeSummary> summaries = recipeService.findSummaries(
                 picked.stream().map(RecipeCandidate::recipeId).toList());
@@ -94,6 +103,26 @@ public class ChatRecommendationFacade {
                 ? List.of()
                 : RecommendationPromptBuilder.notices(query, picked, found.keywordsNotFound());
         return new RecommendationReply(ChatRecommendationsEventResponse.of(recipes), candidateInfo, notices);
+    }
+
+    /**
+     * AI가 요리 이름을 비웠을 때 채울 이름. 키워드 중 사용자 말에 그대로(공백 무시) 있는 첫 이름이고(두 글자 이상),
+     * 고른 후보 레시피 이름에 그 이름이 하나도 없을 때만 돌려준다. 레시피 이름에 있으면 늘린 이름으로 맞은 그대로 둔다.
+     */
+    static Optional<String> spokenDishWithoutRecipe(String content, RecipeQuery query, List<RecipeCandidate> candidates) {
+        if (query.keywordText() != null || content == null) {
+            return Optional.empty();
+        }
+        String message = compact(content);
+        return query.keywords().stream()
+                .filter(keyword -> compact(keyword).length() >= 2 && message.contains(compact(keyword)))
+                .findFirst()
+                .filter(keyword -> candidates.stream()
+                        .noneMatch(candidate -> candidate.name() != null && compact(candidate.name()).contains(compact(keyword))));
+    }
+
+    private static String compact(String text) {
+        return text.replaceAll("\\s+", "");
     }
 
     // 후보 10개의 정렬 단계별 값 (DEBUG). 정렬 순서: 요청 > 선택 > (선택이 있으면) 모자람 아님 > 임박 > 맛 > 보유 비율 > 없는 재료 수 > id
