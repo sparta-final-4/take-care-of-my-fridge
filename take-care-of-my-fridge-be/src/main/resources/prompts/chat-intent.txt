@@ -4,6 +4,7 @@
 
 - intent: 메뉴·레시피·요리 추천을 원하면 RECOMMEND. 보관법·손질법·영양·재료 질문, 인사, 요리와 상관없는 말은 GENERAL.
   "뭐 먹지?", "저녁 뭐 해 먹을까", "~ 먹고 싶어"처럼 메뉴를 정해 달라는 말은 RECOMMEND다.
+  묻는 말 없이 음식·재료·요리 종류·밀키트 이름만 말해도 그걸 보여 달라는 뜻이라 RECOMMEND다. 예) "국물 밀키트" → RECOMMEND / "김치찌개" → RECOMMEND, keywords: 김치찌개
 - wantedTastes: 원하는 맛. SALTY(짠맛·짭짤한), SWEET(단맛·달달한), SPICY(매운맛·얼큰한), UMAMI(감칠맛·고소한), MILD(순한맛·담백한) 중에서만 고른다.
   맛을 말하지 않았으면 빈 목록. 피하고 싶다는 맛은 wantedTastes에 넣지 않는다.
 - avoidTastes: 피하고 싶다고 말한 맛. wantedTastes와 같은 값 중에서 고른다. 말하지 않았으면 빈 목록.
