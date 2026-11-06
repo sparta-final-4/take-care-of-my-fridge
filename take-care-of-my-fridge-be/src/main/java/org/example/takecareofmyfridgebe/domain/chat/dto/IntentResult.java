@@ -133,6 +133,12 @@ public record IntentResult(
         );
     }
 
+    // 서버가 메시지의 분류 단어로 분류·키워드·요리 이름·뺄 조건을 바로잡은 결과 (CategoryWordChecker)
+    public IntentResult withCategories(List<String> categories, List<String> keywords, String dishText, List<String> removed) {
+        return new IntentResult(intent, wantedTastes, categories, maxMinutes, includeIngredients, excludeIngredients,
+                useSelectedOnly, keywords, dishText, preferenceText, targetIndex, targetName, removed, avoidTastes, detailQuestion);
+    }
+
     // 빼라고 한 조건 종류. sanitize한 뒤에 쓴다 (없으면 빈 집합)
     public Set<RefineCondition> removedConditions() {
         if (removed == null) {

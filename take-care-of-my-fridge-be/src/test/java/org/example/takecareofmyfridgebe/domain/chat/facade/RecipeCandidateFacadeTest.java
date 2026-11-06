@@ -44,6 +44,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -545,6 +546,32 @@ class RecipeCandidateFacadeTest {
         assertThat(result.candidates().get(0).reason().keywordMatch().type()).isEqualTo(KeywordMatch.Type.NAME);
         assertThat(result.keywordsNotFound()).isFalse();
         verify(recipeSearchService, never()).search(any());
+    }
+
+    @Test
+    @DisplayName("ES 경로: \"디저트 추천해줘\"를 두 번 하면 두 번째는 이미 추천한 디저트를 뒤로 보내 다른 디저트가 앞에 온다")
+    void ranksOtherDesserts_whenSameRequestAgain() throws Exception {
+        when(memberService.getMyInfo(MEMBER_ID)).thenReturn(mock(MyInfoResponse.class));
+        when(candidateSearchService.search(any())).thenReturn(List.of(
+                hit(10L, RecipeCandidateSearchService.MATCH_CATEGORY), hit(20L, RecipeCandidateSearchService.MATCH_CATEGORY),
+                hit(30L, RecipeCandidateSearchService.MATCH_CATEGORY), hit(40L, RecipeCandidateSearchService.MATCH_CATEGORY),
+                hit(50L, RecipeCandidateSearchService.MATCH_CATEGORY), hit(60L, RecipeCandidateSearchService.MATCH_CATEGORY)));
+        givenEsRecipes(Map.of(
+                10L, new RecipeCandidateInfo(10L, "단호박푸딩", "디저트", 30, 1),
+                20L, new RecipeCandidateInfo(20L, "건강 마늘 꿀환", "디저트", 30, 1),
+                30L, new RecipeCandidateInfo(30L, "자색고구마찹쌀푸딩", "디저트", 30, 1),
+                40L, new RecipeCandidateInfo(40L, "완두콩 롤", "디저트", 30, 1),
+                50L, new RecipeCandidateInfo(50L, "오이 소르베", "디저트", 30, 1),
+                60L, new RecipeCandidateInfo(60L, "현미 크레이프", "디저트", 30, 1)));
+        RecipeQuery dessert = new RecipeQuery(MEMBER_ID, List.of(), null, List.of("디저트"), null, null, false);
+
+        List<RecipeCandidate> first = RecommendationPicker.pick(esFacade.findCandidates(dessert).candidates());
+        Set<Long> firstIds = first.stream().map(RecipeCandidate::recipeId).collect(Collectors.toSet());
+        List<RecipeCandidate> second = RecommendationPicker.pick(
+                esFacade.findCandidates(dessert.withAlreadyRecommended(firstIds)).candidates());
+
+        assertThat(second).extracting(RecipeCandidate::category).containsOnly("디저트");
+        assertThat(second).extracting(RecipeCandidate::recipeId).doesNotContainAnyElementsOf(firstIds);
     }
 
     // ES로 찾히는 레시피들. 모두 두부(1번)를 쓰고, 정보·재료는 요청한 ID만 돌려준다

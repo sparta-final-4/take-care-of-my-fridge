@@ -62,12 +62,14 @@ public final class TasteWordChecker {
         return found ? Optional.of(Stance.WANT) : Optional.empty();
     }
 
-    private static boolean negatedBefore(String before, ChatTasteWordProperties words) {
+    // 단어 바로 앞에 부정어("안·덜")가 붙었는지. 분류 단어 확인(CategoryWordChecker)도 같은 기준을 쓴다
+    static boolean negatedBefore(String before, ChatTasteWordProperties words) {
         return words.negationBefore().stream().map(TasteWordChecker::compact)
                 .anyMatch(negation -> !negation.isEmpty() && before.endsWith(negation));
     }
 
-    private static boolean negatedAfter(String text, int from, ChatTasteWordProperties words) {
+    // 단어 뒤 AFTER_WINDOW글자 안에 부정어("말고·빼고·않·싫·없이")가 있는지
+    static boolean negatedAfter(String text, int from, ChatTasteWordProperties words) {
         String after = text.substring(from, Math.min(text.length(), from + AFTER_WINDOW));
         return words.negationAfter().stream().map(TasteWordChecker::compact)
                 .anyMatch(negation -> !negation.isEmpty() && after.contains(negation));
