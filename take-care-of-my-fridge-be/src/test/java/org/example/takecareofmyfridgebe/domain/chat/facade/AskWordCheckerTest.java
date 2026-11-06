@@ -12,7 +12,8 @@ class AskWordCheckerTest {
 
     static final ChatAskWordProperties WORDS = new ChatAskWordProperties(
             List.of("기준", "어떻게", "왜", "방법", "얼마나", "보관", "가격", "차이", "뭐가달라", "뭐가다른"),
-            List.of("추천", "뭐있", "보여줘", "먹고싶", "사고싶", "골라줘"));
+            List.of("추천", "뭐있", "보여줘", "먹고싶", "사고싶", "골라줘"),
+            List.of("있어", "있나", "있을까", "없어", "뭐가좋아", "살만한"));
 
     @Test
     @DisplayName("달라는 말만 있으면 달라는 말이다 (밀키트 뭐 있어, 디저트 추천해줘, 매운 거 먹고 싶어)")
@@ -31,6 +32,16 @@ class AskWordCheckerTest {
             assertThat(AskWordChecker.asks(message, WORDS)).as(message).isTrue();
             assertThat(AskWordChecker.requests(message, WORDS)).as(message).isFalse();
         }
+    }
+
+    @Test
+    @DisplayName("밀키트와 같이 쓴 \"있어·있나·없어·뭐가 좋아\"는 달라는 말이고, 묻는 말이 같이 있으면 묻는 말이 이긴다")
+    void returnsMealkitRequest_whenExistenceWord() {
+        for (String message : List.of("국물 밀키트 있어?", "밀키트 있나?", "밀키트 있을까", "밀키트 없어?", "밀키트 뭐가 좋아?", "살 만한 밀키트")) {
+            assertThat(AskWordChecker.requestsMealkit(message, WORDS)).as(message).isTrue();
+        }
+        assertThat(AskWordChecker.requestsMealkit("밀키트 추천 기준 있어?", WORDS)).isFalse();
+        assertThat(AskWordChecker.requests("국물 밀키트 있어?", WORDS)).isFalse();
     }
 
     @Test

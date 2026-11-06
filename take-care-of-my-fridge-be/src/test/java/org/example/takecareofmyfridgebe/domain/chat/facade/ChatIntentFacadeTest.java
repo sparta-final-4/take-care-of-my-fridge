@@ -169,6 +169,19 @@ class ChatIntentFacadeTest {
         }
 
         @Test
+        @DisplayName("밀키트와 같이 \"있어·있나\"라고 하면 AI가 GENERAL이어도 추천으로 바꾸고, \"추천 기준 있어?\"는 일반 그대로 둔다")
+        void recommends_whenMealkitWithExistenceWord() {
+            givenExtracted(IntentResult.general());
+
+            for (String message : List.of("국물 밀키트 있어?", "밀키트 있나?")) {
+                assertThat(facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of(message)).intent())
+                        .as(message).isEqualTo(ChatIntent.RECOMMEND);
+            }
+            assertThat(facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("밀키트 추천 기준 있어?")).intent())
+                    .isEqualTo(ChatIntent.GENERAL);
+        }
+
+        @Test
         @DisplayName("AI가 GENERAL이라고 한 묻는 말(추천 기준·어떻게·보관)은 밀키트·분류·맛 단어가 있어도 서버가 추천으로 바꾸지 않는다")
         void keepsGeneral_whenQuestionMessages() {
             givenExtracted(IntentResult.general());

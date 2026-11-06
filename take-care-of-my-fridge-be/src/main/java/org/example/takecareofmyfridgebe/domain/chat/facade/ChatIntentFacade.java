@@ -147,7 +147,7 @@ public class ChatIntentFacade {
 
     /**
      * "밀키트 뭐 있어"처럼 밀키트를 달라는 말인데 AI가 일반 대화로 본 말은 추천으로 바꾼다 (밀키트 카드는 추천 답에만 붙는다).
-     * 달라는 말이 있고 묻는 말이 없을 때만 바꾼다 (AskWordChecker). "밀키트 추천 기준이 뭐야?"는 묻는 말이라 일반 답 그대로다.
+     * 달라는 말이 있고 묻는 말이 없을 때만 바꾼다 (AskWordChecker). 밀키트와 같이 쓴 "있어·있나·없어"도 달라는 말로 본다. "밀키트 추천 기준이 뭐야?"는 묻는 말이라 일반 답 그대로다.
      * "국물 밀키트"처럼 달라는 말이 없는 짧은 말은 AI 판단을 따른다.
      */
     private boolean mealkitRequested(Long memberId, Long sessionId, String message) {
@@ -156,7 +156,7 @@ public class ChatIntentFacade {
         if (!mealkit) {
             return false;
         }
-        if (AskWordChecker.requests(message, chatAskWordProperties)) {
+        if (AskWordChecker.requestsMealkit(message, chatAskWordProperties)) {
             log.info("상담 밀키트를 달라고 해 일반 대화를 추천으로 - memberId: {}, sessionId: {}", memberId, sessionId);
             return true;
         }

@@ -25,6 +25,13 @@ public final class AskWordChecker {
         return containsAny(text, words.request()) && !containsAny(text, words.question());
     }
 
+    // 밀키트와 같이 쓴 말: 달라는 말에 "있어·있나·없어·뭐가 좋아·살 만한"도 더하고, 묻는 말이 없는지 ("국물 밀키트 있어?")
+    public static boolean requestsMealkit(String message, ChatAskWordProperties words) {
+        String text = compact(message);
+        return (containsAny(text, words.request()) || containsAny(text, words.mealkitRequest()))
+                && !containsAny(text, words.question());
+    }
+
     private static boolean containsAny(String text, List<String> words) {
         return words.stream().map(AskWordChecker::compact).anyMatch(word -> !word.isEmpty() && text.contains(word));
     }
