@@ -111,8 +111,8 @@ class ChatIntentPromptTest {
         assertThat(followUp).doesNotContain("wantedTastes: SPICY", "avoidTastes: SPICY", "\"맛은 상관없어\"", "\"두부 안 넣어도 돼\"",
                 "\"맛있게 하는 팁\"", "생략", "[다른 제안]", "[이미 안내한 말]");
         assertThat(followUp.lines().filter(line -> line.contains("예)"))).hasSize(5);
-        // 35% 줄이기 전(1,809자)보다 짧게 둔다
-        assertThat(followUp.length()).isLessThan(1_600);
+        // 35% 줄이기 전(1,809자)보다 짧게 둔다. 이름만 말한 말·새 추천의 맛 규칙을 더해 1,650자까지
+        assertThat(followUp.length()).isLessThan(1_650);
     }
 
     @Test

@@ -145,6 +145,10 @@ public class ChatIntentFacade {
             result = correctCategories(memberId, sessionId, request.content(), categories, context,
                     correctTastes(memberId, sessionId, request.content(), result));
         }
+        // 새 추천은 앞 대화의 맛을 잇지 않는다 (앞 조건 이어 가기는 다시 추천만). AI가 따라 넣은 맛은 이번 말에 없으면 뺀다
+        if (result.intent() == ChatIntent.RECOMMEND || mealkitRecommend) {
+            result = keepSpokenTastes(memberId, sessionId, request.content(), result);
+        }
         ChatIntentResolution resolution = switch (result.intent()) {
             case RECOMMEND -> ChatIntentResolution.recommend(Source.AI, toRecipeQuery(memberId, sessionId, request, result));
             case REFINE -> refine(memberId, sessionId, request, result, context);
@@ -272,6 +276,34 @@ public class ChatIntentFacade {
                 result.excludeIngredients(), result.useSelectedOnly(), result.keywords(), result.dishText(),
                 result.preferenceText(), result.targetIndex(), result.targetName(), result.removed(), avoid,
                 result.detailQuestion());
+    }
+
+    /**
+     * 새 추천의 원하는 맛·피할 맛은 이번 말에 그 맛 단어가 있을 때만 남긴다 (TasteWordChecker.mentioned).
+     * "매운 거 말고" 다음 "김치찌개"에서 AI가 앞의 피할 맛(매운맛)을 따라 넣어 김치찌개가 빠지는 것을 막는다. 비웠으면 INFO로 남긴다.
+     */
+    IntentResult keepSpokenTastes(Long memberId, Long sessionId, String message, IntentResult result) {
+        Set<Member.Taste> spoken = TasteWordChecker.mentioned(message, chatTasteWordProperties);
+        List<String> wanted = orEmpty(result.wantedTastes()).stream().filter(taste -> spokenTaste(spoken, taste)).toList();
+        List<String> avoid = orEmpty(result.avoidTastes()).stream().filter(taste -> spokenTaste(spoken, taste)).toList();
+        if (wanted.size() == orEmpty(result.wantedTastes()).size() && avoid.size() == orEmpty(result.avoidTastes()).size()) {
+            return result;
+        }
+        log.info("상담 새 추천이라 이번 말에 없는 맛을 뺌 - memberId: {}, sessionId: {}, 원하는 맛: {} → {}, 피할 맛: {} → {}",
+                memberId, sessionId, result.wantedTastes(), wanted, result.avoidTastes(), avoid);
+        return new IntentResult(result.intent(), wanted, result.moodCategories(), result.maxMinutes(), result.includeIngredients(),
+                result.excludeIngredients(), result.useSelectedOnly(), result.keywords(), result.dishText(),
+                result.preferenceText(), result.targetIndex(), result.targetName(), result.removed(), avoid,
+                result.detailQuestion());
+    }
+
+    // AI가 준 맛 이름(SPICY 등)이 이번 말에 나온 맛인지. 모르는 이름은 sanitize가 이미 걸렀다
+    private static boolean spokenTaste(Set<Member.Taste> spoken, String taste) {
+        try {
+            return spoken.contains(Member.Taste.valueOf(taste));
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
     }
 
     /**

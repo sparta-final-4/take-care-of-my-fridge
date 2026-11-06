@@ -13,16 +13,25 @@ import java.util.List;
  * @param sweet          단맛 단어 ("달달한 거", "단 거")
  * @param negationBefore 맛 단어 바로 앞에 오면 피하는 말 ("안 맵게", "덜 달게")
  * @param negationAfter  맛 단어 뒤 몇 글자 안에 오면 피하는 말 ("매운 거 말고", "맵지 않게", "단 거 싫어")
+ * @param salty          짠맛 단어. 원하는·피할 맛 보정에는 쓰지 않고, 새 추천에서 이번 말에 그 맛을 말했는지만 본다
+ * @param umami          감칠맛 단어 (salty와 같은 용도)
+ * @param mild           순한맛 단어 (salty와 같은 용도)
  */
 @ConfigurationProperties(prefix = "app.chat.taste-words")
 public record ChatTasteWordProperties(
         @DefaultValue({"매운", "맵게", "맵지", "매콤", "얼큰", "칼칼"})
         List<String> spicy,
-        @DefaultValue({"달달", "달게", "단거"})
+        @DefaultValue({"달달", "달게", "단거", "단걸", "달콤", "단맛"})
         List<String> sweet,
         @DefaultValue({"안", "덜"})
         List<String> negationBefore,
         @DefaultValue({"말고", "빼고", "않", "싫", "없이"})
-        List<String> negationAfter
+        List<String> negationAfter,
+        @DefaultValue({"짠", "짭짤", "짜게", "짭조름"})
+        List<String> salty,
+        @DefaultValue({"감칠", "고소"})
+        List<String> umami,
+        @DefaultValue({"순한", "담백", "슴슴", "심심", "자극적이지"})
+        List<String> mild
 ) {
 }

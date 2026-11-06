@@ -822,6 +822,32 @@ class ChatIntentFacadeTest {
         }
 
         @Test
+        @DisplayName("\"매운 거 말고\" 뒤 \"김치찌개\"는 새 추천이라 AI가 따라 넣은 피할 맛을 빼고, 이번 말에 맛이 있으면 그 맛은 남긴다")
+        void dropsCarriedTastes_whenNewRecommend() {
+            RecipeQuery noSpicy = previous.withAvoidTastes(List.of(Taste.SPICY));
+            ChatContext afterAvoid = new ChatContext(List.of(), LastRecommendation.of(noSpicy, List.of(10L)), context.lastCards());
+            givenExtracted(new IntentResult(ChatIntent.RECOMMEND, List.of("SWEET"), List.of("찌개"), 0, List.of(), List.of(), false,
+                    List.of("김치찌개"), "김치찌개", null, null, null, List.of(), List.of("SPICY")));
+
+            RecipeQuery stew = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("김치찌개"), afterAvoid)
+                    .recipeQuery();
+
+            assertThat(stew.avoidTastes()).isEmpty();
+            assertThat(stew.wantedTastes()).isEmpty();
+            assertThat(stew.keywords()).containsExactly("김치찌개");
+
+            givenExtracted(new IntentResult(ChatIntent.RECOMMEND, List.of("SPICY"), null, 0, List.of(), List.of(), false,
+                    List.of(), null, null, null, null, List.of(), List.of()));
+            assertThat(facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("매운 거 추천해줘"), afterAvoid)
+                    .recipeQuery().wantedTastes()).containsExactly(Taste.SPICY);
+
+            givenExtracted(new IntentResult(ChatIntent.RECOMMEND, null, null, 0, List.of(), List.of(), false,
+                    List.of("김치찌개"), "김치찌개", null, null, null, List.of(), List.of("SPICY")));
+            assertThat(facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("매운 거 말고 김치찌개 줘"), afterAvoid)
+                    .recipeQuery().avoidTastes()).containsExactly(Taste.SPICY);
+        }
+
+        @Test
         @DisplayName("피할 맛을 이어 가다가 \"다시 매운 걸로\"처럼 그 맛을 원하면 피할 맛에서 푼다")
         void releasesAvoidTaste_whenWantedAgain() {
             RecipeQuery noSpicy = previous.withAvoidTastes(List.of(Taste.SPICY));
