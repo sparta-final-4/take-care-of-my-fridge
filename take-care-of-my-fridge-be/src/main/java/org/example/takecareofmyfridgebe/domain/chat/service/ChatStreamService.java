@@ -50,7 +50,7 @@ public class ChatStreamService {
     static final String NO_RECIPE_REPLY = "조건에 맞는 레시피를 찾지 못했어요. 시간을 늘리거나, 선택 재료를 줄이거나, 다른 요리 종류로 다시 물어봐 주세요.";
     // 물어본 레시피가 지워졌을 때 답 (AI를 부르지 않는다)
     static final String RECIPE_GONE_REPLY = "물어보신 레시피는 지금 볼 수 없어요. 다른 레시피를 물어봐 주세요.";
-    // 요리와 상관없는 질문(의도 OFF_TOPIC)의 답 (답 생성 AI를 부르지 않고 하루 횟수를 돌려준다)
+    // 요리와 상관없는 질문(의도 OFF_TOPIC)의 답 (답 생성 AI를 부르지 않는다. 의도 판단 AI를 썼으므로 하루 횟수는 센다)
     static final String OFF_TOPIC_REPLY = "저는 요리, 냉장고 재료, 장보기 상담만 도와드릴 수 있어요. 냉장고 재료로 만들 요리를 추천해 드릴까요?";
     // 사용자가 보낸 말에 건강 관련 말이 있으면 답 끝에 빈 줄 하나를 두고 붙이는 안내 (추천 답은 소개 글 끝, 곧 카드 바로 위)
     static final String HEALTH_NOTICE = "일반적인 정보예요. 질환·알레르기·임신·복용 중인 약과 관련된 판단은 의사나 약사와 상담해 주세요.";
@@ -81,7 +81,7 @@ public class ChatStreamService {
      * 첫 조각 뒤에 실패하거나 사용자가 끊으면(cancel) 돌려주지 않는다.
      * 금지어·자해·탈취 단어에 걸린 말은 하루 횟수를 늘리기 전에 걸러, AI 없이 안내 답을 보내고 횟수를 세지 않는다.
      * 의도 판단이 상관없는 질문(OFF_TOPIC)·목록 밖 욕설·탈취(BLOCKED)·자해(SELF_HARM)면 답 생성 AI 없이 안내 답을 보내고,
-     * 저장한 뒤 하루 횟수를 돌려준다(의도 판단 비용은 감수). BLOCKED·SELF_HARM은 걸러진 메시지(filtered)로 저장한다.
+     * 의도 판단 AI를 썼으므로 하루 횟수는 센다 (AI를 썼으면 센다). BLOCKED·SELF_HARM은 걸러진 메시지(filtered)로 저장한다.
      * 보낸 말에 건강 관련 말(질환·알레르기·임신·약)이 있으면 답 끝에 상담 안내를 message로 하나 더 보내고 같이 저장한다 (하루 횟수는 센다).
      * 안전 장치 안내에는 붙이지 않고, 답 조각이 하나도 없으면 붙이지 않는다 (안내는 첫 조각으로 치지 않는다).
      *
@@ -119,13 +119,6 @@ public class ChatStreamService {
         // 이 답의 계획(추천이면 조건·카드)과 카드별 설명. 답이 끝나면 AI 메시지와 함께 저장한다
         AtomicReference<ReplyPlan> planRef = new AtomicReference<>();
         List<StringBuilder> descriptions = new ArrayList<>();
-        // 하루 횟수는 한 번만 돌려준다 (서버 안내 답은 저장 뒤, 실패는 오류에서)
-        AtomicBoolean refunded = new AtomicBoolean(false);
-        Runnable refundOnce = () -> {
-            if (refunded.compareAndSet(false, true)) {
-                chatDailyLimitService.refund(limitKey);
-            }
-        };
 
         // 5. 의도·조건 뽑기 → (추천이면) 후보 검색 → 카드 (event: recommendations) → 답변 스트리밍 조각 (event: message)
         // 의도 판단·후보 검색은 AI·DB·검색을 부르는 블로킹 작업이라 boundedElastic에서 실행한다.
@@ -180,7 +173,7 @@ public class ChatStreamService {
         // 알레르기 안내(추천 답에서 재료를 뺐을 때)가 있으면 건강 안내 앞에 한 메시지로 붙인다
         Flux<ServerSentEvent<String>> healthNotice = Flux.defer(() -> {
             ReplyPlan plan = planRef.get();
-            if (plan == null || plan.uncounted() || !firstChunkReceived.get()) {
+            if (plan == null || plan.serverNotice() || !firstChunkReceived.get()) {
                 return Flux.empty();
             }
             List<String> lines = new ArrayList<>();
@@ -208,21 +201,15 @@ public class ChatStreamService {
                 log.warn("상담 답이 비어 있음 - memberId: {}, sessionId: {}", memberId, sessionId);
                 return Mono.error(new BusinessException(ErrorCode.CHAT_AI_UNAVAILABLE));
             }
-            ReplyPlan plan = planRef.get();
-            return saveExchange(sessionId, content, accumulated, plan, descriptions)
-                    .doOnSuccess(done -> {
-                        if (plan != null && plan.uncounted()) {
-                            refundOnce.run();
-                        }
-                    });
+            return saveExchange(sessionId, content, accumulated, planRef.get(), descriptions);
         });
 
-        // 7. 실패 시 에러 이벤트 (event: error) 및 로깅. 첫 조각 전 실패이거나 세지 않는 답(서버 안내)이면 하루 횟수를 돌려준다
+        // 7. 실패 시 에러 이벤트 (event: error) 및 로깅. 첫 조각 전 실패면 하루 횟수를 돌려준다
+        // 의도 판단으로 서버 안내를 보낸 답(OFF_TOPIC·BLOCKED·SELF_HARM)은 의도 판단 AI를 썼으므로 센다 (안내 글이 첫 조각이라 돌려주지 않는다)
         return Flux.concat(messageStream, healthNotice, doneStream)
                 .onErrorResume(e -> {
-                    ReplyPlan plan = planRef.get();
-                    if (!firstChunkReceived.get() || (plan != null && plan.uncounted())) {
-                        refundOnce.run();
+                    if (!firstChunkReceived.get()) {
+                        chatDailyLimitService.refund(limitKey);
                     }
                     return Flux.just(errorEvent(sessionId, e));
                 })
@@ -327,7 +314,7 @@ public class ChatStreamService {
     /**
      * 답 방식. recommendation이 있으면 추천(query는 추천에 쓴 조건, 직전 추천으로 Redis에 둔다),
      * detail이 있으면 레시피 자세히, recipeGone이면 물어본 레시피가 지워져 정해진 답,
-     * declined가 있으면 답 생성 AI 없이 서버 안내(하루 횟수를 돌려줌), 모두 없으면 일반 답.
+     * declined가 있으면 답 생성 AI 없이 서버 안내(의도 판단 AI를 썼으므로 하루 횟수는 셈), 모두 없으면 일반 답.
      */
     private record ReplyPlan(ChatContext context, RecommendationReply recommendation, RecipeQuery query,
                              RecipeDetailReply detail, boolean recipeGone, Declined declined, List<String> allergens) {
@@ -344,8 +331,8 @@ public class ChatStreamService {
             return new ReplyPlan(context, null, null, null, false, declined, List.of());
         }
 
-        // 하루 횟수를 세지 않는 답인지 (서버 안내)
-        private boolean uncounted() {
+        // 의도 판단으로 답 생성 AI 없이 서버 안내를 보내는 답인지 (건강·알레르기 안내를 붙이지 않는다)
+        private boolean serverNotice() {
             return declined != null;
         }
 
