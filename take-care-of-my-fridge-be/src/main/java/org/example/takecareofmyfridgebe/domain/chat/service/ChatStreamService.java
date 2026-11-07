@@ -2,6 +2,7 @@ package org.example.takecareofmyfridgebe.domain.chat.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.example.takecareofmyfridgebe.domain.chat.config.ChatHealthWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatSafetyWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatDoneEventResponse;
@@ -23,6 +24,7 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.ChatSafetyBlock;
 import org.example.takecareofmyfridgebe.domain.chat.facade.ChatContextFacade;
 import org.example.takecareofmyfridgebe.domain.chat.facade.ChatIntentFacade;
 import org.example.takecareofmyfridgebe.domain.chat.facade.ChatRecommendationFacade;
+import org.example.takecareofmyfridgebe.domain.chat.facade.HealthWordChecker;
 import org.example.takecareofmyfridgebe.domain.chat.facade.SafetyWordChecker;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
@@ -50,6 +52,9 @@ public class ChatStreamService {
     static final String RECIPE_GONE_REPLY = "물어보신 레시피는 지금 볼 수 없어요. 다른 레시피를 물어봐 주세요.";
     // 요리와 상관없는 질문(의도 OFF_TOPIC)의 답 (답 생성 AI를 부르지 않고 하루 횟수를 돌려준다)
     static final String OFF_TOPIC_REPLY = "저는 요리, 냉장고 재료, 장보기 상담만 도와드릴 수 있어요. 냉장고 재료로 만들 요리를 추천해 드릴까요?";
+    // 사용자가 보낸 말에 건강 관련 말이 있으면 답 끝에 빈 줄 하나를 두고 붙이는 안내 (추천 답은 소개 글 끝, 곧 카드 바로 위)
+    static final String HEALTH_NOTICE = "일반적인 정보예요. 질환·알레르기·임신·복용 중인 약과 관련된 판단은 의사나 약사와 상담해 주세요.";
+    static final String HEALTH_NOTICE_SEPARATOR = "\n\n";
 
     private final ChatMessageService chatMessageService;
     private final ChatStreamLockService chatStreamLockService;
@@ -60,6 +65,7 @@ public class ChatStreamService {
     private final ChatContextFacade chatContextFacade;
     private final ChatContextStore chatContextStore;
     private final ChatSafetyWordProperties chatSafetyWordProperties;
+    private final ChatHealthWordProperties chatHealthWordProperties;
     private final ObjectMapper objectMapper;
 
     /**
@@ -74,6 +80,8 @@ public class ChatStreamService {
      * 금지어·자해·탈취 단어에 걸린 말은 하루 횟수를 늘리기 전에 걸러, AI 없이 안내 답을 보내고 횟수를 세지 않는다.
      * 의도 판단이 상관없는 질문(OFF_TOPIC)·목록 밖 욕설·탈취(BLOCKED)·자해(SELF_HARM)면 답 생성 AI 없이 안내 답을 보내고,
      * 저장한 뒤 하루 횟수를 돌려준다(의도 판단 비용은 감수). BLOCKED·SELF_HARM은 걸러진 메시지(filtered)로 저장한다.
+     * 보낸 말에 건강 관련 말(질환·알레르기·임신·약)이 있으면 답 끝에 상담 안내를 message로 하나 더 보내고 같이 저장한다 (하루 횟수는 센다).
+     * 안전 장치 안내에는 붙이지 않고, 답 조각이 하나도 없으면 붙이지 않는다 (안내는 첫 조각으로 치지 않는다).
      *
      * @param memberId  회원 ID
      * @param sessionId 세션 ID
@@ -165,6 +173,19 @@ public class ChatStreamService {
                     return Flux.concat(Mono.just(cards), textEvents);
                 });
 
+        // 건강 안내: 보낸 말만 본다 (AI 답은 보지 않는다). 답이 끝난 뒤 빈 줄 하나를 두고 붙여 화면·저장 모두 답 끝에 둔다
+        boolean healthMentioned = HealthWordChecker.mentions(content, chatHealthWordProperties);
+        Flux<ServerSentEvent<String>> healthNotice = Flux.defer(() -> {
+            ReplyPlan plan = planRef.get();
+            if (!healthMentioned || plan == null || plan.uncounted() || !firstChunkReceived.get()) {
+                return Flux.empty();
+            }
+            String notice = accumulated.isEmpty() ? HEALTH_NOTICE : HEALTH_NOTICE_SEPARATOR + HEALTH_NOTICE;
+            accumulated.append(notice);
+            log.info("상담 건강 관련 말이라 답 끝에 안내를 붙임 - memberId: {}, sessionId: {}", memberId, sessionId);
+            return Flux.just(messageEvent(notice));
+        });
+
         // 6. 스트림 정상 완료 시 DB 저장 후 종료 이벤트 (event: done)
         // 블로킹 I/O(DB 저장)가 Reactor 계산/이벤트루프 스레드를 점유하지 않도록 Schedulers.boundedElastic()에서 실행
         // 조각 없이 끝난 빈 답은 저장하지 않고 오류로 보낸다 (아래 7에서 하루 횟수를 돌려준다)
@@ -183,7 +204,7 @@ public class ChatStreamService {
         });
 
         // 7. 실패 시 에러 이벤트 (event: error) 및 로깅. 첫 조각 전 실패이거나 세지 않는 답(서버 안내)이면 하루 횟수를 돌려준다
-        return Flux.concat(messageStream, doneStream)
+        return Flux.concat(messageStream, healthNotice, doneStream)
                 .onErrorResume(e -> {
                     ReplyPlan plan = planRef.get();
                     if (!firstChunkReceived.get() || (plan != null && plan.uncounted())) {
