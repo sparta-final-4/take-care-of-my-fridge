@@ -51,6 +51,7 @@ import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -766,6 +767,38 @@ class RecipeCandidateFacadeTest {
     }
 
     // ES로 찾히는 레시피들. 모두 두부(1번)를 쓰고, 정보·재료는 요청한 ID만 돌려준다
+    @Test
+    @DisplayName("ES 경로: 콕 집은 요리(새우볶음밥)여도 뺄 재료(알레르기)가 들어 있으면 뺀다 — ES 조건에 뺄 재료를 넣고, 정렬 단계도 재료로 다시 거른다")
+    void dropsNamedDish_whenItUsesExcludedIngredient() throws Exception {
+        long shrimp = 50L;
+        long salted = 51L;
+        when(memberService.getMyInfo(MEMBER_ID)).thenReturn(mock(MyInfoResponse.class));
+        when(candidateSearchService.search(any())).thenReturn(List.of(
+                hit(10L, RecipeCandidateSearchService.MATCH_KEYWORD), hit(30L, RecipeCandidateSearchService.MATCH_FRIDGE)));
+        Map<Long, RecipeCandidateInfo> infos = Map.of(
+                10L, new RecipeCandidateInfo(10L, "새우볶음밥", "밥", 20, 1),
+                30L, new RecipeCandidateInfo(30L, "두부조림", "조림", 20, 1));
+        when(recipeService.findCandidateInfos(any())).thenAnswer(invocation -> filter(infos, invocation.getArgument(0)));
+        when(recipeService.findNonBasicIngredients(any())).thenAnswer(invocation -> {
+            Collection<Long> ids = invocation.getArgument(0);
+            return ids.stream().filter(infos::containsKey)
+                    .map(id -> id == 10L
+                            ? new RecipeCandidateIngredient(id, shrimp, "새우", false)
+                            : new RecipeCandidateIngredient(id, 1L, "두부", false))
+                    .toList();
+        });
+        RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, null, null, List.of(shrimp, salted), false,
+                List.of("새우볶음밥"), "새우볶음밥");
+
+        RecipeCandidates result = esFacade.findCandidates(query);
+
+        ArgumentCaptor<Condition> condition = ArgumentCaptor.forClass(Condition.class);
+        verify(candidateSearchService, atLeastOnce()).search(condition.capture());
+        assertThat(condition.getAllValues()).allSatisfy(sent ->
+                assertThat(sent.excludeIngredientIds()).containsExactlyInAnyOrder(shrimp, salted));
+        assertThat(result.candidates()).extracting(RecipeCandidate::recipeId).doesNotContain(10L).contains(30L);
+    }
+
     private void givenEsRecipes(Map<Long, RecipeCandidateInfo> infos) {
         when(recipeService.findCandidateInfos(any())).thenAnswer(invocation -> filter(infos, invocation.getArgument(0)));
         when(recipeService.findNonBasicIngredients(any())).thenAnswer(invocation -> {

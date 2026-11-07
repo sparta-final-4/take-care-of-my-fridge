@@ -203,6 +203,21 @@ public class ChatMessageService {
      * 안전 장치로 걸러진 말과 그 안내 답(filtered)은 빼고 센다 (걸린 말이 다음 AI 호출에 들어가지 않게).
      */
     public List<ChatMessageResponse> findRecentMessages(Long sessionId) {
+        return findRecent(sessionId);
+    }
+
+    /**
+     * 이 상담에서 사용자가 보낸 말 (오래된 것부터). 안전 장치로 걸러진 말(filtered)은 뺀다.
+     * 알레르기 재료를 상담 전체에서 다시 찾을 때 쓴다 (다시 추천·새 추천 모두 이어 가게).
+     */
+    public List<String> findUserContents(Long sessionId) {
+        return chatMessageRepository.findBySessionIdAndRoleAndFilteredFalseOrderBySequenceAsc(sessionId, ChatMessageRole.USER)
+                .stream()
+                .map(ChatMessage::getContent)
+                .toList();
+    }
+
+    private List<ChatMessageResponse> findRecent(Long sessionId) {
         List<ChatMessageResponse> recent = new ArrayList<>(chatMessageRepository.findTop6BySessionIdAndFilteredFalseOrderBySequenceDesc(sessionId).stream()
                 .map(ChatMessageResponse::from)
                 .toList());

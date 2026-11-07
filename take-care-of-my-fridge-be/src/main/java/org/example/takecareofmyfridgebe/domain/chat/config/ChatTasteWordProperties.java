@@ -25,7 +25,7 @@ public record ChatTasteWordProperties(
         List<String> sweet,
         @DefaultValue({"안", "덜"})
         List<String> negationBefore,
-        @DefaultValue({"말고", "빼고", "않", "싫", "없이"})
+        @DefaultValue({"말고", "빼고", "않", "싫", "없이", "못먹"})
         List<String> negationAfter,
         @DefaultValue({"짠", "짭짤", "짜게", "짭조름"})
         List<String> salty,

@@ -15,7 +15,7 @@ class TasteWordCheckerTest {
 
     static final ChatTasteWordProperties WORDS = new ChatTasteWordProperties(
             List.of("매운", "맵게", "맵지", "매콤", "얼큰", "칼칼"), List.of("달달", "달게", "단거", "단걸", "달콤", "단맛"),
-            List.of("안", "덜"), List.of("말고", "빼고", "않", "싫", "없이"),
+            List.of("안", "덜"), List.of("말고", "빼고", "않", "싫", "없이", "못먹"),
             List.of("짠", "짭짤", "짜게", "짭조름"), List.of("감칠", "고소"), List.of("순한", "담백", "슴슴", "심심", "자극적이지"));
 
     @Test
@@ -59,5 +59,11 @@ class TasteWordCheckerTest {
         assertThat(TasteWordChecker.mentioned("짭짤하고 고소한 거", WORDS)).containsExactlyInAnyOrder(Taste.SALTY, Taste.UMAMI);
         assertThat(TasteWordChecker.mentioned("담백한 거", WORDS)).containsExactly(Taste.MILD);
         assertThat(TasteWordChecker.mentioned("김치찌개", WORDS)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("\"매운 거 못 먹어\"는 맛 단어 뒤에 \"못 먹\"이 있어 매운맛을 피하는 말이다")
+    void returnsAvoidSpicy_whenCannotEatSpicy() {
+        assertThat(TasteWordChecker.check("매운 거 못 먹어", WORDS)).containsExactly(new TasteStance(Taste.SPICY, Stance.AVOID));
     }
 }

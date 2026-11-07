@@ -1376,4 +1376,61 @@ class ChatStreamServiceTest {
         assertThat(events.get(0).data()).contains("CHAT_010");
         verify(chatDailyLimitService).refund(LIMIT_KEY);
     }
+
+    @Test
+    @DisplayName("알레르기 안내는 받침에 따라 이/가를 고르고 여러 재료는 가운뎃점으로 잇는다 (땅콩이, 새우가, 땅콩·새우가)")
+    void buildsAllergyNotice_withParticle() {
+        assertThat(ChatStreamService.allergyNotice(List.of("땅콩")))
+                .isEqualTo("땅콩이 들어간 레시피는 뺐어요. 양념이나 가공품에 성분이 들어 있을 수 있으니 재료를 꼭 확인해 주세요.");
+        assertThat(ChatStreamService.allergyNotice(List.of("새우"))).startsWith("새우가 들어간 레시피는 뺐어요.");
+        assertThat(ChatStreamService.allergyNotice(List.of("땅콩", "새우"))).startsWith("땅콩·새우가 들어간 레시피는 뺐어요.");
+    }
+
+    @Test
+    @DisplayName("추천에서 알레르기 재료를 뺐으면 소개 글 끝(카드 바로 위)에 알레르기 안내를 붙이고, 건강 말이 있으면 건강 안내를 이어 붙인다")
+    void appendsAllergyNoticeAboveCards_whenAllergensExcluded() {
+        Long sessionId = 10L;
+        ChatMessageCreateRequest request = ChatMessageCreateRequest.of("땅콩 알레르기 있어, 뭐 먹지");
+        RecipeQuery query = RecipeQuery.of(1L, List.of());
+        when(chatIntentFacade.resolve(eq(1L), eq(sessionId), eq(request), any()))
+                .thenReturn(ChatIntentResolution.recommend(Source.AI, query).withAllergens(List.of("땅콩"), List.of(101L)));
+        RecipeQuery excluded = query.withExcludedIngredients(List.of(101L));
+        when(chatMessageService.findRecommendedRecipeIds(sessionId)).thenReturn(Set.of());
+        when(chatRecommendationFacade.recommend(request.content(), excluded.withAlreadyRecommended(Set.of()), List.of(), sessionId))
+                .thenReturn(new RecommendationReply(ChatRecommendationsEventResponse.of(List.of(card(314L, "두부조림"))), "후보 정보"));
+        when(chatReplyGenerator.generateRecommendation(1L, sessionId, request.content(), "후보 정보"))
+                .thenReturn(Flux.just("[소개] 두부 요리예요.\n[1] 짭짤해요."));
+        when(chatMessageService.saveExchange(eq(sessionId), eq(request.content()), any(), any())).thenReturn(List.of(
+                new ChatMessageResponse(100L, 1, ChatMessageRole.USER, request.content(), LocalDateTime.now()),
+                new ChatMessageResponse(101L, 2, ChatMessageRole.ASSISTANT, "답", LocalDateTime.now())));
+
+        List<ServerSentEvent<String>> events = chatStreamService.streamMessage(1L, sessionId, request).collectList().block();
+
+        String expectedTail = ChatStreamService.HEALTH_NOTICE_SEPARATOR + ChatStreamService.allergyNotice(List.of("땅콩"))
+                + "\n" + ChatStreamService.HEALTH_NOTICE;
+        assertThat(events.get(events.size() - 2).event()).isEqualTo("message");
+        assertThat(events.get(events.size() - 2).data()).contains("땅콩이 들어간 레시피는 뺐어요.", ChatStreamService.HEALTH_NOTICE);
+        verify(chatMessageService).saveExchange(eq(sessionId), eq(request.content()), eq("두부 요리예요." + expectedTail), any());
+    }
+
+    @Test
+    @DisplayName("알레르기 재료를 빼서 후보가 없으면 \"찾지 못했어요\" 답 뒤에 알레르기 안내를 붙인다")
+    void appendsAllergyNoticeToNoRecipeReply() {
+        Long sessionId = 10L;
+        ChatMessageCreateRequest request = ChatMessageCreateRequest.of("새우 못 먹어, 새우볶음밥 줘");
+        RecipeQuery query = RecipeQuery.of(1L, List.of());
+        when(chatIntentFacade.resolve(eq(1L), eq(sessionId), eq(request), any()))
+                .thenReturn(ChatIntentResolution.recommend(Source.AI, query).withAllergens(List.of("새우"), List.of(50L)));
+        when(chatMessageService.findRecommendedRecipeIds(sessionId)).thenReturn(Set.of());
+        when(chatRecommendationFacade.recommend(eq(request.content()), any(), eq(List.of()), eq(sessionId)))
+                .thenReturn(new RecommendationReply(ChatRecommendationsEventResponse.of(List.of()), "후보 정보"));
+        when(chatMessageService.saveExchange(eq(sessionId), eq(request.content()), any())).thenReturn(List.of(
+                new ChatMessageResponse(100L, 1, ChatMessageRole.USER, request.content(), LocalDateTime.now()),
+                new ChatMessageResponse(101L, 2, ChatMessageRole.ASSISTANT, "답", LocalDateTime.now())));
+
+        chatStreamService.streamMessage(1L, sessionId, request).collectList().block();
+
+        verify(chatMessageService).saveExchange(sessionId, request.content(), ChatStreamService.NO_RECIPE_REPLY
+                + ChatStreamService.HEALTH_NOTICE_SEPARATOR + ChatStreamService.allergyNotice(List.of("새우")));
+    }
 }

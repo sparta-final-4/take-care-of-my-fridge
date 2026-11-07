@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Stream;
 
 /**
  * 레시피 후보 검색 조건.
@@ -107,6 +108,19 @@ public record RecipeQuery(
         return new RecipeQuery(memberId, selectedIngredientIds, wantedTastes, moodCategories, maxMinutes,
                 excludeIngredientIds, useSelectedOnly, keywords, keywordText, preferenceText, groups, keywordMatches,
                 alreadyRecommendedIds, avoidTastes);
+    }
+
+    // 뺄 재료를 더한 검색 조건 (알레르기 재료). 선택 재료에 있으면 선택 재료에서도 뺀다 (뺄 재료가 앞선다)
+    public RecipeQuery withExcludedIngredients(Collection<Long> ingredientIds) {
+        if (ingredientIds == null || ingredientIds.isEmpty()) {
+            return this;
+        }
+        List<Long> excluded = Stream.concat(excludeIngredientIds.stream(), ingredientIds.stream())
+                .distinct()
+                .toList();
+        return new RecipeQuery(memberId, selectedIngredientIds, wantedTastes, moodCategories, maxMinutes,
+                excluded, useSelectedOnly, keywords, keywordText, preferenceText, selectedIngredientGroups, keywordMatches,
+                alreadyRecommendedIds, avoidTastes).withoutSelectedIngredients(Set.copyOf(ingredientIds));
     }
 
     // 선택 재료에서 주어진 재료(기본 양념 등)를 뺀 검색 조건. 그 재료의 같은 종류 묶음도 뺀다

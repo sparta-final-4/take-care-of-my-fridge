@@ -82,6 +82,7 @@ public class ChatIntentFacade {
     private final ChatAskWordProperties chatAskWordProperties;
     private final ChatCategoryWordProperties chatCategoryWordProperties;
     private final ChatFoodWordProperties chatFoodWordProperties;
+    private final AllergyExclusionFinder allergyExclusionFinder;
 
     // 상담 문맥 없이 (첫 질문과 같게) 정한다
     public ChatIntentResolution resolve(Long memberId, Long sessionId, ChatMessageCreateRequest request) {
@@ -91,6 +92,15 @@ public class ChatIntentFacade {
     public ChatIntentResolution resolve(Long memberId, Long sessionId, ChatMessageCreateRequest request, ChatContext context) {
         Decision decision = decide(memberId, sessionId, request, context);
         ChatIntentResolution resolution = decision.resolution();
+        // 추천이면 이 상담에서 말한 알레르기·못 먹는 재료를 뺄 재료에 더한다 (AI가 놓쳐도, 다시 추천·새 추천 모두. 콕 집은 요리여도 뺀다)
+        if (resolution.recommends()) {
+            AllergyExclusionFinder.Allergens allergens = allergyExclusionFinder.find(sessionId, request.content());
+            if (!allergens.isEmpty()) {
+                log.info("상담 알레르기 재료를 뺄 재료로 - memberId: {}, sessionId: {}, 재료: {}, 뺄 재료 수: {}",
+                        memberId, sessionId, allergens.names(), allergens.ingredientIds().size());
+                resolution = resolution.withAllergens(allergens.names(), allergens.ingredientIds());
+            }
+        }
         log.info("상담 의도 - memberId: {}, sessionId: {}, 의도: {}, 출처: {}, 조건: {}, 지울 조건(removed): {}, 대상 레시피: {}, 질문 종류: {}",
                 memberId, sessionId, resolution.intent(), resolution.source(), summarize(resolution.recipeQuery()),
                 decision.removed(), resolution.targetRecipeId(), resolution.detailQuestion());

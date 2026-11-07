@@ -2,6 +2,7 @@ package org.example.takecareofmyfridgebe.domain.chat.facade;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.example.takecareofmyfridgebe.domain.chat.config.ChatAllergyWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatMealkitWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatTasteWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse;
@@ -24,6 +25,7 @@ import org.example.takecareofmyfridgebe.domain.chat.service.ChatMessageService;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.Ingredient;
 import org.example.takecareofmyfridgebe.domain.ingredient.service.IngredientService;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
+import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeCandidateIngredient;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeDetailResponse;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeSummary;
 import org.example.takecareofmyfridgebe.domain.product.entity.IngredientProduct;
@@ -84,6 +86,7 @@ public class ChatRecommendationFacade {
     private final ChatMessageService chatMessageService;
     private final ChatMealkitWordProperties chatMealkitWordProperties;
     private final ChatTasteWordProperties chatTasteWordProperties;
+    private final ChatAllergyWordProperties chatAllergyWordProperties;
 
     /**
      * @param content 사용자 메시지 원문 (설명 프롬프트에 넣는다)
@@ -148,7 +151,7 @@ public class ChatRecommendationFacade {
      * 판매 중인 밀키트를 MealkitPicker로 고른다. 밀키트·판매가·연결 레시피(냉장고 기준)를 한 번씩 읽는다. 판매 중 밀키트가 없으면 더 읽지 않는다.
      */
     private List<MealkitPicker.Picked> pickMealkits(RecipeQuery query, Collection<Long> cardRecipeIds, Set<Long> shown, int limit) {
-        List<MealkitProduct> mealkits = productService.getOnSaleMealkits();
+        List<MealkitProduct> mealkits = withoutExcludedIngredients(productService.getOnSaleMealkits(), query);
         if (mealkits.isEmpty()) {
             return List.of();
         }
@@ -269,6 +272,45 @@ public class ChatRecommendationFacade {
                 .findFirst()
                 .filter(keyword -> candidates.stream()
                         .noneMatch(candidate -> candidate.name() != null && compact(candidate.name()).contains(compact(keyword))));
+    }
+
+    /**
+     * 뺄 재료(알레르기 재료 포함)가 들어간 밀키트를 뺀다. 연결된 레시피가 있으면 그 레시피가 뺄 재료를 쓰는지,
+     * 없으면 상품 이름에 뺄 재료 이름(두 글자 이상)이 들어 있는지 본다 ("새우 볶음밥 밀키트"). 넓히지 않을 이름("땅콩호박")은 지우고 본다.
+     */
+    private List<MealkitProduct> withoutExcludedIngredients(List<MealkitProduct> mealkits, RecipeQuery query) {
+        if (mealkits.isEmpty() || query.excludeIngredientIds().isEmpty()) {
+            return mealkits;
+        }
+        Set<Long> excludedRecipeIds = recipeService.findCandidateIngredients(query.excludeIngredientIds()).stream()
+                .map(RecipeCandidateIngredient::recipeId)
+                .collect(Collectors.toSet());
+        List<String> excludedNames = ingredientService.getIngredientsByIds(query.excludeIngredientIds()).values().stream()
+                .map(ingredient -> compact(ingredient.getName()))
+                .filter(name -> name.length() >= 2)
+                .distinct()
+                .toList();
+        List<MealkitProduct> kept = mealkits.stream()
+                .filter(mealkit -> mealkit.getRecipeId() != null
+                        ? !excludedRecipeIds.contains(mealkit.getRecipeId())
+                        : excludedNames.stream().noneMatch(productNameWithoutOtherKinds(mealkit.getProduct().getName())::contains))
+                .toList();
+        if (kept.size() < mealkits.size()) {
+            log.info("상담 밀키트 뺄 재료가 들어 있어 뺌 - 뺀 수: {}", mealkits.size() - kept.size());
+        }
+        return kept;
+    }
+
+    // 넓히지 않을 이름(땅콩호박 등)은 끊어 두고 본다 ("땅콩호박 수프 밀키트"가 "땅콩"으로 빠지지 않게)
+    private String productNameWithoutOtherKinds(String name) {
+        String text = compact(name);
+        for (String word : chatAllergyWordProperties.notSameKind()) {
+            String other = compact(word);
+            if (!other.isEmpty()) {
+                text = text.replace(other, "|");
+            }
+        }
+        return text;
     }
 
     private static String compact(String text) {

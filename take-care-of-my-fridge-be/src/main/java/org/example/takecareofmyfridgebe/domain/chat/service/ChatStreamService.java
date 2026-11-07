@@ -55,6 +55,8 @@ public class ChatStreamService {
     // 사용자가 보낸 말에 건강 관련 말이 있으면 답 끝에 빈 줄 하나를 두고 붙이는 안내 (추천 답은 소개 글 끝, 곧 카드 바로 위)
     static final String HEALTH_NOTICE = "일반적인 정보예요. 질환·알레르기·임신·복용 중인 약과 관련된 판단은 의사나 약사와 상담해 주세요.";
     static final String HEALTH_NOTICE_SEPARATOR = "\n\n";
+    // 추천에서 알레르기·못 먹는 재료를 뺐을 때 답 끝(카드 바로 위)에 붙이는 안내. 앞에 "땅콩이"·"땅콩·새우가"를 붙인다
+    static final String ALLERGY_NOTICE_TAIL = " 들어간 레시피는 뺐어요. 양념이나 가공품에 성분이 들어 있을 수 있으니 재료를 꼭 확인해 주세요.";
 
     private final ChatMessageService chatMessageService;
     private final ChatStreamLockService chatStreamLockService;
@@ -175,14 +177,26 @@ public class ChatStreamService {
 
         // 건강 안내: 보낸 말만 본다 (AI 답은 보지 않는다). 답이 끝난 뒤 빈 줄 하나를 두고 붙여 화면·저장 모두 답 끝에 둔다
         boolean healthMentioned = HealthWordChecker.mentions(content, chatHealthWordProperties);
+        // 알레르기 안내(추천 답에서 재료를 뺐을 때)가 있으면 건강 안내 앞에 한 메시지로 붙인다
         Flux<ServerSentEvent<String>> healthNotice = Flux.defer(() -> {
             ReplyPlan plan = planRef.get();
-            if (!healthMentioned || plan == null || plan.uncounted() || !firstChunkReceived.get()) {
+            if (plan == null || plan.uncounted() || !firstChunkReceived.get()) {
                 return Flux.empty();
             }
-            String notice = accumulated.isEmpty() ? HEALTH_NOTICE : HEALTH_NOTICE_SEPARATOR + HEALTH_NOTICE;
+            List<String> lines = new ArrayList<>();
+            if (plan.recommendation() != null && !plan.allergens().isEmpty()) {
+                lines.add(allergyNotice(plan.allergens()));
+            }
+            if (healthMentioned) {
+                lines.add(HEALTH_NOTICE);
+                log.info("상담 건강 관련 말이라 답 끝에 안내를 붙임 - memberId: {}, sessionId: {}", memberId, sessionId);
+            }
+            if (lines.isEmpty()) {
+                return Flux.empty();
+            }
+            String text = String.join("\n", lines);
+            String notice = accumulated.isEmpty() ? text : HEALTH_NOTICE_SEPARATOR + text;
             accumulated.append(notice);
-            log.info("상담 건강 관련 말이라 답 끝에 안내를 붙임 - memberId: {}, sessionId: {}", memberId, sessionId);
             return Flux.just(messageEvent(notice));
         });
 
@@ -242,7 +256,7 @@ public class ChatStreamService {
                     ? chatRecommendationFacade.recommend(request.content(), query, context.lastRecommendation().recipeIds(), sessionId)
                     : chatRecommendationFacade.recommend(request.content(), query, List.of(), sessionId);
             // 고른 레시피·맞은 방식·카드 이유는 ChatRecommendationFacade가 "상담 추천 후보 -"로 남긴다
-            return new ReplyPlan(context, recommendation, resolution.recipeQuery());
+            return new ReplyPlan(context, recommendation, resolution.recipeQuery(), null, false, null, resolution.allergens());
         } catch (RuntimeException e) {
             log.warn("상담 추천 후보 검색 실패, 일반 답으로 - memberId: {}, sessionId: {}", memberId, sessionId, e);
             return ReplyPlan.general(context);
@@ -253,16 +267,24 @@ public class ChatStreamService {
     private ReplyPlan planRecipeDetail(Long memberId, Long sessionId, Long recipeId, String question, ChatContext context) {
         try {
             return chatRecommendationFacade.describe(memberId, recipeId)
-                    .map(detail -> new ReplyPlan(context, null, null, detail.withQuestion(question), false, null))
+                    .map(detail -> new ReplyPlan(context, null, null, detail.withQuestion(question), false, null, List.of()))
                     .orElseGet(() -> {
                         log.info("상담 레시피 자세히 대상이 지워짐 - memberId: {}, sessionId: {}, recipeId: {}", memberId, sessionId, recipeId);
-                        return new ReplyPlan(context, null, null, null, true, null);
+                        return new ReplyPlan(context, null, null, null, true, null, List.of());
                     });
         } catch (RuntimeException e) {
             log.warn("상담 레시피 자세히 정보 읽기 실패, 일반 답으로 - memberId: {}, sessionId: {}, recipeId: {}",
                     memberId, sessionId, recipeId, e);
             return ReplyPlan.general(context);
         }
+    }
+
+    // "땅콩이 들어간 레시피는 뺐어요. …" / "땅콩·새우가 …". 이·가는 마지막 이름의 받침으로 고른다
+    static String allergyNotice(List<String> names) {
+        String joined = String.join("·", names);
+        char last = joined.charAt(joined.length() - 1);
+        boolean hasFinalConsonant = last >= '가' && last <= '힣' && (last - '가') % 28 != 0;
+        return joined + (hasFinalConsonant ? "이" : "가") + ALLERGY_NOTICE_TAIL;
     }
 
     // AI 답에 섞인 링크를 지운다 (일반·추천·레시피 자세히 모두, 화면과 저장 모두 지운 글. 추천 답은 [소개]·[n]으로 나누기 전).
@@ -308,10 +330,10 @@ public class ChatStreamService {
      * declined가 있으면 답 생성 AI 없이 서버 안내(하루 횟수를 돌려줌), 모두 없으면 일반 답.
      */
     private record ReplyPlan(ChatContext context, RecommendationReply recommendation, RecipeQuery query,
-                             RecipeDetailReply detail, boolean recipeGone, Declined declined) {
+                             RecipeDetailReply detail, boolean recipeGone, Declined declined, List<String> allergens) {
 
         private ReplyPlan(ChatContext context, RecommendationReply recommendation, RecipeQuery query) {
-            this(context, recommendation, query, null, false, null);
+            this(context, recommendation, query, null, false, null, List.of());
         }
 
         private static ReplyPlan general(ChatContext context) {
@@ -319,7 +341,7 @@ public class ChatStreamService {
         }
 
         private static ReplyPlan declined(ChatContext context, Declined declined) {
-            return new ReplyPlan(context, null, null, null, false, declined);
+            return new ReplyPlan(context, null, null, null, false, declined, List.of());
         }
 
         // 하루 횟수를 세지 않는 답인지 (서버 안내)

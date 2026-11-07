@@ -62,6 +62,33 @@
 | 실제 AI 답 | OpenAI 키 필요 | 미실행 | |
 | `pnpm test` | 프론트 변경 없음 | 미실행 | |
 
+## 후속: 알레르기 재료 빼기
+- 문제: "땅콩 알레르기 있어, 뭐 먹지"에 건강 안내는 붙었지만 알레르기 재료를 빼는 규칙이 없었다. 의도 프롬프트는 "빼달라고 하거나 못 먹는다고 말한 재료"만 뺄 재료로 본다.
+  - 이때 나온 콩비지찌개에는 땅콩이 없다(dev DB 읽기 전용 확인: 콩(흰콩)·돼지고기·배추 등). 땅콩 ↔ 콩처럼 이름만 비슷한 경우다.
+- 사용자 결정: 재료 도메인에 조회 메서드 추가 허용, 넓히지 않을 이름·묶음 구성 계획대로, 콩 요리 이름으로 정렬을 뒤로 보내지 않음, 안내는 카드 바로 위, 상담 메시지를 다시 볼 때 filtered는 뺌, 안내 문장 지정
+- 변경
+  - 재료 도메인: `IngredientRepository.findByNameContaining`·`findByNameStartingWith`, `IngredientService.findContainingNames`
+    - 두 글자 이상은 이름에 들어 있는 재료, 한 글자는 그 글자로 시작하는 재료다. 직접 입력·밀키트는 뺀다.
+    - "버섯 → 표고버섯" 넓히기(`findSameKind`)는 끝나는 이름만 찾아서 땅콩버터·새우젓을 못 찾으므로 따로 뒀다.
+  - `app.chat.allergy-words`(표시 말·조사·넓히지 않을 이름), `app.chat.allergy-groups`(실제 재료 사전 이름 기준)
+    - 계란은 사전에서 달걀로 합쳐져 있다. 랍스터·요구르트는 사전에 없다.
+  - `AllergyWordChecker`(순수, 표시 말 앞 낱말 후보), `AllergyExclusionFinder`(이번 말 + 이 상담의 걸러지지 않은 사용자 말 → 묶음·사전 확인 → 넓히기)
+  - `ChatIntentFacade.resolve`: 추천이면(칩 포함) 알레르기 재료를 `RecipeQuery.withExcludedIngredients`로 뺄 재료에 더하고 고른 재료에서도 뺀다. `ChatIntentResolution.allergens`에 이름을 둔다.
+  - 기존 뺄 재료 처리(ES `mustNot`, 정렬 단계 재료 거르기)가 콕 집은 요리도 빼므로 그대로 쓴다.
+  - `ChatRecommendationFacade`: 밀키트는 연결 레시피가 뺄 재료를 쓰거나, 연결이 없으면 상품 이름에 뺄 재료 이름이 있으면 뺀다(땅콩호박 등은 끊어 보고).
+  - `ChatStreamService.allergyNotice`: 추천 답 끝(카드 바로 위)에 알레르기 안내를 붙인다. 건강 안내가 있으면 한 메시지로 이어 붙인다.
+  - `app.chat.taste-words.negation-after`에 "못먹"을 더했다("매운 거 못 먹어" → 피할 맛 SPICY).
+- 계획과 달라진 점: 한 글자 재료를 처음에는 "이름이 같은 재료만"으로 했다. 그러면 잣가루·게살이 빠지지 않아 "그 글자로 시작하는 재료"로 바꿨다. 바게트·스파게티·멍게살은 "게"로 시작하지 않아 걸리지 않는다.
+- 테스트
+  - `AllergyWordCheckerTest`, `AllergyExclusionFinderTest`: 땅콩(땅콩호박 남김)·견과류·새우 못 먹어·게(바게트·스파게티 남김)·갑각류·계란·앞선 말·오이·"매운 거 못 먹어"·"약불로 끓여"·조회 실패
+  - `IngredientContainingNameTest`
+  - `ChatIntentFacadeTest`: 추천·칩·다시 추천(EXCLUDE 지우기 뒤에도)·일반 답, "매운 거 못 먹어" → 피할 맛 SPICY
+  - `RecipeCandidateFacadeTest`: 콕 집은 새우볶음밥도 ES 조건과 정렬에서 빠짐
+  - `ChatRecommendationFacadeTest`: 밀키트 빼기
+  - `ChatStreamServiceTest`: 안내 문장·이/가·건강 안내와 이어 붙이기·후보 없음
+  - `ChatMessageRepositoryAndServiceTest`: 걸러진 말 뺀 사용자 말
+- 남은 것: "이제 땅콩 먹어도 돼"처럼 푸는 말은 다루지 않는다. 실제 AI 답 설명이 알레르기 재료를 말하지 않는지는 실제 키로 확인해야 한다.
+
 ## 연결과 남은 작업
 - 커밋: `feat/chat-safety-health-link` 로컬 커밋 3개 (push 안 함)
 - 다음: PR④ 남용 제한(연속 3번 → 10분 차단, 하루 안 센 횟수 20번 넘으면 셈)·Moderation(실제 키로 지연 측정)

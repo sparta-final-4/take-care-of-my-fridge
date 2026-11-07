@@ -16,11 +16,13 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeQuery;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecommendationReply;
 import org.example.takecareofmyfridgebe.domain.chat.dto.SavedRecommendation;
 import org.example.takecareofmyfridgebe.domain.chat.service.ChatMessageService;
+import org.example.takecareofmyfridgebe.domain.ingredient.entity.Ingredient;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.StorageType;
 import org.example.takecareofmyfridgebe.domain.ingredient.service.IngredientService;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member.Taste;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeDetailResponse.StepItem;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeDetailResponse;
+import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeCandidateIngredient;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeSummary;
 import org.example.takecareofmyfridgebe.domain.product.entity.IngredientProduct;
 import org.example.takecareofmyfridgebe.domain.product.entity.MealkitProduct;
@@ -65,6 +67,7 @@ class ChatRecommendationFacadeTest {
 
     private RecipeCandidateFacade recipeCandidateFacade;
     private RecipeService recipeService;
+    private IngredientService ingredientService;
     private ProductService productService;
     private SaleEventReader saleEventReader;
     private ChatMessageService chatMessageService;
@@ -74,12 +77,12 @@ class ChatRecommendationFacadeTest {
     void setUp() {
         recipeCandidateFacade = mock(RecipeCandidateFacade.class);
         recipeService = mock(RecipeService.class);
-        IngredientService ingredientService = mock(IngredientService.class);
+        ingredientService = mock(IngredientService.class);
         productService = mock(ProductService.class);
         saleEventReader = mock(SaleEventReader.class);
         chatMessageService = mock(ChatMessageService.class);
         facade = new ChatRecommendationFacade(recipeCandidateFacade, recipeService, ingredientService, productService,
-                saleEventReader, chatMessageService, MealkitWordCheckerTest.WORDS, TasteWordCheckerTest.WORDS);
+                saleEventReader, chatMessageService, MealkitWordCheckerTest.WORDS, TasteWordCheckerTest.WORDS, AllergyWordCheckerTest.WORDS);
         when(ingredientService.getIngredientsByIds(any())).thenReturn(Map.of());
     }
 
@@ -366,6 +369,25 @@ class ChatRecommendationFacadeTest {
     }
 
     @Test
+    @DisplayName("뺄 재료(알레르기)가 있으면 연결 레시피가 그 재료를 쓰는 밀키트와, 연결이 없는데 이름에 그 재료가 든 밀키트를 뺀다 (땅콩호박은 남김)")
+    void dropsMealkitsWithExcludedIngredients() {
+        givenMealkits(
+                mealkit(40L, "된장국", 9000, 544L),
+                mealkit(41L, "땅콩 소스 비빔면", 9000, 543L),
+                mealkit(42L, "땅콩 강정", 9000, null),
+                mealkit(43L, "땅콩호박 수프", 9000, null));
+        when(recipeService.findCandidateIngredients(List.of(101L))).thenReturn(List.of(
+                new RecipeCandidateIngredient(543L, 101L, "땅콩", false)));
+        when(ingredientService.getIngredientsByIds(List.of(101L))).thenReturn(Map.of(101L, ingredient(101L, "땅콩")));
+        RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, null, null, List.of(101L), false, null, null);
+
+        RecommendationReply reply = facade.recommend("밀키트 추천해줘", query, List.of(), 7L);
+
+        assertThat(reply.event().mealkits()).extracting(m -> m.product().productId())
+                .contains(40L, 43L).doesNotContain(41L, 42L);
+    }
+
+    @Test
     @DisplayName("\"밀키트 추천해줘\"면 레시피 카드 없이 밀키트를 최대 3장 고르고, 글은 AI 없이 서버가 쓰며, 이미 보여 준 밀키트를 읽는다")
     void picksOnlyMealkits_whenMealkitWordSpoken() {
         givenMealkits(
@@ -530,6 +552,12 @@ class ChatRecommendationFacadeTest {
         when(saleEventReader.findSellingPrices(any())).thenReturn(prices);
         when(recipeCandidateFacade.describeMealkitRecipes(any(), any()))
                 .thenReturn(new RecipeCandidateFacade.MealkitRecipes(recipes, Map.of(), List.of()));
+    }
+
+    private static Ingredient ingredient(Long id, String name) {
+        Ingredient ingredient = Ingredient.builder().ingredientCode("ING_" + id).name(name).baseUnit("g").build();
+        ReflectionTestUtils.setField(ingredient, "id", id);
+        return ingredient;
     }
 
     private record MealkitWithPrice(MealkitProduct mealkit, SellingPrice price) {
