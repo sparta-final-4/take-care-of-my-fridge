@@ -659,23 +659,27 @@ class RecipeCandidateFacadeTest {
     }
 
     @Test
-    @DisplayName("ES 경로: 키워드 결과로 표시되지 않은 후보도 이름에 키워드가 있으면 키워드로 맞은 것으로 보고 벡터 보충을 하지 않는다")
-    void countsNameMatch_whenEsDidNotMarkKeyword() throws Exception {
+    @DisplayName("ES 경로: 키워드 결과로 표시된 후보만 키워드로 맞은 것으로 보고, 표시 없이 온 후보는 이름에 키워드가 있어도 세지 않는다")
+    void countsOnlyEsMarkedKeywordHits() throws Exception {
         when(memberService.getMyInfo(MEMBER_ID)).thenReturn(mock(MyInfoResponse.class));
-        // ES는 키워드가 여럿이면 마지막 키워드(깐풍기)로 맞은 것만 표시한다. 탕수육은 표시 없이 온다
+        // 키워드 검색이 이름 하나(keyword)로 묶여(#599) 키워드로 맞은 레시피는 모두 표시된다
         when(candidateSearchService.search(any())).thenReturn(List.of(
-                hit(433L, RecipeCandidateSearchService.MATCH_FRIDGE), hit(366L, RecipeCandidateSearchService.MATCH_KEYWORD)));
+                hit(433L, RecipeCandidateSearchService.MATCH_KEYWORD), hit(366L, RecipeCandidateSearchService.MATCH_KEYWORD),
+                hit(722L, RecipeCandidateSearchService.MATCH_FRIDGE)));
         givenEsRecipes(Map.of(
                 433L, new RecipeCandidateInfo(433L, "탕수육", "튀김", 40, 1),
-                366L, new RecipeCandidateInfo(366L, "깐풍기", "튀김", 40, 1)));
+                366L, new RecipeCandidateInfo(366L, "깐풍기", "튀김", 40, 1),
+                722L, new RecipeCandidateInfo(722L, "황태탕수육", "튀김", 40, 1)));
         RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, null, null, null, false,
                 List.of("김피탕", "탕수육", "깐풍기"), "김피탕");
 
         RecipeCandidates result = esFacade.findCandidates(query);
 
         RecipeCandidate tangsuyuk = result.candidates().stream().filter(c -> c.recipeId() == 433L).findFirst().orElseThrow();
+        RecipeCandidate fridgeOnly = result.candidates().stream().filter(c -> c.recipeId() == 722L).findFirst().orElseThrow();
         assertThat(tangsuyuk.reason().keywordMatch().type()).isEqualTo(KeywordMatch.Type.EXPANDED);
         assertThat(tangsuyuk.ranking().requestMatches()).isEqualTo(1);
+        assertThat(fridgeOnly.reason().keywordMatch()).isNull();
         verify(recipeSearchService, never()).search(any());
     }
 
