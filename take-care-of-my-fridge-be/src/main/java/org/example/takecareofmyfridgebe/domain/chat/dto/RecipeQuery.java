@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Stream;
 
 /**
  * 레시피 후보 검색 조건.
@@ -109,6 +110,19 @@ public record RecipeQuery(
                 alreadyRecommendedIds, avoidTastes);
     }
 
+    // 뺄 재료를 더한 검색 조건 (알레르기 재료). 선택 재료에 있으면 선택 재료에서도 뺀다 (뺄 재료가 앞선다)
+    public RecipeQuery withExcludedIngredients(Collection<Long> ingredientIds) {
+        if (ingredientIds == null || ingredientIds.isEmpty()) {
+            return this;
+        }
+        List<Long> excluded = Stream.concat(excludeIngredientIds.stream(), ingredientIds.stream())
+                .distinct()
+                .toList();
+        return new RecipeQuery(memberId, selectedIngredientIds, wantedTastes, moodCategories, maxMinutes,
+                excluded, useSelectedOnly, keywords, keywordText, preferenceText, selectedIngredientGroups, keywordMatches,
+                alreadyRecommendedIds, avoidTastes).withoutSelectedIngredients(Set.copyOf(ingredientIds));
+    }
+
     // 선택 재료에서 주어진 재료(기본 양념 등)를 뺀 검색 조건. 그 재료의 같은 종류 묶음도 뺀다
     public RecipeQuery withoutSelectedIngredients(Set<Long> ingredientIds) {
         if (ingredientIds.isEmpty()) {
@@ -169,6 +183,13 @@ public record RecipeQuery(
     }
 
     // 피할 맛을 채운 검색 조건. 원하는 맛과 겹치면 피할 맛이 이긴다 (원하는 맛에서 뺀다)
+    // 원하는 맛·피할 맛을 함께 바꾼 검색 조건 (다시 추천에서 이번 말의 맛을 따를 때). 둘 다 있는 맛은 피할 맛으로 본다
+    public RecipeQuery withTastes(List<Member.Taste> wanted, List<Member.Taste> avoid) {
+        return new RecipeQuery(memberId, selectedIngredientIds, orEmpty(wanted).stream().distinct().toList(), moodCategories,
+                maxMinutes, excludeIngredientIds, useSelectedOnly, keywords, keywordText, preferenceText, selectedIngredientGroups,
+                keywordMatches, alreadyRecommendedIds, avoidTastes).withAvoidTastes(avoid);
+    }
+
     public RecipeQuery withAvoidTastes(List<Member.Taste> tastes) {
         List<Member.Taste> avoid = orEmpty(tastes).stream().distinct().toList();
         List<Member.Taste> wanted = wantedTastes.stream().filter(taste -> !avoid.contains(taste)).toList();

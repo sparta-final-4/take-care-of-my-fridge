@@ -21,11 +21,11 @@ import java.util.List;
 public record ChatTasteWordProperties(
         @DefaultValue({"매운", "맵게", "맵지", "매콤", "얼큰", "칼칼"})
         List<String> spicy,
-        @DefaultValue({"달달", "달게", "단거", "단걸", "달콤", "단맛"})
+        @DefaultValue({"달달", "달게", "단거", "단걸", "단것", "달콤", "단맛"})
         List<String> sweet,
         @DefaultValue({"안", "덜"})
         List<String> negationBefore,
-        @DefaultValue({"말고", "빼고", "않", "싫", "없이"})
+        @DefaultValue({"말고", "빼고", "않", "싫", "없이", "못먹"})
         List<String> negationAfter,
         @DefaultValue({"짠", "짭짤", "짜게", "짭조름"})
         List<String> salty,

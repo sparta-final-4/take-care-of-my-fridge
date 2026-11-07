@@ -1,5 +1,7 @@
 package org.example.takecareofmyfridgebe.domain.chat.dto;
 
+import java.util.List;
+
 /**
  * 상담 메시지를 어떻게 처리할지 정한 결과.
  *
@@ -9,14 +11,25 @@ package org.example.takecareofmyfridgebe.domain.chat.dto;
  * @param recipeQuery    추천 조건 (REFINE이면 직전 조건과 합친 것). RECOMMEND·REFINE이 아니면 null
  * @param targetRecipeId RECIPE_DETAIL일 때 물어본 레시피 ID. 그 밖에는 null
  * @param detailQuestion RECIPE_DETAIL일 때 질문 종류 (모르면 null, OTHER처럼 다룬다). 그 밖에는 null
+ * @param allergens      이 상담에서 사용자가 말한 알레르기·못 먹는 재료 이름 (추천이면 그 재료를 recipeQuery의 뺄 재료에 더했다). 없으면 빈 목록
  */
 public record ChatIntentResolution(
         ChatIntent intent,
         Source source,
         RecipeQuery recipeQuery,
         Long targetRecipeId,
-        DetailQuestion detailQuestion
+        DetailQuestion detailQuestion,
+        List<String> allergens
 ) {
+
+    public ChatIntentResolution {
+        allergens = allergens == null ? List.of() : List.copyOf(allergens);
+    }
+
+    public ChatIntentResolution(ChatIntent intent, Source source, RecipeQuery recipeQuery, Long targetRecipeId,
+                                DetailQuestion detailQuestion) {
+        this(intent, source, recipeQuery, targetRecipeId, detailQuestion, List.of());
+    }
 
     public enum Source {
         // 칩(mode=RECOMMEND)이라 AI 판단 없이 추천
@@ -55,6 +68,12 @@ public record ChatIntentResolution(
     // 답 생성 AI를 부르지 않고 서버 안내로 답하는지 (하루 횟수를 돌려준다)
     public boolean declines() {
         return intent == ChatIntent.OFF_TOPIC || intent == ChatIntent.BLOCKED || intent == ChatIntent.SELF_HARM;
+    }
+
+    // 알레르기 재료를 뺄 재료에 더한 결과 (추천이 아니면 이름만 둔다)
+    public ChatIntentResolution withAllergens(List<String> names, List<Long> ingredientIds) {
+        RecipeQuery query = recipeQuery == null ? null : recipeQuery.withExcludedIngredients(ingredientIds);
+        return new ChatIntentResolution(intent, source, query, targetRecipeId, detailQuestion, names);
     }
 
     // 후보를 찾아 카드로 추천하는지 (새 추천·다시 추천)

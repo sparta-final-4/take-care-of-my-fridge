@@ -45,6 +45,27 @@ public final class TasteWordChecker {
     }
 
     /**
+     * 메시지에 나온 맛 전체(매운·단·짠·감칠·순한)의 원함·피함. 부정어 규칙은 check와 같다 ("짠 거 말고" → 짠맛 피함, "담백한 거로" → 순한맛 원함).
+     * 다시 추천에서 맛이 부딪힐 때 이번 말에 나온 쪽을 따르는 데 쓴다 (check는 매운맛·단맛만 AI 결과를 고친다).
+     *
+     * @return 맛마다 원하는지·피하는지. 맛 단어가 없는 맛은 담지 않는다
+     */
+    public static List<TasteStance> stances(String message, ChatTasteWordProperties words) {
+        String text = compact(message);
+        List<TasteStance> result = new ArrayList<>();
+        stance(text, words.spicy(), words).ifPresent(stance -> result.add(new TasteStance(Member.Taste.SPICY, stance)));
+        stance(text, words.sweet(), words).ifPresent(stance -> result.add(new TasteStance(Member.Taste.SWEET, stance)));
+        stance(text, orEmpty(words.salty()), words).ifPresent(stance -> result.add(new TasteStance(Member.Taste.SALTY, stance)));
+        stance(text, orEmpty(words.umami()), words).ifPresent(stance -> result.add(new TasteStance(Member.Taste.UMAMI, stance)));
+        stance(text, orEmpty(words.mild()), words).ifPresent(stance -> result.add(new TasteStance(Member.Taste.MILD, stance)));
+        return result;
+    }
+
+    private static List<String> orEmpty(List<String> values) {
+        return values == null ? List.of() : values;
+    }
+
+    /**
      * 메시지에 단어가 나온 맛 (원하든 피하든). 새 추천에서 이번 말에 없는 맛을 조건에서 뺄 때 쓴다.
      * 매운맛·단맛은 맛 단어, 짠맛·감칠맛·순한맛은 그 맛을 말하는 단어로 본다.
      */

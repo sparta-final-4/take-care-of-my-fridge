@@ -14,5 +14,11 @@ public interface IngredientRepository extends JpaRepository<Ingredient, Long> {
     // 이름이 suffix로 끝나는 재료 (LIKE '%suffix', 특수 문자는 Spring Data가 이스케이프)
     List<Ingredient> findByNameEndingWith(String suffix);
 
+    // 이름에 part가 들어 있는 재료 (LIKE '%part%', 특수 문자는 Spring Data가 이스케이프)
+    List<Ingredient> findByNameContaining(String part);
+
+    // 이름이 prefix로 시작하는 재료 (LIKE 'prefix%', 특수 문자는 Spring Data가 이스케이프)
+    List<Ingredient> findByNameStartingWith(String prefix);
+
     Optional<Ingredient> findByIngredientCode(String ingredientCode);
 }

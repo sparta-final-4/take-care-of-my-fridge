@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -100,6 +101,39 @@ public class IngredientService {
                         .sorted()
                         .toList()));
         return result;
+    }
+
+    /**
+     * 다른 도메인(chat 알레르기 재료 빼기)에서 쓰는 조회.
+     * 이름마다 "이름에 그 이름이 들어 있는 재료"를 돌려준다 (예: 땅콩 → 땅콩, 땅콩가루, 땅콩버터 / 새우 → 건새우, 새우젓).
+     * 이름이 suffix-min-length(공백 제외 2글자)보다 짧으면("게", "잣") 들어 있는 것으로 보면 너무 많은 재료와 겹치므로("바게트", "스파게티")
+     * 이름이 그 이름으로 시작하는 재료만 돌려준다 (게 → 게, 게살, 게맛살 / 잣 → 잣, 잣가루).
+     * 직접 입력(ING_CUSTOM)·밀키트(ING_MEALKIT)는 빼고, 그런 재료가 없으면 빈 목록이다.
+     *
+     * @param names 재료 이름 목록 (앞뒤 공백은 지운다)
+     * @return 이름(정리한 것)을 키로 하는 재료 (ID 오름차순)
+     */
+    public Map<String, List<Ingredient>> findContainingNames(Collection<String> names) {
+        if (names == null || names.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        Map<String, List<Ingredient>> result = new LinkedHashMap<>();
+        names.stream()
+                .filter(name -> name != null && !name.isBlank())
+                .map(String::trim)
+                .distinct()
+                .forEach(name -> result.put(name, findContaining(name).stream()
+                        .filter(ingredient -> !ingredient.isCustom() && !ingredient.isMealkit())
+                        .sorted(Comparator.comparing(Ingredient::getId))
+                        .toList()));
+        return result;
+    }
+
+    private List<Ingredient> findContaining(String name) {
+        if (name.replace(" ", "").length() < matchProperties.suffixMinLength()) {
+            return ingredientRepository.findByNameStartingWith(name);
+        }
+        return ingredientRepository.findByNameContaining(name);
     }
 
     private List<Ingredient> findSameKind(String name) {

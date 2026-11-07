@@ -1,5 +1,6 @@
 package org.example.takecareofmyfridgebe.domain.chat.service;
 
+import org.example.takecareofmyfridgebe.domain.chat.config.ChatHealthWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatSafetyWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext.CardName;
@@ -31,6 +32,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -94,6 +96,10 @@ class ChatStreamServiceTest {
 
     @Spy
     private ObjectMapper objectMapper = new ObjectMapper();
+
+    @Spy
+    private ChatHealthWordProperties chatHealthWordProperties = new ChatHealthWordProperties(
+            List.of("당뇨", "알레르기", "임신", "약먹"), List.of("약불", "약간"));
 
     @Spy
     private ChatSafetyWordProperties chatSafetyWordProperties = new ChatSafetyWordProperties(
@@ -1157,5 +1163,274 @@ class ChatStreamServiceTest {
         assertThat(events.get(0).data()).contains("자살예방상담전화 109(24시간, 무료)");
         verify(chatMessageService).saveFilteredExchange(sessionId, "다 놓고 싶어", reply);
         verify(chatDailyLimitService, times(1)).refund(LIMIT_KEY);
+    }
+
+    private static final String HEALTH_TAIL = ChatStreamService.HEALTH_NOTICE_SEPARATOR + ChatStreamService.HEALTH_NOTICE;
+
+    @Test
+    @DisplayName("보낸 말에 건강 관련 말이 있으면 일반 답 끝에 빈 줄 하나를 두고 안내를 보내고, 답과 함께 저장하며 하루 횟수는 센다")
+    void appendsHealthNoticeToGeneralReply_whenHealthWord(CapturedOutput output) {
+        Long sessionId = 10L;
+        when(chatDailyLimitService.checkAndIncrement(1L)).thenReturn(LIMIT_KEY);
+        when(chatReplyGenerator.generate(1L, sessionId, "당뇨에 좋은 간식", List.of())).thenReturn(Flux.just("견과류가", " 좋아요"));
+        when(chatMessageService.saveExchange(sessionId, "당뇨에 좋은 간식", "견과류가 좋아요" + HEALTH_TAIL)).thenReturn(List.of(
+                new ChatMessageResponse(100L, 1, ChatMessageRole.USER, "당뇨에 좋은 간식", LocalDateTime.now()),
+                new ChatMessageResponse(101L, 2, ChatMessageRole.ASSISTANT, "답", LocalDateTime.now())));
+
+        List<ServerSentEvent<String>> events = chatStreamService
+                .streamMessage(1L, sessionId, ChatMessageCreateRequest.of("당뇨에 좋은 간식")).collectList().block();
+
+        assertThat(events).extracting(ServerSentEvent::event).containsExactly("message", "message", "message", "done");
+        assertThat(events.get(2).data()).contains(ChatStreamService.HEALTH_NOTICE);
+        verify(chatMessageService).saveExchange(sessionId, "당뇨에 좋은 간식", "견과류가 좋아요" + HEALTH_TAIL);
+        verify(chatDailyLimitService).checkAndIncrement(1L);
+        verify(chatDailyLimitService, never()).refund(any());
+        assertThat(output.getOut()).contains("답 끝에 안내를 붙임").doesNotContain("당뇨에 좋은 간식");
+    }
+
+    @Test
+    @DisplayName("추천 답은 카드 설명 뒤, 소개 글 끝(카드 바로 위)에 건강 안내를 붙이고 AI 소개 글은 그대로 둔다")
+    void appendsHealthNoticeToRecommendationIntro_whenHealthWord() {
+        Long sessionId = 10L;
+        ChatMessageCreateRequest request = ChatMessageCreateRequest.of("임신 중인데 두부로 뭐 해 먹지?");
+        RecipeQuery query = RecipeQuery.of(1L, List.of(21L));
+        givenRecommend(sessionId, request, query, new RecommendationReply(
+                ChatRecommendationsEventResponse.of(List.of(card(314L, "두부조림"))), "후보 정보"));
+        when(chatReplyGenerator.generateRecommendation(1L, sessionId, request.content(), "후보 정보"))
+                .thenReturn(Flux.just("[소개] 두부 요리예요.\n[1] 짭짤해요."));
+        when(chatMessageService.saveExchange(eq(sessionId), eq(request.content()), any(), any())).thenReturn(List.of(
+                new ChatMessageResponse(100L, 1, ChatMessageRole.USER, request.content(), LocalDateTime.now()),
+                new ChatMessageResponse(101L, 2, ChatMessageRole.ASSISTANT, "답", LocalDateTime.now())));
+
+        List<ServerSentEvent<String>> events = chatStreamService.streamMessage(1L, sessionId, request).collectList().block();
+
+        assertThat(events.get(events.size() - 2).event()).isEqualTo("message");
+        assertThat(events.get(events.size() - 2).data()).contains(ChatStreamService.HEALTH_NOTICE);
+        ArgumentCaptor<String> saved = ArgumentCaptor.forClass(String.class);
+        verify(chatMessageService).saveExchange(eq(sessionId), eq(request.content()), saved.capture(), any());
+        assertThat(saved.getValue()).startsWith("두부 요리예요.").endsWith(HEALTH_TAIL);
+    }
+
+    @Test
+    @DisplayName("레시피 자세히 답 끝에도 건강 안내를 붙여 저장한다")
+    void appendsHealthNoticeToRecipeDetail_whenHealthWord() {
+        Long sessionId = 10L;
+        ChatMessageCreateRequest request = ChatMessageCreateRequest.of("알레르기 있는데 두 번째 거 재료 뭐야?");
+        when(chatIntentFacade.resolve(eq(1L), eq(sessionId), eq(request), any()))
+                .thenReturn(ChatIntentResolution.recipeDetail(Source.AI, 315L, DetailQuestion.INGREDIENTS));
+        RecommendedRecipe detailCard = new RecommendedRecipe(315L, "두부전", null, "전", 20, List.of(), List.of(), List.of(),
+                List.of(), List.of(), false, "물어보신 레시피예요", "물어보신 레시피예요");
+        when(chatRecommendationFacade.describe(1L, 315L)).thenReturn(Optional.of(
+                new RecipeDetailReply(ChatRecommendationsEventResponse.of(List.of(detailCard)), "[레시피 정보]")));
+        when(chatReplyGenerator.generateRecipeDetail(eq(1L), eq(sessionId), any(), eq("[레시피 정보]"))).thenReturn(Flux.just("두부, 달걀"));
+        when(chatMessageService.saveExchange(eq(sessionId), eq(request.content()), any(), any())).thenReturn(List.of(
+                new ChatMessageResponse(100L, 1, ChatMessageRole.USER, request.content(), LocalDateTime.now()),
+                new ChatMessageResponse(101L, 2, ChatMessageRole.ASSISTANT, "답", LocalDateTime.now())));
+
+        chatStreamService.streamMessage(1L, sessionId, request).collectList().block();
+
+        verify(chatMessageService).saveExchange(eq(sessionId), eq(request.content()), eq("두부, 달걀" + HEALTH_TAIL), any());
+    }
+
+    @Test
+    @DisplayName("후보가 없어 서버가 정해서 보내는 답에도 건강 안내를 붙인다")
+    void appendsHealthNoticeToNoRecipeReply_whenHealthWord() {
+        Long sessionId = 10L;
+        ChatMessageCreateRequest request = ChatMessageCreateRequest.of("당뇨인데 먹을 거 추천해줘");
+        RecipeQuery query = RecipeQuery.of(1L, List.of());
+        givenRecommend(sessionId, request, query, new RecommendationReply(ChatRecommendationsEventResponse.of(List.of()), "후보 정보"));
+        when(chatMessageService.saveExchange(eq(sessionId), eq(request.content()), any())).thenReturn(List.of(
+                new ChatMessageResponse(100L, 1, ChatMessageRole.USER, request.content(), LocalDateTime.now()),
+                new ChatMessageResponse(101L, 2, ChatMessageRole.ASSISTANT, "답", LocalDateTime.now())));
+
+        chatStreamService.streamMessage(1L, sessionId, request).collectList().block();
+
+        verify(chatMessageService).saveExchange(sessionId, request.content(), ChatStreamService.NO_RECIPE_REPLY + HEALTH_TAIL);
+        verify(chatReplyGenerator, never()).generateRecommendation(any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("안전 장치 안내(상관없는 질문)에는 건강 관련 말이 있어도 건강 안내를 붙이지 않는다")
+    void skipsHealthNotice_whenDeclined() {
+        Long sessionId = 10L;
+        when(chatDailyLimitService.checkAndIncrement(1L)).thenReturn(LIMIT_KEY);
+        when(chatIntentFacade.resolve(eq(1L), eq(sessionId), any(), any()))
+                .thenReturn(ChatIntentResolution.declined(ChatIntent.OFF_TOPIC));
+        when(chatMessageService.saveExchange(eq(sessionId), any(), any())).thenReturn(List.of(
+                new ChatMessageResponse(100L, 1, ChatMessageRole.USER, "말", LocalDateTime.now()),
+                new ChatMessageResponse(101L, 2, ChatMessageRole.ASSISTANT, "답", LocalDateTime.now())));
+
+        List<ServerSentEvent<String>> events = chatStreamService
+                .streamMessage(1L, sessionId, ChatMessageCreateRequest.of("당뇨 약 회사 주식 추천해줘")).collectList().block();
+
+        assertThat(events).extracting(ServerSentEvent::event).containsExactly("message", "done");
+        verify(chatMessageService).saveExchange(sessionId, "당뇨 약 회사 주식 추천해줘", ChatStreamService.OFF_TOPIC_REPLY);
+    }
+
+    @Test
+    @DisplayName("단어 차단 안내에는 건강 관련 말이 있어도 건강 안내를 붙이지 않는다")
+    void skipsHealthNotice_whenBlockedByWords() {
+        Long sessionId = 10L;
+        when(chatStreamLockService.acquire(sessionId)).thenReturn(LOCK_TOKEN);
+        when(chatMessageService.saveFilteredExchange(eq(sessionId), any(), any())).thenReturn(List.of(
+                new ChatMessageResponse(100L, 1, ChatMessageRole.USER, "말", LocalDateTime.now()),
+                new ChatMessageResponse(101L, 2, ChatMessageRole.ASSISTANT, "답", LocalDateTime.now())));
+
+        List<ServerSentEvent<String>> events = chatStreamService
+                .streamMessage(1L, sessionId, ChatMessageCreateRequest.of("당뇨 ㅅㅂ")).collectList().block();
+
+        assertThat(events).extracting(ServerSentEvent::event).containsExactly("message", "done");
+        verify(chatMessageService).saveFilteredExchange(sessionId, "당뇨 ㅅㅂ", ChatSafetyBlock.BANNED.reply());
+    }
+
+    @Test
+    @DisplayName("건강 관련 말이 있어도 답 조각이 하나도 없으면 안내를 붙이지 않고 CHAT_010을 보내며 하루 횟수를 돌려준다")
+    void skipsHealthNoticeAndRefunds_whenReplyIsEmpty() {
+        Long sessionId = 10L;
+        when(chatDailyLimitService.checkAndIncrement(1L)).thenReturn(LIMIT_KEY);
+        when(chatReplyGenerator.generate(1L, sessionId, "당뇨에 좋은 간식", List.of())).thenReturn(Flux.empty());
+
+        List<ServerSentEvent<String>> events = chatStreamService
+                .streamMessage(1L, sessionId, ChatMessageCreateRequest.of("당뇨에 좋은 간식")).collectList().block();
+
+        assertThat(events).extracting(ServerSentEvent::event).containsExactly("error");
+        assertThat(events.get(0).data()).contains("CHAT_010");
+        verify(chatDailyLimitService).refund(LIMIT_KEY);
+    }
+
+    @Test
+    @DisplayName("일반 답에 섞인 링크는 조각 경계에서 쪼개져도 화면에 보내지 않고 저장값에서도 지운다")
+    void removesLinkFromGeneralReply() {
+        Long sessionId = 10L;
+        when(chatReplyGenerator.generate(1L, sessionId, "두부 보관법", List.of()))
+                .thenReturn(Flux.just("냉장 보관해요. 자세한 건 https:/", "/naver.com/abc 에서 보세요"));
+        when(chatMessageService.saveExchange(eq(sessionId), eq("두부 보관법"), any())).thenReturn(List.of(
+                new ChatMessageResponse(100L, 1, ChatMessageRole.USER, "두부 보관법", LocalDateTime.now()),
+                new ChatMessageResponse(101L, 2, ChatMessageRole.ASSISTANT, "답", LocalDateTime.now())));
+
+        List<ServerSentEvent<String>> events = chatStreamService
+                .streamMessage(1L, sessionId, ChatMessageCreateRequest.of("두부 보관법")).collectList().block();
+
+        assertThat(events).extracting(ServerSentEvent::data).noneMatch(data -> data != null && data.contains("naver"));
+        verify(chatMessageService).saveExchange(sessionId, "두부 보관법", "냉장 보관해요. 자세한 건 에서 보세요");
+    }
+
+    @Test
+    @DisplayName("추천 답은 [소개]·[n]으로 나누기 전에 링크를 지워 카드 설명 표시가 깨지지 않고 저장 설명에도 링크가 없다")
+    @SuppressWarnings("unchecked")
+    void removesLinkFromRecommendationText() {
+        Long sessionId = 10L;
+        ChatMessageCreateRequest request = ChatMessageCreateRequest.of("두부로 뭐 해 먹지?");
+        RecipeQuery query = RecipeQuery.of(1L, List.of(21L));
+        givenRecommend(sessionId, request, query, new RecommendationReply(
+                ChatRecommendationsEventResponse.of(List.of(card(314L, "두부조림"))), "후보 정보"));
+        when(chatReplyGenerator.generateRecommendation(1L, sessionId, request.content(), "후보 정보"))
+                .thenReturn(Flux.just("[소개] 두부 요리예요.\n[1] 짭짤해요. www.exam", "ple.com 참고"));
+        when(chatMessageService.saveExchange(eq(sessionId), eq(request.content()), any(), any())).thenReturn(List.of(
+                new ChatMessageResponse(100L, 1, ChatMessageRole.USER, request.content(), LocalDateTime.now()),
+                new ChatMessageResponse(101L, 2, ChatMessageRole.ASSISTANT, "답", LocalDateTime.now())));
+
+        List<ServerSentEvent<String>> events = chatStreamService.streamMessage(1L, sessionId, request).collectList().block();
+
+        assertThat(events).extracting(ServerSentEvent::event).contains("recommendation_text");
+        assertThat(events).extracting(ServerSentEvent::data).noneMatch(data -> data != null && data.contains("example"));
+        ArgumentCaptor<List<RecommendationToSave>> cards = ArgumentCaptor.forClass(List.class);
+        verify(chatMessageService).saveExchange(eq(sessionId), eq(request.content()), eq("두부 요리예요."), cards.capture());
+        assertThat(cards.getValue().get(0).description()).isEqualTo("짭짤해요. 참고");
+    }
+
+    @Test
+    @DisplayName("레시피 자세히 답에 섞인 링크도 지우고, 숫자·단위는 그대로 둔다")
+    void removesLinkFromRecipeDetail() {
+        Long sessionId = 10L;
+        ChatMessageCreateRequest request = ChatMessageCreateRequest.of("두 번째 거 어떻게 만들어?");
+        when(chatIntentFacade.resolve(eq(1L), eq(sessionId), eq(request), any()))
+                .thenReturn(ChatIntentResolution.recipeDetail(Source.AI, 315L, DetailQuestion.HOW_TO));
+        RecommendedRecipe detailCard = new RecommendedRecipe(315L, "두부전", null, "전", 20, List.of(), List.of(), List.of(),
+                List.of(), List.of(), false, "물어보신 레시피예요", "물어보신 레시피예요");
+        when(chatRecommendationFacade.describe(1L, 315L)).thenReturn(Optional.of(
+                new RecipeDetailReply(ChatRecommendationsEventResponse.of(List.of(detailCard)), "[레시피 정보]")));
+        when(chatReplyGenerator.generateRecipeDetail(eq(1L), eq(sessionId), any(), eq("[레시피 정보]")))
+                .thenReturn(Flux.just("1. 두부를 3.", "5cm로 썰어요. naver.com/abc", "\n2. 1.5배 물을 부어요."));
+        when(chatMessageService.saveExchange(eq(sessionId), eq(request.content()), any(), any())).thenReturn(List.of(
+                new ChatMessageResponse(100L, 1, ChatMessageRole.USER, request.content(), LocalDateTime.now()),
+                new ChatMessageResponse(101L, 2, ChatMessageRole.ASSISTANT, "답", LocalDateTime.now())));
+
+        chatStreamService.streamMessage(1L, sessionId, request).collectList().block();
+
+        verify(chatMessageService).saveExchange(eq(sessionId), eq(request.content()),
+                eq("1. 두부를 3.5cm로 썰어요.\n2. 1.5배 물을 부어요."), any());
+    }
+
+    @Test
+    @DisplayName("링크만 있던 답은 빈 답으로 보고 CHAT_010을 보내며 하루 횟수를 돌려준다")
+    void sendsEmptyReplyError_whenReplyIsOnlyLink() {
+        Long sessionId = 10L;
+        when(chatDailyLimitService.checkAndIncrement(1L)).thenReturn(LIMIT_KEY);
+        when(chatReplyGenerator.generate(1L, sessionId, "질문", List.of())).thenReturn(Flux.just("https://naver.com"));
+
+        List<ServerSentEvent<String>> events = chatStreamService
+                .streamMessage(1L, sessionId, ChatMessageCreateRequest.of("질문")).collectList().block();
+
+        assertThat(events).extracting(ServerSentEvent::event).containsExactly("error");
+        assertThat(events.get(0).data()).contains("CHAT_010");
+        verify(chatDailyLimitService).refund(LIMIT_KEY);
+    }
+
+    @Test
+    @DisplayName("알레르기 안내는 받침에 따라 이/가를 고르고 여러 재료는 가운뎃점으로 잇는다 (땅콩이, 새우가, 땅콩·새우가)")
+    void buildsAllergyNotice_withParticle() {
+        assertThat(ChatStreamService.allergyNotice(List.of("땅콩")))
+                .isEqualTo("땅콩이 들어간 레시피는 뺐어요. 양념이나 가공품에 성분이 들어 있을 수 있으니 재료를 꼭 확인해 주세요.");
+        assertThat(ChatStreamService.allergyNotice(List.of("새우"))).startsWith("새우가 들어간 레시피는 뺐어요.");
+        assertThat(ChatStreamService.allergyNotice(List.of("땅콩", "새우"))).startsWith("땅콩·새우가 들어간 레시피는 뺐어요.");
+    }
+
+    @Test
+    @DisplayName("추천에서 알레르기 재료를 뺐으면 소개 글 끝(카드 바로 위)에 알레르기 안내를 붙이고, 건강 말이 있으면 건강 안내를 이어 붙인다")
+    void appendsAllergyNoticeAboveCards_whenAllergensExcluded() {
+        Long sessionId = 10L;
+        ChatMessageCreateRequest request = ChatMessageCreateRequest.of("땅콩 알레르기 있어, 뭐 먹지");
+        RecipeQuery query = RecipeQuery.of(1L, List.of());
+        when(chatIntentFacade.resolve(eq(1L), eq(sessionId), eq(request), any()))
+                .thenReturn(ChatIntentResolution.recommend(Source.AI, query).withAllergens(List.of("땅콩"), List.of(101L)));
+        RecipeQuery excluded = query.withExcludedIngredients(List.of(101L));
+        when(chatMessageService.findRecommendedRecipeIds(sessionId)).thenReturn(Set.of());
+        when(chatRecommendationFacade.recommend(request.content(), excluded.withAlreadyRecommended(Set.of()), List.of(), sessionId))
+                .thenReturn(new RecommendationReply(ChatRecommendationsEventResponse.of(List.of(card(314L, "두부조림"))), "후보 정보"));
+        when(chatReplyGenerator.generateRecommendation(1L, sessionId, request.content(), "후보 정보"))
+                .thenReturn(Flux.just("[소개] 두부 요리예요.\n[1] 짭짤해요."));
+        when(chatMessageService.saveExchange(eq(sessionId), eq(request.content()), any(), any())).thenReturn(List.of(
+                new ChatMessageResponse(100L, 1, ChatMessageRole.USER, request.content(), LocalDateTime.now()),
+                new ChatMessageResponse(101L, 2, ChatMessageRole.ASSISTANT, "답", LocalDateTime.now())));
+
+        List<ServerSentEvent<String>> events = chatStreamService.streamMessage(1L, sessionId, request).collectList().block();
+
+        String expectedTail = ChatStreamService.HEALTH_NOTICE_SEPARATOR + ChatStreamService.allergyNotice(List.of("땅콩"))
+                + "\n" + ChatStreamService.HEALTH_NOTICE;
+        assertThat(events.get(events.size() - 2).event()).isEqualTo("message");
+        assertThat(events.get(events.size() - 2).data()).contains("땅콩이 들어간 레시피는 뺐어요.", ChatStreamService.HEALTH_NOTICE);
+        verify(chatMessageService).saveExchange(eq(sessionId), eq(request.content()), eq("두부 요리예요." + expectedTail), any());
+    }
+
+    @Test
+    @DisplayName("알레르기 재료를 빼서 후보가 없으면 \"찾지 못했어요\" 답 뒤에 알레르기 안내를 붙인다")
+    void appendsAllergyNoticeToNoRecipeReply() {
+        Long sessionId = 10L;
+        ChatMessageCreateRequest request = ChatMessageCreateRequest.of("새우 못 먹어, 새우볶음밥 줘");
+        RecipeQuery query = RecipeQuery.of(1L, List.of());
+        when(chatIntentFacade.resolve(eq(1L), eq(sessionId), eq(request), any()))
+                .thenReturn(ChatIntentResolution.recommend(Source.AI, query).withAllergens(List.of("새우"), List.of(50L)));
+        when(chatMessageService.findRecommendedRecipeIds(sessionId)).thenReturn(Set.of());
+        when(chatRecommendationFacade.recommend(eq(request.content()), any(), eq(List.of()), eq(sessionId)))
+                .thenReturn(new RecommendationReply(ChatRecommendationsEventResponse.of(List.of()), "후보 정보"));
+        when(chatMessageService.saveExchange(eq(sessionId), eq(request.content()), any())).thenReturn(List.of(
+                new ChatMessageResponse(100L, 1, ChatMessageRole.USER, request.content(), LocalDateTime.now()),
+                new ChatMessageResponse(101L, 2, ChatMessageRole.ASSISTANT, "답", LocalDateTime.now())));
+
+        chatStreamService.streamMessage(1L, sessionId, request).collectList().block();
+
+        verify(chatMessageService).saveExchange(sessionId, request.content(), ChatStreamService.NO_RECIPE_REPLY
+                + ChatStreamService.HEALTH_NOTICE_SEPARATOR + ChatStreamService.allergyNotice(List.of("새우")));
     }
 }

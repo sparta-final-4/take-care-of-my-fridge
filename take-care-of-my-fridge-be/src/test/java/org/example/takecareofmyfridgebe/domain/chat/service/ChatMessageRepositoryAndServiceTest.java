@@ -309,4 +309,15 @@ class ChatMessageRepositoryAndServiceTest extends MySqlContainerSupport {
             assertThat(stat.lastMessage()).isNull();
         });
     }
+
+    @Test
+    @DisplayName("이 상담의 사용자 말은 오래된 것부터 읽고, 안전 장치로 걸러진 말과 AI 답은 뺀다 (알레르기 다시 찾기용)")
+    void findsUserContents_withoutFilteredOrAssistant() {
+        ChatSession session = chatSessionRepository.saveAndFlush(ChatSession.builder().memberId(112L).build());
+        chatMessageService.saveExchange(session.getId(), "땅콩 알레르기 있어", "알겠어요");
+        chatMessageService.saveFilteredExchange(session.getId(), "새우 알레르기 ㅅㅂ", "금지어 안내");
+        chatMessageService.saveExchange(session.getId(), "매운 걸로", "매운 요리예요");
+
+        assertThat(chatMessageService.findUserContents(session.getId())).containsExactly("땅콩 알레르기 있어", "매운 걸로");
+    }
 }

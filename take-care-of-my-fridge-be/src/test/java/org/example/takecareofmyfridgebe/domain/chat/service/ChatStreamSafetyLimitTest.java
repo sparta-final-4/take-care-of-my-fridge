@@ -1,6 +1,7 @@
 package org.example.takecareofmyfridgebe.domain.chat.service;
 
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatProperties;
+import org.example.takecareofmyfridgebe.domain.chat.config.ChatHealthWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatSafetyWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntent;
@@ -51,7 +52,7 @@ import static org.mockito.BDDMockito.given;
         ChatStreamSafetyLimitTest.TestConfig.class
 })
 @ImportAutoConfiguration(DataRedisAutoConfiguration.class)
-@EnableConfigurationProperties({ChatProperties.class, ChatSafetyWordProperties.class})
+@EnableConfigurationProperties({ChatProperties.class, ChatSafetyWordProperties.class, ChatHealthWordProperties.class})
 class ChatStreamSafetyLimitTest extends RedisContainerSupport {
 
     private static final Long MEMBER_ID = 811L;
