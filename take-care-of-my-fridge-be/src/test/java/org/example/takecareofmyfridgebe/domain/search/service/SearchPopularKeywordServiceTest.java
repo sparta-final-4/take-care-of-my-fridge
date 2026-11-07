@@ -57,11 +57,11 @@ class SearchPopularKeywordServiceTest extends RedisContainerSupport {
 
         assertThat(service.getTopKeywords().keywords()).isEmpty();
         assertThat(redisTemplate.opsForZSet().score("search:popular:20261104", "김치")).isEqualTo(1.0);
-        assertThat(redisTemplate.opsForSet().members("search:popular-seen:20261104:1")).containsExactly("김치");
+        assertThat(redisTemplate.opsForSet().members("search:popular-seen:20261104")).containsExactly("1:김치");
     }
 
     @Test
-    @DisplayName("한 회원이 다른 검색어를 검색하면 각각 세고 그날 검색어를 키 하나에 모은다")
+    @DisplayName("한 회원이 다른 검색어를 검색하면 각각 세고 그날 센 회원·검색어를 키 하나에 모은다")
     void countsEachKeyword_whenSameMemberSearchesDifferentKeywords() {
         SearchPopularKeywordService service = serviceAt("2026-11-04T10:00:00Z");
         service.record(1L, "김치");
@@ -69,8 +69,8 @@ class SearchPopularKeywordServiceTest extends RedisContainerSupport {
 
         assertThat(redisTemplate.opsForZSet().score("search:popular:20261104", "김치")).isEqualTo(1.0);
         assertThat(redisTemplate.opsForZSet().score("search:popular:20261104", "두부")).isEqualTo(1.0);
-        assertThat(redisTemplate.opsForSet().members("search:popular-seen:20261104:1"))
-                .containsExactlyInAnyOrder("김치", "두부");
+        assertThat(redisTemplate.opsForSet().members("search:popular-seen:20261104"))
+                .containsExactlyInAnyOrder("1:김치", "1:두부");
     }
 
     @Test
@@ -94,12 +94,35 @@ class SearchPopularKeywordServiceTest extends RedisContainerSupport {
     }
 
     @Test
-    @DisplayName("어제 검색은 오늘 인기 검색어에 들어가지 않는다")
-    void returnsTodayOnly() {
-        searchBy(serviceAt("2026-11-03T10:00:00Z"), "어제", 5);
-        searchBy(serviceAt("2026-11-04T10:00:00Z"), "된장찌개", 2);
+    @DisplayName("오늘부터 6일 전까지의 검색만 합치고 7일 전 검색은 버린다")
+    void returnsLastSevenDaysOnly() {
+        searchBy(serviceAt("2026-11-03T10:00:00Z"), "오래된", 5);
+        searchBy(serviceAt("2026-11-04T10:00:00Z"), "김치", 2);
+        searchBy(serviceAt("2026-11-10T10:00:00Z"), "두부", 3);
 
-        assertThat(serviceAt("2026-11-04T12:00:00Z").getTopKeywords().keywords()).containsExactly("된장찌개");
+        assertThat(serviceAt("2026-11-10T12:00:00Z").getTopKeywords().keywords()).containsExactly("두부", "김치");
+    }
+
+    @Test
+    @DisplayName("같은 회원이 다른 날 같은 검색어를 검색하면 날마다 세어 합친다")
+    void sumsScoresAcrossDays() {
+        serviceAt("2026-11-08T10:00:00Z").record(1L, "김치");
+        serviceAt("2026-11-09T10:00:00Z").record(1L, "김치");
+
+        assertThat(serviceAt("2026-11-09T12:00:00Z").getTopKeywords().keywords()).containsExactly("김치");
+    }
+
+    @Test
+    @DisplayName("같은 날 다시 조회하면 보관한 합산 결과를 돌려주고 보관 키에는 만료 시간이 있다")
+    void reusesWeeklyResult_whenQueriedAgainSameDay() {
+        SearchPopularKeywordService service = serviceAt("2026-11-04T10:00:00Z");
+        searchBy(service, "김치", 2);
+        assertThat(service.getTopKeywords().keywords()).containsExactly("김치");
+
+        searchBy(service, "두부", 3);
+
+        assertThat(service.getTopKeywords().keywords()).containsExactly("김치");
+        assertThat(redisTemplate.getExpire("search:popular:week:20261104")).isPositive();
     }
 
     private SearchPopularKeywordService serviceAt(String instant) {
