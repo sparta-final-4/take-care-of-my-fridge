@@ -41,28 +41,6 @@
   }
 }
 
-// 사진 오른쪽 위 안내 칩: "ⓘ 눌러서 정보 보기". 반투명 잉크 바탕, 종이색 글자.
-.infoHint {
-  position: absolute;
-  top: var(--ant-margin-xs);
-  right: var(--ant-margin-xs);
-  z-index: 1;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--ant-margin-xxs);
-  padding: 2px var(--ant-padding-xs);
-  font-size: $product-card-overlay-size-sm;
-  color: var(--ant-color-bg-layout);
-  white-space: nowrap;
-  background: color-mix(in srgb, var(--ant-color-text) 55%, transparent);
-  border-radius: $pill-radius;
-  backdrop-filter: blur(4px);
-
-  @include from(md) {
-    font-size: $product-card-overlay-size;
-  }
-}
-
 .image {
   width: 100%;
   height: 100%;

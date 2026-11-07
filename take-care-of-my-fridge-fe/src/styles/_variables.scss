@@ -82,6 +82,8 @@ $card-back-small-size: 17px;
 $card-back-control-size: 19px;
 // 상품 모달의 상품명
 $product-modal-name-size: 24px;
+// 상품 모달 뒤 목록 흐림 정도(antd mask blur 옵션은 4px 고정이라 직접 건다)
+$product-modal-mask-blur: 8px;
 // 정보 칸 바탕: 귤색(포인트 색)을 아주 옅게 푼 부드러운 살구색 oklch(95% 0.03 60), 잉크 글자 대비 16:1.
 // 안쪽 칸(정보 상자·칩·수량 조절기)은 더 연한 크림 oklch(98% 0.012 60). 선 없이 색 차이로만 나눈다.
 $card-back-bg: #feeadb;
