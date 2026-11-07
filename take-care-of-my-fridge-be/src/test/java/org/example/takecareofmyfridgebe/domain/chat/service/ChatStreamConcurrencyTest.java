@@ -1,6 +1,7 @@
 package org.example.takecareofmyfridgebe.domain.chat.service;
 
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatProperties;
+import org.example.takecareofmyfridgebe.domain.chat.config.ChatSafetyWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageCreateRequest;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageResponse;
@@ -60,7 +61,7 @@ import static org.mockito.BDDMockito.given;
         ChatStreamConcurrencyTest.TestConfig.class
 })
 @ImportAutoConfiguration(DataRedisAutoConfiguration.class)
-@EnableConfigurationProperties(ChatProperties.class)
+@EnableConfigurationProperties({ChatProperties.class, ChatSafetyWordProperties.class})
 class ChatStreamConcurrencyTest extends RedisContainerSupport {
 
     private static final Long MEMBER_ID = 801L;
