@@ -19,6 +19,8 @@ class AllergyWordCheckerTest {
                     new NotSameKind("땅콩", List.of("땅콩호박")),
                     new NotSameKind("게", List.of("바게트", "스파게티", "멍게살")),
                     new NotSameKind("게살", List.of("멍게살")),
+                    new NotSameKind("우유", List.of("아몬드우유")),
+                    new NotSameKind("버터", List.of("땅콩버터")),
                     new NotSameKind("굴", List.of("굴비")),
                     new NotSameKind("김", List.of("김장김치", "김치", "김칫국물", "김칫잎")),
                     new NotSameKind("떡", List.of("떡볶이양념파우더")),

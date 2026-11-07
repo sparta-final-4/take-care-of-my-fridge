@@ -179,6 +179,11 @@ app:
           names: 바게트, 스파게티, 멍게살
         - word: 게살
           names: 멍게살
+        # 우유·버터 대신 쓰는 재료 (우유 알레르기에 오히려 쓰고, 땅콩버터의 땅콩은 땅콩 쪽에서 뺀다)
+        - word: 우유
+          names: 아몬드우유
+        - word: 버터
+          names: 땅콩버터
         - word: 굴
           names: 굴비
         - word: 김
@@ -207,7 +212,7 @@ app:
     allergy-groups:
       groups:
         - word: 견과류
-          ingredients: 호두, 아몬드, 잣, 캐슈넛, 피스타치오, 땅콩
+          ingredients: 호두, 아몬드, 잣, 캐슈넛, 피스타치오, 마카다미아, 땅콩
         - word: 갑각류
           ingredients: 새우, 게, 꽃게, 게살, 게맛살, 가재새우
         - word: 유제품

@@ -34,7 +34,7 @@ class ChatSafetyYamlBindingTest {
     void bindsAllergyConfig() {
         assertThat(allergyGroups.groups()).extracting(ChatAllergyGroupProperties.Group::word)
                 .containsExactly("견과류", "갑각류", "유제품", "달걀", "계란", "밀가루");
-        assertThat(allergyGroups.groups().get(0).ingredients()).containsExactly("호두", "아몬드", "잣", "캐슈넛", "피스타치오", "땅콩");
+        assertThat(allergyGroups.groups().get(0).ingredients()).containsExactly("호두", "아몬드", "잣", "캐슈넛", "피스타치오", "마카다미아", "땅콩");
         assertThat(allergyWords.markers()).containsExactly("알레르기", "알러지", "못먹", "먹으면안");
         assertThat(allergyWords.notSameKindOf("땅콩")).containsExactly("땅콩호박");
         assertThat(allergyWords.notSameKindOf("굴")).containsExactly("굴비");

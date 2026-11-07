@@ -31,7 +31,7 @@ class AllergyExclusionFinderTest {
 
     // application.yml app.chat.allergy-groups와 같은 묶음
     static final ChatAllergyGroupProperties GROUPS = new ChatAllergyGroupProperties(List.of(
-            new Group("견과류", List.of("호두", "아몬드", "잣", "캐슈넛", "피스타치오", "땅콩")),
+            new Group("견과류", List.of("호두", "아몬드", "잣", "캐슈넛", "피스타치오", "마카다미아", "땅콩")),
             new Group("갑각류", List.of("새우", "게", "꽃게", "게살", "게맛살", "가재새우")),
             new Group("유제품", List.of("우유", "치즈", "버터", "생크림", "요거트")),
             new Group("달걀", List.of("달걀", "메추리알", "마요네즈")),
@@ -50,7 +50,7 @@ class AllergyExclusionFinderTest {
         long id = 1;
         for (String name : List.of("땅콩", "땅콩가루", "땅콩기름", "땅콩버터", "땅콩잼", "땅콩호박", "새우", "건새우", "새우젓", "새우살",
                 "가재새우", "게", "꽃게", "게살", "게맛살", "바게트", "스파게티", "멍게살", "호두", "아몬드", "아몬드가루", "잣", "잣가루",
-                "캐슈넛", "피스타치오", "달걀", "달걀노른자", "메추리알", "마요네즈", "오이", "우유", "굴", "굴소스", "굴비", "마", "마늘",
+                "캐슈넛", "피스타치오", "마카다미아", "아몬드우유", "버터", "달걀", "달걀노른자", "메추리알", "마요네즈", "오이", "우유", "굴", "굴소스", "굴비", "마", "마늘",
                 "마늘가루", "김", "김가루", "김치", "배추", "배추김치")) {
             DICTIONARY.put(name, ingredient(id++, name));
         }
@@ -106,6 +106,20 @@ class AllergyExclusionFinderTest {
         assertThat(namesOf(finder.find(SESSION_ID, "갑각류 알레르기")))
                 .contains("새우", "새우젓", "게", "꽃게", "게살", "게맛살")
                 .doesNotContain("바게트", "스파게티", "멍게살");
+    }
+
+    @Test
+    @DisplayName("우유 알레르기면 대신 쓰는 아몬드우유는 빼지 않고, 유제품 알레르기도 버터는 빼되 땅콩버터는 빼지 않는다")
+    void keepsSubstitutes_whenMilkAllergy() {
+        assertThat(namesOf(finder.find(SESSION_ID, "우유 알레르기"))).containsExactly("우유");
+        assertThat(namesOf(finder.find(SESSION_ID, "유제품 알레르기"))).contains("우유", "버터")
+                .doesNotContain("아몬드우유", "땅콩버터");
+    }
+
+    @Test
+    @DisplayName("견과류 알레르기면 마카다미아와 아몬드우유·땅콩버터까지 뺀다")
+    void excludesMacadamiaAndAlmondMilk_whenNutAllergy() {
+        assertThat(namesOf(finder.find(SESSION_ID, "견과류 알레르기"))).contains("마카다미아", "아몬드우유", "땅콩버터");
     }
 
     @Test
