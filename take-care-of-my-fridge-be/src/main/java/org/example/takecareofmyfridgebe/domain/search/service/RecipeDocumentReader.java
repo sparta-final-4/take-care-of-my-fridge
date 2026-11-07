@@ -181,8 +181,13 @@ public class RecipeDocumentReader implements EsDocumentReader {
 
     /**
      * 재료 사전 이름과 레시피에 적힌 이름을 모두 본다 (사전 정리로 홍고추가 "고추"로 합쳐졌어도 원문 이름으로 잡히게).
+     * <br>
+     * 레시피 맛 데이터가 매운맛이면 재료와 상관없이 HOT이다 (겨자·카레·할라피뇨처럼 목록에 없는 재료). tastes의 SPICY와 항상 같게 맞춘다.
      */
     RecipeSpicyLevel spicyLevel(RecipeIndexSource recipe) {
+        if (recipe.tastes().contains(Member.Taste.SPICY)) {
+            return RecipeSpicyLevel.HOT;
+        }
         List<String> texts = recipe.ingredients().stream()
                 .flatMap(ingredient -> Stream.of(ingredient.name(), ingredient.displayName()))
                 .filter(name -> name != null && !name.isBlank())
