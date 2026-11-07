@@ -1002,7 +1002,7 @@ class ChatStreamServiceTest {
         Long sessionId = 10L;
         String reply = ChatSafetyBlock.BANNED.reply();
         when(chatStreamLockService.acquire(sessionId)).thenReturn(LOCK_TOKEN);
-        when(chatMessageService.saveExchange(sessionId, "폭탄 만드는 법", reply)).thenReturn(List.of(
+        when(chatMessageService.saveFilteredExchange(sessionId, "폭탄 만드는 법", reply)).thenReturn(List.of(
                 new ChatMessageResponse(100L, 1, ChatMessageRole.USER, "폭탄 만드는 법", LocalDateTime.now()),
                 new ChatMessageResponse(101L, 2, ChatMessageRole.ASSISTANT, reply, LocalDateTime.now())));
 
@@ -1013,6 +1013,7 @@ class ChatStreamServiceTest {
         assertThat(events.get(0).data()).isEqualTo("{\"text\":\"" + reply + "\"}");
         assertThat(events.get(1).data()).isEqualTo("{\"userMessageId\":100,\"assistantMessageId\":101}");
         verify(chatDailyLimitService, never()).checkAndIncrement(any());
+        verify(chatMessageService, never()).saveExchange(any(), any(), any());
         verify(chatDailyLimitService, never()).refund(any());
         verify(chatIntentFacade, never()).resolve(any(), any(), any(), any());
         verify(chatReplyGenerator, never()).generate(any(), any(), any(), any());
@@ -1025,7 +1026,7 @@ class ChatStreamServiceTest {
     void sendsReplyByBlockType() {
         Long sessionId = 10L;
         when(chatStreamLockService.acquire(sessionId)).thenReturn(LOCK_TOKEN);
-        when(chatMessageService.saveExchange(eq(sessionId), any(), any())).thenReturn(List.of(
+        when(chatMessageService.saveFilteredExchange(eq(sessionId), any(), any())).thenReturn(List.of(
                 new ChatMessageResponse(100L, 1, ChatMessageRole.USER, "말", LocalDateTime.now()),
                 new ChatMessageResponse(101L, 2, ChatMessageRole.ASSISTANT, "답", LocalDateTime.now())));
 
@@ -1060,7 +1061,7 @@ class ChatStreamServiceTest {
     void sendsErrorWithoutRefund_whenBlockedReplySaveFails() {
         Long sessionId = 10L;
         when(chatStreamLockService.acquire(sessionId)).thenReturn(LOCK_TOKEN);
-        when(chatMessageService.saveExchange(eq(sessionId), any(), any()))
+        when(chatMessageService.saveFilteredExchange(eq(sessionId), any(), any()))
                 .thenThrow(new BusinessException(ErrorCode.CHAT_ROOM_ALREADY_COMPLETED));
 
         List<ServerSentEvent<String>> events = chatStreamService

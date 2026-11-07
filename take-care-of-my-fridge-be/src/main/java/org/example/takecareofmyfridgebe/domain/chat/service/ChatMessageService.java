@@ -86,6 +86,22 @@ public class ChatMessageService {
     @Transactional
     public List<ChatMessageResponse> saveExchange(Long sessionId, String userContent, String assistantContent,
                                                   List<RecommendationToSave> recommendations) {
+        return save(sessionId, userContent, assistantContent, recommendations, false);
+    }
+
+    /**
+     * 금지어·자해·탈취 단어에 걸린 말과 서버 안내 답을 표시(filtered)해 저장한다. 그 밖에는 saveExchange와 같다.
+     * 표시한 메시지는 대화 화면에는 그대로 보이고, 상담 문맥(최근 대화)과 내역 첫 질문·마지막 미리보기에서 빠진다.
+     *
+     * @return 저장된 두 메시지 DTO [사용자 메시지, 안내 답]
+     */
+    @Transactional
+    public List<ChatMessageResponse> saveFilteredExchange(Long sessionId, String userContent, String assistantContent) {
+        return save(sessionId, userContent, assistantContent, List.of(), true);
+    }
+
+    private List<ChatMessageResponse> save(Long sessionId, String userContent, String assistantContent,
+                                           List<RecommendationToSave> recommendations, boolean filtered) {
         ChatSession session = chatSessionRepository.findById(sessionId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND));
 
@@ -105,6 +121,7 @@ public class ChatMessageService {
                 .sequence(userSequence)
                 .role(ChatMessageRole.USER)
                 .content(userContent)
+                .filtered(filtered)
                 .build();
 
         ChatMessage assistantMessage = ChatMessage.builder()
@@ -112,6 +129,7 @@ public class ChatMessageService {
                 .sequence(assistantSequence)
                 .role(ChatMessageRole.ASSISTANT)
                 .content(assistantContent)
+                .filtered(filtered)
                 .build();
 
         ChatMessage savedUser = chatMessageRepository.save(userMessage);
@@ -182,9 +200,10 @@ public class ChatMessageService {
 
     /**
      * 최근 메시지 최대 6개(3턴)를 오래된 것부터 읽는다. 이전 대화로 AI에 넘긴다.
+     * 단어에 걸린 말과 그 안내 답(filtered)은 빼고 센다 (걸린 말이 다음 AI 호출에 들어가지 않게).
      */
     public List<ChatMessageResponse> findRecentMessages(Long sessionId) {
-        List<ChatMessageResponse> recent = new ArrayList<>(chatMessageRepository.findTop6BySessionIdOrderBySequenceDesc(sessionId).stream()
+        List<ChatMessageResponse> recent = new ArrayList<>(chatMessageRepository.findTop6BySessionIdAndFilteredFalseOrderBySequenceDesc(sessionId).stream()
                 .map(ChatMessageResponse::from)
                 .toList());
         Collections.reverse(recent);

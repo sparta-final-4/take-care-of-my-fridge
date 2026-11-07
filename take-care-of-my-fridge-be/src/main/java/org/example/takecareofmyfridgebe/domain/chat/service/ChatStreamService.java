@@ -329,7 +329,7 @@ public class ChatStreamService {
         log.info("상담 메시지 단어 차단, AI 없이 안내 - memberId: {}, sessionId: {}, 종류: {}", memberId, sessionId, block);
         String reply = block.reply();
         Mono<ServerSentEvent<String>> done = Mono.fromCallable(() -> {
-            List<ChatMessageResponse> saved = chatMessageService.saveExchange(sessionId, content, reply);
+            List<ChatMessageResponse> saved = chatMessageService.saveFilteredExchange(sessionId, content, reply);
             chatContextStore.touch(sessionId);
             return doneEvent(saved);
         }).subscribeOn(Schedulers.boundedElastic());

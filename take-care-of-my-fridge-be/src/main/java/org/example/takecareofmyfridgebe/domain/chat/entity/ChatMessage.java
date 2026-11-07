@@ -51,16 +51,22 @@ public class ChatMessage extends BaseTimeEntity {
     @Column(name = "content", columnDefinition = "TEXT", nullable = false)
     private String content;
 
+    // 금지어·자해·탈취 단어에 걸려 AI 없이 안내한 말과 그 안내 답. 대화 화면에는 보이고, 상담 문맥(최근 대화)·내역 첫 질문·미리보기에서는 뺀다
+    @Column(name = "filtered", nullable = false)
+    private boolean filtered;
+
     @Builder
     private ChatMessage(
         ChatSession session,
         int sequence,
         ChatMessageRole role,
-        String content
+        String content,
+        boolean filtered
     ) {
         this.session = session;
         this.sequence = sequence;
         this.role = role;
         this.content = content;
+        this.filtered = filtered;
     }
 }

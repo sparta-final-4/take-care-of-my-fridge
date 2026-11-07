@@ -89,6 +89,7 @@ class ChatStreamSafetyLimitTest extends RedisContainerSupport {
                 new ChatMessageResponse(100L, 1, ChatMessageRole.USER, "말", LocalDateTime.now()),
                 new ChatMessageResponse(101L, 2, ChatMessageRole.ASSISTANT, "답", LocalDateTime.now()));
         given(chatMessageService.saveExchange(eq(SESSION_ID), any(), any())).willReturn(saved);
+        given(chatMessageService.saveFilteredExchange(eq(SESSION_ID), any(), any())).willReturn(saved);
         for (String pattern : List.of("chat:streaming:*", "chat:limit:*")) {
             Set<String> keys = stringRedisTemplate.keys(pattern);
             if (keys != null && !keys.isEmpty()) {
