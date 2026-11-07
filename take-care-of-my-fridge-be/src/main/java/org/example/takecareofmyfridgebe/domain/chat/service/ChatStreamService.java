@@ -72,7 +72,8 @@ public class ChatStreamService {
      * 의도 판단을 포함해 메시지 하나를 하루 1회로 센다. 답 조각을 하나도 못 받고 실패하거나 빈 답으로 끝나면 하루 횟수를 돌려준다.
      * 첫 조각 뒤에 실패하거나 사용자가 끊으면(cancel) 돌려주지 않는다.
      * 금지어·자해·탈취 단어에 걸린 말은 하루 횟수를 늘리기 전에 걸러, AI 없이 안내 답을 보내고 횟수를 세지 않는다.
-     * 의도 판단이 상관없는 질문(OFF_TOPIC)이면 답 생성 AI 없이 안내 답을 보내고, 저장한 뒤 하루 횟수를 돌려준다(의도 판단 비용은 감수).
+     * 의도 판단이 상관없는 질문(OFF_TOPIC)·목록 밖 욕설·탈취(BLOCKED)·자해(SELF_HARM)면 답 생성 AI 없이 안내 답을 보내고,
+     * 저장한 뒤 하루 횟수를 돌려준다(의도 판단 비용은 감수). BLOCKED·SELF_HARM은 걸러진 메시지(filtered)로 저장한다.
      *
      * @param memberId  회원 ID
      * @param sessionId 세션 ID
@@ -315,13 +316,16 @@ public class ChatStreamService {
 
     /**
      * 답 생성 AI 없이 보내는 서버 안내 답. filtered면 보낸 말과 안내 답을 안전 장치로 걸러진 메시지로 저장한다.
-     * 상관없는 질문은 다른 주제일 뿐이라 표시하지 않는다 (문맥에 남아도 된다).
+     * 상관없는 질문은 다른 주제일 뿐이라 표시하지 않고(문맥에 남아도 된다), 목록 밖 욕설·탈취(BLOCKED)와 자해(SELF_HARM)는 표시한다.
      */
     private record Declined(String reply, boolean filtered) {
 
         private static Declined of(ChatIntent intent) {
             return switch (intent) {
                 case OFF_TOPIC -> new Declined(OFF_TOPIC_REPLY, false);
+                // 서버 단어 목록 밖의 욕설·탈취는 금지어 안내 하나로, 자해는 상담 전화 안내로 답한다 (단어 차단과 같은 문장)
+                case BLOCKED -> new Declined(ChatSafetyBlock.BANNED.reply(), true);
+                case SELF_HARM -> new Declined(ChatSafetyBlock.SELF_HARM.reply(), true);
                 default -> throw new IllegalArgumentException("서버 안내로 답하지 않는 의도: " + intent);
             };
         }

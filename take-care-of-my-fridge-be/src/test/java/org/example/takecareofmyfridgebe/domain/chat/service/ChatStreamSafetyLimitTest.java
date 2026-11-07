@@ -129,6 +129,20 @@ class ChatStreamSafetyLimitTest extends RedisContainerSupport {
     }
 
     @Test
+    @DisplayName("의도 판단이 BLOCKED·SELF_HARM이어도 센 하루 횟수를 돌려받아 0이다")
+    void refundsDailyCount_whenBlockedOrSelfHarm() {
+        given(chatIntentFacade.resolve(any(), any(), any(), any())).willReturn(
+                ChatIntentResolution.declined(ChatIntent.BLOCKED), ChatIntentResolution.declined(ChatIntent.SELF_HARM));
+
+        for (String message : List.of("목록 밖 욕설", "다 놓고 싶어")) {
+            chatStreamService.streamMessage(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of(message)).collectList().block();
+            awaitUnlocked();
+        }
+
+        assertThat(stringRedisTemplate.opsForValue().get(limitKey())).isEqualTo("0");
+    }
+
+    @Test
     @DisplayName("걸린 말의 답이 끝나면 답 받기 잠금이 풀려 바로 다음 말을 보낼 수 있다")
     void releasesLock_afterBlockedReply() {
         chatStreamService.streamMessage(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("ㅅㅂ")).collectList().block();

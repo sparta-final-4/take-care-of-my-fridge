@@ -1089,6 +1089,31 @@ class ChatIntentFacadeTest {
         }
 
         @Test
+        @DisplayName("AI가 BLOCKED·SELF_HARM이라고 하면 서버 안내로 답하는 의도로 정한다")
+        void declines_whenIntentIsBlockedOrSelfHarm() {
+            for (ChatIntent intent : List.of(ChatIntent.BLOCKED, ChatIntent.SELF_HARM)) {
+                givenExtracted(intentOnly(intent));
+
+                ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("말"));
+
+                assertThat(resolution.intent()).as(intent.name()).isEqualTo(intent);
+                assertThat(resolution.declines()).as(intent.name()).isTrue();
+                assertThat(resolution.recipeQuery()).as(intent.name()).isNull();
+            }
+        }
+
+        @Test
+        @DisplayName("AI 의도 판단이 실패하면 거절하지 않고 지금처럼 일반 답으로 정한다")
+        void fallsBackToGeneral_whenExtractorFails() {
+            when(extractor.extract(any(), any(), any(), any(), any())).thenThrow(new RuntimeException("timeout"));
+
+            ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("숙제 풀어줘"));
+
+            assertThat(resolution.intent()).isEqualTo(ChatIntent.GENERAL);
+            assertThat(resolution.declines()).isFalse();
+        }
+
+        @Test
         @DisplayName("OFF_TOPIC은 밀키트를 달라는 말·이름만 말한 짧은 말이어도 추천으로 바꾸지 않는다 (바꾸는 규칙은 GENERAL에만)")
         void keepsOffTopic_whenMealkitOrNameOnlyWords() {
             givenExtracted(intentOnly(ChatIntent.OFF_TOPIC));

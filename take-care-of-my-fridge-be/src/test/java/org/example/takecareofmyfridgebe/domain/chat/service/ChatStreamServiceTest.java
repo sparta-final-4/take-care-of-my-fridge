@@ -1115,4 +1115,47 @@ class ChatStreamServiceTest {
         assertThat(events).extracting(ServerSentEvent::event).containsExactly("message", "error");
         verify(chatDailyLimitService, times(1)).refund(LIMIT_KEY);
     }
+
+    @Test
+    @DisplayName("의도가 BLOCKED면 답 생성 AI 없이 금지어 안내를 보내고, 걸러진 메시지로 저장한 뒤 하루 횟수를 돌려준다")
+    void sendsBannedReplyAsFiltered_whenIntentIsBlocked() {
+        Long sessionId = 10L;
+        String reply = ChatSafetyBlock.BANNED.reply();
+        when(chatDailyLimitService.checkAndIncrement(1L)).thenReturn(LIMIT_KEY);
+        when(chatIntentFacade.resolve(eq(1L), eq(sessionId), any(), any()))
+                .thenReturn(ChatIntentResolution.declined(ChatIntent.BLOCKED));
+        when(chatMessageService.saveFilteredExchange(sessionId, "목록 밖 욕설", reply)).thenReturn(List.of(
+                new ChatMessageResponse(100L, 1, ChatMessageRole.USER, "목록 밖 욕설", LocalDateTime.now()),
+                new ChatMessageResponse(101L, 2, ChatMessageRole.ASSISTANT, reply, LocalDateTime.now())));
+
+        List<ServerSentEvent<String>> events = chatStreamService
+                .streamMessage(1L, sessionId, ChatMessageCreateRequest.of("목록 밖 욕설")).collectList().block();
+
+        assertThat(events).extracting(ServerSentEvent::event).containsExactly("message", "done");
+        assertThat(events.get(0).data()).isEqualTo("{\"text\":\"" + reply + "\"}");
+        verify(chatMessageService).saveFilteredExchange(sessionId, "목록 밖 욕설", reply);
+        verify(chatMessageService, never()).saveExchange(any(), any(), any());
+        verify(chatReplyGenerator, never()).generate(any(), any(), any(), any());
+        verify(chatDailyLimitService, times(1)).refund(LIMIT_KEY);
+    }
+
+    @Test
+    @DisplayName("의도가 SELF_HARM이면 상담 전화 109 안내를 보내고, 걸러진 메시지로 저장한 뒤 하루 횟수를 돌려준다")
+    void sendsSelfHarmReplyAsFiltered_whenIntentIsSelfHarm() {
+        Long sessionId = 10L;
+        String reply = ChatSafetyBlock.SELF_HARM.reply();
+        when(chatDailyLimitService.checkAndIncrement(1L)).thenReturn(LIMIT_KEY);
+        when(chatIntentFacade.resolve(eq(1L), eq(sessionId), any(), any()))
+                .thenReturn(ChatIntentResolution.declined(ChatIntent.SELF_HARM));
+        when(chatMessageService.saveFilteredExchange(sessionId, "다 놓고 싶어", reply)).thenReturn(List.of(
+                new ChatMessageResponse(100L, 1, ChatMessageRole.USER, "다 놓고 싶어", LocalDateTime.now()),
+                new ChatMessageResponse(101L, 2, ChatMessageRole.ASSISTANT, reply, LocalDateTime.now())));
+
+        List<ServerSentEvent<String>> events = chatStreamService
+                .streamMessage(1L, sessionId, ChatMessageCreateRequest.of("다 놓고 싶어")).collectList().block();
+
+        assertThat(events.get(0).data()).contains("자살예방상담전화 109(24시간, 무료)");
+        verify(chatMessageService).saveFilteredExchange(sessionId, "다 놓고 싶어", reply);
+        verify(chatDailyLimitService, times(1)).refund(LIMIT_KEY);
+    }
 }

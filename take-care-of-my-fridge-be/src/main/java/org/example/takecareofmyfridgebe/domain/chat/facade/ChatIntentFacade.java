@@ -157,7 +157,7 @@ public class ChatIntentFacade {
                     ? ChatIntentResolution.recommend(Source.AI, toRecipeQuery(memberId, sessionId, request, result))
                     : ChatIntentResolution.general(Source.AI);
             // 이름만 말하기·밀키트처럼 의도를 바꾸는 규칙은 GENERAL에만 걸리므로 그대로 둔다
-            case OFF_TOPIC -> ChatIntentResolution.declined(result.intent());
+            case OFF_TOPIC, BLOCKED, SELF_HARM -> ChatIntentResolution.declined(result.intent());
         };
         return new Decision(resolution, result.removed() == null ? List.of() : result.removed());
     }
