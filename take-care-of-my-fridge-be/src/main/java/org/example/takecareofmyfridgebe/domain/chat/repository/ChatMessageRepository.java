@@ -15,6 +15,6 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long>,
 
     List<ChatMessage> findBySessionIdOrderBySequenceAsc(Long sessionId);
 
-    // 최근 메시지 6개 (최근 것부터). uk_chat_messages_chat_session_id_sequence 인덱스로 읽는다
-    List<ChatMessage> findTop6BySessionIdOrderBySequenceDesc(Long sessionId);
+    // 단어에 걸리지 않은 최근 메시지 6개 (최근 것부터). uk_chat_messages_chat_session_id_sequence 인덱스로 읽는다
+    List<ChatMessage> findTop6BySessionIdAndFilteredFalseOrderBySequenceDesc(Long sessionId);
 }

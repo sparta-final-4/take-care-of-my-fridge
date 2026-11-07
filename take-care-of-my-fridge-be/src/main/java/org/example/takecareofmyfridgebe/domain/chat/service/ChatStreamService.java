@@ -2,6 +2,7 @@ package org.example.takecareofmyfridgebe.domain.chat.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.example.takecareofmyfridgebe.domain.chat.config.ChatSafetyWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatDoneEventResponse;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatErrorEventResponse;
@@ -18,9 +19,11 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeDetailReply;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeQuery;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecommendationReply;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecommendationToSave;
+import org.example.takecareofmyfridgebe.domain.chat.dto.ChatSafetyBlock;
 import org.example.takecareofmyfridgebe.domain.chat.facade.ChatContextFacade;
 import org.example.takecareofmyfridgebe.domain.chat.facade.ChatIntentFacade;
 import org.example.takecareofmyfridgebe.domain.chat.facade.ChatRecommendationFacade;
+import org.example.takecareofmyfridgebe.domain.chat.facade.SafetyWordChecker;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 import org.springframework.http.codec.ServerSentEvent;
@@ -32,6 +35,7 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -53,6 +57,7 @@ public class ChatStreamService {
     private final ChatRecommendationFacade chatRecommendationFacade;
     private final ChatContextFacade chatContextFacade;
     private final ChatContextStore chatContextStore;
+    private final ChatSafetyWordProperties chatSafetyWordProperties;
     private final ObjectMapper objectMapper;
 
     /**
@@ -64,6 +69,7 @@ public class ChatStreamService {
      * 답변 완료 후 DB 저장은 boundedElastic 스케줄러에서 비동기 I/O로 격리된다.
      * 의도 판단을 포함해 메시지 하나를 하루 1회로 센다. 답 조각을 하나도 못 받고 실패하거나 빈 답으로 끝나면 하루 횟수를 돌려준다.
      * 첫 조각 뒤에 실패하거나 사용자가 끊으면(cancel) 돌려주지 않는다.
+     * 금지어·자해·탈취 단어에 걸린 말은 하루 횟수를 늘리기 전에 걸러, AI 없이 안내 답을 보내고 횟수를 세지 않는다.
      *
      * @param memberId  회원 ID
      * @param sessionId 세션 ID
@@ -79,7 +85,13 @@ public class ChatStreamService {
         // 2. 답 받기 잠금 (같은 상담에 이미 답을 받는 요청이 있으면 409 JSON 에러, 하루 횟수는 쓰지 않음)
         String lockToken = chatStreamLockService.acquire(sessionId);
 
-        // 3. 일일 메시지 횟수 검증 (잠금 획득 후 카운트 증가 및 30개 초과 시 429 JSON 에러). 실패하면 잠금을 풀고 던진다
+        // 3. AI를 부르기 전에 단어로 거른다 (잠금 뒤, 하루 횟수 전). 걸리면 하루 횟수를 세지 않고 안내 답을 보낸다
+        Optional<ChatSafetyBlock> block = SafetyWordChecker.check(content, chatSafetyWordProperties);
+        if (block.isPresent()) {
+            return blockedReply(memberId, sessionId, content, block.get(), lockToken);
+        }
+
+        // 4. 일일 메시지 횟수 검증 (잠금 획득 후 카운트 증가 및 30개 초과 시 429 JSON 에러). 실패하면 잠금을 풀고 던진다
         String limitKey;
         try {
             limitKey = chatDailyLimitService.checkAndIncrement(memberId);
@@ -94,7 +106,7 @@ public class ChatStreamService {
         AtomicReference<ReplyPlan> planRef = new AtomicReference<>();
         List<StringBuilder> descriptions = new ArrayList<>();
 
-        // 4. 의도·조건 뽑기 → (추천이면) 후보 검색 → 카드 (event: recommendations) → 답변 스트리밍 조각 (event: message)
+        // 5. 의도·조건 뽑기 → (추천이면) 후보 검색 → 카드 (event: recommendations) → 답변 스트리밍 조각 (event: message)
         // 의도 판단·후보 검색은 AI·DB·검색을 부르는 블로킹 작업이라 boundedElastic에서 실행한다.
         // 의도 판단이 실패하면 일반 답(ChatIntentFacade), 후보 검색이 실패하면 일반 답으로 넘어간다. 하루 횟수는 위에서 센 1회에 포함된다
         Flux<ServerSentEvent<String>> messageStream = Mono.fromCallable(() -> planReply(memberId, sessionId, request))
@@ -142,9 +154,9 @@ public class ChatStreamService {
                     return Flux.concat(Mono.just(cards), textEvents);
                 });
 
-        // 5. 스트림 정상 완료 시 DB 저장 후 종료 이벤트 (event: done)
+        // 6. 스트림 정상 완료 시 DB 저장 후 종료 이벤트 (event: done)
         // 블로킹 I/O(DB 저장)가 Reactor 계산/이벤트루프 스레드를 점유하지 않도록 Schedulers.boundedElastic()에서 실행
-        // 조각 없이 끝난 빈 답은 저장하지 않고 오류로 보낸다 (아래 6에서 하루 횟수를 돌려준다)
+        // 조각 없이 끝난 빈 답은 저장하지 않고 오류로 보낸다 (아래 7에서 하루 횟수를 돌려준다)
         Mono<ServerSentEvent<String>> doneStream = Mono.defer(() -> {
             if (!firstChunkReceived.get()) {
                 log.warn("상담 답이 비어 있음 - memberId: {}, sessionId: {}", memberId, sessionId);
@@ -153,7 +165,7 @@ public class ChatStreamService {
             return saveExchange(sessionId, content, accumulated, planRef.get(), descriptions);
         });
 
-        // 6. 실패 시 에러 이벤트 (event: error) 및 로깅. 첫 조각 전 실패면 하루 횟수를 돌려준다
+        // 7. 실패 시 에러 이벤트 (event: error) 및 로깅. 첫 조각 전 실패면 하루 횟수를 돌려준다
         return Flux.concat(messageStream, doneStream)
                 .onErrorResume(e -> {
                     if (!firstChunkReceived.get()) {
@@ -161,7 +173,7 @@ public class ChatStreamService {
                     }
                     return Flux.just(errorEvent(sessionId, e));
                 })
-                // 7. 완료·오류·끊김(cancel) 어느 쪽으로 끝나도 잠금을 푼다
+                // 8. 완료·오류·끊김(cancel) 어느 쪽으로 끝나도 잠금을 푼다
                 .doFinally(signal -> chatStreamLockService.release(sessionId, lockToken));
     }
 
@@ -308,6 +320,31 @@ public class ChatStreamService {
                 .build();
     }
 
+    /**
+     * 단어에 걸린 말의 답: AI를 부르지 않고 안내 답 하나를 message로 보낸 뒤 저장하고 done을 보낸다.
+     * 하루 횟수는 늘리지 않았으므로 돌려줄 것도 없다. 로그에는 종류만 남기고 보낸 말은 남기지 않는다.
+     */
+    private Flux<ServerSentEvent<String>> blockedReply(Long memberId, Long sessionId, String content, ChatSafetyBlock block,
+                                                       String lockToken) {
+        log.info("상담 메시지 단어 차단, AI 없이 안내 - memberId: {}, sessionId: {}, 종류: {}", memberId, sessionId, block);
+        String reply = block.reply();
+        Mono<ServerSentEvent<String>> done = Mono.fromCallable(() -> {
+            List<ChatMessageResponse> saved = chatMessageService.saveFilteredExchange(sessionId, content, reply);
+            chatContextStore.touch(sessionId);
+            return doneEvent(saved);
+        }).subscribeOn(Schedulers.boundedElastic());
+        return Flux.concat(Mono.just(messageEvent(reply)), done)
+                .onErrorResume(e -> Flux.just(errorEvent(sessionId, e)))
+                .doFinally(signal -> chatStreamLockService.release(sessionId, lockToken));
+    }
+
+    private ServerSentEvent<String> doneEvent(List<ChatMessageResponse> saved) {
+        return ServerSentEvent.<String>builder()
+                .event("done")
+                .data(toJson(new ChatDoneEventResponse(saved.get(0).id(), saved.get(1).id())))
+                .build();
+    }
+
     private Mono<ServerSentEvent<String>> saveExchange(Long sessionId, String content, StringBuilder accumulated,
                                                        ReplyPlan plan, List<StringBuilder> descriptions) {
         return Mono.fromCallable(() -> {
@@ -336,11 +373,7 @@ public class ChatStreamService {
                     ? chatMessageService.saveExchange(sessionId, content, accumulated.toString())
                     : chatMessageService.saveExchange(sessionId, content, accumulated.toString(), cards);
             rememberContext(sessionId, plan, recipes);
-            String doneJson = toJson(new ChatDoneEventResponse(saved.get(0).id(), saved.get(1).id()));
-            return ServerSentEvent.<String>builder()
-                    .event("done")
-                    .data(doneJson)
-                    .build();
+            return doneEvent(saved);
         }).subscribeOn(Schedulers.boundedElastic());
     }
 
