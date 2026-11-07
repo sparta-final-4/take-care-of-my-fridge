@@ -48,6 +48,19 @@ class ChatIntentPromptTest {
     }
 
     @Test
+    @DisplayName("요리와 상관없는 일을 해 달라는 말은 OFF_TOPIC이고, 음식·장보기·냉장고와 이어진 말과 인사는 아니라고 예시와 함께 지시한다")
+    void instructsOffTopic() throws IOException {
+        String followUp = new ClassPathResource("prompts/chat-intent-followup.txt").getContentAsString(StandardCharsets.UTF_8);
+
+        assertThat(prompt).contains(
+                "요리·식재료·냉장고·장보기·밀키트와 상관없는 일을 해 달라는 말은 OFF_TOPIC",
+                "\"주식 추천해줘\", \"숙제 풀어줘\", \"파이썬 코드 짜줘\" → OFF_TOPIC",
+                "\"주식으로 먹을 거 추천해줘\" → RECOMMEND",
+                "\"장보기 목록 짜줘\", \"냉장고 정리 방법\", \"안녕\", \"밥 먹었어?\" → GENERAL");
+        assertThat(followUp).contains("OFF_TOPIC은 첫 질문 규칙대로다");
+    }
+
+    @Test
     @DisplayName("요리 이름을 말하면 그 이름과 비슷한 요리를 키워드에 먼저 넣고, 탕이 붙은 튀김 요리를 국으로 보지 말라고 지시한다")
     void instructsDishNameFirst_andTangIsNotAlwaysSoup() {
         assertThat(prompt).contains("그 이름을 맨 앞에, 이어서 비슷한 요리 이름을 넣는다",

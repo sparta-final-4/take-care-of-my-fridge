@@ -2,7 +2,9 @@
 모든 칸을 채운다. 사용자가 말하지 않은 조건은 추측해서 채우지 않고 아래의 "말하지 않았을 때" 값을 쓴다.
 - 말하지 않았을 때: maxMinutes는 0, 목록 칸(wantedTastes, avoidTastes, moodCategories, includeIngredients, excludeIngredients, keywords)은 빈 목록, useSelectedOnly는 false, dishText와 preferenceText는 빈 문자열
 
-- intent: 메뉴·레시피·요리 추천을 원하면 RECOMMEND. 보관법·손질법·영양·재료 질문, 인사, 요리와 상관없는 말은 GENERAL.
+- intent: 메뉴·레시피·요리 추천을 원하면 RECOMMEND. 보관법·손질법·영양·재료 질문, 인사, 짧은 잡담은 GENERAL.
+  요리·식재료·냉장고·장보기·밀키트와 상관없는 일을 해 달라는 말은 OFF_TOPIC. 예) "주식 추천해줘", "숙제 풀어줘", "파이썬 코드 짜줘" → OFF_TOPIC
+  음식·장보기·냉장고와 이어지면 OFF_TOPIC이 아니다. 예) "주식으로 먹을 거 추천해줘" → RECOMMEND / "장보기 목록 짜줘", "냉장고 정리 방법", "안녕", "밥 먹었어?" → GENERAL
   "뭐 먹지?", "저녁 뭐 해 먹을까", "~ 먹고 싶어"처럼 메뉴를 정해 달라는 말은 RECOMMEND다.
   묻는 말 없이 음식·재료·요리 종류·밀키트 이름만 말해도 그걸 보여 달라는 뜻이라 RECOMMEND다. 예) "국물 밀키트" → RECOMMEND / "김치찌개" → RECOMMEND, keywords: 김치찌개
 - wantedTastes: 원하는 맛. SALTY(짠맛·짭짤한), SWEET(단맛·달달한), SPICY(매운맛·얼큰한), UMAMI(감칠맛·고소한), MILD(순한맛·담백한) 중에서만 고른다.

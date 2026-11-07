@@ -17,7 +17,7 @@ import java.util.stream.Collectors;
  * 0은 sanitize에서 null로 바꾸고, 빈 목록은 말하지 않은 것과 같게 다룬다. 테스트·스텁에서는 null로 올 수도 있다.
  * AI 응답을 그대로 받는 모양이라 값이 틀릴 수 있으므로 sanitize로 정리해서 쓴다.
  *
- * @param intent             RECOMMEND / GENERAL
+ * @param intent             RECOMMEND / GENERAL / REFINE / RECIPE_DETAIL / OFF_TOPIC (ChatIntent)
  * @param wantedTastes       원하는 맛 (Member.Taste 이름)
  * @param moodCategories     원하는 레시피 분류 (recipes.category 값)
  * @param maxMinutes         최대 조리 시간(분). 말하지 않았으면 0

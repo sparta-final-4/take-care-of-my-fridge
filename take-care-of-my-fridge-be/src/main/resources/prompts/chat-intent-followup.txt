@@ -13,7 +13,7 @@
   targetIndex: [직전 추천] 번호(1부터). "그거"이고 직전 추천이 하나면 1, 모르면 0. targetName: 말한 레시피 이름 그대로, 없으면 빈 문자열.
   detailQuestion: HOW_TO(만드는 법), TIME(조리 시간), INGREDIENTS(재료), TIP(팁), OTHER 중 하나.
   예) "두 번째 거 어떻게 만들어?" → targetIndex: 2, HOW_TO / "아까 그 장어 조림 시간 얼마나 걸려?" → targetName: 장어 조림, TIME / "그거 재료 뭐 들어가?" → INGREDIENTS
-- 새 요리 이름이나 새 조건으로 처음부터 추천해 달라는 말("김치찌개 먹고 싶어"), 묻는 말 없이 이름만 말한 말("국물 밀키트"), 코스를 더하는 말("디저트도", "후식으로", "국도 같이")은 RECOMMEND이고 [직전 조건]을 잇지 않는다(원하는 맛·피할 맛도 이번 말에서만 뽑는다). 레시피와 상관없는 질문(보관법·손질법·인사)은 GENERAL.
+- 새 요리 이름이나 새 조건으로 처음부터 추천해 달라는 말("김치찌개 먹고 싶어"), 묻는 말 없이 이름만 말한 말("국물 밀키트"), 코스를 더하는 말("디저트도", "후식으로", "국도 같이")은 RECOMMEND이고 [직전 조건]을 잇지 않는다(원하는 맛·피할 맛도 이번 말에서만 뽑는다). 레시피와 상관없는 질문(보관법·손질법·인사)은 GENERAL. OFF_TOPIC은 첫 질문 규칙대로다.
 - RECIPE_DETAIL이 아니면 targetIndex는 0, targetName과 detailQuestion은 빈 문자열. REFINE이 아니면 removed는 빈 목록.
 예) 직전이 김피탕일 때 "디저트 추천해줘" → RECOMMEND, 분류 디저트, 키워드 없음
 예) 직전이 디저트일 때 "디저트 추천해줘" → RECOMMEND, 디저트 / "다른 디저트" → REFINE, 디저트 / "다른 거" → REFINE, 분류 없음 / "디저트 말고 국" → REFINE, 국, removed: CATEGORY

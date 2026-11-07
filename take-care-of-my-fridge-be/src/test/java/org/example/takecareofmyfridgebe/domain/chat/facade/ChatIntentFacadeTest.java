@@ -1070,6 +1070,61 @@ class ChatIntentFacadeTest {
         assertThat(ChatIntentFacade.followUp(context)).isEqualTo("[직전 추천] 1. 탕수육\n[직전 조건] 피할 맛 SPICY / 분류 튀김");
     }
 
+    @Nested
+    @DisplayName("안전 장치 의도 (서버 안내로 답함)")
+    class Declined {
+
+        @Test
+        @DisplayName("AI가 OFF_TOPIC이라고 하면 서버 안내로 답하는 의도로 정하고 추천 조건은 만들지 않는다")
+        void declines_whenIntentIsOffTopic() {
+            givenExtracted(intentOnly(ChatIntent.OFF_TOPIC));
+
+            ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("파이썬 코드 짜줘"));
+
+            assertThat(resolution.intent()).isEqualTo(ChatIntent.OFF_TOPIC);
+            assertThat(resolution.source()).isEqualTo(Source.AI);
+            assertThat(resolution.declines()).isTrue();
+            assertThat(resolution.recommends()).isFalse();
+            assertThat(resolution.recipeQuery()).isNull();
+        }
+
+        @Test
+        @DisplayName("OFF_TOPIC은 밀키트를 달라는 말·이름만 말한 짧은 말이어도 추천으로 바꾸지 않는다 (바꾸는 규칙은 GENERAL에만)")
+        void keepsOffTopic_whenMealkitOrNameOnlyWords() {
+            givenExtracted(intentOnly(ChatIntent.OFF_TOPIC));
+
+            ChatIntentResolution mealkit = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("밀키트 회사 주식 추천해줘"));
+            ChatIntentResolution nameOnly = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("두부 주가"));
+
+            assertThat(mealkit.intent()).isEqualTo(ChatIntent.OFF_TOPIC);
+            assertThat(nameOnly.intent()).isEqualTo(ChatIntent.OFF_TOPIC);
+            verify(ingredientMatcher, never()).matchAll(anyList());
+        }
+
+        @Test
+        @DisplayName("OFF_TOPIC이면 안 되는 말은 AI가 GENERAL·RECOMMEND라고 한 대로 두고 서버 안내로 답하지 않는다")
+        void keepsGeneralOrRecommend_whenFoodRelatedMessages() {
+            Map<String, ChatIntent> messages = Map.of(
+                    "주식으로 먹을 거 추천해줘", ChatIntent.RECOMMEND,
+                    "장보기 목록 짜줘", ChatIntent.GENERAL,
+                    "냉장고 정리 방법", ChatIntent.GENERAL,
+                    "안녕", ChatIntent.GENERAL,
+                    "밥 먹었어?", ChatIntent.GENERAL);
+            messages.forEach((message, intent) -> {
+                givenExtracted(intentOnly(intent));
+
+                ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of(message));
+
+                assertThat(resolution.intent()).as(message).isEqualTo(intent);
+                assertThat(resolution.declines()).as(message).isFalse();
+            });
+        }
+
+        private static IntentResult intentOnly(ChatIntent intent) {
+            return new IntentResult(intent, List.of(), List.of(), 0, List.of(), List.of(), false, null, null, null);
+        }
+    }
+
     private void givenExtracted(IntentResult result) {
         when(extractor.extract(eq(MEMBER_ID), eq(SESSION_ID), any(), any(), any())).thenReturn(result);
     }

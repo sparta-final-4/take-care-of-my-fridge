@@ -4,6 +4,7 @@ import org.example.takecareofmyfridgebe.domain.chat.config.ChatSafetyWordPropert
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext.CardName;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext.ContextMessage;
+import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntent;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntentResolution;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntentResolution.Source;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageCreateRequest;
@@ -1071,5 +1072,47 @@ class ChatStreamServiceTest {
         assertThat(events.get(1).data()).contains("CHAT_005");
         verify(chatDailyLimitService, never()).refund(any());
         verify(chatStreamLockService, timeout(1_000).times(1)).release(sessionId, LOCK_TOKEN);
+    }
+
+    @Test
+    @DisplayName("의도가 OFF_TOPIC이면 답 생성 AI 없이 서버 안내를 보내고, 걸러진 표시 없이 저장한 뒤 하루 횟수를 한 번 돌려준다")
+    void sendsOffTopicReplyAndRefunds_whenIntentIsOffTopic(CapturedOutput output) {
+        Long sessionId = 10L;
+        String reply = ChatStreamService.OFF_TOPIC_REPLY;
+        when(chatStreamLockService.acquire(sessionId)).thenReturn(LOCK_TOKEN);
+        when(chatDailyLimitService.checkAndIncrement(1L)).thenReturn(LIMIT_KEY);
+        when(chatIntentFacade.resolve(eq(1L), eq(sessionId), any(), any()))
+                .thenReturn(ChatIntentResolution.declined(ChatIntent.OFF_TOPIC));
+        when(chatMessageService.saveExchange(sessionId, "주식 추천해줘", reply)).thenReturn(List.of(
+                new ChatMessageResponse(100L, 1, ChatMessageRole.USER, "주식 추천해줘", LocalDateTime.now()),
+                new ChatMessageResponse(101L, 2, ChatMessageRole.ASSISTANT, reply, LocalDateTime.now())));
+
+        List<ServerSentEvent<String>> events = chatStreamService
+                .streamMessage(1L, sessionId, ChatMessageCreateRequest.of("주식 추천해줘")).collectList().block();
+
+        assertThat(events).extracting(ServerSentEvent::event).containsExactly("message", "done");
+        assertThat(events.get(0).data()).isEqualTo("{\"text\":\"" + reply + "\"}");
+        verify(chatDailyLimitService, times(1)).checkAndIncrement(1L);
+        verify(chatDailyLimitService, times(1)).refund(LIMIT_KEY);
+        verify(chatReplyGenerator, never()).generate(any(), any(), any(), any());
+        verify(chatMessageService, never()).saveFilteredExchange(any(), any(), any());
+        assertThat(output.getOut()).contains("의도: OFF_TOPIC").doesNotContain("주식 추천해줘");
+    }
+
+    @Test
+    @DisplayName("OFF_TOPIC 안내 답 저장이 실패하면 error 이벤트를 보내고 하루 횟수는 한 번만 돌려준다")
+    void refundsOnce_whenOffTopicSaveFails() {
+        Long sessionId = 10L;
+        when(chatDailyLimitService.checkAndIncrement(1L)).thenReturn(LIMIT_KEY);
+        when(chatIntentFacade.resolve(eq(1L), eq(sessionId), any(), any()))
+                .thenReturn(ChatIntentResolution.declined(ChatIntent.OFF_TOPIC));
+        when(chatMessageService.saveExchange(eq(sessionId), any(), any()))
+                .thenThrow(new BusinessException(ErrorCode.CHAT_ROOM_ALREADY_COMPLETED));
+
+        List<ServerSentEvent<String>> events = chatStreamService
+                .streamMessage(1L, sessionId, ChatMessageCreateRequest.of("숙제 풀어줘")).collectList().block();
+
+        assertThat(events).extracting(ServerSentEvent::event).containsExactly("message", "error");
+        verify(chatDailyLimitService, times(1)).refund(LIMIT_KEY);
     }
 }
