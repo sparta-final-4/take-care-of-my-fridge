@@ -6,6 +6,7 @@ import org.example.takecareofmyfridgebe.domain.chat.config.ChatCandidateProperti
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatAskWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatCategoryWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatFoodWordProperties;
+import org.example.takecareofmyfridgebe.domain.chat.config.ChatTasteOppositeProperties;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatMealkitWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatTasteWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext;
@@ -30,6 +31,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -83,6 +85,7 @@ public class ChatIntentFacade {
     private final ChatCategoryWordProperties chatCategoryWordProperties;
     private final ChatFoodWordProperties chatFoodWordProperties;
     private final AllergyExclusionFinder allergyExclusionFinder;
+    private final ChatTasteOppositeProperties chatTasteOppositeProperties;
 
     // 상담 문맥 없이 (첫 질문과 같게) 정한다
     public ChatIntentResolution resolve(Long memberId, Long sessionId, ChatMessageCreateRequest request) {
@@ -450,13 +453,50 @@ public class ChatIntentFacade {
         if (!removed.isEmpty()) {
             log.info("상담 다시 추천에서 뺄 조건 - memberId: {}, sessionId: {}, 조건: {}", memberId, sessionId, removed);
         }
-        return ChatIntentResolution.refine(Source.AI, mergeRefine(previous, current, removed));
+        RecipeQuery merged = mergeRefine(previous, current, removed);
+        return ChatIntentResolution.refine(Source.AI, followSpokenTastes(memberId, sessionId, request.content(), merged));
+    }
+
+    /**
+     * 다시 추천에서 맛이 부딪히면 이번 말에 나온 맛을 따른다 (맛 전체, TasteWordChecker.stances로 이번 말의 맛만 본다).
+     * <ul>
+     *   <li>이번 말에 원한 맛: 원하는 맛에 넣고 피할 맛에서 빼며, 그 맛과 반대인 맛(app.chat.taste-opposites)은 원하는 맛에서 지운다
+     *       ("짭짤한 거" → "담백한 거로" → 순한맛만, "매운 거 말고" → "좀 더 매운 걸로" → 매운맛 원함·피할 맛 없음)</li>
+     *   <li>이번 말에 피한 맛: 피할 맛에 넣고 원하는 맛에서 뺀다 ("매운 거 추천해줘" → "매운 거 말고")</li>
+     *   <li>이번 말에 나오지 않은 맛은 직전 값을 그대로 쌓는다 ("매운 걸로" → "단 것도" → 매운맛 + 단맛)</li>
+     * </ul>
+     * 알레르기 재료는 맛과 상관없이 resolve에서 계속 뺀다.
+     */
+    RecipeQuery followSpokenTastes(Long memberId, Long sessionId, String message, RecipeQuery merged) {
+        List<TasteWordChecker.TasteStance> spoken = TasteWordChecker.stances(message, chatTasteWordProperties);
+        if (spoken.isEmpty()) {
+            return merged;
+        }
+        Set<Member.Taste> wanted = new LinkedHashSet<>(merged.wantedTastes());
+        Set<Member.Taste> avoid = new LinkedHashSet<>(merged.avoidTastes());
+        for (TasteWordChecker.TasteStance stance : spoken) {
+            if (stance.stance() == TasteWordChecker.Stance.WANT) {
+                wanted.removeAll(chatTasteOppositeProperties.oppositesOf(stance.taste()));
+                wanted.add(stance.taste());
+                avoid.remove(stance.taste());
+            } else {
+                avoid.add(stance.taste());
+                wanted.remove(stance.taste());
+            }
+        }
+        RecipeQuery followed = merged.withTastes(List.copyOf(wanted), List.copyOf(avoid));
+        if (!followed.wantedTastes().equals(merged.wantedTastes()) || !followed.avoidTastes().equals(merged.avoidTastes())) {
+            log.info("상담 다시 추천 맛이 부딪혀 이번 말을 따름 - memberId: {}, sessionId: {}, 원하는 맛: {} → {}, 피할 맛: {} → {}",
+                    memberId, sessionId, merged.wantedTastes(), followed.wantedTastes(), merged.avoidTastes(), followed.avoidTastes());
+        }
+        return followed;
     }
 
     /**
      * 직전 조건과 이번 말(다시 추천)을 합친다.
      * <ul>
-     *   <li>맛·분류·시간·키워드: AI가 [직전 조건]에 이번 말을 반영한 최종값을 낸다. AI가 비워 둔 칸은 직전 값을 쓴다
+     *   <li>원하는 맛: 직전 맛에 이번 맛을 쌓고(removed에 TASTE면 이번 맛만), 부딪히는 맛은 followSpokenTastes가 이번 말을 따라 고친다</li>
+     *   <li>분류·시간·키워드: AI가 [직전 조건]에 이번 말을 반영한 최종값을 낸다. AI가 비워 둔 칸은 직전 값을 쓴다
      *       ("좀 더 매운 걸로" → 맛만 바뀌고 분류·키워드는 그대로, "국물 말고 볶음으로" → 분류만 바뀜, "다른 거 없어?" → 모두 그대로).
      *       removed에 있는 조건은 직전 값을 지우고 이번 말의 값만 쓴다 ("매운 거 말고" → 맛 조건 없음, "시간 상관없이" → 시간 조건 없음)</li>
      *   <li>요리 이름·원한 표현: 이어 가지 않는다 (다시 추천에서 "김피탕 레시피는 없어서…" 같은 안내가 다시 나오지 않게)</li>
@@ -482,7 +522,10 @@ public class ChatIntentFacade {
         boolean useSelectedOnly = removed.contains(RefineCondition.INCLUDE)
                 ? current.useSelectedOnly()
                 : previous.useSelectedOnly() || current.useSelectedOnly();
-        List<Member.Taste> wanted = merged(current.wantedTastes(), previous.wantedTastes(), removed.contains(RefineCondition.TASTE))
+        // 원하는 맛은 직전 맛에 이번 맛을 쌓는다 (맛을 지우라는 말이면 이번 맛만). 부딪히는 맛은 followSpokenTastes가 이번 말을 따라 고친다
+        List<Member.Taste> wanted = (removed.contains(RefineCondition.TASTE)
+                ? current.wantedTastes()
+                : Stream.concat(previous.wantedTastes().stream(), current.wantedTastes().stream()).distinct().toList())
                 .stream()
                 .filter(taste -> !current.avoidTastes().contains(taste))
                 .toList();

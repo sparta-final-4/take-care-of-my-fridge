@@ -89,6 +89,27 @@
   - `ChatMessageRepositoryAndServiceTest`: 걸러진 말 뺀 사용자 말
 - 남은 것: "이제 땅콩 먹어도 돼"처럼 푸는 말은 다루지 않는다. 실제 AI 답 설명이 알레르기 재료를 말하지 않는지는 실제 키로 확인해야 한다.
 
+## 후속: 다시 추천에서 맛이 부딪히면 이번 말을 따르기
+- 문제
+  - 같은 맛이 원하는 맛과 피할 맛에 둘 다 남을 수 있었다("매운 거 말고" → "좀 더 매운 걸로").
+  - 반대 맛이 원하는 맛에 같이 남을 수 있었다("짭짤한 거" → "담백한 거로"에서 SALTY가 남고 MILD가 더해짐). 다시 추천은 AI가 낸 최종값을 그대로 믿었다.
+- 규칙: 이번 말에 나온 맛이 이긴다(맛 전체).
+  - 원하는 맛은 직전 맛에 쌓는다.
+  - 이번에 원한 맛은 피할 맛에서 빼고, 반대 맛(`app.chat.taste-opposites`: MILD ↔ SPICY, MILD ↔ SALTY)은 원하는 맛에서 지운다.
+  - 이번에 피한 맛은 원하는 맛에서 뺀다.
+- 변경
+  - `TasteWordChecker.stances`: 맛 전체(매운·단·짠·감칠·순한)의 원함·피함을 같은 부정어 규칙으로 본다. 기존 `check`(매운맛·단맛만 AI 결과를 고침)는 그대로 둔다.
+  - `ChatIntentFacade.mergeRefine`: 원하는 맛을 직전 + 이번으로 쌓는다(맛을 지우라는 말이면 이번 맛만). 전에는 이번 맛이 있으면 이번 맛만 썼다.
+  - `ChatIntentFacade.followSpokenTastes`: 합친 뒤 이번 말의 맛으로 고친다. 바뀌면 로그를 남긴다.
+  - `RecipeQuery.withTastes`, `ChatTasteOppositeProperties`
+  - 단맛 단어에 "단것"을 더했다("단 것도"가 단맛으로 잡히게).
+- 새 추천은 이미 이번 말의 맛만 쓰므로(`keepSpokenTastes`) 바꾸지 않았다. 알레르기 재료는 resolve에서 계속 뺀다.
+- 테스트
+  - `ChatIntentFacadeTest$TasteConflict` 6개: 요청 시나리오 전부. AI가 직전 맛을 이어 쓰거나 이번 맛만 내는 경우 포함
+  - `TasteWordCheckerTest.returnsStancesForAllTastes`, `ChatTasteOppositePropertiesTest`
+  - `ChatSafetyYamlBindingTest`: yml 맛 반대 쌍·알레르기 설정이 실제로 묶이는지
+  - 기존 다시 추천 테스트는 모두 그대로 통과했다.
+
 ## 연결과 남은 작업
 - 커밋: `feat/chat-safety-health-link` 로컬 커밋 3개 (push 안 함)
 - 다음: PR④ 남용 제한(연속 3번 → 10분 차단, 하루 안 센 횟수 20번 넘으면 셈)·Moderation(실제 키로 지연 측정)

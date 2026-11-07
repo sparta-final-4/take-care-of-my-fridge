@@ -183,6 +183,13 @@ public record RecipeQuery(
     }
 
     // 피할 맛을 채운 검색 조건. 원하는 맛과 겹치면 피할 맛이 이긴다 (원하는 맛에서 뺀다)
+    // 원하는 맛·피할 맛을 함께 바꾼 검색 조건 (다시 추천에서 이번 말의 맛을 따를 때). 둘 다 있는 맛은 피할 맛으로 본다
+    public RecipeQuery withTastes(List<Member.Taste> wanted, List<Member.Taste> avoid) {
+        return new RecipeQuery(memberId, selectedIngredientIds, orEmpty(wanted).stream().distinct().toList(), moodCategories,
+                maxMinutes, excludeIngredientIds, useSelectedOnly, keywords, keywordText, preferenceText, selectedIngredientGroups,
+                keywordMatches, alreadyRecommendedIds, avoidTastes).withAvoidTastes(avoid);
+    }
+
     public RecipeQuery withAvoidTastes(List<Member.Taste> tastes) {
         List<Member.Taste> avoid = orEmpty(tastes).stream().distinct().toList();
         List<Member.Taste> wanted = wantedTastes.stream().filter(taste -> !avoid.contains(taste)).toList();
