@@ -16,6 +16,8 @@ import java.util.List;
  * @param spicyExclusions      이름에 매운 재료가 들어 있어도 이 이름이면 매운 재료로 보지 않는다 (안 매운 김치: 백김치·물김치·동치미·나박김치)
  * @param mildSpicyIngredients 이 재료가 들어 있으면 "매울 수 있는" 레시피다 (홍고추·청고추처럼 조금 들어가는 경우가 많은 것).
  *                             피할 맛 매운맛("매운 거 말고")은 확실히 매운 레시피와 함께 이것까지 뺀다
+ * @param mildSpicyExactIngredients 공백 뺀 이름이 이것과 똑같으면 "매울 수 있는" 레시피다 (고추·붉은고추·고추냉이).
+ *                             이름에 들어 있는 것으로 보면 오이고추·꽈리고추·아삭이고추까지 걸려서 따로 둔다
  */
 @ConfigurationProperties(prefix = "app.chat.candidate")
 public record ChatCandidateProperties(
@@ -29,6 +31,8 @@ public record ChatCandidateProperties(
         @DefaultValue({"백김치", "물김치", "동치미", "나박김치"})
         List<String> spicyExclusions,
         @DefaultValue({"홍고추", "청고추"})
-        List<String> mildSpicyIngredients
+        List<String> mildSpicyIngredients,
+        @DefaultValue({"고추", "붉은고추", "고추냉이"})
+        List<String> mildSpicyExactIngredients
 ) {
 }

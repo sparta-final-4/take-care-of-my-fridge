@@ -12,6 +12,8 @@ import org.example.takecareofmyfridgebe.domain.search.dto.RecipeSpicyLevel;
 import org.example.takecareofmyfridgebe.infra.elasticsearch.dto.EsDocument;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 import java.util.List;
 import java.util.Map;
@@ -31,7 +33,8 @@ class RecipeDocumentReaderEmbeddingTest {
     private final RecipeIndexSourceService recipeIndexSourceService = mock(RecipeIndexSourceService.class);
     private final RecipeEmbedder embedder = mock(RecipeEmbedder.class);
     private final ChatCandidateProperties spicyProperties = new ChatCandidateProperties(List.of(), 0.4,
-            List.of("청양고추", "고춧가루", "김치"), List.of("백김치"), List.of("홍고추"));
+            List.of("청양고추", "고춧가루", "고추장", "김치"), List.of("백김치"), List.of("홍고추"),
+            List.of("고추", "붉은고추", "고추냉이"));
 
     private RecipeDocumentReader reader(boolean embedding) {
         RecipeSearchProperties properties = new RecipeSearchProperties(
@@ -205,6 +208,31 @@ class RecipeDocumentReaderEmbeddingTest {
         // Then
         assertThat(doc.get("spicy_level")).isEqualTo(RecipeSpicyLevel.MILD.name());
         assertThat(doc.get("tastes")).isEqualTo(List.of());
+    }
+
+    @ParameterizedTest(name = "사전 이름 {0} / 레시피에 적힌 이름 {1} → {2}")
+    @CsvSource({
+            "고추, 고추, MILD",
+            "고추, 붉은 고추, MILD",
+            "와사비, 고추냉이, MILD",
+            "오이고추, 아삭이고추, NONE",
+            "오이고추, 오이고추, NONE",
+            "꽈리고추, 꽈리고추, NONE",
+            "풋고추, 풋고추, NONE",
+            "고추장, 고추장, HOT",
+            "고추, 청양고추, HOT"
+    })
+    @DisplayName("고추·붉은고추·고추냉이는 이름이 똑같을 때만 MILD이고, 오이고추·꽈리고추·풋고추는 MILD가 아니며, 고추장·청양고추는 HOT이다")
+    void putsSpicyLevel_byExactPepperName(String name, String displayName, RecipeSpicyLevel expected) {
+        // Given
+        when(recipeIndexSourceService.findOne(1L)).thenReturn(Optional.of(recipe(1L, "볶음", null, null, List.of(
+                ingredient(10L, name, displayName, false)))));
+
+        // When
+        Map<String, Object> doc = reader(false).readOne(1L).orElseThrow().source();
+
+        // Then
+        assertThat(doc.get("spicy_level")).isEqualTo(expected.name());
     }
 
     @Test

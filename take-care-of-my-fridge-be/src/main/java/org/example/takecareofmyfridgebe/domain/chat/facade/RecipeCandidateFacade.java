@@ -502,7 +502,7 @@ public class RecipeCandidateFacade {
      * 재료로 가른 매운 레시피 두 단계.
      *
      * @param definite 확실히 매운 레시피 (청양고추·고춧가루·고추장·김치류 등). 원하는 맛 매운맛과 맞은 것으로 센다
-     * @param maybe    매울 수 있는 레시피 (확실히 매운 것 + 홍고추·청고추). 피할 맛 매운맛이면 이것까지 뺀다
+     * @param maybe    매울 수 있는 레시피 (확실히 매운 것 + 홍고추·청고추, 정확한 이름 고추·붉은고추·고추냉이). 피할 맛 매운맛이면 이것까지 뺀다
      */
     private record SpicyRecipes(Set<Long> definite, Set<Long> maybe) {
         private static final SpicyRecipes NONE = new SpicyRecipes(Set.of(), Set.of());
@@ -527,7 +527,8 @@ public class RecipeCandidateFacade {
         List<String> maybeWords = Stream.concat(definiteWords.stream(), chatCandidateProperties.mildSpicyIngredients().stream()).toList();
         return new SpicyRecipes(
                 SpicyRecipeDetector.spicyRecipeIds(texts, definiteWords, chatCandidateProperties.spicyExclusions()),
-                SpicyRecipeDetector.spicyRecipeIds(texts, maybeWords, chatCandidateProperties.spicyExclusions()));
+                SpicyRecipeDetector.spicyRecipeIds(texts, maybeWords, chatCandidateProperties.mildSpicyExactIngredients(),
+                        chatCandidateProperties.spicyExclusions()));
     }
 
     // 맛 데이터에 매운맛이 없어도 확실히 매운 재료가 들어 있으면 매운맛을 더한다 (매울 수 있는 것은 더하지 않는다)

@@ -13,6 +13,11 @@ class SpicyRecipeDetectorTest {
     private static final List<String> SPICY = List.of("청양고추", "홍고추", "청고추", "고춧가루", "고추장", "건고추",
             "베트남고추", "페퍼론치노", "핫소스", "고추기름", "김치", "배추김치", "깍두기", "열무김치", "총각김치", "파김치", "갓김치");
     private static final List<String> EXCLUSIONS = List.of("백김치", "물김치", "동치미", "나박김치");
+    // application.yml과 같은 목록
+    private static final List<String> HOT = List.of("청양고추", "고춧가루", "고추장", "고추기름", "건고추", "베트남고추", "페퍼론치노",
+            "핫소스", "김치", "배추김치", "깍두기", "열무김치", "총각김치", "파김치", "갓김치");
+    private static final List<String> MILD = List.of("홍고추", "청고추");
+    private static final List<String> MILD_EXACT = List.of("고추", "붉은고추", "고추냉이");
 
     @Test
     @DisplayName("재료에 고춧가루가 있으면 맛 데이터와 상관없이 매운 레시피다")
@@ -58,5 +63,29 @@ class SpicyRecipeDetectorTest {
                 1L, List.of("백김치"), 2L, List.of("물 김치"), 3L, List.of("동치미"), 4L, List.of("나박김치", "무"),
                 5L, List.of("백김치", "고춧가루")), SPICY, EXCLUSIONS))
                 .containsExactly(5L);
+    }
+
+    @Test
+    @DisplayName("매울 수 있음 정확한 이름 목록이면 고추·붉은 고추·고추냉이는 공백을 빼고 이름이 같아서 매울 수 있는 레시피다")
+    void detectsMild_whenExactPepperName() {
+        assertThat(SpicyRecipeDetector.spicyRecipeIds(Map.of(
+                1L, List.of("고추"), 2L, List.of("붉은 고추"), 3L, List.of("고추냉이"), 4L, List.of("간장")), MILD, MILD_EXACT, EXCLUSIONS))
+                .containsExactlyInAnyOrder(1L, 2L, 3L);
+    }
+
+    @Test
+    @DisplayName("매울 수 있음 정확한 이름 목록에 고추가 있어도 오이고추·아삭이고추·꽈리고추·풋고추는 이름이 달라서 매울 수 있는 레시피가 아니다")
+    void ignoresPepperVarieties_whenExactPepperName() {
+        assertThat(SpicyRecipeDetector.spicyRecipeIds(Map.of(
+                1L, List.of("오이고추"), 2L, List.of("아삭이고추"), 3L, List.of("꽈리고추"), 4L, List.of("풋고추")), MILD, MILD_EXACT, EXCLUSIONS))
+                .isEmpty();
+    }
+
+    @Test
+    @DisplayName("고추장·청양고추는 지금처럼 확실히 매운 레시피이고, 그냥 고추는 확실히 매운 레시피가 아니다")
+    void keepsHot_whenGochujangOrCheongyang() {
+        assertThat(SpicyRecipeDetector.spicyRecipeIds(Map.of(
+                1L, List.of("고추장"), 2L, List.of("청양고추"), 3L, List.of("고추")), HOT, EXCLUSIONS))
+                .containsExactlyInAnyOrder(1L, 2L);
     }
 }
