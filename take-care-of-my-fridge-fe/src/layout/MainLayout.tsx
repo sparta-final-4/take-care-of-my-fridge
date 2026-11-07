@@ -1,5 +1,6 @@
 import { Layout } from 'antd';
-import { Outlet, useLocation, useMatches, useNavigation } from 'react-router';
+import { useEffect, useRef } from 'react';
+import { Outlet, useLocation, useMatches, useNavigation, useNavigationType } from 'react-router';
 
 import { ROUTES } from '@/app/paths';
 import { NavigationProgress } from '@/common/components/NavigationProgress';
@@ -18,10 +19,21 @@ const STABLE_ROUTE_IDS = ['mypage-layout', 'products'];
 export function MainLayout() {
   const navigation = useNavigation();
   const matches = useMatches();
+  const navigationType = useNavigationType();
   const { pathname } = useLocation();
   // 다른 화면으로 바뀔 때만 본문을 다시 그려 진입 효과를 준다. 같은 화면의 파라미터·쿼리 변경은 유지한다.
   const pageKey =
     matches.find((match) => STABLE_ROUTE_IDS.includes(match.id))?.id ?? matches.at(-1)?.id;
+  // 주소가 바뀌면 맨 위에서 시작한다. 쿼리(필터·페이지)만 바뀔 때와 상품 목록 ↔ 상품 모달은 그대로 두고,
+  // 뒤로·앞으로 가기(POP)는 브라우저가 이전 위치로 돌려놓게 둔다.
+  const isProducts = matches.some((match) => match.id === 'products');
+  const scrollKey = isProducts ? 'products' : pathname;
+  const lastScrollKey = useRef(scrollKey);
+  useEffect(() => {
+    if (lastScrollKey.current === scrollKey) return;
+    lastScrollKey.current = scrollKey;
+    if (navigationType !== 'POP') window.scrollTo({ top: 0 });
+  }, [scrollKey, navigationType]);
   // 메인은 사진·색 띠가 화면 폭 끝까지 가도록 본문 폭 제한과 여백을 풀고, 띠마다 안쪽에서 폭을 맞춘다.
   const isHome = pathname === ROUTES.home;
   const contentClassName = [
