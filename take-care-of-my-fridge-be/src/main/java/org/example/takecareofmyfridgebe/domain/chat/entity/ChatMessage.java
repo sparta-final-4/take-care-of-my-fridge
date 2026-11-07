@@ -51,7 +51,8 @@ public class ChatMessage extends BaseTimeEntity {
     @Column(name = "content", columnDefinition = "TEXT", nullable = false)
     private String content;
 
-    // 금지어·자해·탈취 단어에 걸려 AI 없이 안내한 말과 그 안내 답. 대화 화면에는 보이고, 상담 문맥(최근 대화)·내역 첫 질문·미리보기에서는 뺀다
+    // 안전 장치로 걸러진 메시지 여부: 금지어·자해·탈취 단어에 걸리거나 의도 판단이 BLOCKED·SELF_HARM이라 AI 답 없이 안내한 말과 그 안내 답.
+    // 대화 화면에는 보이고, 상담 문맥(최근 대화)·내역 첫 질문·미리보기에서는 뺀다. 상관없는 질문(OFF_TOPIC)은 표시하지 않는다
     @Column(name = "filtered", nullable = false)
     private boolean filtered;
 

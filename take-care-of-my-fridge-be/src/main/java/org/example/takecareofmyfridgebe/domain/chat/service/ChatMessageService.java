@@ -90,7 +90,7 @@ public class ChatMessageService {
     }
 
     /**
-     * 금지어·자해·탈취 단어에 걸린 말과 서버 안내 답을 표시(filtered)해 저장한다. 그 밖에는 saveExchange와 같다.
+     * 안전 장치(금지어·자해·탈취 단어, 의도 판단 BLOCKED·SELF_HARM)로 걸러진 말과 서버 안내 답을 표시(filtered)해 저장한다. 그 밖에는 saveExchange와 같다.
      * 표시한 메시지는 대화 화면에는 그대로 보이고, 상담 문맥(최근 대화)과 내역 첫 질문·마지막 미리보기에서 빠진다.
      *
      * @return 저장된 두 메시지 DTO [사용자 메시지, 안내 답]
@@ -200,7 +200,7 @@ public class ChatMessageService {
 
     /**
      * 최근 메시지 최대 6개(3턴)를 오래된 것부터 읽는다. 이전 대화로 AI에 넘긴다.
-     * 단어에 걸린 말과 그 안내 답(filtered)은 빼고 센다 (걸린 말이 다음 AI 호출에 들어가지 않게).
+     * 안전 장치로 걸러진 말과 그 안내 답(filtered)은 빼고 센다 (걸린 말이 다음 AI 호출에 들어가지 않게).
      */
     public List<ChatMessageResponse> findRecentMessages(Long sessionId) {
         List<ChatMessageResponse> recent = new ArrayList<>(chatMessageRepository.findTop6BySessionIdAndFilteredFalseOrderBySequenceDesc(sessionId).stream()

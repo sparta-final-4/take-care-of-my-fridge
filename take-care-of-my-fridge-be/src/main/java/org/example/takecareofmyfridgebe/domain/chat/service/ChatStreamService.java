@@ -48,6 +48,8 @@ public class ChatStreamService {
     static final String NO_RECIPE_REPLY = "조건에 맞는 레시피를 찾지 못했어요. 시간을 늘리거나, 선택 재료를 줄이거나, 다른 요리 종류로 다시 물어봐 주세요.";
     // 물어본 레시피가 지워졌을 때 답 (AI를 부르지 않는다)
     static final String RECIPE_GONE_REPLY = "물어보신 레시피는 지금 볼 수 없어요. 다른 레시피를 물어봐 주세요.";
+    // 요리와 상관없는 질문(의도 OFF_TOPIC)의 답 (답 생성 AI를 부르지 않고 하루 횟수를 돌려준다)
+    static final String OFF_TOPIC_REPLY = "저는 요리, 냉장고 재료, 장보기 상담만 도와드릴 수 있어요. 냉장고 재료로 만들 요리를 추천해 드릴까요?";
 
     private final ChatMessageService chatMessageService;
     private final ChatStreamLockService chatStreamLockService;
@@ -70,6 +72,8 @@ public class ChatStreamService {
      * 의도 판단을 포함해 메시지 하나를 하루 1회로 센다. 답 조각을 하나도 못 받고 실패하거나 빈 답으로 끝나면 하루 횟수를 돌려준다.
      * 첫 조각 뒤에 실패하거나 사용자가 끊으면(cancel) 돌려주지 않는다.
      * 금지어·자해·탈취 단어에 걸린 말은 하루 횟수를 늘리기 전에 걸러, AI 없이 안내 답을 보내고 횟수를 세지 않는다.
+     * 의도 판단이 상관없는 질문(OFF_TOPIC)·목록 밖 욕설·탈취(BLOCKED)·자해(SELF_HARM)면 답 생성 AI 없이 안내 답을 보내고,
+     * 저장한 뒤 하루 횟수를 돌려준다(의도 판단 비용은 감수). BLOCKED·SELF_HARM은 걸러진 메시지(filtered)로 저장한다.
      *
      * @param memberId  회원 ID
      * @param sessionId 세션 ID
@@ -105,6 +109,13 @@ public class ChatStreamService {
         // 이 답의 계획(추천이면 조건·카드)과 카드별 설명. 답이 끝나면 AI 메시지와 함께 저장한다
         AtomicReference<ReplyPlan> planRef = new AtomicReference<>();
         List<StringBuilder> descriptions = new ArrayList<>();
+        // 하루 횟수는 한 번만 돌려준다 (서버 안내 답은 저장 뒤, 실패는 오류에서)
+        AtomicBoolean refunded = new AtomicBoolean(false);
+        Runnable refundOnce = () -> {
+            if (refunded.compareAndSet(false, true)) {
+                chatDailyLimitService.refund(limitKey);
+            }
+        };
 
         // 5. 의도·조건 뽑기 → (추천이면) 후보 검색 → 카드 (event: recommendations) → 답변 스트리밍 조각 (event: message)
         // 의도 판단·후보 검색은 AI·DB·검색을 부르는 블로킹 작업이라 boundedElastic에서 실행한다.
@@ -162,14 +173,21 @@ public class ChatStreamService {
                 log.warn("상담 답이 비어 있음 - memberId: {}, sessionId: {}", memberId, sessionId);
                 return Mono.error(new BusinessException(ErrorCode.CHAT_AI_UNAVAILABLE));
             }
-            return saveExchange(sessionId, content, accumulated, planRef.get(), descriptions);
+            ReplyPlan plan = planRef.get();
+            return saveExchange(sessionId, content, accumulated, plan, descriptions)
+                    .doOnSuccess(done -> {
+                        if (plan != null && plan.uncounted()) {
+                            refundOnce.run();
+                        }
+                    });
         });
 
-        // 7. 실패 시 에러 이벤트 (event: error) 및 로깅. 첫 조각 전 실패면 하루 횟수를 돌려준다
+        // 7. 실패 시 에러 이벤트 (event: error) 및 로깅. 첫 조각 전 실패이거나 세지 않는 답(서버 안내)이면 하루 횟수를 돌려준다
         return Flux.concat(messageStream, doneStream)
                 .onErrorResume(e -> {
-                    if (!firstChunkReceived.get()) {
-                        chatDailyLimitService.refund(limitKey);
+                    ReplyPlan plan = planRef.get();
+                    if (!firstChunkReceived.get() || (plan != null && plan.uncounted())) {
+                        refundOnce.run();
                     }
                     return Flux.just(errorEvent(sessionId, e));
                 })
@@ -181,6 +199,11 @@ public class ChatStreamService {
     private ReplyPlan planReply(Long memberId, Long sessionId, ChatMessageCreateRequest request) {
         ChatContext context = chatContextFacade.load(sessionId);
         ChatIntentResolution resolution = chatIntentFacade.resolve(memberId, sessionId, request, context);
+        if (resolution != null && resolution.declines()) {
+            Declined declined = Declined.of(resolution.intent());
+            log.info("상담 의도 판단으로 AI 답 없이 안내 - memberId: {}, sessionId: {}, 의도: {}", memberId, sessionId, resolution.intent());
+            return ReplyPlan.declined(context, declined);
+        }
         if (resolution != null && resolution.intent() == ChatIntent.RECIPE_DETAIL) {
             // 사용자 말 대신 질문 종류로 만든 질문을 넘긴다 ("두 번째 거"를 단계 번호로 알아듣지 않게). 저장하는 사용자 메시지는 원래 말
             String question = DetailQuestion.questionFor(resolution.detailQuestion(), request.content());
@@ -209,10 +232,10 @@ public class ChatStreamService {
     private ReplyPlan planRecipeDetail(Long memberId, Long sessionId, Long recipeId, String question, ChatContext context) {
         try {
             return chatRecommendationFacade.describe(memberId, recipeId)
-                    .map(detail -> new ReplyPlan(context, null, null, detail.withQuestion(question), false))
+                    .map(detail -> new ReplyPlan(context, null, null, detail.withQuestion(question), false, null))
                     .orElseGet(() -> {
                         log.info("상담 레시피 자세히 대상이 지워짐 - memberId: {}, sessionId: {}, recipeId: {}", memberId, sessionId, recipeId);
-                        return new ReplyPlan(context, null, null, null, true);
+                        return new ReplyPlan(context, null, null, null, true, null);
                     });
         } catch (RuntimeException e) {
             log.warn("상담 레시피 자세히 정보 읽기 실패, 일반 답으로 - memberId: {}, sessionId: {}, recipeId: {}",
@@ -222,6 +245,9 @@ public class ChatStreamService {
     }
 
     private Flux<String> replyText(Long memberId, Long sessionId, String content, ReplyPlan plan) {
+        if (plan.declined() != null) {
+            return Flux.just(plan.declined().reply());
+        }
         if (plan.recipeGone()) {
             return Flux.just(RECIPE_GONE_REPLY);
         }
@@ -246,17 +272,32 @@ public class ChatStreamService {
 
     /**
      * 답 방식. recommendation이 있으면 추천(query는 추천에 쓴 조건, 직전 추천으로 Redis에 둔다),
-     * detail이 있으면 레시피 자세히, recipeGone이면 물어본 레시피가 지워져 정해진 답, 모두 없으면 일반 답.
+     * detail이 있으면 레시피 자세히, recipeGone이면 물어본 레시피가 지워져 정해진 답,
+     * declined가 있으면 답 생성 AI 없이 서버 안내(하루 횟수를 돌려줌), 모두 없으면 일반 답.
      */
     private record ReplyPlan(ChatContext context, RecommendationReply recommendation, RecipeQuery query,
-                             RecipeDetailReply detail, boolean recipeGone) {
+                             RecipeDetailReply detail, boolean recipeGone, Declined declined) {
 
         private ReplyPlan(ChatContext context, RecommendationReply recommendation, RecipeQuery query) {
-            this(context, recommendation, query, null, false);
+            this(context, recommendation, query, null, false, null);
         }
 
         private static ReplyPlan general(ChatContext context) {
             return new ReplyPlan(context, null, null);
+        }
+
+        private static ReplyPlan declined(ChatContext context, Declined declined) {
+            return new ReplyPlan(context, null, null, null, false, declined);
+        }
+
+        // 하루 횟수를 세지 않는 답인지 (서버 안내)
+        private boolean uncounted() {
+            return declined != null;
+        }
+
+        // 보낸 말과 답을 안전 장치로 걸러진 메시지(filtered)로 저장하는지
+        private boolean filtered() {
+            return declined != null && declined.filtered();
         }
 
         // 저장할 카드 (추천 카드 또는 레시피 자세히 카드 하나)
@@ -270,6 +311,23 @@ public class ChatStreamService {
         // 저장할 밀키트 카드 (추천 답에만 있다)
         private List<RecommendedMealkit> mealkits() {
             return recommendation != null ? recommendation.event().mealkits() : List.of();
+        }
+    }
+
+    /**
+     * 답 생성 AI 없이 보내는 서버 안내 답. filtered면 보낸 말과 안내 답을 안전 장치로 걸러진 메시지로 저장한다.
+     * 상관없는 질문은 다른 주제일 뿐이라 표시하지 않고(문맥에 남아도 된다), 목록 밖 욕설·탈취(BLOCKED)와 자해(SELF_HARM)는 표시한다.
+     */
+    private record Declined(String reply, boolean filtered) {
+
+        private static Declined of(ChatIntent intent) {
+            return switch (intent) {
+                case OFF_TOPIC -> new Declined(OFF_TOPIC_REPLY, false);
+                // 서버 단어 목록 밖의 욕설·탈취는 금지어 안내 하나로, 자해는 상담 전화 안내로 답한다 (단어 차단과 같은 문장)
+                case BLOCKED -> new Declined(ChatSafetyBlock.BANNED.reply(), true);
+                case SELF_HARM -> new Declined(ChatSafetyBlock.SELF_HARM.reply(), true);
+                default -> throw new IllegalArgumentException("서버 안내로 답하지 않는 의도: " + intent);
+            };
         }
     }
 
@@ -368,8 +426,10 @@ public class ChatStreamService {
             for (RecommendedMealkit mealkit : plan == null ? List.<RecommendedMealkit>of() : plan.mealkits()) {
                 cards.add(RecommendationToSave.mealkit(mealkit.product().productId(), mealkit.description()));
             }
-            // 카드가 없으면 기존처럼 메시지만 저장한다
-            List<ChatMessageResponse> saved = cards.isEmpty()
+            // 카드가 없으면 기존처럼 메시지만 저장한다. 안전 장치로 걸러진 답(서버 안내)은 표시해 저장한다
+            List<ChatMessageResponse> saved = plan != null && plan.filtered()
+                    ? chatMessageService.saveFilteredExchange(sessionId, content, accumulated.toString())
+                    : cards.isEmpty()
                     ? chatMessageService.saveExchange(sessionId, content, accumulated.toString())
                     : chatMessageService.saveExchange(sessionId, content, accumulated.toString(), cards);
             rememberContext(sessionId, plan, recipes);

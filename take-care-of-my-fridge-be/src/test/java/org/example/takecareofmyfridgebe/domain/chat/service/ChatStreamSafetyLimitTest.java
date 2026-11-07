@@ -3,6 +3,7 @@ package org.example.takecareofmyfridgebe.domain.chat.service;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatProperties;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatSafetyWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext;
+import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntent;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntentResolution;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntentResolution.Source;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageCreateRequest;
@@ -112,6 +113,33 @@ class ChatStreamSafetyLimitTest extends RedisContainerSupport {
         chatStreamService.streamMessage(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("죽 먹고 싶어")).collectList().block();
 
         assertThat(stringRedisTemplate.opsForValue().get(limitKey())).isEqualTo("2");
+    }
+
+    @Test
+    @DisplayName("의도 판단이 OFF_TOPIC이면 센 하루 횟수를 돌려받아 몇 번 보내도 0이다")
+    void refundsDailyCount_whenOffTopic() {
+        given(chatIntentFacade.resolve(any(), any(), any(), any())).willReturn(ChatIntentResolution.declined(ChatIntent.OFF_TOPIC));
+
+        for (String message : List.of("주식 추천해줘", "숙제 풀어줘", "파이썬 코드 짜줘")) {
+            chatStreamService.streamMessage(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of(message)).collectList().block();
+            awaitUnlocked();
+        }
+
+        assertThat(stringRedisTemplate.opsForValue().get(limitKey())).isEqualTo("0");
+    }
+
+    @Test
+    @DisplayName("의도 판단이 BLOCKED·SELF_HARM이어도 센 하루 횟수를 돌려받아 0이다")
+    void refundsDailyCount_whenBlockedOrSelfHarm() {
+        given(chatIntentFacade.resolve(any(), any(), any(), any())).willReturn(
+                ChatIntentResolution.declined(ChatIntent.BLOCKED), ChatIntentResolution.declined(ChatIntent.SELF_HARM));
+
+        for (String message : List.of("목록 밖 욕설", "다 놓고 싶어")) {
+            chatStreamService.streamMessage(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of(message)).collectList().block();
+            awaitUnlocked();
+        }
+
+        assertThat(stringRedisTemplate.opsForValue().get(limitKey())).isEqualTo("0");
     }
 
     @Test

@@ -2,6 +2,7 @@ package org.example.takecareofmyfridgebe.domain.chat.dto;
 
 /**
  * 서버 단어로 걸러 AI를 부르지 않는 메시지 종류와 그때 보내는 안내 답 (SafetyWordChecker).
+ * 의도 판단이 BLOCKED면 BANNED의 안내 답을, SELF_HARM이면 SELF_HARM의 안내 답을 같이 쓴다.
  * 걸린 말은 하루 횟수를 세지 않고, 안내 답과 함께 표시(filtered)해 저장한다.
  */
 public enum ChatSafetyBlock {
