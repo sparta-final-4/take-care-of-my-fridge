@@ -1297,4 +1297,83 @@ class ChatStreamServiceTest {
         assertThat(events.get(0).data()).contains("CHAT_010");
         verify(chatDailyLimitService).refund(LIMIT_KEY);
     }
+
+    @Test
+    @DisplayName("일반 답에 섞인 링크는 조각 경계에서 쪼개져도 화면에 보내지 않고 저장값에서도 지운다")
+    void removesLinkFromGeneralReply() {
+        Long sessionId = 10L;
+        when(chatReplyGenerator.generate(1L, sessionId, "두부 보관법", List.of()))
+                .thenReturn(Flux.just("냉장 보관해요. 자세한 건 https:/", "/naver.com/abc 에서 보세요"));
+        when(chatMessageService.saveExchange(eq(sessionId), eq("두부 보관법"), any())).thenReturn(List.of(
+                new ChatMessageResponse(100L, 1, ChatMessageRole.USER, "두부 보관법", LocalDateTime.now()),
+                new ChatMessageResponse(101L, 2, ChatMessageRole.ASSISTANT, "답", LocalDateTime.now())));
+
+        List<ServerSentEvent<String>> events = chatStreamService
+                .streamMessage(1L, sessionId, ChatMessageCreateRequest.of("두부 보관법")).collectList().block();
+
+        assertThat(events).extracting(ServerSentEvent::data).noneMatch(data -> data != null && data.contains("naver"));
+        verify(chatMessageService).saveExchange(sessionId, "두부 보관법", "냉장 보관해요. 자세한 건 에서 보세요");
+    }
+
+    @Test
+    @DisplayName("추천 답은 [소개]·[n]으로 나누기 전에 링크를 지워 카드 설명 표시가 깨지지 않고 저장 설명에도 링크가 없다")
+    @SuppressWarnings("unchecked")
+    void removesLinkFromRecommendationText() {
+        Long sessionId = 10L;
+        ChatMessageCreateRequest request = ChatMessageCreateRequest.of("두부로 뭐 해 먹지?");
+        RecipeQuery query = RecipeQuery.of(1L, List.of(21L));
+        givenRecommend(sessionId, request, query, new RecommendationReply(
+                ChatRecommendationsEventResponse.of(List.of(card(314L, "두부조림"))), "후보 정보"));
+        when(chatReplyGenerator.generateRecommendation(1L, sessionId, request.content(), "후보 정보"))
+                .thenReturn(Flux.just("[소개] 두부 요리예요.\n[1] 짭짤해요. www.exam", "ple.com 참고"));
+        when(chatMessageService.saveExchange(eq(sessionId), eq(request.content()), any(), any())).thenReturn(List.of(
+                new ChatMessageResponse(100L, 1, ChatMessageRole.USER, request.content(), LocalDateTime.now()),
+                new ChatMessageResponse(101L, 2, ChatMessageRole.ASSISTANT, "답", LocalDateTime.now())));
+
+        List<ServerSentEvent<String>> events = chatStreamService.streamMessage(1L, sessionId, request).collectList().block();
+
+        assertThat(events).extracting(ServerSentEvent::event).contains("recommendation_text");
+        assertThat(events).extracting(ServerSentEvent::data).noneMatch(data -> data != null && data.contains("example"));
+        ArgumentCaptor<List<RecommendationToSave>> cards = ArgumentCaptor.forClass(List.class);
+        verify(chatMessageService).saveExchange(eq(sessionId), eq(request.content()), eq("두부 요리예요."), cards.capture());
+        assertThat(cards.getValue().get(0).description()).isEqualTo("짭짤해요. 참고");
+    }
+
+    @Test
+    @DisplayName("레시피 자세히 답에 섞인 링크도 지우고, 숫자·단위는 그대로 둔다")
+    void removesLinkFromRecipeDetail() {
+        Long sessionId = 10L;
+        ChatMessageCreateRequest request = ChatMessageCreateRequest.of("두 번째 거 어떻게 만들어?");
+        when(chatIntentFacade.resolve(eq(1L), eq(sessionId), eq(request), any()))
+                .thenReturn(ChatIntentResolution.recipeDetail(Source.AI, 315L, DetailQuestion.HOW_TO));
+        RecommendedRecipe detailCard = new RecommendedRecipe(315L, "두부전", null, "전", 20, List.of(), List.of(), List.of(),
+                List.of(), List.of(), false, "물어보신 레시피예요", "물어보신 레시피예요");
+        when(chatRecommendationFacade.describe(1L, 315L)).thenReturn(Optional.of(
+                new RecipeDetailReply(ChatRecommendationsEventResponse.of(List.of(detailCard)), "[레시피 정보]")));
+        when(chatReplyGenerator.generateRecipeDetail(eq(1L), eq(sessionId), any(), eq("[레시피 정보]")))
+                .thenReturn(Flux.just("1. 두부를 3.", "5cm로 썰어요. naver.com/abc", "\n2. 1.5배 물을 부어요."));
+        when(chatMessageService.saveExchange(eq(sessionId), eq(request.content()), any(), any())).thenReturn(List.of(
+                new ChatMessageResponse(100L, 1, ChatMessageRole.USER, request.content(), LocalDateTime.now()),
+                new ChatMessageResponse(101L, 2, ChatMessageRole.ASSISTANT, "답", LocalDateTime.now())));
+
+        chatStreamService.streamMessage(1L, sessionId, request).collectList().block();
+
+        verify(chatMessageService).saveExchange(eq(sessionId), eq(request.content()),
+                eq("1. 두부를 3.5cm로 썰어요.\n2. 1.5배 물을 부어요."), any());
+    }
+
+    @Test
+    @DisplayName("링크만 있던 답은 빈 답으로 보고 CHAT_010을 보내며 하루 횟수를 돌려준다")
+    void sendsEmptyReplyError_whenReplyIsOnlyLink() {
+        Long sessionId = 10L;
+        when(chatDailyLimitService.checkAndIncrement(1L)).thenReturn(LIMIT_KEY);
+        when(chatReplyGenerator.generate(1L, sessionId, "질문", List.of())).thenReturn(Flux.just("https://naver.com"));
+
+        List<ServerSentEvent<String>> events = chatStreamService
+                .streamMessage(1L, sessionId, ChatMessageCreateRequest.of("질문")).collectList().block();
+
+        assertThat(events).extracting(ServerSentEvent::event).containsExactly("error");
+        assertThat(events.get(0).data()).contains("CHAT_010");
+        verify(chatDailyLimitService).refund(LIMIT_KEY);
+    }
 }

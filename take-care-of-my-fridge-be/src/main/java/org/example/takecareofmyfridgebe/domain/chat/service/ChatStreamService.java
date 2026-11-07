@@ -265,6 +265,17 @@ public class ChatStreamService {
         }
     }
 
+    // AI 답에 섞인 링크를 지운다 (일반·추천·레시피 자세히 모두, 화면과 저장 모두 지운 글. 추천 답은 [소개]·[n]으로 나누기 전).
+    // 서버가 정한 글에는 링크가 없어 거치지 않는다. 답 하나마다 필터를 새로 만들고, 지우고 남은 빈 글은 보내지 않는다 (링크만 있던 답은 빈 답이라 CHAT_010)
+    private static Flux<String> withoutLinks(Flux<String> reply) {
+        return Flux.defer(() -> {
+            LinkFilter filter = new LinkFilter();
+            return reply.map(filter::feed)
+                    .concatWith(Flux.defer(() -> Flux.just(filter.finish())))
+                    .filter(piece -> !piece.isEmpty());
+        });
+    }
+
     private Flux<String> replyText(Long memberId, Long sessionId, String content, ReplyPlan plan) {
         if (plan.declined() != null) {
             return Flux.just(plan.declined().reply());
@@ -274,11 +285,11 @@ public class ChatStreamService {
         }
         if (plan.detail() != null) {
             String question = plan.detail().question() == null ? content : plan.detail().question();
-            return chatReplyGenerator.generateRecipeDetail(memberId, sessionId, question, plan.detail().recipeInfo());
+            return withoutLinks(chatReplyGenerator.generateRecipeDetail(memberId, sessionId, question, plan.detail().recipeInfo()));
         }
         if (plan.recommendation() == null) {
             // 일반 답에만 이전 대화(최근 3턴)를 넣는다. 추천 설명은 후보 정보로 충분하다
-            return chatReplyGenerator.generate(memberId, sessionId, content, plan.context().recentMessages());
+            return withoutLinks(chatReplyGenerator.generate(memberId, sessionId, content, plan.context().recentMessages()));
         }
         // 밀키트만 보여 주는 답은 AI를 부르지 않고 서버 글을 보낸다 (레시피 카드가 없어 AI가 레시피를 소개하지 않게)
         if (plan.recommendation().fixedReply() != null) {
@@ -288,7 +299,7 @@ public class ChatStreamService {
         if (plan.recommendation().event().empty()) {
             return Flux.just(NO_RECIPE_REPLY);
         }
-        return chatReplyGenerator.generateRecommendation(memberId, sessionId, content, plan.recommendation().candidateInfo());
+        return withoutLinks(chatReplyGenerator.generateRecommendation(memberId, sessionId, content, plan.recommendation().candidateInfo()));
     }
 
     /**
