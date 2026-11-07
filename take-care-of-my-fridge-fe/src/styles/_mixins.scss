@@ -2,9 +2,77 @@
 @use 'variables' as *;
 
 // 모바일 우선: 기본 스타일은 모바일, 큰 화면만 from(bp)로 덮어쓴다.
+// 마우스를 쓰는 PC는 창 폭과 관계없이 PC 화면($desktop-min-width)까지의 분기를 늘 켠다(창을 줄여도 UI·글자가 그대로).
+// 그보다 큰 분기(xxl)는 PC에서도 실제 창 폭으로 정한다.
 @mixin from($bp) {
-  @media (min-width: map.get($breakpoints, $bp)) {
-    @content;
+  $min: map.get($breakpoints, $bp);
+
+  @if $min <= $desktop-min-width {
+    @media (min-width: $min), #{$desktop-pointer} {
+      @content;
+    }
+  } @else {
+    @media (min-width: $min) {
+      @content;
+    }
+  }
+}
+
+// 화면 좌우 여백. 레퍼런스(row7seeds.com)처럼 본문 폭을 묶지 않고 화면 폭 전체를 쓰며, 양 끝 여백만 둔다
+// (모바일 20px / md 32px / lg 48px). 헤더·본문·메인 띠가 모두 이 값이라 양 끝 선이 맞는다.
+@mixin page-gutter {
+  padding-inline: $page-gutter-sm;
+
+  @include from(md) {
+    padding-inline: $page-gutter-md;
+  }
+
+  @include from(lg) {
+    padding-inline: $page-gutter-lg;
+  }
+}
+
+// 메인 화면 띠 안의 내용: 띠(사진·색)는 화면 끝까지 가고, 내용은 최대 1200px 안에 가운데 정렬한다
+// (다른 화면은 화면 폭 전체를 쓰지만 메인은 사용자 요청으로 원래 폭을 유지, 2026-11-06).
+@mixin main-container {
+  width: 100%;
+  max-width: $content-max-width;
+  margin-inline: auto;
+  padding-inline: var(--ant-padding);
+
+  @include from(md) {
+    padding-inline: var(--ant-padding-lg);
+  }
+}
+
+// 메인 띠 제목. 제목용 글꼴(굵기 하나), 자간 없음, 줄바꿈은 균형 있게.
+@mixin display-heading {
+  min-width: 0;
+  margin: 0;
+  font-family: $font-display;
+  font-weight: 400;
+  letter-spacing: $display-tracking;
+  text-wrap: balance;
+  overflow-wrap: break-word;
+}
+
+// 메인 띠가 스크롤로 화면에 들어올 때 아래에서 살짝 떠오르며 나타난다(페이지 전체에 이 한 가지만 쓴다).
+// 스크롤 연동 애니메이션을 지원하는 브라우저에서만 움직이고, 지원하지 않거나 움직임 줄이기 설정이면
+// 처음부터 그대로 보인다(스크립트 없이 CSS만 쓰므로 내용이 숨겨진 채 남는 일이 없다).
+@mixin reveal-on-view {
+  @supports (animation-timeline: view()) {
+    @media (prefers-reduced-motion: no-preference) {
+      animation: reveal-on-view linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 35%;
+    }
+  }
+
+  @keyframes reveal-on-view {
+    from {
+      opacity: 0;
+      transform: translateY($reveal-offset);
+    }
   }
 }
 

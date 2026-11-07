@@ -5,6 +5,20 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>냉장고를 부탁해</title>
+    <meta
+      name="description"
+      content="남은 재료를 적어 두면 소비기한을 챙기고, 그 재료로 만들 요리를 찾아 드려요."
+    />
+    <meta name="theme-color" content="#f5f1ea" />
+    <!-- 링크를 공유할 때 보이는 미리보기. og:image는 배포 주소가 정해지면 절대 주소로 바꾼다. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="냉장고를 부탁해" />
+    <meta property="og:title" content="냉장고를 부탁해" />
+    <meta
+      property="og:description"
+      content="남은 재료를 적어 두면 소비기한을 챙기고, 그 재료로 만들 요리를 찾아 드려요."
+    />
+    <meta property="og:image" content="/images/main/hero-fridge-960.jpg" />
     <style>
       /* 스크립트를 받는 동안 흰 화면 대신 보이는 로딩. React가 그리면 #root 내용과 함께 사라진다. */
       .boot-loading {
@@ -12,7 +26,7 @@
         align-items: center;
         justify-content: center;
         min-height: 100vh;
-        background: #f5f5f5; /* antd Layout 기본 배경(colorBgLayout) */
+        background: #f5f1ea; /* src/app/theme.ts의 colorBgLayout(PAPER)과 같은 값. 바꾸면 함께 바꾼다 */
       }
       .boot-loading img {
         width: 40px;

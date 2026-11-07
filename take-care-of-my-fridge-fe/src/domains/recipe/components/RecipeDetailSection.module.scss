@@ -1,9 +1,12 @@
+/* Hallmark · v2.0.0 · redesign: full · scope: app · shape: app screen (recipe article: hero text + photo, ingredients | method, cook panel and reviews below) · theme: furrow · faces: Black Han Sans title and step numbers, Pretendard body · layout ref: row7seeds.com recipe article structure only (bordered hero with text left and tall photo right, two columns split by a rule, half-width INGREDIENTS/DIRECTIONS tab buttons sliding the panels on phones) · copy: tab labels 재료 / 조리 순서, server text as sent · states: loading, 404, error kept */
+@use '@/styles/variables' as *;
 @use '@/styles/mixins' as *;
 
 .page {
   display: flex;
   flex-direction: column;
-  gap: var(--ant-margin-sm);
+  gap: var(--ant-margin-lg);
+  padding-bottom: var(--ant-padding-xl);
 }
 
 .back {
@@ -11,12 +14,130 @@
   padding-inline: 0;
 }
 
-// 모바일: 레시피 내용 아래에 요리 완료·후기 / lg부터 MainPage와 같은 좌우 비율
+// ── 재료 | 조리 순서 ──
+.method {
+  display: flex;
+  flex-direction: column;
+
+  @include from(lg) {
+    padding-block: var(--ant-padding-lg) $recipe-hero-padding-lg;
+    border-bottom: 1px solid var(--ant-color-border-secondary);
+  }
+}
+
+// 좁은 화면 탭: 반반 버튼, 위아래 얇은 선. 고른 쪽은 잉크로 채우고 종이색 글자(레퍼런스 검정 버튼). lg 이상은 숨긴다.
+.tabs {
+  display: flex;
+
+  @include from(lg) {
+    display: none;
+  }
+}
+
+.tab {
+  flex: 1;
+  min-height: $recipe-tab-height;
+  padding: var(--ant-padding-sm);
+  font: inherit;
+  font-weight: var(--ant-font-weight-strong);
+  color: var(--ant-color-text);
+  background: transparent;
+  border: 0;
+  border-block: 1px solid var(--ant-color-text);
+  cursor: pointer;
+  transition:
+    background-color var(--ant-motion-duration-mid),
+    color var(--ant-motion-duration-mid);
+
+  &:hover {
+    background: var(--ant-color-fill-quaternary);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--ant-color-primary-active);
+    outline-offset: -4px;
+  }
+}
+
+.tabActive,
+.tabActive:hover {
+  color: var(--ant-color-bg-layout);
+  background: var(--ant-color-text);
+}
+
+// 좁은 화면: 두 칸을 가로로 이어 붙인 띠(폭 200%)를 옆으로 밀어 고른 칸만 보인다. 고르지 않은 칸은 높이 0·숨김.
+// lg 이상: 띠를 풀어 두 칸을 나란히(52 : 48), 사이에 세로선.
+.viewport {
+  overflow: hidden;
+}
+
+.track {
+  display: flex;
+  align-items: flex-start;
+  width: 200%;
+
+  @media (prefers-reduced-motion: no-preference) {
+    transition: transform var(--ant-motion-duration-slow) var(--ant-motion-ease-in-out);
+  }
+
+  @include from(lg) {
+    display: grid;
+    grid-template-columns: minmax(0, 52fr) minmax(0, 48fr);
+    width: 100%;
+    transition: none;
+  }
+}
+
+.trackSteps {
+  transform: translateX(-50%);
+
+  @include from(lg) {
+    transform: none;
+  }
+}
+
+.panel {
+  width: 50%;
+  height: 0;
+  padding-top: var(--ant-padding-lg);
+  overflow: hidden;
+  visibility: hidden;
+
+  @include from(lg) {
+    width: auto;
+    height: auto;
+    padding-top: 0;
+    overflow: visible;
+    visibility: visible;
+  }
+}
+
+.panelActive {
+  height: auto;
+  visibility: visible;
+}
+
+.panelIngredients {
+  @include from(lg) {
+    padding-right: $recipe-method-gap-lg;
+    border-right: 1px solid var(--ant-color-border-secondary);
+  }
+}
+
+.panelSteps {
+  @include from(lg) {
+    padding-left: $recipe-method-gap-lg;
+  }
+}
+
+// ── 아래: 영양·후기 | 요리 완료·통계 ──
+// 모바일은 요리 완료가 먼저 오도록 오른쪽 칸을 위로. lg부터 좌우 비율(MainPage와 같음), 오른쪽 칸은 따라 내려온다.
 .row {
   display: grid;
-  grid-template-columns: 1fr;
-  gap: var(--ant-margin-lg);
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--ant-margin-xl);
   align-items: start;
+  padding-top: var(--ant-padding-lg);
 
   @include from(lg) {
     grid-template-columns: minmax(0, 780fr) minmax(0, 416fr);
@@ -26,6 +147,16 @@
 .column {
   display: flex;
   flex-direction: column;
-  gap: var(--ant-margin-lg);
+  gap: var(--ant-margin-xl);
   min-width: 0;
+}
+
+.aside {
+  order: -1;
+
+  @include from(lg) {
+    position: sticky;
+    top: calc(#{$header-height} + var(--ant-margin-lg));
+    order: 0;
+  }
 }

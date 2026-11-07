@@ -1,9 +1,81 @@
+/* Hallmark · v2.0.0 · redesign: full · scope: app · shape: app screen (catalogue: condition column + recipe grid), same system as the products page · theme: furrow · faces: Black Han Sans head, Pretendard body · layout ref: row7seeds.com collection structure only · copy: one new lede line; the old section titles "무엇을 찾고 있나요?" and its hint are dropped, filter word not shown · states: loading, empty, error kept */
+@use '@/styles/variables' as *;
+@use '@/styles/mixins' as *;
+
 .page {
   display: flex;
   flex-direction: column;
-  gap: var(--ant-margin-lg);
+  gap: $main-section-gap;
 }
 
-.title {
+// 제목과 한 줄 설명을 가운데에(레퍼런스 상품 목록 머리).
+.head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--ant-margin-xs);
+  padding-top: var(--ant-padding-lg);
+  text-align: center;
+}
+
+:global(.ant-typography).title {
+  @include display-heading;
+
+  font-size: var(--ant-font-size-heading-2);
+  line-height: var(--ant-line-height-heading-2);
+
+  @include from(md) {
+    font-size: var(--ant-font-size-heading-1);
+    line-height: var(--ant-line-height-heading-1);
+  }
+}
+
+// 한 줄 설명: md 이상은 한 줄로(줄바꿈 없음). 좁은 휴대폰 폭에서는 화면을 넘지 않게 두 줄까지 허용한다.
+:global(.ant-typography).lede {
   margin: 0;
+  font-size: var(--ant-font-size-lg);
+  color: var(--ant-color-text-secondary);
+  text-wrap: balance;
+
+  @include from(md) {
+    white-space: nowrap;
+  }
+}
+
+// lg 이상은 왼쪽 검색 조건 칸(240px) + 레시피 목록. 좁은 화면은 목록만(조건은 도구 줄의 서랍).
+.collection {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: $collection-gap;
+  align-items: start;
+
+  @include from(lg) {
+    grid-template-columns: $collection-sidebar-width minmax(0, 1fr);
+  }
+
+  @include from(xl) {
+    gap: $collection-gap-xl;
+  }
+}
+
+.sidebar {
+  display: none;
+
+  @include from(lg) {
+    position: sticky;
+    top: calc(#{$header-height} + var(--ant-margin-lg));
+    display: block;
+    // 필터를 다 펼쳐 화면보다 길어지면 칸 안에서 스크롤한다(아래쪽 필터가 화면 밖에 갇히지 않게).
+    max-height: calc(100vh - #{$header-height} - 2 * var(--ant-margin-lg));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+}
+
+// 오른쪽 칸: 레시피 목록
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: $main-section-gap;
+  min-width: 0;
 }

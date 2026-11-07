@@ -1,3 +1,4 @@
+@use '@/styles/variables' as *;
 @use '@/styles/mixins' as *;
 
 // 모바일은 가로로 넘겨 보고, md부터 3칸으로 나란히 둔다.
@@ -5,7 +6,7 @@
   display: grid;
   grid-auto-columns: 70%;
   grid-auto-flow: column;
-  gap: var(--ant-margin);
+  gap: $product-grid-column-gap-md;
   margin: 0;
   padding: 0 0 var(--ant-padding-xs);
   overflow-x: auto;
@@ -16,6 +17,11 @@
     grid-auto-flow: row;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     overflow-x: visible;
+  }
+
+  // 상품 그리드와 같은 칸 사이(레퍼런스 product-list)
+  @include from(xl) {
+    gap: $product-grid-column-gap-xl;
   }
 }
 

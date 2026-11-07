@@ -1,33 +1,34 @@
 @use '@/styles/variables' as *;
 @use '@/styles/mixins' as *;
 
+// 재료 추가(냉장고 관리 앱들의 추가 흐름): [재료 이름(크게)] → [빠른 선택 칩] → [수량 · 소비기한 · 보관 · 추가]
+// → [담은 재료 칩] → [AI 상담 · 냉장고 저장]
 .container {
   display: flex;
   flex-direction: column;
   height: 100%;
-  gap: var(--ant-margin-sm);
+  gap: var(--ant-margin);
 }
 
+.nameRow {
+  display: flex;
+}
+
+.nameInput {
+  width: 100%;
+}
+
+// 수량 · 소비기한 · 보관 · 추가: md 이상 한 줄(추가 버튼은 내용만큼), 좁은 화면은 두 칸씩
 .formRow {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--ant-margin-xs);
 
   @include from(md) {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  @include from(xl) {
-    grid-template-columns:
-      minmax(0, 188fr)
-      minmax(0, 160fr)
-      minmax(0, 132fr)
-      minmax(0, 108fr)
-      minmax(0, 112fr);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) auto;
   }
 }
 
-.nameInput,
 .quantityInput,
 .datePicker,
 .storageSelect,
@@ -47,33 +48,35 @@
   font-size: var(--ant-font-size-sm);
 }
 
-.chipButton {
+:global(.ant-btn).chipButton {
   font-size: var(--ant-font-size-sm);
+  border-radius: $pill-radius;
 }
 
 .divider {
-  margin: var(--ant-margin-xxs) 0;
+  margin: 0;
 }
 
 .stagedList {
   flex: 1;
+  align-content: flex-start;
 }
 
-// 추가한 재료가 없을 때 빈 칸 가운데에 연하게 안내한다.
+// 담은 재료가 없을 때 연하게 안내
 .stagedEmpty {
-  margin: auto;
   font-size: var(--ant-font-size-sm);
 }
 
+// 담은 재료 칩: [이름(굵게) 수량 · 소비기한 · 보관 ×]
 .stagedItem {
-  display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(0, 0.8fr) minmax(0, 1.2fr) minmax(0, 0.8fr) auto;
+  display: inline-flex;
   align-items: center;
   gap: var(--ant-margin-xs);
-  padding: var(--ant-padding-xs) var(--ant-padding-sm);
-  background: var(--ant-color-bg-container);
-  border: 1px solid var(--ant-color-border);
-  border-radius: var(--ant-border-radius);
+  max-width: 100%;
+  min-height: $touch-target-size;
+  padding: 0 var(--ant-padding-xxs) 0 var(--ant-padding-sm);
+  background: var(--ant-color-fill-tertiary);
+  border-radius: $pill-radius;
 }
 
 .stagedName,
@@ -85,13 +88,23 @@
   white-space: nowrap;
 }
 
+.stagedName {
+  max-width: 12ch;
+}
+
+.stagedQty {
+  font-variant-numeric: tabular-nums;
+}
+
 .stagedDate,
 .stagedStorage {
   font-size: var(--ant-font-size-sm);
 }
 
-.removeButton {
-  border: 1px solid var(--ant-color-border);
+:global(.ant-btn).removeButton {
+  min-width: $touch-target-size;
+  min-height: $touch-target-size;
+  border-radius: $pill-radius;
 }
 
 .footerActions {

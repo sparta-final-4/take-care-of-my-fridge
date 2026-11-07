@@ -1,6 +1,7 @@
 import { LeftOutlined } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
 import { Button, Result, Skeleton } from 'antd';
+import { useState, type KeyboardEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 
 import { ROUTES } from '@/app/paths';
@@ -21,6 +22,14 @@ interface RecipeDetailSectionProps {
   recipeId: number;
 }
 
+// 좁은 화면에서 재료·조리 순서를 바꿔 보는 탭(레퍼런스 INGREDIENTS / DIRECTIONS 버튼)
+const METHOD_TABS = [
+  { key: 'ingredients', label: '재료' },
+  { key: 'steps', label: '조리 순서' },
+] as const;
+
+type MethodTab = (typeof METHOD_TABS)[number]['key'];
+
 export function RecipeDetailSection({ recipeId }: RecipeDetailSectionProps) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -32,11 +41,20 @@ export function RecipeDetailSection({ recipeId }: RecipeDetailSectionProps) {
     refetch,
   } = useQuery(recipeQueries.detail(recipeId));
   const fridgeMatch = useRecipeFridgeMatch(recipe?.ingredients ?? []);
+  const [methodTab, setMethodTab] = useState<MethodTab>('ingredients');
 
   // 앱 안에서 이동해 왔으면 이전 화면(필터가 남은 목록 등)으로 돌아간다.
   // 주소로 바로 들어와 앱 안의 이전 화면이 없으면(location.key === 'default') 목록으로 간다.
   // window.history.length는 외부 사이트에서 들어온 기록도 세므로 쓰지 않는다.
   const handleGoBack = () => (location.key === 'default' ? navigate(ROUTES.recipes) : navigate(-1));
+
+  // 탭 사이는 왼쪽·오른쪽 화살표로도 옮긴다(탭이 둘이라 어느 쪽이든 다른 탭으로).
+  const handleTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
+    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+    const next: MethodTab = methodTab === 'ingredients' ? 'steps' : 'ingredients';
+    setMethodTab(next);
+    document.getElementById(`recipe-tab-${next}`)?.focus();
+  };
 
   if (isPending) return <Skeleton active paragraph={{ rows: 10 }} />;
   if (isError) {
@@ -60,23 +78,79 @@ export function RecipeDetailSection({ recipeId }: RecipeDetailSectionProps) {
       <Button type="link" icon={<LeftOutlined />} onClick={handleGoBack} className={styles.back}>
         이전으로
       </Button>
-      <div className={styles.row}>
-        {/* 왼쪽: 사진·이름 → 재료 → 조리 순서 → 영양 성분 */}
-        <div className={styles.column}>
-          <RecipeOverview recipe={recipe} fridgeMatch={fridgeMatch} />
-          <RecipeIngredientSection
-            ingredients={recipe.ingredients ?? []}
-            fridgeMatch={fridgeMatch}
-          />
-          <RecipeStepSection steps={recipe.steps ?? []} tip={recipe.tip} />
-          <RecipeNutritionSection nutrition={recipe.nutrition} />
-        </div>
 
-        {/* 오른쪽: [내 냉장고 재료] + [요리 완료] → 요리 통계 → 후기 */}
+      {/* 머리: 글 + 사진(레퍼런스 레시피 글 머리) */}
+      <RecipeOverview recipe={recipe} fridgeMatch={fridgeMatch} />
+
+      {/* 본문: lg 이상은 재료 | 조리 순서 두 칸, 좁은 화면은 탭 버튼으로 하나씩 */}
+      <section className={styles.method} aria-label="재료와 조리 순서">
+        <div role="tablist" aria-label="레시피 내용" className={styles.tabs}>
+          {METHOD_TABS.map((tab) => {
+            const selected = methodTab === tab.key;
+            return (
+              <button
+                key={tab.key}
+                type="button"
+                role="tab"
+                id={`recipe-tab-${tab.key}`}
+                aria-selected={selected}
+                aria-controls={`recipe-panel-${tab.key}`}
+                tabIndex={selected ? 0 : -1}
+                onClick={() => setMethodTab(tab.key)}
+                onKeyDown={handleTabKeyDown}
+                className={selected ? `${styles.tab} ${styles.tabActive}` : styles.tab}
+              >
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
+        <div className={styles.viewport}>
+          <div
+            className={
+              methodTab === 'steps' ? `${styles.track} ${styles.trackSteps}` : styles.track
+            }
+          >
+            <div
+              role="tabpanel"
+              id="recipe-panel-ingredients"
+              aria-labelledby="recipe-tab-ingredients"
+              className={
+                methodTab === 'ingredients'
+                  ? `${styles.panel} ${styles.panelIngredients} ${styles.panelActive}`
+                  : `${styles.panel} ${styles.panelIngredients}`
+              }
+            >
+              <RecipeIngredientSection
+                ingredients={recipe.ingredients ?? []}
+                fridgeMatch={fridgeMatch}
+              />
+            </div>
+            <div
+              role="tabpanel"
+              id="recipe-panel-steps"
+              aria-labelledby="recipe-tab-steps"
+              className={
+                methodTab === 'steps'
+                  ? `${styles.panel} ${styles.panelSteps} ${styles.panelActive}`
+                  : `${styles.panel} ${styles.panelSteps}`
+              }
+            >
+              <RecipeStepSection steps={recipe.steps ?? []} tip={recipe.tip} />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 아래: 왼쪽 영양 정보 → 후기, 오른쪽 [내 냉장고 재료] + [요리 완료] → 요리 통계 */}
+      <div className={styles.row}>
         <div className={styles.column}>
+          <RecipeNutritionSection nutrition={recipe.nutrition} />
+          <RecipeReviewSection recipeId={recipeId} tipSummary={recipe.tipSummary} />
+        </div>
+        <div className={`${styles.column} ${styles.aside}`}>
           <RecipeCookPanel recipeId={recipeId} recipe={recipe} fridgeMatch={fridgeMatch} />
           <RecipeCookingStats recipeId={recipeId} />
-          <RecipeReviewSection recipeId={recipeId} tipSummary={recipe.tipSummary} />
         </div>
       </div>
     </div>

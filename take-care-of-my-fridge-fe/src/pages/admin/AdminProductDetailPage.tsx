@@ -15,6 +15,7 @@ import { useNavigate, useParams } from 'react-router';
 
 import { ROUTES } from '@/app/paths';
 import type { ProductUpdateRequest } from '@/common/api/clients';
+import { useScreens } from '@/common/hooks/useScreens';
 import { updateProduct } from '@/domains/product/api';
 import { ProductImageUpload } from '@/domains/product/components/ProductImageUpload';
 import { productImageUploadKey, productQueries } from '@/domains/product/queries';
@@ -31,6 +32,8 @@ const SALES_OPTIONS = [
 ];
 
 function AdminProductDetail({ productId }: { productId: number }) {
+  // 휴대폰은 폭에 따라 바뀌고, 마우스를 쓰는 PC는 창을 줄여도 넓은 배치 그대로(useScreens).
+  const screens = useScreens();
   const { message } = App.useApp();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -60,7 +63,7 @@ function AdminProductDetail({ productId }: { productId: number }) {
         <Typography.Title level={2}>{detail.name ?? '상품 상세'}</Typography.Title>
         <Button onClick={() => navigate(ROUTES.adminProducts)}>목록으로</Button>
       </Flex>
-      <Descriptions bordered column={{ xs: 1, sm: 2 }} className={styles.details}>
+      <Descriptions bordered column={screens.sm ? 2 : 1} className={styles.details}>
         <Descriptions.Item label="상품 번호">{detail.productId ?? '-'}</Descriptions.Item>
         <Descriptions.Item label="종류">
           {detail.productType ? TYPE_LABELS[detail.productType] : '-'}

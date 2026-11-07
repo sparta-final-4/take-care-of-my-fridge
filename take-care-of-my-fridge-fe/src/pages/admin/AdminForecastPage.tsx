@@ -22,6 +22,7 @@ import { useSearchParams } from 'react-router';
 
 import { getErrorCode, getErrorMessage } from '@/common/api/errors';
 import type { ForecastItem } from '@/common/api/clients';
+import { useScreens } from '@/common/hooks/useScreens';
 import { forecastQueries } from '@/domains/forecast/queries';
 
 import styles from './AdminForecastPage.module.scss';
@@ -39,6 +40,10 @@ function toWeekStart(value: string | null) {
 }
 
 export default function AdminForecastPage() {
+  // 휴대폰은 폭에 따라 바뀌고, 마우스를 쓰는 PC는 창을 줄여도 넓은 배치 그대로(useScreens).
+  // 요약 숫자 한 줄 수: 휴대폰 2 / md 3 / lg 6.
+  const screens = useScreens();
+  const statSpan = screens.lg ? 4 : screens.md ? 8 : 12;
   const { token } = theme.useToken();
   const [searchParams, setSearchParams] = useSearchParams();
   const weekStart = toWeekStart(searchParams.get('weekStart'));
@@ -143,7 +148,12 @@ export default function AdminForecastPage() {
               className={styles.notice}
             />
           )}
-          <Descriptions bordered size="small" column={{ xs: 1, sm: 2 }} className={styles.metadata}>
+          <Descriptions
+            bordered
+            size="small"
+            column={screens.sm ? 2 : 1}
+            className={styles.metadata}
+          >
             <Descriptions.Item label="모델 버전">{data.modelVersion}</Descriptions.Item>
             <Descriptions.Item label="생성 시각">{dateTime(data.createdAt)}</Descriptions.Item>
             <Descriptions.Item label="입력 데이터 기준 시각">
@@ -191,7 +201,7 @@ export default function AdminForecastPage() {
           ) : (
             <>
               <Row gutter={[token.marginSM, token.marginSM]} className={styles.summary}>
-                <Col xs={12} md={8} lg={4}>
+                <Col span={statSpan}>
                   <Card size="small">
                     <Statistic
                       title="TOP 10 일치"
@@ -200,7 +210,7 @@ export default function AdminForecastPage() {
                     />
                   </Card>
                 </Col>
-                <Col xs={12} md={8} lg={4}>
+                <Col span={statSpan}>
                   <Card size="small">
                     <Statistic
                       title="지난주 TOP 10 일치"
@@ -209,7 +219,7 @@ export default function AdminForecastPage() {
                     />
                   </Card>
                 </Col>
-                <Col xs={12} md={8} lg={4}>
+                <Col span={statSpan}>
                   <Card size="small">
                     <Statistic
                       title="예측 MAE"
@@ -218,7 +228,7 @@ export default function AdminForecastPage() {
                     />
                   </Card>
                 </Col>
-                <Col xs={12} md={8} lg={4}>
+                <Col span={statSpan}>
                   <Card size="small">
                     <Statistic
                       title="지난주 수량 MAE"
@@ -227,12 +237,12 @@ export default function AdminForecastPage() {
                     />
                   </Card>
                 </Col>
-                <Col xs={12} md={8} lg={4}>
+                <Col span={statSpan}>
                   <Card size="small">
                     <Statistic title="새로 진입" value={data.summary.enteredCount} suffix="개" />
                   </Card>
                 </Col>
-                <Col xs={12} md={8} lg={4}>
+                <Col span={statSpan}>
                   <Card size="small">
                     <Statistic title="TOP 10 이탈" value={data.summary.droppedCount} suffix="개" />
                   </Card>

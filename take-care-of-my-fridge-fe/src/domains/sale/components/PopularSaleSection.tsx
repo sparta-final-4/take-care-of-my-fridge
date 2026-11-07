@@ -1,4 +1,4 @@
-import { LeftOutlined, RightOutlined } from '@ant-design/icons';
+import { CaretRightOutlined, LeftOutlined, PauseOutlined, RightOutlined } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
 import { Button, Empty, Flex, Skeleton, Typography } from 'antd';
 import {
@@ -10,7 +10,9 @@ import {
   type PointerEvent,
   type TransitionEvent,
 } from 'react';
+import { Link } from 'react-router';
 
+import { ROUTES } from '@/app/paths';
 import { SectionCard } from '@/common/components/SectionCard';
 import { saleQueries } from '@/domains/sale/queries';
 
@@ -35,6 +37,7 @@ const prefersReducedMotion = () => window.matchMedia('(prefers-reduced-motion: r
 
 // 메인 화면 지금 뜨는 할인. 2장씩 보여 주고, 3개 이상이면 5초마다 다음 2장이 밀려 들어온다.
 // 화살표나 마우스·손가락으로 끌어서도 넘길 수 있고, 마지막 다음은 되감기지 않고 처음 페이지가 이어서 들어온다.
+// 자동 넘김은 마우스·포커스가 있는 동안 잠시 멈추고, 일시정지 버튼으로 계속 멈출 수 있다.
 export function PopularSaleSection() {
   const { data: sales = [], isPending, isError, refetch } = useQuery(saleQueries.popular());
   const pages = Array.from({ length: Math.ceil(sales.length / PAGE_SIZE) }, (_, index) =>
@@ -48,6 +51,8 @@ export function PopularSaleSection() {
   const [animating, setAnimating] = useState(true);
   // 카드 위에 마우스를 올리거나 키보드로 카드에 들어가 있는 동안은 넘기지 않는다.
   const [paused, setPaused] = useState(false);
+  // 일시정지 버튼으로 멈춘 상태. 다시 누르기 전까지 자동으로 넘기지 않는다(화살표·끌기는 그대로 된다).
+  const [stopped, setStopped] = useState(false);
   const [dragOffset, setDragOffset] = useState(0);
   const [dragging, setDragging] = useState(false);
   const dragRef = useRef<DragState | null>(null);
@@ -152,7 +157,7 @@ export function PopularSaleSection() {
 
   // 페이지가 바뀌면(화살표·끌기 포함) 타이머를 다시 시작해, 넘긴 직후 바로 또 넘어가지 않게 한다.
   useEffect(() => {
-    if (paused || dragging || pageCount < 2) return;
+    if (paused || stopped || dragging || pageCount < 2) return;
     const timer = setTimeout(goNext, AUTO_SLIDE_MS);
     return () => clearTimeout(timer);
   });
@@ -163,6 +168,14 @@ export function PopularSaleSection() {
 
   const arrows = pageCount > 1 && (
     <Flex gap="small">
+      <Button
+        size="small"
+        icon={stopped ? <CaretRightOutlined /> : <PauseOutlined />}
+        onClick={() => setStopped((value) => !value)}
+        aria-label={stopped ? '자동 넘김 다시 시작' : '자동 넘김 멈춤'}
+        aria-pressed={stopped}
+        className={styles.arrow}
+      />
       <Button
         size="small"
         icon={<LeftOutlined />}
@@ -181,7 +194,24 @@ export function PopularSaleSection() {
   );
 
   return (
-    <SectionCard title="지금 뜨는 할인" extra={arrows} bracket={false}>
+    <SectionCard
+      title="지금 뜨는 할인"
+      titleVariant="page"
+      bracket={false}
+      extra={
+        <Flex vertical gap="middle" className={styles.extra}>
+          <Typography.Text type="secondary" className={styles.description}>
+            지금 할인 중인 재료와 밀키트예요.
+          </Typography.Text>
+          <Flex align="center" wrap gap="middle">
+            <Link to={ROUTES.products} className={styles.moreLink}>
+              전체 보기
+            </Link>
+            {arrows}
+          </Flex>
+        </Flex>
+      }
+    >
       {isPending && <Skeleton active paragraph={{ rows: 4 }} />}
 
       {isError && (

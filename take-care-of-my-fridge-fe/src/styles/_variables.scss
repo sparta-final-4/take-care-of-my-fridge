@@ -6,14 +6,134 @@ $breakpoints: (
   xxl: 1600px,
 );
 
+// 마우스를 쓰는 PC는 창을 줄여도 PC 화면(xl, 1200px)을 그대로 둔다. 그보다 좁으면 가로 스크롤이 생긴다.
+// 휴대폰·터치 태블릿은 이 조건에 맞지 않아 지금처럼 폭에 따라 바뀐다. JS 쪽 기준은 common/hooks/useScreens.ts.
+$desktop-pointer: '(hover: hover) and (pointer: fine)';
+$desktop-min-width: 1200px;
+
+// 메인 화면 띠 안의 내용과 관리자 화면 일부가 쓰는 최대 폭. 그 밖의 회원 화면은 화면 폭 전체를 쓴다(좌우 여백 $page-gutter-*).
 $content-max-width: 1200px;
+// 화면 좌우 여백(레퍼런스 컨테이너 여백: 모바일 / md 이상 / lg 이상). 헤더·본문·메인 띠가 같이 쓴다.
+$page-gutter-sm: 20px;
+$page-gutter-md: 32px;
+$page-gutter-lg: 48px;
 $header-height: 64px;
 
+// 제목 자간(Furrow 테마 -0.035em을 한글에 맞게 줄인 값). 한글은 자간을 많이 줄이면 글자가 붙는다.
+$heading-tracking: -0.02em;
+
+// 제목용 글꼴(메인 첫 화면·띠 제목만). antd 토큰에 제목 글꼴 자리가 없어 여기 둔다. 굵기는 400 하나뿐이다.
+// 본문·라벨·버튼은 계속 Pretendard(theme.ts fontFamily).
+$font-display: 'Black Han Sans', 'Pretendard Variable', Pretendard, sans-serif;
+// 굵은 제목 글꼴은 자간을 줄이지 않는다(글자가 붙는다).
+$display-tracking: 0;
+// 메인 화면 섹션 사이 간격(모바일 / md 이상). 섹션을 상자로 나누지 않으므로 여백이 구분 역할을 한다.
+$main-section-gap: 64px;
+$main-section-gap-md: 112px;
+// 메인 첫 화면(사진 위 글). 1280x800에서 헤더·인기 검색어와 함께 제목·설명·버튼이 스크롤 없이 보이는 높이
+$main-hero-min-height: 560px;
+$main-hero-min-height-sm: 440px;
+// 메인 띠(색이 바뀌는 구역)의 위아래 안쪽 여백(lg 이상). 띠마다 같은 간격이 반복되지 않게 세 단계로 나눈다.
+// 좁게: 첫 화면 바로 아래, 기본: 대부분의 띠, 넓게: 어두운 AI 상담 띠(색이 바뀌는 곳은 숨을 더 준다)
+$main-band-padding-lg-tight: 64px;
+$main-band-padding-lg: 96px;
+$main-band-padding-lg-wide: 128px;
+// 띠가 화면에 들어올 때 떠오르는 거리
+$reveal-offset: 16px;
+$main-hero-text-max-width: 560px;
+$main-hero-text-padding-lg: 64px;
+$main-hero-title-size: 56px;
+$main-hero-action-min-width: 140px;
+// AI 상담 띠의 세로 사진이 한 화면을 넘지 않게
+$main-consult-image-max-height: 560px;
+
+// 메인 화면 인기 레시피 썸네일, 순위 칸
+$popular-recipe-thumb-size: 64px;
+$popular-recipe-rank-width: 24px;
+
 // 마이페이지 왼쪽 메뉴. 메뉴 한 줄 높이(md 이상, 모바일은 터치 영역 크기)
+// 마이페이지 전체 폭: 넓은 화면에서도 메뉴+내용을 가운데로 모은다(헤더·하단바는 화면 폭 그대로).
+$mypage-max-width: 1200px;
+$mypage-gap-lg: 64px; // lg 이상 메뉴와 내용 사이
 $mypage-sidebar-width: 220px;
 $mypage-nav-item-height: 40px;
-// 관리자 헤더 로그아웃 버튼의 닉네임 최대 너비(xl 1200px에서 관리자 메뉴와 한 줄에 들어가는 너비)
-$header-nickname-max-width: 96px;
+// 로그인·회원가입 폼 폭
+$auth-login-max-width: 400px;
+$auth-signup-max-width: 480px;
+
+// 상단바 글자 크기. 메뉴·아이콘은 기본(14·16px)보다 3px 크게, 로고는 그보다 확실히 크게(모바일 / md 이상).
+$header-nav-font-size: 17px;
+// 상단 메뉴 밑줄이 글자 가운데에서 아래로 떨어진 거리
+$nav-underline-offset: 0.85em;
+$header-icon-size: 19px;
+$header-brand-font-size-sm: 22px;
+$header-brand-font-size: 28px;
+// 상품 모달 정보 칸(예전 카드 뒷면과 같은 모양)의 안쪽 여백
+$card-back-padding: 16px;
+// 상품 사진 칸·모달 정보 칸: 모서리(조금 더 둥글게), 정보 칸 그림자, 설명 글자 크기(좁을 때 / 넓을 때)
+$product-media-radius: 16px;
+$product-media-shadow:
+  0 1px 2px rgb(20 17 15 / 6%),
+  0 12px 28px -16px rgb(20 17 15 / 30%);
+$card-back-description-size-sm: 20px;
+$card-back-description-size: 21px;
+// 정보 칸 나머지 글자(사용자 요청으로 기본보다 5px 크게): 칩·정보 상자 17px, 수량 숫자·담기 버튼 19px
+$card-back-small-size: 17px;
+$card-back-control-size: 19px;
+// 상품 모달의 상품명
+$product-modal-name-size: 24px;
+// 정보 칸 바탕: 귤색(포인트 색)을 아주 옅게 푼 부드러운 살구색 oklch(95% 0.03 60), 잉크 글자 대비 16:1.
+// 안쪽 칸(정보 상자·칩·수량 조절기)은 더 연한 크림 oklch(98% 0.012 60). 선 없이 색 차이로만 나눈다.
+$card-back-bg: #feeadb;
+$card-back-inner: #fff7f1;
+// 알약 모양(둥근 칩·수량 조절기·담기 버튼)
+$pill-radius: 999px;
+// 상품 카드 앞면 글자(사용자 요청으로 기본보다 5px 크게): 종류·할인 태그 17px, 상품명 19px, 가격 21px,
+// 사진 위 안내 칩·남은 시간 17px(좁은 휴대폰 카드에서는 사진을 덜 가리게 14px)
+$product-card-tag-size: 17px;
+$product-card-name-size: 19px;
+$product-card-price-size: 21px;
+$product-card-overlay-size-sm: 14px;
+$product-card-overlay-size: 17px;
+// 상품 사진 칸에 마우스를 올렸을 때 카드가 떠오르는 거리
+$product-card-lift: 4px;
+
+// 상품 목록(레퍼런스 collection 치수): 필터 칸 폭, 필터 칸과 목록 사이(lg / xl 이상)
+$collection-sidebar-width: 240px;
+$collection-gap: 32px;
+$collection-gap-xl: 50px;
+// 상품 그리드 칸 사이(가로) · 줄 사이(세로): 모바일 2칸 / md 3칸 / xl 이상
+$product-grid-column-gap: 10px;
+$product-grid-row-gap: 35px;
+$product-grid-column-gap-md: 24px;
+$product-grid-row-gap-md: 48px;
+$product-grid-column-gap-xl: 48px;
+$product-grid-row-gap-xl: 64px;
+// 필터 목록 앞 점 크기
+$facet-dot-size: 10px;
+
+// 장바구니 서랍(레퍼런스 cart-drawer 치수): 좌우 32px, 머리 줄 위아래 18px
+$cart-drawer-padding-inline: 32px;
+$cart-drawer-header-padding-block: 18px;
+// 장바구니 목록이 넓은 배치로 바뀌는 칸 폭(장바구니 화면 기준 md·lg 화면에서의 본문 폭)
+$cart-container-md: 720px;
+$cart-container-lg: 940px;
+// 헤더 아래 검색 줄이 열릴 때 내려오는 거리
+$header-search-enter-offset: 8px;
+
+// 헤더 좌우 여백(레퍼런스 컨테이너 여백과 같은 값: 모바일 / md 이상 / lg 이상)
+$header-gutter-sm: $page-gutter-sm;
+$header-gutter-md: $page-gutter-md;
+$header-gutter-lg: $page-gutter-lg;
+// 헤더 아래 검색 줄(레퍼런스 header-search와 같은 치수: 모바일 / md 이상)
+$header-search-padding-sm: 12px;
+$header-search-padding: 24px;
+$header-search-gap-sm: 12px;
+$header-search-gap: 20px;
+$header-search-font-size-sm: 14px;
+$header-search-font-size: 18px;
+// 검색 안내 문구(대문자 영문) 자간
+$header-search-placeholder-tracking: 0.08em;
 
 // YYYY-MM-DD(10자)가 잘리지 않는 너비
 $date-min-width: 10ch;
@@ -78,12 +198,36 @@ $dday-tag-min-width: 4.5em;
 $fridge-sort-select-min-width: 120px;
 $fridge-input-action-min-width: 120px;
 
+// 내 냉장고 화면: 오른쪽 칸(AI 상담·최근 기록) 폭
+$fridge-aside-width: 380px;
+
+// 내 냉장고 재료 칸(그리드): 칸 최소 폭(넓으면 한 줄에 여러 칸), 보관 탭 아이콘 크기
+$fridge-tile-min-width: 200px;
+$storage-icon-size: 16px;
+
+// 냉장고 일러스트 크기(내 냉장고 제목 옆 / 빈 냉장고 안내)
+$fridge-illustration-size-sm: 56px;
+$fridge-illustration-size: 72px;
+$fridge-illustration-empty-size: 120px;
+
 // 냉장고 재료 목록 수량 칸. "0.3개", "12.5개", "1000ml"이 줄마다 같은 칸에 오른쪽 정렬되도록 고정
 $fridge-item-quantity-width: 64px;
 
 // 레시피 조리 순서
 $recipe-step-number-size: 24px;
 $recipe-step-image-max-width: 360px;
+
+// 레시피 상세(레퍼런스 row7seeds 레시피 글 구성): 위 머리(글 + 사진), 아래 재료 | 조리 순서 두 칸.
+// 좁은 화면은 사진이 위로, 재료·조리 순서는 반반 버튼(탭)으로 바꿔 본다.
+$recipe-hero-image-max-height: 360px; // 좁은 화면 사진 최대 높이
+$recipe-hero-image-max-height-lg: 480px; // 넓은 화면 사진 최대 높이
+$recipe-hero-padding-lg: 56px; // 넓은 화면 머리·본문 안쪽 여백
+$recipe-hero-title-size: 30px;
+$recipe-hero-title-size-md: 48px;
+$recipe-tab-height: 52px;
+$recipe-step-index-size: 26px; // 조리 순서 큰 번호(01, 02 …)
+$recipe-step-index-width: 48px;
+$recipe-method-gap-lg: 56px; // 재료 | 조리 순서 사이(세로선 양쪽)
 
 // 모바일 터치 영역 최소 크기
 $touch-target-size: 44px;

@@ -14,6 +14,11 @@ export default defineConfig(({ mode }) => {
         '@': path.resolve(import.meta.dirname, './src'),
       },
     },
+    build: {
+      // 글꼴 조각(작은 woff·woff2)은 CSS에 base64로 넣지 않고 따로 둔다. 넣으면 첫 화면 CSS가 커지고
+      // 화면에 없는 글자 조각까지 미리 받는다. 따로 두면 브라우저가 unicode-range로 필요한 조각만 받는다.
+      assetsInlineLimit: (filePath: string) => (/\.woff2?$/.test(filePath) ? false : undefined),
+    },
     server: {
       proxy: {
         '/api': {

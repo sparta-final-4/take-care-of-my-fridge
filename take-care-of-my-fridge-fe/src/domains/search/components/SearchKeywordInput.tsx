@@ -111,7 +111,7 @@ export function SearchKeywordInput({
     >
       <Input
         prefix={<SearchOutlined />}
-        placeholder="재료나 요리를 검색해 보세요"
+        placeholder="SEARCH FOR..."
         aria-label={ariaLabel}
         maxLength={SEARCH_KEYWORD_MAX_LENGTH}
         enterKeyHint="search"

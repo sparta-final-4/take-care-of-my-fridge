@@ -1,9 +1,7 @@
-import { ReloadOutlined } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
-import { Button, Flex, Input, Tag, Typography } from 'antd';
+import { Button, Input, Tag, Typography } from 'antd';
 import { useState } from 'react';
 
-import { SectionCard } from '@/common/components/SectionCard';
 import { COOK_TIME_OPTIONS } from '@/domains/recipe/format';
 import { useRecipeFilters } from '@/domains/recipe/hooks/useRecipeFilters';
 import { recipeQueries } from '@/domains/recipe/queries';
@@ -85,46 +83,41 @@ export function RecipeSearchSection() {
   ];
 
   return (
-    <SectionCard
-      title="무엇을 찾고 있나요?"
-      extra={
-        // 조건을 하나라도 고르면 안내 문구 대신 초기화 버튼을 보여 준다.
-        filtered ? (
-          <Button type="link" icon={<ReloadOutlined />} onClick={reset} className={styles.reset}>
-            초기화
-          </Button>
-        ) : (
-          <Typography.Text type="secondary" className={styles.hint}>
-            조건을 고르면 아래 목록이 바로 바뀌어요
-          </Typography.Text>
-        )
-      }
-    >
-      <Flex vertical gap="middle">
+    <section className={styles.facets} aria-label="레시피 검색 조건">
+      <div className={styles.group}>
+        {/* 첫 묶음 이름 줄 오른쪽에 초기화를 둔다(칸 제목은 따로 두지 않는다). */}
+        <div className={styles.groupHead}>
+          <Typography.Text className={styles.groupLabel}>검색</Typography.Text>
+          {filtered && (
+            <Button type="link" onClick={reset} className={styles.reset}>
+              초기화
+            </Button>
+          )}
+        </div>
         {/* 입력값은 검색을 누를 때만 URL에 반영한다. 뒤로 가기로 검색어가 바뀌면 key로 입력칸을 다시 채운다. */}
         <Input.Search
           key={keyword}
           defaultValue={keyword}
-          size="large"
-          placeholder="레시피 이름 (예: 된장찌개, 계란 볶음밥)"
+          placeholder="레시피 이름 (예: 된장찌개)"
           aria-label="레시피 검색"
-          enterButton="검색"
           allowClear
           maxLength={50}
           onSearch={setKeyword}
         />
-        {filterRows.map((row) => (
-          <div key={row.label} className={styles.filterRow}>
-            <Typography.Text type="secondary" className={styles.label}>
-              {row.label}
-            </Typography.Text>
-            <Flex gap="small" wrap>
+      </div>
+      {/* 분류를 못 받아 와 고를 것이 없는 묶음은 감춘다. */}
+      {filterRows
+        .filter((row) => row.chips.length > 0)
+        .map((row) => (
+          <div key={row.label} className={styles.group}>
+            <Typography.Text className={styles.groupLabel}>{row.label}</Typography.Text>
+            <div className={styles.options}>
               {row.chips.map((chip) => (
                 <Tag.CheckableTag
                   key={chip.key}
                   checked={chip.checked}
                   onChange={chip.onChange}
-                  className={styles.chip}
+                  className={styles.option}
                 >
                   {chip.label}
                 </Tag.CheckableTag>
@@ -139,10 +132,9 @@ export function RecipeSearchSection() {
                   {row.toggle.expanded ? '접기' : '더보기'}
                 </Button>
               )}
-            </Flex>
+            </div>
           </div>
         ))}
-      </Flex>
-    </SectionCard>
+    </section>
   );
 }

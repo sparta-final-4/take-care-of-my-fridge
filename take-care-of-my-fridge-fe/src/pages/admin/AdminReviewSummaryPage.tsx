@@ -21,6 +21,7 @@ import { generatePath } from 'react-router';
 
 import { ROUTES } from '@/app/paths';
 import { runReviewSummary, type ReviewSummaryItem } from '@/domains/review/api';
+import { useScreens } from '@/common/hooks/useScreens';
 
 import styles from './AdminReviewSummaryPage.module.scss';
 
@@ -110,16 +111,18 @@ interface SummaryCompareProps {
 
 // 펼친 행: 이전 요약과 새 요약을 나란히 보여준다(모바일은 위아래)
 function SummaryCompare({ item }: SummaryCompareProps) {
+  // 휴대폰은 폭에 따라 바뀌고, 마우스를 쓰는 PC는 창을 줄여도 넓은 배치 그대로(useScreens).
+  const screens = useScreens();
   const { token } = theme.useToken();
   return (
     <Row gutter={[token.margin, token.marginXS]}>
-      <Col xs={24} md={12}>
+      <Col span={screens.md ? 12 : 24}>
         <Typography.Text type="secondary">이전 요약</Typography.Text>
         <Typography.Paragraph className={styles.compareText}>
           {item.previousSummary ?? '(없음)'}
         </Typography.Paragraph>
       </Col>
-      <Col xs={24} md={12}>
+      <Col span={screens.md ? 12 : 24}>
         <Typography.Text type="secondary">새 요약</Typography.Text>
         <Typography.Paragraph className={styles.compareText}>
           {item.newSummary ?? '(없음)'}
@@ -130,6 +133,8 @@ function SummaryCompare({ item }: SummaryCompareProps) {
 }
 
 export default function AdminReviewSummaryPage() {
+  // 휴대폰은 폭에 따라 바뀌고, 마우스를 쓰는 PC는 창을 줄여도 넓은 배치 그대로(useScreens).
+  const screens = useScreens();
   const { token } = theme.useToken();
   const { mutate, data: result, isPending } = useMutation({ mutationFn: runReviewSummary });
 
@@ -180,7 +185,7 @@ export default function AdminReviewSummaryPage() {
       <Card className={styles.guide}>
         <Row gutter={[token.marginLG, token.margin]} align="stretch">
           {GUIDES.map((guide) => (
-            <Col key={guide.title} xs={24} md={8}>
+            <Col key={guide.title} span={screens.md ? 8 : 24}>
               <Flex gap="small" align="flex-start" className={styles.guideItem}>
                 <span className={styles.guideIcon} aria-hidden>
                   {guide.icon}
@@ -228,7 +233,7 @@ export default function AdminReviewSummaryPage() {
         <>
           <Row gutter={[token.marginSM, token.marginSM]} className={styles.summary}>
             {stats?.map((stat) => (
-              <Col key={stat.title} xs={12} md={6}>
+              <Col key={stat.title} span={screens.md ? 6 : 12}>
                 <Card size="small">
                   <Statistic title={stat.title} value={stat.value} suffix={stat.suffix} />
                 </Card>

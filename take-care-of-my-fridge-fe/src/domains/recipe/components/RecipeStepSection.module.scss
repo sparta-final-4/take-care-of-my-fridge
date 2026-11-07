@@ -1,36 +1,60 @@
 @use '@/styles/variables' as *;
+@use '@/styles/mixins' as *;
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ant-margin-lg);
+}
+
+// 좁은 화면은 위 탭 버튼이 제목 역할, lg 이상에서만 "조리 순서" 제목을 보인다.
+:global(.ant-typography).title {
+  display: none;
+  margin: 0;
+  font-size: var(--ant-font-size-heading-3);
+  letter-spacing: $heading-tracking;
+
+  @include from(lg) {
+    display: block;
+  }
+}
 
 .list {
   display: flex;
   flex-direction: column;
-  gap: var(--ant-margin);
   margin: 0;
   padding: 0;
   list-style: none;
+  border-top: 1px solid var(--ant-color-text);
 }
 
+// 단계마다 [큰 번호 | 문단], 사이는 얇은 선
 .step {
-  display: flex;
+  display: grid;
+  grid-template-columns: $recipe-step-index-width minmax(0, 1fr);
   gap: var(--ant-margin-sm);
+  padding-block: var(--ant-padding-lg);
+  border-bottom: 1px solid var(--ant-color-border-secondary);
 }
 
 .number {
-  display: inline-flex;
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: center;
-  width: $recipe-step-number-size;
-  height: $recipe-step-number-size;
-  color: var(--ant-color-white);
-  font-size: var(--ant-font-size-sm);
-  font-weight: var(--ant-font-weight-strong);
-  background: var(--ant-color-text);
-  border-radius: 50%;
+  @include display-heading;
+
+  font-size: $recipe-step-index-size;
+  line-height: 1;
+  color: var(--ant-color-text);
 }
 
 .body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ant-margin-xs);
   min-width: 0;
-  padding-top: var(--ant-padding-xxs);
+}
+
+:global(.ant-typography).description {
+  margin: 0;
+  font-size: var(--ant-font-size-lg);
 }
 
 .stepTip {
@@ -41,4 +65,18 @@
   width: 100%;
   max-width: $recipe-step-image-max-width;
   border-radius: var(--ant-border-radius);
+}
+
+// 전체 조리 팁: 옅은 칸 바탕 메모
+.tip {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ant-margin-xxs);
+  padding: var(--ant-padding) var(--ant-padding-lg);
+  background: var(--ant-color-fill-tertiary);
+  border-radius: var(--ant-border-radius-lg);
+}
+
+:global(.ant-typography).tipText {
+  margin: 0;
 }

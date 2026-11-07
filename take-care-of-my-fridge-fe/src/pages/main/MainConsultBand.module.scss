@@ -1,0 +1,67 @@
+@use '@/styles/variables' as *;
+@use '@/styles/mixins' as *;
+
+// 잉크색 띠(어두운 사진과 이어진다). 글자는 종이색으로 바꾼다.
+.band {
+  padding-block: $main-section-gap;
+  color: var(--ant-color-bg-layout);
+  background: var(--ant-color-text);
+
+  // 색이 바뀌는 어두운 띠라 위아래 숨을 더 준다.
+  @include from(lg) {
+    padding-block: $main-band-padding-lg-wide;
+  }
+}
+
+// 모바일: 사진 위, 글 아래. lg 이상: 사진 5칸, 글 7칸.
+.inner {
+  @include main-container;
+  @include reveal-on-view;
+
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--ant-margin-xl);
+  align-items: center;
+
+  @include from(lg) {
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    gap: var(--ant-margin-xxl);
+  }
+}
+
+.image {
+  display: block;
+  width: 100%;
+  max-height: $main-consult-image-max-height;
+  height: auto;
+  object-fit: cover;
+  border-radius: var(--ant-border-radius-lg);
+}
+
+.text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ant-margin);
+  min-width: 0;
+}
+
+:global(.ant-typography).title {
+  @include display-heading;
+
+  font-size: var(--ant-font-size-heading-2);
+  line-height: var(--ant-line-height-heading-2);
+  color: var(--ant-color-bg-layout);
+
+  @include from(md) {
+    font-size: var(--ant-font-size-heading-1);
+    line-height: var(--ant-line-height-heading-1);
+  }
+}
+
+:global(.ant-typography).description {
+  max-width: 40ch;
+  margin: 0;
+  font-size: var(--ant-font-size-lg);
+  color: var(--ant-color-border-secondary);
+  text-wrap: pretty;
+}

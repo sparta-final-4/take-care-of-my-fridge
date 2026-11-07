@@ -1,0 +1,120 @@
+@use '@/styles/variables' as *;
+@use '@/styles/mixins' as *;
+
+// 모든 화면 맨 아래 흰 띠(종이색 본문과 구분). 위에 얇은 선.
+.band {
+  padding-block: $main-section-gap;
+  background: var(--ant-color-bg-container);
+  border-top: 1px solid var(--ant-color-border-secondary);
+
+  @include from(lg) {
+    padding-block: $main-band-padding-lg var(--ant-padding-xl);
+  }
+}
+
+// 모바일은 위아래로, lg 이상은 소개 6칸 · 바로가기 6칸, 출처는 아래 한 줄.
+.inner {
+  @include main-container;
+
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--ant-margin-xl);
+
+  @include from(lg) {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    row-gap: var(--ant-margin-xxl);
+  }
+}
+
+.about {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ant-margin-sm);
+}
+
+:global(.ant-typography).wordmark {
+  font-family: $font-display;
+  font-size: var(--ant-font-size-heading-2);
+  font-weight: 400;
+  letter-spacing: $display-tracking;
+}
+
+:global(.ant-typography).description {
+  max-width: 36ch;
+  margin: 0;
+  color: var(--ant-color-text-secondary);
+  text-wrap: pretty;
+}
+
+.links {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--ant-margin-xs) var(--ant-margin-lg);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.link {
+  display: inline-flex;
+  align-items: center;
+  min-height: $touch-target-size;
+  color: var(--ant-color-text);
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-underline-offset: 0.2em;
+  transition: text-decoration-color var(--ant-motion-duration-fast);
+
+  &:hover {
+    color: var(--ant-color-text);
+    text-decoration-color: currentcolor;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--ant-color-primary-active);
+    outline-offset: 2px;
+  }
+}
+
+// 사진 출처: 전체 폭, 작은 글씨
+.credits {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ant-margin-xxs);
+  padding-top: var(--ant-padding);
+  font-size: var(--ant-font-size-sm);
+  color: var(--ant-color-text-secondary);
+  border-top: 1px solid var(--ant-color-border-secondary);
+
+  @include from(lg) {
+    grid-column: 1 / -1;
+  }
+}
+
+.creditsHeading {
+  font-size: var(--ant-font-size-sm);
+}
+
+.creditList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ant-margin-xxs) var(--ant-margin);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.creditLink {
+  color: var(--ant-color-text-secondary);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+
+  &:hover {
+    color: var(--ant-color-text);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--ant-color-primary-active);
+    outline-offset: 2px;
+  }
+}

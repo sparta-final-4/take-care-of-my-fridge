@@ -1,6 +1,6 @@
 import { CloseOutlined, DownOutlined, RobotOutlined, SendOutlined } from '@ant-design/icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { App, Button, Flex, Grid, Input, type InputRef, Result, Spin, Tag, Typography } from 'antd';
+import { App, Button, Flex, Input, type InputRef, Result, Spin, Tag, Typography } from 'antd';
 import {
   Fragment,
   type KeyboardEvent,
@@ -17,6 +17,7 @@ import { useNavigate } from 'react-router';
 import { ROUTES } from '@/app/paths';
 import { getChatErrorInfo, getErrorCode, type ChatErrorInfo } from '@/common/api/errors';
 import { useAuthStore } from '@/common/auth/authStore';
+import { useScreens } from '@/common/hooks/useScreens';
 import { streamMessage } from '../api';
 import { useChatModalStore } from '../model/useChatModalStore';
 import { useChatStreamingStore } from '../model/useChatStreamingStore';
@@ -99,7 +100,7 @@ export function ChatRoomSection({
   const [pendingText, setPendingText] = useState<string | null>(null);
   // 받는 중인 카드 설명 (카드 순서). recommendation_text 이벤트로 채운다
   const [streamingDescriptions, setStreamingDescriptions] = useState<string[]>([]);
-  const screens = Grid.useBreakpoint();
+  const screens = useScreens();
 
   const containerRef = useRef<HTMLDivElement>(null);
   // 보낸 질문 말풍선. 답을 받는 동안 이 말풍선이 대화 영역 위쪽에 올 때까지만 따라 내려간다.

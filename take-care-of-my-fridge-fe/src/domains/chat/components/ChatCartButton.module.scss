@@ -13,6 +13,16 @@
     inset: calc(($touch-target-size - var(--ant-control-height)) / -2);
     content: '';
   }
+
+  // 담기 아이콘은 귤색 대신 잉크색(귤색은 글자·아이콘 색으로 쓰지 않는다). 마우스를 올리면 옅은 칸 바탕.
+  &:global(.ant-btn):not(:disabled) {
+    color: var(--ant-color-text);
+  }
+
+  &:global(.ant-btn):not(:disabled):hover {
+    color: var(--ant-color-text);
+    background: var(--ant-color-fill-tertiary);
+  }
 }
 
 .icon {

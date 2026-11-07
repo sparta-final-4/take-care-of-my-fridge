@@ -1,36 +1,76 @@
+/* Hallmark · v2.0.0 · redesign: full · scope: page · shape: photographic, full-bleed bands (hero photo, member fridge row, three feature tiles, ink consult band, paper sale band, recipe photo cards, white about band) · theme: furrow (deal: manual, palette, radius and rules only; no map, no Red Hat faces) · faces: Black Han Sans for band heads and the wordmark, Pretendard for everything else (Red Hat has no Hangul) · posture: full palette (paper, ink, white, each a band) · job: open the fridge log · hero: full-bleed fridge photograph under an ink scrim and a transparent nav, a two-line head that says the job, one sentence, two actions, bottom left · signature: the open fridge, by day in the hero and by night in the consult band · photos: Wikimedia Commons and Unsplash, two sizes each via srcset, credited in the about band · motion: one CSS scroll-driven reveal per band, none without support or under reduced motion · nav: kept · footer: about band with links and credits · layout ref: row7seeds.com structure only · copy: new lines for hero, tiles, consult and about, every claim an existing feature */
+/* Hallmark · pre-emit critique: P4 H4 E4 S4 R4 V4 · weakest: S, Unsplash stand-ins until the service has its own photographs; slots are mainPhotos.ts */
+@use '@/styles/variables' as *;
 @use '@/styles/mixins' as *;
 
 .page {
   display: flex;
   flex-direction: column;
-  gap: var(--ant-margin-lg);
 }
 
-.row {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: var(--ant-margin-lg);
-  align-items: stretch;
+// 로그인한 회원의 임박 재료 줄. 첫 화면 바로 아래라 위 여백은 좁게, 아래는 바로가기 띠가 이어받는다.
+.fridgeBand {
+  padding-top: $main-section-gap;
 
   @include from(lg) {
-    grid-template-columns: minmax(0, 780fr) minmax(0, 416fr);
+    padding-top: $main-band-padding-lg-tight;
   }
 }
 
-.leftCol,
-.rightCol {
+.fridgeInner {
+  @include main-container;
+  @include reveal-on-view;
+
   display: flex;
-  min-width: 0;
 }
 
-.rightStack {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ant-margin-lg);
-  min-width: 0;
+// 할인 상품 줄. 바탕은 바로가기 띠와 같은 종이색. lg 이상에서 제목·화살표는 왼쪽 좁은 칸, 카드는 오른쪽 넓은 칸.
+.saleBand {
+  padding-block: $main-section-gap;
+  background: var(--ant-color-bg-layout);
+
+  @include from(lg) {
+    padding-block: $main-band-padding-lg;
+  }
 }
 
-.rightStackItem {
+// 할인 띠 바로 뒤의 레시피 띠는 같은 종이색이라 여백이 두 번 겹치지 않게 위 여백을 뺀다.
+.saleBand + .recipeSlot > section {
+  padding-top: 0;
+}
+
+.saleInner {
+  @include main-container;
+  @include reveal-on-view;
+
   display: flex;
-  flex: 1;
+
+  > section {
+    @include from(lg) {
+      display: grid;
+      grid-template-columns: minmax(0, 4fr) minmax(0, 8fr);
+      column-gap: var(--ant-margin-xxl);
+      align-items: start;
+
+      > :first-child {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--ant-margin);
+        margin-bottom: 0;
+      }
+    }
+  }
+
+  // 할인 제목: AI 상담 띠와 같은 제목 글꼴·크기(띠마다 제목 크기를 맞춘다)
+  > section > :first-child :global(h3.ant-typography) {
+    @include display-heading;
+
+    font-size: var(--ant-font-size-heading-2);
+    line-height: var(--ant-line-height-heading-2);
+
+    @include from(md) {
+      font-size: var(--ant-font-size-heading-1);
+      line-height: var(--ant-line-height-heading-1);
+    }
+  }
 }

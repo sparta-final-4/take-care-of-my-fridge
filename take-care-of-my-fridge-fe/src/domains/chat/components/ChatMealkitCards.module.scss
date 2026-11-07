@@ -10,7 +10,8 @@
 
 .heading {
   font-size: var(--ant-font-size-sm);
-  color: var(--ant-color-primary);
+  font-weight: var(--ant-font-weight-strong);
+  color: var(--ant-color-text);
 }
 
 .list {
@@ -28,19 +29,21 @@
   gap: var(--ant-margin-xxs);
 }
 
-// 레시피 카드(흰 바탕·회색 테두리)와 구분되게 옅은 primary 바탕과 테두리
+// 레시피 카드(흰 바탕·회색 테두리)와 구분되게 옅은 종이색 칸 바탕(귤색 바탕·글자는 쓰지 않는다).
+// 마우스를 올리면 테두리가 잉크색으로 바뀐다.
 .card {
   position: relative;
-  border: 1px solid var(--ant-color-primary-border);
+  border: 1px solid transparent;
   border-radius: var(--ant-border-radius-lg);
-  background: var(--ant-color-primary-bg);
+  background: var(--ant-color-fill-tertiary);
+  transition: border-color var(--ant-motion-duration-fast);
 
   &:hover {
-    background: var(--ant-color-primary-bg-hover);
+    border-color: var(--ant-color-text);
   }
 
   &:has(.cardLink:focus-visible) {
-    outline: 2px solid var(--ant-color-primary);
+    outline: 2px solid var(--ant-color-primary-active);
     outline-offset: -2px;
   }
 }

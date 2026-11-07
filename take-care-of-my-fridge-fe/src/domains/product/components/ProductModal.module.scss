@@ -1,0 +1,183 @@
+@use '@/styles/variables' as *;
+@use '@/styles/mixins' as *;
+
+// 상품 정보 모달. 오른쪽 칸은 예전 카드 뒷면과 같은 모양(살구색 바탕, 크림색 안쪽 칸, 귤색 알약 담기 버튼, 선 없음).
+// 모바일: 사진 위, 정보 아래 / md부터 좌우 2단
+.layout {
+  display: grid;
+  gap: var(--ant-margin);
+
+  @include from(md) {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+    gap: var(--ant-margin-lg);
+    align-items: stretch;
+  }
+}
+
+// 사진 칸: 카드와 같은 모서리. 좁은 화면은 가로로 넓게 두어 정보 칸이 화면 안에 들어오게 한다.
+.media {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  background: var(--ant-color-fill-tertiary);
+  border-radius: $product-media-radius;
+
+  @include from(md) {
+    aspect-ratio: 4 / 5;
+  }
+}
+
+.image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.soldOutMark {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ant-color-white);
+  font-size: var(--ant-font-size-heading-4);
+  font-weight: var(--ant-font-weight-strong);
+  background: var(--ant-color-bg-mask);
+}
+
+// 정보 칸: 부드러운 살구색 바탕, 옅은 그림자
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ant-margin);
+  min-width: 0;
+  padding: $card-back-padding;
+  color: var(--ant-color-text);
+  background: $card-back-bg;
+  border-radius: $product-media-radius;
+  box-shadow: $product-media-shadow;
+}
+
+// [재료] [냉장 보관] [번개 드롭] 칩
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ant-margin-xxs);
+}
+
+.chip {
+  padding: 2px var(--ant-padding-sm);
+  font-size: $card-back-small-size;
+  font-weight: var(--ant-font-weight-strong);
+  white-space: nowrap;
+  background: $card-back-inner;
+  border-radius: $pill-radius;
+}
+
+.heading {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ant-margin-xxs);
+}
+
+.name {
+  margin: 0;
+  font-size: $product-modal-name-size;
+  font-weight: var(--ant-font-weight-strong);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.priceRow {
+  font-size: $product-card-name-size;
+  font-variant-numeric: tabular-nums;
+}
+
+.price {
+  font-size: $product-card-price-size;
+}
+
+// 상품 설명: 큰 글씨·넉넉한 줄 간격. 모달이라 줄 수를 자르지 않는다.
+.description {
+  flex: 1;
+  margin: 0;
+  font-size: $card-back-description-size-sm;
+  line-height: 1.65;
+  text-wrap: pretty;
+  overflow-wrap: anywhere;
+
+  @include from(md) {
+    font-size: $card-back-description-size;
+  }
+}
+
+// 정보 상자: 연한 크림색 둥근 칸 안에 [이름표 ……… 값] 줄(선 없음)
+.specs {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ant-margin-xxs);
+  margin: 0;
+  padding: var(--ant-padding-xs) var(--ant-padding-sm);
+  background: $card-back-inner;
+  border-radius: var(--ant-border-radius-lg);
+}
+
+.spec {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--ant-margin-xs);
+  font-size: $card-back-small-size;
+
+  dt {
+    color: var(--ant-color-text-secondary);
+    white-space: nowrap;
+  }
+
+  dd {
+    margin: 0;
+    font-weight: var(--ant-font-weight-strong);
+    text-align: right;
+  }
+}
+
+// 아래 버튼 줄: [− n +] [합계 담기]
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--ant-margin-xs);
+}
+
+// 둥근 수량 조절기
+.stepper {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  background: $card-back-inner;
+  border-radius: $pill-radius;
+}
+
+:global(.ant-btn).stepButton {
+  min-width: $touch-target-size;
+  min-height: $touch-target-size;
+  border-radius: $pill-radius;
+}
+
+.quantity {
+  min-width: 2ch;
+  font-size: $card-back-control-size;
+  font-weight: var(--ant-font-weight-strong);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+// 합계 담기: 남은 폭을 다 쓰는 귤색 알약 버튼, 숫자 자리 맞춤
+:global(.ant-btn).cartButton {
+  flex: 1;
+  min-width: 0;
+  min-height: $touch-target-size;
+  font-size: $card-back-control-size;
+  font-weight: var(--ant-font-weight-strong);
+  font-variant-numeric: tabular-nums;
+  border-radius: $pill-radius;
+}

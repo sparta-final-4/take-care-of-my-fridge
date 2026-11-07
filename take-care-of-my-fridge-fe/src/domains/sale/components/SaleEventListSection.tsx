@@ -6,7 +6,6 @@ import {
   DatePicker,
   Drawer,
   Flex,
-  Grid,
   Input,
   Result,
   Select,
@@ -24,6 +23,7 @@ import { generatePath, Link, useSearchParams } from 'react-router';
 import { ROUTES } from '@/app/paths';
 import type { SaleEventListRequest, SaleEventListResponse } from '@/common/api/clients';
 import { getErrorMessage } from '@/common/api/errors';
+import { useScreens } from '@/common/hooks/useScreens';
 import { formatPrice } from '@/domains/cart/format';
 import { deleteSaleEvent, endSaleEvent } from '@/domains/sale/api';
 import { SaleEventEditPanel } from '@/domains/sale/components/SaleEventEditPanel';
@@ -138,7 +138,7 @@ export function SaleEventListSection() {
   // 행 아래로 펼친 수정 칸의 행 키. 한 번에 하나만 펼친다.
   const [editing, setEditing] = useState<{ key: string; saleEventId: number } | null>(null);
   // 좁은 화면은 표가 가로로 스크롤돼 행 아래 칸이 한 화면에 들어오지 않아, 아래에서 올라오는 패널로 연다.
-  const narrow = !Grid.useBreakpoint().xl;
+  const narrow = !useScreens().xl;
   const statusParam = searchParams.get('status');
   const typeParam = searchParams.get('kind');
   const status = isStatus(statusParam) ? statusParam : undefined;

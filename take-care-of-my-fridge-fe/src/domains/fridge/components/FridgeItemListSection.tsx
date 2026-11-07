@@ -1,9 +1,8 @@
 import { CheckOutlined } from '@ant-design/icons';
 import { App, Button, Empty, Flex, Result, Segmented, Select, Skeleton, Typography } from 'antd';
-import { useState } from 'react';
-import { useLocation, useNavigate, useSearchParams } from 'react-router';
+import { useCallback, useState } from 'react';
+import { useLocation, useSearchParams } from 'react-router';
 
-import { ROUTES } from '@/app/paths';
 import { SectionCard } from '@/common/components/SectionCard';
 import { useChatModalStore } from '@/domains/chat/model/useChatModalStore';
 import { toChatSelectedIngredients } from '@/domains/chat/selectedIngredients';
@@ -14,9 +13,12 @@ import { STORAGE_LABELS } from '../format';
 import { useFridgeSort } from '../hooks/useFridgeSort';
 import { readNewFridgeIds } from '../newItems';
 import { useFridgeItems, useRemoveFridgeItem, useTakeOutFridgeItem } from '../queries';
+import { scrollToIngredientInput } from '../sectionIds';
 import { FridgeItemConsumeModal } from './FridgeItemConsumeModal';
 import { FridgeItemEditModal } from './FridgeItemEditModal';
+import { FridgeIllustration } from './FridgeIllustration';
 import { FridgeItemRow } from './FridgeItemRow';
+import { StorageIcon } from './StorageIcon';
 import styles from './FridgeItemListSection.module.scss';
 
 const TAB_LABELS: Record<FridgeTab, string> = {
@@ -53,7 +55,6 @@ const EXPIRATION_GROUPS: Array<{ label: string; match: (item: FridgeItemResponse
 export function FridgeItemListSection() {
   const openChat = useChatModalStore((state) => state.openChat);
   const { message } = App.useApp();
-  const navigate = useNavigate();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const [sort, setSort] = useFridgeSort();
@@ -68,7 +69,7 @@ export function FridgeItemListSection() {
   // 기존 링크가 그대로 열리도록 키는 storage로 두고 밀키트·기본 양념 탭 값만 더했다.
   const storageParam = searchParams.get('storage');
   const storage: FridgeTab = isFridgeTab(storageParam) ? storageParam : 'ALL';
-  // 메인에서 등록하고 넘어왔을 때만 있다. 정렬·탭을 바꾸면 state 없이 이동해 사라진다.
+  // 위 재료 입력에서 방금 등록했을 때만 있다. 정렬·탭을 바꾸면 state 없이 이동해 사라진다.
   const newFridgeIds = readNewFridgeIds(location.state);
 
   const handleStorageChange = (next: FridgeTab) => {
@@ -82,46 +83,52 @@ export function FridgeItemListSection() {
     );
   };
 
-  const handleCheck = (fridgeId: number, checked: boolean) => {
+  // 재료 칸(memo)에 넘기는 함수는 매번 새로 만들지 않고 고정한다(useCallback). 동작은 그대로다.
+  const handleCheck = useCallback((fridgeId: number, checked: boolean) => {
     setCheckedIds((ids) => (checked ? [...ids, fridgeId] : ids.filter((id) => id !== fridgeId)));
-  };
+  }, []);
 
   // 여러 재료를 연달아 처리할 수 있어 진행 중인 id를 모두 기록한다.
   // mutate의 콜백은 마지막 호출에만 실행되므로 호출마다 결과를 받는 mutateAsync를 쓴다.
-  const removeRow = async (
-    fridgeId: number,
-    request: Promise<unknown>,
-    successMessage: string,
-  ): Promise<void> => {
-    setRemovingIds((ids) => [...ids, fridgeId]);
-    try {
-      await request;
-      setCheckedIds((ids) => ids.filter((id) => id !== fridgeId));
-      void message.success(successMessage);
-    } catch {
-      // 실패 알림은 MutationCache.onError가 띄운다.
-    } finally {
-      setRemovingIds((ids) => ids.filter((id) => id !== fridgeId));
-    }
-  };
+  const removeRow = useCallback(
+    async (fridgeId: number, request: Promise<unknown>, successMessage: string): Promise<void> => {
+      setRemovingIds((ids) => [...ids, fridgeId]);
+      try {
+        await request;
+        setCheckedIds((ids) => ids.filter((id) => id !== fridgeId));
+        void message.success(successMessage);
+      } catch {
+        // 실패 알림은 MutationCache.onError가 띄운다.
+      } finally {
+        setRemovingIds((ids) => ids.filter((id) => id !== fridgeId));
+      }
+    },
+    [message],
+  );
 
-  const handleDiscard = (fridgeId: number) =>
-    removeRow(
-      fridgeId,
-      // quantity를 빼고 보내면 남은 양 전부를 뺀다.
-      takeOutMutation.mutateAsync({ fridgeId, request: { action: 'DISCARDED' } }),
-      '버렸어요',
-    );
+  // mutateAsync는 TanStack Query가 같은 함수를 계속 돌려준다.
+  const takeOut = takeOutMutation.mutateAsync;
+  const remove = removeMutation.mutateAsync;
 
-  const handleDelete = (fridgeId: number) =>
-    removeRow(
-      fridgeId,
-      removeMutation.mutateAsync({ fridgeId, reason: 'WRONG_ENTRY' }),
-      '재료를 삭제했습니다.',
-    );
+  const handleDiscard = useCallback(
+    (fridgeId: number) =>
+      removeRow(
+        fridgeId,
+        // quantity를 빼고 보내면 남은 양 전부를 뺀다.
+        takeOut({ fridgeId, request: { action: 'DISCARDED' } }),
+        '버렸어요',
+      ),
+    [removeRow, takeOut],
+  );
+
+  const handleDelete = useCallback(
+    (fridgeId: number) =>
+      removeRow(fridgeId, remove({ fridgeId, reason: 'WRONG_ENTRY' }), '재료를 삭제했습니다.'),
+    [removeRow, remove],
+  );
 
   const renderRows = (items: FridgeItemResponse[]) => (
-    <div>
+    <div className={styles.rows}>
       {items.map((item) => {
         const fridgeId = item.id ?? 0;
         return (
@@ -131,11 +138,11 @@ export function FridgeItemListSection() {
             checked={checkedIds.includes(fridgeId)}
             removing={removingIds.includes(fridgeId)}
             highlighted={newFridgeIds.includes(fridgeId)}
-            onCheck={(checked) => handleCheck(fridgeId, checked)}
-            onEdit={() => setEditingItem(item)}
-            onConsume={() => setConsumingItem(item)}
-            onDiscard={() => handleDiscard(fridgeId)}
-            onDelete={() => handleDelete(fridgeId)}
+            onCheck={handleCheck}
+            onEdit={setEditingItem}
+            onConsume={setConsumingItem}
+            onDiscard={handleDiscard}
+            onDelete={handleDelete}
           />
         );
       })}
@@ -155,11 +162,14 @@ export function FridgeItemListSection() {
     }
     if (data.length === 0) {
       return (
-        <Empty description="냉장고가 비어 있어요">
+        <Empty
+          image={<FridgeIllustration mood="empty" className={styles.emptyIllustration} />}
+          description="냉장고가 비어 있어요"
+        >
           <Typography.Paragraph type="secondary">
-            메인 화면의 [냉장고에 뭐가 남았나요?]에서 재료를 추가해 보세요.
+            위쪽 [냉장고에 뭐가 남았나요?]에서 재료를 추가해 보세요.
           </Typography.Paragraph>
-          <Button onClick={() => navigate(ROUTES.home)}>재료 추가하러 가기</Button>
+          <Button onClick={scrollToIngredientInput}>재료 추가하러 가기</Button>
         </Empty>
       );
     }
@@ -173,16 +183,16 @@ export function FridgeItemListSection() {
     if (sort !== 'EXPIRATION') return renderRows(visibleItems);
 
     return (
-      <Flex vertical gap="middle">
+      <Flex vertical gap="large">
         {EXPIRATION_GROUPS.map((group) => {
           const groupItems = visibleItems.filter(group.match);
           if (groupItems.length === 0) return null;
           return (
-            <section key={group.label} aria-label={group.label}>
-              <Typography.Text strong className={styles.groupTitle}>
-                {group.label}{' '}
-                <Typography.Text type="secondary">{groupItems.length}</Typography.Text>
-              </Typography.Text>
+            <section key={group.label} aria-label={group.label} className={styles.group}>
+              <div className={styles.groupHead}>
+                <span className={styles.groupTitle}>{group.label}</span>
+                <span className={styles.groupCount}>{groupItems.length}</span>
+              </div>
               {renderRows(groupItems)}
             </section>
           );
@@ -196,28 +206,36 @@ export function FridgeItemListSection() {
   const checkedItems = data?.filter((item) => checkedIds.includes(item.id ?? 0)) ?? [];
 
   return (
-    <SectionCard
-      title="재료 목록"
-      extra={
-        <Select
-          value={sort}
-          onChange={setSort}
-          options={SORT_OPTIONS}
-          aria-label="정렬"
-          className={styles.sortSelect}
-        />
-      }
-    >
+    <SectionCard title="재료 목록">
       <Flex vertical gap="middle" className={styles.container}>
-        <Segmented<FridgeTab>
-          value={storage}
-          onChange={handleStorageChange}
-          options={FRIDGE_TABS.map((tab) => ({
-            value: tab,
-            label: `${TAB_LABELS[tab]} ${countOf(tab)}`,
-          }))}
-          className={styles.storageTabs}
-        />
+        {/* 도구 줄: 보관 탭 + 정렬. 목록이 길어 스크롤해도 상단바 바로 아래에 붙어 있다. */}
+        <div className={styles.toolbar}>
+          <Segmented<FridgeTab>
+            value={storage}
+            onChange={handleStorageChange}
+            options={FRIDGE_TABS.map((tab) => ({
+              value: tab,
+              // 보관 탭(냉장·냉동·상온)은 앞에 작은 아이콘
+              label:
+                tab === 'REFRIGERATED' || tab === 'FROZEN' || tab === 'ROOM_TEMP' ? (
+                  <span className={styles.tabLabel}>
+                    <StorageIcon storage={tab} />
+                    {`${TAB_LABELS[tab]} ${countOf(tab)}`}
+                  </span>
+                ) : (
+                  `${TAB_LABELS[tab]} ${countOf(tab)}`
+                ),
+            }))}
+            className={styles.storageTabs}
+          />
+          <Select
+            value={sort}
+            onChange={setSort}
+            options={SORT_OPTIONS}
+            aria-label="정렬"
+            className={styles.sortSelect}
+          />
+        </div>
 
         {renderBody()}
 

@@ -1,11 +1,36 @@
 @use '@/styles/variables' as *;
+@use '@/styles/mixins' as *;
 
+// 목록 칸 폭을 기준으로 재료를 한 줄 / 두 줄로 놓는다(container: fridge-list).
 .container {
   height: 100%;
+  container: fridge-list / inline-size;
+}
+
+// 도구 줄: [보관 탭 ……] [정렬]. 스크롤해도 상단바 바로 아래에 붙고, 위아래 얇은 선(재료/밀키트 도구 줄과 같은 모양).
+.toolbar {
+  position: sticky;
+  top: $header-height;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ant-margin-xs) var(--ant-margin);
+  padding-block: var(--ant-padding-xs);
+  background: var(--ant-color-bg-layout);
+  border-block: 1px solid var(--ant-color-border-secondary);
 }
 
 .sortSelect {
   min-width: $fridge-sort-select-min-width;
+}
+
+// 보관 탭 글자 앞 아이콘
+.tabLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ant-margin-xxs);
 }
 
 // 탭이 많아 좁은 화면에서는 가로로 스크롤한다(페이지 전체 가로 스크롤 방지).
@@ -14,16 +39,59 @@
   overflow-x: auto;
 }
 
-.groupTitle {
-  display: block;
+// 임박순 묶음: 위에 여백과 선, [묶음 이름][개수 알약] 머리
+.group {
+  & + & {
+    padding-top: var(--ant-padding);
+    border-top: 1px solid var(--ant-color-border-secondary);
+  }
+}
+
+.groupHead {
+  display: flex;
+  align-items: center;
+  gap: var(--ant-margin-xs);
   margin-bottom: var(--ant-margin-xs);
 }
 
+.groupTitle {
+  font-size: var(--ant-font-size-lg);
+  font-weight: var(--ant-font-weight-strong);
+}
+
+.groupCount {
+  min-width: 2.25em;
+  padding: 0 var(--ant-padding-xs);
+  font-size: var(--ant-font-size-sm);
+  font-weight: var(--ant-font-weight-strong);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  background: var(--ant-color-fill-tertiary);
+  border-radius: $pill-radius;
+}
+
+// 재료 칸 그리드: 칸 폭이 200px 이상이 되도록 한 줄에 들어가는 만큼 놓는다(휴대폰 2칸, 넓은 화면 4~5칸).
+.rows {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--ant-margin-sm);
+
+  @container fridge-list (min-width: #{$fridge-tile-min-width * 3}) {
+    grid-template-columns: repeat(auto-fill, minmax($fridge-tile-min-width, 1fr));
+    gap: var(--ant-margin);
+  }
+}
+
+// 선택 막대: 재료가 많아도 화면 아래쪽에 붙어 보인다.
 .selectionBar {
+  position: sticky;
+  bottom: var(--ant-margin);
+  z-index: 5;
   margin-top: auto;
   padding: var(--ant-padding-sm) var(--ant-padding);
   background: var(--ant-color-text);
-  border-radius: var(--ant-border-radius);
+  border-radius: var(--ant-border-radius-lg);
+  box-shadow: $product-media-shadow;
 }
 
 .selectionText {
@@ -36,4 +104,11 @@
 
 .selectionButton {
   flex-shrink: 0;
+}
+
+// 냉장고가 비어 있을 때: 기본 빈 상자 그림 대신 입을 동그랗게 벌린 냉장고 일러스트
+.emptyIllustration {
+  width: $fridge-illustration-empty-size;
+  height: auto;
+  margin-inline: auto;
 }
