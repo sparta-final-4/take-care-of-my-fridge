@@ -45,7 +45,7 @@ class RecipeDocumentReaderTest extends MySqlContainerSupport {
     static class EmbeddingDisabled {
         @Bean
         ChatCandidateProperties chatCandidateProperties() {
-            return new ChatCandidateProperties(List.of(), 0.4, List.of("청양고추"), List.of(), List.of("홍고추"));
+            return new ChatCandidateProperties(List.of(), 0.4, List.of("청양고추"), List.of(), List.of("홍고추"), List.of());
         }
 
         @Bean

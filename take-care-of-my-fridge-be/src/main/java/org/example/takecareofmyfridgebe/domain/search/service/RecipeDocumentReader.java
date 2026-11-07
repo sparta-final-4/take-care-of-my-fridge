@@ -198,7 +198,8 @@ public class RecipeDocumentReader implements EsDocumentReader {
             return RecipeSpicyLevel.HOT;
         }
         List<String> mild = spicyProperties.mildSpicyIngredients();
-        if (!SpicyRecipeDetector.spicyRecipeIds(textsById, mild, spicyProperties.spicyExclusions()).isEmpty()) {
+        List<String> mildExact = spicyProperties.mildSpicyExactIngredients();
+        if (!SpicyRecipeDetector.spicyRecipeIds(textsById, mild, mildExact, spicyProperties.spicyExclusions()).isEmpty()) {
             return RecipeSpicyLevel.MILD;
         }
         return RecipeSpicyLevel.NONE;
