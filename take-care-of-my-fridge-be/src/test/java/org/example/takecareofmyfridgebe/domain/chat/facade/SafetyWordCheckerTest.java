@@ -11,7 +11,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class SafetyWordCheckerTest {
 
-    // application.yml app.chat.safety-words와 같은 목록
+    // config/chat-safety.yml app.chat.safety-words와 같은 목록
     static final ChatSafetyWordProperties WORDS = new ChatSafetyWordProperties(
             List.of("씨발", "시발", "씨바", "ㅅㅂ", "ㅆㅂ", "개새끼", "개새기", "병신", "ㅂㅅ", "좆", "존나", "ㅈㄴ",
                     "미친놈", "미친년", "닥쳐", "폭탄", "마약", "필로폰", "대마초", "살인", "사람죽이", "독극물", "독약", "총기", "해킹"),
