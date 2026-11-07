@@ -1,0 +1,21 @@
+@use '@/styles/variables' as *;
+@use './auth' as *;
+
+.container {
+  @include auth-column($auth-signup-max-width);
+}
+
+// 가입 완료 안내: 제목은 로그인·회원가입과 같은 제목용 글꼴, 설명은 한 단계 큰 보조 글자.
+.result {
+  padding: 0;
+
+  :global(.ant-result-title) {
+    @include auth-title;
+  }
+
+  :global(.ant-result-subtitle) {
+    font-size: var(--ant-font-size-lg);
+    color: var(--ant-color-text-secondary);
+    text-wrap: pretty;
+  }
+}

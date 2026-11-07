@@ -1,14 +1,14 @@
 @use '@/styles/variables' as *;
 
+// 섹션을 상자로 감싸지 않는다. 위에 잉크색 선 한 줄, 그 아래 제목 줄과 내용. 섹션 사이는 여백으로 나눈다.
 .card {
   display: flex;
   flex-direction: column;
   width: 100%;
   height: 100%;
-  padding: var(--ant-padding-lg);
-  background: var(--ant-color-bg-container);
-  border: 1px solid var(--ant-color-border);
-  border-radius: var(--ant-border-radius-lg);
+  min-width: 0;
+  padding-top: var(--ant-padding-sm);
+  border-top: 1px solid var(--ant-color-text);
   // 스크롤로 이동했을 때 고정 헤더에 가리지 않게 한다.
   scroll-margin-top: calc(#{$header-height} + var(--ant-margin));
 }
@@ -16,19 +16,29 @@
 .header {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
+  align-items: baseline;
   justify-content: space-between;
-  gap: var(--ant-margin-xs);
-  margin-bottom: var(--ant-margin);
+  gap: var(--ant-margin-xs) var(--ant-margin);
+  margin-bottom: var(--ant-margin-lg);
 }
 
 .title {
-  font-size: var(--ant-font-size-lg);
+  min-width: 0;
+  font-size: var(--ant-font-size-heading-4);
+  font-weight: var(--ant-font-weight-strong);
+  line-height: var(--ant-line-height-heading-4);
+  letter-spacing: $heading-tracking;
+  text-wrap: balance;
+  overflow-wrap: break-word;
 }
 
 // 크기·굵기는 Title level 3을 따르고, 머리 줄 간격은 .header가 정한다.
 :global(.ant-typography).pageTitle {
+  min-width: 0;
   margin: 0;
+  letter-spacing: $heading-tracking;
+  text-wrap: balance;
+  overflow-wrap: break-word;
 }
 
 .extra {
@@ -38,4 +48,5 @@
 
 .body {
   flex: 1;
+  min-width: 0;
 }

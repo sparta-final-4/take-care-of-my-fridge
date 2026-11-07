@@ -7,6 +7,7 @@ import { Link } from 'react-router';
 import { ROUTES } from '@/app/paths';
 import { SectionCard } from '@/common/components/SectionCard';
 import { SectionLoading } from '@/common/components/SectionLoading';
+import { useScreens } from '@/common/hooks/useScreens';
 import { RecipeCard } from '@/domains/recipe/components/RecipeCard';
 import { COOK_TIME_OPTIONS } from '@/domains/recipe/format';
 import { recipeQueries } from '@/domains/recipe/queries';
@@ -21,6 +22,9 @@ import {
 } from '@/domains/search/hooks/useSearchKeyword';
 
 export function SearchRecipeSection() {
+  // 한 줄 카드 수: 휴대폰 2 / md 3 / lg 4. 마우스를 쓰는 PC는 창을 줄여도 4개(useScreens).
+  const screens = useScreens();
+  const cardSpan = screens.lg ? 6 : screens.md ? 8 : 12;
   const {
     keyword,
     page,
@@ -122,9 +126,7 @@ export function SearchRecipeSection() {
                 {recipes.map((recipe) => (
                   <Col
                     key={recipe.recipeId}
-                    xs={12}
-                    md={8}
-                    lg={6}
+                    span={cardSpan}
                     onClick={
                       recipe.recipeId === undefined ? undefined : handleClickRecipe(recipe.recipeId)
                     }

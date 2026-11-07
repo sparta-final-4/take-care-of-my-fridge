@@ -1,6 +1,6 @@
 import { CheckCircleOutlined, DeleteOutlined, MoreOutlined } from '@ant-design/icons';
 import { Button, Checkbox, Dropdown, Flex, Popconfirm, Tag, Tooltip, Typography } from 'antd';
-import { useState } from 'react';
+import { memo, useState } from 'react';
 
 import type { FridgeItemResponse } from '../api';
 import { formatQuantity, STORAGE_LABELS, withObjectParticle } from '../format';
@@ -12,16 +12,18 @@ interface FridgeItemRowProps {
   item: FridgeItemResponse;
   checked: boolean;
   removing: boolean;
-  // 메인에서 방금 등록한 재료
+  // 위 재료 입력에서 방금 등록한 재료
   highlighted: boolean;
-  onCheck: (checked: boolean) => void;
-  onEdit: () => void;
-  onConsume: () => void;
-  onDiscard: () => Promise<void>;
-  onDelete: () => Promise<void>;
+  // 목록이 길어도 바뀐 칸만 다시 그리도록(memo) 부모는 매번 같은 함수를 넘기고, 칸이 자기 재료 id·재료를 넣어 부른다.
+  onCheck: (fridgeId: number, checked: boolean) => void;
+  onEdit: (item: FridgeItemResponse) => void;
+  onConsume: (item: FridgeItemResponse) => void;
+  onDiscard: (fridgeId: number) => Promise<void>;
+  onDelete: (fridgeId: number) => Promise<void>;
 }
 
-export function FridgeItemRow({
+// 바뀐 칸만 다시 그린다: 체크·삭제 중 표시가 바뀐 칸과 데이터가 바뀐 칸만. 나머지 칸은 그대로 둔다.
+export const FridgeItemRow = memo(function FridgeItemRow({
   item,
   checked,
   removing,
@@ -33,15 +35,31 @@ export function FridgeItemRow({
   onDelete,
 }: FridgeItemRowProps) {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const fridgeId = item.id ?? 0;
 
+  // 신선도: 기한 지남은 옅은 빨강, 임박은 옅은 노랑 바탕(서버가 준 status 그대로).
+  const freshnessClass =
+    item.status === 'EXPIRED' ? styles.expired : item.status === 'IMMINENT' ? styles.imminent : '';
+  const tileClassName = [styles.row, freshnessClass, highlighted && styles.highlighted]
+    .filter(Boolean)
+    .join(' ');
+
+  // 재료 칸(카드): [체크 · D-day] → [이름 · 종류·NEW 태그] → [수량 · 보관] → [먹었어요 · 버렸어요 · 더보기]
   return (
-    <div className={highlighted ? `${styles.row} ${styles.highlighted}` : styles.row}>
-      <Checkbox
-        checked={checked}
-        onChange={(event) => onCheck(event.target.checked)}
-        aria-label={`${item.rawName} 선택`}
-        className={styles.check}
-      />
+    <div className={tileClassName}>
+      <div className={styles.top}>
+        <Checkbox
+          checked={checked}
+          onChange={(event) => onCheck(fridgeId, event.target.checked)}
+          aria-label={`${item.rawName} 선택`}
+          className={styles.check}
+        />
+        <div className={styles.badge}>
+          {item.dDay !== undefined && (
+            <DdayTag dDay={item.dDay} expirationDate={item.expirationDate} />
+          )}
+        </div>
+      </div>
       <div className={styles.nameWrapper}>
         <Typography.Text title={item.rawName} className={styles.name}>
           {item.rawName}
@@ -53,14 +71,11 @@ export function FridgeItemRow({
           </Tag>
         )}
       </div>
-      <Typography.Text className={styles.quantity}>{formatQuantity(item)}</Typography.Text>
-      <Typography.Text type="secondary" className={styles.storage}>
-        {item.storage && STORAGE_LABELS[item.storage]}
-      </Typography.Text>
-      <div className={styles.badge}>
-        {item.dDay !== undefined && (
-          <DdayTag dDay={item.dDay} expirationDate={item.expirationDate} />
-        )}
+      <div className={styles.meta}>
+        <Typography.Text className={styles.quantity}>{formatQuantity(item)}</Typography.Text>
+        <Typography.Text type="secondary" className={styles.storage}>
+          {item.storage && STORAGE_LABELS[item.storage]}
+        </Typography.Text>
       </div>
       <Flex className={styles.actions}>
         <Tooltip title="먹었어요">
@@ -68,7 +83,7 @@ export function FridgeItemRow({
             type="text"
             icon={<CheckCircleOutlined />}
             aria-label={`${item.rawName} 먹었어요`}
-            onClick={onConsume}
+            onClick={() => onConsume(item)}
             disabled={removing}
             className={styles.iconButton}
           />
@@ -80,7 +95,7 @@ export function FridgeItemRow({
           cancelText="취소"
           okButtonProps={{ loading: removing, disabled: removing }}
           cancelButtonProps={{ disabled: removing }}
-          onConfirm={onDiscard}
+          onConfirm={() => onDiscard(fridgeId)}
         >
           <Tooltip title="버렸어요">
             <Button
@@ -108,7 +123,7 @@ export function FridgeItemRow({
           onConfirm={async () => {
             // 삭제가 실패해 예외가 나도 확인창이 열린 채 남지 않게 닫는다.
             try {
-              await onDelete();
+              await onDelete(fridgeId);
             } finally {
               setDeleteConfirmOpen(false);
             }
@@ -123,7 +138,7 @@ export function FridgeItemRow({
                 { key: 'delete', label: '삭제', danger: true },
               ],
               onClick: ({ key }) => {
-                if (key === 'edit') onEdit();
+                if (key === 'edit') onEdit(item);
                 if (key === 'delete') setDeleteConfirmOpen(true);
               },
             }}
@@ -140,4 +155,4 @@ export function FridgeItemRow({
       </Flex>
     </div>
   );
-}
+});

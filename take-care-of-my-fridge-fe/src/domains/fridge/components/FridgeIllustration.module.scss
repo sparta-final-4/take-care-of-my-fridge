@@ -1,0 +1,55 @@
+// 냉장고 일러스트 색: 모두 사이트 토큰(잉크·종이·귤색)에서 가져온다.
+.svg {
+  display: block;
+  flex-shrink: 0;
+  overflow: visible;
+}
+
+.body {
+  fill: var(--ant-color-bg-container);
+  stroke: var(--ant-color-text);
+  stroke-width: 3;
+}
+
+.line {
+  fill: none;
+  stroke: var(--ant-color-text);
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+.ink {
+  fill: var(--ant-color-text);
+}
+
+.mouth {
+  fill: var(--ant-color-text);
+}
+
+.note {
+  fill: var(--ant-color-fill-tertiary);
+  stroke: var(--ant-color-text);
+  stroke-width: 1.5;
+}
+
+.noteLine {
+  stroke: var(--ant-color-text-tertiary);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+}
+
+.accent {
+  fill: var(--ant-color-primary);
+}
+
+// 볼터치: 귤색을 옅게
+.blush {
+  fill: color-mix(in srgb, var(--ant-color-primary) 35%, transparent);
+}
+
+// 땀방울: 잉크 선, 옅은 종이색 안쪽
+.sweat {
+  fill: var(--ant-color-bg-layout);
+  stroke: var(--ant-color-text);
+  stroke-width: 2;
+}

@@ -1,4 +1,6 @@
+// 장바구니 목록(CartSection)은 이 칸의 폭을 기준으로 배치한다(헤더 장바구니 서랍과 같은 기준).
 .page {
+  container: cart / inline-size;
   display: flex;
   flex-direction: column;
   gap: var(--ant-margin-lg);

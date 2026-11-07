@@ -1,5 +1,5 @@
 @use '@/styles/variables' as *;
-@use '@/styles/mixins' as *;
+// 배치는 화면 폭이 아니라 감싼 칸(container: cart — 장바구니 화면, 헤더 장바구니 서랍)의 폭을 기준으로 바뀐다.
 
 // 모바일: 체크·이미지·상품 정보 / 수량·금액·삭제 2줄, md부터 한 줄
 .row {
@@ -13,7 +13,7 @@
   padding: var(--ant-padding) 0;
   border-bottom: 1px solid var(--ant-color-border-secondary);
 
-  @include from(md) {
+  @container cart (min-width: #{$cart-container-md}) {
     grid-template-areas: 'check thumb info quantity total remove';
     grid-template-columns: auto auto minmax(0, 1fr) auto $cart-total-min-width auto;
   }
@@ -107,7 +107,7 @@
     content: '';
   }
 
-  @include from(md) {
+  @container cart (min-width: #{$cart-container-md}) {
     &::after {
       content: none;
     }
@@ -130,7 +130,7 @@
   min-width: $touch-target-size;
   min-height: $touch-target-size;
 
-  @include from(md) {
+  @container cart (min-width: #{$cart-container-md}) {
     min-width: 0;
     min-height: 0;
   }

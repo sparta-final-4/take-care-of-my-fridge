@@ -1,21 +1,22 @@
+// 상자 없이 한 줄. 아래 얇은 선으로만 본문과 나눈다.
 .bar {
   display: flex;
   align-items: center;
   gap: var(--ant-margin);
-  padding: var(--ant-padding-sm) var(--ant-padding-lg);
-  background: var(--ant-color-bg-container);
-  border: 1px solid var(--ant-color-border-secondary);
-  border-radius: var(--ant-border-radius-lg);
+  min-width: 0;
+  padding-bottom: var(--ant-padding-sm);
+  border-bottom: 1px solid var(--ant-color-border-secondary);
 }
 
 .label {
   flex-shrink: 0;
+  font-size: var(--ant-font-size-sm);
 }
 
 // 데스크톱 폭에서 10개가 한 줄에 들어가게 간격을 좁게 둔다. 좁은 화면에서는 옆으로 넘겨 본다.
 .list {
   display: flex;
-  gap: var(--ant-margin-xs);
+  gap: var(--ant-margin-xxs);
   min-width: 0;
   margin: 0;
   padding: 0;
@@ -28,29 +29,32 @@
   display: inline-flex;
   align-items: center;
   gap: var(--ant-margin-xxs);
-  padding: var(--ant-padding-xxs) var(--ant-padding-xs);
+  min-height: var(--ant-control-height-sm);
+  padding: 0 var(--ant-padding-xs);
   color: inherit;
   white-space: nowrap;
   text-decoration: none;
-  border-radius: var(--ant-border-radius);
-  transition: background-color var(--ant-motion-duration-mid);
+  border-radius: var(--ant-border-radius-sm);
+  transition: background-color var(--ant-motion-duration-fast);
 
   &:hover {
     color: inherit;
-    background-color: var(--ant-color-fill-quaternary);
+    background-color: var(--ant-color-fill-tertiary);
   }
 
   &:focus-visible {
-    outline: 2px solid var(--ant-color-primary);
+    outline: 2px solid var(--ant-color-primary-active);
     outline-offset: -2px;
   }
 }
 
 .rank {
+  font-variant-numeric: tabular-nums;
   font-weight: var(--ant-font-weight-strong);
   color: var(--ant-color-text-tertiary);
 
+  // 1~3위는 잉크색으로 진하게(귤색은 글자에 쓰지 않는다).
   &.topRank {
-    color: var(--ant-color-primary);
+    color: var(--ant-color-text);
   }
 }

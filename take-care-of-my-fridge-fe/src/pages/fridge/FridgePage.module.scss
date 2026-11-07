@@ -1,21 +1,22 @@
+/* Hallmark · waive 80 · drawn fridge mascot beside the title and in the empty state · the user asked for a cute fridge picture on this screen and there is no photograph of the service */
 @use '@/styles/variables' as *;
 @use '@/styles/mixins' as *;
 
 .page {
   display: flex;
   flex-direction: column;
-  gap: var(--ant-margin-lg);
+  gap: var(--ant-margin-xl);
 }
 
-// MainPage와 같은 좌우 비율
+// lg 이상: 재료 목록(남는 폭 전부) | 오른쪽 칸(380px). 좁은 화면은 위아래로.
 .row {
   display: grid;
-  grid-template-columns: 1fr;
-  gap: var(--ant-margin-lg);
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--ant-margin-xl);
   align-items: start;
 
   @include from(lg) {
-    grid-template-columns: minmax(0, 780fr) minmax(0, 416fr);
+    grid-template-columns: minmax(0, 1fr) $fridge-aside-width;
   }
 }
 
@@ -24,9 +25,18 @@
   min-width: 0;
 }
 
-.rightStack {
+// 오른쪽 칸: 재료 목록이 길어 스크롤해도 상단바 아래에 붙어 따라온다. 칸 안 내용이 화면보다 길면 칸만 스크롤.
+.aside {
   display: flex;
   flex-direction: column;
-  gap: var(--ant-margin-lg);
+  gap: var(--ant-margin-xl);
   min-width: 0;
+
+  @include from(lg) {
+    position: sticky;
+    top: calc(#{$header-height} + var(--ant-margin-lg));
+    max-height: calc(100vh - #{$header-height} - var(--ant-margin-lg) * 2);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
 }

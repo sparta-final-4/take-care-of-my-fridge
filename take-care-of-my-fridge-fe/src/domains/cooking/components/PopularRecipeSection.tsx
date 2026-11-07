@@ -1,4 +1,4 @@
-import { StarFilled } from '@ant-design/icons';
+import { MessageOutlined, StarFilled } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
 import { Button, Skeleton, Typography } from 'antd';
 import { generatePath, Link } from 'react-router';
@@ -23,6 +23,7 @@ export function PopularRecipeSection() {
   return (
     <SectionCard
       title="이번 달 많이 만든 레시피"
+      bracket={false}
       extra={
         <Link to={ROUTES.recipes} className={styles.moreLink}>
           레시피 더 보기 &gt;
@@ -117,7 +118,8 @@ export function PopularRecipeSection() {
 
                   {recipe.tipSummary && (
                     <div className={styles.tipSummary} title={recipe.tipSummary}>
-                      💬 {recipe.tipSummary}
+                      <MessageOutlined aria-hidden className={styles.tipIcon} />
+                      {recipe.tipSummary}
                     </div>
                   )}
                 </div>

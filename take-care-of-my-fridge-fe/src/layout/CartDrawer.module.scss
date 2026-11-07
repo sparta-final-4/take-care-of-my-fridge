@@ -1,0 +1,33 @@
+@use '@/styles/variables' as *;
+@use '@/styles/mixins' as *;
+
+// 레퍼런스 장바구니 서랍 치수: 머리 줄 위아래 18px·좌우 32px(아래 선), 본문 좌우 32px. 바탕은 본문과 같은 종이색.
+.section {
+  background: var(--ant-color-bg-layout);
+}
+
+.header {
+  padding: $cart-drawer-header-padding-block $cart-drawer-padding-inline;
+  border-bottom: 1px solid var(--ant-color-border-secondary);
+}
+
+.title {
+  font-family: $font-display;
+  font-size: var(--ant-font-size-heading-4);
+  font-weight: 400;
+  letter-spacing: $display-tracking;
+}
+
+.body {
+  padding: 0 $cart-drawer-padding-inline $cart-drawer-padding-inline;
+}
+
+// 안의 장바구니 목록은 이 칸의 폭을 기준으로 배치한다(좁은 서랍에서는 한 줄 배치).
+.cart {
+  container: cart / inline-size;
+}
+
+.signedOut {
+  padding-block: $main-section-gap;
+  text-align: center;
+}

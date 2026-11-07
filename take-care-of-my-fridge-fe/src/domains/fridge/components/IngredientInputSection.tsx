@@ -14,6 +14,7 @@ import { STORAGE_LABELS } from '../format';
 import { MOCK_QUICK_CHIPS } from '../mocks';
 import { getNewItemsView, type NewFridgeItemsState } from '../newItems';
 import { useCreateFridgeItems } from '../queries';
+import { INGREDIENT_INPUT_SECTION_ID } from '../sectionIds';
 import styles from './IngredientInputSection.module.scss';
 
 // FridgeItemCreateRequest.java의 @Size 제한
@@ -117,9 +118,10 @@ export function IngredientInputSection() {
   };
 
   return (
-    <SectionCard title="냉장고에 뭐가 남았나요?">
+    <SectionCard id={INGREDIENT_INPUT_SECTION_ID} title="냉장고에 뭐가 남았나요?" bracket={false}>
       <div className={styles.container}>
-        <div className={styles.formRow}>
+        {/* 재료 이름을 먼저 크게 받고(냉장고 관리 앱의 추가 흐름), 아래에 빠른 선택 → 수량·소비기한·보관·추가 */}
+        <div className={styles.nameRow}>
           <Input
             placeholder="재료명 (예: 참치캔)"
             aria-label="재료명"
@@ -127,8 +129,32 @@ export function IngredientInputSection() {
             maxLength={MAX_NAME_LENGTH}
             onChange={(event) => setName(event.target.value)}
             onPressEnter={handleAdd}
+            size="large"
             className={styles.nameInput}
           />
+        </div>
+
+        <Flex align="center" wrap gap="small" className={styles.quickRow}>
+          <Typography.Text type="secondary" className={styles.quickLabel}>
+            빠른 선택
+          </Typography.Text>
+          <Flex wrap gap="xs">
+            {MOCK_QUICK_CHIPS.map((chip) => (
+              <Button
+                key={chip.id}
+                size="small"
+                shape="round"
+                icon={<PlusOutlined />}
+                onClick={() => setName(chip.name)}
+                className={styles.chipButton}
+              >
+                {chip.name}
+              </Button>
+            ))}
+          </Flex>
+        </Flex>
+
+        <div className={styles.formRow}>
           <Input
             placeholder="수량"
             inputMode="decimal"
@@ -170,29 +196,10 @@ export function IngredientInputSection() {
           </Button>
         </div>
 
-        <Flex align="center" wrap gap="small" className={styles.quickRow}>
-          <Typography.Text type="secondary" className={styles.quickLabel}>
-            빠른 선택
-          </Typography.Text>
-          <Flex wrap gap="xs">
-            {MOCK_QUICK_CHIPS.map((chip) => (
-              <Button
-                key={chip.id}
-                size="small"
-                shape="round"
-                icon={<PlusOutlined />}
-                onClick={() => setName(chip.name)}
-                className={styles.chipButton}
-              >
-                {chip.name}
-              </Button>
-            ))}
-          </Flex>
-        </Flex>
-
         <Divider className={styles.divider} />
 
-        <Flex vertical gap="xs" className={styles.stagedList}>
+        {/* 담은 재료: "두부 1 · 11/10 · 냉장 ×" 칩으로 나열 */}
+        <Flex wrap gap="small" className={styles.stagedList}>
           {stagedItems.length === 0 && (
             <Typography.Text type="secondary" className={styles.stagedEmpty}>
               추가한 재료가 여기에 보여요

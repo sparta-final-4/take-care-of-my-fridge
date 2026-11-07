@@ -1,17 +1,43 @@
+@use '@/styles/variables' as *;
+@use '@/styles/mixins' as *;
+
+// 전체 보기 링크: 잉크 글자, 마우스를 올리면 밑줄(귤색은 글자에 쓰지 않는다). 터치 영역 44px.
 .moreLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: $touch-target-size;
   font-size: var(--ant-font-size-sm);
-  color: var(--ant-color-text-secondary);
-  text-decoration: none;
-  transition: color var(--ant-motion-duration-mid);
+  font-weight: var(--ant-font-weight-strong);
+  color: var(--ant-color-text);
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-underline-offset: 0.25em;
+  transition: text-decoration-color var(--ant-motion-duration-fast);
 
   &:hover {
-    color: var(--ant-color-primary);
+    color: var(--ant-color-text);
+    text-decoration-color: currentcolor;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--ant-color-primary-active);
+    outline-offset: 2px;
   }
 }
 
+// 모바일 한 줄, md 2열, lg 3열. 칸마다 위에 얇은 선(마지막 줄 아래는 없음).
 .list {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  column-gap: var(--ant-margin-xl);
+
+  @include from(md) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  @include from(lg) {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 .item {
@@ -21,12 +47,10 @@
   padding: var(--ant-padding-sm) var(--ant-padding-xs);
   color: inherit;
   text-decoration: none;
-  border-radius: var(--ant-border-radius);
-  transition: background-color var(--ant-motion-duration-mid);
+  border-radius: var(--ant-border-radius-sm);
+  transition: background-color var(--ant-motion-duration-fast);
 
-  &:not(:last-child) {
-    border-bottom: 1px solid var(--ant-color-border-secondary);
-  }
+  border-top: 1px solid var(--ant-color-border-secondary);
 
   &:hover {
     color: inherit;
@@ -34,7 +58,7 @@
   }
 
   &:focus-visible {
-    outline: 2px solid var(--ant-color-primary);
+    outline: 2px solid var(--ant-color-primary-active);
     outline-offset: -2px;
   }
 }
@@ -43,21 +67,23 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
+  width: $popular-recipe-rank-width;
   font-size: var(--ant-font-size-lg);
+  font-variant-numeric: tabular-nums;
   font-weight: var(--ant-font-weight-strong);
   color: var(--ant-color-text-tertiary);
   flex-shrink: 0;
 
+  // 1~3위는 잉크색(귤색은 글자에 쓰지 않는다).
   &.topRank {
-    color: var(--ant-color-primary);
+    color: var(--ant-color-text);
   }
 }
 
 .thumb {
   position: relative;
-  width: 64px;
-  height: 64px;
+  width: $popular-recipe-thumb-size;
+  height: $popular-recipe-thumb-size;
   flex-shrink: 0;
   overflow: hidden;
   background: var(--ant-color-fill-tertiary);
@@ -73,7 +99,7 @@
 .info {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--ant-margin-xxs);
   min-width: 0;
   flex: 1;
 }
@@ -95,7 +121,11 @@
 }
 
 .starIcon {
-  color: #faad14;
+  color: var(--ant-color-warning);
+}
+
+.tipIcon {
+  margin-right: var(--ant-margin-xxs);
 }
 
 .tipSummary {
@@ -123,8 +153,5 @@
   align-items: center;
   gap: var(--ant-margin-sm);
   padding: var(--ant-padding-sm) var(--ant-padding-xs);
-
-  &:not(:last-child) {
-    border-bottom: 1px solid var(--ant-color-border-secondary);
-  }
+  border-top: 1px solid var(--ant-color-border-secondary);
 }

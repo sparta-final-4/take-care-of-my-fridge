@@ -1,8 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { Skeleton } from 'antd';
+import { useLocation } from 'react-router';
 
 import { SectionCard } from '@/common/components/SectionCard';
-import { useAddToCart } from '@/domains/cart/hooks/useAddToCart';
 import { productQueries } from '@/domains/product/queries';
 
 import { ProductCard } from './ProductCard';
@@ -15,7 +15,7 @@ export function TodayMealkitSection() {
   const { data, isPending } = useQuery(
     productQueries.list({ type: 'MEALKIT', sort: 'LATEST', page: 1, size: MEALKIT_COUNT }),
   );
-  const { addToCart, pendingProductId } = useAddToCart();
+  const { search } = useLocation();
   const mealkits = data?.content ?? [];
 
   if (!isPending && mealkits.length === 0) return null;
@@ -28,12 +28,7 @@ export function TodayMealkitSection() {
         <ul className={styles.list} aria-label="오늘의 밀키트">
           {mealkits.map((product) => (
             <li key={product.productId} className={styles.item}>
-              <ProductCard
-                product={product}
-                pending={pendingProductId === product.productId}
-                onAddToCart={addToCart}
-                wide
-              />
+              <ProductCard product={product} listSearch={search} fromList wide />
             </li>
           ))}
         </ul>

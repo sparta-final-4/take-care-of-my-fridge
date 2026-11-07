@@ -1,26 +1,35 @@
 @use '@/styles/variables' as *;
-@use '@/styles/mixins' as *;
+@use './auth' as *;
 
 .container {
-  width: 100%;
-  max-width: 440px;
-  margin: var(--ant-margin-xl) auto;
-  padding: var(--ant-padding-lg);
-  background: var(--ant-color-bg-container);
-  border: 1px solid var(--ant-color-border-secondary);
-  border-radius: var(--ant-border-radius);
+  @include auth-column($auth-login-max-width);
+}
 
-  @include from(md) {
-    margin-top: var(--ant-margin-xxl);
-    padding: var(--ant-padding-xl);
-  }
+.head {
+  @include auth-head;
+}
+
+:global(.ant-typography).title {
+  @include auth-title;
+}
+
+:global(.ant-typography).lede {
+  @include auth-lede;
+}
+
+.form {
+  @include auth-form;
 }
 
 .error {
   margin-bottom: var(--ant-margin);
 }
 
-.signupLink {
-  margin: var(--ant-margin-lg) 0 0;
-  text-align: center;
+// 로그인 버튼은 비밀번호 칸과 조금 띄운다.
+.submit {
+  margin-top: var(--ant-margin-xs);
+}
+
+:global(.ant-typography).signupLink {
+  @include auth-switch;
 }

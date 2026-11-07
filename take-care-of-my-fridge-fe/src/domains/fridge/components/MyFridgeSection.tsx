@@ -73,6 +73,7 @@ export function MyFridgeSection() {
   return (
     <SectionCard
       title="내 냉장고"
+      bracket={false}
       extra={
         <Flex align="center" gap="small">
           <Typography.Text type="secondary" className={styles.summaryText}>

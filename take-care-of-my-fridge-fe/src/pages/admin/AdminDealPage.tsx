@@ -30,6 +30,7 @@ import type {
   Excluded,
 } from '@/common/api/clients';
 import { getErrorCode, getErrorMessage } from '@/common/api/errors';
+import { useScreens } from '@/common/hooks/useScreens';
 import { registerDealEvent, runDealAnalysis, saveDealReview } from '@/domains/deal/api';
 import { dealQueries } from '@/domains/deal/queries';
 import { DATE_TIME_FORMAT, REQUEST_TIME_FORMAT } from '@/domains/sale/format';
@@ -55,6 +56,8 @@ const dateTime = (value?: string) => (value ? dayjs(value).format('YYYY-MM-DD HH
 const dayLabels = { MON: '월', TUE: '화', WED: '수', THU: '목', FRI: '금', SAT: '토', SUN: '일' };
 
 export default function AdminDealPage() {
+  // 휴대폰은 폭에 따라 바뀌고, 마우스를 쓰는 PC는 창을 줄여도 넓은 배치 그대로(useScreens).
+  const screens = useScreens();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const demoAvailable = import.meta.env.DEV || window.location.hostname === 'dev.imhungry.click';
@@ -265,7 +268,7 @@ export default function AdminDealPage() {
         요일 · 분석 할인율 {analysis.discountRate}% · 최소 재고{' '}
         {analysis.minStock?.toLocaleString('ko-KR') ?? '-'}개
       </Typography.Paragraph>
-      <Descriptions bordered size="small" column={{ xs: 1, sm: 2 }} className={styles.notice}>
+      <Descriptions bordered size="small" column={screens.sm ? 2 : 1} className={styles.notice}>
         <Descriptions.Item label="모델 버전">{analysis.modelVersion ?? '-'}</Descriptions.Item>
         <Descriptions.Item label="입력 데이터 기준">
           {dateTime(analysis.dataCutoffAt)}

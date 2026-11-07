@@ -1,0 +1,78 @@
+@use '@/styles/variables' as *;
+@use '@/styles/mixins' as *;
+
+// 종이색 바탕 띠. 첫 화면 바로 아래라 위 여백은 좁게.
+.band {
+  padding-block: $main-section-gap;
+
+  @include from(lg) {
+    padding-block: $main-band-padding-lg-tight $main-band-padding-lg;
+  }
+}
+
+// 모바일은 한 줄씩, md 이상은 세 칸.
+.list {
+  @include main-container;
+  @include reveal-on-view;
+
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--ant-margin-xl);
+  margin-block: 0;
+  list-style: none;
+
+  @include from(md) {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--ant-margin-lg);
+  }
+}
+
+// 사진이 칸 역할, 아래에 이름과 한 줄 설명. 마우스를 올리면 이름에 밑줄 하나(사진은 움직이지 않는다).
+.tile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ant-margin-xs);
+  color: var(--ant-color-text);
+  text-decoration: none;
+  border-radius: var(--ant-border-radius-lg);
+
+  &:hover {
+    color: var(--ant-color-text);
+
+    .label {
+      text-decoration-color: currentcolor;
+    }
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--ant-color-primary-active);
+    outline-offset: 4px;
+  }
+}
+
+.image {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin-bottom: var(--ant-margin-xs);
+  // 사진 칸 비율 4:3(변수로 두면 Sass가 나눗셈으로 계산해 경고가 난다)
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  background: var(--ant-color-fill-tertiary);
+  border-radius: var(--ant-border-radius-lg);
+}
+
+.label {
+  font-family: $font-display;
+  font-size: var(--ant-font-size-heading-3);
+  font-weight: 400;
+  letter-spacing: $display-tracking;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-underline-offset: 0.2em;
+  transition: text-decoration-color var(--ant-motion-duration-fast);
+}
+
+.description {
+  color: var(--ant-color-text-secondary);
+}
