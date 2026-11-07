@@ -22,7 +22,7 @@ import java.util.Set;
  *   <li>이번 말과 이 상담의 사용자 말(안전 장치로 걸러진 말은 뺌)을 모두 본다. 그래서 다시 추천·새 추천 모두 같은 상담 안에서는 계속 뺀다</li>
  *   <li>○○이 묶음 말(app.chat.allergy-groups)이면 묶음 재료, 재료 사전에 이름이 그대로 있으면 그 재료를 쓴다. 둘 다 아니면 버린다 ("매운 거 못 먹어"의 "거")</li>
  *   <li>재료는 이름에 그 이름이 들어 있는 재료로 넓힌다 (땅콩 → 땅콩버터·땅콩가루, 새우 → 건새우·새우젓). 한 글자("게", "잣")는 그 글자로 시작하는 재료만 (게살·잣가루).
- *       넓히지 않을 이름(땅콩호박·바게트·스파게티·멍게살)은 뺀다</li>
+ *       재료마다 넓히지 않을 이름(땅콩 → 땅콩호박, 굴 → 굴비, 마 → 마늘)은 그 재료를 넓힐 때만 뺀다 ("마늘 알레르기"면 마늘가루는 뺀다)</li>
  *   <li>재료 조회가 실패하면(DB 장애) 경고만 남기고 알레르기 없이 계속한다</li>
  * </ul>
  */
@@ -83,14 +83,14 @@ public class AllergyExclusionFinder {
                 List<Ingredient> ingredients = found.getOrDefault(candidate, List.of());
                 if (ingredients.stream().anyMatch(ingredient -> ingredient.getName().equals(candidate))) {
                     names.add(candidate);
-                    addSameKind(ids, ingredients);
+                    addSameKind(ids, candidate, ingredients);
                     break;
                 }
             }
         }
         for (ChatAllergyGroupProperties.Group group : groups) {
             names.add(group.word());
-            group.ingredients().forEach(name -> addSameKind(ids, found.getOrDefault(name, List.of())));
+            group.ingredients().forEach(name -> addSameKind(ids, name, found.getOrDefault(name, List.of())));
         }
         return ids.isEmpty() ? Allergens.NONE : new Allergens(List.copyOf(names), List.copyOf(ids));
     }
@@ -102,14 +102,11 @@ public class AllergyExclusionFinder {
                 .findFirst();
     }
 
-    // 넓히지 않을 이름(땅콩호박 등)이 들어 있는 재료는 뺀다
-    private void addSameKind(Set<Long> ids, List<Ingredient> ingredients) {
+    // word를 넓힌 재료 중 그 재료의 넓히지 않을 이름(땅콩 → 땅콩호박, 굴 → 굴비)과 같은 재료는 뺀다
+    private void addSameKind(Set<Long> ids, String word, List<Ingredient> ingredients) {
+        Set<String> otherKinds = chatAllergyWordProperties.notSameKindOf(word);
         for (Ingredient ingredient : ingredients) {
-            String name = compact(ingredient.getName());
-            boolean otherKind = chatAllergyWordProperties.notSameKind().stream()
-                    .map(AllergyExclusionFinder::compact)
-                    .anyMatch(word -> !word.isEmpty() && name.contains(word));
-            if (!otherKind) {
+            if (!otherKinds.contains(compact(ingredient.getName()))) {
                 ids.add(ingredient.getId());
             }
         }

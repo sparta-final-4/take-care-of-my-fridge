@@ -1,6 +1,7 @@
 package org.example.takecareofmyfridgebe.domain.chat.facade;
 
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatAllergyWordProperties;
+import org.example.takecareofmyfridgebe.domain.chat.config.ChatAllergyWordProperties.NotSameKind;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -14,7 +15,25 @@ class AllergyWordCheckerTest {
     public static final ChatAllergyWordProperties WORDS = new ChatAllergyWordProperties(
             List.of("알레르기", "알러지", "못먹", "먹으면안"),
             List.of("에는", "에도", "은", "는", "이", "가", "을", "를", "에", "도"),
-            List.of("땅콩호박", "바게트", "스파게티", "멍게살"));
+            List.of(
+                    new NotSameKind("땅콩", List.of("땅콩호박")),
+                    new NotSameKind("게", List.of("바게트", "스파게티", "멍게살")),
+                    new NotSameKind("게살", List.of("멍게살")),
+                    new NotSameKind("굴", List.of("굴비")),
+                    new NotSameKind("김", List.of("김장김치", "김치", "김칫국물", "김칫잎")),
+                    new NotSameKind("떡", List.of("떡볶이양념파우더")),
+                    new NotSameKind("마", List.of("마늘", "마늘가루", "마늘기름", "마늘종", "마늘즙", "마늘칩", "마늘튀김", "마른오징어",
+                            "마스카포네치즈", "마요네즈", "마카다미아")),
+                    new NotSameKind("무", List.of("무가당 두유", "무가당 아보카도 마요네즈", "무가당 코코아 파우더", "무가당 코코아가루",
+                            "무염버터", "무지개고추", "무화과")),
+                    new NotSameKind("묵", List.of("묵은지")),
+                    new NotSameKind("물", List.of("물김치국물", "물밤", "물엿", "물전분", "물파래")),
+                    new NotSameKind("밤", List.of("밤고구마")),
+                    new NotSameKind("배", List.of("배추", "배추김치")),
+                    new NotSameKind("쑥", List.of("쑥갓")),
+                    new NotSameKind("양", List.of("양겨자", "양념간장", "양념장", "양념족발", "양배추", "양상추", "양송이버섯",
+                            "양송이버섯 밑동", "양장피 면", "양파", "양파 껍질", "양파가루", "양파즙")),
+                    new NotSameKind("조", List.of("조개", "조개살", "조기", "조랭이떡", "조림간장", "조미료", "조선부추", "조청"))));
 
     @Test
     @DisplayName("알레르기·못 먹어·먹으면 안 돼 바로 앞 낱말을 찾는다 (땅콩 알레르기, 새우 못 먹어, 우유 먹으면 안 돼)")

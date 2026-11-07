@@ -50,7 +50,8 @@ class AllergyExclusionFinderTest {
         long id = 1;
         for (String name : List.of("땅콩", "땅콩가루", "땅콩기름", "땅콩버터", "땅콩잼", "땅콩호박", "새우", "건새우", "새우젓", "새우살",
                 "가재새우", "게", "꽃게", "게살", "게맛살", "바게트", "스파게티", "멍게살", "호두", "아몬드", "아몬드가루", "잣", "잣가루",
-                "캐슈넛", "피스타치오", "달걀", "달걀노른자", "메추리알", "마요네즈", "오이", "우유")) {
+                "캐슈넛", "피스타치오", "달걀", "달걀노른자", "메추리알", "마요네즈", "오이", "우유", "굴", "굴소스", "굴비", "마", "마늘",
+                "마늘가루", "김", "김가루", "김치", "배추", "배추김치")) {
             DICTIONARY.put(name, ingredient(id++, name));
         }
         chatMessageService = mock(ChatMessageService.class);
@@ -105,6 +106,22 @@ class AllergyExclusionFinderTest {
         assertThat(namesOf(finder.find(SESSION_ID, "갑각류 알레르기")))
                 .contains("새우", "새우젓", "게", "꽃게", "게살", "게맛살")
                 .doesNotContain("바게트", "스파게티", "멍게살");
+    }
+
+    @Test
+    @DisplayName("굴 알레르기면 굴로 시작하는 굴소스는 빼고, 다른 재료인 굴비는 빼지 않는다")
+    void excludesOysterSauce_withoutDriedCroaker() {
+        assertThat(namesOf(finder.find(SESSION_ID, "굴 알레르기"))).containsExactlyInAnyOrder("굴", "굴소스");
+    }
+
+    @Test
+    @DisplayName("한 글자 마·김의 넓히지 않을 이름(마늘·마요네즈, 김치)은 그 재료를 넓힐 때만 빼고, 마늘·배추 알레르기에서는 마늘가루·배추김치를 뺀다")
+    void appliesNotSameKind_onlyToThatWord() {
+        assertThat(namesOf(finder.find(SESSION_ID, "마 알레르기"))).containsExactly("마");
+        assertThat(namesOf(finder.find(SESSION_ID, "마늘 알레르기"))).containsExactlyInAnyOrder("마늘", "마늘가루");
+        assertThat(namesOf(finder.find(SESSION_ID, "김 알레르기"))).containsExactlyInAnyOrder("김", "김가루");
+        assertThat(namesOf(finder.find(SESSION_ID, "배추 알레르기"))).containsExactlyInAnyOrder("배추", "배추김치");
+        assertThat(namesOf(finder.find(SESSION_ID, "달걀 알레르기"))).contains("마요네즈");
     }
 
     @Test

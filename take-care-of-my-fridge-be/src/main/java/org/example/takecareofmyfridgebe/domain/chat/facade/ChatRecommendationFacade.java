@@ -290,10 +290,14 @@ public class ChatRecommendationFacade {
                 .filter(name -> name.length() >= 2)
                 .distinct()
                 .toList();
+        // 뺄 재료 자신인 이름은 끊지 않는다 ("마늘 알레르기"면 "마늘빵 밀키트"의 마늘을 끊으면 안 된다)
+        List<String> otherKinds = chatAllergyWordProperties.allNotSameKindNames().stream()
+                .filter(name -> !excludedNames.contains(name))
+                .toList();
         List<MealkitProduct> kept = mealkits.stream()
                 .filter(mealkit -> mealkit.getRecipeId() != null
                         ? !excludedRecipeIds.contains(mealkit.getRecipeId())
-                        : excludedNames.stream().noneMatch(productNameWithoutOtherKinds(mealkit.getProduct().getName())::contains))
+                        : excludedNames.stream().noneMatch(cutOtherKinds(mealkit.getProduct().getName(), otherKinds)::contains))
                 .toList();
         if (kept.size() < mealkits.size()) {
             log.info("상담 밀키트 뺄 재료가 들어 있어 뺌 - 뺀 수: {}", mealkits.size() - kept.size());
@@ -302,13 +306,10 @@ public class ChatRecommendationFacade {
     }
 
     // 넓히지 않을 이름(땅콩호박 등)은 끊어 두고 본다 ("땅콩호박 수프 밀키트"가 "땅콩"으로 빠지지 않게)
-    private String productNameWithoutOtherKinds(String name) {
+    private static String cutOtherKinds(String name, List<String> otherKinds) {
         String text = compact(name);
-        for (String word : chatAllergyWordProperties.notSameKind()) {
-            String other = compact(word);
-            if (!other.isEmpty()) {
-                text = text.replace(other, "|");
-            }
+        for (String other : otherKinds) {
+            text = text.replace(other, "|");
         }
         return text;
     }
