@@ -46,6 +46,30 @@
   text-wrap: pretty;
 }
 
+// GitHub 저장소 아이콘: 터치 영역 44px, 소개 글과 같은 보조색에서 마우스를 올리면 잉크색.
+.github {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: flex-start;
+  width: $touch-target-size;
+  height: $touch-target-size;
+  margin-inline-start: calc(-1 * var(--ant-margin-xs));
+  font-size: var(--ant-font-size-heading-3);
+  color: var(--ant-color-text-secondary);
+  border-radius: 50%;
+  transition: color var(--ant-motion-duration-fast);
+
+  &:hover {
+    color: var(--ant-color-text);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--ant-color-primary-active);
+    outline-offset: 2px;
+  }
+}
+
 .links {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
