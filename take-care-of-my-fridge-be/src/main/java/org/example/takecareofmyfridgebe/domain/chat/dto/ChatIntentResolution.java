@@ -65,7 +65,7 @@ public record ChatIntentResolution(
         return new ChatIntentResolution(intent, Source.AI, null, null, null);
     }
 
-    // 답 생성 AI를 부르지 않고 서버 안내로 답하는지 (하루 횟수를 돌려준다)
+    // 답 생성 AI를 부르지 않고 서버 안내로 답하는지 (의도 판단 AI를 썼으므로 하루 횟수는 센다)
     public boolean declines() {
         return intent == ChatIntent.OFF_TOPIC || intent == ChatIntent.BLOCKED || intent == ChatIntent.SELF_HARM;
     }

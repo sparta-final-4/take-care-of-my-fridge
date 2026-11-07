@@ -1081,8 +1081,8 @@ class ChatStreamServiceTest {
     }
 
     @Test
-    @DisplayName("의도가 OFF_TOPIC이면 답 생성 AI 없이 서버 안내를 보내고, 걸러진 표시 없이 저장한 뒤 하루 횟수를 한 번 돌려준다")
-    void sendsOffTopicReplyAndRefunds_whenIntentIsOffTopic(CapturedOutput output) {
+    @DisplayName("의도가 OFF_TOPIC이면 답 생성 AI 없이 서버 안내를 보내고 걸러진 표시 없이 저장하며, 의도 판단 AI를 썼으므로 하루 횟수는 센다")
+    void sendsOffTopicReplyAndCounts_whenIntentIsOffTopic(CapturedOutput output) {
         Long sessionId = 10L;
         String reply = ChatStreamService.OFF_TOPIC_REPLY;
         when(chatStreamLockService.acquire(sessionId)).thenReturn(LOCK_TOKEN);
@@ -1099,15 +1099,15 @@ class ChatStreamServiceTest {
         assertThat(events).extracting(ServerSentEvent::event).containsExactly("message", "done");
         assertThat(events.get(0).data()).isEqualTo("{\"text\":\"" + reply + "\"}");
         verify(chatDailyLimitService, times(1)).checkAndIncrement(1L);
-        verify(chatDailyLimitService, times(1)).refund(LIMIT_KEY);
+        verify(chatDailyLimitService, never()).refund(any());
         verify(chatReplyGenerator, never()).generate(any(), any(), any(), any());
         verify(chatMessageService, never()).saveFilteredExchange(any(), any(), any());
         assertThat(output.getOut()).contains("의도: OFF_TOPIC").doesNotContain("주식 추천해줘");
     }
 
     @Test
-    @DisplayName("OFF_TOPIC 안내 답 저장이 실패하면 error 이벤트를 보내고 하루 횟수는 한 번만 돌려준다")
-    void refundsOnce_whenOffTopicSaveFails() {
+    @DisplayName("OFF_TOPIC 안내 답 저장이 실패하면 error 이벤트를 보내고, 안내 글을 이미 보냈으므로 하루 횟수는 돌려주지 않는다")
+    void keepsDailyCount_whenOffTopicSaveFails() {
         Long sessionId = 10L;
         when(chatDailyLimitService.checkAndIncrement(1L)).thenReturn(LIMIT_KEY);
         when(chatIntentFacade.resolve(eq(1L), eq(sessionId), any(), any()))
@@ -1119,11 +1119,11 @@ class ChatStreamServiceTest {
                 .streamMessage(1L, sessionId, ChatMessageCreateRequest.of("숙제 풀어줘")).collectList().block();
 
         assertThat(events).extracting(ServerSentEvent::event).containsExactly("message", "error");
-        verify(chatDailyLimitService, times(1)).refund(LIMIT_KEY);
+        verify(chatDailyLimitService, never()).refund(any());
     }
 
     @Test
-    @DisplayName("의도가 BLOCKED면 답 생성 AI 없이 금지어 안내를 보내고, 걸러진 메시지로 저장한 뒤 하루 횟수를 돌려준다")
+    @DisplayName("의도가 BLOCKED면 답 생성 AI 없이 금지어 안내를 보내고 걸러진 메시지로 저장하며, 의도 판단 AI를 썼으므로 하루 횟수는 센다")
     void sendsBannedReplyAsFiltered_whenIntentIsBlocked() {
         Long sessionId = 10L;
         String reply = ChatSafetyBlock.BANNED.reply();
@@ -1142,11 +1142,11 @@ class ChatStreamServiceTest {
         verify(chatMessageService).saveFilteredExchange(sessionId, "목록 밖 욕설", reply);
         verify(chatMessageService, never()).saveExchange(any(), any(), any());
         verify(chatReplyGenerator, never()).generate(any(), any(), any(), any());
-        verify(chatDailyLimitService, times(1)).refund(LIMIT_KEY);
+        verify(chatDailyLimitService, never()).refund(any());
     }
 
     @Test
-    @DisplayName("의도가 SELF_HARM이면 상담 전화 109 안내를 보내고, 걸러진 메시지로 저장한 뒤 하루 횟수를 돌려준다")
+    @DisplayName("의도가 SELF_HARM이면 상담 전화 109 안내를 보내고 걸러진 메시지로 저장하며, 의도 판단 AI를 썼으므로 하루 횟수는 센다")
     void sendsSelfHarmReplyAsFiltered_whenIntentIsSelfHarm() {
         Long sessionId = 10L;
         String reply = ChatSafetyBlock.SELF_HARM.reply();
@@ -1162,7 +1162,7 @@ class ChatStreamServiceTest {
 
         assertThat(events.get(0).data()).contains("자살예방상담전화 109(24시간, 무료)");
         verify(chatMessageService).saveFilteredExchange(sessionId, "다 놓고 싶어", reply);
-        verify(chatDailyLimitService, times(1)).refund(LIMIT_KEY);
+        verify(chatDailyLimitService, never()).refund(any());
     }
 
     private static final String HEALTH_TAIL = ChatStreamService.HEALTH_NOTICE_SEPARATOR + ChatStreamService.HEALTH_NOTICE;

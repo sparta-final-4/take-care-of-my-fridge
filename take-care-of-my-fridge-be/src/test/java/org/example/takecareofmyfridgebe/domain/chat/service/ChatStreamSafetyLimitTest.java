@@ -117,8 +117,8 @@ class ChatStreamSafetyLimitTest extends RedisContainerSupport {
     }
 
     @Test
-    @DisplayName("의도 판단이 OFF_TOPIC이면 센 하루 횟수를 돌려받아 몇 번 보내도 0이다")
-    void refundsDailyCount_whenOffTopic() {
+    @DisplayName("의도 판단이 OFF_TOPIC이면 의도 판단 AI를 썼으므로 보낼 때마다 하루 횟수가 1씩 오른다")
+    void countsDailyCount_whenOffTopic() {
         given(chatIntentFacade.resolve(any(), any(), any(), any())).willReturn(ChatIntentResolution.declined(ChatIntent.OFF_TOPIC));
 
         for (String message : List.of("주식 추천해줘", "숙제 풀어줘", "파이썬 코드 짜줘")) {
@@ -126,12 +126,12 @@ class ChatStreamSafetyLimitTest extends RedisContainerSupport {
             awaitUnlocked();
         }
 
-        assertThat(stringRedisTemplate.opsForValue().get(limitKey())).isEqualTo("0");
+        assertThat(stringRedisTemplate.opsForValue().get(limitKey())).isEqualTo("3");
     }
 
     @Test
-    @DisplayName("의도 판단이 BLOCKED·SELF_HARM이어도 센 하루 횟수를 돌려받아 0이다")
-    void refundsDailyCount_whenBlockedOrSelfHarm() {
+    @DisplayName("의도 판단이 BLOCKED·SELF_HARM이어도 의도 판단 AI를 썼으므로 하루 횟수가 1씩 오른다 (단어 차단과 다르다)")
+    void countsDailyCount_whenBlockedOrSelfHarm() {
         given(chatIntentFacade.resolve(any(), any(), any(), any())).willReturn(
                 ChatIntentResolution.declined(ChatIntent.BLOCKED), ChatIntentResolution.declined(ChatIntent.SELF_HARM));
 
@@ -140,7 +140,7 @@ class ChatStreamSafetyLimitTest extends RedisContainerSupport {
             awaitUnlocked();
         }
 
-        assertThat(stringRedisTemplate.opsForValue().get(limitKey())).isEqualTo("0");
+        assertThat(stringRedisTemplate.opsForValue().get(limitKey())).isEqualTo("2");
     }
 
     @Test
