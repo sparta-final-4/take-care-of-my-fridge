@@ -61,11 +61,11 @@ class ChatIntentFacadeTest {
     private static final Long MUSHROOM = 161L;
     private static final Long CUCUMBER = 15L;
 
-    // application.yml app.chat.taste-opposites와 같은 쌍
+    // config/chat-words.yml app.chat.taste-opposites와 같은 쌍
     static final ChatTasteOppositeProperties TASTE_OPPOSITES = new ChatTasteOppositeProperties(List.of(
             List.of(Taste.MILD, Taste.SPICY), List.of(Taste.MILD, Taste.SALTY)));
 
-    // application.yml app.chat.food-words와 같은 목록
+    // config/chat-words.yml app.chat.food-words와 같은 목록
     static final ChatFoodWordProperties FOOD_WORDS = new ChatFoodWordProperties(List.of("먹", "요리", "레시피", "밥", "반찬",
             "끼니", "아침", "점심", "저녁", "야식", "간식", "재료", "냉장고", "장보기", "밀키트"));
 

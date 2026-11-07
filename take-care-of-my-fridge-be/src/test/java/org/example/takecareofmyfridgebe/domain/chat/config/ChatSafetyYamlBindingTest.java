@@ -9,7 +9,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-// application.yml의 맛 반대 쌍·알레르기 묶음이 설정 값으로 묶이는지 본다 (목록 안의 목록·객체 목록)
+// config/chat-words.yml(맛 반대 쌍)·config/chat-safety.yml(알레르기 묶음)을 application.yml의 spring.config.import로 불러와 설정 값으로 묶이는지 본다 (목록 안의 목록·객체 목록)
 @SpringBootTest(classes = ChatSafetyYamlBindingTest.class)
 @EnableConfigurationProperties({ChatTasteOppositeProperties.class, ChatAllergyGroupProperties.class, ChatAllergyWordProperties.class})
 class ChatSafetyYamlBindingTest {

@@ -43,7 +43,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 
-// 실제 Redis에 하루 횟수를 두고, 단어에 걸린 말은 횟수가 그대로인지 본다. 단어는 application.yml(app.chat.safety-words) 값이다
+// 실제 Redis에 하루 횟수를 두고, 단어에 걸린 말은 횟수가 그대로인지 본다. 단어는 config/chat-safety.yml(app.chat.safety-words) 값이다
 @SpringBootTest(classes = {
         RedisConfig.class,
         ChatStreamService.class,

@@ -11,7 +11,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class AllergyWordCheckerTest {
 
-    // application.yml app.chat.allergy-words와 같은 목록
+    // config/chat-safety.yml app.chat.allergy-words와 같은 목록
     public static final ChatAllergyWordProperties WORDS = new ChatAllergyWordProperties(
             List.of("알레르기", "알러지", "못먹", "먹으면안"),
             List.of("에는", "에도", "은", "는", "이", "가", "을", "를", "에", "도"),

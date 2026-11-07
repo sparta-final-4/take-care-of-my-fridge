@@ -29,7 +29,7 @@ class AllergyExclusionFinderTest {
 
     private static final Long SESSION_ID = 7L;
 
-    // application.yml app.chat.allergy-groups와 같은 묶음
+    // config/chat-safety.yml app.chat.allergy-groups와 같은 묶음
     static final ChatAllergyGroupProperties GROUPS = new ChatAllergyGroupProperties(List.of(
             new Group("견과류", List.of("호두", "아몬드", "잣", "캐슈넛", "피스타치오", "마카다미아", "땅콩")),
             new Group("갑각류", List.of("새우", "게", "꽃게", "게살", "게맛살", "가재새우")),

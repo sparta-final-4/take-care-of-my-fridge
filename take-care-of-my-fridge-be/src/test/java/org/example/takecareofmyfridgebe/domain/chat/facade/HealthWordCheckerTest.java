@@ -10,7 +10,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class HealthWordCheckerTest {
 
-    // application.yml app.chat.health-words와 같은 목록
+    // config/chat-safety.yml app.chat.health-words와 같은 목록
     public static final ChatHealthWordProperties WORDS = new ChatHealthWordProperties(
             List.of("당뇨", "혈당", "고혈압", "혈압", "고지혈", "콜레스테롤", "신장질환", "신장병", "신장기능", "콩팥", "투석",
                     "통풍", "요산", "질환", "환자", "위염", "역류성", "항암", "알레르기", "알러지", "아토피", "임신", "임산부", "산모",
