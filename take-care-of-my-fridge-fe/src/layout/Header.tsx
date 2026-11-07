@@ -21,6 +21,7 @@ import { cartQueries } from '@/domains/cart/queries';
 import { chatSessionEventListener } from '@/domains/chat/chatSessionEvent';
 import { NotificationBell } from '@/domains/notification/components/NotificationBell';
 import { notificationEventListener } from '@/domains/notification/notificationEvent';
+import { PopularKeywordBar } from '@/domains/search/components/PopularKeywordBar';
 import { SearchKeywordInput } from '@/domains/search/components/SearchKeywordInput';
 
 import { CartDrawer } from './CartDrawer';
@@ -344,6 +345,7 @@ export function Header() {
                 />
               )}
             </div>
+            <PopularKeywordBar className={styles.searchPopular} />
           </div>
         </>
       )}
@@ -369,6 +371,7 @@ export function Header() {
               }}
             />
           )}
+          {!isAdmin && <PopularKeywordBar onNavigate={handleCloseDrawer} />}
           <Flex vertical gap="xs" role="navigation" aria-label="모바일 메뉴">
             {isAdmin
               ? VISIBLE_ADMIN_NAV_ITEMS.map((item) => (
