@@ -221,4 +221,20 @@ class RecipeDocumentReaderEmbeddingTest {
         assertThat(doc.get("spicy_level")).isEqualTo(RecipeSpicyLevel.NONE.name());
     }
 
+    @Test
+    @DisplayName("매운 재료가 없어도 레시피 맛 데이터가 매운맛이면 HOT이다")
+    void putsHot_whenTasteIsSpicyWithoutSpicyIngredient() {
+        // Given: 겨자는 매운 재료 목록에 없다
+        when(recipeIndexSourceService.findOne(1L)).thenReturn(Optional.of(recipe(1L, "새우겨자채", null, null, List.of(
+                ingredient(10L, "새우", "새우", false),
+                ingredient(20L, "겨자", "연겨자", false)), Set.of(Member.Taste.SPICY))));
+
+        // When
+        Map<String, Object> doc = reader(false).readOne(1L).orElseThrow().source();
+
+        // Then
+        assertThat(doc.get("spicy_level")).isEqualTo(RecipeSpicyLevel.HOT.name());
+        assertThat(doc.get("tastes")).isEqualTo(List.of("SPICY"));
+    }
+
 }
