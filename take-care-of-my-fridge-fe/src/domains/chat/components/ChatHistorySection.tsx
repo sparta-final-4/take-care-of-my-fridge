@@ -1,6 +1,6 @@
 import { ArrowLeftOutlined } from '@ant-design/icons';
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
-import { Button, Empty, Grid, Result, Segmented, Skeleton, Spin, Tag, Typography } from 'antd';
+import { Button, Empty, Result, Segmented, Skeleton, Spin, Tag, Typography } from 'antd';
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
 
@@ -11,6 +11,7 @@ import type {
 } from '@/common/api/clients';
 import { SectionCard } from '@/common/components/SectionCard';
 import { SectionLoading } from '@/common/components/SectionLoading';
+import { useScreens } from '@/common/hooks/useScreens';
 
 import { formatChatDateTime, formatChatTime } from '../format';
 import { useChatModalStore } from '../model/useChatModalStore';
@@ -52,7 +53,7 @@ const MENU_CHIP_LIMIT = 3;
 export function ChatHistorySection() {
   const openChat = useChatModalStore((state) => state.openChat);
   const setInlineHost = useChatModalStore((state) => state.setInlineHost);
-  const isSplit = Grid.useBreakpoint().lg ?? false;
+  const isSplit = useScreens().lg ?? false;
   const [searchParams, setSearchParams] = useSearchParams();
   const tab = parseTab(searchParams.get('status'));
   const [selectedId, setSelectedId] = useState<number | null>(null);

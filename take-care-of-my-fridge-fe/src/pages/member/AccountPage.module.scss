@@ -19,3 +19,16 @@
 .cardAction {
   margin-top: var(--ant-margin-lg);
 }
+
+// 마이페이지 "내 정보 수정": 다른 메뉴 화면(SectionCard)과 같은 폭·시작선. 바깥 여백과 폭 제한을 풀고,
+// 위에 잉크색 선 한 줄 + 제목 줄.
+.inMyPage {
+  max-width: none;
+  margin: 0;
+  padding: var(--ant-padding-sm) 0 0;
+  border-top: 1px solid var(--ant-color-text);
+}
+
+:global(.ant-typography).myPageTitle {
+  margin: 0 0 var(--ant-margin-lg);
+}

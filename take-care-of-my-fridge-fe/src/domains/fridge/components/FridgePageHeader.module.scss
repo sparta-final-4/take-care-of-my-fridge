@@ -1,3 +1,20 @@
+@use '@/styles/variables' as *;
+@use '@/styles/mixins' as *;
+
+.titleGroup {
+  min-width: 0;
+}
+
+// 제목 옆 냉장고 일러스트
+.illustration {
+  width: $fridge-illustration-size-sm;
+  height: auto;
+
+  @include from(md) {
+    width: $fridge-illustration-size;
+  }
+}
+
 .title {
   margin: 0;
 }

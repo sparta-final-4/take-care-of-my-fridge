@@ -1,24 +1,43 @@
+@use '@/styles/variables' as *;
+@use '@/styles/mixins' as *;
+
+// 요약 숫자 띠: 상자 없이 숫자 세 개를 가로로, 사이에 얇은 세로선. 숫자는 제목 글꼴로 크게.
 .stats {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--ant-margin-xs);
 }
 
 .stat {
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--ant-margin-xxs);
-  padding: var(--ant-padding) var(--ant-padding-xs);
-  text-align: center;
-  background: var(--ant-color-fill-quaternary);
-  border: 1px solid var(--ant-color-border);
-  border-radius: var(--ant-border-radius);
+  padding: var(--ant-padding-xs) var(--ant-padding);
+
+  &:first-child {
+    padding-left: 0;
+  }
+
+  & + & {
+    border-left: 1px solid var(--ant-color-border-secondary);
+  }
+
+  @include from(md) {
+    padding-inline: var(--ant-padding-lg);
+  }
 }
 
-.value {
-  font-size: var(--ant-font-size-heading-3);
-  line-height: var(--ant-line-height-heading-3);
+:global(.ant-typography).value {
+  font-family: $font-display;
+  font-size: var(--ant-font-size-heading-2);
+  font-weight: 400;
+  line-height: 1.1;
+  letter-spacing: $display-tracking;
+  font-variant-numeric: tabular-nums;
+
+  @include from(md) {
+    font-size: var(--ant-font-size-heading-1);
+  }
 }
 
 .label {

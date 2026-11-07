@@ -1,29 +1,71 @@
-@use '@/styles/mixins' as *;
+@use '@/styles/variables' as *;
+@use './auth' as *;
 
 .container {
-  width: 100%;
-  max-width: 520px;
-  margin: var(--ant-margin-xl) auto;
-  padding: var(--ant-padding-lg);
-  background: var(--ant-color-bg-container);
-  border: 1px solid var(--ant-color-border-secondary);
-  border-radius: var(--ant-border-radius);
-
-  @include from(md) {
-    margin-top: var(--ant-margin-xxl);
-    padding: var(--ant-padding-xl);
-  }
+  @include auth-column($auth-signup-max-width);
 }
 
-.checkRow {
-  margin: calc(-1 * var(--ant-margin-sm)) 0 var(--ant-margin-lg);
+.head {
+  @include auth-head;
+}
+
+:global(.ant-typography).title {
+  @include auth-title;
+}
+
+:global(.ant-typography).lede {
+  @include auth-lede;
+}
+
+.form {
+  @include auth-form;
 }
 
 .error {
   margin-bottom: var(--ant-margin);
 }
 
-.loginLink {
-  margin: var(--ant-margin-lg) 0 0;
-  text-align: center;
+// 입력칸 오른쪽에 붙는 중복 확인 버튼. 글자가 줄바꿈되지 않게 줄이지 않는다.
+.checkButton {
+  flex-shrink: 0;
+}
+
+// 좋아하는 맛: 체크박스 목록을 눌러서 고르는 칩 모양으로. 고르면 잉크 테두리와 옅은 바탕.
+.tastes {
+  :global(.ant-checkbox-group) {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--ant-margin-xs);
+  }
+
+  :global(.ant-checkbox-wrapper) {
+    min-height: $touch-target-size;
+    margin: 0;
+    padding: 0 var(--ant-padding-sm);
+    align-items: center;
+    background: var(--ant-color-bg-container);
+    border: 1px solid var(--ant-color-border-secondary);
+    border-radius: var(--ant-border-radius);
+    transition:
+      border-color var(--ant-motion-duration-fast),
+      background-color var(--ant-motion-duration-fast);
+
+    &:hover {
+      border-color: var(--ant-color-border);
+    }
+  }
+
+  :global(.ant-checkbox-wrapper-checked) {
+    background: var(--ant-color-fill-tertiary);
+    border-color: var(--ant-color-text);
+  }
+}
+
+// 가입하기 버튼은 맛 선택과 조금 띄운다.
+.submit {
+  margin-top: var(--ant-margin-xs);
+}
+
+:global(.ant-typography).loginLink {
+  @include auth-switch;
 }

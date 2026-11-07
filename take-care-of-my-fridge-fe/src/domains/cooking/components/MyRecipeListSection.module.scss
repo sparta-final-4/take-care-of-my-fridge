@@ -1,14 +1,13 @@
 @use '@/styles/variables' as *;
 @use '@/styles/mixins' as *;
 
+// 마이페이지 다른 화면(SectionCard)과 같은 모양: 상자 없이 위에 잉크색 선 한 줄, 그 아래 제목 줄.
 .section {
   display: flex;
   flex-direction: column;
   width: 100%;
-  padding: var(--ant-padding-lg);
-  background: var(--ant-color-bg-container);
-  border: 1px solid var(--ant-color-border);
-  border-radius: var(--ant-border-radius-lg);
+  padding-top: var(--ant-padding-sm);
+  border-top: 1px solid var(--ant-color-text);
 }
 
 .header {
@@ -16,7 +15,7 @@
   justify-content: space-between;
   align-items: center;
   gap: var(--ant-margin-sm);
-  margin-bottom: var(--ant-margin);
+  margin-bottom: var(--ant-margin-lg);
 
   // 크기·굵기는 Title level 3(마이페이지 화면 제목 24px / 600)을 따른다.
   :global(.ant-typography).title {

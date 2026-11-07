@@ -1,5 +1,5 @@
 import { useMutation } from '@tanstack/react-query';
-import { Alert, Button, Form, Input, Typography } from 'antd';
+import { Alert, Button, ConfigProvider, Form, Input, Typography } from 'antd';
 import { isAxiosError } from 'axios';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 
@@ -9,6 +9,7 @@ import type { LoginRequest, MyInfoResponse } from '@/common/api/clients';
 import { setSession } from '@/common/auth/session';
 import { login } from '@/domains/auth/api';
 
+import { AUTH_THEME } from './authTheme';
 import styles from './LoginPage.module.scss';
 
 function safeRedirect(value: string | null, role: MyInfoResponse['role']) {
@@ -46,57 +47,69 @@ export default function LoginPage() {
         : null;
 
   return (
-    <section className={styles.container}>
-      <Typography.Title level={2}>로그인</Typography.Title>
-      <Typography.Paragraph type="secondary">
-        냉장고에 남은 재료와 나에게 맞는 메뉴를 확인해 보세요.
-      </Typography.Paragraph>
-      {errorMessage && (
-        <Alert type="error" title={errorMessage} showIcon className={styles.error} />
-      )}
-      {!errorMessage && sessionReason && (
-        <Alert
-          type="warning"
-          title={
-            sessionReason === 'suspended'
-              ? '계정 이용이 제한되어 로그인이 해제되었습니다.'
-              : '로그인이 만료되었습니다. 다시 로그인해 주세요.'
-          }
-          showIcon
-          className={styles.error}
-        />
-      )}
-      <Form<LoginRequest> layout="vertical" onFinish={handleSubmit} requiredMark={false}>
-        <Form.Item
-          label="이메일"
-          name="email"
-          rules={[
-            { required: true, message: '이메일을 입력해 주세요.' },
-            { type: 'email', message: '올바른 이메일 형식으로 입력해 주세요.' },
-          ]}
+    <ConfigProvider theme={AUTH_THEME} componentSize="large">
+      <section className={styles.container}>
+        <div className={styles.head}>
+          <Typography.Title level={2} className={styles.title}>
+            로그인
+          </Typography.Title>
+          <Typography.Paragraph className={styles.lede}>
+            냉장고에 남은 재료와 나에게 맞는 메뉴를 확인해 보세요.
+          </Typography.Paragraph>
+        </div>
+        {errorMessage && (
+          <Alert type="error" title={errorMessage} showIcon className={styles.error} />
+        )}
+        {!errorMessage && sessionReason && (
+          <Alert
+            type="warning"
+            title={
+              sessionReason === 'suspended'
+                ? '계정 이용이 제한되어 로그인이 해제되었습니다.'
+                : '로그인이 만료되었습니다. 다시 로그인해 주세요.'
+            }
+            showIcon
+            className={styles.error}
+          />
+        )}
+        <Form<LoginRequest>
+          layout="vertical"
+          onFinish={handleSubmit}
+          requiredMark={false}
+          className={styles.form}
         >
-          <Input autoComplete="email" size="large" />
-        </Form.Item>
-        <Form.Item
-          label="비밀번호"
-          name="password"
-          rules={[{ required: true, message: '비밀번호를 입력해 주세요.' }]}
-        >
-          <Input.Password autoComplete="current-password" size="large" />
-        </Form.Item>
-        <Button
-          type="primary"
-          htmlType="submit"
-          size="large"
-          block
-          loading={loginMutation.isPending}
-        >
-          로그인
-        </Button>
-      </Form>
-      <Typography.Paragraph className={styles.signupLink}>
-        아직 계정이 없나요? <Link to={ROUTES.signup}>회원가입</Link>
-      </Typography.Paragraph>
-    </section>
+          <Form.Item
+            label="이메일"
+            name="email"
+            rules={[
+              { required: true, message: '이메일을 입력해 주세요.' },
+              { type: 'email', message: '올바른 이메일 형식으로 입력해 주세요.' },
+            ]}
+          >
+            <Input autoComplete="email" size="large" />
+          </Form.Item>
+          <Form.Item
+            label="비밀번호"
+            name="password"
+            rules={[{ required: true, message: '비밀번호를 입력해 주세요.' }]}
+          >
+            <Input.Password autoComplete="current-password" size="large" />
+          </Form.Item>
+          <Button
+            type="primary"
+            htmlType="submit"
+            size="large"
+            block
+            loading={loginMutation.isPending}
+            className={styles.submit}
+          >
+            로그인
+          </Button>
+        </Form>
+        <Typography.Paragraph className={styles.signupLink}>
+          아직 계정이 없나요? <Link to={ROUTES.signup}>회원가입</Link>
+        </Typography.Paragraph>
+      </section>
+    </ConfigProvider>
   );
 }

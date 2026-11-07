@@ -1,54 +1,74 @@
 @use '@/styles/variables' as *;
 @use '@/styles/mixins' as *;
 
+// 레퍼런스처럼 본문과 같은 바탕, 아래 구분선 없음. 스크롤해도 위에 붙어 있다.
 .header {
   position: sticky;
   top: 0;
   z-index: 10;
-  height: $header-height;
-  padding: 0 var(--ant-padding);
+  height: auto;
+  padding: 0;
   line-height: normal;
-  background: var(--ant-color-bg-container);
-  border-bottom: 1px solid var(--ant-color-border-secondary);
-
-  @include from(md) {
-    padding: 0 var(--ant-padding-lg);
-  }
+  background: var(--ant-color-bg-layout);
+  transition: background-color var(--ant-motion-duration-mid);
 }
 
+// 화면 양 끝까지 펼친다: [로고(왼쪽 끝)] [핵심 메뉴] ……… [아이콘(오른쪽 끝)].
+// 본문 폭(1200px)에 묶지 않고 화면 폭 전체를 쓴다. 좁은 화면은 로고 앞에 메뉴 버튼이 온다.
 .inner {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--ant-margin);
-  max-width: $content-max-width;
-  height: 100%;
-  margin: 0 auto;
+  gap: var(--ant-margin-sm);
+  width: 100%;
+  min-height: $header-height;
+  @include page-gutter;
+
+  @include from(lg) {
+    gap: var(--ant-margin-xl);
+  }
 }
 
+// 로고: 맨 왼쪽, 상단바에서 가장 큰 글자
 .brand {
   display: inline-flex;
   flex-shrink: 0;
   align-items: center;
   gap: var(--ant-margin-xs);
-  min-height: 44px;
+  min-height: $touch-target-size;
+  color: var(--ant-color-text);
+  text-decoration: none;
+
+  &:hover {
+    color: var(--ant-color-text);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--ant-color-primary-active);
+    outline-offset: 2px;
+  }
 }
 
+// 로고 아이콘: 좁은 화면에서는 로고 글자만 남긴다(메뉴 버튼·아이콘과 한 줄에 들어가게).
 .logoMark {
-  display: inline-flex;
+  display: none;
+  flex-shrink: 0;
   align-items: center;
   justify-content: center;
   width: var(--ant-control-height);
   height: var(--ant-control-height);
   background: var(--ant-color-text);
   border-radius: var(--ant-border-radius);
+
+  @include from(md) {
+    display: inline-flex;
+  }
 }
 
 .logoDoor {
   position: relative;
   width: var(--ant-font-size-sm);
   height: var(--ant-font-size-lg);
-  border: 2px solid var(--ant-color-bg-container);
+  border: 2px solid var(--ant-color-bg-layout);
   border-radius: 2px;
 
   &::after {
@@ -57,96 +77,301 @@
     top: 35%;
     right: 0;
     left: 0;
-    border-top: 2px solid var(--ant-color-bg-container);
+    border-top: 2px solid var(--ant-color-bg-layout);
   }
 }
 
+// 워드마크: 메인 제목과 같은 제목용 글꼴. 메뉴 글자보다 확실히 크게.
 .brandText {
-  font-size: var(--ant-font-size-lg);
-  color: var(--ant-color-text);
-}
-
-.searchWrapper {
-  display: none;
-  flex: 1;
-  max-width: 300px;
+  font-family: $font-display;
+  font-size: $header-brand-font-size-sm;
+  line-height: 1;
+  letter-spacing: $display-tracking;
+  white-space: nowrap;
 
   @include from(md) {
-    display: block;
+    font-size: $header-brand-font-size;
   }
 }
 
-.searchInput {
-  border-radius: var(--ant-control-height);
+// 핵심 메뉴: 글자 링크(버튼 모양 없음). 현재 화면은 글자 아래 귤색 선.
+.desktopNav,
+.adminNav {
+  display: none;
+  align-items: center;
+  gap: var(--ant-margin-lg);
+  min-width: 0;
 }
 
 .desktopNav {
-  display: none;
-  align-items: center;
-  gap: var(--ant-margin-xxs);
-  margin-left: auto;
-
   @include from(lg) {
     display: flex;
   }
 }
 
-// 관리자 메뉴: 7개라 lg에서는 한 줄에 들어가지 않아 xl부터 펼친다(그보다 좁으면 Drawer)
 .adminNav {
-  display: none;
-  align-items: center;
-  gap: var(--ant-margin-xxs);
-  margin-left: auto;
+  gap: var(--ant-margin);
 
   @include from(xl) {
     display: flex;
   }
 }
 
-.navButton {
-  min-height: 44px;
-}
-
-// 관리자 로그아웃 버튼의 닉네임: 길면 말줄임(닉네임은 30자까지)
-.nickname {
-  display: inline-block;
-  max-width: $header-nickname-max-width;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  vertical-align: bottom;
-}
-
-// 현재 위치 메뉴: 굵게 + 밑줄
-.navButtonCurrent {
-  @extend .navButton;
-
+.navLink {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: $touch-target-size;
+  font-size: $header-nav-font-size;
   font-weight: var(--ant-font-weight-strong);
-  border-bottom: 2px solid var(--ant-color-text);
-  border-radius: 0;
-}
+  color: var(--ant-color-text);
+  white-space: nowrap;
 
-.actions {
-  flex-shrink: 0;
-  margin-left: auto;
+  // 밑줄: 글자 아래 따로 그린 2px 선(레퍼런스 링크 밑줄 방식). 글자색을 따라가서 사진 위에서는 종이색, 바탕 위에서는 잉크색.
+  // 마우스를 올리면 왼쪽에서 오른쪽으로 그어지고, 올려 둔 동안 계속 보인다.
+  &::after {
+    content: '';
+    position: absolute;
+    top: calc(50% + #{$nav-underline-offset});
+    right: 0;
+    left: 0;
+    height: 2px;
+    background: currentcolor;
+    transform: scaleX(0);
+    transform-origin: left center;
 
-  @include from(lg) {
-    margin-left: 0;
+    @media (prefers-reduced-motion: no-preference) {
+      transition: transform var(--ant-motion-duration-mid) var(--ant-motion-ease-out);
+    }
+  }
+
+  &:hover {
+    color: var(--ant-color-text);
+
+    &::after {
+      transform: scaleX(1);
+    }
+  }
+
+  // 지금 보고 있는 화면의 메뉴: 귤색 밑줄이 늘 그어져 있다.
+  &[aria-current='page']::after {
+    background: var(--ant-color-primary);
+    transform: scaleX(1);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--ant-color-primary-active);
+    outline-offset: 2px;
   }
 }
 
-.mobileMenuTrigger {
-  min-width: 44px;
-  min-height: 44px;
+.actions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--ant-margin-xxs);
+  margin-left: auto;
+}
+
+// 메인 첫 화면: 상단바를 따로 두지 않고 사진 위에 투명하게 겹친다. 글자·아이콘·로고는 종이색(사진 위 잉크색 막이 대비를 받친다).
+// 마우스를 올리면 본문 바탕색이 나타나고 글자는 원래 잉크색으로 돌아온다(마우스를 치우면 다시 투명).
+// 포커스로는 바탕을 고정하지 않는다: 장바구니 서랍·검색 줄을 닫으면 포커스가 헤더 안으로 돌아와 바탕이 남기 때문.
+// 키보드 사용자는 사진 위 잉크색 막 위의 종이색 글자와 포커스 테두리로 위치를 본다.
+.overlay:not(:hover) {
+  background: transparent;
+
+  .brand,
+  .navLink,
+  .brand:hover,
+  .navLink:hover {
+    color: var(--ant-color-bg-layout);
+  }
+
+  .logoMark {
+    background: var(--ant-color-bg-layout);
+  }
+
+  .logoDoor,
+  .logoDoor::after {
+    border-color: var(--ant-color-text);
+  }
+
+  :global(.ant-btn).iconButton,
+  .actions :global(.ant-btn) {
+    color: var(--ant-color-bg-layout);
+  }
+}
+
+// 아이콘만 있는 버튼(검색·계정·장바구니·메뉴). 터치 영역 44px.
+:global(.ant-btn).iconButton {
+  min-width: $touch-target-size;
+  min-height: $touch-target-size;
+  font-size: $header-icon-size;
+}
+
+// 검색 아이콘은 md 이상에서만(좁은 화면은 왼쪽 메뉴 Drawer 안에 검색창이 있다)
+:global(.ant-btn).searchButton {
+  display: none;
+
+  @include from(md) {
+    display: inline-flex;
+  }
+}
+
+// 계정 아이콘은 lg 이상에서만(좁은 화면은 왼쪽 메뉴 Drawer에 마이페이지·로그아웃이 있다)
+.desktopOnly {
+  display: none;
+
+  @include from(lg) {
+    display: inline-flex;
+  }
+}
+
+// 돋보기를 누르면 헤더 아래에 열리는 검색 줄(레퍼런스 header-search 치수).
+// 바탕은 헤더와 같은 종이색, 아래 얇은 선. 클릭해도 선·테두리가 바뀌지 않는다.
+.searchPanel {
+  background: var(--ant-color-bg-layout);
+  border-bottom: 1px solid var(--ant-color-border-secondary);
+}
+
+// 검색 화면 밖: 본문을 밀어내지 않고 헤더 바로 아래에 띄운다.
+// 닫혀 있으면 살짝 위에서 투명하게 숨어 있다가, 열리면 부드럽게 내려오며 나타난다(닫을 때는 반대로).
+// visibility는 열릴 때 바로 보이고 닫힐 때는 움직임이 끝난 뒤 숨는다. 움직임 줄이기 설정이면 바로 바뀐다.
+.searchFloating {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  left: 0;
+
+  &:not(.searchOpen) {
+    visibility: hidden;
+    opacity: 0;
+    transform: translateY(-$header-search-enter-offset);
+    pointer-events: none;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    transition:
+      opacity var(--ant-motion-duration-mid) var(--ant-motion-ease-out),
+      transform var(--ant-motion-duration-mid) var(--ant-motion-ease-out),
+      visibility 0s linear var(--ant-motion-duration-mid);
+
+    &.searchOpen {
+      transition-delay: 0s;
+    }
+  }
+}
+
+.searchOpen {
+  visibility: visible;
+  opacity: 1;
+  transform: none;
+}
+
+// 검색 줄이 떠 있는 동안 아래 본문을 40% 어둡게 덮는다. 누르면 닫힌다(키보드는 닫기 버튼).
+// 헤더 줄은 덮지 않도록 헤더 높이 아래부터 덮는다.
+.searchBackdrop {
+  position: fixed;
+  inset: $header-height 0 0;
+  z-index: -1;
+  padding: 0;
+  visibility: hidden;
+  background: color-mix(in srgb, var(--ant-color-text) 40%, transparent);
+  border: 0;
+  opacity: 0;
+  cursor: default;
+  pointer-events: none;
+
+  @media (prefers-reduced-motion: no-preference) {
+    transition:
+      opacity var(--ant-motion-duration-mid) var(--ant-motion-ease-out),
+      visibility 0s linear var(--ant-motion-duration-mid);
+  }
+}
+
+.searchBackdropOpen {
+  visibility: visible;
+  opacity: 1;
+  pointer-events: auto;
+
+  @media (prefers-reduced-motion: no-preference) {
+    transition-delay: 0s;
+  }
+}
+
+// [돋보기 입력칸 — 남은 폭 전부] [닫기]. 위아래 12px(md 이상 24px), 사이 12px(md 이상 20px).
+.searchInner {
+  @include page-gutter;
+
+  display: flex;
+  align-items: center;
+  gap: $header-search-gap-sm;
+  padding-block: $header-search-padding-sm;
+
+  @include from(md) {
+    gap: $header-search-gap;
+    padding-block: $header-search-padding;
+  }
+}
+
+// 입력칸: 테두리·바탕 없이 검색 줄 바탕(종이색)에 그대로 얹힌 글자(레퍼런스와 같은 크기 14px, md 이상 18px).
+// antd 입력칸·자동완성 상자의 흰 바탕(colorBgContainer)이 이기지 않도록 .searchInner 안으로 범위를 좁혀 우선순위를 올린다.
+.searchInner {
+  :global(.ant-select),
+  :global(.ant-select-selector),
+  :global(.ant-input-affix-wrapper),
+  :global(.ant-input-affix-wrapper:hover),
+  :global(.ant-input-affix-wrapper:focus-within),
+  :global(.ant-input),
+  :global(.ant-input:focus) {
+    background: transparent;
+    border-color: transparent;
+    outline: none;
+    box-shadow: none;
+  }
+
+  :global(.ant-input-affix-wrapper).searchInput {
+    flex: 1;
+    min-width: 0;
+    padding-inline: 0;
+    font-size: $header-search-font-size-sm;
+
+    :global(.ant-input) {
+      font-size: inherit;
+      color: var(--ant-color-text);
+
+      // 안내 문구 "SEARCH FOR...": 레퍼런스처럼 대문자, 보조 글자색
+      &::placeholder {
+        letter-spacing: $header-search-placeholder-tracking;
+        color: var(--ant-color-text-tertiary);
+      }
+    }
+
+    :global(.ant-input-prefix) {
+      margin-inline-end: $header-search-gap-sm;
+      font-size: $header-icon-size;
+      color: var(--ant-color-text);
+    }
+
+    @include from(md) {
+      font-size: $header-search-font-size;
+
+      :global(.ant-input-prefix) {
+        margin-inline-end: $header-search-gap;
+      }
+    }
+  }
+}
+
+// 입력칸을 감싼 자동완성 상자도 남은 폭을 다 쓴다.
+.searchInner > :global(.ant-select) {
+  flex: 1;
+  min-width: 0;
 }
 
 .drawerNavButton {
   justify-content: flex-start;
-  min-height: 44px;
-}
-
-.drawerNavInner {
-  width: 100%;
+  min-height: $touch-target-size;
 }
 
 // Drawer 계정 영역의 닉네임: 버튼 글자와 같은 위치에서 시작하도록 버튼 안쪽 여백만큼 띄운다

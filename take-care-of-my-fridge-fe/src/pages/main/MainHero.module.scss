@@ -1,0 +1,116 @@
+@use '@/styles/variables' as *;
+@use '@/styles/mixins' as *;
+
+// 사진이 화면 폭 전체를 덮고, 투명한 헤더 밑(화면 맨 위)까지 올라간다(MainLayout .fullBleed가 헤더 높이만큼 끌어올림).
+// 사진이 밝아서 위(헤더 글자)·아래·왼쪽에 잉크색 막을 깔아 글자 대비(종이색 글자)를 지킨다.
+.hero {
+  position: relative;
+  display: grid;
+  min-height: calc(#{$main-hero-min-height-sm} + #{$header-height});
+  overflow: hidden;
+  isolation: isolate;
+  background: var(--ant-color-text);
+
+  @include from(md) {
+    min-height: calc(#{$main-hero-min-height} + #{$header-height});
+  }
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    background:
+      linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--ant-color-text) 60%, transparent) 0%,
+        transparent 28%
+      ),
+      linear-gradient(
+        0deg,
+        color-mix(in srgb, var(--ant-color-text) 88%, transparent) 0%,
+        color-mix(in srgb, var(--ant-color-text) 40%, transparent) 55%,
+        transparent 100%
+      ),
+      linear-gradient(
+        90deg,
+        color-mix(in srgb, var(--ant-color-text) 55%, transparent) 0%,
+        transparent 60%
+      );
+    pointer-events: none;
+  }
+}
+
+.image {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+// 글은 다른 띠와 같은 폭의 컨테이너 안, 아래쪽에.
+.inner {
+  @include main-container;
+
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: flex-end;
+  padding-block: var(--ant-padding-xl);
+
+  @include from(lg) {
+    padding-block: $main-band-padding-lg;
+  }
+}
+
+.text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ant-margin);
+  max-width: $main-hero-text-max-width;
+}
+
+:global(.ant-typography).title {
+  @include display-heading;
+
+  font-size: var(--ant-font-size-heading-1);
+  line-height: 1.1;
+  color: var(--ant-color-bg-layout);
+
+  @include from(md) {
+    font-size: $main-hero-title-size;
+  }
+}
+
+:global(.ant-typography).lede {
+  max-width: 32ch;
+  margin: 0;
+  font-size: var(--ant-font-size-lg);
+  color: var(--ant-color-bg-layout);
+  text-wrap: pretty;
+}
+
+.action {
+  min-width: $main-hero-action-min-width;
+}
+
+// 사진 위 두 번째 버튼: 종이색 테두리·글자(ghost). antd 기본은 마우스를 올리면 귤색 글자로 바뀌는데,
+// 귤색은 글자색으로 쓰지 않고 사진 위에서 대비도 모자라므로, 종이색을 유지하고 바탕만 옅게 채운다.
+:global(.ant-btn-background-ghost).action {
+  color: var(--ant-color-bg-layout);
+  border-color: var(--ant-color-bg-layout);
+
+  &:not(:disabled):hover,
+  &:not(:disabled):active {
+    color: var(--ant-color-bg-layout);
+    background: color-mix(in srgb, var(--ant-color-bg-layout) 16%, transparent);
+    border-color: var(--ant-color-bg-layout);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--ant-color-bg-layout);
+    outline-offset: 2px;
+  }
+}

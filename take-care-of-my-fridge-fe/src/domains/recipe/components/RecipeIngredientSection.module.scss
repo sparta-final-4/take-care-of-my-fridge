@@ -1,47 +1,82 @@
 @use '@/styles/variables' as *;
 @use '@/styles/mixins' as *;
 
-.list {
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ant-margin-lg);
+}
+
+// 칸 머리: 좁은 화면은 위 탭 버튼이 제목 역할을 하므로 보조 문구만, lg 이상은 "재료" 제목도 보인다.
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--ant-margin-xs) var(--ant-margin);
+}
+
+:global(.ant-typography).title {
+  display: none;
+  margin: 0;
+  font-size: var(--ant-font-size-heading-3);
+  letter-spacing: $heading-tracking;
+
+  @include from(lg) {
+    display: block;
+  }
+}
+
+.note {
+  font-size: var(--ant-font-size-sm);
+}
+
+.group {
   display: flex;
   flex-direction: column;
   gap: var(--ant-margin-xs);
+}
+
+.groupName {
+  font-weight: var(--ant-font-weight-strong);
+  color: var(--ant-color-text-secondary);
+}
+
+.list {
   margin: 0;
   padding: 0;
   list-style: none;
+  border-top: 1px solid var(--ant-color-text);
 }
 
-// 모바일: 이름·상태 / 양 2줄, md부터 이름·양·상태 한 줄
-// 줄마다 그리드가 따로라서, 상태 칸 너비를 고정해야 양 칸이 줄끼리 같은 위치에 온다.
+// 한 줄에 재료 하나: 이름 | 양 | 보유. 줄 사이는 얇은 선.
+// 보유 칸 너비를 고정해 양 칸이 줄끼리 같은 위치에 온다.
 .row {
   display: grid;
-  grid-template-areas:
-    'name status'
-    'amount status';
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  gap: 0 var(--ant-margin);
-  padding: var(--ant-padding-sm) var(--ant-padding);
-  border: 1px solid var(--ant-color-border-secondary);
-  border-radius: var(--ant-border-radius);
+  gap: var(--ant-margin-xxs) var(--ant-margin);
+  min-height: $touch-target-size;
+  padding-block: var(--ant-padding-sm);
+  border-bottom: 1px solid var(--ant-color-border-secondary);
 
-  @include from(md) {
-    grid-template-areas: 'name amount status';
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) $recipe-ingredient-status-width;
+  &:has(.status) {
+    grid-template-columns: minmax(0, 1fr) auto $recipe-ingredient-status-width;
   }
 }
 
 .name {
-  grid-area: name;
+  font-size: var(--ant-font-size-lg);
   overflow-wrap: anywhere;
 }
 
 .amount {
-  grid-area: amount;
+  font-weight: var(--ant-font-weight-strong);
+  text-align: right;
 }
 
 .status {
   display: inline-flex;
-  grid-area: status;
   align-items: center;
   justify-content: flex-end;
   gap: var(--ant-margin-xs);

@@ -27,10 +27,13 @@ export const router = createBrowserRouter([
         path: ROUTES.recipeDetail,
         lazy: page(() => import('@/pages/recipe/RecipeDetailPage')),
       },
-      { path: ROUTES.products, lazy: page(() => import('@/pages/product/ProductsPage')) },
       {
-        path: ROUTES.productDetail,
-        lazy: page(() => import('@/pages/product/ProductDetailPage')),
+        // 상품 주소(/products/:productId)를 목록 아래에 둔다. 화면은 ProductsPage가 목록 위 상품 모달로 그리므로
+        // 따로 불러올 페이지 코드가 없다(모달을 열 때 목록이 흐려지지 않는다). MainLayout도 이 id를 쓴다.
+        id: 'products',
+        path: ROUTES.products,
+        lazy: page(() => import('@/pages/product/ProductsPage')),
+        children: [{ path: ROUTES.productDetail }],
       },
       { path: ROUTES.search, lazy: page(() => import('@/pages/search/SearchPage')) },
       {

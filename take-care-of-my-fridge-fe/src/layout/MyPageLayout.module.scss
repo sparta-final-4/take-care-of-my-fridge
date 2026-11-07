@@ -2,16 +2,24 @@
 @use '@/styles/mixins' as *;
 
 // 왼쪽 메뉴 카드와 오른쪽 내용 카드는 둘 다 맨 위에서 시작해 윗선이 맞는다.
+// 넓은 화면에서 양옆이 비더라도 메뉴+내용을 최대 1200px로 가운데에 모은다.
 .container {
   display: flex;
   flex-direction: column;
   gap: var(--ant-margin-lg);
   width: 100%;
+  max-width: $mypage-max-width;
+  margin-inline: auto;
 
   @include from(md) {
     flex-direction: row;
     align-items: flex-start;
     gap: var(--ant-margin-xl);
+  }
+
+  // 넓은 화면은 메뉴와 내용 사이를 더 띄운다.
+  @include from(lg) {
+    gap: $mypage-gap-lg;
   }
 }
 
@@ -65,8 +73,8 @@
   }
 
   &:focus-visible {
-    outline: var(--ant-line-width-focus) solid var(--ant-color-primary-border);
-    outline-offset: calc(-1 * var(--ant-line-width-focus));
+    outline: 2px solid var(--ant-color-primary-active);
+    outline-offset: -2px;
   }
 
   @include from(md) {
@@ -81,14 +89,15 @@
   font-size: var(--ant-font-size);
 }
 
+// 지금 메뉴: 귤색 글자 대신 잉크로 채우고 종이색 글자(버튼의 잉크 채움과 같은 말투)
 .navItemActive {
-  background-color: var(--ant-color-primary-bg);
-  color: var(--ant-color-primary);
+  color: var(--ant-color-bg-layout);
   font-weight: var(--ant-font-weight-strong);
+  background-color: var(--ant-color-text);
 
   &:hover {
-    color: var(--ant-color-primary);
-    background-color: var(--ant-color-primary-bg-hover);
+    color: var(--ant-color-bg-layout);
+    background-color: var(--ant-color-text);
   }
 }
 

@@ -9,6 +9,7 @@ import { useAuthStore } from '@/common/auth/authStore';
 
 import { notificationQueries } from '../queries';
 import { NotificationList } from './NotificationList';
+import styles from './NotificationBell.module.scss';
 import { NotificationTitle } from './NotificationTitle';
 
 export function NotificationBell() {
@@ -34,11 +35,12 @@ export function NotificationBell() {
   }, [pathname, queryClient]);
 
   const bell = (
-    <Badge count={unreadCount} size="small">
+    <Badge count={unreadCount} size="small" offset={[-6, 6]}>
+      {/* 헤더의 다른 아이콘(검색·계정·장바구니)과 같은 테두리 없는 아이콘 버튼, 터치 영역 44px */}
       <Button
-        type="default"
-        shape="circle"
+        type="text"
         icon={<BellOutlined />}
+        className={styles.button}
         aria-label={unreadCount > 0 ? `알림, 안 읽은 알림 ${unreadCount}개` : '알림'}
         onClick={authenticated ? undefined : () => navigate(ROUTES.login)}
       />

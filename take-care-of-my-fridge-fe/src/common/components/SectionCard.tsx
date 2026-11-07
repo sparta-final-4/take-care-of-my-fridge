@@ -10,7 +10,7 @@ export interface SectionCardProps {
   extra?: ReactNode;
   // false면 제목을 대괄호 없이 보여 준다.
   bracket?: boolean;
-  // 제목 모양. card: 카드 제목(16px / 600), page: 화면 제목(Title level 3, 24px / 600)
+  // 제목 모양. card: 섹션 제목(20px / 600), page: 화면 제목(Title level 3, 24px / 600)
   titleVariant?: 'card' | 'page';
   children: ReactNode;
 }
@@ -28,11 +28,12 @@ export function SectionCard({
   return (
     <section id={id} className={styles.card}>
       <div className={styles.header}>
-        {titleVariant === 'page' ? (
+        {titleVariant === 'page' && (
           <Typography.Title level={3} className={styles.pageTitle}>
             {text}
           </Typography.Title>
-        ) : (
+        )}
+        {titleVariant === 'card' && (
           <Typography.Text strong className={styles.title}>
             {text}
           </Typography.Text>

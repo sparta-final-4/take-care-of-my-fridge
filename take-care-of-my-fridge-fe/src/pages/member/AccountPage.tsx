@@ -234,9 +234,11 @@ export default function AccountPage({ inMyPage = false }: AccountPageProps) {
     );
   }
   return (
-    <section className={styles.container}>
+    <section className={inMyPage ? `${styles.container} ${styles.inMyPage}` : styles.container}>
       {inMyPage ? (
-        <Typography.Title level={3}>내 정보 수정</Typography.Title>
+        <Typography.Title level={3} className={styles.myPageTitle}>
+          내 정보 수정
+        </Typography.Title>
       ) : (
         <Typography.Title level={2}>내 계정</Typography.Title>
       )}

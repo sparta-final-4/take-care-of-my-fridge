@@ -1,34 +1,105 @@
 @use '@/styles/variables' as *;
 @use '@/styles/mixins' as *;
 
-.label {
-  margin-right: var(--ant-margin-xs);
+// 상품 검색 조건 칸: 상자 없이 묶음마다 얇은 선으로 나눈다(레퍼런스 facets 아코디언 모양, 접지는 않는다).
+// 맨 위 잉크색 선·제목 모양은 옆 칸 섹션(SectionCard: 오늘의 밀키트)과 똑같이 맞춰, 두 칸의 위쪽 선이 한 줄에 놓인다.
+.facets {
+  display: flex;
+  flex-direction: column;
+  padding-top: var(--ant-padding-sm);
+  border-top: 1px solid var(--ant-color-text);
 }
 
-// 모바일에서는 칩을 눌러도 되는 크기로 키운다.
-.chip {
-  display: inline-flex;
-  align-items: center;
-  min-height: $touch-target-size;
-  margin: 0;
-  padding-inline: var(--ant-padding-sm);
-  border: 1px solid var(--ant-color-border);
-  border-radius: var(--ant-border-radius-lg);
+// 첫 묶음 이름 줄: [검색] ……… [초기화]
+.groupHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--ant-margin-xs);
+}
 
-  @include from(md) {
-    min-height: auto;
-    padding-block: var(--ant-padding-xxs);
+// 초기화: 잉크 글자 + 밑줄(귤색은 글자에 쓰지 않는다). 제목 줄 높이를 늘리지 않게 높이는 글자만큼.
+:global(.ant-btn).reset {
+  height: auto;
+  padding: 0;
+  color: var(--ant-color-text);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+
+  &:not(:disabled):hover {
+    color: var(--ant-color-text-secondary);
   }
 }
 
-// 칩과 같은 높이로 맞춰 모바일에서도 누르기 쉽게 한다.
-.reset {
-  min-height: $touch-target-size;
-  padding-inline: var(--ant-padding-xs);
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ant-margin-sm);
+  padding-block: var(--ant-padding-lg);
 
-  @include from(md) {
-    min-height: auto;
-    height: auto;
-    padding-block: var(--ant-padding-xxs);
+  // 첫 묶음은 맨 위 선 바로 아래에서 시작한다(옆 칸 섹션 제목과 같은 높이).
+  &:first-child {
+    padding-top: 0;
+  }
+
+  & + & {
+    border-top: 1px solid var(--ant-color-border-secondary);
+  }
+}
+
+.groupLabel {
+  font-weight: var(--ant-font-weight-strong);
+}
+
+.options {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+// 종류·가격대: 앞에 점이 붙은 글자 줄. 고르면 점이 잉크색으로 차고 글자가 굵어진다.
+:global(.ant-tag).option {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ant-margin-xs);
+  min-height: $touch-target-size;
+  margin: 0;
+  padding: 0;
+  font-size: var(--ant-font-size);
+  color: var(--ant-color-text-secondary);
+  background: transparent;
+  border: 0;
+
+  &::before {
+    content: '';
+    flex-shrink: 0;
+    width: $facet-dot-size;
+    height: $facet-dot-size;
+    border: 1px solid var(--ant-color-border);
+    border-radius: 50%;
+    transition:
+      background-color var(--ant-motion-duration-fast),
+      border-color var(--ant-motion-duration-fast);
+  }
+
+  &:hover {
+    color: var(--ant-color-text);
+    background: transparent;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--ant-color-primary-active);
+    outline-offset: 2px;
+  }
+}
+
+:global(.ant-tag-checkable-checked).option {
+  font-weight: var(--ant-font-weight-strong);
+  color: var(--ant-color-text);
+  background: transparent;
+
+  &::before {
+    background: var(--ant-color-text);
+    border-color: var(--ant-color-text);
   }
 }

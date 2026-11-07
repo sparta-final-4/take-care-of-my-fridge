@@ -1,0 +1,77 @@
+// 로그인·회원가입·가입 완료 화면이 같이 쓰는 모양. 레퍼런스(row7seeds.com 계정 화면)처럼
+// 상자 없이 종이색 바탕 위에 좁은 한 줄 폼을 가운데 두고, 제목은 메인 띠와 같은 제목용 글꼴로 크게.
+@use '@/styles/variables' as *;
+@use '@/styles/mixins' as *;
+
+@mixin auth-column($max-width) {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: $max-width;
+  margin: var(--ant-margin-xl) auto $main-section-gap;
+
+  @include from(md) {
+    margin-top: $main-section-gap;
+  }
+}
+
+@mixin auth-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--ant-margin-xs);
+  margin-bottom: var(--ant-margin-xl);
+  text-align: center;
+}
+
+@mixin auth-title {
+  @include display-heading;
+
+  font-size: var(--ant-font-size-heading-2);
+  line-height: var(--ant-line-height-heading-2);
+
+  @include from(md) {
+    font-size: var(--ant-font-size-heading-1);
+    line-height: var(--ant-line-height-heading-1);
+  }
+}
+
+@mixin auth-lede {
+  max-width: 32ch;
+  margin: 0;
+  font-size: var(--ant-font-size-lg);
+  color: var(--ant-color-text-secondary);
+  text-wrap: pretty;
+}
+
+// 라벨은 본문 글꼴 한 단계 굵게. 입력칸·버튼 높이(48px)는 각 화면의 AUTH_THEME(ConfigProvider)이 정한다.
+@mixin auth-form {
+  :global(.ant-form-item-label > label) {
+    font-weight: var(--ant-font-weight-strong);
+  }
+}
+
+// 아래 "계정이 없나요? 회원가입" 줄. 링크는 잉크 글자 + 밑줄(귤색은 글자에 쓰지 않는다).
+@mixin auth-switch {
+  margin: var(--ant-margin-xl) 0 0;
+  padding-top: var(--ant-padding-lg);
+  color: var(--ant-color-text-secondary);
+  text-align: center;
+  border-top: 1px solid var(--ant-color-border-secondary);
+
+  a {
+    font-weight: var(--ant-font-weight-strong);
+    color: var(--ant-color-text);
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+
+    &:hover {
+      color: var(--ant-color-text-secondary);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--ant-color-primary-active);
+      outline-offset: 2px;
+    }
+  }
+}

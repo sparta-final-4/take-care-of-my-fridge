@@ -1,0 +1,8 @@
+@use '@/styles/variables' as *;
+
+// 헤더 아이콘 버튼과 같은 터치 영역·아이콘 크기
+:global(.ant-btn).button {
+  min-width: $touch-target-size;
+  min-height: $touch-target-size;
+  font-size: $header-icon-size;
+}

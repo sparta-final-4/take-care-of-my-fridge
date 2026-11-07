@@ -1,3 +1,5 @@
+@use 'variables' as *;
+
 // antd v6의 CSS 변수(--ant-*)는 :root가 아니라 ConfigProvider 범위에만 생긴다.
 // body에서는 쓸 수 없으므로 폰트·글자색은 AntdApp, 배경은 Layout이 적용한다.
 *,
@@ -12,6 +14,16 @@ body {
 }
 
 body {
+  // 가로 스크롤을 막되 sticky 헤더는 살린다(hidden은 sticky를 깨뜨린다).
+  // html에는 두지 않는다. html의 overflow가 visible이어야 body의 overflow가 화면(viewport)으로 넘어가,
+  // antd 모달·서랍이 여는 동안 body에 거는 스크롤 잠금(overflow-y: hidden + 스크롤바 폭 보정)이 제대로 동작한다.
+  overflow-x: clip;
   min-width: 320px;
   -webkit-font-smoothing: antialiased;
+
+  // 마우스를 쓰는 PC: 창을 줄여도 PC 화면 폭을 지키고, 모자라는 만큼 가로 스크롤한다.
+  @media #{$desktop-pointer} {
+    min-width: $desktop-min-width;
+    overflow-x: visible;
+  }
 }

@@ -1,16 +1,14 @@
 import { PlusOutlined } from '@ant-design/icons';
 import { Button, Flex, Typography } from 'antd';
-import { useNavigate } from 'react-router';
-
-import { ROUTES } from '@/app/paths';
 
 import { withoutBasicSeasoning } from '../filter';
 import { useFridgeSort } from '../hooks/useFridgeSort';
 import { useFridgeItems } from '../queries';
+import { scrollToIngredientInput } from '../sectionIds';
+import { FridgeIllustration } from './FridgeIllustration';
 import styles from './FridgePageHeader.module.scss';
 
 export function FridgePageHeader() {
-  const navigate = useNavigate();
   const [sort] = useFridgeSort();
   const { data: allItems } = useFridgeItems(sort, true);
   // 요약 카드와 같은 기준으로 기본 양념은 빼고 센다.
@@ -20,24 +18,27 @@ export function FridgePageHeader() {
 
   return (
     <Flex align="center" justify="space-between" wrap gap="middle">
-      <Flex align="baseline" wrap gap="small">
-        <Typography.Title level={2} className={styles.title}>
-          내 냉장고
-        </Typography.Title>
-        {data && (
-          <Typography.Text type="secondary">
-            재료 {data.length}개 · 임박 {imminentCount}개
-            {expiredCount > 0 && ` · 기한 지남 ${expiredCount}개`}
-          </Typography.Text>
-        )}
+      {/* 제목 왼쪽에 웃는 냉장고 일러스트(장식) */}
+      <Flex align="center" gap="middle" className={styles.titleGroup}>
+        {/* 임박·기한 지난 재료가 있으면 땀 흘리는 표정 */}
+        <FridgeIllustration
+          mood={imminentCount + expiredCount > 0 ? 'worried' : 'happy'}
+          className={styles.illustration}
+        />
+        <Flex align="baseline" wrap gap="small">
+          <Typography.Title level={2} className={styles.title}>
+            내 냉장고
+          </Typography.Title>
+          {data && (
+            <Typography.Text type="secondary">
+              재료 {data.length}개 · 임박 {imminentCount}개
+              {expiredCount > 0 && ` · 기한 지남 ${expiredCount}개`}
+            </Typography.Text>
+          )}
+        </Flex>
       </Flex>
-      {/* 재료 입력은 메인의 [냉장고에 뭐가 남았나요?]에서 한다. */}
-      <Button
-        type="primary"
-        size="large"
-        icon={<PlusOutlined />}
-        onClick={() => navigate(ROUTES.home)}
-      >
+      {/* 재료 입력은 이 화면 위쪽 [냉장고에 뭐가 남았나요?]에서 한다. */}
+      <Button type="primary" size="large" icon={<PlusOutlined />} onClick={scrollToIngredientInput}>
         재료 추가
       </Button>
     </Flex>

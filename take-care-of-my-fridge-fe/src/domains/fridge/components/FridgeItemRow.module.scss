@@ -1,33 +1,75 @@
 @use '@/styles/variables' as *;
 @use '@/styles/mixins' as *;
 
-// 모바일: 체크·이름·수량·소비기한 / 버튼 2줄(보관 칸은 숨김), md부터 한 줄
-// 체크 / 이름(남는 폭, 말줄임)+태그 / 수량 / 보관 / 소비기한 / 버튼
+// 재료 칸(카드, 냉장고 관리 앱들의 재료 타일 구성):
+// [체크 ……… D-day] → [이름(크게) · 종류·NEW] → [수량 · 보관] → [먹었어요 · 버렸어요 · 더보기]
 .row {
-  display: grid;
-  grid-template-areas:
-    'check name quantity badge'
-    'actions actions actions actions';
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
-  align-items: center;
-  gap: var(--ant-margin-xxs) var(--ant-margin-sm);
-  padding: var(--ant-padding-xxs) var(--ant-padding-xs);
-  border-radius: var(--ant-border-radius);
+  display: flex;
+  flex-direction: column;
+  gap: var(--ant-margin-xs);
+  height: 100%;
+  padding: var(--ant-padding-sm);
+  background: var(--ant-color-bg-container);
+  border-radius: $product-media-radius;
+  box-shadow: $product-media-shadow;
+  transition: box-shadow var(--ant-motion-duration-mid);
 
-  // 줄 사이에만 얇은 구분선을 둔다(마지막 줄 아래는 없음).
-  & + & {
-    border-top: 1px solid var(--ant-color-border-secondary);
-  }
-
-  @include from(md) {
-    grid-template-areas: 'check name quantity storage badge actions';
-    grid-template-columns: auto minmax(0, 1fr) $fridge-item-quantity-width auto auto auto;
+  &:hover {
+    box-shadow:
+      $product-media-shadow,
+      0 0 0 1px var(--ant-color-border-secondary);
   }
 }
 
-// 메인에서 방금 등록한 재료.
+// 신선도 바탕: 기한 지남 = 옅은 빨강, 임박 = 옅은 노랑
+.expired {
+  background: var(--ant-color-error-bg);
+}
+
+.imminent {
+  background: var(--ant-color-warning-bg);
+}
+
+// 메인·입력에서 방금 등록한 재료: 귤색 테두리
 .highlighted {
-  background: var(--ant-color-primary-bg);
+  box-shadow:
+    $product-media-shadow,
+    0 0 0 2px var(--ant-color-primary);
+}
+
+.top {
+  display: flex;
+  align-items: center;
+  gap: var(--ant-margin-xs);
+}
+
+.check {
+  flex-shrink: 0;
+}
+
+// D-day 배지는 칸 오른쪽 위
+.badge {
+  margin-left: auto;
+}
+
+.nameWrapper {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ant-margin-xxs) var(--ant-margin-xs);
+  min-width: 0;
+}
+
+// 재료 이름: 크게, 두 줄까지
+.name {
+  display: -webkit-box;
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--ant-font-size-lg);
+  font-weight: var(--ant-font-weight-strong);
+  line-height: 1.35;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
 }
 
 // 재료 종류 태그(IngredientTypeTag)와 같은 크기
@@ -37,60 +79,35 @@
   white-space: nowrap;
 }
 
-.check {
-  grid-area: check;
-}
-
-.nameWrapper {
-  grid-area: name;
+// 수량 · 보관
+.meta {
   display: flex;
-  align-items: center;
+  flex-wrap: wrap;
+  align-items: baseline;
   gap: var(--ant-margin-xs);
-  min-width: 0;
-}
-
-.name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .quantity {
-  grid-area: quantity;
   font-variant-numeric: tabular-nums;
-  text-align: end;
   white-space: nowrap;
 }
 
 .storage {
-  display: none;
-  grid-area: storage;
+  font-size: var(--ant-font-size-sm);
   white-space: nowrap;
-
-  @include from(md) {
-    display: inline;
-  }
 }
 
+// 아래 버튼 줄: 칸 맨 아래에 붙고, 위에 얇은 선
 .actions {
-  grid-area: actions;
   justify-content: flex-end;
   gap: var(--ant-margin-xxs);
+  margin-top: auto;
+  padding-top: var(--ant-padding-xs);
+  border-top: 1px solid var(--ant-color-border-secondary);
 }
 
-// 모바일은 터치 영역 44px을 지키고, 한 줄로 펼쳐지는 xl부터 기본 컨트롤 높이로 줄인다.
+// 터치 영역 44px
 .iconButton {
   min-width: $touch-target-size;
   min-height: $touch-target-size;
-
-  @include from(xl) {
-    min-width: var(--ant-control-height);
-    min-height: var(--ant-control-height);
-  }
-}
-
-// 소비기한 태그는 칸 오른쪽에 붙인다.
-.badge {
-  grid-area: badge;
-  justify-self: end;
 }

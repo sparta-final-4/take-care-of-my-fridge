@@ -7,7 +7,7 @@ import { Link } from 'react-router';
 import { ROUTES } from '@/app/paths';
 import { SectionCard } from '@/common/components/SectionCard';
 import { SectionLoading } from '@/common/components/SectionLoading';
-import { useAddToCart } from '@/domains/cart/hooks/useAddToCart';
+import { useScreens } from '@/common/hooks/useScreens';
 import { ProductCard } from '@/domains/product/components/ProductCard';
 import { PRICE_RANGES, PRODUCT_TYPE_LABELS } from '@/domains/product/format';
 import { recordSearchClick } from '@/domains/search/api';
@@ -22,6 +22,9 @@ import { searchQueries } from '@/domains/search/queries';
 const PRODUCT_TYPES = ['INGREDIENT', 'MEALKIT'] as const;
 
 export function SearchProductSection() {
+  // 한 줄 카드 수: 휴대폰 2 / md 3 / lg 4. 마우스를 쓰는 PC는 창을 줄여도 4개(useScreens).
+  const screens = useScreens();
+  const cardSpan = screens.lg ? 6 : screens.md ? 8 : 12;
   const {
     keyword,
     productPage,
@@ -37,14 +40,19 @@ export function SearchProductSection() {
   const { data, isPending, isError, isPlaceholderData, refetch } = useQuery(
     searchQueries.products(productRequest),
   );
-  const { addToCart, pendingProductId } = useAddToCart();
+  // 상품을 누르면 같은 검색어·종류·가격대로 걸러진 상품 목록 위에 상품 모달이 뜬다. 모달을 닫으면 그 목록이 남는다.
+  const productListSearch = `?${new URLSearchParams({
+    q: keyword,
+    ...(type ? { type } : {}),
+    ...(priceRangeKey ? { price: priceRangeKey } : {}),
+  })}`;
   const { mutate: recordClick } = useMutation({
     mutationFn: recordSearchClick,
     // 클릭 기록은 사용자가 모르게 남긴다. 실패해도 알리지 않고 상세 이동은 그대로 한다.
     meta: { skipGlobalError: true },
   });
 
-  // 카드의 상세 링크를 누를 때만 기록한다. 장바구니 담기 버튼은 링크 밖이라 세지 않는다.
+  // 카드의 상품 링크(사진)를 누를 때만 기록한다. 카드의 글자 부분을 누른 것은 세지 않는다.
   const handleClickProduct = (productId: number) => (event: MouseEvent<HTMLElement>) => {
     const link = event.target instanceof Element ? event.target.closest('a') : null;
     if (!link || !event.currentTarget.contains(link)) return;
@@ -114,20 +122,14 @@ export function SearchProductSection() {
                 {products.map((product) => (
                   <Col
                     key={product.productId}
-                    xs={12}
-                    md={8}
-                    lg={6}
+                    span={cardSpan}
                     onClick={
                       product.productId === undefined
                         ? undefined
                         : handleClickProduct(product.productId)
                     }
                   >
-                    <ProductCard
-                      product={product}
-                      pending={pendingProductId === product.productId}
-                      onAddToCart={addToCart}
-                    />
+                    <ProductCard product={product} listSearch={productListSearch} />
                   </Col>
                 ))}
               </Row>
