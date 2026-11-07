@@ -6,6 +6,8 @@ import co.elastic.clients.elasticsearch._types.query_dsl.Operator;
 import co.elastic.clients.elasticsearch._types.query_dsl.Query;
 import co.elastic.clients.elasticsearch._types.query_dsl.TextQueryType;
 import co.elastic.clients.elasticsearch.core.SearchRequest;
+import co.elastic.clients.elasticsearch.core.search.Hit;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 import org.example.takecareofmyfridgebe.domain.search.config.RecipeSearchProperties;
@@ -15,11 +17,12 @@ import org.springframework.stereotype.Service;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
 
 /**
- * AI 상담 레시피 후보 검색 (ES). 조건에 맞는 레시피를 최대 100건 고르고, 어떤 조건에 맞았는지(matched)를 함께 돌려준다.
+ * AI 상담 레시피 후보 검색 (ES). 조건에 맞는 레시피를 최대 100건 고르고, 어떤 조건에 맞았는지(matched)와 맛·매운 정도를 함께 돌려준다.
  * 정렬과 카드 구성은 호출하는 쪽(chat)이 한다.
  * <ul>
  *   <li>should(점수): 분류·키워드·선택 재료·임박 재료·냉장고 재료·원하는 맛. 하나 이상 맞아야 한다</li>
@@ -53,6 +56,8 @@ public class RecipeCandidateSearchService {
     private static final List<String> KEYWORD_FIELDS = List.of("name^3", "ingredients.text^2", "summary");
     // 피할 맛이 매운맛이면 확실히 매운 레시피에 더해 매울 수 있는 레시피까지 뺀다
     private static final List<String> MAYBE_SPICY = List.of(RecipeSpicyLevel.MILD.name(), RecipeSpicyLevel.HOT.name());
+    // 문서 본문에서는 매운맛 판단에 쓰는 두 필드만 받는다 (임베딩 등 큰 필드는 받지 않는다)
+    static final List<String> SOURCE_FIELDS = List.of("tastes", "spicy_level");
 
     private final ElasticsearchClient esClient;
     private final RecipeSearchProperties properties;
@@ -65,12 +70,30 @@ public class RecipeCandidateSearchService {
         if (shoulds.isEmpty()) {
             return List.of();
         }
-        return esClient.search(searchRequest(condition, shoulds), Void.class).hits().hits().stream()
-                .map(hit -> new CandidateHit(
-                        Long.valueOf(hit.id()),
-                        hit.score() == null ? 0 : hit.score(),
-                        hit.matchedQueries().keySet()))
+        return esClient.search(searchRequest(condition, shoulds), HitSource.class).hits().hits().stream()
+                .map(RecipeCandidateSearchService::toCandidateHit)
                 .toList();
+    }
+
+    // 재색인 전 인덱스처럼 필드가 없으면 맛은 비우고 매운 정도는 NONE으로 둔다
+    private static CandidateHit toCandidateHit(Hit<HitSource> hit) {
+        HitSource source = hit.source();
+        Set<Member.Taste> tastes = EnumSet.noneOf(Member.Taste.class);
+        RecipeSpicyLevel spicyLevel = RecipeSpicyLevel.NONE;
+        if (source != null) {
+            if (source.tastes() != null) {
+                source.tastes().forEach(taste -> tastes.add(Member.Taste.valueOf(taste)));
+            }
+            if (source.spicyLevel() != null) {
+                spicyLevel = RecipeSpicyLevel.valueOf(source.spicyLevel());
+            }
+        }
+        return new CandidateHit(
+                Long.valueOf(hit.id()),
+                hit.score() == null ? 0 : hit.score(),
+                hit.matchedQueries().keySet(),
+                tastes,
+                spicyLevel);
     }
 
     SearchRequest searchRequest(Condition condition, List<Query> shoulds) {
@@ -78,7 +101,7 @@ public class RecipeCandidateSearchService {
         return SearchRequest.of(s -> s
                 .index(properties.indexProperties().recipe().alias())
                 .size(POOL_SIZE)
-                .source(src -> src.fetch(false))
+                .source(src -> src.filter(f -> f.includes(SOURCE_FIELDS)))
                 .query(q -> q.bool(b -> {
                     if (condition.selectedOnly() && !condition.selectedIngredientIds().isEmpty()) {
                         b.must(idTerms("ingredient_ids", condition.selectedIngredientIds()));
@@ -233,13 +256,48 @@ public class RecipeCandidateSearchService {
     /**
      * @param matched 맞은 조건 이름 (MATCH_* 상수)
      */
-    public record CandidateHit(Long recipeId, double score, Set<String> matched) {
+    // 검색 결과 문서 본문 (SOURCE_FIELDS)
+    record HitSource(
+            List<String> tastes,
+            @JsonProperty("spicy_level") String spicyLevel
+    ) {
+    }
+
+    /**
+     * @param matched    맞은 조건 이름 (MATCH_* 상수)
+     * @param tastes     레시피 맛 (색인할 때 확실히 매운 재료가 있으면 SPICY를 더한 값)
+     * @param spicyLevel 재료로 가른 매운 정도
+     */
+    public record CandidateHit(
+            Long recipeId,
+            double score,
+            Set<String> matched,
+            Set<Member.Taste> tastes,
+            RecipeSpicyLevel spicyLevel
+    ) {
         public CandidateHit {
             matched = Set.copyOf(matched);
+            tastes = tastes == null || tastes.isEmpty() ? Set.of() : Set.copyOf(tastes);
+            spicyLevel = spicyLevel == null ? RecipeSpicyLevel.NONE : spicyLevel;
+        }
+
+        // 맛·매운 정도가 필요 없는 곳(테스트 등)에서 쓴다
+        public CandidateHit(Long recipeId, double score, Set<String> matched) {
+            this(recipeId, score, matched, Set.of(), RecipeSpicyLevel.NONE);
         }
 
         public boolean matched(String name) {
             return matched.contains(name);
+        }
+
+        // 확실히 매운 레시피 (원하는 맛 매운맛과 맞은 것으로 센다)
+        public boolean definitelySpicy() {
+            return tastes.contains(Member.Taste.SPICY);
+        }
+
+        // 매울 수 있는 레시피 (피할 맛 매운맛이면 뺀다). 검색의 피할 맛 조건과 같이 맛 SPICY도 본다
+        public boolean maybeSpicy() {
+            return spicyLevel != RecipeSpicyLevel.NONE || definitelySpicy();
         }
     }
 }

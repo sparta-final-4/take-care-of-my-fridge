@@ -7,13 +7,16 @@ import co.elastic.clients.elasticsearch.core.SearchRequest;
 import co.elastic.clients.elasticsearch.core.SearchResponse;
 import co.elastic.clients.elasticsearch.core.search.Hit;
 import co.elastic.clients.elasticsearch.core.search.TotalHitsRelation;
+import co.elastic.clients.json.jackson.JacksonJsonpMapper;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 import org.example.takecareofmyfridgebe.domain.search.config.RecipeSearchProperties;
 import org.example.takecareofmyfridgebe.domain.search.config.RecipeSearchProperties.IndexProperties;
 import org.example.takecareofmyfridgebe.domain.search.config.RecipeSearchProperties.RecipeIndexProperties;
 import org.example.takecareofmyfridgebe.domain.search.config.SearchEngine;
+import org.example.takecareofmyfridgebe.domain.search.dto.RecipeSpicyLevel;
 import org.example.takecareofmyfridgebe.domain.search.service.RecipeCandidateSearchService.CandidateHit;
 import org.example.takecareofmyfridgebe.domain.search.service.RecipeCandidateSearchService.Condition;
+import org.example.takecareofmyfridgebe.domain.search.service.RecipeCandidateSearchService.HitSource;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -69,8 +72,8 @@ class RecipeCandidateSearchServiceTest {
     }
 
     @Test
-    @DisplayName("100건까지 문서 본문 없이 찾고, 조건 중 하나 이상 맞아야 한다")
-    void requestsPoolWithoutSource() {
+    @DisplayName("100건까지 찾되 문서 본문은 맛과 매운 정도만 받고, 조건 중 하나 이상 맞아야 한다")
+    void requestsPoolWithTasteFieldsOnly() {
         // Given
         Condition condition = condition(List.of(1L), null, false, null, null, null);
 
@@ -80,7 +83,7 @@ class RecipeCandidateSearchServiceTest {
         // Then
         assertThat(request.index()).containsExactly("recipes");
         assertThat(request.size()).isEqualTo(100);
-        assertThat(request.source().fetch()).isFalse();
+        assertThat(request.source().filter().includes()).containsExactly("tastes", "spicy_level");
         assertThat(request.query().bool().minimumShouldMatch()).isEqualTo("1");
     }
 
@@ -235,18 +238,13 @@ class RecipeCandidateSearchServiceTest {
     @DisplayName("검색 결과를 레시피 id·점수·맞은 조건 이름으로 바꾼다")
     void returnsHitsWithMatchedQueries() throws IOException {
         // Given
-        SearchResponse<Void> response = SearchResponse.of(r -> r
-                .took(1)
-                .timedOut(false)
-                .shards(s -> s.total(1).successful(1).failed(0))
-                .hits(h -> h
-                        .total(t -> t.value(2).relation(TotalHitsRelation.Eq))
-                        .hits(List.of(
-                                Hit.<Void>of(hit -> hit.index("recipes_1").id("10").score(5.0)
-                                        .matchedQueries(Map.of("selected", 3.0, "fridge", 2.0))),
-                                Hit.<Void>of(hit -> hit.index("recipes_1").id("20").score(1.0)
-                                        .matchedQueries(Map.of("fridge", 1.0)))))));
-        when(esClient.search(any(SearchRequest.class), eq(Void.class))).thenReturn(response);
+        stubHits(List.of(
+                Hit.<HitSource>of(hit -> hit.index("recipes_1").id("10").score(5.0)
+                        .matchedQueries(Map.of("selected", 3.0, "fridge", 2.0))
+                        .source(new HitSource(List.of("SPICY", "UMAMI"), "HOT"))),
+                Hit.<HitSource>of(hit -> hit.index("recipes_1").id("20").score(1.0)
+                        .matchedQueries(Map.of("fridge", 1.0))
+                        .source(new HitSource(List.of(), "NONE")))));
 
         // When
         List<CandidateHit> hits = service.search(condition(List.of(1L), List.of(2L), false, null, null, null));
@@ -257,6 +255,85 @@ class RecipeCandidateSearchServiceTest {
         assertThat(hits.get(0).matched(RecipeCandidateSearchService.MATCH_SELECTED)).isTrue();
         assertThat(hits.get(1).matched(RecipeCandidateSearchService.MATCH_SELECTED)).isFalse();
         assertThat(hits.get(1).matched()).containsExactly("fridge");
+        assertThat(hits.get(0).tastes()).containsExactlyInAnyOrder(Member.Taste.SPICY, Member.Taste.UMAMI);
+        assertThat(hits.get(0).spicyLevel()).isEqualTo(RecipeSpicyLevel.HOT);
+        assertThat(hits.get(1).tastes()).isEmpty();
+        assertThat(hits.get(1).spicyLevel()).isEqualTo(RecipeSpicyLevel.NONE);
+    }
+
+    @Test
+    @DisplayName("ES 문서의 spicy_level 필드를 매운 정도로 읽는다")
+    void readsSnakeCaseSpicyLevel() throws IOException {
+        // Given
+        String json = "{\"tastes\":[\"SPICY\",\"UMAMI\"],\"spicy_level\":\"HOT\"}";
+
+        // When
+        HitSource source = new JacksonJsonpMapper().objectMapper().readValue(json, HitSource.class);
+
+        // Then
+        assertThat(source).isEqualTo(new HitSource(List.of("SPICY", "UMAMI"), "HOT"));
+    }
+
+    @Test
+    @DisplayName("문서에 맛과 매운 정도가 없으면 맛은 비우고 매운 정도는 NONE으로 둔다")
+    void fillsEmptyTastesAndNone_whenSourceFieldsMissing() throws IOException {
+        // Given: 재색인 전 인덱스처럼 필드가 없는 문서와 본문이 없는 문서
+        stubHits(List.of(
+                Hit.<HitSource>of(hit -> hit.index("recipes_1").id("10").score(1.0)
+                        .source(new HitSource(null, null))),
+                Hit.<HitSource>of(hit -> hit.index("recipes_1").id("20").score(1.0))));
+
+        // When
+        List<CandidateHit> hits = service.search(condition(List.of(1L), null, false, null, null, null));
+
+        // Then
+        assertThat(hits).extracting(CandidateHit::tastes).containsExactly(Set.of(), Set.of());
+        assertThat(hits).extracting(CandidateHit::spicyLevel).containsExactly(RecipeSpicyLevel.NONE, RecipeSpicyLevel.NONE);
+    }
+
+    @Test
+    @DisplayName("맛에 매운맛이 있으면 확실히 매운 레시피이고, 매울 수 있는 레시피에도 든다")
+    void isDefinitelyAndMaybeSpicy_whenTasteIsSpicy() {
+        // Given
+        CandidateHit hit = new CandidateHit(1L, 1.0, Set.of(), Set.of(Member.Taste.SPICY), RecipeSpicyLevel.HOT);
+
+        // When, Then
+        assertThat(hit.definitelySpicy()).isTrue();
+        assertThat(hit.maybeSpicy()).isTrue();
+    }
+
+    @Test
+    @DisplayName("매운 정도가 MILD면 확실히 매운 레시피는 아니지만 매울 수 있는 레시피다")
+    void isOnlyMaybeSpicy_whenMild() {
+        // Given
+        CandidateHit hit = new CandidateHit(1L, 1.0, Set.of(), Set.of(Member.Taste.SWEET), RecipeSpicyLevel.MILD);
+
+        // When, Then
+        assertThat(hit.definitelySpicy()).isFalse();
+        assertThat(hit.maybeSpicy()).isTrue();
+    }
+
+    @Test
+    @DisplayName("맛과 매운 정도 없이 만들면 맛은 비어 있고 매운 정도는 NONE이다")
+    void isNotSpicy_whenCreatedWithoutTastes() {
+        // Given
+        CandidateHit hit = new CandidateHit(1L, 1.0, Set.of("fridge"));
+
+        // When, Then
+        assertThat(hit.tastes()).isEmpty();
+        assertThat(hit.spicyLevel()).isEqualTo(RecipeSpicyLevel.NONE);
+        assertThat(hit.maybeSpicy()).isFalse();
+    }
+
+    private void stubHits(List<Hit<HitSource>> hits) throws IOException {
+        SearchResponse<HitSource> response = SearchResponse.of(r -> r
+                .took(1)
+                .timedOut(false)
+                .shards(s -> s.total(1).successful(1).failed(0))
+                .hits(h -> h
+                        .total(t -> t.value(hits.size()).relation(TotalHitsRelation.Eq))
+                        .hits(hits)));
+        when(esClient.search(any(SearchRequest.class), eq(HitSource.class))).thenReturn(response);
     }
 
     private String queryName(Query query) {
