@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatCandidateProperties;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatAskWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatCategoryWordProperties;
+import org.example.takecareofmyfridgebe.domain.chat.config.ChatFoodWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatMealkitWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatTasteWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext;
@@ -80,6 +81,7 @@ public class ChatIntentFacade {
     private final ChatMealkitWordProperties chatMealkitWordProperties;
     private final ChatAskWordProperties chatAskWordProperties;
     private final ChatCategoryWordProperties chatCategoryWordProperties;
+    private final ChatFoodWordProperties chatFoodWordProperties;
 
     // 상담 문맥 없이 (첫 질문과 같게) 정한다
     public ChatIntentResolution resolve(Long memberId, Long sessionId, ChatMessageCreateRequest request) {
@@ -131,6 +133,11 @@ public class ChatIntentFacade {
                     RecipeQuery.of(memberId, request.selectedIngredientIds(), request.useSelectedOnly())));
         }
 
+        // AI가 상관없는 질문이라고 해도 음식 말이 있으면 거절하지 않는다 (정상 질문을 거절하는 게 상관없는 질문을 통과시키는 것보다 나쁘다).
+        // 되살린 GENERAL·RECOMMEND는 아래에서 AI가 처음부터 그렇게 본 것처럼 처리한다. BLOCKED·SELF_HARM은 되살리지 않는다
+        if (result.intent() == ChatIntent.OFF_TOPIC) {
+            result = reviveOffTopic(memberId, sessionId, request.content(), categories, result);
+        }
         boolean mealkitRecommend = result.intent() == ChatIntent.GENERAL
                 && mealkitRequested(memberId, sessionId, request.content());
         // "국물 밀키트", "김치찌개", "두부"처럼 이름만 말한 짧은 말은 보여 달라는 뜻으로 보고 추천으로 바꾼다
@@ -160,6 +167,52 @@ public class ChatIntentFacade {
             case OFF_TOPIC, BLOCKED, SELF_HARM -> ChatIntentResolution.declined(result.intent());
         };
         return new Decision(resolution, result.removed() == null ? List.of() : result.removed());
+    }
+
+    /**
+     * AI가 상관없는 질문(OFF_TOPIC)이라고 본 말에 음식 말이 있으면 되살린다. 달라는 말이 있으면 RECOMMEND, 없으면 GENERAL.
+     * <ul>
+     *   <li>음식 말(app.chat.food-words, 공백 빼고) → 분류 단어(묶음 말 포함) → 재료 사전 이름 → 레시피 이름 순으로 보고, 앞에서 찾으면 뒤는 보지 않는다</li>
+     *   <li>예) "주식으로 먹을 거 추천해줘" → RECOMMEND, "장보기 목록 짜줘" → GENERAL, "주식 추천해줘"·"파이썬 코드 짜줘" → OFF_TOPIC 그대로</li>
+     *   <li>재료·레시피 이름 찾기가 실패하면(DB·검색 장애) 찾지 못한 것으로 본다</li>
+     * </ul>
+     */
+    IntentResult reviveOffTopic(Long memberId, Long sessionId, String message, List<String> categories, IntentResult result) {
+        Optional<String> found = foodMention(message, categories);
+        if (found.isEmpty()) {
+            return result;
+        }
+        ChatIntent intent = AskWordChecker.requests(message, chatAskWordProperties) ? ChatIntent.RECOMMEND : ChatIntent.GENERAL;
+        log.info("상담 음식 말이 있어 상관없는 질문을 되살림 - memberId: {}, sessionId: {}, 찾은 것: {}, 의도: {}",
+                memberId, sessionId, found.get(), intent);
+        return result.withIntent(intent);
+    }
+
+    // 보낸 말에 있는 음식 말의 종류 (음식 말·분류·재료·레시피 이름). 로그에는 종류만 남긴다
+    private Optional<String> foodMention(String message, List<String> categories) {
+        if (message == null || message.isBlank()) {
+            return Optional.empty();
+        }
+        String compact = message.replaceAll("\\s+", "");
+        if (chatFoodWordProperties.food().stream().map(word -> word.replaceAll("\\s+", ""))
+                .anyMatch(word -> !word.isEmpty() && compact.contains(word))) {
+            return Optional.of("음식 말");
+        }
+        if (!CategoryWordChecker.check(message, categories, chatTasteWordProperties, chatCategoryWordProperties.groups()).isEmpty()) {
+            return Optional.of("분류");
+        }
+        String text = message.strip().replaceAll("[?!.~…,]+$", "").strip();
+        if (!ingredientNames(List.of(text.split("\\s+"))).isEmpty()) {
+            return Optional.of("재료");
+        }
+        try {
+            if (!recipeService.suggestNames(text, 1).isEmpty()) {
+                return Optional.of("레시피 이름");
+            }
+        } catch (RuntimeException e) {
+            log.warn("상담 상관없는 질문의 레시피 이름 찾기 실패, 찾지 못한 것으로 - 원인: {}", e.toString());
+        }
+        return Optional.empty();
     }
 
     /**

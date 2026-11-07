@@ -96,6 +96,12 @@ public record IntentResult(
                 keywords, dishText, preferenceText, targetIndex, targetName, removed, avoidTastes, null);
     }
 
+    // 의도만 바꾼 결과 (조건 칸은 그대로)
+    public IntentResult withIntent(ChatIntent newIntent) {
+        return new IntentResult(newIntent, wantedTastes, moodCategories, maxMinutes, includeIngredients, excludeIngredients,
+                useSelectedOnly, keywords, dishText, preferenceText, targetIndex, targetName, removed, avoidTastes, detailQuestion);
+    }
+
     // 의도만 있고 조건은 하나도 말하지 않은 결과
     public static IntentResult general() {
         return new IntentResult(ChatIntent.GENERAL, null, null, null, null, null, null, null, null, null);

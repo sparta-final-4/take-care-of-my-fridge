@@ -2,6 +2,7 @@ package org.example.takecareofmyfridgebe.domain.chat.facade;
 
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatCandidateProperties;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatCategoryWordProperties;
+import org.example.takecareofmyfridgebe.domain.chat.config.ChatFoodWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext.CardName;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext.ContextMessage;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext;
@@ -59,6 +60,10 @@ class ChatIntentFacadeTest {
     private static final Long MUSHROOM = 161L;
     private static final Long CUCUMBER = 15L;
 
+    // application.yml app.chat.food-words와 같은 목록
+    static final ChatFoodWordProperties FOOD_WORDS = new ChatFoodWordProperties(List.of("먹", "요리", "레시피", "밥", "반찬",
+            "끼니", "아침", "점심", "저녁", "야식", "간식", "재료", "냉장고", "장보기", "밀키트"));
+
     private ChatIntentExtractor extractor;
     private RecipeService recipeService;
     private IngredientMatcher ingredientMatcher;
@@ -74,7 +79,7 @@ class ChatIntentFacadeTest {
         facade = new ChatIntentFacade(extractor, recipeService, ingredientMatcher,
                 new ChatCandidateProperties(List.of("양념", "음료"), 0.4, List.of(), List.of("백김치", "물김치", "동치미", "나박김치"), List.of(), List.of()),
                 chatMessageService, TasteWordCheckerTest.WORDS, MealkitWordCheckerTest.WORDS, AskWordCheckerTest.WORDS,
-                new ChatCategoryWordProperties(CategoryWordCheckerTest.GROUPS));
+                new ChatCategoryWordProperties(CategoryWordCheckerTest.GROUPS), FOOD_WORDS);
         when(recipeService.getClassifications())
                 .thenReturn(new RecipeClassificationResponse(List.of("한식"), List.of("국", "기타", "샐러드", "양념", "음료", "찌개")));
     }
@@ -1114,16 +1119,85 @@ class ChatIntentFacadeTest {
         }
 
         @Test
-        @DisplayName("OFF_TOPIC은 밀키트를 달라는 말·이름만 말한 짧은 말이어도 추천으로 바꾸지 않는다 (바꾸는 규칙은 GENERAL에만)")
-        void keepsOffTopic_whenMealkitOrNameOnlyWords() {
+        @DisplayName("AI가 OFF_TOPIC이어도 음식 말이 있고 달라는 말이 있으면 추천으로 되살린다 (주식으로 먹을 거 추천해줘)")
+        void revivesAsRecommend_whenFoodWordAndRequestWord() {
             givenExtracted(intentOnly(ChatIntent.OFF_TOPIC));
 
-            ChatIntentResolution mealkit = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("밀키트 회사 주식 추천해줘"));
-            ChatIntentResolution nameOnly = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("두부 주가"));
+            ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("주식으로 먹을 거 추천해줘"));
 
-            assertThat(mealkit.intent()).isEqualTo(ChatIntent.OFF_TOPIC);
-            assertThat(nameOnly.intent()).isEqualTo(ChatIntent.OFF_TOPIC);
-            verify(ingredientMatcher, never()).matchAll(anyList());
+            assertThat(resolution.intent()).isEqualTo(ChatIntent.RECOMMEND);
+            assertThat(resolution.declines()).isFalse();
+            assertThat(resolution.recipeQuery()).isNotNull();
+        }
+
+        @Test
+        @DisplayName("OFF_TOPIC을 추천으로 되살리면 맛·분류 보정이 돈다 (매운 국 먹을 거 추천해줘 → 원하는 맛 SPICY, 분류 국)")
+        void correctsTastesAndCategories_whenRevivedAsRecommend() {
+            givenExtracted(intentOnly(ChatIntent.OFF_TOPIC));
+
+            RecipeQuery query = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("매운 국 먹을 거 추천해줘")).recipeQuery();
+
+            assertThat(query.wantedTastes()).containsExactly(Taste.SPICY);
+            assertThat(query.moodCategories()).contains("국");
+        }
+
+        @Test
+        @DisplayName("AI가 OFF_TOPIC이어도 음식 말이 있고 달라는 말이 없으면 일반 답으로 되살린다 (장보기 목록 짜줘)")
+        void revivesAsGeneral_whenFoodWordWithoutRequestWord() {
+            givenExtracted(intentOnly(ChatIntent.OFF_TOPIC));
+
+            ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("장보기 목록 짜줘"));
+
+            assertThat(resolution.intent()).isEqualTo(ChatIntent.GENERAL);
+            assertThat(resolution.declines()).isFalse();
+        }
+
+        @Test
+        @DisplayName("음식 말이 없어도 재료 사전 이름이 있으면 OFF_TOPIC을 되살린다")
+        void revives_whenIngredientName() {
+            givenExtracted(intentOnly(ChatIntent.OFF_TOPIC));
+            when(ingredientMatcher.matchAll(anyList())).thenReturn(Map.of("두부", ingredient(TOFU, "ING_TOFU", "두부")));
+
+            ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("두부 값이 왜 올랐어"));
+
+            assertThat(resolution.declines()).isFalse();
+        }
+
+        @Test
+        @DisplayName("음식 말·분류·재료·레시피 이름이 없으면 OFF_TOPIC 그대로다 (주식 추천해줘, 파이썬 코드 짜줘)")
+        void keepsOffTopic_whenNoFoodMention() {
+            givenExtracted(intentOnly(ChatIntent.OFF_TOPIC));
+
+            for (String message : List.of("주식 추천해줘", "파이썬 코드 짜줘")) {
+                ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of(message));
+
+                assertThat(resolution.intent()).as(message).isEqualTo(ChatIntent.OFF_TOPIC);
+                assertThat(resolution.declines()).as(message).isTrue();
+            }
+        }
+
+        @Test
+        @DisplayName("레시피 이름 찾기가 실패해도 오류 없이 OFF_TOPIC 그대로다")
+        void keepsOffTopic_whenRecipeNameLookupFails() {
+            givenExtracted(intentOnly(ChatIntent.OFF_TOPIC));
+            when(recipeService.suggestNames(any(), anyInt())).thenThrow(new RuntimeException("db down"));
+
+            assertThat(facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("주식 추천해줘")).intent())
+                    .isEqualTo(ChatIntent.OFF_TOPIC);
+        }
+
+        @Test
+        @DisplayName("BLOCKED·SELF_HARM은 음식 말이 있어도 되살리지 않는다 (마약김밥 먹고 죽고 싶어)")
+        void keepsBlockedAndSelfHarm_whenFoodWord() {
+            for (ChatIntent intent : List.of(ChatIntent.BLOCKED, ChatIntent.SELF_HARM)) {
+                givenExtracted(intentOnly(intent));
+
+                ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID,
+                        ChatMessageCreateRequest.of("마약김밥 먹고 죽고 싶어 추천해줘"));
+
+                assertThat(resolution.intent()).as(intent.name()).isEqualTo(intent);
+                assertThat(resolution.declines()).as(intent.name()).isTrue();
+            }
         }
 
         @Test
