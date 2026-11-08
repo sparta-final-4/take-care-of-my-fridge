@@ -2,7 +2,8 @@
 // 배치는 화면 폭이 아니라 감싼 칸(container: cart — 장바구니 화면, 헤더 장바구니 서랍)의 폭을 기준으로 바뀐다.
 
 // FridgePage와 같은 좌우 비율. lg 미만에서는 결제 예정 금액이 목록 아래로 간다.
-// 장바구니 화면은 테마가 --cart-columns 등 CSS 변수로 비율·모양을 바꾼다(서랍은 변수가 없어 기본 모양).
+// 헤더 장바구니 서랍은 테마가 CSS 변수(--cart-list-*, --cart-summary-*)로 목록 모양·결제 칸 위치를 바꾼다.
+// 변수가 없으면(장바구니 화면) 기본 모양.
 .layout {
   display: grid;
   grid-template-columns: 1fr;
@@ -10,7 +11,7 @@
   align-items: start;
 
   @container cart (min-width: #{$cart-container-lg}) {
-    grid-template-columns: var(--cart-columns, minmax(0, 780fr) minmax(0, 416fr));
+    grid-template-columns: minmax(0, 780fr) minmax(0, 416fr);
   }
 }
 
@@ -36,7 +37,10 @@
 }
 
 .summary {
+  position: var(--cart-summary-position, static);
+  bottom: var(--cart-summary-bottom, auto);
   min-width: 0;
+  padding-bottom: var(--cart-summary-padding-bottom, 0);
 
   @container cart (min-width: #{$cart-container-lg}) {
     position: sticky;

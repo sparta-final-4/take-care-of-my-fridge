@@ -7,8 +7,9 @@ import { CartSection } from '@/domains/cart/components/CartSection';
 
 import styles from './CartDrawer.module.scss';
 
-// 레퍼런스(row7seeds.com)의 장바구니 서랍: 오른쪽에서 밀려 나오고, 폭은 화면의 92%까지 최대 450px.
-const CART_DRAWER_SIZE = 'min(92vw, 450px)';
+// 레퍼런스(row7seeds.com)의 장바구니 서랍: 오른쪽에서 밀려 나온다.
+// 폭은 서랍 테마(styles/_cart-theme.scss)가 CSS 변수로 정한다(기본 화면의 92%까지 최대 450px).
+const CART_DRAWER_SIZE = 'var(--cart-drawer-width, min(92vw, 450px))';
 
 interface CartDrawerProps {
   open: boolean;
@@ -28,6 +29,7 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
       open={open}
       onClose={onClose}
       destroyOnHidden
+      rootClassName={styles.root}
       classNames={{
         header: styles.header,
         title: styles.title,
