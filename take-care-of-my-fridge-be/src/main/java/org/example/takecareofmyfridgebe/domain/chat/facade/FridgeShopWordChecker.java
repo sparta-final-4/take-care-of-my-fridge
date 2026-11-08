@@ -14,7 +14,7 @@ import java.util.Optional;
  * <ul>
  *   <li>묻는 말(AskWordChecker)이 있으면 바꾸지 않는다 ("냉장고에서 꺼낸 고기 어떻게 해동해?", "유통기한 지난 거 먹어도 돼?")</li>
  *   <li>요리 말이 있으면 바꾸지 않는다 ("냉장고에 있는 재료로 뭐 먹지", "두부 있으면 두부 요리 추천해줘")</li>
- *   <li>냉장고 보기 말이 있으면 FRIDGE, 없고 사기 말("사고 싶·어디서 사·장바구니·담아·주문해")이 있으면 SHOP</li>
+ *   <li>냉장고 보기 말이 있으면 FRIDGE, 없고 사기 말("사고 싶·어디서 사·장바구니·담아·주문해")이나 할인 말("세일·할인·특가·번개")이 있으면 SHOP</li>
  * </ul>
  */
 public final class FridgeShopWordChecker {
@@ -32,10 +32,15 @@ public final class FridgeShopWordChecker {
         if (containsAny(text, words.fridge())) {
             return Optional.of(ChatIntent.FRIDGE);
         }
-        if (containsAny(text, words.shop())) {
+        if (containsAny(text, words.shop()) || containsAny(text, words.sale())) {
             return Optional.of(ChatIntent.SHOP);
         }
         return Optional.empty();
+    }
+
+    // 할인 말("세일·할인·특가·번개")이 있는지. 있으면 사기에서 할인 중인 상품만 보여 준다
+    public static boolean asksSale(String message, ChatFridgeShopWordProperties words) {
+        return containsAny(compact(message), words.sale());
     }
 
     // 요리 말("추천·만들·해먹·뭐 먹지")이 있는지. 있으면 냉장고 말이 있어도 추천으로 둔다

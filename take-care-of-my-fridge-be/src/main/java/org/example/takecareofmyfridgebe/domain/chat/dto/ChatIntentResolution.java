@@ -1,5 +1,7 @@
 package org.example.takecareofmyfridgebe.domain.chat.dto;
 
+import org.example.takecareofmyfridgebe.domain.product.entity.ProductType;
+
 import java.util.List;
 
 /**
@@ -36,13 +38,19 @@ public record ChatIntentResolution(
     /**
      * 냉장고 보기에서 볼 것.
      *
-     * @param scope 범위 (재료 이름을 말했으면 무시하고 그 재료만 본다)
-     * @param names 말한 재료·상품 이름 (말한 그대로). 없으면 빈 목록
+     * @param scope       범위 (재료 이름을 말했으면 무시하고 그 재료만 본다)
+     * @param names       말한 재료·상품 이름 (말한 그대로). 없으면 빈 목록
+     * @param saleOnly    사기에서 할인 중인 상품을 물었는지 ("세일하는 재료 있어?")
+     * @param productType 할인 상품을 물을 때 상품 종류 ("밀키트" → MEALKIT, "재료" → INGREDIENT). 말하지 않았으면 null(둘 다)
      */
-    public record ItemLookup(FridgeScope scope, List<String> names) {
+    public record ItemLookup(FridgeScope scope, List<String> names, boolean saleOnly, ProductType productType) {
         public ItemLookup {
             scope = scope == null ? FridgeScope.ALL : scope;
             names = names == null ? List.of() : List.copyOf(names);
+        }
+
+        public ItemLookup(FridgeScope scope, List<String> names) {
+            this(scope, names, false, null);
         }
     }
 

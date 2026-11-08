@@ -28,6 +28,7 @@ import org.example.takecareofmyfridgebe.domain.chat.service.ChatIntentExtractor;
 import org.example.takecareofmyfridgebe.domain.chat.service.ChatMessageService;
 import org.example.takecareofmyfridgebe.domain.ingredient.service.IngredientMatcher;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
+import org.example.takecareofmyfridgebe.domain.product.entity.ProductType;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeSummary;
 import org.example.takecareofmyfridgebe.domain.recipe.service.RecipeService;
 import org.springframework.stereotype.Component;
@@ -76,6 +77,10 @@ public class ChatIntentFacade {
     private static final String NONE = "없음";
     // 이름만 말한 말로 볼 최대 글자 수 (공백·끝 문장 부호 뺀 글). "닭가슴살 브로콜리 만두"(11자)·"매운 국물 밀키트"(7자)가 들어간다
     static final int NAME_ONLY_MAX_LENGTH = 15;
+    // 사기에서 찾을 이름으로 보지 않는 말 ("세일하는 재료 있어?", "밀키트 사고 싶어")
+    private static final Set<String> SHOP_GENERIC_NAMES = Set.of("재료", "밀키트", "상품", "식재료", "거", "것");
+    // 할인 상품을 물을 때 재료 상품만 보는 말
+    private static final String INGREDIENT_WORD = "재료";
 
     private final ChatIntentExtractor chatIntentExtractor;
     private final RecipeService recipeService;
@@ -256,7 +261,24 @@ public class ChatIntentFacade {
             String text = message.strip().replaceAll("[?!.~…,]+$", "").strip();
             names = ingredientNames(List.of(text.split("\\s+")));
         }
-        return new ItemLookup(scope, names);
+        if (result.intent() != ChatIntent.SHOP) {
+            return new ItemLookup(scope, names);
+        }
+        // 사기: "재료·밀키트·상품"은 찾을 이름이 아니다 ("세일하는 재료 있어?"). 할인 말이 있으면 할인 중인 상품만, 종류는 단어로 나눈다
+        List<String> itemNames = names.stream().filter(name -> !SHOP_GENERIC_NAMES.contains(compact(name))).toList();
+        boolean saleOnly = FridgeShopWordChecker.asksSale(message, chatFridgeShopWordProperties);
+        return new ItemLookup(scope, itemNames, saleOnly, saleOnly ? saleProductType(message) : null);
+    }
+
+    // 할인 상품을 물을 때 종류: 밀키트 단어 → MEALKIT, "재료" → INGREDIENT, 둘 다 없거나 둘 다 있으면 null(모두)
+    private ProductType saleProductType(String message) {
+        boolean mealkit = MealkitWordChecker.check(message, chatMealkitWordProperties, chatTasteWordProperties)
+                == MealkitWordChecker.Mode.ONLY;
+        boolean ingredient = message != null && compact(message).contains(INGREDIENT_WORD);
+        if (mealkit == ingredient) {
+            return null;
+        }
+        return mealkit ? ProductType.MEALKIT : ProductType.INGREDIENT;
     }
 
     // 보낸 말에 있는 음식 말의 종류 (음식 말·분류·재료·레시피 이름). 로그에는 종류만 남긴다

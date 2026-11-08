@@ -18,6 +18,7 @@ class FridgeShopWordCheckerTest {
             List.of("남았", "아직있", "냉장고에뭐", "냉장고에있", "냉장고에서", "버려야", "유통기한지난", "소비기한지난"),
             List.of("버려야", "지난", "임박", "유통기한", "소비기한"),
             List.of("사고싶", "어디서사", "장바구니", "담아", "주문해"),
+            List.of("세일", "할인", "특가", "번개"),
             List.of("추천", "만들", "해먹", "요리", "레시피", "뭐먹", "먹지", "먹을까"));
 
     private static Optional<ChatIntent> check(String message) {
@@ -63,6 +64,16 @@ class FridgeShopWordCheckerTest {
         for (String message : List.of("당근 사고 싶어", "두부 어디서 사", "대파 장바구니에 담아줘", "우유 주문해줘")) {
             assertThat(check(message)).as(message).contains(ChatIntent.SHOP);
         }
+    }
+
+    @Test
+    @DisplayName("할인 말이 있으면 사기로 보고 할인 질문으로 표시한다")
+    void returnsShop_whenSaleWord() {
+        for (String message : List.of("지금 세일하는 재료 있어?", "할인하는 밀키트 뭐 있어?", "특가 상품 보여줘", "두부 세일해?")) {
+            assertThat(check(message)).as(message).contains(ChatIntent.SHOP);
+            assertThat(FridgeShopWordChecker.asksSale(message, WORDS)).as(message).isTrue();
+        }
+        assertThat(FridgeShopWordChecker.asksSale("당근 사고 싶어", WORDS)).isFalse();
     }
 
     @Test

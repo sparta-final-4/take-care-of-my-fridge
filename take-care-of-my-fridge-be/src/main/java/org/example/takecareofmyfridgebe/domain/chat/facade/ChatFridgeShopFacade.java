@@ -24,6 +24,7 @@ import org.example.takecareofmyfridgebe.domain.product.entity.IngredientProduct;
 import org.example.takecareofmyfridgebe.domain.product.entity.Product;
 import org.example.takecareofmyfridgebe.domain.product.entity.ProductType;
 import org.example.takecareofmyfridgebe.domain.product.service.ProductService;
+import org.example.takecareofmyfridgebe.domain.sale.dto.ActiveSale;
 import org.example.takecareofmyfridgebe.domain.sale.dto.SellingPrice;
 import org.example.takecareofmyfridgebe.domain.sale.service.SaleEventReader;
 import org.example.takecareofmyfridgebe.domain.search.config.RecipeSearchProperties;
@@ -66,6 +67,10 @@ public class ChatFridgeShopFacade {
     static final int CARD_LIMIT = 10;
     // 사기 답에서 재료·상품 이름을 못 뽑았을 때
     static final String NO_NAME_REPLY = "어떤 재료를 찾으시는지 이름으로 말씀해 주시면 살 수 있는 상품을 찾아 드릴게요.";
+    // 할인 상품을 물었을 때 보여 줄 카드 수 (더 있으면 상품 메뉴로 안내)
+    static final int SALE_SHOWN = 3;
+    // 화면 상단 상품 메뉴 이름 (Header.tsx)
+    private static final String PRODUCT_MENU = "재료/밀키트";
 
     private final FridgeService fridgeService;
     private final IngredientMatcher ingredientMatcher;
@@ -112,6 +117,17 @@ public class ChatFridgeShopFacade {
      */
     public RecommendationReply shop(Long memberId, ItemLookup lookup) {
         List<String> names = lookup.names();
+        if (lookup.saleOnly() && names.isEmpty()) {
+            return saleProducts(memberId, lookup.productType());
+        }
+        if (lookup.saleOnly()) {
+            List<ProductCard> cards = productCards(names, dictionaryIngredients(names));
+            Set<String> found = cards.stream().map(ProductCard::name).collect(Collectors.toSet());
+            List<String> missing = names.stream().filter(name -> !found.contains(name)).toList();
+            log.info("상담 사기(할인 확인) - memberId: {}, 말한 이름: {}, 상품 카드: {}, 상품 없음: {}", memberId, names,
+                    cards.stream().map(card -> card.name() + "=" + card.product().productId()).toList(), missing);
+            return RecommendationReply.fixed(ChatRecommendationsEventResponse.products(cards), saleCheckReply(cards, missing));
+        }
         if (names.isEmpty()) {
             log.info("상담 사기 - memberId: {}, 말한 이름 없음", memberId);
             return RecommendationReply.fixed(ChatRecommendationsEventResponse.products(List.of()), NO_NAME_REPLY);
@@ -122,6 +138,59 @@ public class ChatFridgeShopFacade {
         log.info("상담 사기 - memberId: {}, 말한 이름: {}, 상품 카드: {}, 상품 없음: {}", memberId, names,
                 cards.stream().map(card -> card.name() + "=" + card.product().productId()).toList(), missing);
         return RecommendationReply.fixed(ChatRecommendationsEventResponse.products(cards), shopReply(cards, missing));
+    }
+
+    /**
+     * 할인 중인 상품 ("세일하는 재료 있어?", "할인하는 밀키트 뭐 있어?"). 진행 중인 할인 전체에서 종류로 거르고,
+     * 지금 살 수 없는 것(상품 품절·번개 드롭 수량 0)은 빼고, 할인율 높은 순 → 상품 ID 순으로 {@value #SALE_SHOWN}장까지 보여 준다.
+     * 더 있으면 "재료/밀키트" 메뉴에서 보라고 쓴다. 할인·상품 조회는 한 번씩이다.
+     */
+    private RecommendationReply saleProducts(Long memberId, ProductType productType) {
+        Map<Long, ActiveSale> sales = saleEventReader.findAllActiveSales();
+        List<Product> products = sales.isEmpty() ? List.of() : productService.getProductsByIds(List.copyOf(sales.keySet()));
+        List<Product> onSale = products.stream()
+                .filter(product -> productType == null || product.getProductType() == productType)
+                .filter(product -> !SellingPrice.of(product, sales.get(product.getId())).soldOut())
+                .sorted(Comparator.comparingInt((Product product) -> sales.get(product.getId()).discountRate()).reversed()
+                        .thenComparing(Product::getId))
+                .toList();
+        List<ProductCard> cards = onSale.stream()
+                .limit(SALE_SHOWN)
+                .map(product -> new ProductCard(product.getName(),
+                        ShoppingProduct.from(product, SellingPrice.of(product, sales.get(product.getId())))))
+                .toList();
+        log.info("상담 사기(할인 상품) - memberId: {}, 종류: {}, 진행 중 할인 {}건 중 살 수 있는 {}건, 카드: {}", memberId,
+                productType, sales.size(), onSale.size(), cards.stream().map(card -> card.product().productId()).toList());
+        return RecommendationReply.fixed(ChatRecommendationsEventResponse.products(cards),
+                saleListReply(productType, cards.size(), onSale.size()));
+    }
+
+    // "지금 할인 중인 재료예요. 더 많은 할인 상품은 재료/밀키트 메뉴에서 확인해 주세요." / "지금 할인 중인 밀키트가 없어요."
+    static String saleListReply(ProductType productType, int shown, int total) {
+        String label = productType == ProductType.MEALKIT ? "밀키트" : productType == ProductType.INGREDIENT ? "재료" : "상품";
+        if (shown == 0) {
+            return "지금 할인 중인 " + label + (hasFinalConsonant(label) ? "이" : "가") + " 없어요.";
+        }
+        String head = "지금 할인 중인 " + label + (hasFinalConsonant(label) ? "이에요." : "예요.");
+        return total > shown ? head + " 더 많은 할인 상품은 " + PRODUCT_MENU + " 메뉴에서 확인해 주세요." : head;
+    }
+
+    // "두부는 지금 할인 중이에요. 대파는 지금 할인 중이 아니에요. 참치캔은 지금 파는 상품이 없어요."
+    static String saleCheckReply(List<ProductCard> cards, List<String> missing) {
+        List<String> onSale = cards.stream().filter(card -> card.product().salePrice() != null).map(ProductCard::name).toList();
+        List<String> notOnSale = cards.stream().filter(card -> card.product().salePrice() == null).map(ProductCard::name).toList();
+        List<String> sentences = new ArrayList<>();
+        if (!onSale.isEmpty()) {
+            sentences.add(String.join(", ", onSale) + topicParticle(onSale.get(onSale.size() - 1)) + " 지금 할인 중이에요.");
+        }
+        if (!notOnSale.isEmpty()) {
+            sentences.add(String.join(", ", notOnSale) + topicParticle(notOnSale.get(notOnSale.size() - 1))
+                    + " 지금 할인 중이 아니에요.");
+        }
+        if (!missing.isEmpty()) {
+            sentences.add(String.join(", ", missing) + topicParticle(missing.get(missing.size() - 1)) + " 지금 파는 상품이 없어요.");
+        }
+        return String.join(" ", sentences);
     }
 
     // "당근은 아래 상품으로 담을 수 있어요. 참치캔은 지금 파는 상품이 없어요."
@@ -228,9 +297,12 @@ public class ChatFridgeShopFacade {
     }
 
     private static String topicParticle(String word) {
+        return hasFinalConsonant(word) ? "은" : "는";
+    }
+
+    private static boolean hasFinalConsonant(String word) {
         char last = word.charAt(word.length() - 1);
-        boolean hasFinalConsonant = last >= '가' && last <= '힣' && (last - '가') % 28 != 0;
-        return hasFinalConsonant ? "은" : "는";
+        return last >= '가' && last <= '힣' && (last - '가') % 28 != 0;
     }
 
     private static Predicate<FridgeItemResponse> inScope(FridgeScope scope) {

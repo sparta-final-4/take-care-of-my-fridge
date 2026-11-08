@@ -73,6 +73,15 @@ class ChatIntentPromptTest {
     }
 
     @Test
+    @DisplayName("세일·할인 상품을 묻는 말은 SHOP이고, \"재료·밀키트·상품\"은 찾을 이름이 아니라고 지시한다")
+    void instructsSaleShop() {
+        assertThat(prompt).contains(
+                "세일·할인·특가 중인 상품을 묻는 말도 SHOP이다",
+                "\"재료\", \"밀키트\", \"상품\"이라는 말은 이름이 아니다",
+                "\"세일하는 재료 있어?\" → 빈 목록");
+    }
+
+    @Test
     @DisplayName("목록 밖 욕설·불법·탈취는 BLOCKED, 자해는 SELF_HARM이고, 역할만 정하는 말과 과장한 말은 아니라고 예시와 함께 지시한다")
     void instructsBlockedAndSelfHarm() {
         assertThat(prompt).contains(

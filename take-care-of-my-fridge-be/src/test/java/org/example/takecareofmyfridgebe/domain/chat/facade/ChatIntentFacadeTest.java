@@ -28,6 +28,7 @@ import org.example.takecareofmyfridgebe.domain.chat.service.ChatMessageService;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.Ingredient;
 import org.example.takecareofmyfridgebe.domain.ingredient.service.IngredientMatcher;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member.Taste;
+import org.example.takecareofmyfridgebe.domain.product.entity.ProductType;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeClassificationResponse;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeSummary;
 import org.example.takecareofmyfridgebe.domain.recipe.service.RecipeService;
@@ -1560,6 +1561,37 @@ class ChatIntentFacadeTest {
             ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("당근 사고 싶어"));
 
             assertThat(resolution.intent()).isEqualTo(ChatIntent.SHOP);
+        }
+
+        @Test
+        @DisplayName("할인 질문은 일반 대화로 봐도 사기로 바꾸고, 밀키트·재료 단어로 종류를 나누며 \"재료\"는 찾을 이름으로 보지 않는다")
+        void resolvesSaleQuestion_withProductType() {
+            Map<String, ProductType> cases = new LinkedHashMap<>();
+            cases.put("지금 세일하는 밀키트 있어?", ProductType.MEALKIT);
+            cases.put("지금 세일하는 재료 있어?", ProductType.INGREDIENT);
+            cases.put("지금 세일하는 거 있어?", null);
+            cases.forEach((message, type) -> {
+                givenExtracted(new IntentResult(ChatIntent.GENERAL, List.of(), List.of(), 0, List.of("재료"), List.of(), false,
+                        null, null, null));
+
+                ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of(message));
+
+                assertThat(resolution.intent()).as(message).isEqualTo(ChatIntent.SHOP);
+                assertThat(resolution.lookup().saleOnly()).as(message).isTrue();
+                assertThat(resolution.lookup().productType()).as(message).isEqualTo(type);
+                assertThat(resolution.lookup().names()).as(message).isEmpty();
+            });
+        }
+
+        @Test
+        @DisplayName("할인 말이 없는 사기는 할인 질문으로 보지 않는다")
+        void keepsNormalShop_whenNoSaleWord() {
+            givenExtracted(new IntentResult(ChatIntent.SHOP, List.of(), List.of(), 0, List.of("당근"), List.of(), false, null, null, null));
+
+            ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("당근 사고 싶어"));
+
+            assertThat(resolution.lookup().saleOnly()).isFalse();
+            assertThat(resolution.lookup().productType()).isNull();
         }
 
         @Test

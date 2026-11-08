@@ -22,7 +22,9 @@ import org.example.takecareofmyfridgebe.domain.product.entity.Product;
 import org.example.takecareofmyfridgebe.domain.product.entity.ProductStatus;
 import org.example.takecareofmyfridgebe.domain.product.entity.ProductType;
 import org.example.takecareofmyfridgebe.domain.product.service.ProductService;
+import org.example.takecareofmyfridgebe.domain.sale.dto.ActiveSale;
 import org.example.takecareofmyfridgebe.domain.sale.dto.SellingPrice;
+import org.example.takecareofmyfridgebe.domain.sale.entity.SaleEventType;
 import org.example.takecareofmyfridgebe.domain.sale.service.SaleEventReader;
 import org.example.takecareofmyfridgebe.domain.search.config.RecipeSearchProperties;
 import org.example.takecareofmyfridgebe.domain.search.config.SearchEngine;
@@ -46,6 +48,7 @@ import java.util.stream.IntStream;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -125,6 +128,65 @@ class ChatFridgeShopFacadeTest {
 
         assertThat(reply.event().empty()).isTrue();
         assertThat(reply.fixedReply()).isEqualTo("참치캔은 지금 파는 상품이 없어요.");
+    }
+
+    @Test
+    @DisplayName("할인 상품을 물으면 진행 중 할인에서 종류로 거르고, 수량이 다 된 번개 드롭은 빼며, 할인율 높은 순 3장과 더 있다는 안내를 쓴다")
+    void showsSaleProducts_byTypeAndDiscount() {
+        when(saleEventReader.findAllActiveSales()).thenReturn(Map.of(
+                1L, sale(1L, SaleEventType.SPECIAL, 10, null),
+                2L, sale(2L, SaleEventType.SPECIAL, 30, null),
+                3L, sale(3L, SaleEventType.FLASH_DROP, 50, 0),
+                4L, sale(4L, SaleEventType.FLASH_DROP, 20, 5),
+                5L, sale(5L, SaleEventType.SPECIAL, 40, null),
+                6L, sale(6L, SaleEventType.SPECIAL, 15, null),
+                7L, sale(7L, SaleEventType.SPECIAL, 90, null)));
+        when(productService.getProductsByIds(any())).thenReturn(List.of(
+                product(1L, "두부", ProductType.INGREDIENT), product(2L, "대파", ProductType.INGREDIENT),
+                product(3L, "우유", ProductType.INGREDIENT), product(4L, "달걀", ProductType.INGREDIENT),
+                product(5L, "양파", ProductType.INGREDIENT), product(6L, "감자", ProductType.INGREDIENT),
+                product(7L, "된장국 밀키트", ProductType.MEALKIT)));
+
+        RecommendationReply reply = facade.shop(MEMBER_ID, new ItemLookup(FridgeScope.ALL, List.of(), true, ProductType.INGREDIENT));
+
+        assertThat(reply.event().products()).extracting(card -> card.product().productId()).containsExactly(5L, 2L, 4L);
+        assertThat(reply.event().products().get(0).product().salePrice()).isNotNull();
+        assertThat(reply.fixedReply()).isEqualTo("지금 할인 중인 재료예요. 더 많은 할인 상품은 재료/밀키트 메뉴에서 확인해 주세요.");
+    }
+
+    @Test
+    @DisplayName("할인 중인 밀키트가 3장 이하면 더 있다는 안내를 쓰지 않고, 없으면 없다고 쓴다")
+    void writesSaleReply_withoutMoreOrNone() {
+        when(saleEventReader.findAllActiveSales()).thenReturn(Map.of(7L, sale(7L, SaleEventType.SPECIAL, 20, null)));
+        when(productService.getProductsByIds(any())).thenReturn(List.of(product(7L, "된장국 밀키트", ProductType.MEALKIT)));
+
+        RecommendationReply mealkits = facade.shop(MEMBER_ID, new ItemLookup(FridgeScope.ALL, List.of(), true, ProductType.MEALKIT));
+        RecommendationReply ingredients = facade.shop(MEMBER_ID, new ItemLookup(FridgeScope.ALL, List.of(), true, ProductType.INGREDIENT));
+
+        assertThat(mealkits.fixedReply()).isEqualTo("지금 할인 중인 밀키트예요.");
+        assertThat(mealkits.event().products()).hasSize(1);
+        assertThat(ingredients.fixedReply()).isEqualTo("지금 할인 중인 재료가 없어요.");
+        assertThat(ingredients.event().empty()).isTrue();
+        assertThat(ChatFridgeShopFacade.saleListReply(null, 0, 0)).isEqualTo("지금 할인 중인 상품이 없어요.");
+    }
+
+    @Test
+    @DisplayName("이름으로 할인을 물으면 그 상품이 할인 중인지 알려 주고 상품 카드를 보여 준다")
+    void checksSaleOfNamedProducts() {
+        when(ingredientMatcher.matchAll(List.of("두부", "대파"))).thenReturn(Map.of(
+                "두부", ingredient(11L, "두부"), "대파", ingredient(12L, "대파")));
+        Product tofu = product(9L, "국산 두부", ProductType.INGREDIENT);
+        Product pa = product(10L, "대파 1단", ProductType.INGREDIENT);
+        when(productService.getPublicIngredientProducts(any())).thenReturn(List.of(
+                IngredientProduct.builder().product(tofu).ingredientId(11L).build(),
+                IngredientProduct.builder().product(pa).ingredientId(12L).build()));
+        doReturn(Map.of(
+                9L, SellingPrice.of(tofu, sale(9L, SaleEventType.SPECIAL, 20, null)), 10L, SellingPrice.of(pa, null))).when(saleEventReader).findSellingPrices(any());
+
+        RecommendationReply reply = facade.shop(MEMBER_ID, new ItemLookup(FridgeScope.ALL, List.of("두부", "대파"), true, null));
+
+        assertThat(reply.fixedReply()).isEqualTo("두부는 지금 할인 중이에요. 대파는 지금 할인 중이 아니에요.");
+        assertThat(reply.event().products()).extracting(ProductCard::name).containsExactly("두부", "대파");
     }
 
     @Test
@@ -300,6 +362,11 @@ class ChatFridgeShopFacadeTest {
         Ingredient ingredient = Ingredient.builder().ingredientCode("ING_" + id).name(name).baseUnit("g").build();
         ReflectionTestUtils.setField(ingredient, "id", id);
         return ingredient;
+    }
+
+    private static ActiveSale sale(Long productId, SaleEventType type, int discountRate, Integer remaining) {
+        return new ActiveSale(productId, 900L + productId, type, 1000, discountRate, LocalDateTime.now().plusDays(1),
+                remaining, remaining == null ? null : 10);
     }
 
     private static Ingredient customIngredient() {
