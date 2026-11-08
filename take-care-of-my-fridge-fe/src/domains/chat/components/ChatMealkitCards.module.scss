@@ -115,3 +115,15 @@
     margin-bottom: var(--ant-margin-xs);
   }
 }
+
+// 냉장고에 있어요 · 임박 태그
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ant-margin-xxs);
+}
+
+.tag {
+  margin-inline-end: 0;
+  font-size: var(--ant-font-size-sm);
+}

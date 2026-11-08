@@ -28,6 +28,7 @@ export interface FridgeItemResponse {
     'ingredientName'?: string;
     'ingredientType'?: FridgeItemResponseIngredientTypeEnum;
     'orderItemId'?: number;
+    'productId'?: number;
     'quantity'?: number;
     'rawName'?: string;
     'source'?: FridgeItemResponseSourceEnum;

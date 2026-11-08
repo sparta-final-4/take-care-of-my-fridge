@@ -24,6 +24,7 @@ import { useChatStreamingStore } from '../model/useChatStreamingStore';
 import { chatQueries, useCompleteChatSession, useStartChatSession } from '../queries';
 import {
   type ChatRecommendations,
+  toChatProductCards,
   toChatRecommendedMealkits,
   toChatRecommendedRecipes,
 } from '../recommendations';
@@ -586,6 +587,7 @@ export function ChatRoomSection({
             messagesData.map((msg) => {
               const cards = toChatRecommendedRecipes(msg.recommendations);
               const mealkits = toChatRecommendedMealkits(msg.mealkits);
+              const products = toChatProductCards(msg.products);
               return (
                 <Fragment key={msg.id ?? msg.sequence}>
                   <ChatMessageBubble
@@ -596,6 +598,7 @@ export function ChatRoomSection({
                   <ChatRecommendationCards
                     recipes={cards}
                     mealkits={mealkits}
+                    products={products}
                     onNavigate={closeOnNavigate}
                   />
                 </Fragment>
@@ -652,6 +655,8 @@ export function ChatRoomSection({
             <ChatRecommendationCards
               recipes={streamingRecommendations.recipes}
               mealkits={streamingRecommendations.mealkits}
+              fridgeItems={streamingRecommendations.fridgeItems}
+              products={streamingRecommendations.products}
               descriptions={streamingDescriptions}
               onNavigate={closeOnNavigate}
             />

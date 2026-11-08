@@ -6,7 +6,11 @@ import type { ChatSessionSummaryResponse } from '@/common/api/clients';
 
 import { formatChatDateTime } from '../format';
 import { chatQueries } from '../queries';
-import { toChatRecommendedMealkits, toChatRecommendedRecipes } from '../recommendations';
+import {
+  toChatProductCards,
+  toChatRecommendedMealkits,
+  toChatRecommendedRecipes,
+} from '../recommendations';
 import { ChatMessageBubble } from './ChatMessageBubble';
 import { ChatRecommendationCards } from './ChatRecommendationCards';
 import { ChatSessionStatusTag } from './ChatSessionStatusTag';
@@ -54,6 +58,7 @@ export function ChatSessionConversation({ session }: ChatSessionConversationProp
           data.map((message) => {
             const cards = toChatRecommendedRecipes(message.recommendations);
             const mealkits = toChatRecommendedMealkits(message.mealkits);
+            const products = toChatProductCards(message.products);
             return (
               <Fragment key={message.id ?? message.sequence}>
                 <ChatMessageBubble
@@ -61,7 +66,7 @@ export function ChatSessionConversation({ session }: ChatSessionConversationProp
                   content={message.content ?? ''}
                   createdAt={message.createdAt}
                 />
-                <ChatRecommendationCards recipes={cards} mealkits={mealkits} />
+                <ChatRecommendationCards recipes={cards} mealkits={mealkits} products={products} />
               </Fragment>
             );
           })

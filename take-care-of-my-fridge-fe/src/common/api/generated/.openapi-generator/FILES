@@ -220,6 +220,7 @@ models/popular-keywords-response.ts
 models/popular-recipe-request.ts
 models/popular-recipe-response.ts
 models/popular-sale-response.ts
+models/product-card.ts
 models/product-create-request.ts
 models/product-detail-response.ts
 models/product-list-item-response.ts

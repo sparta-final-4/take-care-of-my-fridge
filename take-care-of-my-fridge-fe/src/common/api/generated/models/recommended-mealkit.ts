@@ -20,6 +20,8 @@ import type { ShoppingProduct } from './shopping-product';
 
 export interface RecommendedMealkit {
     'description'?: string;
+    'fridgeDDay'?: number;
+    'inFridge'?: boolean;
     'product'?: ShoppingProduct;
     'recipeId'?: number;
     'recipeName'?: string;

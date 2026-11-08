@@ -16,6 +16,9 @@
 
 // May contain unused imports in some cases
 // @ts-ignore
+import type { ProductCard } from './product-card';
+// May contain unused imports in some cases
+// @ts-ignore
 import type { RecommendedMealkit } from './recommended-mealkit';
 // May contain unused imports in some cases
 // @ts-ignore
@@ -26,6 +29,7 @@ export interface ChatMessageResponse {
     'createdAt'?: string;
     'id'?: number;
     'mealkits'?: Array<RecommendedMealkit>;
+    'products'?: Array<ProductCard>;
     'recommendations'?: Array<RecommendedRecipe>;
     'role'?: ChatMessageResponseRoleEnum;
     'sequence'?: number;
