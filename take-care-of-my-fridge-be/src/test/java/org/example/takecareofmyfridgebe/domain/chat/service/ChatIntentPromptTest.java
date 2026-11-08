@@ -57,7 +57,19 @@ class ChatIntentPromptTest {
                 "\"주식 추천해줘\", \"숙제 풀어줘\", \"파이썬 코드 짜줘\" → OFF_TOPIC",
                 "\"주식으로 먹을 거 추천해줘\" → RECOMMEND",
                 "\"장보기 목록 짜줘\", \"냉장고 정리 방법\", \"안녕\", \"밥 먹었어?\" → GENERAL");
-        assertThat(followUp).contains("OFF_TOPIC·BLOCKED·SELF_HARM은 첫 질문 규칙대로다");
+        assertThat(followUp).contains("FRIDGE·OFF_TOPIC·BLOCKED·SELF_HARM은 첫 질문 규칙대로이고 [직전 조건]을 잇지 않는다");
+    }
+
+    @Test
+    @DisplayName("냉장고에 무엇이 있는지 보려는 말은 FRIDGE이고, 살 밀키트·냉장고 재료 요리·해동 질문은 아니라고 범위와 함께 지시한다")
+    void instructsFridge() {
+        assertThat(prompt).contains(
+                "내 냉장고에 무엇이 있는지 보려는 말은 FRIDGE",
+                "\"밀키트 뭐 있어\", \"밀키트 추천해줘\" → RECOMMEND",
+                "\"두부 있으면 두부 요리 추천해줘\", \"냉장고에 있는 재료로 뭐 먹지\" → RECOMMEND",
+                "\"냉장고에서 꺼낸 고기 어떻게 해동해?\", \"유통기한 지난 거 먹어도 돼?\" → GENERAL",
+                "- fridgeScope: FRIDGE일 때 볼 범위",
+                "fridgeScope는 ALL");
     }
 
     @Test

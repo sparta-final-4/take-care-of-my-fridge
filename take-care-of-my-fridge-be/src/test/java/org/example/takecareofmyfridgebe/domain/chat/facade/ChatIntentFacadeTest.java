@@ -13,6 +13,7 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntentResolution.Sou
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageCreateRequest;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageMode;
 import org.example.takecareofmyfridgebe.domain.chat.dto.DetailQuestion;
+import org.example.takecareofmyfridgebe.domain.chat.dto.FridgeScope;
 import org.example.takecareofmyfridgebe.domain.chat.dto.IntentResult;
 import org.example.takecareofmyfridgebe.domain.chat.dto.KeywordMatch;
 import org.example.takecareofmyfridgebe.domain.chat.dto.LastRecommendation;
@@ -37,6 +38,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -87,7 +89,8 @@ class ChatIntentFacadeTest {
         facade = new ChatIntentFacade(extractor, recipeService, ingredientMatcher,
                 new ChatCandidateProperties(List.of("양념", "음료"), 0.4, List.of(), List.of("백김치", "물김치", "동치미", "나박김치"), List.of(), List.of()),
                 chatMessageService, TasteWordCheckerTest.WORDS, MealkitWordCheckerTest.WORDS, AskWordCheckerTest.WORDS,
-                new ChatCategoryWordProperties(CategoryWordCheckerTest.GROUPS), FOOD_WORDS, allergyExclusionFinder, TASTE_OPPOSITES);
+                new ChatCategoryWordProperties(CategoryWordCheckerTest.GROUPS), FOOD_WORDS, allergyExclusionFinder, TASTE_OPPOSITES,
+                FridgeShopWordCheckerTest.WORDS);
         when(recipeService.getClassifications())
                 .thenReturn(new RecipeClassificationResponse(List.of("한식"), List.of("국", "기타", "샐러드", "양념", "음료", "찌개")));
     }
@@ -1377,6 +1380,141 @@ class ChatIntentFacadeTest {
                 assertThat(resolution.intent()).as(message).isEqualTo(intent);
                 assertThat(resolution.declines()).as(message).isFalse();
             });
+        }
+
+        private static IntentResult intentOnly(ChatIntent intent) {
+            return new IntentResult(intent, List.of(), List.of(), 0, List.of(), List.of(), false, null, null, null);
+        }
+    }
+
+    @Nested
+    @DisplayName("냉장고 보기 (FRIDGE)")
+    class Fridge {
+
+        @Test
+        @DisplayName("AI가 냉장고 보기로 보면 범위·말한 재료로 냉장고 보기를 정하고 추천 조건은 만들지 않는다")
+        void resolvesFridge_whenAiSaysFridge() {
+            givenExtracted(fridge(List.of("두부"), "ALL"));
+
+            ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("두부 아직 있어?"));
+
+            assertThat(resolution.intent()).isEqualTo(ChatIntent.FRIDGE);
+            assertThat(resolution.recommends()).isFalse();
+            assertThat(resolution.recipeQuery()).isNull();
+            assertThat(resolution.lookup().names()).containsExactly("두부");
+        }
+
+        @Test
+        @DisplayName("AI가 일반 대화로 봐도 냉장고 보기 말이면 냉장고 보기로 바꾸고 밀키트 단어로 범위를 MEALKIT으로 정한다 (밀키트 뭐 남았어)")
+        void changesGeneralToFridge_whenFridgeWord() {
+            givenExtracted(intentOnly(ChatIntent.GENERAL));
+
+            ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("밀키트 뭐 남았어"));
+
+            assertThat(resolution.intent()).isEqualTo(ChatIntent.FRIDGE);
+            assertThat(resolution.lookup().scope()).isEqualTo(FridgeScope.MEALKIT);
+        }
+
+        @Test
+        @DisplayName("\"내 냉장고에서 밀키트 어떤 거 있어?\"는 살 밀키트 추천이 아니라 냉장고 밀키트 보기다")
+        void resolvesFridgeMealkit_notMealkitRecommend() {
+            givenExtracted(intentOnly(ChatIntent.GENERAL));
+
+            ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID,
+                    ChatMessageCreateRequest.of("내 냉장고에서 밀키트 어떤 거 있어?"));
+
+            assertThat(resolution.intent()).isEqualTo(ChatIntent.FRIDGE);
+            assertThat(resolution.lookup().scope()).isEqualTo(FridgeScope.MEALKIT);
+        }
+
+        @Test
+        @DisplayName("AI가 추천으로 봐도 냉장고 보기 말이면 바꾸고 AI가 뽑은 재료를 쓴다 (두부 아직 있어?)")
+        void changesRecommendToFridge_withAiIngredients() {
+            givenExtracted(new IntentResult(ChatIntent.RECOMMEND, List.of(), List.of(), 0, List.of("두부"), List.of(), false,
+                    null, null, null));
+
+            ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("두부 아직 있어?"));
+
+            assertThat(resolution.intent()).isEqualTo(ChatIntent.FRIDGE);
+            assertThat(resolution.lookup().names()).containsExactly("두부");
+            assertThat(resolution.lookup().scope()).isEqualTo(FridgeScope.ALL);
+        }
+
+        @Test
+        @DisplayName("AI가 재료를 비웠으면 서버가 말에서 재료 사전 이름을 찾는다")
+        void fillsIngredientNames_whenAiLeftEmpty() {
+            givenExtracted(intentOnly(ChatIntent.GENERAL));
+            when(ingredientMatcher.matchAll(anyList())).thenReturn(Map.of("두부", ingredient(TOFU, "ING_TOFU", "두부")));
+
+            ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("두부 아직 있어?"));
+
+            assertThat(resolution.lookup().names()).containsExactly("두부");
+        }
+
+        @Test
+        @DisplayName("곧 버려야 할 것을 물으면 범위를 IMMINENT로 정한다")
+        void picksImminentScope() {
+            givenExtracted(intentOnly(ChatIntent.GENERAL));
+
+            ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("곧 버려야 할 거 있어?"));
+
+            assertThat(resolution.intent()).isEqualTo(ChatIntent.FRIDGE);
+            assertThat(resolution.lookup().scope()).isEqualTo(FridgeScope.IMMINENT);
+        }
+
+        @Test
+        @DisplayName("AI가 정한 범위가 있으면 그 범위를 쓴다")
+        void keepsAiScope() {
+            givenExtracted(fridge(List.of(), "IMMINENT"));
+
+            ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("냉장고 좀 봐줘"));
+
+            assertThat(resolution.lookup().scope()).isEqualTo(FridgeScope.IMMINENT);
+        }
+
+        @Test
+        @DisplayName("AI가 상관없는 질문으로 봐도 음식 말이 있고 냉장고 보기 말이면 냉장고 보기로 되살린다 (냉장고에 뭐 있어)")
+        void revivesOffTopicAsFridge() {
+            givenExtracted(intentOnly(ChatIntent.OFF_TOPIC));
+
+            ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("냉장고에 뭐 있어"));
+
+            assertThat(resolution.intent()).isEqualTo(ChatIntent.FRIDGE);
+            assertThat(resolution.declines()).isFalse();
+        }
+
+        @Test
+        @DisplayName("AI가 냉장고 보기로 봐도 요리 말이 있으면 추천으로 둔다 (두부 있으면 두부 요리 추천해줘)")
+        void keepsRecommend_whenCookWordWithFridgeIntent() {
+            givenExtracted(fridge(List.of("두부"), "ALL"));
+
+            ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID,
+                    ChatMessageCreateRequest.of("두부 있으면 두부 요리 추천해줘"));
+
+            assertThat(resolution.intent()).isEqualTo(ChatIntent.RECOMMEND);
+            assertThat(resolution.recipeQuery()).isNotNull();
+        }
+
+        @Test
+        @DisplayName("잘못 걸리기 쉬운 말은 바꾸지 않는다: 요리 말은 추천, 묻는 말과 주문 상태 질문은 일반 답")
+        void keepsIntent_whenMisleadingMessages() {
+            Map<String, ChatIntent> cases = new LinkedHashMap<>();
+            cases.put("냉장고에 있는 재료로 뭐 먹지", ChatIntent.RECOMMEND);
+            cases.put("냉장고에서 꺼낸 고기 어떻게 해동해?", ChatIntent.GENERAL);
+            cases.put("유통기한 지난 거 먹어도 돼?", ChatIntent.GENERAL);
+            cases.put("주문한 거 언제 와?", ChatIntent.GENERAL);
+            cases.forEach((message, aiIntent) -> {
+                givenExtracted(intentOnly(aiIntent));
+
+                ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of(message));
+
+                assertThat(resolution.intent()).as(message).isEqualTo(aiIntent);
+            });
+        }
+
+        private static IntentResult fridge(List<String> names, String scope) {
+            return new IntentResult(ChatIntent.FRIDGE, List.of(), List.of(), 0, names, List.of(), false, List.of(), "", "",
+                    0, "", List.of(), List.of(), "", scope);
         }
 
         private static IntentResult intentOnly(ChatIntent intent) {

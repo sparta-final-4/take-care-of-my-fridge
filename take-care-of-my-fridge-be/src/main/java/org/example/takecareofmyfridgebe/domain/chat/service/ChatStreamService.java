@@ -22,6 +22,7 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.RecommendationReply;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecommendationToSave;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatSafetyBlock;
 import org.example.takecareofmyfridgebe.domain.chat.facade.ChatContextFacade;
+import org.example.takecareofmyfridgebe.domain.chat.facade.ChatFridgeShopFacade;
 import org.example.takecareofmyfridgebe.domain.chat.facade.ChatIntentFacade;
 import org.example.takecareofmyfridgebe.domain.chat.facade.ChatRecommendationFacade;
 import org.example.takecareofmyfridgebe.domain.chat.facade.HealthWordChecker;
@@ -64,6 +65,7 @@ public class ChatStreamService {
     private final ChatReplyGenerator chatReplyGenerator;
     private final ChatIntentFacade chatIntentFacade;
     private final ChatRecommendationFacade chatRecommendationFacade;
+    private final ChatFridgeShopFacade chatFridgeShopFacade;
     private final ChatContextFacade chatContextFacade;
     private final ChatContextStore chatContextStore;
     private final ChatSafetyWordProperties chatSafetyWordProperties;
@@ -231,6 +233,9 @@ public class ChatStreamService {
             String question = DetailQuestion.questionFor(resolution.detailQuestion(), request.content());
             return planRecipeDetail(memberId, sessionId, resolution.targetRecipeId(), question, context);
         }
+        if (resolution != null && resolution.intent() == ChatIntent.FRIDGE) {
+            return planFridge(memberId, sessionId, resolution, context);
+        }
         if (resolution == null || !resolution.recommends()) {
             return ReplyPlan.general(context);
         }
@@ -246,6 +251,16 @@ public class ChatStreamService {
             return new ReplyPlan(context, recommendation, resolution.recipeQuery(), null, false, null, resolution.allergens());
         } catch (RuntimeException e) {
             log.warn("상담 추천 후보 검색 실패, 일반 답으로 - memberId: {}, sessionId: {}", memberId, sessionId, e);
+            return ReplyPlan.general(context);
+        }
+    }
+
+    // 냉장고 보기: 냉장고 카드와 서버 문장 (답 생성 AI 없음, 카드는 저장하지 않는다). 냉장고를 읽다 실패하면 일반 답
+    private ReplyPlan planFridge(Long memberId, Long sessionId, ChatIntentResolution resolution, ChatContext context) {
+        try {
+            return new ReplyPlan(context, chatFridgeShopFacade.fridge(memberId, resolution.lookup()), null);
+        } catch (RuntimeException e) {
+            log.warn("상담 냉장고 보기 실패, 일반 답으로 - memberId: {}, sessionId: {}", memberId, sessionId, e);
             return ReplyPlan.general(context);
         }
     }

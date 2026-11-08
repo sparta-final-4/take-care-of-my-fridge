@@ -6,6 +6,7 @@ import org.example.takecareofmyfridgebe.domain.chat.config.ChatCandidateProperti
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatAskWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatCategoryWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatFoodWordProperties;
+import org.example.takecareofmyfridgebe.domain.chat.config.ChatFridgeShopWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatTasteOppositeProperties;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatMealkitWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatTasteWordProperties;
@@ -13,7 +14,9 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext.CardName;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntent;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntentResolution;
+import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntentResolution.ItemLookup;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntentResolution.Source;
+import org.example.takecareofmyfridgebe.domain.chat.dto.FridgeScope;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageCreateRequest;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageMode;
 import org.example.takecareofmyfridgebe.domain.chat.dto.IntentResult;
@@ -86,6 +89,7 @@ public class ChatIntentFacade {
     private final ChatFoodWordProperties chatFoodWordProperties;
     private final AllergyExclusionFinder allergyExclusionFinder;
     private final ChatTasteOppositeProperties chatTasteOppositeProperties;
+    private final ChatFridgeShopWordProperties chatFridgeShopWordProperties;
 
     // 상담 문맥 없이 (첫 질문과 같게) 정한다
     public ChatIntentResolution resolve(Long memberId, Long sessionId, ChatMessageCreateRequest request) {
@@ -151,6 +155,8 @@ public class ChatIntentFacade {
         if (result.intent() == ChatIntent.OFF_TOPIC) {
             result = reviveOffTopic(memberId, sessionId, request.content(), categories, result);
         }
+        // 냉장고 보기 말이면 AI가 추천·일반 대화로 봐도(되살린 것 포함) 냉장고 보기로 바꾼다. 아래 밀키트·이름만 말하기 규칙보다 먼저 본다
+        result = applyFridgeShopWords(memberId, sessionId, request.content(), result);
         boolean mealkitRecommend = result.intent() == ChatIntent.GENERAL
                 && mealkitRequested(memberId, sessionId, request.content());
         // "국물 밀키트", "김치찌개", "두부"처럼 이름만 말한 짧은 말은 보여 달라는 뜻으로 보고 추천으로 바꾼다
@@ -173,6 +179,7 @@ public class ChatIntentFacade {
             case RECOMMEND -> ChatIntentResolution.recommend(Source.AI, toRecipeQuery(memberId, sessionId, request, result));
             case REFINE -> refine(memberId, sessionId, request, result, context);
             case RECIPE_DETAIL -> recipeDetail(memberId, sessionId, result, context);
+            case FRIDGE -> ChatIntentResolution.fridge(Source.AI, lookupOf(request.content(), result));
             case GENERAL -> mealkitRecommend
                     ? ChatIntentResolution.recommend(Source.AI, toRecipeQuery(memberId, sessionId, request, result))
                     : ChatIntentResolution.general(Source.AI);
@@ -199,6 +206,49 @@ public class ChatIntentFacade {
         log.info("상담 음식 말이 있어 상관없는 질문을 되살림 - memberId: {}, sessionId: {}, 찾은 것: {}, 의도: {}",
                 memberId, sessionId, found.get(), intent);
         return result.withIntent(intent);
+    }
+
+    /**
+     * 냉장고 보기 말(app.chat.fridge-shop-words)로 의도를 한 번 더 정한다 (FridgeShopWordChecker).
+     * <ul>
+     *   <li>AI가 추천·일반 대화로 본 말에 냉장고 보기 말이 있으면 FRIDGE ("밀키트 뭐 남았어", "두부 아직 있어?")</li>
+     *   <li>묻는 말("어떻게 해동해?", "먹어도 돼?")이나 요리 말("뭐 먹지", "요리 추천")이 있으면 바꾸지 않는다</li>
+     *   <li>AI가 냉장고 보기로 봤어도 요리 말이 있으면 추천으로 둔다 ("두부 있으면 두부 요리 추천해줘")</li>
+     * </ul>
+     * 다시 추천·레시피 자세히·거절 의도는 건드리지 않는다. 바꿨으면 INFO로 남긴다.
+     */
+    IntentResult applyFridgeShopWords(Long memberId, Long sessionId, String message, IntentResult result) {
+        ChatIntent intent = result.intent();
+        if (intent == ChatIntent.FRIDGE && FridgeShopWordChecker.cooks(message, chatFridgeShopWordProperties)) {
+            log.info("상담 요리 말이 있어 냉장고 보기를 추천으로 - memberId: {}, sessionId: {}", memberId, sessionId);
+            return result.withIntent(ChatIntent.RECOMMEND);
+        }
+        if (intent != ChatIntent.RECOMMEND && intent != ChatIntent.GENERAL) {
+            return result;
+        }
+        Optional<ChatIntent> changed = FridgeShopWordChecker.check(message, chatFridgeShopWordProperties, chatAskWordProperties);
+        if (changed.isEmpty()) {
+            return result;
+        }
+        log.info("상담 냉장고 보기 말이 있어 의도를 바꿈 - memberId: {}, sessionId: {}, 의도: {} → {}",
+                memberId, sessionId, intent, changed.get());
+        return result.withIntent(changed.get());
+    }
+
+    /**
+     * 냉장고 보기에서 볼 것. 범위는 AI 값을 쓰고, AI가 전체(ALL)로 뒀으면 서버가 단어로 정한다 (밀키트 → MEALKIT, 버려야·지난 → IMMINENT).
+     * 재료 이름은 AI가 뽑은 재료를 쓰고, 비었는데 범위가 전체면 서버가 말에서 재료 사전 이름을 찾는다.
+     */
+    private ItemLookup lookupOf(String message, IntentResult result) {
+        FridgeScope scope = result.scope() != FridgeScope.ALL
+                ? result.scope()
+                : FridgeShopWordChecker.scope(message, chatFridgeShopWordProperties, chatMealkitWordProperties);
+        List<String> names = orEmpty(result.includeIngredients());
+        if (names.isEmpty() && scope == FridgeScope.ALL && message != null) {
+            String text = message.strip().replaceAll("[?!.~…,]+$", "").strip();
+            names = ingredientNames(List.of(text.split("\\s+")));
+        }
+        return new ItemLookup(scope, names);
     }
 
     // 보낸 말에 있는 음식 말의 종류 (음식 말·분류·재료·레시피 이름). 로그에는 종류만 남긴다

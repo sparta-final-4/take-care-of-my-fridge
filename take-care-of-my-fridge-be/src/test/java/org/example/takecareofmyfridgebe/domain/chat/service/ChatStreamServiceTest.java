@@ -7,11 +7,14 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext.CardName;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext.ContextMessage;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntent;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntentResolution;
+import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntentResolution.ItemLookup;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntentResolution.Source;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageCreateRequest;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageMode;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageResponse;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse;
+import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse.FridgeItemCard;
+import org.example.takecareofmyfridgebe.domain.chat.dto.FridgeScope;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse.RecommendedMealkit;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse.RecommendedRecipe;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse.ShoppingProduct;
@@ -24,6 +27,8 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.RecommendationToSave;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatSafetyBlock;
 import org.example.takecareofmyfridgebe.domain.chat.entity.ChatMessageRole;
 import org.example.takecareofmyfridgebe.domain.chat.facade.ChatContextFacade;
+import org.example.takecareofmyfridgebe.domain.chat.facade.ChatFridgeShopFacade;
+import org.example.takecareofmyfridgebe.domain.fridge.entity.FridgeItemStatus;
 import org.example.takecareofmyfridgebe.domain.chat.facade.ChatIntentFacade;
 import org.example.takecareofmyfridgebe.domain.chat.facade.ChatRecommendationFacade;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
@@ -45,6 +50,7 @@ import reactor.core.publisher.Flux;
 import reactor.test.StepVerifier;
 import tools.jackson.databind.ObjectMapper;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -87,6 +93,9 @@ class ChatStreamServiceTest {
 
     @Mock
     private ChatRecommendationFacade chatRecommendationFacade;
+
+    @Mock
+    private ChatFridgeShopFacade chatFridgeShopFacade;
 
     @Mock
     private ChatContextFacade chatContextFacade;
@@ -619,6 +628,30 @@ class ChatStreamServiceTest {
     }
 
     @Test
+    @DisplayName("냉장고 보기면 냉장고 카드 이벤트와 서버 글을 보내고 답 AI를 부르지 않으며, 카드는 저장하지 않고 글만 저장한다")
+    void sendsFridgeCardsAndServerText_withoutSavingCards() {
+        Long sessionId = 10L;
+        ChatMessageCreateRequest request = ChatMessageCreateRequest.of("냉장고에 뭐 있어");
+        ItemLookup lookup = new ItemLookup(FridgeScope.ALL, List.of());
+        String text = "냉장고에 두부(내일까지)가 있어요.";
+        when(chatIntentFacade.resolve(eq(1L), eq(sessionId), eq(request), any())).thenReturn(ChatIntentResolution.fridge(Source.AI, lookup));
+        when(chatFridgeShopFacade.fridge(1L, lookup)).thenReturn(RecommendationReply.fixed(ChatRecommendationsEventResponse.fridge(List.of(
+                new FridgeItemCard(7L, 11L, "두부", "두부", BigDecimal.ONE, "모", 1, FridgeItemStatus.IMMINENT, false, null, null))), text));
+        when(chatMessageService.saveExchange(sessionId, "냉장고에 뭐 있어", text)).thenReturn(List.of(
+                new ChatMessageResponse(100L, 1, ChatMessageRole.USER, "냉장고에 뭐 있어", LocalDateTime.now()),
+                new ChatMessageResponse(101L, 2, ChatMessageRole.ASSISTANT, text, LocalDateTime.now())));
+
+        List<ServerSentEvent<String>> events = chatStreamService.streamMessage(1L, sessionId, request).collectList().block();
+
+        assertThat(events).extracting(ServerSentEvent::event).containsExactly("recommendations", "message", "done");
+        assertThat(events.get(0).data()).contains("\"fridgeItems\":[{", "\"fridgeId\":7", "\"status\":\"IMMINENT\"", "\"empty\":false");
+        assertThat(events.get(1).data()).contains(text);
+        verify(chatReplyGenerator, never()).generate(any(), any(), any(), any());
+        verify(chatMessageService).saveExchange(sessionId, "냉장고에 뭐 있어", text);
+        verify(chatContextStore, never()).saveRecommendation(any(), any(), any());
+    }
+
+    @Test
     @DisplayName("레시피 카드 아래 밀키트가 붙으면 레시피 카드 다음 순서로 밀키트를 서버 설명과 함께 저장한다")
     void savesMealkitAfterRecipeCards() {
         Long sessionId = 10L;
@@ -681,7 +714,7 @@ class ChatStreamServiceTest {
         List<ServerSentEvent<String>> events = chatStreamService.streamMessage(1L, sessionId, request).collectList().block();
 
         assertThat(events).extracting(ServerSentEvent::event).containsExactly("recommendations", "message", "done");
-        assertThat(events.get(0).data()).isEqualTo("{\"recipes\":[],\"mealkits\":[],\"relaxed\":[],\"empty\":true}");
+        assertThat(events.get(0).data()).isEqualTo("{\"recipes\":[],\"mealkits\":[],\"fridgeItems\":[],\"relaxed\":[],\"empty\":true}");
         assertThat(events.get(1).data()).contains("찾지 못했어요");
         verify(chatReplyGenerator, never()).generateRecommendation(any(), any(), any(), any());
         verify(chatDailyLimitService, never()).refund(any());
