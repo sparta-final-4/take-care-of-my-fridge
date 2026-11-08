@@ -1,0 +1,124 @@
+@use 'sass:map';
+
+// ════════════════════════════════════════════════════════════════════
+//  레시피 목록 화면 테마 — 아래 $recipe-list-theme 숫자만 바꾸면 화면 배치가 한 번에 바뀐다.
+//  세트 안의 값을 바꾸면 그 세트만 바뀐다. 새 세트는 번호를 하나 더 추가한다.
+//  화면 SCSS는 _variables.scss를 통해 맨 아래 "고른 세트의 값"을 읽는다.
+// ════════════════════════════════════════════════════════════════════
+
+//   1: 원래 화면 — 가운데 제목, 왼쪽 검색 조건, 2 · 3 · 4칸 카드
+//   2: 큰 카드 — 양옆 여백, 정사각 사진, 2 · 2 · 3칸
+//   3: 오른쪽 조건 — 제목 왼쪽 정렬, 검색 조건이 오른쪽, 2 · 3 · 3칸
+//   4: 촘촘 — 한 줄에 더 많이(2 · 4 · 5칸)
+//   5: 가로 목록 — 사진 왼쪽 · 글 오른쪽 카드, 1 · 2 · 2칸
+$recipe-list-theme: 1;
+
+// 세트 항목
+//   inset: 화면 양옆 여백(화면 기본 여백 안쪽에 더한다, 레시피 상세의 inset과 같다)
+//   head-align: 제목·설명 정렬 center / left
+//   sidebar-side: 넓은 화면(lg 이상) 검색 조건 칸 위치 left / right
+//   columns: 카드 칸 수. base = 휴대폰, md = 태블릿, xl = PC(마우스를 쓰는 PC는 창 폭과 관계없이 xl)
+//   card-aspect: 카드 사진 가로 / 세로(따옴표 안에)
+//   card-direction: column = 사진 위 · 글 아래, row = 사진 왼쪽 · 글 오른쪽
+$recipe-list-themes: (
+  1: (
+    inset: (
+      md: 0,
+      lg: 0,
+      xl: 0,
+      xxl: 0,
+    ),
+    head-align: center,
+    sidebar-side: left,
+    columns: (
+      base: 2,
+      md: 3,
+      xl: 4,
+    ),
+    card-aspect: '4 / 3',
+    card-direction: column,
+  ),
+  2: (
+    inset: (
+      md: 16px,
+      lg: 48px,
+      xl: 96px,
+      xxl: 200px,
+    ),
+    head-align: center,
+    sidebar-side: left,
+    columns: (
+      base: 2,
+      md: 2,
+      xl: 3,
+    ),
+    card-aspect: '1 / 1',
+    card-direction: column,
+  ),
+  3: (
+    inset: (
+      md: 0,
+      lg: 0,
+      xl: 48px,
+      xxl: 120px,
+    ),
+    head-align: left,
+    sidebar-side: right,
+    columns: (
+      base: 2,
+      md: 3,
+      xl: 3,
+    ),
+    card-aspect: '4 / 3',
+    card-direction: column,
+  ),
+  4: (
+    inset: (
+      md: 0,
+      lg: 0,
+      xl: 0,
+      xxl: 0,
+    ),
+    head-align: center,
+    sidebar-side: left,
+    columns: (
+      base: 2,
+      md: 4,
+      xl: 5,
+    ),
+    card-aspect: '4 / 3',
+    card-direction: column,
+  ),
+  5: (
+    inset: (
+      md: 0,
+      lg: 0,
+      xl: 48px,
+      xxl: 160px,
+    ),
+    head-align: left,
+    sidebar-side: left,
+    columns: (
+      base: 1,
+      md: 2,
+      xl: 2,
+    ),
+    card-aspect: '4 / 3',
+    card-direction: row,
+  ),
+);
+
+$recipe-list-row-thumb-width: 40%; // card-direction: row일 때 사진 칸 폭
+
+// ── 고른 세트의 값(여기는 고치지 않는다) ──
+@if not map.has-key($recipe-list-themes, $recipe-list-theme) {
+  @error '$recipe-list-theme #{$recipe-list-theme}번 세트가 $recipe-list-themes에 없습니다.';
+}
+
+$_recipe-list: map.get($recipe-list-themes, $recipe-list-theme);
+$recipe-list-inset: map.get($_recipe-list, inset);
+$recipe-list-head-align: map.get($_recipe-list, head-align);
+$recipe-list-sidebar-side: map.get($_recipe-list, sidebar-side);
+$recipe-list-columns: map.get($_recipe-list, columns);
+$recipe-list-card-aspect: map.get($_recipe-list, card-aspect);
+$recipe-list-card-direction: map.get($_recipe-list, card-direction);

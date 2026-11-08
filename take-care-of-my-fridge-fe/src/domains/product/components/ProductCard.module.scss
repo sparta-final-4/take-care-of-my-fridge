@@ -19,11 +19,11 @@
   }
 }
 
-// 사진 칸: 사진 전체가 하나의 링크. 세로로 조금 긴 4:5.
+// 사진 칸: 사진 전체가 하나의 링크. 세로로 조금 긴 4:5(재료/밀키트 목록 테마가 CSS 변수로 비율을 바꾼다).
 .media {
   position: relative;
   display: block;
-  aspect-ratio: 4 / 5;
+  aspect-ratio: var(--product-card-aspect, 4 / 5);
   overflow: hidden;
   background: var(--ant-color-fill-tertiary);
   border-radius: $product-media-radius;

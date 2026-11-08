@@ -1,6 +1,10 @@
 @use 'sass:map';
-// 레시피 상세 테마 설정 파일. 여기서 읽고, 이 파일을 쓰는 화면에도 그대로 넘긴다.
+// 화면별 테마 설정 파일(사람이 숫자를 바꿔 보며 확인한다). 이 파일을 쓰는 화면에 그대로 넘긴다.
 @forward 'recipe-detail-theme';
+@forward 'recipe-list-theme';
+@forward 'product-list-theme';
+@forward 'fridge-theme';
+@forward 'cart-theme';
 @use 'recipe-detail-theme' as *;
 
 $breakpoints: (

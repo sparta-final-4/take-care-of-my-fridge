@@ -1,11 +1,46 @@
+@use '@/styles/variables' as *;
+@use '@/styles/mixins' as *;
+
 // 장바구니 목록(CartSection)은 이 칸의 폭을 기준으로 배치한다(헤더 장바구니 서랍과 같은 기준).
+// 화면 폭 · 목록 : 결제 금액 비율 · 목록 상자 모양은 styles/_cart-theme.scss의 $cart-theme이 정한다.
+// 목록 섹션에는 CSS 변수로 넘겨, 같은 섹션을 쓰는 헤더 장바구니 서랍은 그대로 둔다.
 .page {
   container: cart / inline-size;
   display: flex;
   flex-direction: column;
   gap: var(--ant-margin-lg);
+
+  @if $cart-max-width != none {
+    width: 100%;
+    max-width: $cart-max-width;
+    margin-inline: auto;
+  }
+
+  @if $cart-summary-width != none {
+    --cart-columns: minmax(0, 1fr) #{$cart-summary-width};
+  } @else {
+    --cart-columns: minmax(0, #{$cart-list-ratio}fr) minmax(0, #{$cart-summary-ratio}fr);
+  }
+
+  @if not $cart-list-box {
+    --cart-list-border: 0;
+    --cart-list-border-top: 1px solid var(--ant-color-text);
+    --cart-list-bg: transparent;
+    --cart-list-radius: 0;
+    --cart-list-padding-inline: 0;
+  }
 }
 
-.title {
+:global(.ant-typography).title {
   margin: 0;
+
+  @if $cart-title-display {
+    @include display-heading;
+
+    font-size: var(--ant-font-size-heading-2);
+
+    @include from(md) {
+      font-size: var(--ant-font-size-heading-1);
+    }
+  }
 }

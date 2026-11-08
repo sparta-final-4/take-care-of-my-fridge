@@ -1,3 +1,4 @@
+@use 'sass:map';
 @use '@/styles/variables' as *;
 @use '@/styles/mixins' as *;
 
@@ -83,4 +84,20 @@
 
 .pagination {
   margin-top: $product-grid-row-gap-xl;
+}
+
+// ── 테마(styles/_product-list-theme.scss): 카드 칸 수와 카드 모양 ──
+// 카드 모양은 이 목록 안에만 적용되도록 CSS 변수로 카드에 넘긴다(다른 화면의 같은 카드는 기본 모양).
+.grid {
+  --product-card-aspect: #{$product-list-card-aspect};
+
+  grid-template-columns: repeat(map.get($product-list-columns, base), minmax(0, 1fr));
+
+  @include from(md) {
+    grid-template-columns: repeat(map.get($product-list-columns, md), minmax(0, 1fr));
+  }
+
+  @include from(xl) {
+    grid-template-columns: repeat(map.get($product-list-columns, xl), minmax(0, 1fr));
+  }
 }
