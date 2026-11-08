@@ -28,6 +28,8 @@ public final class FridgeReplyWriter {
     // 전체 보기에서 "곧 끝나는 건"에 쓸 이름 수
     static final int SOON_SHOWN = 3;
     private static final int LABEL_DAYS = 3;
+    // 기본 양념 보기 끝에 붙이는 사기 안내
+    static final String SEASONING_SHOP_HINT = "살 수 있는 조미료가 궁금하시면 '간장 사고 싶어'처럼 이름으로 말씀해 주세요.";
 
     private FridgeReplyWriter() {
     }
@@ -80,7 +82,11 @@ public final class FridgeReplyWriter {
             sentences.add(String.join(", ", missing) + topicParticle(missing.get(missing.size() - 1)) + " 지금 냉장고에 없어요.");
         }
         if (sentences.isEmpty()) {
-            return named ? "말씀하신 재료는 지금 냉장고에 없어요." : emptyReply(scope);
+            sentences.add(named ? "말씀하신 재료는 지금 냉장고에 없어요." : emptyReply(scope));
+        }
+        // "조미료 뭐 있어?"는 살 것을 물은 것일 수도 있어, 냉장고로 답하고 사는 방법을 한 줄 붙인다
+        if (scope == FridgeScope.SEASONING && !named) {
+            sentences.add(SEASONING_SHOP_HINT);
         }
         return String.join(" ", sentences);
     }

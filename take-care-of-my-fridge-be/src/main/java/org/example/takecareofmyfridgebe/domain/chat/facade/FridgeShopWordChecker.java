@@ -14,7 +14,8 @@ import java.util.Optional;
  * <ul>
  *   <li>묻는 말(AskWordChecker)이 있으면 바꾸지 않는다 ("냉장고에서 꺼낸 고기 어떻게 해동해?", "유통기한 지난 거 먹어도 돼?")</li>
  *   <li>요리 말이 있으면 바꾸지 않는다 ("냉장고에 있는 재료로 뭐 먹지", "두부 있으면 두부 요리 추천해줘")</li>
- *   <li>냉장고 보기 말이 있으면 FRIDGE, 없고 사기 말("사고 싶·어디서 사·장바구니·담아·주문해")이나 할인 말("세일·할인·특가·번개")이 있으면 SHOP</li>
+ *   <li>냉장고 보기 말이 있으면 FRIDGE, 없고 사기 말("사고 싶·어디서 사·장바구니·담아·주문해")이나 할인 말("세일·할인·특가·번개")이 있으면 SHOP,
+ *       그것도 없고 양념 말("기본 양념·조미료")이 있으면 FRIDGE ("조미료 뭐 있어?")</li>
  * </ul>
  */
 public final class FridgeShopWordChecker {
@@ -34,6 +35,10 @@ public final class FridgeShopWordChecker {
         }
         if (containsAny(text, words.shop()) || containsAny(text, words.sale())) {
             return Optional.of(ChatIntent.SHOP);
+        }
+        // "조미료 뭐 있어?"처럼 냉장고를 말하지 않아도 기본 양념을 물으면 냉장고 보기 (사기·할인 말이 있으면 위에서 사기)
+        if (containsAny(text, words.seasoning())) {
+            return Optional.of(ChatIntent.FRIDGE);
         }
         return Optional.empty();
     }

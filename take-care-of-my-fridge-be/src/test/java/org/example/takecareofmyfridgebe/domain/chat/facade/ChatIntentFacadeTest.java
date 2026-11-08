@@ -1477,6 +1477,19 @@ class ChatIntentFacadeTest {
         }
 
         @Test
+        @DisplayName("AI가 추천으로 봐도 \"조미료 뭐있어?\"는 냉장고 기본 양념 보기로 바꾼다")
+        void changesRecommendToSeasoningFridge() {
+            givenExtracted(new IntentResult(ChatIntent.RECOMMEND, List.of(), List.of(), 0, List.of("조미료"), List.of(), false,
+                    null, null, null));
+
+            ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("조미료 뭐있어?"));
+
+            assertThat(resolution.intent()).isEqualTo(ChatIntent.FRIDGE);
+            assertThat(resolution.lookup().scope()).isEqualTo(FridgeScope.SEASONING);
+            assertThat(resolution.lookup().names()).isEmpty();
+        }
+
+        @Test
         @DisplayName("AI가 정한 범위가 있으면 그 범위를 쓴다")
         void keepsAiScope() {
             givenExtracted(fridge(List.of(), "IMMINENT"));

@@ -276,7 +276,7 @@ class ChatFridgeShopFacadeTest {
     }
 
     @Test
-    @DisplayName("기본 양념 보기는 기본 양념 줄만 이름으로 나열하고, 없으면 없다고 쓴다")
+    @DisplayName("기본 양념 보기는 기본 양념 줄만 이름으로 나열하고(없으면 없다고), 끝에 살 수 있는 조미료를 묻는 방법을 붙인다")
     void showsBasicSeasoningsOnly() {
         givenFridge(
                 item(1L, 10L, "두부", 1, IngredientType.NORMAL, false, null),
@@ -286,11 +286,11 @@ class ChatFridgeShopFacadeTest {
         RecommendationReply reply = facade.fridge(MEMBER_ID, new ItemLookup(FridgeScope.SEASONING, List.of()));
 
         assertThat(reply.event().fridgeItems()).extracting(FridgeItemCard::fridgeId).containsExactly(3L, 2L);
-        assertThat(reply.fixedReply()).isEqualTo("냉장고에 고추장, 간장이 있어요.");
+        assertThat(reply.fixedReply()).isEqualTo("냉장고에 고추장, 간장이 있어요. 살 수 있는 조미료가 궁금하시면 '간장 사고 싶어'처럼 이름으로 말씀해 주세요.");
 
         givenFridge(item(1L, 10L, "두부", 1, IngredientType.NORMAL, false, null));
         assertThat(facade.fridge(MEMBER_ID, new ItemLookup(FridgeScope.SEASONING, List.of())).fixedReply())
-                .isEqualTo("냉장고에 등록된 기본 양념이 없어요.");
+                .isEqualTo("냉장고에 등록된 기본 양념이 없어요. " + FridgeReplyWriter.SEASONING_SHOP_HINT);
     }
 
     @Test

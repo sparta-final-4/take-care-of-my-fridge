@@ -78,6 +78,16 @@ class FridgeShopWordCheckerTest {
     }
 
     @Test
+    @DisplayName("냉장고를 말하지 않아도 기본 양념·조미료를 물으면 냉장고 보기, 사기·할인 말이 있으면 사기, 요리 말이 있으면 바꾸지 않는다")
+    void returnsFridge_whenSeasoningWordOnly() {
+        assertThat(check("조미료 뭐있어?")).contains(ChatIntent.FRIDGE);
+        assertThat(check("기본 양념 뭐 남았지")).contains(ChatIntent.FRIDGE);
+        assertThat(check("조미료 세일해?")).contains(ChatIntent.SHOP);
+        assertThat(check("기본 양념으로 만들 요리 추천해줘")).isEmpty();
+        assertThat(check("양념 뭐 있어?")).isEmpty();
+    }
+
+    @Test
     @DisplayName("냉장고 보기 말과 사기 말이 같이 있으면 냉장고 보기로 본다")
     void returnsFridge_whenFridgeAndShopWords() {
         assertThat(check("두부 아직 있어? 없으면 장바구니에 담아줘")).contains(ChatIntent.FRIDGE);
