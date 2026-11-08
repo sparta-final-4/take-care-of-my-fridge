@@ -165,7 +165,8 @@ public class RecipeCandidateFacade {
         }
     }
 
-    // 레시피 정보는 한 번 읽는다. 맛·매운 정도는 ES 검색 결과에 있는 레시피는 그 값을 쓰고, 없는 레시피(DB 경로 전체, 벡터 보충)만 DB로 계산한다
+    // 레시피 정보는 한 번 읽는다. 맛·매운 정도는 ES 검색 결과에 있는 레시피는 그 값을 쓰고,
+    // ES 경로인데 검색 결과가 아닌 레시피(벡터 보충)는 ES에서 id로 한 번에 읽는다. 그래도 모르는 레시피와 DB 경로는 DB로 계산한다
     // 후보가 없으면 조회하지 않는다 (RecipeService도 빈 입력이면 빈 값을 돌려주지만 호출부에서 먼저 막는다)
     private PoolDetails loadDetails(CandidatePool pool, RecipeQuery query, List<Member.Taste> memberTastes) {
         Set<Long> recipeIds = pool.recipeIds();
@@ -182,6 +183,12 @@ public class RecipeCandidateFacade {
             } else {
                 levels.put(id, level);
             }
+        }
+        // rowsNonBasicComplete는 ES 경로(ES 검색·벡터 보충·피할 맛 다시 검색)에서만 true다
+        if (!unknown.isEmpty() && pool.rowsNonBasicComplete()) {
+            Map<Long, RecipeTasteLevel> read = readTasteLevels(unknown, query.memberId());
+            levels.putAll(read);
+            unknown = unknown.stream().filter(id -> !read.containsKey(id)).toList();
         }
         TasteDetails tastes = TasteDetails.of(levels);
         if (!unknown.isEmpty()) {
@@ -223,7 +230,18 @@ public class RecipeCandidateFacade {
         }
     }
 
-    // DB 대체 경로와 ES 결과가 아닌 후보: 맛 데이터를 읽고, 매운맛이 중요하면 재료 이름으로 매운 정도를 계산해 확실히 매우면 SPICY를 더한다
+    // ES에서 레시피 id로 맛·매운 정도를 읽는다. 실패하면 빈 값을 돌려줘 호출하는 쪽이 DB로 계산하게 한다
+    private Map<Long, RecipeTasteLevel> readTasteLevels(Collection<Long> recipeIds, Long memberId) {
+        try {
+            return recipeCandidateSearchService.findTasteLevels(recipeIds);
+        } catch (IOException | RuntimeException e) {
+            log.warn("레시피 맛·매운 정도 ES 조회 실패, DB로 계산 - memberId: {}, 레시피 수: {}, 원인: {}",
+                    memberId, recipeIds.size(), e.toString());
+            return Map.of();
+        }
+    }
+
+    // DB 대체 경로와 ES에서 읽지 못한 레시피: 맛 데이터를 읽고, 매운맛이 중요하면 재료 이름으로 매운 정도를 계산해 확실히 매우면 SPICY를 더한다
     private TasteDetails tasteDetailsFromDb(Collection<Long> recipeIds, boolean spicyMatters) {
         SpicyRecipes spicy = spicyMatters ? spicyRecipes(recipeIds) : SpicyRecipes.NONE;
         return new TasteDetails(withDefinitelySpicy(recipeService.findTastesByRecipeIds(recipeIds), spicy), spicy);
