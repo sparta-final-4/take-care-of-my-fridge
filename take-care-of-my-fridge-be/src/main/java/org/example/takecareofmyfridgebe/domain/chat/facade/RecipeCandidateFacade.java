@@ -23,6 +23,7 @@ import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeSort;
 import org.example.takecareofmyfridgebe.domain.recipe.service.RecipeService;
 import org.example.takecareofmyfridgebe.domain.search.config.RecipeSearchProperties;
 import org.example.takecareofmyfridgebe.domain.search.dto.RecipeSearchResult;
+import org.example.takecareofmyfridgebe.domain.search.dto.RecipeTasteLevel;
 import org.example.takecareofmyfridgebe.domain.search.service.RecipeCandidateSearchService;
 import org.example.takecareofmyfridgebe.domain.search.service.RecipeCandidateSearchService.CandidateHit;
 import org.example.takecareofmyfridgebe.domain.search.service.RecipeCandidateSearchService.Condition;
@@ -49,7 +50,7 @@ import java.util.stream.Stream;
  * <p>
  * 후보는 레시피 후보 검색(ES, RecipeCandidateSearchService)으로 모은다. 분류·키워드를 말했으면 요청 조건만 넣은 검색을 한 번 더 해서 합친다
  * (냉장고 재료가 많이 겹치는 레시피에 밀려 "디저트"만 맞은 레시피가 빠지지 않게).
- * 모은 후보의 재료·정보는 한 번씩 읽어 지금처럼 정렬한다.
+ * 모은 후보의 재료·정보는 한 번씩 읽어 지금처럼 정렬한다. 맛·매운 정도는 ES 검색 결과(색인 때 정한 tastes·spicy_level)를 쓴다.
  * ES를 쓰지 않는 설정이거나 검색이 실패하면 DB 경로(냉장고·선택 재료로 레시피 역조회 + 키워드마다 레시피 검색)로 모은다.
  */
 @Slf4j
@@ -93,7 +94,7 @@ public class RecipeCandidateFacade {
                 : List.of();
 
         CandidatePool pool = collectCandidates(grouped, fridge, scorer);
-        PoolDetails details = loadDetails(pool.recipeIds(), grouped, memberTastes);
+        PoolDetails details = loadDetails(pool, grouped, memberTastes);
         Ranked ranked = rankPool(scorer, grouped, fridge, memberTastes, pool, details, Set.of());
 
         // ES 경로에서 키워드로 맞은(이름·늘린 이름·재료) 레시피가 하나도 없으면 레시피 검색으로 보충한다. 벡터 검색은 한 번만
@@ -108,7 +109,7 @@ public class RecipeCandidateFacade {
             // 새로 찾은 게 없어도 합친다 (벡터를 불렀는지 로그에 남기려고)
             pool = pool.plus(supplement);
             if (!supplement.recipeIds().isEmpty()) {
-                details = details.plus(loadDetails(supplement.recipeIds(), grouped, memberTastes));
+                details = details.plus(loadDetails(supplement, grouped, memberTastes));
                 ranked = rankPool(scorer, grouped, fridge, memberTastes, pool, details, Set.of());
             }
             pool = pool.withLog(route, counts);
@@ -124,7 +125,7 @@ public class RecipeCandidateFacade {
             if (!avoided.recipeIds().isEmpty()) {
                 refilled = avoided.recipeIds().size();
                 pool = pool.plus(avoided);
-                details = details.plus(loadDetails(avoided.recipeIds(), grouped, memberTastes));
+                details = details.plus(loadDetails(avoided, grouped, memberTastes));
                 ranked = rankPool(scorer, grouped, fridge, memberTastes, pool, details, avoided.recipeIds());
             }
         }
@@ -148,7 +149,7 @@ public class RecipeCandidateFacade {
     }
 
     /**
-     * 후보 레시피의 정보·맛(확실히 매운 재료로 매운맛 보완)·매운 정도.
+     * 후보 레시피의 정보·맛·매운 정도. 맛에는 확실히 매운 레시피면 SPICY가 들어 있다.
      */
     private record PoolDetails(
             Map<Long, RecipeCandidateInfo> infos,
@@ -164,16 +165,68 @@ public class RecipeCandidateFacade {
         }
     }
 
-    // 레시피 정보·맛·재료 이름(매운 정도)을 한 번씩 읽는다
+    // 레시피 정보는 한 번 읽는다. 맛·매운 정도는 ES 검색 결과에 있는 레시피는 그 값을 쓰고, 없는 레시피(DB 경로 전체, 벡터 보충)만 DB로 계산한다
     // 후보가 없으면 조회하지 않는다 (RecipeService도 빈 입력이면 빈 값을 돌려주지만 호출부에서 먼저 막는다)
-    private PoolDetails loadDetails(Set<Long> recipeIds, RecipeQuery query, List<Member.Taste> memberTastes) {
+    private PoolDetails loadDetails(CandidatePool pool, RecipeQuery query, List<Member.Taste> memberTastes) {
+        Set<Long> recipeIds = pool.recipeIds();
         if (recipeIds.isEmpty()) {
             return new PoolDetails(Map.of(), Map.of(), SpicyRecipes.NONE);
         }
         Map<Long, RecipeCandidateInfo> infos = recipeService.findCandidateInfos(recipeIds);
-        SpicyRecipes spicy = spicyRecipes(recipeIds, query, memberTastes);
-        Map<Long, Set<Member.Taste>> tastes = withDefinitelySpicy(recipeService.findTastesByRecipeIds(recipeIds), spicy);
-        return new PoolDetails(infos, tastes, spicy);
+        Map<Long, RecipeTasteLevel> levels = new HashMap<>();
+        List<Long> unknown = new ArrayList<>();
+        for (Long id : recipeIds) {
+            RecipeTasteLevel level = pool.tasteLevels().get(id);
+            if (level == null) {
+                unknown.add(id);
+            } else {
+                levels.put(id, level);
+            }
+        }
+        TasteDetails tastes = TasteDetails.of(levels);
+        if (!unknown.isEmpty()) {
+            tastes = tastes.plus(tasteDetailsFromDb(unknown, spicyMatters(query, memberTastes)));
+        }
+        return new PoolDetails(infos, tastes.tastes(), tastes.spicy());
+    }
+
+    /**
+     * 레시피별 맛과 매운 레시피 두 단계.
+     *
+     * @param tastes 레시피 ID별 맛 (확실히 매운 레시피면 SPICY가 들어 있다)
+     */
+    private record TasteDetails(Map<Long, Set<Member.Taste>> tastes, SpicyRecipes spicy) {
+
+        // ES 값: HOT = 확실히 매움, MILD 이상 = 매울 수 있음. 색인할 때 HOT이면 맛에 SPICY를 더해 두었다
+        static TasteDetails of(Map<Long, RecipeTasteLevel> levels) {
+            Map<Long, Set<Member.Taste>> tastes = new HashMap<>();
+            Set<Long> definite = new HashSet<>();
+            Set<Long> maybe = new HashSet<>();
+            levels.forEach((id, level) -> {
+                if (!level.tastes().isEmpty()) {
+                    tastes.put(id, level.tastes());
+                }
+                if (level.definitelySpicy()) {
+                    definite.add(id);
+                }
+                if (level.maybeSpicy()) {
+                    maybe.add(id);
+                }
+            });
+            return new TasteDetails(tastes, new SpicyRecipes(Set.copyOf(definite), Set.copyOf(maybe)));
+        }
+
+        TasteDetails plus(TasteDetails other) {
+            Map<Long, Set<Member.Taste>> merged = new HashMap<>(tastes);
+            merged.putAll(other.tastes());
+            return new TasteDetails(merged, spicy.plus(other.spicy()));
+        }
+    }
+
+    // DB 대체 경로와 ES 결과가 아닌 후보: 맛 데이터를 읽고, 매운맛이 중요하면 재료 이름으로 매운 정도를 계산해 확실히 매우면 SPICY를 더한다
+    private TasteDetails tasteDetailsFromDb(Collection<Long> recipeIds, boolean spicyMatters) {
+        SpicyRecipes spicy = spicyMatters ? spicyRecipes(recipeIds) : SpicyRecipes.NONE;
+        return new TasteDetails(withDefinitelySpicy(recipeService.findTastesByRecipeIds(recipeIds), spicy), spicy);
     }
 
     // 정렬한 후보와, 키워드 결과(이름·재료 등으로 맞은 방식)를 채운 검색 조건
@@ -275,6 +328,7 @@ public class RecipeCandidateFacade {
      * @param recipeIds            후보 레시피 ID
      * @param rows                 후보의 재료 줄 (정렬용)
      * @param keywordHits          키워드로 찾은 레시피 ID별 벡터 검색으로만 찾았는지 (카드 이유·정렬 1단계용으로 가른다)
+     * @param tasteLevels          ES 후보 검색 결과의 레시피 ID별 맛·매운 정도 (DB 경로·벡터 보충은 비어 있다)
      * @param rowsNonBasicComplete rows가 후보마다 기본 양념 뺀 재료 전체인지 (그러면 부족한 재료를 다시 조회하지 않는다)
      * @param route                어디서 모았는지 (ES / ES+요청만 / ES+벡터 / ES+요청만+벡터 / DB 대체). 로그용
      * @param counts               검색별로 더한 후보 수. 로그용
@@ -285,13 +339,14 @@ public class RecipeCandidateFacade {
             Set<Long> recipeIds,
             List<RecipeCandidateIngredient> rows,
             Map<Long, Boolean> keywordHits,
+            Map<Long, RecipeTasteLevel> tasteLevels,
             boolean rowsNonBasicComplete,
             String route,
             String counts,
             int esCalls,
             boolean vectorCalled
     ) {
-        private static final CandidatePool EMPTY = new CandidatePool(Set.of(), List.of(), Map.of(), true, "", "", 0, false);
+        private static final CandidatePool EMPTY = new CandidatePool(Set.of(), List.of(), Map.of(), Map.of(), true, "", "", 0, false);
 
         // 다른 후보를 뒤에 합친다 (같은 레시피는 앞의 것을 둔다)
         CandidatePool plus(CandidatePool other) {
@@ -299,13 +354,16 @@ public class RecipeCandidateFacade {
             ids.addAll(other.recipeIds());
             Map<Long, Boolean> hits = new LinkedHashMap<>(keywordHits);
             other.keywordHits().forEach(hits::putIfAbsent);
+            Map<Long, RecipeTasteLevel> levels = new HashMap<>(tasteLevels);
+            other.tasteLevels().forEach(levels::putIfAbsent);
             List<RecipeCandidateIngredient> mergedRows = Stream.concat(rows.stream(), other.rows().stream()).distinct().toList();
-            return new CandidatePool(ids, mergedRows, hits, rowsNonBasicComplete && other.rowsNonBasicComplete(), route, counts,
-                    esCalls, vectorCalled || other.vectorCalled());
+            return new CandidatePool(ids, mergedRows, hits, levels, rowsNonBasicComplete && other.rowsNonBasicComplete(), route,
+                    counts, esCalls, vectorCalled || other.vectorCalled());
         }
 
         CandidatePool withLog(String newRoute, String newCounts) {
-            return new CandidatePool(recipeIds, rows, keywordHits, rowsNonBasicComplete, newRoute, newCounts, esCalls, vectorCalled);
+            return new CandidatePool(recipeIds, rows, keywordHits, tasteLevels, rowsNonBasicComplete, newRoute, newCounts, esCalls,
+                    vectorCalled);
         }
     }
 
@@ -338,22 +396,23 @@ public class RecipeCandidateFacade {
         Condition condition = withoutAvoidTastes ? base.withoutAvoidTastes() : base;
         Set<Long> recipeIds = new LinkedHashSet<>();
         Map<Long, Boolean> keywordHits = new LinkedHashMap<>();
+        Map<Long, RecipeTasteLevel> tasteLevels = new HashMap<>();
         List<String> route = new ArrayList<>(List.of("ES"));
         List<String> counts = new ArrayList<>();
         int esCalls = 1;
 
         int before = recipeIds.size();
-        addHits(recipeCandidateSearchService.search(condition), skipIds, recipeIds, keywordHits);
+        addHits(recipeCandidateSearchService.search(condition), skipIds, recipeIds, keywordHits, tasteLevels);
         counts.add("전체 " + (recipeIds.size() - before));
         if (RecipeCandidateConditions.hasRequest(condition)) {
             before = recipeIds.size();
             addHits(recipeCandidateSearchService.search(RecipeCandidateConditions.requestOnly(condition)), skipIds, recipeIds,
-                    keywordHits);
+                    keywordHits, tasteLevels);
             esCalls++;
             route.add("요청만");
             counts.add("요청만 새로 " + (recipeIds.size() - before));
         }
-        return new CandidatePool(recipeIds, readNonBasicRows(recipeIds), keywordHits, true,
+        return new CandidatePool(recipeIds, readNonBasicRows(recipeIds), keywordHits, tasteLevels, true,
                 String.join("+", route), String.join(", ", counts), esCalls, false);
     }
 
@@ -381,7 +440,7 @@ public class RecipeCandidateFacade {
         // 제외 분류·최대 시간(isFilteredOut), 선택 재료만 쓰기(rank), 피할 맛·매운 정도(rankAvoiding), 기본 양념이 아닌 뺄 재료(isFilteredOut).
         // 정렬 단계의 재료 줄에는 기본 양념이 없어서, 뺄 재료가 기본 양념이면 여기서 뺀다
         removeWithExcludedIngredients(query, recipeIds, keywordHits);
-        return new CandidatePool(recipeIds, readNonBasicRows(recipeIds), keywordHits, true, "", "", 0,
+        return new CandidatePool(recipeIds, readNonBasicRows(recipeIds), keywordHits, Map.of(), true, "", "", 0,
                 search.vectorCalled());
     }
 
@@ -403,13 +462,15 @@ public class RecipeCandidateFacade {
         keywordHits.keySet().removeAll(excluded);
     }
 
-    // 검색 결과를 후보에 더한다. 이미 모은 레시피(skipIds)는 뺀다. 키워드로 맞은 레시피는 키워드 결과로 표시한다
-    private static void addHits(List<CandidateHit> hits, Set<Long> skipIds, Set<Long> recipeIds, Map<Long, Boolean> keywordHits) {
+    // 검색 결과를 후보에 더한다. 이미 모은 레시피(skipIds)는 뺀다. 키워드로 맞은 레시피는 키워드 결과로 표시하고, 맛·매운 정도를 담는다
+    private static void addHits(List<CandidateHit> hits, Set<Long> skipIds, Set<Long> recipeIds, Map<Long, Boolean> keywordHits,
+                                Map<Long, RecipeTasteLevel> tasteLevels) {
         for (CandidateHit hit : hits) {
             if (skipIds.contains(hit.recipeId())) {
                 continue;
             }
             recipeIds.add(hit.recipeId());
+            tasteLevels.putIfAbsent(hit.recipeId(), hit.tasteLevel());
             if (hit.matched(RecipeCandidateSearchService.MATCH_KEYWORD)) {
                 keywordHits.put(hit.recipeId(), false);
             }
@@ -433,7 +494,7 @@ public class RecipeCandidateFacade {
                 .toList();
         Set<Long> recipeIds = new LinkedHashSet<>(scorer.candidateRecipeIds(query, fridge, rows));
         recipeIds.addAll(keywordHits.keySet());
-        return new CandidatePool(recipeIds, rows, keywordHits, false, "DB 대체",
+        return new CandidatePool(recipeIds, rows, keywordHits, Map.of(), false, "DB 대체",
                 "재료 역조회·키워드 " + recipeIds.size(), 0, search.vectorCalled());
     }
 
@@ -514,12 +575,16 @@ public class RecipeCandidateFacade {
         }
     }
 
-    // 원하는 맛·피할 맛·회원 선호 맛 어디에도 매운맛이 없으면 조회하지 않는다 (재료 이름 조회 1번)
-    private SpicyRecipes spicyRecipes(Set<Long> recipeIds, RecipeQuery query, List<Member.Taste> memberTastes) {
-        boolean spicyMatters = query.wantedTastes().contains(Member.Taste.SPICY)
+    // 원하는 맛·피할 맛·회원 선호 맛 어디에 매운맛이 있는지. 없으면 DB로 매운 정도를 계산하지 않는다
+    private static boolean spicyMatters(RecipeQuery query, List<Member.Taste> memberTastes) {
+        return query.wantedTastes().contains(Member.Taste.SPICY)
                 || query.avoidTastes().contains(Member.Taste.SPICY)
                 || memberTastes.contains(Member.Taste.SPICY);
-        if (!spicyMatters || recipeIds.isEmpty()) {
+    }
+
+    // 재료 이름으로 매운 정도를 계산한다 (재료 이름 조회 1번). 레시피 색인(RecipeDocumentReader)과 같은 기준이다
+    private SpicyRecipes spicyRecipes(Collection<Long> recipeIds) {
+        if (recipeIds.isEmpty()) {
             return SpicyRecipes.NONE;
         }
         Map<Long, List<String>> texts = recipeService.findIngredientTexts(recipeIds);

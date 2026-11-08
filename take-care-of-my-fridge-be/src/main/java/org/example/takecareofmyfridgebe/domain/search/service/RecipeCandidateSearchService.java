@@ -12,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 import org.example.takecareofmyfridgebe.domain.search.config.RecipeSearchProperties;
 import org.example.takecareofmyfridgebe.domain.search.dto.RecipeSpicyLevel;
+import org.example.takecareofmyfridgebe.domain.search.dto.RecipeTasteLevel;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -288,6 +289,10 @@ public class RecipeCandidateSearchService {
 
         public boolean matched(String name) {
             return matched.contains(name);
+        }
+
+        public RecipeTasteLevel tasteLevel() {
+            return new RecipeTasteLevel(tastes, spicyLevel);
         }
 
         // 확실히 매운 레시피 (원하는 맛 매운맛과 맞은 것으로 센다)
