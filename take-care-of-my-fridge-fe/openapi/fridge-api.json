@@ -7849,6 +7849,9 @@
           "imageUrl": {
             "type": "string"
           },
+          "lastStepImageUrl": {
+            "type": "string"
+          },
           "name": {
             "type": "string"
           },

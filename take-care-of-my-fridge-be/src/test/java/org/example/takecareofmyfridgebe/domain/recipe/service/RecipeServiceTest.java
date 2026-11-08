@@ -11,6 +11,7 @@ import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeListItemResponse
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeListRequest;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeNutritionRequest;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeSort;
+import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeStepImageDto;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeStepRequest;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeSummary;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeUpdatedAtDto;
@@ -108,7 +109,27 @@ class RecipeServiceTest {
         assertThat(result.pageNumber()).isEqualTo(1);
         assertThat(result.totalElements()).isEqualTo(1);
         assertThat(result.content()).containsExactly(new RecipeListItemResponse(
-                7L, "된장찌개", "된장찌개 만드는 법", null, "한식", "국", 30, 2, 3, new BigDecimal("350.00")));
+                7L, "된장찌개", "된장찌개 만드는 법", null, "한식", "국", 30, 2, 3, new BigDecimal("350.00"), null));
+    }
+
+    @Test
+    @DisplayName("목록을 조회하면 마지막 조리 단계 사진을 레시피별로 붙이고, 사진이 없는 레시피는 null로 둔다")
+    void attachesLastStepImageUrl() {
+        // given
+        Recipe stew = RecipeFixture.createRecipe(7L, "된장찌개");
+        Recipe soup = RecipeFixture.createRecipe(8L, "미역국");
+        when(recipeRepository.findRecipesByCondition(any(RecipeListRequest.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(stew, soup), PageRequest.of(0, 20), 2));
+        when(recipeRepository.findLastStepImages(List.of(7L, 8L)))
+                .thenReturn(List.of(new RecipeStepImageDto(7L, "https://img.example/7-last.jpg")));
+        RecipeListRequest request = new RecipeListRequest(null, null, null, null, null, null, null, null);
+
+        // when
+        PageResponse<RecipeListItemResponse> result = service.getRecipes(request);
+
+        // then
+        assertThat(result.content()).extracting(RecipeListItemResponse::lastStepImageUrl)
+                .containsExactly("https://img.example/7-last.jpg", null);
     }
 
     @Test
