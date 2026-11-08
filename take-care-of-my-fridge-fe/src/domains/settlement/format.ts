@@ -6,6 +6,7 @@ import type { SettlementPeriodResponse, SettlementUnit } from './api';
 
 export const formatWon = (value?: number) => `${(value ?? 0).toLocaleString('ko-KR')}원`;
 export const formatCount = (value?: number) => `${(value ?? 0).toLocaleString('ko-KR')}건`;
+export const formatPercent = (value: number) => `${value.toFixed(1)}%`;
 
 // 표·툴팁에 보이는 기간. 조회 기간에서 잘린 주는 잘린 날짜 그대로 보여 준다
 export function formatPeriod(unit: SettlementUnit, period: SettlementPeriodResponse) {
