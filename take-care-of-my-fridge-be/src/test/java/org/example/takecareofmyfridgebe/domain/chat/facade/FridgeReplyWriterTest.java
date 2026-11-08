@@ -16,7 +16,7 @@ class FridgeReplyWriterTest {
     @Test
     @DisplayName("남은 줄은 D-3 이내만 남은 날을 붙여 쓰고, 지난 줄은 뒤에 따로 쓴다")
     void writesAliveWithLabelsAndExpiredAfter() {
-        String reply = FridgeReplyWriter.write(FridgeScope.ALL, List.of(
+        String reply = FridgeReplyWriter.write(FridgeScope.MEALKIT, List.of(
                 new Line("우유", -2),
                 new Line("두부", 1),
                 new Line("대파", 3),
@@ -28,7 +28,7 @@ class FridgeReplyWriterTest {
     @Test
     @DisplayName("오늘까지면 \"오늘까지\", 받침 있는 마지막 이름에는 \"이\"를 붙인다")
     void writesTodayLabelAndParticle() {
-        String reply = FridgeReplyWriter.write(FridgeScope.ALL, List.of(new Line("양파", 5), new Line("버섯", 0)), List.of(), false);
+        String reply = FridgeReplyWriter.write(FridgeScope.IMMINENT, List.of(new Line("양파", 5), new Line("버섯", 0)), List.of(), false);
 
         assertThat(reply).isEqualTo("냉장고에 양파, 버섯(오늘까지)이 있어요.");
     }
@@ -40,9 +40,36 @@ class FridgeReplyWriterTest {
         lines.add(new Line("재료1", 12));
         IntStream.rangeClosed(1, 5).forEach(i -> lines.add(new Line("지난것" + i, -1)));
 
-        String reply = FridgeReplyWriter.write(FridgeScope.ALL, lines, List.of(), false);
+        String reply = FridgeReplyWriter.write(FridgeScope.IMMINENT, lines, List.of(), false);
 
         assertThat(reply).isEqualTo("냉장고에 재료1, 재료2, 재료3, 재료4, 재료5, 재료6 외 3개가 있어요. 지난것1, 지난것2, 지난것3 외 2개는 지났어요.");
+    }
+
+    @Test
+    @DisplayName("전체 보기는 가짓수를 먼저 말하고, D-3 이내만 앞 3개 + \"외 N개\"로 써서 임박 보기와 다르게 보인다")
+    void writesAllScopeWithCountAndSoonOnly() {
+        List<Line> lines = List.of(
+                new Line("양파", -5), new Line("깻잎", -3), new Line("고추", -3), new Line("배추", -1), new Line("버섯", -2),
+                new Line("대파", 0), new Line("버섯", 0), new Line("서울우유", 1), new Line("표고버섯", 1), new Line("우유", 2),
+                new Line("감자", 15), new Line("마늘", 21));
+
+        String all = FridgeReplyWriter.write(FridgeScope.ALL, lines, List.of(), false);
+        String imminent = FridgeReplyWriter.write(FridgeScope.IMMINENT,
+                lines.stream().filter(line -> line.dDay() <= 3).toList(), List.of(), false);
+
+        assertThat(all).isEqualTo("냉장고에 재료 7가지가 있어요. 곧 끝나는 건 대파(오늘까지), 버섯(오늘까지), 서울우유(내일까지) 외 2개예요. "
+                + "양파, 깻잎, 고추 외 2개는 지났어요.");
+        assertThat(imminent).startsWith("냉장고에 대파(오늘까지), 버섯(오늘까지), 서울우유(내일까지), 표고버섯(내일까지), 우유(모레까지)가 있어요.");
+        assertThat(all).isNotEqualTo(imminent);
+    }
+
+    @Test
+    @DisplayName("전체 보기에서 곧 끝나는 재료가 없으면 없다고 쓰고, 받침 있는 마지막 이름에는 \"이에요\"를 붙인다")
+    void writesAllScopeWithoutSoon() {
+        assertThat(FridgeReplyWriter.write(FridgeScope.ALL, List.of(new Line("감자", 15)), List.of(), false))
+                .isEqualTo("냉장고에 재료 1가지가 있어요. 소비기한이 곧 끝나는 재료는 없어요.");
+        assertThat(FridgeReplyWriter.write(FridgeScope.ALL, List.of(new Line("버섯", 1)), List.of(), false))
+                .isEqualTo("냉장고에 재료 1가지가 있어요. 곧 끝나는 건 버섯(내일까지)이에요.");
     }
 
     @Test

@@ -10,11 +10,12 @@ import java.util.Map;
 /**
  * 냉장고 보기 답 글. 스프링에 의존하지 않는 순수 클래스. 답 생성 AI 없이 이 글을 그대로 보내고 저장한다.
  * <pre>
- * 냉장고에 두부(내일까지), 대파(3일 남음), 된장국 밀키트가 있어요. 우유는 지났어요.
- * 냉장고에 두부(오늘까지), 대파, 양파, 감자, 당근, 버섯 외 4개가 있어요.
+ * (전체) 냉장고에 재료 12가지가 있어요. 곧 끝나는 건 대파(오늘까지), 버섯(오늘까지), 서울우유(내일까지) 외 6개예요. 양파, 깻잎, 고추 외 4개는 지났어요.
+ * (임박·밀키트·이름) 냉장고에 두부(내일까지), 대파(3일 남음), 된장국 밀키트가 있어요. 우유는 지났어요.
  * 두부는 지금 냉장고에 없어요.
  * </pre>
  * <ul>
+ *   <li>전체 보기는 가짓수를 먼저 말하고, D-3 이내만 앞 {@value #SOON_SHOWN}개 + "외 N개"로 쓴다 (임박 보기와 같은 답처럼 보이지 않게)</li>
  *   <li>남은 줄은 앞 {@value #ALIVE_SHOWN}개, 지난 줄은 앞 {@value #EXPIRED_SHOWN}개까지 쓰고 나머지는 "외 N개"로 센다</li>
  *   <li>같은 이름은 한 번만 쓴다 (소비기한이 가까운 줄 기준). 남은 날은 D-3 이내만 쓴다 (오늘까지·내일까지·모레까지·3일 남음)</li>
  *   <li>이/가·은/는은 마지막 말의 받침으로 고른다</li>
@@ -24,6 +25,8 @@ public final class FridgeReplyWriter {
 
     static final int ALIVE_SHOWN = 6;
     static final int EXPIRED_SHOWN = 3;
+    // 전체 보기에서 "곧 끝나는 건"에 쓸 이름 수
+    static final int SOON_SHOWN = 3;
     private static final int LABEL_DAYS = 3;
 
     private FridgeReplyWriter() {
@@ -49,7 +52,20 @@ public final class FridgeReplyWriter {
             (line.dDay() < 0 ? expired : alive).putIfAbsent(line.name(), line.dDay());
         }
         List<String> sentences = new ArrayList<>();
-        if (!alive.isEmpty()) {
+        // 전체 보기는 임박 보기와 같은 이름이 앞에 와 같은 답처럼 보이지 않게, 가짓수를 먼저 말하고 곧 끝나는 것만 몇 개 쓴다
+        if (scope == FridgeScope.ALL && !named && !alive.isEmpty()) {
+            sentences.add("냉장고에 재료 " + alive.size() + "가지가 있어요.");
+            List<String> soon = alive.entrySet().stream()
+                    .filter(entry -> entry.getValue() <= LABEL_DAYS)
+                    .map(entry -> entry.getKey() + label(entry.getValue()))
+                    .toList();
+            if (soon.isEmpty()) {
+                sentences.add("소비기한이 곧 끝나는 재료는 없어요.");
+            } else {
+                String last = soon.size() > SOON_SHOWN ? "개" : lastSoonName(alive);
+                sentences.add("곧 끝나는 건 " + joined(soon, SOON_SHOWN) + copula(last) + ".");
+            }
+        } else if (!alive.isEmpty()) {
             List<String> labeled = alive.entrySet().stream()
                     .map(entry -> entry.getKey() + label(entry.getValue()))
                     .toList();
@@ -102,6 +118,22 @@ public final class FridgeReplyWriter {
             last = name;
         }
         return last;
+    }
+
+    // "곧 끝나는 건"에 쓴 마지막 이름 (D-3 이내 중 마지막)
+    private static String lastSoonName(Map<String, Long> alive) {
+        String last = null;
+        for (Map.Entry<String, Long> entry : alive.entrySet()) {
+            if (entry.getValue() <= LABEL_DAYS) {
+                last = entry.getKey();
+            }
+        }
+        return last;
+    }
+
+    // "○○예요" / "○○이에요" (받침으로 고른다)
+    private static String copula(String word) {
+        return hasFinalConsonant(word) ? "이에요" : "예요";
     }
 
     private static String subjectParticle(String word) {

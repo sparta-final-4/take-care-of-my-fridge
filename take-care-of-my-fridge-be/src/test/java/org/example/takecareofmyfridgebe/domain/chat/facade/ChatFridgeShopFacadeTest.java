@@ -188,7 +188,7 @@ class ChatFridgeShopFacadeTest {
 
         RecommendationReply reply = facade.fridge(MEMBER_ID, new ItemLookup(FridgeScope.ALL, List.of()));
 
-        assertThat(reply.fixedReply()).isEqualTo("냉장고에 두부(내일까지), 대파(3일 남음)가 있어요. 우유는 지났어요.");
+        assertThat(reply.fixedReply()).isEqualTo("냉장고에 재료 2가지가 있어요. 곧 끝나는 건 두부(내일까지), 대파(3일 남음)예요. 우유는 지났어요.");
         assertThat(reply.event().fridgeItems()).extracting(FridgeItemCard::fridgeId).containsExactly(2L, 4L, 1L);
         assertThat(reply.event().fridgeItems().get(2).status()).isEqualTo(FridgeItemStatus.EXPIRED);
         assertThat(reply.event().recipes()).isEmpty();
@@ -256,7 +256,7 @@ class ChatFridgeShopFacadeTest {
     }
 
     @Test
-    @DisplayName("카드는 최대 10장이고 글은 6개 + \"외 N개\"로 줄인다")
+    @DisplayName("카드는 최대 10장이고, 전체 보기 글은 가짓수와 곧 끝나는 재료만 쓴다")
     void limitsCards() {
         givenFridge(IntStream.rangeClosed(1, 12)
                 .mapToObj(i -> item((long) i, 100L + i, "재료" + i, 10 + i, IngredientType.NORMAL, false, null))
@@ -265,7 +265,7 @@ class ChatFridgeShopFacadeTest {
         RecommendationReply reply = facade.fridge(MEMBER_ID, new ItemLookup(FridgeScope.ALL, List.of()));
 
         assertThat(reply.event().fridgeItems()).hasSize(ChatFridgeShopFacade.CARD_LIMIT);
-        assertThat(reply.fixedReply()).endsWith("재료6 외 6개가 있어요.");
+        assertThat(reply.fixedReply()).isEqualTo("냉장고에 재료 12가지가 있어요. 소비기한이 곧 끝나는 재료는 없어요.");
     }
 
     @Test
