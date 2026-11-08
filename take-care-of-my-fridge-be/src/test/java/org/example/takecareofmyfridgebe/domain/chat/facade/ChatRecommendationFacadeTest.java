@@ -551,7 +551,7 @@ class ChatRecommendationFacadeTest {
         }
         when(saleEventReader.findSellingPrices(any())).thenReturn(prices);
         when(recipeCandidateFacade.describeMealkitRecipes(any(), any()))
-                .thenReturn(new RecipeCandidateFacade.MealkitRecipes(recipes, Map.of(), List.of()));
+                .thenReturn(new RecipeCandidateFacade.MealkitRecipes(recipes, Map.of(), Set.of(), List.of()));
     }
 
     private static Ingredient ingredient(Long id, String name) {

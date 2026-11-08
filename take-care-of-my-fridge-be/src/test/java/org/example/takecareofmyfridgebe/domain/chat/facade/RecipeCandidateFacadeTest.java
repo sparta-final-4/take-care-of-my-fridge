@@ -1013,6 +1013,48 @@ class RecipeCandidateFacadeTest {
         verify(fridgeService, times(2)).getItems(any(), any());
     }
 
+    @Test
+    @DisplayName("밀키트 연결 레시피의 맛·매운 정도는 ES에서 id로 한 번에 읽어, 맛 데이터에 매운맛이 없어도 MILD·HOT이면 매울 수 있는 레시피로 돌려주고 DB 맛·재료 이름은 읽지 않는다")
+    void readsMealkitRecipeLevels_fromEsByIds() throws Exception {
+        when(memberService.getMyInfo(MEMBER_ID)).thenReturn(mock(MyInfoResponse.class));
+        when(recipeService.findCandidateInfos(List.of(539L, 59L, 544L))).thenReturn(Map.of(
+                539L, new RecipeCandidateInfo(539L, "부추 콩가루 찜", "찜", 20, 2),
+                59L, new RecipeCandidateInfo(59L, "고추잡채", "볶음", 20, 2),
+                544L, new RecipeCandidateInfo(544L, "된장국", "국", 20, 2)));
+        when(candidateSearchService.findTasteLevels(List.of(539L, 59L, 544L))).thenReturn(Map.of(
+                539L, new RecipeTasteLevel(Set.of(Taste.MILD, Taste.SPICY), RecipeSpicyLevel.HOT),
+                59L, new RecipeTasteLevel(Set.of(Taste.SALTY), RecipeSpicyLevel.MILD),
+                544L, new RecipeTasteLevel(Set.of(Taste.UMAMI), RecipeSpicyLevel.NONE)));
+
+        RecipeCandidateFacade.MealkitRecipes found = esFacade.describeMealkitRecipes(MEMBER_ID, List.of(539L, 59L, 544L));
+
+        assertThat(found.maybeSpicyRecipeIds()).containsExactlyInAnyOrder(539L, 59L);
+        assertThat(found.recipeTastes()).containsEntry(539L, Set.of(Taste.MILD, Taste.SPICY))
+                .containsEntry(59L, Set.of(Taste.SALTY));
+        verify(recipeService, never()).findTastesByRecipeIds(any());
+        verify(recipeService, never()).findIngredientTexts(any());
+    }
+
+    @Test
+    @DisplayName("밀키트 연결 레시피의 ES 조회가 실패하면 DB 맛 데이터·재료 이름으로 매운 정도를 계산한다 (정확한 이름 고추는 매울 수 있음, 고춧가루는 확실히 매움)")
+    void computesMealkitRecipeLevelsFromDb_whenEsLookupFails() throws Exception {
+        when(memberService.getMyInfo(MEMBER_ID)).thenReturn(mock(MyInfoResponse.class));
+        when(recipeService.findCandidateInfos(List.of(539L, 59L))).thenReturn(Map.of(
+                539L, new RecipeCandidateInfo(539L, "부추 콩가루 찜", "찜", 20, 2),
+                59L, new RecipeCandidateInfo(59L, "고추잡채", "볶음", 20, 2)));
+        when(candidateSearchService.findTasteLevels(any())).thenThrow(new IOException("es down"));
+        when(recipeService.findTastesByRecipeIds(List.of(539L, 59L)))
+                .thenReturn(Map.of(539L, Set.of(Taste.MILD), 59L, Set.of(Taste.SALTY)));
+        when(recipeService.findIngredientTexts(List.of(539L, 59L)))
+                .thenReturn(Map.of(539L, List.of("부추", "고춧가루"), 59L, List.of("돼지고기", "고추")));
+
+        RecipeCandidateFacade.MealkitRecipes found = esFacade.describeMealkitRecipes(MEMBER_ID, List.of(539L, 59L));
+
+        assertThat(found.maybeSpicyRecipeIds()).containsExactlyInAnyOrder(539L, 59L);
+        assertThat(found.recipeTastes().get(539L)).contains(Taste.SPICY);
+        assertThat(found.recipeTastes().get(59L)).doesNotContain(Taste.SPICY);
+    }
+
     private static FridgeItemResponse mealkitItem(String rawName, long dDay) {
         FridgeItemStatus status = FridgeItemStatus.of(dDay);
         return new FridgeItemResponse(

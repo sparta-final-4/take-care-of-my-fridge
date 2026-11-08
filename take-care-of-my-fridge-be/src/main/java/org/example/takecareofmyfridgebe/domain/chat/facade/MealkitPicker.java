@@ -19,7 +19,7 @@ import java.util.stream.Collectors;
  * 상담에 보여 줄 밀키트를 고른다. 스프링에 의존하지 않는 순수 클래스.
  * <p>
  * 거르기: 살 수 있는 것만(판매가가 있고 품절 아님), 레시피 카드와 같은 레시피는 빼고, 냉장고에 이름이 같은 밀키트가 있으면 빼고,
- * 연결된 레시피가 피할 맛이면 뺀다.
+ * 연결된 레시피가 피할 맛이면 뺀다. 피할 맛이 매운맛이면 매울 수 있는 레시피(색인의 매운 정도 MILD·HOT)도 뺀다.
  * <p>
  * 정렬: 요청 조건 일치 수(분류·원하는 맛·요리 이름 키워드) → 이 상담에서 아직 안 보여 준 것 → 레시피 연결 있음 →
  * 냉장고 재료와 겹치는 수(레시피 재료 기준) → 할인 중 → 판매 단가 낮은 순 → 상품 ID.
@@ -50,7 +50,8 @@ public final class MealkitPicker {
      * @param mealkits           판매 중인 밀키트 (상품이 함께 읽혀 있어야 한다)
      * @param prices             상품 ID별 판매가. 판매가가 없는 밀키트는 고르지 않는다
      * @param recipes            레시피 ID별 지금 냉장고 기준 계산 (가진 재료 수). 없으면 레시피 연결이 없는 것으로 본다
-     * @param recipeTastes       레시피 ID별 맛
+     * @param recipeTastes       레시피 ID별 맛 (확실히 매운 레시피면 SPICY가 들어 있다)
+     * @param maybeSpicyRecipeIds 매울 수 있는 레시피 ID (매운 정도 MILD·HOT). "매운 거 말고"면 뺀다
      * @param query              추천 조건 (분류·원하는 맛·피할 맛·키워드)
      * @param cardRecipeIds      같은 답의 레시피 카드 (같은 레시피 밀키트는 뺀다)
      * @param fridgeMealkitNames 냉장고 밀키트 줄 이름 (공백 무관)
@@ -61,6 +62,7 @@ public final class MealkitPicker {
             Map<Long, SellingPrice> prices,
             Map<Long, RecipeCandidate> recipes,
             Map<Long, Set<Member.Taste>> recipeTastes,
+            Set<Long> maybeSpicyRecipeIds,
             RecipeQuery query,
             Collection<Long> cardRecipeIds,
             Collection<String> fridgeMealkitNames,
@@ -87,7 +89,7 @@ public final class MealkitPicker {
                 .filter(mealkit -> mealkit.getRecipeId() == null || !cardRecipeIds.contains(mealkit.getRecipeId()))
                 .map(mealkit -> toOption(mealkit, input, shown))
                 .filter(option -> option.price() != null && !option.price().soldOut())
-                .filter(option -> !avoided(option, input.recipeTastes(), query))
+                .filter(option -> !avoided(option, input, query))
                 .sorted(ORDER)
                 .toList();
         List<Picked> picked = new ArrayList<>();
@@ -130,11 +132,16 @@ public final class MealkitPicker {
         return matches;
     }
 
-    private static boolean avoided(Option option, Map<Long, Set<Member.Taste>> recipeTastes, RecipeQuery query) {
+    // 연결 레시피가 없는 밀키트는 맛을 몰라 거르지 않는다
+    private static boolean avoided(Option option, Input input, RecipeQuery query) {
         if (option.recipe() == null || query.avoidTastes().isEmpty()) {
             return false;
         }
-        Set<Member.Taste> tastes = recipeTastes.getOrDefault(option.recipe().recipeId(), Set.of());
+        Long recipeId = option.recipe().recipeId();
+        if (query.avoidTastes().contains(Member.Taste.SPICY) && input.maybeSpicyRecipeIds().contains(recipeId)) {
+            return true;
+        }
+        Set<Member.Taste> tastes = input.recipeTastes().getOrDefault(recipeId, Set.of());
         return query.avoidTastes().stream().anyMatch(tastes::contains);
     }
 

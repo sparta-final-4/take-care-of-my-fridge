@@ -174,27 +174,35 @@ public class RecipeCandidateFacade {
             return new PoolDetails(Map.of(), Map.of(), SpicyRecipes.NONE);
         }
         Map<Long, RecipeCandidateInfo> infos = recipeService.findCandidateInfos(recipeIds);
+        // rowsNonBasicComplete는 ES 경로(ES 검색·벡터 보충·피할 맛 다시 검색)에서만 true다
+        TasteDetails tastes = tasteDetails(recipeIds, pool.tasteLevels(), pool.rowsNonBasicComplete(),
+                spicyMatters(query, memberTastes), query.memberId());
+        return new PoolDetails(infos, tastes.tastes(), tastes.spicy());
+    }
+
+    /**
+     * 레시피 맛·매운 정도. 이미 아는 값(ES 검색 결과)을 쓰고, readEs면 모르는 레시피를 ES에서 id로 한 번에 읽는다.
+     * 그래도 모르는 레시피(ES를 쓰지 않음·조회 실패·인덱스에 없음)만 DB로 계산한다.
+     */
+    private TasteDetails tasteDetails(Collection<Long> recipeIds, Map<Long, RecipeTasteLevel> known, boolean readEs,
+                                      boolean spicyMatters, Long memberId) {
         Map<Long, RecipeTasteLevel> levels = new HashMap<>();
         List<Long> unknown = new ArrayList<>();
         for (Long id : recipeIds) {
-            RecipeTasteLevel level = pool.tasteLevels().get(id);
+            RecipeTasteLevel level = known.get(id);
             if (level == null) {
                 unknown.add(id);
             } else {
                 levels.put(id, level);
             }
         }
-        // rowsNonBasicComplete는 ES 경로(ES 검색·벡터 보충·피할 맛 다시 검색)에서만 true다
-        if (!unknown.isEmpty() && pool.rowsNonBasicComplete()) {
-            Map<Long, RecipeTasteLevel> read = readTasteLevels(unknown, query.memberId());
+        if (!unknown.isEmpty() && readEs) {
+            Map<Long, RecipeTasteLevel> read = readTasteLevels(unknown, memberId);
             levels.putAll(read);
             unknown = unknown.stream().filter(id -> !read.containsKey(id)).toList();
         }
         TasteDetails tastes = TasteDetails.of(levels);
-        if (!unknown.isEmpty()) {
-            tastes = tastes.plus(tasteDetailsFromDb(unknown, spicyMatters(query, memberTastes)));
-        }
-        return new PoolDetails(infos, tastes.tastes(), tastes.spicy());
+        return unknown.isEmpty() ? tastes : tastes.plus(tasteDetailsFromDb(unknown, spicyMatters));
     }
 
     /**
@@ -293,7 +301,8 @@ public class RecipeCandidateFacade {
     }
 
     /**
-     * 밀키트 추천 재료: 밀키트에 연결된 레시피의 지금 냉장고 기준 계산(가진 재료 수)과 레시피 맛, 냉장고 밀키트 줄 이름.
+     * 밀키트 추천 재료: 밀키트에 연결된 레시피의 지금 냉장고 기준 계산(가진 재료 수)과 레시피 맛·매울 수 있는 레시피, 냉장고 밀키트 줄 이름.
+     * 맛·매운 정도는 후보와 같은 기준으로 ES에서 id로 읽고, ES를 쓰지 않거나 읽지 못한 레시피는 DB 맛 데이터·재료 이름으로 계산한다.
      * 냉장고 조회는 한 번이고, 레시피가 없으면 레시피 조회를 하지 않는다.
      * 냉장고 밀키트 줄은 상품 ID 없이 구매 때의 상품 이름(raw_name)만 있어 이름으로 같은 밀키트를 가린다. 기한이 지난 줄은 뺀다.
      */
@@ -304,22 +313,25 @@ public class RecipeCandidateFacade {
                 .map(FridgeItemResponse::rawName)
                 .toList();
         if (recipeIds.isEmpty()) {
-            return new MealkitRecipes(Map.of(), Map.of(), fridgeMealkitNames);
+            return new MealkitRecipes(Map.of(), Map.of(), Set.of(), fridgeMealkitNames);
         }
-        Map<Long, Set<Member.Taste>> recipeTastes = recipeService.findTastesByRecipeIds(recipeIds);
+        // 피할 맛·원하는 맛을 여기서 모르므로 DB로 계산할 때도 매운 정도를 늘 계산한다 (밀키트 연결 레시피는 몇 건뿐이다)
+        TasteDetails tastes = tasteDetails(recipeIds, Map.of(), recipeSearchProperties.useElasticSearch(), true, memberId);
         Map<Long, RecipeCandidate> recipes = describe(memberId, RecipeCandidateScorer.prepareFridge(items), recipeIds,
-                recipeTastes);
-        return new MealkitRecipes(recipes, recipeTastes, fridgeMealkitNames);
+                tastes.tastes());
+        return new MealkitRecipes(recipes, tastes.tastes(), tastes.spicy().maybe(), fridgeMealkitNames);
     }
 
     /**
      * @param recipes            레시피 ID별 지금 냉장고 기준 계산 (지워진 레시피는 없다)
-     * @param recipeTastes       레시피 ID별 맛
-     * @param fridgeMealkitNames 냉장고 밀키트 줄 이름 (기한 지난 줄 제외)
+     * @param recipeTastes        레시피 ID별 맛 (확실히 매운 레시피면 SPICY가 들어 있다)
+     * @param maybeSpicyRecipeIds 매울 수 있는 레시피 ID (매운 정도 MILD·HOT)
+     * @param fridgeMealkitNames  냉장고 밀키트 줄 이름 (기한 지난 줄 제외)
      */
     public record MealkitRecipes(
             Map<Long, RecipeCandidate> recipes,
             Map<Long, Set<Member.Taste>> recipeTastes,
+            Set<Long> maybeSpicyRecipeIds,
             List<String> fridgeMealkitNames
     ) {
     }
