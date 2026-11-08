@@ -1,3 +1,8 @@
+@use 'sass:map';
+// 레시피 상세 테마 설정 파일. 여기서 읽고, 이 파일을 쓰는 화면에도 그대로 넘긴다.
+@forward 'recipe-detail-theme';
+@use 'recipe-detail-theme' as *;
+
 $breakpoints: (
   sm: 576px,
   md: 768px,
@@ -223,6 +228,7 @@ $recipe-step-image-max-width: 360px;
 // 좁은 화면은 사진이 위로, 재료·조리 순서는 반반 버튼(탭)으로 바꿔 본다.
 $recipe-hero-image-max-height: 360px; // 좁은 화면 사진 최대 높이
 $recipe-hero-image-max-height-lg: 480px; // 넓은 화면 사진 최대 높이
+
 $recipe-hero-padding-lg: 56px; // 넓은 화면 머리·본문 안쪽 여백
 $recipe-hero-title-size: 30px;
 $recipe-hero-title-size-md: 48px;
@@ -230,6 +236,29 @@ $recipe-tab-height: 52px;
 $recipe-step-index-size: 26px; // 조리 순서 큰 번호(01, 02 …)
 $recipe-step-index-width: 48px;
 $recipe-method-gap-lg: 56px; // 재료 | 조리 순서 사이(세로선 양쪽)
+
+// 레시피 상세: 고른 세트의 값. 화면 SCSS는 아래 변수만 쓴다.
+// 테마 번호·세트·세부 치수는 _recipe-detail-theme.scss에서 바꾼다(여기는 고치지 않는다).
+$_recipe-detail: map.get($recipe-detail-themes, $recipe-detail-theme);
+$recipe-detail-inset: map.get($_recipe-detail, inset);
+$recipe-hero-text-ratio: map.get($_recipe-detail, text-ratio);
+$recipe-hero-photo-ratio: map.get($_recipe-detail, photo-ratio);
+$recipe-hero-image-aspect: map.get($_recipe-detail, image-aspect);
+$recipe-hero-show-counts: map.get($_recipe-detail, show-counts);
+$recipe-hero-image-full-bleed: map.get($_recipe-detail, image-full-bleed);
+$recipe-hero-layout: map.get($_recipe-detail, layout);
+$recipe-hero-text-side: map.get($_recipe-detail, text-side);
+$recipe-hero-image-fit: map.get($_recipe-detail, image-fit);
+$recipe-hero-fill: map.get($_recipe-detail, hero-fill);
+$recipe-page-sections: map.get($_recipe-detail, page-sections);
+$recipe-section-nav: map.get($_recipe-detail, section-nav);
+
+// 조리 순서 전체보기(휴대폰을 옆에 두고 보는 화면이라 글자를 크게)
+$recipe-fullscreen-content-max-width: 880px;
+$recipe-fullscreen-index-size: 56px;
+$recipe-fullscreen-text-size: 22px;
+$recipe-fullscreen-text-size-md: 28px;
+$recipe-fullscreen-image-max-height: 40vh;
 
 // 모바일 터치 영역 최소 크기
 $touch-target-size: 44px;

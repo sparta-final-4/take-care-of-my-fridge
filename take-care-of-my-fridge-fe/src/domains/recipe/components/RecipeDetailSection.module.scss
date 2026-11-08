@@ -7,6 +7,13 @@
   flex-direction: column;
   gap: var(--ant-margin-lg);
   padding-bottom: var(--ant-padding-xl);
+
+  // 양옆 여백: 숫자는 _recipe-detail-theme.scss 세트의 inset에서 조절
+  @each $bp, $inset in $recipe-detail-inset {
+    @include from($bp) {
+      padding-inline: $inset;
+    }
+  }
 }
 
 .back {
@@ -158,5 +165,54 @@
     position: sticky;
     top: calc(#{$header-height} + var(--ant-margin-lg));
     order: 0;
+  }
+}
+
+// ── page-sections: 소개 · 만드는 법 · 영양과 후기가 각각 한 화면 ──
+// 묶음마다 첫 화면 높이를 채우고 가운데에 내용을 둔다. 스크롤을 멈추면 가까운 묶음 위끝에 맞춰 멈춘다
+// (proximity라 긴 묶음 안에서는 자유롭게 스크롤된다). 묶음이 화면에 들어올 때 살짝 떠오른다.
+// 오른쪽 화면 바로가기(antd Anchor)는 세트의 section-nav가 켜진 세트에서만 보인다.
+.sectionNav {
+  display: none;
+}
+
+@if $recipe-page-sections {
+  :global(html):has(.page) {
+    scroll-snap-type: y proximity;
+    scroll-padding-top: $header-height;
+  }
+
+  .method,
+  .row {
+    min-height: calc(100svh - #{$header-height});
+    scroll-snap-align: start;
+
+    @include reveal-on-view;
+
+    @include from(lg) {
+      padding-block: $recipe-section-padding;
+    }
+  }
+
+  .method {
+    justify-content: center;
+  }
+
+  .row {
+    align-content: center;
+  }
+}
+
+// 화면 바로가기는 세트의 section-nav로 켠다(한 화면 묶음이 아닌 세트에서도 쓸 수 있다).
+@if $recipe-section-nav {
+  .sectionNav {
+    @include from(xl) {
+      position: fixed;
+      top: 50%;
+      right: $recipe-section-nav-offset;
+      z-index: 1;
+      display: block;
+      transform: translateY(-50%);
+    }
   }
 }

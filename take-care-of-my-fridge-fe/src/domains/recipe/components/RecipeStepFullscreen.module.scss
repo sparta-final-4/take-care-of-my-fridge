@@ -1,0 +1,177 @@
+@use '@/styles/variables' as *;
+@use '@/styles/mixins' as *;
+
+// ── Modal을 화면 전체로 ──
+// antd가 좁은 화면에서 Modal 양옆·위아래 여백과 둥근 모서리를 주므로, 그보다 구체적인 선택자로 덮는다.
+:global(.ant-modal-wrap) :global(.ant-modal).modal {
+  top: 0;
+  width: 100vw;
+  max-width: 100vw;
+  height: 100dvh;
+  margin: 0;
+  padding-bottom: 0;
+
+  .container {
+    height: 100%;
+    padding: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  // 제목은 화면 읽기 프로그램용 이름으로만 쓰고 보이지 않는다(위 줄에 단계 번호가 대신 있다).
+  .header {
+    display: none;
+  }
+
+  .body {
+    height: 100%;
+  }
+}
+
+// ── 화면: 위 줄(단계·닫기) / 가운데 글 / 아래 줄(이전·안내) ──
+.screen {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: var(--ant-padding-sm) $page-gutter-sm var(--ant-padding);
+  padding-bottom: max(var(--ant-padding), env(safe-area-inset-bottom));
+
+  @include from(md) {
+    padding-inline: $page-gutter-md;
+  }
+}
+
+// 화면 전체를 덮는 "다음" 버튼. 위·가운데·아래 줄은 그 위에 있고 클릭을 통과시킨다(버튼만 클릭을 받는다).
+.stage {
+  position: absolute;
+  inset: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: 2px solid var(--ant-color-primary-active);
+    outline-offset: -4px;
+  }
+}
+
+.top,
+.content,
+.bottom,
+.progress {
+  position: relative;
+  pointer-events: none;
+}
+
+.control,
+.finishActions,
+.tip {
+  pointer-events: auto;
+}
+
+.top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: $touch-target-size;
+}
+
+.counter {
+  font-size: var(--ant-font-size-lg);
+}
+
+.progress {
+  margin: 0;
+}
+
+.content {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--ant-margin);
+  justify-content: center;
+  width: 100%;
+  max-width: $recipe-fullscreen-content-max-width;
+  min-height: 0;
+  margin-inline: auto;
+  padding-block: var(--ant-padding-lg);
+  overflow-y: auto;
+}
+
+.number {
+  @include display-heading;
+
+  font-size: $recipe-fullscreen-index-size;
+  line-height: 1;
+  color: var(--ant-color-primary);
+}
+
+.description {
+  margin: 0;
+  font-size: $recipe-fullscreen-text-size;
+  line-height: 1.5;
+  overflow-wrap: break-word;
+  white-space: pre-line;
+
+  @include from(md) {
+    font-size: $recipe-fullscreen-text-size-md;
+  }
+}
+
+.stepTip {
+  font-size: var(--ant-font-size-lg);
+}
+
+.image {
+  align-self: flex-start;
+  max-width: 100%;
+  max-height: $recipe-fullscreen-image-max-height;
+  object-fit: contain;
+  border-radius: var(--ant-border-radius-lg);
+}
+
+.bottom {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ant-margin-sm);
+  align-items: center;
+  justify-content: space-between;
+}
+
+.hint {
+  font-size: var(--ant-font-size-sm);
+}
+
+// ── 끝 화면 ──
+.finish {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ant-margin-lg);
+}
+
+.finishTitle {
+  @include display-heading;
+
+  font-size: $recipe-fullscreen-index-size;
+}
+
+.tip {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ant-margin-xxs);
+  padding: var(--ant-padding) var(--ant-padding-lg);
+  background: var(--ant-color-fill-tertiary);
+  border-radius: var(--ant-border-radius-lg);
+}
+
+:global(.ant-typography).tipText {
+  margin: 0;
+}
+
+.finishActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ant-margin-sm);
+}
