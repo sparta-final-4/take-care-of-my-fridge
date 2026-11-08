@@ -180,6 +180,7 @@ public class ChatIntentFacade {
             case REFINE -> refine(memberId, sessionId, request, result, context);
             case RECIPE_DETAIL -> recipeDetail(memberId, sessionId, result, context);
             case FRIDGE -> ChatIntentResolution.fridge(Source.AI, lookupOf(request.content(), result));
+            case SHOP -> ChatIntentResolution.shop(Source.AI, lookupOf(request.content(), result));
             case GENERAL -> mealkitRecommend
                     ? ChatIntentResolution.recommend(Source.AI, toRecipeQuery(memberId, sessionId, request, result))
                     : ChatIntentResolution.general(Source.AI);
@@ -209,18 +210,20 @@ public class ChatIntentFacade {
     }
 
     /**
-     * 냉장고 보기 말(app.chat.fridge-shop-words)로 의도를 한 번 더 정한다 (FridgeShopWordChecker).
+     * 냉장고 보기·사기 말(app.chat.fridge-shop-words)로 의도를 한 번 더 정한다 (FridgeShopWordChecker).
      * <ul>
      *   <li>AI가 추천·일반 대화로 본 말에 냉장고 보기 말이 있으면 FRIDGE ("밀키트 뭐 남았어", "두부 아직 있어?")</li>
+     *   <li>냉장고 보기 말이 없고 사기 말이 있으면 SHOP ("당근 사고 싶어", "대파 장바구니에 담아줘")</li>
      *   <li>묻는 말("어떻게 해동해?", "먹어도 돼?")이나 요리 말("뭐 먹지", "요리 추천")이 있으면 바꾸지 않는다</li>
-     *   <li>AI가 냉장고 보기로 봤어도 요리 말이 있으면 추천으로 둔다 ("두부 있으면 두부 요리 추천해줘")</li>
+     *   <li>AI가 냉장고 보기·사기로 봤어도 요리 말이 있으면 추천으로 둔다 ("두부 있으면 두부 요리 추천해줘")</li>
      * </ul>
      * 다시 추천·레시피 자세히·거절 의도는 건드리지 않는다. 바꿨으면 INFO로 남긴다.
      */
     IntentResult applyFridgeShopWords(Long memberId, Long sessionId, String message, IntentResult result) {
         ChatIntent intent = result.intent();
-        if (intent == ChatIntent.FRIDGE && FridgeShopWordChecker.cooks(message, chatFridgeShopWordProperties)) {
-            log.info("상담 요리 말이 있어 냉장고 보기를 추천으로 - memberId: {}, sessionId: {}", memberId, sessionId);
+        if ((intent == ChatIntent.FRIDGE || intent == ChatIntent.SHOP)
+                && FridgeShopWordChecker.cooks(message, chatFridgeShopWordProperties)) {
+            log.info("상담 요리 말이 있어 {}를 추천으로 - memberId: {}, sessionId: {}", intent, memberId, sessionId);
             return result.withIntent(ChatIntent.RECOMMEND);
         }
         if (intent != ChatIntent.RECOMMEND && intent != ChatIntent.GENERAL) {
@@ -236,13 +239,18 @@ public class ChatIntentFacade {
     }
 
     /**
-     * 냉장고 보기에서 볼 것. 범위는 AI 값을 쓰고, AI가 전체(ALL)로 뒀으면 서버가 단어로 정한다 (밀키트 → MEALKIT, 버려야·지난 → IMMINENT).
-     * 재료 이름은 AI가 뽑은 재료를 쓰고, 비었는데 범위가 전체면 서버가 말에서 재료 사전 이름을 찾는다.
+     * 냉장고 보기·사기에서 볼 것. 범위(냉장고 보기만)는 AI 값을 쓰고, AI가 전체(ALL)로 뒀으면 서버가 단어로 정한다 (밀키트 → MEALKIT, 버려야·지난 → IMMINENT).
+     * 이름은 AI가 뽑은 재료·상품 이름을 쓰고, 비었는데 사기이거나 냉장고 보기 범위가 전체면 서버가 말에서 재료 사전 이름을 찾는다.
      */
     private ItemLookup lookupOf(String message, IntentResult result) {
-        FridgeScope scope = result.scope() != FridgeScope.ALL
-                ? result.scope()
-                : FridgeShopWordChecker.scope(message, chatFridgeShopWordProperties, chatMealkitWordProperties);
+        FridgeScope scope;
+        if (result.intent() == ChatIntent.SHOP) {
+            scope = FridgeScope.ALL;
+        } else if (result.scope() != FridgeScope.ALL) {
+            scope = result.scope();
+        } else {
+            scope = FridgeShopWordChecker.scope(message, chatFridgeShopWordProperties, chatMealkitWordProperties);
+        }
         List<String> names = orEmpty(result.includeIngredients());
         if (names.isEmpty() && scope == FridgeScope.ALL && message != null) {
             String text = message.strip().replaceAll("[?!.~…,]+$", "").strip();

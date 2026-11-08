@@ -57,7 +57,7 @@ class ChatIntentPromptTest {
                 "\"주식 추천해줘\", \"숙제 풀어줘\", \"파이썬 코드 짜줘\" → OFF_TOPIC",
                 "\"주식으로 먹을 거 추천해줘\" → RECOMMEND",
                 "\"장보기 목록 짜줘\", \"냉장고 정리 방법\", \"안녕\", \"밥 먹었어?\" → GENERAL");
-        assertThat(followUp).contains("FRIDGE·OFF_TOPIC·BLOCKED·SELF_HARM은 첫 질문 규칙대로이고 [직전 조건]을 잇지 않는다");
+        assertThat(followUp).contains("FRIDGE·SHOP·OFF_TOPIC·BLOCKED·SELF_HARM은 첫 질문 규칙대로이고 [직전 조건]을 잇지 않는다");
     }
 
     @Test

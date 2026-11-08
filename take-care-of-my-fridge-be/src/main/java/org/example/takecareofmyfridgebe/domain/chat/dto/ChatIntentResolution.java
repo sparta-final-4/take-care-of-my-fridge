@@ -6,13 +6,13 @@ import java.util.List;
  * 상담 메시지를 어떻게 처리할지 정한 결과.
  *
  * @param intent         RECOMMEND·REFINE이면 recipeQuery로 후보를 찾고, RECIPE_DETAIL이면 targetRecipeId 레시피를 자세히 답하고,
- *                       FRIDGE면 lookup으로 냉장고를 보여 주고, GENERAL이면 일반 답을 한다. OFF_TOPIC·BLOCKED·SELF_HARM이면 답 생성 AI 없이 서버 안내로 답한다(declines)
+ *                       FRIDGE면 lookup으로 냉장고를, SHOP이면 살 상품을 보여 주고, GENERAL이면 일반 답을 한다. OFF_TOPIC·BLOCKED·SELF_HARM이면 답 생성 AI 없이 서버 안내로 답한다(declines)
  * @param source         의도를 정한 방법
  * @param recipeQuery    추천 조건 (REFINE이면 직전 조건과 합친 것). RECOMMEND·REFINE이 아니면 null
  * @param targetRecipeId RECIPE_DETAIL일 때 물어본 레시피 ID. 그 밖에는 null
  * @param detailQuestion RECIPE_DETAIL일 때 질문 종류 (모르면 null, OTHER처럼 다룬다). 그 밖에는 null
  * @param allergens      이 상담에서 사용자가 말한 알레르기·못 먹는 재료 이름 (추천이면 그 재료를 recipeQuery의 뺄 재료에 더했다). 없으면 빈 목록
- * @param lookup         FRIDGE일 때 볼 범위와 말한 재료 이름. 그 밖에는 null
+ * @param lookup         FRIDGE·SHOP일 때 볼 범위와 말한 재료·상품 이름. 그 밖에는 null
  */
 public record ChatIntentResolution(
         ChatIntent intent,
@@ -48,6 +48,10 @@ public record ChatIntentResolution(
 
     public static ChatIntentResolution fridge(Source source, ItemLookup lookup) {
         return new ChatIntentResolution(ChatIntent.FRIDGE, source, null, null, null, List.of(), lookup);
+    }
+
+    public static ChatIntentResolution shop(Source source, ItemLookup lookup) {
+        return new ChatIntentResolution(ChatIntent.SHOP, source, null, null, null, List.of(), lookup);
     }
 
     public enum Source {

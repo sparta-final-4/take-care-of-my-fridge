@@ -2,8 +2,10 @@ package org.example.takecareofmyfridgebe.domain.chat.facade;
 
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntentResolution.ItemLookup;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse.FridgeItemCard;
+import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse.ProductCard;
 import org.example.takecareofmyfridgebe.domain.chat.dto.FridgeScope;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecommendationReply;
+import org.example.takecareofmyfridgebe.domain.chat.dto.SavedRecommendation;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemResponse;
 import org.example.takecareofmyfridgebe.domain.fridge.entity.FridgeItemStatus;
 import org.example.takecareofmyfridgebe.domain.fridge.entity.FridgeSource;
@@ -13,20 +15,30 @@ import org.example.takecareofmyfridgebe.domain.ingredient.entity.IngredientType;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.StorageType;
 import org.example.takecareofmyfridgebe.domain.ingredient.service.IngredientMatcher;
 import org.example.takecareofmyfridgebe.domain.ingredient.service.IngredientService;
+import org.example.takecareofmyfridgebe.domain.product.dto.ProductListRequest;
+import org.example.takecareofmyfridgebe.domain.product.entity.IngredientProduct;
 import org.example.takecareofmyfridgebe.domain.product.entity.MealkitProduct;
 import org.example.takecareofmyfridgebe.domain.product.entity.Product;
 import org.example.takecareofmyfridgebe.domain.product.entity.ProductStatus;
 import org.example.takecareofmyfridgebe.domain.product.entity.ProductType;
 import org.example.takecareofmyfridgebe.domain.product.service.ProductService;
+import org.example.takecareofmyfridgebe.domain.sale.dto.SellingPrice;
+import org.example.takecareofmyfridgebe.domain.sale.service.SaleEventReader;
+import org.example.takecareofmyfridgebe.domain.search.config.RecipeSearchProperties;
+import org.example.takecareofmyfridgebe.domain.search.config.SearchEngine;
+import org.example.takecareofmyfridgebe.domain.search.dto.ProductSearchResult;
+import org.example.takecareofmyfridgebe.domain.search.service.ProductSearchService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.IntStream;
@@ -47,6 +59,8 @@ class ChatFridgeShopFacadeTest {
     private IngredientMatcher ingredientMatcher;
     private IngredientService ingredientService;
     private ProductService productService;
+    private ProductSearchService productSearchService;
+    private SaleEventReader saleEventReader;
     private ChatFridgeShopFacade facade;
 
     @BeforeEach
@@ -55,7 +69,112 @@ class ChatFridgeShopFacadeTest {
         ingredientMatcher = mock(IngredientMatcher.class);
         ingredientService = mock(IngredientService.class);
         productService = mock(ProductService.class);
-        facade = new ChatFridgeShopFacade(fridgeService, ingredientMatcher, ingredientService, productService);
+        productSearchService = mock(ProductSearchService.class);
+        saleEventReader = mock(SaleEventReader.class);
+        facade = new ChatFridgeShopFacade(fridgeService, ingredientMatcher, ingredientService, productService,
+                productSearchService, saleEventReader, new RecipeSearchProperties(SearchEngine.ELASTICSEARCH, null, null));
+        // 판매가는 정가로 (할인 없음)
+        when(saleEventReader.findSellingPrices(any())).thenAnswer(invocation -> {
+            List<Product> products = invocation.getArgument(0);
+            Map<Long, SellingPrice> prices = new HashMap<>();
+            products.forEach(product -> prices.put(product.getId(), SellingPrice.of(product, null)));
+            return prices;
+        });
+    }
+
+    @Test
+    @DisplayName("사기는 재료 사전 이름이면 그 재료에 이어진 상품 하나를 카드로 보여 주고 상품 검색은 하지 않는다")
+    void showsLinkedProduct_forDictionaryIngredient() throws Exception {
+        when(ingredientMatcher.matchAll(List.of("당근"))).thenReturn(Map.of("당근", ingredient(20L, "당근")));
+        Product carrot = product(7L, "흙당근 1kg", ProductType.INGREDIENT);
+        when(productService.getPublicIngredientProducts(any())).thenReturn(List.of(
+                IngredientProduct.builder().product(carrot).ingredientId(20L).unitAmount(BigDecimal.ONE).unit("kg").build()));
+
+        RecommendationReply reply = facade.shop(MEMBER_ID, new ItemLookup(FridgeScope.ALL, List.of("당근")));
+
+        assertThat(reply.event().products()).extracting(ProductCard::name, card -> card.product().productId(), card -> card.product().unit())
+                .containsExactly(tuple("당근", 7L, "kg"));
+        assertThat(reply.fixedReply()).isEqualTo("당근은 아래 상품으로 담을 수 있어요.");
+        verify(productSearchService, never()).search(any());
+    }
+
+    @Test
+    @DisplayName("사전에 없거나 이어진 상품이 없는 이름은 상품 검색 1등으로 보충하고, 그래도 없으면 없다고 쓴다")
+    void searchesProduct_whenNotLinked() throws Exception {
+        when(ingredientMatcher.matchAll(List.of("참치캔", "용과"))).thenReturn(Map.of(
+                "참치캔", customIngredient(), "용과", ingredient(21L, "용과")));
+        when(productSearchService.search(any())).thenAnswer(invocation -> {
+            ProductListRequest request = invocation.getArgument(0);
+            return request.keyword().equals("참치캔") ? new ProductSearchResult(List.of(8L), 1) : new ProductSearchResult(List.of(), 0);
+        });
+        when(productService.getProductsByIds(List.of(8L))).thenReturn(List.of(product(8L, "살코기 참치 150g", ProductType.INGREDIENT)));
+
+        RecommendationReply reply = facade.shop(MEMBER_ID, new ItemLookup(FridgeScope.ALL, List.of("참치캔", "용과")));
+
+        assertThat(reply.event().products()).extracting(ProductCard::name).containsExactly("참치캔");
+        assertThat(reply.fixedReply()).isEqualTo("참치캔은 아래 상품으로 담을 수 있어요. 용과는 지금 파는 상품이 없어요.");
+    }
+
+    @Test
+    @DisplayName("상품 검색이 실패해도 오류 없이 상품 없음으로 답한다")
+    void answersNoProduct_whenSearchFails() throws Exception {
+        when(ingredientMatcher.matchAll(any())).thenReturn(Map.of());
+        when(productSearchService.search(any())).thenThrow(new IOException("es down"));
+
+        RecommendationReply reply = facade.shop(MEMBER_ID, new ItemLookup(FridgeScope.ALL, List.of("참치캔")));
+
+        assertThat(reply.event().empty()).isTrue();
+        assertThat(reply.fixedReply()).isEqualTo("참치캔은 지금 파는 상품이 없어요.");
+    }
+
+    @Test
+    @DisplayName("사기에서 이름을 못 뽑았으면 이름을 말해 달라고 답한다")
+    void asksName_whenNoName() {
+        RecommendationReply reply = facade.shop(MEMBER_ID, new ItemLookup(FridgeScope.ALL, List.of()));
+
+        assertThat(reply.fixedReply()).isEqualTo(ChatFridgeShopFacade.NO_NAME_REPLY);
+        assertThat(reply.event().empty()).isTrue();
+    }
+
+    @Test
+    @DisplayName("냉장고 보기에서 말한 재료가 없으면 없다는 글과 그 재료의 상품 카드를 붙인다")
+    void addsProductCard_whenNamedIngredientMissing() {
+        givenFridge(item(1L, 10L, "대파", 2, IngredientType.NORMAL, false, null));
+        when(ingredientMatcher.matchAll(List.of("두부"))).thenReturn(Map.of("두부", ingredient(11L, "두부")));
+        Product tofu = product(9L, "국산 두부", ProductType.INGREDIENT);
+        when(productService.getPublicIngredientProducts(any())).thenReturn(List.of(
+                IngredientProduct.builder().product(tofu).ingredientId(11L).unitAmount(BigDecimal.ONE).unit("모").build()));
+
+        RecommendationReply reply = facade.fridge(MEMBER_ID, new ItemLookup(FridgeScope.ALL, List.of("두부")));
+
+        assertThat(reply.fixedReply()).isEqualTo("두부는 지금 냉장고에 없어요.");
+        assertThat(reply.event().fridgeItems()).isEmpty();
+        assertThat(reply.event().products()).extracting(ProductCard::name).containsExactly("두부");
+        assertThat(reply.event().empty()).isFalse();
+    }
+
+    @Test
+    @DisplayName("저장된 상품 카드는 재료 상품만 지금 가격으로 다시 만들고 저장된 이름을 쓰며, 밀키트·판매 중지 상품은 뺀다")
+    void rebuildsIngredientProductCardsOnly() {
+        List<SavedRecommendation> saved = List.of(
+                new SavedRecommendation(2L, 30L, null, 0, "설명"),
+                new SavedRecommendation(2L, null, 41L, 1, null),
+                new SavedRecommendation(2L, null, 7L, 2, "당근"),
+                new SavedRecommendation(3L, null, 99L, 0, "대파"));
+        when(productService.getProductsByIds(List.of(41L, 7L, 99L))).thenReturn(List.of(
+                product(41L, "된장국 밀키트", ProductType.MEALKIT), product(7L, "흙당근 1kg", ProductType.INGREDIENT)));
+
+        Map<Long, List<ProductCard>> cards = facade.rebuildProductCards(saved);
+
+        assertThat(cards).containsOnlyKeys(2L);
+        assertThat(cards.get(2L)).extracting(ProductCard::name, card -> card.product().productId()).containsExactly(tuple("당근", 7L));
+    }
+
+    @Test
+    @DisplayName("저장된 상품 카드가 없으면 상품을 조회하지 않는다")
+    void skipsRebuild_whenNoProductCards() {
+        assertThat(facade.rebuildProductCards(List.of(new SavedRecommendation(2L, 30L, 0, null)))).isEmpty();
+        verify(productService, never()).getProductsByIds(any());
     }
 
     @Test
@@ -181,6 +300,26 @@ class ChatFridgeShopFacadeTest {
         Ingredient ingredient = Ingredient.builder().ingredientCode("ING_" + id).name(name).baseUnit("g").build();
         ReflectionTestUtils.setField(ingredient, "id", id);
         return ingredient;
+    }
+
+    private static Ingredient customIngredient() {
+        Ingredient ingredient = Ingredient.builder().ingredientCode("ING_CUSTOM").name("직접 입력").baseUnit("개").build();
+        ReflectionTestUtils.setField(ingredient, "id", 98L);
+        return ingredient;
+    }
+
+    private static Product product(Long id, String name, ProductType type) {
+        Product product = Product.builder()
+                .productType(type)
+                .name(name)
+                .price(3000)
+                .stock(10)
+                .storage(StorageType.REFRIGERATED)
+                .shelfDays(7)
+                .status(ProductStatus.ON_SALE)
+                .build();
+        ReflectionTestUtils.setField(product, "id", id);
+        return product;
     }
 
     private static Ingredient mealkitIngredient() {

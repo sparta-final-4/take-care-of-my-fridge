@@ -14,6 +14,7 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.DetailQuestion;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageEventResponse;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageResponse;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationTextEventResponse;
+import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse.ProductCard;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse.RecommendedMealkit;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse.RecommendedRecipe;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeDetailReply;
@@ -233,8 +234,8 @@ public class ChatStreamService {
             String question = DetailQuestion.questionFor(resolution.detailQuestion(), request.content());
             return planRecipeDetail(memberId, sessionId, resolution.targetRecipeId(), question, context);
         }
-        if (resolution != null && resolution.intent() == ChatIntent.FRIDGE) {
-            return planFridge(memberId, sessionId, resolution, context);
+        if (resolution != null && (resolution.intent() == ChatIntent.FRIDGE || resolution.intent() == ChatIntent.SHOP)) {
+            return planFridgeOrShop(memberId, sessionId, resolution, context);
         }
         if (resolution == null || !resolution.recommends()) {
             return ReplyPlan.general(context);
@@ -255,12 +256,15 @@ public class ChatStreamService {
         }
     }
 
-    // 냉장고 보기: 냉장고 카드와 서버 문장 (답 생성 AI 없음, 카드는 저장하지 않는다). 냉장고를 읽다 실패하면 일반 답
-    private ReplyPlan planFridge(Long memberId, Long sessionId, ChatIntentResolution resolution, ChatContext context) {
+    // 냉장고 보기·사기: 냉장고·상품 카드와 서버 문장 (답 생성 AI 없음, 냉장고 카드는 저장하지 않는다). 읽다 실패하면 일반 답
+    private ReplyPlan planFridgeOrShop(Long memberId, Long sessionId, ChatIntentResolution resolution, ChatContext context) {
         try {
-            return new ReplyPlan(context, chatFridgeShopFacade.fridge(memberId, resolution.lookup()), null);
+            RecommendationReply reply = resolution.intent() == ChatIntent.FRIDGE
+                    ? chatFridgeShopFacade.fridge(memberId, resolution.lookup())
+                    : chatFridgeShopFacade.shop(memberId, resolution.lookup());
+            return new ReplyPlan(context, reply, null);
         } catch (RuntimeException e) {
-            log.warn("상담 냉장고 보기 실패, 일반 답으로 - memberId: {}, sessionId: {}", memberId, sessionId, e);
+            log.warn("상담 {} 답 실패, 일반 답으로 - memberId: {}, sessionId: {}", resolution.intent(), memberId, sessionId, e);
             return ReplyPlan.general(context);
         }
     }
@@ -367,6 +371,10 @@ public class ChatStreamService {
         // 저장할 밀키트 카드 (추천 답에만 있다)
         private List<RecommendedMealkit> mealkits() {
             return recommendation != null ? recommendation.event().mealkits() : List.of();
+        }
+
+        private List<ProductCard> products() {
+            return recommendation != null ? recommendation.event().products() : List.of();
         }
     }
 
@@ -481,6 +489,10 @@ public class ChatStreamService {
             // 밀키트 카드는 레시피 카드 다음 순서로, 서버가 쓴 설명과 함께 저장한다
             for (RecommendedMealkit mealkit : plan == null ? List.<RecommendedMealkit>of() : plan.mealkits()) {
                 cards.add(RecommendationToSave.mealkit(mealkit.product().productId(), mealkit.description()));
+            }
+            // 재료 상품 카드(사기 답·냉장고 보기의 없는 재료)는 말한 이름과 함께 저장한다. 냉장고 카드는 저장하지 않는다
+            for (ProductCard product : plan == null ? List.<ProductCard>of() : plan.products()) {
+                cards.add(RecommendationToSave.product(product.product().productId(), product.name()));
             }
             // 카드가 없으면 기존처럼 메시지만 저장한다. 안전 장치로 걸러진 답(서버 안내)은 표시해 저장한다
             List<ChatMessageResponse> saved = plan != null && plan.filtered()

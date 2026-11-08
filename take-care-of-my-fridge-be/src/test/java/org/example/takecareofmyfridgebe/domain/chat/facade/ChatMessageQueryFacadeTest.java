@@ -1,6 +1,7 @@
 package org.example.takecareofmyfridgebe.domain.chat.facade;
 
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageResponse;
+import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse.ProductCard;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse.RecommendedMealkit;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse.RecommendedRecipe;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse.ShoppingProduct;
@@ -30,13 +31,15 @@ class ChatMessageQueryFacadeTest {
 
     private ChatMessageService chatMessageService;
     private ChatRecommendationFacade chatRecommendationFacade;
+    private ChatFridgeShopFacade chatFridgeShopFacade;
     private ChatMessageQueryFacade facade;
 
     @BeforeEach
     void setUp() {
         chatMessageService = mock(ChatMessageService.class);
         chatRecommendationFacade = mock(ChatRecommendationFacade.class);
-        facade = new ChatMessageQueryFacade(chatMessageService, chatRecommendationFacade);
+        chatFridgeShopFacade = mock(ChatFridgeShopFacade.class);
+        facade = new ChatMessageQueryFacade(chatMessageService, chatRecommendationFacade, chatFridgeShopFacade);
     }
 
     @Test
@@ -86,6 +89,21 @@ class ChatMessageQueryFacadeTest {
 
         assertThat(answer.recommendations()).isEmpty();
         assertThat(answer.mealkits()).containsExactly(mealkit);
+    }
+
+    @Test
+    @DisplayName("사기 답의 상품 카드도 다시 만들어 그 AI 메시지에 붙인다")
+    void attachesProductCards() {
+        when(chatMessageService.getMessages(MEMBER_ID, SESSION_ID)).thenReturn(List.of(message(2L, ChatMessageRole.ASSISTANT)));
+        List<SavedRecommendation> saved = List.of(new SavedRecommendation(2L, null, 7L, 0, "당근"));
+        when(chatMessageService.findRecommendations(List.of(2L))).thenReturn(saved);
+        ProductCard product = new ProductCard("당근", new ShoppingProduct(7L, "흙당근 1kg", null, 3000, null, null, false, null, null));
+        when(chatFridgeShopFacade.rebuildProductCards(saved)).thenReturn(Map.of(2L, List.of(product)));
+
+        ChatMessageResponse answer = facade.getMessages(MEMBER_ID, SESSION_ID).get(0);
+
+        assertThat(answer.products()).containsExactly(product);
+        assertThat(answer.mealkits()).isEmpty();
     }
 
     private static ChatMessageResponse message(Long id, ChatMessageRole role) {

@@ -17,6 +17,7 @@ class FridgeShopWordCheckerTest {
     static final ChatFridgeShopWordProperties WORDS = new ChatFridgeShopWordProperties(
             List.of("남았", "아직있", "냉장고에뭐", "냉장고에있", "냉장고에서", "버려야", "유통기한지난", "소비기한지난"),
             List.of("버려야", "지난", "임박", "유통기한", "소비기한"),
+            List.of("사고싶", "어디서사", "장바구니", "담아", "주문해"),
             List.of("추천", "만들", "해먹", "요리", "레시피", "뭐먹", "먹지", "먹을까"));
 
     private static Optional<ChatIntent> check(String message) {
@@ -52,6 +53,28 @@ class FridgeShopWordCheckerTest {
     @DisplayName("냉장고 보기 말이 없으면 바꾸지 않는다 (주문한 거 언제 와?, 밀키트 뭐 있어)")
     void returnsEmpty_whenNoFridgeWord() {
         for (String message : List.of("주문한 거 언제 와?", "밀키트 뭐 있어", "안녕", "")) {
+            assertThat(check(message)).as(message).isEmpty();
+        }
+    }
+
+    @Test
+    @DisplayName("냉장고 보기 말이 없고 사기 말이 있으면 사기로 본다")
+    void returnsShop_whenShopWord() {
+        for (String message : List.of("당근 사고 싶어", "두부 어디서 사", "대파 장바구니에 담아줘", "우유 주문해줘")) {
+            assertThat(check(message)).as(message).contains(ChatIntent.SHOP);
+        }
+    }
+
+    @Test
+    @DisplayName("냉장고 보기 말과 사기 말이 같이 있으면 냉장고 보기로 본다")
+    void returnsFridge_whenFridgeAndShopWords() {
+        assertThat(check("두부 아직 있어? 없으면 장바구니에 담아줘")).contains(ChatIntent.FRIDGE);
+    }
+
+    @Test
+    @DisplayName("주문 상태를 묻거나, 묻는 말·요리 말이 같이 있으면 사기로 보지 않는다")
+    void returnsEmpty_whenShopWordIsMisleading() {
+        for (String message : List.of("주문한 거 언제 와?", "남은 국은 밀폐용기에 담아 보관해?", "두부 사서 만들 요리 추천해줘")) {
             assertThat(check(message)).as(message).isEmpty();
         }
     }

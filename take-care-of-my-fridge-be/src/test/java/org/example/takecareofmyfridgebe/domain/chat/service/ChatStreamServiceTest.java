@@ -14,6 +14,7 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageMode;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageResponse;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse.FridgeItemCard;
+import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse.ProductCard;
 import org.example.takecareofmyfridgebe.domain.chat.dto.FridgeScope;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse.RecommendedMealkit;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse.RecommendedRecipe;
@@ -636,7 +637,7 @@ class ChatStreamServiceTest {
         String text = "냉장고에 두부(내일까지)가 있어요.";
         when(chatIntentFacade.resolve(eq(1L), eq(sessionId), eq(request), any())).thenReturn(ChatIntentResolution.fridge(Source.AI, lookup));
         when(chatFridgeShopFacade.fridge(1L, lookup)).thenReturn(RecommendationReply.fixed(ChatRecommendationsEventResponse.fridge(List.of(
-                new FridgeItemCard(7L, 11L, "두부", "두부", BigDecimal.ONE, "모", 1, FridgeItemStatus.IMMINENT, false, null, null))), text));
+                new FridgeItemCard(7L, 11L, "두부", "두부", BigDecimal.ONE, "모", 1, FridgeItemStatus.IMMINENT, false, null, null)), List.of()), text));
         when(chatMessageService.saveExchange(sessionId, "냉장고에 뭐 있어", text)).thenReturn(List.of(
                 new ChatMessageResponse(100L, 1, ChatMessageRole.USER, "냉장고에 뭐 있어", LocalDateTime.now()),
                 new ChatMessageResponse(101L, 2, ChatMessageRole.ASSISTANT, text, LocalDateTime.now())));
@@ -649,6 +650,29 @@ class ChatStreamServiceTest {
         verify(chatReplyGenerator, never()).generate(any(), any(), any(), any());
         verify(chatMessageService).saveExchange(sessionId, "냉장고에 뭐 있어", text);
         verify(chatContextStore, never()).saveRecommendation(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("사기면 상품 카드 이벤트와 서버 글을 보내고 답 AI를 부르지 않으며, 상품 카드를 말한 이름과 함께 저장한다")
+    void sendsProductCardsAndSavesThem_whenShop() {
+        Long sessionId = 10L;
+        ChatMessageCreateRequest request = ChatMessageCreateRequest.of("당근 사고 싶어");
+        ItemLookup lookup = new ItemLookup(FridgeScope.ALL, List.of("당근"));
+        String text = "당근은 아래 상품으로 담을 수 있어요.";
+        when(chatIntentFacade.resolve(eq(1L), eq(sessionId), eq(request), any())).thenReturn(ChatIntentResolution.shop(Source.AI, lookup));
+        when(chatFridgeShopFacade.shop(1L, lookup)).thenReturn(RecommendationReply.fixed(ChatRecommendationsEventResponse.products(List.of(
+                new ProductCard("당근", new ShoppingProduct(7L, "흙당근 1kg", null, 3000, null, null, false, BigDecimal.ONE, "kg")))), text));
+        List<RecommendationToSave> toSave = List.of(RecommendationToSave.product(7L, "당근"));
+        when(chatMessageService.saveExchange(sessionId, "당근 사고 싶어", text, toSave)).thenReturn(List.of(
+                new ChatMessageResponse(100L, 1, ChatMessageRole.USER, "당근 사고 싶어", LocalDateTime.now()),
+                new ChatMessageResponse(101L, 2, ChatMessageRole.ASSISTANT, text, LocalDateTime.now())));
+
+        List<ServerSentEvent<String>> events = chatStreamService.streamMessage(1L, sessionId, request).collectList().block();
+
+        assertThat(events).extracting(ServerSentEvent::event).containsExactly("recommendations", "message", "done");
+        assertThat(events.get(0).data()).contains("\"products\":[{\"name\":\"당근\"", "\"productId\":7");
+        verify(chatReplyGenerator, never()).generate(any(), any(), any(), any());
+        verify(chatMessageService).saveExchange(sessionId, "당근 사고 싶어", text, toSave);
     }
 
     @Test
@@ -714,7 +738,7 @@ class ChatStreamServiceTest {
         List<ServerSentEvent<String>> events = chatStreamService.streamMessage(1L, sessionId, request).collectList().block();
 
         assertThat(events).extracting(ServerSentEvent::event).containsExactly("recommendations", "message", "done");
-        assertThat(events.get(0).data()).isEqualTo("{\"recipes\":[],\"mealkits\":[],\"fridgeItems\":[],\"relaxed\":[],\"empty\":true}");
+        assertThat(events.get(0).data()).isEqualTo("{\"recipes\":[],\"mealkits\":[],\"fridgeItems\":[],\"products\":[],\"relaxed\":[],\"empty\":true}");
         assertThat(events.get(1).data()).contains("찾지 못했어요");
         verify(chatReplyGenerator, never()).generateRecommendation(any(), any(), any(), any());
         verify(chatDailyLimitService, never()).refund(any());

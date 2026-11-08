@@ -1,6 +1,8 @@
 package org.example.takecareofmyfridgebe.domain.chat.dto;
 
 import org.example.takecareofmyfridgebe.domain.fridge.entity.FridgeItemStatus;
+import org.example.takecareofmyfridgebe.domain.product.entity.Product;
+import org.example.takecareofmyfridgebe.domain.sale.dto.SellingPrice;
 import org.example.takecareofmyfridgebe.domain.sale.entity.SaleEventType;
 
 import java.math.BigDecimal;
@@ -12,6 +14,7 @@ import java.util.List;
  * @param recipes  추천 레시피 (최대 3개, 서버가 고른 순서). 밀키트만 보여 주는 답이면 빈 목록
  * @param mealkits    추천 밀키트 (레시피 카드 아래). 말에 밀키트 단어가 있으면 최대 3개, 번거로워하는 말이면 1개, 그 밖에는 빈 목록
  * @param fridgeItems 냉장고 보기 카드 (소비기한 순, 지난 줄은 맨 아래, 최대 10개). 이 답에서만 보여 주고 저장하지 않는다. 그 밖에는 빈 목록
+ * @param products    살 상품 카드 (사기 답, 냉장고 보기에서 없는 재료). 재료·상품 이름마다 하나. 그 밖에는 빈 목록
  * @param relaxed     후보를 찾으려고 푼 조건 (조건 풀기 전이라 지금은 빈 목록)
  * @param empty       보여 줄 카드가 하나도 없는지
  */
@@ -19,6 +22,7 @@ public record ChatRecommendationsEventResponse(
         List<RecommendedRecipe> recipes,
         List<RecommendedMealkit> mealkits,
         List<FridgeItemCard> fridgeItems,
+        List<ProductCard> products,
         List<String> relaxed,
         boolean empty
 ) {
@@ -27,16 +31,23 @@ public record ChatRecommendationsEventResponse(
         recipes = recipes == null ? List.of() : List.copyOf(recipes);
         mealkits = mealkits == null ? List.of() : List.copyOf(mealkits);
         fridgeItems = fridgeItems == null ? List.of() : List.copyOf(fridgeItems);
+        products = products == null ? List.of() : List.copyOf(products);
         relaxed = relaxed == null ? List.of() : List.copyOf(relaxed);
     }
 
     public ChatRecommendationsEventResponse(List<RecommendedRecipe> recipes, List<String> relaxed, boolean empty) {
-        this(recipes, List.of(), List.of(), relaxed, empty);
+        this(recipes, List.of(), List.of(), List.of(), relaxed, empty);
     }
 
-    // 냉장고 보기 카드만 있는 이벤트
-    public static ChatRecommendationsEventResponse fridge(List<FridgeItemCard> items) {
-        return new ChatRecommendationsEventResponse(List.of(), List.of(), items, List.of(), items.isEmpty());
+    // 냉장고 보기 카드와 (없는 재료의) 상품 카드
+    public static ChatRecommendationsEventResponse fridge(List<FridgeItemCard> items, List<ProductCard> products) {
+        return new ChatRecommendationsEventResponse(List.of(), List.of(), items, products, List.of(),
+                items.isEmpty() && products.isEmpty());
+    }
+
+    // 상품 카드만 있는 이벤트 (사기 답)
+    public static ChatRecommendationsEventResponse products(List<ProductCard> products) {
+        return fridge(List.of(), products);
     }
 
     public static ChatRecommendationsEventResponse of(List<RecommendedRecipe> recipes) {
@@ -44,7 +55,17 @@ public record ChatRecommendationsEventResponse(
     }
 
     public static ChatRecommendationsEventResponse of(List<RecommendedRecipe> recipes, List<RecommendedMealkit> mealkits) {
-        return new ChatRecommendationsEventResponse(recipes, mealkits, List.of(), List.of(), recipes.isEmpty() && mealkits.isEmpty());
+        return new ChatRecommendationsEventResponse(recipes, mealkits, List.of(), List.of(), List.of(),
+                recipes.isEmpty() && mealkits.isEmpty());
+    }
+
+    /**
+     * 살 상품 카드 하나. 누르면 상품 상세로 가고 [담기]로 장바구니에 담는다 (서버가 직접 담지 않는다).
+     *
+     * @param name    사용자가 말한 재료·상품 이름 ("당근")
+     * @param product 담을 상품 (가격·할인가·품절은 카드를 만들 때 기준, 다시 불러올 때도 그때 기준)
+     */
+    public record ProductCard(String name, ShoppingProduct product) {
     }
 
     /**
@@ -168,5 +189,10 @@ public record ChatRecommendationsEventResponse(
             BigDecimal unitAmount,
             String unit
     ) {
+        // 용량을 모르는 상품 (상품 검색으로 찾았거나 다시 불러온 상품 카드)
+        public static ShoppingProduct from(Product product, SellingPrice price) {
+            return new ShoppingProduct(product.getId(), product.getName(), product.getImageUrl(), price.listPrice(),
+                    price.sale().isPresent() ? price.unitPrice() : null, price.saleType(), price.soldOut(), null, null);
+        }
     }
 }

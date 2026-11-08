@@ -411,7 +411,7 @@ public class ChatRecommendationFacade {
      * @return AI 메시지 ID별 카드 (보여 준 순서)
      */
     public Map<Long, List<RecommendedRecipe>> rebuildCards(Long memberId, List<SavedRecommendation> all) {
-        List<SavedRecommendation> saved = all.stream().filter(recommendation -> !recommendation.isMealkit()).toList();
+        List<SavedRecommendation> saved = all.stream().filter(recommendation -> !recommendation.isProduct()).toList();
         if (saved.isEmpty()) {
             return Map.of();
         }
@@ -450,7 +450,7 @@ public class ChatRecommendationFacade {
      * @return AI 메시지 ID별 밀키트 카드 (보여 준 순서). 밀키트 카드가 없는 메시지는 맵에 없다
      */
     public Map<Long, List<RecommendedMealkit>> rebuildMealkitCards(List<SavedRecommendation> all) {
-        List<SavedRecommendation> saved = all.stream().filter(SavedRecommendation::isMealkit).toList();
+        List<SavedRecommendation> saved = all.stream().filter(SavedRecommendation::isProduct).toList();
         if (saved.isEmpty()) {
             return Map.of();
         }
