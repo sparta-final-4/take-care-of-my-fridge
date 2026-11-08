@@ -2,6 +2,14 @@
 @use '@/styles/mixins' as *;
 
 // 상품 정보 모달. 오른쪽 칸은 예전 카드 뒷면과 같은 모양(살구색 바탕, 크림색 안쪽 칸, 귤색 알약 담기 버튼, 선 없음).
+
+// 뒤 목록: 회색 마스크 대신 흐림 위에 옅은 반투명 종이색 막을 얹는다(젖빛 유리처럼).
+// antd 마스크 규칙보다 우선하도록 antd 클래스를 함께 건다.
+.mask:global(.ant-modal-mask) {
+  background: color-mix(in srgb, var(--ant-color-bg-layout) 35%, transparent);
+  backdrop-filter: blur($product-modal-mask-blur);
+}
+
 // 모바일: 사진 위, 정보 아래 / md부터 좌우 2단
 .layout {
   display: grid;

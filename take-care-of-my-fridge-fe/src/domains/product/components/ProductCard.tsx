@@ -1,4 +1,4 @@
-import { ClockCircleOutlined, InfoCircleOutlined } from '@ant-design/icons';
+import { ClockCircleOutlined } from '@ant-design/icons';
 import { Flex, Tag, Typography } from 'antd';
 import { Link } from 'react-router';
 
@@ -48,11 +48,6 @@ export function ProductCard({
           className={styles.image}
           loading="lazy"
         />
-        {/* 눌러서 정보를 볼 수 있다는 안내(장식, 링크 이름은 aria-label이 맡는다) */}
-        <span className={styles.infoHint} aria-hidden="true">
-          <InfoCircleOutlined />
-          눌러서 정보 보기
-        </span>
         {soldOut && <span className={styles.soldOutMark}>품절</span>}
         {/* 남은 시간·수량은 이미지 위에 올려, 할인 상품과 일반 상품의 카드 높이를 같게 둔다. */}
         {sale?.endsAt && (
