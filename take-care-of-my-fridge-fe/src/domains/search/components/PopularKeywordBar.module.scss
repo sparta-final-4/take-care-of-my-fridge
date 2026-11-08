@@ -1,11 +1,11 @@
-// 상자 없이 한 줄. 아래 얇은 선으로만 본문과 나눈다.
+@use '@/styles/variables' as *;
+
+// 상자 없이 한 줄. 위아래 여백·선은 놓이는 자리(헤더 검색 줄·왼쪽 메뉴)가 정한다.
 .bar {
   display: flex;
   align-items: center;
   gap: var(--ant-margin);
   min-width: 0;
-  padding-bottom: var(--ant-padding-sm);
-  border-bottom: 1px solid var(--ant-color-border-secondary);
 }
 
 .label {
@@ -29,7 +29,7 @@
   display: inline-flex;
   align-items: center;
   gap: var(--ant-margin-xxs);
-  min-height: var(--ant-control-height-sm);
+  min-height: $touch-target-size;
   padding: 0 var(--ant-padding-xs);
   color: inherit;
   white-space: nowrap;
