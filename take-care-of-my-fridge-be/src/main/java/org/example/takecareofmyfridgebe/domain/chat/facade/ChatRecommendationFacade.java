@@ -30,7 +30,6 @@ import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeDetailResponse;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeSummary;
 import org.example.takecareofmyfridgebe.domain.product.entity.IngredientProduct;
 import org.example.takecareofmyfridgebe.domain.product.entity.MealkitProduct;
-import org.example.takecareofmyfridgebe.domain.product.entity.Product;
 import org.example.takecareofmyfridgebe.domain.product.service.ProductService;
 import org.example.takecareofmyfridgebe.domain.recipe.service.RecipeService;
 import org.example.takecareofmyfridgebe.domain.sale.dto.SellingPrice;
@@ -143,7 +142,8 @@ public class ChatRecommendationFacade {
         if (picked.isEmpty()) {
             return recipes;
         }
-        List<RecommendedMealkit> cards = toMealkitCards(picked, ChatRecommendationFacade::mealkitSuggestion);
+        List<RecommendedMealkit> cards = toMealkitCards(picked,
+                p -> mealkitSuggestion(p.mealkit().getProduct().getName(), p.inFridge()));
         return recipes.withEvent(recipes.event().withMealkits(cards));
     }
 
@@ -161,24 +161,21 @@ public class ChatRecommendationFacade {
                 mealkits.stream().map(MealkitProduct::getProduct).toList());
         return MealkitPicker.pick(new MealkitPicker.Input(mealkits, prices, recipes.recipes(), recipes.recipeTastes(),
                 recipes.maybeSpicyRecipeIds(), query,
-                cardRecipeIds, recipes.fridgeMealkitNames(), shown), limit);
+                cardRecipeIds, recipes.fridgeMealkits(), shown), limit);
     }
 
     private static List<RecommendedMealkit> toMealkitCards(List<MealkitPicker.Picked> picked,
-                                                           Function<String, String> description) {
+                                                           Function<MealkitPicker.Picked, String> description) {
         return picked.stream()
                 .map(p -> toMealkitCard(p.mealkit(), p.price(), p.recipe() == null ? null : p.recipe().name(),
-                        description == null ? null : description.apply(p.mealkit().getProduct().getName())))
+                        description == null ? null : description.apply(p), p.fridgeDDay()))
                 .toList();
     }
 
     private static RecommendedMealkit toMealkitCard(MealkitProduct mealkit, SellingPrice price, String recipeName,
-                                                    String description) {
-        Product product = mealkit.getProduct();
-        ShoppingProduct shopping = new ShoppingProduct(product.getId(), product.getName(), product.getImageUrl(),
-                price.listPrice(), price.sale().isPresent() ? price.unitPrice() : null, price.saleType(), price.soldOut(),
-                null, null);
-        return new RecommendedMealkit(shopping, mealkit.getServings(), mealkit.getRecipeId(), recipeName, description);
+                                                    String description, Long fridgeDDay) {
+        return new RecommendedMealkit(ShoppingProduct.from(mealkit.getProduct(), price), mealkit.getServings(),
+                mealkit.getRecipeId(), recipeName, description, fridgeDDay != null, fridgeDDay);
     }
 
     /**
@@ -186,9 +183,14 @@ public class ChatRecommendationFacade {
      * 상품 이름에 "밀키트"가 이미 있으면 붙이지 않는다. 조사(으로/로)는 마지막 글자 받침을 본다 (ㄹ 받침은 "로").
      */
     static String mealkitSuggestion(String productName) {
+        return mealkitSuggestion(productName, false);
+    }
+
+    // 냉장고에 있는 밀키트면 "요리하기 번거로우면 냉장고에 있는 된장국 밀키트로 간편하게 드셔 보세요."
+    static String mealkitSuggestion(String productName, boolean inFridge) {
         String name = productName.strip();
         String label = name.contains(MEALKIT_WORD) ? name : name + " " + MEALKIT_WORD;
-        return "요리하기 번거로우면 " + label + instrumentalParticle(label) + " 간편하게 드셔 보세요.";
+        return "요리하기 번거로우면 " + (inFridge ? "냉장고에 있는 " : "") + label + instrumentalParticle(label) + " 간편하게 드셔 보세요.";
     }
 
     // "으로" / "로" (받침 없음·ㄹ 받침은 "로", 한글이 아니면 "로")
@@ -211,7 +213,8 @@ public class ChatRecommendationFacade {
         String head = !asked ? "지금 살 수 있는 밀키트를 골라 봤어요."
                 : matched ? "말씀하신 조건에 맞춰 밀키트를 골라 봤어요."
                 : "말씀하신 조건에 맞는 밀키트는 없어서, 지금 살 수 있는 밀키트를 골라 봤어요.";
-        return head + " 카드를 누르면 상품을 볼 수 있고, 장바구니 아이콘으로 바로 담을 수 있어요.";
+        String fridge = picked.stream().anyMatch(MealkitPicker.Picked::inFridge) ? " 냉장고에 이미 있는 밀키트는 먼저 보여 드려요." : "";
+        return head + fridge + " 카드를 누르면 상품을 볼 수 있고, 장바구니 아이콘으로 바로 담을 수 있어요.";
     }
 
     private static void logMealkits(RecipeQuery query, MealkitWordChecker.Mode mode, List<MealkitPicker.Picked> picked) {
@@ -445,11 +448,13 @@ public class ChatRecommendationFacade {
     /**
      * 저장된 밀키트 카드를 다시 만든다. 순서·설명은 저장값, 이름·이미지·인분·가격·품절은 지금 상품, 레시피 이름은 지금 레시피 기준.
      * 판매 중지됐거나 지워진 밀키트는 빼고, 품절이면 카드는 두고 품절로 보여 준다.
-     * 상품·판매가·레시피 이름 조회는 메시지 수와 상관없이 한 번씩이고, 밀키트 카드가 없으면 조회하지 않는다.
+     * "냉장고에 있어요"(inFridge·남은 일수)는 지금 냉장고 기준이다.
+     * 상품 카드 중 밀키트(상품 종류 MEALKIT)만 만든다 (재료 상품 카드는 ChatFridgeShopFacade.rebuildProductCards).
+     * 상품·판매가·레시피 이름·냉장고 조회는 메시지 수와 상관없이 한 번씩이고, 밀키트 카드가 없으면 조회하지 않는다.
      *
      * @return AI 메시지 ID별 밀키트 카드 (보여 준 순서). 밀키트 카드가 없는 메시지는 맵에 없다
      */
-    public Map<Long, List<RecommendedMealkit>> rebuildMealkitCards(List<SavedRecommendation> all) {
+    public Map<Long, List<RecommendedMealkit>> rebuildMealkitCards(Long memberId, List<SavedRecommendation> all) {
         List<SavedRecommendation> saved = all.stream().filter(SavedRecommendation::isProduct).toList();
         if (saved.isEmpty()) {
             return Map.of();
@@ -464,6 +469,7 @@ public class ChatRecommendationFacade {
                 mealkits.values().stream().map(MealkitProduct::getProduct).toList());
         Map<Long, RecipeSummary> recipes = recipeService.findSummaries(
                 mealkits.values().stream().map(MealkitProduct::getRecipeId).filter(Objects::nonNull).distinct().toList());
+        MealkitPicker.FridgeMealkits fridge = recipeCandidateFacade.findFridgeMealkits(memberId);
 
         Map<Long, List<RecommendedMealkit>> cards = new LinkedHashMap<>();
         saved.stream()
@@ -478,7 +484,7 @@ public class ChatRecommendationFacade {
                     RecipeSummary recipe = mealkit.getRecipeId() == null ? null : recipes.get(mealkit.getRecipeId());
                     cards.computeIfAbsent(recommendation.messageId(), id -> new ArrayList<>())
                             .add(toMealkitCard(mealkit, price, recipe == null ? null : recipe.name(),
-                                    recommendation.description()));
+                                    recommendation.description(), fridge.dDayOf(mealkit.getProduct())));
                 });
         return cards;
     }

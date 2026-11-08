@@ -36,7 +36,7 @@ public class ChatMessageQueryFacade {
             return messages;
         }
         Map<Long, List<RecommendedRecipe>> cards = chatRecommendationFacade.rebuildCards(memberId, saved);
-        Map<Long, List<RecommendedMealkit>> mealkits = chatRecommendationFacade.rebuildMealkitCards(saved);
+        Map<Long, List<RecommendedMealkit>> mealkits = chatRecommendationFacade.rebuildMealkitCards(memberId, saved);
         Map<Long, List<ProductCard>> products = chatFridgeShopFacade.rebuildProductCards(saved);
         return messages.stream()
                 .map(message -> message.withRecommendations(cards.getOrDefault(message.id(), List.of()),

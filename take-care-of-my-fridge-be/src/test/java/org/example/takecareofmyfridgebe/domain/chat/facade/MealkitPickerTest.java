@@ -4,6 +4,7 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate.Ranking;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate.Reason;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeQuery;
+import org.example.takecareofmyfridgebe.domain.chat.facade.MealkitPicker.FridgeMealkits;
 import org.example.takecareofmyfridgebe.domain.chat.facade.MealkitPicker.Input;
 import org.example.takecareofmyfridgebe.domain.chat.facade.MealkitPicker.Picked;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.StorageType;
@@ -125,7 +126,7 @@ class MealkitPickerTest {
     }
 
     @Test
-    @DisplayName("품절·판매가 없는 밀키트, 레시피 카드와 같은 레시피, 냉장고에 이름이 같은 밀키트는 빼고 이미 보여 준 밀키트는 뒤로 보낸다")
+    @DisplayName("품절·판매가 없는 밀키트, 레시피 카드와 같은 레시피는 빼고, 냉장고에 이름이 같은 밀키트(예전 줄)는 앞에, 이미 보여 준 밀키트는 뒤로 보낸다")
     void skipsUnavailableAndDuplicates_andMovesShownBack() {
         mealkit(40L, "된장국", 9000, recipe(544L, "된장국", "국", 5));
         mealkit(41L, "황태 해장국", 9000, recipe(543L, "황태해장국", "국", 5));
@@ -138,7 +139,46 @@ class MealkitPickerTest {
         List<Picked> picked = MealkitPicker.pick(
                 input(query(List.of(), List.of()), Set.of(544L), Set.of("황태해장국"), Set.of(43L)), 3);
 
-        assertThat(picked).extracting(p -> p.mealkit().getProduct().getId()).containsExactly(44L, 43L);
+        assertThat(picked).extracting(p -> p.mealkit().getProduct().getId()).containsExactly(41L, 44L, 43L);
+        assertThat(picked.get(0).inFridge()).isTrue();
+    }
+
+    @Test
+    @DisplayName("조건 없이 고르면 냉장고에 있는 밀키트(product_id로 판단)를 맨 앞에 남은 일수와 함께 두고, 품절이어도 빼지 않는다")
+    void putsFridgeMealkitFirst_byProductId() {
+        mealkit(24L, "된장국 밀키트", 9000, recipe(544L, "된장국", "국", 5));
+        mealkit(28L, "닭가슴살 브로콜리 만두 밀키트", 9000, recipe(555L, "닭가슴살 브로콜리 만두", "만두", 0), null, ProductStatus.SOLD_OUT);
+        mealkit(27L, "부추 콩가루 찜 밀키트", 9000, recipe(539L, "부추 콩가루 찜", "찜", 3));
+
+        List<Picked> picked = MealkitPicker.pick(new Input(mealkits, prices, recipes, tastes, maybeSpicy,
+                query(List.of(), List.of()), Set.of(), new FridgeMealkits(Map.of(28L, 2L), Map.of()), Set.of()), 3);
+
+        assertThat(picked).extracting(p -> p.mealkit().getProduct().getId(), Picked::fridgeDDay)
+                .containsExactly(tuple(28L, 2L), tuple(24L, null), tuple(27L, null));
+    }
+
+    @Test
+    @DisplayName("요청 조건이 맞는 밀키트가 냉장고 밀키트보다 앞선다 (\"국물 밀키트\" + 냉장고에 만두 밀키트면 국물 밀키트가 먼저)")
+    void putsRequestMatchBeforeFridgeMealkit() {
+        mealkit(24L, "된장국 밀키트", 9000, recipe(544L, "된장국", "국", 0));
+        mealkit(28L, "닭가슴살 브로콜리 만두 밀키트", 9000, recipe(555L, "닭가슴살 브로콜리 만두", "만두", 5));
+
+        List<Picked> picked = MealkitPicker.pick(new Input(mealkits, prices, recipes, tastes, maybeSpicy,
+                query(List.of("국"), List.of()), Set.of(), new FridgeMealkits(Map.of(28L, 4L), Map.of()), Set.of()), 3);
+
+        assertThat(picked).extracting(p -> p.mealkit().getProduct().getId()).containsExactly(24L, 28L);
+    }
+
+    @Test
+    @DisplayName("product_id가 없는 예전 냉장고 줄은 등록 이름(공백 무관)으로 같은 밀키트를 본다")
+    void matchesFridgeMealkitByName_whenNoProductId() {
+        FridgeMealkits fridge = new FridgeMealkits(Map.of(), Map.of("된장국밀키트", 1L));
+        Product product = Product.builder().productType(ProductType.MEALKIT).name("된장국 밀키트").price(9000).stock(1)
+                .storage(StorageType.REFRIGERATED).shelfDays(3).status(ProductStatus.ON_SALE).build();
+        ReflectionTestUtils.setField(product, "id", 24L);
+
+        assertThat(fridge.dDayOf(product)).isEqualTo(1L);
+        assertThat(FridgeMealkits.NONE.dDayOf(product)).isNull();
     }
 
     @Test
@@ -185,7 +225,11 @@ class MealkitPickerTest {
     }
 
     private Input input(RecipeQuery query, Set<Long> cardRecipeIds, Set<String> fridgeNames, Set<Long> shown) {
-        return new Input(mealkits, prices, recipes, tastes, maybeSpicy, query, cardRecipeIds, fridgeNames, shown);
+        // 냉장고 밀키트 이름은 product_id가 없는 예전 줄로 본다 (남은 일수 5)
+        Map<String, Long> byName = new HashMap<>();
+        fridgeNames.forEach(name -> byName.put(MealkitPicker.compact(name), 5L));
+        return new Input(mealkits, prices, recipes, tastes, maybeSpicy, query, cardRecipeIds,
+                new FridgeMealkits(Map.of(), byName), shown);
     }
 
     private static RecipeQuery query(List<String> categories, List<String> keywords) {

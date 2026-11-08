@@ -7,6 +7,7 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.KeywordMatch;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidates;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeQuery;
+import org.example.takecareofmyfridgebe.domain.chat.facade.MealkitPicker.FridgeMealkits;
 import org.example.takecareofmyfridgebe.domain.chat.facade.RecipeCandidateScorer.FridgeStock;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemResponse;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeSortType;
@@ -301,38 +302,59 @@ public class RecipeCandidateFacade {
     }
 
     /**
-     * 밀키트 추천 재료: 밀키트에 연결된 레시피의 지금 냉장고 기준 계산(가진 재료 수)과 레시피 맛·매울 수 있는 레시피, 냉장고 밀키트 줄 이름.
+     * 밀키트 추천 재료: 밀키트에 연결된 레시피의 지금 냉장고 기준 계산(가진 재료 수)과 레시피 맛·매울 수 있는 레시피, 냉장고에 있는 밀키트.
      * 맛·매운 정도는 후보와 같은 기준으로 ES에서 id로 읽고, ES를 쓰지 않거나 읽지 못한 레시피는 DB 맛 데이터·재료 이름으로 계산한다.
      * 냉장고 조회는 한 번이고, 레시피가 없으면 레시피 조회를 하지 않는다.
-     * 냉장고 밀키트 줄은 상품 ID 없이 구매 때의 상품 이름(raw_name)만 있어 이름으로 같은 밀키트를 가린다. 기한이 지난 줄은 뺀다.
      */
     public MealkitRecipes describeMealkitRecipes(Long memberId, Collection<Long> recipeIds) {
         List<FridgeItemResponse> items = fridgeService.getItems(memberId, FridgeSortType.EXPIRATION);
-        List<String> fridgeMealkitNames = items.stream()
-                .filter(item -> item.ingredientType() == IngredientType.MEALKIT && item.dDay() >= 0)
-                .map(FridgeItemResponse::rawName)
-                .toList();
+        FridgeMealkits fridgeMealkits = toFridgeMealkits(items);
         if (recipeIds.isEmpty()) {
-            return new MealkitRecipes(Map.of(), Map.of(), Set.of(), fridgeMealkitNames);
+            return new MealkitRecipes(Map.of(), Map.of(), Set.of(), fridgeMealkits);
         }
         // 피할 맛·원하는 맛을 여기서 모르므로 DB로 계산할 때도 매운 정도를 늘 계산한다 (밀키트 연결 레시피는 몇 건뿐이다)
         TasteDetails tastes = tasteDetails(recipeIds, Map.of(), recipeSearchProperties.useElasticSearch(), true, memberId);
         Map<Long, RecipeCandidate> recipes = describe(memberId, RecipeCandidateScorer.prepareFridge(items), recipeIds,
                 tastes.tastes());
-        return new MealkitRecipes(recipes, tastes.tastes(), tastes.spicy().maybe(), fridgeMealkitNames);
+        return new MealkitRecipes(recipes, tastes.tastes(), tastes.spicy().maybe(), fridgeMealkits);
+    }
+
+    // 냉장고에 있는 밀키트 (저장된 밀키트 카드를 다시 보여 줄 때도 지금 냉장고 기준으로 쓴다). 냉장고 조회 1번
+    public FridgeMealkits findFridgeMealkits(Long memberId) {
+        return toFridgeMealkits(fridgeService.getItems(memberId, FridgeSortType.EXPIRATION));
     }
 
     /**
-     * @param recipes            레시피 ID별 지금 냉장고 기준 계산 (지워진 레시피는 없다)
+     * 냉장고 밀키트 줄을 상품 ID(fridge.product_id)로, 상품 ID가 없는 예전 줄은 등록 이름(raw_name)으로 묶는다.
+     * 기한이 지난 줄은 뺀다. 같은 밀키트가 여러 줄이면 소비기한이 가장 가까운 줄의 남은 일수를 둔다.
+     */
+    private static FridgeMealkits toFridgeMealkits(List<FridgeItemResponse> items) {
+        Map<Long, Long> byProduct = new HashMap<>();
+        Map<String, Long> byName = new HashMap<>();
+        for (FridgeItemResponse item : items) {
+            if (item.ingredientType() != IngredientType.MEALKIT || item.dDay() < 0) {
+                continue;
+            }
+            if (item.productId() != null) {
+                byProduct.merge(item.productId(), item.dDay(), Math::min);
+            } else if (item.rawName() != null) {
+                byName.merge(MealkitPicker.compact(item.rawName()), item.dDay(), Math::min);
+            }
+        }
+        return new FridgeMealkits(byProduct, byName);
+    }
+
+    /**
+     * @param recipes             레시피 ID별 지금 냉장고 기준 계산 (지워진 레시피는 없다)
      * @param recipeTastes        레시피 ID별 맛 (확실히 매운 레시피면 SPICY가 들어 있다)
      * @param maybeSpicyRecipeIds 매울 수 있는 레시피 ID (매운 정도 MILD·HOT)
-     * @param fridgeMealkitNames  냉장고 밀키트 줄 이름 (기한 지난 줄 제외)
+     * @param fridgeMealkits      냉장고에 있는 밀키트 (기한 지난 줄 제외)
      */
     public record MealkitRecipes(
             Map<Long, RecipeCandidate> recipes,
             Map<Long, Set<Member.Taste>> recipeTastes,
             Set<Long> maybeSpicyRecipeIds,
-            List<String> fridgeMealkitNames
+            FridgeMealkits fridgeMealkits
     ) {
     }
 

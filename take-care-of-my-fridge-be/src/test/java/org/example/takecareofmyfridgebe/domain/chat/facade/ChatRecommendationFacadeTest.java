@@ -1,5 +1,6 @@
 package org.example.takecareofmyfridgebe.domain.chat.facade;
 
+import org.example.takecareofmyfridgebe.domain.chat.facade.MealkitPicker.FridgeMealkits;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse.RecommendedMealkit;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse.RecommendedRecipe;
@@ -505,14 +506,18 @@ class ChatRecommendationFacadeTest {
         when(recipeService.findSummaries(any())).thenReturn(Map.of(
                 543L, new RecipeSummary(543L, "황태해장국", null, null),
                 544L, new RecipeSummary(544L, "된장국", null, null)));
+        when(recipeCandidateFacade.findFridgeMealkits(MEMBER_ID)).thenReturn(new FridgeMealkits(Map.of(40L, 1L), Map.of()));
 
-        Map<Long, List<RecommendedMealkit>> cards = facade.rebuildMealkitCards(saved);
+        Map<Long, List<RecommendedMealkit>> cards = facade.rebuildMealkitCards(MEMBER_ID, saved);
 
         assertThat(cards.get(2L)).extracting(m -> m.product().productId(), RecommendedMealkit::description)
                 .containsExactly(tuple(41L, "요리하기 번거로우면 황태해장국 밀키트로 간편하게 드셔 보세요."));
         assertThat(cards.get(4L)).extracting(m -> m.product().productId()).containsExactly(40L, 43L);
         assertThat(cards.get(4L).get(0).recipeName()).isEqualTo("된장국");
         assertThat(cards.get(4L).get(1).product().soldOut()).isTrue();
+        // 냉장고에 있는지는 지금 냉장고 기준 (된장국 밀키트가 냉장고에 있음)
+        assertThat(cards.get(4L)).extracting(RecommendedMealkit::inFridge, RecommendedMealkit::fridgeDDay)
+                .containsExactly(tuple(true, 1L), tuple(false, null));
         verify(productService, times(1)).getPublicMealkits(any());
     }
 
@@ -523,6 +528,19 @@ class ChatRecommendationFacadeTest {
 
         assertThat(cards).isEmpty();
         verify(recipeCandidateFacade, never()).describeRecipes(any(), any());
+    }
+
+    @Test
+    @DisplayName("냉장고에 있는 밀키트면 제안 문장에 \"냉장고에 있는\"을 붙이고, 밀키트만 보여 주는 글에 냉장고 밀키트를 먼저 보여 준다고 쓴다")
+    void mentionsFridgeMealkit() {
+        MealkitWithPrice doenjang = mealkit(40L, "된장국", 7000, 544L);
+        MealkitPicker.Picked inFridge = new MealkitPicker.Picked(doenjang.mealkit(), doenjang.price(), null, 0, 2L);
+
+        assertThat(ChatRecommendationFacade.mealkitSuggestion("된장국 밀키트", true))
+                .isEqualTo("요리하기 번거로우면 냉장고에 있는 된장국 밀키트로 간편하게 드셔 보세요.");
+        assertThat(ChatRecommendationFacade.mealkitOnlyReply(RecipeQuery.of(MEMBER_ID, List.of()), List.of(inFridge)))
+                .isEqualTo("지금 살 수 있는 밀키트를 골라 봤어요. 냉장고에 이미 있는 밀키트는 먼저 보여 드려요. "
+                        + "카드를 누르면 상품을 볼 수 있고, 장바구니 아이콘으로 바로 담을 수 있어요.");
     }
 
     @Test
@@ -551,7 +569,7 @@ class ChatRecommendationFacadeTest {
         }
         when(saleEventReader.findSellingPrices(any())).thenReturn(prices);
         when(recipeCandidateFacade.describeMealkitRecipes(any(), any()))
-                .thenReturn(new RecipeCandidateFacade.MealkitRecipes(recipes, Map.of(), Set.of(), List.of()));
+                .thenReturn(new RecipeCandidateFacade.MealkitRecipes(recipes, Map.of(), Set.of(), FridgeMealkits.NONE));
     }
 
     private static Ingredient ingredient(Long id, String name) {

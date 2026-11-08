@@ -83,7 +83,7 @@ class ChatMessageQueryFacadeTest {
         when(chatRecommendationFacade.rebuildCards(MEMBER_ID, saved)).thenReturn(Map.of());
         RecommendedMealkit mealkit = new RecommendedMealkit(
                 new ShoppingProduct(41L, "황태해장국", null, 9000, null, null, false, null, null), 2, 543L, "황태해장국", null);
-        when(chatRecommendationFacade.rebuildMealkitCards(saved)).thenReturn(Map.of(2L, List.of(mealkit)));
+        when(chatRecommendationFacade.rebuildMealkitCards(MEMBER_ID, saved)).thenReturn(Map.of(2L, List.of(mealkit)));
 
         ChatMessageResponse answer = facade.getMessages(MEMBER_ID, SESSION_ID).get(0);
 

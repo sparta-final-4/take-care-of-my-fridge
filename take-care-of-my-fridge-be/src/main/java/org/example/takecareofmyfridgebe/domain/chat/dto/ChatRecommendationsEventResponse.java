@@ -111,14 +111,21 @@ public record ChatRecommendationsEventResponse(
      * @param recipeId    이 밀키트로 만드는 레시피 ID (연결이 없으면 null)
      * @param recipeName  그 레시피 이름 (연결이 없거나 레시피가 지워졌으면 null)
      * @param description 카드 아래 서버 설명 (레시피 카드 아래 한 장이면 "요리하기 번거로우면 …", 밀키트만 보여 주면 null)
+     * @param inFridge    냉장고에 이 밀키트가 있는지 (있으면 화면이 "냉장고에 있어요" 태그를 붙이고 [담기]를 숨긴다). 다시 불러올 때도 지금 냉장고 기준
+     * @param fridgeDDay  냉장고에 있으면 소비기한까지 남은 일수 (D-3 이내면 임박 태그). 없으면 null
      */
     public record RecommendedMealkit(
             ShoppingProduct product,
             int servings,
             Long recipeId,
             String recipeName,
-            String description
+            String description,
+            boolean inFridge,
+            Long fridgeDDay
     ) {
+        public RecommendedMealkit(ShoppingProduct product, int servings, Long recipeId, String recipeName, String description) {
+            this(product, servings, recipeId, recipeName, description, false, null);
+        }
     }
 
     /**
