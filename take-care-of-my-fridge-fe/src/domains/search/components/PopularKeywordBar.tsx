@@ -15,7 +15,7 @@ interface PopularKeywordBarProps {
   onNavigate?: () => void;
 }
 
-// 오늘 많이 검색된 검색어를 한 줄로 보여 준다. 누르면 그 검색어로 통합 검색한다.
+// 최근 7일 동안 많이 검색된 검색어를 한 줄로 보여 준다. 누르면 그 검색어로 통합 검색한다.
 // 헤더 검색 줄(입력칸 아래)과 좁은 화면의 왼쪽 메뉴 검색칸 아래에 놓인다.
 // 집계된 검색어가 없거나 불러오지 못하면 자리를 차지하지 않도록 그리지 않는다.
 export function PopularKeywordBar({ className, onNavigate }: PopularKeywordBarProps) {
