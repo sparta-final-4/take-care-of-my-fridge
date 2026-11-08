@@ -38,6 +38,7 @@ export function ProductModal({ productId, onClose }: ProductModalProps) {
       centered
       width={880}
       title="상품 정보"
+      classNames={{ mask: styles.mask }}
     >
       {/* 다른 상품으로 바뀌면 수량을 처음부터 시작한다. */}
       {shownId !== undefined && <ProductModalBody key={shownId} productId={shownId} />}

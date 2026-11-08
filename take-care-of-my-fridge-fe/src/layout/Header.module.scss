@@ -363,6 +363,19 @@
   }
 }
 
+// 입력칸 아래 인기 검색어 줄: 입력칸과 같은 좌우 여백, 아래는 검색 줄 위아래 여백과 같게.
+.searchPopular {
+  @include page-gutter;
+
+  margin-top: calc(-1 * $header-search-padding-sm);
+  padding-bottom: $header-search-padding-sm;
+
+  @include from(md) {
+    margin-top: calc(-1 * $header-search-padding / 2);
+    padding-bottom: $header-search-padding;
+  }
+}
+
 // 입력칸을 감싼 자동완성 상자도 남은 폭을 다 쓴다.
 .searchInner > :global(.ant-select) {
   flex: 1;

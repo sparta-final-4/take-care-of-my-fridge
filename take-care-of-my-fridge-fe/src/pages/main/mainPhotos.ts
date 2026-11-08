@@ -1,6 +1,7 @@
 // 메인 화면 사진. Wikimedia Commons 자유 이용 사진과 Unsplash License 사진이며, 화면 맨 아래에 출처를 표시한다
 // (Wikimedia CC BY-SA는 출처 표시가 조건, Unsplash는 조건은 아니지만 함께 표시).
-// 파일은 public/images/main/에 크기별로 있다(파일 이름 끝 숫자가 가로 px). 브라우저가 화면 폭(sizes)에 맞는 파일만 받는다.
+// 파일은 public/photos/main/에 크기별로 있다(파일 이름 끝 숫자가 가로 px). 브라우저가 화면 폭(sizes)에 맞는 파일만 받는다.
+// /images/는 CloudFront가 상품 이미지 버킷으로 보내므로 프론트 정적 파일을 두지 않는다.
 // 서비스 사진이 생기면 src·srcSet·width·height만 바꾸고, 출처 줄은 지운다.
 export interface MainPhoto {
   // srcSet을 모르는 브라우저가 받는 기본 파일
@@ -22,8 +23,8 @@ const TILE_SIZES = '(min-width: 768px) 400px, 100vw';
 
 export const MAIN_PHOTOS = {
   hero: {
-    src: '/images/main/hero-fridge-1920.jpg',
-    srcSet: '/images/main/hero-fridge-960.jpg 960w, /images/main/hero-fridge-1920.jpg 1920w',
+    src: '/photos/main/hero-fridge-1920.jpg',
+    srcSet: '/photos/main/hero-fridge-960.jpg 960w, /photos/main/hero-fridge-1920.jpg 1920w',
     sizes: '100vw',
     width: 1920,
     height: 1372,
@@ -33,8 +34,8 @@ export const MAIN_PHOTOS = {
     page: 'https://commons.wikimedia.org/wiki/File:Food_Safety_-_Cut_Waste_in_Refrigerators_(20200605-FSIS-LSC-0059).jpg',
   },
   fridge: {
-    src: '/images/main/tile-fridge-960.jpg',
-    srcSet: '/images/main/tile-fridge-480.jpg 480w, /images/main/tile-fridge-960.jpg 960w',
+    src: '/photos/main/tile-fridge-960.jpg',
+    srcSet: '/photos/main/tile-fridge-480.jpg 480w, /photos/main/tile-fridge-960.jpg 960w',
     sizes: TILE_SIZES,
     width: 960,
     height: 720,
@@ -44,8 +45,8 @@ export const MAIN_PHOTOS = {
     page: 'https://unsplash.com/photos/XIMl4Crm1GQ',
   },
   recipes: {
-    src: '/images/main/tile-recipes-960.jpg',
-    srcSet: '/images/main/tile-recipes-480.jpg 480w, /images/main/tile-recipes-960.jpg 960w',
+    src: '/photos/main/tile-recipes-960.jpg',
+    srcSet: '/photos/main/tile-recipes-480.jpg 480w, /photos/main/tile-recipes-960.jpg 960w',
     sizes: TILE_SIZES,
     width: 960,
     height: 720,
@@ -55,8 +56,8 @@ export const MAIN_PHOTOS = {
     page: 'https://unsplash.com/photos/KD3XqquHlcc',
   },
   products: {
-    src: '/images/main/tile-products-960.jpg',
-    srcSet: '/images/main/tile-products-480.jpg 480w, /images/main/tile-products-960.jpg 960w',
+    src: '/photos/main/tile-products-960.jpg',
+    srcSet: '/photos/main/tile-products-480.jpg 480w, /photos/main/tile-products-960.jpg 960w',
     sizes: TILE_SIZES,
     width: 960,
     height: 720,
@@ -66,9 +67,9 @@ export const MAIN_PHOTOS = {
     page: 'https://unsplash.com/photos/D4ZtZX1UeAI',
   },
   consult: {
-    src: '/images/main/story-night-fridge-960.jpg',
+    src: '/photos/main/story-night-fridge-960.jpg',
     srcSet:
-      '/images/main/story-night-fridge-500.jpg 500w, /images/main/story-night-fridge-960.jpg 960w',
+      '/photos/main/story-night-fridge-500.jpg 500w, /photos/main/story-night-fridge-960.jpg 960w',
     // lg 이상은 본문의 5/12 칸(약 420px), 그보다 좁으면 화면 폭
     sizes: '(min-width: 992px) 420px, 100vw',
     width: 960,
