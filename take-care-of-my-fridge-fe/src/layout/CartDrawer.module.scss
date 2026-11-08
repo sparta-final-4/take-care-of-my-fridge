@@ -7,6 +7,19 @@
   --cart-drawer-width: #{$cart-drawer-width};
 }
 
+// 서랍 뒤 화면: frost 테마면 회색 막 대신 흐림 위에 반투명 종이색 막(상품 정보 모달과 같은 방식).
+// antd 마스크 규칙보다 우선하도록 antd 클래스를 함께 건다.
+@if $cart-drawer-mask == frost {
+  .mask:global(.ant-drawer-mask) {
+    background: color-mix(
+      in srgb,
+      var(--ant-color-bg-layout) #{$cart-drawer-mask-film},
+      transparent
+    );
+    backdrop-filter: blur($cart-drawer-mask-blur);
+  }
+}
+
 // 레퍼런스 장바구니 서랍 치수: 머리 줄 위아래 18px·좌우 32px(아래 선), 본문 좌우 32px. 바탕은 본문과 같은 종이색.
 .section {
   background: var(--ant-color-bg-layout);

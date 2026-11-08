@@ -13,39 +13,56 @@
 //   3: 넓게 · 한 줄 — 최대 800px, 상품 정보 · 수량 · 금액이 한 줄
 //   4: 결제 고정 — 최대 480px, 목록 테두리 없이, 결제 금액이 서랍 아래에 붙어 따라온다
 //   5: 두 칸 — 최대 1040px, 목록 | 결제 금액을 나란히, 목록 테두리 없이
+//   6: 젖빛 배경 — 1번 서랍에 뒤 화면을 회색 대신 흐림 + 반투명 종이색 막으로(상품 정보 모달과 같은 방식)
 $cart-theme: 1;
 
 // 세트 항목
 //   width: 서랍 폭(CSS 값). 화면이 좁으면 92vw처럼 화면 비율로 줄어들게 min()으로 둔다.
 //   list-box: 상품 목록을 테두리 상자로 감쌀지(false면 줄만 남는다)
 //   sticky-summary: 결제 금액 칸을 서랍 아래에 붙여, 목록을 스크롤해도 늘 보이게 할지
+//   mask: 서랍 뒤 화면 dim = antd 기본 회색 막, frost = 흐림 + 반투명 종이색 막(아래 세부 치수)
 $cart-themes: (
   1: (
     width: min(92vw, 450px),
     list-box: true,
     sticky-summary: false,
+    mask: dim,
   ),
   2: (
     width: min(92vw, 560px),
     list-box: true,
     sticky-summary: false,
+    mask: dim,
   ),
   3: (
     width: min(92vw, 800px),
     list-box: true,
     sticky-summary: false,
+    mask: dim,
   ),
   4: (
     width: min(92vw, 480px),
     list-box: false,
     sticky-summary: true,
+    mask: dim,
   ),
   5: (
     width: min(96vw, 1040px),
     list-box: false,
     sticky-summary: false,
+    mask: dim,
+  ),
+  6: (
+    width: min(92vw, 450px),
+    list-box: true,
+    sticky-summary: false,
+    mask: frost,
   ),
 );
+
+// mask: frost의 세부 치수
+$cart-drawer-mask-blur: 8px; // 뒤 화면 흐림 정도
+$cart-drawer-mask-film: 35%; // 종이색 막 진하기(0%면 흐림만, 클수록 뒤가 덜 보인다)
 
 // ── 고른 세트의 값(여기는 고치지 않는다) ──
 @if not map.has-key($cart-themes, $cart-theme) {
@@ -56,3 +73,4 @@ $_cart: map.get($cart-themes, $cart-theme);
 $cart-drawer-width: map.get($_cart, width);
 $cart-list-box: map.get($_cart, list-box);
 $cart-sticky-summary: map.get($_cart, sticky-summary);
+$cart-drawer-mask: map.get($_cart, mask);

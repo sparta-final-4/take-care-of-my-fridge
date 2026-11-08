@@ -31,6 +31,7 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
       destroyOnHidden
       rootClassName={styles.root}
       classNames={{
+        mask: styles.mask,
         header: styles.header,
         title: styles.title,
         section: styles.section,
