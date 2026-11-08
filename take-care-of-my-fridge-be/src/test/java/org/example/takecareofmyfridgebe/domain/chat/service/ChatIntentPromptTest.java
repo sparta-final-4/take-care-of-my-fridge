@@ -69,6 +69,7 @@ class ChatIntentPromptTest {
                 "\"두부 있으면 두부 요리 추천해줘\", \"냉장고에 있는 재료로 뭐 먹지\" → RECOMMEND",
                 "\"냉장고에서 꺼낸 고기 어떻게 해동해?\", \"유통기한 지난 거 먹어도 돼?\" → GENERAL",
                 "- fridgeScope: FRIDGE일 때 볼 범위",
+                "\"기본 양념 뭐 있어?\" → SEASONING, includeIngredients: 빈 목록",
                 "fridgeScope는 ALL");
     }
 

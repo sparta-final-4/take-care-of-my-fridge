@@ -310,6 +310,7 @@ public class ChatFridgeShopFacade {
             case ALL -> item -> !item.basicSeasoning();
             case MEALKIT -> item -> item.ingredientType() == IngredientType.MEALKIT;
             case IMMINENT -> item -> item.status() != FridgeItemStatus.NORMAL;
+            case SEASONING -> FridgeItemResponse::basicSeasoning;
         };
     }
 

@@ -276,6 +276,24 @@ class ChatFridgeShopFacadeTest {
     }
 
     @Test
+    @DisplayName("기본 양념 보기는 기본 양념 줄만 이름으로 나열하고, 없으면 없다고 쓴다")
+    void showsBasicSeasoningsOnly() {
+        givenFridge(
+                item(1L, 10L, "두부", 1, IngredientType.NORMAL, false, null),
+                item(2L, 12L, "간장", 300, IngredientType.NORMAL, true, null),
+                item(3L, 13L, "고추장", 100, IngredientType.NORMAL, true, null));
+
+        RecommendationReply reply = facade.fridge(MEMBER_ID, new ItemLookup(FridgeScope.SEASONING, List.of()));
+
+        assertThat(reply.event().fridgeItems()).extracting(FridgeItemCard::fridgeId).containsExactly(3L, 2L);
+        assertThat(reply.fixedReply()).isEqualTo("냉장고에 고추장, 간장이 있어요.");
+
+        givenFridge(item(1L, 10L, "두부", 1, IngredientType.NORMAL, false, null));
+        assertThat(facade.fridge(MEMBER_ID, new ItemLookup(FridgeScope.SEASONING, List.of())).fixedReply())
+                .isEqualTo("냉장고에 등록된 기본 양념이 없어요.");
+    }
+
+    @Test
     @DisplayName("임박 보기는 D-3 이내와 지난 줄만 보여 준다")
     void showsImminentAndExpiredOnly() {
         givenFridge(

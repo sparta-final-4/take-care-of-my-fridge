@@ -1464,6 +1464,19 @@ class ChatIntentFacadeTest {
         }
 
         @Test
+        @DisplayName("기본 양념을 물으면 \"기본 양념\"을 찾을 재료로 보지 않고 범위를 SEASONING으로 정한다")
+        void picksSeasoningScope_andDropsSeasoningName() {
+            givenExtracted(fridge(List.of("기본 양념"), "ALL"));
+
+            ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID,
+                    ChatMessageCreateRequest.of("내 냉장고에 기본 양념 뭐있어?"));
+
+            assertThat(resolution.intent()).isEqualTo(ChatIntent.FRIDGE);
+            assertThat(resolution.lookup().scope()).isEqualTo(FridgeScope.SEASONING);
+            assertThat(resolution.lookup().names()).isEmpty();
+        }
+
+        @Test
         @DisplayName("AI가 정한 범위가 있으면 그 범위를 쓴다")
         void keepsAiScope() {
             givenExtracted(fridge(List.of(), "IMMINENT"));

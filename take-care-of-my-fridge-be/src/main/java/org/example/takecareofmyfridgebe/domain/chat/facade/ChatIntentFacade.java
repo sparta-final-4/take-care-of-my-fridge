@@ -257,6 +257,10 @@ public class ChatIntentFacade {
             scope = FridgeShopWordChecker.scope(message, chatFridgeShopWordProperties, chatMealkitWordProperties);
         }
         List<String> names = orEmpty(result.includeIngredients());
+        // 냉장고 보기에서 "기본 양념·조미료"는 찾을 재료 이름이 아니라 범위다 ("기본 양념 뭐 있어?" → SEASONING)
+        if (result.intent() == ChatIntent.FRIDGE) {
+            names = names.stream().filter(name -> !FridgeShopWordChecker.seasoningWord(name, chatFridgeShopWordProperties)).toList();
+        }
         if (names.isEmpty() && scope == FridgeScope.ALL && message != null) {
             String text = message.strip().replaceAll("[?!.~…,]+$", "").strip();
             names = ingredientNames(List.of(text.split("\\s+")));

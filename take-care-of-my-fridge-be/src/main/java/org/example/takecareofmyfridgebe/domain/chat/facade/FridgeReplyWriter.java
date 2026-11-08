@@ -89,6 +89,7 @@ public final class FridgeReplyWriter {
         return switch (scope) {
             case MEALKIT -> "냉장고에 밀키트가 없어요.";
             case IMMINENT -> "소비기한이 곧 끝나는 재료는 없어요.";
+            case SEASONING -> "냉장고에 등록된 기본 양념이 없어요.";
             case ALL -> "냉장고에 등록된 재료가 없어요.";
         };
     }
