@@ -17,7 +17,7 @@ class FridgeShopWordCheckerTest {
     static final ChatFridgeShopWordProperties WORDS = new ChatFridgeShopWordProperties(
             List.of("남았", "아직있", "냉장고에뭐", "냉장고에있", "냉장고에서", "버려야", "유통기한지난", "소비기한지난"),
             List.of("버려야", "지난", "임박", "유통기한", "소비기한"),
-            List.of("양념", "조미료"),
+            List.of("기본양념", "조미료"),
             List.of("사고싶", "어디서사", "장바구니", "담아", "주문해"),
             List.of("세일", "할인", "특가", "번개"),
             List.of("추천", "만들", "해먹", "요리", "레시피", "뭐먹", "먹지", "먹을까"));
@@ -102,5 +102,10 @@ class FridgeShopWordCheckerTest {
                 .isEqualTo(FridgeScope.SEASONING);
         assertThat(FridgeShopWordChecker.seasoningWord("기본 양념", WORDS)).isTrue();
         assertThat(FridgeShopWordChecker.seasoningWord("두부", WORDS)).isFalse();
+        // "양념"만으로는 기본 양념 보기로 보지 않는다
+        assertThat(FridgeShopWordChecker.scope("양념치킨 밀키트 남았어?", WORDS, MealkitWordCheckerTest.WORDS))
+                .isEqualTo(FridgeScope.MEALKIT);
+        assertThat(FridgeShopWordChecker.scope("냉장고에 조미료 뭐 있어?", WORDS, MealkitWordCheckerTest.WORDS))
+                .isEqualTo(FridgeScope.SEASONING);
     }
 }

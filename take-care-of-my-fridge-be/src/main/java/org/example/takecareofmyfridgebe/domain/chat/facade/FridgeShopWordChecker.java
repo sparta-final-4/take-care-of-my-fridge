@@ -48,7 +48,7 @@ public final class FridgeShopWordChecker {
         return containsAny(compact(message), words.cook());
     }
 
-    // 냉장고 보기 범위: 양념 말("양념·조미료") → SEASONING, 밀키트 단어 → MEALKIT, 임박 말("버려야·지난·임박") → IMMINENT, 그 밖은 ALL
+    // 냉장고 보기 범위: 양념 말("기본 양념·조미료") → SEASONING, 밀키트 단어 → MEALKIT, 임박 말("버려야·지난·임박") → IMMINENT, 그 밖은 ALL
     public static FridgeScope scope(String message, ChatFridgeShopWordProperties words, ChatMealkitWordProperties mealkitWords) {
         String text = compact(message);
         if (containsAny(text, words.seasoning())) {
@@ -63,7 +63,7 @@ public final class FridgeShopWordChecker {
         return FridgeScope.ALL;
     }
 
-    // 양념 말("양념", "기본 양념", "조미료")이 들어간 이름인지. 냉장고 보기에서 찾을 재료 이름으로 보지 않는다
+    // 양념 말("기본 양념", "조미료")이 들어간 이름인지. 냉장고 보기에서 찾을 재료 이름으로 보지 않는다
     public static boolean seasoningWord(String name, ChatFridgeShopWordProperties words) {
         return containsAny(compact(name), words.seasoning());
     }

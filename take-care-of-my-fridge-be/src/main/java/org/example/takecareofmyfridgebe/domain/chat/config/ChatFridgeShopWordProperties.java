@@ -25,7 +25,7 @@ public record ChatFridgeShopWordProperties(
         List<String> fridge,
         @DefaultValue({"버려야", "지난", "임박", "유통기한", "소비기한"})
         List<String> imminent,
-        @DefaultValue({"양념", "조미료"})
+        @DefaultValue({"기본양념", "조미료"})
         List<String> seasoning,
         @DefaultValue({"사고싶", "어디서사", "장바구니", "담아", "주문해"})
         List<String> shop,
