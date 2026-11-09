@@ -932,6 +932,36 @@ class ChatIntentFacadeTest {
         }
 
         @Test
+        @DisplayName("\"김피탕 같은 메뉴\" 다음 \"매운 건 빼줘\"는 AI가 원하는 맛으로 줘도 피할 맛 매운맛이고 김피탕 키워드는 이어 간다")
+        void avoidsSpicyAndKeepsKeywords_whenRemoveWord() {
+            RecipeQuery kimpi = new RecipeQuery(MEMBER_ID, List.of(), List.of(), List.of("튀김"), null, List.of(), false,
+                    List.of("김피탕", "탕수육", "깐풍기"), "김피탕", null);
+            ChatContext afterKimpi = new ChatContext(List.of(), LastRecommendation.of(kimpi, List.of(10L)), context.lastCards());
+            for (IntentResult extracted : List.of(refine(List.of("SPICY"), null, List.of("TASTE")), avoid(null, List.of("SPICY")))) {
+                givenExtracted(extracted);
+
+                RecipeQuery query = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("매운 건 빼줘"), afterKimpi)
+                        .recipeQuery();
+
+                assertThat(query.avoidTastes()).containsExactly(Taste.SPICY);
+                assertThat(query.wantedTastes()).isEmpty();
+                assertThat(query.keywords()).containsExactly("김피탕", "탕수육", "깐풍기");
+            }
+        }
+
+        @Test
+        @DisplayName("부정어를 모르는 말(매운 건 별로야)에서 AI가 피할 맛으로 두면 서버가 원하는 맛으로 뒤집지 않는다")
+        void keepsAiAvoid_whenTasteWordIsAmbiguous() {
+            givenExtracted(avoid(null, List.of("SPICY")));
+
+            RecipeQuery query = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("매운 건 별로야"), context)
+                    .recipeQuery();
+
+            assertThat(query.avoidTastes()).containsExactly(Taste.SPICY);
+            assertThat(query.wantedTastes()).doesNotContain(Taste.SPICY);
+        }
+
+        @Test
         @DisplayName("\"매운 거 말고 짭짤하게\"는 피할 맛 매운맛, 원하는 맛 짠맛이다")
         void avoidsSpicyAndWantsSalty() {
             givenExtracted(avoid(List.of("SALTY"), null));

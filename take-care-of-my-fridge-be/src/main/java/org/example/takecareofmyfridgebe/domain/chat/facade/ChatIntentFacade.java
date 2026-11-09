@@ -409,6 +409,9 @@ public class ChatIntentFacade {
     /**
      * 메시지의 맛 단어로 원하는 맛·피할 맛을 한 번 더 정한다 (TasteWordChecker.stances, 다섯 맛 모두). 맛 단어가 있는 맛만 바꾸고,
      * AI 결과와 다르면 서버 판단을 쓰고 DEBUG로 남긴다. "좀 더 매운 걸로"가 피할 맛으로, "짠 거 말고"가 원하는 맛으로 가는 것을 막는다.
+     * 서버가 확실할 때만 덮어쓴다: 부정어가 있으면 피할 맛으로 바꾸지만, 부정어가 없다는 것만으로는 AI가 피할 맛으로 둔 맛을
+     * 원하는 맛으로 바꾸지 않는다. 원하는 말("더", "걸로", "먹고 싶어")이 붙어 있을 때만 바꾼다 (TasteWordChecker.surelyWanted).
+     * 모르는 부정어("매운 건 별로야")에서 AI가 맞게 본 피할 맛을 서버가 뒤집지 않게 하기 위해서다.
      */
     IntentResult correctTastes(Long memberId, Long sessionId, String message, IntentResult result) {
         List<String> wanted = new ArrayList<>(result.wantedTastes() == null ? List.of() : result.wantedTastes());
@@ -416,6 +419,11 @@ public class ChatIntentFacade {
         for (TasteWordChecker.TasteStance stance : TasteWordChecker.stances(message, chatTasteWordProperties)) {
             String taste = stance.taste().name();
             boolean want = stance.stance() == TasteWordChecker.Stance.WANT;
+            if (want && avoid.contains(taste) && !wanted.contains(taste)
+                    && !TasteWordChecker.surelyWanted(message, stance.taste(), chatTasteWordProperties)) {
+                log.debug("상담 맛 단어가 애매해 AI 피할 맛을 그대로 둠 - memberId: {}, sessionId: {}, 맛: {}", memberId, sessionId, taste);
+                continue;
+            }
             // 이미 맞는 쪽에 있으면 순서를 건드리지 않는다
             List<String> keep = want ? wanted : avoid;
             (want ? avoid : wanted).remove(taste);
@@ -543,7 +551,8 @@ public class ChatIntentFacade {
      * 다시 추천에서 맛이 부딪히면 이번 말에 나온 맛을 따른다 (맛 전체, TasteWordChecker.stances로 이번 말의 맛만 본다).
      * <ul>
      *   <li>이번 말에 원한 맛: 원하는 맛에 넣고 피할 맛에서 빼며, 그 맛과 반대인 맛(app.chat.taste-opposites)은 원하는 맛에서 지운다
-     *       ("짭짤한 거" → "담백한 거로" → 순한맛만, "매운 거 말고" → "좀 더 매운 걸로" → 매운맛 원함·피할 맛 없음)</li>
+     *       ("짭짤한 거" → "담백한 거로" → 순한맛만, "매운 거 말고" → "좀 더 매운 걸로" → 매운맛 원함·피할 맛 없음).
+     *       피할 맛에 든 맛은 원하는 말이 붙었을 때만 푼다 (TasteWordChecker.surelyWanted, "매운 건 별로야"는 그대로 피함)</li>
      *   <li>이번 말에 피한 맛: 피할 맛에 넣고 원하는 맛에서 뺀다 ("매운 거 추천해줘" → "매운 거 말고")</li>
      *   <li>이번 말에 나오지 않은 맛은 직전 값을 그대로 쌓는다 ("매운 걸로" → "단 것도" → 매운맛 + 단맛)</li>
      * </ul>
@@ -558,6 +567,11 @@ public class ChatIntentFacade {
         Set<Member.Taste> avoid = new LinkedHashSet<>(merged.avoidTastes());
         for (TasteWordChecker.TasteStance stance : spoken) {
             if (stance.stance() == TasteWordChecker.Stance.WANT) {
+                // 맛 단어만 있고 원하는 말이 없으면("매운 건 별로야") 피할 맛에 든 맛을 풀지 않는다 (correctTastes와 같은 기준)
+                if (avoid.contains(stance.taste())
+                        && !TasteWordChecker.surelyWanted(message, stance.taste(), chatTasteWordProperties)) {
+                    continue;
+                }
                 wanted.removeAll(chatTasteOppositeProperties.oppositesOf(stance.taste()));
                 wanted.add(stance.taste());
                 avoid.remove(stance.taste());
