@@ -26,6 +26,8 @@ function mealkit(
     recipeId: 543,
     recipeName: '황태해장국',
     description: null,
+    inFridge: false,
+    fridgeDDay: null,
     ...overrides,
   };
 }
@@ -79,6 +81,22 @@ describe('ChatMealkitCards', () => {
 
     expect(html).toContain('요리하기 번거로우면 황태해장국 밀키트로 간편하게 드셔 보세요.');
     expect(html).toContain('ant-btn-loading');
+  });
+
+  it('냉장고에 있는 밀키트는 "냉장고에 있어요"와 임박이면 남은 날 태그를 붙이고 담기 버튼을 숨긴다', () => {
+    const html = render([mealkit({ inFridge: true, fridgeDDay: 1 })]);
+
+    expect(html).toContain('냉장고에 있어요');
+    expect(html).toContain('내일까지');
+    expect(html).not.toContain('장바구니에 담기');
+    expect(html).toContain('href="/products/41"');
+  });
+
+  it('냉장고에 있어도 D-3보다 여유가 있으면 남은 날 태그는 붙이지 않는다', () => {
+    const html = render([mealkit({ inFridge: true, fridgeDDay: 10 })]);
+
+    expect(html).toContain('냉장고에 있어요');
+    expect(html).not.toContain('10일 남음');
   });
 
   it('밀키트가 없으면 아무것도 그리지 않는다', () => {

@@ -987,12 +987,14 @@ class RecipeCandidateFacadeTest {
     }
 
     @Test
-    @DisplayName("밀키트 추천 재료는 냉장고를 한 번 읽어 기한이 남은 밀키트 줄 이름과 연결 레시피 계산·맛을 돌려주고, 레시피가 없으면 레시피를 조회하지 않는다")
+    @DisplayName("밀키트 추천 재료는 냉장고를 한 번 읽어 기한이 남은 냉장고 밀키트(상품 ID, 없으면 등록 이름)와 연결 레시피 계산·맛을 돌려주고, 레시피가 없으면 레시피를 조회하지 않는다")
     void describesMealkitRecipes_withFridgeMealkitNames() {
         when(memberService.getMyInfo(MEMBER_ID)).thenReturn(mock(MyInfoResponse.class));
         when(fridgeService.getItems(any(), any())).thenReturn(List.of(
                 fridgeItem(1L, "두부", 5),
                 mealkitItem("황태해장국", 2),
+                mealkitItem("된장국 밀키트", 3, 24L),
+                mealkitItem("된장국 밀키트", 1, 24L),
                 mealkitItem("지난 된장국", -1)));
         when(recipeService.findNonBasicIngredients(List.of(543L))).thenReturn(List.of(
                 new RecipeCandidateIngredient(543L, 1L, "두부", false),
@@ -1004,11 +1006,12 @@ class RecipeCandidateFacadeTest {
         RecipeCandidateFacade.MealkitRecipes found = facade.describeMealkitRecipes(MEMBER_ID, List.of(543L));
         RecipeCandidateFacade.MealkitRecipes noRecipe = facade.describeMealkitRecipes(MEMBER_ID, List.of());
 
-        assertThat(found.fridgeMealkitNames()).containsExactly("황태해장국");
+        assertThat(found.fridgeMealkits().dDayByName()).containsExactly(Map.entry("황태해장국", 2L));
+        assertThat(found.fridgeMealkits().dDayByProductId()).containsExactly(Map.entry(24L, 1L));
         assertThat(found.recipes().get(543L).ranking().ownedCount()).isEqualTo(1);
         assertThat(found.recipeTastes()).containsEntry(543L, Set.of(Taste.UMAMI));
         assertThat(noRecipe.recipes()).isEmpty();
-        assertThat(noRecipe.fridgeMealkitNames()).containsExactly("황태해장국");
+        assertThat(noRecipe.fridgeMealkits().dDayByName()).containsOnlyKeys("황태해장국");
         verify(recipeService, times(1)).findCandidateInfos(any());
         verify(fridgeService, times(2)).getItems(any(), any());
     }
@@ -1056,12 +1059,16 @@ class RecipeCandidateFacadeTest {
     }
 
     private static FridgeItemResponse mealkitItem(String rawName, long dDay) {
+        return mealkitItem(rawName, dDay, null);
+    }
+
+    private static FridgeItemResponse mealkitItem(String rawName, long dDay, Long productId) {
         FridgeItemStatus status = FridgeItemStatus.of(dDay);
         return new FridgeItemResponse(
                 900L + dDay, 99L, "밀키트", "개", rawName, BigDecimal.ONE, StorageType.REFRIGERATED,
                 LocalDate.now().plusDays(dDay), FridgeSource.COMMERCE, 1L,
                 status == FridgeItemStatus.IMMINENT, status == FridgeItemStatus.EXPIRED, dDay, status,
-                IngredientType.MEALKIT, false, LocalDateTime.now(), LocalDateTime.now());
+                IngredientType.MEALKIT, false, LocalDateTime.now(), LocalDateTime.now(), productId);
     }
 
     private static FridgeItemResponse fridgeItem(long ingredientId, String name, long dDay) {

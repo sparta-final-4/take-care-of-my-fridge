@@ -1,5 +1,8 @@
 package org.example.takecareofmyfridgebe.domain.chat.dto;
 
+import org.example.takecareofmyfridgebe.domain.fridge.entity.FridgeItemStatus;
+import org.example.takecareofmyfridgebe.domain.product.entity.Product;
+import org.example.takecareofmyfridgebe.domain.sale.dto.SellingPrice;
 import org.example.takecareofmyfridgebe.domain.sale.entity.SaleEventType;
 
 import java.math.BigDecimal;
@@ -9,13 +12,17 @@ import java.util.List;
  * 상담 추천 카드 SSE 이벤트(event: recommendations). 추천 설명 글보다 먼저 보낸다.
  *
  * @param recipes  추천 레시피 (최대 3개, 서버가 고른 순서). 밀키트만 보여 주는 답이면 빈 목록
- * @param mealkits 추천 밀키트 (레시피 카드 아래). 말에 밀키트 단어가 있으면 최대 3개, 번거로워하는 말이면 1개, 그 밖에는 빈 목록
- * @param relaxed  후보를 찾으려고 푼 조건 (조건 풀기 전이라 지금은 빈 목록)
- * @param empty    보여 줄 레시피·밀키트가 하나도 없는지
+ * @param mealkits    추천 밀키트 (레시피 카드 아래). 말에 밀키트 단어가 있으면 최대 3개, 번거로워하는 말이면 1개, 그 밖에는 빈 목록
+ * @param fridgeItems 냉장고 보기 카드 (소비기한 순, 지난 줄은 맨 아래, 최대 10개). 이 답에서만 보여 주고 저장하지 않는다. 그 밖에는 빈 목록
+ * @param products    살 상품 카드 (사기 답, 냉장고 보기에서 없는 재료). 재료·상품 이름마다 하나. 그 밖에는 빈 목록
+ * @param relaxed     후보를 찾으려고 푼 조건 (조건 풀기 전이라 지금은 빈 목록)
+ * @param empty       보여 줄 카드가 하나도 없는지
  */
 public record ChatRecommendationsEventResponse(
         List<RecommendedRecipe> recipes,
         List<RecommendedMealkit> mealkits,
+        List<FridgeItemCard> fridgeItems,
+        List<ProductCard> products,
         List<String> relaxed,
         boolean empty
 ) {
@@ -23,11 +30,24 @@ public record ChatRecommendationsEventResponse(
     public ChatRecommendationsEventResponse {
         recipes = recipes == null ? List.of() : List.copyOf(recipes);
         mealkits = mealkits == null ? List.of() : List.copyOf(mealkits);
+        fridgeItems = fridgeItems == null ? List.of() : List.copyOf(fridgeItems);
+        products = products == null ? List.of() : List.copyOf(products);
         relaxed = relaxed == null ? List.of() : List.copyOf(relaxed);
     }
 
     public ChatRecommendationsEventResponse(List<RecommendedRecipe> recipes, List<String> relaxed, boolean empty) {
-        this(recipes, List.of(), relaxed, empty);
+        this(recipes, List.of(), List.of(), List.of(), relaxed, empty);
+    }
+
+    // 냉장고 보기 카드와 (없는 재료의) 상품 카드
+    public static ChatRecommendationsEventResponse fridge(List<FridgeItemCard> items, List<ProductCard> products) {
+        return new ChatRecommendationsEventResponse(List.of(), List.of(), items, products, List.of(),
+                items.isEmpty() && products.isEmpty());
+    }
+
+    // 상품 카드만 있는 이벤트 (사기 답)
+    public static ChatRecommendationsEventResponse products(List<ProductCard> products) {
+        return fridge(List.of(), products);
     }
 
     public static ChatRecommendationsEventResponse of(List<RecommendedRecipe> recipes) {
@@ -35,7 +55,47 @@ public record ChatRecommendationsEventResponse(
     }
 
     public static ChatRecommendationsEventResponse of(List<RecommendedRecipe> recipes, List<RecommendedMealkit> mealkits) {
-        return new ChatRecommendationsEventResponse(recipes, mealkits, List.of(), recipes.isEmpty() && mealkits.isEmpty());
+        return new ChatRecommendationsEventResponse(recipes, mealkits, List.of(), List.of(), List.of(),
+                recipes.isEmpty() && mealkits.isEmpty());
+    }
+
+    /**
+     * 살 상품 카드 하나. 누르면 상품 상세로 가고 [담기]로 장바구니에 담는다 (서버가 직접 담지 않는다).
+     *
+     * @param name    사용자가 말한 재료·상품 이름 ("당근")
+     * @param product 담을 상품 (가격·할인가·품절은 카드를 만들 때 기준, 다시 불러올 때도 그때 기준)
+     */
+    public record ProductCard(String name, ShoppingProduct product) {
+    }
+
+    /**
+     * 냉장고 보기 카드 하나 (냉장고 줄 하나).
+     *
+     * @param fridgeId     냉장고 줄 ID
+     * @param ingredientId 재료 ID
+     * @param name         보여 줄 이름 (일반 재료는 재료 이름, 밀키트·직접 입력은 등록 이름)
+     * @param rawName      등록 이름 (구매 때 상품 이름 등)
+     * @param quantity     남은 수량
+     * @param unit         수량 단위
+     * @param dDay         오늘 기준 소비기한까지 남은 일수 (0이면 오늘까지, 음수면 지남)
+     * @param status       소비기한 상태 (NORMAL·IMMINENT·EXPIRED)
+     * @param mealkit      밀키트 줄인지
+     * @param productId    구매 확정으로 들어온 줄의 상품 ID (없으면 null)
+     * @param imageUrl     밀키트 줄이면 연결 상품 이미지 (없으면 null)
+     */
+    public record FridgeItemCard(
+            Long fridgeId,
+            Long ingredientId,
+            String name,
+            String rawName,
+            BigDecimal quantity,
+            String unit,
+            long dDay,
+            FridgeItemStatus status,
+            boolean mealkit,
+            Long productId,
+            String imageUrl
+    ) {
     }
 
     // 같은 레시피 카드에 밀키트를 붙인 이벤트
@@ -51,14 +111,21 @@ public record ChatRecommendationsEventResponse(
      * @param recipeId    이 밀키트로 만드는 레시피 ID (연결이 없으면 null)
      * @param recipeName  그 레시피 이름 (연결이 없거나 레시피가 지워졌으면 null)
      * @param description 카드 아래 서버 설명 (레시피 카드 아래 한 장이면 "요리하기 번거로우면 …", 밀키트만 보여 주면 null)
+     * @param inFridge    냉장고에 이 밀키트가 있는지 (있으면 화면이 "냉장고에 있어요" 태그를 붙이고 [담기]를 숨긴다). 다시 불러올 때도 지금 냉장고 기준
+     * @param fridgeDDay  냉장고에 있으면 소비기한까지 남은 일수 (D-3 이내면 임박 태그). 없으면 null
      */
     public record RecommendedMealkit(
             ShoppingProduct product,
             int servings,
             Long recipeId,
             String recipeName,
-            String description
+            String description,
+            boolean inFridge,
+            Long fridgeDDay
     ) {
+        public RecommendedMealkit(ShoppingProduct product, int servings, Long recipeId, String recipeName, String description) {
+            this(product, servings, recipeId, recipeName, description, false, null);
+        }
     }
 
     /**
@@ -129,5 +196,10 @@ public record ChatRecommendationsEventResponse(
             BigDecimal unitAmount,
             String unit
     ) {
+        // 용량을 모르는 상품 (상품 검색으로 찾았거나 다시 불러온 상품 카드)
+        public static ShoppingProduct from(Product product, SellingPrice price) {
+            return new ShoppingProduct(product.getId(), product.getName(), product.getImageUrl(), price.listPrice(),
+                    price.sale().isPresent() ? price.unitPrice() : null, price.saleType(), price.soldOut(), null, null);
+        }
     }
 }

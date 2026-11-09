@@ -4805,6 +4805,12 @@
               "$ref": "#/components/schemas/RecommendedMealkit"
             }
           },
+          "products": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductCard"
+            }
+          },
           "recommendations": {
             "type": "array",
             "items": {
@@ -5719,6 +5725,10 @@
             ]
           },
           "orderItemId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "productId": {
             "type": "integer",
             "format": "int64"
           },
@@ -7324,6 +7334,17 @@
           }
         }
       },
+      "ProductCard": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "product": {
+            "$ref": "#/components/schemas/ShoppingProduct"
+          }
+        }
+      },
       "ProductCreateRequest": {
         "type": "object",
         "properties": {
@@ -8071,6 +8092,13 @@
         "properties": {
           "description": {
             "type": "string"
+          },
+          "fridgeDDay": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "inFridge": {
+            "type": "boolean"
           },
           "product": {
             "$ref": "#/components/schemas/ShoppingProduct"

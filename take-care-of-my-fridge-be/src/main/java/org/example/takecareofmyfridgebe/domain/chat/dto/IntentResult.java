@@ -32,6 +32,7 @@ import java.util.stream.Collectors;
  * @param removed            REFINE일 때 지우라고 한 조건 종류 (RefineCondition 이름, "시간 상관없이" → MAX_MINUTES). 없으면 빈 목록
  * @param avoidTastes        피할 맛 (Member.Taste 이름, "매운 거 말고" → SPICY). 말하지 않았으면 빈 목록
  * @param detailQuestion     RECIPE_DETAIL일 때 질문 종류 (DetailQuestion 이름: HOW_TO, TIME, INGREDIENTS, TIP, OTHER). 다른 의도면 빈 값
+ * @param fridgeScope        FRIDGE일 때 보여 줄 범위 (FridgeScope 이름: ALL, MEALKIT, IMMINENT). 다른 의도면 ALL
  */
 public record IntentResult(
         ChatIntent intent,
@@ -48,7 +49,8 @@ public record IntentResult(
         String targetName,
         List<String> removed,
         List<String> avoidTastes,
-        String detailQuestion
+        String detailQuestion,
+        String fridgeScope
 ) {
 
     // 레시피 검색에 쓸 요리 이름 키워드 최대 개수
@@ -65,6 +67,18 @@ public record IntentResult(
     private static final Set<String> CONDITION_NAMES = Arrays.stream(RefineCondition.values())
             .map(Enum::name)
             .collect(Collectors.toUnmodifiableSet());
+
+    private static final Set<String> SCOPE_NAMES = Arrays.stream(FridgeScope.values())
+            .map(Enum::name)
+            .collect(Collectors.toUnmodifiableSet());
+
+    public IntentResult(ChatIntent intent, List<String> wantedTastes, List<String> moodCategories, Integer maxMinutes,
+                        List<String> includeIngredients, List<String> excludeIngredients, Boolean useSelectedOnly,
+                        List<String> keywords, String dishText, String preferenceText, Integer targetIndex, String targetName,
+                        List<String> removed, List<String> avoidTastes, String detailQuestion) {
+        this(intent, wantedTastes, moodCategories, maxMinutes, includeIngredients, excludeIngredients, useSelectedOnly,
+                keywords, dishText, preferenceText, targetIndex, targetName, removed, avoidTastes, detailQuestion, null);
+    }
 
     public IntentResult(ChatIntent intent, List<String> wantedTastes, List<String> moodCategories, Integer maxMinutes,
                         List<String> includeIngredients, List<String> excludeIngredients, Boolean useSelectedOnly,
@@ -99,7 +113,15 @@ public record IntentResult(
     // 의도만 바꾼 결과 (조건 칸은 그대로)
     public IntentResult withIntent(ChatIntent newIntent) {
         return new IntentResult(newIntent, wantedTastes, moodCategories, maxMinutes, includeIngredients, excludeIngredients,
-                useSelectedOnly, keywords, dishText, preferenceText, targetIndex, targetName, removed, avoidTastes, detailQuestion);
+                useSelectedOnly, keywords, dishText, preferenceText, targetIndex, targetName, removed, avoidTastes, detailQuestion,
+                fridgeScope);
+    }
+
+    // 서버가 냉장고 보기·사기로 바꾼 결과. 범위와 말한 재료를 서버가 정한 값으로 바꾼다
+    public IntentResult withLookup(ChatIntent newIntent, FridgeScope scope, List<String> names) {
+        return new IntentResult(newIntent, wantedTastes, moodCategories, maxMinutes, names, excludeIngredients,
+                useSelectedOnly, keywords, dishText, preferenceText, targetIndex, targetName, removed, avoidTastes, detailQuestion,
+                scope.name());
     }
 
     // 의도만 있고 조건은 하나도 말하지 않은 결과
@@ -135,14 +157,23 @@ public record IntentResult(
                 cleanNames(avoidTastes, name -> name.toUpperCase(Locale.ROOT), TASTE_NAMES),
                 detailQuestion == null || !QUESTION_NAMES.contains(detailQuestion.strip().toUpperCase(Locale.ROOT))
                         ? null
-                        : detailQuestion.strip().toUpperCase(Locale.ROOT)
+                        : detailQuestion.strip().toUpperCase(Locale.ROOT),
+                fridgeScope == null || !SCOPE_NAMES.contains(fridgeScope.strip().toUpperCase(Locale.ROOT))
+                        ? null
+                        : fridgeScope.strip().toUpperCase(Locale.ROOT)
         );
     }
 
     // 서버가 메시지의 분류 단어로 분류·키워드·요리 이름·뺄 조건을 바로잡은 결과 (CategoryWordChecker)
     public IntentResult withCategories(List<String> categories, List<String> keywords, String dishText, List<String> removed) {
         return new IntentResult(intent, wantedTastes, categories, maxMinutes, includeIngredients, excludeIngredients,
-                useSelectedOnly, keywords, dishText, preferenceText, targetIndex, targetName, removed, avoidTastes, detailQuestion);
+                useSelectedOnly, keywords, dishText, preferenceText, targetIndex, targetName, removed, avoidTastes, detailQuestion,
+                fridgeScope);
+    }
+
+    // 냉장고 보기 범위. sanitize한 뒤에 쓴다 (없거나 모르는 값이면 ALL)
+    public FridgeScope scope() {
+        return fridgeScope == null || !SCOPE_NAMES.contains(fridgeScope) ? FridgeScope.ALL : FridgeScope.valueOf(fridgeScope);
     }
 
     // 빼라고 한 조건 종류. sanitize한 뒤에 쓴다 (없으면 빈 집합)

@@ -1,4 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import type { ComponentProps } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { MemoryRouter } from 'react-router';
 import { describe, expect, it } from 'vitest';
@@ -41,12 +42,17 @@ const mealkit: ChatRecommendedMealkit = {
   recipeId: 544,
   recipeName: '된장국',
   description: null,
+  inFridge: false,
+  fridgeDDay: null,
 };
 
-function render(recipes: ChatRecommendedRecipe[]) {
+function render(
+  recipes: ChatRecommendedRecipe[],
+  extra: Partial<ComponentProps<typeof ChatRecommendationCards>> = {},
+) {
   return renderToStaticMarkup(
     <MemoryRouter>
-      <ChatRecommendationCards recipes={recipes} />
+      <ChatRecommendationCards recipes={recipes} {...extra} />
     </MemoryRouter>,
   );
 }
@@ -160,6 +166,51 @@ describe('ChatRecommendationCards', () => {
     expect(html).not.toContain('추천 레시피');
     expect(html).toContain('밀키트로 간편하게');
     expect(html).toContain('aria-label="된장국 장바구니에 담기"');
+  });
+
+  it('사기 답이면 "살 수 있는 상품" 아래 말한 이름과 상품, 담기 버튼을 보여 준다', () => {
+    const html = renderToStaticMarkup(
+      <QueryClientProvider client={new QueryClient()}>
+        <MemoryRouter>
+          <ChatRecommendationCards
+            recipes={[]}
+            products={[
+              { name: '당근', product: { ...mealkit.product, productId: 7, name: '흙당근 1kg' } },
+            ]}
+          />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(html).toContain('살 수 있는 상품');
+    expect(html).not.toContain('밀키트로 간편하게');
+    expect(html).toContain('당근');
+    expect(html).toContain('href="/products/7"');
+    expect(html).toContain('aria-label="흙당근 1kg 장바구니에 담기"');
+  });
+
+  it('냉장고 보기 답이면 냉장고 카드를 보여 준다', () => {
+    const html = render([], {
+      fridgeItems: [
+        {
+          fridgeId: 1,
+          ingredientId: 11,
+          name: '두부',
+          rawName: '두부',
+          quantity: 1,
+          unit: '모',
+          dDay: 1,
+          status: 'IMMINENT',
+          mealkit: false,
+          productId: null,
+          imageUrl: null,
+        },
+      ],
+    });
+
+    expect(html).toContain('냉장고에 있어요');
+    expect(html).toContain('두부');
+    expect(html).toContain('내일까지');
   });
 
   it('레시피·밀키트가 모두 없으면 아무것도 그리지 않는다', () => {

@@ -2,6 +2,7 @@ package org.example.takecareofmyfridgebe.domain.chat.facade;
 
 import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageResponse;
+import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse.ProductCard;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse.RecommendedMealkit;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse.RecommendedRecipe;
 import org.example.takecareofmyfridgebe.domain.chat.dto.SavedRecommendation;
@@ -22,6 +23,7 @@ public class ChatMessageQueryFacade {
 
     private final ChatMessageService chatMessageService;
     private final ChatRecommendationFacade chatRecommendationFacade;
+    private final ChatFridgeShopFacade chatFridgeShopFacade;
 
     public List<ChatMessageResponse> getMessages(Long memberId, Long sessionId) {
         List<ChatMessageResponse> messages = chatMessageService.getMessages(memberId, sessionId);
@@ -34,10 +36,11 @@ public class ChatMessageQueryFacade {
             return messages;
         }
         Map<Long, List<RecommendedRecipe>> cards = chatRecommendationFacade.rebuildCards(memberId, saved);
-        Map<Long, List<RecommendedMealkit>> mealkits = chatRecommendationFacade.rebuildMealkitCards(saved);
+        Map<Long, List<RecommendedMealkit>> mealkits = chatRecommendationFacade.rebuildMealkitCards(memberId, saved);
+        Map<Long, List<ProductCard>> products = chatFridgeShopFacade.rebuildProductCards(saved);
         return messages.stream()
                 .map(message -> message.withRecommendations(cards.getOrDefault(message.id(), List.of()),
-                        mealkits.getOrDefault(message.id(), List.of())))
+                        mealkits.getOrDefault(message.id(), List.of()), products.getOrDefault(message.id(), List.of())))
                 .toList();
     }
 }

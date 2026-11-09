@@ -1,17 +1,24 @@
-import { Typography } from 'antd';
+import { Tag, Typography } from 'antd';
 import { useId } from 'react';
 import { generatePath, Link } from 'react-router';
 
 import { ROUTES } from '@/app/paths';
 import { FallbackImage } from '@/common/components/FallbackImage';
 import { formatPrice } from '@/domains/cart/format';
+import { ddayTagColor } from '@/domains/fridge/format';
 
-import type { ChatRecommendedMealkit } from '../recommendations';
+import {
+  type ChatRecommendedMealkit,
+  formatImminentLabel,
+  IMMINENT_DAYS,
+} from '../recommendations';
 import { ChatCartButton } from './ChatCartButton';
 import styles from './ChatMealkitCards.module.scss';
 
 interface ChatMealkitCardsProps {
   mealkits: ChatRecommendedMealkit[];
+  // 묶음 제목. 살 상품 카드(사기 답)도 같은 카드로 그린다
+  heading?: string;
   // 장바구니 아이콘을 눌렀을 때 (상품 1개)
   onAdd: (productId: number) => void;
   // 담는 중인 상품 (그 버튼에 로딩을 보여 준다)
@@ -22,8 +29,10 @@ interface ChatMealkitCardsProps {
 
 // 상담 답의 밀키트 카드. 레시피 카드 아래 "밀키트로 간편하게" 묶음으로 보여 준다.
 // 카드를 누르면 상품 상세로 가고, 장바구니 아이콘은 상담 창 안에서 1개를 담는다 (품절이면 막는다).
+// 냉장고에 있는 밀키트는 "냉장고에 있어요"(임박이면 남은 날도) 태그를 붙이고 장바구니 아이콘을 숨긴다.
 export function ChatMealkitCards({
   mealkits,
+  heading = '밀키트로 간편하게',
   onAdd,
   pendingProductId,
   onNavigate,
@@ -33,7 +42,7 @@ export function ChatMealkitCards({
   return (
     <section className={styles.section} aria-labelledby={headingId}>
       <Typography.Text strong id={headingId} className={styles.heading}>
-        밀키트로 간편하게
+        {heading}
       </Typography.Text>
       <ul className={styles.list}>
         {mealkits.map((mealkit) => (
@@ -58,7 +67,7 @@ interface MealkitCardProps {
 }
 
 function MealkitCard({ mealkit, onAdd, pending, onNavigate }: MealkitCardProps) {
-  const { product } = mealkit;
+  const { product, fridgeDDay } = mealkit;
   const onSale = product.salePrice !== null;
   const meta = [
     mealkit.servings > 0 ? `${mealkit.servings}인분` : null,
@@ -90,6 +99,18 @@ function MealkitCard({ mealkit, onAdd, pending, onNavigate }: MealkitCardProps) 
               {product.name}
             </Typography.Text>
             {meta && <span className={styles.meta}>{meta}</span>}
+            {mealkit.inFridge && (
+              <span className={styles.tags}>
+                <Tag variant="filled" color="success" className={styles.tag}>
+                  냉장고에 있어요
+                </Tag>
+                {fridgeDDay !== null && fridgeDDay <= IMMINENT_DAYS && (
+                  <Tag variant="filled" color={ddayTagColor(fridgeDDay)} className={styles.tag}>
+                    {formatImminentLabel(fridgeDDay)}
+                  </Tag>
+                )}
+              </span>
+            )}
             <span className={styles.price}>
               <Typography.Text strong type={onSale ? 'danger' : undefined}>
                 {formatPrice(product.salePrice ?? product.price)}
@@ -101,14 +122,16 @@ function MealkitCard({ mealkit, onAdd, pending, onNavigate }: MealkitCardProps) 
               )}
             </span>
           </div>
-          <ChatCartButton
-            productId={product.productId}
-            productName={product.name}
-            soldOutLabel={product.name}
-            soldOut={product.soldOut}
-            pending={pending}
-            onAdd={onAdd}
-          />
+          {!mealkit.inFridge && (
+            <ChatCartButton
+              productId={product.productId}
+              productName={product.name}
+              soldOutLabel={product.name}
+              soldOut={product.soldOut}
+              pending={pending}
+              onAdd={onAdd}
+            />
+          )}
         </div>
       </div>
       {mealkit.description && (

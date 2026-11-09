@@ -1,6 +1,7 @@
 package org.example.takecareofmyfridgebe.domain.chat.dto;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse.ProductCard;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse.RecommendedMealkit;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse.RecommendedRecipe;
 import org.example.takecareofmyfridgebe.domain.chat.entity.ChatMessage;
@@ -25,11 +26,19 @@ public record ChatMessageResponse(
         @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
         LocalDateTime createdAt,
         List<RecommendedRecipe> recommendations,
-        List<RecommendedMealkit> mealkits
+        List<RecommendedMealkit> mealkits,
+        // 살 상품 카드 (사기 답·냉장고 보기의 없는 재료). 지금 가격 기준으로 다시 만든다
+        List<ProductCard> products
 ) {
     public ChatMessageResponse {
         recommendations = recommendations == null ? List.of() : List.copyOf(recommendations);
         mealkits = mealkits == null ? List.of() : List.copyOf(mealkits);
+        products = products == null ? List.of() : List.copyOf(products);
+    }
+
+    public ChatMessageResponse(Long id, int sequence, ChatMessageRole role, String content, LocalDateTime createdAt,
+                               List<RecommendedRecipe> recommendations, List<RecommendedMealkit> mealkits) {
+        this(id, sequence, role, content, createdAt, recommendations, mealkits, List.of());
     }
 
     public ChatMessageResponse(Long id, int sequence, ChatMessageRole role, String content, LocalDateTime createdAt,
@@ -56,6 +65,11 @@ public record ChatMessageResponse(
     }
 
     public ChatMessageResponse withRecommendations(List<RecommendedRecipe> cards, List<RecommendedMealkit> mealkitCards) {
-        return new ChatMessageResponse(id, sequence, role, content, createdAt, cards, mealkitCards);
+        return withRecommendations(cards, mealkitCards, List.of());
+    }
+
+    public ChatMessageResponse withRecommendations(List<RecommendedRecipe> cards, List<RecommendedMealkit> mealkitCards,
+                                                   List<ProductCard> productCards) {
+        return new ChatMessageResponse(id, sequence, role, content, createdAt, cards, mealkitCards, productCards);
     }
 }

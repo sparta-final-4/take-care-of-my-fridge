@@ -182,6 +182,7 @@ export * from './popular-keywords-response';
 export * from './popular-recipe-request';
 export * from './popular-recipe-response';
 export * from './popular-sale-response';
+export * from './product-card';
 export * from './product-create-request';
 export * from './product-detail-response';
 export * from './product-list-item-response';

@@ -9,6 +9,7 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageResponse;
 import org.example.takecareofmyfridgebe.domain.chat.entity.ChatMessageRole;
 import org.example.takecareofmyfridgebe.domain.chat.facade.ChatContextFacade;
 import org.example.takecareofmyfridgebe.domain.chat.facade.ChatIntentFacade;
+import org.example.takecareofmyfridgebe.domain.chat.facade.ChatFridgeShopFacade;
 import org.example.takecareofmyfridgebe.domain.chat.facade.ChatRecommendationFacade;
 import org.example.takecareofmyfridgebe.global.config.RedisConfig;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
@@ -85,6 +86,9 @@ class ChatStreamConcurrencyTest extends RedisContainerSupport {
 
     @MockitoBean
     private ChatRecommendationFacade chatRecommendationFacade;
+
+    @MockitoBean
+    private ChatFridgeShopFacade chatFridgeShopFacade;
 
     @MockitoBean
     private ChatContextFacade chatContextFacade;
