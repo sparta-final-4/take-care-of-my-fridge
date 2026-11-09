@@ -14,8 +14,12 @@
  */
 
 
+// May contain unused imports in some cases
+// @ts-ignore
+import type { CookedRecipe } from './cooked-recipe';
 
 export interface ChatSessionResponse {
+    'cookedRecipe'?: CookedRecipe;
     'createdAt'?: string;
     'id'?: number;
     'lastMessageAt'?: string;

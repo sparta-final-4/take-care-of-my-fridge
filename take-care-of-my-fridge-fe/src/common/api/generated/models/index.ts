@@ -87,6 +87,7 @@ export * from './chat-session-list-response';
 export * from './chat-session-response';
 export * from './chat-session-status-counts';
 export * from './chat-session-summary-response';
+export * from './cooked-recipe';
 export * from './cooking-complete-request';
 export * from './cooking-complete-response';
 export * from './cooking-log-response';

@@ -17,3 +17,8 @@ export function formatChatDateTime(value?: string): string {
 export function formatChatTime(value?: string): string {
   return value ? dayjs(value).format('HH:mm') : '';
 }
+
+// 끝난 상담 안내. 요리 완료로 끝났으면 그 요리 이름을 붙인다.
+export function formatEndedLabel(cookedRecipeName?: string): string {
+  return cookedRecipeName ? `${cookedRecipeName} 요리 완료로 상담이 끝났어요` : '상담이 끝났어요';
+}

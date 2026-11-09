@@ -26,6 +26,16 @@ export async function startSession(signal?: AbortSignal): Promise<ChatSessionRes
 }
 
 /**
+ * 상담 세션 하나를 조회한다. 요리 완료로 끝난 상담이면 그 요리(cookedRecipe)가 함께 온다.
+ */
+export async function getSession(
+  sessionId: number,
+  signal?: AbortSignal,
+): Promise<ChatSessionResponse> {
+  return unwrap(chatSessionApi.getSession({ sessionId }, { signal }));
+}
+
+/**
  * 진행 중인 상담 세션을 명시적으로 종료(COMPLETED) 처리한다.
  */
 export async function completeSession(sessionId: number): Promise<ChatSessionResponse> {
