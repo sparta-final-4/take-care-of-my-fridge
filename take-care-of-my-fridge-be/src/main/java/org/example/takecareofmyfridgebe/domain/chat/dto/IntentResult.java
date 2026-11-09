@@ -142,15 +142,23 @@ public record IntentResult(
      */
     public IntentResult sanitize(Collection<String> allowedCategories) {
         Set<String> categories = Set.copyOf(allowedCategories);
+        List<String> cleanCategories = cleanNames(moodCategories, name -> name, categories);
+        List<String> cleanKeywords = keywords == null ? null
+                : cleanNames(keywords, name -> name, null).stream().limit(MAX_KEYWORDS).toList();
+        // AI가 고른 분류를 키워드에 그대로 옮겨 적었으면("따뜻한 국물 요리" → 국, 찌개…) 요리 이름이 아니므로 키워드를 비운다
+        if (cleanKeywords != null && !cleanKeywords.isEmpty() && cleanCategories != null
+                && cleanCategories.containsAll(cleanKeywords)) {
+            cleanKeywords = List.of();
+        }
         return new IntentResult(
                 intent == null ? ChatIntent.GENERAL : intent,
                 cleanNames(wantedTastes, name -> name.toUpperCase(Locale.ROOT), TASTE_NAMES),
-                cleanNames(moodCategories, name -> name, categories),
+                cleanCategories,
                 maxMinutes == null || maxMinutes <= 0 ? null : maxMinutes,
                 cleanNames(includeIngredients, name -> name, null),
                 cleanNames(excludeIngredients, name -> name, null),
                 useSelectedOnly,
-                keywords == null ? null : cleanNames(keywords, name -> name, null).stream().limit(MAX_KEYWORDS).toList(),
+                cleanKeywords,
                 dishText == null || dishText.isBlank() ? null : dishText.strip(),
                 preferenceText == null || preferenceText.isBlank() ? null : preferenceText.strip(),
                 targetIndex == null || targetIndex <= 0 ? null : targetIndex,

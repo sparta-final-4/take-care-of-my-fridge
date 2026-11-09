@@ -33,7 +33,8 @@ class ChatIntentPromptTest {
     @Test
     @DisplayName("원한 특징·요리 표현을 preferenceText로 그대로 쓰고, 뭐 먹지?처럼 없으면 빈 문자열로 쓰라고 지시한다")
     void instructsPreferenceText() {
-        assertThat(prompt).contains("- preferenceText:", "\"차가운 요리 추천해줘\" → \"차가운 요리\"", "\"뭐 먹지?\" → 빈 문자열");
+        assertThat(prompt).contains("- preferenceText:", "\"차가운 요리 추천해줘\" → \"차가운 요리\"", "\"뭐 먹지?\" → 빈 문자열",
+                "keywords로 바꾼 특징(\"차가운\", \"시원한\")은 꼭 쓴다");
     }
 
     @Test

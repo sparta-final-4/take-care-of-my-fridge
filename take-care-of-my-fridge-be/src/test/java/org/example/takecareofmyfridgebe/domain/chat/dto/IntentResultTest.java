@@ -30,6 +30,22 @@ class IntentResultTest {
     }
 
     @Test
+    @DisplayName("키워드가 모두 고른 분류 이름이면 요리 이름이 아니므로 키워드를 비운다")
+    void clearsKeywords_whenAllKeywordsAreCategories() {
+        IntentResult copied = new IntentResult(ChatIntent.RECOMMEND, null, List.of("국", "찌개"), null,
+                null, null, null, List.of("국", "찌개"), null, null).sanitize(CATEGORIES);
+        IntentResult mixed = new IntentResult(ChatIntent.RECOMMEND, null, List.of("샐러드"), null,
+                null, null, null, List.of("샐러드", "시저샐러드"), null, null).sanitize(CATEGORIES);
+        IntentResult notChosen = new IntentResult(ChatIntent.RECOMMEND, null, List.of(), null,
+                null, null, null, List.of("샐러드"), null, null).sanitize(CATEGORIES);
+
+        assertThat(copied.keywords()).isEmpty();
+        assertThat(copied.moodCategories()).containsExactly("국", "찌개");
+        assertThat(mixed.keywords()).containsExactly("샐러드", "시저샐러드");
+        assertThat(notChosen.keywords()).containsExactly("샐러드");
+    }
+
+    @Test
     @DisplayName("말하지 않은 칸(null)은 정리한 뒤에도 null로 두고, 의도가 없으면 GENERAL로 본다")
     void keepsNull_whenFieldIsNotSaid() {
         IntentResult result = new IntentResult(null, null, null, null, null, null, null, null, null, null).sanitize(CATEGORIES);

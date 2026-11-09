@@ -15,13 +15,13 @@ class FridgeShopWordCheckerTest {
 
     // config/chat-words.yml의 app.chat.fridge-shop-words와 같은 값
     static final ChatFridgeShopWordProperties WORDS = new ChatFridgeShopWordProperties(
-            List.of("남았", "아직있", "냉장고에뭐", "냉장고에있", "냉장고에서", "버려야", "유통기한지난", "소비기한지난"),
+            List.of("남았", "아직있", "냉장고에뭐", "냉장고에있", "냉장고에서", "버려야", "유통기한지난", "소비기한지난", "처리해야할거", "처리할거"),
             List.of("버려야", "지난", "임박", "유통기한", "소비기한", "상한", "상할", "상했", "오래된", "오래됐", "처리해야"),
             List.of("기본양념", "조미료"),
             List.of("사고싶", "어디서사", "장바구니", "담아", "주문해"),
             List.of("세일", "할인", "특가", "번개"),
             List.of("추천", "만들", "해먹", "요리", "레시피", "뭐먹", "먹지", "먹을까"),
-            List.of("어떻게", "방법", "보관", "해동", "먹어도돼", "괜찮", "왜", "언제와", "언제도착", "배송"));
+            List.of("어떻게", "방법", "보관", "해동", "먹어도돼", "괜찮", "왜", "언제와", "언제도착", "배송", "짜줘", "짜줄"));
 
     private static Optional<ChatIntent> check(String message) {
         return FridgeShopWordChecker.check(message, WORDS, AskWordCheckerTest.WORDS);
@@ -31,7 +31,7 @@ class FridgeShopWordCheckerTest {
     @DisplayName("냉장고 보기 말이 있으면 냉장고 보기로 본다")
     void returnsFridge_whenFridgeWord() {
         for (String message : List.of("냉장고에 뭐 있어", "밀키트 뭐 남았어", "두부 아직 있어?", "곧 버려야 할 거 있어?",
-                "내 냉장고에서 밀키트 어떤 거 있어?", "냉장고에 먹을 거 뭐 남았어")) {
+                "내 냉장고에서 밀키트 어떤 거 있어?", "냉장고에 먹을 거 뭐 남았어", "슬슬 처리해야 할 거 있어?")) {
             assertThat(check(message)).as(message).contains(ChatIntent.FRIDGE);
         }
     }
@@ -53,9 +53,20 @@ class FridgeShopWordCheckerTest {
     }
 
     @Test
-    @DisplayName("냉장고 보기 말이 없으면 바꾸지 않는다 (주문한 거 언제 와?, 밀키트 뭐 있어)")
+    @DisplayName("짜 달라는 말이나 묻는 말이 있으면 일반 답으로 보고, 얼마나·가격만 있으면 일반 답으로 보지 않는다")
+    void returnsAsksGeneral_whenPlanOrQuestionWord() {
+        for (String message : List.of("장보기 목록 짜줘", "일주일 장보기 목록 짜 줄래?", "주문한 거 언제 와?")) {
+            assertThat(FridgeShopWordChecker.asksGeneral(message, WORDS)).as(message).isTrue();
+        }
+        for (String message : List.of("두부 얼마나 남았어?", "두부 가격 얼마야?", "당근 사고 싶어")) {
+            assertThat(FridgeShopWordChecker.asksGeneral(message, WORDS)).as(message).isFalse();
+        }
+    }
+
+    @Test
+    @DisplayName("냉장고 보기 말이 없으면 바꾸지 않는다 (주문한 거 언제 와?, 밀키트 뭐 있어, 고기 핏물 처리해야 돼?)")
     void returnsEmpty_whenNoFridgeWord() {
-        for (String message : List.of("주문한 거 언제 와?", "밀키트 뭐 있어", "안녕", "")) {
+        for (String message : List.of("주문한 거 언제 와?", "밀키트 뭐 있어", "안녕", "", "고기 핏물 처리해야 돼?")) {
             assertThat(check(message)).as(message).isEmpty();
         }
     }
