@@ -42,7 +42,7 @@ class ChatIntentPromptTest {
         String followUp = new ClassPathResource("prompts/chat-intent-followup.txt").getContentAsString(StandardCharsets.UTF_8);
 
         assertThat(prompt).contains("묻는 말 없이 음식·재료·요리 종류·밀키트 이름만 말해도 RECOMMEND다", "\"김치찌개\", \"국물 밀키트\"");
-        assertThat(followUp).contains("묻는 말 없이 이름만 말한 말(\"국물 밀키트\")");
+        assertThat(followUp).contains("이름만 말한 말(\"국물 밀키트\")");
     }
 
     @Test
@@ -54,7 +54,7 @@ class ChatIntentPromptTest {
                 "OFF_TOPIC: 요리·식재료·냉장고·장보기·밀키트와 상관없는 일을 해 달라는 말",
                 "\"주식 추천해줘\", \"숙제 풀어줘\", \"파이썬 코드 짜줘\"",
                 "인사, 짧은 잡담");
-        assertThat(followUp).contains("FRIDGE·SHOP·OFF_TOPIC·BLOCKED·SELF_HARM은 첫 질문 규칙대로이고 [직전 조건]을 잇지 않는다");
+        assertThat(followUp).contains("그 밖은 첫 질문 규칙대로 정하고 [직전 조건]을 잇지 않는다");
     }
 
     @Test
@@ -105,7 +105,8 @@ class ChatIntentPromptTest {
                 "말한 이름이 레시피에 없을 법하면(줄임말·세트 메뉴·가게 메뉴·신조어) \"같은\"이 없어도 그 요리를 이루는 요리나 비슷한 요리로 늘린다",
                 "세트 메뉴면 구성 요리를 모두 넣는다");
         assertThat(prompt).doesNotContain("탕짜면", "짬짜면");
-        assertThat(followUp).contains("요리 이름·keywords는 첫 질문 규칙대로 뽑는다");
+        // 후속 규칙은 요리 이름 늘리기를 되풀이하지 않고 첫 질문 규칙을 따르게 한다
+        assertThat(followUp).contains("첫 질문 규칙대로").doesNotContain("줄임말");
     }
 
     @Test
@@ -115,16 +116,23 @@ class ChatIntentPromptTest {
 
         assertThat(prompt).doesNotContain("REFINE", "RECIPE_DETAIL", "[직전 추천]");
         assertThat(followUp).contains("REFINE: 직전 추천을 바꿔 달라는 말(\"다른\", \"또\", \"말고 다른\")",
-                "바꾸라고 하지 않은 조건은 [직전 조건] 그대로 쓴다",
-                "RECIPE_DETAIL: 이 상담에서 추천했던 레시피 하나",
-                "[직전 추천]·[이전 추천]에 없어도 \"아까 그 ○○\"처럼 앞서 추천받은 레시피 이름을 말하면 RECIPE_DETAIL이다",
-                "targetIndex: [직전 추천] 번호(1부터)", "targetName: 말한 레시피 이름",
-                "맛은 첫 질문 규칙대로 쓰고, 피할 맛은 [직전 조건]의 피할 맛을 이어 쓴다",
-                "\"시간 상관없이\" → removed: MAX_MINUTES / \"오이 넣어도 돼\" → removed: EXCLUDE",
-                "REFINE이 아니면 removed는 빈 목록",
+                "조건 칸에는 [직전 조건]에 이번 말을 반영한 최종 조건을 쓴다(바꾸라고 하지 않은 조건은 그대로",
+                "RECIPE_DETAIL: 이 상담에서 추천한 레시피 하나",
+                "\"아까 그 ○○\"처럼 앞서 추천받은 이름을 말해도 RECIPE_DETAIL이다",
+                "targetIndex: [직전 추천] 번호(1부터", "targetName: 말한 레시피 이름",
+                "\"시간 상관없이\" → MAX_MINUTES",
                 "detailQuestion: HOW_TO(만드는 법), TIME(조리 시간), INGREDIENTS(재료), TIP(팁), OTHER 중 하나",
                 "\"두 번째 거 어떻게 만들어?\" → targetIndex: 2, HOW_TO",
-                "새 요리 이름이나 새 조건으로 처음부터 추천해 달라는 말(\"김치찌개 먹고 싶어\")");
+                "새 요리 이름·새 조건(\"김치찌개 먹고 싶어\")");
+    }
+
+    @Test
+    @DisplayName("후속 규칙은 맛·시간·재료만 말한 짧은 말을 다시 추천으로 보고 앞 분류를 잇는다고 한 줄로 정한다 (디저트 → 매운 거 말고)")
+    void keepsPreviousCategory_whenOnlyConditionSpoken() throws IOException {
+        String followUp = new ClassPathResource("prompts/chat-intent-followup.txt").getContentAsString(StandardCharsets.UTF_8);
+
+        assertThat(followUp).contains("맛·시간·재료만 말한 짧은 말도 REFINE이고 [직전 조건]의 분류를 잇는다(분류와 어울리지 않아 보이는 맛이어도)",
+                "\"매운 거 말고\" → REFINE, 디저트 그대로, 피할 맛 SPICY");
     }
 
     @Test
@@ -134,11 +142,11 @@ class ChatIntentPromptTest {
 
         assertThat(followUp).contains(
                 "이번 말의 분류·요리 이름이 [직전 조건]보다 앞선다",
-                "같은 요청을 다시 해도 조건을 비우지 않고 이번 말에서 뽑는다",
-                "코스를 더하는 말(\"디저트도\", \"후식으로\", \"국도 같이\")은 RECOMMEND이고 [직전 조건]을 잇지 않는다",
-                "직전이 김피탕일 때 \"디저트 추천해줘\" → RECOMMEND, 분류 디저트, 키워드 없음",
+                "그 밖은 첫 질문 규칙대로 정하고 [직전 조건]을 잇지 않는다",
+                "코스를 더하는 말(\"디저트도\", \"후식으로\")은 RECOMMEND다",
+                "직전이 김피탕일 때 \"디저트 추천해줘\" → RECOMMEND, 디저트, 키워드 없음",
+                "직전이 디저트일 때 \"디저트 추천해줘\" → RECOMMEND, 디저트",
                 "\"다른 디저트\" → REFINE, 디저트",
-                "\"다른 거\" → REFINE, 분류 없음",
                 "\"디저트 말고 국\" → REFINE, 국, removed: CATEGORY");
     }
 
@@ -150,8 +158,8 @@ class ChatIntentPromptTest {
         assertThat(followUp).doesNotContain("wantedTastes: SPICY", "avoidTastes: SPICY", "\"맛은 상관없어\"", "\"두부 안 넣어도 돼\"",
                 "\"맛있게 하는 팁\"", "생략", "[다른 제안]", "[이미 안내한 말]");
         assertThat(followUp.lines().filter(line -> line.contains("예)"))).hasSize(5);
-        // 35% 줄이기 전(1,809자)보다 짧게 둔다. 이름만 말한 말·새 추천의 맛 규칙을 더해 1,650자까지
-        assertThat(followUp.length()).isLessThan(1_700);
+        // 서버가 하는 일(새 추천의 맛 비우기, 피할 맛 잇기, 키워드 끊기, 대상 칸 정리)을 빼서 1,692자 → 1,200자 아래로 둔다
+        assertThat(followUp.length()).isLessThan(1_200);
     }
 
     @Test
