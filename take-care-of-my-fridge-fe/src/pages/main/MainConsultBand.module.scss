@@ -1,65 +1,113 @@
 @use '@/styles/variables' as *;
 @use '@/styles/mixins' as *;
 
-// 잉크색 띠(어두운 사진과 이어진다). 글자는 종이색으로 바꾼다.
+// 한 화면을 꽉 채우는 잉크색 띠. 글자는 종이색.
 .band {
-  padding-block: $main-section-gap;
+  display: flex;
+  min-height: 100svh;
   color: var(--ant-color-bg-layout);
   background: var(--ant-color-text);
 
-  // 색이 바뀌는 어두운 띠라 위아래 숨을 더 준다.
   @include from(lg) {
-    padding-block: $main-band-padding-lg-wide;
+    align-items: center;
+    min-height: $main-fullscreen-min-height;
+    height: 100svh;
   }
 }
 
-// 모바일: 사진 위, 글 아래. lg 이상: 사진 5칸, 글 7칸.
+// 휴대폰: 사진(화면 끝까지) 위, 글 아래. lg 이상: 본문 폭 안에서 사진 6칸 · 글 6칸, 세로 가운데.
 .inner {
-  @include main-container;
-  @include reveal-on-view;
-
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: var(--ant-margin-xl);
-  align-items: center;
+  grid-template-rows: $main-consult-photo-height-sm auto;
+  width: 100%;
 
   @include from(lg) {
-    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    @include main-container;
+
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: none;
     gap: var(--ant-margin-xxl);
+    align-items: center;
+  }
+}
+
+// 냉장고만 오려 낸(배경 투명) 사진을 잉크색 위에 그대로 얹는다. 틀·둥근 모서리 없이 칸 안에 통째로 보인다.
+// 휴대폰은 위 칸 높이 안에, lg 이상은 화면 높이의 일정 비율을 넘지 않게.
+.media {
+  display: flex;
+  justify-content: center;
+  min-height: 0;
+  padding-top: var(--ant-padding-xl);
+
+  // 사진은 칸 왼쪽에 붙이고, PC는 본문 밖으로 조금 더 왼쪽으로 내민다(창이 좁아도 화면 밖으로 잘리지 않을 만큼만).
+  @include from(lg) {
+    justify-content: flex-start;
+    padding-top: 0;
+  }
+
+  @include from(xl) {
+    margin-left: calc(
+      -1 *
+        min(
+          #{$main-consult-photo-shift},
+          (100vw - #{$content-max-width}) / 2 + var(--ant-padding-lg)
+        )
+    );
   }
 }
 
 .image {
   display: block;
-  width: 100%;
-  max-height: $main-consult-image-max-height;
-  height: auto;
-  object-fit: cover;
-  border-radius: var(--ant-border-radius-lg);
+  width: auto;
+  max-width: 100%;
+  height: 100%;
+  object-fit: contain;
+
+  @include from(lg) {
+    height: auto;
+    max-height: $main-consult-photo-max-height;
+  }
 }
 
 .text {
+  @include reveal-on-view;
+
   display: flex;
   flex-direction: column;
-  gap: var(--ant-margin);
+  justify-content: center;
+  gap: var(--ant-margin-lg);
   min-width: 0;
+  padding: $main-section-gap $page-gutter-sm;
+
+  @include from(md) {
+    padding-inline: $page-gutter-md;
+  }
+
+  @include from(lg) {
+    padding: 0;
+  }
+}
+
+.eyebrow {
+  @include eyebrow;
+
+  color: var(--ant-color-border-secondary);
 }
 
 :global(.ant-typography).title {
   @include display-heading;
 
   font-size: var(--ant-font-size-heading-2);
-  line-height: var(--ant-line-height-heading-2);
+  line-height: 1.2;
   color: var(--ant-color-bg-layout);
 
   @include from(md) {
-    font-size: var(--ant-font-size-heading-1);
-    line-height: var(--ant-line-height-heading-1);
+    font-size: $main-consult-title-size;
   }
 }
 
 :global(.ant-typography).description {
-  max-width: 40ch;
+  max-width: 34ch;
   margin: 0;
   font-size: var(--ant-font-size-lg);
   color: var(--ant-color-border-secondary);

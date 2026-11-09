@@ -5,6 +5,7 @@ import { Outlet, useLocation, useMatches, useNavigation, useNavigationType } fro
 import { ROUTES } from '@/app/paths';
 import { NavigationProgress } from '@/common/components/NavigationProgress';
 import { RouteFallback } from '@/common/components/RouteFallback';
+import { scrollToTopInstantly } from '@/common/scroll/smoothScroll';
 
 import { ChatModal } from '@/domains/chat/components/ChatModal';
 
@@ -32,7 +33,7 @@ export function MainLayout() {
   useEffect(() => {
     if (lastScrollKey.current === scrollKey) return;
     lastScrollKey.current = scrollKey;
-    if (navigationType !== 'POP') window.scrollTo({ top: 0 });
+    if (navigationType !== 'POP') scrollToTopInstantly();
   }, [scrollKey, navigationType]);
   // 메인은 사진·색 띠가 화면 폭 끝까지 가도록 본문 폭 제한과 여백을 풀고, 띠마다 안쪽에서 폭을 맞춘다.
   const isHome = pathname === ROUTES.home;

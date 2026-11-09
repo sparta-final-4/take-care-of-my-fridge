@@ -1,46 +1,47 @@
 @use '@/styles/variables' as *;
 @use '@/styles/mixins' as *;
 
-// 사진이 화면 폭 전체를 덮고, 투명한 헤더 밑(화면 맨 위)까지 올라간다(MainLayout .fullBleed가 헤더 높이만큼 끌어올림).
+// 사진이 한 화면(뷰포트 높이)을 꽉 채우고, 투명한 헤더 밑(화면 맨 위)까지 올라간다(MainLayout .fullBleed가 헤더 높이만큼 끌어올림).
 // 사진이 밝아서 위(헤더 글자)·아래·왼쪽에 잉크색 막을 깔아 글자 대비(종이색 글자)를 지킨다.
 .hero {
   position: relative;
   display: grid;
-  min-height: calc(#{$main-hero-min-height-sm} + #{$header-height});
+  min-height: $main-fullscreen-min-height;
+  height: 100svh;
   overflow: hidden;
   isolation: isolate;
+  color: var(--ant-color-bg-layout);
   background: var(--ant-color-text);
-
-  @include from(md) {
-    min-height: calc(#{$main-hero-min-height} + #{$header-height});
-  }
 
   &::after {
     content: '';
     position: absolute;
     inset: 0;
     z-index: 0;
+    // 사진 전체를 살짝 낮춘 위에 위(헤더)·아래(글)·왼쪽(글)을 더 어둡게 깐다.
     background:
       linear-gradient(
         180deg,
-        color-mix(in srgb, var(--ant-color-text) 60%, transparent) 0%,
-        transparent 28%
+        color-mix(in srgb, var(--ant-color-text) 55%, transparent) 0%,
+        transparent 22%
       ),
       linear-gradient(
         0deg,
-        color-mix(in srgb, var(--ant-color-text) 88%, transparent) 0%,
-        color-mix(in srgb, var(--ant-color-text) 40%, transparent) 55%,
-        transparent 100%
+        color-mix(in srgb, var(--ant-color-text) 96%, transparent) 0%,
+        color-mix(in srgb, var(--ant-color-text) 62%, transparent) 40%,
+        transparent 85%
       ),
       linear-gradient(
         90deg,
-        color-mix(in srgb, var(--ant-color-text) 55%, transparent) 0%,
+        color-mix(in srgb, var(--ant-color-text) 50%, transparent) 0%,
         transparent 60%
-      );
+      ),
+      color-mix(in srgb, var(--ant-color-text) 32%, transparent);
     pointer-events: none;
   }
 }
 
+// 처음 열 때 사진이 아주 천천히 제자리로 물러난다(움직임 줄이기 설정이면 멈춘 채).
 .image {
   position: absolute;
   inset: 0;
@@ -48,9 +49,19 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
+
+  @media (prefers-reduced-motion: no-preference) {
+    animation: hero-settle $main-hero-settle-duration var(--ant-motion-ease-out) both;
+  }
 }
 
-// 글은 다른 띠와 같은 폭의 컨테이너 안, 아래쪽에.
+@keyframes hero-settle {
+  from {
+    transform: scale(1.06);
+  }
+}
+
+// 글은 다른 띠와 같은 폭의 컨테이너 안 왼쪽 아래, 스크롤 표시는 오른쪽 아래.
 .inner {
   @include main-container;
 
@@ -58,18 +69,36 @@
   z-index: 1;
   display: flex;
   align-items: flex-end;
-  padding-block: var(--ant-padding-xl);
+  justify-content: space-between;
+  gap: var(--ant-margin-xl);
+  padding-block: var(--ant-padding-xl) $main-hero-bottom-padding-sm;
 
   @include from(lg) {
-    padding-block: $main-band-padding-lg;
+    padding-bottom: $main-hero-bottom-padding;
   }
 }
 
 .text {
   display: flex;
   flex-direction: column;
-  gap: var(--ant-margin);
+  gap: var(--ant-margin-lg);
   max-width: $main-hero-text-max-width;
+
+  @media (prefers-reduced-motion: no-preference) {
+    animation: hero-text-in var(--ant-motion-duration-slow) var(--ant-motion-ease-out) 0.2s both;
+  }
+}
+
+@keyframes hero-text-in {
+  from {
+    opacity: 0;
+    transform: translateY($reveal-offset);
+  }
+}
+
+// 제목 위 작은 영문 머리글: 넓은 자간의 대문자 한 줄
+.eyebrow {
+  @include eyebrow;
 }
 
 :global(.ant-typography).title {
@@ -82,6 +111,10 @@
   @include from(md) {
     font-size: $main-hero-title-size;
   }
+
+  @include from(xl) {
+    font-size: $main-hero-title-size-xl;
+  }
 }
 
 :global(.ant-typography).lede {
@@ -89,5 +122,55 @@
   margin: 0;
   font-size: var(--ant-font-size-lg);
   color: var(--ant-color-bg-layout);
+  opacity: 0.85;
   text-wrap: pretty;
+}
+
+// 오른쪽 아래 세로 글자 + 아래로 흐르는 가는 선. 휴대폰은 글과 겹치지 않게 숨긴다.
+.scrollCue {
+  display: none;
+
+  @include from(md) {
+    @include eyebrow;
+
+    position: relative;
+    display: block;
+    padding-bottom: $main-scroll-cue-line;
+    writing-mode: vertical-rl;
+
+    &::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      width: 1px;
+      height: calc(#{$main-scroll-cue-line} - var(--ant-margin-xs));
+      background: currentcolor;
+      transform-origin: top;
+
+      @media (prefers-reduced-motion: no-preference) {
+        animation: scroll-cue 2.4s var(--ant-motion-ease-in-out) infinite;
+      }
+    }
+  }
+}
+
+@keyframes scroll-cue {
+  0% {
+    transform: scaleY(0);
+  }
+
+  50% {
+    transform: scaleY(1);
+    transform-origin: top;
+  }
+
+  51% {
+    transform-origin: bottom;
+  }
+
+  100% {
+    transform: scaleY(0);
+    transform-origin: bottom;
+  }
 }

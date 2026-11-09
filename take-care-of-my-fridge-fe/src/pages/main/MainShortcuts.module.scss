@@ -27,7 +27,8 @@
   }
 }
 
-// 사진이 칸 역할, 아래에 이름과 한 줄 설명. 마우스를 올리면 이름에 밑줄 하나(사진은 움직이지 않는다).
+// 사진이 칸 역할, 아래에 번호·이름·화살표와 한 줄 설명.
+// 마우스를 올리면 사진이 칸 안에서 아주 조금 커지고, 화살표가 오른쪽으로 밀린다.
 .tile {
   display: flex;
   flex-direction: column;
@@ -39,8 +40,12 @@
   &:hover {
     color: var(--ant-color-text);
 
-    .label {
-      text-decoration-color: currentcolor;
+    .image {
+      transform: scale(1.03);
+    }
+
+    .arrow {
+      transform: translateX(var(--ant-margin-xxs));
     }
   }
 
@@ -50,27 +55,54 @@
   }
 }
 
-.image {
+// 사진 칸 비율 4:5 세로(변수로 두면 Sass가 나눗셈으로 계산해 경고가 난다). 커지는 사진이 칸을 넘지 않게 자른다.
+.frame {
   display: block;
-  width: 100%;
-  height: auto;
-  margin-bottom: var(--ant-margin-xs);
-  // 사진 칸 비율 4:3(변수로 두면 Sass가 나눗셈으로 계산해 경고가 난다)
-  aspect-ratio: 4 / 3;
-  object-fit: cover;
+  margin-bottom: var(--ant-margin-sm);
+  overflow: hidden;
+  aspect-ratio: 4 / 5;
   background: var(--ant-color-fill-tertiary);
   border-radius: var(--ant-border-radius-lg);
 }
 
+.image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform var(--ant-motion-duration-slow) var(--ant-motion-ease-out);
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
+}
+
+// 번호 · 이름 ……… 화살표. 위에 얇은 선 한 줄.
+.labelRow {
+  display: flex;
+  align-items: baseline;
+  gap: var(--ant-margin-sm);
+  padding-top: var(--ant-padding-sm);
+  border-top: 1px solid var(--ant-color-text);
+}
+
+.index {
+  font-size: var(--ant-font-size-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--ant-color-text-secondary);
+}
+
 .label {
+  flex: 1;
   font-family: $font-display;
   font-size: var(--ant-font-size-heading-3);
   font-weight: 400;
   letter-spacing: $display-tracking;
-  text-decoration: underline;
-  text-decoration-color: transparent;
-  text-underline-offset: 0.2em;
-  transition: text-decoration-color var(--ant-motion-duration-fast);
+}
+
+.arrow {
+  align-self: center;
+  transition: transform var(--ant-motion-duration-mid) var(--ant-motion-ease-out);
 }
 
 .description {
