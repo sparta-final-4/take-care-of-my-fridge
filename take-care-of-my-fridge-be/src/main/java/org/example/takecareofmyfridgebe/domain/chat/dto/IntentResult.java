@@ -171,6 +171,38 @@ public record IntentResult(
                 fridgeScope);
     }
 
+    // 서버가 맛 단어로 바로잡은 원하는 맛·피할 맛
+    public IntentResult withTastes(List<String> wanted, List<String> avoid) {
+        return new IntentResult(intent, wanted, moodCategories, maxMinutes, includeIngredients, excludeIngredients,
+                useSelectedOnly, keywords, dishText, preferenceText, targetIndex, targetName, removed, avoid, detailQuestion,
+                fridgeScope);
+    }
+
+    // 서버가 이름만 말한 말로 채운 추천 (재료 이름·요리 이름 키워드)
+    public IntentResult withNamed(List<String> includes, List<String> namedKeywords) {
+        return new IntentResult(ChatIntent.RECOMMEND, wantedTastes, moodCategories, maxMinutes, includes, excludeIngredients,
+                useSelectedOnly, namedKeywords, dishText, preferenceText, targetIndex, targetName, removed, avoidTastes,
+                detailQuestion, fridgeScope);
+    }
+
+    /**
+     * 요리 이름은 서버가 정한다: 첫 키워드가 메시지에 그대로 있으면 그 이름, 아니면 없음 (공백 빼고 비교).
+     * 예) "김피탕 같은 요리 추천해줘"(첫 키워드 김피탕) → 김피탕, "차가운 요리 추천해줘"(첫 키워드 샐러드) → 없음
+     */
+    public IntentResult withDishFromKeywords(String message) {
+        String dish = null;
+        if (message != null && keywords != null && !keywords.isEmpty()) {
+            String first = keywords.get(0);
+            String compactFirst = first.replaceAll("\\s+", "");
+            if (!compactFirst.isEmpty() && message.replaceAll("\\s+", "").contains(compactFirst)) {
+                dish = first;
+            }
+        }
+        return new IntentResult(intent, wantedTastes, moodCategories, maxMinutes, includeIngredients, excludeIngredients,
+                useSelectedOnly, keywords, dish, preferenceText, targetIndex, targetName, removed, avoidTastes, detailQuestion,
+                fridgeScope);
+    }
+
     // 냉장고 보기 범위. sanitize한 뒤에 쓴다 (없거나 모르는 값이면 ALL)
     public FridgeScope scope() {
         return fridgeScope == null || !SCOPE_NAMES.contains(fridgeScope) ? FridgeScope.ALL : FridgeScope.valueOf(fridgeScope);

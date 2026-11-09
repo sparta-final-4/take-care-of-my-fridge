@@ -125,4 +125,26 @@ class IntentResultTest {
         assertThat(unknown.question()).isNull();
         assertThat(IntentResult.general().question()).isNull();
     }
+
+    @Test
+    @DisplayName("서버가 맛·이름·요리 이름을 바꿔도 냉장고 보기 범위를 버리지 않는다")
+    void keepsFridgeScope_whenServerChangesFields() {
+        IntentResult result = new IntentResult(ChatIntent.RECOMMEND, List.of("SPICY"), List.of(), 0, List.of(), List.of(), false,
+                List.of("김치찌개"), null, null, 0, null, List.of(), List.of(), null, "IMMINENT");
+
+        assertThat(result.withTastes(List.of(), List.of("SPICY")).fridgeScope()).isEqualTo("IMMINENT");
+        assertThat(result.withNamed(List.of("두부"), List.of()).fridgeScope()).isEqualTo("IMMINENT");
+        assertThat(result.withDishFromKeywords("김치찌개 먹고 싶어").fridgeScope()).isEqualTo("IMMINENT");
+    }
+
+    @Test
+    @DisplayName("요리 이름은 첫 키워드가 메시지에 띄어쓰기와 상관없이 그대로 있을 때만 그 이름이다")
+    void picksDish_whenFirstKeywordInMessage() {
+        IntentResult result = new IntentResult(ChatIntent.RECOMMEND, null, null, null, null, null, null,
+                List.of("장어 조림", "장어구이"), "엉뚱한 이름", null);
+
+        assertThat(result.withDishFromKeywords("장어조림 먹고 싶어").dishText()).isEqualTo("장어 조림");
+        assertThat(result.withDishFromKeywords("장어 요리 추천해줘").dishText()).isNull();
+        assertThat(IntentResult.general().withDishFromKeywords("뭐 먹지?").dishText()).isNull();
+    }
 }

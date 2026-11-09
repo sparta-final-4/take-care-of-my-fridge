@@ -16,11 +16,12 @@ class FridgeShopWordCheckerTest {
     // config/chat-words.yml의 app.chat.fridge-shop-words와 같은 값
     static final ChatFridgeShopWordProperties WORDS = new ChatFridgeShopWordProperties(
             List.of("남았", "아직있", "냉장고에뭐", "냉장고에있", "냉장고에서", "버려야", "유통기한지난", "소비기한지난"),
-            List.of("버려야", "지난", "임박", "유통기한", "소비기한"),
+            List.of("버려야", "지난", "임박", "유통기한", "소비기한", "상한", "상할", "상했", "오래된", "오래됐", "처리해야"),
             List.of("기본양념", "조미료"),
             List.of("사고싶", "어디서사", "장바구니", "담아", "주문해"),
             List.of("세일", "할인", "특가", "번개"),
-            List.of("추천", "만들", "해먹", "요리", "레시피", "뭐먹", "먹지", "먹을까"));
+            List.of("추천", "만들", "해먹", "요리", "레시피", "뭐먹", "먹지", "먹을까"),
+            List.of("어떻게", "방법", "보관", "해동", "먹어도돼", "괜찮", "왜", "언제와", "언제도착", "배송"));
 
     private static Optional<ChatIntent> check(String message) {
         return FridgeShopWordChecker.check(message, WORDS, AskWordCheckerTest.WORDS);
