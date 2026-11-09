@@ -1,5 +1,3 @@
-@use 'variables' as *;
-
 // antd v6의 CSS 변수(--ant-*)는 :root가 아니라 ConfigProvider 범위에만 생긴다.
 // body에서는 쓸 수 없으므로 폰트·글자색은 AntdApp, 배경은 Layout이 적용한다.
 *,
@@ -20,10 +18,4 @@ body {
   overflow-x: clip;
   min-width: 320px;
   -webkit-font-smoothing: antialiased;
-
-  // 마우스를 쓰는 PC: 창을 줄여도 PC 화면 폭을 지키고, 모자라는 만큼 가로 스크롤한다.
-  @media #{$desktop-pointer} {
-    min-width: $desktop-min-width;
-    overflow-x: visible;
-  }
 }

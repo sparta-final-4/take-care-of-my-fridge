@@ -1,20 +1,12 @@
 @use 'sass:map';
 @use 'variables' as *;
 
-// 모바일 우선: 기본 스타일은 모바일, 큰 화면만 from(bp)로 덮어쓴다.
-// 마우스를 쓰는 PC는 창 폭과 관계없이 PC 화면($desktop-min-width)까지의 분기를 늘 켠다(창을 줄여도 UI·글자가 그대로).
-// 그보다 큰 분기(xxl)는 PC에서도 실제 창 폭으로 정한다.
+// 모바일 우선: 기본 스타일은 모바일, 큰 화면만 from(bp)로 덮어쓴다. 기기와 관계없이 화면(창) 폭으로 정한다.
 @mixin from($bp) {
   $min: map.get($breakpoints, $bp);
 
-  @if $min <= $desktop-min-width {
-    @media (min-width: $min), #{$desktop-pointer} {
-      @content;
-    }
-  } @else {
-    @media (min-width: $min) {
-      @content;
-    }
+  @media (min-width: $min) {
+    @content;
   }
 }
 

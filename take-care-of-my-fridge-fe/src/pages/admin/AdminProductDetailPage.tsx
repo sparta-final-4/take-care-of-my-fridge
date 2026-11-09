@@ -32,7 +32,6 @@ const SALES_OPTIONS = [
 ];
 
 function AdminProductDetail({ productId }: { productId: number }) {
-  // 휴대폰은 폭에 따라 바뀌고, 마우스를 쓰는 PC는 창을 줄여도 넓은 배치 그대로(useScreens).
   const screens = useScreens();
   const { message } = App.useApp();
   const navigate = useNavigate();

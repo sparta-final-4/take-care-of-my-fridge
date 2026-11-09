@@ -40,7 +40,6 @@ function toWeekStart(value: string | null) {
 }
 
 export default function AdminForecastPage() {
-  // 휴대폰은 폭에 따라 바뀌고, 마우스를 쓰는 PC는 창을 줄여도 넓은 배치 그대로(useScreens).
   // 요약 숫자 한 줄 수: 휴대폰 2 / md 3 / lg 6.
   const screens = useScreens();
   const statSpan = screens.lg ? 4 : screens.md ? 8 : 12;

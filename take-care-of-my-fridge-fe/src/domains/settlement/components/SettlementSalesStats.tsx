@@ -22,7 +22,6 @@ interface SettlementSalesStatsProps {
 
 // 다섯 칸을 모바일 2열, 태블릿 3열, 데스크톱 한 줄로 놓는다
 export function SettlementSalesStats({ sales, bordered }: SettlementSalesStatsProps) {
-  // 휴대폰은 폭에 따라 바뀌고, 마우스를 쓰는 PC는 창을 줄여도 넓은 배치 그대로(useScreens).
   // 한 줄 카드 수: 휴대폰 2 / md 3 / xl 5.
   const screens = useScreens();
   const statColProps = screens.xl ? { flex: '20%' } : { span: screens.md ? 8 : 12 };

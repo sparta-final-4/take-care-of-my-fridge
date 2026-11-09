@@ -111,7 +111,6 @@ interface SummaryCompareProps {
 
 // 펼친 행: 이전 요약과 새 요약을 나란히 보여준다(모바일은 위아래)
 function SummaryCompare({ item }: SummaryCompareProps) {
-  // 휴대폰은 폭에 따라 바뀌고, 마우스를 쓰는 PC는 창을 줄여도 넓은 배치 그대로(useScreens).
   const screens = useScreens();
   const { token } = theme.useToken();
   return (
@@ -133,7 +132,6 @@ function SummaryCompare({ item }: SummaryCompareProps) {
 }
 
 export default function AdminReviewSummaryPage() {
-  // 휴대폰은 폭에 따라 바뀌고, 마우스를 쓰는 PC는 창을 줄여도 넓은 배치 그대로(useScreens).
   const screens = useScreens();
   const { token } = theme.useToken();
   const { mutate, data: result, isPending } = useMutation({ mutationFn: runReviewSummary });
