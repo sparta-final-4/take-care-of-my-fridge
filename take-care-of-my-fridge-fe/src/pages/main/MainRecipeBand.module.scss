@@ -19,8 +19,11 @@
   gap: var(--ant-margin-lg);
 }
 
-// 제목은 왼쪽, 더 보기는 오른쪽 끝(레퍼런스 상품 줄 머리와 같은 구성)
+// 제목은 왼쪽, 더 보기는 오른쪽 끝(레퍼런스 상품 줄 머리와 같은 구성).
+// 위에 잉크색 선 한 줄(오늘의 밀키트·지금 뜨는 할인 머리와 같은 SectionCard 모양).
 .head {
+  padding-top: var(--ant-padding-sm);
+  border-top: 1px solid var(--ant-color-text);
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
