@@ -42,6 +42,7 @@ export function SiteFooter() {
                   {photo.author}
                 </a>
                 , {photo.license}
+                {'modification' in photo && ` (${photo.modification})`}
               </li>
             ))}
           </ul>

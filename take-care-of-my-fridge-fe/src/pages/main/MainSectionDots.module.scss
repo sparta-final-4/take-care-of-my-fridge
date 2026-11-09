@@ -1,0 +1,66 @@
+@use '@/styles/variables' as *;
+@use '@/styles/mixins' as *;
+
+// 오른쪽 끝 세로 가운데에 고정. 점 색은 글자색(currentcolor)을 따르고, 어두운 띠 위에서는 종이색으로 바꾼다.
+// 헤더(10)보다 아래, 본문보다 위.
+.dots {
+  display: none;
+
+  @include from(lg) {
+    position: fixed;
+    top: 50%;
+    right: $main-section-dots-offset;
+    z-index: $main-section-dots-z-index;
+    display: flex;
+    flex-direction: column;
+    gap: var(--ant-margin-xxs);
+    color: var(--ant-color-text);
+    transform: translateY(-50%);
+    transition: color var(--ant-motion-duration-mid);
+  }
+}
+
+.onDark {
+  color: var(--ant-color-bg-layout);
+}
+
+// 누르는 칸은 점보다 넓게, 점은 가운데 작은 원
+.dot {
+  display: grid;
+  place-items: center;
+  width: $main-section-dot-hit-size;
+  height: $main-section-dot-hit-size;
+  padding: 0;
+  // 버튼은 브라우저 기본 글자색을 따로 가지므로, 점 색(currentcolor)을 위 nav에서 받게 한다.
+  color: inherit;
+  cursor: pointer;
+  background: none;
+  border: 0;
+
+  &::before {
+    content: '';
+    width: $main-section-dot-size;
+    height: $main-section-dot-size;
+    background: currentcolor;
+    border-radius: 50%;
+    opacity: 0.4;
+    transition:
+      opacity var(--ant-motion-duration-mid),
+      transform var(--ant-motion-duration-mid) var(--ant-motion-ease-out);
+  }
+
+  &:hover::before {
+    opacity: 0.8;
+  }
+
+  &:focus-visible {
+    outline: 2px solid currentcolor;
+    outline-offset: -2px;
+    border-radius: 50%;
+  }
+}
+
+.active::before {
+  opacity: 1;
+  transform: scale(1.5);
+}

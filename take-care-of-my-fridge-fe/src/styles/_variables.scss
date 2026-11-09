@@ -39,21 +39,37 @@ $display-tracking: 0;
 // 메인 화면 섹션 사이 간격(모바일 / md 이상). 섹션을 상자로 나누지 않으므로 여백이 구분 역할을 한다.
 $main-section-gap: 64px;
 $main-section-gap-md: 112px;
-// 메인 첫 화면(사진 위 글). 1280x800에서 헤더·인기 검색어와 함께 제목·설명·버튼이 스크롤 없이 보이는 높이
-$main-hero-min-height: 560px;
-$main-hero-min-height-sm: 440px;
-// 메인 띠(색이 바뀌는 구역)의 위아래 안쪽 여백(lg 이상). 띠마다 같은 간격이 반복되지 않게 세 단계로 나눈다.
-// 좁게: 첫 화면 바로 아래, 기본: 대부분의 띠, 넓게: 어두운 AI 상담 띠(색이 바뀌는 곳은 숨을 더 준다)
+// 메인 첫 화면·AI 상담 띠는 한 화면(뷰포트 높이)을 꽉 채운다. 창이 아주 낮아도 글이 잘리지 않는 최소 높이
+$main-fullscreen-min-height: 560px;
+// 메인 띠(색이 바뀌는 구역)의 위아래 안쪽 여백(lg 이상). 띠마다 같은 간격이 반복되지 않게 두 단계로 나눈다.
+// 좁게: 첫 화면 바로 아래, 기본: 대부분의 띠
 $main-band-padding-lg-tight: 64px;
 $main-band-padding-lg: 96px;
-$main-band-padding-lg-wide: 128px;
 // 띠가 화면에 들어올 때 떠오르는 거리
 $reveal-offset: 16px;
-$main-hero-text-max-width: 560px;
-$main-hero-text-padding-lg: 64px;
+$main-hero-text-max-width: 640px;
 $main-hero-title-size: 56px;
-// AI 상담 띠의 세로 사진이 한 화면을 넘지 않게
-$main-consult-image-max-height: 560px;
+$main-hero-title-size-xl: 72px;
+// 첫 화면 글 아래 여백(모바일 / lg 이상)
+$main-hero-bottom-padding-sm: 48px;
+$main-hero-bottom-padding: 80px;
+// 첫 화면 사진이 처음에 천천히 물러나는 시간
+$main-hero-settle-duration: 2.4s;
+// 첫 화면 오른쪽 아래 스크롤 표시의 세로 선 길이
+$main-scroll-cue-line: 72px;
+// AI 상담 띠: 휴대폰 사진 높이, lg 이상 사진 최대 높이(화면 높이 기준), 제목 크기
+$main-consult-photo-height-sm: 44svh;
+$main-consult-photo-max-height: 76svh;
+// PC에서 사진을 본문 왼쪽 끝 밖으로 내미는 최대 거리
+$main-consult-photo-shift: 64px;
+$main-consult-title-size: 48px;
+// 메인 화면 오른쪽 띠 위치 점: 화면 끝에서 거리, 점 크기, 누르는 칸 크기, 쌓임 순서(헤더 10보다 아래)
+$main-section-dots-offset: 20px;
+$main-section-dot-size: 6px;
+$main-section-dot-hit-size: 24px;
+$main-section-dots-z-index: 5;
+// 띠 제목 위 작은 영문 머리글 자간
+$eyebrow-tracking: 0.24em;
 
 // 메인 화면 인기 레시피 썸네일, 순위 칸
 $popular-recipe-thumb-size: 64px;

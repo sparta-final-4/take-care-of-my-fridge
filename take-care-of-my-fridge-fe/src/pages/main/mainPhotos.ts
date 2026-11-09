@@ -16,6 +16,8 @@ export interface MainPhoto {
   author: string;
   license: string;
   page: string;
+  // 원본을 고쳐 쓴 경우 출처 줄에 함께 표시한다(CC BY-SA는 변경 사항 표시가 조건).
+  modification?: string;
 }
 
 // 바로가기 3칸: 모바일은 화면 폭, md 이상은 본문(1200px)의 1/3
@@ -67,16 +69,18 @@ export const MAIN_PHOTOS = {
     page: 'https://unsplash.com/photos/D4ZtZX1UeAI',
   },
   consult: {
-    src: '/photos/main/story-night-fridge-960.jpg',
+    // 원본 사진에서 냉장고만 오려 낸(배경 투명) WebP. 잉크색 띠 위에 바로 얹는다.
+    src: '/photos/main/story-night-fridge-cutout-898.webp',
     srcSet:
-      '/photos/main/story-night-fridge-500.jpg 500w, /photos/main/story-night-fridge-960.jpg 960w',
-    // lg 이상은 본문의 5/12 칸(약 420px), 그보다 좁으면 화면 폭
-    sizes: '(min-width: 992px) 420px, 100vw',
-    width: 960,
-    height: 1274,
-    alt: '어두운 부엌에서 불이 켜진 채 열려 있는 냉장고',
+      '/photos/main/story-night-fridge-cutout-500.webp 500w, /photos/main/story-night-fridge-cutout-898.webp 898w',
+    // lg 이상은 본문의 절반 칸(약 560px), 그보다 좁으면 화면 폭
+    sizes: '(min-width: 992px) 560px, 100vw',
+    width: 898,
+    height: 1185,
+    alt: '불이 켜진 채 열려 있는 냉장고',
     author: 'W.carter',
     license: 'CC BY-SA 4.0',
     page: 'https://commons.wikimedia.org/wiki/File:Open_refrigerator_with_food_at_night.jpg',
+    modification: '배경 제거',
   },
 } satisfies Record<string, MainPhoto>;

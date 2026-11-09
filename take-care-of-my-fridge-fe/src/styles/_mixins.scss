@@ -56,6 +56,15 @@
   overflow-wrap: break-word;
 }
 
+// 메인 띠 제목 위의 작은 영문 머리글. 넓은 자간의 대문자, 색은 감싼 띠의 글자색을 따른다.
+@mixin eyebrow {
+  font-size: var(--ant-font-size-sm);
+  font-weight: var(--ant-font-weight-strong);
+  line-height: 1;
+  letter-spacing: $eyebrow-tracking;
+  text-transform: uppercase;
+}
+
 // 메인 띠가 스크롤로 화면에 들어올 때 아래에서 살짝 떠오르며 나타난다(페이지 전체에 이 한 가지만 쓴다).
 // 스크롤 연동 애니메이션을 지원하는 브라우저에서만 움직이고, 지원하지 않거나 움직임 줄이기 설정이면
 // 처음부터 그대로 보인다(스크립트 없이 CSS만 쓰므로 내용이 숨겨진 채 남는 일이 없다).

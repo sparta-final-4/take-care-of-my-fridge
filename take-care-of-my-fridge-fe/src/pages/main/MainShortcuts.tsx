@@ -1,3 +1,4 @@
+import { ArrowRightOutlined } from '@ant-design/icons';
 import { Link } from 'react-router';
 
 import { ROUTES } from '@/app/paths';
@@ -5,7 +6,7 @@ import { ROUTES } from '@/app/paths';
 import { MAIN_PHOTOS, type MainPhoto } from './mainPhotos';
 import styles from './MainShortcuts.module.scss';
 
-// 서비스의 핵심 세 가지. 메인에서는 사진과 한 줄 설명만 보여 주고, 누르면 그 화면으로 들어간다.
+// 서비스의 핵심 세 가지. 메인에서는 번호·사진·한 줄 설명만 보여 주고, 누르면 그 화면으로 들어간다.
 const SHORTCUTS: { label: string; description: string; to: string; photo: MainPhoto }[] = [
   {
     label: '내 냉장고',
@@ -31,20 +32,28 @@ export function MainShortcuts() {
   return (
     <nav aria-label="바로가기" className={styles.band}>
       <ul className={styles.list}>
-        {SHORTCUTS.map((item) => (
+        {SHORTCUTS.map((item, index) => (
           <li key={item.to}>
             <Link to={item.to} className={styles.tile}>
-              <img
-                src={item.photo.src}
-                srcSet={item.photo.srcSet}
-                sizes={item.photo.sizes}
-                width={item.photo.width}
-                height={item.photo.height}
-                alt={item.photo.alt}
-                loading="lazy"
-                className={styles.image}
-              />
-              <span className={styles.label}>{item.label}</span>
+              <span className={styles.frame}>
+                <img
+                  src={item.photo.src}
+                  srcSet={item.photo.srcSet}
+                  sizes={item.photo.sizes}
+                  width={item.photo.width}
+                  height={item.photo.height}
+                  alt={item.photo.alt}
+                  loading="lazy"
+                  className={styles.image}
+                />
+              </span>
+              <span className={styles.labelRow}>
+                <span className={styles.index} aria-hidden>
+                  {String(index + 1).padStart(2, '0')}
+                </span>
+                <span className={styles.label}>{item.label}</span>
+                <ArrowRightOutlined aria-hidden className={styles.arrow} />
+              </span>
               <span className={styles.description}>{item.description}</span>
             </Link>
           </li>
