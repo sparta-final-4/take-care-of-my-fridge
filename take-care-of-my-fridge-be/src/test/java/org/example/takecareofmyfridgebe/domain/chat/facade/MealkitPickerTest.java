@@ -22,6 +22,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -37,6 +38,7 @@ class MealkitPickerTest {
     private final Map<Long, SellingPrice> prices = new HashMap<>();
     private final Map<Long, RecipeCandidate> recipes = new HashMap<>();
     private final Map<Long, Set<Taste>> tastes = new HashMap<>();
+    private final Set<Long> maybeSpicy = new HashSet<>();
 
     @Test
     @DisplayName("요청 분류(국)에 맞는 레시피와 연결된 밀키트를 먼저 고르고, 레시피 연결이 없는 밀키트는 맨 뒤에 둔다")
@@ -83,6 +85,43 @@ class MealkitPickerTest {
                 .extracting(p -> p.mealkit().getProduct().getId(), Picked::requestMatches)
                 .contains(tuple(41L, 1), tuple(42L, 1), tuple(40L, 0))
                 .last().isEqualTo(tuple(40L, 0));
+    }
+
+    @Test
+    @DisplayName("\"매운 거 말고\"면 맛 데이터에 매운맛이 없어도 연결 레시피가 매울 수 있음(MILD·HOT)인 밀키트를 빼고, 연결 레시피가 없는 밀키트는 남긴다")
+    void skipsMaybeSpicyRecipeMealkit_whenAvoidingSpicy() {
+        mealkit(27L, "부추 콩가루 찜 밀키트", 9000, recipe(539L, "부추 콩가루 찜", "찜", 3));
+        tastes.put(539L, Set.of(Taste.MILD));
+        maybeSpicy.add(539L);
+        mealkit(30L, "고추잡채 밀키트", 9000, recipe(59L, "고추잡채", "볶음", 3));
+        tastes.put(59L, Set.of(Taste.SALTY));
+        maybeSpicy.add(59L);
+        mealkit(24L, "된장국 밀키트", 9000, recipe(544L, "된장국", "국", 0));
+        tastes.put(544L, Set.of(Taste.UMAMI));
+        mealkit(13L, "나베", 9000, null);
+
+        RecipeQuery avoidSpicy = query(List.of(), List.of()).withAvoidTastes(List.of(Taste.SPICY));
+        List<Picked> picked = MealkitPicker.pick(input(avoidSpicy, Set.of(), Set.of(), Set.of()), 3);
+
+        assertThat(picked).extracting(p -> p.mealkit().getProduct().getId()).containsExactly(24L, 13L);
+    }
+
+    @Test
+    @DisplayName("\"매운 걸로\"면 맛에 매운맛이 있는(HOT) 레시피 밀키트만 원하는 맛과 맞은 것으로 세고, 매울 수 있음(MILD)은 세지 않는다")
+    void countsOnlyHotAsWantedSpicy() {
+        mealkit(27L, "부추 콩가루 찜 밀키트", 9000, recipe(539L, "부추 콩가루 찜", "찜", 0));
+        tastes.put(539L, Set.of(Taste.MILD, Taste.SPICY));
+        maybeSpicy.add(539L);
+        mealkit(30L, "고추잡채 밀키트", 9000, recipe(59L, "고추잡채", "볶음", 0));
+        tastes.put(59L, Set.of(Taste.SALTY));
+        maybeSpicy.add(59L);
+
+        RecipeQuery wantSpicy = new RecipeQuery(MEMBER_ID, List.of(), List.of(Taste.SPICY), List.of(), null, List.of(),
+                false, List.of(), null);
+        List<Picked> picked = MealkitPicker.pick(input(wantSpicy, Set.of(), Set.of(), Set.of()), 3);
+
+        assertThat(picked).extracting(p -> p.mealkit().getProduct().getId(), Picked::requestMatches)
+                .containsExactly(tuple(27L, 1), tuple(30L, 0));
     }
 
     @Test
@@ -146,7 +185,7 @@ class MealkitPickerTest {
     }
 
     private Input input(RecipeQuery query, Set<Long> cardRecipeIds, Set<String> fridgeNames, Set<Long> shown) {
-        return new Input(mealkits, prices, recipes, tastes, query, cardRecipeIds, fridgeNames, shown);
+        return new Input(mealkits, prices, recipes, tastes, maybeSpicy, query, cardRecipeIds, fridgeNames, shown);
     }
 
     private static RecipeQuery query(List<String> categories, List<String> keywords) {

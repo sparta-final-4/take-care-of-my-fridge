@@ -159,7 +159,8 @@ public class ChatRecommendationFacade {
         MealkitRecipes recipes = recipeCandidateFacade.describeMealkitRecipes(query.memberId(), recipeIds);
         Map<Long, SellingPrice> prices = saleEventReader.findSellingPrices(
                 mealkits.stream().map(MealkitProduct::getProduct).toList());
-        return MealkitPicker.pick(new MealkitPicker.Input(mealkits, prices, recipes.recipes(), recipes.recipeTastes(), query,
+        return MealkitPicker.pick(new MealkitPicker.Input(mealkits, prices, recipes.recipes(), recipes.recipeTastes(),
+                recipes.maybeSpicyRecipeIds(), query,
                 cardRecipeIds, recipes.fridgeMealkitNames(), shown), limit);
     }
 

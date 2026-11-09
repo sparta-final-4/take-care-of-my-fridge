@@ -25,6 +25,8 @@ import org.example.takecareofmyfridgebe.domain.recipe.service.RecipeService;
 import org.example.takecareofmyfridgebe.domain.search.config.RecipeSearchProperties;
 import org.example.takecareofmyfridgebe.domain.search.config.SearchEngine;
 import org.example.takecareofmyfridgebe.domain.search.dto.RecipeSearchResult;
+import org.example.takecareofmyfridgebe.domain.search.dto.RecipeSpicyLevel;
+import org.example.takecareofmyfridgebe.domain.search.dto.RecipeTasteLevel;
 import org.example.takecareofmyfridgebe.domain.search.service.RecipeCandidateSearchService;
 import org.example.takecareofmyfridgebe.domain.search.service.RecipeCandidateSearchService.CandidateHit;
 import org.example.takecareofmyfridgebe.domain.search.service.RecipeCandidateSearchService.Condition;
@@ -799,6 +801,127 @@ class RecipeCandidateFacadeTest {
         assertThat(result.candidates()).extracting(RecipeCandidate::recipeId).doesNotContain(10L).contains(30L);
     }
 
+    @Test
+    @DisplayName("ES 경로: \"매운 걸로\"면 검색 결과 매운 정도가 HOT인 레시피만 원하는 맛과 맞은 것으로 세고, 맛·재료 이름을 DB로 읽지 않는다")
+    void countsOnlyHotAsWantedSpicy_whenEsHitsHaveLevels() throws Exception {
+        when(candidateSearchService.search(any())).thenReturn(List.of(
+                hit(10L, Set.of(Taste.SALTY, Taste.SPICY), RecipeSpicyLevel.HOT, RecipeCandidateSearchService.MATCH_TASTE),
+                hit(20L, Set.of(Taste.SALTY), RecipeSpicyLevel.MILD, RecipeCandidateSearchService.MATCH_FRIDGE),
+                hit(30L, Set.of(Taste.SALTY), RecipeSpicyLevel.NONE, RecipeCandidateSearchService.MATCH_FRIDGE)));
+        givenEsRecipes(Map.of(
+                10L, new RecipeCandidateInfo(10L, "제육볶음", "볶음", 20, 1),
+                20L, new RecipeCandidateInfo(20L, "고추잡채", "볶음", 20, 1),
+                30L, new RecipeCandidateInfo(30L, "간장불고기", "볶음", 20, 1)));
+        RecipeQuery wantSpicy = new RecipeQuery(MEMBER_ID, List.of(), List.of(Taste.SPICY), null, null, null, false);
+
+        RecipeCandidates result = esFacade.findCandidates(wantSpicy);
+
+        assertThat(result.candidates().get(0).recipeId()).isEqualTo(10L);
+        assertThat(result.candidates()).filteredOn(candidate -> !candidate.reason().matchedWantedTastes().isEmpty())
+                .extracting(RecipeCandidate::recipeId).containsExactly(10L);
+        verify(recipeService, never()).findTastesByRecipeIds(any());
+        verify(recipeService, never()).findIngredientTexts(any());
+    }
+
+    @Test
+    @DisplayName("ES 경로: \"매운 거 말고\"면 검색 결과 매운 정도가 MILD·HOT인 레시피를 빼고, 맛·재료 이름을 DB로 읽지 않는다")
+    void dropsMildAndHot_whenAvoidingSpicyOnEsHits() throws Exception {
+        when(memberService.getMyInfo(MEMBER_ID)).thenReturn(mock(MyInfoResponse.class));
+        when(candidateSearchService.search(any())).thenReturn(List.of(
+                hit(10L, Set.of(Taste.SPICY), RecipeSpicyLevel.HOT, RecipeCandidateSearchService.MATCH_FRIDGE),
+                hit(20L, Set.of(Taste.SALTY), RecipeSpicyLevel.MILD, RecipeCandidateSearchService.MATCH_FRIDGE),
+                hit(30L, Set.of(Taste.SALTY), RecipeSpicyLevel.NONE, RecipeCandidateSearchService.MATCH_FRIDGE),
+                hit(40L, Set.of(Taste.SWEET), RecipeSpicyLevel.NONE, RecipeCandidateSearchService.MATCH_FRIDGE),
+                hit(50L, Set.of(), RecipeSpicyLevel.NONE, RecipeCandidateSearchService.MATCH_FRIDGE)));
+        givenEsRecipes(Map.of(
+                10L, new RecipeCandidateInfo(10L, "두부김치", "볶음", 20, 1),
+                20L, new RecipeCandidateInfo(20L, "두부조림", "조림", 20, 1),
+                30L, new RecipeCandidateInfo(30L, "두부부침", "전", 20, 1),
+                40L, new RecipeCandidateInfo(40L, "두부강정", "튀김", 20, 1),
+                50L, new RecipeCandidateInfo(50L, "두부국", "국", 20, 1)));
+
+        RecipeCandidates result = esFacade.findCandidates(RecipeQuery.of(MEMBER_ID, List.of()).withAvoidTastes(List.of(Taste.SPICY)));
+
+        assertThat(result.candidates()).extracting(RecipeCandidate::recipeId).containsExactlyInAnyOrder(30L, 40L, 50L);
+        verify(recipeService, never()).findTastesByRecipeIds(any());
+        verify(recipeService, never()).findIngredientTexts(any());
+    }
+
+    @Test
+    @DisplayName("ES 경로: 원하는 맛은 검색 결과의 맛으로 센다 (맛 데이터를 DB로 읽지 않는다)")
+    void matchesWantedTaste_fromEsHitTastes() throws Exception {
+        when(candidateSearchService.search(any())).thenReturn(List.of(
+                hit(10L, Set.of(Taste.SALTY), RecipeSpicyLevel.NONE, RecipeCandidateSearchService.MATCH_TASTE),
+                hit(20L, Set.of(Taste.SWEET), RecipeSpicyLevel.NONE, RecipeCandidateSearchService.MATCH_TASTE)));
+        givenEsRecipes(Map.of(
+                10L, new RecipeCandidateInfo(10L, "두부조림", "조림", 20, 1),
+                20L, new RecipeCandidateInfo(20L, "두부강정", "튀김", 20, 1)));
+        RecipeQuery wantSweet = new RecipeQuery(MEMBER_ID, List.of(), List.of(Taste.SWEET), null, null, null, false);
+
+        RecipeCandidates result = esFacade.findCandidates(wantSweet);
+
+        assertThat(result.candidates().get(0).recipeId()).isEqualTo(20L);
+        assertThat(result.candidates().get(0).reason().matchedWantedTastes()).containsExactly(Taste.SWEET);
+        verify(recipeService, never()).findTastesByRecipeIds(any());
+    }
+
+    @Test
+    @DisplayName("ES 경로: 벡터 보충 후보는 ES에서 id로 읽은 매운 정도로 거르고(MILD는 \"매운 거 말고\"에서 빠짐), 맛·재료 이름을 DB로 읽지 않는다")
+    void readsVectorSupplementLevels_fromEsByIds() throws Exception {
+        when(memberService.getMyInfo(MEMBER_ID)).thenReturn(mock(MyInfoResponse.class));
+        when(candidateSearchService.search(any())).thenReturn(List.of(
+                hit(10L, Set.of(), RecipeSpicyLevel.NONE, RecipeCandidateSearchService.MATCH_FRIDGE),
+                hit(20L, Set.of(), RecipeSpicyLevel.NONE, RecipeCandidateSearchService.MATCH_FRIDGE),
+                hit(30L, Set.of(), RecipeSpicyLevel.NONE, RecipeCandidateSearchService.MATCH_FRIDGE)));
+        when(recipeSearchService.search(any(RecipeListRequest.class))).thenReturn(new RecipeSearchResult(List.of(80L, 81L), 2, true));
+        when(candidateSearchService.findTasteLevels(any())).thenReturn(Map.of(
+                80L, new RecipeTasteLevel(Set.of(Taste.SALTY), RecipeSpicyLevel.MILD),
+                81L, new RecipeTasteLevel(Set.of(Taste.SWEET), RecipeSpicyLevel.NONE)));
+        givenEsRecipes(Map.of(
+                10L, new RecipeCandidateInfo(10L, "두부부침", "전", 20, 1),
+                20L, new RecipeCandidateInfo(20L, "두부조림", "조림", 20, 1),
+                30L, new RecipeCandidateInfo(30L, "두부국", "국", 20, 1),
+                80L, new RecipeCandidateInfo(80L, "고추잡채", "볶음", 20, 1),
+                81L, new RecipeCandidateInfo(81L, "탕수육", "튀김", 20, 1)));
+        RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, null, null, null, false, List.of("탕짜면"), null)
+                .withAvoidTastes(List.of(Taste.SPICY));
+
+        RecipeCandidates result = esFacade.findCandidates(query);
+
+        assertThat(result.candidates()).extracting(RecipeCandidate::recipeId).contains(81L).doesNotContain(80L);
+        verify(candidateSearchService).findTasteLevels(List.of(80L, 81L));
+        verify(recipeService, never()).findTastesByRecipeIds(any());
+        verify(recipeService, never()).findIngredientTexts(any());
+    }
+
+    @Test
+    @DisplayName("ES 경로: 벡터 보충 후보의 ES id 조회가 실패하면 그 레시피만 DB 맛 데이터·재료 이름으로 계산해 매운 레시피를 뺀다")
+    void computesVectorSupplementFromDb_whenEsLevelLookupFails() throws Exception {
+        when(memberService.getMyInfo(MEMBER_ID)).thenReturn(mock(MyInfoResponse.class));
+        when(candidateSearchService.search(any())).thenReturn(List.of(
+                hit(10L, Set.of(), RecipeSpicyLevel.NONE, RecipeCandidateSearchService.MATCH_FRIDGE),
+                hit(20L, Set.of(), RecipeSpicyLevel.NONE, RecipeCandidateSearchService.MATCH_FRIDGE),
+                hit(30L, Set.of(), RecipeSpicyLevel.NONE, RecipeCandidateSearchService.MATCH_FRIDGE)));
+        when(recipeSearchService.search(any(RecipeListRequest.class))).thenReturn(new RecipeSearchResult(List.of(80L, 81L), 2, true));
+        when(candidateSearchService.findTasteLevels(any())).thenThrow(new IOException("es down"));
+        givenEsRecipes(Map.of(
+                10L, new RecipeCandidateInfo(10L, "두부부침", "전", 20, 1),
+                20L, new RecipeCandidateInfo(20L, "두부조림", "조림", 20, 1),
+                30L, new RecipeCandidateInfo(30L, "두부국", "국", 20, 1),
+                80L, new RecipeCandidateInfo(80L, "고추잡채", "볶음", 20, 1),
+                81L, new RecipeCandidateInfo(81L, "탕수육", "튀김", 20, 1)));
+        when(recipeService.findTastesByRecipeIds(any())).thenReturn(Map.of(80L, Set.of(Taste.SALTY), 81L, Set.of(Taste.SWEET)));
+        when(recipeService.findIngredientTexts(any())).thenReturn(Map.of(80L, List.of("돼지고기", "고추"), 81L, List.of("돼지고기")));
+        RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, null, null, null, false, List.of("탕짜면"), null)
+                .withAvoidTastes(List.of(Taste.SPICY));
+
+        RecipeCandidates result = esFacade.findCandidates(query);
+
+        assertThat(result.candidates()).extracting(RecipeCandidate::recipeId).contains(81L).doesNotContain(80L);
+        verify(recipeService).findTastesByRecipeIds(List.of(80L, 81L));
+        verify(recipeService).findIngredientTexts(List.of(80L, 81L));
+    }
+
     private void givenEsRecipes(Map<Long, RecipeCandidateInfo> infos) {
         when(recipeService.findCandidateInfos(any())).thenAnswer(invocation -> filter(infos, invocation.getArgument(0)));
         when(recipeService.findNonBasicIngredients(any())).thenAnswer(invocation -> {
@@ -811,6 +934,10 @@ class RecipeCandidateFacadeTest {
 
     private static CandidateHit hit(Long recipeId, String... matched) {
         return new CandidateHit(recipeId, 1.0, Set.of(matched));
+    }
+
+    private static CandidateHit hit(Long recipeId, Set<Taste> tastes, RecipeSpicyLevel spicyLevel, String... matched) {
+        return new CandidateHit(recipeId, 1.0, Set.of(matched), tastes, spicyLevel);
     }
 
     private static Ingredient ingredient(Long id, String name, boolean basicSeasoning) {
@@ -884,6 +1011,48 @@ class RecipeCandidateFacadeTest {
         assertThat(noRecipe.fridgeMealkitNames()).containsExactly("황태해장국");
         verify(recipeService, times(1)).findCandidateInfos(any());
         verify(fridgeService, times(2)).getItems(any(), any());
+    }
+
+    @Test
+    @DisplayName("밀키트 연결 레시피의 맛·매운 정도는 ES에서 id로 한 번에 읽어, 맛 데이터에 매운맛이 없어도 MILD·HOT이면 매울 수 있는 레시피로 돌려주고 DB 맛·재료 이름은 읽지 않는다")
+    void readsMealkitRecipeLevels_fromEsByIds() throws Exception {
+        when(memberService.getMyInfo(MEMBER_ID)).thenReturn(mock(MyInfoResponse.class));
+        when(recipeService.findCandidateInfos(List.of(539L, 59L, 544L))).thenReturn(Map.of(
+                539L, new RecipeCandidateInfo(539L, "부추 콩가루 찜", "찜", 20, 2),
+                59L, new RecipeCandidateInfo(59L, "고추잡채", "볶음", 20, 2),
+                544L, new RecipeCandidateInfo(544L, "된장국", "국", 20, 2)));
+        when(candidateSearchService.findTasteLevels(List.of(539L, 59L, 544L))).thenReturn(Map.of(
+                539L, new RecipeTasteLevel(Set.of(Taste.MILD, Taste.SPICY), RecipeSpicyLevel.HOT),
+                59L, new RecipeTasteLevel(Set.of(Taste.SALTY), RecipeSpicyLevel.MILD),
+                544L, new RecipeTasteLevel(Set.of(Taste.UMAMI), RecipeSpicyLevel.NONE)));
+
+        RecipeCandidateFacade.MealkitRecipes found = esFacade.describeMealkitRecipes(MEMBER_ID, List.of(539L, 59L, 544L));
+
+        assertThat(found.maybeSpicyRecipeIds()).containsExactlyInAnyOrder(539L, 59L);
+        assertThat(found.recipeTastes()).containsEntry(539L, Set.of(Taste.MILD, Taste.SPICY))
+                .containsEntry(59L, Set.of(Taste.SALTY));
+        verify(recipeService, never()).findTastesByRecipeIds(any());
+        verify(recipeService, never()).findIngredientTexts(any());
+    }
+
+    @Test
+    @DisplayName("밀키트 연결 레시피의 ES 조회가 실패하면 DB 맛 데이터·재료 이름으로 매운 정도를 계산한다 (정확한 이름 고추는 매울 수 있음, 고춧가루는 확실히 매움)")
+    void computesMealkitRecipeLevelsFromDb_whenEsLookupFails() throws Exception {
+        when(memberService.getMyInfo(MEMBER_ID)).thenReturn(mock(MyInfoResponse.class));
+        when(recipeService.findCandidateInfos(List.of(539L, 59L))).thenReturn(Map.of(
+                539L, new RecipeCandidateInfo(539L, "부추 콩가루 찜", "찜", 20, 2),
+                59L, new RecipeCandidateInfo(59L, "고추잡채", "볶음", 20, 2)));
+        when(candidateSearchService.findTasteLevels(any())).thenThrow(new IOException("es down"));
+        when(recipeService.findTastesByRecipeIds(List.of(539L, 59L)))
+                .thenReturn(Map.of(539L, Set.of(Taste.MILD), 59L, Set.of(Taste.SALTY)));
+        when(recipeService.findIngredientTexts(List.of(539L, 59L)))
+                .thenReturn(Map.of(539L, List.of("부추", "고춧가루"), 59L, List.of("돼지고기", "고추")));
+
+        RecipeCandidateFacade.MealkitRecipes found = esFacade.describeMealkitRecipes(MEMBER_ID, List.of(539L, 59L));
+
+        assertThat(found.maybeSpicyRecipeIds()).containsExactlyInAnyOrder(539L, 59L);
+        assertThat(found.recipeTastes().get(539L)).contains(Taste.SPICY);
+        assertThat(found.recipeTastes().get(59L)).doesNotContain(Taste.SPICY);
     }
 
     private static FridgeItemResponse mealkitItem(String rawName, long dDay) {
