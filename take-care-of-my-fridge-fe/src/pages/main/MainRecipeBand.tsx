@@ -92,6 +92,11 @@ function RankedRecipe({ recipe, rank }: { recipe: PopularRecipeResponse; rank: n
               </>
             )}
           </span>
+          {recipe.tipSummary && (
+            <span className={styles.rowSummary} title={recipe.tipSummary}>
+              {recipe.tipSummary}
+            </span>
+          )}
         </span>
       </Link>
     </li>

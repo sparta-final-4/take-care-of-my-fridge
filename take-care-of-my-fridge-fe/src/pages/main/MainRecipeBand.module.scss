@@ -255,6 +255,15 @@
   text-overflow: ellipsis;
 }
 
+// 후기 요약: 한 줄, 넘치면 말줄임(1등 카드처럼 다 읽히지 않아도 분위기만 전한다)
+.rowSummary {
+  overflow: hidden;
+  font-size: var(--ant-font-size-sm);
+  color: var(--ant-color-text-secondary);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
 // 불러오는 동안: 같은 모양의 회색 상자
 .topSkeleton {
   display: flex;
