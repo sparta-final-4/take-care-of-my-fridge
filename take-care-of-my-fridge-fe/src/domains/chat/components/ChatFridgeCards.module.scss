@@ -1,0 +1,89 @@
+@use '@/styles/variables' as *;
+
+// 밀키트 카드와 같은 들여쓰기(AI 말풍선 내용)로 답 아래에 둔다
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ant-margin-xxs);
+  margin: 0 0 var(--ant-margin-sm) $chat-assistant-indent;
+}
+
+.heading {
+  font-size: var(--ant-font-size-sm);
+  font-weight: var(--ant-font-weight-strong);
+  color: var(--ant-color-text);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ant-margin-xxs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+// 냉장고 줄은 사는 상품이 아니라 흰 바탕·회색 테두리(레시피 카드와 같은 결)로 둔다
+.card {
+  position: relative;
+  border: 1px solid var(--ant-color-border-secondary);
+  border-radius: var(--ant-border-radius-lg);
+  background: var(--ant-color-bg-container);
+
+  &:has(.cardLink:focus-visible) {
+    outline: 2px solid var(--ant-color-primary-active);
+    outline-offset: -2px;
+  }
+}
+
+// 밀키트 줄의 상품 상세 링크 (카드 전체를 덮는다)
+.cardLink {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+
+  &:focus-visible {
+    outline: none;
+  }
+}
+
+// 이미지(밀키트만) | 이름 · 수량 | 소비기한 태그. 좁으면 이름부터 줄어든다
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--ant-margin-sm);
+  padding: var(--ant-padding-xs) var(--ant-padding-sm);
+  pointer-events: none;
+}
+
+.thumb {
+  flex-shrink: 0;
+  width: $chat-recommend-thumb-size;
+  height: $chat-recommend-thumb-size;
+  border-radius: var(--ant-border-radius);
+  object-fit: cover;
+}
+
+.body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  line-height: var(--ant-line-height-sm);
+}
+
+.name {
+  min-width: 0;
+  font-size: var(--ant-font-size);
+}
+
+.meta {
+  font-size: var(--ant-font-size-sm);
+  color: var(--ant-color-text-tertiary);
+}
+
+.tag {
+  flex-shrink: 0;
+  margin-inline-end: 0;
+  font-size: var(--ant-font-size-sm);
+}

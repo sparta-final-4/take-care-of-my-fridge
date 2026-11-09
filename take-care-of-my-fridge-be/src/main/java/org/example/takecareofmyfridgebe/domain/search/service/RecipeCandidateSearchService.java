@@ -12,13 +12,16 @@ import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 import org.example.takecareofmyfridgebe.domain.search.config.RecipeSearchProperties;
 import org.example.takecareofmyfridgebe.domain.search.dto.RecipeSpicyLevel;
+import org.example.takecareofmyfridgebe.domain.search.dto.RecipeTasteLevel;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -75,9 +78,42 @@ public class RecipeCandidateSearchService {
                 .toList();
     }
 
-    // 재색인 전 인덱스처럼 필드가 없으면 맛은 비우고 매운 정도는 NONE으로 둔다
+    /**
+     * 레시피 id로 인덱스에 색인된 맛·매운 정도를 한 번에 읽는다 (후보 검색 결과가 아닌 레시피용: 레시피 검색으로 찾은 후보, 밀키트 연결 레시피).
+     *
+     * @return 레시피 id별 맛·매운 정도. 인덱스에 없는 id는 빠진다. id가 없으면 검색하지 않고 빈 Map
+     */
+    public Map<Long, RecipeTasteLevel> findTasteLevels(Collection<Long> recipeIds) throws IOException {
+        List<String> ids = recipeIds.stream().distinct().map(String::valueOf).toList();
+        if (ids.isEmpty()) {
+            return Map.of();
+        }
+        Map<Long, RecipeTasteLevel> levels = new HashMap<>();
+        esClient.search(tasteLevelRequest(ids), HitSource.class).hits().hits()
+                .forEach(hit -> levels.put(Long.valueOf(hit.id()), tasteLevel(hit.source())));
+        return levels;
+    }
+
+    SearchRequest tasteLevelRequest(List<String> ids) {
+        return SearchRequest.of(s -> s
+                .index(properties.indexProperties().recipe().alias())
+                .size(ids.size())
+                .source(src -> src.filter(f -> f.includes(SOURCE_FIELDS)))
+                .query(q -> q.ids(i -> i.values(ids))));
+    }
+
     private static CandidateHit toCandidateHit(Hit<HitSource> hit) {
-        HitSource source = hit.source();
+        RecipeTasteLevel level = tasteLevel(hit.source());
+        return new CandidateHit(
+                Long.valueOf(hit.id()),
+                hit.score() == null ? 0 : hit.score(),
+                hit.matchedQueries().keySet(),
+                level.tastes(),
+                level.spicyLevel());
+    }
+
+    // 재색인 전 인덱스처럼 필드가 없으면 맛은 비우고 매운 정도는 NONE으로 둔다
+    private static RecipeTasteLevel tasteLevel(HitSource source) {
         Set<Member.Taste> tastes = EnumSet.noneOf(Member.Taste.class);
         RecipeSpicyLevel spicyLevel = RecipeSpicyLevel.NONE;
         if (source != null) {
@@ -88,12 +124,7 @@ public class RecipeCandidateSearchService {
                 spicyLevel = RecipeSpicyLevel.valueOf(source.spicyLevel());
             }
         }
-        return new CandidateHit(
-                Long.valueOf(hit.id()),
-                hit.score() == null ? 0 : hit.score(),
-                hit.matchedQueries().keySet(),
-                tastes,
-                spicyLevel);
+        return new RecipeTasteLevel(tastes, spicyLevel);
     }
 
     SearchRequest searchRequest(Condition condition, List<Query> shoulds) {
@@ -288,6 +319,10 @@ public class RecipeCandidateSearchService {
 
         public boolean matched(String name) {
             return matched.contains(name);
+        }
+
+        public RecipeTasteLevel tasteLevel() {
+            return new RecipeTasteLevel(tastes, spicyLevel);
         }
 
         // 확실히 매운 레시피 (원하는 맛 매운맛과 맞은 것으로 센다)

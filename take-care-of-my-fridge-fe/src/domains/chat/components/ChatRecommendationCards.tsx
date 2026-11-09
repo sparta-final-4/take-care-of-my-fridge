@@ -9,11 +9,14 @@ import { useAddToCart } from '@/domains/cart/hooks/useAddToCart';
 import { ddayTagColor } from '@/domains/fridge/format';
 
 import {
+  type ChatFridgeItem,
+  type ChatProductCard,
   type ChatRecommendedMealkit,
   type ChatRecommendationMissingIngredient,
   type ChatRecommendedRecipe,
   summarizeImminent,
 } from '../recommendations';
+import { ChatFridgeCards } from './ChatFridgeCards';
 import { ChatMealkitCards } from './ChatMealkitCards';
 import { ChatShoppingList } from './ChatShoppingList';
 import styles from './ChatRecommendationCards.module.scss';
@@ -22,6 +25,10 @@ interface ChatRecommendationCardsProps {
   recipes: ChatRecommendedRecipe[];
   // 레시피 카드 아래 밀키트 카드 (밀키트만 보여 주는 답이면 recipes는 빈 목록)
   mealkits?: ChatRecommendedMealkit[];
+  // 냉장고 보기 카드 (받는 중인 답에만 있다)
+  fridgeItems?: ChatFridgeItem[];
+  // 살 상품 카드 (사기 답, 냉장고 보기에서 없는 재료)
+  products?: ChatProductCard[];
   // 받는 중인 카드 설명 (카드 순서). 있으면 저장된 설명(recipe.description) 대신 쓴다
   descriptions?: string[];
   // 카드를 눌러 레시피·상품 상세로 갈 때 (모바일 전체 화면 채팅창은 닫는다)
@@ -29,24 +36,54 @@ interface ChatRecommendationCardsProps {
 }
 
 // AI 상담 추천 카드 (최대 3개). 소개 말풍선 아래에 카드 → 설명 → 카드 → 설명 순서로 쌓고, 밀키트 카드는 그 아래에 둔다.
+// 냉장고 보기 답은 냉장고 카드, 사기 답은 살 상품 카드를 같은 자리에 둔다.
 export function ChatRecommendationCards({
   recipes,
   mealkits = [],
+  fridgeItems = [],
+  products = [],
   descriptions,
   onNavigate,
 }: ChatRecommendationCardsProps) {
-  if (recipes.length === 0 && mealkits.length === 0) return null;
+  if (
+    recipes.length === 0 &&
+    mealkits.length === 0 &&
+    fridgeItems.length === 0 &&
+    products.length === 0
+  )
+    return null;
   return (
     <>
       {recipes.length > 0 && (
         <RecipeCards recipes={recipes} descriptions={descriptions} onNavigate={onNavigate} />
       )}
       {mealkits.length > 0 && <MealkitSection mealkits={mealkits} onNavigate={onNavigate} />}
+      {fridgeItems.length > 0 && <ChatFridgeCards items={fridgeItems} onNavigate={onNavigate} />}
+      {products.length > 0 && (
+        <MealkitSection
+          heading="살 수 있는 상품"
+          mealkits={products.map(toProductMealkit)}
+          onNavigate={onNavigate}
+        />
+      )}
     </>
   );
 }
 
-type RecipeCardsProps = Omit<ChatRecommendationCardsProps, 'mealkits'>;
+// 살 상품 카드는 밀키트 카드와 같은 모양으로 그린다 (말한 이름을 인분 자리에 보여 준다)
+function toProductMealkit(card: ChatProductCard): ChatRecommendedMealkit {
+  return {
+    product: card.product,
+    servings: 0,
+    recipeId: null,
+    recipeName: card.name,
+    description: null,
+    inFridge: false,
+    fridgeDDay: null,
+  };
+}
+
+type RecipeCardsProps = Omit<ChatRecommendationCardsProps, 'mealkits' | 'fridgeItems' | 'products'>;
 
 function RecipeCards({ recipes, descriptions, onNavigate }: RecipeCardsProps) {
   return (
@@ -178,15 +215,17 @@ function ShoppingSection({ id, ingredients }: ShoppingSectionProps) {
 
 interface MealkitSectionProps {
   mealkits: ChatRecommendedMealkit[];
+  heading?: string;
   onNavigate?: () => void;
 }
 
-// 밀키트 카드. 담기는 상품 목록·상세와 같은 장바구니 담기를 쓰고, 상담 창은 그대로 둔다
-function MealkitSection({ mealkits, onNavigate }: MealkitSectionProps) {
+// 밀키트·살 상품 카드. 담기는 상품 목록·상세와 같은 장바구니 담기를 쓰고, 상담 창은 그대로 둔다
+function MealkitSection({ mealkits, heading, onNavigate }: MealkitSectionProps) {
   const { addToCart, pendingProductId } = useAddToCart();
   return (
     <ChatMealkitCards
       mealkits={mealkits}
+      heading={heading}
       onAdd={(productId) => addToCart(productId, 1)}
       pendingProductId={pendingProductId}
       onNavigate={onNavigate}

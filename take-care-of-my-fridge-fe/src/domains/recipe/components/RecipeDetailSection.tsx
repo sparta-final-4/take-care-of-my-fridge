@@ -1,6 +1,6 @@
 import { LeftOutlined } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
-import { Button, Result, Skeleton } from 'antd';
+import { Anchor, Button, Result, Skeleton } from 'antd';
 import { useState, type KeyboardEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 
@@ -29,6 +29,16 @@ const METHOD_TABS = [
 ] as const;
 
 type MethodTab = (typeof METHOD_TABS)[number]['key'];
+
+// 오른쪽 화면 바로가기. 세트의 section-nav가 꺼진 세트에서는 CSS로 숨긴다.
+// 머리 높이(_variables.scss $header-height)만큼 띄워 묶음 위끝이 헤더에 가리지 않게 한다.
+// 맨 위에서는 소개 묶음이 아직 헤더 밑까지 올라오지 않아 antd가 아무 항목도 고르지 않으므로, 그때는 첫 항목(소개)을 표시한다.
+const HEADER_HEIGHT = 64;
+const SECTION_LINKS = [
+  { key: 'overview', href: '#recipe-overview', title: '소개' },
+  { key: 'method', href: '#recipe-method', title: '만드는 법' },
+  { key: 'more', href: '#recipe-more', title: '영양과 후기' },
+];
 
 export function RecipeDetailSection({ recipeId }: RecipeDetailSectionProps) {
   const navigate = useNavigate();
@@ -75,6 +85,16 @@ export function RecipeDetailSection({ recipeId }: RecipeDetailSectionProps) {
 
   return (
     <div className={styles.page}>
+      <nav className={styles.sectionNav} aria-label="레시피 화면 바로가기">
+        <Anchor
+          affix={false}
+          replace
+          targetOffset={HEADER_HEIGHT}
+          items={SECTION_LINKS}
+          getCurrentAnchor={(activeLink) => activeLink || SECTION_LINKS[0].href}
+        />
+      </nav>
+
       <Button type="link" icon={<LeftOutlined />} onClick={handleGoBack} className={styles.back}>
         이전으로
       </Button>
@@ -83,7 +103,7 @@ export function RecipeDetailSection({ recipeId }: RecipeDetailSectionProps) {
       <RecipeOverview recipe={recipe} fridgeMatch={fridgeMatch} />
 
       {/* 본문: lg 이상은 재료 | 조리 순서 두 칸, 좁은 화면은 탭 버튼으로 하나씩 */}
-      <section className={styles.method} aria-label="재료와 조리 순서">
+      <section id="recipe-method" className={styles.method} aria-label="재료와 조리 순서">
         <div role="tablist" aria-label="레시피 내용" className={styles.tabs}>
           {METHOD_TABS.map((tab) => {
             const selected = methodTab === tab.key;
@@ -143,7 +163,7 @@ export function RecipeDetailSection({ recipeId }: RecipeDetailSectionProps) {
       </section>
 
       {/* 아래: 왼쪽 영양 정보 → 후기, 오른쪽 [내 냉장고 재료] + [요리 완료] → 요리 통계 */}
-      <div className={styles.row}>
+      <div id="recipe-more" className={styles.row}>
         <div className={styles.column}>
           <RecipeNutritionSection nutrition={recipe.nutrition} />
           <RecipeReviewSection recipeId={recipeId} tipSummary={recipe.tipSummary} />

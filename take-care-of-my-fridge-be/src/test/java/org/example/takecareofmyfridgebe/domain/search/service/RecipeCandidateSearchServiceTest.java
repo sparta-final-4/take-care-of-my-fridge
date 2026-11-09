@@ -14,6 +14,7 @@ import org.example.takecareofmyfridgebe.domain.search.config.RecipeSearchPropert
 import org.example.takecareofmyfridgebe.domain.search.config.RecipeSearchProperties.RecipeIndexProperties;
 import org.example.takecareofmyfridgebe.domain.search.config.SearchEngine;
 import org.example.takecareofmyfridgebe.domain.search.dto.RecipeSpicyLevel;
+import org.example.takecareofmyfridgebe.domain.search.dto.RecipeTasteLevel;
 import org.example.takecareofmyfridgebe.domain.search.service.RecipeCandidateSearchService.CandidateHit;
 import org.example.takecareofmyfridgebe.domain.search.service.RecipeCandidateSearchService.Condition;
 import org.example.takecareofmyfridgebe.domain.search.service.RecipeCandidateSearchService.HitSource;
@@ -323,6 +324,36 @@ class RecipeCandidateSearchServiceTest {
         assertThat(hit.tastes()).isEmpty();
         assertThat(hit.spicyLevel()).isEqualTo(RecipeSpicyLevel.NONE);
         assertThat(hit.maybeSpicy()).isFalse();
+    }
+
+    @Test
+    @DisplayName("레시피 id로 맛·매운 정도를 읽을 때 id 조건·맛 필드만 받아 한 번에 검색하고, 없는 id는 결과에서 빠진다")
+    void readsTasteLevelsByIds() throws IOException {
+        // Given
+        stubHits(List.of(
+                Hit.<HitSource>of(hit -> hit.index("recipes_1").id("80").score(1.0)
+                        .source(new HitSource(List.of("SALTY"), "MILD"))),
+                Hit.<HitSource>of(hit -> hit.index("recipes_1").id("81").score(1.0)
+                        .source(new HitSource(List.of("SPICY"), "HOT")))));
+
+        // When
+        Map<Long, RecipeTasteLevel> levels = service.findTasteLevels(List.of(80L, 81L, 99L));
+        SearchRequest request = service.tasteLevelRequest(List.of("80", "81", "99"));
+
+        // Then
+        assertThat(levels).containsOnly(
+                Map.entry(80L, new RecipeTasteLevel(Set.of(Member.Taste.SALTY), RecipeSpicyLevel.MILD)),
+                Map.entry(81L, new RecipeTasteLevel(Set.of(Member.Taste.SPICY), RecipeSpicyLevel.HOT)));
+        assertThat(request.query().ids().values()).containsExactly("80", "81", "99");
+        assertThat(request.size()).isEqualTo(3);
+        assertThat(request.source().filter().includes()).containsExactlyElementsOf(RecipeCandidateSearchService.SOURCE_FIELDS);
+    }
+
+    @Test
+    @DisplayName("레시피 id가 없으면 ES를 부르지 않고 빈 Map을 돌려준다")
+    void returnsEmptyTasteLevels_whenNoIds() throws IOException {
+        assertThat(service.findTasteLevels(List.of())).isEmpty();
+        verifyNoInteractions(esClient);
     }
 
     private void stubHits(List<Hit<HitSource>> hits) throws IOException {

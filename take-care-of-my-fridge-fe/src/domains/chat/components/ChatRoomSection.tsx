@@ -23,7 +23,9 @@ import { useChatModalStore } from '../model/useChatModalStore';
 import { useChatStreamingStore } from '../model/useChatStreamingStore';
 import { chatQueries, useCompleteChatSession, useStartChatSession } from '../queries';
 import {
+  type ChatFridgeItem,
   type ChatRecommendations,
+  toChatProductCards,
   toChatRecommendedMealkits,
   toChatRecommendedRecipes,
 } from '../recommendations';
@@ -100,6 +102,11 @@ export function ChatRoomSection({
   const [pendingText, setPendingText] = useState<string | null>(null);
   // 받는 중인 카드 설명 (카드 순서). recommendation_text 이벤트로 채운다
   const [streamingDescriptions, setStreamingDescriptions] = useState<string[]>([]);
+  // 냉장고 보기 카드는 저장하지 않아 기록에 없다. 받은 답의 AI 메시지 id에 붙여 이 화면에 있는 동안만 보여 준다
+  // (새로고침·다시 열면 저장된 글만 보인다)
+  const [fridgeCardsByMessage, setFridgeCardsByMessage] = useState<
+    Record<number, ChatFridgeItem[]>
+  >({});
   const screens = useScreens();
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -371,6 +378,8 @@ export function ChatRoomSection({
 
     const controller = new AbortController();
     abortControllerRef.current = controller;
+    // 이 답의 냉장고 보기 카드 (done에서 AI 메시지 id에 붙인다)
+    let receivedFridgeItems: ChatFridgeItem[] = [];
 
     try {
       await streamMessage({
@@ -381,6 +390,7 @@ export function ChatRoomSection({
         useSelectedOnly,
         signal: controller.signal,
         onRecommendations: (recommendations) => {
+          receivedFridgeItems = recommendations.fridgeItems;
           setStreamingRecommendations(recommendations);
           setPendingText(null);
         },
@@ -396,9 +406,14 @@ export function ChatRoomSection({
           setPendingText(null);
           setStreamingAssistantMessage((prev) => (prev ?? '') + chunk);
         },
-        onDone: async () => {
+        onDone: async ({ assistantMessageId }) => {
           // 카드는 AI 메시지와 함께 저장됐으므로 기록을 다시 받으면 기록의 카드로 그린다.
-          // 다시 받기가 끝난 뒤에 받는 중인 카드를 지워 깜빡이지 않게 한다
+          // 다시 받기가 끝난 뒤에 받는 중인 카드를 지워 깜빡이지 않게 한다.
+          // 냉장고 보기 카드는 저장하지 않으므로 기록을 받기 전에 그 AI 메시지에 붙여 둔다
+          if (assistantMessageId !== undefined && receivedFridgeItems.length > 0) {
+            const items = receivedFridgeItems;
+            setFridgeCardsByMessage((prev) => ({ ...prev, [assistantMessageId]: items }));
+          }
           try {
             await queryClient.refetchQueries({ queryKey: chatQueries.messages(sessionId) });
             // 상담 내역의 메시지 수·마지막 시각이 바뀌므로 다시 받게 한다.
@@ -586,6 +601,7 @@ export function ChatRoomSection({
             messagesData.map((msg) => {
               const cards = toChatRecommendedRecipes(msg.recommendations);
               const mealkits = toChatRecommendedMealkits(msg.mealkits);
+              const products = toChatProductCards(msg.products);
               return (
                 <Fragment key={msg.id ?? msg.sequence}>
                   <ChatMessageBubble
@@ -596,6 +612,8 @@ export function ChatRoomSection({
                   <ChatRecommendationCards
                     recipes={cards}
                     mealkits={mealkits}
+                    fridgeItems={msg.id === undefined ? undefined : fridgeCardsByMessage[msg.id]}
+                    products={products}
                     onNavigate={closeOnNavigate}
                   />
                 </Fragment>
@@ -652,6 +670,8 @@ export function ChatRoomSection({
             <ChatRecommendationCards
               recipes={streamingRecommendations.recipes}
               mealkits={streamingRecommendations.mealkits}
+              fridgeItems={streamingRecommendations.fridgeItems}
+              products={streamingRecommendations.products}
               descriptions={streamingDescriptions}
               onNavigate={closeOnNavigate}
             />

@@ -1,17 +1,20 @@
 package org.example.takecareofmyfridgebe.domain.chat.dto;
 
+import org.example.takecareofmyfridgebe.domain.product.entity.ProductType;
+
 import java.util.List;
 
 /**
  * 상담 메시지를 어떻게 처리할지 정한 결과.
  *
  * @param intent         RECOMMEND·REFINE이면 recipeQuery로 후보를 찾고, RECIPE_DETAIL이면 targetRecipeId 레시피를 자세히 답하고,
- *                       GENERAL이면 일반 답을 한다. OFF_TOPIC·BLOCKED·SELF_HARM이면 답 생성 AI 없이 서버 안내로 답한다(declines)
+ *                       FRIDGE면 lookup으로 냉장고를, SHOP이면 살 상품을 보여 주고, GENERAL이면 일반 답을 한다. OFF_TOPIC·BLOCKED·SELF_HARM이면 답 생성 AI 없이 서버 안내로 답한다(declines)
  * @param source         의도를 정한 방법
  * @param recipeQuery    추천 조건 (REFINE이면 직전 조건과 합친 것). RECOMMEND·REFINE이 아니면 null
  * @param targetRecipeId RECIPE_DETAIL일 때 물어본 레시피 ID. 그 밖에는 null
  * @param detailQuestion RECIPE_DETAIL일 때 질문 종류 (모르면 null, OTHER처럼 다룬다). 그 밖에는 null
  * @param allergens      이 상담에서 사용자가 말한 알레르기·못 먹는 재료 이름 (추천이면 그 재료를 recipeQuery의 뺄 재료에 더했다). 없으면 빈 목록
+ * @param lookup         FRIDGE·SHOP일 때 볼 범위와 말한 재료·상품 이름. 그 밖에는 null
  */
 public record ChatIntentResolution(
         ChatIntent intent,
@@ -19,7 +22,8 @@ public record ChatIntentResolution(
         RecipeQuery recipeQuery,
         Long targetRecipeId,
         DetailQuestion detailQuestion,
-        List<String> allergens
+        List<String> allergens,
+        ItemLookup lookup
 ) {
 
     public ChatIntentResolution {
@@ -28,7 +32,34 @@ public record ChatIntentResolution(
 
     public ChatIntentResolution(ChatIntent intent, Source source, RecipeQuery recipeQuery, Long targetRecipeId,
                                 DetailQuestion detailQuestion) {
-        this(intent, source, recipeQuery, targetRecipeId, detailQuestion, List.of());
+        this(intent, source, recipeQuery, targetRecipeId, detailQuestion, List.of(), null);
+    }
+
+    /**
+     * 냉장고 보기에서 볼 것.
+     *
+     * @param scope       범위 (재료 이름을 말했으면 무시하고 그 재료만 본다)
+     * @param names       말한 재료·상품 이름 (말한 그대로). 없으면 빈 목록
+     * @param saleOnly    사기에서 할인 중인 상품을 물었는지 ("세일하는 재료 있어?")
+     * @param productType 할인 상품을 물을 때 상품 종류 ("밀키트" → MEALKIT, "재료" → INGREDIENT). 말하지 않았으면 null(둘 다)
+     */
+    public record ItemLookup(FridgeScope scope, List<String> names, boolean saleOnly, ProductType productType) {
+        public ItemLookup {
+            scope = scope == null ? FridgeScope.ALL : scope;
+            names = names == null ? List.of() : List.copyOf(names);
+        }
+
+        public ItemLookup(FridgeScope scope, List<String> names) {
+            this(scope, names, false, null);
+        }
+    }
+
+    public static ChatIntentResolution fridge(Source source, ItemLookup lookup) {
+        return new ChatIntentResolution(ChatIntent.FRIDGE, source, null, null, null, List.of(), lookup);
+    }
+
+    public static ChatIntentResolution shop(Source source, ItemLookup lookup) {
+        return new ChatIntentResolution(ChatIntent.SHOP, source, null, null, null, List.of(), lookup);
     }
 
     public enum Source {
@@ -73,7 +104,7 @@ public record ChatIntentResolution(
     // 알레르기 재료를 뺄 재료에 더한 결과 (추천이 아니면 이름만 둔다)
     public ChatIntentResolution withAllergens(List<String> names, List<Long> ingredientIds) {
         RecipeQuery query = recipeQuery == null ? null : recipeQuery.withExcludedIngredients(ingredientIds);
-        return new ChatIntentResolution(intent, source, query, targetRecipeId, detailQuestion, names);
+        return new ChatIntentResolution(intent, source, query, targetRecipeId, detailQuestion, names, lookup);
     }
 
     // 후보를 찾아 카드로 추천하는지 (새 추천·다시 추천)

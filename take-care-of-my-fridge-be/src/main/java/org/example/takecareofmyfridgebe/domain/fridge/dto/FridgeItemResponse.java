@@ -33,8 +33,19 @@ public record FridgeItemResponse(
         // 기본 양념(재료의 is_basic_seasoning). 냉장고 목록의 기본 양념 탭과 개수 제외에 쓴다.
         boolean basicSeasoning,
         LocalDateTime createdAt,
-        LocalDateTime updatedAt
+        LocalDateTime updatedAt,
+        // 구매 확정으로 들어온 줄의 상품 ID (fridge.product_id). 직접 등록한 줄과 예전 줄은 null
+        Long productId
 ) {
+    public FridgeItemResponse(Long id, Long ingredientId, String ingredientName, String baseUnit, String rawName,
+                              BigDecimal quantity, StorageType storage, LocalDate expirationDate, FridgeSource source,
+                              Long orderItemId, boolean imminent, boolean expired, long dDay, FridgeItemStatus status,
+                              IngredientType ingredientType, boolean basicSeasoning, LocalDateTime createdAt,
+                              LocalDateTime updatedAt) {
+        this(id, ingredientId, ingredientName, baseUnit, rawName, quantity, storage, expirationDate, source, orderItemId,
+                imminent, expired, dDay, status, ingredientType, basicSeasoning, createdAt, updatedAt, null);
+    }
+
     // 한 요청 안의 응답들이 같은 기준일로 계산되도록 today를 호출하는 쪽에서 받는다.
     public static FridgeItemResponse from(Fridge fridge, LocalDate today) {
         Ingredient ingredient = fridge.getIngredient();
@@ -68,7 +79,8 @@ public record FridgeItemResponse(
                 ingredientType,
                 ingredient != null && ingredient.isBasicSeasoning(),
                 fridge.getCreatedAt(),
-                fridge.getUpdatedAt()
+                fridge.getUpdatedAt(),
+                fridge.getProductId()
         );
     }
 }

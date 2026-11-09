@@ -80,3 +80,34 @@
   gap: $main-section-gap;
   min-width: 0;
 }
+
+// ── 테마(styles/_product-list-theme.scss의 $product-list-theme) ──
+// 양옆 여백 · 제목 정렬 · 넓은 화면 조건 칸 위치. 카드 칸 수와 모양은 목록 섹션 SCSS가 같은 테마를 읽는다.
+.page {
+  @each $bp, $inset in $product-list-inset {
+    @include from($bp) {
+      padding-inline: $inset;
+    }
+  }
+}
+
+@if $product-list-head-align == left {
+  .head {
+    align-items: flex-start;
+    text-align: left;
+  }
+}
+
+@if $product-list-sidebar-side == right {
+  .collection {
+    @include from(lg) {
+      grid-template-columns: minmax(0, 1fr) $collection-sidebar-width;
+    }
+  }
+
+  .sidebar {
+    @include from(lg) {
+      order: 2;
+    }
+  }
+}
