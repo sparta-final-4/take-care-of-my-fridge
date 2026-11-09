@@ -90,7 +90,7 @@ export function RefundDetailSection({ orderId }: RefundDetailSectionProps) {
             ) : (
               overallStatus && (
                 <Tag
-                  color={overallStatus === 'REQUESTED' ? 'processing' : undefined}
+                  color={overallStatus === 'REQUESTED' ? 'gold' : undefined}
                   className={styles.tag}
                 >
                   {REFUND_STATUS_LABELS[overallStatus]}
