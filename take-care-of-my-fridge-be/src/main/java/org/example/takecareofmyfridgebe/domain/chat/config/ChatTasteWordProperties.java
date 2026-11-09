@@ -19,6 +19,8 @@ import java.util.List;
  * @param wantBefore     맛 단어 바로 앞에 오면 그 맛을 확실히 원하는 말 ("좀 더 매운")
  * @param wantAfter      맛 단어 뒤 몇 글자 안에서 시작하면 그 맛을 확실히 원하는 말 ("매운 걸로", "매운 거 먹고 싶어").
  *                       부정어도 이 말도 없으면 서버 판단이 애매하므로 AI가 피할 맛으로 둔 맛을 원하는 맛으로 바꾸지 않는다
+ * @param clear          맛 조건을 지우라는 말 ("맛 상관없이", "맛은 아무거나"). 이 말이 없고 피하는 맛만 말했으면
+ *                       AI가 넣은 뺄 조건 TASTE를 서버가 지운다 ("매운 건 빼줘"가 직전에 원한 짠맛까지 지우지 않게)
  */
 @ConfigurationProperties(prefix = "app.chat.taste-words")
 public record ChatTasteWordProperties(
@@ -39,6 +41,8 @@ public record ChatTasteWordProperties(
         @DefaultValue({"더"})
         List<String> wantBefore,
         @DefaultValue({"걸로", "거로", "것으로", "먹고싶", "땡", "좋아", "원해", "당겨"})
-        List<String> wantAfter
+        List<String> wantAfter,
+        @DefaultValue({"맛상관없", "맛은상관없", "맛아무거나", "맛은아무거나"})
+        List<String> clear
 ) {
 }

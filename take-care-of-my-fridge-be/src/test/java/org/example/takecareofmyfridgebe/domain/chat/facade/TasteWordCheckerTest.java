@@ -17,7 +17,17 @@ class TasteWordCheckerTest {
             List.of("매운", "맵게", "맵지", "매콤", "얼큰", "칼칼"), List.of("달달", "달게", "단거", "단걸", "단것", "달콤", "단맛"),
             List.of("안", "덜"), List.of("말고", "빼고", "않", "싫", "없이", "못먹", "빼줘", "빼주", "빼달", "제외", "안들어간", "없는"),
             List.of("짠", "짭짤", "짜게", "짭조름"), List.of("감칠", "고소"), List.of("순한", "담백", "슴슴", "심심", "자극적이지"),
-            List.of("더"), List.of("걸로", "거로", "것으로", "먹고싶", "땡", "좋아", "원해", "당겨"));
+            List.of("더"), List.of("걸로", "거로", "것으로", "먹고싶", "땡", "좋아", "원해", "당겨"),
+            List.of("맛상관없", "맛은상관없", "맛아무거나", "맛은아무거나"));
+
+    @Test
+    @DisplayName("맛 상관없이·맛은 아무거나는 맛 조건을 지우라는 말이고, 매운 건 빼줘는 아니다")
+    void returnsClearsTastes_whenClearWord() {
+        for (String message : List.of("맛 상관없이", "맛은 상관없어", "맛은 아무거나", "맛 아무거나 다른 거")) {
+            assertThat(TasteWordChecker.clearsTastes(message, WORDS)).as(message).isTrue();
+        }
+        assertThat(TasteWordChecker.clearsTastes("매운 건 빼줘", WORDS)).isFalse();
+    }
 
     @Test
     @DisplayName("빼 달라·제외·안 들어간·없는 말이 맛 단어 뒤에 오면 피할 맛이다 (공백 무시)")

@@ -950,6 +950,39 @@ class ChatIntentFacadeTest {
         }
 
         @Test
+        @DisplayName("\"짭짤한 거\" 다음 \"매운 건 빼줘\"는 AI가 맛 조건 지우기(TASTE)를 넣어도 원하는 맛 짠맛을 남기고 매운맛만 피한다")
+        void keepsSalty_whenOnlyAvoidSpokenWithRemovedTaste() {
+            RecipeQuery salty = new RecipeQuery(MEMBER_ID, List.of(), List.of(Taste.SALTY), List.of("조림"), null, List.of(), false,
+                    List.of(), null, null);
+            ChatContext afterSalty = new ChatContext(List.of(), LastRecommendation.of(salty, List.of(10L)), context.lastCards());
+            givenExtracted(new IntentResult(ChatIntent.REFINE, null, null, null, null, null, null, null, null, null,
+                    null, null, List.of("TASTE"), List.of("SPICY")));
+
+            ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("매운 건 빼줘"),
+                    afterSalty);
+
+            assertThat(resolution.recipeQuery().wantedTastes()).containsExactly(Taste.SALTY);
+            assertThat(resolution.recipeQuery().avoidTastes()).containsExactly(Taste.SPICY);
+            assertThat(resolution.recipeQuery().moodCategories()).containsExactly("조림");
+        }
+
+        @Test
+        @DisplayName("\"맛 상관없이\"처럼 맛을 지우라는 말이면 지금처럼 직전 원하는 맛을 지운다 (피하는 맛을 같이 말해도)")
+        void clearsTastes_whenClearWordSpoken() {
+            RecipeQuery salty = new RecipeQuery(MEMBER_ID, List.of(), List.of(Taste.SALTY), List.of("조림"), null, List.of(), false,
+                    List.of(), null, null);
+            ChatContext afterSalty = new ChatContext(List.of(), LastRecommendation.of(salty, List.of(10L)), context.lastCards());
+            for (String message : List.of("맛 상관없이", "맛은 아무거나, 매운 것만 빼줘")) {
+                givenExtracted(refine(null, null, List.of("TASTE")));
+
+                RecipeQuery query = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of(message), afterSalty)
+                        .recipeQuery();
+
+                assertThat(query.wantedTastes()).as(message).isEmpty();
+            }
+        }
+
+        @Test
         @DisplayName("부정어를 모르는 말(매운 건 별로야)에서 AI가 피할 맛으로 두면 서버가 원하는 맛으로 뒤집지 않는다")
         void keepsAiAvoid_whenTasteWordIsAmbiguous() {
             givenExtracted(avoid(null, List.of("SPICY")));

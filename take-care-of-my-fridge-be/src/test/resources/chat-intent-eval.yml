@@ -65,6 +65,9 @@ contexts:
   kimpi:
     cards: [[301, 탕수육], [302, 깐풍기], [303, 돼지고기 찹쌀부침]]
     condition: { categories: [튀김], keywords: [김피탕, 탕수육, 깐풍기], dish: 김피탕 }
+  salty:
+    cards: [[501, 두부조림], [502, 장조림], [503, 간장불고기]]
+    condition: { wanted: [SALTY], categories: [조림] }
 
 cases:
   # ── 기본 추천 ──
@@ -184,3 +187,4 @@ cases:
   - { id: U15, group: 후속, context: dessert, message: "매운 거 말고", expect: { intent: REFINE, categories: [디저트], avoid: [SPICY] } }
   - { id: U16, group: 후속, context: kimpi, message: "디저트 추천해줘", expect: { intent: RECOMMEND, categories: [디저트], keywordsEmpty: true } }
   - { id: U17, group: 후속, context: kimpi, message: "매운 건 빼줘", expect: { intent: REFINE, wanted: [], avoid: [SPICY], keywordsFirst: 김피탕 } }
+  - { id: U18, group: 후속, context: salty, message: "매운 건 빼줘", expect: { intent: REFINE, wanted: [SALTY], avoid: [SPICY], categories: [조림] } }

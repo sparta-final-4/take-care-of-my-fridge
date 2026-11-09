@@ -175,6 +175,7 @@ public class ChatIntentFacade {
         if (result.intent() == ChatIntent.RECOMMEND || result.intent() == ChatIntent.REFINE || mealkitRecommend) {
             // 요리 이름은 AI가 아니라 서버가 정한다 (첫 키워드가 메시지에 그대로 있을 때만)
             result = result.withDishFromKeywords(request.content());
+            result = keepOtherTastes(memberId, sessionId, request.content(), result);
             result = correctCategories(memberId, sessionId, request.content(), categories, context,
                     correctTastes(memberId, sessionId, request.content(), result));
         }
@@ -437,6 +438,27 @@ public class ChatIntentFacade {
         log.debug("상담 맛 단어로 맛 조건 바꿈 - memberId: {}, sessionId: {}, AI 원하는 맛: {}, AI 피할 맛: {}, 바꾼 원하는 맛: {}, 바꾼 피할 맛: {}",
                 memberId, sessionId, result.wantedTastes(), result.avoidTastes(), wanted, avoid);
         return result.withTastes(wanted, avoid);
+    }
+
+    /**
+     * 피하는 맛만 말했으면("매운 건 빼줘") AI가 넣은 뺄 조건 TASTE를 지운다. AI가 "빼줘"를 맛 조건 지우기로 읽으면
+     * 다시 추천에서 직전에 원한 다른 맛("짭짤한 거")까지 사라지기 때문이다. 피할 맛은 그대로 둔다.
+     * 맛 조건을 지우라는 말("맛 상관없이", "맛은 아무거나")이 있으면 AI 값을 그대로 쓴다. 지웠으면 INFO로 남긴다.
+     */
+    IntentResult keepOtherTastes(Long memberId, Long sessionId, String message, IntentResult result) {
+        List<String> removed = orEmpty(result.removed());
+        if (!removed.contains(RefineCondition.TASTE.name()) || TasteWordChecker.clearsTastes(message, chatTasteWordProperties)) {
+            return result;
+        }
+        boolean avoids = TasteWordChecker.stances(message, chatTasteWordProperties).stream()
+                .anyMatch(stance -> stance.stance() == TasteWordChecker.Stance.AVOID);
+        if (!avoids) {
+            return result;
+        }
+        List<String> kept = removed.stream().filter(condition -> !condition.equals(RefineCondition.TASTE.name())).toList();
+        log.info("상담 피하는 맛만 말해서 맛 조건 지우기를 뺌 - memberId: {}, sessionId: {}, removed: {} → {}",
+                memberId, sessionId, removed, kept);
+        return result.withRemoved(kept);
     }
 
     /**

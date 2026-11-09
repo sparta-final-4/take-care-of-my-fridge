@@ -151,6 +151,13 @@ public final class TasteWordChecker {
         return false;
     }
 
+    // 맛 조건을 지우라는 말("맛 상관없이", "맛은 아무거나")이 있는지 (공백 빼고 비교)
+    public static boolean clearsTastes(String message, ChatTasteWordProperties words) {
+        String text = compact(message);
+        return orEmpty(words.clear()).stream().map(TasteWordChecker::compact)
+                .anyMatch(word -> !word.isEmpty() && text.contains(word));
+    }
+
     private static List<String> tasteWords(Member.Taste taste, ChatTasteWordProperties words) {
         return switch (taste) {
             case SPICY -> words.spicy();

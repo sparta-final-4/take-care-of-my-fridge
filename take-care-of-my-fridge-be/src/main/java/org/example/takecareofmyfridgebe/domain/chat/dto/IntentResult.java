@@ -188,6 +188,13 @@ public record IntentResult(
                 fridgeScope);
     }
 
+    // 서버가 바로잡은 뺄 조건
+    public IntentResult withRemoved(List<String> newRemoved) {
+        return new IntentResult(intent, wantedTastes, moodCategories, maxMinutes, includeIngredients, excludeIngredients,
+                useSelectedOnly, keywords, dishText, preferenceText, targetIndex, targetName, newRemoved, avoidTastes, detailQuestion,
+                fridgeScope);
+    }
+
     // 서버가 이름만 말한 말로 채운 추천 (재료 이름·요리 이름 키워드)
     public IntentResult withNamed(List<String> includes, List<String> namedKeywords) {
         return new IntentResult(ChatIntent.RECOMMEND, wantedTastes, moodCategories, maxMinutes, includes, excludeIngredients,
