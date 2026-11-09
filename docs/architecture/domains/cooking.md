@@ -20,6 +20,7 @@
    - 교착을 막기 위해 `ingredientId` 오름차순으로 비관적 락을 잡습니다.
    - 같은 재료가 여러 줄이면 소비기한 빠른 순(FIFO)으로 차감합니다.
    - 기본 양념(`basicSeasoning=true`), 직접 입력 재료(`ING_CUSTOM`), 밀키트(`ING_MEALKIT`)는 차감하지 않습니다.
+   - `quantity`가 null이거나 가진 양 이상이면 그 재료를 모두 차감합니다.
    - 냉장고에 없는 재료는 오류 없이 건너뛰고, 실제로 차감한 것만 응답 `deductions`에 담습니다.
 5. 이은 상담이 있으면 커밋된 뒤 이벤트(`CookingCompletedEvent`)로 상담을 끝냅니다(COMPLETED). 요리 결과가 FAILED여도 끝냅니다. 그 사이 끝났거나 만료된 상담은 그대로 두고, 종료가 실패해도 요리 기록·재료 차감은 되돌리지 않고 로그만 남깁니다. 끝나면 상담 바뀜 신호(`COMPLETED`)가 나갑니다.
 
@@ -29,7 +30,7 @@
 | 기록 수정 | 재료 차감은 되돌릴 수 없으므로 결과(`result`)와 메모(`memo`)만 바꿉니다. 남의 기록·없는 기록은 404 `COOKING_001`입니다 | `CookingService.updateCookingLog` |
 | 기록 목록 | `from`·`to`는 `created_at` 날짜 기준이며 `to` 하루 전체를 포함합니다. `from`이 `to`보다 늦으면 400 `C001`입니다 | `CookingService.getCookingLogs` |
 | 레시피 요리 통계 | 비로그인도 봅니다. 레시피가 없으면 404, 기록이 없으면 횟수가 모두 0입니다 | `CookingService.getCookingStats` |
-| 마이 레시피 | 요리한 레시피를 레시피별로 묶고, 후기 작성 여부(`reviewStatus`)로 거릅니다. 요약은 필터와 상관없는 전체 값입니다: 레시피 수, 총 요리 수, 후기 쓴 수·안 쓴 수, 가장 많이 만든 레시피, 요리로 쓴 재료 수 | `CookingService.getMyRecipes` |
+| 마이 레시피 | 요리한 레시피를 레시피별로 묶고(정렬: 최근 요리순 또는 많이 만든 순), 후기 작성 여부(`reviewStatus`)로 거릅니다. 요약은 필터와 상관없는 전체 값입니다: 레시피 수, 총 요리 수, 후기 쓴 수·안 쓴 수, 가장 많이 만든 레시피, 요리로 쓴 재료 종류 수 | `CookingService.getMyRecipes` |
 | 인기 레시피 | 최근 30일 요리한 회원 수 순위입니다. 순위는 24시간 캐시하고(기록이 없는 빈 순위는 캐시하지 않음), 이름·이미지·팁 요약·평점·후기 수는 요청마다 읽습니다 | `PopularRecipeService`, `PopularRecipeRankingService` |
 
 ## 변경 이력

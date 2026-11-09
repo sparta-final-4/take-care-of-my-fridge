@@ -5,7 +5,7 @@
 ## 적용 메모
 
 - 아래 원문은 공유된 백엔드 지침을 보존한 것입니다. 경로·명령의 기준은 backend/입니다. 패키지와 코드는 예시이며 컴파일된 구현이 아닙니다.
-- [공통 지침](../../AGENTS.md), [백엔드 진입점](../../backend/AGENTS.md), [DB 규칙](database.md)을 함께 적용합니다.
+- [공통 지침](../../AGENTS.md), [백엔드 진입점](../../take-care-of-my-fridge-be/CLAUDE.md), [DB 규칙](database.md)을 함께 적용합니다.
 - S3 추가: JPAQueryFactory·RedisTemplate·KafkaTemplate은 등록된 빈을 주입하고 중복 생성하지 않습니다.
 - S3는 같은 클래스명 충돌 시 FQCN 예외를 허용하지만 S1은 일괄 금지입니다. 와일드카드 import도 금지/지양이 다릅니다. 합의 전 금지 기준을 유지하고 충돌 상황을 보고합니다.
 - Lombok 허용 목록: `@Getter`, `@Builder`, `@RequiredArgsConstructor`, `@NoArgsConstructor(access = AccessLevel.PROTECTED)`를 허용하며, 엔티티는 `@Builder` 생성자 패턴을 사용하고 Request -> Entity 변환은 Request DTO에서 수행합니다.

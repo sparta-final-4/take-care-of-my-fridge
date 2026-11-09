@@ -2,10 +2,7 @@
 
 상태: 구현 완료 · 담당: 이현정 · 공통 규칙: [API 계약](api-spec.md#공통-규칙) · 자세한 동작: [요리 기록 설계](../architecture/domains/cooking.md)
 
-이 문서의 약속:
-- 경로는 `/api`를 뺀 값입니다. 권한이 "로그인"인 API는 모두 401 `A003`이 있어 에러 표에서 뺍니다.
-- 요청 검증 실패(형식·범위·필수 누락·모르는 enum 값)는 400 `C001`입니다. 에러 표에는 그 밖의 오류만 씁니다.
-- 페이지는 1부터 시작하고 응답은 공통 `PageResponse`입니다. 시각 형식을 따로 적지 않은 칸은 ISO-8601입니다.
+공통 응답·오류 코드·페이지·날짜 형식은 [공통 규칙](api-spec.md#공통-규칙)을 따릅니다. 이 문서의 경로는 `/api`를 뺀 값이고, 에러 표에는 공통 오류(401 `A003`, 400 `C001`)를 빼고 이 API만의 오류를 적습니다.
 
 ## 목차
 
@@ -28,7 +25,7 @@
 | chatSessionId | long | N | 이을 상담. 비우면 서버가 찾음 |
 | usedIngredients | `UsedIngredientRequest[]` | N | 30개 이하, 같은 재료 두 번 안 됨 |
 | usedIngredients[].ingredientId | long | Y | 표준 재료 ID |
-| usedIngredients[].quantity | number | N | 0보다 큼 |
+| usedIngredients[].quantity | number | N | 0보다 큼. null이거나 가진 양 이상이면 그 재료를 모두 차감 |
 
 응답: `CookingCompleteResponse`
 
@@ -59,7 +56,7 @@
 | page (query) | int | N | 기본 1, 1 이상 |
 | size (query) | int | N | 기본 20, 1~100 |
 
-응답: `PageResponse<CookingLogResponse>`
+응답: `PageResponse<CookingLogResponse>` (최신순)
 
 | HTTP | 코드 | 조건 |
 |---|---|---|
@@ -123,7 +120,7 @@
 | summary.writtenCount | long | N | 후기 쓴 레시피 수 |
 | summary.notWrittenCount | long | N | 후기 안 쓴 레시피 수 |
 | summary.mostCookedRecipe | `{ recipeId, recipeName, cookCount }` | Y | 가장 많이 만든 레시피. 기록이 없으면 null |
-| summary.consumedIngredientCount | long | N | 요리로 쓴 재료 수 |
+| summary.consumedIngredientCount | long | N | 요리로 쓴 재료 종류 수 |
 | recipes | `PageResponse<MyRecipeResponse>` | N | |
 | recipes.content[].recipeId | long | N | |
 | recipes.content[].recipeName | string | Y | |
