@@ -5,6 +5,7 @@ import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeIngredientCountD
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeIngredientNameDto;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeIngredientTextDto;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeListRequest;
+import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeStepImageDto;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeStepTextDto;
 import org.example.takecareofmyfridgebe.domain.recipe.entity.Recipe;
 import org.springframework.data.domain.Page;
@@ -31,6 +32,9 @@ public interface RecipeRepositoryCustom {
 
     // recipeId가 null이면 전체 레시피. 레시피 id, step_no 순
     List<RecipeStepTextDto> findStepTexts(Long recipeId);
+
+    // 목록 카드 hover용: 레시피별 마지막 조리 단계의 사진. 마지막 단계에 사진이 없는 레시피는 빠진다
+    List<RecipeStepImageDto> findLastStepImages(Collection<Long> recipeIds);
 
     // AI 상담 후보 검색용: 주어진 재료가 들어간 레시피 재료 줄 (레시피·재료 쌍마다 한 줄)
     List<RecipeCandidateIngredient> findCandidateIngredients(Collection<Long> ingredientIds);

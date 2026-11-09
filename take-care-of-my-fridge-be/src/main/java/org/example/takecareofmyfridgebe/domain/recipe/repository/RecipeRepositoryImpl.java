@@ -5,6 +5,7 @@ import com.querydsl.core.types.Projections;
 import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.core.types.dsl.NumberPath;
 import com.querydsl.core.types.dsl.StringPath;
+import com.querydsl.jpa.JPAExpressions;
 import com.querydsl.jpa.impl.JPAQuery;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import lombok.RequiredArgsConstructor;
@@ -14,7 +15,9 @@ import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeIngredientNameDt
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeIngredientTextDto;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeListRequest;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeSort;
+import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeStepImageDto;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeStepTextDto;
+import org.example.takecareofmyfridgebe.domain.recipe.entity.QRecipeStep;
 import org.example.takecareofmyfridgebe.domain.recipe.entity.Recipe;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -171,6 +174,30 @@ public class RecipeRepositoryImpl implements RecipeRepositoryCustom {
                 .from(recipeStep)
                 .where(recipeIdEq(recipeStep.recipe.id, recipeId))
                 .orderBy(recipeStep.recipe.id.asc(), recipeStep.stepNo.asc())
+                .fetch();
+    }
+
+    @Override
+    public List<RecipeStepImageDto> findLastStepImages(Collection<Long> recipeIds) {
+        if (recipeIds.isEmpty()) {
+            return List.of();
+        }
+        QRecipeStep lastStep = new QRecipeStep("lastStep");
+        return queryFactory
+                .select(Projections.constructor(RecipeStepImageDto.class,
+                        recipeStep.recipe.id,
+                        recipeStep.imageUrl
+                ))
+                .from(recipeStep)
+                .where(
+                        recipeStep.recipe.id.in(recipeIds),
+                        recipeStep.stepNo.eq(JPAExpressions
+                                .select(lastStep.stepNo.max())
+                                .from(lastStep)
+                                .where(lastStep.recipe.id.eq(recipeStep.recipe.id))),
+                        recipeStep.imageUrl.isNotNull(),
+                        recipeStep.imageUrl.trim().isNotEmpty()
+                )
                 .fetch();
     }
 

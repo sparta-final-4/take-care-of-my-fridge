@@ -1,4 +1,5 @@
 import { Flex, Typography } from 'antd';
+import { useState } from 'react';
 import { generatePath, Link } from 'react-router';
 
 import { ROUTES } from '@/app/paths';
@@ -15,7 +16,11 @@ interface RecipeCardProps {
 }
 
 export function RecipeCard({ recipe, fridgeMatch }: RecipeCardProps) {
-  const { recipeId, name = '', imageUrl, summary } = recipe;
+  const { recipeId, name = '', imageUrl, summary, lastStepImageUrl } = recipe;
+  // 마지막 조리 단계 사진은 마우스를 처음 올릴 때 받는다(목록이 뜰 때 사진을 두 배로 받지 않도록).
+  // 다 받은 뒤에만 겹쳐 보여 주고, 받지 못하면 대표 사진을 그대로 둔다.
+  const [hoverImageRequested, setHoverImageRequested] = useState(false);
+  const [hoverImageLoaded, setHoverImageLoaded] = useState(false);
   if (recipeId === undefined) return null;
 
   const meta = formatRecipeMeta(recipe);
@@ -26,6 +31,9 @@ export function RecipeCard({ recipe, fridgeMatch }: RecipeCardProps) {
     <Link
       to={generatePath(ROUTES.recipeDetail, { recipeId: String(recipeId) })}
       className={styles.card}
+      onPointerEnter={(event) => {
+        if (lastStepImageUrl && event.pointerType === 'mouse') setHoverImageRequested(true);
+      }}
     >
       <div className={styles.thumb}>
         <FallbackImage
@@ -35,6 +43,20 @@ export function RecipeCard({ recipe, fridgeMatch }: RecipeCardProps) {
           className={styles.image}
           loading="lazy"
         />
+        {hoverImageRequested && lastStepImageUrl && (
+          <img
+            src={lastStepImageUrl}
+            alt=""
+            aria-hidden
+            decoding="async"
+            className={
+              hoverImageLoaded
+                ? `${styles.hoverImage} ${styles.hoverImageLoaded}`
+                : styles.hoverImage
+            }
+            onLoad={() => setHoverImageLoaded(true)}
+          />
+        )}
       </div>
       <Flex vertical gap={4} className={styles.info}>
         <Typography.Text strong className={styles.name} title={name}>

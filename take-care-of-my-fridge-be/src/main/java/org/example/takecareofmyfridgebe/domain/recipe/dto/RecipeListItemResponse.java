@@ -16,9 +16,11 @@ public record RecipeListItemResponse(
         Integer cookTimeMin,
         Integer servings,
         int difficulty,
-        BigDecimal calories
+        BigDecimal calories,
+        // 마지막 조리 단계의 사진. 없으면 null (카드 hover 때만 쓴다)
+        String lastStepImageUrl
 ) {
-    public static RecipeListItemResponse from(Recipe recipe) {
+    public static RecipeListItemResponse from(Recipe recipe, String lastStepImageUrl) {
         return RecipeListItemResponse.builder()
                 .recipeId(recipe.getId())
                 .name(recipe.getName())
@@ -30,6 +32,7 @@ public record RecipeListItemResponse(
                 .servings(recipe.getServings())
                 .difficulty(recipe.getDifficulty())
                 .calories(recipe.getCalories())
+                .lastStepImageUrl(lastStepImageUrl)
                 .build();
     }
 }

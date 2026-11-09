@@ -14,6 +14,7 @@ import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeIngredientTextDt
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeListItemResponse;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeListRequest;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeIngredientCountDto;
+import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeStepImageDto;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeSummary;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeTasteDto;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeUpdatedAtDto;
@@ -72,8 +73,10 @@ public class RecipeService {
     public PageResponse<RecipeListItemResponse> getRecipes(RecipeListRequest request) {
         PageRequest pageable = PageRequest.of(request.page() - 1, request.size());
 
-        Page<RecipeListItemResponse> response = recipeRepository.findRecipesByCondition(request, pageable)
-                .map(RecipeListItemResponse::from);
+        Page<Recipe> recipes = recipeRepository.findRecipesByCondition(request, pageable);
+        Map<Long, String> lastStepImages = findLastStepImages(recipes.map(Recipe::getId).getContent());
+        Page<RecipeListItemResponse> response = recipes
+                .map(recipe -> RecipeListItemResponse.from(recipe, lastStepImages.get(recipe.getId())));
 
         return PageResponse.of(response);
     }
@@ -134,6 +137,12 @@ public class RecipeService {
         return response;
     }
 
+    // 목록 한 페이지의 마지막 단계 사진을 한 번에 조회한다 (레시피 id → 사진 URL)
+    private Map<Long, String> findLastStepImages(Collection<Long> recipeIds) {
+        return recipeRepository.findLastStepImages(recipeIds).stream()
+                .collect(Collectors.toMap(RecipeStepImageDto::recipeId, RecipeStepImageDto::imageUrl));
+    }
+
     private RecipeDetailResponse toDetailResponse(
             Recipe recipe,
             List<RecipeIngredient> ingredients,
@@ -187,10 +196,11 @@ public class RecipeService {
         Map<Long, Recipe> recipesById = recipeRepository.findAllById(recipeIds).stream()
                 .collect(Collectors.toMap(Recipe::getId, Function.identity()));
 
+        Map<Long, String> lastStepImages = findLastStepImages(recipesById.keySet());
         List<RecipeListItemResponse> content = recipeIds.stream()
                 .map(recipesById::get)
                 .filter(Objects::nonNull)
-                .map(RecipeListItemResponse::from)
+                .map(recipe -> RecipeListItemResponse.from(recipe, lastStepImages.get(recipe.getId())))
                 .toList();
 
         return PageResponse.of(content, request.page(), request.size(), total);

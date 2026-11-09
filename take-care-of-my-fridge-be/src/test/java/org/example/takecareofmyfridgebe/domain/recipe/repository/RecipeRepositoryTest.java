@@ -1,8 +1,10 @@
 package org.example.takecareofmyfridgebe.domain.recipe.repository;
 
 import jakarta.persistence.EntityManager;
+import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeStepImageDto;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeUpdatedAtDto;
 import org.example.takecareofmyfridgebe.domain.recipe.entity.Recipe;
+import org.example.takecareofmyfridgebe.domain.recipe.entity.RecipeStep;
 import org.example.takecareofmyfridgebe.global.config.JpaAuditingConfig;
 import org.example.takecareofmyfridgebe.global.config.QueryDslConfig;
 import org.example.takecareofmyfridgebe.support.MySqlContainerSupport;
@@ -16,6 +18,7 @@ import org.springframework.context.annotation.Import;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
@@ -106,5 +109,37 @@ class RecipeRepositoryTest extends MySqlContainerSupport {
                 .findFirst()
                 .orElseThrow();
         assertNotNull(dto2.updatedAt());
+    }
+
+    private void createTestStep(Recipe recipe, int stepNo, String imageUrl) {
+        em.persist(RecipeStep.builder()
+                .recipe(recipe)
+                .stepNo(stepNo)
+                .description(stepNo + "단계")
+                .imageUrl(imageUrl)
+                .build());
+    }
+
+    @Test
+    @DisplayName("마지막 조리 단계에 사진이 있는 레시피만 그 사진을 돌려주고, 앞 단계 사진은 쓰지 않는다")
+    void returnsOnlyLastStepImages() {
+        // given
+        Recipe withLastImage = createTestRecipe("김치찌개", null);
+        createTestStep(withLastImage, 1, "https://img.example/1.jpg");
+        createTestStep(withLastImage, 2, "https://img.example/2.jpg");
+        Recipe withoutLastImage = createTestRecipe("순두부찌개", null);
+        createTestStep(withoutLastImage, 1, "https://img.example/3.jpg");
+        createTestStep(withoutLastImage, 2, null);
+        Recipe blankLastImage = createTestRecipe("된장찌개", null);
+        createTestStep(blankLastImage, 1, " ");
+        em.flush();
+        em.clear();
+
+        // when
+        List<RecipeStepImageDto> result = recipeRepository.findLastStepImages(
+                List.of(withLastImage.getId(), withoutLastImage.getId(), blankLastImage.getId()));
+
+        // then
+        assertThat(result).containsExactly(new RecipeStepImageDto(withLastImage.getId(), "https://img.example/2.jpg"));
     }
 }

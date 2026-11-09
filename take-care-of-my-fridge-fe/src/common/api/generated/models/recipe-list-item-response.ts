@@ -22,6 +22,7 @@ export interface RecipeListItemResponse {
     'cuisineType'?: string;
     'difficulty'?: number;
     'imageUrl'?: string;
+    'lastStepImageUrl'?: string;
     'name'?: string;
     'recipeId'?: number;
     'servings'?: number;
