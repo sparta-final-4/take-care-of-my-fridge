@@ -5,6 +5,7 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.ChatSessionResponse;
 import org.example.takecareofmyfridgebe.domain.chat.entity.ChatSession;
 import org.example.takecareofmyfridgebe.domain.chat.entity.ChatSessionStatus;
 import org.example.takecareofmyfridgebe.domain.chat.event.ChatSessionChangedEvent;
+import org.example.takecareofmyfridgebe.domain.chat.repository.ChatRecommendationRepository;
 import org.example.takecareofmyfridgebe.domain.chat.repository.ChatSessionRepository;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
@@ -39,6 +40,9 @@ class ChatSessionServiceTest {
 
     @Mock
     private ChatSessionRepository chatSessionRepository;
+
+    @Mock
+    private ChatRecommendationRepository chatRecommendationRepository;
 
     @Mock
     private ChatProperties chatProperties;
@@ -431,5 +435,91 @@ class ChatSessionServiceTest {
 
         verify(eventPublisher, times(1)).publishEvent(any(Object.class));
         verify(eventPublisher).publishEvent(new ChatSessionChangedEvent(1L, 10L, ChatSessionStatus.COMPLETED));
+    }
+
+    @Test
+    @DisplayName("요리 완료로 끝낼 상담이 없거나 이미 끝났으면 예외 없이 건너뛴다")
+    void skipsWithoutThrowing_whenCookingSessionIsMissingOrEnded() {
+        ChatSession completed = session(11L);
+        completed.complete();
+        when(chatSessionRepository.findByIdAndMemberId(11L, 1L)).thenReturn(Optional.of(completed));
+        when(chatSessionRepository.findByIdAndMemberId(12L, 1L)).thenReturn(Optional.empty());
+
+        chatSessionService.completeSessionFromCooking(1L, 11L);
+        chatSessionService.completeSessionFromCooking(1L, 12L);
+
+        assertThat(completed.getStatus()).isEqualTo(ChatSessionStatus.COMPLETED);
+        verify(eventPublisher, never()).publishEvent(any(Object.class));
+    }
+
+    @Test
+    @DisplayName("요청에 상담이 없으면 진행 중 상담에서 이 레시피를 추천한 적 있을 때 그 상담을 잇는다")
+    void returnsActiveSession_whenRecipeWasRecommended() {
+        when(chatSessionRepository.findByMemberIdAndStatus(1L, ChatSessionStatus.ACTIVE)).thenReturn(Optional.of(session(10L)));
+        when(chatRecommendationRepository.existsRecipeInSession(10L, 12L)).thenReturn(true);
+
+        assertThat(chatSessionService.findCookingSessionId(1L, null, 12L)).contains(10L);
+    }
+
+    @Test
+    @DisplayName("요청에 상담이 없고 진행 중 상담에서 이 레시피를 추천하지 않았으면 잇지 않는다")
+    void returnsEmpty_whenRecipeWasNotRecommended() {
+        when(chatSessionRepository.findByMemberIdAndStatus(1L, ChatSessionStatus.ACTIVE)).thenReturn(Optional.of(session(10L)));
+        when(chatRecommendationRepository.existsRecipeInSession(10L, 12L)).thenReturn(false);
+
+        assertThat(chatSessionService.findCookingSessionId(1L, null, 12L)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("진행 중 상담이 없으면 잇지 않는다")
+    void returnsEmpty_whenNoActiveSession() {
+        when(chatSessionRepository.findByMemberIdAndStatus(1L, ChatSessionStatus.ACTIVE)).thenReturn(Optional.empty());
+
+        assertThat(chatSessionService.findCookingSessionId(1L, null, 12L)).isEmpty();
+        verify(chatRecommendationRepository, never()).existsRecipeInSession(any(), any());
+    }
+
+    @Test
+    @DisplayName("30분이 지나 아직 ACTIVE인 상담은 추천했어도 잇지 않는다")
+    void returnsEmpty_whenActiveSessionTimedOut() {
+        ChatSession idle = session(10L);
+        ReflectionTestUtils.setField(idle, "lastMessageAt", LocalDateTime.now().minusMinutes(35));
+        when(chatSessionRepository.findByMemberIdAndStatus(1L, ChatSessionStatus.ACTIVE)).thenReturn(Optional.of(idle));
+        when(chatSessionRepository.findByIdAndMemberId(10L, 1L)).thenReturn(Optional.of(idle));
+
+        assertThat(chatSessionService.findCookingSessionId(1L, null, 12L)).isEmpty();
+        assertThat(chatSessionService.findCookingSessionId(1L, 10L, 12L)).isEmpty();
+        verify(chatRecommendationRepository, never()).existsRecipeInSession(any(), any());
+    }
+
+    @Test
+    @DisplayName("요청에 담긴 상담이 내 진행 중 상담이면 추천 여부를 보지 않고 그 상담을 잇는다")
+    void returnsRequestedSession_whenItIsMyActiveSession() {
+        when(chatSessionRepository.findByIdAndMemberId(10L, 1L)).thenReturn(Optional.of(session(10L)));
+
+        assertThat(chatSessionService.findCookingSessionId(1L, 10L, 12L)).contains(10L);
+        verify(chatRecommendationRepository, never()).existsRecipeInSession(any(), any());
+    }
+
+    @Test
+    @DisplayName("요청에 담긴 상담이 남의 상담·끝난 상담·만료된 상담이면 예외 없이 잇지 않는다")
+    void returnsEmpty_whenRequestedSessionIsOthersOrEnded() {
+        ChatSession completed = session(11L);
+        completed.complete();
+        ChatSession expired = session(12L);
+        expired.expire();
+        when(chatSessionRepository.findByIdAndMemberId(10L, 1L)).thenReturn(Optional.empty());
+        when(chatSessionRepository.findByIdAndMemberId(11L, 1L)).thenReturn(Optional.of(completed));
+        when(chatSessionRepository.findByIdAndMemberId(12L, 1L)).thenReturn(Optional.of(expired));
+
+        assertThat(chatSessionService.findCookingSessionId(1L, 10L, 12L)).isEmpty();
+        assertThat(chatSessionService.findCookingSessionId(1L, 11L, 12L)).isEmpty();
+        assertThat(chatSessionService.findCookingSessionId(1L, 12L, 12L)).isEmpty();
+    }
+
+    private static ChatSession session(Long id) {
+        ChatSession session = ChatSession.builder().memberId(1L).build();
+        ReflectionTestUtils.setField(session, "id", id);
+        return session;
     }
 }

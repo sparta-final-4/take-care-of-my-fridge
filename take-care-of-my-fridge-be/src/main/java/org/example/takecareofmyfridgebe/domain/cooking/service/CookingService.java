@@ -41,16 +41,17 @@ public class CookingService {
      * 요리 완료 기록을 생성하여 저장한다.
      *
      * @param memberId 회원 ID
-     * @param request  요리 완료 요청 정보
+     * @param request       요리 완료 요청 정보
+     * @param chatSessionId 이을 상담 ID (CookingFacade가 확인·찾은 값, 잇지 않으면 null)
      * @return 저장된 요리 기록 엔티티
      */
     @Transactional
-    public CookingLog saveCookingLog(Long memberId, CookingCompleteRequest request) {
+    public CookingLog saveCookingLog(Long memberId, CookingCompleteRequest request, Long chatSessionId) {
         if (!recipeService.existsById(request.recipeId())) {
             throw new BusinessException(ErrorCode.RECIPE_NOT_FOUND);
         }
 
-        CookingLog cookingLog = request.toEntity(memberId);
+        CookingLog cookingLog = request.toEntity(memberId, chatSessionId);
         return cookingLogRepository.save(cookingLog);
     }
 
