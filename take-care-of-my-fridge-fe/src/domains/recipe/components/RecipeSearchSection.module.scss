@@ -56,6 +56,26 @@
   align-items: flex-start;
 }
 
+// 요리 분류: 두 칸으로 나눠 세로 길이를 줄인다. 더보기·접기는 두 칸에 걸쳐 맨 아래에.
+.twoColumns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: var(--ant-margin-sm);
+  align-items: start;
+
+  > :global(.ant-btn) {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+
+  // 마우스로 고르는 PC는 터치 영역이 필요 없어 줄 높이를 줄인다.
+  @media #{$desktop-pointer} {
+    > :global(.ant-tag).option {
+      min-height: $facet-compact-row-height;
+    }
+  }
+}
+
 // 음식 종류·요리 분류·조리 시간: 앞에 점이 붙은 글자 줄. 고르면 점이 잉크색으로 차고 글자가 굵어진다.
 :global(.ant-tag).option {
   display: inline-flex;

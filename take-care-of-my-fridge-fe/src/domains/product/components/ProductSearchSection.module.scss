@@ -2,7 +2,7 @@
 @use '@/styles/mixins' as *;
 
 // 상품 검색 조건 칸: 상자 없이 묶음마다 얇은 선으로 나눈다(레퍼런스 facets 아코디언 모양, 접지는 않는다).
-// 맨 위 잉크색 선·제목 모양은 옆 칸 섹션(SectionCard: 오늘의 밀키트)과 똑같이 맞춰, 두 칸의 위쪽 선이 한 줄에 놓인다.
+// 맨 위 잉크색 선·제목 모양은 다른 화면의 섹션(SectionCard)과 똑같이 맞춘다.
 .facets {
   display: flex;
   flex-direction: column;
