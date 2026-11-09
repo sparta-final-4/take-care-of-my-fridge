@@ -7,6 +7,7 @@
 - api-spec.md에는 API마다 Method/Path·권한, 요청 표, 응답 DTO 표, 에러 표, 주의 사항(3줄 이내)만 남겼습니다.
 - 날짜 표시("2026-11-0x 추가", "(기존)")는 지우고, 큰 변경 3개만 도메인 문서 변경 이력에 남겼습니다.
 - 명세에 없던 API 4개를 넣었습니다: 상담 시작, 상담 끝내기, 인기 레시피, 후기 요약 실행.
+- 그 뒤 명세를 도메인별 파일로 나눴습니다: [fridge-api.md](../api/fridge-api.md), [cooking-api.md](../api/cooking-api.md), [review-api.md](../api/review-api.md), [chat-api.md](../api/chat-api.md). 아래 표의 "api-spec ○○ API"는 이 파일들을 뜻합니다.
 
 ## 전후 대조표
 | 지금까지 api-spec.md에 있던 항목 | 옮긴 곳 |
