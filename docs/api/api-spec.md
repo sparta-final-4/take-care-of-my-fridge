@@ -32,6 +32,9 @@
 | 요리 기록 | [cooking-api.md](cooking-api.md) |
 | 후기 | [review-api.md](review-api.md) |
 | AI 상담 | [chat-api.md](chat-api.md) |
+| 레시피 | [이 문서의 레시피 API](#레시피-api) |
+| 상품 | [이 문서의 상품 API](#상품-api) |
+| 통합검색 | [이 문서의 통합검색 API](#통합검색-api) |
 | 장바구니 | [이 문서의 장바구니 API](#장바구니-api) |
 | 주문 | [이 문서의 주문 API](#주문-api) |
 | 환불 | [이 문서의 환불 API](#환불-api) |
@@ -69,15 +72,6 @@
 ## 페이지 응답
 
 공유 구조: content, pageNumber, pageSize, totalElements, totalPages, isLast. 요청 page와 응답 pageNumber는 1부터 시작하며, 서비스 내부의 Spring Page 번호는 0부터 시작합니다.
-
-## 관리자 상품 조회
-
-| 기능 | Method / Path | 권한 | 요청 | 성공 응답 |
-|---|---|---|---|---|
-| 상품 목록 | GET /api/admin/products | ADMIN | keyword(상품명 일부), type(INGREDIENT/MEALKIT), status(ON_SALE/SOLD_OUT/STOPPED), page(기본 1), size(기본 20, 최대 100) | PageResponse<ProductListItemResponse> |
-| 상품 상세 | GET /api/admin/products/{productId} | ADMIN | productId | ProductDetailResponse, 없으면 PRODUCT_001 |
-
-관리자 목록에서 status를 생략하면 세 상태를 모두 조회합니다. 상세 조회는 판매 중지 상품도 반환합니다. 공개 `/api/products` 조회는 기존처럼 판매 중지 상품을 제외합니다.
 
 ## 상품 할인·품절 필드
 
@@ -165,6 +159,119 @@ HTTP 메서드·경로·DTO 이름은 구현 전 합의합니다.
 - 맛 선호 변경은 `PUT /members/me/tastes` 요청 본문 `{"tastes":["SALTY","UMAMI"]}`으로 목록 전체를 교체합니다. 빈 목록은 모든 맛 선호를 지웁니다. 중복 값은 허용하고 서버에서 한 번만 저장합니다. 목록 누락·null, null 항목, 허용하지 않는 맛 값은 400입니다. 성공 본문은 공통 `ApiResponse.ok()` 형식입니다.
 - 가입 성공 데이터는 `{ memberId: number }`입니다. 이메일 중복은 `M001`, 닉네임 중복은 `M002`로 응답합니다.
 - `POST /members`는 익명 요청을 허용합니다. 다른 POST 경로의 CSRF 보호는 유지합니다.
+
+## 레시피 API
+
+상태: **구현 완료** · 근거: `RecipeController`, `AdminRecipeController`, `RecipeService`
+
+경로는 prefix(/api)를 뺀 값입니다. 조회는 비로그인도 쓸 수 있고, 등록·수정은 ADMIN만 쓸 수 있습니다(`/admin/**`).
+
+| 기능 | Method / Path | 권한 | 요청 | 성공 응답 | 주요 오류 |
+|---|---|---|---|---|---|
+| 레시피 목록 조회 | GET /recipes | 공개 | Query: sort?, keyword?, cuisineType?, category?, maxCookTimeMin?, maxDifficulty?, page?, size? | 200, `PageResponse<RecipeListItemResponse>` | 400 C001 검증 오류 |
+| 레시피 분류 값 조회 | GET /recipes/classifications | 공개 | 없음 | 200, `RecipeClassificationResponse` | - |
+| 레시피 상세 조회 | GET /recipes/{recipeId} | 공개 | Path: recipeId | 200, `RecipeDetailResponse` | 404 RECIPE_001 |
+| 레시피 등록 | POST /admin/recipes | ADMIN | Body: `RecipeCreateRequest` | 201, `RecipeDetailResponse` | 400 C001 검증 오류, 401, 403, 404 INGREDIENT_002 연결할 재료 없음 |
+| 레시피 수정 | PATCH /admin/recipes/{recipeId} | ADMIN | Path: recipeId<br>Body: `RecipeUpdateRequest` | 200, `RecipeDetailResponse` | 400 C001 검증 오류, 401, 403, 404 RECIPE_001·INGREDIENT_002 |
+
+- **목록 조회 조건**: 모든 조건은 선택이고, 빈 값이면 그 조건 없이 조회합니다. `keyword`(최대 50자)는 레시피 이름에 들어 있는지 보고, `cuisineType`(최대 20자)·`category`(최대 50자)는 값이 같은지 봅니다. `maxCookTimeMin`(1 이상)·`maxDifficulty`(1~10)는 그 값을 포함합니다. `page`는 1부터(기본 1), `size`는 1~100(기본 20)입니다.
+- **정렬(`sort`)**: `LATEST`(기본, ID 내림차순), `RELEVANCE`, `NAME_ASC`(이름순), `DIFFICULTY_ASC`(쉬운 순). 이 API는 MySQL로만 조회하므로 `RELEVANCE`는 `LATEST`와 같습니다. 관련도 순은 통합검색 API(`GET /search/recipes`)에서 씁니다.
+- `RecipeListItemResponse`: recipeId, name, summary, imageUrl, cuisineType, category, cookTimeMin, servings, difficulty, calories, lastStepImageUrl(마지막 조리 단계 사진, 없으면 null. 카드에 마우스를 올렸을 때 씀).
+- `RecipeClassificationResponse`: cuisineTypes, categories. 레시피 데이터에 실제로 있는 값만 가나다순으로 담으며, 목록 필터 칩에 씁니다. 캐시해 두고 레시피 등록·수정 때 비웁니다.
+- `RecipeDetailResponse`: recipeId, name, summary, imageUrl, cuisineType, category, cookMethod, cookTimeMin, servings, difficulty, tags, tip, tipSummary, nutrition, ingredients, steps.
+  - `nutrition`(1인분 기준): weightG, calories, carbsG, proteinG, fatG, sodiumMg.
+  - `ingredients[]`: seq, ingredientId, displayName, amount, role, groupName, quantity, basicSeasoning(기본 양념이면 true). seq 순서입니다.
+  - `steps[]`: stepNo, description, imageUrl, tip. stepNo 순서입니다.
+- **등록 요청(`RecipeCreateRequest`)**:
+  - 필수: name(최대 200자), difficulty(1~10), ingredients(1~100개), steps(1~50개).
+  - 선택: summary·tip(최대 2,000자), imageUrl(최대 500자, `http://`·`https://`로 시작), cuisineType(최대 20자), category(최대 50자), cookMethod(최대 20자), mainIngredientCategory(최대 30자), cookTimeMin(1 이상), servings(1 이상), tags(최대 255자), nutrition(각 항목 0 이상, 정수 6자리·소수 2자리).
+  - `ingredients[]`: ingredientId(필수), displayName(필수, 최대 100자), amount(최대 100자), quantity(0보다 큼, 정수 8자리·소수 2자리), role(최대 20자), groupName(최대 50자).
+  - `steps[]`: description(필수, 최대 2,000자), imageUrl(최대 500자, 빈 값은 null), tip(최대 2,000자).
+  - 재료 순서(seq)와 단계 번호(stepNo)는 목록 순서대로 1부터 매깁니다. 출처(source)는 `ADMIN`이고 원본 코드(source_id)는 서버가 만듭니다.
+- **수정 요청(`RecipeUpdateRequest`)**: 보낸 필드만 바꿉니다(null이면 기존 값 유지). 선택 텍스트 필드는 빈 문자열을 보내면 비웁니다. 영양 정보도 보낸 항목만 바꿉니다. `ingredients`·`steps`를 보내면 목록 전체를 바꾸고 번호를 1부터 다시 매기며, 보낼 때는 1개 이상이어야 합니다. 검증 범위는 등록과 같습니다.
+- **재료 확인**: `recipe_ingredients.ingredient_id`는 FK 없이 ID로만 참조하므로, 저장 전에 모든 ingredientId가 재료 사전에 있는지 확인하고 하나라도 없으면 404 `INGREDIENT_002`입니다.
+- **트랜잭션·검색 색인**: 레시피·재료·조리 단계는 한 트랜잭션에서 저장합니다. 저장 후 이벤트(`RecipeChangedEvent`)로 검색 색인(ES)의 해당 레시피를 다시 넣습니다.
+- 레시피 삭제 API는 없습니다.
+
+## 상품 API
+
+상태: **구현 완료** · 근거: `ProductController`, `AdminProductController`, `ProductFacade`, `ProductService`, `AdminImageController`
+
+경로는 prefix(/api)를 뺀 값입니다. 공개 조회는 비로그인도 쓸 수 있고, `/admin/**`은 ADMIN만 쓸 수 있습니다. 상품 응답의 `sale`·`soldOut` 필드는 위 [상품 할인·품절 필드](#상품-할인품절-필드)를 따릅니다.
+
+| 기능 | Method / Path | 권한 | 요청 | 성공 응답 | 주요 오류 |
+|---|---|---|---|---|---|
+| 상품 목록 조회 | GET /products | 공개 | Query: sort?, keyword?, type?, minPrice?, maxPrice?, page?, size? | 200, `PageResponse<ProductListItemResponse>` | 400 C001 검증 오류 |
+| 상품 상세 조회 | GET /products/{productId} | 공개 | Path: productId | 200, `ProductDetailResponse` | 404 PRODUCT_001 (판매 중지 포함) |
+| 관리자 상품 목록 | GET /admin/products | ADMIN | Query: keyword?, type?, status?, page?, size? | 200, `PageResponse<ProductListItemResponse>` | 400 C001, 401, 403 |
+| 관리자 상품 상세 | GET /admin/products/{productId} | ADMIN | Path: productId | 200, `ProductDetailResponse` | 401, 403, 404 PRODUCT_001 |
+| 상품 등록 | POST /admin/products | ADMIN | Body: `ProductCreateRequest` | 201, `ProductDetailResponse` | 400 C001·PRODUCT_006, 401, 403, 404 INGREDIENT_002 |
+| 상품 수정 | PATCH /admin/products/{productId} | ADMIN | Path: productId<br>Body: `ProductUpdateRequest` | 200, `ProductDetailResponse` | 400 C001·PRODUCT_006, 401, 403, 404 PRODUCT_001·INGREDIENT_002, 500 PRODUCT_007 |
+| 상품 삭제(판매 중지) | DELETE /admin/products/{productId} | ADMIN | Path: productId | 200, 공통 성공 응답 | 401, 403, 404 PRODUCT_001 |
+| 상품 이미지 업로드 URL 발급 | POST /admin/images/presign | ADMIN | Body: contentType, fileSize | 200, `ImageUploadUrlResponse` | 400 C001·IMAGE_002, 401, 403, 503 IMAGE_001 |
+
+- **공개 목록 조건**: 모든 조건은 선택입니다. `keyword`(최대 50자)는 상품명에 들어 있는지 보고(대소문자 무시), `type`은 `INGREDIENT`·`MEALKIT`, `minPrice`·`maxPrice`(0 이상, 양 끝 포함)는 정가(`price`) 기준입니다. `minPrice`가 `maxPrice`보다 크면 400입니다. `page`는 1부터(기본 1), `size`는 1~100(기본 20)입니다.
+- **정렬(`sort`)**: `LATEST`(기본, ID 내림차순), `RELEVANCE`, `PRICE_ASC`, `PRICE_DESC`. 이 API는 MySQL로만 조회하므로 `RELEVANCE`는 `LATEST`와 같습니다. 관련도 순은 통합검색 API(`GET /search/products`)에서 씁니다.
+- **공개 범위**: 공개 목록·상세는 판매 중지(`STOPPED`) 상품을 빼고, 품절(`SOLD_OUT`) 상품은 보여 줍니다. 판매 중지 상품의 공개 상세는 404입니다.
+- **관리자 조회**: `keyword`·`type`·`page`·`size`는 공개 목록과 같고 정렬은 최신순입니다. `status`(`ON_SALE`·`SOLD_OUT`·`STOPPED`)를 생략하면 세 상태를 모두 조회합니다. 관리자 상세는 판매 중지 상품도 반환합니다.
+- `ProductListItemResponse`: productId, productType, name, imageUrl, price(정가), status, sale, soldOut.
+- `ProductDetailResponse`: productId, productType, name, description, imageUrl, price, stock, storage(`ROOM_TEMP`·`REFRIGERATED`·`FROZEN`), shelfDays(권장 보관 일수), status, sale, soldOut, ingredient, mealkit. 상품 종류에 따라 `ingredient`(unitAmount, unit) 또는 `mealkit`(servings) 하나만 채워지고, 상세 행이 없으면 둘 다 null입니다.
+- **등록 요청(`ProductCreateRequest`)**:
+  - 필수: productType, name(최대 200자), price(1원~1,000만 원), stock(0~10만), storage, shelfDays(1 이상).
+  - 선택: description(최대 2,000자), imageUrl(최대 500자, `http://`·`https://`로 시작, 빈 값은 null).
+  - 상품 종류에 맞는 상세 하나만 보냅니다. 다르거나 둘 다 보내면 400입니다.
+    - `ingredient`: ingredientId, unitAmount(0보다 큼, 정수 6자리·소수 2자리), unit(최대 20자), baseQuantity(재료 기본 단위 수량, 0보다 큼, 정수 8자리·소수 2자리). 모두 필수입니다.
+    - `mealkit`: servings(1 이상, 필수).
+  - 등록한 상품의 상태는 판매 중(`ON_SALE`)입니다.
+- **수정 요청(`ProductUpdateRequest`)**: 보낸 필드만 바꿉니다(null이면 기존 값 유지). description·imageUrl은 빈 문자열을 보내면 비웁니다. name·unit은 공백을 뺀 뒤 1자 이상이어야 합니다.
+  - 상태: `STOPPED`를 보내거나 판매 중지 상품에 status를 보내지 않으면 판매 중지입니다. 그 밖에는 재고로 정합니다(재고 0이면 `SOLD_OUT`, 1 이상이면 `ON_SALE`). 보낸 `ON_SALE`·`SOLD_OUT`이 재고와 어긋나도 재고를 따릅니다. 판매 중지 상품에 `ON_SALE`·`SOLD_OUT`을 보내면 판매를 다시 엽니다.
+  - 상품 종류(productType)는 바꿀 수 없고, 상품 종류와 다른 상세를 보내면 400 `C001`("상품 종류에 맞지 않는 상세 정보입니다.")입니다. 상세 행이 없는 상품에 상세를 보내면 500 `PRODUCT_007`입니다. 수정은 상품 행을 잠그고(`SELECT ... FOR UPDATE`) 처리합니다.
+- **연결 재료 확인**: `ingredient_products.ingredient_id`는 FK 없이 ID로만 참조하므로 저장 전에 확인합니다. 재료가 없으면 404 `INGREDIENT_002`, 직접 입력용(`ING_CUSTOM`)·밀키트용(`ING_MEALKIT`) 기본 재료이면 400 `PRODUCT_006`입니다.
+- **삭제**: 행을 지우지 않고 상태를 판매 중지(`STOPPED`)로 바꾸는 논리 삭제입니다. 이미 판매 중지된 상품을 다시 삭제해도 성공입니다. 원자적 UPDATE가 주문 생성과 같은 행에 쓰기 잠금을 걸어, 삭제 직후 진행 중인 주문이 판매 중지 상품을 사지 않게 합니다. 기존 주문의 상품 정보·가격은 주문 스냅샷으로 남습니다.
+- **판매가**: 응답의 할인·품절 값은 상품 저장이 커밋된 뒤 할인 행사 도메인(`SaleEventReader`)에서 읽어 붙입니다.
+- **검색 색인**: 등록·수정·삭제 후 이벤트(`ProductChangedEvent`)로 검색 색인(ES)의 해당 상품을 다시 넣습니다.
+- **이미지 업로드 URL 발급**: 상품 이미지를 서버를 거치지 않고 브라우저에서 S3로 바로 올리기 위한 Presigned PUT URL을 만듭니다.
+  - 요청: contentType(필수, `image/jpeg`·`image/png`·`image/webp`만 가능, 다르면 400 `IMAGE_002`), fileSize(필수, 1바이트~5MB).
+  - `ImageUploadUrlResponse`: uploadUrl(5분 동안 유효한 PUT URL), imageUrl(올린 뒤 상품 `imageUrl`에 저장할 조회 URL). 파일은 요청한 Content-Type·크기 그대로 PUT해야 하며, 다르면 S3가 거부합니다.
+  - 키는 `images/products/{UUID}.{확장자}`로 매번 새로 만듭니다. 이미지 업로드를 끈 환경에서는 503 `IMAGE_001`이며, 이때는 이미지 URL을 직접 입력합니다.
+
+## 통합검색 API
+
+상태: **구현 완료** · 근거: `SearchController`, `RecipeSearchFacade`, `ProductSearchFacade`, `SearchFridgeMatchFacade`, `SearchPopularKeywordService`, `SearchClickHistoryService`
+
+경로는 prefix(/api)를 뺀 값입니다. `GET /search/fridge-matches`만 로그인이 필요하고 나머지는 비로그인도 쓸 수 있습니다. 로그인했으면 회원 ID를 기록·집계에 씁니다.
+
+| 기능 | Method / Path | 권한 | 요청 | 성공 응답 | 주요 오류 |
+|---|---|---|---|---|---|
+| 레시피 검색 | GET /search/recipes | 공개 | Query: 레시피 목록 조회와 같음 | 200, `PageResponse<RecipeListItemResponse>` | 400 C001 |
+| 상품 검색 | GET /search/products | 공개 | Query: 상품 목록 조회와 같음 | 200, `PageResponse<ProductListItemResponse>` | 400 C001 |
+| 검색어 자동완성 | GET /search/suggestions | 공개 | Query: keyword(필수, 최대 50자) | 200, `List<String>` (레시피 이름, 최대 8개) | 400 C001 |
+| 인기 검색어 | GET /search/popular | 공개 | 없음 | 200, `PopularKeywordsResponse` | - |
+| 검색 결과와 내 냉장고 비교 | GET /search/fridge-matches | 로그인 | Query: recipeIds(1~20개), keyword?(최대 50자) | 200, `SearchFridgeMatchResponse` | 400 C001, 401 |
+| 검색 결과 상품 클릭 기록 | POST /search/clicks | 공개 | Body: productId(1 이상), keyword(필수, 최대 100자) | 200, 공통 성공 응답 | 400 C001 |
+| 검색 결과 레시피 클릭 기록 | POST /search/recipe-clicks | 공개 | Body: recipeId(1 이상), keyword(필수, 최대 100자) | 200, 공통 성공 응답 | 400 C001 |
+
+- **검색 엔진 선택**: 검색어가 없거나 설정(`app.search.engine`, 환경 변수 `SEARCH_ENGINE`, 기본 `elasticsearch`)이 `mysql`이면 MySQL로 조회하고, 결과는 레시피·상품 목록 조회 API와 같습니다. 검색어가 있고 ES를 쓰면 ES가 고른 ID 순서대로 DB에서 레시피·상품을 읽어 응답하며, 전체 건수는 ES 값을 씁니다. 가격·상태·할인은 DB 값입니다. ES 조회가 실패하면 오류 없이 MySQL 조회로 대신합니다.
+- **ES 레시피 검색**: 검색어의 단어가 이름(가중치 3), 재료(가중치 2), 요약 중 어딘가에 모두 있어야 합니다. 분류·조리 시간·난이도는 점수에 영향이 없는 필터로 겁니다. `RELEVANCE` 정렬은 점수 순, 같으면 ID 내림차순입니다.
+  - 키워드 결과가 0건이고 벡터 검색을 켰으면 검색어 임베딩으로 의미가 가까운 레시피를 다시 찾습니다(kNN, 같은 필터·정렬). 벡터 쪽이 실패하거나 호출 제한에 걸리면 0건으로 응답합니다. 응답에는 벡터 검색으로 찾은 결과인지 표시하지 않습니다.
+- **ES 상품 검색**: 검색어의 단어가 이름(가중치 3)·설명 중 어딘가에 모두 있어야 합니다. 판매 중지 상품은 빼고, 종류·가격 범위는 필터로 겁니다. 색인이 늦어 판매 중지 상품이 섞여 와도 DB에서 읽을 때 뺍니다.
+- **검색 기록**: 검색어가 있고, 필터 없는 첫 페이지일 때만 기록합니다(2페이지 이후나 필터를 바꾼 조회는 세지 않음).
+  - 0건이면 0건 검색어(`search_zero_result_histories`)에 대상(`RECIPE`·`PRODUCT`)과 함께 남깁니다. 검색어 사전 보강의 근거로 씁니다.
+  - 레시피 검색 결과가 있으면 인기 검색어로 셉니다. 상품 검색은 인기 검색어로 세지 않습니다.
+- **자동완성**: 레시피 이름에서 단어가 검색어로 시작하거나 이름에 검색어 단어가 있는 것을 고릅니다("김" → 김치찌개, "찌개" → 김치찌개). 이름이 검색어로 시작하면 앞에 오고, 같은 이름은 한 번만 나옵니다. 벡터 검색은 하지 않습니다. ES가 꺼져 있거나 실패하면 이름에 검색어가 들어간 레시피를 MySQL에서 찾습니다.
+- **인기 검색어(`PopularKeywordsResponse.keywords`)**: 최근 7일(오늘 포함, Asia/Seoul) 동안 많이 검색된 순서로 최대 10개입니다. 없으면 빈 목록입니다.
+  - 로그인 회원의 검색만 세고, 같은 회원·검색어는 하루에 한 번만 셉니다. 2번 이상 검색된 검색어만 보여 줍니다.
+  - 검색어는 앞뒤 공백을 빼고 연속 공백을 하나로, 영문은 소문자로 맞춰 셉니다. 20자를 넘는 검색어는 세지 않습니다.
+  - 집계는 Redis에 두며, 합친 결과를 5분 동안 캐시합니다(FE도 5분 캐시해 화면 반영은 최대 약 10분 늦음). Redis 장애면 세지 않고 조회는 빈 목록입니다.
+- **냉장고 비교(`SearchFridgeMatchResponse`)**:
+  - `recipes[]`: recipeId, ownedCount(냉장고에 있는 재료 수), ingredientCount(비교한 재료 수). 요청 순서대로입니다.
+  - `keywordItems`: 입력한 이름에 검색어가 들었거나 표준 재료 이름이 검색어와 같은 내 냉장고 재료의 입력 이름입니다. 같은 이름은 한 번만 넣고, 검색어가 없으면 빈 목록입니다.
+  - 재료는 표준 재료 ID로 비교합니다(냉장고 "국산 흙대파"와 레시피 "대파"가 같은 재료). 기본 양념·직접 입력·밀키트 재료는 요리 완료 차감과 같은 기준으로 세지 않습니다. 소비기한이 지난 냉장고 재료는 비교하지 않습니다.
+- **상품 클릭 기록**: `search_click_histories`에 남기며, 할인 후보 분석과 메인 "지금 뜨는 할인"이 이 클릭 수를 읽습니다. 반복 클릭은 걸러서 저장합니다.
+  - 로그인: 같은 회원·상품·검색어는 10분 안에 한 번만 저장합니다.
+  - 비로그인: 상품별로 1분에 30건까지만 저장합니다.
+  - 걸러진 클릭도 200입니다. Redis 장애면 거르지 않고 저장합니다. 상품이 있는지는 확인하지 않습니다.
+- **레시피 클릭 기록**: `search_recipe_click_histories`에 거르지 않고 그대로 저장합니다. 레시피가 있는지는 확인하지 않습니다.
 
 ## 장바구니 API
 
