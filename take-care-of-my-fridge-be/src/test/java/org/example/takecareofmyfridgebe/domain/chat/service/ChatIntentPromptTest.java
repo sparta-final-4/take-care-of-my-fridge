@@ -98,7 +98,7 @@ class ChatIntentPromptTest {
         assertThat(prompt).contains("그 이름을 맨 앞에, 이어서 비슷한 요리 이름을 넣는다",
                 "moodCategories는 그 요리의 분류가 확실할 때만 넣는다",
                 "탕수육·김피탕·깐풍기는 튀김 요리다",
-                "\"김피탕 같은 요리 추천해줘\" → keywords: 김피탕, 탕수육, 깐풍기 / moodCategories: 튀김 / dishText: 김피탕");
+                "\"김피탕 같은 요리 추천해줘\" → keywords: 김피탕, 탕수육, 깐풍기 / moodCategories: 튀김");
     }
 
     @Test
@@ -108,10 +108,9 @@ class ChatIntentPromptTest {
 
         assertThat(prompt).contains(
                 "말한 이름이 레시피에 없을 법하면(줄임말·세트 메뉴·가게 메뉴·신조어) \"같은\"이 없어도 그 요리를 이루는 요리나 비슷한 요리로 늘린다",
-                "세트 메뉴면 구성 요리를 모두 넣는다",
-                "그 이름을 짧게 그대로 쓴다(레시피에 없을 법한 이름도)");
+                "세트 메뉴면 구성 요리를 모두 넣는다");
         assertThat(prompt).doesNotContain("탕짜면", "짬짜면");
-        assertThat(followUp).contains("요리 이름·keywords·dishText는 첫 질문 규칙대로 뽑는다");
+        assertThat(followUp).contains("요리 이름·keywords는 첫 질문 규칙대로 뽑는다");
     }
 
     @Test

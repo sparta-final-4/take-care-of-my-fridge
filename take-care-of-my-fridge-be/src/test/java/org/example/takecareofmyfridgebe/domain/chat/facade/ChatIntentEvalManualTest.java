@@ -231,7 +231,7 @@ class ChatIntentEvalManualTest {
         runLines.add(String.join(",", "id", "group", "context", "message", "run", "pass", "mismatch", "source",
                 "intent", "wanted", "avoid", "categories", "keywords", "dish", "preference", "maxMinutes", "include", "exclude",
                 "useSelectedOnly", "scope", "names", "saleOnly", "productType", "target", "question",
-                "aiIntent", "aiWanted", "aiAvoid", "aiCategories", "aiKeywords", "aiDish", "aiPreference", "aiMaxMinutes",
+                "aiIntent", "aiWanted", "aiAvoid", "aiCategories", "aiKeywords", "aiPreference", "aiMaxMinutes",
                 "aiInclude", "aiExclude", "aiUseSelectedOnly", "aiScope", "aiTargetIndex", "aiTargetName", "aiRemoved",
                 "aiQuestion", "inputTokens", "cachedTokens", "outputTokens", "ms"));
         rows.forEach(row -> runLines.add(row.line()));
@@ -325,12 +325,12 @@ class ChatIntentEvalManualTest {
                     csv(source)));
             cells.addAll(outcome.cells());
             if (ai == null) {
-                for (int i = 0; i < 16; i++) {
+                for (int i = 0; i < 15; i++) {
                     cells.add("");
                 }
             } else {
                 cells.addAll(List.of(csv(ai.intent()), csv(ai.wantedTastes()), csv(ai.avoidTastes()), csv(ai.moodCategories()),
-                        csv(ai.keywords()), csv(ai.dishText()), csv(ai.preferenceText()), csv(ai.maxMinutes()),
+                        csv(ai.keywords()), csv(ai.preferenceText()), csv(ai.maxMinutes()),
                         csv(ai.includeIngredients()), csv(ai.excludeIngredients()), csv(ai.useSelectedOnly()),
                         csv(ai.fridgeScope()), csv(ai.targetIndex()), csv(ai.targetName()), csv(ai.removed()),
                         csv(ai.detailQuestion())));

@@ -1,5 +1,6 @@
 package org.example.takecareofmyfridgebe.domain.chat.dto;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 
 import java.util.Arrays;
@@ -25,7 +26,8 @@ import java.util.stream.Collectors;
  * @param excludeIngredients 빼고 싶은 재료 이름 (말한 그대로)
  * @param useSelectedOnly    고른·말한 재료를 꼭 쓰는 레시피만 원하는지
  * @param keywords           레시피 이름에 나올 만한 구체적인 요리 이름 (예: 냉면, 막국수). 특징("차가운")도 요리 이름으로 바꾼 것
- * @param dishText           사용자가 말한 요리 이름 (예: "냉면"). 레시피 이름 비교와 카드 이유에 쓴다
+ * @param dishText           사용자가 말한 요리 이름 (예: "냉면"). 레시피 이름 비교와 카드 이유에 쓴다.
+ *                           AI에 받지 않고(@JsonIgnore, 스키마에 없음) 서버가 첫 키워드로 정한다 (withDishFromKeywords)
  * @param preferenceText     사용자가 원한 특징·요리 표현 그대로 (예: "차가운 요리", "냉면 같은 면 요리"). 요청에 못 맞췄을 때 안내에 쓴다
  * @param targetIndex        RECIPE_DETAIL일 때 직전 추천 카드 번호(1부터). 모르면 0
  * @param targetName         RECIPE_DETAIL일 때 말한 레시피 이름 (예: "깐풍기"). 없으면 빈 문자열
@@ -43,7 +45,7 @@ public record IntentResult(
         List<String> excludeIngredients,
         Boolean useSelectedOnly,
         List<String> keywords,
-        String dishText,
+        @JsonIgnore String dishText,
         String preferenceText,
         Integer targetIndex,
         String targetName,
