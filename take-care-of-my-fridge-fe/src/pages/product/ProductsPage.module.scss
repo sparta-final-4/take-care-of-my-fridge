@@ -73,11 +73,8 @@
   }
 }
 
-// 오른쪽 칸: 오늘의 밀키트와 상품 목록을 위아래로, 사이는 섹션 간격.
+// 오른쪽 칸: 상품 목록
 .main {
-  display: flex;
-  flex-direction: column;
-  gap: $main-section-gap;
   min-width: 0;
 }
 

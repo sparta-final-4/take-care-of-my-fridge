@@ -24,8 +24,9 @@
   display: flex;
 }
 
-// 할인 상품 줄. 바탕은 바로가기 띠와 같은 종이색. lg 이상에서 제목·화살표는 왼쪽 좁은 칸, 카드는 오른쪽 넓은 칸.
-.saleBand {
+// 할인 상품 줄과 오늘의 밀키트 줄. 바탕은 바로가기 띠와 같은 종이색. lg 이상에서 제목·설명은 왼쪽 좁은 칸, 카드는 오른쪽 넓은 칸.
+.saleBand,
+.mealkitBand {
   padding-block: $main-section-gap;
   background: var(--ant-color-bg-layout);
 
@@ -34,12 +35,19 @@
   }
 }
 
-// 할인 띠 바로 뒤의 레시피 띠는 같은 종이색이라 여백이 두 번 겹치지 않게 위 여백을 뺀다.
-.saleBand + .recipeSlot > section {
+// 오늘의 밀키트는 밀키트가 없으면 비어 있으므로 띠도 숨긴다.
+.mealkitBand:not(:has(section)) {
+  display: none;
+}
+
+// 같은 종이색 띠가 이어지면 여백이 두 번 겹치지 않게 뒤 띠의 위 여백을 뺀다.
+.saleBand + .mealkitBand,
+.mealkitBand:has(section) + .recipeSlot > section {
   padding-top: 0;
 }
 
-.saleInner {
+.saleInner,
+.mealkitInner {
   @include main-container;
   @include reveal-on-view;
 
@@ -61,7 +69,7 @@
     }
   }
 
-  // 할인 제목: AI 상담 띠와 같은 제목 글꼴·크기(띠마다 제목 크기를 맞춘다)
+  // 할인·밀키트 제목: AI 상담 띠와 같은 제목 글꼴·크기(띠마다 제목 크기를 맞춘다)
   > section > :first-child :global(h3.ant-typography) {
     @include display-heading;
 

@@ -19,6 +19,8 @@ interface FilterRow {
     onChange: (checked: boolean) => void;
   }>;
   toggle?: { expanded: boolean; onToggle: () => void };
+  // 칩을 두 칸으로 나눠 세로로 너무 길어지지 않게 한다.
+  twoColumns?: boolean;
 }
 
 export function RecipeSearchSection() {
@@ -70,6 +72,7 @@ export function RecipeSearchSection() {
               onToggle: () => setShowAllCategories((prev) => !prev),
             }
           : undefined,
+      twoColumns: true,
     },
     {
       label: '조리 시간',
@@ -111,7 +114,9 @@ export function RecipeSearchSection() {
         .map((row) => (
           <div key={row.label} className={styles.group}>
             <Typography.Text className={styles.groupLabel}>{row.label}</Typography.Text>
-            <div className={styles.options}>
+            <div
+              className={row.twoColumns ? `${styles.options} ${styles.twoColumns}` : styles.options}
+            >
               {row.chips.map((chip) => (
                 <Tag.CheckableTag
                   key={chip.key}

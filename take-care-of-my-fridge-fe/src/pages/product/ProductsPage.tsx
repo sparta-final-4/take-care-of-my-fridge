@@ -7,13 +7,12 @@ import { ROUTES } from '@/app/paths';
 import { ProductListSection } from '@/domains/product/components/ProductListSection';
 import { ProductModal } from '@/domains/product/components/ProductModal';
 import { ProductSearchSection } from '@/domains/product/components/ProductSearchSection';
-import { TodayMealkitSection } from '@/domains/product/components/TodayMealkitSection';
 import { isProductModalFromList } from '@/domains/product/productModal';
 
 import styles from './ProductsPage.module.scss';
 
 // 레퍼런스(row7seeds.com 상품 목록)의 구성: 제목·한 줄 설명 →
-// 왼쪽 필터 칸 + 오른쪽 칸(오늘의 밀키트, 그 아래 상품 목록과 위에 붙는 도구 줄: 필터·개수·정렬).
+// 왼쪽 필터 칸 + 오른쪽 상품 목록(위에 붙는 도구 줄: 필터·개수·정렬). 오늘의 밀키트는 메인 화면에 있다.
 // 좁은 화면은 필터를 서랍으로 연다.
 // 상품 주소(/products/:productId)는 어디서 들어와도(카드·공유 링크·장바구니·로그인 후 복귀) 이 목록 위에 상품 모달을 띄운다.
 export default function ProductsPage() {
@@ -43,13 +42,11 @@ export default function ProductsPage() {
         </Typography.Paragraph>
       </header>
 
-      {/* 필터 칸은 오늘의 밀키트 옆부터 시작한다. 오늘의 밀키트와 상품 목록은 오른쪽 칸에 위아래로. */}
       <div className={styles.collection}>
         <aside className={styles.sidebar} aria-label="상품 필터">
           <ProductSearchSection />
         </aside>
         <div className={styles.main}>
-          <TodayMealkitSection />
           <ProductListSection />
         </div>
       </div>
