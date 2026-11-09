@@ -1,16 +1,45 @@
-# API 계약 초안
-
-상태: 초안 · 회원가입 컨트롤러 구현, DB 통합 검증 대기 · 다른 회원 API는 제안 단계 · 냉장고/요리 기록/후기 API 구현 완료 · 근거: S1, S3, S4, S5
+# API 
 
 ## 공통 규칙
 
-- 프론트 baseURL은 /api prefix를 포함하고, 도메인 API 함수에는 prefix를 반복하지 않습니다.
-- 성공·실패는 ApiResponse<T>로 통일합니다.
-- HTTP 인증 실패는 401, 인증된 사용자의 권한 부족은 403으로 구분합니다.
-- 업무 오류는 ErrorCode·BusinessException·공통 처리기를 사용합니다. 인증 필터의 응답도 같은 규격으로 맞출 방법을 정합니다.
-- 쿠키 인증·withCredentials는 공유 프론트 규칙입니다. 로그인 쿠키와 CSRF 계약은 아래 회원 API 절을 따릅니다. CORS 정책은 배포 주소 확정 전까지 미정입니다.
-- 날짜·시간은 기본 ISO-8601. 시간대·날짜 전용 값·null 허용을 필드별로 확정합니다.
-- 경로 변수 인코딩, 조회 요청 취소 신호, 요청·응답 타입 단일 정의는 프론트 규칙을 따릅니다.
+- 모든 API 경로는 `/api`로 시작합니다. 프론트 baseURL은 서버 주소(origin)만 갖고, `/api`는 생성된 API 경로에 들어 있습니다.
+- 프론트는 API와 같은 출처로 부릅니다(로컬 Vite proxy, 운영 CloudFront `/api/*`). 그래서 백엔드에 CORS 설정은 없습니다.
+- 인증은 HttpOnly 쿠키이고 프론트는 `withCredentials: true`로 보냅니다. 로그인 쿠키와 CSRF 계약은 아래 회원 API 절을 따릅니다.
+- 성공·실패 응답은 모두 `ApiResponse<T>`입니다. 업무 오류는 `ErrorCode`를 담은 `BusinessException`을 공통 처리기가 바꿉니다. 인증 필터·권한 거부 응답도 같은 모양입니다.
+- 공통 오류 코드:
+
+| HTTP | 코드 | 조건 |
+|---|---|---|
+| 400 | C001 | 요청 검증 실패, 본문·파라미터 형식 오류, 필수 파라미터 누락 |
+| 401 | A003 | 로그인이 필요함(쿠키 없음·세션 만료) |
+| 403 | A004 | 로그인했지만 권한이 없음(USER가 `/api/admin/**`) |
+| 403 | AUTH_002 | CSRF 실패, 메서드 단위 권한 거부 |
+| 404 | COMMON_003 | 없는 경로 |
+| 500 | COMMON_002 | 처리하지 못한 서버 오류 |
+
+- 날짜·시간 형식:
+  - 기본은 시간대 없는 ISO-8601입니다(`2026-11-09T17:04:30`, 날짜만이면 `2026-11-09`).
+  - 상담·메시지·후기 응답처럼 `@JsonFormat`을 붙인 칸은 `yyyy-MM-dd HH:mm:ss`입니다. 각 API 명세의 응답 표에 적습니다.
+  - 할인 `endsAt`은 `+09:00`이 붙은 시각입니다.
+- 경로 변수 인코딩, 조회 요청 취소 신호(`signal`)는 [프론트 규칙](../conventions/frontend.md)을 따릅니다. 요청·응답 타입은 `/v3/api-docs`로 생성한 클라이언트를 씁니다.
+
+## 도메인별 API
+
+| 도메인 | 명세 |
+|---|---|
+| 회원·인증·관리자 | [member-auth-admin-api.md](member-auth-admin-api.md) |
+| 냉장고 | [fridge-api.md](fridge-api.md) |
+| 요리 기록 | [cooking-api.md](cooking-api.md) |
+| 후기 | [review-api.md](review-api.md) |
+| AI 상담 | [chat-api.md](chat-api.md) |
+| 장바구니 | [이 문서의 장바구니 API](#장바구니-api) |
+| 주문 | [이 문서의 주문 API](#주문-api) |
+| 환불 | [이 문서의 환불 API](#환불-api) |
+| 클릭 수 기반 할인 상품 | [이 문서의 클릭 수 기반 할인 상품 API](#클릭-수-기반-할인-상품-api) |
+| 할인 행사 | [이 문서의 할인 행사 API](#할인-행사-api) |
+| 결제 | [이 문서의 결제 API](#결제-api) |
+| 정산 | [이 문서의 정산 API](#정산-api) |
+| 알림 | [이 문서의 알림 API](#알림-api) |
 
 ## 공유된 응답 형태
 
@@ -35,11 +64,11 @@
 }
 ```
 
-필드별 검증 실패를 담을 구조는 Q-10에서 확정합니다. 기존 두 필드만으로 form.setFields 매핑이 가능하다고 가정하지 않습니다.
+검증 실패는 400 `C001`이고, 첫 번째 필드 오류의 메시지 하나만 `error.message`에 담깁니다. 필드 이름은 오지 않으므로 `form.setFields` 매핑에 쓸 수 없습니다(필드별 구조는 Q-10).
 
 ## 페이지 응답
 
-공유 구조: content, pageNumber, pageSize, totalElements, totalPages, isLast. 요청 page와 응답 pageNumber는 1부터 시작하며, 서비스 내부의 Spring Page 번호는 0부터 시작합니다(2026-10-17 회원 목록 조회 구현).
+공유 구조: content, pageNumber, pageSize, totalElements, totalPages, isLast. 요청 page와 응답 pageNumber는 1부터 시작하며, 서비스 내부의 Spring Page 번호는 0부터 시작합니다.
 
 ## 관리자 상품 조회
 
@@ -136,167 +165,6 @@ HTTP 메서드·경로·DTO 이름은 구현 전 합의합니다.
 - 맛 선호 변경은 `PUT /members/me/tastes` 요청 본문 `{"tastes":["SALTY","UMAMI"]}`으로 목록 전체를 교체합니다. 빈 목록은 모든 맛 선호를 지웁니다. 중복 값은 허용하고 서버에서 한 번만 저장합니다. 목록 누락·null, null 항목, 허용하지 않는 맛 값은 400입니다. 성공 본문은 공통 `ApiResponse.ok()` 형식입니다.
 - 가입 성공 데이터는 `{ memberId: number }`입니다. 이메일 중복은 `M001`, 닉네임 중복은 `M002`로 응답합니다.
 - `POST /members`는 익명 요청을 허용합니다. 다른 POST 경로의 CSRF 보호는 유지합니다.
-
-## 냉장고 API
-
-상태: **구현 완료** · 담당: 이현정 · 근거: 실제 백엔드 컨트롤러 및 서비스 구현
-
-경로는 prefix(/api)를 뺀 값입니다. 냉장고 재료 관리는 본인(`memberId`) 소유의 재료만 접근 가능합니다.
-
-| 기능 | Method / Path | 권한 | 요청 | 성공 응답 | 주요 오류 |
-|---|---|---|---|---|---|
-| 냉장고 재료 목록 조회 | GET /fridge/items | 로그인 | Query: sort (EXPIRATION 기본, CREATED 최신 등록순, NAME) | 200, `List<FridgeItemResponse>` (회원 재료 전체, 탭 구분은 프론트) | 400 정렬 오류, 401 |
-| 냉장고 재료 이력 조회 | GET /fridge/logs | 로그인 | Query: action, from, to, page, size | 200, `PageResponse<FridgeItemLogResponse>` | 400 from>to 또는 page/size 오류, 401 |
-| 냉장고 재료 일괄 등록 | POST /fridge/items | 로그인 | Body: `items`: `[{ rawName, quantity, storage?, expirationDate? }]` (1~20개) | 200, `List<FridgeItemResponse>` | 400 수량<=0 또는 누락, 401 |
-| 냉장고 재료 정보 수정 | PATCH /fridge/items/{fridgeId} | 로그인 | Path: fridgeId<br>Body: rawName, quantity, storage, expirationDate | 200, `FridgeItemResponse` | 400 검증 오류, 401, 404 재료 없음/타인 재료 |
-| 냉장고 재료 빼기(일부/전부) | POST /fridge/items/{fridgeId}/take-out | 로그인 | Path: fridgeId<br>Body: action, quantity? (null이면 전량) | 200, `FridgeItemTakeOutResponse` | 400 수량<=0, 401, 404 재료 없음/타인 재료 |
-| 냉장고 재료 비우기(삭제) | DELETE /fridge/items/{fridgeId} | 로그인 | Path: fridgeId<br>Query: reason (CONSUMED, DISCARDED, WRONG_ENTRY) | 200, 공통 성공 응답 | 400 사유 누락/오류, 401, 404 재료 없음/타인 재료 |
-
-- **상품 ID(2026-11-08 추가)**: `FridgeItemResponse.productId`는 구매 확정으로 들어온 줄의 상품 ID(`fridge.product_id`)입니다. 직접 등록한 줄과 칸이 생기기 전의 예전 줄은 null입니다.
-- **본인 소유 검증**: 타인의 냉장고 재료이거나 존재하지 않는 재료에 대한 수정·삭제·빼기 요청은 리소스 존재 여부 노출을 방지하기 위해 404 `FRIDGE_ITEM_NOT_FOUND`로 통일합니다.
-- **표준 재료 매핑**: 등록 시 원문 재료명(`rawName`)은 `IngredientMatcher`를 통해 표준 사전 재료(`Ingredient`)와 자동 매핑되며, 사전에 없는 이름은 직접 입력 재료(`ING_CUSTOM`)로 매핑됩니다.
-- **기본값 자동 설정**: 재료 등록 시 보관방식(`storage`)과 소비기한(`expirationDate`)이 비어 있으면 매핑된 표준 재료의 기본 보관방식 및 기본 소비기한 일수(`오늘 + defaultShelfDays`)로 자동 계산되어 저장됩니다.
-- **선택적 재매핑**: 재료 정보 수정(`PATCH /fridge/items/{fridgeId}`) 시 `rawName`이 기존과 달라진 경우에만 표준 재료를 다시 매핑하고, 이름이 같으면 기존 매핑을 유지합니다.
-- **수량 차감 및 0.05 미만 보정**: 재료 수량 차감 후 남은 양이 0.05 미만(`ZERO_THRESHOLD`)이면 잔여 수량을 0으로 보정하며, 수량이 0이 된 재료는 냉장고 테이블(`fridge`)에서 자동 삭제됩니다.
-- **이력 기록 구분**:
-  - `DELETE /fridge/items/{fridgeId}`: 사유(`reason`)가 `CONSUMED`(다 먹었어요) 또는 `DISCARDED`(버렸어요)이면 `fridge_item_logs`에 이력을 저장한 뒤 삭제하고, `WRONG_ENTRY`(잘못 등록)는 이력 없이 즉시 삭제합니다.
-  - `POST /fridge/items/{fridgeId}/take-out`: `quantity`가 null이거나 남은 양 이상이면 전체를 빼며, 실제로 뺀 수량을 이력에 기록합니다.
-- **동시성 제어**: 단건 수정·삭제·빼기 시 `SELECT ... FOR UPDATE` 비관적 락을 적용하여 수량 동시성 경합을 방지합니다.
-
-## 요리 기록 API
-
-상태: **구현 완료** · 담당: 이현정 · 근거: 실제 백엔드 컨트롤러 및 서비스 구현
-
-경로는 prefix(/api)를 뺀 값입니다. 요리 완료 기록과 본인의 요리 이력 관리 기능을 제공합니다.
-
-| 기능 | Method / Path | 권한 | 요청 | 성공 응답 | 주요 오류 |
-|---|---|---|---|---|---|
-| 요리 완료 등록 | POST /cooking-logs | 로그인 | Body: recipeId, result, memo?, chatSessionId?, usedIngredients?: `[{ ingredientId, quantity? }]` | 200, `CookingCompleteResponse` | 400 재료 중복, 401, 404 레시피 없음 (상담은 잇지 못해도 오류 없음) |
-| 요리 기록 목록 조회 | GET /cooking-logs | 로그인 | Query: recipeId, from, to, page, size | 200, `PageResponse<CookingLogResponse>` | 400 from>to 또는 page/size 오류, 401 |
-| 요리 기록 결과·메모 수정 | PATCH /cooking-logs/{cookingLogId} | 로그인 | Path: cookingLogId<br>Body: result, memo? (최대 50자) | 200, `CookingLogResponse` | 400 result 누락, 401, 404 기록 없음/타인 기록 |
-| 레시피 요리 통계 조회 | GET /recipes/{recipeId}/cooking-stats | 공개 | Path: recipeId | 200, `CookingStatsResponse` | 404 레시피 없음 |
-| 마이 레시피 목록 및 통계 조회 | GET /me/recipes | 로그인 | Query: reviewStatus, sort, page, size | 200, `MyRecipeListResponse` | 400 정렬/필터 오류, 401 |
-
-- **요리 완료 원자적 처리 (`POST /cooking-logs`)**:
-  1. 레시피 존재 여부를 `RecipeService.existsById`로 검증하며, 없으면 404 `RECIPE_NOT_FOUND`입니다.
-  2. 이을 상담을 찾습니다(2026-11-09 변경). 상담 때문에 요리 완료가 실패하지 않습니다(예전 404·409 없음).
-     - `chatSessionId`가 있으면 본인의 진행 중 상담이고 30분이 지나지 않았을 때만 잇습니다. 그 상담에서 이 레시피를 추천했는지는 보지 않습니다. 남의 상담·끝난 상담·만료된 상담이면 잇지 않고 진행합니다.
-     - 없으면 서버가 찾습니다. 진행 중 상담이 30분이 지나지 않았고 그 상담에서 이 레시피를 레시피 카드(`chat_recommendations.recipe_id`)로 추천한 적 있으면 잇습니다. 밀키트 카드(연결 레시피 포함)는 보지 않습니다.
-     - 요리 트랜잭션 밖에서 읽기만 하며(상담 1번 + 추천 1번), 찾다가 오류가 나면 잇지 않고 진행합니다.
-  3. 요리 기록(`CookingLog`)을 생성·저장합니다. `chat_session_id`는 2에서 이은 상담 ID입니다(잇지 않으면 null).
-  4. 냉장고 재료를 자동 차감(`FridgeService.consumeForCooking`)합니다:
-     - 데드락(교착) 방지를 위해 `ingredientId` 오름차순으로 정렬하여 비관적 락을 획득합니다.
-     - 동일 재료가 여러 개면 소비기한 빠른 순(FIFO)으로 순차 차감합니다.
-     - 기본 양념(`basicSeasoning=true`), 직접 입력 재료(`ING_CUSTOM`), 밀키트(`ING_MEALKIT`)는 차감 대상에서 자동 제외됩니다.
-     - 냉장고에 보유하지 않은 재료는 에러 없이 건너뛰며, 실제 차감된 내역만 응답의 `deductions` 목록에 반환됩니다.
-  5. 이은 상담이 있으면 요리 완료가 커밋된 뒤 이벤트(`CookingCompletedEvent`)로 상담을 종료(COMPLETED)합니다. 요리 결과가 실패(FAILED)여도 끝냅니다. 그 사이 끝났거나 만료된 상담은 그대로 두고, 종료가 실패해도 요리 기록·재료 차감은 되돌리지 않고 로그만 남깁니다. 끝나면 기존 상담 바뀜 신호(`COMPLETED`)가 나갑니다.
-- **요리 기록 수정 (`PATCH /cooking-logs/{cookingLogId}`)**: 본인 기록만 수정 가능(미존재 또는 타인 기록 시 404 `COOKING_LOG_NOT_FOUND`). 냉장고 재료 차감 내역은 되돌릴 수 없으므로 결과(`result`)와 메모(`memo`)만 수정할 수 있습니다.
-- **레시피 요리 통계 (`GET /recipes/{recipeId}/cooking-stats`)**: 비로그인 요청을 허용합니다. 레시피가 없으면 404이며, 요리 기록이 하나도 없으면 모든 카운트(총 횟수, 성공, 실패)가 0으로 반환됩니다.
-- **마이 레시피 (`GET /me/recipes`)**: 회원이 요리 완료한 레시피들을 그룹화하여 후기 작성 상태(`reviewStatus`: ALL, PENDING, COMPLETED) 필터링과 전체 요약 통계(총 요리 수, 고유 레시피 수, 성공 수, 작성 후기 수)를 함께 반환합니다.
-
-## AI 상담 내역 API
-
-상태: **구현 완료** (2026-11-02) · 근거: `ChatSessionController`, `ChatSessionService.getMySessions`
-
-| 기능 | Method / Path | 권한 | 요청 | 성공 응답 | 주요 오류 |
-|---|---|---|---|---|---|
-| 내 상담 목록 | GET /chat-sessions | 로그인 | Query: page(기본 1), size(기본 10, 최대 100), status(ALL/ACTIVE/ENDED, 기본 ALL) | 200, `ChatSessionListResponse` | 400 page/size/status 오류, 401 |
-| 상담 단건 조회 | GET /chat-sessions/{sessionId} | 로그인 | Path: sessionId | 200, `ChatSessionResponse` | 401, 404 `CHAT_001` 없음/타인 상담 |
-| 상담 메시지 조회(기존) | GET /chat-sessions/{sessionId}/messages | 로그인 | Path: sessionId | 200, `ChatMessageResponse[]` | 401, 404 없음/타인 상담 |
-| 상담 메시지 보내기(기존) | POST /chat-sessions/{sessionId}/messages | 로그인 | Path: sessionId, Body: content(최대 500자), mode(AUTO/RECOMMEND, 기본 AUTO), selectedIngredientIds(최대 50개), useSelectedOnly(기본 false) | 200, `text/event-stream` (추천이면 `recommendations` → `message` 조각 → `done`, 실패 시 `error`) | 스트림 전 JSON 오류: 401, 404, 409 `CHAT_005` 끝난 상담·`CHAT_006` 만료·`CHAT_009` 다른 창에서 답을 받는 중, 429 `CHAT_007` 하루 횟수, 503 `CHAT_008` |
-
-- `ChatSessionResponse`: id, status(ACTIVE/COMPLETED/EXPIRED), lastMessageAt, createdAt, cookedRecipe(2026-11-09 추가). `cookedRecipe`는 요리 완료로 끝난 상담일 때만 `{ recipeId, name }`이고, 직접 끝냈거나 진행 중·만료거나 레시피가 지워졌으면 null입니다. 단건 조회만 채우고 상담 시작·종료 API는 늘 null입니다. `cooking_logs.chat_session_id`로 요리 기록 1번 + 레시피 이름 1번 조회합니다(DB 변경 없음).
-- `ChatSessionListResponse`: `counts`(`ChatSessionStatusCounts`: total, active, ended — 상태 필터와 상관없는 탭 건수), `sessions`(`PageResponse<ChatSessionSummaryResponse>`, 다음 페이지 여부는 공통 `isLast`).
-- `ChatSessionSummaryResponse`: sessionId, status(ACTIVE/COMPLETED/EXPIRED), startedAt(세션 생성 시각), lastMessageAt, messageCount, firstQuestion(첫 USER 메시지 앞 50자), lastMessagePreview(마지막 메시지 앞 50자, 역할 무관). 자르기는 코드 포인트 기준. 시각은 `yyyy-MM-dd HH:mm:ss`.
-- 상태: ACTIVE = 진행 중이면서 마지막 대화가 시간 제한(`chat.session-timeout`, 30분) 안. ENDED = 종료(COMPLETED) + 만료(EXPIRED). 시간이 지났는데 아직 ACTIVE로 남은 상담(다음 상담 시작 때 만료 처리됨)은 목록 status를 EXPIRED로 주고 ENDED 필터·종료 건수에 넣습니다.
-- 본인 상담만, 최근 시작순(startedAt 내림차순, 같으면 id 내림차순). 메시지가 0개인 상담은 목록·건수에서 빠집니다.
-- 안전 장치로 걸러진 메시지(2026-11-07 추가, 아래 "단어 차단"과 서버 안내 의도 BLOCKED·SELF_HARM): `messageCount`에는 세고, `firstQuestion`·`lastMessagePreview`는 걸린 메시지를 빼고 고릅니다. 걸린 메시지뿐인 상담은 목록에 남고 두 값이 null입니다.
-- 쿼리: 세션 목록 1회 + 세션 ID 목록으로 메시지 수·첫 질문·마지막 메시지 1회(그룹 집계 + 상관 서브쿼리) + 탭 건수 1회(조건 합계). 전체 개수가 필요할 때만 count 1회 추가.
-- 메시지 보내기 순서(2026-11-02 추가): 세션 검증 → 답 받기 잠금(`chat:streaming:{sessionId}`, SET NX + 요청 토큰, 유지 `app.chat.reply-lock-ttl` 150초) → 하루 횟수 차감 → 스트림. 잠금에 실패하면 409 `CHAT_009`이고 하루 횟수를 쓰지 않습니다. 하루 횟수에서 실패하면 잠금을 풀고 그 오류를 돌려줍니다. 잠금은 스트림이 완료·오류·끊김 중 어느 쪽으로 끝나도 풀고, 토큰이 같을 때만 지웁니다. Redis 장애면 503 `CHAT_008`.
-- 단어 차단(2026-11-07 추가): 잠금 뒤, 하루 횟수 차감 전에 보낸 말을 단어(`app.chat.safety-words`)로 거릅니다. 소문자로 바꾸고 공백·숫자·기호를 뺀 글로 비교하고("시1발" → "시발"), 제외 목록(죽 먹고·마약김밥·폭탄주·칼국수·독일·약불·약간 등)은 먼저 지우고 봅니다. 자해 → 금지어(욕설·불법·위험) → 탈취(지시 무시·프롬프트 공개) 순으로 보며, "너는 이제부터 ~야"처럼 역할만 정하는 말은 거르지 않습니다.
-  - 걸리면 의도 판단·AI 답 없이 안내 답 하나를 `message`로 보내고 `done`을 보냅니다(요청·응답 모양은 그대로, 새 에러 코드 없음). 하루 횟수는 세지 않습니다.
-  - 안내 답: 자해 "많이 힘드시죠. 혼자 견디지 마시고 자살예방상담전화 109(24시간, 무료)에 이야기해 주세요.", 금지어 "그 이야기는 도와드릴 수 없어요. 요리나 식재료에 대해 물어봐 주세요.", 탈취 "그 요청은 들어드릴 수 없어요. 요리나 냉장고 재료에 대해 물어봐 주세요."
-  - 저장: 보낸 말과 안내 답을 `chat_messages.filtered = true`로 저장합니다. 메시지 조회 API에는 그대로 나오고(필드 추가 없음), 다음 답의 이전 대화(최근 6개)와 상담 목록 첫 질문·미리보기에서는 빠집니다.
-  - 로그에는 걸린 종류만 남기고 보낸 말은 남기지 않습니다. 저장이 실패하면 `error` 이벤트이고, 세지 않았으므로 돌려줄 횟수도 없습니다.
-- 건강 안내(2026-11-07 추가): 사용자가 보낸 말에 건강 관련 말(`app.chat.health-words`: 당뇨·혈당·고혈압·신장질환·콩팥·투석·통풍·알레르기·임신·수유·복용·처방·약 먹 등, 공백 무시. 약불·약간·약한 불·신장개업 등 제외 목록은 먼저 지움, "약"·"신장"·다이어트는 넣지 않음)이 있으면, 답이 끝난 뒤 `message` 이벤트를 하나 더 보내 빈 줄 하나와 안내 "일반적인 정보예요. 질환·알레르기·임신·복용 중인 약과 관련된 판단은 의사나 약사와 상담해 주세요."를 붙입니다. AI 답은 보지 않습니다.
-  - 일반 답·추천 답(소개 글 끝, 곧 카드 바로 위)·레시피 자세히 답과 서버가 정한 답(후보 없음·밀키트만)에 붙이고, 저장되는 AI 메시지도 `답 + "\n\n" + 안내`입니다. 추천 답의 AI 소개 글은 그대로 둡니다.
-  - 안전 장치 안내(단어 차단, OFF_TOPIC·BLOCKED·SELF_HARM)와 답 조각이 없는 실패(`CHAT_010`)에는 붙이지 않습니다. 막지 않고 하루 횟수도 셉니다.
-- 링크 지우기(2026-11-07 추가): AI가 만든 답(일반·추천·레시피 자세히)에서 `http://`·`https://`·`www.`로 시작하는 링크와 도메인 형태(영문·숫자 이름 + `.com .net .org .kr .co.kr .io .me .shop .info .app .dev .ly`, 뒤 경로 포함)를 지웁니다. "(링크 생략)" 같은 말은 넣지 않고, 링크 앞 공백과 링크만 있던 괄호도 같이 지웁니다.
-  - 조각 경계에서 쪼개진 링크("https:/" + "/naver.com")도 지웁니다. 영문이 든 끝 글자 묶음만 다음 조각까지 잠시 모아 두고, 한글·숫자·문장 부호는 바로 보냅니다. "1.5배", "3.5cm", "약 2.5kg"은 그대로입니다.
-  - 화면에 보내는 글과 저장되는 글(소개·카드 설명) 모두 지운 뒤의 글입니다. 추천 답은 `[소개]`·`[n]`으로 나누기 전에 지웁니다. 서버가 정한 글은 거치지 않습니다. 링크만 있던 답은 빈 답으로 보고 `CHAT_010`을 보내며 하루 횟수를 돌려줍니다.
-- 알레르기 재료 빼기(2026-11-07 추가): "○○ 알레르기/알러지", "○○ 못 먹어", "○○ 먹으면 안 돼"(`app.chat.allergy-words`)의 ○○을 추천(새 추천·다시 추천·추천 칩)에서 뺄 재료로 더합니다. AI가 뺄 재료로 넣지 않아도 서버가 확인합니다.
-  - ○○은 묶음 말(`app.chat.allergy-groups`: 견과류·갑각류·유제품·달걀·계란·밀가루)이거나 재료 사전에 이름이 그대로 있을 때만 씁니다("매운 거 못 먹어"의 "거"는 버림). 조사("새우를")는 떼어 보되, 붙은 이름("오이")을 먼저 봅니다.
-  - 재료 사전에서 이름에 ○○이 들어 있는 재료로 넓힙니다(땅콩 → 땅콩가루·땅콩버터·땅콩잼, 새우 → 건새우·새우젓). 한 글자(게·잣·굴)는 그 글자로 시작하는 재료만(게살·잣가루·굴소스)입니다. 같은 계열이 아닌 이름은 재료마다 정해 그 재료를 넓힐 때만 뺍니다(`app.chat.allergy-words.not-same-kind`: 땅콩 → 땅콩호박, 굴 → 굴비, 마 → 마늘·마요네즈, 김 → 김치, 배 → 배추, 게살 → 멍게살 등. "마늘 알레르기"면 마늘가루는 뺍니다). 대신 쓰는 재료도 넓히지 않습니다(우유 → 아몬드우유, 버터 → 땅콩버터. 땅콩버터는 땅콩·견과류 알레르기에서 빠짐). 견과류 묶음에는 마카다미아도 있습니다. 땅콩 ↔ 콩처럼 이름이 비슷한 다른 재료는 빼지 않습니다.
-  - 이번 말과 이 상담의 사용자 말(안전 장치로 걸러진 말은 뺌)을 모두 봅니다. 그래서 같은 상담에서는 다시 추천("다른 거", "오이 넣어도 돼" 뒤에도)·새 추천 모두 계속 뺍니다. 뺄 재료라 콕 집은 요리여도 뺍니다(피할 맛과 다름). 고른 재료에 있으면 고른 재료에서도 뺍니다.
-  - 밀키트도 연결 레시피가 뺄 재료를 쓰면 빼고, 연결 레시피가 없으면 상품 이름에 뺄 재료 이름(두 글자 이상)이 있으면 뺍니다.
-  - 추천 답(카드·후보 없음·밀키트만) 끝, 곧 카드 바로 위에 "땅콩이 들어간 레시피는 뺐어요. 양념이나 가공품에 성분이 들어 있을 수 있으니 재료를 꼭 확인해 주세요."를 붙입니다(여러 개면 "땅콩·새우가 …"). 건강 안내도 붙으면 같은 메시지에 한 줄 바꿔 이어 붙이고, 저장 글에도 같이 들어갑니다.
-  - "매운 거 못 먹어"처럼 맛 단어 뒤에 "못 먹"이 오면 피할 맛입니다(`app.chat.taste-words.negation-after`에 "못먹" 추가).
-- 종료·만료된 상담도 본인 것이면 기존 메시지 조회 API로 대화를 볼 수 있습니다.
-- 추천 요청 필드(2026-11-04 추가): `mode=RECOMMEND`는 칩([알아서 추천해줘]·[이 재료로 추천받기])으로 AI 의도 판단 없이 추천합니다. `AUTO`(기본)는 AI가 메시지를 읽어 추천(RECOMMEND)인지 일반 질문(GENERAL)인지 정합니다(직전 추천이 있으면 다시 추천·레시피 자세히도, 아래 "이전 대화와 이어지는 말"). `selectedIngredientIds`는 내 냉장고에서 고른 재료 ID(null·중복 제거), `useSelectedOnly=true`면 고른 재료를 하나도 안 쓰는 레시피는 추천하지 않습니다. 필드를 보내지 않으면 기존과 같습니다.
-- 추천 카드 이벤트(2026-11-04 추가): 추천이면 설명 글(`message`)보다 먼저 `event: recommendations`를 한 번 보냅니다. 일반 질문이면 보내지 않습니다. 카드는 아직 저장하지 않아 메시지 조회 API에는 나오지 않고, 저장되는 AI 메시지는 설명 글만입니다.
-  - `data`: `{ recipes: RecommendedRecipe[] (최대 3개), mealkits: RecommendedMealkit[] (2026-11-06 추가, 아래), fridgeItems: FridgeItemCard[] (2026-11-08 추가, 냉장고 보기), products: ProductCard[] (2026-11-08 추가, 사기), relaxed: string[] (지금은 항상 빈 목록), empty: boolean (보여 줄 카드가 모두 없으면 true) }`
-  - `RecommendedRecipe`: recipeId, name, imageUrl(없으면 null), category, cookTimeMin(없으면 null), usedIngredients(쓰는 냉장고 재료 이름, 임박한 순), imminentIngredients(`{ name, dDay }`, D-3 이내, dDay 0은 오늘까지), matchedTastes(겹친 맛 한글: 메시지로 말한 맛, 없으면 회원 선호 맛), missingIngredients(`{ ingredientId, name, product }`, 기본 양념 제외. product는 아래), missingSelectedIngredients(고른·말한 재료 중 냉장고에 없는 것의 이름. 같은 종류로 넓혔으면 레시피에 쓰인 이름, 예: 버섯 → 표고버섯. missingIngredients에도 들어 있음), lacksManyIngredients(재료를 많이 사야 함), reason(카드에 보여 줄 추천 이유 한 줄, 25자 안팎. 우선순위: 요리 이름 키워드·요청 일치 > 선택 재료 > 임박 재료 > 겹친 맛, 예: "찾으신 냉면 요리예요", "버섯·두부가 주재료예요", "내일까지인 고추를 쓸 수 있어요")
-  - 장볼 재료 상품(2026-11-06 추가): `missingIngredients[].product`는 그 재료로 담을 상품이고, 판매 상품이 없으면 null입니다. `ShoppingProduct`: productId, name, imageUrl(없으면 null), price(정가), salePrice(진행 중 할인 판매가, 할인이 없으면 null), saleType(`SPECIAL`/`FLASH_DROP`, 할인이 없으면 null), soldOut(지금 살 수 없음: 상품 품절·번개 드롭 남은 수량 0), unitAmount·unit(상품 용량, 예: 300·g).
-    - 판매 중지 상품은 넣지 않고 품절 상품은 soldOut=true로 넣습니다. 재료 하나에 상품이 여러 개면 살 수 있는 것 → 할인 중 → 판매 단가 낮은 순 → 상품 id 순으로 하나를 고릅니다. 가격·품절은 상품 목록·장바구니와 같은 판매가 계산을 씁니다.
-    - 메시지 조회(`recommendations`)와 레시피 자세히 카드도 같은 모양이고, 다시 불러올 때는 지금 가격·품절 기준으로 다시 계산합니다.
-    - 담기는 기존 장바구니 담기 API(`POST /api/cart-items`, productId·quantity)를 그대로 씁니다.
-  - 밀키트 카드(2026-11-06 추가): 사용자 말에 밀키트 단어가 있으면(`app.chat.mealkit-words`, 공백 무시, 부정어는 맛 단어와 같음) 밀키트를 함께 고릅니다. 의도 프롬프트는 바꾸지 않습니다.
-    - "밀키트"를 말함("밀키트 추천해줘", "국물 밀키트"): `recipes`는 빈 목록, `mealkits` 최대 3개. 글은 AI 없이 서버 문장 하나를 `message`로 보냅니다(`recommendation_text` 없음). 고를 밀키트가 없으면 "지금은 추천드릴 밀키트가 없어요." 안내를 맨 앞에 두고 레시피 카드를 보여 줍니다. AI가 일반 대화로 본 말은 밀키트를 말하고 달라는 말(추천·뭐 있·보여줘 등)이 있으며 묻는 말(기준·어떻게·왜·방법·얼마나·보관·가격·차이 등, `app.chat.ask-words`)이 없을 때만 추천으로 바꿉니다("밀키트 추천 기준이 뭐야?"는 일반 답). 밀키트와 같이 쓴 "있어·있나·있을까·없어·뭐가 좋아·살 만한"도 달라는 말로 봅니다. 묻는 말 없이 이름만 말한 짧은 말(공백 뺀 15자 이하: "국물 밀키트", "디저트", "두부", "김치찌개")도 밀키트·분류(묶음 말 포함)·재료 사전·레시피 이름 중 하나가 있으면 추천으로 바꿉니다. 분류 단어 보정은 "국물"→국·찌개·전골·수프·스튜처럼 묶음 말(`app.chat.category-words`)도 씁니다.
-    - 번거로워하는 말만 있음("간단하게·간편·빨리·귀찮·요리하기 싫"): 레시피 카드 3장 + `mealkits` 1개(레시피 카드와 같은 레시피 밀키트는 뺌).
-    - "밀키트 말고"처럼 부정이면 밀키트를 고르지 않습니다. 밀키트를 보여 줄 때는 키워드·요리 이름에서 "밀키트"를 뺍니다.
-    - 고르기: 판매 중이고 살 수 있는 것만(냉장고에 있는 밀키트는 품절이어도 둠), 연결된 레시피가 피할 맛이면 뺌(피할 맛이 매운맛이면 레시피 매운 정도 MILD·HOT도 뺌). 요청 일치 수(연결된 레시피의 분류·원하는 맛·요리 이름) → 냉장고에 있는 밀키트(2026-11-08 변경: 빼지 않고 앞에) → 이 상담에서 아직 안 보여 준 것 → 레시피 연결 있음 → 냉장고 재료와 겹치는 수 → 할인 중 → 판매 단가 낮은 순 → 상품 id. 냉장고에 있는지는 `fridge.product_id`로 보고, product_id가 없는 예전 줄은 등록 이름(raw_name, 공백 무시)으로 보며, 기한이 지난 줄은 넣지 않습니다. 레시피 연결도 없고 요청 조건도 안 맞는 밀키트는 한 장까지만 보여 주고(냉장고 밀키트는 세지 않음), 3장이 안 차면 빈자리로 둡니다. 냉장고 밀키트가 있으면 밀키트만 보여 주는 글에 "냉장고에 이미 있는 밀키트는 먼저 보여 드려요."를, 레시피 카드 아래 한 장이면 "요리하기 번거로우면 냉장고에 있는 ○○ 밀키트로 …"를 씁니다.
-    - `RecommendedMealkit`: product(`ShoppingProduct`, unitAmount·unit은 null), servings(인분), recipeId(연결 레시피, 없으면 null), recipeName(없으면 null), description(레시피 카드 아래 한 장이면 서버 문장 "요리하기 번거로우면 ○○ 밀키트로 간편하게 드셔 보세요.", 밀키트만 보여 주면 null), inFridge(2026-11-08 추가, 냉장고에 있는지. 화면은 "냉장고에 있어요" 태그를 붙이고 담기를 숨김), fridgeDDay(냉장고에 있으면 남은 일수, 없으면 null. D-3 이내면 임박 태그). 다시 불러올 때도 inFridge·fridgeDDay는 지금 냉장고 기준입니다.
-    - 저장: `chat_recommendations`에 레시피 카드 다음 순서로 product_id와 description을 저장합니다. 메시지 조회 `ChatMessageResponse.mealkits`로 다시 받고, 다시 불러올 때는 지금 가격·품절 기준이며 판매 중지된 밀키트는 빠집니다. 같은 product_id 칸에 재료 상품 카드(아래 사기)도 저장하므로, 다시 만들 때 상품 종류(MEALKIT·INGREDIENT)로 밀키트 카드와 상품 카드를 나눕니다.
-  - 냉장고 보기(2026-11-08 추가, 의도 `FRIDGE`): "냉장고에 뭐 있어", "밀키트 뭐 남았어", "두부 아직 있어?", "곧 버려야 할 거 있어?" 등. 답 생성 AI 없이 `recommendations`(`fridgeItems`, 없는 재료면 `products`) → 서버 문장 `message` → `done`.
-    - 의도의 `fridgeScope`: ALL(기본 양념 뺀 전체), MEALKIT(밀키트 줄만), IMMINENT(D-3 이내·지난 줄), SEASONING(2026-11-08 추가, 기본 양념 줄만: "기본 양념 뭐 있어?". 양념 말 `app.chat.fridge-shop-words.seasoning`: 기본 양념·조미료가 있으면("양념"만으로는 보지 않음, 냉장고를 말하지 않은 "조미료 뭐 있어?"도 냉장고 보기. 답 끝에 "살 수 있는 조미료가 궁금하시면 '간장 사고 싶어'처럼 이름으로 말씀해 주세요."를 붙임) 서버도 이 범위로 정하고, 이 말은 찾을 재료 이름으로 보지 않음). 재료를 말했으면(`includeIngredients`) 범위와 상관없이 그 재료(같은 종류 포함, 기본 양념도) 줄만 보고, 사전에 없는 이름·밀키트 이름은 등록 이름에 그 이름이 들어간 줄로 봅니다.
-    - 순서: 소비기한 순, 지난 줄은 맨 아래. 카드는 최대 10장입니다.
-    - 전체 보기(ALL, 재료 이름 없음) 문장: 가짓수를 먼저 말하고 D-3 이내만 앞 3개 + "외 N개"로 씁니다. 예: "냉장고에 재료 12가지가 있어요. 곧 끝나는 건 대파(오늘까지), 버섯(오늘까지), 서울우유(내일까지) 외 6개예요. 양파, 깻잎, 고추 외 4개는 지났어요." 곧 끝나는 재료가 없으면 "소비기한이 곧 끝나는 재료는 없어요."
-    - 임박·밀키트 보기와 이름으로 물은 답의 문장 예: "냉장고에 두부(내일까지), 대파(3일 남음), 된장국 밀키트가 있어요. 우유는 지났어요." 남은 날은 D-3 이내만(오늘까지·내일까지·모레까지·3일 남음), 남은 줄은 앞 6개, 지난 줄은 앞 3개까지 쓰고 나머지는 "외 N개". 말한 재료가 없으면 "두부는 지금 냉장고에 없어요." + 그 재료의 상품 카드. 보여 줄 줄이 없으면 "냉장고에 등록된 재료가 없어요." / "냉장고에 밀키트가 없어요." / "소비기한이 곧 끝나는 재료는 없어요."
-    - `FridgeItemCard`: fridgeId, ingredientId, name(일반 재료는 재료 이름, 밀키트·직접 입력은 등록 이름), rawName, quantity, unit, dDay(음수면 지남), status(NORMAL·IMMINENT·EXPIRED), mealkit, productId(`fridge.product_id`, 없으면 null), imageUrl(밀키트 줄이면 연결 상품 이미지, 없으면 null).
-    - 저장: 냉장고 카드는 저장하지 않습니다. AI 메시지 content(서버 문장)만 저장하므로 다시 불러오면 그때 상태의 글만 보입니다. 화면은 답을 다 받은 뒤 기록을 다시 받아 그리므로, `done`의 assistantMessageId에 받은 냉장고 카드를 붙여 그 화면에 있는 동안만 보여 줍니다. 상품 카드는 사기와 같이 저장합니다.
-  - 사기(2026-11-08 추가, 의도 `SHOP`): "당근 사고 싶어", "두부 어디서 사", "대파 장바구니에 담아줘" 등. 답 생성 AI 없이 `recommendations`(`products`) → 서버 문장 `message` → `done`. 서버는 장바구니에 직접 담지 않고 카드의 담기로 담습니다.
-    - 이름(`includeIngredients`, 비었으면 서버가 말에서 재료 사전 이름을 찾음)마다 상품 하나: 재료 사전 이름이면 장볼 재료 담기와 같은 방법(살 수 있는 것 → 할인 중 → 판매 단가 낮은 순), 사전에 없거나 이어진 상품이 없으면 상품 검색 1등으로 보충합니다(ES를 쓰지 않으면 DB 검색, 검색이 실패하면 상품 없음).
-    - 서버 문장 예: "당근은 아래 상품으로 담을 수 있어요. 참치캔은 지금 파는 상품이 없어요." 이름을 못 뽑았으면 "어떤 재료를 찾으시는지 이름으로 말씀해 주시면 살 수 있는 상품을 찾아 드릴게요."
-    - 할인 질문(2026-11-08 추가): 말에 할인 말(`app.chat.fridge-shop-words.sale`: 세일·할인·특가·번개)이 있으면 할인 중인 상품만 봅니다. "재료·밀키트·상품"은 찾을 이름으로 보지 않습니다.
-      - 이름이 없을 때("세일하는 재료 있어?", "할인하는 밀키트 뭐 있어?", "세일하는 거 있어?"): 진행 중 할인 전체에서 밀키트 단어면 밀키트만, "재료"면 재료 상품만, 둘 다 없으면 모두 보고, 지금 살 수 없는 것(상품 품절·번개 드롭 수량 0)은 뺍니다. 할인율 높은 순 → 상품 id 순으로 3장까지 보여 주고, 더 있으면 "더 많은 할인 상품은 재료/밀키트 메뉴에서 확인해 주세요."를 붙입니다. 문장: "지금 할인 중인 재료예요." / 없으면 "지금 할인 중인 재료가 없어요." 상품 카드의 name은 상품 이름입니다.
-      - 이름이 있을 때("두부 세일해?"): 사기와 같이 상품을 찾고 "두부는 지금 할인 중이에요." / "대파는 지금 할인 중이 아니에요."로 답합니다.
-    - `ProductCard`: name(말한 이름), product(`ShoppingProduct`. 상품 검색으로 찾았거나 다시 불러온 카드는 unitAmount·unit이 null).
-    - 저장: `chat_recommendations`에 product_id와 description(말한 이름)을 저장하고, 메시지 조회 `ChatMessageResponse.products`(2026-11-08 추가)로 지금 가격·품절 기준으로 다시 받습니다. 판매 중지된 상품은 빠집니다.
-  - 냉장고 보기·사기 서버 단어 안전망(`app.chat.fridge-shop-words`): AI가 `RECOMMEND`·`GENERAL`로 봐도(OFF_TOPIC을 음식 말로 되살린 것 포함) 냉장고 보기 말(남았·아직 있·냉장고에 뭐·냉장고에 있·냉장고에서·버려야·유통기한 지난·소비기한 지난)이면 `FRIDGE`, 사기 말(사고 싶·어디서 사·장바구니·담아·주문해)이나 할인 말(세일·할인·특가·번개)이면 `SHOP`으로 바꿉니다(둘 다 있으면 FRIDGE). 묻는 말(`ask-words.question`, 2026-11-08에 "먹어도 돼·괜찮" 추가)이나 요리 말(추천·만들·해먹·요리·레시피·뭐 먹·먹지·먹을까)이 있으면 바꾸지 않고, AI가 FRIDGE·SHOP으로 봤어도 요리 말이 있으면 추천으로 둡니다. 예) "냉장고에 있는 재료로 뭐 먹지" → 추천, "냉장고에서 꺼낸 고기 어떻게 해동해?"·"유통기한 지난 거 먹어도 돼?"·"주문한 거 언제 와?" → 일반 답, "두부 있으면 두부 요리 추천해줘" → 추천.
-  - 카드 설명 이벤트(2026-11-05 추가): 추천 답은 `[소개]`·`[1]`~`[3]` 표시로 나눠 보냅니다. 소개 글은 `message`, 카드 설명 글은 `event: recommendation_text`로 옵니다. `data`: `{ index: number (카드 순서, 0부터), text: string (그 카드 설명의 이어지는 글) }`. AI가 표시를 빼먹으면 전체가 `message`(소개)로 오고 카드 설명은 비어 있습니다. 저장은 소개가 AI 메시지 content, 카드 설명이 카드의 description이고, 메시지 조회의 `recommendations[].description`으로 다시 받습니다.
-  - 하루 횟수: `recommendations`는 첫 조각으로 치지 않습니다. 카드를 보낸 뒤 설명 글 첫 조각 전에 실패해도 하루 횟수를 돌려줍니다. 후보 검색이 실패하면 카드 없이 일반 답을 합니다.
-- 이전 대화와 이어지는 말(2026-11-05 추가): 메시지를 보낼 때 같은 상담의 최근 3턴(메시지 6개)과 직전 추천을 읽어 의도를 정합니다. 요청·응답 모양은 그대로이고, 의도마다 SSE 이벤트 순서가 다릅니다.
-  - 의도 종류: `RECOMMEND`(새 추천), `GENERAL`(일반 질문), `REFINE`(다시 추천: "좀 더 매운 걸로", "다른 거 없어?", "국물 말고 볶음으로"), `RECIPE_DETAIL`(추천한 레시피 하나 자세히: "두 번째 거 어떻게 만들어?", "아까 그 깐풍기 시간 얼마나 걸려?"). REFINE·RECIPE_DETAIL은 직전 추천 카드가 있을 때만 나옵니다.
-  - 서버 안내 의도(2026-11-07 추가): `OFF_TOPIC`(요리·식재료·냉장고·장보기·밀키트와 상관없는 요청: "주식 추천해줘", "숙제 풀어줘", "파이썬 코드 짜줘"), `BLOCKED`(단어 목록 밖의 욕설·혐오·불법·위험, 지시 무시·프롬프트 공개 요청), `SELF_HARM`(자해·자살을 말함). 셋 다 답 생성 AI 없이 서버 안내 답 하나를 `message`로 보내고 `done`을 보냅니다. 의도 판단 AI를 썼으므로 하루 횟수는 셉니다(2026-11-07 변경: "AI를 썼으면 센다". 단어 차단은 AI를 쓰지 않아 세지 않음).
-    - 안내 답: `OFF_TOPIC` "저는 요리, 냉장고 재료, 장보기 상담만 도와드릴 수 있어요. 냉장고 재료로 만들 요리를 추천해 드릴까요?", `BLOCKED` 단어 차단의 금지어 안내, `SELF_HARM` 단어 차단의 자해 안내(109).
-    - 저장: `OFF_TOPIC`은 걸러진 표시 없이 저장해 이전 대화에 남고, `BLOCKED`·`SELF_HARM`은 `filtered = true`로 저장해 이전 대화·목록 미리보기에서 빠집니다.
-    - OFF_TOPIC 되살리기: AI가 `OFF_TOPIC`이라고 해도 보낸 말에 음식 말(`app.chat.food-words`: 먹·요리·레시피·밥·반찬·끼니·아침·점심·저녁·야식·간식·재료·냉장고·장보기·밀키트, 공백 무시)·분류 단어(묶음 말 포함)·재료 사전 이름·레시피 이름이 있으면 거절하지 않습니다. 달라는 말(`app.chat.ask-words.request`)이 있으면 `RECOMMEND`(맛·분류 보정 포함), 없으면 `GENERAL`로 처리합니다. 예) "주식으로 먹을 거 추천해줘" → 추천, "장보기 목록 짜줘" → 일반 답, "주식 추천해줘" → OFF_TOPIC 그대로. `BLOCKED`·`SELF_HARM`은 음식 말이 있어도 되살리지 않습니다.
-    - "주식으로 먹을 거 추천해줘", "장보기 목록 짜줘", "냉장고 정리 방법", 인사·짧은 잡담("안녕", "밥 먹었어?")은 OFF_TOPIC이 아니고, 역할만 정하는 말("너는 이제부터 요리사야")과 과장한 말("배고파 죽겠어", "죽여주는 맛")은 BLOCKED·SELF_HARM이 아닙니다. 이름만 말하기·밀키트 달라는 말처럼 서버가 의도를 바꾸는 규칙은 GENERAL에만 걸리고, AI 의도 판단이 실패하면 지금처럼 GENERAL입니다(거절하지 않음). 추천 칩(`mode=RECOMMEND`)은 의도 판단을 하지 않습니다.
-  - GENERAL: 최근 3턴을 이전 대화로 넣어 답합니다(AI 답은 300자까지, 보여 준 카드 이름 포함). 이벤트는 기존과 같이 `message` 조각 → `done`.
-  - REFINE: 직전 추천 조건에 이번 말을 합쳐 다시 추천합니다. 맛·분류·시간·키워드는 AI가 낸 최종값(비운 칸은 직전 값), 재료는 직전 선택 재료를 이어 갑니다. "매운 거 말고"처럼 조건을 빼는 말은 의도의 `removed`(TASTE, CATEGORY, MAX_MINUTES, KEYWORD, INCLUDE, EXCLUDE)에 있는 조건의 직전 값을 지웁니다. 요리 이름·원한 표현은 이어 가지 않아 "김피탕 레시피는 없어서…" 안내가 다시 나오지 않습니다. "매운 거 말고"처럼 맛을 피하는 말은 `avoidTastes`(피할 맛)로 받아, 그 맛인 레시피를 후보에서 빼고(3개가 안 되면 뒤에 채움) 다시 추천에서도 이어 갑니다. 원하는 맛·회원 선호 맛보다 피할 맛이 앞섭니다. 매운 레시피는 맛 데이터 SPICY 또는 매운 재료(`app.chat.candidate.spicy-ingredients`, 재료 사전 이름·레시피에 적힌 이름 모두, 그냥 "고추"는 제외)로 가립니다. 직전 카드는 후보에서 빼고, 빼서 3개보다 적으면 뒤에 다시 넣습니다. 직전 조건이 없으면(Redis 만료·장애) 이번 말만으로 새 추천합니다. 이벤트는 추천과 같습니다(`recommendations` → `message`/`recommendation_text` → `done`).
-    - 맛 부딪힘(2026-11-07 추가): 원하는 맛은 직전 맛에 이번 맛을 쌓고("매운 걸로" → "단 것도" → 매운맛 + 단맛), 맛이 부딪히면 이번 말에 나온 맛(서버 맛 단어 확인, AI가 앞 대화에서 따라 넣은 맛과 구분)을 따릅니다. 같은 맛이 원하는 맛·피할 맛에 둘 다 있으면 이번 말 쪽만 남기고("매운 거 말고" → "좀 더 매운 걸로" → 원하는 맛 SPICY, 피할 맛 없음), 이번에 원한 맛과 반대인 맛(`app.chat.taste-opposites`: MILD ↔ SPICY, MILD ↔ SALTY. 단맛·감칠맛은 반대 없음)은 원하는 맛에서 지웁니다("짭짤한 거" → "담백한 거로" → MILD만). 알레르기 재료는 이 규칙과 상관없이 계속 뺍니다. 새 추천은 원래 이번 말의 맛만 씁니다.
-  - RECIPE_DETAIL: 물어본 레시피를 직전 카드 이름 → 직전 카드 번호 → 상담 전체 추천(최근부터) 이름 순으로 찾고, 못 찾으면 GENERAL로 답합니다. 이벤트는 `recommendations`(그 레시피 카드 1개, `reason`과 `description` 모두 "물어보신 레시피예요", 다시 불러와도 같음) → `message` 조각(표시 없이 글 그대로, AI에는 사용자 말 대신 질문 종류 `detailQuestion`(HOW_TO·TIME·INGREDIENTS·TIP·OTHER)로 만든 질문을 넘김, 레시피 정보에 있는 내용만, 단계는 레시피대로 모두 "1. …" 한 줄씩 10줄까지) → `done`. 저장은 글이 AI 메시지 content, 카드 1개가 그 메시지의 `recommendations`입니다. 레시피가 지워졌으면 카드 없이 `message`("물어보신 레시피는 지금 볼 수 없어요. 다른 레시피를 물어봐 주세요.") → `done`.
-  - 직전 추천은 Redis `chat:context:{sessionId}`(조건과 카드 레시피 ID, TTL 30분, 답을 저장할 때마다 다시 늘림)에 둡니다. 새 추천·다시 추천 답을 저장하면 바뀌고, 일반·레시피 자세히 답은 바꾸지 않습니다(레시피 자세히 뒤의 "첫 번째 거는?"도 직전 추천 기준). Redis 장애면 문맥 없이 지금처럼 답합니다.
-  - 하루 횟수는 이어지는 말도 메시지 하나에 1번입니다. AI 호출은 메시지 하나에 의도 판단 1번 + 답 1번입니다(추천 칩은 의도 판단 없이, 정해진 답은 답 생성 없이, 단어 차단은 AI 호출도 하루 횟수도 없이, 서버 안내 의도는 의도 판단 1번만 하고 하루 횟수는 셈).
-
-## 후기 API
-
-상태: **구현 완료** · 담당: 이현정 · 근거: 실제 백엔드 컨트롤러 및 서비스 구현
-
-경로는 prefix(/api)를 뺀 값입니다. 레시피별 후기 작성·수정·삭제 및 목록 조회를 제공합니다.
-
-| 기능 | Method / Path | 권한 | 요청 | 성공 응답 | 주요 오류 |
-|---|---|---|---|---|---|
-| 레시피 후기 목록 조회 | GET /reviews | 공개 | Query: recipeId, mine, sort, page, size | 200, `PageResponse<ReviewResponse>` | 400 sort/page/size 오류, 401 (mine=true 비로그인) |
-| 레시피 후기 작성 | POST /reviews | 로그인 | Body: recipeId, rating (1~5), content (최대 100자) | 200, `ReviewResponse` | 400 별점/내용 오류, 401, 404 레시피 없음, 409 이미 후기 작성함 |
-| 레시피 후기 수정 | PATCH /reviews/{reviewId} | 로그인 | Path: reviewId<br>Body: rating (1~5), content (최대 100자) | 200, `ReviewResponse` | 400 별점/내용 오류, 401, 404 후기 없음/타인 후기 |
-| 레시피 후기 삭제 | DELETE /reviews/{reviewId} | 로그인 | Path: reviewId | 200, 공통 성공 응답 | 401, 404 후기 없음/타인 후기 |
-
-- **목록 조회 비로그인 허용**: `GET /reviews`는 비로그인 사용자도 조회할 수 있습니다. 단, 내 후기만 필터링하는 `mine=true` 파라미터는 비로그인 시 401 `UNAUTHORIZED`가 발생합니다.
-- **응답 내 본인 글 여부**: 목록 응답의 각 후기 항목에는 로그인 사용자가 작성한 글인지 나타내는 `isMine` (boolean) 필드가 포함됩니다.
-- **1회원 1레시피 1후기 제한**: 동일 회원이 동일 레시피에 2건 이상의 후기를 작성할 수 없습니다. 이미 존재하는 경우 409 `REVIEW_ALREADY_EXISTS`를 반환하며, 동시 요청으로 인한 DB 유니크 제약(`uk_recipe_reviews_member_id_recipe_id`) 위반 시에도 409로 변환 처리합니다.
-- **레시피 존재 검증**: 후기 작성 시 레시피 존재 여부를 `RecipeService.existsById`로 확인하며, 미존재 시 404 `RECIPE_NOT_FOUND`를 반환합니다.
-- **본인 후기 검증**: 후기 수정 및 삭제는 작성자 본인만 가능하며, 타인의 후기이거나 존재하지 않는 후기인 경우 404 `REVIEW_NOT_FOUND`로 통일하여 존재 여부를 노출하지 않습니다.
 
 ## 장바구니 API
 

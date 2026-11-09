@@ -394,7 +394,7 @@
 | member_id | BIGINT | 허용 | NULL | | 클릭한 회원. 비로그인 클릭은 NULL. 물리 FK 없음 |
 | keyword | VARCHAR(100) | 불가 | | | 클릭 당시 검색어(앞뒤 공백 제거) |
 
-- 실행용 DDL 초안은 [search.sql](search.sql)에 있습니다.
+- 저장소에 이 테이블의 DDL 파일은 없습니다. 타입은 엔티티(`SearchClickHistory`) 기준입니다.
 
 ## search_recipe_click_histories — 검색 결과 레시피 클릭 기록
 
