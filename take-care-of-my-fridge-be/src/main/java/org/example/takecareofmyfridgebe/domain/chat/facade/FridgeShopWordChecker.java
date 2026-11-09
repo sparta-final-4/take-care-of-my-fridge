@@ -68,6 +68,11 @@ public final class FridgeShopWordChecker {
         return FridgeScope.ALL;
     }
 
+    // 냉장고 보기·사기가 아니라 일반 답으로 볼 묻는 말이 있는지 ("유통기한 지난 거 먹어도 돼?", "주문한 거 언제 와?")
+    public static boolean asksGeneral(String message, ChatFridgeShopWordProperties words) {
+        return message != null && containsAny(compact(message), words.general());
+    }
+
     // 양념 말("기본 양념", "조미료")이 들어간 이름인지. 냉장고 보기에서 찾을 재료 이름으로 보지 않는다
     public static boolean seasoningWord(String name, ChatFridgeShopWordProperties words) {
         return containsAny(compact(name), words.seasoning());

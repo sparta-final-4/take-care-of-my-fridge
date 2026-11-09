@@ -14,8 +14,8 @@ import java.util.Set;
  * AI가 "좀 더 매운 걸로"를 피할 맛으로 넣는 것처럼 반대로 뽑는 경우를 서버가 바로잡는다.
  * <ul>
  *   <li>맛 단어(매운·맵게·칼칼 / 달달·달게·단 거)가 있고 부정어가 없으면 원하는 맛, 있으면 피할 맛</li>
- *   <li>부정어는 위치를 본다: "안·덜"은 맛 단어 바로 앞("안 맵게", "덜 달게"), "말고·빼고·않·싫·없이"는 맛 단어 뒤 {@value #AFTER_WINDOW}글자 안
- *       ("매운 거 말고", "맵지 않게"). 그래서 "30분 안에 매운 거"나 "짭짤한 거 말고 매운 걸로"는 원하는 맛이다</li>
+ *   <li>부정어는 위치를 본다: "안·덜"은 맛 단어 바로 앞("안 맵게", "덜 달게"), "말고·빼고·빼줘·제외·않·싫·없이"는 맛 단어 뒤 {@value #AFTER_WINDOW}글자 안에서 시작
+ *       ("매운 거 말고", "맵지 않게", "매운 건 빼줘"). 그래서 "30분 안에 매운 거"나 "짭짤한 거 말고 매운 걸로"는 원하는 맛이다</li>
  *   <li>공백은 빼고 비교한다 ("단 거" = "단거")</li>
  * </ul>
  */
@@ -113,11 +113,73 @@ public final class TasteWordChecker {
                 .anyMatch(negation -> !negation.isEmpty() && before.endsWith(negation));
     }
 
-    // 단어 뒤 AFTER_WINDOW글자 안에 부정어("말고·빼고·않·싫·없이")가 있는지
+    // 단어 뒤 AFTER_WINDOW글자 안에서 부정어("말고·빼고·않·싫·없이·빼줘·제외·안들어간")가 시작하는지 ("매운게안들어간"처럼 부정어가 창 밖으로 이어져도 본다)
     static boolean negatedAfter(String text, int from, ChatTasteWordProperties words) {
-        String after = text.substring(from, Math.min(text.length(), from + AFTER_WINDOW));
-        return words.negationAfter().stream().map(TasteWordChecker::compact)
-                .anyMatch(negation -> !negation.isEmpty() && after.contains(negation));
+        return startsWithin(text, from, words.negationAfter()) >= 0;
+    }
+
+    /**
+     * 메시지가 그 맛을 확실히 원하는지. 부정어가 없고, 맛 단어 바로 앞에 원하는 말("좀 더 매운")이 있거나
+     * 뒤 {@value #AFTER_WINDOW}글자 안에서 원하는 말("매운 걸로", "매운 거 먹고 싶어")이 시작할 때만 true.
+     * 원하는 말 앞에 "안·덜"이 끼면("매운 거 안 먹고 싶어") 확실하지 않다.
+     * 맛 단어만 있고 둘 다 없으면("매운 건 별로") 서버 판단이 애매하므로 false다.
+     */
+    public static boolean surelyWanted(String message, Member.Taste taste, ChatTasteWordProperties words) {
+        String text = compact(message);
+        for (String word : orEmpty(tasteWords(taste, words))) {
+            String tasteWord = compact(word);
+            if (tasteWord.isEmpty()) {
+                continue;
+            }
+            int at = text.indexOf(tasteWord);
+            while (at >= 0) {
+                int end = at + tasteWord.length();
+                if (!negatedBefore(text.substring(0, at), words) && !negatedAfter(text, end, words)) {
+                    String before = text.substring(0, at);
+                    boolean wantBefore = orEmpty(words.wantBefore()).stream().map(TasteWordChecker::compact)
+                            .anyMatch(marker -> !marker.isEmpty() && before.endsWith(marker));
+                    int marker = startsWithin(text, end, orEmpty(words.wantAfter()));
+                    boolean wantAfter = marker >= 0 && words.negationBefore().stream().map(TasteWordChecker::compact)
+                            .noneMatch(negation -> !negation.isEmpty() && text.substring(end, end + marker).contains(negation));
+                    if (wantBefore || wantAfter) {
+                        return true;
+                    }
+                }
+                at = text.indexOf(tasteWord, at + 1);
+            }
+        }
+        return false;
+    }
+
+    // 맛 조건을 지우라는 말("맛 상관없이", "맛은 아무거나")이 있는지 (공백 빼고 비교)
+    public static boolean clearsTastes(String message, ChatTasteWordProperties words) {
+        String text = compact(message);
+        return orEmpty(words.clear()).stream().map(TasteWordChecker::compact)
+                .anyMatch(word -> !word.isEmpty() && text.contains(word));
+    }
+
+    private static List<String> tasteWords(Member.Taste taste, ChatTasteWordProperties words) {
+        return switch (taste) {
+            case SPICY -> words.spicy();
+            case SWEET -> words.sweet();
+            case SALTY -> words.salty();
+            case UMAMI -> words.umami();
+            case MILD -> words.mild();
+        };
+    }
+
+    // from 뒤 AFTER_WINDOW글자 안에서 말 하나가 시작하면 그 시작 위치(from 기준), 없으면 -1
+    private static int startsWithin(String text, int from, List<String> targets) {
+        int limit = Math.min(text.length(), from + AFTER_WINDOW);
+        for (int i = from; i < limit; i++) {
+            for (String target : targets) {
+                String compactTarget = compact(target);
+                if (!compactTarget.isEmpty() && text.startsWith(compactTarget, i)) {
+                    return i - from;
+                }
+            }
+        }
+        return -1;
     }
 
     private static String compact(String text) {

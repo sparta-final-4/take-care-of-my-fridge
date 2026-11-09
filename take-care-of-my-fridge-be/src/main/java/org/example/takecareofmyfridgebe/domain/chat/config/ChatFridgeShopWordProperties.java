@@ -10,7 +10,8 @@ import java.util.List;
  * AI가 추천·일반 대화로 봐도 냉장고 보기 말이 있으면 냉장고 보기, 사기 말이 있으면 사기로 서버가 바꾼다 (둘 다 있으면 냉장고 보기).
  * 요리 말이 같이 있거나 묻는 말(app.chat.ask-words.question)이 있으면 바꾸지 않는다.
  *
- * @param fridge   냉장고 보기 말 ("밀키트 뭐 남았어", "두부 아직 있어?", "냉장고에 뭐 있어", "곧 버려야 할 거 있어?")
+ * @param fridge   냉장고 보기 말 ("밀키트 뭐 남았어", "두부 아직 있어?", "냉장고에 뭐 있어", "곧 버려야 할 거 있어?", "슬슬 처리해야 할 거 있어?").
+ *                 "처리해야"만으로는 보지 않는다 ("고기 핏물 처리해야 돼?")
  * @param shop     사기 말 ("당근 사고 싶어", "두부 어디서 사", "대파 장바구니에 담아줘", "우유 주문해줘").
  *                 "주문"만으로는 보지 않는다 ("주문한 거 언제 와?"는 사기가 아니다)
  * @param sale     할인 말 ("세일하는 재료 있어?", "할인하는 밀키트 뭐 있어?"). 사기로 보고 할인 중인 상품만 보여 준다
@@ -18,12 +19,14 @@ import java.util.List;
  * @param seasoning 냉장고 보기 범위를 기본 양념으로 볼 말 ("기본 양념 뭐 있어?"). 이 말은 찾을 재료 이름으로 보지 않는다
  * @param cook     요리 말. 같이 있으면 추천 그대로 둔다 ("냉장고에 있는 재료로 뭐 먹지", "두부 있으면 두부 요리 추천해줘").
  *                 "먹" 한 글자는 넣지 않는다 ("냉장고에 먹을 거 뭐 남았어"는 냉장고 보기)
+ * @param general  AI가 냉장고 보기·사기로 봤어도 일반 답으로 되돌릴 묻는 말 ("유통기한 지난 거 먹어도 돼?", "주문한 거 언제 와?", "장보기 목록 짜줘").
+ *                 "얼마나"·"가격"은 넣지 않는다 ("두부 얼마나 남았어?", "두부 가격 얼마야?"는 냉장고 보기·사기)
  */
 @ConfigurationProperties(prefix = "app.chat.fridge-shop-words")
 public record ChatFridgeShopWordProperties(
-        @DefaultValue({"남았", "아직있", "냉장고에뭐", "냉장고에있", "냉장고에서", "버려야", "유통기한지난", "소비기한지난"})
+        @DefaultValue({"남았", "아직있", "냉장고에뭐", "냉장고에있", "냉장고에서", "버려야", "유통기한지난", "소비기한지난", "처리해야할거", "처리할거"})
         List<String> fridge,
-        @DefaultValue({"버려야", "지난", "임박", "유통기한", "소비기한"})
+        @DefaultValue({"버려야", "지난", "임박", "유통기한", "소비기한", "상한", "상할", "상했", "오래된", "오래됐", "처리해야"})
         List<String> imminent,
         @DefaultValue({"기본양념", "조미료"})
         List<String> seasoning,
@@ -32,6 +35,8 @@ public record ChatFridgeShopWordProperties(
         @DefaultValue({"세일", "할인", "특가", "번개"})
         List<String> sale,
         @DefaultValue({"추천", "만들", "해먹", "요리", "레시피", "뭐먹", "먹지", "먹을까"})
-        List<String> cook
+        List<String> cook,
+        @DefaultValue({"어떻게", "방법", "보관", "해동", "먹어도돼", "괜찮", "왜", "언제와", "언제도착", "배송", "짜줘", "짜줄"})
+        List<String> general
 ) {
 }

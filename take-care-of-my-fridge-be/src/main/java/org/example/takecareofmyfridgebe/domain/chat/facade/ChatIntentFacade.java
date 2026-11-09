@@ -173,6 +173,9 @@ public class ChatIntentFacade {
         }
         // 맛·분류 단어로 조건을 고치는 것은 추천·다시 추천일 때만 한다. 일반 답·레시피 자세히는 AI 결과를 그대로 쓴다
         if (result.intent() == ChatIntent.RECOMMEND || result.intent() == ChatIntent.REFINE || mealkitRecommend) {
+            // 요리 이름은 AI가 아니라 서버가 정한다 (첫 키워드가 메시지에 그대로 있을 때만)
+            result = result.withDishFromKeywords(request.content());
+            result = keepOtherTastes(memberId, sessionId, request.content(), result);
             result = correctCategories(memberId, sessionId, request.content(), categories, context,
                     correctTastes(memberId, sessionId, request.content(), result));
         }
@@ -221,6 +224,7 @@ public class ChatIntentFacade {
      *   <li>냉장고 보기 말이 없고 사기 말이 있으면 SHOP ("당근 사고 싶어", "대파 장바구니에 담아줘")</li>
      *   <li>묻는 말("어떻게 해동해?", "먹어도 돼?")이나 요리 말("뭐 먹지", "요리 추천")이 있으면 바꾸지 않는다</li>
      *   <li>AI가 냉장고 보기·사기로 봤어도 요리 말이 있으면 추천으로 둔다 ("두부 있으면 두부 요리 추천해줘")</li>
+     *   <li>AI가 냉장고 보기·사기로 봤어도 묻는 말(fridge-shop-words.general)이 있으면 일반 답으로 ("유통기한 지난 거 먹어도 돼?", "주문한 거 언제 와?")</li>
      * </ul>
      * 다시 추천·레시피 자세히·거절 의도는 건드리지 않는다. 바꿨으면 INFO로 남긴다.
      */
@@ -230,6 +234,11 @@ public class ChatIntentFacade {
                 && FridgeShopWordChecker.cooks(message, chatFridgeShopWordProperties)) {
             log.info("상담 요리 말이 있어 {}를 추천으로 - memberId: {}, sessionId: {}", intent, memberId, sessionId);
             return result.withIntent(ChatIntent.RECOMMEND);
+        }
+        if ((intent == ChatIntent.FRIDGE || intent == ChatIntent.SHOP)
+                && FridgeShopWordChecker.asksGeneral(message, chatFridgeShopWordProperties)) {
+            log.info("상담 묻는 말이 있어 {}를 일반 답으로 - memberId: {}, sessionId: {}", intent, memberId, sessionId);
+            return result.withIntent(ChatIntent.GENERAL);
         }
         if (intent != ChatIntent.RECOMMEND && intent != ChatIntent.GENERAL) {
             return result;
@@ -357,7 +366,6 @@ public class ChatIntentFacade {
         String found = null;
         List<String> includes = List.of();
         List<String> keywords = List.of();
-        String dish = null;
         if (MealkitWordChecker.check(message, chatMealkitWordProperties, chatTasteWordProperties) == MealkitWordChecker.Mode.ONLY) {
             found = "밀키트";
         } else if (CategoryWordChecker.check(message, categories, chatTasteWordProperties, chatCategoryWordProperties.groups())
@@ -371,7 +379,6 @@ public class ChatIntentFacade {
             } else if (!recipeService.suggestNames(text, 1).isEmpty()) {
                 found = "레시피 이름";
                 keywords = List.of(text);
-                dish = text;
             }
         }
         if (found == null) {
@@ -379,11 +386,9 @@ public class ChatIntentFacade {
         }
         log.info("상담 이름만 말해 일반 대화를 추천으로 - memberId: {}, sessionId: {}, 찾은 것: {}, 재료: {}, 키워드: {}",
                 memberId, sessionId, found, includes, keywords);
-        return Optional.of(new IntentResult(ChatIntent.RECOMMEND, result.wantedTastes(), result.moodCategories(),
-                result.maxMinutes(), includes.isEmpty() ? result.includeIngredients() : includes, result.excludeIngredients(),
-                result.useSelectedOnly(), keywords.isEmpty() ? result.keywords() : keywords,
-                dish == null ? result.dishText() : dish, result.preferenceText(), result.targetIndex(), result.targetName(),
-                result.removed(), result.avoidTastes(), result.detailQuestion()));
+        // 요리 이름은 뒤에서 첫 키워드로 정한다 (레시피 이름이면 그 이름이 첫 키워드)
+        return Optional.of(result.withNamed(includes.isEmpty() ? result.includeIngredients() : includes,
+                keywords.isEmpty() ? result.keywords() : keywords));
     }
 
     // 재료 사전에 있는 이름만 (직접 입력·밀키트 재료로 잡힌 이름은 뺀다). 매칭이 실패하면(DB·검색 장애) 빈 목록
@@ -403,15 +408,23 @@ public class ChatIntentFacade {
     }
 
     /**
-     * 메시지의 맛 단어로 원하는 맛·피할 맛을 한 번 더 정한다 (TasteWordChecker). 맛 단어가 있는 맛만 바꾸고,
-     * AI 결과와 다르면 서버 판단을 쓰고 DEBUG로 남긴다. "좀 더 매운 걸로"가 피할 맛으로 가는 것을 막는다.
+     * 메시지의 맛 단어로 원하는 맛·피할 맛을 한 번 더 정한다 (TasteWordChecker.stances, 다섯 맛 모두). 맛 단어가 있는 맛만 바꾸고,
+     * AI 결과와 다르면 서버 판단을 쓰고 DEBUG로 남긴다. "좀 더 매운 걸로"가 피할 맛으로, "짠 거 말고"가 원하는 맛으로 가는 것을 막는다.
+     * 서버가 확실할 때만 덮어쓴다: 부정어가 있으면 피할 맛으로 바꾸지만, 부정어가 없다는 것만으로는 AI가 피할 맛으로 둔 맛을
+     * 원하는 맛으로 바꾸지 않는다. 원하는 말("더", "걸로", "먹고 싶어")이 붙어 있을 때만 바꾼다 (TasteWordChecker.surelyWanted).
+     * 모르는 부정어("매운 건 별로야")에서 AI가 맞게 본 피할 맛을 서버가 뒤집지 않게 하기 위해서다.
      */
     IntentResult correctTastes(Long memberId, Long sessionId, String message, IntentResult result) {
         List<String> wanted = new ArrayList<>(result.wantedTastes() == null ? List.of() : result.wantedTastes());
         List<String> avoid = new ArrayList<>(result.avoidTastes() == null ? List.of() : result.avoidTastes());
-        for (TasteWordChecker.TasteStance stance : TasteWordChecker.check(message, chatTasteWordProperties)) {
+        for (TasteWordChecker.TasteStance stance : TasteWordChecker.stances(message, chatTasteWordProperties)) {
             String taste = stance.taste().name();
             boolean want = stance.stance() == TasteWordChecker.Stance.WANT;
+            if (want && avoid.contains(taste) && !wanted.contains(taste)
+                    && !TasteWordChecker.surelyWanted(message, stance.taste(), chatTasteWordProperties)) {
+                log.debug("상담 맛 단어가 애매해 AI 피할 맛을 그대로 둠 - memberId: {}, sessionId: {}, 맛: {}", memberId, sessionId, taste);
+                continue;
+            }
             // 이미 맞는 쪽에 있으면 순서를 건드리지 않는다
             List<String> keep = want ? wanted : avoid;
             (want ? avoid : wanted).remove(taste);
@@ -424,10 +437,28 @@ public class ChatIntentFacade {
         }
         log.debug("상담 맛 단어로 맛 조건 바꿈 - memberId: {}, sessionId: {}, AI 원하는 맛: {}, AI 피할 맛: {}, 바꾼 원하는 맛: {}, 바꾼 피할 맛: {}",
                 memberId, sessionId, result.wantedTastes(), result.avoidTastes(), wanted, avoid);
-        return new IntentResult(result.intent(), wanted, result.moodCategories(), result.maxMinutes(), result.includeIngredients(),
-                result.excludeIngredients(), result.useSelectedOnly(), result.keywords(), result.dishText(),
-                result.preferenceText(), result.targetIndex(), result.targetName(), result.removed(), avoid,
-                result.detailQuestion());
+        return result.withTastes(wanted, avoid);
+    }
+
+    /**
+     * 피하는 맛만 말했으면("매운 건 빼줘") AI가 넣은 뺄 조건 TASTE를 지운다. AI가 "빼줘"를 맛 조건 지우기로 읽으면
+     * 다시 추천에서 직전에 원한 다른 맛("짭짤한 거")까지 사라지기 때문이다. 피할 맛은 그대로 둔다.
+     * 맛 조건을 지우라는 말("맛 상관없이", "맛은 아무거나")이 있으면 AI 값을 그대로 쓴다. 지웠으면 INFO로 남긴다.
+     */
+    IntentResult keepOtherTastes(Long memberId, Long sessionId, String message, IntentResult result) {
+        List<String> removed = orEmpty(result.removed());
+        if (!removed.contains(RefineCondition.TASTE.name()) || TasteWordChecker.clearsTastes(message, chatTasteWordProperties)) {
+            return result;
+        }
+        boolean avoids = TasteWordChecker.stances(message, chatTasteWordProperties).stream()
+                .anyMatch(stance -> stance.stance() == TasteWordChecker.Stance.AVOID);
+        if (!avoids) {
+            return result;
+        }
+        List<String> kept = removed.stream().filter(condition -> !condition.equals(RefineCondition.TASTE.name())).toList();
+        log.info("상담 피하는 맛만 말해서 맛 조건 지우기를 뺌 - memberId: {}, sessionId: {}, removed: {} → {}",
+                memberId, sessionId, removed, kept);
+        return result.withRemoved(kept);
     }
 
     /**
@@ -443,10 +474,7 @@ public class ChatIntentFacade {
         }
         log.info("상담 새 추천이라 이번 말에 없는 맛을 뺌 - memberId: {}, sessionId: {}, 원하는 맛: {} → {}, 피할 맛: {} → {}",
                 memberId, sessionId, result.wantedTastes(), wanted, result.avoidTastes(), avoid);
-        return new IntentResult(result.intent(), wanted, result.moodCategories(), result.maxMinutes(), result.includeIngredients(),
-                result.excludeIngredients(), result.useSelectedOnly(), result.keywords(), result.dishText(),
-                result.preferenceText(), result.targetIndex(), result.targetName(), result.removed(), avoid,
-                result.detailQuestion());
+        return result.withTastes(wanted, avoid);
     }
 
     // AI가 준 맛 이름(SPICY 등)이 이번 말에 나온 맛인지. 모르는 이름은 sanitize가 이미 걸렀다
@@ -545,7 +573,8 @@ public class ChatIntentFacade {
      * 다시 추천에서 맛이 부딪히면 이번 말에 나온 맛을 따른다 (맛 전체, TasteWordChecker.stances로 이번 말의 맛만 본다).
      * <ul>
      *   <li>이번 말에 원한 맛: 원하는 맛에 넣고 피할 맛에서 빼며, 그 맛과 반대인 맛(app.chat.taste-opposites)은 원하는 맛에서 지운다
-     *       ("짭짤한 거" → "담백한 거로" → 순한맛만, "매운 거 말고" → "좀 더 매운 걸로" → 매운맛 원함·피할 맛 없음)</li>
+     *       ("짭짤한 거" → "담백한 거로" → 순한맛만, "매운 거 말고" → "좀 더 매운 걸로" → 매운맛 원함·피할 맛 없음).
+     *       피할 맛에 든 맛은 원하는 말이 붙었을 때만 푼다 (TasteWordChecker.surelyWanted, "매운 건 별로야"는 그대로 피함)</li>
      *   <li>이번 말에 피한 맛: 피할 맛에 넣고 원하는 맛에서 뺀다 ("매운 거 추천해줘" → "매운 거 말고")</li>
      *   <li>이번 말에 나오지 않은 맛은 직전 값을 그대로 쌓는다 ("매운 걸로" → "단 것도" → 매운맛 + 단맛)</li>
      * </ul>
@@ -560,6 +589,11 @@ public class ChatIntentFacade {
         Set<Member.Taste> avoid = new LinkedHashSet<>(merged.avoidTastes());
         for (TasteWordChecker.TasteStance stance : spoken) {
             if (stance.stance() == TasteWordChecker.Stance.WANT) {
+                // 맛 단어만 있고 원하는 말이 없으면("매운 건 별로야") 피할 맛에 든 맛을 풀지 않는다 (correctTastes와 같은 기준)
+                if (avoid.contains(stance.taste())
+                        && !TasteWordChecker.surelyWanted(message, stance.taste(), chatTasteWordProperties)) {
+                    continue;
+                }
                 wanted.removeAll(chatTasteOppositeProperties.oppositesOf(stance.taste()));
                 wanted.add(stance.taste());
                 avoid.remove(stance.taste());

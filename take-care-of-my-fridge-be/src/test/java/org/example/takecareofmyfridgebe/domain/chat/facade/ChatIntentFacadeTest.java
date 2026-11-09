@@ -244,11 +244,11 @@ class ChatIntentFacadeTest {
         }
 
         @Test
-        @DisplayName("묻는 말, 음식 말이 없는 말(안녕), 긴 말은 이름만 말한 말로 보지 않고 일반 답 그대로 둔다")
+        @DisplayName("묻는 말(영양을 묻는 말 포함), 음식 말이 없는 말(안녕), 긴 말은 이름만 말한 말로 보지 않고 일반 답 그대로 둔다")
         void keepsGeneral_whenNotNameOnly() {
             givenExtracted(IntentResult.general());
 
-            for (String message : List.of("밀키트 추천 기준이 뭐야?", "안녕", "오늘 날씨가 너무 좋아서 기분이 정말 좋아")) {
+            for (String message : List.of("밀키트 추천 기준이 뭐야?", "안녕", "오늘 날씨가 너무 좋아서 기분이 정말 좋아", "브로콜리 영양소 알려줘")) {
                 assertThat(facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of(message)).intent())
                         .as(message).isEqualTo(ChatIntent.GENERAL);
             }
@@ -381,6 +381,32 @@ class ChatIntentFacadeTest {
             assertThat(query.keywords()).containsExactly("냉면", "막국수");
             assertThat(query.keywordText()).isEqualTo("냉면");
             assertThat(query.preferenceText()).isEqualTo("냉면 같은 면 요리");
+        }
+
+        @Test
+        @DisplayName("요리 이름은 AI 값이 아니라 첫 키워드가 메시지에 그대로 있을 때 그 이름으로 정한다")
+        void picksDishFromFirstKeyword() {
+            givenExtracted(new IntentResult(ChatIntent.RECOMMEND, null, List.of("튀김"), null, null, null, null,
+                    List.of("김피탕", "탕수육"), "", null));
+            assertThat(facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("김피탕 같은 요리 추천해줘"))
+                    .recipeQuery().keywordText()).isEqualTo("김피탕");
+
+            givenExtracted(new IntentResult(ChatIntent.RECOMMEND, null, null, null, null, null, null,
+                    List.of("샐러드", "냉채"), "차가운 요리", "차가운 요리"));
+            assertThat(facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("차가운 요리 추천해줘"))
+                    .recipeQuery().keywordText()).isNull();
+        }
+
+        @Test
+        @DisplayName("새 추천에서 짠맛·순한맛·감칠맛도 맛 단어로 원하는 맛과 피할 맛을 바로잡는다 (짠 거 말고 담백한 거)")
+        void correctsAllTastes_whenAiMixesUp() {
+            givenExtracted(new IntentResult(ChatIntent.RECOMMEND, List.of("SALTY"), null, null, null, null, null, null, null, null));
+
+            RecipeQuery query = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("짠 거 말고 담백한 거"))
+                    .recipeQuery();
+
+            assertThat(query.wantedTastes()).containsExactly(Taste.MILD);
+            assertThat(query.avoidTastes()).containsExactly(Taste.SALTY);
         }
     }
 
@@ -903,6 +929,69 @@ class ChatIntentFacadeTest {
                 assertThat(query.avoidTastes()).as(message).containsExactly(Taste.SPICY);
                 assertThat(query.wantedTastes()).as(message).isEmpty();
             }
+        }
+
+        @Test
+        @DisplayName("\"김피탕 같은 메뉴\" 다음 \"매운 건 빼줘\"는 AI가 원하는 맛으로 줘도 피할 맛 매운맛이고 김피탕 키워드는 이어 간다")
+        void avoidsSpicyAndKeepsKeywords_whenRemoveWord() {
+            RecipeQuery kimpi = new RecipeQuery(MEMBER_ID, List.of(), List.of(), List.of("튀김"), null, List.of(), false,
+                    List.of("김피탕", "탕수육", "깐풍기"), "김피탕", null);
+            ChatContext afterKimpi = new ChatContext(List.of(), LastRecommendation.of(kimpi, List.of(10L)), context.lastCards());
+            for (IntentResult extracted : List.of(refine(List.of("SPICY"), null, List.of("TASTE")), avoid(null, List.of("SPICY")))) {
+                givenExtracted(extracted);
+
+                RecipeQuery query = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("매운 건 빼줘"), afterKimpi)
+                        .recipeQuery();
+
+                assertThat(query.avoidTastes()).containsExactly(Taste.SPICY);
+                assertThat(query.wantedTastes()).isEmpty();
+                assertThat(query.keywords()).containsExactly("김피탕", "탕수육", "깐풍기");
+            }
+        }
+
+        @Test
+        @DisplayName("\"짭짤한 거\" 다음 \"매운 건 빼줘\"는 AI가 맛 조건 지우기(TASTE)를 넣어도 원하는 맛 짠맛을 남기고 매운맛만 피한다")
+        void keepsSalty_whenOnlyAvoidSpokenWithRemovedTaste() {
+            RecipeQuery salty = new RecipeQuery(MEMBER_ID, List.of(), List.of(Taste.SALTY), List.of("조림"), null, List.of(), false,
+                    List.of(), null, null);
+            ChatContext afterSalty = new ChatContext(List.of(), LastRecommendation.of(salty, List.of(10L)), context.lastCards());
+            givenExtracted(new IntentResult(ChatIntent.REFINE, null, null, null, null, null, null, null, null, null,
+                    null, null, List.of("TASTE"), List.of("SPICY")));
+
+            ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("매운 건 빼줘"),
+                    afterSalty);
+
+            assertThat(resolution.recipeQuery().wantedTastes()).containsExactly(Taste.SALTY);
+            assertThat(resolution.recipeQuery().avoidTastes()).containsExactly(Taste.SPICY);
+            assertThat(resolution.recipeQuery().moodCategories()).containsExactly("조림");
+        }
+
+        @Test
+        @DisplayName("\"맛 상관없이\"처럼 맛을 지우라는 말이면 지금처럼 직전 원하는 맛을 지운다 (피하는 맛을 같이 말해도)")
+        void clearsTastes_whenClearWordSpoken() {
+            RecipeQuery salty = new RecipeQuery(MEMBER_ID, List.of(), List.of(Taste.SALTY), List.of("조림"), null, List.of(), false,
+                    List.of(), null, null);
+            ChatContext afterSalty = new ChatContext(List.of(), LastRecommendation.of(salty, List.of(10L)), context.lastCards());
+            for (String message : List.of("맛 상관없이", "맛은 아무거나, 매운 것만 빼줘")) {
+                givenExtracted(refine(null, null, List.of("TASTE")));
+
+                RecipeQuery query = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of(message), afterSalty)
+                        .recipeQuery();
+
+                assertThat(query.wantedTastes()).as(message).isEmpty();
+            }
+        }
+
+        @Test
+        @DisplayName("부정어를 모르는 말(매운 건 별로야)에서 AI가 피할 맛으로 두면 서버가 원하는 맛으로 뒤집지 않는다")
+        void keepsAiAvoid_whenTasteWordIsAmbiguous() {
+            givenExtracted(avoid(null, List.of("SPICY")));
+
+            RecipeQuery query = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("매운 건 별로야"), context)
+                    .recipeQuery();
+
+            assertThat(query.avoidTastes()).containsExactly(Taste.SPICY);
+            assertThat(query.wantedTastes()).doesNotContain(Taste.SPICY);
         }
 
         @Test
@@ -1537,6 +1626,40 @@ class ChatIntentFacadeTest {
 
                 assertThat(resolution.intent()).as(message).isEqualTo(aiIntent);
             });
+        }
+
+        @Test
+        @DisplayName("AI가 냉장고 보기·사기로 봐도 묻는 말이 있으면 일반 답으로, \"얼마나\"·\"가격\"은 그대로 둔다")
+        void changesToGeneral_whenGeneralQuestionWithFridgeOrShop() {
+            Map<String, IntentResult> general = new LinkedHashMap<>();
+            general.put("유통기한 지난 거 먹어도 돼?", fridge(List.of(), "IMMINENT"));
+            general.put("냉장고에서 꺼낸 고기 어떻게 해동해?", fridge(List.of("고기"), "ALL"));
+            general.put("주문한 거 언제 와?", intentOnly(ChatIntent.SHOP));
+            general.forEach((message, ai) -> {
+                givenExtracted(ai);
+                assertThat(facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of(message)).intent())
+                        .as(message).isEqualTo(ChatIntent.GENERAL);
+            });
+
+            givenExtracted(fridge(List.of("두부"), "ALL"));
+            assertThat(facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("두부 얼마나 남았어?")).intent())
+                    .isEqualTo(ChatIntent.FRIDGE);
+            givenExtracted(intentOnly(ChatIntent.SHOP));
+            assertThat(facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("두부 가격 얼마야?")).intent())
+                    .isEqualTo(ChatIntent.SHOP);
+        }
+
+        @Test
+        @DisplayName("AI가 범위를 ALL로 두면 상한·오래된·처리해야 같은 말로 IMMINENT를 보충하고, AI가 정한 범위는 그대로 둔다")
+        void supplementsImminentScope_whenAiLeavesAll() {
+            for (String message : List.of("상한 거 있어?", "오래된 거 뭐 있어?", "슬슬 처리해야 할 거 있어?")) {
+                givenExtracted(fridge(List.of(), "ALL"));
+                assertThat(facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of(message)).lookup().scope())
+                        .as(message).isEqualTo(FridgeScope.IMMINENT);
+            }
+            givenExtracted(fridge(List.of(), "MEALKIT"));
+            assertThat(facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("오래된 밀키트 뭐 있어?")).lookup().scope())
+                    .isEqualTo(FridgeScope.MEALKIT);
         }
 
         private static IntentResult fridge(List<String> names, String scope) {
