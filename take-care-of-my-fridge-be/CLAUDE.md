@@ -1,6 +1,7 @@
 # CLAUDE.md — take-care-of-my-fridge-be
 
 take-care-of-my-fridge-be/ 개발 규칙. 이 문서와 기존 코드의 패턴을 따른다. 충돌하면 이 문서가 우선이며 그 사실을 보고한다.
+이 문서가 백엔드 규칙의 기준본이다. [docs/conventions/backend.md](../docs/conventions/backend.md)에는 팀 결정·참고만 두고 규칙을 복사하지 않는다.
 
 0. 작업 절차
    시작 전
@@ -44,7 +45,7 @@ take-care-of-my-fridge-be/ 개발 규칙. 이 문서와 기존 코드의 패턴�
    ├── filter           # JWT 인증/인가 필터
    └── entity           # BaseTimeEntity (createdAt, updatedAt 등 공통 엔티티)
 ```
-- 모든 인프라성 설정(JPA Auditing, QueryDSL, Redis, Redisson, Kafka 등)은 global/config/의 단일 Config 클래스로 관리한다. 도메인 패키지 내부에서 @Configuration을 중복 선언하지 않는다.
+- 모든 인프라성 설정(JPA Auditing, QueryDSL, Redis, Redisson, Kafka 등)은 global/config/에 기술마다 Config 클래스 하나로 관리한다(예: RedisConfig, KafkaConfig). 같은 기술의 설정을 여러 클래스에 나누지 않고, 도메인 패키지 내부에는 @Configuration을 선언하지 않는다.
 - 설정 값 클래스(@ConfigurationProperties) 위치
     - 한 도메인에서만 쓰는 설정은 domain/{도메인}/config에 둘 수 있다. 예: domain/search/config/RecipeSearchProperties, domain/chat/config/ChatProperties
     - 여러 도메인이 같이 쓰는 설정은 global/config에 둔다. 예: global/config/SseProperties
@@ -111,6 +112,14 @@ public record ApiResponse<T>(
         return new ApiResponse<>(true, null, null);
     }
 
+    public static <T> ApiResponse<T> error(ErrorCode errorCode) {
+        return error(errorCode.getCode(), errorCode.getMessage());
+    }
+
+    public static <T> ApiResponse<T> error(ErrorCode errorCode, String message) {
+        return error(errorCode.getCode(), message);
+    }
+
     public static <T> ApiResponse<T> error(String code, String message) {
         return new ApiResponse<>(false, null, new ErrorResponse(code, message));
     }
@@ -171,19 +180,19 @@ public ResponseEntity<ApiResponse<PageResponse<ProductResponse>>> getProducts(Pa
 - 비즈니스 예외는 ErrorCode enum을 가진 BusinessException을 throw한다.
 - Controller에서 ApiResponse.error(...)를 직접 호출하지 않는다.
 - @RestControllerAdvice(GlobalExceptionHandler)에서 에러를 일괄 가로채 처리한다:
-    - BusinessException: errorCode.getHttpStatus()에 맞춰 ApiResponse.error(code, message) 응답.
-    - MethodArgumentNotValidException: 400 Bad Request와 함께 @NotBlank 등의 유효성 검증 실패 메시지를 추출해 응답.
-    - 미처리 Exception: 500 에러 코드(S001)로 마스킹하고, 서버 콘솔/로그에만 상세 log.error 스택트레이스를 남긴다.
+    - BusinessException: errorCode.getStatus()에 맞춰 ApiResponse.error(code, message) 응답.
+    - MethodArgumentNotValidException: 400 C001과 함께 첫 번째 필드 오류의 검증 메시지를 응답.
+    - 미처리 Exception: 500 COMMON_002로 마스킹하고, 서버 콘솔/로그에만 상세 log.error 스택트레이스를 남긴다.
 ```java
 // global/error/ErrorCode.java 예시
 @Getter
 @RequiredArgsConstructor
 public enum ErrorCode {
     INVALID_INPUT_VALUE(HttpStatus.BAD_REQUEST, "C001", "적절하지 않은 요청 값입니다."),
-    RESOURCE_NOT_FOUND(HttpStatus.NOT_FOUND, "C002", "해당 리소스를 찾을 수 없습니다."),
-    INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "S001", "서버 내부 오류가 발생했습니다.");
+    INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "COMMON_002", "서버 에러가 발생했습니다."),
+    FRIDGE_ITEM_NOT_FOUND(HttpStatus.NOT_FOUND, "FRIDGE_001", "냉장고 재료를 찾을 수 없습니다.");
 
-    private final HttpStatus httpStatus;
+    private final HttpStatus status;
     private final String code;
     private final String message;
 }
