@@ -52,13 +52,14 @@ $reveal-offset: 16px;
 $main-hero-text-max-width: 560px;
 $main-hero-text-padding-lg: 64px;
 $main-hero-title-size: 56px;
-$main-hero-action-min-width: 140px;
 // AI 상담 띠의 세로 사진이 한 화면을 넘지 않게
 $main-consult-image-max-height: 560px;
 
 // 메인 화면 인기 레시피 썸네일, 순위 칸
 $popular-recipe-thumb-size: 64px;
 $popular-recipe-rank-width: 24px;
+// 메인 인기 레시피 1등 카드 사진 위 순위 칸
+$main-recipe-top-rank-size: 40px;
 
 // 마이페이지 왼쪽 메뉴. 메뉴 한 줄 높이(md 이상, 모바일은 터치 영역 크기)
 // 마이페이지 전체 폭: 넓은 화면에서도 메뉴+내용을 가운데로 모은다(헤더·하단바는 화면 폭 그대로).

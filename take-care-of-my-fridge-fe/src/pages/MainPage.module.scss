@@ -8,22 +8,6 @@
   flex-direction: column;
 }
 
-// 로그인한 회원의 임박 재료 줄. 첫 화면 바로 아래라 위 여백은 좁게, 아래는 바로가기 띠가 이어받는다.
-.fridgeBand {
-  padding-top: $main-section-gap;
-
-  @include from(lg) {
-    padding-top: $main-band-padding-lg-tight;
-  }
-}
-
-.fridgeInner {
-  @include main-container;
-  @include reveal-on-view;
-
-  display: flex;
-}
-
 // 할인 상품 줄과 오늘의 밀키트 줄. 바탕은 바로가기 띠와 같은 종이색. lg 이상에서 제목·설명은 왼쪽 좁은 칸, 카드는 오른쪽 넓은 칸.
 .saleBand,
 .mealkitBand {

@@ -1,35 +1,45 @@
 @use '@/styles/variables' as *;
 @use '@/styles/mixins' as *;
 
-// 모든 화면 맨 아래 흰 띠(종이색 본문과 구분). 위에 얇은 선.
+// 모든 화면 맨 아래 흰 띠(종이색 본문과 구분). 위에 얇은 선. 본문 띠보다 위아래 여백을 작게 둔다.
 .band {
-  padding-block: $main-section-gap;
+  padding-block: var(--ant-padding-lg);
   background: var(--ant-color-bg-container);
   border-top: 1px solid var(--ant-color-border-secondary);
 
-  @include from(lg) {
-    padding-block: $main-band-padding-lg var(--ant-padding-xl);
+  @include from(md) {
+    padding-block: var(--ant-padding-xl);
   }
 }
 
-// 모바일은 위아래로, lg 이상은 소개 6칸 · 바로가기 6칸, 출처는 아래 한 줄.
+// 위: 서비스 소개, 아래: 사진 출처. 둘 다 전체 폭.
 .inner {
   @include main-container;
 
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: var(--ant-margin-xl);
-
-  @include from(lg) {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    row-gap: var(--ant-margin-xxl);
-  }
+  display: flex;
+  flex-direction: column;
+  gap: var(--ant-margin-lg);
 }
 
+// 모바일은 소개 글 아래 GitHub 아이콘, md 이상은 소개 글 왼쪽 · 아이콘 오른쪽 끝으로 한 줄.
 .about {
   display: flex;
   flex-direction: column;
-  gap: var(--ant-margin-sm);
+  gap: var(--ant-margin-xs);
+
+  @include from(md) {
+    flex-direction: row;
+    gap: var(--ant-margin-lg);
+    align-items: center;
+    justify-content: space-between;
+  }
+}
+
+.intro {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ant-margin-xs);
+  min-width: 0;
 }
 
 :global(.ant-typography).wordmark {
@@ -44,6 +54,7 @@
   margin: 0;
   color: var(--ant-color-text-secondary);
   text-wrap: pretty;
+  word-break: keep-all;
 }
 
 // GitHub 저장소 아이콘: 터치 영역 44px, 소개 글과 같은 보조색에서 마우스를 올리면 잉크색.
@@ -51,10 +62,17 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
   align-self: flex-start;
   width: $touch-target-size;
   height: $touch-target-size;
   margin-inline-start: calc(-1 * var(--ant-margin-xs));
+
+  // 오른쪽 끝에 둘 때는 아이콘 모양이 본문 오른쪽 선에 맞게 바깥 여백을 반대로 준다.
+  @include from(md) {
+    align-self: center;
+    margin-inline: 0 calc(-1 * var(--ant-margin-xs));
+  }
   font-size: var(--ant-font-size-heading-3);
   color: var(--ant-color-text-secondary);
   border-radius: 50%;
@@ -62,36 +80,6 @@
 
   &:hover {
     color: var(--ant-color-text);
-  }
-
-  &:focus-visible {
-    outline: 2px solid var(--ant-color-primary-active);
-    outline-offset: 2px;
-  }
-}
-
-.links {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--ant-margin-xs) var(--ant-margin-lg);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.link {
-  display: inline-flex;
-  align-items: center;
-  min-height: $touch-target-size;
-  color: var(--ant-color-text);
-  text-decoration: underline;
-  text-decoration-color: transparent;
-  text-underline-offset: 0.2em;
-  transition: text-decoration-color var(--ant-motion-duration-fast);
-
-  &:hover {
-    color: var(--ant-color-text);
-    text-decoration-color: currentcolor;
   }
 
   &:focus-visible {
@@ -109,10 +97,6 @@
   font-size: var(--ant-font-size-sm);
   color: var(--ant-color-text-secondary);
   border-top: 1px solid var(--ant-color-border-secondary);
-
-  @include from(lg) {
-    grid-column: 1 / -1;
-  }
 }
 
 .creditsHeading {

@@ -1,14 +1,10 @@
-import { Button, Flex, Typography } from 'antd';
-import { useNavigate } from 'react-router';
-
-import { ROUTES } from '@/app/paths';
+import { Typography } from 'antd';
 
 import { MAIN_PHOTOS } from './mainPhotos';
 import styles from './MainHero.module.scss';
 
-// 메인 첫 화면. 냉장고 안 사진이 화면 폭을 다 덮고, 왼쪽 아래에 제목·설명·버튼을 얹는다.
+// 메인 첫 화면. 냉장고 안 사진이 화면 폭을 다 덮고, 왼쪽 아래에 제목·설명을 얹는다. 화면 이동은 헤더 메뉴가 맡는다.
 export function MainHero() {
-  const navigate = useNavigate();
   const photo = MAIN_PHOTOS.hero;
 
   return (
@@ -34,24 +30,6 @@ export function MainHero() {
           <Typography.Paragraph className={styles.lede}>
             재료를 적어 두면 소비기한을 챙기고, 그 재료로 만들 요리를 찾아 드려요.
           </Typography.Paragraph>
-          <Flex wrap gap="small">
-            <Button
-              type="primary"
-              size="large"
-              className={styles.action}
-              onClick={() => navigate(ROUTES.fridge)}
-            >
-              내 냉장고 열기
-            </Button>
-            <Button
-              size="large"
-              ghost
-              className={styles.action}
-              onClick={() => navigate(ROUTES.recipes)}
-            >
-              레시피 보기
-            </Button>
-          </Flex>
         </div>
       </div>
     </section>
