@@ -122,6 +122,8 @@ $product-grid-column-gap-xl: 48px;
 $product-grid-row-gap-xl: 64px;
 // 필터 목록 앞 점 크기
 $facet-dot-size: 10px;
+// 검색 조건 항목이 많은 묶음(요리 분류)의 PC 줄 높이
+$facet-compact-row-height: 28px;
 
 // 장바구니 서랍(레퍼런스 cart-drawer 치수): 좌우 32px, 머리 줄 위아래 18px
 $cart-drawer-padding-inline: 32px;

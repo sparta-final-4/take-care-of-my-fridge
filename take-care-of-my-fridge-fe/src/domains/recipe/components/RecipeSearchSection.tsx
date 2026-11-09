@@ -47,6 +47,7 @@ export function RecipeSearchSection() {
     : categories.filter((value, index) => index < CATEGORY_PREVIEW_COUNT || value === category);
 
   // 칩은 하나만 고를 수 있고, 고른 칩을 다시 누르면 해제한다.
+  // 항목이 많은 요리 분류는 맨 아래에 둬 짧은 조건이 먼저 보이게 한다.
   const filterRows: FilterRow[] = [
     {
       label: '음식 종류',
@@ -55,6 +56,15 @@ export function RecipeSearchSection() {
         label: value,
         checked: cuisineType === value,
         onChange: (checked: boolean) => setCuisineType(checked ? value : undefined),
+      })),
+    },
+    {
+      label: '조리 시간',
+      chips: COOK_TIME_OPTIONS.map((option) => ({
+        key: option.key,
+        label: option.label,
+        checked: cookTimeKey === option.key,
+        onChange: (checked: boolean) => setCookTime(checked ? option.key : undefined),
       })),
     },
     {
@@ -73,15 +83,6 @@ export function RecipeSearchSection() {
             }
           : undefined,
       twoColumns: true,
-    },
-    {
-      label: '조리 시간',
-      chips: COOK_TIME_OPTIONS.map((option) => ({
-        key: option.key,
-        label: option.label,
-        checked: cookTimeKey === option.key,
-        onChange: (checked: boolean) => setCookTime(checked ? option.key : undefined),
-      })),
     },
   ];
 
