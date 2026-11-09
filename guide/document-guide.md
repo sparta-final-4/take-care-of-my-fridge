@@ -204,14 +204,14 @@
 
 ## 프론트 규칙
 
-대상: [docs/conventions/frontend.md](../docs/conventions/frontend.md) · 현재 수준: **상세 원문·적용 메모 있음**
+대상: [docs/conventions/frontend.md](../docs/conventions/frontend.md) · 현재 수준: **기준본 안내·팀 결정 있음**
 
 | 구분 | 내용 |
 |---|---|
 | **역할** | 프론트 코드의 구조와 구현 방식을 통일하는 기준입니다. |
 | **작성할 내용** | 기술 스택, 디렉터리·명명, 상태 관리, 라우팅, API·인증, UI·스타일·반응형·접근성, 포맷·검증 절차를 적습니다. |
-| **현재 내용** | 공유한 프론트 규칙 원문과 적용 메모가 있습니다. React·TypeScript, Ant Design·SCSS, Query·Zustand, 라우터, API 타입·에러, 세션 처리, 검증 명령까지 상세히 작성되어 있습니다. |
-| **보완할 내용** | 원문 경로는 예정 구조입니다. 초기 구성 후 실제 경로·버전·명령과 맞춰야 합니다. 30분 미사용 로그아웃(Q-01)은 결정됐고, 재발급·만료 화면(Q-02·08), 가입·필드 오류(Q-09·10)는 다른 문서와 합의가 필요합니다. |
+| **현재 내용** | 규칙의 기준본은 [프론트 CLAUDE.md](../take-care-of-my-fridge-fe/CLAUDE.md)이고, 이 문서에는 기준본 링크와 팀 결정만 있습니다. 처음 공유한 원문은 git 기록에 있습니다. |
+| **보완할 내용** | 규칙을 바꿀 때는 기준본만 고칩니다. |
 | **작성 시점** | 구현 기준으로 사용하되 변경한 규칙은 팀과 합의합니다. 특정 화면의 요구사항은 화면 명세에서 관리합니다. |
 
 [↑ 목차로](#빠른-목차)
@@ -220,14 +220,14 @@
 
 ## 백엔드 규칙
 
-대상: [docs/conventions/backend.md](../docs/conventions/backend.md) · 현재 수준: **상세 원문·충돌 메모 있음**
+대상: [docs/conventions/backend.md](../docs/conventions/backend.md) · 현재 수준: **기준본 안내·팀 결정 있음**
 
 | 구분 | 내용 |
 |---|---|
 | **역할** | 백엔드 코드의 책임·상태 변경·트랜잭션·예외 처리 방식을 통일합니다. |
 | **작성할 내용** | 기술 스택·패키지, Controller·Service·Entity·DTO·Repository 책임, 트랜잭션, 락·이벤트, 공통 응답·오류, 설정·검증 절차를 적습니다. |
-| **현재 내용** | 공유 원문에 도메인 구조, Java record, 엔티티 변경 원칙, QueryDSL, Redisson·Kafka, ApiResponse·ErrorCode 예시가 있습니다. 원문 내용은 그대로 두고 제목·코드 블록 형식만 정리했습니다. 추가 자료의 차이와 적용 메모도 있습니다. |
-| **보완할 내용** | FQCN 예외·Builder 허용·Config 범위(Q-17), 감사 시간 관리(Q-06), 필드 오류(Q-10)를 통일해야 합니다. 패키지·코드 예시는 아직 실제 구현이 아닙니다. 인프라 사용 범위도 기능별로 확정합니다. |
+| **현재 내용** | 규칙의 기준본은 [백엔드 CLAUDE.md](../take-care-of-my-fridge-be/CLAUDE.md)이고, 이 문서에는 기준본 링크와 팀 결정만 있습니다. 처음 공유한 원문은 git 기록에 있습니다. |
+| **보완할 내용** | 규칙을 바꿀 때는 기준본만 고칩니다. |
 | **작성 시점** | 백엔드 구현 전에 기준으로 삼고 합의·구현과 달라지면 갱신합니다. |
 
 [↑ 목차로](#빠른-목차)
@@ -306,10 +306,8 @@ README의 안내 목록 외에 다음 파일도 있습니다.
 |---|---|---|
 | [README.md](../README.md) | 서비스·담당 범위·계획 스택·문서 링크가 있는 프로젝트 소개 | 실제 실행 방법·배포·기여·증거 추가 |
 | [CLAUDE.md](../CLAUDE.md) | 공통 지침과 영역별 진입점 링크 | 연결 경로 유지 |
-| [frontend/AGENTS.md](../frontend/AGENTS.md) | 프론트 참조 문서·초기 설치 주의·검증 명령 | 실제 구성과 대조 |
-| [frontend/CLAUDE.md](../frontend/CLAUDE.md) | 프론트 지침으로 연결 | 연결 경로 유지 |
-| [backend/AGENTS.md](../backend/AGENTS.md) | 백엔드 참조 문서·API/DB 확인·검증 명령 | 실제 구성과 대조 |
-| [backend/CLAUDE.md](../backend/CLAUDE.md) | 백엔드 지침으로 연결 | 연결 경로 유지 |
+| [take-care-of-my-fridge-fe/CLAUDE.md](../take-care-of-my-fridge-fe/CLAUDE.md) | 프론트 규칙 기준본(구조·API·UI·검증 명령) | 규칙이 바뀌면 여기만 고침 |
+| [take-care-of-my-fridge-be/CLAUDE.md](../take-care-of-my-fridge-be/CLAUDE.md) | 백엔드 규칙 기준본(구조·레이어·응답·테스트·검증 명령) | 규칙이 바뀌면 여기만 고침 |
 | [도메인 설계 템플릿](../docs/architecture/domains/_template.md) | 도메인 책임·정책·상태 전이·연동·검증 양식 | 회원은 작성됨. 할인 후보·판매 예측 등 다른 도메인 문서 작성 |
 | [DDL 초안](../docs/database/member-auth-admin.sql) | 개인 담당 8개 테이블의 CREATE TABLE 초안 | DB 확정 후 실행, 데이터 사전과 함께 갱신 |
 

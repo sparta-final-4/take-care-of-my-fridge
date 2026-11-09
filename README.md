@@ -62,8 +62,8 @@ docker compose up -d
 | [테스트 전략](docs/testing/test-strategy.md) | 검증할 조건·기대 결과·방법 | 검증 계획 있음·실행 결과 없음 | [가이드](guide/document-guide.md#테스트-전략) |
 | [문서 규칙](docs/conventions/documentation-standard.md) | 문서 상태·출처·이름·갱신 기준 | 작성·갱신 규칙 초안 있음 | [가이드](guide/document-guide.md#문서-규칙) |
 | [Git 협업 초안](docs/conventions/git.md) | 브랜치·커밋·리뷰·병합·배포 | 협의용 초안·PR 양식 있음 | [가이드](guide/document-guide.md#git-협업-초안) |
-| [프론트 규칙](docs/conventions/frontend.md) | 프론트 구현·상태·UI·검증 기준 | 상세 원문·적용 메모 있음 | [가이드](guide/document-guide.md#프론트-규칙) |
-| [백엔드 규칙](docs/conventions/backend.md) | 백엔드 책임·트랜잭션·오류 기준 | 상세 원문·충돌 메모 있음 | [가이드](guide/document-guide.md#백엔드-규칙) |
+| [프론트 규칙](docs/conventions/frontend.md) | 기준본(프론트 `CLAUDE.md`) 안내, 팀 결정 | 기준본 안내·팀 결정 있음 | [가이드](guide/document-guide.md#프론트-규칙) |
+| [백엔드 규칙](docs/conventions/backend.md) | 기준본(백엔드 `CLAUDE.md`) 안내, 팀 결정 | 기준본 안내·팀 결정 있음 | [가이드](guide/document-guide.md#백엔드-규칙) |
 | [DB 규칙](docs/conventions/database.md) | 테이블 공통 명명·타입·시간 기준 | 공통 기준·적용 쟁점 있음 | [가이드](guide/document-guide.md#db-규칙) |
 | [기술 결정 템플릿](docs/decisions/ADR-000-template.md) | 선택한 방법과 대안·이유 기록 | 빈 양식만 있음 | [가이드](guide/document-guide.md#기술-결정-템플릿) |
 | [문제 해결 템플릿](docs/troubleshooting/_template.md) | 실제 문제의 재현·원인·해결 기록 | 빈 양식만 있음 | [가이드](guide/document-guide.md#문제-해결-템플릿) |
