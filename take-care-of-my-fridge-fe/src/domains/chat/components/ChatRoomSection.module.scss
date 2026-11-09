@@ -52,6 +52,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: var(--ant-margin-xs);
   padding: 6px 14px;
   border-bottom: 1px solid var(--ant-color-border-secondary);
   background-color: var(--ant-color-fill-quaternary);
@@ -65,6 +66,14 @@
   align-items: center;
   gap: 6px;
   color: var(--ant-color-text-secondary);
+  min-width: 0;
+}
+
+// 요리 이름이 길면 [새 상담 시작]을 밀어내지 않게 줄인다
+.statusText {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .statusDot {
@@ -245,4 +254,8 @@
 
 .selectedTag {
   margin-inline-end: 0;
+}
+
+.newSessionButton {
+  flex-shrink: 0;
 }

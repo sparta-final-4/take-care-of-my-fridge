@@ -75,25 +75,27 @@ class CookingServiceTest {
      * 정상적인 요리 기록 저장 요청 시 엔티티를 repository.save로 저장하는지 검증한다.
      */
     @Test
-    @DisplayName("요리 기록 저장을 요청하면 요리 기록을 저장한다")
-    void savesCookingLog() {
+    @DisplayName("요리 기록을 저장하면 요청 값이 아니라 넘겨받은 상담 ID로 저장한다")
+    void savesCookingLogWithGivenSessionId() {
         // Given
         Long memberId = 7L;
         CookingCompleteRequest request = new CookingCompleteRequest(
                 12L, CookingResult.SUCCESS, "맛있어요", 10L, List.of());
-        CookingLog savedLog = request.toEntity(memberId);
-        ReflectionTestUtils.setField(savedLog, "id", 100L);
 
         when(recipeService.existsById(12L)).thenReturn(true);
-        when(cookingLogRepository.save(any(CookingLog.class))).thenReturn(savedLog);
+        when(cookingLogRepository.save(any(CookingLog.class))).thenAnswer(invocation -> {
+            CookingLog saved = invocation.getArgument(0);
+            ReflectionTestUtils.setField(saved, "id", 100L);
+            return saved;
+        });
 
         // When
-        CookingLog result = cookingService.saveCookingLog(memberId, request);
+        CookingLog result = cookingService.saveCookingLog(memberId, request, 20L);
 
         // Then
         assertThat(result.getId()).isEqualTo(100L);
+        assertThat(result.getChatSessionId()).isEqualTo(20L);
         verify(recipeService).existsById(12L);
-        verify(cookingLogRepository).save(any(CookingLog.class));
     }
 
     /**
@@ -109,7 +111,7 @@ class CookingServiceTest {
         when(recipeService.existsById(999L)).thenReturn(false);
 
         // When & Then
-        assertThatThrownBy(() -> cookingService.saveCookingLog(memberId, request))
+        assertThatThrownBy(() -> cookingService.saveCookingLog(memberId, request, null))
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode")
                 .isEqualTo(ErrorCode.RECIPE_NOT_FOUND)

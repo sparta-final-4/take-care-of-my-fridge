@@ -124,6 +124,7 @@ models/chat-session-list-response.ts
 models/chat-session-response.ts
 models/chat-session-status-counts.ts
 models/chat-session-summary-response.ts
+models/cooked-recipe.ts
 models/cooking-complete-request.ts
 models/cooking-complete-response.ts
 models/cooking-log-response.ts

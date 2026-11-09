@@ -171,7 +171,7 @@ HTTP 메서드·경로·DTO 이름은 구현 전 합의합니다.
 
 | 기능 | Method / Path | 권한 | 요청 | 성공 응답 | 주요 오류 |
 |---|---|---|---|---|---|
-| 요리 완료 등록 | POST /cooking-logs | 로그인 | Body: recipeId, result, memo?, chatSessionId?, usedIngredients?: `[{ ingredientId, quantity? }]` | 200, `CookingCompleteResponse` | 400 재료 중복, 401, 404 레시피/상담세션 없음 |
+| 요리 완료 등록 | POST /cooking-logs | 로그인 | Body: recipeId, result, memo?, chatSessionId?, usedIngredients?: `[{ ingredientId, quantity? }]` | 200, `CookingCompleteResponse` | 400 재료 중복, 401, 404 레시피 없음 (상담은 잇지 못해도 오류 없음) |
 | 요리 기록 목록 조회 | GET /cooking-logs | 로그인 | Query: recipeId, from, to, page, size | 200, `PageResponse<CookingLogResponse>` | 400 from>to 또는 page/size 오류, 401 |
 | 요리 기록 결과·메모 수정 | PATCH /cooking-logs/{cookingLogId} | 로그인 | Path: cookingLogId<br>Body: result, memo? (최대 50자) | 200, `CookingLogResponse` | 400 result 누락, 401, 404 기록 없음/타인 기록 |
 | 레시피 요리 통계 조회 | GET /recipes/{recipeId}/cooking-stats | 공개 | Path: recipeId | 200, `CookingStatsResponse` | 404 레시피 없음 |
@@ -179,14 +179,17 @@ HTTP 메서드·경로·DTO 이름은 구현 전 합의합니다.
 
 - **요리 완료 원자적 처리 (`POST /cooking-logs`)**:
   1. 레시피 존재 여부를 `RecipeService.existsById`로 검증하며, 없으면 404 `RECIPE_NOT_FOUND`입니다.
-  2. `chatSessionId`가 전달된 경우 본인 소유의 상담 세션인지 먼저 검증하며, 없거나 타인의 세션이면 404 `CHAT_SESSION_NOT_FOUND`로 즉시 실패합니다.
-  3. 요리 기록(`CookingLog`)을 생성·저장합니다.
+  2. 이을 상담을 찾습니다(2026-11-09 변경). 상담 때문에 요리 완료가 실패하지 않습니다(예전 404·409 없음).
+     - `chatSessionId`가 있으면 본인의 진행 중 상담이고 30분이 지나지 않았을 때만 잇습니다. 그 상담에서 이 레시피를 추천했는지는 보지 않습니다. 남의 상담·끝난 상담·만료된 상담이면 잇지 않고 진행합니다.
+     - 없으면 서버가 찾습니다. 진행 중 상담이 30분이 지나지 않았고 그 상담에서 이 레시피를 레시피 카드(`chat_recommendations.recipe_id`)로 추천한 적 있으면 잇습니다. 밀키트 카드(연결 레시피 포함)는 보지 않습니다.
+     - 요리 트랜잭션 밖에서 읽기만 하며(상담 1번 + 추천 1번), 찾다가 오류가 나면 잇지 않고 진행합니다.
+  3. 요리 기록(`CookingLog`)을 생성·저장합니다. `chat_session_id`는 2에서 이은 상담 ID입니다(잇지 않으면 null).
   4. 냉장고 재료를 자동 차감(`FridgeService.consumeForCooking`)합니다:
      - 데드락(교착) 방지를 위해 `ingredientId` 오름차순으로 정렬하여 비관적 락을 획득합니다.
      - 동일 재료가 여러 개면 소비기한 빠른 순(FIFO)으로 순차 차감합니다.
      - 기본 양념(`basicSeasoning=true`), 직접 입력 재료(`ING_CUSTOM`), 밀키트(`ING_MEALKIT`)는 차감 대상에서 자동 제외됩니다.
      - 냉장고에 보유하지 않은 재료는 에러 없이 건너뛰며, 실제 차감된 내역만 응답의 `deductions` 목록에 반환됩니다.
-  5. 연결된 상담 세션이 `ACTIVE` 상태이면 요리 완료에 따라 세션을 종료(`complete`) 처리합니다.
+  5. 이은 상담이 있으면 요리 완료가 커밋된 뒤 이벤트(`CookingCompletedEvent`)로 상담을 종료(COMPLETED)합니다. 요리 결과가 실패(FAILED)여도 끝냅니다. 그 사이 끝났거나 만료된 상담은 그대로 두고, 종료가 실패해도 요리 기록·재료 차감은 되돌리지 않고 로그만 남깁니다. 끝나면 기존 상담 바뀜 신호(`COMPLETED`)가 나갑니다.
 - **요리 기록 수정 (`PATCH /cooking-logs/{cookingLogId}`)**: 본인 기록만 수정 가능(미존재 또는 타인 기록 시 404 `COOKING_LOG_NOT_FOUND`). 냉장고 재료 차감 내역은 되돌릴 수 없으므로 결과(`result`)와 메모(`memo`)만 수정할 수 있습니다.
 - **레시피 요리 통계 (`GET /recipes/{recipeId}/cooking-stats`)**: 비로그인 요청을 허용합니다. 레시피가 없으면 404이며, 요리 기록이 하나도 없으면 모든 카운트(총 횟수, 성공, 실패)가 0으로 반환됩니다.
 - **마이 레시피 (`GET /me/recipes`)**: 회원이 요리 완료한 레시피들을 그룹화하여 후기 작성 상태(`reviewStatus`: ALL, PENDING, COMPLETED) 필터링과 전체 요약 통계(총 요리 수, 고유 레시피 수, 성공 수, 작성 후기 수)를 함께 반환합니다.
@@ -198,9 +201,11 @@ HTTP 메서드·경로·DTO 이름은 구현 전 합의합니다.
 | 기능 | Method / Path | 권한 | 요청 | 성공 응답 | 주요 오류 |
 |---|---|---|---|---|---|
 | 내 상담 목록 | GET /chat-sessions | 로그인 | Query: page(기본 1), size(기본 10, 최대 100), status(ALL/ACTIVE/ENDED, 기본 ALL) | 200, `ChatSessionListResponse` | 400 page/size/status 오류, 401 |
+| 상담 단건 조회 | GET /chat-sessions/{sessionId} | 로그인 | Path: sessionId | 200, `ChatSessionResponse` | 401, 404 `CHAT_001` 없음/타인 상담 |
 | 상담 메시지 조회(기존) | GET /chat-sessions/{sessionId}/messages | 로그인 | Path: sessionId | 200, `ChatMessageResponse[]` | 401, 404 없음/타인 상담 |
 | 상담 메시지 보내기(기존) | POST /chat-sessions/{sessionId}/messages | 로그인 | Path: sessionId, Body: content(최대 500자), mode(AUTO/RECOMMEND, 기본 AUTO), selectedIngredientIds(최대 50개), useSelectedOnly(기본 false) | 200, `text/event-stream` (추천이면 `recommendations` → `message` 조각 → `done`, 실패 시 `error`) | 스트림 전 JSON 오류: 401, 404, 409 `CHAT_005` 끝난 상담·`CHAT_006` 만료·`CHAT_009` 다른 창에서 답을 받는 중, 429 `CHAT_007` 하루 횟수, 503 `CHAT_008` |
 
+- `ChatSessionResponse`: id, status(ACTIVE/COMPLETED/EXPIRED), lastMessageAt, createdAt, cookedRecipe(2026-11-09 추가). `cookedRecipe`는 요리 완료로 끝난 상담일 때만 `{ recipeId, name }`이고, 직접 끝냈거나 진행 중·만료거나 레시피가 지워졌으면 null입니다. 단건 조회만 채우고 상담 시작·종료 API는 늘 null입니다. `cooking_logs.chat_session_id`로 요리 기록 1번 + 레시피 이름 1번 조회합니다(DB 변경 없음).
 - `ChatSessionListResponse`: `counts`(`ChatSessionStatusCounts`: total, active, ended — 상태 필터와 상관없는 탭 건수), `sessions`(`PageResponse<ChatSessionSummaryResponse>`, 다음 페이지 여부는 공통 `isLast`).
 - `ChatSessionSummaryResponse`: sessionId, status(ACTIVE/COMPLETED/EXPIRED), startedAt(세션 생성 시각), lastMessageAt, messageCount, firstQuestion(첫 USER 메시지 앞 50자), lastMessagePreview(마지막 메시지 앞 50자, 역할 무관). 자르기는 코드 포인트 기준. 시각은 `yyyy-MM-dd HH:mm:ss`.
 - 상태: ACTIVE = 진행 중이면서 마지막 대화가 시간 제한(`chat.session-timeout`, 30분) 안. ENDED = 종료(COMPLETED) + 만료(EXPIRED). 시간이 지났는데 아직 ACTIVE로 남은 상담(다음 상담 시작 때 만료 처리됨)은 목록 status를 EXPIRED로 주고 ENDED 필터·종료 건수에 넣습니다.

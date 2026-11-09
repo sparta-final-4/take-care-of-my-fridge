@@ -9,12 +9,13 @@ import {
 
 import type { ChatSessionListRequestStatusEnum, ChatSessionResponse } from '@/common/api/clients';
 
-import { completeSession, getMessages, getMySessions, startSession } from './api';
+import { completeSession, getMessages, getMySessions, getSession, startSession } from './api';
 
 export const chatQueries = {
   all: () => ['chat'] as const,
   activeSession: () => ['chat', 'activeSession'] as const,
   messages: (sessionId: number) => ['chat', 'messages', sessionId] as const,
+  session: (sessionId: number) => ['chat', 'session', sessionId] as const,
   sessions: () => ['chat', 'sessions'] as const,
 
   activeSessionQuery: () =>
@@ -25,6 +26,15 @@ export const chatQueries = {
       refetchOnWindowFocus: false,
       refetchOnReconnect: false,
       retry: false,
+    }),
+
+  // 끝난 상담 하나. 요리 완료로 끝났으면 그 요리를 알려 준다. 끝난 상담은 바뀌지 않아 다시 받지 않는다.
+  endedSessionQuery: (sessionId: number) =>
+    queryOptions({
+      queryKey: chatQueries.session(sessionId),
+      queryFn: ({ signal }) => getSession(sessionId, signal),
+      enabled: sessionId > 0,
+      staleTime: Infinity,
     }),
 
   messagesQuery: (sessionId: number) =>

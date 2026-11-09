@@ -46,11 +46,12 @@ public record CookingCompleteRequest(
         return true;
     }
 
-    public CookingLog toEntity(Long memberId) {
+    // chatSessionId는 서버가 확인·찾은 상담 ID (요청 값이 아니다. 잇지 않으면 null)
+    public CookingLog toEntity(Long memberId, Long chatSessionId) {
         return CookingLog.builder()
                 .memberId(memberId)
                 .recipeId(this.recipeId)
-                .chatSessionId(this.chatSessionId)
+                .chatSessionId(chatSessionId)
                 .result(this.result)
                 .memo(this.memo)
                 .build();

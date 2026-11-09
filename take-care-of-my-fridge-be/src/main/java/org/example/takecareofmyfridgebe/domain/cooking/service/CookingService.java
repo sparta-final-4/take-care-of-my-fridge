@@ -27,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -41,16 +42,17 @@ public class CookingService {
      * 요리 완료 기록을 생성하여 저장한다.
      *
      * @param memberId 회원 ID
-     * @param request  요리 완료 요청 정보
+     * @param request       요리 완료 요청 정보
+     * @param chatSessionId 이을 상담 ID (CookingFacade가 확인·찾은 값, 잇지 않으면 null)
      * @return 저장된 요리 기록 엔티티
      */
     @Transactional
-    public CookingLog saveCookingLog(Long memberId, CookingCompleteRequest request) {
+    public CookingLog saveCookingLog(Long memberId, CookingCompleteRequest request, Long chatSessionId) {
         if (!recipeService.existsById(request.recipeId())) {
             throw new BusinessException(ErrorCode.RECIPE_NOT_FOUND);
         }
 
-        CookingLog cookingLog = request.toEntity(memberId);
+        CookingLog cookingLog = request.toEntity(memberId, chatSessionId);
         return cookingLogRepository.save(cookingLog);
     }
 
@@ -63,6 +65,18 @@ public class CookingService {
      */
     public boolean hasCooked(Long memberId, Long recipeId) {
         return cookingLogRepository.existsByMemberIdAndRecipeId(memberId, recipeId);
+    }
+
+    /**
+     * 상담과 이은 요리 기록의 레시피 ID를 찾는다 (요리 완료로 끝난 상담 화면 문구용).
+     *
+     * @param memberId      회원 ID
+     * @param chatSessionId 상담 ID
+     * @return 레시피 ID (이은 요리 기록이 없으면 비어 있음)
+     */
+    public Optional<Long> findCookedRecipeId(Long memberId, Long chatSessionId) {
+        return cookingLogRepository.findFirstByMemberIdAndChatSessionIdOrderByIdAsc(memberId, chatSessionId)
+                .map(CookingLog::getRecipeId);
     }
 
     /**

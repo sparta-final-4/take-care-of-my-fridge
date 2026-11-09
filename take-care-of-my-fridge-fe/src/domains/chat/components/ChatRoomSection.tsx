@@ -19,6 +19,7 @@ import { getChatErrorInfo, getErrorCode, type ChatErrorInfo } from '@/common/api
 import { useAuthStore } from '@/common/auth/authStore';
 import { useScreens } from '@/common/hooks/useScreens';
 import { streamMessage } from '../api';
+import { formatEndedLabel } from '../format';
 import { useChatModalStore } from '../model/useChatModalStore';
 import { useChatStreamingStore } from '../model/useChatStreamingStore';
 import { chatQueries, useCompleteChatSession, useStartChatSession } from '../queries';
@@ -135,6 +136,12 @@ export function ChatRoomSection({
   const sessionId = activeSession?.id ?? 0;
   const isSessionEnded =
     activeSession?.status === 'COMPLETED' || activeSession?.status === 'EXPIRED';
+
+  // 종료(COMPLETED)된 상담은 요리 완료로 끝났는지 한 번 받아 안내에 요리 이름을 붙인다.
+  const { data: endedSession } = useQuery({
+    ...chatQueries.endedSessionQuery(sessionId),
+    enabled: isAuthenticated && sessionId > 0 && activeSession?.status === 'COMPLETED',
+  });
 
   // 2. 세션의 메시지 기록 조회
   const { data: messagesData, isLoading: isMessagesLoading } = useQuery({
@@ -568,11 +575,14 @@ export function ChatRoomSection({
             <>
               <div className={styles.statusIndicator}>
                 <span className={`${styles.statusDot} ${styles.ended}`} />
-                <span>상담이 끝났어요</span>
+                <span className={styles.statusText}>
+                  {formatEndedLabel(endedSession?.cookedRecipe?.name)}
+                </span>
               </div>
               <Button
                 type="link"
                 size="small"
+                className={styles.newSessionButton}
                 style={{ padding: 0, height: 'auto', fontSize: 'var(--ant-font-size-sm)' }}
                 onClick={handleStartNewSession}
                 loading={startSessionMutation.isPending}

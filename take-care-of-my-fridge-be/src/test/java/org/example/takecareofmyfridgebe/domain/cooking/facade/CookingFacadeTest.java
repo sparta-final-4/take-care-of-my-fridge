@@ -7,10 +7,9 @@ import org.example.takecareofmyfridgebe.domain.cooking.dto.IngredientDeductionRe
 import org.example.takecareofmyfridgebe.domain.cooking.dto.UsedIngredientRequest;
 import org.example.takecareofmyfridgebe.domain.cooking.entity.CookingLog;
 import org.example.takecareofmyfridgebe.domain.cooking.entity.CookingResult;
+import org.example.takecareofmyfridgebe.domain.cooking.event.CookingCompletedEvent;
 import org.example.takecareofmyfridgebe.domain.cooking.service.CookingService;
 import org.example.takecareofmyfridgebe.domain.fridge.service.FridgeService;
-import org.example.takecareofmyfridgebe.global.error.BusinessException;
-import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -18,16 +17,17 @@ import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.http.HttpStatus;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doThrow;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -35,12 +35,14 @@ import static org.mockito.Mockito.when;
 
 /**
  * CookingFacade 단위 테스트.
- * 요리 완료 시:
- * 1) 상담 세션 소유권 사전 검증 (타인 세션이면 요리 기록 저장 및 재료 차감 없이 즉시 404 실패)
- * 2) 요리 기록 저장 -> 냉장고 재료 차감 -> 상담 세션 완료 순서 검증
+ * 요리 완료 시 이을 상담 찾기 -> 요리 기록 저장 -> 냉장고 재료 차감 -> 요리 완료 이벤트 발행(커밋 뒤 상담 종료) 순서와,
+ * 상담을 잇지 못해도(없음·남의 상담·끝난 상담·조회 오류) 요리 완료는 성공하는지 본다.
  */
 @ExtendWith(MockitoExtension.class)
 class CookingFacadeTest {
+
+    private static final Long MEMBER_ID = 7L;
+    private static final Long RECIPE_ID = 12L;
 
     @Mock
     private CookingService cookingService;
@@ -51,104 +53,86 @@ class CookingFacadeTest {
     @Mock
     private ChatSessionService chatSessionService;
 
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
     @InjectMocks
     private CookingFacade cookingFacade;
 
-    /**
-     * chatSessionId가 존재할 때 타인의 세션이거나 없는 세션이면
-     * 요리 기록 저장 및 냉장고 차감 로직을 전혀 실행하지 않고 404 CHAT_ROOM_NOT_FOUND로 즉시 종료되는지 검증한다.
-     */
     @Test
-    @DisplayName("다른 회원의 상담이거나 없는 상담으로 요리를 완료하면 기록·차감 없이 CHAT_ROOM_NOT_FOUND 예외를 던진다")
-    void throwsChatRoomNotFound_whenSessionIsOthersOrMissing() {
-        // Given
-        Long memberId = 7L;
-        Long invalidSessionId = 999L;
-        CookingCompleteRequest request = new CookingCompleteRequest(
-                12L, CookingResult.SUCCESS, "맛있게 됨", invalidSessionId, List.of());
-
-        doThrow(new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND))
-                .when(chatSessionService).validateAndGetSession(memberId, invalidSessionId);
-
-        // When & Then
-        assertThatThrownBy(() -> cookingFacade.completeCooking(memberId, request))
-                .isInstanceOf(BusinessException.class)
-                .extracting("errorCode")
-                .isEqualTo(ErrorCode.CHAT_ROOM_NOT_FOUND);
-
-        verify(cookingService, never()).saveCookingLog(any(), any());
-        verify(fridgeService, never()).consumeForCooking(any(), any(), any());
-        verify(chatSessionService, never()).completeSessionFromCooking(any(), any());
-    }
-
-    /**
-     * chatSessionId가 이미 종료(COMPLETED)된 상담 세션이면
-     * 요리 기록 저장 및 냉장고 차감 로직을 전혀 실행하지 않고 409 CHAT_ROOM_ALREADY_COMPLETED로 즉시 실패하는지 검증한다.
-     */
-    @Test
-    @DisplayName("이미 종료된 상담으로 요리를 완료하면 기록·차감 없이 CHAT_ROOM_ALREADY_COMPLETED 예외를 던진다")
-    void throwsAlreadyCompleted_whenSessionIsCompleted() {
-        // Given
-        Long memberId = 7L;
-        Long completedSessionId = 20L;
-        CookingCompleteRequest request = new CookingCompleteRequest(
-                12L, CookingResult.SUCCESS, "완료", completedSessionId, List.of());
-
-        doThrow(new BusinessException(ErrorCode.CHAT_ROOM_ALREADY_COMPLETED))
-                .when(chatSessionService).validateAndGetSession(memberId, completedSessionId);
-
-        // When & Then
-        assertThatThrownBy(() -> cookingFacade.completeCooking(memberId, request))
-                .isInstanceOf(BusinessException.class)
-                .extracting("errorCode")
-                .isEqualTo(ErrorCode.CHAT_ROOM_ALREADY_COMPLETED)
-                .extracting("status")
-                .isEqualTo(HttpStatus.CONFLICT);
-
-        verify(cookingService, never()).saveCookingLog(any(), any());
-        verify(fridgeService, never()).consumeForCooking(any(), any(), any());
-        verify(chatSessionService, never()).completeSessionFromCooking(any(), any());
-    }
-
-    /**
-     * 정상적인 요리 완료 요청 시:
-     * 1) 세션 검증 -> 2) 기록 저장 -> 3) 재료 차감 -> 4) 세션 완료 순서로 실행되는지 검증한다.
-     */
-    @Test
-    @DisplayName("요리를 완료하면 상담 확인, 기록 저장, 재료 차감, 상담 완료 순서로 처리한다")
-    void completesCookingInOrder() {
-        // Given
-        Long memberId = 7L;
-        Long sessionId = 10L;
+    @DisplayName("이을 상담을 찾으면 상담 찾기, 그 상담 ID로 기록 저장, 재료 차감, 요리 완료 이벤트 발행 순서로 처리한다")
+    void completesCookingInOrder_whenSessionIsFound() {
         List<UsedIngredientRequest> used = List.of(new UsedIngredientRequest(3L, new BigDecimal("1.00")));
-        CookingCompleteRequest request = new CookingCompleteRequest(
-                12L, CookingResult.SUCCESS, "성공", sessionId, used);
-
-        CookingLog cookingLog = CookingLog.builder()
-                .memberId(memberId)
-                .recipeId(12L)
-                .chatSessionId(sessionId)
-                .result(CookingResult.SUCCESS)
-                .memo("성공")
-                .build();
-        ReflectionTestUtils.setField(cookingLog, "id", 100L);
-
-        when(cookingService.saveCookingLog(memberId, request)).thenReturn(cookingLog);
-        when(fridgeService.consumeForCooking(memberId, 100L, used))
+        CookingCompleteRequest request = request(CookingResult.SUCCESS, null, used);
+        when(chatSessionService.findCookingSessionId(MEMBER_ID, null, RECIPE_ID)).thenReturn(Optional.of(10L));
+        when(cookingService.saveCookingLog(MEMBER_ID, request, 10L)).thenReturn(cookingLog(10L));
+        when(fridgeService.consumeForCooking(MEMBER_ID, 100L, used))
                 .thenReturn(List.of(new IngredientDeductionResponse(3L, new BigDecimal("1.00"), BigDecimal.ZERO)));
 
-        // When
-        CookingCompleteResponse response = cookingFacade.completeCooking(memberId, request);
+        CookingCompleteResponse response = cookingFacade.completeCooking(MEMBER_ID, request);
 
-        // Then
         assertThat(response.cookingLogId()).isEqualTo(100L);
-        assertThat(response.deductions().size()).isEqualTo(1);
-        assertThat(response.deductions().get(0).ingredientId()).isEqualTo(3L);
+        assertThat(response.deductions()).extracting(IngredientDeductionResponse::ingredientId).containsExactly(3L);
+        InOrder inOrder = inOrder(chatSessionService, cookingService, fridgeService, eventPublisher);
+        inOrder.verify(chatSessionService).findCookingSessionId(MEMBER_ID, null, RECIPE_ID);
+        inOrder.verify(cookingService).saveCookingLog(MEMBER_ID, request, 10L);
+        inOrder.verify(fridgeService).consumeForCooking(MEMBER_ID, 100L, used);
+        inOrder.verify(eventPublisher).publishEvent(new CookingCompletedEvent(MEMBER_ID, 10L, 100L));
+    }
 
-        InOrder inOrder = inOrder(chatSessionService, cookingService, fridgeService);
-        inOrder.verify(chatSessionService).validateAndGetSession(memberId, sessionId);
-        inOrder.verify(cookingService).saveCookingLog(memberId, request);
-        inOrder.verify(fridgeService).consumeForCooking(memberId, 100L, used);
-        inOrder.verify(chatSessionService).completeSessionFromCooking(memberId, sessionId);
+    @Test
+    @DisplayName("이을 상담이 없으면(추천 안 한 레시피·남의 상담·끝난 상담) 상담 없이 기록하고 요리 완료 이벤트를 발행하지 않는다")
+    void savesWithoutSession_whenNoSessionIsFound() {
+        CookingCompleteRequest request = request(CookingResult.SUCCESS, 999L, List.of());
+        when(chatSessionService.findCookingSessionId(MEMBER_ID, 999L, RECIPE_ID)).thenReturn(Optional.empty());
+        when(cookingService.saveCookingLog(MEMBER_ID, request, null)).thenReturn(cookingLog(null));
+
+        CookingCompleteResponse response = cookingFacade.completeCooking(MEMBER_ID, request);
+
+        assertThat(response.cookingLogId()).isEqualTo(100L);
+        verify(fridgeService).consumeForCooking(MEMBER_ID, 100L, List.of());
+        verify(eventPublisher, never()).publishEvent(any(Object.class));
+    }
+
+    @Test
+    @DisplayName("상담을 찾다가 오류가 나도 상담 없이 요리 완료를 마친다")
+    void completesCookingWithoutSession_whenLookupFails() {
+        CookingCompleteRequest request = request(CookingResult.SUCCESS, null, List.of());
+        when(chatSessionService.findCookingSessionId(MEMBER_ID, null, RECIPE_ID))
+                .thenThrow(new IllegalStateException("DB 오류"));
+        when(cookingService.saveCookingLog(eq(MEMBER_ID), eq(request), isNull())).thenReturn(cookingLog(null));
+
+        CookingCompleteResponse response = cookingFacade.completeCooking(MEMBER_ID, request);
+
+        assertThat(response.cookingLogId()).isEqualTo(100L);
+        verify(eventPublisher, never()).publishEvent(any(Object.class));
+    }
+
+    @Test
+    @DisplayName("요리 결과가 실패여도 이은 상담을 끝내도록 요리 완료 이벤트를 발행한다")
+    void completesSession_whenResultIsFailed() {
+        CookingCompleteRequest request = request(CookingResult.FAILED, null, List.of());
+        when(chatSessionService.findCookingSessionId(MEMBER_ID, null, RECIPE_ID)).thenReturn(Optional.of(10L));
+        when(cookingService.saveCookingLog(MEMBER_ID, request, 10L)).thenReturn(cookingLog(10L));
+
+        cookingFacade.completeCooking(MEMBER_ID, request);
+
+        verify(eventPublisher).publishEvent(new CookingCompletedEvent(MEMBER_ID, 10L, 100L));
+    }
+
+    private static CookingCompleteRequest request(CookingResult result, Long chatSessionId, List<UsedIngredientRequest> used) {
+        return new CookingCompleteRequest(RECIPE_ID, result, "메모", chatSessionId, used);
+    }
+
+    private static CookingLog cookingLog(Long chatSessionId) {
+        CookingLog cookingLog = CookingLog.builder()
+                .memberId(MEMBER_ID)
+                .recipeId(RECIPE_ID)
+                .chatSessionId(chatSessionId)
+                .result(CookingResult.SUCCESS)
+                .memo("메모")
+                .build();
+        ReflectionTestUtils.setField(cookingLog, "id", 100L);
+        return cookingLog;
     }
 }

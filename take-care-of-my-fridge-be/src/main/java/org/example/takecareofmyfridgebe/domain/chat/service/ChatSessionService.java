@@ -11,6 +11,7 @@ import org.example.takecareofmyfridgebe.domain.chat.entity.ChatSession;
 import org.example.takecareofmyfridgebe.domain.chat.entity.ChatSessionStatus;
 import org.example.takecareofmyfridgebe.domain.chat.event.ChatSessionChangedEvent;
 import org.example.takecareofmyfridgebe.domain.chat.repository.ChatMessageRepository;
+import org.example.takecareofmyfridgebe.domain.chat.repository.ChatRecommendationRepository;
 import org.example.takecareofmyfridgebe.domain.chat.repository.ChatSessionRepository;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
@@ -25,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -35,6 +37,7 @@ public class ChatSessionService {
 
     private final ChatSessionRepository chatSessionRepository;
     private final ChatMessageRepository chatMessageRepository;
+    private final ChatRecommendationRepository chatRecommendationRepository;
     private final ChatProperties chatProperties;
     private final ApplicationEventPublisher eventPublisher;
 
@@ -181,38 +184,55 @@ public class ChatSessionService {
     }
 
     /**
-     * 회원의 채팅 세션을 검증하고 조회한다.
-     * 존재하지 않거나 다른 회원의 세션이면 404(CHAT_ROOM_NOT_FOUND) 예외를 던진다.
+     * 요리 완료를 이을 상담 ID를 찾는다. 찾지 못하면 비어 있고, 예외를 던지지 않는다.
+     * <ul>
+     *   <li>요청에 상담 ID가 있으면: 내 상담이고 진행 중(ACTIVE)이며 시간이 지나지 않았으면 그 상담 (추천 여부는 보지 않는다)</li>
+     *   <li>없으면: 진행 중 상담이 시간이 지나지 않았고, 그 상담에서 이 레시피를 레시피 카드로 추천한 적 있으면 그 상담</li>
+     * </ul>
+     * 남의 상담·끝난 상담·시간이 지난 상담은 잇지 않을 뿐 요리 완료를 막지 않는다.
+     * 요리 완료 트랜잭션 밖(NOT_SUPPORTED)에서 읽는다. 안에서 읽다 예외가 나면 요리 완료 트랜잭션이 롤백 전용으로 표시되기 때문이다.
+     * 조회는 상담 1번 + (서버가 찾을 때) 추천 1번.
      *
-     * @param memberId  요청 회원 ID
-     * @param sessionId 채팅 세션 ID
-     * @return 검증된 채팅 세션 엔티티
+     * @param memberId           회원 ID
+     * @param requestedSessionId 요청에 담긴 상담 ID (없으면 null)
+     * @param recipeId           요리 완료한 레시피 ID
+     * @return 이을 상담 ID
      */
-    public ChatSession validateAndGetSession(Long memberId, Long sessionId) {
-        ChatSession session = chatSessionRepository.findByIdAndMemberId(sessionId, memberId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND));
-
-        if (session.isCompleted()) {
-            throw new BusinessException(ErrorCode.CHAT_ROOM_ALREADY_COMPLETED);
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public Optional<Long> findCookingSessionId(Long memberId, Long requestedSessionId, Long recipeId) {
+        LocalDateTime now = LocalDateTime.now();
+        if (requestedSessionId != null) {
+            return chatSessionRepository.findByIdAndMemberId(requestedSessionId, memberId)
+                    .filter(session -> isOpen(session, now))
+                    .map(ChatSession::getId);
         }
+        return chatSessionRepository.findByMemberIdAndStatus(memberId, ChatSessionStatus.ACTIVE)
+                .filter(session -> isOpen(session, now))
+                .map(ChatSession::getId)
+                .filter(sessionId -> chatRecommendationRepository.existsRecipeInSession(sessionId, recipeId));
+    }
 
-        return session;
+    // 진행 중이고 시간이 지나지 않은 상담 (시간이 지난 ACTIVE 상담은 목록에서 이미 만료로 보인다)
+    private boolean isOpen(ChatSession session, LocalDateTime now) {
+        return session.isActive() && !session.isExpired(chatProperties.sessionTimeout(), now);
     }
 
     /**
-     * 요리 완료 후 연관된 채팅 세션을 종료(COMPLETED) 처리한다.
-     * ACTIVE 상태일 때만 complete()를 호출하며, 이미 종료(COMPLETED)되거나 만료(EXPIRED)된 세션은 건너뛴다.
-     * 종료했을 때만 상담 변경(COMPLETED) 이벤트를 발행하며, 요리 완료 트랜잭션이 커밋된 뒤에 신호가 나간다.
+     * 요리 완료로 상담을 종료(COMPLETED)한다. 요리 결과(성공·실패)와 상관없이 끝낸다.
+     * 내 상담이고 진행 중(ACTIVE)일 때만 끝내며, 없거나 이미 끝난 상담은 건너뛴다(예외를 던지지 않는다).
+     * 종료했을 때만 상담 변경(COMPLETED) 이벤트를 발행하며, 이 트랜잭션이 커밋된 뒤 신호가 나간다.
+     * 요리 완료 커밋 뒤(AFTER_COMMIT) 리스너가 부른다. 그때는 끝난 요리 트랜잭션에 참여하면 저장되지 않으므로 새 트랜잭션으로 실행한다.
      *
      * @param memberId  요청 회원 ID
      * @param sessionId 채팅 세션 ID
      */
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void completeSessionFromCooking(Long memberId, Long sessionId) {
-        ChatSession session = validateAndGetSession(memberId, sessionId);
-        if (session.isActive()) {
-            session.complete();
-            eventPublisher.publishEvent(ChatSessionChangedEvent.from(session));
-        }
+        chatSessionRepository.findByIdAndMemberId(sessionId, memberId)
+                .filter(ChatSession::isActive)
+                .ifPresent(session -> {
+                    session.complete();
+                    eventPublisher.publishEvent(ChatSessionChangedEvent.from(session));
+                });
     }
 }

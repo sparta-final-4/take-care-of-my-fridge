@@ -4868,6 +4868,9 @@
       "ChatSessionResponse": {
         "type": "object",
         "properties": {
+          "cookedRecipe": {
+            "$ref": "#/components/schemas/CookedRecipe"
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time"
@@ -4945,6 +4948,18 @@
               "COMPLETED",
               "EXPIRED"
             ]
+          }
+        }
+      },
+      "CookedRecipe": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "recipeId": {
+            "type": "integer",
+            "format": "int64"
           }
         }
       },

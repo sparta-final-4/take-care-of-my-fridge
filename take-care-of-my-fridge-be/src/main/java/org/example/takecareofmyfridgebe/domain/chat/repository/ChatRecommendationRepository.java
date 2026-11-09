@@ -24,6 +24,10 @@ public interface ChatRecommendationRepository extends JpaRepository<ChatRecommen
     @Query("SELECT DISTINCT r.recipeId FROM ChatRecommendation r WHERE r.message.session.id = :sessionId AND r.recipeId IS NOT NULL")
     List<Long> findRecipeIdsBySessionId(@Param("sessionId") Long sessionId);
 
+    // 한 상담에서 이 레시피를 레시피 카드로 추천한 적 있는지 (요리 완료 연결)
+    @Query("SELECT COUNT(r) > 0 FROM ChatRecommendation r WHERE r.message.session.id = :sessionId AND r.recipeId = :recipeId")
+    boolean existsRecipeInSession(@Param("sessionId") Long sessionId, @Param("recipeId") Long recipeId);
+
     // AI 메시지 여러 개의 레시피·밀키트 추천을 한 번에 (메시지 id, 보여 줄 순서대로)
     @Query("SELECT r FROM ChatRecommendation r WHERE r.message.id IN :messageIds "
             + "ORDER BY r.message.id ASC, r.displayOrder ASC")
