@@ -2,12 +2,15 @@ package org.example.takecareofmyfridgebe.domain.chat.facade;
 
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatSessionListRequest;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatSessionListResponse;
+import org.example.takecareofmyfridgebe.domain.chat.dto.ChatSessionResponse;
+import org.example.takecareofmyfridgebe.domain.chat.dto.ChatSessionResponse.CookedRecipe;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatSessionStatusCounts;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatSessionSummaryResponse;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatSessionSummaryResponse.RecommendedRecipeName;
 import org.example.takecareofmyfridgebe.domain.chat.entity.ChatSessionStatus;
 import org.example.takecareofmyfridgebe.domain.chat.service.ChatMessageService;
 import org.example.takecareofmyfridgebe.domain.chat.service.ChatSessionService;
+import org.example.takecareofmyfridgebe.domain.cooking.service.CookingService;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeSummary;
 import org.example.takecareofmyfridgebe.domain.recipe.service.RecipeService;
 import org.example.takecareofmyfridgebe.global.response.PageResponse;
@@ -18,6 +21,7 @@ import org.junit.jupiter.api.Test;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -34,6 +38,7 @@ class ChatSessionQueryFacadeTest {
     private ChatSessionService chatSessionService;
     private ChatMessageService chatMessageService;
     private RecipeService recipeService;
+    private CookingService cookingService;
     private ChatSessionQueryFacade facade;
     private final ChatSessionListRequest request = new ChatSessionListRequest(1, 10, null);
 
@@ -42,7 +47,8 @@ class ChatSessionQueryFacadeTest {
         chatSessionService = mock(ChatSessionService.class);
         chatMessageService = mock(ChatMessageService.class);
         recipeService = mock(RecipeService.class);
-        facade = new ChatSessionQueryFacade(chatSessionService, chatMessageService, recipeService);
+        cookingService = mock(CookingService.class);
+        facade = new ChatSessionQueryFacade(chatSessionService, chatMessageService, recipeService, cookingService);
     }
 
     @Test
@@ -71,6 +77,35 @@ class ChatSessionQueryFacadeTest {
 
         assertThat(facade.getMySessions(MEMBER_ID, request).sessions().content().get(0).recommendedRecipes()).isEmpty();
         verify(recipeService, never()).findSummaries(any());
+    }
+
+    @Test
+    @DisplayName("요리 완료로 끝난 상담을 조회하면 이은 요리의 레시피 이름을 붙인다")
+    void attachesCookedRecipe_whenSessionEndedByCooking() {
+        when(chatSessionService.getSession(MEMBER_ID, 5L)).thenReturn(session(ChatSessionStatus.COMPLETED));
+        when(cookingService.findCookedRecipeId(MEMBER_ID, 5L)).thenReturn(Optional.of(10L));
+        when(recipeService.findSummaries(List.of(10L))).thenReturn(Map.of(10L, new RecipeSummary(10L, "두부조림", null, null)));
+
+        assertThat(facade.getSession(MEMBER_ID, 5L).cookedRecipe()).isEqualTo(new CookedRecipe(10L, "두부조림"));
+    }
+
+    @Test
+    @DisplayName("직접 끝낸 상담·레시피가 지워진 상담은 요리 완료 정보가 없고, 진행 중 상담은 요리 기록을 찾지 않는다")
+    void returnsNullCookedRecipe_whenNotEndedByCooking() {
+        when(chatSessionService.getSession(MEMBER_ID, 5L)).thenReturn(session(ChatSessionStatus.COMPLETED));
+        when(cookingService.findCookedRecipeId(MEMBER_ID, 5L)).thenReturn(Optional.empty(), Optional.of(10L));
+        when(recipeService.findSummaries(List.of(10L))).thenReturn(Map.of());
+        when(chatSessionService.getSession(MEMBER_ID, 6L)).thenReturn(session(ChatSessionStatus.ACTIVE));
+
+        assertThat(facade.getSession(MEMBER_ID, 5L).cookedRecipe()).isNull();
+        assertThat(facade.getSession(MEMBER_ID, 5L).cookedRecipe()).isNull();
+        assertThat(facade.getSession(MEMBER_ID, 6L).cookedRecipe()).isNull();
+        verify(cookingService, never()).findCookedRecipeId(MEMBER_ID, 6L);
+    }
+
+    private static ChatSessionResponse session(ChatSessionStatus status) {
+        LocalDateTime at = LocalDateTime.of(2026, 11, 9, 12, 0);
+        return new ChatSessionResponse(5L, status, at, at, null);
     }
 
     private static ChatSessionListResponse listOf(ChatSessionSummaryResponse... sessions) {

@@ -49,13 +49,13 @@ public class ChatSessionController {
     }
 
     /**
-     * 회원의 특정 상담 세션을 조회한다.
+     * 회원의 특정 상담 세션을 조회한다. 요리 완료로 끝난 상담이면 그 요리(cookedRecipe)를 함께 준다.
      */
     @GetMapping("/{sessionId}")
     public ResponseEntity<ApiResponse<ChatSessionResponse>> getSession(
             @AuthenticationPrincipal AuthPrincipal principal,
             @PathVariable Long sessionId) {
-        ChatSessionResponse response = chatSessionService.getSession(principal.memberId(), sessionId);
+        ChatSessionResponse response = chatSessionQueryFacade.getSession(principal.memberId(), sessionId);
         return ResponseEntity.ok(ApiResponse.ok(response));
     }
 

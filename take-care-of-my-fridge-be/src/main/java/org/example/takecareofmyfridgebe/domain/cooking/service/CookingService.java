@@ -27,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -64,6 +65,18 @@ public class CookingService {
      */
     public boolean hasCooked(Long memberId, Long recipeId) {
         return cookingLogRepository.existsByMemberIdAndRecipeId(memberId, recipeId);
+    }
+
+    /**
+     * 상담과 이은 요리 기록의 레시피 ID를 찾는다 (요리 완료로 끝난 상담 화면 문구용).
+     *
+     * @param memberId      회원 ID
+     * @param chatSessionId 상담 ID
+     * @return 레시피 ID (이은 요리 기록이 없으면 비어 있음)
+     */
+    public Optional<Long> findCookedRecipeId(Long memberId, Long chatSessionId) {
+        return cookingLogRepository.findFirstByMemberIdAndChatSessionIdOrderByIdAsc(memberId, chatSessionId)
+                .map(CookingLog::getRecipeId);
     }
 
     /**

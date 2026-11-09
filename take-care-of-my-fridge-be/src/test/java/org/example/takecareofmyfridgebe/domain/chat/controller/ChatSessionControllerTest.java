@@ -73,7 +73,8 @@ class ChatSessionControllerTest {
                 10L,
                 ChatSessionStatus.ACTIVE,
                 LocalDateTime.of(2026, 10, 28, 12, 0, 0),
-                LocalDateTime.of(2026, 10, 28, 12, 0, 0)
+                LocalDateTime.of(2026, 10, 28, 12, 0, 0),
+                null
         );
         when(chatSessionService.getOrCreateActiveSession(memberId)).thenReturn(dummyResponse);
 
@@ -87,24 +88,27 @@ class ChatSessionControllerTest {
     }
 
     @Test
-    @DisplayName("로그인 사용자가 세션 단건 조회 시 200 OK와 세션 정보를 반환한다")
+    @DisplayName("로그인 사용자가 세션 단건 조회 시 200 OK와 세션 정보·요리 완료 정보를 반환한다")
     void returnsOwnSession() throws Exception {
         Long memberId = 1L;
         Long sessionId = 10L;
         ChatSessionResponse dummyResponse = new ChatSessionResponse(
                 sessionId,
-                ChatSessionStatus.ACTIVE,
+                ChatSessionStatus.COMPLETED,
                 LocalDateTime.of(2026, 10, 28, 12, 0, 0),
-                LocalDateTime.of(2026, 10, 28, 12, 0, 0)
+                LocalDateTime.of(2026, 10, 28, 12, 0, 0),
+                new ChatSessionResponse.CookedRecipe(12L, "두부조림")
         );
-        when(chatSessionService.getSession(memberId, sessionId)).thenReturn(dummyResponse);
+        when(chatSessionQueryFacade.getSession(memberId, sessionId)).thenReturn(dummyResponse);
 
         mvc.perform(get("/api/chat-sessions/{sessionId}", sessionId)
                         .with(authentication(authenticationFor(memberId))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.id").value(sessionId))
-                .andExpect(jsonPath("$.data.status").value("ACTIVE"));
+                .andExpect(jsonPath("$.data.status").value("COMPLETED"))
+                .andExpect(jsonPath("$.data.cookedRecipe.recipeId").value(12L))
+                .andExpect(jsonPath("$.data.cookedRecipe.name").value("두부조림"));
     }
 
     @Test
@@ -112,7 +116,7 @@ class ChatSessionControllerTest {
     void returnsNotFound_whenGettingOthersOrMissingSession() throws Exception {
         Long memberId = 1L;
         Long sessionId = 999L;
-        when(chatSessionService.getSession(memberId, sessionId))
+        when(chatSessionQueryFacade.getSession(memberId, sessionId))
                 .thenThrow(new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND));
 
         mvc.perform(get("/api/chat-sessions/{sessionId}", sessionId)
@@ -131,7 +135,8 @@ class ChatSessionControllerTest {
                 sessionId,
                 ChatSessionStatus.COMPLETED,
                 LocalDateTime.of(2026, 10, 28, 12, 0, 0),
-                LocalDateTime.of(2026, 10, 28, 12, 0, 0)
+                LocalDateTime.of(2026, 10, 28, 12, 0, 0),
+                null
         );
         when(chatSessionService.completeSession(memberId, sessionId)).thenReturn(dummyResponse);
 
