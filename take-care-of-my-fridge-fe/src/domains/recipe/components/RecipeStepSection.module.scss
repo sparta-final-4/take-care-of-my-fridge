@@ -7,6 +7,19 @@
   gap: var(--ant-margin-lg);
 }
 
+// 제목 + [전체보기]. 좁은 화면은 제목이 숨으므로 버튼만 오른쪽에 남는다.
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ant-margin-sm);
+  align-items: center;
+}
+
+.fullscreenButton {
+  min-height: $touch-target-size;
+  margin-left: auto;
+}
+
 // 좁은 화면은 위 탭 버튼이 제목 역할, lg 이상에서만 "조리 순서" 제목을 보인다.
 :global(.ant-typography).title {
   display: none;

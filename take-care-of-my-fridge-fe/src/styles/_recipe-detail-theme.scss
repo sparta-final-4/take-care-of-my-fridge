@@ -1,0 +1,280 @@
+@use 'sass:map';
+
+// ════════════════════════════════════════════════════════════════════
+//  레시피 상세 화면 테마 — 사람이 바꿔 보며 확인하는 값은 이 파일에만 있다.
+//  1) 아래 $recipe-detail-theme 숫자를 바꾸고 저장하면 개발 서버 화면이 바로 바뀐다.
+//  2) 세트 안의 값을 바꾸면 그 세트만 바뀐다. 새 세트는 번호를 하나 더 추가한다.
+//  3) 맨 아래 "세부 치수"는 모든 세트가 같이 쓰는 크기다.
+//  화면 SCSS는 _variables.scss를 통해 이 값을 읽는다.
+// ════════════════════════════════════════════════════════════════════
+
+// 아래 숫자 하나만 바꾸면 양옆 여백·머리(사진) 배치가 한 번에 바뀐다.
+//   1: 원래 화면(2026-11-08 이전)
+//   2: 여백 + 가로 사진 + 재료·단계 수
+//   3: 2에서 사진을 더 크게(16:9)
+//   4: 좌우 반전 — 정사각 사진 왼쪽, 글 오른쪽
+//   5: 커버 — 사진이 머리 전체를 채우고, 요약 카드가 오른쪽에 떠 있다(allbirds 상품 화면 방식)
+//   6: 사진 전체 — 5에서 사진을 자르지 않고 왼쪽에 다 보이고, 남는 곳은 사진 가장자리 색으로 채운다. 카드는 오른쪽
+//   7: 커버 — 5와 같고 카드가 왼쪽
+//   8: 배너 — 와이드 사진이 위, 그 아래 이름(왼쪽) | 정보(오른쪽) 두 칸
+//   9: 1번을 한 화면으로 — 사진·이름 머리가 첫 화면을 꽉 채우고 사진이 커진다(글 50 : 사진 50)
+//  10: 2번을 한 화면으로 — 9와 같은 방식, 가로 사진이 더 크다(글 40 : 사진 60). 오른쪽 화면 바로가기도 뜬다.
+//  11: 한 화면에 한 내용 — 소개 · 만드는 법 · 영양과 후기가 각각 한 화면을 채우고, 스크롤하면 다음 화면에 맞춰 멈춘다.
+//      이름을 가운데 크게, 사진은 그 아래 넓게(애플 제품 페이지 느낌). 넓은 화면은 오른쪽에 화면 바로가기가 뜬다.
+// 세트를 더 만들려면 $recipe-detail-themes에 번호를 하나 더 추가한다.
+$recipe-detail-theme: 10;
+
+// 세트 항목
+//   inset: 상세 양옆 여백. 화면 기본 여백($page-gutter-*) 안쪽에 더한다. 0이면 추가 여백 없음, 모바일(md 미만)은 기본 여백만.
+//          마우스를 쓰는 PC는 창 폭과 관계없이 xl까지 켜지므로(_mixins.scss from) 보통 xl 값, 1600px 이상 창은 xxl 값이다.
+//   layout: 넓은 화면(lg 이상) 머리 배치
+//           split = 글 | 사진 두 칸, cover = 사진이 배경을 채우고 카드가 위에 뜸, banner = 사진 위 · 글 아래
+//           좁은 화면은 늘 사진이 위다(cover는 카드가 사진 아래쪽에 살짝 겹친다).
+//   text-side: 글(또는 카드)이 놓일 쪽 left / right. split·cover에서 사진은 반대쪽, banner는 이름 칸의 쪽.
+//   layout에 stage 추가: 이름·정보를 가운데 크게 두고 사진을 그 아래 넓게(좁은 화면도 이름이 먼저)
+//   hero-fill: 사진·이름 머리가 첫 화면 높이를 꽉 채울지(사진이 남는 높이를 다 쓴다)
+//   page-sections: 상세의 큰 묶음(소개 · 재료와 조리 순서 · 영양과 후기)이 각각 한 화면을 채우고 스크롤이 묶음에 맞춰 멈출지
+//   section-nav: 넓은 화면(xl 이상) 오른쪽에 화면 바로가기(소개 · 만드는 법 · 영양과 후기)를 띄울지
+//   image-fit: cover의 사진 채우기. cover = 머리를 꽉 채우고 넘치는 곳은 잘림,
+//              contain = 넓은 화면에서 사진 전체를 글 반대쪽에 보이고, 남는 곳은 사진 맨 끝 줄을 늘려 가장자리 색이 이어지게
+//   text-ratio / photo-ratio: split의 글 : 사진 폭 비율
+//   image-aspect: 사진 가로 : 세로 비율(따옴표 안에). cover·banner는 좁은 화면에서만 쓴다.
+//                 식약처 레시피 사진은 가로형이 많아 세로형이면 많이 잘린다.
+//   show-counts: 조리 시간·분량 옆에 "재료 8개 · 조리 6단계"를 보일지
+//   image-full-bleed: 좁은 화면(lg 미만)에서 사진을 좌우 여백 없이 화면 끝까지, 모서리 없이 보일지
+$recipe-detail-themes: (
+  1: (
+    inset: (
+      md: 0,
+      lg: 0,
+      xl: 0,
+      xxl: 0,
+    ),
+    layout: split,
+    text-side: left,
+    image-fit: cover,
+    hero-fill: false,
+    page-sections: false,
+    section-nav: false,
+    text-ratio: 60,
+    photo-ratio: 40,
+    image-aspect: '4 / 5',
+    show-counts: false,
+    image-full-bleed: false,
+  ),
+  2: (
+    inset: (
+      md: 16px,
+      lg: 48px,
+      xl: 96px,
+      xxl: 200px,
+    ),
+    layout: split,
+    text-side: left,
+    image-fit: cover,
+    hero-fill: false,
+    page-sections: false,
+    section-nav: false,
+    text-ratio: 45,
+    photo-ratio: 55,
+    image-aspect: '4 / 3',
+    show-counts: true,
+    image-full-bleed: true,
+  ),
+  3: (
+    inset: (
+      md: 16px,
+      lg: 48px,
+      xl: 96px,
+      xxl: 200px,
+    ),
+    layout: split,
+    text-side: left,
+    image-fit: cover,
+    hero-fill: false,
+    page-sections: false,
+    section-nav: false,
+    text-ratio: 40,
+    photo-ratio: 60,
+    image-aspect: '16 / 9',
+    show-counts: true,
+    image-full-bleed: true,
+  ),
+  4: (
+    inset: (
+      md: 16px,
+      lg: 48px,
+      xl: 96px,
+      xxl: 200px,
+    ),
+    layout: split,
+    text-side: right,
+    image-fit: cover,
+    hero-fill: false,
+    page-sections: false,
+    section-nav: false,
+    text-ratio: 48,
+    photo-ratio: 52,
+    image-aspect: '1 / 1',
+    show-counts: true,
+    image-full-bleed: true,
+  ),
+  5: (
+    inset: (
+      md: 16px,
+      lg: 24px,
+      xl: 48px,
+      xxl: 160px,
+    ),
+    layout: cover,
+    text-side: right,
+    image-fit: cover,
+    hero-fill: false,
+    page-sections: false,
+    section-nav: false,
+    text-ratio: 45,
+    photo-ratio: 55,
+    image-aspect: '4 / 3',
+    show-counts: true,
+    image-full-bleed: true,
+  ),
+  6: (
+    inset: (
+      md: 16px,
+      lg: 0,
+      xl: 0,
+      xxl: 120px,
+    ),
+    layout: cover,
+    text-side: right,
+    image-fit: contain,
+    hero-fill: false,
+    page-sections: false,
+    section-nav: false,
+    text-ratio: 45,
+    photo-ratio: 55,
+    image-aspect: '3 / 2',
+    show-counts: true,
+    image-full-bleed: true,
+  ),
+  7: (
+    inset: (
+      md: 16px,
+      lg: 24px,
+      xl: 48px,
+      xxl: 160px,
+    ),
+    layout: cover,
+    text-side: left,
+    image-fit: cover,
+    hero-fill: false,
+    page-sections: false,
+    section-nav: false,
+    text-ratio: 45,
+    photo-ratio: 55,
+    image-aspect: '4 / 3',
+    show-counts: true,
+    image-full-bleed: true,
+  ),
+  8: (
+    inset: (
+      md: 16px,
+      lg: 32px,
+      xl: 64px,
+      xxl: 200px,
+    ),
+    layout: banner,
+    text-side: left,
+    image-fit: cover,
+    hero-fill: false,
+    page-sections: false,
+    section-nav: false,
+    text-ratio: 45,
+    photo-ratio: 55,
+    image-aspect: '4 / 3',
+    show-counts: true,
+    image-full-bleed: true,
+  ),
+  9: (
+    inset: (
+      md: 0,
+      lg: 0,
+      xl: 0,
+      xxl: 0,
+    ),
+    layout: split,
+    text-side: left,
+    image-fit: cover,
+    hero-fill: true,
+    page-sections: false,
+    section-nav: false,
+    text-ratio: 50,
+    photo-ratio: 50,
+    image-aspect: '4 / 5',
+    show-counts: false,
+    image-full-bleed: false,
+  ),
+  10: (
+    inset: (
+      md: 16px,
+      lg: 48px,
+      xl: 96px,
+      xxl: 200px,
+    ),
+    layout: split,
+    text-side: left,
+    image-fit: cover,
+    hero-fill: true,
+    page-sections: false,
+    section-nav: true,
+    text-ratio: 40,
+    photo-ratio: 60,
+    image-aspect: '4 / 3',
+    show-counts: true,
+    image-full-bleed: true,
+  ),
+  11: (
+    inset: (
+      md: 16px,
+      lg: 64px,
+      xl: 160px,
+      xxl: 280px,
+    ),
+    layout: stage,
+    text-side: left,
+    image-fit: cover,
+    hero-fill: true,
+    page-sections: true,
+    section-nav: true,
+    text-ratio: 50,
+    photo-ratio: 50,
+    image-aspect: '4 / 3',
+    show-counts: true,
+    image-full-bleed: true,
+  ),
+);
+
+@if not map.has-key($recipe-detail-themes, $recipe-detail-theme) {
+  @error '$recipe-detail-theme #{$recipe-detail-theme}번 세트가 $recipe-detail-themes에 없습니다.';
+}
+
+// ── 세부 치수(배치별, 모든 세트 공통) ──
+$recipe-hero-cover-height: 720px; // cover: 넓은 화면 사진 높이(5·7번). 키울수록 사진 위아래가 덜 잘린다
+$recipe-hero-card-width: 440px; // cover: 떠 있는 카드 폭
+$recipe-hero-card-offset: 48px; // cover: 카드와 사진 가장자리 사이
+$recipe-hero-contain-height: 560px; // cover + contain: 넓은 화면 사진 높이(사진 전체가 이 높이 안에 들어온다)
+$recipe-hero-backdrop-blur: 24px; // cover + contain: 가장자리 연장을 흐리게 하는 정도(가장자리에 걸친 그릇 줄무늬를 풀어 준다)
+$recipe-hero-edge-stretch: 5000%; // cover + contain: 사진을 가로로 늘리는 배율. 클수록 더 얇은 맨 끝 줄만 쓴다(5000% = 끝 2%)
+$recipe-hero-photo-fade: 96px; // cover + contain: 사진의 카드 쪽 가장자리를 배경으로 녹이는 폭
+$recipe-hero-card-overlap: 48px; // cover: 좁은 화면에서 카드가 사진 위로 올라오는 만큼
+$recipe-hero-fill-offset: 104px; // hero-fill: 첫 화면에서 헤더 말고 머리 위에 있는 높이(본문 위 여백 + 이전으로 버튼 + 간격)
+$recipe-hero-stage-title-size: 72px; // stage: 넓은 화면 이름 크기
+$recipe-hero-stage-image-max-width: 1200px; // stage: 사진 최대 폭
+// stage + hero-fill: 사진 칸 가로 : 세로. 첫 화면에 남는 높이에 이 비율을 곱한 폭까지만 넓힌다.
+// 레시피 사진(대부분 3:2 = 1.5)에 가까울수록 위아래가 덜 잘리고, 클수록 칸이 넓어지며 위아래가 더 잘린다.
+$recipe-hero-stage-image-ratio: 1.6;
+$recipe-hero-stage-text-height: 300px; // stage + hero-fill: 사진 위 이름·정보 칸 높이(어림값, 남는 높이 계산에 쓴다)
+$recipe-section-padding: 96px; // page-sections: 묶음 위아래 여백(넓은 화면)
+$recipe-section-nav-offset: 32px; // page-sections: 화면 바로가기와 화면 오른쪽 끝 사이
+$recipe-hero-banner-aspect: '21 / 9'; // banner: 넓은 화면 사진 비율
+$recipe-hero-banner-max-height: 420px; // banner: 넓은 화면 사진 최대 높이(1280x800에서 이름까지 첫 화면에 보이게)

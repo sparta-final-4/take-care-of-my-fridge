@@ -1,17 +1,60 @@
+@use 'sass:map';
 @use '@/styles/variables' as *;
 @use '@/styles/mixins' as *;
 
-// 레퍼런스 레시피 머리: 좁은 화면은 사진 → 글. lg 이상은 글(왼쪽) | 사진(오른쪽)을 세로선으로 나누고 위아래에 얇은 선.
+// 레시피 머리. 배치는 _recipe-detail-theme.scss 레시피 상세 세트($recipe-hero-layout · $recipe-hero-text-side)가 정한다.
+//   split : lg 이상 글 | 사진 두 칸, 세로선으로 나누고 위아래에 얇은 선
+//   cover : lg 이상 사진이 머리 전체를 채우고 요약 카드가 한쪽에 뜬다. 좁은 화면은 카드가 사진 아래쪽에 겹친다.
+//           image-fit이 contain이면 사진을 자르지 않고 글 반대쪽에 다 보이고, 카드는 남는 칸 가운데에 둔다.
+//           사진 뒤에는 같은 사진의 카드 쪽 맨 끝 한 줄만 옆으로 길게 늘려 깐다(.backdrop).
+//           바닥·벽처럼 가장자리에 있는 색만 이어지고, 가운데 그릇·음식 색은 섞이지 않는다.
+//           이미지 서버가 CORS 헤더를 주지 않아 픽셀 색을 직접 읽지 못하므로 이 방식을 쓴다.
+//   banner: 와이드 사진이 위, 아래는 이름 | 정보 두 칸
+//   stage : 이름·정보를 가운데 크게, 사진은 그 아래 넓게(좁은 화면도 이름이 먼저)
+// 좁은 화면은 stage 말고는 사진 → 글 순서다. hero-fill이면 머리가 첫 화면 높이를 채운다(파일 아래쪽).
+$layout: $recipe-hero-layout;
+$text-right: $recipe-hero-text-side == right;
+$pad: $recipe-hero-padding-lg;
+$contain: $layout == cover and $recipe-hero-image-fit == contain;
+// contain에서 카드가 차지하는 칸(카드 폭 + 양옆 간격). 사진은 나머지 폭 안에 들어온다.
+$card-column: $recipe-hero-card-width + 2 * $recipe-hero-card-offset;
+
 .hero {
   display: flex;
   flex-direction: column;
-  border-bottom: 1px solid var(--ant-color-border-secondary);
+
+  @if $layout != cover and $layout != stage {
+    border-bottom: 1px solid var(--ant-color-border-secondary);
+  }
 
   @include from(lg) {
-    display: grid;
-    grid-template-columns: minmax(0, 60fr) minmax(0, 40fr);
-    align-items: center;
-    border-top: 1px solid var(--ant-color-border-secondary);
+    @if $layout == split {
+      $text: $recipe-hero-text-ratio * 1fr;
+      $photo: $recipe-hero-photo-ratio * 1fr;
+
+      display: grid;
+      align-items: center;
+      border-top: 1px solid var(--ant-color-border-secondary);
+
+      @if $text-right {
+        grid-template-columns: minmax(0, $photo) minmax(0, $text);
+      } @else {
+        grid-template-columns: minmax(0, $text) minmax(0, $photo);
+      }
+    } @else if $contain {
+      // 사진 칸이 두 칸 전체에 깔리고, 카드는 글 쪽 칸에 놓인다.
+      display: grid;
+
+      @if $text-right {
+        grid-template-columns: minmax(0, 1fr) $card-column;
+      } @else {
+        grid-template-columns: $card-column minmax(0, 1fr);
+      }
+    } @else if $layout == cover {
+      // 사진과 카드를 같은 칸에 겹쳐 놓는다(카드가 뒤에 오므로 위에 보인다).
+      display: grid;
+      grid-template: minmax(0, 1fr) / minmax(0, 1fr);
+    }
   }
 }
 
@@ -20,25 +63,127 @@
 .media {
   display: flex;
   overflow: hidden;
+
+  @if $contain {
+    position: relative;
+    isolation: isolate;
+    justify-content: center;
+  }
+
   background: var(--ant-color-fill-tertiary);
   border-radius: $product-media-radius;
 
+  // 좁은 화면 사진을 화면 끝까지: 바깥 화면 여백(MainLayout)과 상세 양옆 여백만큼 밖으로 뺀다. lg부터는 아래 margin이 덮는다.
+  @if $recipe-hero-image-full-bleed {
+    margin-inline: -$page-gutter-sm;
+    border-radius: 0;
+
+    @include from(md) {
+      margin-inline: -($page-gutter-md + map.get($recipe-detail-inset, md));
+    }
+  }
+
   @include from(lg) {
-    order: 2;
-    margin: $recipe-hero-padding-lg 0 $recipe-hero-padding-lg $recipe-hero-padding-lg;
+    border-radius: $product-media-radius;
+
+    @if $layout == split {
+      @if $text-right {
+        order: 1;
+        margin: $pad $pad $pad 0;
+      } @else {
+        order: 2;
+        margin: $pad 0 $pad $pad;
+      }
+    } @else if $contain {
+      grid-area: 1 / 1 / 2 / -1;
+      justify-content: flex-start;
+
+      @if not $text-right {
+        justify-content: flex-end;
+      }
+      height: $recipe-hero-contain-height;
+      margin: 0;
+    } @else if $layout == cover {
+      grid-area: 1 / 1;
+      height: $recipe-hero-cover-height;
+      margin: 0;
+    } @else {
+      margin: 0;
+    }
   }
 }
 
-// 사진은 세로로 조금 긴 4:5, 높이는 좁은 화면 360px · 넓은 화면 480px까지(처음 세로 사진보다 작게).
+// 사진 비율은 세트의 image-aspect, 높이는 좁은 화면 360px · 넓은 화면 480px까지.
+// cover는 넓은 화면에서 사진 칸 높이를 꽉 채우고, banner는 와이드 비율을 쓴다.
 .image {
   width: 100%;
   height: auto;
   max-height: $recipe-hero-image-max-height;
-  aspect-ratio: 4 / 5;
+  aspect-ratio: #{$recipe-hero-image-aspect};
   object-fit: cover;
 
   @include from(lg) {
-    max-height: $recipe-hero-image-max-height-lg;
+    // contain: 사진 전체를 보인다. 남는 곳은 뒤의 .backdrop이 보인다. 좁은 화면은 일반 사진처럼 채운다.
+    @if $contain {
+      position: relative;
+      // 사진은 원래 비율 그대로 높이에 맞추고, 카드 칸을 뺀 폭보다 넓으면 그 폭에 맞춘다.
+      width: auto;
+      min-width: 50%;
+      max-width: calc(100% - #{$card-column});
+      height: 100%;
+      max-height: none;
+      aspect-ratio: auto;
+      object-fit: contain;
+      // 카드 쪽 가장자리를 투명하게 녹여 뒤의 흐린 사진과 경계가 보이지 않게 한다(mask는 투명도만 쓴다).
+      $fade: linear-gradient(to right, black calc(100% - #{$recipe-hero-photo-fade}), transparent);
+
+      object-position: left center;
+      mask-image: $fade;
+
+      @if not $text-right {
+        object-position: right center;
+        mask-image: linear-gradient(
+          to left,
+          black calc(100% - #{$recipe-hero-photo-fade}),
+          transparent
+        );
+      }
+    } @else if $layout == cover {
+      height: 100%;
+      max-height: none;
+      aspect-ratio: auto;
+    } @else if $layout == banner {
+      max-height: $recipe-hero-banner-max-height;
+      aspect-ratio: #{$recipe-hero-banner-aspect};
+    } @else {
+      max-height: $recipe-hero-image-max-height-lg;
+    }
+  }
+}
+
+// 사진 뒤에 까는 가장자리 연장. 같은 사진을 가로로 아주 크게 늘리고 카드 쪽 끝에 맞춰,
+// 사진 맨 끝 한 줄(세트 값 $recipe-hero-edge-stretch만큼 좁은 띠)만 칸 전체에 보이게 한다.
+// 가장자리에 그릇이 조금 걸친 줄은 가로 줄무늬가 되므로 살짝 흐린다. lg 이상 contain 세트에서만 보인다.
+.backdrop {
+  display: none;
+
+  @if $contain {
+    @include from(lg) {
+      position: absolute;
+      inset: 0;
+      z-index: -1;
+      display: block;
+      background-repeat: no-repeat;
+      background-position: right center;
+      background-size: $recipe-hero-edge-stretch 100%;
+      filter: blur($recipe-hero-backdrop-blur);
+      transform: scale(1.1);
+      pointer-events: none;
+
+      @if not $text-right {
+        background-position: left center;
+      }
+    }
   }
 }
 
@@ -49,13 +194,83 @@
   gap: var(--ant-margin-sm);
   padding-block: var(--ant-padding-lg) var(--ant-padding-xl);
 
-  @include from(lg) {
-    order: 1;
-    padding: $recipe-hero-padding-lg $recipe-hero-padding-lg $recipe-hero-padding-lg 0;
-    border-right: 1px solid var(--ant-color-border-secondary);
-    align-self: stretch;
-    justify-content: center;
+  // cover: 종이색 카드. 좁은 화면은 사진 아래쪽에 겹쳐 올라오고, 넓은 화면은 사진 한쪽 가운데에 뜬다.
+  @if $layout == cover {
+    position: relative;
+    margin: (-$recipe-hero-card-overlap) var(--ant-margin-sm) 0;
+    padding: var(--ant-padding-lg);
+    background: var(--ant-color-bg-container);
+    border-radius: var(--ant-border-radius-lg);
+    box-shadow: var(--ant-box-shadow-tertiary);
+
+    // contain은 사진을 다 보여야 하므로 카드가 사진 위로 올라오지 않는다.
+    @if $contain {
+      margin-top: var(--ant-margin-sm);
+    }
   }
+
+  @include from(lg) {
+    @if $layout == split {
+      align-self: stretch;
+      justify-content: center;
+
+      @if $text-right {
+        order: 2;
+        padding: $pad 0 $pad $pad;
+        border-left: 1px solid var(--ant-color-border-secondary);
+      } @else {
+        order: 1;
+        padding: $pad $pad $pad 0;
+        border-right: 1px solid var(--ant-color-border-secondary);
+      }
+    } @else if $contain {
+      grid-area: 1 / 2;
+
+      @if not $text-right {
+        grid-area: 1 / 1;
+      }
+      align-self: center;
+      justify-self: center;
+      width: $recipe-hero-card-width;
+      margin: 0;
+      padding: var(--ant-padding-xl);
+      box-shadow: var(--ant-box-shadow-secondary);
+    } @else if $layout == cover {
+      grid-area: 1 / 1;
+      align-self: center;
+      justify-self: start;
+      width: min(100% - #{2 * $recipe-hero-card-offset}, #{$recipe-hero-card-width});
+      margin: $recipe-hero-card-offset;
+      padding: var(--ant-padding-xl);
+      box-shadow: var(--ant-box-shadow-secondary);
+
+      @if $text-right {
+        justify-self: end;
+      }
+    } @else if $layout == banner {
+      // banner: 이름 | 정보 두 칸, 아래끝을 맞춘다.
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: var(--ant-margin-xl);
+      align-items: end;
+      padding-block: var(--ant-padding-xl);
+
+      @if $text-right {
+        .heading {
+          order: 2;
+        }
+      }
+    }
+  }
+}
+
+.heading,
+.details {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--ant-margin-sm);
+  min-width: 0;
 }
 
 .kind {
@@ -98,6 +313,13 @@
   }
 }
 
+// 재료·단계 수는 설정($recipe-hero-show-counts)으로 켜고 끈다.
+.countFact {
+  @if not $recipe-hero-show-counts {
+    display: none;
+  }
+}
+
 // 냉장고 재료로 바로 가능하면 초록, 부족하면 잉크 글자
 .ready {
   font-weight: var(--ant-font-weight-strong);
@@ -117,4 +339,94 @@
 
 .tag {
   margin: 0;
+}
+
+// ── stage: 가운데 큰 이름 + 아래 넓은 사진 ──
+@if $layout == stage {
+  .hero {
+    align-items: center;
+    text-align: center;
+  }
+
+  .content {
+    order: -1;
+    align-items: center;
+
+    @include from(lg) {
+      padding-block: var(--ant-padding-xl);
+    }
+  }
+
+  .heading,
+  .details {
+    align-items: center;
+  }
+
+  .facts {
+    justify-content: center;
+  }
+
+  :global(.ant-typography).name {
+    @include from(lg) {
+      font-size: $recipe-hero-stage-title-size;
+    }
+  }
+
+  .media {
+    align-self: stretch;
+
+    @include from(lg) {
+      width: 100%;
+      max-width: $recipe-hero-stage-image-max-width;
+      margin: 0 auto;
+      align-self: center;
+
+      // 한 화면 머리면 사진 칸 높이가 화면에 묶이므로, 폭도 그 높이에 비율을 곱한 만큼까지만 넓힌다.
+      // 칸이 너무 넓적해져 사진 위아래가 크게 잘리는 것을 막는다.
+      @if $recipe-hero-fill {
+        $photo-height: calc(
+          100svh -
+            #{$header-height} -
+            #{$recipe-hero-fill-offset} -
+            #{$recipe-hero-stage-text-height}
+        );
+
+        max-width: min(
+          #{$recipe-hero-stage-image-max-width},
+          calc(#{$photo-height} * #{$recipe-hero-stage-image-ratio})
+        );
+      }
+    }
+  }
+}
+
+// ── hero-fill: 머리가 첫 화면 높이를 꽉 채운다 ──
+// 사진 칸이 남는 높이를 다 쓰고, 사진은 그 칸을 덮는다(칸 비율에 맞춰 잘린다).
+// 좁은 화면은 사진 → 글(stage는 글 → 사진)을 쌓은 채 사진 칸이 늘어난다.
+@if $recipe-hero-fill {
+  .hero {
+    min-height: calc(100svh - #{$header-height} - #{$recipe-hero-fill-offset});
+
+    @include from(lg) {
+      align-items: stretch;
+    }
+  }
+
+  .media {
+    position: relative;
+    flex: 1 1 auto;
+    min-height: $recipe-hero-image-max-height;
+  }
+
+  .image {
+    position: absolute;
+    inset: 0;
+    height: 100%;
+    max-height: none;
+    aspect-ratio: auto;
+
+    @include from(lg) {
+      max-height: none;
+    }
+  }
 }
