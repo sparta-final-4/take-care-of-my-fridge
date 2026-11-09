@@ -22,6 +22,7 @@ import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 import org.example.takecareofmyfridgebe.domain.sale.dto.SellingPrice;
 import org.example.takecareofmyfridgebe.domain.sale.service.SaleEventReader;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 // 장바구니 응답에 상품과 판매가를 붙이고, 담기·수량 변경에 필요한 상품 한도를 읽어 장바구니 서비스에 넘긴다.
 // 장바구니 서비스는 장바구니 일만 하고, 상품과 판매가는 여기서 합친다. 삭제처럼 합칠 것이 없는 일은 컨트롤러가 서비스를 바로 부른다.
@@ -33,6 +34,9 @@ public class CartFacade {
     private final ProductService productService;
     private final SaleEventReader saleEventReader;
 
+    // 항목·상품·판매가 조회를 한 읽기 전용 트랜잭션으로 묶는다. 묶지 않으면 서비스마다 트랜잭션이 열려 제어 문장이 세 번 나간다.
+    // 클래스가 아니라 이 메서드에만 건다. 담기는 재시도하려면 트랜잭션 밖이어야 한다.
+    @Transactional(readOnly = true)
     public CartItemsResponse getItems(Long memberId) {
         List<CartItem> items = cartService.getItems(memberId);
         List<Long> productIds = items.stream().map(CartItem::getProductId).toList();
