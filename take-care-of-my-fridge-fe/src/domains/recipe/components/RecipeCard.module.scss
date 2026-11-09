@@ -2,9 +2,11 @@
 
 // 레시피 카드: 재료/밀키트 카드 앞면처럼 테두리·바탕 없이 사진이 카드 역할을 하고, 아래에 이름·요약·정보.
 // 마우스를 올리면 카드가 살짝 떠오른다(transform만, 움직임 줄이기면 생략. 사진 확대는 쓰지 않는다).
+// 레시피 목록 테마가 CSS 변수로 사진 비율·배치(사진 위 / 사진 왼쪽)를 바꾼다. 변수가 없으면 기본 모양.
 .card {
   display: flex;
-  flex-direction: column;
+  flex-direction: var(--recipe-card-direction, column);
+  align-items: var(--recipe-card-align, stretch);
   gap: var(--ant-margin-sm);
   height: 100%;
   color: inherit;
@@ -29,7 +31,8 @@
 }
 
 .thumb {
-  aspect-ratio: 4 / 3;
+  flex: 0 0 var(--recipe-card-thumb-width, auto);
+  aspect-ratio: var(--recipe-card-aspect, 4 / 3);
   overflow: hidden;
   background: var(--ant-color-fill-tertiary);
   border-radius: $product-media-radius;
@@ -42,6 +45,7 @@
 }
 
 .info {
+  flex: 1 1 auto;
   min-width: 0;
 }
 

@@ -16,7 +16,7 @@
   align-items: start;
 
   @include from(lg) {
-    grid-template-columns: minmax(0, 1fr) $fridge-aside-width;
+    grid-template-columns: minmax(0, 1fr) $fridge-aside-theme-width;
   }
 }
 
@@ -38,5 +38,69 @@
     max-height: calc(100vh - #{$header-height} - var(--ant-margin-lg) * 2);
     overflow-y: auto;
     overscroll-behavior: contain;
+  }
+}
+
+// ── 테마(styles/_fridge-theme.scss의 $fridge-theme) ──
+.page {
+  @each $bp, $inset in $fridge-inset {
+    @include from($bp) {
+      padding-inline: $inset;
+    }
+  }
+}
+
+// 위 두 칸: 넓은 화면에서 요약(2번째) | 재료 등록(3번째)을 나란히, 나머지(머리·목록 줄)는 두 칸 전체.
+@if $fridge-top-split {
+  .page {
+    @include from(lg) {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      align-items: stretch;
+
+      > * {
+        grid-column: 1 / -1;
+        min-width: 0;
+      }
+
+      > :nth-child(2) {
+        grid-column: 1;
+      }
+
+      > :nth-child(3) {
+        grid-column: 2;
+      }
+    }
+  }
+}
+
+@if $fridge-aside == left {
+  .row {
+    @include from(lg) {
+      grid-template-columns: $fridge-aside-theme-width minmax(0, 1fr);
+    }
+  }
+
+  .aside {
+    @include from(lg) {
+      order: -1;
+    }
+  }
+} @else if $fridge-aside == bottom {
+  // 한 줄: 오른쪽 칸 내용을 재료 목록 아래로. 넓은 화면은 AI 상담 | 최근 기록 두 칸, 따라오지 않는다.
+  .row {
+    @include from(lg) {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
+  .aside {
+    @include from(lg) {
+      position: static;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      max-height: none;
+      overflow: visible;
+    }
   }
 }
