@@ -35,10 +35,8 @@ import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabas
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionTemplate;
 
 // 테스트 자체 트랜잭션을 끄고(NOT_SUPPORTED) 서비스의 트랜잭션 경계대로 커밋된 뒤에만 Redis 발행기가 불리는지 본다.
 // 발행기는 mock으로 바꿔, 리스너가 언제 몇 번 무엇을 넘기는지만 확인한다
@@ -58,7 +56,6 @@ class ChatSessionChangedEventTransactionTest extends MySqlContainerSupport {
     private final ChatSessionService chatSessionService;
     private final ChatMessageService chatMessageService;
     private final ChatSessionRepository chatSessionRepository;
-    private final TransactionTemplate transactionTemplate;
     private final JdbcTemplate jdbcTemplate;
 
     @Autowired
@@ -66,12 +63,10 @@ class ChatSessionChangedEventTransactionTest extends MySqlContainerSupport {
             ChatSessionService chatSessionService,
             ChatMessageService chatMessageService,
             ChatSessionRepository chatSessionRepository,
-            PlatformTransactionManager transactionManager,
             DataSource dataSource) {
         this.chatSessionService = chatSessionService;
         this.chatMessageService = chatMessageService;
         this.chatSessionRepository = chatSessionRepository;
-        this.transactionTemplate = new TransactionTemplate(transactionManager);
         this.jdbcTemplate = new JdbcTemplate(dataSource);
     }
 
@@ -90,34 +85,6 @@ class ChatSessionChangedEventTransactionTest extends MySqlContainerSupport {
         chatSessionService.completeSession(MEMBER_ID, sessionId);
 
         verify(chatSessionPushPublisher).publish(MEMBER_ID, sessionId, ChatSessionStatus.COMPLETED);
-    }
-
-    @Test
-    @DisplayName("요리 완료 트랜잭션 안에서 상담을 끝내면 커밋 전에는 발행하지 않고 커밋된 뒤 발행한다")
-    void publishesAfterOuterCommit_whenCompletedFromCooking() {
-        Long sessionId = saveActiveSession();
-
-        transactionTemplate.executeWithoutResult(status -> {
-            chatSessionService.completeSessionFromCooking(MEMBER_ID, sessionId);
-            verifyNoInteractions(chatSessionPushPublisher);
-        });
-
-        verify(chatSessionPushPublisher).publish(MEMBER_ID, sessionId, ChatSessionStatus.COMPLETED);
-    }
-
-    @Test
-    @DisplayName("요리 완료 트랜잭션이 롤백되면 상담도 그대로이고 신호도 발행하지 않는다")
-    void doesNotPublish_whenCookingTransactionRollsBack() {
-        Long sessionId = saveActiveSession();
-
-        transactionTemplate.executeWithoutResult(status -> {
-            chatSessionService.completeSessionFromCooking(MEMBER_ID, sessionId);
-            status.setRollbackOnly();
-        });
-
-        verifyNoInteractions(chatSessionPushPublisher);
-        assertThat(chatSessionRepository.findById(sessionId).orElseThrow().getStatus())
-                .isEqualTo(ChatSessionStatus.ACTIVE);
     }
 
     @Test

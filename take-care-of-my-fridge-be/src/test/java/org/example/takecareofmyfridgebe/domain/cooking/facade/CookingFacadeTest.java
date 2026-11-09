@@ -7,6 +7,7 @@ import org.example.takecareofmyfridgebe.domain.cooking.dto.IngredientDeductionRe
 import org.example.takecareofmyfridgebe.domain.cooking.dto.UsedIngredientRequest;
 import org.example.takecareofmyfridgebe.domain.cooking.entity.CookingLog;
 import org.example.takecareofmyfridgebe.domain.cooking.entity.CookingResult;
+import org.example.takecareofmyfridgebe.domain.cooking.event.CookingCompletedEvent;
 import org.example.takecareofmyfridgebe.domain.cooking.service.CookingService;
 import org.example.takecareofmyfridgebe.domain.fridge.service.FridgeService;
 import org.junit.jupiter.api.DisplayName;
@@ -16,6 +17,7 @@ import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
@@ -33,7 +35,7 @@ import static org.mockito.Mockito.when;
 
 /**
  * CookingFacade 단위 테스트.
- * 요리 완료 시 이을 상담 찾기 -> 요리 기록 저장 -> 냉장고 재료 차감 -> 상담 종료 순서와,
+ * 요리 완료 시 이을 상담 찾기 -> 요리 기록 저장 -> 냉장고 재료 차감 -> 요리 완료 이벤트 발행(커밋 뒤 상담 종료) 순서와,
  * 상담을 잇지 못해도(없음·남의 상담·끝난 상담·조회 오류) 요리 완료는 성공하는지 본다.
  */
 @ExtendWith(MockitoExtension.class)
@@ -51,11 +53,14 @@ class CookingFacadeTest {
     @Mock
     private ChatSessionService chatSessionService;
 
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
     @InjectMocks
     private CookingFacade cookingFacade;
 
     @Test
-    @DisplayName("이을 상담을 찾으면 상담 찾기, 그 상담 ID로 기록 저장, 재료 차감, 상담 종료 순서로 처리한다")
+    @DisplayName("이을 상담을 찾으면 상담 찾기, 그 상담 ID로 기록 저장, 재료 차감, 요리 완료 이벤트 발행 순서로 처리한다")
     void completesCookingInOrder_whenSessionIsFound() {
         List<UsedIngredientRequest> used = List.of(new UsedIngredientRequest(3L, new BigDecimal("1.00")));
         CookingCompleteRequest request = request(CookingResult.SUCCESS, null, used);
@@ -68,15 +73,15 @@ class CookingFacadeTest {
 
         assertThat(response.cookingLogId()).isEqualTo(100L);
         assertThat(response.deductions()).extracting(IngredientDeductionResponse::ingredientId).containsExactly(3L);
-        InOrder inOrder = inOrder(chatSessionService, cookingService, fridgeService);
+        InOrder inOrder = inOrder(chatSessionService, cookingService, fridgeService, eventPublisher);
         inOrder.verify(chatSessionService).findCookingSessionId(MEMBER_ID, null, RECIPE_ID);
         inOrder.verify(cookingService).saveCookingLog(MEMBER_ID, request, 10L);
         inOrder.verify(fridgeService).consumeForCooking(MEMBER_ID, 100L, used);
-        inOrder.verify(chatSessionService).completeSessionFromCooking(MEMBER_ID, 10L);
+        inOrder.verify(eventPublisher).publishEvent(new CookingCompletedEvent(MEMBER_ID, 10L, 100L));
     }
 
     @Test
-    @DisplayName("이을 상담이 없으면(추천 안 한 레시피·남의 상담·끝난 상담) 상담 없이 기록하고 상담을 끝내지 않는다")
+    @DisplayName("이을 상담이 없으면(추천 안 한 레시피·남의 상담·끝난 상담) 상담 없이 기록하고 요리 완료 이벤트를 발행하지 않는다")
     void savesWithoutSession_whenNoSessionIsFound() {
         CookingCompleteRequest request = request(CookingResult.SUCCESS, 999L, List.of());
         when(chatSessionService.findCookingSessionId(MEMBER_ID, 999L, RECIPE_ID)).thenReturn(Optional.empty());
@@ -86,7 +91,7 @@ class CookingFacadeTest {
 
         assertThat(response.cookingLogId()).isEqualTo(100L);
         verify(fridgeService).consumeForCooking(MEMBER_ID, 100L, List.of());
-        verify(chatSessionService, never()).completeSessionFromCooking(any(), any());
+        verify(eventPublisher, never()).publishEvent(any(Object.class));
     }
 
     @Test
@@ -100,11 +105,11 @@ class CookingFacadeTest {
         CookingCompleteResponse response = cookingFacade.completeCooking(MEMBER_ID, request);
 
         assertThat(response.cookingLogId()).isEqualTo(100L);
-        verify(chatSessionService, never()).completeSessionFromCooking(any(), any());
+        verify(eventPublisher, never()).publishEvent(any(Object.class));
     }
 
     @Test
-    @DisplayName("요리 결과가 실패여도 이은 상담을 끝낸다")
+    @DisplayName("요리 결과가 실패여도 이은 상담을 끝내도록 요리 완료 이벤트를 발행한다")
     void completesSession_whenResultIsFailed() {
         CookingCompleteRequest request = request(CookingResult.FAILED, null, List.of());
         when(chatSessionService.findCookingSessionId(MEMBER_ID, null, RECIPE_ID)).thenReturn(Optional.of(10L));
@@ -112,7 +117,7 @@ class CookingFacadeTest {
 
         cookingFacade.completeCooking(MEMBER_ID, request);
 
-        verify(chatSessionService).completeSessionFromCooking(MEMBER_ID, 10L);
+        verify(eventPublisher).publishEvent(new CookingCompletedEvent(MEMBER_ID, 10L, 100L));
     }
 
     private static CookingCompleteRequest request(CookingResult result, Long chatSessionId, List<UsedIngredientRequest> used) {

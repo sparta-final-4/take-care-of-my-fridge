@@ -220,12 +220,13 @@ public class ChatSessionService {
     /**
      * 요리 완료로 상담을 종료(COMPLETED)한다. 요리 결과(성공·실패)와 상관없이 끝낸다.
      * 내 상담이고 진행 중(ACTIVE)일 때만 끝내며, 없거나 이미 끝난 상담은 건너뛴다(예외를 던지지 않는다).
-     * 종료했을 때만 상담 변경(COMPLETED) 이벤트를 발행한다.
+     * 종료했을 때만 상담 변경(COMPLETED) 이벤트를 발행하며, 이 트랜잭션이 커밋된 뒤 신호가 나간다.
+     * 요리 완료 커밋 뒤(AFTER_COMMIT) 리스너가 부른다. 그때는 끝난 요리 트랜잭션에 참여하면 저장되지 않으므로 새 트랜잭션으로 실행한다.
      *
      * @param memberId  요청 회원 ID
      * @param sessionId 채팅 세션 ID
      */
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void completeSessionFromCooking(Long memberId, Long sessionId) {
         chatSessionRepository.findByIdAndMemberId(sessionId, memberId)
                 .filter(ChatSession::isActive)
