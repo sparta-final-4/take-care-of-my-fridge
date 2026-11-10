@@ -224,9 +224,10 @@ class ChatIntentEvalManualTest {
         AllergyExclusionFinder allergyExclusionFinder = mock(AllergyExclusionFinder.class);
         when(allergyExclusionFinder.find(any(), any()))
                 .thenReturn(AllergyExclusionFinder.Allergens.NONE);
-        return new ChatIntentFacade(extractor, recipeService, ingredientMatcher, candidateProperties,
-                mock(ChatMessageService.class), tasteWords, mealkitWords, askWords, categoryWords, foodWords,
-                allergyExclusionFinder, tasteOpposites, fridgeShopWords, corrections);
+        IntentCorrector corrector = new IntentCorrector(recipeService, ingredientMatcher, mock(ChatMessageService.class),
+                tasteWords, mealkitWords, askWords, categoryWords, foodWords, fridgeShopWords, corrections);
+        return new ChatIntentFacade(extractor, recipeService, ingredientMatcher, candidateProperties, tasteWords, mealkitWords,
+                askWords, allergyExclusionFinder, tasteOpposites, fridgeShopWords, corrections, corrector);
     }
 
     private void write(EvalSet set, List<EvalCase> cases, List<RunRow> rows, int runs, Set<String> off) throws IOException {

@@ -255,10 +255,10 @@ class ChatIntentFacadeTest {
         @Test
         @DisplayName("레시피 말은 띄어 써도 지운다 (닭볶음탕 만드는 법 → 닭볶음탕, 잡채 만 들 기 → 잡채)")
         void removesSpacedRecipeWords() {
-            assertThat(facade.withoutRecipeWords("닭볶음탕 만드는 법")).isEqualTo("닭볶음탕");
-            assertThat(facade.withoutRecipeWords("잡채 만 들 기")).isEqualTo("잡채");
-            assertThat(facade.withoutRecipeWords("닭볶음탕레시피")).isEqualTo("닭볶음탕");
-            assertThat(facade.withoutRecipeWords("레시피")).isEmpty();
+            assertThat(newCorrector(ChatCorrectionProperties.ALL_ON).withoutRecipeWords("닭볶음탕 만드는 법")).isEqualTo("닭볶음탕");
+            assertThat(newCorrector(ChatCorrectionProperties.ALL_ON).withoutRecipeWords("잡채 만 들 기")).isEqualTo("잡채");
+            assertThat(newCorrector(ChatCorrectionProperties.ALL_ON).withoutRecipeWords("닭볶음탕레시피")).isEqualTo("닭볶음탕");
+            assertThat(newCorrector(ChatCorrectionProperties.ALL_ON).withoutRecipeWords("레시피")).isEmpty();
         }
 
         @Test
@@ -325,7 +325,8 @@ class ChatIntentFacadeTest {
         @Test
         @DisplayName("일반 대화·레시피 자세히면 맛·분류 단어로 조건을 고치지 않고, 추천이면 지금처럼 고친다")
         void correctsConditions_onlyWhenRecommend() {
-            ChatIntentFacade spied = spy(facade);
+            IntentCorrector spiedCorrector = spy(newCorrector(ChatCorrectionProperties.ALL_ON));
+            ChatIntentFacade spied = newFacade(ChatCorrectionProperties.ALL_ON, spiedCorrector);
             givenExtracted(IntentResult.general());
             spied.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("찌개는 어떻게 골라? 매운 거 기준은?"));
             // 물어본 레시피가 직전 카드에 있는 레시피 자세히 (없으면 그 요리 추천으로 바뀌어 보정한다)
@@ -334,8 +335,8 @@ class ChatIntentFacadeTest {
             spied.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("매운 김치찌개 어떻게 만들어?"),
                     new ChatContext(List.of(), null, List.of(new CardName(10L, "김치찌개"))));
 
-            verify(spied, never()).correctTastes(any(), any(), any(), any());
-            verify(spied, never()).correctCategories(any(), any(), any(), any(), any(), any());
+            verify(spiedCorrector, never()).correctTastes(any(), any(), any(), any());
+            verify(spiedCorrector, never()).correctCategories(any(), any(), any(), any(), any(), any());
 
             givenExtracted(new IntentResult(ChatIntent.RECOMMEND, null, null, null, null, null, false, null, null, null));
             ChatIntentResolution recommend = spied.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("매운 찌개 추천해줘"));
@@ -1826,11 +1827,20 @@ class ChatIntentFacadeTest {
 
     // 보정 켜고 끄기(app.chat.corrections)만 바꿔 만든다
     private ChatIntentFacade newFacade(ChatCorrectionProperties corrections) {
+        return newFacade(corrections, newCorrector(corrections));
+    }
+
+    private ChatIntentFacade newFacade(ChatCorrectionProperties corrections, IntentCorrector corrector) {
         return new ChatIntentFacade(extractor, recipeService, ingredientMatcher,
                 new ChatCandidateProperties(List.of("양념", "음료"), 0.4, List.of(), List.of("백김치", "물김치", "동치미", "나박김치"), List.of(), List.of()),
-                chatMessageService, TasteWordCheckerTest.WORDS, MealkitWordCheckerTest.WORDS, AskWordCheckerTest.WORDS,
-                new ChatCategoryWordProperties(CategoryWordCheckerTest.GROUPS), FOOD_WORDS, allergyExclusionFinder, TASTE_OPPOSITES,
-                FridgeShopWordCheckerTest.WORDS, corrections);
+                TasteWordCheckerTest.WORDS, MealkitWordCheckerTest.WORDS, AskWordCheckerTest.WORDS, allergyExclusionFinder,
+                TASTE_OPPOSITES, FridgeShopWordCheckerTest.WORDS, corrections, corrector);
+    }
+
+    private IntentCorrector newCorrector(ChatCorrectionProperties corrections) {
+        return new IntentCorrector(recipeService, ingredientMatcher, chatMessageService, TasteWordCheckerTest.WORDS,
+                MealkitWordCheckerTest.WORDS, AskWordCheckerTest.WORDS, new ChatCategoryWordProperties(CategoryWordCheckerTest.GROUPS),
+                FOOD_WORDS, FridgeShopWordCheckerTest.WORDS, corrections);
     }
 
     @Test
