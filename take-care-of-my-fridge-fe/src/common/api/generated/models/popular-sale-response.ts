@@ -23,6 +23,15 @@ export interface PopularSaleResponse {
     'name'?: string;
     'price'?: number;
     'productId'?: number;
+    'productType'?: PopularSaleResponseProductTypeEnum;
     'sale'?: SaleResponse;
 }
+
+export const PopularSaleResponseProductTypeEnum = {
+    Ingredient: 'INGREDIENT',
+    Mealkit: 'MEALKIT',
+} as const;
+
+export type PopularSaleResponseProductTypeEnum = typeof PopularSaleResponseProductTypeEnum[keyof typeof PopularSaleResponseProductTypeEnum];
+
 

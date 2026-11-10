@@ -25,7 +25,6 @@ export interface SaleEventListResponse {
     'remainingQuantity'?: number;
     'saleEventId'?: number;
     'salePrice'?: number;
-    'soldQuantity'?: number;
     'startsAt'?: string;
     'status'?: SaleEventListResponseStatusEnum;
     'type'?: SaleEventListResponseTypeEnum;

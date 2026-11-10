@@ -7344,6 +7344,13 @@
             "type": "integer",
             "format": "int64"
           },
+          "productType": {
+            "type": "string",
+            "enum": [
+              "INGREDIENT",
+              "MEALKIT"
+            ]
+          },
           "sale": {
             "$ref": "#/components/schemas/SaleResponse"
           }
@@ -8863,7 +8870,6 @@
               "DISCOUNT_RATE",
               "LIMITED_QUANTITY",
               "REMAINING_QUANTITY",
-              "SOLD_QUANTITY",
               "STARTS_AT",
               "ENDS_AT"
             ]
@@ -8933,10 +8939,6 @@
           "salePrice": {
             "type": "integer",
             "format": "int32"
-          },
-          "soldQuantity": {
-            "type": "integer",
-            "format": "int64"
           },
           "startsAt": {
             "type": "string",
