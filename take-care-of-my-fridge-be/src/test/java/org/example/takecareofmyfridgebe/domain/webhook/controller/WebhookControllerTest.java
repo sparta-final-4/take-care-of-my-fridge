@@ -1,11 +1,11 @@
-package org.example.takecareofmyfridgebe.infra.portone.webhook.controller;
+package org.example.takecareofmyfridgebe.domain.webhook.controller;
 
+import org.example.takecareofmyfridgebe.domain.webhook.service.WebhookHandler;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 import org.example.takecareofmyfridgebe.global.error.GlobalExceptionHandler;
 import org.example.takecareofmyfridgebe.infra.portone.dto.PortOneWebhook;
 import org.example.takecareofmyfridgebe.infra.portone.webhook.PortOneWebhookVerifier;
-import org.example.takecareofmyfridgebe.infra.portone.webhook.service.WebhookHandler;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

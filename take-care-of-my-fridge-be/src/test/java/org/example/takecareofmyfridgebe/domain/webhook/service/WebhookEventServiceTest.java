@@ -1,10 +1,10 @@
-package org.example.takecareofmyfridgebe.infra.portone.webhook.service;
+package org.example.takecareofmyfridgebe.domain.webhook.service;
 
 import org.example.takecareofmyfridgebe.domain.payment.entity.Payment;
-import org.example.takecareofmyfridgebe.infra.portone.webhook.entity.WebhookEvent;
-import org.example.takecareofmyfridgebe.infra.portone.webhook.entity.WebhookStatus;
 import org.example.takecareofmyfridgebe.domain.payment.repository.PaymentRepository;
-import org.example.takecareofmyfridgebe.infra.portone.webhook.repository.WebhookEventRepository;
+import org.example.takecareofmyfridgebe.domain.webhook.entity.WebhookEvent;
+import org.example.takecareofmyfridgebe.domain.webhook.entity.WebhookStatus;
+import org.example.takecareofmyfridgebe.domain.webhook.repository.WebhookEventRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

@@ -1,10 +1,10 @@
-package org.example.takecareofmyfridgebe.infra.portone.webhook.service;
+package org.example.takecareofmyfridgebe.domain.webhook.service;
 
 import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.payment.entity.Payment;
-import org.example.takecareofmyfridgebe.infra.portone.webhook.entity.WebhookEvent;
 import org.example.takecareofmyfridgebe.domain.payment.repository.PaymentRepository;
-import org.example.takecareofmyfridgebe.infra.portone.webhook.repository.WebhookEventRepository;
+import org.example.takecareofmyfridgebe.domain.webhook.entity.WebhookEvent;
+import org.example.takecareofmyfridgebe.domain.webhook.repository.WebhookEventRepository;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 import org.springframework.stereotype.Service;
