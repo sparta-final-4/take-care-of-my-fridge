@@ -4,7 +4,7 @@ name: FE Deploy
 # main → s3://<버킷>/main → https://imhungry.click
 on:
   push:
-    branches: [dev, main]
+    branches: [dev]
     paths:
       - "take-care-of-my-fridge-fe/**"
       - ".github/workflows/fe-ci.yml"
@@ -20,7 +20,7 @@ jobs:
 
   deploy:
     needs: ci
-    if: github.ref_name == 'dev' || github.ref_name == 'main'
+    if: github.ref_name == 'dev'  # main 배포는 비용 문제로 중단
     runs-on: ubuntu-latest
     # 같은 환경 배포는 순서대로 한 번에 하나씩(진행 중인 배포는 취소하지 않음)
     concurrency:
