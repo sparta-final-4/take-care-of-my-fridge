@@ -26,10 +26,11 @@
 }
 
 // 오른쪽 칸: 재료 목록이 길어 스크롤해도 상단바 아래에 붙어 따라온다. 칸 안 내용이 화면보다 길면 칸만 스크롤.
+// AI 상담 카드와 최근 기록 사이는 조금 좁게.
 .aside {
   display: flex;
   flex-direction: column;
-  gap: var(--ant-margin-xl);
+  gap: var(--ant-margin-lg);
   min-width: 0;
 
   @include from(lg) {
