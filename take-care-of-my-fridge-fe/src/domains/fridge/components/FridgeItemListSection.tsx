@@ -154,7 +154,7 @@ export function FridgeItemListSection({ onAdd }: FridgeItemListSectionProps) {
     [removeRow, remove],
   );
 
-  // 여러 재료를 한 번에 처리한다. 성공한 재료는 목록에서 빠지고 체크도 풀린다. 실패한 줄은 그대로 남는다.
+  // 기한 지난 재료를 한 번에 비운다. 성공한 재료는 목록에서 빠지고 체크도 풀린다. 실패한 줄은 그대로 남는다.
   const runBulk = async (request: FridgeBulkRequest, doneMessage: string) => {
     const { succeededIds, failedIds } = await bulkMutation.mutateAsync(request);
     uncheck(succeededIds);
@@ -167,27 +167,25 @@ export function FridgeItemListSection({ onAdd }: FridgeItemListSectionProps) {
     }
   };
 
-  // 확인창을 띄우고, 확인하면 처리가 끝날 때까지 확인 버튼이 돌아간다.
-  const confirmBulk = (
-    title: string,
-    okText: string,
-    request: FridgeBulkRequest,
-    done: string,
-    content = '냉장고에서 빠지고 기록에 남아요.',
-  ) => {
+  // [한 번에 정리]: 확인창을 띄우고, 확인하면 처리가 끝날 때까지 확인 버튼이 돌아간다.
+  const confirmCleanup = (items: FridgeItemResponse[]) => {
     if (bulkConfirming || bulkMutation.isPending) return;
     setBulkConfirming(true);
     modal.confirm({
-      title,
-      content,
-      okText,
+      title: `기한 지난 재료 ${items.length}개를 정리할까요?`,
+      content: '모두 버린 것으로 냉장고에서 빠지고 기록에 남아요.',
+      okText: '정리',
       cancelText: '취소',
-      onOk: () => runBulk(request, done),
+      onOk: () =>
+        runBulk(
+          { fridgeIds: items.map((item) => item.id ?? 0), remove: 'DISCARDED' },
+          '기한 지난 재료를 정리했어요',
+        ),
       afterClose: () => setBulkConfirming(false),
     });
   };
 
-  // 처리 중인 재료 id(한 줄씩 처리 + 여러 개 한 번에 처리)
+  // 처리 중인 재료 id(한 줄씩 처리 + 한 번에 정리)
   const busyIds = bulkMutation.isPending
     ? [...removingIds, ...(bulkMutation.variables?.fridgeIds ?? [])]
     : removingIds;
@@ -282,18 +280,7 @@ export function FridgeItemListSection({ onAdd }: FridgeItemListSectionProps) {
                     danger
                     loading={bulkMutation.isPending}
                     disabled={bulkConfirming || bulkMutation.isPending}
-                    onClick={() =>
-                      confirmBulk(
-                        `기한 지난 재료 ${groupItems.length}개를 정리할까요?`,
-                        '정리',
-                        {
-                          fridgeIds: groupItems.map((item) => item.id ?? 0),
-                          remove: 'DISCARDED',
-                        },
-                        '기한 지난 재료를 정리했어요',
-                        '모두 버린 것으로 냉장고에서 빠지고 기록에 남아요.',
-                      )
-                    }
+                    onClick={() => confirmCleanup(groupItems)}
                     className={styles.cleanButton}
                   >
                     한 번에 정리
@@ -312,7 +299,6 @@ export function FridgeItemListSection({ onAdd }: FridgeItemListSectionProps) {
     data?.filter((item) => matchesFridgeTab(item, tab)).length ?? 0;
   // 체크한 재료 중 아직 냉장고에 있는 것(다른 탭에 있는 재료도 포함)
   const checkedItems = data?.filter((item) => checkedIds.includes(item.id ?? 0)) ?? [];
-  const checkedFridgeIds = checkedItems.map((item) => item.id ?? 0);
 
   return (
     <SectionCard title="재료 목록" bracket={false}>
@@ -350,31 +336,9 @@ export function FridgeItemListSection({ onAdd }: FridgeItemListSectionProps) {
 
         {checkedItems.length > 0 && (
           <FridgeSelectionBar
-            items={checkedItems}
-            pending={bulkConfirming || bulkMutation.isPending}
+            count={checkedItems.length}
             // 체크한 재료 중 추천에 쓸 수 있는 것만 넘긴다. 남는 게 없으면 선택 없이 연다.
             onChat={() => openChat(toChatSelectedIngredients(checkedItems))}
-            onConsume={() => {
-              // 하나면 지금처럼 먹은 양을 묻고, 여러 개면 전부 먹은 것으로 뺀다.
-              if (checkedItems.length === 1) {
-                setConsumingItem(checkedItems[0]);
-                return;
-              }
-              confirmBulk(
-                `${checkedItems.length}개를 다 먹었어요로 뺄까요?`,
-                '먹었어요',
-                { fridgeIds: checkedFridgeIds, takeOut: 'CONSUMED' },
-                '냉장고에서 뺐어요',
-              );
-            }}
-            onDiscard={() =>
-              confirmBulk(
-                `${checkedItems.length}개를 버릴까요?`,
-                '버리기',
-                { fridgeIds: checkedFridgeIds, takeOut: 'DISCARDED' },
-                '버렸어요',
-              )
-            }
             onClear={clearChecked}
           />
         )}

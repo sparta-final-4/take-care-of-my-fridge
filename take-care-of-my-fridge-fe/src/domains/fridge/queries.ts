@@ -13,7 +13,6 @@ import {
   removeFridgeItem,
   takeOutFridgeItem,
   updateFridgeItem,
-  type FridgeItemAction,
   type FridgeItemLogSearchRequest,
   type FridgeItemTakeOutRequest,
   type FridgeItemUpdateRequest,
@@ -93,21 +92,18 @@ export function useRemoveFridgeItem() {
   });
 }
 
-// 여러 재료를 한 번에 빼기(전량)·비우기. 몇 개씩 나눠 보내고, 다 끝난 뒤 목록·기록을 한 번만 새로 받는다.
+// 여러 재료를 한 번에 비우기(기한 지남 [한 번에 정리]). 몇 개씩 나눠 보내고, 다 끝난 뒤 목록·기록을 한 번만 새로 받는다.
 // 일부만 실패할 수 있어 예외 대신 성공·실패 id를 돌려주고, 실패 안내는 화면이 한 번에 띄운다.
-export type FridgeBulkRequest =
-  | { fridgeIds: number[]; takeOut: FridgeItemAction }
-  | { fridgeIds: number[]; remove: FridgeRemoveReason };
+export interface FridgeBulkRequest {
+  fridgeIds: number[];
+  remove: FridgeRemoveReason;
+}
 
 export function useBulkFridgeAction() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (request: FridgeBulkRequest) =>
-      runInChunks(request.fridgeIds, (fridgeId) =>
-        'takeOut' in request
-          ? takeOutFridgeItem(fridgeId, { action: request.takeOut })
-          : removeFridgeItem(fridgeId, request.remove),
-      ),
+      runInChunks(request.fridgeIds, (fridgeId) => removeFridgeItem(fridgeId, request.remove)),
     meta: { skipGlobalError: true },
     onSettled: () =>
       Promise.all([
