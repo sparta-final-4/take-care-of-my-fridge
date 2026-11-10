@@ -5,7 +5,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.takecareofmyfridgebe.domain.notification.event.NotificationRequestedMessage;
 import org.example.takecareofmyfridgebe.domain.sale.facade.AdminSaleEventFacade;
-import org.example.takecareofmyfridgebe.global.config.KafkaTopics;
+import org.example.takecareofmyfridgebe.global.config.kafka.KafkaTopics;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;

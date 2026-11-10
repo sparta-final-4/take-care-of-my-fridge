@@ -1,4 +1,4 @@
-package org.example.takecareofmyfridgebe.global.config;
+package org.example.takecareofmyfridgebe.global.config.scheduling;
 
 import net.javacrumbs.shedlock.core.DefaultLockingTaskExecutor;
 import net.javacrumbs.shedlock.core.LockProvider;

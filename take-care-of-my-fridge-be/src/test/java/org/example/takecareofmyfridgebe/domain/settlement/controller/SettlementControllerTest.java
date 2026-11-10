@@ -14,7 +14,7 @@ import org.example.takecareofmyfridgebe.domain.settlement.dto.SettlementResponse
 import org.example.takecareofmyfridgebe.domain.settlement.dto.SettlementSearchRequest;
 import org.example.takecareofmyfridgebe.domain.settlement.dto.TodaySalesResponse;
 import org.example.takecareofmyfridgebe.domain.settlement.facade.SettlementQueryFacade;
-import org.example.takecareofmyfridgebe.global.config.SecurityConfig;
+import org.example.takecareofmyfridgebe.global.config.security.SecurityConfig;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 import org.example.takecareofmyfridgebe.global.response.PageResponse;
 import org.junit.jupiter.api.BeforeEach;

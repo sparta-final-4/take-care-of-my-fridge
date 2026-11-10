@@ -10,7 +10,7 @@ import org.example.takecareofmyfridgebe.domain.payment.dto.PaymentPinSetRequest;
 import org.example.takecareofmyfridgebe.domain.payment.dto.PaymentPinStatusResponse;
 import org.example.takecareofmyfridgebe.domain.payment.facade.PaymentPinFacade;
 import org.example.takecareofmyfridgebe.domain.payment.service.PaymentPinService;
-import org.example.takecareofmyfridgebe.global.config.SecurityConfig;
+import org.example.takecareofmyfridgebe.global.config.security.SecurityConfig;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 import org.junit.jupiter.api.BeforeEach;

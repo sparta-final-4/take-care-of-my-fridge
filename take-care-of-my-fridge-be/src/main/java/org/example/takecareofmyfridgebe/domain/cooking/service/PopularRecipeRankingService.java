@@ -3,7 +3,7 @@ package org.example.takecareofmyfridgebe.domain.cooking.service;
 import lombok.RequiredArgsConstructor;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.PopularRecipeRanking;
 import org.example.takecareofmyfridgebe.domain.cooking.repository.CookingLogRepository;
-import org.example.takecareofmyfridgebe.global.config.CacheNames;
+import org.example.takecareofmyfridgebe.global.config.cache.CacheNames;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

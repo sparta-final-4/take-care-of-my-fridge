@@ -18,7 +18,7 @@ import org.example.takecareofmyfridgebe.domain.search.facade.RecipeSearchFacade;
 import org.example.takecareofmyfridgebe.domain.search.facade.SearchFridgeMatchFacade;
 import org.example.takecareofmyfridgebe.domain.search.service.SearchClickHistoryService;
 import org.example.takecareofmyfridgebe.domain.search.service.SearchPopularKeywordService;
-import org.example.takecareofmyfridgebe.global.config.SecurityConfig;
+import org.example.takecareofmyfridgebe.global.config.security.SecurityConfig;
 import org.example.takecareofmyfridgebe.global.error.GlobalExceptionHandler;
 import org.example.takecareofmyfridgebe.global.response.PageResponse;
 import org.junit.jupiter.api.BeforeEach;

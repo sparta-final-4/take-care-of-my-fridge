@@ -17,7 +17,7 @@ import org.example.takecareofmyfridgebe.domain.sale.dto.PopularSaleResponse;
 import org.example.takecareofmyfridgebe.domain.sale.dto.SaleResponse;
 import org.example.takecareofmyfridgebe.domain.sale.entity.SaleEventType;
 import org.example.takecareofmyfridgebe.domain.sale.facade.SaleEventFacade;
-import org.example.takecareofmyfridgebe.global.config.SecurityConfig;
+import org.example.takecareofmyfridgebe.global.config.security.SecurityConfig;
 import org.example.takecareofmyfridgebe.global.error.GlobalExceptionHandler;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

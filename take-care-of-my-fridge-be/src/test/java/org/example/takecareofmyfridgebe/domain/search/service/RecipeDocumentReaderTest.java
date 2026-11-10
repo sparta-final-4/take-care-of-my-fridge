@@ -15,8 +15,8 @@ import org.example.takecareofmyfridgebe.domain.search.config.RecipeSearchPropert
 import org.example.takecareofmyfridgebe.domain.search.config.RecipeSearchProperties.RecipeIndexProperties;
 import org.example.takecareofmyfridgebe.domain.search.config.SearchEngine;
 import org.example.takecareofmyfridgebe.infra.elasticsearch.dto.EsDocument;
-import org.example.takecareofmyfridgebe.global.config.JpaAuditingConfig;
-import org.example.takecareofmyfridgebe.global.config.QueryDslConfig;
+import org.example.takecareofmyfridgebe.global.config.jpa.JpaAuditingConfig;
+import org.example.takecareofmyfridgebe.global.config.jpa.QueryDslConfig;
 import org.example.takecareofmyfridgebe.support.MySqlContainerSupport;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

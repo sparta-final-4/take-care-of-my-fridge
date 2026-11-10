@@ -30,8 +30,8 @@ import org.example.takecareofmyfridgebe.domain.sale.event.FlashDropNotificationE
 import org.example.takecareofmyfridgebe.domain.sale.event.FlashDropNotificationEvent.Moment;
 import org.example.takecareofmyfridgebe.domain.sale.repository.SaleEventItemRepository;
 import org.example.takecareofmyfridgebe.domain.sale.repository.SaleEventRepository;
-import org.example.takecareofmyfridgebe.global.config.JpaAuditingConfig;
-import org.example.takecareofmyfridgebe.global.config.QueryDslConfig;
+import org.example.takecareofmyfridgebe.global.config.jpa.JpaAuditingConfig;
+import org.example.takecareofmyfridgebe.global.config.jpa.QueryDslConfig;
 import org.example.takecareofmyfridgebe.support.MySqlContainerSupport;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;

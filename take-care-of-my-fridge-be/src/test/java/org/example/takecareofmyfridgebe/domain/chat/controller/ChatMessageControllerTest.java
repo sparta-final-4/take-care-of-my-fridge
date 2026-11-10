@@ -9,7 +9,7 @@ import org.example.takecareofmyfridgebe.domain.chat.entity.ChatMessageRole;
 import org.example.takecareofmyfridgebe.domain.chat.facade.ChatMessageQueryFacade;
 import org.example.takecareofmyfridgebe.domain.chat.service.ChatStreamService;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
-import org.example.takecareofmyfridgebe.global.config.SecurityConfig;
+import org.example.takecareofmyfridgebe.global.config.security.SecurityConfig;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 import org.junit.jupiter.api.BeforeEach;

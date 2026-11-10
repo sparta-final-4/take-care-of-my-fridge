@@ -28,7 +28,7 @@ import org.example.takecareofmyfridgebe.domain.product.entity.ProductType;
 import org.example.takecareofmyfridgebe.domain.product.repository.IngredientProductRepository;
 import org.example.takecareofmyfridgebe.domain.product.repository.MealkitProductRepository;
 import org.example.takecareofmyfridgebe.domain.product.repository.ProductRepository;
-import org.example.takecareofmyfridgebe.global.config.KafkaTopics;
+import org.example.takecareofmyfridgebe.global.config.kafka.KafkaTopics;
 import org.example.takecareofmyfridgebe.support.KafkaContainerSupport;
 import org.example.takecareofmyfridgebe.support.MySqlContainerSupport;
 import org.junit.jupiter.api.AfterEach;

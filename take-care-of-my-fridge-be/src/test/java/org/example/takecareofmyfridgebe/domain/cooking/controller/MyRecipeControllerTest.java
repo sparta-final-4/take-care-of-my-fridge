@@ -12,7 +12,7 @@ import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeSortType;
 import org.example.takecareofmyfridgebe.domain.cooking.dto.MyRecipeSummaryResponse;
 import org.example.takecareofmyfridgebe.domain.cooking.service.CookingService;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
-import org.example.takecareofmyfridgebe.global.config.SecurityConfig;
+import org.example.takecareofmyfridgebe.global.config.security.SecurityConfig;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 import org.example.takecareofmyfridgebe.global.response.PageResponse;
 import org.junit.jupiter.api.BeforeEach;

@@ -9,7 +9,7 @@ import org.example.takecareofmyfridgebe.domain.payment.dto.BillingKeyRegisterReq
 import org.example.takecareofmyfridgebe.domain.payment.dto.BillingKeyResponse;
 import org.example.takecareofmyfridgebe.domain.payment.entity.CardType;
 import org.example.takecareofmyfridgebe.domain.payment.facade.BillingKeyFacade;
-import org.example.takecareofmyfridgebe.global.config.SecurityConfig;
+import org.example.takecareofmyfridgebe.global.config.security.SecurityConfig;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 import org.junit.jupiter.api.BeforeEach;

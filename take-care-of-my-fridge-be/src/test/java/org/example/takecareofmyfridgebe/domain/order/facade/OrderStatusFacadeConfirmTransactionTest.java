@@ -40,8 +40,8 @@ import org.example.takecareofmyfridgebe.domain.refund.repository.RefundRepositor
 import org.example.takecareofmyfridgebe.domain.refund.service.RefundCommandService;
 import org.example.takecareofmyfridgebe.domain.refund.service.RefundQueryService;
 import org.example.takecareofmyfridgebe.domain.sale.service.SaleEventStockService;
-import org.example.takecareofmyfridgebe.global.config.JpaAuditingConfig;
-import org.example.takecareofmyfridgebe.global.config.QueryDslConfig;
+import org.example.takecareofmyfridgebe.global.config.jpa.JpaAuditingConfig;
+import org.example.takecareofmyfridgebe.global.config.jpa.QueryDslConfig;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 import org.example.takecareofmyfridgebe.support.MySqlContainerSupport;

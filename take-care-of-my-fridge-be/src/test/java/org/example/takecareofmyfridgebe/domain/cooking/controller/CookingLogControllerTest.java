@@ -11,7 +11,7 @@ import org.example.takecareofmyfridgebe.domain.cooking.entity.CookingResult;
 import org.example.takecareofmyfridgebe.domain.cooking.facade.CookingFacade;
 import org.example.takecareofmyfridgebe.domain.cooking.service.CookingService;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
-import org.example.takecareofmyfridgebe.global.config.SecurityConfig;
+import org.example.takecareofmyfridgebe.global.config.security.SecurityConfig;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 import org.example.takecareofmyfridgebe.global.response.PageResponse;

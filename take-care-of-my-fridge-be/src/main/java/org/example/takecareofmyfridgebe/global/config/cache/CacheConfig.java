@@ -1,4 +1,4 @@
-package org.example.takecareofmyfridgebe.global.config;
+package org.example.takecareofmyfridgebe.global.config.cache;
 
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.CachingConfigurer;
