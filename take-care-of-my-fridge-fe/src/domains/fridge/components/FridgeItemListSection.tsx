@@ -55,8 +55,13 @@ const SORT_OPTIONS: Array<{ value: FridgeSortType; label: string }> = [
 const VISIBLE_ROW_COUNT = 8;
 
 // 임박순 그룹. 서버가 준 status·dDay만으로 나눈다.
-const EXPIRATION_GROUPS: Array<{ label: string; match: (item: FridgeItemResponse) => boolean }> = [
-  { label: '기한 지남', match: (item) => item.status === 'EXPIRED' },
+// 기한 지남 묶음은 제목 옆 [한 번에 정리]로 묶음의 재료를 모두 비울 수 있다.
+const EXPIRATION_GROUPS: Array<{
+  label: string;
+  match: (item: FridgeItemResponse) => boolean;
+  cleanable?: boolean;
+}> = [
+  { label: '기한 지남', match: (item) => item.status === 'EXPIRED', cleanable: true },
   { label: '오늘까지', match: (item) => item.status === 'IMMINENT' && item.dDay === 0 },
   { label: '3일 이내', match: (item) => item.status === 'IMMINENT' && (item.dDay ?? 0) > 0 },
   { label: '여유 있음', match: (item) => item.status === 'NORMAL' },
@@ -163,12 +168,18 @@ export function FridgeItemListSection({ onAdd }: FridgeItemListSectionProps) {
   };
 
   // 확인창을 띄우고, 확인하면 처리가 끝날 때까지 확인 버튼이 돌아간다.
-  const confirmBulk = (title: string, okText: string, request: FridgeBulkRequest, done: string) => {
+  const confirmBulk = (
+    title: string,
+    okText: string,
+    request: FridgeBulkRequest,
+    done: string,
+    content = '냉장고에서 빠지고 기록에 남아요.',
+  ) => {
     if (bulkConfirming || bulkMutation.isPending) return;
     setBulkConfirming(true);
     modal.confirm({
       title,
-      content: '냉장고에서 빠지고 기록에 남아요.',
+      content,
       okText,
       cancelText: '취소',
       onOk: () => runBulk(request, done),
@@ -264,6 +275,30 @@ export function FridgeItemListSection({ onAdd }: FridgeItemListSectionProps) {
               <div className={styles.groupHead}>
                 <span className={styles.groupTitle}>{group.label}</span>
                 <span className={styles.groupCount}>{groupItems.length}</span>
+                {group.cleanable && (
+                  // 지금 탭의 기한 지난 재료 전부([더 보기]로 접힌 줄 포함)를 비운다.
+                  <Button
+                    size="small"
+                    danger
+                    loading={bulkMutation.isPending}
+                    disabled={bulkConfirming || bulkMutation.isPending}
+                    onClick={() =>
+                      confirmBulk(
+                        `기한 지난 재료 ${groupItems.length}개를 정리할까요?`,
+                        '정리',
+                        {
+                          fridgeIds: groupItems.map((item) => item.id ?? 0),
+                          remove: 'DISCARDED',
+                        },
+                        '기한 지난 재료를 정리했어요',
+                        '모두 버린 것으로 냉장고에서 빠지고 기록에 남아요.',
+                      )
+                    }
+                    className={styles.cleanButton}
+                  >
+                    한 번에 정리
+                  </Button>
+                )}
               </div>
               {renderRows(group.label, groupItems)}
             </section>

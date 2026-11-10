@@ -84,8 +84,12 @@ export function useRemoveFridgeItem() {
   return useMutation({
     mutationFn: ({ fridgeId, reason }: { fridgeId: number; reason: FridgeRemoveReason }) =>
       removeFridgeItem(fridgeId, reason),
-    // 화면에서는 기록 없이 지우는 WRONG_ENTRY에만 쓰므로 기록 쿼리는 무효화하지 않는다.
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: fridgeQueries.itemLists() }),
+    // 버림(DISCARDED)·사용(CONSUMED)은 기록에 남아 이번 달 버린 재료 수가 바뀌므로 기록 쿼리도 새로 받는다.
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: fridgeQueries.itemLists() }),
+        queryClient.invalidateQueries({ queryKey: fridgeQueries.logLists() }),
+      ]),
   });
 }
 

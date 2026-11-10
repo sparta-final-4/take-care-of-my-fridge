@@ -57,6 +57,11 @@
   font-weight: var(--ant-font-weight-strong);
 }
 
+// 기한 지남 제목 줄 오른쪽 끝
+.cleanButton {
+  margin-inline-start: auto;
+}
+
 .groupCount {
   min-width: 2.25em;
   padding: 0 var(--ant-padding-xs);
