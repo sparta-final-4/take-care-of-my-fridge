@@ -10,7 +10,6 @@ public enum SaleEventListSort {
     DISCOUNT_RATE,
     LIMITED_QUANTITY,
     REMAINING_QUANTITY,
-    SOLD_QUANTITY,
     STARTS_AT,
     ENDS_AT
 }
