@@ -1,0 +1,70 @@
+@use '@/styles/variables' as *;
+@use '@/styles/mixins' as *;
+
+// 선택 막대: 재료가 많아도 화면 아래쪽에 붙어 보인다. 잉크색 바탕에 밝은 글자.
+// 좁은 화면은 [글] 아래 [버튼 줄], md 이상은 한 줄.
+.bar {
+  position: sticky;
+  bottom: var(--ant-margin);
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: var(--ant-margin-xs);
+  margin-top: auto;
+  padding: var(--ant-padding-sm) var(--ant-padding);
+  color: var(--ant-color-text-light-solid);
+  background: var(--ant-color-text);
+  border-radius: var(--ant-border-radius-lg);
+  box-shadow: $product-media-shadow;
+
+  @include from(md) {
+    flex-direction: row;
+    align-items: center;
+    gap: var(--ant-margin);
+  }
+}
+
+.info {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.summary,
+.notice {
+  min-width: 0;
+  overflow: hidden;
+  color: inherit;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.notice {
+  font-size: var(--ant-font-size-sm);
+  opacity: 0.75;
+}
+
+.actions {
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ant-margin-xs);
+}
+
+// 좁은 화면: AI 상담 버튼이 한 줄을 다 쓰고 먹었어요·버리기는 그 아래
+.chatButton {
+  flex: 1 1 100%;
+
+  @include from(md) {
+    flex: none;
+  }
+}
+
+:global(.ant-btn).clearButton {
+  min-width: $touch-target-size;
+  min-height: $touch-target-size;
+  margin-inline-start: auto;
+  color: inherit;
+}
