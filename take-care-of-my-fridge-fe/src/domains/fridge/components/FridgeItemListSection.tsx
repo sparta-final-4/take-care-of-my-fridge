@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useLocation, useSearchParams } from 'react-router';
 
 import { SectionCard } from '@/common/components/SectionCard';
-import { useDesktopPointer } from '@/common/hooks/useScreens';
+import { useScreens } from '@/common/hooks/useScreens';
 import { useChatModalStore } from '@/domains/chat/model/useChatModalStore';
 import { toChatSelectedIngredients } from '@/domains/chat/selectedIngredients';
 
@@ -93,7 +93,8 @@ export function FridgeItemListSection({ onAdd }: FridgeItemListSectionProps) {
   const [consumingItem, setConsumingItem] = useState<FridgeItemResponse>();
   // [더 보기]로 편 묶음(임박순 묶음 이름, 다른 정렬은 'ALL')
   const [expandedGroups, setExpandedGroups] = useState<string[]>([]);
-  const hoverActions = useDesktopPointer();
+  // 768px 이상은 줄마다 [먹었어요][버리기] 아이콘, 좁은 화면은 ⋯ 메뉴(그릴 버튼이 달라 JS로 나눈다)
+  const inlineActions = useScreens().md ?? false;
 
   // 기존 링크가 그대로 열리도록 키는 storage로 두고 밀키트·기본 양념 탭 값만 더했다.
   const storageParam = searchParams.get('storage');
@@ -206,7 +207,7 @@ export function FridgeItemListSection({ onAdd }: FridgeItemListSectionProps) {
                 checked={checkedIds.includes(fridgeId)}
                 removing={busyIds.includes(fridgeId)}
                 highlighted={newFridgeIds.includes(fridgeId)}
-                hoverActions={hoverActions}
+                inlineActions={inlineActions}
                 onCheck={handleCheck}
                 onEdit={setEditingItem}
                 onConsume={setConsumingItem}

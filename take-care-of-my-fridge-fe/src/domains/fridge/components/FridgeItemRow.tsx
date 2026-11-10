@@ -1,4 +1,4 @@
-import { MoreOutlined } from '@ant-design/icons';
+import { CheckCircleOutlined, DeleteOutlined, MoreOutlined } from '@ant-design/icons';
 import { Button, Checkbox, Dropdown, Popconfirm, Tag, Typography } from 'antd';
 import { memo, useState } from 'react';
 
@@ -14,8 +14,8 @@ interface FridgeItemRowProps {
   removing: boolean;
   // 재료 추가에서 방금 등록한 재료
   highlighted: boolean;
-  // 마우스를 쓰는 PC: [먹었어요][버리기]를 줄에 마우스를 올렸을 때 보여 준다. 아니면 ⋯ 메뉴에 넣는다.
-  hoverActions: boolean;
+  // 768px 이상: [먹었어요][버리기]를 늘 보이는 작은 아이콘으로 둔다. 좁은 화면은 ⋯ 메뉴에 글자로 넣는다.
+  inlineActions: boolean;
   // 목록이 길어도 바뀐 줄만 다시 그리도록(memo) 부모는 매번 같은 함수를 넘기고, 줄이 자기 재료 id·재료를 넣어 부른다.
   onCheck: (fridgeId: number, checked: boolean) => void;
   onEdit: (item: FridgeItemResponse) => void;
@@ -33,7 +33,7 @@ export const FridgeItemRow = memo(function FridgeItemRow({
   checked,
   removing,
   highlighted,
-  hoverActions,
+  inlineActions,
   onCheck,
   onEdit,
   onConsume,
@@ -61,7 +61,7 @@ export const FridgeItemRow = memo(function FridgeItemRow({
       : discardConfirm;
 
   const menuItems = [
-    ...(hoverActions
+    ...(inlineActions
       ? []
       : [
           { key: 'consume', label: '먹었어요' },
@@ -71,7 +71,7 @@ export const FridgeItemRow = memo(function FridgeItemRow({
     { key: 'delete', label: '잘못 등록', danger: true },
   ];
 
-  // 줄: [체크] [이름 · 밀키트·NEW / (휴대폰) 수량 · 보관] [수량] [보관] [남은 날] [먹었어요 · 버리기] [⋯]
+  // 줄: [체크] [이름 · 밀키트·NEW / (휴대폰) 수량 · 보관] [수량] [보관] [남은 날] [먹었어요 · 버리기 아이콘] [⋯]
   return (
     <div className={styles.row}>
       <Checkbox
@@ -106,17 +106,18 @@ export const FridgeItemRow = memo(function FridgeItemRow({
           <DdayTag dDay={item.dDay} expirationDate={item.expirationDate} />
         )}
       </span>
-      {hoverActions && (
-        <div className={styles.hoverActions}>
+      {inlineActions && (
+        <div className={styles.inlineActions}>
+          {/* 먹었어요: 먹은 양 입력 창을 연다. 말풍선 없이 화면 읽기용 이름만 둔다. */}
           <Button
             size="small"
             type="text"
+            icon={<CheckCircleOutlined />}
             onClick={() => onConsume(item)}
             disabled={removing}
             aria-label={`${name} 먹었어요`}
-          >
-            먹었어요
-          </Button>
+            className={styles.iconButton}
+          />
           <Popconfirm
             {...discardConfirm}
             cancelText="취소"
@@ -127,12 +128,12 @@ export const FridgeItemRow = memo(function FridgeItemRow({
             <Button
               size="small"
               type="text"
+              icon={<DeleteOutlined />}
               loading={removing}
               disabled={removing}
               aria-label={`${name} 버리기`}
-            >
-              버리기
-            </Button>
+              className={styles.iconButton}
+            />
           </Popconfirm>
         </div>
       )}

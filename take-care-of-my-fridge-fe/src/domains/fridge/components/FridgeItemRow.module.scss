@@ -2,7 +2,7 @@
 @use '@/styles/mixins' as *;
 
 // 재료 한 줄. 휴대폰: [체크] [이름 / 수량 · 보관] [남은 날] [⋯]
-// md 이상: [체크] [이름(정한 폭)] [수량] [보관] [남은 날] ……… [(마우스) 먹었어요 · 버리기] [⋯]
+// md 이상: [체크] [이름(정한 폭)] [수량] [보관] [남은 날] ……… [먹었어요 · 버리기 아이콘] [⋯]
 //   이름 칸 폭을 정해 수량·보관·뱃지가 이름 바로 옆에 오고, 버튼과 ⋯만 오른쪽 끝에 붙는다.
 // 바탕은 흰색 하나(기한 상태는 남은 날 뱃지 색으로만 나타낸다).
 .row {
@@ -100,20 +100,15 @@
   }
 }
 
-// 마우스를 올리거나 키보드로 줄 안에 들어오면 보인다. 자리는 늘 차지해 줄 폭이 흔들리지 않는다.
-.hoverActions {
+// 768px 이상: 늘 보이는 회색 아이콘 버튼 두 개(32px)
+.inlineActions {
   display: flex;
   flex-shrink: 0;
   gap: var(--ant-margin-xxs);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity var(--ant-motion-duration-fast);
+}
 
-  .row:hover &,
-  .row:focus-within & {
-    opacity: 1;
-    pointer-events: auto;
-  }
+:global(.ant-btn).iconButton {
+  color: var(--ant-color-text-secondary);
 }
 
 // 터치 영역 44px
