@@ -53,7 +53,7 @@ public class AdminSaleEventFacade {
         return SaleEventDetailResponse.from(saleEvent, items, productsById);
     }
 
-    // 번개 드롭 등록·시작이 커밋된 뒤 불린다. 끝난 트랜잭션에 섞이지 않게 읽기마다 새로 연다.
+    // 번개 드롭 시작이 커밋된 뒤 불린다. 끝난 트랜잭션에 섞이지 않게 읽기마다 새로 연다.
     // 받는 사람마다 알림 요청 메시지를 만든다.
     public List<NotificationRequestedMessage> getFlashDropNotifications(FlashDropNotificationEvent event) {
         List<SaleEventItem> items = saleEventQueryService.getItemsWithSaleEvent(event.saleEventIds());
@@ -62,7 +62,7 @@ public class AdminSaleEventFacade {
         Map<Long, String> productNames = findProducts(productIds).stream()
                 .collect(Collectors.toMap(Product::getId, Product::getName));
         List<Long> memberIds = memberRepository.findIdsByRoleAndStatus(Member.Role.USER, Member.Status.ACTIVE);
-        return flashDropNotificationService.createMessages(event.moment(), items, productNames, memberIds);
+        return flashDropNotificationService.createMessages(items, productNames, memberIds);
     }
 
     public SaleEventsCreateResponse createSpecialSale(SpecialSaleCreateRequest request) {

@@ -27,7 +27,7 @@ public class FlashDropNotificationEventListener {
             List<NotificationRequestedMessage> messages = adminSaleEventFacade.getFlashDropNotifications(event);
             messages.forEach(message -> send(event, message));
         } catch (RuntimeException e) {
-            log.error("번개 드롭 알림 요청 발행 실패: moment={}, saleEventIds={}", event.moment(), event.saleEventIds(), e);
+            log.error("번개 드롭 알림 요청 발행 실패: saleEventIds={}", event.saleEventIds(), e);
         }
     }
 
@@ -35,8 +35,8 @@ public class FlashDropNotificationEventListener {
         kafkaTemplate.send(KafkaTopics.NOTIFICATION_REQUESTED, String.valueOf(message.memberId()), message)
                 .whenComplete((result, e) -> {
                     if (e != null) {
-                        log.error("번개 드롭 알림 요청 발행 실패: moment={}, dedupeKey={}, memberId={}",
-                                event.moment(), message.dedupeKey(), message.memberId(), e);
+                        log.error("번개 드롭 알림 요청 발행 실패: dedupeKey={}, memberId={}",
+                                message.dedupeKey(), message.memberId(), e);
                     }
                 });
     }
