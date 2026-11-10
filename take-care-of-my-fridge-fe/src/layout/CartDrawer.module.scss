@@ -30,7 +30,8 @@
   border-bottom: 1px solid var(--ant-color-border-secondary);
 }
 
-.title {
+// antd 제목 규칙(16px)보다 우선하도록 antd 클래스를 함께 건다.
+.title:global(.ant-drawer-title) {
   font-family: $font-display;
   font-size: var(--ant-font-size-heading-4);
   font-weight: 400;
@@ -41,13 +42,20 @@
   padding: 0 $cart-drawer-padding-inline $cart-drawer-padding-inline;
 }
 
+// 위 .body 여백은 antd 본문 규칙(사방 24px)에 밀려 적용되지 않는다. 좌우·아래는 머리 줄과 맞는 지금 값(24px)을 두고,
+// 위쪽만 없애 머리 줄 바로 아래에서 목록 툴바가 시작하게 한다.
+.body:global(.ant-drawer-body) {
+  padding-top: 0;
+}
+
 // 안의 장바구니 목록은 이 칸의 폭을 기준으로 배치한다(좁은 서랍에서는 한 줄 배치).
 .cart {
   container: cart / inline-size;
 
+  // 상자 없이 둘 때 목록 위쪽 선은 두지 않는다. 서랍 머리 줄 아래 선이 이미 나눠 준다.
   @if not $cart-list-box {
     --cart-list-border: 0;
-    --cart-list-border-top: 1px solid var(--ant-color-text);
+    --cart-list-border-top: 0;
     --cart-list-bg: transparent;
     --cart-list-radius: 0;
     --cart-list-padding-inline: 0;

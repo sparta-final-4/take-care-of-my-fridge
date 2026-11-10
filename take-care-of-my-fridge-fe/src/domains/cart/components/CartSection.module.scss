@@ -36,6 +36,17 @@
   border-bottom: 1px solid var(--ant-color-border);
 }
 
+// 선택·전체 삭제는 작은 버튼으로 두고, 누르는 영역만 위아래로 넓혀 44px를 맞춘다.
+.toolbarButton {
+  position: relative;
+
+  &::after {
+    position: absolute;
+    inset: calc(($touch-target-size - var(--ant-control-height-sm)) / -2) 0;
+    content: '';
+  }
+}
+
 .summary {
   position: var(--cart-summary-position, static);
   bottom: var(--cart-summary-bottom, auto);
