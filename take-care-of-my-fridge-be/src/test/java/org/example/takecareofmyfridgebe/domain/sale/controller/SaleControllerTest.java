@@ -12,6 +12,7 @@ import java.time.ZoneOffset;
 import java.util.List;
 import org.example.takecareofmyfridgebe.domain.auth.service.AuthSessionService;
 import org.example.takecareofmyfridgebe.domain.auth.service.JwtTokenService;
+import org.example.takecareofmyfridgebe.domain.product.entity.ProductType;
 import org.example.takecareofmyfridgebe.domain.sale.dto.PopularSaleList;
 import org.example.takecareofmyfridgebe.domain.sale.dto.PopularSaleResponse;
 import org.example.takecareofmyfridgebe.domain.sale.dto.SaleResponse;
@@ -51,7 +52,7 @@ class SaleControllerTest {
         SaleResponse sale = new SaleResponse(SaleEventType.SPECIAL, 1600, 20,
                 OffsetDateTime.of(2026, 11, 1, 18, 0, 0, 0, ZoneOffset.ofHours(9)), null, null);
         when(saleEventFacade.getPopularSales())
-                .thenReturn(new PopularSaleList(List.of(new PopularSaleResponse(1L, "두부", "https://img.test/tofu.png", 2000, sale))));
+                .thenReturn(new PopularSaleList(List.of(new PopularSaleResponse(1L, "두부", ProductType.INGREDIENT, "https://img.test/tofu.png", 2000, sale))));
 
         // when & then
         mvc.perform(get("/api/sales/popular"))
@@ -59,6 +60,7 @@ class SaleControllerTest {
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data[0].productId").value(1L))
                 .andExpect(jsonPath("$.data[0].name").value("두부"))
+                .andExpect(jsonPath("$.data[0].productType").value("INGREDIENT"))
                 .andExpect(jsonPath("$.data[0].price").value(2000))
                 .andExpect(jsonPath("$.data[0].sale.salePrice").value(1600))
                 .andExpect(jsonPath("$.data[0].sale.discountRate").value(20));

@@ -31,6 +31,6 @@ public class SaleEventStatusService {
         if (startingFlashDropIds.isEmpty()) {
             return;
         }
-        eventPublisher.publishEvent(FlashDropNotificationEvent.started(startingFlashDropIds));
+        eventPublisher.publishEvent(new FlashDropNotificationEvent(startingFlashDropIds));
     }
 }

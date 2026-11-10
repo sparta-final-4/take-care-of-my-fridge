@@ -1,7 +1,5 @@
 package org.example.takecareofmyfridgebe.domain.sale.repository;
 
-import static org.example.takecareofmyfridgebe.domain.order.entity.QOrder.order;
-import static org.example.takecareofmyfridgebe.domain.order.entity.QOrderItem.orderItem;
 import static org.example.takecareofmyfridgebe.domain.product.entity.QProduct.product;
 import static org.example.takecareofmyfridgebe.domain.sale.entity.QSaleEvent.saleEvent;
 import static org.example.takecareofmyfridgebe.domain.sale.entity.QSaleEventItem.saleEventItem;
@@ -13,15 +11,12 @@ import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.core.types.dsl.CaseBuilder;
 import com.querydsl.core.types.dsl.DateTimePath;
 import com.querydsl.core.types.dsl.NumberExpression;
-import com.querydsl.jpa.JPAExpressions;
-import com.querydsl.jpa.JPQLQuery;
 import com.querydsl.jpa.impl.JPAQuery;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
-import org.example.takecareofmyfridgebe.domain.order.entity.OrderStatus;
 import org.example.takecareofmyfridgebe.domain.sale.dto.SaleEventListRequest;
 import org.example.takecareofmyfridgebe.domain.sale.dto.SaleEventListResponse;
 import org.example.takecareofmyfridgebe.domain.sale.dto.SaleEventListSort;
@@ -63,8 +58,7 @@ public class SaleEventRepositoryImpl implements SaleEventRepositoryCustom {
                         saleEventItem.salePrice,
                         saleEventItem.discountRate,
                         saleEventItem.limitedQuantity,
-                        saleEventItem.remainingQuantity,
-                        soldQuantity()))
+                        saleEventItem.remainingQuantity))
                 .from(saleEventItem)
                 .join(saleEventItem.saleEvent, saleEvent)
                 .join(product).on(product.id.eq(saleEventItem.productId))
@@ -91,15 +85,6 @@ public class SaleEventRepositoryImpl implements SaleEventRepositoryCustom {
                 .otherwise(product.price);
     }
 
-    // 결제 완료·구매 확정 주문의 수량만 센다. 취소·결제 대기 주문은 팔린 것으로 보지 않는다.
-    private JPQLQuery<Long> soldQuantity() {
-        return JPAExpressions.select(orderItem.quantity.longValue().sum().coalesce(0L))
-                .from(orderItem)
-                .join(orderItem.order, order)
-                .where(orderItem.saleEventItemId.eq(saleEventItem.id),
-                        order.status.in(OrderStatus.PAID, OrderStatus.CONFIRMED));
-    }
-
     // 기준이 같은 행은 최신 행사가 먼저, 같은 행사 안에서는 먼저 담은 상품이 먼저 와서 페이지를 넘겨도 순서가 흔들리지 않는다.
     private OrderSpecifier<?>[] orderBy(SaleEventListRequest condition) {
         OrderSpecifier<Long> newestFirst = saleEvent.id.desc();
@@ -118,7 +103,6 @@ public class SaleEventRepositoryImpl implements SaleEventRepositoryCustom {
             case DISCOUNT_RATE -> new OrderSpecifier<>(order, saleEventItem.discountRate);
             case LIMITED_QUANTITY -> new OrderSpecifier<>(order, saleEventItem.limitedQuantity);
             case REMAINING_QUANTITY -> new OrderSpecifier<>(order, saleEventItem.remainingQuantity);
-            case SOLD_QUANTITY -> new OrderSpecifier<>(order, soldQuantity());
             case STARTS_AT -> new OrderSpecifier<>(order, saleEvent.startsAt);
             case ENDS_AT -> new OrderSpecifier<>(order, saleEvent.endsAt);
         };
