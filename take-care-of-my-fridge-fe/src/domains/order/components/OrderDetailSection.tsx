@@ -94,6 +94,8 @@ export function OrderDetailSection({ orderId }: OrderDetailSectionProps) {
     groupRefundedItems(refundHistory).map((item) => [item.productName, item.quantity]),
   );
   const refundedAmount = sumRefundAmountByStatus(refundHistory, 'COMPLETED');
+  // 환불 상세 화면은 실패한 환불을 보여 주지 않아, 실패 말고 다른 환불이 있을 때만 환불 금액과 상세 버튼을 둔다.
+  const hasVisibleRefund = refundHistory.some((refund) => refund.status !== 'FAILED');
   // 환불 가능 상품을 아직 못 읽었으면 막지 않고, 환불 신청 화면이 다시 확인한다
   const nothingToRefund =
     refundableItems !== undefined &&
@@ -202,7 +204,7 @@ export function OrderDetailSection({ orderId }: OrderDetailSectionProps) {
                 {formatPrice(order.payAmount ?? 0)}
               </Typography.Text>
             </Flex>
-            {refundHistory.length > 0 && (
+            {hasVisibleRefund && (
               <>
                 <Flex justify="space-between">
                   <Typography.Text type="secondary">환불 금액</Typography.Text>
