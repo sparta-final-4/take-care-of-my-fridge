@@ -1,0 +1,33 @@
+@use '@/styles/variables' as *;
+
+// 인식된 재료 칩: 남은 날 뱃지와 같은 작은 글자, 긴 이름은 말줄임. 글자·바탕 대비 4.5:1 이상.
+.chip {
+  max-width: 100%;
+  margin: 0;
+  overflow: hidden;
+  font-size: var(--ant-font-size-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
+  border: none;
+}
+
+// 일반 재료: 옅은 칸 회색 + 보조 글자
+.normal {
+  color: var(--ant-color-text-secondary);
+  background: var(--ant-color-fill-tertiary);
+}
+
+// 기타(CUSTOM): 연한 주황 + 진한 주황 글자
+.custom {
+  color: var(--ant-orange-8);
+  background: var(--ant-orange-1);
+  cursor: help;
+}
+
+// 밀키트: 지금까지 쓰던 밀키트 태그 색(보라)
+.mealkit {
+  color: var(--ant-purple-7);
+  background: var(--ant-purple-1);
+  cursor: help;
+}

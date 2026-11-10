@@ -246,8 +246,9 @@ $fridge-item-quantity-width: 64px;
 // 냉장고 AI 상담 카드의 작은 상담 버튼 높이(사이트 기본 44px보다 낮게)
 $fridge-consult-button-height: 36px;
 
-// 냉장고 재료 목록 이름 칸(md 이상). 길면 말줄임
-$fridge-item-name-width: 240px;
+// 냉장고 재료 목록 인식 재료 칩 칸(md 이상, 긴 이름은 말줄임)과 남은 날 뱃지 칸
+$fridge-item-chip-width: 112px;
+$fridge-item-badge-width: 80px;
 
 // 냉장고 재료 목록 보관 칸("냉장", "상온")
 $fridge-item-storage-width: 3em;

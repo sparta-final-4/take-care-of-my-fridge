@@ -5,7 +5,7 @@ import { memo, useState } from 'react';
 import type { FridgeItemResponse } from '../api';
 import { formatQuantity, STORAGE_LABELS, withObjectParticle } from '../format';
 import { DdayTag } from './DdayTag';
-import { IngredientTypeTag } from './IngredientTypeTag';
+import { IngredientChip } from './IngredientChip';
 import styles from './FridgeItemRow.module.scss';
 
 interface FridgeItemRowProps {
@@ -71,7 +71,8 @@ export const FridgeItemRow = memo(function FridgeItemRow({
     { key: 'delete', label: '잘못 등록', danger: true },
   ];
 
-  // 줄: [체크] [이름 · 밀키트·NEW / (휴대폰) 수량 · 보관] [수량] [보관] [남은 날] [먹었어요 · 버리기 아이콘] [⋯]
+  // 휴대폰: [체크] [이름 · 인식 칩 · NEW / 수량 · 보관] [남은 날] [⋯]
+  // 768px 이상: [체크] [등록한 이름(남는 폭)] [인식 칩] [수량] [보관] [남은 날] [먹었어요 · 버리기 아이콘] [⋯]
   return (
     <div className={styles.row}>
       <Checkbox
@@ -85,7 +86,7 @@ export const FridgeItemRow = memo(function FridgeItemRow({
           <Typography.Text title={name} className={styles.name}>
             {name}
           </Typography.Text>
-          <IngredientTypeTag type={item.ingredientType} />
+          <IngredientChip item={item} className={styles.chipInline} />
           {highlighted && (
             <Tag variant="filled" color="blue" className={styles.newTag}>
               NEW
@@ -97,6 +98,9 @@ export const FridgeItemRow = memo(function FridgeItemRow({
           {storage && ` · ${storage}`}
         </Typography.Text>
       </div>
+      <span className={styles.chipCell}>
+        <IngredientChip item={item} />
+      </span>
       <Typography.Text className={styles.quantity}>{quantity}</Typography.Text>
       <Typography.Text type="secondary" className={styles.storage}>
         {storage}
