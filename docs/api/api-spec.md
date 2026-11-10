@@ -169,7 +169,7 @@ HTTP 메서드·경로·DTO 이름은 구현 전 합의합니다.
 | 클릭 수 기반 할인 상품 | GET /sales/popular | 200, `List<PopularSaleResponse>` |
 
 - 메인 화면 할인 섹션이 씁니다. 로그인하지 않아도 부를 수 있고, 요청 값은 없습니다.
-- `PopularSaleResponse`: productId, name, imageUrl, price(정가), sale(`SaleResponse`).
+- `PopularSaleResponse`: productId, name, productType(`INGREDIENT`·`MEALKIT`), imageUrl, price(정가), sale(`SaleResponse`).
 - **대상**: 진행 중인 특가·번개 드롭 상품입니다. 품절·판매 중지·번개 드롭 남은 수량 0인 상품은 뺍니다.
 - **순서**: 오늘을 포함한 최근 7일 검색 결과 클릭이 많은 순입니다. 클릭이 같으면 할인율이 높은 순, 그것도 같으면 상품 ID 순입니다. 최대 6개입니다.
 
@@ -212,7 +212,7 @@ HTTP 메서드·경로·DTO 이름은 구현 전 합의합니다.
 | 삭제 | 404 `SALE_002`, 409 시작 전이 아님(`SALE_005`) |
 
 응답 필드:
-- `SaleEventListResponse`(한 행): saleEventId, type, status, startsAt, endsAt, productId, productName, listPrice, salePrice, discountRate, limitedQuantity, remainingQuantity, soldQuantity.
+- `SaleEventListResponse`(한 행): saleEventId, type, status, startsAt, endsAt, productId, productName, listPrice, salePrice, discountRate, limitedQuantity, remainingQuantity.
 - `SaleEventDetailResponse`: saleEventId, type, status, startsAt, endsAt, items(productId, productName, listPrice, salePrice, discountRate, limitedQuantity, remainingQuantity).
 - `SaleCandidateProductResponse`: productId, productType, name, imageUrl, price, stock.
 - 종류 값: `SPECIAL`(특가), `FLASH_DROP`(번개 드롭). 상태 값: `SCHEDULED`(예정), `ACTIVE`(진행 중), `ENDED`(종료).

@@ -92,13 +92,13 @@ Q-01~Q-17에 의존하는 테스트는 기대값을 합의한 뒤 구현합니�
 | SALE-05 | P0 | 시작 전 행사 삭제, 시작한 행사 삭제 | 행사와 항목이 지워지고 다른 행사는 남음, 시작한 행사는 `SALE_005`로 모두 그대로 | `SaleEventServiceTerminationTransactionTest` |
 | SALE-06 | P0 | 상태 갱신 | 시작 시각이 지난 예정은 진행 중, 종료 시각이 지난 행사는 종료, 같은 시각에 두 번 처리해도 결과가 같음 | `SaleEventLifecycleTransactionTest`, `SaleEventSchedulerTest` |
 | SALE-07 | P0 | 상태 갱신 전에 시각이 지난 행사 조회 | 시각으로 판단해 진행 중으로 조회, 종료로 닫은 행사는 빠짐 | `SaleEventLifecycleTransactionTest` |
-| SALE-08 | P1 | 목록 조회 | 상품마다 한 행, 종료는 등록 당시 정가·나머지는 현재 정가, 필터·정렬·판매량 | `SaleEventQueryServiceListTest` |
+| SALE-08 | P1 | 목록 조회 | 상품마다 한 행, 종료는 등록 당시 정가·나머지는 현재 정가, 필터·정렬 | `SaleEventQueryServiceListTest` |
 | SALE-09 | P1 | 상세 조회, 후보 상품 조회 | 상세는 시각과 행사 항목, 없는 행사는 404. 후보는 판매 중·재고 있음·예정/진행 행사 없는 상품만 | `AdminSaleEventFacadeTest`, `SaleEventQueryServiceCandidateTest` |
 | SALE-10 | P1 | 권한·입력값 | 일반 회원 403, 비로그인 401, 잘못된 입력 400이고 서비스 호출 없음 | `AdminSaleEventControllerTest` |
 | SALE-11 | P1 | 클릭 수 기반 할인 상품 순위 | 최근 검색 클릭 순, 클릭이 같으면 할인율·상품 ID 순, 클릭 기록이 없으면 0, 품절·번개 드롭 소진 제외, 최대 6개 | `PopularSaleServiceTest` |
 | SALE-12 | P1 | 진행 중 할인 전부 조회 | 시작 시각이 지난 예정 행사는 포함, 시작 전·종료 시각이 지난·종료로 닫은 행사는 빠짐 | `SaleEventItemRepositoryTest` |
 | SALE-13 | P1 | 클릭 수 기반 할인 상품 공개 경로 | 비로그인 200, 다른 할인 경로는 비로그인 401 | `SaleControllerTest` |
-| SALE-14 | P1 | 번개 드롭 등록, 특가 등록, 상태 갱신으로 번개 드롭 시작 | 번개 드롭 등록·시작 때만 이벤트를 내고 `ACTIVE`인 `USER` 회원마다 메시지를 만듦. 관리자·정지 회원, 특가, 시작 전 번개 드롭은 빠짐 | `FlashDropNotificationTransactionTest` |
+| SALE-14 | P1 | 특가 등록, 상태 갱신으로 번개 드롭 시작 | 번개 드롭이 시작할 때만 이벤트를 내고 `ACTIVE`인 `USER` 회원마다 메시지를 만듦. 관리자·정지 회원, 특가, 시작 전 번개 드롭은 빠짐. 특가 등록은 알림을 내지 않음 | `FlashDropNotificationTransactionTest` |
 
 번개 드롭 동시 주문과 1인 1개는 ORDER-07·08에서 검증합니다.
 
