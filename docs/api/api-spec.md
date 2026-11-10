@@ -37,11 +37,11 @@
 | 통합검색 | [search-api.md](search-api.md) |
 | 장바구니 | [cart-api.md](cart-api.md) |
 | 주문 | [이 문서의 주문 API](#주문-api) |
-| 환불 | [이 문서의 환불 API](#환불-api) |
+| 환불 | [refund-api.md](refund-api.md) |
 | 클릭 수 기반 할인 상품 | [이 문서의 클릭 수 기반 할인 상품 API](#클릭-수-기반-할인-상품-api) |
 | 할인 행사 | [이 문서의 할인 행사 API](#할인-행사-api) |
-| 결제 | [이 문서의 결제 API](#결제-api) |
-| 정산 | [이 문서의 정산 API](#정산-api) |
+| 결제 | [payment-api.md](payment-api.md) |
+| 정산 | [settlement-api.md](settlement-api.md) |
 | 알림 | [이 문서의 알림 API](#알림-api) |
 
 ## 공유된 응답 형태
@@ -244,72 +244,6 @@ HTTP 메서드·경로·DTO 이름은 구현 전 합의합니다.
 - **본인 소유 검증**: 타인의 주문도 없는 주문과 같은 404(`ORDER_001`)로 답합니다.
 - **주문 금액**: 주문 상품에 주문 당시 정가·단가·상품 이름·이미지를 저장하므로 상품이 바뀌어도 주문 화면의 금액은 바뀌지 않습니다.
 
-## 환불 API
-
-상태: **구현 완료** · 담당: 결제·환불 · 근거: 실제 백엔드 컨트롤러 및 서비스 구현
-
-경로는 prefix(/api)를 뺀 값입니다. 회원 번호는 로그인 정보에서만 읽고 요청에는 받지 않습니다. 환불 금액은 요청으로 받지 않고 주문 당시 단가 × 수량으로 계산합니다.
-
-| 기능 | Method / Path | 권한 | 성공 응답 |
-|---|---|---|---|
-| 환불 신청 | POST /refunds | 로그인 | 201(완료 또는 요청 상태) |
-| 환불 내역 | GET /refunds?orderId= | 로그인 | 200 |
-| 환불 요약 | GET /refunds/summaries?orderIds= | 로그인 | 200 |
-| 환불 가능 수량 | GET /refunds/refundable-items?orderId= | 로그인 | 200 |
-
-요청 값입니다.
-
-| 기능 | 위치 | 이름 | 설명 |
-|---|---|---|---|
-| 환불 신청 | Body | orderId | 환불할 주문. 필수 |
-| 환불 신청 | Body | items | 환불할 상품. 1개 이상, 같은 상품은 한 번만 |
-| 환불 신청 | Body | items[].orderItemId | 주문 상품 번호. 필수 |
-| 환불 신청 | Body | items[].quantity | 환불 수량. 1 이상 |
-| 환불 신청 | Body | reasonType | `CHANGE_OF_MIND`·`ORDER_MISTAKE`·`NO_LONGER_NEEDED`·`ETC`. 필수 |
-| 환불 신청 | Body | reasonDetail | 상세 사유. 500자 이하, 생략 가능 |
-| 환불 내역·환불 가능 수량 | Query | orderId | 대상 주문 |
-| 환불 요약 | Query | orderIds | 주문 번호 목록(쉼표 구분). 빈 값·중복을 뺀 고유 주문 1~50건 |
-
-응답 데이터입니다.
-
-| 기능 | 응답 | 필드 |
-|---|---|---|
-| 환불 신청 | RefundResponse | refundId, status(`COMPLETED`·`REQUESTED`), refundAmount, refundedAt(완료 전 null) |
-| 환불 내역 | List<RefundHistoryResponse> | refundId, status, reasonType, reasonDetail, refundAmount, requestedAt, refundedAt, items |
-| 환불 내역 상품(items) | RefundHistoryItemResponse | orderItemId, productName, productImageUrl, unitPrice, quantity, amount |
-| 환불 요약 | List<RefundSummaryResponse> | orderId, refundStatus(`NONE`·`IN_PROGRESS`·`PARTIAL`·`FULL`), refundedAmount(완료된 환불 금액 합) |
-| 환불 가능 수량 | List<RefundableItemResponse> | orderItemId, productId, productName, productImageUrl, unitPrice, orderedQuantity, refundedQuantity, refundableQuantity, saleType, refundable |
-
-오류입니다. 401은 모든 기능에 공통입니다.
-
-| 기능 | HTTP | 코드 | 조건 |
-|---|---|---|---|
-| 환불 신청 | 400 | `C001` | 값 누락·형식 오류, 수량 1 미만, 상세 사유 500자 초과, 같은 상품 중복 |
-| 환불 신청 | 404 | `ORDER_001` | 주문 없음 또는 타인 주문 |
-| 환불 신청 | 409 | `REFUND_010` | 구매 확정된 주문 |
-| 환불 신청 | 400 | `REFUND_003` | 결제 완료가 아닌 주문 |
-| 환불 신청 | 429 | `REFUND_007` | 같은 주문에 진행 중(요청 상태) 환불이 있음 |
-| 환불 신청 | 404 | `REFUND_004` | 그 주문의 상품이 아님 |
-| 환불 신청 | 400 | `REFUND_011` | 특가·번개 드롭 상품 |
-| 환불 신청 | 400 | `REFUND_005` | 남은 환불 가능 수량 초과 |
-| 환불 신청 | 409 | `REFUND_012` | PG가 취소를 거절함. 환불은 실패로 기록 |
-| 환불 내역 | 404 | `ORDER_001` | 주문 없음 또는 타인 주문 |
-| 환불 요약 | 400 | `REFUND_013` | 고유 주문이 없거나 50건 초과 |
-| 환불 가능 수량 | 404 | `ORDER_001` | 주문 없음 또는 타인 주문 |
-| 환불 가능 수량 | 409 | `REFUND_010` | 구매 확정된 주문 |
-| 환불 가능 수량 | 400 | `REFUND_003` | 결제 완료가 아닌 주문 |
-
-- 상태 값: `REQUESTED`(요청, PG 취소 대기), `COMPLETED`(완료), `FAILED`(실패).
-- **환불 신청**: 신청하면 바로 PG에서 환불 금액만큼 부분 취소합니다. 성공하면 완료(`COMPLETED`)로 응답하고 환불 수량만큼 재고를 되돌립니다. PG 결과를 확정하지 못하면 요청 상태(`REQUESTED`)로 201을 주고, 취소 웹훅이나 10분 뒤 환불 정리가 완료 또는 실패로 마무리합니다.
-- **환불 가능 조건**: 결제 완료 주문의 일반 상품만 환불합니다. 구매 확정 뒤에는 환불할 수 없고(`REFUND_010`), 전액 환불된 주문은 결제 완료가 아니라 `REFUND_003`입니다.
-- **환불 뒤 주문 상태**: 환불이 완료돼 환불 가능한 일반 상품이 모두 환불되면 주문 상태가 바뀝니다. 특가·번개 드롭 상품이 없으면 `REFUNDED`(전액 환불), 있으면 바로 `CONFIRMED`(구매 확정, 확정 수량 기록)입니다. 부분 환불이면 `PAID`로 남습니다. 주문 상태 변경이 실패해도 환불은 완료로 응답하고, 서버의 환불 정리가 5분 주기로 주문 상태를 맞춥니다.
-- **수량**: 요청·완료 상태 환불 수량을 누적으로 보고 주문 수량을 넘지 않게 합니다. 실패한 환불 수량은 다시 신청할 수 있습니다.
-- **중복 신청**: 같은 주문에 진행 중 환불이 있으면 `REFUND_007`입니다. 같은 환불은 멱등 키로 PG에서 한 번만 취소됩니다.
-- **환불 내역**: 상태와 관계없이 최신 환불부터 돌려줍니다. 구매 확정된 주문의 지난 환불도 보여 줍니다. PG 오류 원문(실패 사유)은 응답에 넣지 않습니다.
-- **환불 요약**: 요청 상태 환불이 있으면 `IN_PROGRESS`, 환불 가능한 상품을 모두 환불했으면 `FULL`, 완료된 환불이 있으면 `PARTIAL`, 그 밖은 `NONE`입니다. 타인 주문과 없는 주문은 빼고 요청한 순서대로 돌려줍니다.
-- **환불 가능 수량**: 주문 상품 순서대로 돌려줍니다. 특가·번개 드롭 상품은 `refundable=false`, `refundableQuantity=0`입니다.
-- **본인 소유 검증**: 타인 주문은 없는 주문과 같은 404(`ORDER_001`)로 답합니다.
-
 ## 클릭 수 기반 할인 상품 API
 
 상태: **구현 완료** · 담당: 장준혁 · 근거: 실제 백엔드 컨트롤러 및 서비스 구현
@@ -378,115 +312,6 @@ HTTP 메서드·경로·DTO 이름은 구현 전 합의합니다.
 - **정가 표시**: 목록·상세의 정가는 예정·진행 중이면 상품의 현재 정가, 종료되면 행사 항목에 저장된 등록 당시 정가입니다.
 - **목록**: 상품마다 한 행으로 나옵니다. 시작·종료 날짜는 하나만 주면 그 하루로 봅니다. 정렬 기준은 상품 이름·종류·상태·정가·할인가·할인율·한정 수량·남은 수량·판매량·시작·종료이고, 정렬 기준을 주지 않으면 최신 행사 순이고, 기준이 같으면 최신 행사가 먼저입니다. 판매량은 결제 완료·구매 확정 주문의 수량만 셉니다.
 - **등록 후보 상품**: 판매 중이고 재고가 있으며 예정·진행 중인 할인 행사에 들지 않은 상품만 나옵니다.
-
-## 결제 API
-
-상태: **구현 완료** · 담당: 결제·환불 · 근거: 실제 백엔드 컨트롤러 및 서비스 구현
-
-경로는 prefix(/api)를 뺀 값입니다. 회원 번호는 로그인 정보에서만 읽고 요청에는 받지 않습니다. 결제 금액은 요청으로 받지 않고 주문 금액을 씁니다.
-
-| 기능 | Method / Path | 권한 | 성공 응답 |
-|---|---|---|---|
-| 결제 준비 | POST /orders/{orderId}/payments | 로그인 | 200 |
-| 결제 확정 | POST /payments/confirm | 로그인 | 200 |
-| 결제창 닫기 | POST /payments/{portonePaymentId}/fail | 로그인 | 200(데이터 없음) |
-| PortOne 웹훅 | POST /webhooks/portone | 공개(서명 검증), CSRF 제외 | 200(데이터 없음) |
-
-요청 값입니다.
-
-| 기능 | 위치 | 이름 | 설명 |
-|---|---|---|---|
-| 결제 준비 | Path | orderId | 결제할 주문 |
-| 결제 준비 | Body | pgProvider | 결제 수단(결제대행사). `KAKAOPAY`(카카오페이)·`TOSSPAY`(토스페이)·`KICC`(이지페이)·`INICIS`(KG이니시스)·`TOSSPAYMENTS`(토스페이먼츠). 필수 |
-| 결제 확정 | Body | orderId | 결제할 주문. 필수 |
-| 결제 확정 | Body | portonePaymentId | 결제 준비에서 받은 결제 ID. 필수 |
-| 결제창 닫기 | Path | portonePaymentId | 닫은 결제창의 결제 ID |
-| PortOne 웹훅 | Header | webhook-id, webhook-timestamp, webhook-signature | PortOne 서명 헤더. 없거나 틀리면 401 |
-| PortOne 웹훅 | Body | (원문) | 서명 검증을 위해 원문 그대로 받음 |
-
-응답 데이터입니다.
-
-| 기능 | 응답 | 필드 |
-|---|---|---|
-| 결제 준비 | PaymentPrepareResponse | orderId, portonePaymentId(결제창에 넘길 결제 ID, 40자), orderName(예: "대파 외 2건"), amount(결제 금액), expiresAt(결제 대기 만료 시각), pgProvider(고른 결제대행사), channelKey(그 결제대행사의 PortOne 채널 키), payMethod(`EASY_PAY`·`CARD`), easyPayProvider(`KAKAOPAY`·`TOSSPAY`, 간편결제가 아니면 null) |
-| 결제 확정 | PaymentConfirmResponse | id, orderId, portonePaymentId, amount, status(`PAID`), paidAt, pgProvider(실제로 결제된 결제대행사. PG에서 확인하지 못하면 고른 값) |
-
-오류입니다. 401은 웹훅을 뺀 모든 기능에 공통입니다.
-
-| 기능 | HTTP | 코드 | 조건 |
-|---|---|---|---|
-| 결제 준비 | 400 | `C001` | 결제대행사 누락·모르는 값 |
-| 결제 준비 | 404 | `ORDER_001` | 주문 없음 |
-| 결제 준비 | 403 | `ORDER_003` | 타인 주문 |
-| 결제 준비 | 409 | `PAYMENT_007` | 주문이 결제 대기가 아님(결제 완료·취소). 이전 결제가 PG에서 끝나 지금 승인된 경우 포함 |
-| 결제 준비 | 409 | `PAYMENT_008` | 같은 주문의 결제 준비가 동시에 들어와 다른 요청이 먼저 만듦 |
-| 결제 준비 | 500 | `COMMON_002` | 이전 결제 대기 건의 PG 조회 실패. 새 결제를 만들지 않음 |
-| 결제 확정 | 400 | `C001` | 값 누락, 요청의 주문 ID가 결제의 주문과 다름 |
-| 결제 확정 | 404 | `PAYMENT_001` | 결제 없음 |
-| 결제 확정 | 403 | `ORDER_003` | 타인 결제 |
-| 결제 확정 | 400 | `PAYMENT_004` | PG에 결제 없음·진행 중·실패, PG 응답에 금액·결제 시각 없음 |
-| 결제 확정 | 400 | `PAYMENT_002` | PG 금액과 결제 금액이 다름. 실패 처리 후 PG 취소 |
-| 결제 확정 | 409 | `PAYMENT_006` | 만료 시각 이후 결제됨. 실패 처리 후 PG 취소 |
-| 결제 확정 | 409 | `PAYMENT_007` | 주문이 이미 다른 결제로 결제 완료됐거나 취소됨. 실패 처리 후 PG 취소 |
-| 결제 확정 | 409 | `PAYMENT_005` | 이미 실패 처리된 결제(창 닫기·새 결제로 정리·PG 실패) |
-| 결제창 닫기 | 404 | `PAYMENT_001` | 결제 없음 |
-| 결제창 닫기 | 403 | `ORDER_003` | 타인 결제 |
-| 결제창 닫기 | 409 | `PAYMENT_005` | 결제 대기가 아님, PG에서 이미 결제됨 |
-| PortOne 웹훅 | 401 | `WEBHOOK_001` | 서명 헤더 없음·서명 불일치·5분이 지난 웹훅. 기록하지 않음 |
-| PortOne 웹훅 | 5xx | `COMMON_002`, `PAYMENT_009` 등 | 처리 실패(PG 조회 실패, 보상 취소 거절 등). `FAILED`로 기록하고 PortOne 재전송을 받음 |
-
-- 상태 값: `READY`(결제 대기), `PAID`(결제 완료), `FAILED`(실패).
-- **결제 수단**: 카카오페이·토스페이는 간편결제, 이지페이·KG이니시스·토스페이먼츠는 카드 결제창입니다. 프론트는 응답의 channelKey·payMethod·easyPayProvider로 결제창을 엽니다. 채널 키는 서버 설정(`portone.channels`)에만 있습니다.
-- **결제 준비**: 결제하기를 누를 때마다 고른 결제대행사로 새 결제 ID를 받습니다. 다시 결제할 때 다른 결제대행사를 고를 수 있습니다. 만료 시각은 10분 뒤입니다. 남은 결제 대기 건이 있으면 PG를 조회해, 이미 결제됐으면 그 결제를 승인하고 새 결제는 만들지 않습니다(`PAYMENT_007`). 아니면 이전 건을 실패(`SUPERSEDED`)로 정리한 뒤 새로 만듭니다.
-- **결제 확정**: 서버가 PortOne에 결제 건을 직접 조회해 결제 완료·금액·결제 시각을 확인한 뒤에만 승인하고 주문을 결제 완료로 바꿉니다. 결제창이 성공으로 끝나도 이 응답이 200이어야 결제 성공입니다. PG가 알려 준 결제대행사가 고른 값과 달라도 거절하지 않고 실제 값을 남깁니다. 승인 뒤 서버가 결제한 상품을 장바구니에서 지웁니다.
-- **중복 확정**: 이미 결제 완료된 결제를 다시 확정하면 PG 조회 없이 같은 200 응답을 줍니다. 확정 요청과 웹훅이 동시에 와도 상태는 한 번만 바뀝니다.
-- **받지 않은 결제**: 금액 불일치·만료 후 결제·결제할 수 없는 주문은 실패로 기록한 뒤 PG에서 전액 취소합니다. 취소가 실패해도 거절 이유로 응답하고, 웹훅과 재시도 스케줄러가 다시 취소합니다.
-- **실패한 결제의 오류**: 웹훅·스케줄러가 먼저 실패 처리한 결제도 실패 사유에 맞는 오류(`PAYMENT_002`·`PAYMENT_006`·`PAYMENT_007`·`PAYMENT_005`)로 답합니다.
-- **결제창 닫기**: 결제 대기 건만 실패(`USER_CANCELLED`)로 바꾸고 주문은 결제 대기로 남아 다시 결제할 수 있습니다. 프론트는 지금 부르지 않고 만료 스케줄러가 10분 뒤 정리합니다.
-- **웹훅**: `Transaction.Paid`·`Failed`·`Cancelled`·`PartialCancelled`만 처리하고 나머지는 기록만 합니다. 본문 값을 믿지 않고 PG를 다시 조회해 상태를 맞춥니다. 취소·부분 취소 웹훅은 환불 쪽에도 넘깁니다. 같은 `webhook-id`가 다시 오면 처리가 끝난 경우 200만 돌려줍니다.
-- **본인 소유 검증**: 타인의 주문·결제는 403(`ORDER_003`)으로 답하고 PG를 조회하지 않습니다.
-
-## 정산 API
-
-상태: **구현 완료** · 담당: 결제·환불 · 근거: 실제 백엔드 컨트롤러 및 서비스 구현 · 설계: [정산 설계](../architecture/domains/settlement.md)
-
-경로는 prefix(/api)를 뺀 값입니다. 날짜는 `YYYY-MM-DD`이고 한국 시간 기준이며, 시작일과 종료일을 모두 포함합니다.
-
-| 기능 | Method / Path | 권한 | 성공 응답 |
-|---|---|---|---|
-| 정산 조회 | GET /admin/settlements?unit=&startDate=&endDate= | ADMIN | 200 |
-| 결제 건별 조회 | GET /admin/settlements/payments?startDate=&endDate=&page=&size= | ADMIN | 200 |
-| 오늘 매출 | GET /admin/settlements/today | ADMIN | 200 |
-
-요청 값입니다.
-
-| 기능 | 위치 | 이름 | 설명 |
-|---|---|---|---|
-| 정산 조회 | Query | unit | `DAY`·`WEEK`(월~일)·`MONTH`(1일~말일). 필수 |
-| 정산 조회·결제 건별 | Query | startDate, endDate | 필수. 종료일은 시작일 이후·오늘까지, 시작일 + 3개월 전날까지 |
-| 결제 건별 | Query | page | 1부터. 기본 1, 최대 10000 |
-| 결제 건별 | Query | size | 기본 20, 1~100 |
-
-응답 데이터입니다.
-
-| 기능 | 응답 | 필드 |
-|---|---|---|
-| 정산 조회 | SettlementResponse | summary(기간 전체 합계, SalesAmountResponse), periods(List<SettlementPeriodResponse>) |
-| 금액 묶음 | SalesAmountResponse | paidAmount(결제 금액), refundedAmount(환불 금액), netAmount(순매출, 음수 가능), paidCount(결제 건수), refundedCount(환불 건수, 취소 이력 한 건이 1건) |
-| 기간 행 | SettlementPeriodResponse | startDate, endDate(일 단위면 같음. 조회 기간에서 잘린 주·월은 잘린 날짜), paidAmount, refundedAmount, netAmount, paidCount, refundedCount |
-| 결제 건별 | PageResponse<SettlementPaymentResponse> | paymentId, paidAt(결제 완료 시각), orderNumber, buyerName(회원 닉네임, 없으면 null), paidAmount, refundedAmount, netAmount |
-| 오늘 매출 | TodaySalesResponse | salesDate(오늘), sales(SalesAmountResponse) |
-
-오류입니다. 로그인하지 않으면 401, 관리자가 아니면 403입니다.
-
-| 기능 | HTTP | 코드 | 조건 |
-|---|---|---|---|
-| 정산 조회·결제 건별 | 400 | `C001` | 값 누락·형식 오류, 종료일이 시작일보다 빠름, 종료일이 내일 이후, 조회 기간 3개월 초과, page·size 범위 밖 |
-
-- **매출 기준**: 결제 이력(`payment_histories`)으로 셉니다. 결제는 결제 완료 시점, 환불(콘솔 취소 포함)은 환불 완료 시점의 매출입니다. 결제 상태가 결제 완료인 결제만 세므로 받지 않은 결제와 그 보상 취소는 빠집니다.
-- **정산 조회**: 어제까지는 일별 집계(daily_sales)를 읽고, 집계되지 않은 날은 그 자리에서 집계해 채운 뒤 응답합니다. 기간에 오늘이 있으면 오늘 지금까지의 매출을 붙입니다. 주·월은 일별 값을 묶어 더합니다.
-- **결제 건별**: 기간 안에 결제·환불이 있었던 결제 한 건이 한 행이고, 마지막 결제·환불이 최근인 결제가 먼저입니다. 금액은 기간 안에서 일어난 것만 세므로 기간 전에 결제하고 기간 안에 환불했으면 paidAmount가 0입니다. 모든 행을 더하면 정산 조회의 summary와 같습니다.
-- **오늘 매출**: 오늘 0시부터 조회 시점까지를 바로 셉니다. 저장하지 않습니다.
 
 ## 알림 API
 

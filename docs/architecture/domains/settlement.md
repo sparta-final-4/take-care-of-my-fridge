@@ -1,6 +1,6 @@
 # 정산 설계
 
-상태: 구현 완료 · 담당: 결제·환불 · 관련 화면: 11 매출 정산(관리자 `/admin/settlements`)
+상태: 구현 완료 · 담당: 결제·환불 · 관련 화면: 11 매출 정산(관리자 `/admin/settlements`) · API: [정산 API 명세](../../api/settlement-api.md)
 
 ## 목적과 책임
 - 해결할 사용자 문제: 관리자가 기간을 골라 결제·환불·순매출을 일·주·월 단위로 보고, 결제 한 건씩과 오늘 지금까지의 매출도 확인한다.
@@ -24,7 +24,8 @@
 | 빈 날 채우기 | 정산 조회가 기간 안의 행 없는 날(스케줄러 배포 전, 실패한 날)을 그 자리에서 집계해 채운 뒤 읽습니다. 실제 매출이 0원으로 보이지 않게 하려는 것입니다. 환불 금액은 있는데 환불 건수가 0인 예전 행(환불 건수 칸 추가 전 집계)도 다시 집계합니다 | `SettlementQueryFacade.getSettlement`, `DailySalesRepository.findSalesDatesBetween` | 결정(2026-10-29), 구현 완료 |
 | 오늘 | 오늘은 저장하지 않고 조회 시점까지의 이력을 바로 셉니다. 기간에 오늘이 들어 있으면 어제까지는 daily_sales, 오늘은 바로 센 값을 붙입니다 | `getSettlement`, `getTodaySales` | 구현 완료 |
 | 주·월 | 저장하지 않고 조회 때 일별 값을 묶어 더합니다. 주는 월~일, 월은 1일~말일입니다. 조회 기간이 주·월 중간에서 잘리면 기간 안의 날만 더하고, 행의 시작·종료일도 잘린 날짜로 줍니다 | `SettlementQueryFacade.group` | 결정(2026-10-29), 구현 완료 |
-| 결제 건별 | 기간 안에 결제·환불 이력이 있는 결제를 한 건씩, 마지막 사건이 최근인 순으로 줍니다. 기간 전에 결제하고 기간 안에 환불한 결제는 결제 금액 0으로 나옵니다. 모든 행을 더하면 기간 합계와 같습니다. 구매자는 회원 닉네임이고 회원이 없으면 null입니다 | `SalesHistoryRepository.findPaymentSalesBetween` | 구현 완료 |
+| 결제 건별 | 기간 안에 결제·환불 이력이 있는 결제를 한 건씩, 마지막 사건이 최근인 순으로 줍니다. 기간 전에 결제하고 기간 안에 환불한 결제는 결제 금액 0으로 나옵니다. 모든 행을 더하면 기간 합계와 같습니다. 구매자는 회원 닉네임이고 회원이 없으면 null입니다. 행마다 등록 카드 결제 여부와 실제로 승인한 결제대행사를 붙입니다 | `SalesHistoryRepository.findPaymentSalesBetween` | 구현 완료 |
+| 결제 수단별 | 정산 조회에 조회 기간의 결제 수단별 합계를 함께 줍니다. 등록 카드 결제는 같은 결제대행사의 결제창 결제와 따로 세고, 환불은 원래 결제의 수단으로 셉니다. 결제 금액이 큰 수단이 먼저이고, 같으면 등록 카드가 먼저입니다. 모든 수단을 더하면 기간 합계와 같습니다 | `SalesHistoryRepository.sumSalesByMethodBetween`, `SettlementQueryService.getMethodSales` | 구현 완료 |
 | 조회 기간 | 시작일·종료일 포함, 종료일은 오늘까지, 종료일은 시작일 + 3개월 전날까지입니다(8/1 시작이면 10/31까지). 빈 날을 하루씩 집계하므로 기간을 제한합니다. 건별 조회도 같은 규칙입니다 | `SettlementPeriodRule` | 구현 완료 |
 | 권한 | `/api/admin/**`라 관리자만 조회합니다 | `SettlementController` | 구현 완료 |
 | 결제 이력 없는 과거 | 결제 이력 기록(#277) 전의 결제는 이력이 없어 0원으로 나옵니다 | 결제 이력 도입 시점 | 결정(2026-10-29) |
@@ -96,7 +97,7 @@ sequenceDiagram
 
 ## 데이터·API·이벤트
 - ERD·데이터 사전: [erd.md](../../database/erd.md#정산-테이블-관계), [data-dictionary.md](../../database/data-dictionary.md#daily_sales--일별-매출-집계). 저장소에 daily_sales DDL 파일은 없습니다.
-- 제공 API: [정산 API](../../api/api-spec.md#정산-api) (정산 조회, 결제 건별 조회, 오늘 매출)
+- 제공 API: [정산 API](../../api/settlement-api.md) (정산 조회, 결제 건별 조회, 오늘 매출)
 - 읽는 데이터: `payment_histories`(이벤트 종류·금액·`created_at`), `payments`(상태·결제 시각), `orders`(주문번호), `members`(닉네임). 결제 이력 인덱스 `idx_payment_histories_created_at`을 기간 조회에 씁니다.
 - 이벤트: 발행·수신하지 않습니다. 결제·환불이 이력을 남기면 다음 집계·조회가 읽습니다.
 - 보관 기간·삭제 정책: daily_sales는 지우지 않고 재집계로 덮어씁니다. 원천인 결제 이력도 지우지 않습니다.
