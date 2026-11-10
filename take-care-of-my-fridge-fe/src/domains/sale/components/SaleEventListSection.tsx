@@ -35,7 +35,7 @@ import styles from './SaleEventListSection.module.scss';
 const PAGE_SIZE = 10;
 // 열 너비를 고정해 정렬로 행이 바뀌어도 열이 움직이지 않게 한다. 표는 이 너비보다 좁아지지 않아, 화면이 이보다
 // 좁을 때만 표 안에서 가로로 스크롤한다. 넓으면 열이 비율대로 늘어나 칸 밖으로 넘치지 않는다.
-const TABLE_WIDTH = 1095;
+const TABLE_WIDTH = 1140;
 const ALL = 'ALL';
 const DATE_FORMAT = 'YYYY-MM-DD';
 const TIME_FORMAT = 'HH:mm';
@@ -59,7 +59,6 @@ interface EventRow {
   discountRate: number;
   limitedQuantity?: number;
   remainingQuantity?: number;
-  soldQuantity: number;
 }
 
 // 시각은 열을 좁히려고 날짜와 시간을 두 줄로 나눠 보여 준다.
@@ -74,7 +73,7 @@ const rowKeyOf = (row: EventRow) => `${row.saleEventId}-${row.productId}`;
 
 const toRow = (event: SaleEventListResponse): EventRow[] => {
   const { saleEventId, productId, productName, type, status, startsAt, endsAt } = event;
-  const { listPrice, salePrice, discountRate, soldQuantity } = event;
+  const { listPrice, salePrice, discountRate } = event;
   if (
     saleEventId === undefined ||
     productId === undefined ||
@@ -85,8 +84,7 @@ const toRow = (event: SaleEventListResponse): EventRow[] => {
     endsAt === undefined ||
     listPrice === undefined ||
     salePrice === undefined ||
-    discountRate === undefined ||
-    soldQuantity === undefined
+    discountRate === undefined
   )
     return [];
   return [
@@ -103,7 +101,6 @@ const toRow = (event: SaleEventListResponse): EventRow[] => {
       discountRate,
       limitedQuantity: event.limitedQuantity,
       remainingQuantity: event.remainingQuantity,
-      soldQuantity,
     },
   ];
 };
@@ -233,7 +230,7 @@ export function SaleEventListSection() {
       title: '상품',
       dataIndex: 'productName',
       key: 'productName',
-      width: 136,
+      width: 240,
       ellipsis: true,
       sorter: true,
       sortOrder: sortOrderOf('productName'),
@@ -321,13 +318,6 @@ export function SaleEventListSection() {
       sortOrder: sortOrderOf('remainingQuantity'),
       align: 'right',
       render: (value: number | undefined) => value ?? '',
-    },
-    {
-      title: '판매량',
-      dataIndex: 'soldQuantity',
-      key: 'soldQuantity',
-      width: 59,
-      align: 'right',
     },
     {
       title: '시작',

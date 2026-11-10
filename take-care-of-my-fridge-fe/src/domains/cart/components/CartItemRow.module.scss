@@ -1,21 +1,22 @@
 @use '@/styles/variables' as *;
-// 배치는 화면 폭이 아니라 감싼 칸(container: cart — 장바구니 화면, 헤더 장바구니 서랍)의 폭을 기준으로 바뀐다.
+// 배치는 화면 폭이 아니라 감싼 칸(container: cart — 헤더 장바구니 서랍)의 폭을 기준으로 바뀐다.
 
-// 모바일: 체크·이미지·상품 정보 / 수량·금액·삭제 2줄, md부터 한 줄
+// 서랍 같은 좁은 칸: 체크 | 이미지·수량(위아래로 쌓음) | 상품 정보·금액·삭제. 세 묶음 모두 위에서 시작한다.
+// 수량 칸을 이미지와 같은 폭으로 줄여 이미지 바로 아래에 붙이므로, 정보 줄 수가 달라도 이미지 아래가 비지 않는다.
+// md부터 한 줄(묶음을 풀어 각 칸에 둔다).
 .row {
   display: grid;
-  grid-template-areas:
-    'check thumb info info'
-    'quantity quantity total remove';
-  grid-template-columns: auto auto minmax(0, 1fr) auto;
-  align-items: center;
+  grid-template-areas: 'check media content';
+  grid-template-columns: auto $cart-item-thumb-size minmax(0, 1fr);
+  align-items: start;
   gap: var(--ant-margin-sm) var(--ant-margin);
   padding: var(--ant-padding) 0;
   border-bottom: 1px solid var(--ant-color-border-secondary);
 
   @container cart (min-width: #{$cart-container-md}) {
     grid-template-areas: 'check thumb info quantity total remove';
-    grid-template-columns: auto auto minmax(0, 1fr) auto $cart-total-min-width auto;
+    grid-template-columns: auto auto minmax(0, 1fr) auto $cart-item-total-width auto;
+    align-items: center;
   }
 }
 
@@ -25,15 +26,40 @@
   color: var(--ant-color-text-tertiary);
 }
 
+// 체크는 이미지 높이 안에서 가운데에 둔다. 한 줄 배치(md부터)는 줄 가운데 정렬 그대로다.
 .check {
   grid-area: check;
+  height: $cart-item-thumb-size;
+  align-items: center;
+
+  @container cart (min-width: #{$cart-container-md}) {
+    height: auto;
+  }
+}
+
+// 이미지와 수량 칸 묶음. 한 줄 배치에서는 풀어서 이미지·수량이 각자 칸에 놓인다.
+.media {
+  display: flex;
+  flex-direction: column;
+  grid-area: media;
+  gap: var(--ant-margin-sm);
+
+  // 할인 태그 옆에 남은 시간이 놓이는 폭부터는 간격을 벌려, 가장 긴 번개 드롭 항목에 높이를 맞춘다.
+  @container cart (min-width: #{$cart-sale-inline-width}) {
+    gap: $cart-media-gap-wide;
+  }
+
+  @container cart (min-width: #{$cart-container-md}) {
+    display: contents;
+  }
 }
 
 .thumb {
   position: relative;
+  flex: none;
   grid-area: thumb;
-  width: $cart-thumb-size;
-  height: $cart-thumb-size;
+  width: $cart-item-thumb-size;
+  height: $cart-item-thumb-size;
   overflow: hidden;
   background: var(--ant-color-fill-tertiary);
   border-radius: var(--ant-border-radius);
@@ -56,12 +82,30 @@
   background: var(--ant-color-bg-mask);
 }
 
+// 상품 정보와 금액·삭제 묶음. 이미지와 글자 사이를 칸 간격보다 조금 더 벌려 글자가 이미지에 붙어 보이지 않게 한다.
+// 이미지·수량 묶음이 더 높으면 금액·삭제 줄이 맨 아래(수량 칸 줄)로 내려간다.
+.content {
+  display: flex;
+  flex-direction: column;
+  grid-area: content;
+  gap: var(--ant-margin-sm);
+  align-self: stretch;
+  min-width: 0;
+  margin-left: var(--ant-margin-xs);
+
+  @container cart (min-width: #{$cart-container-md}) {
+    display: contents;
+  }
+}
+
 .info {
   grid-area: info;
   min-width: 0;
 }
 
+// 글자 요소는 기본이 인라인이라 폭 제한이 걸리지 않아, 블록으로 둬야 칸 안에서 말줄임된다.
 .name {
+  display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -84,14 +128,55 @@
   }
 }
 
-.quantity {
-  grid-area: quantity;
+.footer {
+  display: flex;
+  gap: var(--ant-margin-sm);
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 0;
+  min-height: $cart-quantity-height;
+  margin-top: auto;
+
+  @container cart (min-width: #{$cart-container-md}) {
+    display: contents;
+  }
 }
 
+// 빼기·숫자·더하기를 옅은 바탕 상자 하나로 묶는다. 버튼은 테두리 없이 두고, 누를 수 없으면 아이콘만 흐려진다.
+// 좁은 칸에서는 이미지와 같은 폭이다.
+.quantity {
+  flex: none;
+  grid-area: quantity;
+  align-items: center;
+  width: $cart-item-thumb-size;
+  background: var(--ant-color-fill-secondary);
+  border-radius: var(--ant-border-radius);
+
+  @container cart (min-width: #{$cart-container-md}) {
+    width: auto;
+  }
+}
+
+// 이미지 폭(88px)에서 버튼 둘(28px씩)을 뺀 나머지(32px)가 숫자 칸이고, 세 자리 수량이 들어간다.
 .quantityInput {
-  width: calc($cart-quantity-min-width + var(--ant-padding-sm) * 2);
+  flex: 1;
+  width: 0;
+  min-width: 0;
+  height: $cart-quantity-height;
+  padding-inline: 0;
+
+  @container cart (min-width: #{$cart-container-md}) {
+    flex: none;
+    width: calc($cart-quantity-min-width + var(--ant-padding-xs) * 2);
+  }
+
+  // antd가 테두리 없는 숫자 칸에 포커스 외곽선을 그린다. 바탕 상자 안에서는 입력 커서만으로 충분해 지운다.
+  .quantity &:focus-within {
+    outline: none;
+  }
 
   :global(.ant-input-number-input) {
+    padding-inline: 0;
     text-align: center;
     font-variant-numeric: tabular-nums;
   }
@@ -100,10 +185,18 @@
 // 모바일에서는 보이는 크기를 입력칸 높이에 맞춰 두고, 누르는 영역만 넓힌다.
 .stepButton {
   position: relative;
+  height: $cart-quantity-height;
 
+  // antd 아이콘 버튼은 너비를 컨트롤 높이(44px)로 잡아, 수량 상자 안에서 한 번 더 지정해 이긴다.
+  .quantity & {
+    width: $cart-step-button-width;
+    min-width: $cart-step-button-width;
+  }
+
+  // 누르는 영역은 위아래로만 넓힌다. 옆으로 넓히면 가운데 숫자 칸을 가린다.
   &::after {
     position: absolute;
-    inset: calc(($touch-target-size - var(--ant-control-height)) / -2);
+    inset: calc(($touch-target-size - $cart-quantity-height) / -2) 0;
     content: '';
   }
 
@@ -116,13 +209,20 @@
 
 .total {
   grid-area: total;
+  font-size: var(--ant-font-size-lg);
   text-align: right;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
+// 줄 높이는 수량 칸(32px)에 맞추고, 삭제 버튼(44px)은 위아래로 삐져나가게 둬 줄 가운데에 맞춘다.
 .remove {
   grid-area: remove;
+  margin-block: calc(($cart-quantity-height - $touch-target-size) / 2);
+
+  @container cart (min-width: #{$cart-container-md}) {
+    margin-block: 0;
+  }
 }
 
 // 모바일에서는 터치 영역을 넓히고, md부터 antd 기본 크기로 둔다.
@@ -134,4 +234,9 @@
     min-width: 0;
     min-height: 0;
   }
+}
+
+// 할인율·할인가를 상품명보다 한 단계 크게 둬 눈에 띄게 한다. 취소선 정가는 그대로 둔다.
+.price {
+  font-size: var(--ant-font-size-lg);
 }

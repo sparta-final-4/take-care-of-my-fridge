@@ -11,14 +11,22 @@ import { deleteNotification, readAllNotifications } from '../api';
 import { notificationQueries } from '../queries';
 import styles from './NotificationList.module.scss';
 
+const LINE_BREAK = '\n';
 const CONTENT_SEPARATOR = ' · ';
+const FLASH_DROP_LABEL = '번개 드롭';
 
-// "참기름 40% 번개 드롭 · 10월 30일 18:30 시작 · 20개 한정"처럼 오는 문구를 첫 구분점에서 나눠, 시각부터 다음 줄에 둔다.
+// "번개 드롭 시작\n40% 할인 · 10개 한정\n참기름"처럼 줄바꿈이 있으면 줄마다 나눠, 둘째 줄부터 한 줄씩 둔다.
+// 줄바꿈이 없는 예전 문구는 첫 구분점에서 나눠, 시각부터 다음 줄에 둔다.
 function splitContent(content: string) {
+  if (content.includes(LINE_BREAK)) {
+    const [headline, ...lines] = content.split(LINE_BREAK);
+    return { headline, lines, detail: undefined };
+  }
   const index = content.indexOf(CONTENT_SEPARATOR);
-  if (index < 0) return { headline: content, detail: undefined };
+  if (index < 0) return { headline: content, lines: [], detail: undefined };
   return {
     headline: content.slice(0, index),
+    lines: [],
     detail: content.slice(index + CONTENT_SEPARATOR.length),
   };
 }
@@ -113,16 +121,33 @@ export function NotificationList({ onNavigate }: NotificationListProps) {
     <div className={styles.panel}>
       <ul className={styles.list}>
         {notifications.map((notification) => {
-          const { headline, detail } = splitContent(notification.content ?? '');
+          const { headline, lines, detail } = splitContent(notification.content ?? '');
           return (
             <li key={notification.notificationId} className={styles.row}>
               <Link to={notification.linkUrl ?? ''} onClick={onNavigate} className={styles.item}>
                 <span className={styles.dot}>
-                  <Badge status={notification.read ? 'default' : 'processing'} />
+                  {/* 안 읽은 알림은 점과 퍼지는 물결을 primary 색으로 둔다. */}
+                  <Badge
+                    status={notification.read ? 'default' : 'processing'}
+                    color={notification.read ? undefined : 'var(--ant-color-primary)'}
+                  />
                 </span>
                 <span className={styles.body}>
                   <Typography.Text strong={!notification.read}>
-                    {headline}
+                    {headline.startsWith(FLASH_DROP_LABEL) ? (
+                      <>
+                        <span className={styles.label}>{FLASH_DROP_LABEL}</span>
+                        {headline.slice(FLASH_DROP_LABEL.length)}
+                      </>
+                    ) : (
+                      headline
+                    )}
+                    {/* 줄마다 새 줄에서 시작한다. 긴 상품명은 띄어쓰기 자리에서 다음 줄로 넘어간다. */}
+                    {lines.map((line, index) => (
+                      <span key={index} className={styles.line}>
+                        {line}
+                      </span>
+                    ))}
                     {detail && (
                       <>
                         <br />

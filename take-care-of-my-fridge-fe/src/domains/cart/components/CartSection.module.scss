@@ -1,9 +1,9 @@
 @use '@/styles/variables' as *;
-// 배치는 화면 폭이 아니라 감싼 칸(container: cart — 장바구니 화면, 헤더 장바구니 서랍)의 폭을 기준으로 바뀐다.
+// 배치는 화면 폭이 아니라 감싼 칸(container: cart — 헤더 장바구니 서랍)의 폭을 기준으로 바뀐다.
 
 // FridgePage와 같은 좌우 비율. lg 미만에서는 결제 예정 금액이 목록 아래로 간다.
 // 헤더 장바구니 서랍은 테마가 CSS 변수(--cart-list-*, --cart-summary-*)로 목록 모양·결제 칸 위치를 바꾼다.
-// 변수가 없으면(장바구니 화면) 기본 모양.
+// 변수가 없으면 기본 모양.
 .layout {
   display: grid;
   grid-template-columns: 1fr;
@@ -34,6 +34,17 @@
 .toolbar {
   padding: var(--ant-padding) 0;
   border-bottom: 1px solid var(--ant-color-border);
+}
+
+// 선택·전체 삭제는 작은 버튼으로 두고, 누르는 영역만 위아래로 넓혀 44px를 맞춘다.
+.toolbarButton {
+  position: relative;
+
+  &::after {
+    position: absolute;
+    inset: calc(($touch-target-size - var(--ant-control-height-sm)) / -2) 0;
+    content: '';
+  }
 }
 
 .summary {

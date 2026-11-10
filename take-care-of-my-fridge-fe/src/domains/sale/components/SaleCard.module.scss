@@ -1,33 +1,41 @@
-// 메인 화면 할인 카드. 테두리·그림자 없이 큰 사진이 카드 역할을 하고, 그 아래 정보만 둔다.
-// 마우스를 올리면 상품명에 밑줄 하나(사진은 움직이지 않는다).
+@use '@/styles/variables' as *;
+@use '@/styles/mixins' as *;
+
+// 메인 화면 할인 카드. 상품 카드(ProductCard)와 같은 모양: 테두리·그림자 없이 사진이 카드 역할을 하고,
+// 사진 위에 남은 시간·수량 띠, 아래에 가운데 정렬한 태그 → 이름 → 가격을 둔다. 글자 크기는 카드 글자 변수($product-card-*)를 쓴다.
 .card {
   display: flex;
   flex-direction: column;
-  gap: var(--ant-margin-xxs);
+  gap: var(--ant-margin);
   height: 100%;
   min-width: 0;
   color: inherit;
-  border-radius: var(--ant-border-radius-lg);
 
   &:hover {
     color: inherit;
-
-    .name {
-      text-decoration-color: currentcolor;
-    }
   }
 
   &:focus-visible {
     outline: 2px solid var(--ant-color-primary-active);
     outline-offset: 4px;
   }
+
+  // 마우스를 올리면 카드가 살짝 떠오른다. transform만, 움직임 줄이기면 생략.
+  @media (hover: hover) and (prefers-reduced-motion: no-preference) {
+    transition: transform var(--ant-motion-duration-slow) var(--ant-motion-ease-out);
+
+    &:hover {
+      transform: translateY(-$product-card-lift);
+    }
+  }
 }
 
 .thumb {
+  position: relative;
   aspect-ratio: 1;
   overflow: hidden;
   background: var(--ant-color-fill-tertiary);
-  border-radius: var(--ant-border-radius-lg);
+  border-radius: $product-media-radius;
 }
 
 .image {
@@ -36,40 +44,76 @@
   object-fit: cover;
 }
 
-// 할인 구분 태그가 사진에 붙지 않게 띄운다.
-.saleHead {
-  margin-top: var(--ant-margin-xs);
+// 남은 시간과 번개 드롭 남은 수량. 폭이 좁으면 두 항목이 위아래로 나뉜다.
+.saleBand {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--ant-margin-xs);
+  justify-content: center;
+  padding: var(--ant-padding-xxs) var(--ant-padding-xs);
+  color: var(--ant-color-white);
+  font-size: $product-card-overlay-size-sm;
+  font-variant-numeric: tabular-nums;
+  background: var(--ant-color-bg-mask);
+
+  @include from(md) {
+    font-size: $product-card-overlay-size;
+  }
 }
 
-// 남은 시간과 번개 드롭 남은 수량
-.saleInfo {
-  color: var(--ant-color-text-secondary);
-  font-size: var(--ant-font-size-sm);
-  font-variant-numeric: tabular-nums;
+.saleBandItem {
   white-space: nowrap;
 }
 
-.typeTag {
+.info {
+  width: 100%;
+  min-width: 0;
+  text-align: center;
+}
+
+.tags {
+  min-height: var(--ant-control-height-xs);
+}
+
+.typeTag,
+.saleTag {
   margin: 0;
 }
 
-// 상품명은 두 줄까지 보여 준다. 한 줄 이름 아래에 빈 줄을 두지 않는다.
+:global(.ant-tag).typeTag,
+:global(.ant-tag).saleTag {
+  padding-inline: var(--ant-padding-xs);
+  font-size: $product-card-tag-size;
+  line-height: 1.5;
+}
+
+// 상품명은 두 줄까지
 .name {
   display: -webkit-box;
   overflow: hidden;
+  font-size: $product-card-name-size;
   font-weight: var(--ant-font-weight-strong);
-  text-decoration: underline;
-  text-decoration-color: transparent;
-  text-underline-offset: 0.2em;
-  transition: text-decoration-color var(--ant-motion-duration-fast);
+  line-height: 1.4;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
 }
 
-// 옆 카드 이름이 두 줄이어도 가격은 카드 아래에 붙여 줄을 맞춘다.
-.price {
+// 할인율·할인가·정가를 가운데로
+.priceRow {
   display: flex;
-  flex-direction: column;
-  margin-top: auto;
+  justify-content: center;
+  font-size: $product-card-name-size;
   font-variant-numeric: tabular-nums;
+
+  :global(.ant-flex) {
+    justify-content: center;
+  }
+}
+
+.price {
+  font-size: $product-card-price-size;
 }

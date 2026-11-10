@@ -33,6 +33,19 @@ export function startSmoothScroll() {
   });
 }
 
+// 서랍처럼 화면 위에 떠서 따로 스크롤되는 칸에 화면과 같은 부드러운 스크롤을 붙인다. 반환한 함수로 해제한다.
+// content는 wrapper의 바로 아래 자식이어야 한다.
+export function addSmoothScroll(wrapper: HTMLElement, content: HTMLElement): () => void {
+  const panel = new Lenis({
+    wrapper,
+    content,
+    autoRaf: true,
+    lerp: SCROLL_LERP,
+    allowNestedScroll: true,
+  });
+  return () => panel.destroy();
+}
+
 // 띠 스냅: 휠을 멈춘 곳이 띠 시작에서 화면 높이의 이 비율 안이면 그 띠 시작으로 살짝 당겨 맞춘다.
 // 띠 중간을 읽는 중에는 당기지 않는다.
 const SECTION_SNAP_THRESHOLD = '20%';

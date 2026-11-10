@@ -60,65 +60,76 @@ export function CartItemRow({
         aria-label={`${item.productName} 선택`}
         className={styles.check}
       />
-      {/* 이미지와 이름이 같은 상세로 가므로 키보드 이동은 이름 링크 하나만 받는다. */}
-      <Link to={detailPath} tabIndex={-1} aria-hidden="true" className={styles.thumb}>
-        <FallbackImage
-          src={item.imageUrl}
-          alt=""
-          kind="product"
-          size="small"
-          className={styles.image}
-        />
-        {soldOut && <span className={styles.soldOutMark}>품절</span>}
-      </Link>
-      <Flex vertical gap="small" className={styles.info}>
-        <Link to={detailPath} className={styles.nameLink}>
-          <Typography.Text strong={!soldOut} title={item.productName} className={styles.name}>
-            {item.productName}
-          </Typography.Text>
+      {/* 좁은 칸에서는 이미지와 수량 칸을 한 묶음으로 세로로 쌓고, 넓은 칸에서는 묶음을 풀어 각자 칸에 둔다. */}
+      <div className={styles.media}>
+        {/* 이미지와 이름이 같은 상세로 가므로 키보드 이동은 이름 링크 하나만 받는다. */}
+        <Link to={detailPath} tabIndex={-1} aria-hidden="true" className={styles.thumb}>
+          <FallbackImage
+            src={item.imageUrl}
+            alt=""
+            kind="product"
+            size="small"
+            className={styles.image}
+          />
+          {soldOut && <span className={styles.soldOutMark}>품절</span>}
         </Link>
-        <SalePrice listPrice={item.listPrice} sale={sale} />
-        {sale && <SaleInfo sale={sale} />}
-      </Flex>
-      <Space.Compact className={styles.quantity}>
-        <Button
-          icon={<MinusOutlined />}
-          aria-label={`${item.productName} 수량 빼기`}
-          disabled={soldOut || quantity <= 1}
-          className={styles.stepButton}
-          onClick={() => onChangeQuantity(decreasedQuantity)}
-        />
-        <InputNumber
-          min={1}
-          max={maxQuantity}
-          precision={0}
-          controls={false}
-          value={draft}
-          disabled={soldOut}
-          aria-label={`${item.productName} 수량`}
-          className={styles.quantityInput}
-          onChange={setDraft}
-          onBlur={commitDraft}
-          onPressEnter={(event) => event.currentTarget.blur()}
-        />
-        <Button
-          icon={<PlusOutlined />}
-          aria-label={`${item.productName} 수량 더하기`}
-          disabled={soldOut || !canIncrease}
-          className={styles.stepButton}
-          onClick={() => onChangeQuantity(quantity + 1)}
-        />
-      </Space.Compact>
-      <Typography.Text strong className={styles.total}>
-        {soldOut ? '-' : formatPrice(item.unitPrice * quantity)}
-      </Typography.Text>
-      <Button
-        type="text"
-        icon={<CloseOutlined />}
-        aria-label={`${item.productName} 삭제`}
-        onClick={onRemove}
-        className={`${styles.remove} ${styles.touchButton}`}
-      />
+        <Space.Compact className={styles.quantity}>
+          <Button
+            type="text"
+            icon={<MinusOutlined />}
+            aria-label={`${item.productName} 수량 빼기`}
+            disabled={soldOut || quantity <= 1}
+            className={styles.stepButton}
+            onClick={() => onChangeQuantity(decreasedQuantity)}
+          />
+          <InputNumber
+            min={1}
+            max={maxQuantity}
+            precision={0}
+            controls={false}
+            variant="borderless"
+            value={draft}
+            disabled={soldOut}
+            aria-label={`${item.productName} 수량`}
+            className={styles.quantityInput}
+            onChange={setDraft}
+            onBlur={commitDraft}
+            onPressEnter={(event) => event.currentTarget.blur()}
+          />
+          <Button
+            type="text"
+            icon={<PlusOutlined />}
+            aria-label={`${item.productName} 수량 더하기`}
+            disabled={soldOut || !canIncrease}
+            className={styles.stepButton}
+            onClick={() => onChangeQuantity(quantity + 1)}
+          />
+        </Space.Compact>
+      </div>
+      {/* 상품 정보와 금액·삭제를 한 묶음으로 둔다. 금액·삭제는 묶음 맨 아래 줄이다. */}
+      <div className={styles.content}>
+        <Flex vertical gap="small" className={styles.info}>
+          <Link to={detailPath} className={styles.nameLink}>
+            <Typography.Text strong={!soldOut} title={item.productName} className={styles.name}>
+              {item.productName}
+            </Typography.Text>
+          </Link>
+          <SalePrice listPrice={item.listPrice} sale={sale} priceClassName={styles.price} />
+          {sale && <SaleInfo sale={sale} />}
+        </Flex>
+        <div className={styles.footer}>
+          <Typography.Text strong className={styles.total}>
+            {soldOut ? '-' : formatPrice(item.unitPrice * quantity)}
+          </Typography.Text>
+          <Button
+            type="text"
+            icon={<CloseOutlined />}
+            aria-label={`${item.productName} 삭제`}
+            onClick={onRemove}
+            className={`${styles.remove} ${styles.touchButton}`}
+          />
+        </div>
+      </div>
     </div>
   );
 }

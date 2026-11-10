@@ -4,7 +4,7 @@ import { Link } from 'react-router';
 
 import type { ProductListItemResponse } from '@/common/api/clients';
 import { FallbackImage } from '@/common/components/FallbackImage';
-import { PRODUCT_TYPE_LABELS } from '@/domains/product/format';
+import { PRODUCT_TYPE_COLORS, PRODUCT_TYPE_LABELS } from '@/domains/product/format';
 import { PRODUCT_MODAL_STATE, productModalPath } from '@/domains/product/productModal';
 import { SaleCountdown } from '@/domains/sale/components/SaleCountdown';
 import { SalePrice } from '@/domains/sale/components/SalePrice';
@@ -70,10 +70,7 @@ export function ProductCard({
         {/* 할인 구분은 이미지에 따라 안 보일 수 있어 상품 종류 옆에 둔다. */}
         <Flex align="center" justify="center" gap={4} wrap className={styles.tags}>
           {productType && (
-            <Tag
-              color={productType === 'MEALKIT' ? 'purple' : 'default'}
-              className={styles.typeTag}
-            >
+            <Tag color={PRODUCT_TYPE_COLORS[productType]} className={styles.typeTag}>
               {PRODUCT_TYPE_LABELS[productType]}
             </Tag>
           )}

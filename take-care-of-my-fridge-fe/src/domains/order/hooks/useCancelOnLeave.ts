@@ -1,11 +1,11 @@
 import { useMutation } from '@tanstack/react-query';
 import { App } from 'antd';
 import { useRef, useState } from 'react';
-import { useBlocker, useNavigate } from 'react-router';
+import { useBlocker } from 'react-router';
 
-import { ROUTES } from '@/app/paths';
 import { getErrorCode, getErrorMessage } from '@/common/api/errors';
 import { cancelOrder } from '@/domains/order/api';
+import { useGoBack } from '@/domains/order/hooks/useGoBack';
 
 // 이미 지웠거나(만료 포함) 결제 쪽이 취소한 주문. 남은 주문이 없으니 취소한 것처럼 떠난다.
 const GONE_CODES = ['ORDER_001', 'ORDER_008'];
@@ -16,7 +16,7 @@ const PAYMENT_ATTEMPTED_CODE = 'ORDER_012';
 // 탭 닫기·새로고침은 붙잡지 않는다. 그렇게 남은 주문은 서버의 주문 만료가 정리한다.
 export function useCancelOnLeave(orderId: number, enabled: boolean) {
   const { message } = App.useApp();
-  const navigate = useNavigate();
+  const goBack = useGoBack();
   // 취소를 마친 뒤의 이동은 다시 붙잡지 않는다
   const leaveAllowedRef = useRef(false);
   // 취소하기 버튼으로 연 확인 창
@@ -32,14 +32,14 @@ export function useCancelOnLeave(orderId: number, enabled: boolean) {
 
   const isLeaving = blocker.state === 'blocked';
 
-  // 이동을 붙잡은 경우에는 가려던 곳으로, 취소하기 버튼으로 연 경우에는 장바구니로 보낸다(장바구니는 그대로 남아 있다).
+  // 이동을 붙잡은 경우에는 가려던 곳으로, 취소하기 버튼으로 연 경우에는 직전 화면으로 보낸다(장바구니는 그대로 남아 있어 서랍에서 다시 열 수 있다).
   const leave = () => {
     leaveAllowedRef.current = true;
     if (isLeaving) {
       blocker.proceed?.();
       return;
     }
-    navigate(ROUTES.cart);
+    goBack();
   };
 
   // 확인 창에서 취소를 고르면 부른다. 그 밖의 이유로 취소에 실패하면 알리고 이동을 멈춰 화면에 남는다.

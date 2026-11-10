@@ -22,9 +22,19 @@
   }
 }
 
+// 마우스를 올리거나 키보드로 들어가면 본문과 지우기 버튼을 합친 행 전체를 한 모양으로 강조한다.
+// 본문과 버튼이 따로 강조되면 모서리 모양(네모·동그라미)이 달라 어색하고 맞닿아 겹쳐 보인다.
+// 색은 테마의 "바탕 위 마우스 올림" 색(fill-quaternary)을 쓰고, 부드럽게 바뀌게 한다.
 .row {
   display: flex;
   align-items: center;
+  border-radius: var(--ant-border-radius);
+  transition: background-color var(--ant-motion-duration-mid) var(--ant-motion-ease-out);
+
+  &:hover,
+  &:focus-within {
+    background: var(--ant-color-fill-quaternary);
+  }
 }
 
 .item {
@@ -36,17 +46,18 @@
   min-height: $touch-target-size;
   padding: var(--ant-padding-xs);
   border-radius: var(--ant-border-radius);
-
-  &:hover,
-  &:focus-visible {
-    background: var(--ant-color-fill-tertiary);
-  }
 }
 
+// 행이 이미 강조되므로 지우기 버튼은 자체 배경 없이 아이콘만 둔다.
 .delete {
   flex: none;
   width: $touch-target-size;
   height: $touch-target-size;
+
+  &:global(.ant-btn):not(:disabled):hover,
+  &:global(.ant-btn):not(:disabled):active {
+    background: transparent;
+  }
 }
 
 .dot {
@@ -62,6 +73,15 @@
   // 한글도 띄어쓰기 자리에서만 줄을 바꿔 "20개 한정"이 갈라지지 않게 한다. 띄어쓰기 없이 긴 문구만 칸 안에서 자른다
   overflow-wrap: break-word;
   word-break: keep-all;
+}
+
+// 첫 줄이 "번개 드롭"으로 시작하면 그 글자만 읽음 여부와 관계없이 굵게 둔다.
+.label {
+  font-weight: var(--ant-font-weight-strong);
+}
+
+.line {
+  display: block;
 }
 
 .time {

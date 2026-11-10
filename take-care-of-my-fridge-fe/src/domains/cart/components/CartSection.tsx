@@ -113,7 +113,12 @@ export function CartSection() {
               disabled={checkedItems.length === 0}
               onConfirm={() => handleRemove(checkedItems.map((item) => item.cartItemId))}
             >
-              <Button danger disabled={checkedItems.length === 0}>
+              <Button
+                danger
+                size="small"
+                disabled={checkedItems.length === 0}
+                className={styles.toolbarButton}
+              >
                 선택 삭제
               </Button>
             </Popconfirm>
@@ -124,7 +129,9 @@ export function CartSection() {
               okButtonProps={{ danger: true }}
               onConfirm={() => handleRemove(items.map((item) => item.cartItemId))}
             >
-              <Button danger>전체 삭제</Button>
+              <Button danger size="small" className={styles.toolbarButton}>
+                전체 삭제
+              </Button>
             </Popconfirm>
           </Flex>
         </Flex>
