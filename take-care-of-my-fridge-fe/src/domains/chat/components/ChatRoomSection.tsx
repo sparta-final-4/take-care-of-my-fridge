@@ -12,6 +12,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router';
 
 import { ROUTES } from '@/app/paths';
@@ -63,6 +64,9 @@ export interface ChatRoomSectionProps {
   hideStatusBanner?: boolean;
   // 상담 끝내기가 성공했을 때. 상담 내역은 "상담 중" 탭에서 끝내면 "종료" 탭으로 옮긴다.
   onSessionCompleted?: () => void;
+  // 상담 서랍(ChatModal) 안에서 쓸 때 넘긴다. 서랍이 제목·✕를 그리므로 이 칸의 머리 줄은 숨기고,
+  // [상담 끝내기]는 서랍 머리 오른쪽의 이 자리에 그린다(아직 자리가 없으면 null). 마이페이지는 넘기지 않는다.
+  headerActionsSlot?: HTMLElement | null;
 }
 
 export function ChatRoomSection({
@@ -72,7 +76,9 @@ export function ChatRoomSection({
   title,
   hideStatusBanner = false,
   onSessionCompleted,
+  headerActionsSlot,
 }: ChatRoomSectionProps = {}) {
+  const inDrawer = headerActionsSlot !== undefined;
   const headerTitle = title ?? (
     <>
       <RobotOutlined style={{ fontSize: 18, color: 'var(--ant-color-primary)' }} />
@@ -478,19 +484,21 @@ export function ChatRoomSection({
   if (!isAuthenticated) {
     return (
       <div className={styles.loginPrompt}>
-        <header className={styles.chatHeader}>
-          <div className={styles.headerTitle}>{headerTitle}</div>
-          {onCloseModal && (
-            <Button
-              type="text"
-              size="small"
-              icon={<CloseOutlined />}
-              onClick={onCloseModal}
-              className={styles.closeButton}
-              aria-label="닫기"
-            />
-          )}
-        </header>
+        {!inDrawer && (
+          <header className={styles.chatHeader}>
+            <div className={styles.headerTitle}>{headerTitle}</div>
+            {onCloseModal && (
+              <Button
+                type="text"
+                size="small"
+                icon={<CloseOutlined />}
+                onClick={onCloseModal}
+                className={styles.closeButton}
+                aria-label="닫기"
+              />
+            )}
+          </header>
+        )}
 
         <div className={styles.loginPromptBody}>
           <Result
@@ -518,19 +526,21 @@ export function ChatRoomSection({
   if (isSessionLoading) {
     return (
       <div className={styles.chatContainer}>
-        <header className={styles.chatHeader}>
-          <div className={styles.headerTitle}>{headerTitle}</div>
-          {onCloseModal && (
-            <Button
-              type="text"
-              size="small"
-              icon={<CloseOutlined />}
-              onClick={onCloseModal}
-              className={styles.closeButton}
-              aria-label="닫기"
-            />
-          )}
-        </header>
+        {!inDrawer && (
+          <header className={styles.chatHeader}>
+            <div className={styles.headerTitle}>{headerTitle}</div>
+            {onCloseModal && (
+              <Button
+                type="text"
+                size="small"
+                icon={<CloseOutlined />}
+                onClick={onCloseModal}
+                className={styles.closeButton}
+                aria-label="닫기"
+              />
+            )}
+          </header>
+        )}
         <Flex justify="center" align="center" style={{ flex: 1 }}>
           <Spin size="default" description="상담 세션을 불러오는 중..." />
         </Flex>
@@ -541,32 +551,48 @@ export function ChatRoomSection({
   return (
     <div className={styles.chatContainer}>
       {/* 1단: 헤더 (고정) */}
-      <header className={styles.chatHeader}>
-        <div className={styles.headerTitle}>{headerTitle}</div>
+      {!inDrawer && (
+        <header className={styles.chatHeader}>
+          <div className={styles.headerTitle}>{headerTitle}</div>
 
-        <div className={styles.headerActions}>
-          {!isSessionEnded && (
-            <Button
-              size="small"
-              onClick={handleEndSession}
-              disabled={isStreaming || completeSessionMutation.isPending}
-              loading={completeSessionMutation.isPending}
-            >
-              상담 끝내기
-            </Button>
-          )}
-          {onCloseModal && (
-            <Button
-              type="text"
-              size="small"
-              icon={<CloseOutlined />}
-              onClick={onCloseModal}
-              className={styles.closeButton}
-              aria-label="닫기"
-            />
-          )}
-        </div>
-      </header>
+          <div className={styles.headerActions}>
+            {!isSessionEnded && (
+              <Button
+                size="small"
+                onClick={handleEndSession}
+                disabled={isStreaming || completeSessionMutation.isPending}
+                loading={completeSessionMutation.isPending}
+              >
+                상담 끝내기
+              </Button>
+            )}
+            {onCloseModal && (
+              <Button
+                type="text"
+                size="small"
+                icon={<CloseOutlined />}
+                onClick={onCloseModal}
+                className={styles.closeButton}
+                aria-label="닫기"
+              />
+            )}
+          </div>
+        </header>
+      )}
+
+      {headerActionsSlot &&
+        !isSessionEnded &&
+        createPortal(
+          <Button
+            size="small"
+            onClick={handleEndSession}
+            disabled={isStreaming || completeSessionMutation.isPending}
+            loading={completeSessionMutation.isPending}
+          >
+            상담 끝내기
+          </Button>,
+          headerActionsSlot,
+        )}
 
       {/* 2단: 상태 배너 (고정, 헤더 바로 아래 얇은 줄) */}
       {!hideStatusBanner && (
