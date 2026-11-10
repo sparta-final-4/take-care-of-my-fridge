@@ -243,6 +243,9 @@ $fridge-illustration-empty-size: 120px;
 // 냉장고 재료 목록 수량 칸. "0.3개", "12.5개", "1000ml"이 줄마다 같은 칸에 오른쪽 정렬되도록 고정
 $fridge-item-quantity-width: 64px;
 
+// 냉장고 재료 목록 이름 칸(md 이상). 길면 말줄임
+$fridge-item-name-width: 240px;
+
 // 냉장고 재료 목록 보관 칸("냉장", "상온")
 $fridge-item-storage-width: 3em;
 

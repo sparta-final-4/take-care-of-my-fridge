@@ -2,7 +2,8 @@
 @use '@/styles/mixins' as *;
 
 // 재료 한 줄. 휴대폰: [체크] [이름 / 수량 · 보관] [남은 날] [⋯]
-// md 이상: [체크] [이름] [수량] [보관] [남은 날] [(마우스) 먹었어요 · 버리기] [⋯]
+// md 이상: [체크] [이름(정한 폭)] [수량] [보관] [남은 날] ……… [(마우스) 먹었어요 · 버리기] [⋯]
+//   이름 칸 폭을 정해 수량·보관·뱃지가 이름 바로 옆에 오고, 버튼과 ⋯만 오른쪽 끝에 붙는다.
 // 바탕은 흰색 하나(기한 상태는 남은 날 뱃지 색으로만 나타낸다).
 .row {
   display: flex;
@@ -27,6 +28,10 @@
   flex: 1;
   flex-direction: column;
   min-width: 0;
+
+  @include from(md) {
+    flex: 0 1 $fridge-item-name-width;
+  }
 }
 
 .nameLine {
@@ -86,8 +91,13 @@
   font-size: var(--ant-font-size-sm);
 }
 
+// md 이상: 뱃지 뒤 남는 공간을 비워 버튼·⋯을 오른쪽 끝으로 민다.
 .badge {
   flex-shrink: 0;
+
+  @include from(md) {
+    margin-inline-end: auto;
+  }
 }
 
 // 마우스를 올리거나 키보드로 줄 안에 들어오면 보인다. 자리는 늘 차지해 줄 폭이 흔들리지 않는다.
