@@ -81,11 +81,11 @@ class OpenAiChatRecommendationReplyTest {
     }
 
     @Test
-    @DisplayName("일반 답 프롬프트는 음식 말에 설명할 수 없다고 하지 않게 하는 줄, 기준 밖의 것을 말하지 않게 하는 줄과 레시피·밀키트 기준 네 줄이다")
+    @DisplayName("일반 답 프롬프트는 음식 말에 설명할 수 없다고 하지 않게 하는 줄, 레시피를 지어내지 않게 하는 줄, 기준 밖의 것을 말하지 않게 하는 줄과 레시피·밀키트 기준 네 줄이다")
     void hasCriteriaLines_inGeneralPrompt() throws Exception {
         String prompt = new ClassPathResource("prompts/chat-general.txt").getContentAsString(StandardCharsets.UTF_8).strip();
 
-        assertThat(prompt.lines()).hasSize(6);
+        assertThat(prompt.lines()).hasSize(7);
         assertThat(prompt).startsWith("음식·요리·장보기와 관련된 말에").contains("추천해 드릴까요?").contains("[추천 기준]").contains("인기, 평점, 영양처럼 여기 없는 기준은 말하지 않는다")
                 .contains("4. 밀키트는").doesNotContain("0.4");
     }
