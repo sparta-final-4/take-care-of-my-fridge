@@ -100,6 +100,11 @@ cases:
   - { id: T08, group: 맛, message: "김피탕 같은 메뉴에서 매운 건 빼줘", expect: { intent: RECOMMEND, wanted: [], avoid: [SPICY], keywordsFirst: 김피탕 } }
   - { id: T09, group: 맛, message: "단 거 빼주세요", expect: { wanted: [], avoid: [SWEET] } }
   - { id: T10, group: 맛, message: "매운 거 제외하고 추천해줘", expect: { intent: RECOMMEND, wanted: [], avoid: [SPICY] } }
+  # 맛 단어 목록(taste-words)에 없는 매운맛 표현. 서버 보정이 AI의 맞는 값을 지우는지 본다
+  - { id: T11, group: 맛, message: "맵고 따뜻한 국물 요리", expect: { intent: RECOMMEND, wanted: [SPICY], categories: [국, 찌개, 전골, 수프, 스튜] } }
+  - { id: T12, group: 맛, message: "맵고 따뜻한 스프", expect: { intent: RECOMMEND, wanted: [SPICY], categories: [수프] } }
+  - { id: T13, group: 맛, message: "화끈한 거 먹고 싶어", expect: { intent: RECOMMEND, wanted: [SPICY], avoid: [] } }
+  - { id: T14, group: 맛, message: "얼얼한 거", expect: { intent: RECOMMEND, wanted: [SPICY] } }
 
   # ── 이름만 말하기 ──
   - { id: N01, group: 이름만, message: "국물 밀키트", expect: { intent: RECOMMEND } }
