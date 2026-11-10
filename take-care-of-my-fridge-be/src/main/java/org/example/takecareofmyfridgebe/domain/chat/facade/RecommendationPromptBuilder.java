@@ -65,8 +65,17 @@ public final class RecommendationPromptBuilder {
      */
     public static String build(String content, RecipeQuery query, Map<Long, String> ingredientNames,
                                List<RecipeCandidate> picked, boolean keywordsNotFound, List<String> reasons) {
+        return build(content, query, ingredientNames, picked, keywordsNotFound, reasons, false);
+    }
+
+    /**
+     * @param unconditioned 조건에 맞는 후보가 하나도 없어 조건 없이 고른 카드인지. 맞으면 맞는 레시피가 없었다는 안내를 꼭 붙인다
+     */
+    public static String build(String content, RecipeQuery query, Map<Long, String> ingredientNames,
+                               List<RecipeCandidate> picked, boolean keywordsNotFound, List<String> reasons,
+                               boolean unconditioned) {
         StringBuilder text = new StringBuilder();
-        List<String> notices = notices(query, picked, keywordsNotFound);
+        List<String> notices = notices(query, picked, keywordsNotFound, unconditioned);
         if (!notices.isEmpty()) {
             text.append(ALREADY_SAID).append('\n').append(String.join("\n", notices)).append('\n');
         }
@@ -101,9 +110,17 @@ public final class RecommendationPromptBuilder {
      * 임박 재료는 카드의 임박 태그로 충분해 안내하지 않는다
      */
     public static List<String> notices(RecipeQuery query, List<RecipeCandidate> picked, boolean keywordsNotFound) {
+        return notices(query, picked, keywordsNotFound, false);
+    }
+
+    /**
+     * @param unconditioned 조건에 맞는 후보가 하나도 없어 조건 없이 고른 카드인지. 맞으면 맞는 레시피가 없었다는 안내를 꼭 붙인다
+     */
+    public static List<String> notices(RecipeQuery query, List<RecipeCandidate> picked, boolean keywordsNotFound,
+                                       boolean unconditioned) {
         List<String> notices = new ArrayList<>();
-        if (preferenceUnmet(query, picked)) {
-            notices.add(preferenceUnmetNotice(query.preferenceText()));
+        if (unconditioned || preferenceUnmet(query, picked)) {
+            notices.add(preferenceUnmetNotice(query));
         } else if (keywordsNotFound && query.keywordText() != null) {
             // 요리 이름을 말했을 때만 못 찾았다고 안내한다. 특징만 말했으면("시원한 국물") 고른 요리를 바로 소개한다
             notices.add(keywordNotFoundNotice(query, picked));
@@ -122,6 +139,17 @@ public final class RecommendationPromptBuilder {
         return asked
                 && !picked.isEmpty()
                 && picked.stream().allMatch(candidate -> candidate.ranking().requestMatches() == 0);
+    }
+
+    /**
+     * 맞는 레시피가 없었다는 안내. 요리 이름 없이 특징만 말했으면 "시원한 국물에 딱 맞는 레시피가 없어서, …"로 특징에 맞춰 말하고,
+     * 요리 이름을 말했거나 원한 표현이 없으면 지금 안내 그대로다
+     */
+    static String preferenceUnmetNotice(RecipeQuery query) {
+        if (query.keywordText() == null && query.preferenceText() != null) {
+            return query.preferenceText() + "에 딱 맞는 레시피가 없어서, 냉장고 재료로 만들 수 있는 요리를 골랐어요";
+        }
+        return preferenceUnmetNotice(query.preferenceText());
     }
 
     // 원한 표현이 있으면 그 말로, 없으면 "조건에 맞는 레시피"로

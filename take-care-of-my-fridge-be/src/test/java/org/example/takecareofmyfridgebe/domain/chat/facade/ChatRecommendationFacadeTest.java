@@ -162,6 +162,24 @@ class ChatRecommendationFacadeTest {
     }
 
     @Test
+    @DisplayName("조건에 맞는 후보도 채울 후보도 없으면 0장이 아니라 같은 후보에서 조건 없이 3장을 고르고 맞는 레시피가 없었다고 안내한다")
+    void picksUnconditioned_whenNothingMatches() {
+        when(recipeCandidateFacade.findCandidates(any())).thenReturn(new RecipeCandidates(List.of(
+                requested(10L, "오이무침", "무침", 0),
+                requested(20L, "두부조림", "조림", 0),
+                requested(30L, "버섯볶음", "볶음", 0),
+                requested(40L, "가지구이", "구이", 0)), false));
+        when(recipeService.findSummaries(any())).thenReturn(Map.of());
+
+        RecommendationReply reply = facade.recommend("시원한 국물 요리", new RecipeQuery(MEMBER_ID, List.of(),
+                null, List.of("국"), null, null, false, List.of(), null, "시원한 국물"));
+
+        assertThat(reply.event().recipes()).extracting(RecommendedRecipe::recipeId).containsExactly(10L, 20L, 30L);
+        assertThat(reply.notices())
+                .containsExactly("시원한 국물에 딱 맞는 레시피가 없어서, 냉장고 재료로 만들 수 있는 요리를 골랐어요");
+    }
+
+    @Test
     @DisplayName("따뜻한 국물을 원하면 분류가 맞은 오이냉국은 빼고, 이름에 냉이가 든 찌개는 남긴다")
     void removesColdSoup_whenWarmRequested() {
         when(recipeCandidateFacade.findCandidates(any())).thenReturn(new RecipeCandidates(List.of(

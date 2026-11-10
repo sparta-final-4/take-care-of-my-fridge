@@ -270,7 +270,13 @@ public class ChatRecommendationFacade {
                 .withTemperatureMismatched(
                         TemperatureWordChecker.mismatched(candidates, temperature, chatTemperatureWordProperties));
         List<RecipeCandidate> picked = RecommendationPicker.pick(candidates, query.keywords(), rule);
-        if (rule.hasRequest() && picked.size() < RecommendationPicker.PICK_COUNT) {
+        // 조건에 맞는 후보가 하나도 없으면 같은 후보에서 조건 없이 고르고(냉장고 재료 순), 맞는 레시피가 없었다고 안내한다
+        boolean unconditioned = rule.hasRequest() && picked.isEmpty() && !candidates.isEmpty();
+        if (unconditioned) {
+            picked = RecommendationPicker.pick(candidates, query.keywords(), PickRule.NONE);
+            log.info("상담 추천 조건에 맞는 후보가 없어 조건 없이 고름 - memberId: {}, 조건 수: {}, 후보 {}개, 카드 {}장",
+                    query.memberId(), rule.requestCount(), candidates.size(), picked.size());
+        } else if (rule.hasRequest() && picked.size() < RecommendationPicker.PICK_COUNT) {
             log.info("상담 추천 조건에 맞는 후보가 모자라 카드를 줄임 - memberId: {}, 조건 수: {}, 후보 {}개 중 모두 맞음 {}개, 카드 {}장",
                     query.memberId(), rule.requestCount(), candidates.size(),
                     candidates.stream().filter(rule::matchesAll).count(), picked.size());
@@ -291,11 +297,11 @@ public class ChatRecommendationFacade {
         logPicked(query, picked, recipes);
 
         String candidateInfo = RecommendationPromptBuilder.build(
-                content, query, ingredientNames(query), picked, found.keywordsNotFound(), reasons);
+                content, query, ingredientNames(query), picked, found.keywordsNotFound(), reasons, unconditioned);
         // 안내 문장은 AI가 아니라 서버가 소개 맨 앞에 직접 보낸다 (후보가 없으면 정해진 답만 나가므로 붙이지 않는다)
         List<String> notices = picked.isEmpty()
                 ? List.of()
-                : RecommendationPromptBuilder.notices(query, picked, found.keywordsNotFound());
+                : RecommendationPromptBuilder.notices(query, picked, found.keywordsNotFound(), unconditioned);
         return new RecommendationReply(ChatRecommendationsEventResponse.of(recipes), candidateInfo, notices);
     }
 

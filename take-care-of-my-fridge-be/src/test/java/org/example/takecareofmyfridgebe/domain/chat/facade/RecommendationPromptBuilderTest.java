@@ -142,9 +142,32 @@ class RecommendationPromptBuilderTest {
 
         assertThat(text).startsWith("""
                 [이미 안내한 말]
-                말씀하신 차가운 요리는 찾지 못해서 냉장고 재료로 만들 수 있는 요리를 골랐어요
+                차가운 요리에 딱 맞는 레시피가 없어서, 냉장고 재료로 만들 수 있는 요리를 골랐어요
                 [사용자 요청]""");
-        assertThat(text).doesNotContain("비슷한 걸 골랐어요");
+        assertThat(text).doesNotContain("비슷한 걸 골랐어요", "찾지 못해서");
+    }
+
+    @Test
+    @DisplayName("요리 이름을 말했는데 고른 레시피가 요청에 하나도 안 맞으면 지금 안내 그대로 쓴다")
+    void keepsDishNotice_whenDishSpokenAndUnmet() {
+        RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, null, null, null, false,
+                List.of("닭볶음탕"), "닭볶음탕", "매운 닭볶음탕");
+
+        assertThat(RecommendationPromptBuilder.preferenceUnmetNotice(query))
+                .isEqualTo("말씀하신 매운 닭볶음탕은 찾지 못해서 냉장고 재료로 만들 수 있는 요리를 골랐어요");
+    }
+
+    @Test
+    @DisplayName("조건 없이 고른 카드면 일부가 요청에 맞아도 맞는 레시피가 없었다는 안내를 붙인다")
+    void writesUnmetNotice_whenUnconditioned() {
+        RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), List.of(Taste.SPICY), List.of("국"), null, null, false,
+                List.of(), null, "시원한 국물");
+        RecipeCandidate partly = new RecipeCandidate(1L, "김치볶음", "볶음", 10, new Ranking(1, 0, 0, 0, 1, 1, 0),
+                reason(List.of(), List.of(), List.of(), List.of(), List.of(), false));
+
+        assertThat(RecommendationPromptBuilder.notices(query, List.of(partly), false, true))
+                .containsExactly("시원한 국물에 딱 맞는 레시피가 없어서, 냉장고 재료로 만들 수 있는 요리를 골랐어요");
+        assertThat(RecommendationPromptBuilder.notices(query, List.of(partly), false, false)).isEmpty();
     }
 
     @Test
