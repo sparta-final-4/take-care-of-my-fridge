@@ -30,6 +30,11 @@
   padding-top: 0;
 }
 
+// 뒤에 오늘의 밀키트가 이어지면 할인 띠의 아래 여백도 줄여, 두 띠 사이가 너무 벌어지지 않게 한다.
+.saleBand:has(+ .mealkitBand section) {
+  padding-bottom: $main-band-join-gap;
+}
+
 .saleInner,
 .mealkitInner {
   @include main-container;

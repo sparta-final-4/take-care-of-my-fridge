@@ -43,6 +43,8 @@ $main-fullscreen-min-height: 560px;
 // 좁게: 첫 화면 바로 아래, 기본: 대부분의 띠
 $main-band-padding-lg-tight: 64px;
 $main-band-padding-lg: 96px;
+// 같은 종이색 띠가 이어질 때(지금 뜨는 할인 → 오늘의 밀키트) 앞 띠의 아래 여백
+$main-band-join-gap: 48px;
 // 띠가 화면에 들어올 때 떠오르는 거리
 $reveal-offset: 16px;
 $main-hero-text-max-width: 640px;

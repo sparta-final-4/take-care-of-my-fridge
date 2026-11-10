@@ -5,6 +5,12 @@ export const PRODUCT_TYPE_LABELS: Record<ProductListItemResponseProductTypeEnum,
   MEALKIT: '밀키트',
 };
 
+// 상품 종류 태그 색. 카드마다 같은 종류가 같은 색으로 나온다.
+export const PRODUCT_TYPE_COLORS: Record<ProductListItemResponseProductTypeEnum, string> = {
+  INGREDIENT: 'green',
+  MEALKIT: 'purple',
+};
+
 // 가격대 칩
 export const PRICE_RANGES = [
   { key: 'under3k', label: '3천원 이하', maxPrice: 3000 },
