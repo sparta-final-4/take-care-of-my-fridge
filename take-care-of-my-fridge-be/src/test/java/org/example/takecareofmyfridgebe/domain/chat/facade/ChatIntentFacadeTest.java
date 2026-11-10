@@ -439,6 +439,60 @@ class ChatIntentFacadeTest {
         }
 
         @Test
+        @DisplayName("\"디저트\"만 말해 AI가 키워드에 디저트를 넣어도 분류로만 쓰고 키워드·요리 이름에서 뺀다")
+        void removesCategoryKeyword_whenNameOnlyCategory() {
+            when(recipeService.getClassifications())
+                    .thenReturn(new RecipeClassificationResponse(List.of("한식"), List.of("국", "디저트", "찌개")));
+            givenExtracted(new IntentResult(ChatIntent.GENERAL, null, null, null, null, null, null, List.of("디저트"), null, null));
+
+            RecipeQuery query = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("디저트")).recipeQuery();
+
+            assertThat(query.moodCategories()).containsExactly("디저트");
+            assertThat(query.keywords()).isEmpty();
+            assertThat(query.keywordText()).isNull();
+        }
+
+        @Test
+        @DisplayName("\"디저트 추천해줘\"에서 AI가 키워드에 분류 이름을 섞어 줘도 분류 이름만 빼고 요리 이름은 정하지 않는다")
+        void removesMixedCategoryKeyword() {
+            when(recipeService.getClassifications())
+                    .thenReturn(new RecipeClassificationResponse(List.of("한식"), List.of("국", "디저트", "찌개")));
+            givenExtracted(new IntentResult(ChatIntent.RECOMMEND, null, List.of("디저트"), null, null, null, null,
+                    List.of("디저트", "푸딩", "케이크"), null, null));
+
+            RecipeQuery query = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("디저트 추천해줘")).recipeQuery();
+
+            assertThat(query.keywords()).containsExactly("푸딩", "케이크");
+            assertThat(query.keywordText()).isNull();
+        }
+
+        @Test
+        @DisplayName("\"국물\"처럼 묶음 말만 말하면 묶음의 분류로 바꾸고 키워드·요리 이름에서 뺀다")
+        void removesGroupWordKeyword() {
+            givenExtracted(new IntentResult(ChatIntent.GENERAL, null, null, null, null, null, null, List.of("국물"), null, null));
+
+            RecipeQuery query = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("국물")).recipeQuery();
+
+            assertThat(query.moodCategories()).containsExactlyInAnyOrder("국", "찌개");
+            assertThat(query.keywords()).isEmpty();
+            assertThat(query.keywordText()).isNull();
+        }
+
+        @Test
+        @DisplayName("분류 이름·묶음 말은 \"요리·메뉴\"가 붙어도 분류로 보고, 다른 말이 붙은 요리 이름은 분류로 보지 않는다")
+        void judgesCategoryWord() {
+            IntentCorrector corrector = newCorrector(ChatCorrectionProperties.ALL_ON);
+            List<String> categories = List.of("국", "디저트", "찌개", "면류");
+
+            for (String word : List.of("디저트", "디저트 메뉴", "국물 요리", "국물", "면", "찌개 종류")) {
+                assertThat(corrector.categoryWord(word, categories)).as(word).isTrue();
+            }
+            for (String word : List.of("김치찌개", "국수", "매운 국", "디저트 케이크", "요리", "푸딩")) {
+                assertThat(corrector.categoryWord(word, categories)).as(word).isFalse();
+            }
+        }
+
+        @Test
         @DisplayName("새 추천에서 짠맛·순한맛·감칠맛도 맛 단어로 원하는 맛과 피할 맛을 바로잡는다 (짠 거 말고 담백한 거)")
         void correctsAllTastes_whenAiMixesUp() {
             givenExtracted(new IntentResult(ChatIntent.RECOMMEND, List.of("SALTY"), null, null, null, null, null, null, null, null));

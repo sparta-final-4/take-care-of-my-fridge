@@ -143,13 +143,9 @@ public record IntentResult(
     public IntentResult sanitize(Collection<String> allowedCategories) {
         Set<String> categories = Set.copyOf(allowedCategories);
         List<String> cleanCategories = cleanNames(moodCategories, name -> name, categories);
+        // 분류 이름·묶음 말인 키워드("국", "디저트", "국물")는 서버 보정(IntentCorrector.withoutCategoryNames)이 한 곳에서 뺀다
         List<String> cleanKeywords = keywords == null ? null
                 : cleanNames(keywords, name -> name, null).stream().limit(MAX_KEYWORDS).toList();
-        // AI가 고른 분류를 키워드에 그대로 옮겨 적었으면("따뜻한 국물 요리" → 국, 찌개…) 요리 이름이 아니므로 키워드를 비운다
-        if (cleanKeywords != null && !cleanKeywords.isEmpty() && cleanCategories != null
-                && cleanCategories.containsAll(cleanKeywords)) {
-            cleanKeywords = List.of();
-        }
         return new IntentResult(
                 intent == null ? ChatIntent.GENERAL : intent,
                 cleanNames(wantedTastes, name -> name.toUpperCase(Locale.ROOT), TASTE_NAMES),

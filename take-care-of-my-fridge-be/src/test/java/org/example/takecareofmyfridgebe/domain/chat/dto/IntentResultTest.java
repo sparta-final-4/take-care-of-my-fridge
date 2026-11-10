@@ -30,19 +30,13 @@ class IntentResultTest {
     }
 
     @Test
-    @DisplayName("키워드가 모두 고른 분류 이름이면 요리 이름이 아니므로 키워드를 비운다")
-    void clearsKeywords_whenAllKeywordsAreCategories() {
+    @DisplayName("분류 이름인 키워드도 정리에서는 그대로 둔다 (분류 이름 빼기는 서버 보정 IntentCorrector가 한 곳에서 한다)")
+    void keepsCategoryKeywords_whenSanitizing() {
         IntentResult copied = new IntentResult(ChatIntent.RECOMMEND, null, List.of("국", "찌개"), null,
                 null, null, null, List.of("국", "찌개"), null, null).sanitize(CATEGORIES);
-        IntentResult mixed = new IntentResult(ChatIntent.RECOMMEND, null, List.of("샐러드"), null,
-                null, null, null, List.of("샐러드", "시저샐러드"), null, null).sanitize(CATEGORIES);
-        IntentResult notChosen = new IntentResult(ChatIntent.RECOMMEND, null, List.of(), null,
-                null, null, null, List.of("샐러드"), null, null).sanitize(CATEGORIES);
 
-        assertThat(copied.keywords()).isEmpty();
+        assertThat(copied.keywords()).containsExactly("국", "찌개");
         assertThat(copied.moodCategories()).containsExactly("국", "찌개");
-        assertThat(mixed.keywords()).containsExactly("샐러드", "시저샐러드");
-        assertThat(notChosen.keywords()).containsExactly("샐러드");
     }
 
     @Test
