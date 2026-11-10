@@ -1,52 +1,82 @@
+@use '@/styles/variables' as *;
 @use '@/styles/mixins' as *;
 
-.floatingWindow {
-  position: fixed;
-  z-index: 1000;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  width: 100vw;
-  height: 100dvh;
-  display: flex;
-  flex-direction: column;
-  background-color: var(--ant-color-bg-container);
-  border-radius: 0;
-  overflow: hidden;
-  box-shadow: var(--ant-box-shadow-secondary);
-  animation: slideUpMobile 0.2s ease-out;
+// 상담 서랍 폭: 휴대폰(md 미만)은 전체 화면, md 이상 $chat-drawer-width. Drawer의 size가 이 CSS 변수를 읽는다.
+.root {
+  --chat-drawer-width: 100vw;
 
   @include from(md) {
-    top: auto;
-    left: auto;
-    bottom: 28px;
-    right: 28px;
-    width: 380px;
-    height: 550px;
-    border-radius: 14px;
-    border: 1px solid var(--ant-color-border-secondary);
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
-    animation: slideUpDesktop 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    --chat-drawer-width: #{$chat-drawer-width};
   }
 }
 
-@keyframes slideUpMobile {
-  from {
-    transform: translateY(100%);
-  }
-  to {
-    transform: translateY(0);
+// [크게 보기]: md 이상에서 넓게(휴대폰은 늘 전체 화면)
+.wide {
+  @include from(md) {
+    --chat-drawer-width: #{$chat-drawer-width-wide};
   }
 }
 
-@keyframes slideUpDesktop {
-  from {
-    opacity: 0;
-    transform: translateY(20px) scale(0.97);
+// 크게 볼 때만 서랍 왼쪽 화면을 어둡게 덮는다. 누르면 원래 크기로 돌아간다(서랍은 닫지 않는다).
+// 서랍처럼 헤더 아래부터 덮어 크게 볼 때도 헤더(장바구니·알림)를 누를 수 있다.
+// 서랍(z-index 990) 바로 아래, 장바구니 서랍(1000)보다 아래.
+.wideMask {
+  display: none;
+
+  @include from(md) {
+    position: fixed;
+    inset: $header-height 0 0;
+    z-index: 989;
+    display: block;
+    background: var(--ant-color-bg-mask);
   }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
+}
+
+// [크게 보기] 버튼: 휴대폰(전체 화면)에서는 숨긴다.
+.wideButton {
+  display: none;
+
+  @include from(md) {
+    display: inline-flex;
   }
+}
+
+// md 이상은 서랍을 사이트 머리(헤더) 아래에서 시작한다. 덮지 않는 서랍이라 상담 중에도 헤더의 장바구니·메뉴를
+// 그대로 누를 수 있게 한다. 장바구니 서랍(z-index 1000)은 전체 높이로 상담 창 위를 덮는다.
+.root :global(.ant-drawer-content-wrapper) {
+  @include from(md) {
+    top: $header-height;
+  }
+}
+
+// 머리: 장바구니 서랍(layout/CartDrawer.module.scss)과 같은 치수·글꼴·아래 선·종이색 바탕
+.section {
+  background: var(--ant-color-bg-layout);
+}
+
+.header {
+  padding: $cart-drawer-header-padding-block $cart-drawer-padding-inline;
+  border-bottom: 1px solid var(--ant-color-border-secondary);
+}
+
+.title {
+  font-family: $font-display;
+  font-size: var(--ant-font-size-heading-4);
+  font-weight: 400;
+  letter-spacing: $display-tracking;
+}
+
+// 머리 오른쪽: [크게 보기] [상담 끝내기](대화 칸이 이 자리에 그린다)
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: var(--ant-margin-xs);
+}
+
+// 본문은 대화 칸(ChatRoomSection)이 서랍 높이를 꽉 채운다. antd 본문 여백 규칙보다 앞서도록 클래스를 겹친다.
+.root .body {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
 }

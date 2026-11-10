@@ -316,11 +316,27 @@
 | billing_key | VARCHAR(200) | 불가 | | UK | PortOne 빌링키. 응답으로 내려주지 않음 |
 | card_name | VARCHAR(100) | 허용 | NULL | | 카드 상품명(PortOne 빌링키 조회 `card.name`). 카드사 이름이 아님 |
 | card_last4 | CHAR(4) | 허용 | NULL | | 카드 번호 끝 4자리(PortOne 마스킹 번호 `card.number`에서 추출) |
+| card_number_masked | VARCHAR(30) | 허용 | NULL | | PortOne 마스킹 번호(`card.number`). 같은 카드 중복 등록 확인용, 응답으로 내려주지 않음 |
+| card_issuer_code | VARCHAR(30) | 허용 | NULL | | 발급사 코드(`card.issuer`). 마스킹 번호와 함께 같은 카드인지 확인 |
 | card_type | ENUM('CREDIT','DEBIT','GIFT') | 허용 | NULL | | 신용·체크·기프트. PortOne이 주지 않으면 NULL |
 | is_default | BOOLEAN | 불가 | FALSE | | 대표 카드 여부 |
 | status | ENUM('ACTIVE','DELETED') | 불가 | 'ACTIVE' | 인덱스 | 사용 중·삭제 |
 | deleted_at | DATETIME(6) | 허용 | NULL | | 삭제 시각 |
 | pg_deleted_at | DATETIME(6) | 허용 | NULL | 인덱스 | PortOne 빌링키 삭제 확인 시각. 삭제 상태인데 NULL이면 PortOne 삭제 재시도 대상 |
+
+## payment_pins — 결제 비밀번호
+
+- 등록 카드로 결제할 때 넣는 숫자 6자리 비밀번호입니다. 회원당 하나이고 원래 값은 저장하지 않고 BCrypt 해시만 둡니다. 설계는 [등록 카드 결제 설계](../architecture/domains/payment-card.md).
+- 행을 지우지 않고 변경·재설정 때 고쳐 씁니다. 쓰기는 회원 행 잠금 뒤 서비스 로직으로 처리합니다.
+- 제약 이름: UK `uk_payment_pins_member_id`.
+- 위 정의는 엔티티(`PaymentPin`) 기준입니다. `billing_keys`의 `card_number_masked`·`card_issuer_code`도 엔티티 기준입니다.
+
+| 컬럼 | 타입 | NULL | 기본값 | 제약 | 의미 |
+|---|---|---|---|---|---|
+| member_id | BIGINT | 불가 | | UK | 비밀번호 주인 |
+| pin_hash | VARCHAR(100) | 불가 | | | 결제 비밀번호 BCrypt 해시(복원 불가) |
+| failed_count | INT | 불가 | 0 | | 연속으로 틀린 횟수. 맞히거나 변경·재설정하면 0 |
+| locked_at | DATETIME(6) | 허용 | NULL | | 5번 틀려 잠긴 시각. NULL이면 잠기지 않음. 재설정하면 NULL |
 
 ## payment_histories — 결제 이력
 
