@@ -9,16 +9,12 @@ import javax.sql.DataSource;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.StorageType;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 import org.example.takecareofmyfridgebe.domain.member.repository.MemberRepository;
-import org.example.takecareofmyfridgebe.domain.notification.entity.NotificationType;
 import org.example.takecareofmyfridgebe.domain.notification.event.NotificationRequestedMessage;
 import org.example.takecareofmyfridgebe.domain.product.entity.Product;
 import org.example.takecareofmyfridgebe.domain.product.entity.ProductStatus;
 import org.example.takecareofmyfridgebe.domain.product.entity.ProductType;
 import org.example.takecareofmyfridgebe.domain.product.repository.ProductRepository;
 import org.example.takecareofmyfridgebe.domain.product.service.ProductService;
-import org.example.takecareofmyfridgebe.domain.sale.dto.FlashDropCreateRequest;
-import org.example.takecareofmyfridgebe.domain.sale.dto.FlashDropItemRequest;
-import org.example.takecareofmyfridgebe.domain.sale.dto.SaleEventsCreateResponse;
 import org.example.takecareofmyfridgebe.domain.sale.dto.SpecialSaleCreateRequest;
 import org.example.takecareofmyfridgebe.domain.sale.dto.SpecialSaleItemRequest;
 import org.example.takecareofmyfridgebe.domain.sale.facade.AdminSaleEventFacade;
@@ -27,7 +23,6 @@ import org.example.takecareofmyfridgebe.domain.sale.entity.SaleEventItem;
 import org.example.takecareofmyfridgebe.domain.sale.entity.SaleEventStatus;
 import org.example.takecareofmyfridgebe.domain.sale.entity.SaleEventType;
 import org.example.takecareofmyfridgebe.domain.sale.event.FlashDropNotificationEvent;
-import org.example.takecareofmyfridgebe.domain.sale.event.FlashDropNotificationEvent.Moment;
 import org.example.takecareofmyfridgebe.domain.sale.repository.SaleEventItemRepository;
 import org.example.takecareofmyfridgebe.domain.sale.repository.SaleEventRepository;
 import org.example.takecareofmyfridgebe.global.config.JpaAuditingConfig;
@@ -94,37 +89,6 @@ class FlashDropNotificationTransactionTest extends MySqlContainerSupport {
     }
 
     @Test
-    @DisplayName("번개 드롭을 등록하면 정지되지 않은 일반 회원마다 예고 알림 요청이 만들어지고 관리자와 정지 회원은 빠진다")
-    void notifiesOnlyActiveUsersOnFlashDropCreation(ApplicationEvents events) {
-        Member user1 = saveMember("user1");
-        Member user2 = saveMember("user2");
-        Member admin = saveMember("admin");
-        admin.promoteToAdmin();
-        memberRepository.save(admin);
-        Member suspended = saveMember("suspended");
-        jdbcTemplate.update("update members set status = 'SUSPENDED' where id = ?", suspended.getId());
-        Product tofu = saveProduct("두부", 3000);
-        LocalDateTime startsAt = LocalDateTime.of(TOMORROW.getYear(), TOMORROW.getMonth(), TOMORROW.getDayOfMonth(), 18, 0);
-
-        SaleEventsCreateResponse response = adminSaleEventFacade.createFlashDrop(new FlashDropCreateRequest(
-                startsAt, startsAt.plusHours(2), List.of(new FlashDropItemRequest(tofu.getId(), 50, 10))));
-
-        List<FlashDropNotificationEvent> published = events.stream(FlashDropNotificationEvent.class).toList();
-        assertThat(published).containsExactly(FlashDropNotificationEvent.created(response.saleEventIds()));
-        Long saleEventId = response.saleEventIds().get(0);
-        String content = "두부 50%% 번개 드롭 · %d월 %d일 18:00 시작 · 10개 한정"
-                .formatted(startsAt.getMonthValue(), startsAt.getDayOfMonth());
-        String dedupeKey = "FLASH_DROP_CREATED:%d:%d".formatted(saleEventId, tofu.getId());
-        assertThat(adminSaleEventFacade.getFlashDropNotifications(published.get(0)))
-                .extracting(NotificationRequestedMessage::memberId, NotificationRequestedMessage::notificationType,
-                        NotificationRequestedMessage::content, NotificationRequestedMessage::linkUrl,
-                        NotificationRequestedMessage::dedupeKey)
-                .containsExactlyInAnyOrder(
-                        tuple(user1.getId(), NotificationType.FLASH_DROP, content, "/products/" + tofu.getId(), dedupeKey),
-                        tuple(user2.getId(), NotificationType.FLASH_DROP, content, "/products/" + tofu.getId(), dedupeKey));
-    }
-
-    @Test
     @DisplayName("특가를 등록하면 알림을 내보내지 않는다")
     void doesNotNotifyOnSpecialSaleCreation(ApplicationEvents events) {
         saveMember("user1");
@@ -137,9 +101,14 @@ class FlashDropNotificationTransactionTest extends MySqlContainerSupport {
     }
 
     @Test
-    @DisplayName("시작 시각이 된 번개 드롭만 시작 알림을 내보내고, 특가와 아직 시작 전인 번개 드롭은 빠진다")
+    @DisplayName("시작 시각이 된 번개 드롭만 정지되지 않은 일반 회원에게 시작 알림을 내보내고, 특가와 시작 전인 번개 드롭, 관리자와 정지 회원은 빠진다")
     void notifiesOnlyStartedFlashDropsWhenOpeningDueEvents(ApplicationEvents events) {
         Member user = saveMember("user1");
+        Member admin = saveMember("admin");
+        admin.promoteToAdmin();
+        memberRepository.save(admin);
+        Member suspended = saveMember("suspended");
+        jdbcTemplate.update("update members set status = 'SUSPENDED' where id = ?", suspended.getId());
         Product tofu = saveProduct("두부", 3000);
         Product milk = saveProduct("우유", 4000);
         Product greenOnion = saveProduct("대파", 2000);
@@ -150,13 +119,12 @@ class FlashDropNotificationTransactionTest extends MySqlContainerSupport {
         saleEventStatusService.openAndCloseDue(NOW);
 
         List<FlashDropNotificationEvent> published = events.stream(FlashDropNotificationEvent.class).toList();
-        assertThat(published).containsExactly(FlashDropNotificationEvent.started(List.of(dueFlashDrop.getId())));
+        assertThat(published).containsExactly(new FlashDropNotificationEvent(List.of(dueFlashDrop.getId())));
         assertThat(adminSaleEventFacade.getFlashDropNotifications(published.get(0)))
                 .extracting(NotificationRequestedMessage::memberId, NotificationRequestedMessage::content,
                         NotificationRequestedMessage::dedupeKey)
                 .containsExactly(tuple(user.getId(), "번개 드롭 시작\n50% 할인 · 10개 한정\n두부",
                         "FLASH_DROP_STARTED:%d:%d".formatted(dueFlashDrop.getId(), tofu.getId())));
-        assertThat(published.get(0).moment()).isEqualTo(Moment.STARTED);
     }
 
     private SaleEvent saveEvent(SaleEventType type, LocalDateTime startsAt, Product product, Integer limitedQuantity) {
