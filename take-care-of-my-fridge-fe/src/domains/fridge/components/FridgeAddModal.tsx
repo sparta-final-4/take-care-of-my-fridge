@@ -2,6 +2,7 @@ import { CalendarOutlined, CloseOutlined, PlusOutlined } from '@ant-design/icons
 import {
   App,
   Button,
+  ConfigProvider,
   DatePicker,
   Divider,
   Flex,
@@ -22,6 +23,7 @@ import type { FridgeItemCreateRequest, StorageType } from '../api';
 import { STORAGE_LABELS } from '../format';
 import { MOCK_QUICK_CHIPS } from '../mocks';
 import { getNewItemsView, type NewFridgeItemsState } from '../newItems';
+import { COMPACT_FIELD_THEME } from '../fieldTheme';
 import { useCreateFridgeItems } from '../queries';
 import styles from './FridgeAddModal.module.scss';
 
@@ -158,107 +160,109 @@ export function FridgeAddModal({ open, onClose }: FridgeAddModalProps) {
         </Button>
       }
     >
-      <div className={styles.container}>
-        <Input
-          ref={nameInputRef}
-          placeholder="재료명 (예: 참치캔)"
-          aria-label="재료명"
-          value={name}
-          maxLength={MAX_NAME_LENGTH}
-          onChange={(event) => setName(event.target.value)}
-          onPressEnter={handleAdd}
-        />
-
-        <Flex align="center" wrap gap="small" className={styles.quickRow}>
-          <Typography.Text type="secondary" className={styles.quickLabel}>
-            빠른 선택
-          </Typography.Text>
-          <Flex wrap gap="xs">
-            {MOCK_QUICK_CHIPS.map((chip) => (
-              <Button
-                key={chip.id}
-                size="small"
-                shape="round"
-                icon={<PlusOutlined />}
-                onClick={() => setName(chip.name)}
-                className={styles.chipButton}
-              >
-                {chip.name}
-              </Button>
-            ))}
-          </Flex>
-        </Flex>
-
-        <div className={styles.formRow}>
+      <ConfigProvider theme={COMPACT_FIELD_THEME}>
+        <div className={styles.container}>
           <Input
-            placeholder="수량"
-            inputMode="decimal"
-            suffix={
-              <Typography.Text type="secondary" className={styles.unitHint}>
-                단위 자동
-              </Typography.Text>
-            }
-            aria-label="수량"
-            value={quantity}
-            onChange={(event) => setQuantity(event.target.value)}
+            ref={nameInputRef}
+            placeholder="재료명 (예: 참치캔)"
+            aria-label="재료명"
+            value={name}
+            maxLength={MAX_NAME_LENGTH}
+            onChange={(event) => setName(event.target.value)}
             onPressEnter={handleAdd}
           />
-          <DatePicker
-            placeholder="소비기한"
-            suffixIcon={<CalendarOutlined />}
-            aria-label="소비기한"
-            value={expirationDate}
-            onChange={setExpirationDate}
-            className={styles.field}
-          />
-          <Select
-            value={storage}
-            onChange={setStorage}
-            options={STORAGE_OPTIONS}
-            placeholder="보관: 자동"
-            allowClear
-            aria-label="보관 방식"
-            className={`${styles.field} ${styles.storageSelect}`}
-          />
-        </div>
 
-        <Button icon={<PlusOutlined />} block onClick={handleAdd}>
-          목록에 담기
-        </Button>
-
-        <Divider className={styles.divider} />
-
-        {/* 담은 재료: "두부 1 · 11/10 · 냉장 ×" 칩으로 나열 */}
-        <Flex wrap gap="small" aria-label="담은 재료" className={styles.stagedList}>
-          {stagedItems.length === 0 && (
-            <Typography.Text type="secondary" className={styles.stagedEmpty}>
-              목록에 담은 재료가 여기에 보여요
+          <Flex align="center" wrap gap="small" className={styles.quickRow}>
+            <Typography.Text type="secondary" className={styles.quickLabel}>
+              빠른 선택
             </Typography.Text>
-          )}
-          {stagedItems.map((item) => (
-            <div key={item.key} className={styles.stagedItem}>
-              <Typography.Text strong className={styles.stagedName}>
-                {item.rawName}
+            <Flex wrap gap="xs">
+              {MOCK_QUICK_CHIPS.map((chip) => (
+                <Button
+                  key={chip.id}
+                  size="small"
+                  shape="round"
+                  icon={<PlusOutlined />}
+                  onClick={() => setName(chip.name)}
+                  className={styles.chipButton}
+                >
+                  {chip.name}
+                </Button>
+              ))}
+            </Flex>
+          </Flex>
+
+          <div className={styles.formRow}>
+            <Input
+              placeholder="수량"
+              inputMode="decimal"
+              suffix={
+                <Typography.Text type="secondary" className={styles.unitHint}>
+                  단위 자동
+                </Typography.Text>
+              }
+              aria-label="수량"
+              value={quantity}
+              onChange={(event) => setQuantity(event.target.value)}
+              onPressEnter={handleAdd}
+            />
+            <DatePicker
+              placeholder="소비기한"
+              suffixIcon={<CalendarOutlined />}
+              aria-label="소비기한"
+              value={expirationDate}
+              onChange={setExpirationDate}
+              className={styles.field}
+            />
+            <Select
+              value={storage}
+              onChange={setStorage}
+              options={STORAGE_OPTIONS}
+              placeholder="보관: 자동"
+              allowClear
+              aria-label="보관 방식"
+              className={`${styles.field} ${styles.storageSelect}`}
+            />
+          </div>
+
+          <Button icon={<PlusOutlined />} block onClick={handleAdd}>
+            목록에 담기
+          </Button>
+
+          <Divider className={styles.divider} />
+
+          {/* 담은 재료: "두부 1 · 11/10 · 냉장 ×" 칩으로 나열 */}
+          <Flex wrap gap="small" aria-label="담은 재료" className={styles.stagedList}>
+            {stagedItems.length === 0 && (
+              <Typography.Text type="secondary" className={styles.stagedEmpty}>
+                목록에 담은 재료가 여기에 보여요
               </Typography.Text>
-              <Typography.Text className={styles.stagedQty}>{item.quantity}</Typography.Text>
-              <Typography.Text className={styles.stagedDate}>
-                {item.expirationDate ?? '소비기한 자동'}
-              </Typography.Text>
-              <Typography.Text type="secondary" className={styles.stagedStorage}>
-                {item.storage ? STORAGE_LABELS[item.storage] : '자동'}
-              </Typography.Text>
-              <Button
-                type="text"
-                size="small"
-                icon={<CloseOutlined />}
-                aria-label={`${item.rawName} 빼기`}
-                onClick={() => handleRemove(item.key)}
-                className={styles.removeButton}
-              />
-            </div>
-          ))}
-        </Flex>
-      </div>
+            )}
+            {stagedItems.map((item) => (
+              <div key={item.key} className={styles.stagedItem}>
+                <Typography.Text strong className={styles.stagedName}>
+                  {item.rawName}
+                </Typography.Text>
+                <Typography.Text className={styles.stagedQty}>{item.quantity}</Typography.Text>
+                <Typography.Text className={styles.stagedDate}>
+                  {item.expirationDate ?? '소비기한 자동'}
+                </Typography.Text>
+                <Typography.Text type="secondary" className={styles.stagedStorage}>
+                  {item.storage ? STORAGE_LABELS[item.storage] : '자동'}
+                </Typography.Text>
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<CloseOutlined />}
+                  aria-label={`${item.rawName} 빼기`}
+                  onClick={() => handleRemove(item.key)}
+                  className={styles.removeButton}
+                />
+              </div>
+            ))}
+          </Flex>
+        </div>
+      </ConfigProvider>
     </Modal>
   );
 }

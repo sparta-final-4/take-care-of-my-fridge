@@ -1,6 +1,7 @@
 import { Tag, Tooltip } from 'antd';
 
 import type { FridgeItemResponse } from '../api';
+import { linkedIngredientName } from '../format';
 import styles from './IngredientChip.module.scss';
 
 interface IngredientChipProps {
@@ -31,7 +32,7 @@ export function IngredientChip({ item, className }: IngredientChipProps) {
     );
   }
 
-  const name = item.ingredientName ?? item.rawName ?? '';
+  const name = linkedIngredientName(item);
   return (
     <Tag title={name} className={classes(styles.normal)}>
       {name}

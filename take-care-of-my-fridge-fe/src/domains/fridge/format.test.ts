@@ -8,6 +8,7 @@ import {
   formatLogDate,
   formatQuantity,
   getStep,
+  linkedIngredientName,
   withObjectParticle,
 } from './format';
 
@@ -22,6 +23,13 @@ describe('getStep', () => {
 
   it.each([null, undefined, '', '큰술', '컵'])('단위가 없거나 그 밖의 단위(%s)는 0.5', (unit) => {
     expect(getStep(unit)).toBe(0.5);
+  });
+});
+
+describe('linkedIngredientName', () => {
+  it('연결된 재료 이름을 쓰고, 없으면 등록한 이름', () => {
+    expect(linkedIngredientName({ rawName: '서울우유 1L', ingredientName: '우유' })).toBe('우유');
+    expect(linkedIngredientName({ rawName: '통후추' })).toBe('통후추');
   });
 });
 

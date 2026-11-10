@@ -37,6 +37,13 @@ export function ddayTagColor(dDay: number) {
   return undefined;
 }
 
+// 등록한 이름이 연결된 재료 이름. 줄 목록 칩과 수정 창 안내가 같이 쓴다(없으면 등록한 이름).
+export function linkedIngredientName(
+  item: Pick<FridgeItemResponse, 'ingredientName' | 'rawName'>,
+): string {
+  return item.ingredientName ?? item.rawName ?? '';
+}
+
 // 재료명 뒤 목적격 조사. 마지막 글자에 받침이 있으면 '을', 없으면 '를', 한글이 아니면 '을(를)'.
 export function withObjectParticle(name: string) {
   const code = name.charCodeAt(name.length - 1) - 0xac00;
