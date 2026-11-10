@@ -77,6 +77,9 @@ public final class RecommendationPromptBuilder {
         text.append("[추천 후보]\n");
         if (picked.isEmpty()) {
             text.append(NO_CANDIDATES).append('\n');
+        } else {
+            // 조건에 맞는 후보가 모자라 카드가 3장보다 적을 수 있다. 소개에서 개수를 말하면 이 수와 같게 말하게 한다
+            text.append("후보 수: ").append(picked.size()).append("개\n");
         }
         // 번호를 붙이면 AI가 번호 목록으로 답해서 "후보:"로 시작한다
         // 사용자 요청(키워드·분류·요리 이름)이 있으면 회원 선호 맛은 근거로 넘기지 않는다

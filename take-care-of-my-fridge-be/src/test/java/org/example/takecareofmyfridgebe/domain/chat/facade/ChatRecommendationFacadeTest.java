@@ -83,7 +83,8 @@ class ChatRecommendationFacadeTest {
         saleEventReader = mock(SaleEventReader.class);
         chatMessageService = mock(ChatMessageService.class);
         facade = new ChatRecommendationFacade(recipeCandidateFacade, recipeService, ingredientService, productService,
-                saleEventReader, chatMessageService, MealkitWordCheckerTest.WORDS, TasteWordCheckerTest.WORDS, AllergyWordCheckerTest.WORDS);
+                saleEventReader, chatMessageService, MealkitWordCheckerTest.WORDS, TasteWordCheckerTest.WORDS, AllergyWordCheckerTest.WORDS,
+                ChatIntentFacadeTest.TASTE_OPPOSITES);
         when(ingredientService.getIngredientsByIds(any())).thenReturn(Map.of());
     }
 
@@ -142,6 +143,22 @@ class ChatRecommendationFacadeTest {
         assertThat(recipes.get(1).reason()).doesNotContain("매운 요리예요");
         assertThat(recipes.get(2).reason()).doesNotContain("매운 요리예요");
         assertThat(reply.candidateInfo()).contains(recipes.get(0).reason());
+    }
+
+    @Test
+    @DisplayName("분류와 원하는 맛을 말했는데 둘 다 맞은 후보가 2개뿐이면 다른 분류로 채우지 않고 카드 2장과 후보 수 2개를 넘긴다")
+    void returnsTwoCards_whenOnlyTwoMatchAllConditions() {
+        when(recipeCandidateFacade.findCandidates(any())).thenReturn(new RecipeCandidates(List.of(
+                requested(10L, "꽃게해물탕", "국", 2),
+                requested(20L, "토마토 해물누룽지탕", "국", 2),
+                requested(30L, "오이무침", "무침", 0)), false));
+        when(recipeService.findSummaries(any())).thenReturn(Map.of());
+
+        RecommendationReply reply = facade.recommend("맵고 따뜻한 국물 레시피 추천해줘", new RecipeQuery(MEMBER_ID, List.of(),
+                List.of(Taste.SPICY), List.of("국"), null, null, false, List.of(), null, "따뜻한 국물"));
+
+        assertThat(reply.event().recipes()).extracting(RecommendedRecipe::recipeId).containsExactly(10L, 20L);
+        assertThat(reply.candidateInfo()).contains("후보 수: 2개").doesNotContain("오이무침");
     }
 
     @Test
@@ -665,5 +682,10 @@ class ChatRecommendationFacadeTest {
 
     private static Reason reason(List<Taste> tastes) {
         return new Reason(List.of(), List.of(), tastes, List.of(), List.of(), false, false, List.of(), List.of(), List.of(), null);
+    }
+
+    // 요청 일치 수만 정한 후보
+    private static RecipeCandidate requested(Long id, String name, String category, int requestMatches) {
+        return new RecipeCandidate(id, name, category, 20, new Ranking(requestMatches, 0, 0, 0, 1, 1, 0), reason(List.of()));
     }
 }

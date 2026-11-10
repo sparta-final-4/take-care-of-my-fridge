@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatAllergyWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatMealkitWordProperties;
+import org.example.takecareofmyfridgebe.domain.chat.config.ChatTasteOppositeProperties;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatTasteWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse.ImminentIngredient;
@@ -86,6 +87,7 @@ public class ChatRecommendationFacade {
     private final ChatMealkitWordProperties chatMealkitWordProperties;
     private final ChatTasteWordProperties chatTasteWordProperties;
     private final ChatAllergyWordProperties chatAllergyWordProperties;
+    private final ChatTasteOppositeProperties chatTasteOppositeProperties;
 
     /**
      * @param content 사용자 메시지 원문 (설명 프롬프트에 넣는다)
@@ -232,12 +234,20 @@ public class ChatRecommendationFacade {
         Optional<String> spokenDish = spokenDishWithoutRecipe(content, request, found.candidates());
         if (spokenDish.isPresent()) {
             query = request.withKeywordText(spokenDish.get());
-            found = new RecipeCandidates(found.candidates(), found.fallback(), true, found.keptAvoidTastes());
+            found = new RecipeCandidates(found.candidates(), found.fallback(), true, found.keptAvoidTastes())
+                    .withTasteDetails(found.recipeTastes(), found.maybeSpicyIds());
             log.info("상담 요리 이름 채움 - memberId: {}, 요리 이름: {} (AI가 비움, 레시피 이름에 없음)", request.memberId(), spokenDish.get());
         }
         List<RecipeCandidate> candidates = withoutPrevious(found.candidates(), previousCardIds);
         logCandidates(query, candidates);
-        List<RecipeCandidate> picked = RecommendationPicker.pick(candidates, query.keywords());
+        // 말한 조건이 있으면 조건을 모두 맞춘 후보부터 고르고, 모자라면 분류가 맞고 반대 맛이 아닌 후보로만 채운다
+        PickRule rule = PickRule.of(query, found, chatTasteOppositeProperties::oppositesOf);
+        List<RecipeCandidate> picked = RecommendationPicker.pick(candidates, query.keywords(), rule);
+        if (rule.hasRequest() && picked.size() < RecommendationPicker.PICK_COUNT) {
+            log.info("상담 추천 조건에 맞는 후보가 모자라 카드를 줄임 - memberId: {}, 조건 수: {}, 후보 {}개 중 모두 맞음 {}개, 카드 {}장",
+                    query.memberId(), rule.requestCount(), candidates.size(),
+                    candidates.stream().filter(rule::matchesAll).count(), picked.size());
+        }
 
         Map<Long, RecipeSummary> summaries = recipeService.findSummaries(
                 picked.stream().map(RecipeCandidate::recipeId).toList());

@@ -4,10 +4,13 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.KeywordMatch;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate.Ranking;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate.Reason;
+import org.example.takecareofmyfridgebe.domain.member.entity.Member.Taste;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -119,6 +122,89 @@ class RecommendationPickerTest {
 
         assertThat(picked).extracting(RecipeCandidate::recipeId).containsExactly(1L, 2L, 4L);
         assertThat(picked.get(2).alternative()).isFalse();
+    }
+
+    @Test
+    @DisplayName("분류와 원하는 맛을 말했는데 둘 다 맞은 후보가 2개이고 채울 후보가 없으면 카드를 2장만 고른다")
+    void picksOnlyTwo_whenTwoMatchAllAndNothingToFill() {
+        List<RecipeCandidate> ranked = List.of(
+                requested(1L, "국", 2), requested(2L, "국", 2), requested(3L, "무침", 0), requested(4L, "볶음", 0));
+
+        List<RecipeCandidate> picked = RecommendationPicker.pick(ranked, List.of(), spicySoupRule(Map.of(), Set.of()));
+
+        assertThat(picked).extracting(RecipeCandidate::recipeId).containsExactly(1L, 2L);
+    }
+
+    @Test
+    @DisplayName("모두 맞은 후보가 모자라면 분류가 맞는 후보 중 매운 레시피, 매울 수 있는 레시피 순으로 채운다")
+    void fillsWithSpicyFirst_whenMatchAllIsShort() {
+        // 3·4·5는 분류만 맞음. 정렬은 3 → 4 → 5지만 4는 매울 수 있고 5는 확실히 맵다
+        List<RecipeCandidate> ranked = List.of(
+                requested(1L, "국", 2), requested(3L, "국", 1), requested(4L, "국", 1), requested(5L, "국", 1));
+
+        List<RecipeCandidate> picked = RecommendationPicker.pick(ranked, List.of(),
+                spicySoupRule(Map.of(5L, Set.of(Taste.SPICY)), Set.of(4L, 5L)));
+
+        assertThat(picked).extracting(RecipeCandidate::recipeId).containsExactly(1L, 5L, 4L);
+    }
+
+    @Test
+    @DisplayName("매운맛을 원했으면 순한맛만 있는 레시피는 분류가 맞아도 빈자리를 채우지 않는다")
+    void skipsOppositeTaste_whenFilling() {
+        List<RecipeCandidate> ranked = List.of(requested(1L, "국", 2), requested(2L, "국", 2), requested(3L, "국", 1));
+
+        List<RecipeCandidate> picked = RecommendationPicker.pick(ranked, List.of(),
+                spicySoupRule(Map.of(3L, Set.of(Taste.MILD)), Set.of()));
+
+        assertThat(picked).extracting(RecipeCandidate::recipeId).containsExactly(1L, 2L);
+    }
+
+    @Test
+    @DisplayName("분류를 말했으면 3개가 모두 같은 분류여도 다른 분류로 바꾸지 않는다")
+    void keepsSameCategory_whenCategorySpoken() {
+        List<RecipeCandidate> ranked = List.of(
+                requested(1L, "국", 2), requested(2L, "국", 2), requested(3L, "국", 2), requested(4L, "찌개", 2));
+
+        List<RecipeCandidate> picked = RecommendationPicker.pick(ranked, List.of(), spicySoupRule(Map.of(), Set.of()));
+
+        assertThat(picked).extracting(RecipeCandidate::recipeId).containsExactly(1L, 2L, 3L);
+        assertThat(picked).noneMatch(RecipeCandidate::alternative);
+    }
+
+    @Test
+    @DisplayName("원하는 맛만 말했으면 모두 같은 분류일 때 맛이 맞는 다른 분류로 바꾼다")
+    void replacesWithMatchingCategory_whenOnlyTasteSpoken() {
+        PickRule rule = new PickRule(1, Set.of(), Set.of(Taste.SPICY), Set.of(Taste.MILD), Map.of(), Set.of());
+        List<RecipeCandidate> ranked = List.of(
+                requested(1L, "국", 1), requested(2L, "국", 1), requested(3L, "국", 1), requested(4L, "볶음", 1));
+
+        List<RecipeCandidate> picked = RecommendationPicker.pick(ranked, List.of(), rule);
+
+        assertThat(picked).extracting(RecipeCandidate::recipeId).containsExactly(1L, 2L, 4L);
+        assertThat(picked.get(2).alternative()).isTrue();
+    }
+
+    @Test
+    @DisplayName("말한 조건이 없으면 요청 일치와 상관없이 정렬 순서대로 3장을 고른다")
+    void picksTopThree_whenNoRequest() {
+        List<RecipeCandidate> ranked = List.of(
+                requested(1L, "국", 0), requested(2L, "찜", 0), requested(3L, "볶음", 0), requested(4L, "국", 0));
+
+        List<RecipeCandidate> picked = RecommendationPicker.pick(ranked, List.of(), PickRule.NONE);
+
+        assertThat(picked).extracting(RecipeCandidate::recipeId).containsExactly(1L, 2L, 3L);
+    }
+
+    // "맵고 따뜻한 국물": 원하는 맛 매운맛 + 분류 국 (조건 2개)
+    private static PickRule spicySoupRule(Map<Long, Set<Taste>> tastes, Set<Long> maybeSpicy) {
+        return new PickRule(2, Set.of("국"), Set.of(Taste.SPICY), Set.of(Taste.MILD), tastes, maybeSpicy);
+    }
+
+    // 요청 일치 수만 정한 후보
+    private static RecipeCandidate requested(Long id, String category, int requestMatches) {
+        return new RecipeCandidate(id, "레시피" + id, category, 20,
+                new Ranking(requestMatches, 0, 0, 0, 1, 1, 0),
+                new Reason(List.of(), List.of(), List.of(), List.of(), List.of(), false, false, List.of(), List.of(), List.of(), null));
     }
 
     // 늘린 이름(키워드)으로 맞은 후보
