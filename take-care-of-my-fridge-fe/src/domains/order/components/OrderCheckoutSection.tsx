@@ -9,6 +9,7 @@ import { useAuthStore } from '@/common/auth/authStore';
 import { formatPrice } from '@/domains/cart/format';
 import { cartQueries } from '@/domains/cart/queries';
 import { useCancelOnLeave } from '@/domains/order/hooks/useCancelOnLeave';
+import { useGoBack } from '@/domains/order/hooks/useGoBack';
 import { orderQueries } from '@/domains/order/queries';
 import { confirmPayment, payWithCard, preparePayment } from '@/domains/payment/api';
 import { cardName, maskedCardNumber } from '@/domains/payment/cardFormat';
@@ -32,6 +33,7 @@ type PayMethod = { kind: 'card'; cardId: number } | { kind: 'pg'; pgProvider: Pg
 // 결제 대기 주문만 그린다. 결제 완료·취소·없는 주문은 서버가 오류로 알려 주고 안내로 바꾼다.
 export function OrderCheckoutSection({ orderId }: OrderCheckoutSectionProps) {
   const navigate = useNavigate();
+  const goBack = useGoBack();
   const validOrderId = Number.isSafeInteger(orderId) && orderId > 0;
   const {
     data: order,
@@ -112,13 +114,13 @@ export function OrderCheckoutSection({ orderId }: OrderCheckoutSectionProps) {
     allowLeave();
     navigate(ROUTES.home, { replace: true });
   };
-  // 생성 5분이 지나 서버가 지운 주문이면 남은 주문이 없으므로 붙잡지 않고 장바구니로 보낸다
+  // 생성 5분이 지나 서버가 지운 주문이면 남은 주문이 없으므로 붙잡지 않고 직전 화면으로 보낸다
   const handlePayError = (error: unknown) => {
     const code = getErrorCode(error);
     if (code === 'ORDER_001') {
       message.info('주문 시간이 지났습니다. 다시 주문해 주세요.');
       allowLeave();
-      navigate(ROUTES.cart);
+      goBack();
       return;
     }
     // 카드 결제 결과를 아직 모르면 결제 대기로 남아 서버가 마무리한다. 같은 주문을 다시 결제하지 않게 주문 내역으로 보낸다
@@ -188,13 +190,12 @@ export function OrderCheckoutSection({ orderId }: OrderCheckoutSectionProps) {
     );
   };
 
-  const goToCart = () => navigate(ROUTES.cart);
-  const cartButton = (
-    <Button type="primary" onClick={goToCart}>
-      장바구니로 가기
+  const backButton = (
+    <Button type="primary" onClick={goBack}>
+      이전 화면으로
     </Button>
   );
-  const notFound = <Result status="404" title="주문을 찾을 수 없습니다." extra={cartButton} />;
+  const notFound = <Result status="404" title="주문을 찾을 수 없습니다." extra={backButton} />;
 
   if (!validOrderId) return notFound;
   if (isPending) return <Skeleton active paragraph={{ rows: 6 }} />;
@@ -221,7 +222,7 @@ export function OrderCheckoutSection({ orderId }: OrderCheckoutSectionProps) {
           status="warning"
           title="취소된 주문입니다."
           subTitle="장바구니에서 다시 주문해 주세요."
-          extra={cartButton}
+          extra={backButton}
         />
       );
     }

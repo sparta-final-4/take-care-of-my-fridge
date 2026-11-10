@@ -22,7 +22,7 @@
   margin: 0;
 }
 
-// 장바구니 화면과 같은 좌우 비율. lg 미만에서는 결제할 금액이 목록 아래로 간다.
+// 목록 | 결제할 금액 좌우 비율. lg 미만에서는 결제할 금액이 목록 아래로 간다.
 .layout {
   display: grid;
   grid-template-columns: 1fr;

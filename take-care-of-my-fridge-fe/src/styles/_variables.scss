@@ -147,7 +147,7 @@ $cart-drawer-header-padding-block: 18px;
 // AI 상담 서랍 폭(md 이상, 휴대폰은 전체 화면)과 [크게 보기] 폭
 $chat-drawer-width: min(92vw, 480px);
 $chat-drawer-width-wide: min(96vw, 800px);
-// 장바구니 목록이 넓은 배치로 바뀌는 칸 폭(장바구니 화면 기준 md·lg 화면에서의 본문 폭)
+// 장바구니 목록이 넓은 배치로 바뀌는 칸 폭(서랍 폭이 넓은 테마 세트에서 쓴다)
 // 장바구니 칸이 이 폭 이상이면 할인 태그 옆에 남은 시간을 둔다(번개 드롭 태그 72 + 시간 125 + 간격이 정보 칸에 들어가는 폭)
 $cart-sale-inline-width: 360px;
 // 같은 폭 이상에서 이미지와 수량 칸 사이 간격. 가장 긴 번개 드롭 항목의 글자 묶음 높이에 맞춰, 모든 항목이 같은 높이로 수량 칸과 금액이 나란하다.
@@ -189,7 +189,7 @@ $font-size-2xs: 10px;
 
 // 장바구니 줄
 $cart-thumb-size: 72px;
-// 장바구니 화면 항목 썸네일과 수량 칸 높이. 주문·환불 상품 줄은 $cart-thumb-size를 그대로 쓴다.
+// 장바구니 항목 썸네일과 수량 칸 높이. 주문·환불 상품 줄은 $cart-thumb-size를 그대로 쓴다.
 $cart-item-thumb-size: 88px;
 $cart-quantity-height: 32px;
 $cart-step-button-width: 28px;

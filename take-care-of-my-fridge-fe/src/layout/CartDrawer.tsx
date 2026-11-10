@@ -18,7 +18,7 @@ interface CartDrawerProps {
   onClose: () => void;
 }
 
-// 헤더 장바구니 아이콘이 여는 서랍. 안의 목록·수량·삭제·주문은 장바구니 화면과 같은 CartSection을 그대로 쓴다.
+// 헤더 장바구니 아이콘이 여는 서랍. 안의 목록·수량·삭제·주문은 CartSection을 쓴다.
 export function CartDrawer({ open, onClose }: CartDrawerProps) {
   const navigate = useNavigate();
   const status = useAuthStore((state) => state.status);
