@@ -31,6 +31,9 @@ class CategoryWordCheckerTest {
         assertThat(check("디저트 추천해줘")).containsExactly(new CategoryStance("디저트", Stance.WANT));
         assertThat(check("다른 디저트 추천해줘")).containsExactly(new CategoryStance("디저트", Stance.WANT));
         assertThat(check("디저트!")).containsExactly(new CategoryStance("디저트", Stance.WANT));
+        // 끓이는 말도 요청으로 본다 (평가 R14)
+        assertThat(check("두부도 넣어서 찌개 끓이고 싶어")).containsExactly(new CategoryStance("찌개", Stance.WANT));
+        assertThat(check("국 끓여 먹을 거")).containsExactly(new CategoryStance("국", Stance.WANT));
     }
 
     @Test

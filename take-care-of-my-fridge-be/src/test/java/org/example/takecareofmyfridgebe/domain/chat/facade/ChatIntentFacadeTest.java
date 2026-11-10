@@ -1760,6 +1760,18 @@ class ChatIntentFacadeTest {
                 FridgeShopWordCheckerTest.WORDS, corrections);
     }
 
+    @Test
+    @DisplayName("AI가 \"찌개\"를 분류 없이 키워드로만 줘도 \"찌개 끓이고 싶어\"면 분류 단어 보정이 찌개를 채운다 (평가 R14)")
+    void fillsCategory_whenBoilingStew() {
+        givenExtracted(new IntentResult(ChatIntent.RECOMMEND, null, List.of(), null, List.of("두부"), null, false,
+                List.of("찌개"), null, null));
+
+        RecipeQuery query = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("두부도 넣어서 찌개 끓이고 싶어"))
+                .recipeQuery();
+
+        assertThat(query.moodCategories()).containsExactly("찌개");
+    }
+
     @Nested
     @DisplayName("새 추천 맛 정리: 앞 대화에서 따라온 맛만 뺀다")
     class CarriedTastes {
