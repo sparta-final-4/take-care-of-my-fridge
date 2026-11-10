@@ -23,7 +23,7 @@ export function FridgeAiConsultSection() {
   );
 
   return (
-    <SectionCard title="AI 냉장고 상담">
+    <SectionCard title="AI 냉장고 상담" bracket={false}>
       <Flex vertical gap="middle">
         <Typography.Text>임박 재료로 만들 수 있는 메뉴를 추천해 드려요.</Typography.Text>
         {imminentItems.length > 0 ? (

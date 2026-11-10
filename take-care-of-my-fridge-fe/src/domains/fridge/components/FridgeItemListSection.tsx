@@ -315,7 +315,7 @@ export function FridgeItemListSection({ onAdd }: FridgeItemListSectionProps) {
   const checkedFridgeIds = checkedItems.map((item) => item.id ?? 0);
 
   return (
-    <SectionCard title="재료 목록">
+    <SectionCard title="재료 목록" bracket={false}>
       <Flex vertical gap="middle" className={styles.container}>
         {/* 도구 줄: 보관 탭 + 정렬. 목록이 길어 스크롤해도 상단바 바로 아래에 붙어 있다. */}
         <div className={styles.toolbar}>

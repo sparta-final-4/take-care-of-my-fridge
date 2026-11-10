@@ -1,8 +1,6 @@
 import { Typography } from 'antd';
 import dayjs from 'dayjs';
 
-import { SectionCard } from '@/common/components/SectionCard';
-
 import { withoutBasicSeasoning } from '../filter';
 import { useFridgeSort } from '../hooks/useFridgeSort';
 import { useFridgeItems, useFridgeLogs } from '../queries';
@@ -31,28 +29,27 @@ export function FridgeSummarySection() {
   ];
 
   return (
-    <SectionCard title="냉장고 요약">
-      <div className={styles.stats}>
-        {stats.map((stat) => (
-          <div key={stat.label} className={styles.stat}>
-            <Typography.Text
-              strong
-              type={stat.warning ? 'warning' : undefined}
-              className={styles.value}
-            >
-              {stat.value ?? '-'}
-            </Typography.Text>
+    // 제목 없이 숫자만 둔다. 화면을 읽는 프로그램에는 "냉장고 요약"으로 알린다.
+    <section aria-label="냉장고 요약" className={styles.stats}>
+      {stats.map((stat) => (
+        <div key={stat.label} className={styles.stat}>
+          <Typography.Text
+            strong
+            type={stat.warning ? 'warning' : undefined}
+            className={styles.value}
+          >
+            {stat.value ?? '-'}
+          </Typography.Text>
+          <Typography.Text type="secondary" className={styles.label}>
+            {stat.label}
+          </Typography.Text>
+          {stat.note && (
             <Typography.Text type="secondary" className={styles.label}>
-              {stat.label}
+              {stat.note}
             </Typography.Text>
-            {stat.note && (
-              <Typography.Text type="secondary" className={styles.label}>
-                {stat.note}
-              </Typography.Text>
-            )}
-          </div>
-        ))}
-      </div>
-    </SectionCard>
+          )}
+        </div>
+      ))}
+    </section>
   );
 }

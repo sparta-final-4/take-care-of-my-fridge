@@ -1,10 +1,13 @@
 @use '@/styles/variables' as *;
 @use '@/styles/mixins' as *;
 
-// 요약 숫자 띠: 상자 없이 숫자 세 개를 가로로, 사이에 얇은 세로선. 숫자는 제목 글꼴로 크게.
+// 요약 숫자 띠: 제목·상자 없이 숫자 세 개를 가로로, 사이에 얇은 세로선. 숫자는 제목 글꼴로 크게.
+// 위의 잉크색 선은 다른 묶음(SectionCard)과 같다.
 .stats {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding-top: var(--ant-padding-sm);
+  border-top: 1px solid var(--ant-color-text);
 }
 
 .stat {
