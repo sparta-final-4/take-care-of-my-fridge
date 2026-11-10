@@ -47,6 +47,8 @@ recipes:
   - 버섯전
   - 냉면
   - 막국수
+  # 이름이 딱 "닭볶음탕"인 레시피는 없다 (로컬 색인 2026-11-07 기준)
+  - 토마토시금치 닭볶음탕
 
 # 레시피 분류 (dev /api/recipes/classifications, 2026-11-09). 양념·음료·기타는 서버가 AI 목록에서 뺀다
 categories: [과자, 구이, 국, 그라탕, 기타, 김치, 디저트, 떡, 만두, 말이, 면류, 무침, 밥, 볶음, 빵, 샌드위치, 샐러드, 수프, 스튜, 쌈, 양념, 음료, 전, 전골, 절임, 조림, 죽, 찌개, 찜, 튀김, 피자, 한과, 회]
@@ -105,6 +107,10 @@ cases:
   - { id: T12, group: 맛, message: "맵고 따뜻한 스프", expect: { intent: RECOMMEND, wanted: [SPICY], categories: [수프] } }
   - { id: T13, group: 맛, message: "화끈한 거 먹고 싶어", expect: { intent: RECOMMEND, wanted: [SPICY], avoid: [] } }
   - { id: T14, group: 맛, message: "얼얼한 거", expect: { intent: RECOMMEND, wanted: [SPICY] } }
+  # 온도 말. "따뜻한"은 서버가 카드에서 찬 요리를 거르고(TemperatureWordChecker), 의도에서는 맛·추천만 본다
+  - { id: T15, group: 맛, message: "맵고 따뜻한 국물 레시피 추천해줘", expect: { intent: RECOMMEND, wanted: [SPICY] } }
+  # "시원한"은 차가운 국물 쪽 요리 이름으로 바꾸고 원한 표현에 남긴다
+  - { id: T16, group: 맛, message: "시원한 국물 요리", expect: { intent: RECOMMEND, preference: 시원한, keywordsAny: [냉국, 오이냉국, 냉면, 물냉면, 콩국수, 냉모밀, 냉메밀, 물회, 냉채] } }
 
   # ── 이름만 말하기 ──
   - { id: N01, group: 이름만, message: "국물 밀키트", expect: { intent: RECOMMEND } }
@@ -112,6 +118,8 @@ cases:
   - { id: N03, group: 이름만, message: "두부", expect: { intent: RECOMMEND, include: [두부] } }
   - { id: N04, group: 이름만, message: "디저트", expect: { intent: RECOMMEND, categories: [디저트] } }
   - { id: N05, group: 이름만, message: "마라탕", expect: { intent: RECOMMEND, keywordsFirst: 마라탕 } }
+  # 직전 카드 없음. AI가 일반 답이나 레시피 자세히로 봐도 서버가 레시피 말·맛 단어를 빼고 닭볶음탕 추천으로 바꾼다
+  - { id: N06, group: 이름만, message: "매운 닭볶음탕 레시피", expect: { intent: RECOMMEND, keywordsFirst: 닭볶음탕, dish: 닭볶음탕 } }
 
   # ── 일반 답 ──
   - { id: G01, group: 일반, message: "안녕", expect: { intent: GENERAL } }
