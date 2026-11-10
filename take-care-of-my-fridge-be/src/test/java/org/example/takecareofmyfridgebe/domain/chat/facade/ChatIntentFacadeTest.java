@@ -221,6 +221,47 @@ class ChatIntentFacadeTest {
         }
 
         @Test
+        @DisplayName("\"매운 닭볶음탕 레시피\"는 레시피 말과 맛 단어를 빼고 닭볶음탕을 찾아 닭볶음탕 매운맛 추천으로 바꾼다")
+        void recommendsDish_whenNameOnlyWithTasteAndRecipeWords() {
+            when(recipeService.getClassifications()).thenReturn(
+                    new RecipeClassificationResponse(List.of("한식"), List.of("국", "찜", "찌개")));
+            when(ingredientMatcher.matchAll(anyList())).thenReturn(Map.of());
+            when(recipeService.suggestNames(any(), anyInt())).thenReturn(List.of());
+            when(recipeService.suggestNames("닭볶음탕", 1)).thenReturn(List.of("토마토시금치 닭볶음탕"));
+            givenExtracted(IntentResult.general());
+
+            ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("매운 닭볶음탕 레시피"));
+
+            assertThat(resolution.intent()).isEqualTo(ChatIntent.RECOMMEND);
+            assertThat(resolution.recipeQuery().keywords()).containsExactly("닭볶음탕");
+            assertThat(resolution.recipeQuery().keywordText()).isEqualTo("닭볶음탕");
+            assertThat(resolution.recipeQuery().wantedTastes()).containsExactly(Taste.SPICY);
+            verify(recipeService).suggestNames("매운 닭볶음탕", 1);
+        }
+
+        @Test
+        @DisplayName("\"매운탕 레시피\"처럼 맛 단어로 시작하는 요리 이름은 맛 단어를 빼지 않고 그대로 찾는다")
+        void keepsDishStartingWithTasteWord() {
+            when(ingredientMatcher.matchAll(anyList())).thenReturn(Map.of());
+            when(recipeService.suggestNames("매운탕", 1)).thenReturn(List.of("우럭 매운탕"));
+            givenExtracted(IntentResult.general());
+
+            ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("매운탕 레시피"));
+
+            assertThat(resolution.intent()).isEqualTo(ChatIntent.RECOMMEND);
+            assertThat(resolution.recipeQuery().keywords()).containsExactly("매운탕");
+        }
+
+        @Test
+        @DisplayName("레시피 말은 띄어 써도 지운다 (닭볶음탕 만드는 법 → 닭볶음탕, 잡채 만 들 기 → 잡채)")
+        void removesSpacedRecipeWords() {
+            assertThat(facade.withoutRecipeWords("닭볶음탕 만드는 법")).isEqualTo("닭볶음탕");
+            assertThat(facade.withoutRecipeWords("잡채 만 들 기")).isEqualTo("잡채");
+            assertThat(facade.withoutRecipeWords("닭볶음탕레시피")).isEqualTo("닭볶음탕");
+            assertThat(facade.withoutRecipeWords("레시피")).isEmpty();
+        }
+
+        @Test
         @DisplayName("인사·지난 일을 묻는 짧은 말(밥 먹었어?, 안녕 밥은?)은 재료 이름이 있어도 일반 답 그대로 두고, \"밥 추천\"은 추천으로 바꾼다")
         void keepsGeneral_whenGreetingOrPastQuestion() {
             Ingredient rice = ingredient(70L, "ING_RICE", "밥");
