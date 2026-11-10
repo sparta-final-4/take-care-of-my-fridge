@@ -163,6 +163,16 @@ public class ChatIntentFacade {
         if (result.intent() == ChatIntent.OFF_TOPIC && corrections.offTopicRevive()) {
             result = reviveOffTopic(memberId, sessionId, request.content(), categories, result);
         }
+        // 레시피 자세히인데 물어본 레시피가 이 상담 추천에 없으면, 그 요리 이름으로 새 추천을 한다 (아래 맛·분류 보정을 거치게 여기서 바꾼다)
+        Long detailTarget = null;
+        if (result.intent() == ChatIntent.RECIPE_DETAIL) {
+            detailTarget = findTarget(sessionId, result, context);
+            if (detailTarget == null && result.targetName() != null) {
+                log.info("상담 레시피 자세히 대상이 이 상담 추천에 없어 그 요리로 추천 - memberId: {}, sessionId: {}, 이름: {}",
+                        memberId, sessionId, result.targetName());
+                result = result.withNamed(result.includeIngredients(), List.of(result.targetName()));
+            }
+        }
         // 냉장고 보기 말이면 AI가 추천·일반 대화로 봐도(되살린 것 포함) 냉장고 보기로 바꾼다. 아래 밀키트·이름만 말하기 규칙보다 먼저 본다
         if (corrections.fridgeShopWords()) {
             result = applyFridgeShopWords(memberId, sessionId, request.content(), result);
@@ -199,7 +209,7 @@ public class ChatIntentFacade {
         ChatIntentResolution resolution = switch (result.intent()) {
             case RECOMMEND -> ChatIntentResolution.recommend(Source.AI, toRecipeQuery(memberId, sessionId, request, result));
             case REFINE -> refine(memberId, sessionId, request, result, context);
-            case RECIPE_DETAIL -> recipeDetail(memberId, sessionId, result, context);
+            case RECIPE_DETAIL -> recipeDetail(memberId, sessionId, result, detailTarget);
             case FRIDGE -> ChatIntentResolution.fridge(Source.AI, lookupOf(request.content(), result));
             case SHOP -> ChatIntentResolution.shop(Source.AI, lookupOf(request.content(), result));
             case GENERAL -> mealkitRecommend
@@ -696,9 +706,8 @@ public class ChatIntentFacade {
         return removed || !current.isEmpty() ? current : previous;
     }
 
-    // 레시피 자세히. 물어본 레시피를 못 찾으면 일반 답
-    private ChatIntentResolution recipeDetail(Long memberId, Long sessionId, IntentResult result, ChatContext context) {
-        Long recipeId = findTarget(sessionId, result, context);
+    // 레시피 자세히. 이름도 번호도 맞지 않으면 일반 답 (이름만 못 찾았으면 decide에서 그 요리 추천으로 이미 바꿨다)
+    private ChatIntentResolution recipeDetail(Long memberId, Long sessionId, IntentResult result, Long recipeId) {
         if (recipeId == null) {
             log.info("상담 레시피 자세히 대상을 못 찾아 일반 답으로 - memberId: {}, sessionId: {}, 번호: {}, 이름: {}",
                     memberId, sessionId, result.targetIndex(), result.targetName());
