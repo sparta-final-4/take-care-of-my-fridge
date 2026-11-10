@@ -6,19 +6,19 @@
 - 해결할 사용자 문제: 주문 확인 화면에서 결제 수단을 고르고 결제하기를 누르면 그 결제대행사의 PortOne V2 결제창으로 결제하고, 서버가 PG 결제를 확인한 뒤에만 주문을 결제 완료로 바꾼다.
 - 이 도메인이 소유하는 데이터와 정책: 결제 시도(payments), 결제 이력(payment_histories), PortOne 웹훅 수신 기록(webhook_events), 결제대행사별 결제창 값, 결제 승인·실패·만료·보상 취소 규칙.
 - 다른 도메인에 맡기는 책임: 주문 상태·재고(주문), 결제한 상품의 장바구니 삭제(장바구니), 결제 완료 뒤의 부분·전체 취소(환불), 일별 매출 집계(정산). 결제 상태에는 환불 상태를 넣지 않고, 환불로 돈이 돌아간 사실은 결제 이력에만 남깁니다.
-- 등록 카드(빌링키) 결제는 설계 확정·구현 예정이며 [등록 카드 결제 설계](payment-card.md)에 따로 정리했습니다. 이 문서의 결제 준비·승인·보상 취소 규칙을 그대로 씁니다.
+- 등록 카드(빌링키) 결제와 결제 비밀번호는 [등록 카드 결제 설계](payment-card.md)에 따로 정리했습니다. 결제창 없이 서버가 PortOne에 청구하고, 승인·보상 취소 규칙은 이 문서를 그대로 씁니다.
 - 결제 금액은 클라이언트 값이 아니라 주문 금액(`orders.total_amount`)을 씁니다. 브라우저가 전달하는 결제 성공 결과는 믿지 않고 서버가 PortOne에 결제 건을 직접 조회해 확인합니다.
 
 ## 기능·정책
 | 기능 | 정책·제약 | 근거 | 확정 상태 |
 |---|---|---|---|
-| 결제 수단 | 카카오페이(`KAKAOPAY`), 토스페이(`TOSSPAY`), 이지페이(`KICC`), KG이니시스(`INICIS`), 토스페이먼츠(`TOSSPAYMENTS`) 다섯 가지입니다. 결제대행사마다 PortOne 채널이 하나씩 있습니다 | `PgProvider`, `PortOneProperties.channels` | 구현 완료 |
+| 결제 수단 | 결제창 결제는 카카오페이(`KAKAOPAY`), 토스페이(`TOSSPAY`), 이지페이(`KICC`), KG이니시스(`INICIS`), 토스페이먼츠(`TOSSPAYMENTS`) 다섯 가지이고, 결제대행사마다 PortOne 채널이 하나씩 있습니다. 그 밖에 등록 카드 결제가 있습니다(결제에 카드 ID 기록, 토스페이먼츠 정기결제 채널) | `PgProvider`, `PortOneProperties.channels` | 구현 완료 |
 | 결제창 값 | 카카오페이·토스페이는 간편결제(`EASY_PAY`, 간편결제 제공자 같이 보냄), 나머지는 카드 결제창(`CARD`)입니다. 서버가 채널 키·결제 방식을 정해 결제 준비 응답으로 줍니다 | `PortOneClient.getCheckout`, `PaymentCheckout` | 구현 완료 |
 | 채널 설정 | `portone.channels`에 다섯 결제대행사의 채널 키가 모두 있어야 합니다. 하나라도 비어 있으면 서버가 뜨지 않습니다 | `PortOneProperties` | 구현 완료 |
 | 결제 준비 | 결제하기를 누를 때마다 고른 결제대행사로 새 결제 시도를 만들고 결제 ID를 돌려줍니다. 결제 ID는 `payment-` + 하이픈 없는 UUID로 40자입니다(KG이니시스 주문번호 40자 제한). 만료 시각은 생성 10분 뒤입니다. 결제창 값을 먼저 구한 뒤 결제를 만듭니다 | `PaymentFacade.preparePayment`, `PaymentCommandService.create` | 구현 완료 |
 | 결제대행사 필수 | 결제 준비 요청에 결제대행사가 없거나 모르는 값이면 `C001`(400)입니다 | `PaymentPrepareRequest` | 구현 완료 |
 | 재결제(1:N) | 한 주문에 결제 시도가 여러 건 생길 수 있습니다. 결제가 실패해도 주문은 결제 대기로 남아 같은 주문으로 다시 결제합니다. 다시 결제할 때 결제 수단을 바꿀 수 있습니다 | `PaymentCommandService.fail` | 구현 완료 |
-| 이전 결제 대기 정리 | 결제 준비 때 남은 결제 대기 건이 있으면 PG를 조회해, 이미 결제됐으면 그 결제를 승인하고(새 결제는 만들지 않음) 아니면 `SUPERSEDED`로 실패 처리합니다. PG 조회가 실패하면 새 결제를 만들지 않습니다 | `preparePayment`, `closeReady` | 구현 완료 |
+| 이전 결제 대기 정리 | 결제 준비 때 남은 결제 대기 건이 있으면 PG를 조회해, 이미 결제됐으면 그 결제를 승인하고(새 결제는 만들지 않음) 아니면 `SUPERSEDED`로 실패 처리합니다. PG 조회가 실패하면 새 결제를 만들지 않습니다. 남은 건이 등록 카드 결제면 서버가 아직 청구 중일 수 있어 밀어내지 않고 `PAYMENT_008`로 거절합니다 | `preparePayment`, `closeReady` | 구현 완료 |
 | 결제 대기 한 건 | 한 주문의 결제 대기 건은 최대 한 건입니다. 동시에 들어온 결제 준비는 하나만 만들고 나머지는 `PAYMENT_008`로 거절합니다 | `create` | 구현 완료 |
 | 결제 확정 | 결제창이 성공으로 끝나면 프론트가 부릅니다. 본인 결제인지, 요청의 주문 ID가 결제의 주문과 같은지 확인한 뒤 PG를 조회해 결제 완료·금액·결제 시각을 확인하고 승인합니다 | `confirmPayment` | 구현 완료 |
 | 실제 결제대행사 | 승인할 때 PG 조회 결과의 결제대행사(채널)를 확인합니다. 고른 값과 달라도 금액을 검증했으므로 받고, 실제 결제대행사로 고쳐 남깁니다. 확인하지 못하면 고른 값을 둡니다 | `PaymentCommandService.approve`, `Payment.complete`, `PortOnePaymentResponse` | 구현 완료 |
@@ -28,7 +28,7 @@
 | 중복 확정 | 이미 결제 완료면 PG 조회 없이 같은 응답을 줍니다. 이미 실패면 실패 이유에 맞는 오류로 거절합니다 | `confirmPayment` | 구현 완료 |
 | 결제 완료 이벤트 | 처음 승인한 요청만 `PaymentCompletedEvent`를 발행합니다. 장바구니가 커밋 뒤에 결제한 상품을 지웁니다. 삭제가 실패해도 결제는 그대로입니다 | `approve`, `PaymentCompletedEventListener` | 구현 완료 |
 | 결제창 닫기 | 결제 대기 건만 `USER_CANCELLED`로 실패 처리합니다. PG에서 이미 결제됐으면 실패 처리하지 않습니다(`PAYMENT_005`). 프론트는 지금 이 API를 부르지 않고 만료 스케줄러가 정리합니다 | `failByUser` | 구현 완료 |
-| 웹훅 | `Transaction.Paid`·`Failed`·`Cancelled`·`PartialCancelled`만 처리하고, 받을 때마다 PG를 다시 조회해 상태를 맞춥니다. 결제 직후 창을 닫아 확정 요청이 오지 않아도 웹훅이 승인합니다 | `WebhookHandler`, `PaymentFacade.syncWithPg` | 구현 완료 |
+| 웹훅 | `Transaction.Paid`·`Failed`·`Cancelled`·`PartialCancelled`만 처리하고, 받을 때마다 PG를 다시 조회해 상태를 맞춥니다. 결제 직후 창을 닫아 확정 요청이 오지 않아도 웹훅이 승인합니다. `BillingKey.Issued`는 카드 등록을 마무리합니다([등록 카드 결제 설계](payment-card.md)) | `WebhookHandler`, `PaymentFacade.syncWithPg` | 구현 완료 |
 | 웹훅 서명·멱등 | PortOne SDK로 서명을 검증하고(실패 401, 기록 안 함), `webhook_id` UNIQUE로 같은 웹훅을 한 번만 처리합니다. 처리에 실패하면 오류로 응답해 재전송을 받습니다 | `PortOneWebhookVerifier`, `WebhookEventService` | 구현 완료 |
 | 결제 만료 | 1분마다 만료 시각이 지난 결제 대기 건을 100건씩 읽어, PG에서 결제가 끝났으면 웹훅과 같은 규칙으로 처리하고 아니면 `TIMEOUT`으로 실패 처리합니다 | `PaymentTimeoutScheduler.expireOverduePayments` | 구현 완료 |
 | 보상 취소 재시도 | 받지 않은 결제의 PG 취소가 실패해 남아 있으면 5분마다 다시 취소합니다. 다른 경로로 이미 취소됐으면 기록만 남깁니다 | `retryCompensations`, `retryCompensation` | 구현 완료 |
@@ -47,7 +47,8 @@
 | 결제 대기 | 결제 확정·웹훅·만료 | PG 결제 완료, 주문이 결제 대기 아님 | 실패(`ORDER_NOT_PAYABLE`), PG 취소 | `PAYMENT_007` |
 | 결제 대기 | 결제 확정·웹훅·만료 | PG 실패·취소 | 실패(`PG_FAILED`) | `PAYMENT_004` |
 | 결제 대기 | 결제창 닫기 | PG에 결제 없음·미완료 | 실패(`USER_CANCELLED`) | PG 결제 완료면 `PAYMENT_005` |
-| 결제 대기 | 새 결제 준비 | PG에 결제 없음·미완료 | 실패(`SUPERSEDED`) | PG 조회 실패면 새 결제를 만들지 않음 |
+| 결제 대기 | 새 결제 준비 | PG에 결제 없음·미완료, 결제창 결제 | 실패(`SUPERSEDED`) | PG 조회 실패면 새 결제를 만들지 않음. 등록 카드 결제면 그대로 두고 `PAYMENT_008` |
+| 결제 대기 | 등록 카드 결제 거절 | PG에 결제 없음·실패 | 실패(`PG_FAILED`) | `PAYMENT_010` |
 | 결제 대기 | 만료 스케줄러 | 만료 시각 경과, PG에 결제 없음·미완료 | 실패(`TIMEOUT`) | 실패하면 다음 실행에서 재시도 |
 | 실패 | 웹훅·재시도 스케줄러 | PG에서 결제됨 | 실패 그대로, PG 보상 취소 | 취소 실패면 웹훅 재전송·5분 뒤 재시도 |
 
@@ -127,7 +128,7 @@ sequenceDiagram
 
 ## 데이터·API·이벤트
 - ERD·데이터 사전: [erd.md](../../database/erd.md#결제-테이블-관계), [data-dictionary.md](../../database/data-dictionary.md#payments--결제), DDL [payment.sql](../../database/payment.sql)
-- 제공 API: [결제 API](../../api/payment-api.md) (결제 준비, 결제 확정, 결제창 닫기, PortOne 웹훅)
+- 제공 API: [결제 API](../../api/payment-api.md) (결제 준비, 결제 확정, 결제창 닫기, PortOne 웹훅, 등록 카드 결제, 카드, 결제 비밀번호)
 - 수신 이벤트와 중복 처리: PortOne 웹훅. `webhook_id`로 한 번만 처리하고, 처리 실패(`FAILED`)와 수신 중(`RECEIVED`)은 재전송 때 다시 처리합니다.
 - 발행 이벤트: `PaymentCompletedEvent`(orderId, memberId). 처음 승인한 요청만 발행하고, 장바구니가 커밋 뒤(`AFTER_COMMIT`) 받습니다.
 - 보관 기간·삭제 정책: 결제·결제 이력·웹훅 기록은 지우지 않습니다. 결제가 붙은 주문은 주문 쪽에서도 지우지 않고 취소 상태로 남깁니다.
@@ -149,8 +150,8 @@ sequenceDiagram
 | 환불 | PG 취소 기록(`recordCancellation`), 환불이 아닌 취소 금액 합, PG 취소 건 ID 목록 | 환불 완료·PG 대조 때, 환불 → 결제 | 구현 완료 |
 | 환불 | 취소·부분 취소 웹훅 전달(`RefundFacade.syncWithPg`) | 웹훅 수신 때, 웹훅 → 환불 | 구현 완료 |
 | 정산 | 결제 이력(`payment_histories`)을 읽기만 함. 결제 상태 `PAID`인 결제의 `PAID`·`PARTIAL_CANCELLED`·`CANCELLED` 이력 | 일별 집계·조회 때, 정산 → 결제 이력. 결제 코드는 정산을 모름 | 구현 완료 |
-| 프론트 | 결제 수단 목록(`PG_PROVIDER_OPTIONS`), 결제 준비 응답의 채널 키·결제 방식으로 결제창 열기 | 주문 확인 화면 | 구현 완료 |
-| PortOne | 결제 조회(채널의 결제대행사 포함), 결제 취소(멱등 키), 웹훅 | 외부 API | 구현 완료 |
+| 프론트 | 결제 수단 목록(`PG_PROVIDER_OPTIONS`), 결제 준비 응답의 채널 키·결제 방식으로 결제창 열기, 등록 카드 선택과 결제 비밀번호 입력 | 주문 확인 화면 | 구현 완료 |
+| PortOne | 결제 조회(채널의 결제대행사 포함), 결제 취소(멱등 키), 빌링키 결제, 웹훅 | 외부 API | 구현 완료 |
 
 ## 검증과 증거
 - 필수 시나리오: [test-strategy.md](../../testing/test-strategy.md#결제-필수-시나리오)의 PAY-01~15.

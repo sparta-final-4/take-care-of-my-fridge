@@ -21,14 +21,14 @@
 | 환불 뒤 주문 상태 | 환불 가능한 일반 상품(`SaleType.NONE`)을 모두 환불하면 주문 상태를 바꿉니다. 특가·번개 드롭 상품이 없으면 전액 환불(`REFUNDED`), 있으면 7일을 기다리지 않고 바로 구매 확정(`CONFIRMED`)하고 확정 수량(주문 수량 − 완료된 환불 수량)을 남깁니다. 부분 환불이거나 환불할 수 있는 상품이 없는 주문은 바꾸지 않습니다 | `RefundableOrderPolicy.statusAfterRefund`, `OrderStatusService.markRefunded`·`confirm` | 구현 완료 |
 | 주문 상태 변경 실패 | 주문 상태 변경까지 묶은 완료가 실패하면(주문이 결제 완료가 아님 등) 모두 되돌아갑니다. 그때는 새 트랜잭션으로 환불만 완료합니다(재고·결제 이력 포함). PG에서 이미 돈이 돌아갔기 때문입니다 | `RefundFacade.completeRefund`, `completeWithoutOrderStatus` | 구현 완료 |
 | PG 거절 | PG가 4xx로 거절하면 실패로 바꾸고 PG 오류 원문을 실패 사유에 남깁니다(`REFUND_012`) | `RefundFacade.request` | 구현 완료 |
-| 결과 모름 | 타임아웃·5xx로 결과를 모르면 바로 PG를 조회해 판단합니다. 그래도 확정하지 못하면 요청 상태(201, `REQUESTED`)로 돌려주고 웹훅·스케줄러가 마무리합니다 | `syncQuietly` | 구현 완료 |
+| 결과 모름 | 타임아웃·5xx로 결과를 모르면 바로 PG를 조회해 판단합니다. 그래도 확정하지 못하면 요청 상태(201, `REQUESTED`)로 돌려주고 웹훅·스케줄러가 마무리합니다. 프론트는 "환불을 접수했습니다" 안내 후 환불 상세로 이동해 결과를 보여 줍니다 | `syncQuietly` | 구현 완료 |
 | 완료 처리 실패 | PG 취소 뒤 완료 처리가 실패해도 실패로 바꾸지 않고 요청 상태로 둡니다. PG에서는 돈이 돌아갔기 때문입니다 | `RefundFacade.request` | 구현 완료 |
 | PG와 맞추기 | PG 누적 취소 금액 − 우리가 기록한 취소 금액이 진행 중 환불 금액과 같으면 완료, 0이면 아직 취소 안 됨, 그 밖은 로그만 남깁니다. 환불 기록 없는 PG 취소(콘솔 취소)는 결제 이력에만 남기고 재고는 건드리지 않습니다 | `RefundFacade.syncWithPg` | 구현 완료 |
 | 환불 정리 | 5분마다 10분 넘게 요청 상태인 환불을 PG와 맞춥니다. PG에서 취소되지 않았으면 실패로 바꿉니다. 서버가 여러 대여도 ShedLock으로 한 대만 실행합니다 | `RefundReconcileScheduler` | 구현 완료 |
 | 주문 상태 복구 | 같은 실행에서, 환불 가능한 상품을 모두 완료 환불했는데 결제 완료로 남은 주문을 찾아 주문 쪽 `OrderStatusFacade.markRefunded`·`confirmAfterRefund`로 맞춥니다. 부분 환불 주문은 고르지 않습니다. 한 주문이 실패해도 나머지는 계속하고 다음 실행에서 다시 봅니다 | `RefundFacade.syncOrderStatuses`, `RefundRepository.findFullyRefundedOrderIds` | 구현 완료 |
 | 취소 웹훅 | `Transaction.Cancelled`·`PartialCancelled` 웹훅을 받으면 PG와 맞춥니다. API로 이미 완료한 환불의 웹훅은 바꿀 것이 없어 `IGNORED`입니다 | `WebhookHandler` | 구현 완료 |
 | 구매 확정과 순서 | 환불 신청과 구매 확정은 같은 주문 행을 잠가 하나씩 처리합니다. 구매 확정은 요청 상태 환불이 있으면 거절합니다(`ORDER_011`) | `RefundCommandService.request`, `OrderStatusFacade` | 구현 완료 |
-| 조회 | 환불 가능 수량, 주문별 환불 내역(상태와 관계없이 최신순), 주문별 환불 요약(1~50건) | `RefundQueryService` | 구현 완료 |
+| 조회 | 환불 가능 수량, 주문별 환불 내역(상태와 관계없이 최신순, 구매 확정된 주문의 지난 환불 포함, PG 오류 원문은 응답에서 뺌), 주문별 환불 요약(1~50건, 요청 순서대로, 없는·남의 주문은 뺌) | `RefundQueryService` | 구현 완료 |
 
 ## 상태와 전이
 | 현재 상태 | 행동 | 조건 | 다음 상태 | 실패 |

@@ -292,12 +292,13 @@ erDiagram
 
 ## 결제 테이블 관계
 
-결제 테이블 4개입니다. 컬럼 정의는 [데이터 사전](data-dictionary.md#payments--결제)에 있습니다.
+결제 테이블 5개입니다. 컬럼 정의는 [데이터 사전](data-dictionary.md#payments--결제)에 있습니다.
 
 ```mermaid
 erDiagram
     orders ||--o{ payments : "결제 시도"
     members ||--o{ billing_keys : "등록 카드"
+    members ||--o| payment_pins : "결제 비밀번호"
     billing_keys |o--o{ payments : "등록 카드 결제"
     payments ||--o{ payment_histories : "이력"
     payments |o--o{ webhook_events : "웹훅"
@@ -313,10 +314,19 @@ erDiagram
         varchar billing_key UK
         varchar card_name
         char card_last4
+        varchar card_number_masked
+        varchar card_issuer_code
         enum card_type
         boolean is_default
         enum status
         datetime pg_deleted_at
+    }
+    payment_pins {
+        bigint id PK
+        bigint member_id UK
+        varchar pin_hash
+        int failed_count
+        datetime locked_at
     }
     payments {
         bigint id PK
@@ -353,6 +363,9 @@ erDiagram
 | orders 1 : N payments | 주문 하나에 결제 시도 여러 건(재결제). 결제 완료는 한 건만 | 결제에는 주문이 반드시 있음 |
 | payments 1 : N payment_histories | 결제 하나에 사건 여러 건 | 이력에는 결제가 반드시 있음 |
 | payments 1 : N webhook_events | 결제 하나에 웹훅 여러 건 | 결제를 못 찾은 웹훅은 결제 없음 |
+| members 1 : N billing_keys | 회원 하나에 등록 카드 여러 장(사용 중 최대 5장) | 카드에는 회원이 반드시 있음 |
+| billing_keys 1 : N payments | 등록 카드 하나로 결제 여러 건 | 결제창 결제는 카드 없음 |
+| members 1 : 0..1 payment_pins | 회원 하나에 결제 비밀번호 최대 하나 | 설정하지 않은 회원은 없음 |
 
 | 컬럼 | 가리키는 대상 | 소유 도메인 |
 |---|---|---|
