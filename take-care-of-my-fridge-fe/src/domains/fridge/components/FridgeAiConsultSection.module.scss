@@ -1,3 +1,18 @@
 .hint {
   font-size: var(--ant-font-size-sm);
 }
+
+// [선택 해제]: 테두리 없는 작은 회색 글자, 오른쪽 정렬, 마우스를 올리면 밑줄
+:global(.ant-btn).clearLink {
+  align-self: flex-end;
+  padding-inline: 0;
+  font-size: var(--ant-font-size);
+  font-weight: normal;
+  color: var(--ant-color-text-secondary);
+
+  &:hover,
+  &:focus-visible {
+    color: var(--ant-color-text-secondary);
+    text-decoration: underline;
+  }
+}

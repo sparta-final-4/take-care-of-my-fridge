@@ -36,11 +36,12 @@ export function FridgeAiConsultSection() {
               체크한 재료 중 직접 입력·밀키트·기본 양념 {excludedCount}개는 빼고 상담해요.
             </Typography.Text>
           )}
-          <Flex vertical gap="small">
-            <Button type="primary" size="large" block onClick={() => openChat(selected)}>
+          {/* 버튼은 사이트 기본 크기(44px), 카드 폭 그대로. 선택 해제는 오른쪽 작은 글자 링크 */}
+          <Flex vertical gap="xs">
+            <Button type="primary" block onClick={() => openChat(selected)}>
               선택한 재료로 상담하기
             </Button>
-            <Button block onClick={clearChecked}>
+            <Button type="link" onClick={clearChecked} className={styles.clearLink}>
               선택 해제
             </Button>
           </Flex>
@@ -61,7 +62,7 @@ export function FridgeAiConsultSection() {
         <Typography.Text type="secondary" className={styles.hint}>
           목록에서 재료를 체크하면 그 재료로 상담해요.
         </Typography.Text>
-        <Button type="primary" size="large" block onClick={() => openChat()}>
+        <Button type="primary" block onClick={() => openChat()}>
           AI 상담 시작하기
         </Button>
       </Flex>

@@ -30,7 +30,7 @@ export function FridgePageHeader({ onAdd }: FridgePageHeaderProps) {
           내 냉장고
         </Typography.Title>
       </Flex>
-      <Button type="primary" size="large" icon={<PlusOutlined />} onClick={onAdd}>
+      <Button type="primary" icon={<PlusOutlined />} onClick={onAdd}>
         재료 추가
       </Button>
     </Flex>
