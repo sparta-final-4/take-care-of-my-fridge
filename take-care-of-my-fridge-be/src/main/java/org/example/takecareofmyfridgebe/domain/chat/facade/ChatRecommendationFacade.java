@@ -3,6 +3,7 @@ package org.example.takecareofmyfridgebe.domain.chat.facade;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatAllergyWordProperties;
+import org.example.takecareofmyfridgebe.domain.chat.config.ChatFeatureWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatMealkitWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatTasteOppositeProperties;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatTasteWordProperties;
@@ -51,6 +52,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -90,6 +92,7 @@ public class ChatRecommendationFacade {
     private final ChatAllergyWordProperties chatAllergyWordProperties;
     private final ChatTasteOppositeProperties chatTasteOppositeProperties;
     private final ChatTemperatureWordProperties chatTemperatureWordProperties;
+    private final ChatFeatureWordProperties chatFeatureWordProperties;
 
     /**
      * @param content 사용자 메시지 원문 (설명 프롬프트에 넣는다)
@@ -228,12 +231,18 @@ public class ChatRecommendationFacade {
                 .toList());
     }
 
-    private RecommendationReply recommendRecipes(String content, RecipeQuery request, Collection<Long> previousCardIds) {
+    private RecommendationReply recommendRecipes(String content, RecipeQuery spoken, Collection<Long> previousCardIds) {
+        // "시원한 국물"처럼 특징만 말한 표현은 요리 이름이 아니다 (요리 이름이면 "○○ 레시피는 없어서" 안내가 붙는다)
+        RecipeQuery request = spoken;
+        if (spoken.keywordText() != null && isFeature(spoken.keywordText())) {
+            log.info("상담 요리 이름이 특징 표현이라 비움 - memberId: {}, 표현: {}", spoken.memberId(), spoken.keywordText());
+            request = spoken.withKeywordText(null);
+        }
         RecipeCandidates found = recipeCandidateFacade.findCandidates(request);
         RecipeQuery query = request;
         // AI가 요리 이름을 비웠는데 말에 그대로 있는 키워드가 레시피 이름에 하나도 없으면 그 이름을 요리 이름으로 쓴다
-        // ("탕짜면 먹고 싶어" → "탕짜면 레시피는 없어서…" 안내, 카드 이유 "탕짜면과 비슷한 탕수육이에요")
-        Optional<String> spokenDish = spokenDishWithoutRecipe(content, request, found.candidates());
+        // ("탕짜면 먹고 싶어" → "탕짜면 레시피는 없어서…" 안내, 카드 이유 "탕짜면과 비슷한 탕수육이에요"). 특징 표현은 채우지 않는다
+        Optional<String> spokenDish = spokenDishWithoutRecipe(content, request, found.candidates(), this::isFeature);
         if (spokenDish.isPresent()) {
             query = request.withKeywordText(spokenDish.get());
             found = new RecipeCandidates(found.candidates(), found.fallback(), true, found.keptAvoidTastes())
@@ -295,15 +304,33 @@ public class ChatRecommendationFacade {
      * 고른 후보 레시피 이름에 그 이름이 하나도 없을 때만 돌려준다. 레시피 이름에 있으면 늘린 이름으로 맞은 그대로 둔다.
      */
     static Optional<String> spokenDishWithoutRecipe(String content, RecipeQuery query, List<RecipeCandidate> candidates) {
+        return spokenDishWithoutRecipe(content, query, candidates, keyword -> false);
+    }
+
+    /**
+     * @param isFeature 특징 표현인지 ("시원한 국물"). 특징 표현인 키워드로는 요리 이름을 채우지 않는다
+     */
+    static Optional<String> spokenDishWithoutRecipe(String content, RecipeQuery query, List<RecipeCandidate> candidates,
+                                                    Predicate<String> isFeature) {
         if (query.keywordText() != null || content == null) {
             return Optional.empty();
         }
         String message = compact(content);
         return query.keywords().stream()
                 .filter(keyword -> compact(keyword).length() >= 2 && message.contains(compact(keyword)))
+                .filter(isFeature.negate())
                 .findFirst()
                 .filter(keyword -> candidates.stream()
                         .noneMatch(candidate -> candidate.name() != null && compact(candidate.name()).contains(compact(keyword))));
+    }
+
+    // 맛·온도 낱말과 일반 말로만 된 특징 표현인지 ("시원한 국물", "매운 요리"). "매운탕"·"김치찌개"는 아니다
+    private boolean isFeature(String phrase) {
+        List<String> stems = FeaturePhraseChecker.stems(
+                chatTasteWordProperties.spicy(), chatTasteWordProperties.sweet(), chatTasteWordProperties.salty(),
+                chatTasteWordProperties.umami(), chatTasteWordProperties.mild(),
+                chatTemperatureWordProperties.warm(), chatTemperatureWordProperties.cold());
+        return FeaturePhraseChecker.isFeature(phrase, stems, chatFeatureWordProperties);
     }
 
     /**

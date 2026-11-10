@@ -74,6 +74,10 @@ public final class RecommendationPromptBuilder {
         text.append("메시지: ").append(content.strip()).append('\n');
         text.append("선택 재료: ").append(selectedLine(query, ingredientNames)).append('\n');
         text.append("조건: ").append(conditionLine(query, ingredientNames)).append('\n');
+        // 원한 표현은 요리 이름이 아니라 특징으로 넘긴다 (요리 이름처럼 읽고 "○○ 레시피는 없어요"라고 쓰지 않게)
+        if (query.preferenceText() != null) {
+            text.append("사용자가 원한 특징: ").append(query.preferenceText()).append('\n');
+        }
         text.append("[추천 후보]\n");
         if (picked.isEmpty()) {
             text.append(NO_CANDIDATES).append('\n');
@@ -100,7 +104,8 @@ public final class RecommendationPromptBuilder {
         List<String> notices = new ArrayList<>();
         if (preferenceUnmet(query, picked)) {
             notices.add(preferenceUnmetNotice(query.preferenceText()));
-        } else if (keywordsNotFound) {
+        } else if (keywordsNotFound && query.keywordText() != null) {
+            // 요리 이름을 말했을 때만 못 찾았다고 안내한다. 특징만 말했으면("시원한 국물") 고른 요리를 바로 소개한다
             notices.add(keywordNotFoundNotice(query, picked));
         }
         String missingNotice = missingSelectedNotice(picked);
@@ -127,25 +132,20 @@ public final class RecommendationPromptBuilder {
         return "말씀하신 " + subject + " 찾지 못해서 냉장고 재료로 만들 수 있는 요리를 골랐어요";
     }
 
-    // 말한 요리를 못 찾았을 때 안내.
-    // 요리 이름을 말했고 고른 카드 중 키워드로 맞은 요리가 있으면 "김피탕 레시피는 없어서, 비슷한 탕수육과 깐풍기를 골랐어요",
-    // 맞은 요리가 없으면 "말씀하신 김피탕은 찾지 못해서 비슷한 걸 골랐어요", 요리 이름 없이 키워드만 있으면 "말씀하신 냉면 요리는 …"
+    // 말한 요리(요리 이름)를 못 찾았을 때 안내. 요리 이름이 있을 때만 부른다.
+    // 고른 카드 중 키워드로 맞은 요리가 있으면 "김피탕 레시피는 없어서, 비슷한 탕수육과 깐풍기를 골랐어요",
+    // 맞은 요리가 없으면 "말씀하신 김피탕은 찾지 못해서 비슷한 걸 골랐어요"
     static String keywordNotFoundNotice(RecipeQuery query, List<RecipeCandidate> picked) {
-        if (query.keywordText() != null) {
-            String dish = query.keywordText();
-            List<String> similar = similarDishNames(picked);
-            if (!similar.isEmpty()) {
-                String last = similar.get(similar.size() - 1);
-                String names = similar.size() == 1
-                        ? last
-                        : similar.get(0) + withParticle(similar.get(0)) + " " + last;
-                return dish + " 레시피는 없어서, 비슷한 " + names + objectParticle(last) + " 골랐어요";
-            }
-            return "말씀하신 " + dish + topicParticle(dish) + " 찾지 못해서 비슷한 걸 골랐어요";
+        String dish = query.keywordText();
+        List<String> similar = similarDishNames(picked);
+        if (!similar.isEmpty()) {
+            String last = similar.get(similar.size() - 1);
+            String names = similar.size() == 1
+                    ? last
+                    : similar.get(0) + withParticle(similar.get(0)) + " " + last;
+            return dish + " 레시피는 없어서, 비슷한 " + names + objectParticle(last) + " 골랐어요";
         }
-        String dish = query.keywords().get(0);
-        String dishPhrase = dish.endsWith("요리") ? dish : dish + " 요리";
-        return "말씀하신 " + dishPhrase + "는 찾지 못해서 비슷한 걸 골랐어요";
+        return "말씀하신 " + dish + topicParticle(dish) + " 찾지 못해서 비슷한 걸 골랐어요";
     }
 
     // 고른 카드 중 키워드로 맞은 요리 이름 (최대 2개). 늘린 이름으로 맞았으면 그 키워드(탕수육), 재료로 맞았으면 레시피 이름.

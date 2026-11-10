@@ -117,6 +117,20 @@ class RecommendationPromptBuilderTest {
     }
 
     @Test
+    @DisplayName("요리 이름 없이 원한 특징만 있으면 키워드로 못 찾았어도 없다는 안내 없이 원한 특징 줄로 넘긴다")
+    void omitsNotFoundNotice_whenOnlyFeature() {
+        RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, null, null, null, false,
+                List.of("시원한 국물", "냉국"), null, "시원한 국물");
+        RecipeCandidate matched = new RecipeCandidate(1L, "오이냉국", "국", 10, new Ranking(1, 0, 0, 0, 1, 1, 0),
+                reason(List.of(), List.of(), List.of(), List.of(), List.of(), false));
+
+        String text = RecommendationPromptBuilder.build("시원한 국물 요리", query, NAMES, List.of(matched), true);
+
+        assertThat(text).startsWith("[사용자 요청]").contains("사용자가 원한 특징: 시원한 국물")
+                .doesNotContain("[이미 안내한 말]", "없어서", "찾지 못해서");
+    }
+
+    @Test
     @DisplayName("원한 표현이 있는데 고른 레시피가 요청(키워드·분류·맛)에 하나도 안 맞으면 [이미 안내한 말]에 솔직하게 넣는다")
     void writesPreferenceUnmetNotice() {
         RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, null, null, null, false,
