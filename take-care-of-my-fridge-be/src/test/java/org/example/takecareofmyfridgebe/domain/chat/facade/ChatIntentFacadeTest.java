@@ -2,6 +2,7 @@ package org.example.takecareofmyfridgebe.domain.chat.facade;
 
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatCandidateProperties;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatCategoryWordProperties;
+import org.example.takecareofmyfridgebe.domain.chat.config.ChatCorrectionProperties;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatFoodWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatTasteOppositeProperties;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext.CardName;
@@ -87,11 +88,7 @@ class ChatIntentFacadeTest {
         chatMessageService = mock(ChatMessageService.class);
         allergyExclusionFinder = mock(AllergyExclusionFinder.class);
         when(allergyExclusionFinder.find(any(), any())).thenReturn(AllergyExclusionFinder.Allergens.NONE);
-        facade = new ChatIntentFacade(extractor, recipeService, ingredientMatcher,
-                new ChatCandidateProperties(List.of("양념", "음료"), 0.4, List.of(), List.of("백김치", "물김치", "동치미", "나박김치"), List.of(), List.of()),
-                chatMessageService, TasteWordCheckerTest.WORDS, MealkitWordCheckerTest.WORDS, AskWordCheckerTest.WORDS,
-                new ChatCategoryWordProperties(CategoryWordCheckerTest.GROUPS), FOOD_WORDS, allergyExclusionFinder, TASTE_OPPOSITES,
-                FridgeShopWordCheckerTest.WORDS);
+        facade = newFacade(ChatCorrectionProperties.ALL_ON);
         when(recipeService.getClassifications())
                 .thenReturn(new RecipeClassificationResponse(List.of("한식"), List.of("국", "기타", "샐러드", "양념", "음료", "찌개")));
     }
@@ -1751,6 +1748,72 @@ class ChatIntentFacadeTest {
             ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("두부 사서 만들 요리 추천해줘"));
 
             assertThat(resolution.intent()).isEqualTo(ChatIntent.RECOMMEND);
+        }
+    }
+
+    // 보정 켜고 끄기(app.chat.corrections)만 바꿔 만든다
+    private ChatIntentFacade newFacade(ChatCorrectionProperties corrections) {
+        return new ChatIntentFacade(extractor, recipeService, ingredientMatcher,
+                new ChatCandidateProperties(List.of("양념", "음료"), 0.4, List.of(), List.of("백김치", "물김치", "동치미", "나박김치"), List.of(), List.of()),
+                chatMessageService, TasteWordCheckerTest.WORDS, MealkitWordCheckerTest.WORDS, AskWordCheckerTest.WORDS,
+                new ChatCategoryWordProperties(CategoryWordCheckerTest.GROUPS), FOOD_WORDS, allergyExclusionFinder, TASTE_OPPOSITES,
+                FridgeShopWordCheckerTest.WORDS, corrections);
+    }
+
+    @Nested
+    @DisplayName("보정 끄기 (app.chat.corrections)")
+    class Corrections {
+
+        // 끌 보정만 false
+        private ChatCorrectionProperties off(String... names) {
+            return EvalCorrectionSwitches.properties(java.util.Set.of(names));
+        }
+
+        @Test
+        @DisplayName("새 추천 맛 정리를 끄면 맛 단어 목록에 없는 말(\"맵고\")에서도 AI가 넣은 맛을 지우지 않는다")
+        void keepsAiTastes_whenSpokenTastesOff() {
+            givenExtracted(new IntentResult(ChatIntent.RECOMMEND, List.of("SPICY"), null, null, null, null, false, null, null, null));
+            ChatMessageCreateRequest request = ChatMessageCreateRequest.of("맵고 따뜻한 스프");
+
+            RecipeQuery on = facade.resolve(MEMBER_ID, SESSION_ID, request).recipeQuery();
+            RecipeQuery offQuery = newFacade(off("taste-words", "spoken-tastes-only"))
+                    .resolve(MEMBER_ID, SESSION_ID, request).recipeQuery();
+
+            assertThat(on.wantedTastes()).as("켜 두면 지금처럼 지움").isEmpty();
+            assertThat(offQuery.wantedTastes()).containsExactly(Taste.SPICY);
+        }
+
+        @Test
+        @DisplayName("분류 단어 보정을 끄면 AI 분류를 그대로 쓴다")
+        void keepsAiCategories_whenCategoryWordsOff() {
+            givenExtracted(new IntentResult(ChatIntent.RECOMMEND, null, List.of("국"), null, null, null, false, null, null, null));
+            ChatMessageCreateRequest request = ChatMessageCreateRequest.of("찌개 추천해줘");
+
+            assertThat(facade.resolve(MEMBER_ID, SESSION_ID, request).recipeQuery().moodCategories()).containsExactly("찌개");
+            assertThat(newFacade(off("category-words")).resolve(MEMBER_ID, SESSION_ID, request).recipeQuery().moodCategories())
+                    .containsExactly("국");
+        }
+
+        @Test
+        @DisplayName("OFF_TOPIC 되살리기를 끄면 음식 말이 있어도 AI대로 거절한다")
+        void keepsOffTopic_whenReviveOff() {
+            givenExtracted(new IntentResult(ChatIntent.OFF_TOPIC, null, null, null, null, null, false, null, null, null));
+            ChatMessageCreateRequest request = ChatMessageCreateRequest.of("저녁 먹을 거 추천해줘");
+
+            assertThat(facade.resolve(MEMBER_ID, SESSION_ID, request).intent()).isEqualTo(ChatIntent.RECOMMEND);
+            assertThat(newFacade(off("off-topic-revive")).resolve(MEMBER_ID, SESSION_ID, request).intent())
+                    .isEqualTo(ChatIntent.OFF_TOPIC);
+        }
+
+        @Test
+        @DisplayName("요리 이름 서버 계산을 끄면 요리 이름이 없다")
+        void noDish_whenDishFromKeywordsOff() {
+            givenExtracted(new IntentResult(ChatIntent.RECOMMEND, null, null, null, null, null, false, List.of("김치찌개"), null, null));
+            ChatMessageCreateRequest request = ChatMessageCreateRequest.of("김치찌개 추천해줘");
+
+            assertThat(facade.resolve(MEMBER_ID, SESSION_ID, request).recipeQuery().keywordText()).isEqualTo("김치찌개");
+            assertThat(newFacade(off("dish-from-keywords")).resolve(MEMBER_ID, SESSION_ID, request).recipeQuery().keywordText())
+                    .isNull();
         }
     }
 

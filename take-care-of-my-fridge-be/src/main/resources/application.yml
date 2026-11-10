@@ -92,6 +92,19 @@ app:
     # 한 상담에 답을 동시에 하나만 받도록 거는 잠금의 유지 시간. 요청 타임아웃(120s)보다 길게 둔다.
     # 상담 AI 호출은 30s 타임아웃·재시도 1번이라 최악이어도 약 61초에 끝난다(ChatClientConfig)
     reply-lock-ttl: 150s
+    # 의도 판단 뒤 서버가 AI 값을 고치는 보정. 보정마다 끌 수 있다(기본 모두 켜짐). AI만으로 충분한지 평가로 비교할 때 쓴다.
+    # 안전 단어 차단·알레르기 빼기는 여기서 끄지 않는다. 뜻은 ChatCorrectionProperties
+    corrections:
+      taste-words: true
+      spoken-tastes-only: true
+      keep-other-tastes: true
+      refine-spoken-tastes: true
+      category-words: true
+      dish-from-keywords: true
+      name-only: true
+      mealkit-request: true
+      off-topic-revive: true
+      fridge-shop-words: true
   llm:
     # 공식 가격 확인 필요 (USD / 1M tokens)
     input-per-1m: 0.15

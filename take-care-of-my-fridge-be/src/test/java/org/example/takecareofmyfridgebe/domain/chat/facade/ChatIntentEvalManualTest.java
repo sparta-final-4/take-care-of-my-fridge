@@ -7,6 +7,7 @@ import com.openai.models.completions.CompletionUsage;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatAskWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatCandidateProperties;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatCategoryWordProperties;
+import org.example.takecareofmyfridgebe.domain.chat.config.ChatCorrectionProperties;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatFoodWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatFridgeShopWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatMealkitWordProperties;
@@ -83,6 +84,9 @@ import static org.mockito.Mockito.when;
  * (키는 OPENAI_API_KEY가 아니라 OPENAI_INTENT_EVAL_KEY로 넘긴다. build.gradle의 test 작업이 OPENAI_API_KEY를 가짜 키로 덮어쓴다)
  * (선택) OPENAI_INTENT_EVAL_RUNS=3  문장마다 돌릴 횟수 (다수결, 기본 3)
  * (선택) OPENAI_INTENT_EVAL_ONLY=F10,F11  이 id만 돌린다
+ * (선택) OPENAI_INTENT_EVAL_OFF=taste-words,spoken-tastes-only  이 서버 보정을 끄고 돌린다
+ *        (이름은 application.yml app.chat.corrections = EvalCorrectionSwitches.NAMES. 안전 단어 차단·알레르기는 끄지 않는다)
+ * (선택) OPENAI_INTENT_EVAL_LABEL=B  결과 파일 이름에 붙일 이름 (eval-{시각}-B-summary.txt)
  * </pre>
  * 결과: build/reports/chat-intent-eval/eval-{시각}-runs.csv (한 번 돌린 결과마다 한 줄, AI 원래 값과 최종 값),
  * eval-{시각}-cases.csv (문장마다 다수결 결과), eval-{시각}-summary.txt (묶음별 일치율·토큰·시간). 같은 요약을 콘솔에도 찍는다.
@@ -132,9 +136,11 @@ class ChatIntentEvalManualTest {
         assertThat(cases).as("평가 세트").isNotEmpty();
         int runs = Integer.parseInt(Optional.ofNullable(System.getenv("OPENAI_INTENT_EVAL_RUNS")).orElse("3"));
 
+        Set<String> off = EvalCorrectionSwitches.parse(System.getenv("OPENAI_INTENT_EVAL_OFF"));
+
         UsageRecorder usage = new UsageRecorder();
         RecordingExtractor extractor = new RecordingExtractor(openAiExtractor(usage));
-        ChatIntentFacade facade = facade(set, extractor);
+        ChatIntentFacade facade = facade(set, extractor, EvalCorrectionSwitches.properties(off));
 
         List<RunRow> rows = new ArrayList<>();
         for (EvalCase evalCase : cases) {
@@ -142,7 +148,7 @@ class ChatIntentEvalManualTest {
                 rows.add(runOnce(set, facade, extractor, usage, evalCase, run));
             }
         }
-        write(set, cases, rows, runs);
+        write(set, cases, rows, runs, off);
 
         // AI 호출이 실패하면 서버가 일반 답으로 정해 결과가 의미 없으므로, 파일을 남긴 뒤 실패시킨다
         List<RunRow> failed = rows.stream().filter(row -> row.source().startsWith("AI_FAILED")).toList();
@@ -200,7 +206,7 @@ class ChatIntentEvalManualTest {
                 new ClassPathResource("prompts/chat-intent-followup.txt"));
     }
 
-    private ChatIntentFacade facade(EvalSet set, ChatIntentExtractor extractor) {
+    private ChatIntentFacade facade(EvalSet set, ChatIntentExtractor extractor, ChatCorrectionProperties corrections) {
         RecipeService recipeService = mock(RecipeService.class);
         when(recipeService.getClassifications()).thenReturn(new RecipeClassificationResponse(List.of("한식"), set.categories()));
         when(recipeService.suggestNames(anyString(), anyInt())).thenAnswer(invocation -> {
@@ -220,12 +226,15 @@ class ChatIntentEvalManualTest {
                 .thenReturn(AllergyExclusionFinder.Allergens.NONE);
         return new ChatIntentFacade(extractor, recipeService, ingredientMatcher, candidateProperties,
                 mock(ChatMessageService.class), tasteWords, mealkitWords, askWords, categoryWords, foodWords,
-                allergyExclusionFinder, tasteOpposites, fridgeShopWords);
+                allergyExclusionFinder, tasteOpposites, fridgeShopWords, corrections);
     }
 
-    private void write(EvalSet set, List<EvalCase> cases, List<RunRow> rows, int runs) throws IOException {
+    private void write(EvalSet set, List<EvalCase> cases, List<RunRow> rows, int runs, Set<String> off) throws IOException {
         Files.createDirectories(OUT_DIR);
-        String stamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"));
+        String label = Optional.ofNullable(System.getenv("OPENAI_INTENT_EVAL_LABEL")).map(String::strip)
+                .filter(value -> !value.isEmpty()).map(value -> value.replaceAll("[^A-Za-z0-9_-]", "_")).orElse(null);
+        String stamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"))
+                + (label == null ? "" : "-" + label);
 
         List<String> runLines = new ArrayList<>();
         runLines.add(String.join(",", "id", "group", "context", "message", "run", "pass", "mismatch", "source",
@@ -261,6 +270,8 @@ class ChatIntentEvalManualTest {
 
         List<RunRow> aiRows = rows.stream().filter(row -> row.inputTokens() > 0).toList();
         List<String> summary = new ArrayList<>();
+        // 맨 위: 이번에 끈 서버 보정 (A~E 비교용)
+        summary.add(EvalCorrectionSwitches.describe(off) + (label == null ? "" : " · 이름 " + label));
         summary.add("AI 상담 의도 평가 " + stamp + " · 모델 " + MODEL + " · 문장 " + cases.size() + "개 × " + runs + "번 (다수결)");
         summary.add(promptSize(set));
         summary.add(String.format("전체 일치: %d / %d (%.1f%%)", passedCases, cases.size(), 100.0 * passedCases / cases.size()));
