@@ -32,7 +32,10 @@
   white-space: nowrap;
 }
 
+// 안내 상자는 표 폭까지 늘리지 않고 문구 길이만큼만 차지한다(좁은 화면에서는 줄을 바꾼다)
 .alert {
+  width: fit-content;
+  max-width: 100%;
   margin-top: var(--ant-margin);
 }
 

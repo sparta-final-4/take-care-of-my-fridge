@@ -38,15 +38,20 @@ export function CardPicker({
       behavior: 'smooth',
     });
 
+  // 등록 카드가 없으면 넘길 카드가 없어 화살표를 숨긴다
+  const hasCards = cards.length > 0;
+
   return (
     <div className={styles.picker}>
-      <Button
-        shape="circle"
-        icon={<LeftOutlined />}
-        aria-label="이전 카드"
-        onClick={() => scrollBy(-1)}
-        className={styles.arrow}
-      />
+      {hasCards && (
+        <Button
+          shape="circle"
+          icon={<LeftOutlined />}
+          aria-label="이전 카드"
+          onClick={() => scrollBy(-1)}
+          className={styles.arrow}
+        />
+      )}
       <div ref={trackRef} className={styles.track} role="radiogroup" aria-label="등록 카드">
         {cards.map((card) => {
           const selected = card.cardId === selectedCardId;
@@ -87,13 +92,15 @@ export function CardPicker({
           </button>
         )}
       </div>
-      <Button
-        shape="circle"
-        icon={<RightOutlined />}
-        aria-label="다음 카드"
-        onClick={() => scrollBy(1)}
-        className={styles.arrow}
-      />
+      {hasCards && (
+        <Button
+          shape="circle"
+          icon={<RightOutlined />}
+          aria-label="다음 카드"
+          onClick={() => scrollBy(1)}
+          className={styles.arrow}
+        />
+      )}
     </div>
   );
 }

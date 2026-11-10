@@ -84,4 +84,9 @@
   justify-content: center;
   border-style: dashed;
   color: var(--ant-color-text-secondary);
+
+  // 등록 카드가 없어 등록 칸만 있으면 넘길 카드가 없으므로 가운데에 둔다
+  &:only-child {
+    margin-inline: auto;
+  }
 }

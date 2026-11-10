@@ -22,12 +22,18 @@ const FOCUS_RING = `0 0 0 3px ${PAPER_3}`;
 const GREEN = '#246e3a'; // oklch(48% 0.11 150)
 const RED = '#c22826'; // oklch(53% 0.19 27)
 const AMBER = '#8a5500'; // 옅은 경고 바탕 위 글자 4.5:1 이상
+// 경고 안내 바탕·테두리. antd가 진한 AMBER에서 계산하면 탁한 회갈색(#c9c5b5)이 나와 직접 정한다.
+// AMBER 글자와 5.4:1
+const AMBER_BG = '#f8ecd4';
+const AMBER_BORDER = '#e3c690';
 
 export const theme: ThemeConfig = {
   token: {
     colorPrimary: TANGERINE,
     colorSuccess: GREEN,
     colorWarning: AMBER,
+    colorWarningBg: AMBER_BG,
+    colorWarningBorder: AMBER_BORDER,
     colorError: RED,
     colorInfo: INK_2,
     // 귤색은 글자색으로 쓰지 않는다. 링크는 잉크, 마우스를 올리면 보조색.
