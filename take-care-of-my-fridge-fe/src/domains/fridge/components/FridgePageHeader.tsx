@@ -4,11 +4,15 @@ import { Button, Flex, Typography } from 'antd';
 import { withoutBasicSeasoning } from '../filter';
 import { useFridgeSort } from '../hooks/useFridgeSort';
 import { useFridgeItems } from '../queries';
-import { scrollToIngredientInput } from '../sectionIds';
 import { FridgeIllustration } from './FridgeIllustration';
 import styles from './FridgePageHeader.module.scss';
 
-export function FridgePageHeader() {
+interface FridgePageHeaderProps {
+  // [재료 추가]: 재료 추가 팝업을 연다.
+  onAdd: () => void;
+}
+
+export function FridgePageHeader({ onAdd }: FridgePageHeaderProps) {
   const [sort] = useFridgeSort();
   const { data: allItems } = useFridgeItems(sort, true);
   // 요약 카드와 같은 기준으로 기본 양념은 빼고 센다.
@@ -37,8 +41,7 @@ export function FridgePageHeader() {
           )}
         </Flex>
       </Flex>
-      {/* 재료 입력은 이 화면 위쪽 [냉장고에 뭐가 남았나요?]에서 한다. */}
-      <Button type="primary" size="large" icon={<PlusOutlined />} onClick={scrollToIngredientInput}>
+      <Button type="primary" size="large" icon={<PlusOutlined />} onClick={onAdd}>
         재료 추가
       </Button>
     </Flex>

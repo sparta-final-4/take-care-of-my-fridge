@@ -1,39 +1,35 @@
 @use '@/styles/variables' as *;
 @use '@/styles/mixins' as *;
 
-// 재료 추가(냉장고 관리 앱들의 추가 흐름): [재료 이름(크게)] → [빠른 선택 칩] → [수량 · 소비기한 · 보관 · 추가]
-// → [담은 재료 칩] → [AI 상담 · 냉장고 저장]
+// 재료 추가 팝업: [재료 이름(크게)] → [빠른 선택 칩] → [수량 · 소비기한 · 보관] → [목록에 담기] → [담은 재료 칩]
 .container {
   display: flex;
   flex-direction: column;
-  height: 100%;
   gap: var(--ant-margin);
+  padding-top: var(--ant-padding-xs);
 }
 
-.nameRow {
-  display: flex;
-}
-
-.nameInput {
-  width: 100%;
-}
-
-// 수량 · 소비기한 · 보관 · 추가: md 이상 한 줄(추가 버튼은 내용만큼), 좁은 화면은 두 칸씩
+// 수량 · 소비기한 · 보관: 좁은 화면은 두 칸씩(보관은 아래 줄 전체), md 이상 한 줄
 .formRow {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--ant-margin-xs);
 
   @include from(md) {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) auto;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
-.quantityInput,
-.datePicker,
-.storageSelect,
-.addButton {
+.field {
   width: 100%;
+}
+
+.storageSelect {
+  grid-column: 1 / -1;
+
+  @include from(md) {
+    grid-column: auto;
+  }
 }
 
 .unitHint {
@@ -58,7 +54,6 @@
 }
 
 .stagedList {
-  flex: 1;
   align-content: flex-start;
 }
 
@@ -105,13 +100,4 @@
   min-width: $touch-target-size;
   min-height: $touch-target-size;
   border-radius: $pill-radius;
-}
-
-.footerActions {
-  margin-top: auto;
-  padding-top: var(--ant-padding-xs);
-}
-
-.actionButton {
-  min-width: $fridge-input-action-min-width;
 }

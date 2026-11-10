@@ -14,7 +14,6 @@ import { STORAGE_LABELS } from '../format';
 import { useFridgeSort } from '../hooks/useFridgeSort';
 import { readNewFridgeIds } from '../newItems';
 import { useFridgeItems, useRemoveFridgeItem, useTakeOutFridgeItem } from '../queries';
-import { scrollToIngredientInput } from '../sectionIds';
 import { FridgeItemConsumeModal } from './FridgeItemConsumeModal';
 import { FridgeItemEditModal } from './FridgeItemEditModal';
 import { FridgeIllustration } from './FridgeIllustration';
@@ -56,7 +55,12 @@ const EXPIRATION_GROUPS: Array<{ label: string; match: (item: FridgeItemResponse
   { label: '여유 있음', match: (item) => item.status === 'NORMAL' },
 ];
 
-export function FridgeItemListSection() {
+interface FridgeItemListSectionProps {
+  // 빈 냉장고 안내의 [재료 추가]: 재료 추가 팝업을 연다.
+  onAdd: () => void;
+}
+
+export function FridgeItemListSection({ onAdd }: FridgeItemListSectionProps) {
   const openChat = useChatModalStore((state) => state.openChat);
   const { message } = App.useApp();
   const location = useLocation();
@@ -76,7 +80,7 @@ export function FridgeItemListSection() {
   // 기존 링크가 그대로 열리도록 키는 storage로 두고 밀키트·기본 양념 탭 값만 더했다.
   const storageParam = searchParams.get('storage');
   const storage: FridgeTab = isFridgeTab(storageParam) ? storageParam : 'ALL';
-  // 위 재료 입력에서 방금 등록했을 때만 있다. 정렬·탭을 바꾸면 state 없이 이동해 사라진다.
+  // 재료 추가 팝업에서 방금 등록했을 때만 있다. 정렬·탭을 바꾸면 state 없이 이동해 사라진다.
   const newFridgeIds = readNewFridgeIds(location.state);
 
   const handleStorageChange = (next: FridgeTab) => {
@@ -192,9 +196,9 @@ export function FridgeItemListSection() {
           description="냉장고가 비어 있어요"
         >
           <Typography.Paragraph type="secondary">
-            위쪽 [냉장고에 뭐가 남았나요?]에서 재료를 추가해 보세요.
+            [재료 추가]로 남은 재료를 담아 보세요.
           </Typography.Paragraph>
-          <Button onClick={scrollToIngredientInput}>재료 추가하러 가기</Button>
+          <Button onClick={onAdd}>재료 추가</Button>
         </Empty>
       );
     }

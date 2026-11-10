@@ -229,9 +229,8 @@ $recipe-ingredient-status-width: 10em;
 // 냉장고 남은 날 뱃지("D-32", "모레까지")가 줄마다 같은 너비를 쓰도록 고정
 $dday-tag-min-width: 6em;
 
-// 냉장고 정렬 선택("임박순")과 재료 입력 하단 버튼("냉장고 저장")이 내용 길이와 상관없이 같은 너비를 쓰도록 고정
+// 냉장고 정렬 선택("임박순")이 내용 길이와 상관없이 같은 너비를 쓰도록 고정
 $fridge-sort-select-min-width: 120px;
-$fridge-input-action-min-width: 120px;
 
 // 내 냉장고 화면: 오른쪽 칸(AI 상담·최근 기록) 폭
 $fridge-aside-width: 380px;

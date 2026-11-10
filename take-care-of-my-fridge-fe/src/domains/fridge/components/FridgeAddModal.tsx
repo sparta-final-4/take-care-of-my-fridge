@@ -1,21 +1,29 @@
 import { CalendarOutlined, CloseOutlined, PlusOutlined } from '@ant-design/icons';
-import { App, Button, DatePicker, Divider, Flex, Input, Select, Typography } from 'antd';
+import {
+  App,
+  Button,
+  DatePicker,
+  Divider,
+  Flex,
+  Input,
+  Modal,
+  Select,
+  Typography,
+  type InputRef,
+} from 'antd';
 import type { Dayjs } from 'dayjs';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { createSearchParams, useNavigate } from 'react-router';
 
 import { ROUTES } from '@/app/paths';
 import { useAuthStore } from '@/common/auth/authStore';
-import { SectionCard } from '@/common/components/SectionCard';
-import { useChatModalStore } from '@/domains/chat/model/useChatModalStore';
 
 import type { FridgeItemCreateRequest, StorageType } from '../api';
 import { STORAGE_LABELS } from '../format';
 import { MOCK_QUICK_CHIPS } from '../mocks';
 import { getNewItemsView, type NewFridgeItemsState } from '../newItems';
 import { useCreateFridgeItems } from '../queries';
-import { INGREDIENT_INPUT_SECTION_ID } from '../sectionIds';
-import styles from './IngredientInputSection.module.scss';
+import styles from './FridgeAddModal.module.scss';
 
 // FridgeItemCreateRequest.java의 @Size 제한
 const MAX_ITEMS = 20;
@@ -28,18 +36,25 @@ const STORAGE_OPTIONS = (Object.keys(STORAGE_LABELS) as StorageType[]).map((valu
 
 type StagedItem = FridgeItemCreateRequest['items'][number] & { key: string };
 
-export function IngredientInputSection() {
+interface FridgeAddModalProps {
+  open: boolean;
+  onClose: () => void;
+}
+
+// 재료 추가 팝업: [재료 이름] → [빠른 선택] → [수량 · 소비기한 · 보관] → [목록에 담기] → 담은 재료 → [냉장고에 저장]
+// 닫았다 다시 열어도 담은 재료는 남아 있고, 저장하면 비운다.
+export function FridgeAddModal({ open, onClose }: FridgeAddModalProps) {
   const { message } = App.useApp();
   const navigate = useNavigate();
   const isAuthenticated = useAuthStore((state) => state.status === 'authenticated');
   const createMutation = useCreateFridgeItems();
-  const openChat = useChatModalStore((state) => state.openChat);
 
   const [name, setName] = useState('');
   const [quantity, setQuantity] = useState('');
   const [expirationDate, setExpirationDate] = useState<Dayjs | null>(null);
   const [storage, setStorage] = useState<StorageType | undefined>('REFRIGERATED');
   const [stagedItems, setStagedItems] = useState<StagedItem[]>([]);
+  const nameInputRef = useRef<InputRef>(null);
 
   const handleAdd = () => {
     const rawName = name.trim();
@@ -74,6 +89,8 @@ export function IngredientInputSection() {
     setName('');
     setQuantity('');
     setExpirationDate(null);
+    // 다음 재료를 바로 적을 수 있게 이름 칸으로 돌아간다.
+    nameInputRef.current?.focus();
   };
 
   const handleRemove = (key: string) => {
@@ -86,7 +103,7 @@ export function IngredientInputSection() {
       return;
     }
     if (stagedItems.length === 0) {
-      void message.warning('저장할 재료를 먼저 추가해 주세요.');
+      void message.warning('저장할 재료를 먼저 목록에 담아 주세요.');
       return;
     }
 
@@ -101,6 +118,7 @@ export function IngredientInputSection() {
       {
         onSuccess: (createdItems) => {
           setStagedItems([]);
+          onClose();
           const { ids, tab, hiddenSeasoningCount } = getNewItemsView(createdItems);
           void message.success(
             hiddenSeasoningCount > 0
@@ -118,21 +136,39 @@ export function IngredientInputSection() {
   };
 
   return (
-    <SectionCard id={INGREDIENT_INPUT_SECTION_ID} title="냉장고에 뭐가 남았나요?" bracket={false}>
+    <Modal
+      open={open}
+      centered
+      title="재료 추가"
+      onCancel={onClose}
+      // 열리면 바로 재료 이름을 적을 수 있게 이름 칸에 포커스한다.
+      afterOpenChange={(opened) => {
+        if (opened) nameInputRef.current?.focus();
+      }}
+      footer={
+        <Button
+          type="primary"
+          size="large"
+          block
+          loading={createMutation.isPending}
+          disabled={stagedItems.length === 0}
+          onClick={handleSave}
+        >
+          {stagedItems.length > 0 ? `냉장고에 저장 (${stagedItems.length}개)` : '냉장고에 저장'}
+        </Button>
+      }
+    >
       <div className={styles.container}>
-        {/* 재료 이름을 먼저 크게 받고(냉장고 관리 앱의 추가 흐름), 아래에 빠른 선택 → 수량·소비기한·보관·추가 */}
-        <div className={styles.nameRow}>
-          <Input
-            placeholder="재료명 (예: 참치캔)"
-            aria-label="재료명"
-            value={name}
-            maxLength={MAX_NAME_LENGTH}
-            onChange={(event) => setName(event.target.value)}
-            onPressEnter={handleAdd}
-            size="large"
-            className={styles.nameInput}
-          />
-        </div>
+        <Input
+          ref={nameInputRef}
+          placeholder="재료명 (예: 참치캔)"
+          aria-label="재료명"
+          value={name}
+          maxLength={MAX_NAME_LENGTH}
+          onChange={(event) => setName(event.target.value)}
+          onPressEnter={handleAdd}
+          size="large"
+        />
 
         <Flex align="center" wrap gap="small" className={styles.quickRow}>
           <Typography.Text type="secondary" className={styles.quickLabel}>
@@ -167,7 +203,6 @@ export function IngredientInputSection() {
             value={quantity}
             onChange={(event) => setQuantity(event.target.value)}
             onPressEnter={handleAdd}
-            className={styles.quantityInput}
           />
           <DatePicker
             placeholder="소비기한"
@@ -175,7 +210,7 @@ export function IngredientInputSection() {
             aria-label="소비기한"
             value={expirationDate}
             onChange={setExpirationDate}
-            className={styles.datePicker}
+            className={styles.field}
           />
           <Select
             value={storage}
@@ -184,25 +219,21 @@ export function IngredientInputSection() {
             placeholder="보관: 자동"
             allowClear
             aria-label="보관 방식"
-            className={styles.storageSelect}
+            className={`${styles.field} ${styles.storageSelect}`}
           />
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            onClick={handleAdd}
-            className={styles.addButton}
-          >
-            재료 추가
-          </Button>
         </div>
+
+        <Button icon={<PlusOutlined />} block onClick={handleAdd}>
+          목록에 담기
+        </Button>
 
         <Divider className={styles.divider} />
 
         {/* 담은 재료: "두부 1 · 11/10 · 냉장 ×" 칩으로 나열 */}
-        <Flex wrap gap="small" className={styles.stagedList}>
+        <Flex wrap gap="small" aria-label="담은 재료" className={styles.stagedList}>
           {stagedItems.length === 0 && (
             <Typography.Text type="secondary" className={styles.stagedEmpty}>
-              추가한 재료가 여기에 보여요
+              목록에 담은 재료가 여기에 보여요
             </Typography.Text>
           )}
           {stagedItems.map((item) => (
@@ -221,28 +252,14 @@ export function IngredientInputSection() {
                 type="text"
                 size="small"
                 icon={<CloseOutlined />}
-                aria-label={`${item.rawName} 삭제`}
+                aria-label={`${item.rawName} 빼기`}
                 onClick={() => handleRemove(item.key)}
                 className={styles.removeButton}
               />
             </div>
           ))}
         </Flex>
-
-        <Flex justify="flex-end" wrap gap="small" className={styles.footerActions}>
-          <Button className={styles.actionButton} onClick={() => openChat()}>
-            AI 상담
-          </Button>
-          <Button
-            type="primary"
-            loading={createMutation.isPending}
-            onClick={handleSave}
-            className={styles.actionButton}
-          >
-            냉장고 저장
-          </Button>
-        </Flex>
       </div>
-    </SectionCard>
+    </Modal>
   );
 }
