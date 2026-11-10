@@ -1,6 +1,9 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { App, Drawer } from 'antd';
+import { CompressOutlined, ExpandOutlined } from '@ant-design/icons';
+import { App, Button, Drawer } from 'antd';
 import { useCallback, useEffect, useRef, useState } from 'react';
+
+import { readChatDrawerWide, saveChatDrawerWide } from '../chatDrawerSize';
 
 import { useChatModalStore } from '../model/useChatModalStore';
 import { removeEndedActiveSession } from '../queries';
@@ -11,7 +14,7 @@ import styles from './ChatModal.module.scss';
 // 장바구니를 닫으면 상담 창이 그대로 보인다.
 const CHAT_DRAWER_Z_INDEX = 990;
 
-// 폭은 CSS 변수로 정한다(ChatModal.module.scss: 휴대폰 전체 화면, md 이상 $chat-drawer-width).
+// 폭은 CSS 변수로 정한다(ChatModal.module.scss: 휴대폰 전체 화면, md 이상 $chat-drawer-width, 크게 보기 $chat-drawer-width-wide).
 const CHAT_DRAWER_SIZE = 'var(--chat-drawer-width)';
 
 // AI 상담 창: 장바구니와 같은 오른쪽 서랍. 뒤 화면을 덮지 않아 상담하면서 다른 화면을 계속 쓸 수 있다.
@@ -25,6 +28,13 @@ export function ChatModal() {
   const abortStreamRef = useRef<(() => void) | null>(null);
   // 서랍 머리 오른쪽에서 대화 칸이 [상담 끝내기]를 그릴 자리
   const [headerActionsSlot, setHeaderActionsSlot] = useState<HTMLElement | null>(null);
+  // [크게 보기]: 이 브라우저에 기억한다. 크게 볼 때만 왼쪽 화면을 어둡게 덮고, 막을 누르면 원래 크기로(닫지 않는다).
+  const [wide, setWide] = useState(readChatDrawerWide);
+
+  const changeWide = (next: boolean) => {
+    setWide(next);
+    saveChatDrawerWide(next);
+  };
 
   const handleRegisterAbort = useCallback((abortFn: () => void) => {
     abortStreamRef.current = abortFn;
@@ -55,32 +65,53 @@ export function ChatModal() {
   }, [isOpen, queryClient]);
 
   return (
-    <Drawer
-      title="AI 냉장고 상담"
-      placement="right"
-      size={CHAT_DRAWER_SIZE}
-      open={isOpen}
-      onClose={handleRequestClose}
-      mask={false}
-      // 덮지 않으므로 포커스를 서랍 안에 가두지 않는다(뒤 화면을 키보드로도 쓸 수 있게).
-      focusable={{ trap: false }}
-      zIndex={CHAT_DRAWER_Z_INDEX}
-      destroyOnHidden
-      extra={<div ref={setHeaderActionsSlot} className={styles.headerActions} />}
-      rootClassName={styles.root}
-      classNames={{
-        header: styles.header,
-        title: styles.title,
-        section: styles.section,
-        body: styles.body,
-      }}
-    >
-      <ChatRoomSection
-        onStreamingChange={setIsStreaming}
-        onRegisterAbort={handleRegisterAbort}
-        onCloseModal={handleRequestClose}
-        headerActionsSlot={headerActionsSlot}
-      />
-    </Drawer>
+    <>
+      {/* 막은 antd CSS 변수가 있는 곳(ConfigProvider 안)에 그린다. body로 옮기면 바탕색 변수가 비어 투명해진다. */}
+      {isOpen && wide && (
+        <div className={styles.wideMask} onClick={() => changeWide(false)} aria-hidden />
+      )}
+      <Drawer
+        title="AI 냉장고 상담"
+        placement="right"
+        size={CHAT_DRAWER_SIZE}
+        open={isOpen}
+        onClose={handleRequestClose}
+        mask={false}
+        // 덮지 않으므로 포커스를 서랍 안에 가두지 않는다(뒤 화면을 키보드로도 쓸 수 있게).
+        focusable={{ trap: false }}
+        zIndex={CHAT_DRAWER_Z_INDEX}
+        destroyOnHidden
+        extra={
+          <div className={styles.headerActions}>
+            {/* 휴대폰은 늘 전체 화면이라 768px 이상에서만 보인다. */}
+            <Button
+              size="small"
+              type="text"
+              icon={wide ? <CompressOutlined /> : <ExpandOutlined />}
+              onClick={() => changeWide(!wide)}
+              aria-pressed={wide}
+              className={styles.wideButton}
+            >
+              {wide ? '원래 크기' : '크게 보기'}
+            </Button>
+            <div ref={setHeaderActionsSlot} className={styles.headerActions} />
+          </div>
+        }
+        rootClassName={wide ? `${styles.root} ${styles.wide}` : styles.root}
+        classNames={{
+          header: styles.header,
+          title: styles.title,
+          section: styles.section,
+          body: styles.body,
+        }}
+      >
+        <ChatRoomSection
+          onStreamingChange={setIsStreaming}
+          onRegisterAbort={handleRegisterAbort}
+          onCloseModal={handleRequestClose}
+          headerActionsSlot={headerActionsSlot}
+        />
+      </Drawer>
+    </>
   );
 }

@@ -144,8 +144,9 @@ $facet-compact-row-height: 28px;
 $cart-drawer-padding-inline: 32px;
 $cart-drawer-header-padding-block: 18px;
 
-// AI 상담 서랍 폭(md 이상, 휴대폰은 전체 화면)
+// AI 상담 서랍 폭(md 이상, 휴대폰은 전체 화면)과 [크게 보기] 폭
 $chat-drawer-width: min(92vw, 480px);
+$chat-drawer-width-wide: min(96vw, 800px);
 // 장바구니 목록이 넓은 배치로 바뀌는 칸 폭(장바구니 화면 기준 md·lg 화면에서의 본문 폭)
 $cart-container-md: 720px;
 $cart-container-lg: 940px;
