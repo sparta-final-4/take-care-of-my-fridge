@@ -192,9 +192,9 @@ public class ChatIntentFacade {
                 result = correctCategories(memberId, sessionId, request.content(), categories, context, result);
             }
         }
-        // 새 추천은 앞 대화의 맛을 잇지 않는다 (앞 조건 이어 가기는 다시 추천만). AI가 따라 넣은 맛은 이번 말에 없으면 뺀다
+        // 새 추천은 앞 대화의 맛을 잇지 않는다 (앞 조건 이어 가기는 다시 추천만). 직전 조건에서 따라온 맛만 이번 말에 없으면 뺀다
         if ((result.intent() == ChatIntent.RECOMMEND || mealkitRecommend) && corrections.spokenTastesOnly()) {
-            result = keepSpokenTastes(memberId, sessionId, request.content(), result);
+            result = keepSpokenTastes(memberId, sessionId, request.content(), context, result);
         }
         ChatIntentResolution resolution = switch (result.intent()) {
             case RECOMMEND -> ChatIntentResolution.recommend(Source.AI, toRecipeQuery(memberId, sessionId, request, result));
@@ -475,25 +475,36 @@ public class ChatIntentFacade {
     }
 
     /**
-     * 새 추천의 원하는 맛·피할 맛은 이번 말에 그 맛 단어가 있을 때만 남긴다 (TasteWordChecker.mentioned).
-     * "매운 거 말고" 다음 "김치찌개"에서 AI가 앞의 피할 맛(매운맛)을 따라 넣어 김치찌개가 빠지는 것을 막는다. 비웠으면 INFO로 남긴다.
+     * 새 추천에서 앞 대화에서 따라온 맛을 뺀다: 직전 조건(Redis 문맥)의 원하는 맛·피할 맛에 있던 맛이고, 이번 말에 그 맛 단어가 없을 때만
+     * (TasteWordChecker.mentioned). "매운 거 말고" 다음 "김치찌개"에서 AI가 앞의 피할 맛(매운맛)을 따라 넣어 김치찌개가 빠지는 것을 막는다.
+     * 직전 조건이 없거나 직전에 없던 맛은 AI 값 그대로 둔다. 맛 단어 목록에 없는 말("맵고", "화끈한", "얼얼한")에서 AI가 맞게 넣은 맛을
+     * 지우지 않기 위해서다 (평가 T11~T14). 비웠으면 INFO로 남긴다.
      */
-    IntentResult keepSpokenTastes(Long memberId, Long sessionId, String message, IntentResult result) {
+    IntentResult keepSpokenTastes(Long memberId, Long sessionId, String message, ChatContext context, IntentResult result) {
+        QuerySnapshot previous = context.lastRecommendation() == null ? null : context.lastRecommendation().query();
+        if (previous == null) {
+            return result;
+        }
+        Set<Member.Taste> carried = new java.util.HashSet<>(previous.wantedTastes());
+        if (previous.avoidTastes() != null) {
+            carried.addAll(previous.avoidTastes());
+        }
         Set<Member.Taste> spoken = TasteWordChecker.mentioned(message, chatTasteWordProperties);
-        List<String> wanted = orEmpty(result.wantedTastes()).stream().filter(taste -> spokenTaste(spoken, taste)).toList();
-        List<String> avoid = orEmpty(result.avoidTastes()).stream().filter(taste -> spokenTaste(spoken, taste)).toList();
+        List<String> wanted = orEmpty(result.wantedTastes()).stream().filter(taste -> !carriedOnly(carried, spoken, taste)).toList();
+        List<String> avoid = orEmpty(result.avoidTastes()).stream().filter(taste -> !carriedOnly(carried, spoken, taste)).toList();
         if (wanted.size() == orEmpty(result.wantedTastes()).size() && avoid.size() == orEmpty(result.avoidTastes()).size()) {
             return result;
         }
-        log.info("상담 새 추천이라 이번 말에 없는 맛을 뺌 - memberId: {}, sessionId: {}, 원하는 맛: {} → {}, 피할 맛: {} → {}",
+        log.info("상담 새 추천이라 앞 대화에서 따라온 맛을 뺌 - memberId: {}, sessionId: {}, 원하는 맛: {} → {}, 피할 맛: {} → {}",
                 memberId, sessionId, result.wantedTastes(), wanted, result.avoidTastes(), avoid);
         return result.withTastes(wanted, avoid);
     }
 
-    // AI가 준 맛 이름(SPICY 등)이 이번 말에 나온 맛인지. 모르는 이름은 sanitize가 이미 걸렀다
-    private static boolean spokenTaste(Set<Member.Taste> spoken, String taste) {
+    // AI가 준 맛 이름(SPICY 등)이 직전 조건에 있었고 이번 말에는 나오지 않은 맛인지 (앞 대화에서 따라온 맛). 모르는 이름은 sanitize가 이미 걸렀다
+    private static boolean carriedOnly(Set<Member.Taste> carried, Set<Member.Taste> spoken, String taste) {
         try {
-            return spoken.contains(Member.Taste.valueOf(taste));
+            Member.Taste value = Member.Taste.valueOf(taste);
+            return carried.contains(value) && !spoken.contains(value);
         } catch (IllegalArgumentException e) {
             return false;
         }
