@@ -6,15 +6,8 @@ import static org.assertj.core.api.Assertions.tuple;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.UUID;
 import javax.sql.DataSource;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.StorageType;
-import org.example.takecareofmyfridgebe.domain.order.entity.Order;
-import org.example.takecareofmyfridgebe.domain.order.entity.OrderItem;
-import org.example.takecareofmyfridgebe.domain.order.entity.OrderStatus;
-import org.example.takecareofmyfridgebe.domain.order.entity.SaleType;
-import org.example.takecareofmyfridgebe.domain.order.repository.OrderItemRepository;
-import org.example.takecareofmyfridgebe.domain.order.repository.OrderRepository;
 import org.example.takecareofmyfridgebe.domain.product.entity.Product;
 import org.example.takecareofmyfridgebe.domain.product.entity.ProductType;
 import org.example.takecareofmyfridgebe.domain.product.repository.ProductRepository;
@@ -54,8 +47,6 @@ class SaleEventQueryServiceListTest extends MySqlContainerSupport {
     private final SaleEventRepository saleEventRepository;
     private final SaleEventItemRepository saleEventItemRepository;
     private final ProductRepository productRepository;
-    private final OrderRepository orderRepository;
-    private final OrderItemRepository orderItemRepository;
     private final JdbcTemplate jdbcTemplate;
 
     private SaleEvent scheduledSpecial;
@@ -68,15 +59,11 @@ class SaleEventQueryServiceListTest extends MySqlContainerSupport {
             SaleEventRepository saleEventRepository,
             SaleEventItemRepository saleEventItemRepository,
             ProductRepository productRepository,
-            OrderRepository orderRepository,
-            OrderItemRepository orderItemRepository,
             DataSource dataSource) {
         this.saleEventQueryService = saleEventQueryService;
         this.saleEventRepository = saleEventRepository;
         this.saleEventItemRepository = saleEventItemRepository;
         this.productRepository = productRepository;
-        this.orderRepository = orderRepository;
-        this.orderItemRepository = orderItemRepository;
         this.jdbcTemplate = new JdbcTemplate(dataSource);
     }
 
@@ -96,8 +83,6 @@ class SaleEventQueryServiceListTest extends MySqlContainerSupport {
 
     @AfterEach
     void cleanUp() {
-        orderItemRepository.deleteAll();
-        orderRepository.deleteAll();
         saleEventItemRepository.deleteAll();
         saleEventRepository.deleteAll();
         productRepository.deleteAll();
@@ -155,22 +140,6 @@ class SaleEventQueryServiceListTest extends MySqlContainerSupport {
     }
 
     @Test
-    @DisplayName("판매량은 결제 완료·구매 확정 주문의 수량만 센다")
-    void countsOnlyPaidAndConfirmedAsSoldQuantity() {
-        SaleEventItem item = saleEventItemRepository.findAll().stream()
-                .filter(i -> i.getSaleEvent().getId().equals(activeFlash.getId())).findFirst().orElseThrow();
-        saveOrder(OrderStatus.PAID, item, 2);
-        saveOrder(OrderStatus.CONFIRMED, item, 1);
-        saveOrder(OrderStatus.CANCELLED, item, 5);
-        saveOrder(OrderStatus.PENDING, item, 4);
-
-        List<SaleEventListResponse> events = query(null, null, null, null, null, null);
-
-        assertThat(events).extracting(SaleEventListResponse::productName, SaleEventListResponse::soldQuantity)
-                .containsExactly(tuple("양파", 0L), tuple("대파", 0L), tuple("두부", 3L), tuple("대파", 0L));
-    }
-
-    @Test
     @DisplayName("정렬 기준과 방향을 주면 그 순서로 나오고, 기준이 같으면 최신 행사가 먼저다")
     void sortsSaleEvents() {
         assertThat(sorted(SaleEventListSort.STARTS_AT, Sort.Direction.ASC))
@@ -201,29 +170,6 @@ class SaleEventQueryServiceListTest extends MySqlContainerSupport {
                                               LocalDate startTo, LocalDate endFrom, LocalDate endTo) {
         return saleEventQueryService.getSaleEvents(
                 new SaleEventListRequest(status, type, null, startFrom, startTo, endFrom, endTo, null, null, null, null)).content();
-    }
-
-    private void saveOrder(OrderStatus status, SaleEventItem item, int quantity) {
-        Order order = Order.builder()
-                .orderNumber(UUID.randomUUID().toString().substring(0, 20))
-                .memberId(1L)
-                .idempotencyKey(UUID.randomUUID().toString())
-                .totalAmount(0L)
-                .build();
-        // 취소는 결제 대기 주문에서만 되고, 구매 확정은 결제 완료 주문에서만 된다.
-        switch (status) {
-            case PAID -> order.markPaid(LocalDateTime.now());
-            case CONFIRMED -> {
-                order.markPaid(LocalDateTime.now());
-                order.confirm(LocalDateTime.now());
-            }
-            case CANCELLED -> order.cancel();
-            case PENDING -> { }
-        }
-        Order saved = orderRepository.save(order);
-        orderItemRepository.save(OrderItem.builder().order(saved).productId(item.getProductId()).productName("상품")
-                .quantity(quantity).listPrice(3000).unitPrice(2400).saleType(SaleType.SPECIAL)
-                .saleEventItemId(item.getId()).build());
     }
 
     private SaleEvent saveEvent(SaleEventType type, SaleEventStatus status, LocalDateTime startsAt,

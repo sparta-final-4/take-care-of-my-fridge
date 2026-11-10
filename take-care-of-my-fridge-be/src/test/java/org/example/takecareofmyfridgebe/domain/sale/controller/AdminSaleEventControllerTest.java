@@ -259,7 +259,7 @@ class AdminSaleEventControllerTest {
                 .thenReturn(new PageResponse<>(List.of(
                         new SaleEventListResponse(1L, SaleEventType.FLASH_DROP, SaleEventStatus.ACTIVE,
                                 LocalDateTime.of(2026, 10, 1, 18, 0), LocalDateTime.of(2026, 10, 1, 20, 0),
-                                3L, "대파", 3000, 1500, 50, 10, 3, 7L)),
+                                3L, "대파", 3000, 1500, 50, 10, 3)),
                         1, 10, 1, 1, true));
 
         mvc.perform(get("/api/admin/sale-events").param("status", "ACTIVE").param("type", "FLASH_DROP")
@@ -268,8 +268,7 @@ class AdminSaleEventControllerTest {
                 .andExpect(jsonPath("$.data.content[0].saleEventId").value(1))
                 .andExpect(jsonPath("$.data.content[0].type").value("FLASH_DROP"))
                 .andExpect(jsonPath("$.data.content[0].productName").value("대파"))
-                .andExpect(jsonPath("$.data.content[0].remainingQuantity").value(3))
-                .andExpect(jsonPath("$.data.content[0].soldQuantity").value(7));
+                .andExpect(jsonPath("$.data.content[0].remainingQuantity").value(3));
 
         ArgumentCaptor<SaleEventListRequest> captor = ArgumentCaptor.forClass(SaleEventListRequest.class);
         verify(saleEventQueryService).getSaleEvents(captor.capture());
