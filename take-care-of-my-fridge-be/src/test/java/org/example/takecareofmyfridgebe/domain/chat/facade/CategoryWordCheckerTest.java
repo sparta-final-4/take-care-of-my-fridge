@@ -17,6 +17,7 @@ class CategoryWordCheckerTest {
 
     static final List<ChatCategoryWordProperties.Group> GROUPS = List.of(
             new ChatCategoryWordProperties.Group("국물", List.of("국", "찌개", "전골", "수프", "스튜")),
+            new ChatCategoryWordProperties.Group("스프", List.of("수프")),
             new ChatCategoryWordProperties.Group("면", List.of("면류")),
             new ChatCategoryWordProperties.Group("안주", List.of("구이", "전", "튀김")));
 
@@ -30,6 +31,9 @@ class CategoryWordCheckerTest {
         assertThat(check("디저트 추천해줘")).containsExactly(new CategoryStance("디저트", Stance.WANT));
         assertThat(check("다른 디저트 추천해줘")).containsExactly(new CategoryStance("디저트", Stance.WANT));
         assertThat(check("디저트!")).containsExactly(new CategoryStance("디저트", Stance.WANT));
+        // 끓이는 말도 요청으로 본다 (평가 R14)
+        assertThat(check("두부도 넣어서 찌개 끓이고 싶어")).containsExactly(new CategoryStance("찌개", Stance.WANT));
+        assertThat(check("국 끓여 먹을 거")).containsExactly(new CategoryStance("국", Stance.WANT));
     }
 
     @Test
@@ -88,6 +92,9 @@ class CategoryWordCheckerTest {
         assertThat(CategoryWordChecker.check("면 요리 추천해줘", CATEGORIES, TasteWordCheckerTest.WORDS, GROUPS))
                 .containsExactly(new CategoryStance("면류", Stance.WANT));
         assertThat(CategoryWordChecker.check("국수 추천해줘", CATEGORIES, TasteWordCheckerTest.WORDS, GROUPS)).isEmpty();
+        // "스프"는 수프의 다른 표기
+        assertThat(CategoryWordChecker.check("맵고 따뜻한 스프", List.of("국", "수프"), TasteWordCheckerTest.WORDS, GROUPS))
+                .containsExactly(new CategoryStance("수프", Stance.WANT));
         assertThat(CategoryWordChecker.check("국물 말고 안주로 볶음 추천", CATEGORIES, TasteWordCheckerTest.WORDS, GROUPS))
                 .contains(new CategoryStance("국", Stance.AVOID), new CategoryStance("볶음", Stance.WANT));
     }

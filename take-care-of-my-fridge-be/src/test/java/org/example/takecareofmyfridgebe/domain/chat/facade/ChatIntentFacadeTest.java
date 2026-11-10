@@ -2,6 +2,7 @@ package org.example.takecareofmyfridgebe.domain.chat.facade;
 
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatCandidateProperties;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatCategoryWordProperties;
+import org.example.takecareofmyfridgebe.domain.chat.config.ChatCorrectionProperties;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatFoodWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatTasteOppositeProperties;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext.CardName;
@@ -87,11 +88,7 @@ class ChatIntentFacadeTest {
         chatMessageService = mock(ChatMessageService.class);
         allergyExclusionFinder = mock(AllergyExclusionFinder.class);
         when(allergyExclusionFinder.find(any(), any())).thenReturn(AllergyExclusionFinder.Allergens.NONE);
-        facade = new ChatIntentFacade(extractor, recipeService, ingredientMatcher,
-                new ChatCandidateProperties(List.of("양념", "음료"), 0.4, List.of(), List.of("백김치", "물김치", "동치미", "나박김치"), List.of(), List.of()),
-                chatMessageService, TasteWordCheckerTest.WORDS, MealkitWordCheckerTest.WORDS, AskWordCheckerTest.WORDS,
-                new ChatCategoryWordProperties(CategoryWordCheckerTest.GROUPS), FOOD_WORDS, allergyExclusionFinder, TASTE_OPPOSITES,
-                FridgeShopWordCheckerTest.WORDS);
+        facade = newFacade(ChatCorrectionProperties.ALL_ON);
         when(recipeService.getClassifications())
                 .thenReturn(new RecipeClassificationResponse(List.of("한식"), List.of("국", "기타", "샐러드", "양념", "음료", "찌개")));
     }
@@ -865,7 +862,7 @@ class ChatIntentFacadeTest {
         }
 
         @Test
-        @DisplayName("\"매운 거 말고\" 뒤 \"김치찌개\"는 새 추천이라 AI가 따라 넣은 피할 맛을 빼고, 이번 말에 맛이 있으면 그 맛은 남긴다")
+        @DisplayName("\"매운 거 말고\" 뒤 \"김치찌개\"는 새 추천이라 AI가 따라 넣은 피할 맛을 빼고, 직전에 없던 맛·이번 말에 있는 맛은 남긴다")
         void dropsCarriedTastes_whenNewRecommend() {
             RecipeQuery noSpicy = previous.withAvoidTastes(List.of(Taste.SPICY));
             ChatContext afterAvoid = new ChatContext(List.of(), LastRecommendation.of(noSpicy, List.of(10L)), context.lastCards());
@@ -875,8 +872,8 @@ class ChatIntentFacadeTest {
             RecipeQuery stew = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("김치찌개"), afterAvoid)
                     .recipeQuery();
 
-            assertThat(stew.avoidTastes()).isEmpty();
-            assertThat(stew.wantedTastes()).isEmpty();
+            assertThat(stew.avoidTastes()).as("직전 피할 맛에서 따라온 매운맛은 뺀다").isEmpty();
+            assertThat(stew.wantedTastes()).as("직전 조건에 없던 맛은 AI 값 그대로").containsExactly(Taste.SWEET);
             assertThat(stew.keywords()).containsExactly("김치찌개");
 
             givenExtracted(new IntentResult(ChatIntent.RECOMMEND, List.of("SPICY"), null, 0, List.of(), List.of(), false,
@@ -1751,6 +1748,142 @@ class ChatIntentFacadeTest {
             ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("두부 사서 만들 요리 추천해줘"));
 
             assertThat(resolution.intent()).isEqualTo(ChatIntent.RECOMMEND);
+        }
+    }
+
+    // 보정 켜고 끄기(app.chat.corrections)만 바꿔 만든다
+    private ChatIntentFacade newFacade(ChatCorrectionProperties corrections) {
+        return new ChatIntentFacade(extractor, recipeService, ingredientMatcher,
+                new ChatCandidateProperties(List.of("양념", "음료"), 0.4, List.of(), List.of("백김치", "물김치", "동치미", "나박김치"), List.of(), List.of()),
+                chatMessageService, TasteWordCheckerTest.WORDS, MealkitWordCheckerTest.WORDS, AskWordCheckerTest.WORDS,
+                new ChatCategoryWordProperties(CategoryWordCheckerTest.GROUPS), FOOD_WORDS, allergyExclusionFinder, TASTE_OPPOSITES,
+                FridgeShopWordCheckerTest.WORDS, corrections);
+    }
+
+    @Test
+    @DisplayName("AI가 \"찌개\"를 분류 없이 키워드로만 줘도 \"찌개 끓이고 싶어\"면 분류 단어 보정이 찌개를 채운다 (평가 R14)")
+    void fillsCategory_whenBoilingStew() {
+        givenExtracted(new IntentResult(ChatIntent.RECOMMEND, null, List.of(), null, List.of("두부"), null, false,
+                List.of("찌개"), null, null));
+
+        RecipeQuery query = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("두부도 넣어서 찌개 끓이고 싶어"))
+                .recipeQuery();
+
+        assertThat(query.moodCategories()).containsExactly("찌개");
+    }
+
+    @Nested
+    @DisplayName("새 추천 맛 정리: 앞 대화에서 따라온 맛만 뺀다")
+    class CarriedTastes {
+
+        private ChatContext after(List<Taste> wanted, List<Taste> avoid) {
+            RecipeQuery previous = new RecipeQuery(MEMBER_ID, List.of(), wanted, List.of(), null, List.of(), false,
+                    List.of(), null, null).withAvoidTastes(avoid);
+            return new ChatContext(List.of(), LastRecommendation.of(previous, List.of(10L)), List.of(new CardName(10L, "김치찌개")));
+        }
+
+        @Test
+        @DisplayName("직전 조건이 없으면 맛 단어 목록에 없는 말(\"맵고\")이어도 AI가 넣은 맛을 그대로 둔다")
+        void keepsAiTastes_whenNoPreviousCondition() {
+            givenExtracted(new IntentResult(ChatIntent.RECOMMEND, List.of("SPICY"), null, null, null, null, false, null, null, null));
+
+            RecipeQuery query = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("맵고 따뜻한 스프")).recipeQuery();
+
+            assertThat(query.wantedTastes()).containsExactly(Taste.SPICY);
+        }
+
+        @Test
+        @DisplayName("직전 피할 맛 매운맛 뒤 \"김치찌개\"면 따라온 피할 맛을 뺀다")
+        void dropsCarriedAvoid() {
+            givenExtracted(new IntentResult(ChatIntent.RECOMMEND, null, null, 0, List.of(), List.of(), false,
+                    List.of("김치찌개"), null, null, null, null, List.of(), List.of("SPICY")));
+
+            RecipeQuery query = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("김치찌개"),
+                    after(List.of(), List.of(Taste.SPICY))).recipeQuery();
+
+            assertThat(query.avoidTastes()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("직전 원하는 맛 매운맛 뒤 \"디저트\"면 따라온 원하는 맛을 뺀다")
+        void dropsCarriedWanted() {
+            givenExtracted(new IntentResult(ChatIntent.RECOMMEND, List.of("SPICY"), List.of("디저트"), null, null, null, false, null, null, null));
+
+            RecipeQuery query = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("디저트"),
+                    after(List.of(Taste.SPICY), List.of())).recipeQuery();
+
+            assertThat(query.wantedTastes()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("직전 원하는 맛 매운맛이어도 이번 말에 그 맛 단어가 있으면 남긴다")
+        void keepsSpokenTaste_whenAlsoPrevious() {
+            givenExtracted(new IntentResult(ChatIntent.RECOMMEND, List.of("SPICY"), null, null, null, null, false, null, null, null));
+
+            RecipeQuery query = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("매운 볶음 추천해줘"),
+                    after(List.of(Taste.SPICY), List.of())).recipeQuery();
+
+            assertThat(query.wantedTastes()).containsExactly(Taste.SPICY);
+        }
+    }
+
+    @Nested
+    @DisplayName("보정 끄기 (app.chat.corrections)")
+    class Corrections {
+
+        // 끌 보정만 false
+        private ChatCorrectionProperties off(String... names) {
+            return EvalCorrectionSwitches.properties(java.util.Set.of(names));
+        }
+
+        @Test
+        @DisplayName("새 추천 맛 정리를 끄면 직전 조건에서 따라온 맛도 지우지 않는다")
+        void keepsCarriedTastes_whenSpokenTastesOff() {
+            RecipeQuery spicy = new RecipeQuery(MEMBER_ID, List.of(), List.of(Taste.SPICY), List.of(), null, List.of(), false,
+                    List.of(), null, null);
+            ChatContext afterSpicy = new ChatContext(List.of(), LastRecommendation.of(spicy, List.of(10L)),
+                    List.of(new CardName(10L, "김치찌개")));
+            givenExtracted(new IntentResult(ChatIntent.RECOMMEND, List.of("SPICY"), List.of("디저트"), null, null, null, false, null, null, null));
+            ChatMessageCreateRequest request = ChatMessageCreateRequest.of("디저트 추천해줘");
+
+            RecipeQuery on = facade.resolve(MEMBER_ID, SESSION_ID, request, afterSpicy).recipeQuery();
+            RecipeQuery offQuery = newFacade(off("spoken-tastes-only")).resolve(MEMBER_ID, SESSION_ID, request, afterSpicy).recipeQuery();
+
+            assertThat(on.wantedTastes()).as("켜 두면 따라온 맛을 뺀다").isEmpty();
+            assertThat(offQuery.wantedTastes()).containsExactly(Taste.SPICY);
+        }
+
+        @Test
+        @DisplayName("분류 단어 보정을 끄면 AI 분류를 그대로 쓴다")
+        void keepsAiCategories_whenCategoryWordsOff() {
+            givenExtracted(new IntentResult(ChatIntent.RECOMMEND, null, List.of("국"), null, null, null, false, null, null, null));
+            ChatMessageCreateRequest request = ChatMessageCreateRequest.of("찌개 추천해줘");
+
+            assertThat(facade.resolve(MEMBER_ID, SESSION_ID, request).recipeQuery().moodCategories()).containsExactly("찌개");
+            assertThat(newFacade(off("category-words")).resolve(MEMBER_ID, SESSION_ID, request).recipeQuery().moodCategories())
+                    .containsExactly("국");
+        }
+
+        @Test
+        @DisplayName("OFF_TOPIC 되살리기를 끄면 음식 말이 있어도 AI대로 거절한다")
+        void keepsOffTopic_whenReviveOff() {
+            givenExtracted(new IntentResult(ChatIntent.OFF_TOPIC, null, null, null, null, null, false, null, null, null));
+            ChatMessageCreateRequest request = ChatMessageCreateRequest.of("저녁 먹을 거 추천해줘");
+
+            assertThat(facade.resolve(MEMBER_ID, SESSION_ID, request).intent()).isEqualTo(ChatIntent.RECOMMEND);
+            assertThat(newFacade(off("off-topic-revive")).resolve(MEMBER_ID, SESSION_ID, request).intent())
+                    .isEqualTo(ChatIntent.OFF_TOPIC);
+        }
+
+        @Test
+        @DisplayName("요리 이름 서버 계산을 끄면 요리 이름이 없다")
+        void noDish_whenDishFromKeywordsOff() {
+            givenExtracted(new IntentResult(ChatIntent.RECOMMEND, null, null, null, null, null, false, List.of("김치찌개"), null, null));
+            ChatMessageCreateRequest request = ChatMessageCreateRequest.of("김치찌개 추천해줘");
+
+            assertThat(facade.resolve(MEMBER_ID, SESSION_ID, request).recipeQuery().keywordText()).isEqualTo("김치찌개");
+            assertThat(newFacade(off("dish-from-keywords")).resolve(MEMBER_ID, SESSION_ID, request).recipeQuery().keywordText())
+                    .isNull();
         }
     }
 

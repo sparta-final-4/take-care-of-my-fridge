@@ -31,6 +31,9 @@ app:
       groups:
         - word: 국물
           categories: 국, 찌개, 전골, 수프, 스튜
+        # 수프의 다른 표기 ("맵고 따뜻한 스프")
+        - word: 스프
+          categories: 수프
         - word: 면
           categories: 면류
         - word: 반찬
