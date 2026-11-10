@@ -4,6 +4,7 @@ import { App, Button, Drawer } from 'antd';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { readChatDrawerWide, saveChatDrawerWide } from '../chatDrawerSize';
+import { hasOverlayAboveChat, shouldCloseChatOnEscape } from '../chatEscape';
 
 import { useChatModalStore } from '../model/useChatModalStore';
 import { removeEndedActiveSession } from '../queries';
@@ -40,7 +41,7 @@ export function ChatModal() {
     abortStreamRef.current = abortFn;
   }, []);
 
-  // ✕·ESC(서랍이 받는다)·대화 칸의 닫기 모두 여기를 거친다. 답을 받는 중이면 확인 후 닫는다.
+  // ✕·ESC·대화 칸의 닫기 모두 여기를 거친다. 답을 받는 중이면 확인 후 닫는다.
   const handleRequestClose = useCallback(() => {
     if (isStreaming) {
       modal.confirm({
@@ -57,6 +58,28 @@ export function ChatModal() {
     }
     closeChat();
   }, [isStreaming, modal, closeChat]);
+
+  // ESC 닫기: 포커스가 뒤 화면에 있어도 닫히게 document에서 받는다(서랍 자체 ESC는 꺼서 두 번 처리하지 않는다).
+  // 캡처 단계에서 먼저 보고, 위에 장바구니 서랍·모달·드롭다운이 열려 있으면 그것들이 ESC를 처리하게 둔다.
+  // 한글 조합 중 ESC는 조합 취소만 한다.
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      const chatRoot = document.querySelector(`.${styles.root}`);
+      const close = shouldCloseChatOnEscape({
+        key: event.key,
+        isComposing: event.isComposing,
+        keyCode: event.keyCode,
+        overlayOpen: hasOverlayAboveChat(chatRoot),
+      });
+      if (close) handleRequestClose();
+    };
+
+    document.addEventListener('keydown', handleKeyDown, true);
+    return () => document.removeEventListener('keydown', handleKeyDown, true);
+  }, [isOpen, handleRequestClose]);
 
   // 닫히면(✕·ESC·상담 내역으로 이동 등 닫는 경로 모두 isOpen을 거친다) 끝난 상담 캐시를 비워
   // 다시 열 때 언제 열든 새 상담이 열리게 한다. 닫힐 때 대화 칸이 먼저 사라지므로 이 시점엔 보는 곳이 없다.
@@ -77,6 +100,7 @@ export function ChatModal() {
         open={isOpen}
         onClose={handleRequestClose}
         mask={false}
+        keyboard={false}
         // 덮지 않으므로 포커스를 서랍 안에 가두지 않는다(뒤 화면을 키보드로도 쓸 수 있게).
         focusable={{ trap: false }}
         zIndex={CHAT_DRAWER_Z_INDEX}
