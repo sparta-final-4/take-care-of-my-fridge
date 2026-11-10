@@ -1,23 +1,55 @@
-import { Button, Flex, Tag, Typography } from 'antd';
+import { Button, Flex, Typography } from 'antd';
 
 import { SectionCard } from '@/common/components/SectionCard';
 import { useChatModalStore } from '@/domains/chat/model/useChatModalStore';
-import { toChatSelectedIngredients } from '@/domains/chat/selectedIngredients';
+import { isChatSelectable, toChatSelectedIngredients } from '@/domains/chat/selectedIngredients';
 
+import { imminentConsultText, selectedConsultText } from '../consultText';
 import { withoutBasicSeasoning } from '../filter';
-import { formatDDayLabel } from '../format';
 import { useFridgeSort } from '../hooks/useFridgeSort';
 import { useFridgeSelectionStore } from '../model/useFridgeSelectionStore';
 import { useFridgeItems } from '../queries';
 import styles from './FridgeAiConsultSection.module.scss';
 
+// 한 문장 + 버튼. 체크한 재료가 있으면 그 재료로, 없으면 임박 재료를 앞세워(없으면 냉장고 재료로) 상담을 권한다.
+// 768px 이상에서는 체크한 재료를 이 카드에서 처리한다(휴대폰은 아래 선택 바).
 export function FridgeAiConsultSection() {
   const openChat = useChatModalStore((state) => state.openChat);
   const [sort] = useFridgeSort();
   const { data } = useFridgeItems(sort, true);
   const checkedIds = useFridgeSelectionStore((state) => state.checkedIds);
+  const clearChecked = useFridgeSelectionStore((state) => state.clear);
   const checkedItems = data?.filter((item) => checkedIds.includes(item.id ?? 0)) ?? [];
-  // 밀키트·기본 양념은 메뉴 재료로 쓰지 않으므로 칩에서 뺀다.
+
+  if (checkedItems.length > 0) {
+    const selected = toChatSelectedIngredients(checkedItems);
+    // 직접 입력·밀키트·기본 양념은 레시피 재료로 찾을 수 없어 상담에 넘기지 않는다.
+    const excludedCount = checkedItems.filter((item) => !isChatSelectable(item)).length;
+    return (
+      <SectionCard title="AI 냉장고 상담" bracket={false}>
+        <Flex vertical gap="middle">
+          <Typography.Text>
+            {selectedConsultText(selected.map((ingredient) => ingredient.name))}
+          </Typography.Text>
+          {excludedCount > 0 && (
+            <Typography.Text type="secondary" className={styles.hint}>
+              체크한 재료 중 직접 입력·밀키트·기본 양념 {excludedCount}개는 빼고 상담해요.
+            </Typography.Text>
+          )}
+          <Flex vertical gap="small">
+            <Button type="primary" size="large" block onClick={() => openChat(selected)}>
+              선택한 재료로 상담하기
+            </Button>
+            <Button block onClick={clearChecked}>
+              선택 해제
+            </Button>
+          </Flex>
+        </Flex>
+      </SectionCard>
+    );
+  }
+
+  // 밀키트·기본 양념은 메뉴 재료로 쓰지 않으므로 임박 재료에서 뺀다.
   const imminentItems = withoutBasicSeasoning(data ?? []).filter(
     (item) => item.status === 'IMMINENT' && item.ingredientType !== 'MEALKIT',
   );
@@ -25,32 +57,11 @@ export function FridgeAiConsultSection() {
   return (
     <SectionCard title="AI 냉장고 상담" bracket={false}>
       <Flex vertical gap="middle">
-        <Typography.Text>임박 재료로 만들 수 있는 메뉴를 추천해 드려요.</Typography.Text>
-        {imminentItems.length > 0 ? (
-          <Flex wrap gap="xs">
-            {imminentItems.map((item) => (
-              <Tag key={item.id} className={styles.chip}>
-                {item.rawName} {item.dDay !== undefined && formatDDayLabel(item.dDay)}
-              </Tag>
-            ))}
-          </Flex>
-        ) : (
-          <Typography.Text type="secondary">소비기한이 임박한 재료가 없어요.</Typography.Text>
-        )}
+        <Typography.Text>{imminentConsultText(imminentItems)}</Typography.Text>
         <Typography.Text type="secondary" className={styles.hint}>
-          {checkedItems.length > 0
-            ? `목록에서 체크한 재료 ${checkedItems.length}개로 상담해요.`
-            : '목록에서 재료를 체크하면 그 재료로 상담해요.'}
+          목록에서 재료를 체크하면 그 재료로 상담해요.
         </Typography.Text>
-        {/* 체크한 재료가 있으면 그중 추천에 쓸 수 있는 것을 넘기고, 없으면 선택 없이 연다. */}
-        <Button
-          type="primary"
-          size="large"
-          onClick={() =>
-            openChat(checkedItems.length > 0 ? toChatSelectedIngredients(checkedItems) : undefined)
-          }
-          block
-        >
+        <Button type="primary" size="large" block onClick={() => openChat()}>
           AI 상담 시작하기
         </Button>
       </Flex>

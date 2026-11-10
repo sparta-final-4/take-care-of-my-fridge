@@ -33,7 +33,7 @@ export function selectedRecommendMessage(selected: ChatSelectedIngredient[]): st
 }
 
 // 마지막 글자에 받침이 없거나 ㄹ 받침이면 '로', 다른 받침이면 '으로', 한글이 아니면 '(으)로'
-function withDirectionParticle(name: string): string {
+export function withDirectionParticle(name: string): string {
   const code = name.charCodeAt(name.length - 1) - 0xac00;
   if (!(code >= 0 && code <= 11171)) return '(으)로';
   const finalConsonant = code % 28;
