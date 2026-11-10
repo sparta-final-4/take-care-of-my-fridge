@@ -1,6 +1,6 @@
 # 결제 설계
 
-상태: 구현 완료 · 담당: 결제·환불 · 관련 화면: 9 주문 확인(결제 수단·결제하기)
+상태: 구현 완료 · 담당: 결제·환불 · 관련 화면: 9 주문 확인(결제 수단·결제하기) · API: [결제 API 명세](../../api/payment-api.md)
 
 ## 목적과 책임
 - 해결할 사용자 문제: 주문 확인 화면에서 결제 수단을 고르고 결제하기를 누르면 그 결제대행사의 PortOne V2 결제창으로 결제하고, 서버가 PG 결제를 확인한 뒤에만 주문을 결제 완료로 바꾼다.
@@ -34,6 +34,7 @@
 | 보상 취소 재시도 | 받지 않은 결제의 PG 취소가 실패해 남아 있으면 5분마다 다시 취소합니다. 다른 경로로 이미 취소됐으면 기록만 남깁니다 | `retryCompensations`, `retryCompensation` | 구현 완료 |
 | PG 취소 거절 | PG가 취소를 4xx로 거절하면 `PAYMENT_009`(502)입니다. 전액 취소인데 이미 취소된 결제면 성공으로 봅니다 | `PortOneClient.cancelPayment` | 구현 완료 |
 | 결제 정리 호출 | 결제를 시도했지만 끝내지 않은 결제 대기 주문을 1분마다 찾아 주문 도메인의 취소 메서드를 부릅니다. 재고 복구는 주문 쪽이 합니다 | `cancelAbandonedOrders` (주문 담당 추가, #309) | 구현 완료 |
+| 본인 소유 | 남의 주문·결제는 PG를 조회하기 전에 403(`ORDER_003`)으로 거절합니다. 없는 주문은 404(`ORDER_001`), 없는 결제는 404(`PAYMENT_001`)입니다 | `PaymentService.validatePayableOrder`, `PaymentFacade.getOwnedPayment` | 구현 완료 |
 | 결제 이력 | 생성·승인·실패·보상 취소·환불 취소를 사건마다 한 행씩 추가만 합니다. 호출 주체(사용자·웹훅·스케줄러)와 사유를 남깁니다. 정산이 이 이력을 읽어 매출을 집계합니다 | `PaymentHistoryRecorder` | 구현 완료 |
 
 ## 상태와 전이
@@ -126,7 +127,7 @@ sequenceDiagram
 
 ## 데이터·API·이벤트
 - ERD·데이터 사전: [erd.md](../../database/erd.md#결제-테이블-관계), [data-dictionary.md](../../database/data-dictionary.md#payments--결제), DDL [payment.sql](../../database/payment.sql)
-- 제공 API: [결제 API](../../api/api-spec.md#결제-api) (결제 준비, 결제 확정, 결제창 닫기, PortOne 웹훅)
+- 제공 API: [결제 API](../../api/payment-api.md) (결제 준비, 결제 확정, 결제창 닫기, PortOne 웹훅)
 - 수신 이벤트와 중복 처리: PortOne 웹훅. `webhook_id`로 한 번만 처리하고, 처리 실패(`FAILED`)와 수신 중(`RECEIVED`)은 재전송 때 다시 처리합니다.
 - 발행 이벤트: `PaymentCompletedEvent`(orderId, memberId). 처음 승인한 요청만 발행하고, 장바구니가 커밋 뒤(`AFTER_COMMIT`) 받습니다.
 - 보관 기간·삭제 정책: 결제·결제 이력·웹훅 기록은 지우지 않습니다. 결제가 붙은 주문은 주문 쪽에서도 지우지 않고 취소 상태로 남깁니다.
