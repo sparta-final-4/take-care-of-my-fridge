@@ -14,7 +14,7 @@ name: BE Deploy
 #   API_URL_MAIN : https://api.imhungry.click     (FE Deploy와 공유)
 on:
   push:
-    branches: [dev, main]
+    branches: [dev]
     paths:
       - 'take-care-of-my-fridge-be/**'
       - '.github/workflows/be-ci.yml'
@@ -34,7 +34,7 @@ jobs:
 
   deploy:
     needs: ci
-    if: github.ref_name == 'dev' || github.ref_name == 'main'
+    if: github.ref_name == 'dev'  # main 배포는 비용 문제로 중단
     # App 서버가 arm64(t4g)라 arm 러너에서 네이티브로 빌드한다(QEMU 에뮬레이션보다 빠름).
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 30
