@@ -9,3 +9,15 @@
   text-align: center;
   white-space: nowrap;
 }
+
+// 오늘~모레(주황)·D-3(노랑): antd 색 태그는 글자가 옅어 대비가 모자라므로(3.3:1, 2.8:1)
+// 색 이름을 넘기지 않고 옅은 바탕 + 진한 글자를 직접 준다(5:1 이상).
+.tag.orange {
+  color: var(--ant-orange-8);
+  background: var(--ant-orange-1);
+}
+
+.tag.gold {
+  color: var(--ant-gold-9);
+  background: var(--ant-gold-1);
+}

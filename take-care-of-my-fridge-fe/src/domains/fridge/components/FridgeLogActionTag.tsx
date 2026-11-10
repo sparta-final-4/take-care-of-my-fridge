@@ -10,11 +10,11 @@ interface FridgeLogActionTagProps {
   cookedByRecipe: boolean;
 }
 
-// 아이콘은 재료 목록의 먹었어요·버렸어요 버튼과 같은 것을 쓴다.
+// 종류별 색: 요리했어요 초록, 먹었어요 주황, 버렸어요 빨강(옅은 바탕 + 진한 글자, 대비 4.5:1 이상).
 export function FridgeLogActionTag({ action, cookedByRecipe }: FridgeLogActionTagProps) {
   if (cookedByRecipe) {
     return (
-      <Tag variant="filled" color="processing" icon={<FireOutlined />} className={styles.tag}>
+      <Tag icon={<FireOutlined />} className={`${styles.tag} ${styles.cooked}`}>
         요리했어요
       </Tag>
     );
@@ -22,14 +22,14 @@ export function FridgeLogActionTag({ action, cookedByRecipe }: FridgeLogActionTa
 
   if (action === 'DISCARDED') {
     return (
-      <Tag variant="filled" color="default" icon={<DeleteOutlined />} className={styles.tag}>
+      <Tag icon={<DeleteOutlined />} className={`${styles.tag} ${styles.discarded}`}>
         버렸어요
       </Tag>
     );
   }
 
   return (
-    <Tag variant="filled" color="success" icon={<CheckCircleOutlined />} className={styles.tag}>
+    <Tag icon={<CheckCircleOutlined />} className={`${styles.tag} ${styles.consumed}`}>
       먹었어요
     </Tag>
   );
