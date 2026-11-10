@@ -1,113 +1,114 @@
 @use '@/styles/variables' as *;
 @use '@/styles/mixins' as *;
 
-// 재료 칸(카드, 냉장고 관리 앱들의 재료 타일 구성):
-// [체크 ……… D-day] → [이름(크게) · 종류·NEW] → [수량 · 보관] → [먹었어요 · 버렸어요 · 더보기]
+// 재료 한 줄. 휴대폰: [체크] [이름 / 수량 · 보관] [남은 날] [⋯]
+// md 이상: [체크] [이름] [수량] [보관] [남은 날] [(마우스) 먹었어요 · 버리기] [⋯]
+// 바탕은 흰색 하나(기한 상태는 남은 날 뱃지 색으로만 나타낸다).
 .row {
   display: flex;
-  flex-direction: column;
-  gap: var(--ant-margin-xs);
-  height: 100%;
-  padding: var(--ant-padding-sm);
-  background: var(--ant-color-bg-container);
-  border-radius: $product-media-radius;
-  box-shadow: $product-media-shadow;
-  transition: box-shadow var(--ant-motion-duration-mid);
-
-  &:hover {
-    box-shadow:
-      $product-media-shadow,
-      0 0 0 1px var(--ant-color-border-secondary);
-  }
-}
-
-// 신선도 바탕: 기한 지남 = 옅은 빨강, 임박 = 옅은 노랑
-.expired {
-  background: var(--ant-color-error-bg);
-}
-
-.imminent {
-  background: var(--ant-color-warning-bg);
-}
-
-// 메인·입력에서 방금 등록한 재료: 귤색 테두리
-.highlighted {
-  box-shadow:
-    $product-media-shadow,
-    0 0 0 2px var(--ant-color-primary);
-}
-
-.top {
-  display: flex;
   align-items: center;
-  gap: var(--ant-margin-xs);
+  gap: var(--ant-margin-sm);
+  min-height: $touch-target-size;
+  padding: var(--ant-padding-xxs) var(--ant-padding-xxs) var(--ant-padding-xxs)
+    var(--ant-padding-sm);
+  background: var(--ant-color-bg-container);
+
+  & + & {
+    border-top: 1px solid var(--ant-color-border-secondary);
+  }
 }
 
 .check {
   flex-shrink: 0;
 }
 
-// D-day 배지는 칸 오른쪽 위
-.badge {
-  margin-left: auto;
-}
-
-.nameWrapper {
+.main {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--ant-margin-xxs) var(--ant-margin-xs);
+  flex: 1;
+  flex-direction: column;
   min-width: 0;
 }
 
-// 재료 이름: 크게, 두 줄까지
+.nameLine {
+  display: flex;
+  align-items: center;
+  gap: var(--ant-margin-xs);
+  min-width: 0;
+}
+
+// 재료 이름: 한 줄, 넘치면 말줄임
 .name {
-  display: -webkit-box;
   min-width: 0;
   overflow: hidden;
-  font-size: var(--ant-font-size-lg);
   font-weight: var(--ant-font-weight-strong);
-  line-height: 1.35;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 // 재료 종류 태그(IngredientTypeTag)와 같은 크기
 .newTag {
+  flex-shrink: 0;
   margin: 0;
   font-size: var(--ant-font-size-sm);
   white-space: nowrap;
 }
 
-// 수량 · 보관
-.meta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: var(--ant-margin-xs);
+// 휴대폰: 이름 아래 "수량 · 보관". md 이상은 따로 칸이 있어 숨긴다.
+.sub {
+  font-size: var(--ant-font-size-sm);
+  font-variant-numeric: tabular-nums;
+
+  @include from(md) {
+    display: none;
+  }
+}
+
+// md 이상: 수량(오른쪽 정렬)·보관 칸. 줄마다 같은 폭이라 위아래가 맞는다.
+.quantity,
+.storage {
+  display: none;
+  flex-shrink: 0;
+  white-space: nowrap;
+
+  @include from(md) {
+    display: block;
+  }
 }
 
 .quantity {
+  width: $fridge-item-quantity-width;
   font-variant-numeric: tabular-nums;
-  white-space: nowrap;
+  text-align: end;
 }
 
 .storage {
+  width: $fridge-item-storage-width;
   font-size: var(--ant-font-size-sm);
-  white-space: nowrap;
 }
 
-// 아래 버튼 줄: 칸 맨 아래에 붙고, 위에 얇은 선
-.actions {
-  justify-content: flex-end;
+.badge {
+  flex-shrink: 0;
+}
+
+// 마우스를 올리거나 키보드로 줄 안에 들어오면 보인다. 자리는 늘 차지해 줄 폭이 흔들리지 않는다.
+.hoverActions {
+  display: flex;
+  flex-shrink: 0;
   gap: var(--ant-margin-xxs);
-  margin-top: auto;
-  padding-top: var(--ant-padding-xs);
-  border-top: 1px solid var(--ant-color-border-secondary);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--ant-motion-duration-fast);
+
+  .row:hover &,
+  .row:focus-within & {
+    opacity: 1;
+    pointer-events: auto;
+  }
 }
 
 // 터치 영역 44px
-.iconButton {
+.moreButton {
+  flex-shrink: 0;
   min-width: $touch-target-size;
   min-height: $touch-target-size;
 }

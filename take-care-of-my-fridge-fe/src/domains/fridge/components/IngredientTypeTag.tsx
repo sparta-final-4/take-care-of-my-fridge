@@ -8,26 +8,15 @@ interface IngredientTypeTagProps {
   type?: IngredientType;
 }
 
+// 재료 이름 옆에는 밀키트만 표시한다(직접 입력 재료는 따로 표시하지 않는다).
 export function IngredientTypeTag({ type }: IngredientTypeTagProps) {
-  if (type === 'CUSTOM') {
-    return (
-      <Tooltip title="재료 사전에 없는 이름이라 레시피 추천과 요리 완료 차감에 쓰이지 않아요">
-        <Tag variant="filled" color="default" className={styles.tag}>
-          기타
-        </Tag>
-      </Tooltip>
-    );
-  }
+  if (type !== 'MEALKIT') return null;
 
-  if (type === 'MEALKIT') {
-    return (
-      <Tooltip title="밀키트는 요리 완료 때 차감되지 않아요">
-        <Tag variant="filled" color="purple" className={styles.tag}>
-          밀키트
-        </Tag>
-      </Tooltip>
-    );
-  }
-
-  return null;
+  return (
+    <Tooltip title="밀키트는 요리 완료 때 차감되지 않아요">
+      <Tag variant="filled" color="purple" className={styles.tag}>
+        밀키트
+      </Tag>
+    </Tooltip>
+  );
 }

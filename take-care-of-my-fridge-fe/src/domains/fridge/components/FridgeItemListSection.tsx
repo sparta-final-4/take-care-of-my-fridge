@@ -4,6 +4,7 @@ import { useCallback, useState } from 'react';
 import { useLocation, useSearchParams } from 'react-router';
 
 import { SectionCard } from '@/common/components/SectionCard';
+import { useDesktopPointer } from '@/common/hooks/useScreens';
 import { useChatModalStore } from '@/domains/chat/model/useChatModalStore';
 import { toChatSelectedIngredients } from '@/domains/chat/selectedIngredients';
 
@@ -44,6 +45,9 @@ const SORT_OPTIONS: Array<{ value: FridgeSortType; label: string }> = [
   { value: 'NAME', label: '이름순' },
 ];
 
+// 묶음마다 처음에는 이만큼만 보여 주고 [더 보기]로 나머지를 편다.
+const VISIBLE_ROW_COUNT = 8;
+
 // 임박순 그룹. 서버가 준 status·dDay만으로 나눈다.
 const EXPIRATION_GROUPS: Array<{ label: string; match: (item: FridgeItemResponse) => boolean }> = [
   { label: '기한 지남', match: (item) => item.status === 'EXPIRED' },
@@ -65,6 +69,9 @@ export function FridgeItemListSection() {
   const [removingIds, setRemovingIds] = useState<number[]>([]);
   const [editingItem, setEditingItem] = useState<FridgeItemResponse>();
   const [consumingItem, setConsumingItem] = useState<FridgeItemResponse>();
+  // [더 보기]로 편 묶음(임박순 묶음 이름, 다른 정렬은 'ALL')
+  const [expandedGroups, setExpandedGroups] = useState<string[]>([]);
+  const hoverActions = useDesktopPointer();
 
   // 기존 링크가 그대로 열리도록 키는 storage로 두고 밀키트·기본 양념 탭 값만 더했다.
   const storageParam = searchParams.get('storage');
@@ -127,27 +134,45 @@ export function FridgeItemListSection() {
     [removeRow, remove],
   );
 
-  const renderRows = (items: FridgeItemResponse[]) => (
-    <div className={styles.rows}>
-      {items.map((item) => {
-        const fridgeId = item.id ?? 0;
-        return (
-          <FridgeItemRow
-            key={fridgeId}
-            item={item}
-            checked={checkedIds.includes(fridgeId)}
-            removing={removingIds.includes(fridgeId)}
-            highlighted={newFridgeIds.includes(fridgeId)}
-            onCheck={handleCheck}
-            onEdit={setEditingItem}
-            onConsume={setConsumingItem}
-            onDiscard={handleDiscard}
-            onDelete={handleDelete}
-          />
-        );
-      })}
-    </div>
-  );
+  const renderRows = (groupKey: string, items: FridgeItemResponse[]) => {
+    const expanded = expandedGroups.includes(groupKey);
+    const hiddenCount = expanded ? 0 : Math.max(items.length - VISIBLE_ROW_COUNT, 0);
+    const shownItems = hiddenCount > 0 ? items.slice(0, VISIBLE_ROW_COUNT) : items;
+    return (
+      <>
+        <div className={styles.list}>
+          {shownItems.map((item) => {
+            const fridgeId = item.id ?? 0;
+            return (
+              <FridgeItemRow
+                key={fridgeId}
+                item={item}
+                checked={checkedIds.includes(fridgeId)}
+                removing={removingIds.includes(fridgeId)}
+                highlighted={newFridgeIds.includes(fridgeId)}
+                hoverActions={hoverActions}
+                onCheck={handleCheck}
+                onEdit={setEditingItem}
+                onConsume={setConsumingItem}
+                onDiscard={handleDiscard}
+                onDelete={handleDelete}
+              />
+            );
+          })}
+        </div>
+        {hiddenCount > 0 && (
+          <Button
+            type="text"
+            block
+            onClick={() => setExpandedGroups((keys) => [...keys, groupKey])}
+            className={styles.moreButton}
+          >
+            더 보기 ({hiddenCount}개)
+          </Button>
+        )}
+      </>
+    );
+  };
 
   const renderBody = () => {
     if (isPending) return <Skeleton active paragraph={{ rows: 6 }} />;
@@ -180,7 +205,7 @@ export function FridgeItemListSection() {
         <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={EMPTY_TAB_MESSAGES[storage]} />
       );
     }
-    if (sort !== 'EXPIRATION') return renderRows(visibleItems);
+    if (sort !== 'EXPIRATION') return renderRows('ALL', visibleItems);
 
     return (
       <Flex vertical gap="large">
@@ -193,7 +218,7 @@ export function FridgeItemListSection() {
                 <span className={styles.groupTitle}>{group.label}</span>
                 <span className={styles.groupCount}>{groupItems.length}</span>
               </div>
-              {renderRows(groupItems)}
+              {renderRows(group.label, groupItems)}
             </section>
           );
         })}

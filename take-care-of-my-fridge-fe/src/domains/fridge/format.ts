@@ -14,14 +14,23 @@ export function formatDDay(dDay: number) {
   return dDay > 0 ? `D-${dDay}` : `D+${-dDay}`;
 }
 
-// 냉장고 목록의 소비기한 태그 문구. 지난 재료는 "N일 지남", 오늘은 "오늘"로 풀어 쓴다.
+// 냉장고 목록의 남은 날 뱃지 문구. 지난 재료는 "N일 지남", 오늘·내일·모레는 "…까지"로 풀어 쓴다.
+const NEAR_DAY_LABELS = ['오늘까지', '내일까지', '모레까지'];
+
 export function formatDDayLabel(dDay: number) {
   if (dDay < 0) return `${-dDay}일 지남`;
-  if (dDay === 0) return '오늘';
-  return `D-${dDay}`;
+  return NEAR_DAY_LABELS[dDay] ?? `D-${dDay}`;
 }
 
-// 지남·오늘·D-1은 빨강, D-2~3은 주황, D-4부터는 색 없음(배경 없이 회색 글자)
+// 냉장고 목록 뱃지 색: 지남 빨강, 오늘~모레 주황, D-3 노랑, 그 밖은 회색
+export function ddayBadgeColor(dDay: number) {
+  if (dDay < 0) return 'red';
+  if (dDay <= 2) return 'orange';
+  if (dDay === 3) return 'gold';
+  return 'default';
+}
+
+// AI 상담 카드의 태그 색. 지남·오늘·D-1은 빨강, D-2~3은 주황, D-4부터는 색 없음(배경 없이 회색 글자)
 export function ddayTagColor(dDay: number) {
   if (dDay <= 1) return 'error';
   if (dDay <= 3) return 'warning';

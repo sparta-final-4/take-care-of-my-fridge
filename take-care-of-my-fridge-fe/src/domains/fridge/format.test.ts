@@ -2,6 +2,7 @@ import dayjs from 'dayjs';
 import { describe, expect, it } from 'vitest';
 
 import {
+  ddayBadgeColor,
   ddayTagColor,
   formatDDayLabel,
   formatLogDate,
@@ -35,15 +36,27 @@ describe('withObjectParticle', () => {
   });
 });
 
-describe('소비기한 태그', () => {
+describe('남은 날 뱃지', () => {
   it.each([
-    [-2, '2일 지남', 'error'],
-    [0, '오늘', 'error'],
-    [1, 'D-1', 'error'],
-    [3, 'D-3', 'warning'],
-    [32, 'D-32', undefined],
+    [-2, '2일 지남', 'red'],
+    [0, '오늘까지', 'orange'],
+    [1, '내일까지', 'orange'],
+    [2, '모레까지', 'orange'],
+    [3, 'D-3', 'gold'],
+    [14, 'D-14', 'default'],
   ])('dDay %i는 %s, 색 %s', (dDay, label, color) => {
     expect(formatDDayLabel(dDay)).toBe(label);
+    expect(ddayBadgeColor(dDay)).toBe(color);
+  });
+});
+
+describe('AI 상담 카드 태그 색', () => {
+  it.each([
+    [-2, 'error'],
+    [1, 'error'],
+    [3, 'warning'],
+    [32, undefined],
+  ])('dDay %i는 %s', (dDay, color) => {
     expect(ddayTagColor(dDay)).toBe(color);
   });
 });

@@ -1,10 +1,8 @@
 @use '@/styles/variables' as *;
 @use '@/styles/mixins' as *;
 
-// 목록 칸 폭을 기준으로 재료를 한 줄 / 두 줄로 놓는다(container: fridge-list).
 .container {
   height: 100%;
-  container: fridge-list / inline-size;
 }
 
 // 도구 줄: [보관 탭 ……] [정렬]. 스크롤해도 상단바 바로 아래에 붙고, 위아래 얇은 선(재료/밀키트 도구 줄과 같은 모양).
@@ -70,16 +68,19 @@
   border-radius: $pill-radius;
 }
 
-// 재료 칸 그리드: 칸 폭이 200px 이상이 되도록 한 줄에 들어가는 만큼 놓는다(휴대폰 2칸, 넓은 화면 4~5칸).
-.rows {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--ant-margin-sm);
+// 재료 줄 목록: 흰 상자 안에 줄을 얇은 선으로 나눈다.
+.list {
+  overflow: hidden;
+  background: var(--ant-color-bg-container);
+  border: 1px solid var(--ant-color-border-secondary);
+  border-radius: var(--ant-border-radius-lg);
+}
 
-  @container fridge-list (min-width: #{$fridge-tile-min-width * 3}) {
-    grid-template-columns: repeat(auto-fill, minmax($fridge-tile-min-width, 1fr));
-    gap: var(--ant-margin);
-  }
+// 묶음 아래 [더 보기]
+:global(.ant-btn).moreButton {
+  min-height: $touch-target-size;
+  margin-top: var(--ant-margin-xxs);
+  color: var(--ant-color-text-secondary);
 }
 
 // 선택 막대: 재료가 많아도 화면 아래쪽에 붙어 보인다.
