@@ -1,4 +1,4 @@
-package org.example.takecareofmyfridgebe.global.config;
+package org.example.takecareofmyfridgebe.global.config.jpa;
 
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import jakarta.persistence.EntityManager;

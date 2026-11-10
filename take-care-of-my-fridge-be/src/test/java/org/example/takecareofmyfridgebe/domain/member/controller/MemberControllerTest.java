@@ -9,7 +9,7 @@ import org.example.takecareofmyfridgebe.domain.member.dto.NicknameAvailabilityRe
 import org.example.takecareofmyfridgebe.domain.member.dto.SignUpResponse;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 import org.example.takecareofmyfridgebe.domain.member.service.MemberService;
-import org.example.takecareofmyfridgebe.global.config.SecurityConfig;
+import org.example.takecareofmyfridgebe.global.config.security.SecurityConfig;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 import org.junit.jupiter.api.BeforeEach;

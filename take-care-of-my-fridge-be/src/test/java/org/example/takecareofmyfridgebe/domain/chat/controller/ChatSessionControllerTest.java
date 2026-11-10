@@ -11,7 +11,7 @@ import org.example.takecareofmyfridgebe.domain.chat.entity.ChatSessionStatus;
 import org.example.takecareofmyfridgebe.domain.chat.facade.ChatSessionQueryFacade;
 import org.example.takecareofmyfridgebe.domain.chat.service.ChatSessionService;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
-import org.example.takecareofmyfridgebe.global.config.SecurityConfig;
+import org.example.takecareofmyfridgebe.global.config.security.SecurityConfig;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 import org.example.takecareofmyfridgebe.global.response.PageResponse;

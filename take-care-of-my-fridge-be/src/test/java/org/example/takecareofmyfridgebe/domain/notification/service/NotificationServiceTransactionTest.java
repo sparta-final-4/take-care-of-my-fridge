@@ -12,8 +12,8 @@ import org.example.takecareofmyfridgebe.domain.notification.dto.ReadAllNotificat
 import org.example.takecareofmyfridgebe.domain.notification.entity.Notification;
 import org.example.takecareofmyfridgebe.domain.notification.entity.NotificationType;
 import org.example.takecareofmyfridgebe.domain.notification.repository.NotificationRepository;
-import org.example.takecareofmyfridgebe.global.config.JpaAuditingConfig;
-import org.example.takecareofmyfridgebe.global.config.QueryDslConfig;
+import org.example.takecareofmyfridgebe.global.config.jpa.JpaAuditingConfig;
+import org.example.takecareofmyfridgebe.global.config.jpa.QueryDslConfig;
 import org.example.takecareofmyfridgebe.support.MySqlContainerSupport;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;

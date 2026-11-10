@@ -6,8 +6,8 @@ import org.example.takecareofmyfridgebe.domain.member.repository.MemberRepositor
 import org.example.takecareofmyfridgebe.domain.review.dto.RecipeReviewContentDto;
 import org.example.takecareofmyfridgebe.domain.review.dto.RecipeReviewSummaryCandidate;
 import org.example.takecareofmyfridgebe.domain.review.entity.RecipeReview;
-import org.example.takecareofmyfridgebe.global.config.JpaAuditingConfig;
-import org.example.takecareofmyfridgebe.global.config.QueryDslConfig;
+import org.example.takecareofmyfridgebe.global.config.jpa.JpaAuditingConfig;
+import org.example.takecareofmyfridgebe.global.config.jpa.QueryDslConfig;
 import org.example.takecareofmyfridgebe.support.MySqlContainerSupport;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

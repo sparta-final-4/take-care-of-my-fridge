@@ -1,4 +1,4 @@
-package org.example.takecareofmyfridgebe.global.config;
+package org.example.takecareofmyfridgebe.global.config.security;
 
 import org.example.takecareofmyfridgebe.domain.auth.service.AuthSessionService;
 import org.example.takecareofmyfridgebe.domain.auth.service.JwtTokenService;

@@ -4,7 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.takecareofmyfridgebe.domain.notification.push.NotificationPushPublisher;
 import org.example.takecareofmyfridgebe.domain.notification.service.NotificationCreateService;
-import org.example.takecareofmyfridgebe.global.config.KafkaTopics;
+import org.example.takecareofmyfridgebe.global.config.kafka.KafkaTopics;
 import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.kafka.annotation.KafkaListener;

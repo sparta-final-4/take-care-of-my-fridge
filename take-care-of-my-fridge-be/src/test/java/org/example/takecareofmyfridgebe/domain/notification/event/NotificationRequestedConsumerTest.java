@@ -10,7 +10,7 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.example.takecareofmyfridgebe.domain.notification.entity.Notification;
 import org.example.takecareofmyfridgebe.domain.notification.entity.NotificationType;
 import org.example.takecareofmyfridgebe.domain.notification.repository.NotificationRepository;
-import org.example.takecareofmyfridgebe.global.config.KafkaTopics;
+import org.example.takecareofmyfridgebe.global.config.kafka.KafkaTopics;
 import org.example.takecareofmyfridgebe.support.KafkaContainerSupport;
 import org.example.takecareofmyfridgebe.support.MySqlContainerSupport;
 import org.junit.jupiter.api.DisplayName;

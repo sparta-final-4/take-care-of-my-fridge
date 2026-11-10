@@ -1,4 +1,4 @@
-package org.example.takecareofmyfridgebe.global.config;
+package org.example.takecareofmyfridgebe.global.config.cache;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.cache.Cache;

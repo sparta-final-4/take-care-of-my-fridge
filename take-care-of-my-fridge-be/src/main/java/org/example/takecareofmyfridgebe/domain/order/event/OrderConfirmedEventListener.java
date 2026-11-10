@@ -2,7 +2,7 @@ package org.example.takecareofmyfridgebe.domain.order.event;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.example.takecareofmyfridgebe.global.config.KafkaTopics;
+import org.example.takecareofmyfridgebe.global.config.kafka.KafkaTopics;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;

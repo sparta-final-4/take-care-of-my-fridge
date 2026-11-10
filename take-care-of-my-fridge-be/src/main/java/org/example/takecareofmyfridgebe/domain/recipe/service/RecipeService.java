@@ -27,7 +27,7 @@ import org.example.takecareofmyfridgebe.domain.recipe.repository.RecipeIngredien
 import org.example.takecareofmyfridgebe.domain.recipe.repository.RecipeRepository;
 import org.example.takecareofmyfridgebe.domain.recipe.repository.RecipeStepRepository;
 import org.example.takecareofmyfridgebe.domain.recipe.repository.RecipeTasteRepository;
-import org.example.takecareofmyfridgebe.global.config.CacheNames;
+import org.example.takecareofmyfridgebe.global.config.cache.CacheNames;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 import org.example.takecareofmyfridgebe.global.response.PageResponse;

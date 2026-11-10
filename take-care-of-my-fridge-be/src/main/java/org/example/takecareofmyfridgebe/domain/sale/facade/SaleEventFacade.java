@@ -16,7 +16,7 @@ import org.example.takecareofmyfridgebe.domain.sale.service.PopularSaleService;
 import org.example.takecareofmyfridgebe.domain.sale.service.SaleEventReader;
 import org.example.takecareofmyfridgebe.domain.search.dto.ProductClickCount;
 import org.example.takecareofmyfridgebe.domain.search.service.SearchClickMetricService;
-import org.example.takecareofmyfridgebe.global.config.CacheNames;
+import org.example.takecareofmyfridgebe.global.config.cache.CacheNames;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Component;
 

@@ -1,4 +1,4 @@
-package org.example.takecareofmyfridgebe.global.config;
+package org.example.takecareofmyfridgebe.global.config.kafka;
 
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;

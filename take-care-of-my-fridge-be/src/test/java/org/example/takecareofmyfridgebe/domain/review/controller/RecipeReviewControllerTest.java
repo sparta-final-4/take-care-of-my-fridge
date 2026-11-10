@@ -9,7 +9,7 @@ import org.example.takecareofmyfridgebe.domain.review.dto.ReviewSearchRequest;
 import org.example.takecareofmyfridgebe.domain.review.dto.ReviewSortType;
 import org.example.takecareofmyfridgebe.domain.review.dto.ReviewUpdateRequest;
 import org.example.takecareofmyfridgebe.domain.review.service.RecipeReviewService;
-import org.example.takecareofmyfridgebe.global.config.SecurityConfig;
+import org.example.takecareofmyfridgebe.global.config.security.SecurityConfig;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 import org.example.takecareofmyfridgebe.global.response.PageResponse;

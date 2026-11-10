@@ -1,4 +1,4 @@
-package org.example.takecareofmyfridgebe.global.config;
+package org.example.takecareofmyfridgebe.global.config.security;
 
 import jakarta.servlet.DispatcherType;
 import lombok.RequiredArgsConstructor;

@@ -1,4 +1,4 @@
-package org.example.takecareofmyfridgebe.global.config;
+package org.example.takecareofmyfridgebe.global.config.kafka;
 
 import java.util.HashMap;
 import java.util.Map;

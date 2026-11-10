@@ -16,7 +16,7 @@ import org.example.takecareofmyfridgebe.domain.refund.entity.RefundReasonType;
 import org.example.takecareofmyfridgebe.domain.refund.entity.RefundStatus;
 import org.example.takecareofmyfridgebe.domain.refund.facade.RefundFacade;
 import org.example.takecareofmyfridgebe.domain.refund.service.RefundQueryService;
-import org.example.takecareofmyfridgebe.global.config.SecurityConfig;
+import org.example.takecareofmyfridgebe.global.config.security.SecurityConfig;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 import org.junit.jupiter.api.BeforeEach;
