@@ -167,7 +167,6 @@ export function FridgeAddModal({ open, onClose }: FridgeAddModalProps) {
           maxLength={MAX_NAME_LENGTH}
           onChange={(event) => setName(event.target.value)}
           onPressEnter={handleAdd}
-          size="large"
         />
 
         <Flex align="center" wrap gap="small" className={styles.quickRow}>

@@ -1,3 +1,30 @@
+@use '@/styles/variables' as *;
+@use '@/styles/mixins' as *;
+
+// 칸 사이 간격을 antd 기본(24px)보다 줄인다. 마지막 칸 아래는 바로 버튼 줄이라 여백을 뺀다.
+.form {
+  padding-top: var(--ant-padding-xs);
+
+  :global(.ant-form-item) {
+    margin-bottom: var(--ant-margin);
+  }
+
+  > :last-child {
+    margin-bottom: 0;
+  }
+}
+
+// 수량 + 보관 방식: sm 이상 한 줄에 둘, 휴대폰은 세로
+.pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  column-gap: var(--ant-margin-sm);
+
+  @include from(sm) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 .fullWidth {
   width: 100%;
 }

@@ -1,6 +1,8 @@
 import { App, DatePicker, Form, Input, InputNumber, Modal, Select } from 'antd';
 import dayjs from 'dayjs';
 
+import { withDirectionParticle } from '@/domains/chat/selectedIngredients';
+
 import type { FridgeItemResponse, StorageType } from '../api';
 import {
   buildFridgeItemUpdateRequest,
@@ -13,6 +15,20 @@ import styles from './FridgeItemEditModal.module.scss';
 
 // FridgeItemUpdateRequest.java의 @Size 제한
 const MAX_NAME_LENGTH = 200;
+
+// 입력칸이 넷뿐이라 기본 너비(520px)보다 좁게 띄운다. 좁은 화면에서는 antd가 화면 안으로 줄인다.
+const MODAL_WIDTH = 420;
+
+// 재료명 아래 안내: 지금 어떤 재료로 인식됐는지. 이름을 고치는 중이면 저장 뒤 다시 인식된다고만 알린다(실시간 조회 없음).
+function recognitionHint(item: FridgeItemResponse, typedName: string | undefined) {
+  if (typedName !== undefined && typedName.trim() !== (item.rawName ?? '').trim()) {
+    return '저장하면 다시 인식해요';
+  }
+  if (item.ingredientType === 'CUSTOM') return '사전에 없는 재료예요';
+  if (item.ingredientType === 'MEALKIT') return '밀키트예요';
+  if (!item.ingredientName) return undefined;
+  return `${item.ingredientName}${withDirectionParticle(item.ingredientName)} 인식돼요`;
+}
 
 const STORAGE_OPTIONS = (Object.keys(STORAGE_LABELS) as StorageType[]).map((value) => ({
   value,
@@ -49,6 +65,7 @@ export function FridgeItemEditModal({ item, onClose }: FridgeItemEditModalProps)
   return (
     <Modal
       open
+      width={MODAL_WIDTH}
       title="재료 수정"
       okText="저장"
       cancelText="취소"
@@ -68,10 +85,13 @@ export function FridgeItemEditModal({ item, onClose }: FridgeItemEditModalProps)
           expirationDate: dayjs(item.expirationDate),
         }}
         onFinish={handleFinish}
+        className={styles.form}
       >
+        {/* 재료명 / 수량 + 보관 방식(좁은 화면은 세로) / 소비기한 */}
         <Form.Item
           label="재료명"
           name="rawName"
+          extra={recognitionHint(item, watchedValues?.rawName)}
           rules={[
             { required: true, whitespace: true, message: '재료 이름을 입력해 주세요.' },
             { max: MAX_NAME_LENGTH, message: `재료 이름은 ${MAX_NAME_LENGTH}자 이하여야 합니다.` },
@@ -79,35 +99,37 @@ export function FridgeItemEditModal({ item, onClose }: FridgeItemEditModalProps)
         >
           <Input maxLength={MAX_NAME_LENGTH} />
         </Form.Item>
-        <Form.Item
-          label="수량"
-          name="quantity"
-          rules={[
-            { required: true, message: '수량을 입력해 주세요.' },
-            { type: 'number', min: 0.01, message: '수량은 0보다 커야 합니다.' },
-          ]}
-        >
-          <InputNumber
-            min={isMealkit ? 1 : 0}
-            step={isMealkit ? 1 : getStep(item.baseUnit)}
-            precision={isMealkit ? 0 : undefined}
-            suffix={item.baseUnit ?? undefined}
-            className={styles.fullWidth}
-          />
-        </Form.Item>
+        <div className={styles.pair}>
+          <Form.Item
+            label="수량"
+            name="quantity"
+            rules={[
+              { required: true, message: '수량을 입력해 주세요.' },
+              { type: 'number', min: 0.01, message: '수량은 0보다 커야 합니다.' },
+            ]}
+          >
+            <InputNumber
+              min={isMealkit ? 1 : 0}
+              step={isMealkit ? 1 : getStep(item.baseUnit)}
+              precision={isMealkit ? 0 : undefined}
+              suffix={item.baseUnit ?? undefined}
+              className={styles.fullWidth}
+            />
+          </Form.Item>
+          <Form.Item
+            label="보관 방식"
+            name="storage"
+            rules={[{ required: true, message: '보관방식을 선택해 주세요.' }]}
+          >
+            <Select options={STORAGE_OPTIONS} />
+          </Form.Item>
+        </div>
         <Form.Item
           label="소비기한"
           name="expirationDate"
           rules={[{ required: true, message: '소비기한을 입력해 주세요.' }]}
         >
           <DatePicker format="YYYY-MM-DD" className={styles.fullWidth} />
-        </Form.Item>
-        <Form.Item
-          label="보관 방식"
-          name="storage"
-          rules={[{ required: true, message: '보관방식을 선택해 주세요.' }]}
-        >
-          <Select options={STORAGE_OPTIONS} />
         </Form.Item>
       </Form>
     </Modal>
