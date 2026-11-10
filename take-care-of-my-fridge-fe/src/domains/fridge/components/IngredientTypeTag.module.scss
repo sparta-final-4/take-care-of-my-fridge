@@ -1,8 +1,0 @@
-// 소비기한 태그(DdayTag)와 같은 글자 크기를 써서 한 줄에 있어도 크기가 맞게 한다.
-.tag {
-  margin: 0;
-  font-size: var(--ant-font-size-sm);
-  white-space: nowrap;
-  cursor: help;
-  user-select: none;
-}

@@ -1,20 +1,22 @@
 import { CheckCircleOutlined, DeleteOutlined, MoreOutlined } from '@ant-design/icons';
-import { Button, Checkbox, Dropdown, Flex, Popconfirm, Tag, Tooltip, Typography } from 'antd';
+import { Button, Checkbox, Dropdown, Popconfirm, Tag, Typography } from 'antd';
 import { memo, useState } from 'react';
 
 import type { FridgeItemResponse } from '../api';
 import { formatQuantity, STORAGE_LABELS, withObjectParticle } from '../format';
 import { DdayTag } from './DdayTag';
-import { IngredientTypeTag } from './IngredientTypeTag';
+import { IngredientChip } from './IngredientChip';
 import styles from './FridgeItemRow.module.scss';
 
 interface FridgeItemRowProps {
   item: FridgeItemResponse;
   checked: boolean;
   removing: boolean;
-  // 위 재료 입력에서 방금 등록한 재료
+  // 재료 추가에서 방금 등록한 재료
   highlighted: boolean;
-  // 목록이 길어도 바뀐 칸만 다시 그리도록(memo) 부모는 매번 같은 함수를 넘기고, 칸이 자기 재료 id·재료를 넣어 부른다.
+  // 768px 이상: [먹었어요][버리기]를 늘 보이는 작은 아이콘으로 둔다. 좁은 화면은 ⋯ 메뉴에 글자로 넣는다.
+  inlineActions: boolean;
+  // 목록이 길어도 바뀐 줄만 다시 그리도록(memo) 부모는 매번 같은 함수를 넘기고, 줄이 자기 재료 id·재료를 넣어 부른다.
   onCheck: (fridgeId: number, checked: boolean) => void;
   onEdit: (item: FridgeItemResponse) => void;
   onConsume: (item: FridgeItemResponse) => void;
@@ -22,137 +24,166 @@ interface FridgeItemRowProps {
   onDelete: (fridgeId: number) => Promise<void>;
 }
 
-// 바뀐 칸만 다시 그린다: 체크·삭제 중 표시가 바뀐 칸과 데이터가 바뀐 칸만. 나머지 칸은 그대로 둔다.
+// ⋯ 버튼 위에 여는 확인창 종류
+type ConfirmKind = 'discard' | 'delete';
+
+// 바뀐 줄만 다시 그린다: 체크·처리 중 표시가 바뀐 줄과 데이터가 바뀐 줄만. 나머지 줄은 그대로 둔다.
 export const FridgeItemRow = memo(function FridgeItemRow({
   item,
   checked,
   removing,
   highlighted,
+  inlineActions,
   onCheck,
   onEdit,
   onConsume,
   onDiscard,
   onDelete,
 }: FridgeItemRowProps) {
-  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [confirmKind, setConfirmKind] = useState<ConfirmKind>();
   const fridgeId = item.id ?? 0;
+  const name = item.rawName ?? '';
+  const quantity = formatQuantity(item);
+  const storage = item.storage ? STORAGE_LABELS[item.storage] : '';
 
-  // 신선도: 기한 지남은 옅은 빨강, 임박은 옅은 노랑 바탕(서버가 준 status 그대로).
-  const freshnessClass =
-    item.status === 'EXPIRED' ? styles.expired : item.status === 'IMMINENT' ? styles.imminent : '';
-  const tileClassName = [styles.row, freshnessClass, highlighted && styles.highlighted]
-    .filter(Boolean)
-    .join(' ');
+  const discardConfirm = {
+    title: `${withObjectParticle(name)} 버릴까요?`,
+    description: '냉장고에서 빠지고 기록에 남아요.',
+    okText: '버리기',
+  };
+  const confirm =
+    confirmKind === 'delete'
+      ? {
+          title: `${withObjectParticle(name)} 삭제할까요?`,
+          description: '잘못 등록한 재료일 때 사용해요. 기록에 남지 않아요.',
+          okText: '삭제',
+        }
+      : discardConfirm;
 
-  // 재료 칸(카드): [체크 · D-day] → [이름 · 종류·NEW 태그] → [수량 · 보관] → [먹었어요 · 버렸어요 · 더보기]
+  const menuItems = [
+    ...(inlineActions
+      ? []
+      : [
+          { key: 'consume', label: '먹었어요' },
+          { key: 'discard', label: '버리기' },
+        ]),
+    { key: 'edit', label: '수정' },
+    { key: 'delete', label: '잘못 등록', danger: true },
+  ];
+
+  // 휴대폰: [체크] [이름 · 인식 칩 · NEW / 수량 · 보관] [남은 날] [⋯]
+  // 768px 이상: [체크] [등록한 이름(남는 폭)] [인식 칩] [수량] [보관] [남은 날] [먹었어요 · 버리기 아이콘] [⋯]
   return (
-    <div className={tileClassName}>
-      <div className={styles.top}>
-        <Checkbox
-          checked={checked}
-          onChange={(event) => onCheck(fridgeId, event.target.checked)}
-          aria-label={`${item.rawName} 선택`}
-          className={styles.check}
-        />
-        <div className={styles.badge}>
-          {item.dDay !== undefined && (
-            <DdayTag dDay={item.dDay} expirationDate={item.expirationDate} />
+    <div className={styles.row}>
+      <Checkbox
+        checked={checked}
+        onChange={(event) => onCheck(fridgeId, event.target.checked)}
+        aria-label={`${name} 선택`}
+        className={styles.check}
+      />
+      <div className={styles.main}>
+        <div className={styles.nameLine}>
+          <Typography.Text title={name} className={styles.name}>
+            {name}
+          </Typography.Text>
+          <IngredientChip item={item} className={styles.chipInline} />
+          {highlighted && (
+            <Tag variant="filled" color="blue" className={styles.newTag}>
+              NEW
+            </Tag>
           )}
         </div>
-      </div>
-      <div className={styles.nameWrapper}>
-        <Typography.Text title={item.rawName} className={styles.name}>
-          {item.rawName}
+        <Typography.Text type="secondary" className={styles.sub}>
+          {quantity}
+          {storage && ` · ${storage}`}
         </Typography.Text>
-        <IngredientTypeTag type={item.ingredientType} />
-        {highlighted && (
-          <Tag variant="filled" color="blue" className={styles.newTag}>
-            NEW
-          </Tag>
+      </div>
+      <span className={styles.chipCell}>
+        <IngredientChip item={item} />
+      </span>
+      <Typography.Text className={styles.quantity}>{quantity}</Typography.Text>
+      <Typography.Text type="secondary" className={styles.storage}>
+        {storage}
+      </Typography.Text>
+      <span className={styles.badge}>
+        {item.dDay !== undefined && (
+          <DdayTag dDay={item.dDay} expirationDate={item.expirationDate} />
         )}
-      </div>
-      <div className={styles.meta}>
-        <Typography.Text className={styles.quantity}>{formatQuantity(item)}</Typography.Text>
-        <Typography.Text type="secondary" className={styles.storage}>
-          {item.storage && STORAGE_LABELS[item.storage]}
-        </Typography.Text>
-      </div>
-      <Flex className={styles.actions}>
-        <Tooltip title="먹었어요">
+      </span>
+      {inlineActions && (
+        <div className={styles.inlineActions}>
+          {/* 먹었어요: 먹은 양 입력 창을 연다. 말풍선 없이 화면 읽기용 이름만 둔다. */}
           <Button
+            size="small"
             type="text"
             icon={<CheckCircleOutlined />}
-            aria-label={`${item.rawName} 먹었어요`}
             onClick={() => onConsume(item)}
             disabled={removing}
+            aria-label={`${name} 먹었어요`}
             className={styles.iconButton}
           />
-        </Tooltip>
-        <Popconfirm
-          title={`${withObjectParticle(item.rawName ?? '')} 버릴까요?`}
-          description="냉장고에서 빠지고 기록에 남아요."
-          okText="버렸어요"
-          cancelText="취소"
-          okButtonProps={{ loading: removing, disabled: removing }}
-          cancelButtonProps={{ disabled: removing }}
-          onConfirm={() => onDiscard(fridgeId)}
-        >
-          <Tooltip title="버렸어요">
-            <Button
-              type="text"
-              icon={<DeleteOutlined />}
-              aria-label={`${item.rawName} 버렸어요`}
-              loading={removing}
-              disabled={removing}
-              className={styles.iconButton}
-            />
-          </Tooltip>
-        </Popconfirm>
-        {/* 메뉴의 삭제를 누르면 "⋯" 버튼 위에 확인창을 연다. 버튼을 눌러서는 열리지 않는다. */}
-        <Popconfirm
-          open={deleteConfirmOpen}
-          onOpenChange={(open) => {
-            if (!open) setDeleteConfirmOpen(false);
-          }}
-          title={`${withObjectParticle(item.rawName ?? '')} 삭제할까요?`}
-          description="잘못 등록한 재료일 때 사용해요. 기록에 남지 않아요."
-          okText="삭제"
-          okButtonProps={{ danger: true, loading: removing, disabled: removing }}
-          cancelButtonProps={{ disabled: removing }}
-          onCancel={() => setDeleteConfirmOpen(false)}
-          onConfirm={async () => {
-            // 삭제가 실패해 예외가 나도 확인창이 열린 채 남지 않게 닫는다.
-            try {
-              await onDelete(fridgeId);
-            } finally {
-              setDeleteConfirmOpen(false);
-            }
-          }}
-        >
-          <Dropdown
-            trigger={['click']}
-            disabled={removing}
-            menu={{
-              items: [
-                { key: 'edit', label: '수정' },
-                { key: 'delete', label: '삭제', danger: true },
-              ],
-              onClick: ({ key }) => {
-                if (key === 'edit') onEdit(item);
-                if (key === 'delete') setDeleteConfirmOpen(true);
-              },
-            }}
+          <Popconfirm
+            {...discardConfirm}
+            cancelText="취소"
+            okButtonProps={{ loading: removing, disabled: removing }}
+            cancelButtonProps={{ disabled: removing }}
+            onConfirm={() => onDiscard(fridgeId)}
           >
             <Button
+              size="small"
               type="text"
-              icon={<MoreOutlined />}
-              aria-label={`${item.rawName} 더보기`}
+              icon={<DeleteOutlined />}
+              loading={removing}
               disabled={removing}
+              aria-label={`${name} 버리기`}
               className={styles.iconButton}
             />
-          </Dropdown>
-        </Popconfirm>
-      </Flex>
+          </Popconfirm>
+        </div>
+      )}
+      {/* 메뉴의 버리기·잘못 등록을 누르면 "⋯" 버튼 위에 확인창을 연다. 버튼을 눌러서는 열리지 않는다. */}
+      <Popconfirm
+        open={confirmKind !== undefined}
+        onOpenChange={(open) => {
+          if (!open) setConfirmKind(undefined);
+        }}
+        title={confirm.title}
+        description={confirm.description}
+        okText={confirm.okText}
+        cancelText="취소"
+        okButtonProps={{ danger: confirmKind === 'delete', loading: removing, disabled: removing }}
+        cancelButtonProps={{ disabled: removing }}
+        onCancel={() => setConfirmKind(undefined)}
+        onConfirm={async () => {
+          // 실패해 예외가 나도 확인창이 열린 채 남지 않게 닫는다.
+          try {
+            await (confirmKind === 'delete' ? onDelete(fridgeId) : onDiscard(fridgeId));
+          } finally {
+            setConfirmKind(undefined);
+          }
+        }}
+      >
+        <Dropdown
+          trigger={['click']}
+          disabled={removing}
+          menu={{
+            items: menuItems,
+            onClick: ({ key }) => {
+              if (key === 'consume') onConsume(item);
+              if (key === 'edit') onEdit(item);
+              if (key === 'discard' || key === 'delete') setConfirmKind(key);
+            },
+          }}
+        >
+          <Button
+            type="text"
+            icon={<MoreOutlined />}
+            aria-label={`${name} 더보기`}
+            disabled={removing}
+            className={styles.moreButton}
+          />
+        </Dropdown>
+      </Popconfirm>
     </div>
   );
 });

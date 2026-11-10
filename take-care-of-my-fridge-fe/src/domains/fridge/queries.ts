@@ -19,6 +19,7 @@ import {
   type FridgeRemoveReason,
   type FridgeSortType,
 } from './api';
+import { runInChunks } from './bulk';
 
 export const fridgeQueries = {
   all: ['fridge'] as const,
@@ -82,7 +83,32 @@ export function useRemoveFridgeItem() {
   return useMutation({
     mutationFn: ({ fridgeId, reason }: { fridgeId: number; reason: FridgeRemoveReason }) =>
       removeFridgeItem(fridgeId, reason),
-    // 화면에서는 기록 없이 지우는 WRONG_ENTRY에만 쓰므로 기록 쿼리는 무효화하지 않는다.
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: fridgeQueries.itemLists() }),
+    // 버림(DISCARDED)·사용(CONSUMED)은 기록에 남아 이번 달 버린 재료 수가 바뀌므로 기록 쿼리도 새로 받는다.
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: fridgeQueries.itemLists() }),
+        queryClient.invalidateQueries({ queryKey: fridgeQueries.logLists() }),
+      ]),
+  });
+}
+
+// 여러 재료를 한 번에 비우기(기한 지남 [한 번에 정리]). 몇 개씩 나눠 보내고, 다 끝난 뒤 목록·기록을 한 번만 새로 받는다.
+// 일부만 실패할 수 있어 예외 대신 성공·실패 id를 돌려주고, 실패 안내는 화면이 한 번에 띄운다.
+export interface FridgeBulkRequest {
+  fridgeIds: number[];
+  remove: FridgeRemoveReason;
+}
+
+export function useBulkFridgeAction() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (request: FridgeBulkRequest) =>
+      runInChunks(request.fridgeIds, (fridgeId) => removeFridgeItem(fridgeId, request.remove)),
+    meta: { skipGlobalError: true },
+    onSettled: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: fridgeQueries.itemLists() }),
+        queryClient.invalidateQueries({ queryKey: fridgeQueries.logLists() }),
+      ]),
   });
 }

@@ -1,6 +1,6 @@
 @use '@/styles/variables' as *;
 
-// 숫자 자릿수가 달라도 줄마다 태그 폭이 같도록 최소 너비를 두고, 숫자는 고정폭으로 맞춘다.
+// 숫자 자릿수·문구 길이가 달라도 줄마다 뱃지 폭이 같도록 최소 너비를 두고, 숫자는 고정폭으로 맞춘다.
 .tag {
   min-width: $dday-tag-min-width;
   margin: 0;
@@ -10,8 +10,14 @@
   white-space: nowrap;
 }
 
-// D-4 이상: 태그 배경 없이 보조 글자색만 쓴다. 패딩은 그대로 둬서 색 있는 태그와 글자 위치를 맞춘다.
-.plain {
-  color: var(--ant-color-text-secondary);
-  background: transparent;
+// 오늘~모레(주황)·D-3(노랑): antd 색 태그는 글자가 옅어 대비가 모자라므로(3.3:1, 2.8:1)
+// 색 이름을 넘기지 않고 옅은 바탕 + 진한 글자를 직접 준다(5:1 이상).
+.tag.orange {
+  color: var(--ant-orange-8);
+  background: var(--ant-orange-1);
+}
+
+.tag.gold {
+  color: var(--ant-gold-9);
+  background: var(--ant-gold-1);
 }

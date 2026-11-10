@@ -1,9 +1,9 @@
-import { CheckOutlined } from '@ant-design/icons';
 import { App, Button, Empty, Flex, Result, Segmented, Select, Skeleton, Typography } from 'antd';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useLocation, useSearchParams } from 'react-router';
 
 import { SectionCard } from '@/common/components/SectionCard';
+import { useScreens } from '@/common/hooks/useScreens';
 import { useChatModalStore } from '@/domains/chat/model/useChatModalStore';
 import { toChatSelectedIngredients } from '@/domains/chat/selectedIngredients';
 
@@ -11,13 +11,20 @@ import type { FridgeItemResponse, FridgeSortType } from '../api';
 import { FRIDGE_TABS, isFridgeTab, matchesFridgeTab, type FridgeTab } from '../filter';
 import { STORAGE_LABELS } from '../format';
 import { useFridgeSort } from '../hooks/useFridgeSort';
+import { useFridgeSelectionStore } from '../model/useFridgeSelectionStore';
 import { readNewFridgeIds } from '../newItems';
-import { useFridgeItems, useRemoveFridgeItem, useTakeOutFridgeItem } from '../queries';
-import { scrollToIngredientInput } from '../sectionIds';
+import {
+  useBulkFridgeAction,
+  useFridgeItems,
+  useRemoveFridgeItem,
+  useTakeOutFridgeItem,
+  type FridgeBulkRequest,
+} from '../queries';
 import { FridgeItemConsumeModal } from './FridgeItemConsumeModal';
 import { FridgeItemEditModal } from './FridgeItemEditModal';
 import { FridgeIllustration } from './FridgeIllustration';
 import { FridgeItemRow } from './FridgeItemRow';
+import { FridgeSelectionBar } from './FridgeSelectionBar';
 import { StorageIcon } from './StorageIcon';
 import styles from './FridgeItemListSection.module.scss';
 
@@ -44,32 +51,55 @@ const SORT_OPTIONS: Array<{ value: FridgeSortType; label: string }> = [
   { value: 'NAME', label: '이름순' },
 ];
 
+// 묶음마다 처음에는 이만큼만 보여 주고 [더 보기]로 나머지를 편다.
+const VISIBLE_ROW_COUNT = 8;
+
 // 임박순 그룹. 서버가 준 status·dDay만으로 나눈다.
-const EXPIRATION_GROUPS: Array<{ label: string; match: (item: FridgeItemResponse) => boolean }> = [
-  { label: '기한 지남', match: (item) => item.status === 'EXPIRED' },
+// 기한 지남 묶음은 제목 옆 [한 번에 정리]로 묶음의 재료를 모두 비울 수 있다.
+const EXPIRATION_GROUPS: Array<{
+  label: string;
+  match: (item: FridgeItemResponse) => boolean;
+  cleanable?: boolean;
+}> = [
+  { label: '기한 지남', match: (item) => item.status === 'EXPIRED', cleanable: true },
   { label: '오늘까지', match: (item) => item.status === 'IMMINENT' && item.dDay === 0 },
   { label: '3일 이내', match: (item) => item.status === 'IMMINENT' && (item.dDay ?? 0) > 0 },
   { label: '여유 있음', match: (item) => item.status === 'NORMAL' },
 ];
 
-export function FridgeItemListSection() {
+interface FridgeItemListSectionProps {
+  // 빈 냉장고 안내의 [재료 추가]: 재료 추가 팝업을 연다.
+  onAdd: () => void;
+}
+
+export function FridgeItemListSection({ onAdd }: FridgeItemListSectionProps) {
   const openChat = useChatModalStore((state) => state.openChat);
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const [sort, setSort] = useFridgeSort();
   const { data, isPending, isError, refetch } = useFridgeItems(sort, true);
   const takeOutMutation = useTakeOutFridgeItem();
   const removeMutation = useRemoveFridgeItem();
-  const [checkedIds, setCheckedIds] = useState<number[]>([]);
+  const bulkMutation = useBulkFridgeAction();
+  const checkedIds = useFridgeSelectionStore((state) => state.checkedIds);
+  const handleCheck = useFridgeSelectionStore((state) => state.setChecked);
+  const uncheck = useFridgeSelectionStore((state) => state.uncheck);
+  const clearChecked = useFridgeSelectionStore((state) => state.clear);
+  // 여러 재료 처리 확인창이 떠 있는 동안 버튼을 다시 눌러 확인창이 겹치지 않게 한다.
+  const [bulkConfirming, setBulkConfirming] = useState(false);
   const [removingIds, setRemovingIds] = useState<number[]>([]);
   const [editingItem, setEditingItem] = useState<FridgeItemResponse>();
   const [consumingItem, setConsumingItem] = useState<FridgeItemResponse>();
+  // [더 보기]로 편 묶음(임박순 묶음 이름, 다른 정렬은 'ALL')
+  const [expandedGroups, setExpandedGroups] = useState<string[]>([]);
+  // 768px 이상은 줄마다 [먹었어요][버리기] 아이콘, 좁은 화면은 ⋯ 메뉴(그릴 버튼이 달라 JS로 나눈다)
+  const inlineActions = useScreens().md ?? false;
 
   // 기존 링크가 그대로 열리도록 키는 storage로 두고 밀키트·기본 양념 탭 값만 더했다.
   const storageParam = searchParams.get('storage');
   const storage: FridgeTab = isFridgeTab(storageParam) ? storageParam : 'ALL';
-  // 위 재료 입력에서 방금 등록했을 때만 있다. 정렬·탭을 바꾸면 state 없이 이동해 사라진다.
+  // 재료 추가 팝업에서 방금 등록했을 때만 있다. 정렬·탭을 바꾸면 state 없이 이동해 사라진다.
   const newFridgeIds = readNewFridgeIds(location.state);
 
   const handleStorageChange = (next: FridgeTab) => {
@@ -83,10 +113,8 @@ export function FridgeItemListSection() {
     );
   };
 
-  // 재료 칸(memo)에 넘기는 함수는 매번 새로 만들지 않고 고정한다(useCallback). 동작은 그대로다.
-  const handleCheck = useCallback((fridgeId: number, checked: boolean) => {
-    setCheckedIds((ids) => (checked ? [...ids, fridgeId] : ids.filter((id) => id !== fridgeId)));
-  }, []);
+  // 다른 화면에 다녀오면 체크는 비운 채로 시작한다.
+  useEffect(() => clearChecked, [clearChecked]);
 
   // 여러 재료를 연달아 처리할 수 있어 진행 중인 id를 모두 기록한다.
   // mutate의 콜백은 마지막 호출에만 실행되므로 호출마다 결과를 받는 mutateAsync를 쓴다.
@@ -95,7 +123,7 @@ export function FridgeItemListSection() {
       setRemovingIds((ids) => [...ids, fridgeId]);
       try {
         await request;
-        setCheckedIds((ids) => ids.filter((id) => id !== fridgeId));
+        uncheck([fridgeId]);
         void message.success(successMessage);
       } catch {
         // 실패 알림은 MutationCache.onError가 띄운다.
@@ -103,7 +131,7 @@ export function FridgeItemListSection() {
         setRemovingIds((ids) => ids.filter((id) => id !== fridgeId));
       }
     },
-    [message],
+    [message, uncheck],
   );
 
   // mutateAsync는 TanStack Query가 같은 함수를 계속 돌려준다.
@@ -127,27 +155,81 @@ export function FridgeItemListSection() {
     [removeRow, remove],
   );
 
-  const renderRows = (items: FridgeItemResponse[]) => (
-    <div className={styles.rows}>
-      {items.map((item) => {
-        const fridgeId = item.id ?? 0;
-        return (
-          <FridgeItemRow
-            key={fridgeId}
-            item={item}
-            checked={checkedIds.includes(fridgeId)}
-            removing={removingIds.includes(fridgeId)}
-            highlighted={newFridgeIds.includes(fridgeId)}
-            onCheck={handleCheck}
-            onEdit={setEditingItem}
-            onConsume={setConsumingItem}
-            onDiscard={handleDiscard}
-            onDelete={handleDelete}
-          />
-        );
-      })}
-    </div>
-  );
+  // 기한 지난 재료를 한 번에 비운다. 성공한 재료는 목록에서 빠지고 체크도 풀린다. 실패한 줄은 그대로 남는다.
+  const runBulk = async (request: FridgeBulkRequest, doneMessage: string) => {
+    const { succeededIds, failedIds } = await bulkMutation.mutateAsync(request);
+    uncheck(succeededIds);
+    if (failedIds.length > 0) {
+      void message.warning(
+        `${request.fridgeIds.length}개 중 ${failedIds.length}개를 정리하지 못했어요`,
+      );
+    } else {
+      void message.success(doneMessage);
+    }
+  };
+
+  // [한 번에 정리]: 확인창을 띄우고, 확인하면 처리가 끝날 때까지 확인 버튼이 돌아간다.
+  const confirmCleanup = (items: FridgeItemResponse[]) => {
+    if (bulkConfirming || bulkMutation.isPending) return;
+    setBulkConfirming(true);
+    modal.confirm({
+      title: `기한 지난 재료 ${items.length}개를 정리할까요?`,
+      content: '모두 버린 것으로 냉장고에서 빠지고 기록에 남아요.',
+      okText: '정리',
+      cancelText: '취소',
+      onOk: () =>
+        runBulk(
+          { fridgeIds: items.map((item) => item.id ?? 0), remove: 'DISCARDED' },
+          '기한 지난 재료를 정리했어요',
+        ),
+      afterClose: () => setBulkConfirming(false),
+    });
+  };
+
+  // 처리 중인 재료 id(한 줄씩 처리 + 한 번에 정리)
+  const busyIds = bulkMutation.isPending
+    ? [...removingIds, ...(bulkMutation.variables?.fridgeIds ?? [])]
+    : removingIds;
+
+  const renderRows = (groupKey: string, items: FridgeItemResponse[]) => {
+    const expanded = expandedGroups.includes(groupKey);
+    const hiddenCount = expanded ? 0 : Math.max(items.length - VISIBLE_ROW_COUNT, 0);
+    const shownItems = hiddenCount > 0 ? items.slice(0, VISIBLE_ROW_COUNT) : items;
+    return (
+      <>
+        <div className={styles.list}>
+          {shownItems.map((item) => {
+            const fridgeId = item.id ?? 0;
+            return (
+              <FridgeItemRow
+                key={fridgeId}
+                item={item}
+                checked={checkedIds.includes(fridgeId)}
+                removing={busyIds.includes(fridgeId)}
+                highlighted={newFridgeIds.includes(fridgeId)}
+                inlineActions={inlineActions}
+                onCheck={handleCheck}
+                onEdit={setEditingItem}
+                onConsume={setConsumingItem}
+                onDiscard={handleDiscard}
+                onDelete={handleDelete}
+              />
+            );
+          })}
+        </div>
+        {hiddenCount > 0 && (
+          <Button
+            type="text"
+            block
+            onClick={() => setExpandedGroups((keys) => [...keys, groupKey])}
+            className={styles.moreButton}
+          >
+            더 보기 ({hiddenCount}개)
+          </Button>
+        )}
+      </>
+    );
+  };
 
   const renderBody = () => {
     if (isPending) return <Skeleton active paragraph={{ rows: 6 }} />;
@@ -167,9 +249,9 @@ export function FridgeItemListSection() {
           description="냉장고가 비어 있어요"
         >
           <Typography.Paragraph type="secondary">
-            위쪽 [냉장고에 뭐가 남았나요?]에서 재료를 추가해 보세요.
+            [재료 추가]로 남은 재료를 담아 보세요.
           </Typography.Paragraph>
-          <Button onClick={scrollToIngredientInput}>재료 추가하러 가기</Button>
+          <Button onClick={onAdd}>재료 추가</Button>
         </Empty>
       );
     }
@@ -180,7 +262,7 @@ export function FridgeItemListSection() {
         <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={EMPTY_TAB_MESSAGES[storage]} />
       );
     }
-    if (sort !== 'EXPIRATION') return renderRows(visibleItems);
+    if (sort !== 'EXPIRATION') return renderRows('ALL', visibleItems);
 
     return (
       <Flex vertical gap="large">
@@ -192,8 +274,21 @@ export function FridgeItemListSection() {
               <div className={styles.groupHead}>
                 <span className={styles.groupTitle}>{group.label}</span>
                 <span className={styles.groupCount}>{groupItems.length}</span>
+                {group.cleanable && (
+                  // 지금 탭의 기한 지난 재료 전부([더 보기]로 접힌 줄 포함)를 비운다.
+                  <Button
+                    size="small"
+                    danger
+                    loading={bulkMutation.isPending}
+                    disabled={bulkConfirming || bulkMutation.isPending}
+                    onClick={() => confirmCleanup(groupItems)}
+                    className={styles.cleanButton}
+                  >
+                    한 번에 정리
+                  </Button>
+                )}
               </div>
-              {renderRows(groupItems)}
+              {renderRows(group.label, groupItems)}
             </section>
           );
         })}
@@ -203,10 +298,11 @@ export function FridgeItemListSection() {
 
   const countOf = (tab: FridgeTab) =>
     data?.filter((item) => matchesFridgeTab(item, tab)).length ?? 0;
+  // 체크한 재료 중 아직 냉장고에 있는 것(다른 탭에 있는 재료도 포함)
   const checkedItems = data?.filter((item) => checkedIds.includes(item.id ?? 0)) ?? [];
 
   return (
-    <SectionCard title="재료 목록">
+    <SectionCard title="재료 목록" bracket={false}>
       <Flex vertical gap="middle" className={styles.container}>
         {/* 도구 줄: 보관 탭 + 정렬. 목록이 길어 스크롤해도 상단바 바로 아래에 붙어 있다. */}
         <div className={styles.toolbar}>
@@ -240,25 +336,12 @@ export function FridgeItemListSection() {
         {renderBody()}
 
         {checkedItems.length > 0 && (
-          <Flex
-            align="center"
-            justify="space-between"
-            wrap
-            gap="small"
-            className={styles.selectionBar}
-          >
-            <Typography.Text className={styles.selectionText}>
-              <CheckOutlined /> {checkedItems.length}개 선택됨 ·{' '}
-              {checkedItems.map((item) => item.rawName).join(', ')}
-            </Typography.Text>
-            {/* 체크한 재료 중 추천에 쓸 수 있는 것만 넘긴다. 남는 게 없으면 선택 없이 연다. */}
-            <Button
-              className={styles.selectionButton}
-              onClick={() => openChat(toChatSelectedIngredients(checkedItems))}
-            >
-              이 재료 위주로 AI 추천
-            </Button>
-          </Flex>
+          <FridgeSelectionBar
+            count={checkedItems.length}
+            // 체크한 재료 중 추천에 쓸 수 있는 것만 넘긴다. 남는 게 없으면 선택 없이 연다.
+            onChat={() => openChat(toChatSelectedIngredients(checkedItems))}
+            onClear={clearChecked}
+          />
         )}
       </Flex>
 

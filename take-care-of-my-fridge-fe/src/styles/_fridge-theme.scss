@@ -4,75 +4,34 @@
 //  내 냉장고 화면 테마 — 아래 $fridge-theme 숫자만 바꾸면 화면 배치가 한 번에 바뀐다.
 //  세트 안의 값을 바꾸면 그 세트만 바뀐다. 새 세트는 번호를 하나 더 추가한다.
 //  좁은 화면(lg 미만)은 모든 세트가 위에서 아래로 한 줄이다.
+//  양옆 여백은 재료/밀키트 목록 화면과 같게 맞추므로 여기서 정하지 않는다(_product-list-theme.scss의 inset).
 // ════════════════════════════════════════════════════════════════════
 
-//   1: 원래 화면 — 요약 → 재료 등록 → 재료 목록 | 오른쪽 칸(AI 상담 · 최근 기록)
+//   1: 기본 — 요약 → 재료 목록 | 오른쪽 칸(AI 상담 · 최근 기록)
 //   2: 왼쪽 칸 — 1에서 AI 상담 · 최근 기록 칸을 왼쪽으로
-//   3: 위 두 칸 — 요약 | 재료 등록을 나란히 두어 재료 목록이 빨리 보이게, 양옆 여백
-//   4: 한 줄 — 모든 묶음을 가운데 한 줄로 쌓는다(오른쪽 칸 내용은 재료 목록 아래), 양옆 여백 넓게
-//   5: 넓은 오른쪽 칸 — 3에 오른쪽 칸을 넓게(480px)
+//   3: 한 줄 — 오른쪽 칸 내용을 재료 목록 아래로
+//   4: 넓은 오른쪽 칸 — 1에 오른쪽 칸을 넓게(480px)
 $fridge-theme: 1;
 
 // 세트 항목
-//   inset: 화면 양옆 여백(화면 기본 여백 안쪽에 더한다)
 //   aside: 넓은 화면 AI 상담 · 최근 기록 칸 위치 right / left / bottom(재료 목록 아래 한 줄)
 //   aside-width: 그 칸의 폭(right·left일 때)
-//   top-split: 넓은 화면에서 요약 | 재료 등록을 나란히 둘지
 $fridge-themes: (
   1: (
-    inset: (
-      md: 0,
-      lg: 0,
-      xl: 0,
-      xxl: 0,
-    ),
     aside: right,
     aside-width: 380px,
-    top-split: false,
   ),
   2: (
-    inset: (
-      md: 0,
-      lg: 0,
-      xl: 0,
-      xxl: 0,
-    ),
     aside: left,
     aside-width: 380px,
-    top-split: false,
   ),
   3: (
-    inset: (
-      md: 16px,
-      lg: 32px,
-      xl: 64px,
-      xxl: 160px,
-    ),
-    aside: right,
-    aside-width: 380px,
-    top-split: true,
-  ),
-  4: (
-    inset: (
-      md: 16px,
-      lg: 96px,
-      xl: 200px,
-      xxl: 360px,
-    ),
     aside: bottom,
     aside-width: 380px,
-    top-split: false,
   ),
-  5: (
-    inset: (
-      md: 16px,
-      lg: 32px,
-      xl: 64px,
-      xxl: 160px,
-    ),
+  4: (
     aside: right,
     aside-width: 480px,
-    top-split: true,
   ),
 );
 
@@ -82,7 +41,5 @@ $fridge-themes: (
 }
 
 $_fridge: map.get($fridge-themes, $fridge-theme);
-$fridge-inset: map.get($_fridge, inset);
 $fridge-aside: map.get($_fridge, aside);
 $fridge-aside-theme-width: map.get($_fridge, aside-width);
-$fridge-top-split: map.get($_fridge, top-split);

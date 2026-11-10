@@ -1,5 +1,26 @@
+// 최근 기록 종류 태그. 테마의 success·warning 옅은 바탕은 회색에 가까워 글자 대비가 모자라므로(2.7:1, 3.6:1)
+// 초록·주황은 antd 기본 팔레트 변수를, 빨강은 테마 error 변수를 쓴다. 글자·바탕 대비는 모두 5:1 이상.
 .tag {
   margin: 0;
   font-size: var(--ant-font-size-sm);
   white-space: nowrap;
+  border: none;
+}
+
+// 요리했어요: green-1 바탕 + green-8 글자(5.4:1)
+.cooked {
+  color: var(--ant-green-8);
+  background: var(--ant-green-1);
+}
+
+// 먹었어요: orange-1 바탕 + orange-8 글자(5.1:1)
+.consumed {
+  color: var(--ant-orange-8);
+  background: var(--ant-orange-1);
+}
+
+// 버렸어요: 테마 error 옅은 바탕 + error 글자(5.3:1)
+.discarded {
+  color: var(--ant-color-error-text);
+  background: var(--ant-color-error-bg);
 }
