@@ -1,6 +1,6 @@
 # 알림 설계
 
-상태: 구현 완료 · 담당: 장준혁 · 관련 화면: 헤더 종 아이콘
+상태: 구현 완료 · 담당: 장준혁 · 관련 화면: 헤더 종 아이콘 · API: [알림 API 명세](../../api/notification-api.md)
 
 ## 목적과 책임
 - 해결할 사용자 문제: 회원이 사이트를 쓰는 동안 자기에게 온 알림(예: 번개 드롭 시작)을 종 아이콘에서 보고, 누르면 관련 화면으로 간다.
@@ -95,7 +95,7 @@ sequenceDiagram
 
 ## 데이터·API·이벤트
 - ERD·데이터 사전: [erd.md](../../database/erd.md#알림-테이블-관계), [data-dictionary.md](../../database/data-dictionary.md#notifications--알림)
-- 제공 API: [알림 API](../../api/api-spec.md#알림-api) (내 알림 목록, 안 읽은 알림 수, 실시간 알림 스트림, 전부 읽음, 알림 지우기, 모두 지우기)
+- 제공 API: [알림 API](../../api/notification-api.md) (내 알림 목록, 안 읽은 알림 수, 실시간 알림 스트림, 전부 읽음, 알림 지우기, 모두 지우기)
 - 발행 이벤트: Redis 채널 `notification:push`(알림 저장 직후, 회원 ID만 싣습니다). 서버 간 전달용입니다.
 - 수신 이벤트: `notification-requested`(알림 요청). 메시지 칸은 회원 ID, 종류, 문구, 이동 경로, 중복 방지 키로 알림 테이블과 같습니다. 메시지 타입(`NotificationRequestedMessage`)은 이 도메인에 있고 보내는 쪽도 같은 타입을 씁니다.
 - 보관 기간·삭제 정책: 회원이 지운 알림은 `deleted_at`만 채우고 행을 남깁니다. 행을 아예 지우는 일은 없습니다.

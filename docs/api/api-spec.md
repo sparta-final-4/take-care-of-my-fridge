@@ -38,11 +38,11 @@
 | 장바구니 | [cart-api.md](cart-api.md) |
 | 주문 | [order-api.md](order-api.md) |
 | 환불 | [refund-api.md](refund-api.md) |
-| 클릭 수 기반 할인 상품 | [이 문서의 클릭 수 기반 할인 상품 API](#클릭-수-기반-할인-상품-api) |
-| 할인 행사 | [이 문서의 할인 행사 API](#할인-행사-api) |
+| 클릭 수 기반 할인 상품 | [sale-event-api.md](sale-event-api.md#클릭-수-기반-할인-상품-api) |
+| 할인 행사 | [sale-event-api.md](sale-event-api.md#할인-행사-api) |
 | 결제 | [payment-api.md](payment-api.md) |
 | 정산 | [settlement-api.md](settlement-api.md) |
-| 알림 | [이 문서의 알림 API](#알림-api) |
+| 알림 | [notification-api.md](notification-api.md) |
 
 ## 공유된 응답 형태
 
@@ -159,135 +159,6 @@ HTTP 메서드·경로·DTO 이름은 구현 전 합의합니다.
 - 맛 선호 변경은 `PUT /members/me/tastes` 요청 본문 `{"tastes":["SALTY","UMAMI"]}`으로 목록 전체를 교체합니다. 빈 목록은 모든 맛 선호를 지웁니다. 중복 값은 허용하고 서버에서 한 번만 저장합니다. 목록 누락·null, null 항목, 허용하지 않는 맛 값은 400입니다. 성공 본문은 공통 `ApiResponse.ok()` 형식입니다.
 - 가입 성공 데이터는 `{ memberId: number }`입니다. 이메일 중복은 `M001`, 닉네임 중복은 `M002`로 응답합니다.
 - `POST /members`는 익명 요청을 허용합니다. 다른 POST 경로의 CSRF 보호는 유지합니다.
-
-## 클릭 수 기반 할인 상품 API
-
-상태: **구현 완료** · 담당: 장준혁 · 근거: 실제 백엔드 컨트롤러 및 서비스 구현
-
-| 기능 | Method / Path | 성공 응답 |
-|---|---|---|
-| 클릭 수 기반 할인 상품 | GET /sales/popular | 200, `List<PopularSaleResponse>` |
-
-- 메인 화면 할인 섹션이 씁니다. 로그인하지 않아도 부를 수 있고, 요청 값은 없습니다.
-- `PopularSaleResponse`: productId, name, productType(`INGREDIENT`·`MEALKIT`), imageUrl, price(정가), sale(`SaleResponse`).
-- **대상**: 진행 중인 특가·번개 드롭 상품입니다. 품절·판매 중지·번개 드롭 남은 수량 0인 상품은 뺍니다.
-- **순서**: 오늘을 포함한 최근 7일 검색 결과 클릭이 많은 순입니다. 클릭이 같으면 할인율이 높은 순, 그것도 같으면 상품 ID 순입니다. 최대 6개입니다.
-
-## 할인 행사 API
-
-상태: **구현 완료** · 담당: 장준혁 · 근거: 실제 백엔드 컨트롤러 및 서비스 구현
-
-경로는 prefix(/api)를 뺀 값입니다. 모두 관리자 전용입니다(일반 회원 403, 로그인 안 하면 401).
-
-| 기능 | Method / Path | 성공 응답 |
-|---|---|---|
-| 특가 등록 | POST /admin/sale-events/special | 201, `SaleEventsCreateResponse`(saleEventIds) |
-| 번개 드롭 등록 | POST /admin/sale-events/flash-drop | 201, `SaleEventsCreateResponse`(saleEventIds) |
-| 등록 후보 상품 조회 | GET /admin/sale-events/products | 200, `PageResponse<SaleCandidateProductResponse>` |
-| 할인 행사 목록 | GET /admin/sale-events | 200, `PageResponse<SaleEventListResponse>` |
-| 할인 행사 상세 | GET /admin/sale-events/{saleEventId} | 200, `SaleEventDetailResponse` |
-| 할인 행사 수정 | PATCH /admin/sale-events/{saleEventId} | 200, 공통 성공 응답 |
-| 할인 행사 종료 | PATCH /admin/sale-events/{saleEventId}/end | 200, 공통 성공 응답 |
-| 할인 행사 삭제 | DELETE /admin/sale-events/{saleEventId} | 200, 공통 성공 응답 |
-
-요청 값:
-
-| 기능 | 요청 |
-|---|---|
-| 특가 등록 | Body: `startsAt`, `endsAt`, `items`: `[{ productId, discountRate(1~99) }]` |
-| 번개 드롭 등록 | Body: 특가와 같고 항목마다 `limitedQuantity`(1 이상) 추가 |
-| 등록 후보 상품 | Query: keyword(50자 이하), type(상품 종류), page, size(최대 100) |
-| 목록 | Query: status, type, keyword, startFrom·startTo, endFrom·endTo, sort, direction(기본 DESC), page(기본 1), size(기본 10, 최대 100) |
-| 수정 | Body: `startsAt`, `endsAt`, `items`: `[{ productId, discountRate, limitedQuantity? }]` |
-
-주요 오류:
-
-| 기능 | 오류 |
-|---|---|
-| 등록 | 400 시작 시각이 지금보다 과거·종료 시각이 시작 시각보다 늦지 않음·상품 중복·할인율 범위·한정 수량이 재고보다 많음, 404 상품 없음(`PRODUCT_001`), 409 이미 행사가 있는 상품(`SALE_001`)·판매 중지·품절 상품(`PRODUCT_005`) |
-| 목록·후보 | 400 기간 순서·page·size 범위 |
-| 상세 | 404 없는 행사(`SALE_002`) |
-| 수정 | 400 입력값·상품 목록이 행사와 다름·번개 드롭 한정 수량 누락·특가에 한정 수량·한정 수량이 재고보다 많음, 404 `SALE_002`, 409 시작한 행사(`SALE_003`) |
-| 종료 | 404 `SALE_002`, 409 진행 중이 아님(`SALE_004`) |
-| 삭제 | 404 `SALE_002`, 409 시작 전이 아님(`SALE_005`) |
-
-응답 필드:
-- `SaleEventListResponse`(한 행): saleEventId, type, status, startsAt, endsAt, productId, productName, listPrice, salePrice, discountRate, limitedQuantity, remainingQuantity.
-- `SaleEventDetailResponse`: saleEventId, type, status, startsAt, endsAt, items(productId, productName, listPrice, salePrice, discountRate, limitedQuantity, remainingQuantity).
-- `SaleCandidateProductResponse`: productId, productType, name, imageUrl, price, stock.
-- 종류 값: `SPECIAL`(특가), `FLASH_DROP`(번개 드롭). 상태 값: `SCHEDULED`(예정), `ACTIVE`(진행 중), `ENDED`(종료).
-
-- **상품마다 행사 하나**: 등록하면 상품마다 같은 기간의 할인 행사가 하나씩 만들어집니다. 한 상품은 예정·진행 중인 할인 행사에 하나만 들 수 있습니다. 종료된 행사에 들었던 상품과, 종료 시각이 지났지만 상태 갱신이 아직 닫지 않은 행사의 상품은 다시 등록할 수 있습니다. 한 상품이라도 거절되면 모두 저장되지 않습니다.
-- **할인가**: 정가와 할인율(1~99%)로 서버가 `정가 × (100 − 할인율) / 100`의 원 아래를 버려 계산합니다.
-- **번개 드롭**: 한정 수량을 정해 등록하면 남은 수량이 한정 수량과 같게 시작합니다. 1인 1개입니다.
-- **상태 변화**: 진행 여부는 시각(시작 ≤ 지금 < 종료)으로 판단합니다. 1분마다 도는 상태 갱신이 시작 시각이 지난 예정을 진행 중으로, 종료 시각이 지난 행사를 종료로 바꿉니다.
-- **수정**: 시작 전 할인 행사만 고칠 수 있습니다. 행사에 든 상품 목록은 그대로 보내야 하고, 번개 드롭은 한정 수량이 필수이며 특가는 한정 수량을 보내지 않습니다. 정가는 상품의 지금 정가로 다시 읽으며 번개 드롭 남은 수량은 한정 수량과 같게 다시 맞춥니다. 하나라도 거절되면 아무것도 바뀌지 않습니다.
-- **종료**: 시각상 진행 중인 할인 행사만 종료합니다(상태 갱신이 늦어 아직 예정으로 남아 있어도 시작 시각이 지났으면 종료할 수 있습니다). 상태만 종료로 바꾸고 종료 시각과 행사 항목은 그대로이며, 종료한 행사는 다시 열리지 않습니다.
-- **삭제**: 시작 전 할인 행사만 지웁니다. 행사와 행사 항목이 함께 지워집니다.
-- **동시 요청**: 수정·종료·삭제는 행사 행을 잠근 뒤 상태를 확인하므로 상태 갱신과 겹쳐도 한쪽이 끝난 뒤 처리됩니다.
-- **정가 표시**: 목록·상세의 정가는 예정·진행 중이면 상품의 현재 정가, 종료되면 행사 항목에 저장된 등록 당시 정가입니다.
-- **목록**: 상품마다 한 행으로 나옵니다. 시작·종료 날짜는 하나만 주면 그 하루로 봅니다. 정렬 기준은 상품 이름·종류·상태·정가·할인가·할인율·한정 수량·남은 수량·판매량·시작·종료이고, 정렬 기준을 주지 않으면 최신 행사 순이고, 기준이 같으면 최신 행사가 먼저입니다. 판매량은 결제 완료·구매 확정 주문의 수량만 셉니다.
-- **등록 후보 상품**: 판매 중이고 재고가 있으며 예정·진행 중인 할인 행사에 들지 않은 상품만 나옵니다.
-
-## 알림 API
-
-상태: **구현 완료** · 담당: 장준혁 · 근거: 실제 백엔드 컨트롤러 및 서비스 구현
-
-경로는 prefix(/api)를 뺀 값입니다. 회원 번호는 로그인 정보에서만 읽고 요청에는 받지 않습니다.
-
-| 기능 | Method / Path | 권한 | 성공 응답 |
-|---|---|---|---|
-| 내 알림 목록 | GET /notifications | 로그인 | 200 |
-| 안 읽은 알림 수 | GET /notifications/unread-count | 로그인 | 200 |
-| 실시간 알림 스트림 | GET /notifications/stream | 로그인 | 200 (text/event-stream) |
-| 전부 읽음 | PATCH /notifications/read-all | 로그인 | 200 |
-| 알림 지우기 | DELETE /notifications/{notificationId} | 로그인 | 200 |
-| 모두 지우기 | DELETE /notifications | 로그인 | 200 |
-
-요청 값입니다.
-
-| 기능 | 위치 | 이름 | 설명 |
-|---|---|---|---|
-| 내 알림 목록 | Query | beforeId | 이 ID보다 오래된 알림부터 받습니다. 1 이상, 생략하면 가장 최신부터 |
-| 전부 읽음 | Body | lastNotificationId | 화면이 받은 가장 최신 알림 ID. 1 이상, 필수 |
-| 알림 지우기 | Path | notificationId | 지울 알림 ID |
-
-응답 데이터입니다.
-
-| 기능 | 응답 | 필드 |
-|---|---|---|
-| 내 알림 목록 | NotificationListResponse | notifications(최신순), hasNext |
-| 안 읽은 알림 수 | UnreadNotificationCountResponse | unreadCount |
-| 실시간 알림 스트림 | SSE 이벤트 `notification` | 내용 없는 새 알림 신호(`refresh`). 화면이 목록·안 읽은 수 API로 직접 받아갑니다. 공통 응답으로 감싸지 않음 |
-| 실시간 알림 스트림 | SSE 이벤트 `chat` | 상담 바뀜 신호. data는 JSON `{"sessionId":15,"status":"COMPLETED"}`(status: `ACTIVE`·`COMPLETED`·`EXPIRED`). 메시지 내용은 싣지 않음 |
-| 전부 읽음 | 공통 성공 응답 | 없음 |
-| 알림 지우기, 모두 지우기 | 공통 성공 응답 | 없음 |
-
-오류입니다. 401은 모든 기능에 공통입니다.
-
-| 기능 | HTTP | 코드 | 조건 |
-|---|---|---|---|
-| 내 알림 목록 | 400 | 공통 | beforeId가 1 미만이거나 숫자가 아님 |
-| 전부 읽음 | 400 | 공통 | lastNotificationId가 없거나 1 미만 |
-| 알림 지우기 | 400 | 공통 | notificationId가 숫자가 아님 |
-
-알림 항목(`NotificationResponse`): notificationId, notificationType(`EXPIRATION`·`FLASH_DROP`·`COMMERCE_STOCKED`), content(문구), linkUrl(누르면 이동할 화면 경로), read(읽음 여부), createdAt(만든 시각).
-
-- **목록 크기**: 한 번에 5개입니다. 크기는 요청으로 받지 않습니다.
-- **더 보기**: 화면의 마지막 알림 ID를 beforeId로 보냅니다. 목록을 연 사이 새 알림이 와도 다음 알림이 밀리거나 겹치지 않습니다. `hasNext`가 false면 더 받을 알림이 없습니다.
-- **전부 읽음**: 종 아이콘을 열 때 부릅니다. lastNotificationId 이하의 안 읽은 알림을 한 번에 읽음으로 바꾸고, 그 뒤 도착한 알림은 안 읽음으로 남습니다. 받은 알림이 없으면 부르지 않습니다. 같은 요청을 두 번 보내도 결과가 같습니다.
-- **배지**: 전부 읽음 뒤에는 안 읽은 알림 수를 다시 불러옵니다. 화면 이동·탭 복귀·새로고침 때, 새 알림 신호가 올 때도 다시 불러옵니다.
-- **실시간 알림 스트림**: `GET /notifications/stream`은 로그인한 회원의 SSE(`text/event-stream`) 연결입니다. 연결을 오래 쥐는 응답이라 공통 성공 응답으로 감싸지 않습니다. 새 알림이 저장되면 `notification` 이벤트로 내용 없는 `refresh` 신호를 보냅니다. 알림 내용은 싣지 않으므로 화면이 목록·안 읽은 수 API로 직접 받아갑니다. 연결 유지 시간은 30분, 조용한 연결이 끊기지 않도록 30초마다 하트비트(주석)를 보내며, 한 회원이 동시에 열 수 있는 연결은 5개입니다. 한도를 넘기면 가장 오래된 연결이 닫힙니다. 값은 `app.sse.*` 설정입니다. 비로그인은 401입니다. 끊기면 브라우저가 다시 연결하고, 다시 연결될 때 화면이 한 번 다시 조회해 놓친 알림을 메웁니다. 그 밖에 놓친 알림은 다음 조회 때 보입니다.
-- **상담 바뀜 신호(2026-11-02 추가)**: 같은 스트림으로 `chat` 이벤트도 옵니다. 여러 창(브라우저·기기·서버)에서 AI 상담을 맞추는 신호입니다. data는 JSON 문자열 `{"sessionId":15,"status":"COMPLETED"}`이고, 회원 번호와 메시지 내용은 싣지 않으므로 화면이 상담·메시지 조회 API로 직접 받아갑니다. 커밋된 뒤에만 보내고, 실패해 되돌려진 변경은 보내지 않습니다. 보내는 때는 다음과 같습니다.
-  - 새 상담을 만들었을 때 `ACTIVE`(상담 시작 API가 기존 진행 중 상담을 그대로 돌려줄 때는 보내지 않음)
-  - 답(질문·답 한 쌍)을 저장했을 때 `ACTIVE`
-  - 상담 종료 API, 요리 완료로 상담이 끝났을 때 `COMPLETED`
-  - 30분 동안 대화가 없어 서버가 실제로 만료시켰을 때(다음 상담 시작·메시지 보내기 때) `EXPIRED`. 시간이 지나 화면에서만 만료로 보이는 상담은 신호가 없습니다.
-  - 상담 시작 때 오래된 상담을 만료시키고 새로 만들면 `EXPIRED`, `ACTIVE` 순으로 두 번 옵니다.
-  - 서버 간 전달은 알림(`notification:push`)과 따로인 Redis 채널 `chat:push`로 합니다. 놓친 신호는 다음 조회 때 메워집니다.
-- **알림 지우기**: 지운 알림은 목록과 안 읽은 알림 수에서 빠집니다. 없는 알림, 다른 회원의 알림, 이미 지운 알림이면 아무것도 바꾸지 않고 200입니다.
-- **모두 지우기**: 내 알림을 전부 지웁니다. 화면이 받지 않은 알림, 목록을 받은 뒤 도착한 알림도 함께 지워집니다.
-- **본인 소유 검증**: 다른 회원의 알림 ID를 보내도 내 알림만 조회·변경되고 오류는 없습니다.
 
 ## 엔드포인트 작성 템플릿
 
