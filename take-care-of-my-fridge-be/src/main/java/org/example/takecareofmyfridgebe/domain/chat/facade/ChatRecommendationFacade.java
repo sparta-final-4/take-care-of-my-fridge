@@ -6,6 +6,7 @@ import org.example.takecareofmyfridgebe.domain.chat.config.ChatAllergyWordProper
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatMealkitWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatTasteOppositeProperties;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatTasteWordProperties;
+import org.example.takecareofmyfridgebe.domain.chat.config.ChatTemperatureWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse.ImminentIngredient;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse.MissingIngredient;
@@ -88,6 +89,7 @@ public class ChatRecommendationFacade {
     private final ChatTasteWordProperties chatTasteWordProperties;
     private final ChatAllergyWordProperties chatAllergyWordProperties;
     private final ChatTasteOppositeProperties chatTasteOppositeProperties;
+    private final ChatTemperatureWordProperties chatTemperatureWordProperties;
 
     /**
      * @param content 사용자 메시지 원문 (설명 프롬프트에 넣는다)
@@ -239,9 +241,25 @@ public class ChatRecommendationFacade {
             log.info("상담 요리 이름 채움 - memberId: {}, 요리 이름: {} (AI가 비움, 레시피 이름에 없음)", request.memberId(), spokenDish.get());
         }
         List<RecipeCandidate> candidates = withoutPrevious(found.candidates(), previousCardIds);
+        // 온도 말: 따뜻하면 찬 요리(냉국 등)를 빼고, 차가우면 뜨거운 국물 요리를 뒤로 보낸다 (다시 추천은 원한 표현으로 이어 간다)
+        Optional<TemperatureWordChecker.Temperature> temperature =
+                TemperatureWordChecker.wanted(chatTemperatureWordProperties, content, query.preferenceText());
+        List<RecipeCandidate> arranged = TemperatureWordChecker.arrange(candidates, temperature, chatTemperatureWordProperties);
+        if (temperature.isPresent()) {
+            log.info("상담 추천 온도 말 - memberId: {}, 온도: {}, 뺀 찬 요리: {}, 뒤로 보낸 뜨거운 국물: {}",
+                    query.memberId(), temperature.get(),
+                    candidates.stream().filter(c -> !arranged.contains(c)).map(RecipeCandidate::name).toList(),
+                    temperature.get() == TemperatureWordChecker.Temperature.COLD
+                            ? candidates.stream().filter(c -> TemperatureWordChecker.hotDish(c.name(), chatTemperatureWordProperties))
+                            .map(RecipeCandidate::name).toList()
+                            : List.of());
+        }
+        candidates = arranged;
         logCandidates(query, candidates);
-        // 말한 조건이 있으면 조건을 모두 맞춘 후보부터 고르고, 모자라면 분류가 맞고 반대 맛이 아닌 후보로만 채운다
-        PickRule rule = PickRule.of(query, found, chatTasteOppositeProperties::oppositesOf);
+        // 말한 조건이 있으면 조건을 모두 맞춘 후보부터 고르고, 모자라면 분류가 맞고 반대 맛·온도가 아닌 후보로만 채운다
+        PickRule rule = PickRule.of(query, found, chatTasteOppositeProperties::oppositesOf)
+                .withTemperatureMismatched(
+                        TemperatureWordChecker.mismatched(candidates, temperature, chatTemperatureWordProperties));
         List<RecipeCandidate> picked = RecommendationPicker.pick(candidates, query.keywords(), rule);
         if (rule.hasRequest() && picked.size() < RecommendationPicker.PICK_COUNT) {
             log.info("상담 추천 조건에 맞는 후보가 모자라 카드를 줄임 - memberId: {}, 조건 수: {}, 후보 {}개 중 모두 맞음 {}개, 카드 {}장",

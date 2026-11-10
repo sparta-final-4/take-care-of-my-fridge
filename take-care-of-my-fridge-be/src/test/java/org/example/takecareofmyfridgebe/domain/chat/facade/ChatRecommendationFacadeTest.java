@@ -84,7 +84,7 @@ class ChatRecommendationFacadeTest {
         chatMessageService = mock(ChatMessageService.class);
         facade = new ChatRecommendationFacade(recipeCandidateFacade, recipeService, ingredientService, productService,
                 saleEventReader, chatMessageService, MealkitWordCheckerTest.WORDS, TasteWordCheckerTest.WORDS, AllergyWordCheckerTest.WORDS,
-                ChatIntentFacadeTest.TASTE_OPPOSITES);
+                ChatIntentFacadeTest.TASTE_OPPOSITES, TemperatureWordCheckerTest.WORDS);
         when(ingredientService.getIngredientsByIds(any())).thenReturn(Map.of());
     }
 
@@ -159,6 +159,22 @@ class ChatRecommendationFacadeTest {
 
         assertThat(reply.event().recipes()).extracting(RecommendedRecipe::recipeId).containsExactly(10L, 20L);
         assertThat(reply.candidateInfo()).contains("후보 수: 2개").doesNotContain("오이무침");
+    }
+
+    @Test
+    @DisplayName("따뜻한 국물을 원하면 분류가 맞은 오이냉국은 빼고, 이름에 냉이가 든 찌개는 남긴다")
+    void removesColdSoup_whenWarmRequested() {
+        when(recipeCandidateFacade.findCandidates(any())).thenReturn(new RecipeCandidates(List.of(
+                requested(10L, "꽃게해물탕", "국", 2),
+                requested(20L, "토마토 해물누룽지탕", "국", 2),
+                requested(30L, "오이냉국", "국", 1),
+                requested(40L, "냉이된장국", "국", 1)), false));
+        when(recipeService.findSummaries(any())).thenReturn(Map.of());
+
+        RecommendationReply reply = facade.recommend("맵고 따뜻한 국물 레시피 추천해줘", new RecipeQuery(MEMBER_ID, List.of(),
+                List.of(Taste.SPICY), List.of("국"), null, null, false, List.of(), null, "따뜻한 국물"));
+
+        assertThat(reply.event().recipes()).extracting(RecommendedRecipe::recipeId).containsExactly(10L, 20L, 40L);
     }
 
     @Test
