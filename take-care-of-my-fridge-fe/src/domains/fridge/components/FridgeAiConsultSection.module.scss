@@ -1,13 +1,14 @@
 @use '@/styles/variables' as *;
 
-// 옅은 주황 상자(테마 primary의 옅은 바탕). 제목 아래 여백을 SectionCard 기본보다 줄여 가볍게 붙인다.
+// 흰 상자: 바탕·테두리·모서리는 재료 목록 상자(.list)와 같다. 제목 아래 여백을 SectionCard 기본보다 줄여 가볍게 붙인다.
 .box {
   display: flex;
   flex-direction: column;
   gap: var(--ant-margin-sm);
   margin-top: calc(-1 * var(--ant-margin-xs));
   padding: var(--ant-padding);
-  background: var(--ant-color-primary-bg);
+  background: var(--ant-color-bg-container);
+  border: 1px solid var(--ant-color-border-secondary);
   border-radius: var(--ant-border-radius-lg);
 }
 
@@ -30,7 +31,7 @@
   color: var(--ant-color-primary-active);
 }
 
-// 회색 안내: antd 보조 글자(3차 회색)는 주황 상자 위에서 4.4:1이라 한 단계 진한 보조 글자색을 쓴다.
+// 회색 안내: antd 보조 글자(3차 회색) 대신 한 단계 진한 보조 글자색(바탕 위 4.5:1 이상 여유)
 .hint,
 .footHint {
   font-size: var(--ant-font-size-sm);
@@ -42,13 +43,13 @@
   margin-top: var(--ant-margin-xs);
 }
 
-// [상담하기 →] 글자 폭만큼의 작은 주황 버튼 …… [선택 해제]
+// 오른쪽 끝에 [선택 해제] [상담하기 →](글자 폭만큼의 작은 주황 버튼)
 .actions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--ant-margin-xs);
+  justify-content: flex-end;
+  gap: var(--ant-margin);
 }
 
 :global(.ant-btn).consultButton {

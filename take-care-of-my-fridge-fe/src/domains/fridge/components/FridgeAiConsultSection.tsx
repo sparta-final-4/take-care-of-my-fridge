@@ -12,7 +12,7 @@ import { useFridgeSelectionStore } from '../model/useFridgeSelectionStore';
 import { useFridgeItems } from '../queries';
 import styles from './FridgeAiConsultSection.module.scss';
 
-// 옅은 주황 상자 하나: [상담 아이콘 + 한 문장] → [작은 상담 버튼 …… 선택 해제].
+// 흰 상자 하나: [상담 아이콘 + 한 문장] → 오른쪽 끝에 [선택 해제] [작은 상담 버튼].
 // 체크한 재료가 있으면 그 재료로, 없으면 임박 재료를 앞세워(없으면 냉장고 재료로) 상담을 권한다.
 // 768px 이상에서는 체크한 재료를 이 카드에서 처리한다(휴대폰은 아래 선택 바).
 export function FridgeAiConsultSection() {
@@ -47,7 +47,13 @@ export function FridgeAiConsultSection() {
             체크한 재료 중 직접 입력·밀키트·기본 양념 {excludedCount}개는 빼고 상담해요.
           </Typography.Text>
         )}
+        {/* 오른쪽 끝에 모은다: "선택 해제  [상담하기 →]" */}
         <div className={styles.actions}>
+          {hasChecked && (
+            <Button type="link" onClick={clearChecked} className={styles.clearLink}>
+              선택 해제
+            </Button>
+          )}
           <Button
             type="primary"
             icon={<ArrowRightOutlined />}
@@ -57,11 +63,6 @@ export function FridgeAiConsultSection() {
           >
             {hasChecked ? '상담하기' : 'AI 상담 시작하기'}
           </Button>
-          {hasChecked && (
-            <Button type="link" onClick={clearChecked} className={styles.clearLink}>
-              선택 해제
-            </Button>
-          )}
         </div>
       </div>
       {!hasChecked && (
