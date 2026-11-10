@@ -30,8 +30,9 @@ public class FlashDropNotificationService {
             case CREATED -> "%s %d%% 번개 드롭 · %s 시작 · %d개 한정".formatted(
                     productName, item.getDiscountRate(),
                     item.getSaleEvent().getStartsAt().format(STARTS_AT_FORMAT), item.getLimitedQuantity());
-            case STARTED -> "%s %d%% 번개 드롭 시작 · %d개 한정".formatted(
-                    productName, item.getDiscountRate(), item.getLimitedQuantity());
+            // 줄바꿈으로 세 줄을 나눈다. 번개 드롭 시작, 할인율·한정 수량, 상품명 순서다.
+            case STARTED -> "번개 드롭 시작\n%d%% 할인 · %d개 한정\n%s".formatted(
+                    item.getDiscountRate(), item.getLimitedQuantity(), productName);
         };
         String dedupeKey = "FLASH_DROP_%s:%d:%d".formatted(moment, item.getSaleEvent().getId(), item.getProductId());
         return new NotificationRequestedMessage(
