@@ -11,7 +11,7 @@ import { RecipeCard } from './RecipeCard';
 import styles from './RecipeListSection.module.scss';
 import { RecipeSearchSection } from './RecipeSearchSection';
 
-const PAGE_SIZE = 16;
+const PAGE_SIZE = 12;
 
 // 재료/밀키트 목록과 같은 도구 줄: [조건 열기(좁은 화면)] [개수] [정렬].
 // 넓은 화면의 조건은 화면 왼쪽 칸(RecipesPage)에 있고, 좁은 화면은 같은 조건을 서랍으로 연다.

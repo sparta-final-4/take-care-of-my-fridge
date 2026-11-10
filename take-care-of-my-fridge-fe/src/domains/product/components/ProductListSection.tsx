@@ -12,7 +12,7 @@ import { ProductCard } from './ProductCard';
 import { ProductSearchSection } from './ProductSearchSection';
 import styles from './ProductListSection.module.scss';
 
-const PAGE_SIZE = 16;
+const PAGE_SIZE = 12;
 
 // 레퍼런스(row7seeds.com 상품 목록)처럼 목록 위에 붙는 도구 줄: [필터(좁은 화면)] [개수] [정렬].
 // 넓은 화면의 필터는 화면 왼쪽 칸(ProductsPage)에 있고, 좁은 화면은 필터 버튼이 같은 필터를 서랍으로 연다.
