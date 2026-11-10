@@ -1,5 +1,28 @@
+@use '@/styles/variables' as *;
+
 .tag {
   margin: 0;
   font-size: var(--ant-font-size);
   line-height: var(--ant-line-height);
+}
+
+// 1초마다 숫자가 바뀌어도 글자 폭이 흔들리지 않게 한다.
+.countdown {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+// 태그와 남은 시간 묶음. 기본은 두 줄이고, 장바구니 칸이 넓으면(번개 드롭 태그 + 시간이 들어가는 폭) 한 줄이다.
+// 장바구니 밖(상품 상세)에는 cart 칸이 없어 항상 두 줄이다.
+.head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: flex-start;
+
+  @container cart (min-width: #{$cart-sale-inline-width}) {
+    flex-direction: row;
+    gap: var(--ant-margin-xs);
+    align-items: center;
+  }
 }
