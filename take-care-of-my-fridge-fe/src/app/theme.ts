@@ -133,6 +133,11 @@ export const theme: ThemeConfig = {
       itemActiveColor: INK,
       itemActiveColorHover: INK,
     },
+    // 정렬한 열의 본문을 다른 칸과 같은 바탕으로 둔다. 기본값은 마우스를 올린 행과 같은 색이라 둘이 겹쳐 십자 모양이 된다.
+    // 어느 열로 정렬했는지는 헤더 칸 색과 정렬 화살표가 보여 준다.
+    Table: {
+      bodySortBg: PAPER_2,
+    },
     // 체크한 칸은 귤색 채움 그대로, 체크 표시를 흰색 대신 잉크로(흰색은 귤색 위 3:1 정도).
     Checkbox: {
       colorWhite: INK,
