@@ -46,7 +46,6 @@ export const SaleEventListRequestSortEnum = {
     DiscountRate: 'DISCOUNT_RATE',
     LimitedQuantity: 'LIMITED_QUANTITY',
     RemainingQuantity: 'REMAINING_QUANTITY',
-    SoldQuantity: 'SOLD_QUANTITY',
     StartsAt: 'STARTS_AT',
     EndsAt: 'ENDS_AT',
 } as const;
