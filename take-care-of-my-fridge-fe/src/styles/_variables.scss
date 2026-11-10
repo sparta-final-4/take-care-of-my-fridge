@@ -15,10 +15,8 @@ $breakpoints: (
   xxl: 1600px,
 );
 
-// 마우스를 쓰는 PC는 창을 줄여도 PC 화면(xl, 1200px)을 그대로 둔다. 그보다 좁으면 가로 스크롤이 생긴다.
-// 휴대폰·터치 태블릿은 이 조건에 맞지 않아 지금처럼 폭에 따라 바뀐다. JS 쪽 기준은 common/hooks/useScreens.ts.
+// 마우스를 쓰는 PC(호버 효과 등에 쓴다). 반응형 분기는 폭($breakpoints)으로만 정한다.
 $desktop-pointer: '(hover: hover) and (pointer: fine)';
-$desktop-min-width: 1200px;
 
 // 메인 화면 띠 안의 내용과 관리자 화면 일부가 쓰는 최대 폭. 그 밖의 회원 화면은 화면 폭 전체를 쓴다(좌우 여백 $page-gutter-*).
 $content-max-width: 1200px;

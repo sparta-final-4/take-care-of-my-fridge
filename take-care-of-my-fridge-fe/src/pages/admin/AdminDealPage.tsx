@@ -56,7 +56,6 @@ const dateTime = (value?: string) => (value ? dayjs(value).format('YYYY-MM-DD HH
 const dayLabels = { MON: '월', TUE: '화', WED: '수', THU: '목', FRI: '금', SAT: '토', SUN: '일' };
 
 export default function AdminDealPage() {
-  // 휴대폰은 폭에 따라 바뀌고, 마우스를 쓰는 PC는 창을 줄여도 넓은 배치 그대로(useScreens).
   const screens = useScreens();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();

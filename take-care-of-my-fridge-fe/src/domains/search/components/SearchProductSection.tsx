@@ -22,7 +22,7 @@ import { searchQueries } from '@/domains/search/queries';
 const PRODUCT_TYPES = ['INGREDIENT', 'MEALKIT'] as const;
 
 export function SearchProductSection() {
-  // 한 줄 카드 수: 휴대폰 2 / md 3 / lg 4. 마우스를 쓰는 PC는 창을 줄여도 4개(useScreens).
+  // 한 줄 카드 수: 휴대폰 2 / md 3 / lg 4.
   const screens = useScreens();
   const cardSpan = screens.lg ? 6 : screens.md ? 8 : 12;
   const {

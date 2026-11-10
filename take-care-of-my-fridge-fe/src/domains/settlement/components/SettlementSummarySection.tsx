@@ -32,7 +32,6 @@ export function SettlementSummarySection({
   methods,
 }: SettlementSummarySectionProps) {
   const { token } = theme.useToken();
-  // 휴대폰은 폭에 따라, 마우스를 쓰는 PC는 창을 줄여도 넓은 배치(useScreens).
   // 환불률·객단가는 md부터 2열, 결제 수단 표·도넛은 lg부터 한 줄
   const screens = useScreens();
   const ratioColSpan = screens.md ? 12 : 24;
