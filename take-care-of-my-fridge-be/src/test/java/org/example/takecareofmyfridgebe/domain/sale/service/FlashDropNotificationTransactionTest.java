@@ -154,7 +154,7 @@ class FlashDropNotificationTransactionTest extends MySqlContainerSupport {
         assertThat(adminSaleEventFacade.getFlashDropNotifications(published.get(0)))
                 .extracting(NotificationRequestedMessage::memberId, NotificationRequestedMessage::content,
                         NotificationRequestedMessage::dedupeKey)
-                .containsExactly(tuple(user.getId(), "두부 50% 번개 드롭 시작 · 10개 한정",
+                .containsExactly(tuple(user.getId(), "번개 드롭 시작\n50% 할인 · 10개 한정\n두부",
                         "FLASH_DROP_STARTED:%d:%d".formatted(dueFlashDrop.getId(), tofu.getId())));
         assertThat(published.get(0).moment()).isEqualTo(Moment.STARTED);
     }
