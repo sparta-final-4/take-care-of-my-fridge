@@ -1,6 +1,6 @@
-package org.example.takecareofmyfridgebe.infra.portone.webhook.repository;
+package org.example.takecareofmyfridgebe.domain.webhook.repository;
 
-import org.example.takecareofmyfridgebe.infra.portone.webhook.entity.WebhookEvent;
+import org.example.takecareofmyfridgebe.domain.webhook.entity.WebhookEvent;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Optional;

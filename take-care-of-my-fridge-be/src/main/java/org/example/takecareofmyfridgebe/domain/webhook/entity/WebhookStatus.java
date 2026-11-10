@@ -1,4 +1,4 @@
-package org.example.takecareofmyfridgebe.infra.portone.webhook.entity;
+package org.example.takecareofmyfridgebe.domain.webhook.entity;
 
 public enum WebhookStatus {
     RECEIVED,  // 수신 후 처리 중

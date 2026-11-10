@@ -1,4 +1,4 @@
-package org.example.takecareofmyfridgebe.infra.portone.webhook.service;
+package org.example.takecareofmyfridgebe.domain.webhook.service;
 
 import org.example.takecareofmyfridgebe.domain.order.entity.Order;
 import org.example.takecareofmyfridgebe.domain.payment.entity.Payment;

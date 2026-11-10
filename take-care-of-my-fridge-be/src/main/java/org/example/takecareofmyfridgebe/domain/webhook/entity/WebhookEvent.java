@@ -1,4 +1,4 @@
-package org.example.takecareofmyfridgebe.infra.portone.webhook.entity;
+package org.example.takecareofmyfridgebe.domain.webhook.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

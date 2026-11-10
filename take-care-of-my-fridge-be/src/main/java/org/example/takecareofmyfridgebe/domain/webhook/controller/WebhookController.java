@@ -1,11 +1,11 @@
-package org.example.takecareofmyfridgebe.infra.portone.webhook.controller;
+package org.example.takecareofmyfridgebe.domain.webhook.controller;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.example.takecareofmyfridgebe.domain.webhook.service.WebhookHandler;
 import org.example.takecareofmyfridgebe.global.response.ApiResponse;
 import org.example.takecareofmyfridgebe.infra.portone.dto.PortOneWebhook;
 import org.example.takecareofmyfridgebe.infra.portone.webhook.PortOneWebhookVerifier;
-import org.example.takecareofmyfridgebe.infra.portone.webhook.service.WebhookHandler;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
