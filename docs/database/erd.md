@@ -1,7 +1,7 @@
 # 냉장고를 부탁해 ERD (전체 도메인 물리 설계)
 
 > 기준: 최신 전체 스키마 DDL ([schema.sql](schema.sql))  
-> 총 42개 테이블에 대한 도메인별 데이터 개체, 외래키(FK) 및 연관 관계를 정의합니다.
+> 총 43개 테이블에 대한 도메인별 데이터 개체, 외래키(FK) 및 연관 관계를 정의합니다.
 
 ---
 
@@ -74,6 +74,7 @@ erDiagram
         varchar email UK "로그인 이메일"
         varchar password_hash "비밀번호 해시"
         varchar nickname UK "닉네임"
+        varchar phone UK "전화번호 숫자 11자리"
         enum role "USER / ADMIN"
         enum status "ACTIVE / SUSPENDED"
         datetime created_at
@@ -91,7 +92,7 @@ erDiagram
         bigint member_id FK "회원 ID"
         varchar token_hash UK "갱신 토큰 해시"
         boolean keep_logged_in "로그인 유지 여부"
-        varchar device_info "기기 정보"
+        varchar device_info "기기 정보 (엔티티 매핑 없음, 항상 NULL)"
         datetime last_used_at "마지막 사용일시"
         datetime expires_at "만료일시"
         datetime revoked_at "폐기일시"
@@ -171,13 +172,22 @@ erDiagram
         text summary "간략 소개"
         varchar cuisine_type "음식 종류"
         varchar category "요리 분류"
+        varchar main_ingredient_category "주재료 분류"
         varchar cook_method "조리 방법"
         int cook_time_min "조리시간(분)"
         int servings "인분"
         tinyint difficulty "난이도 (1~10)"
+        decimal weight_g "1인분 중량(g)"
+        decimal calories "열량(kcal)"
+        decimal carbs_g "탄수화물(g)"
+        decimal protein_g "단백질(g)"
+        decimal fat_g "지방(g)"
+        decimal sodium_mg "나트륨(mg)"
         text tip "조리 팁"
         text tip_summary "AI 후기 요약"
         varchar image_url "대표 이미지 URL"
+        varchar tags "해시태그"
+        text ingredients_raw "재료 원문"
     }
 
     recipe_ingredients {
@@ -187,6 +197,8 @@ erDiagram
         int seq "순서"
         varchar display_name "표기 재료명"
         varchar amount "원문 용량 (1/2큰술 등)"
+        varchar group_name "원문 그룹명 (양념장 등)"
+        varchar raw_text "재료 항목 원문"
         decimal quantity "기본단위 수량"
         varchar role "주재료/부재료/양념"
     }
@@ -267,6 +279,7 @@ erDiagram
         datetime starts_at "시작 시각"
         datetime ends_at "종료 시각"
         enum status "SCHEDULED, ACTIVE, ENDED"
+        datetime ended_at "중간에 닫은 시각"
     }
 
     sale_event_items {
@@ -299,10 +312,23 @@ erDiagram
         varchar product_image_url "주문 당시 상품 이미지"
         int quantity "수량"
         int list_price "주문 당시 정가"
+        int confirmed_quantity "구매 확정 수량"
         int unit_price "실제 단가 (할인가 또는 정가)"
         enum sale_type "NONE, SPECIAL, FLASH_DROP"
         bigint sale_event_item_id FK "할인 행사 상품 ID"
         bigint flash_drop_member_id FK "번개 드롭 구매 회원 ID"
+    }
+
+    carts {
+        bigint id PK "장바구니 ID"
+        bigint member_id FK, UK "회원 ID"
+    }
+
+    cart_items {
+        bigint id PK "장바구니 상품 ID"
+        bigint cart_id FK "장바구니 ID"
+        bigint product_id FK "상품 ID"
+        int quantity "수량"
     }
 ```
 
@@ -338,6 +364,42 @@ erDiagram
         datetime paid_at "완료 시각"
     }
 
+    billing_keys {
+        bigint id PK "등록 카드 ID"
+        bigint member_id FK "회원 ID"
+        varchar billing_key_ciphertext "빌링키 암호문"
+        char billing_key_hash UK "빌링키 지문"
+        varchar billing_key "암호화 전 평문 (지금은 NULL)"
+        varchar card_name "카드 상품명"
+        char card_last4 "카드 끝 4자리"
+        varchar card_number_masked "마스킹 카드 번호"
+        varchar card_issuer_code "발급사 코드"
+        enum card_type "CREDIT, DEBIT, GIFT"
+        boolean is_default "대표 카드"
+        enum status "ACTIVE, DELETED"
+        datetime deleted_at "삭제 시각"
+        datetime pg_deleted_at "PortOne 삭제 확인 시각"
+    }
+
+    payment_pins {
+        bigint id PK "결제 비밀번호 ID"
+        bigint member_id FK, UK "회원 ID"
+        varchar pin_hash "비밀번호 해시"
+        int failed_count "연속 실패 횟수"
+        datetime locked_at "잠금 시각"
+    }
+
+    webhook_events {
+        bigint id PK "웹훅 이벤트 ID"
+        bigint payment_id FK "결제 ID (선택)"
+        varchar webhook_id UK "포트원 웹훅 ID"
+        varchar event_type "이벤트 종류"
+        enum process_status "RECEIVED, PROCESSED, FAILED, IGNORED"
+        text raw_payload "원문"
+        varchar fail_reason "실패 사유"
+        datetime processed_at "처리 시각"
+    }
+
     payment_histories {
         bigint id PK
         bigint payment_id FK
@@ -355,9 +417,11 @@ erDiagram
         bigint payment_id FK
         bigint refund_amount "환불 금액"
         enum reason_type "사유 구분"
+        varchar reason_detail "상세 사유"
         enum status "REQUESTED, COMPLETED, FAILED"
         varchar portone_cancellation_id "포트원 취소 ID"
         datetime refunded_at "환불 완료 시각"
+        varchar fail_reason "실패 사유"
     }
 
     refund_items {
@@ -476,6 +540,7 @@ erDiagram
         varchar link_url "이동 경로"
         varchar dedupe_key UK "중복 방지 키"
         boolean is_read "읽음 여부"
+        datetime deleted_at "삭제일시"
     }
 ```
 
@@ -487,6 +552,7 @@ PyTorch 머신러닝 주간 판매 예측 결과와 요일별 할인 후보 시�
 ```mermaid
 erDiagram
     prediction_runs ||--o{ sales_forecasts : "상품별 주간 예측"
+    prediction_runs ||..o| forecast_batch_runs : "같은 대상 주 (FK 없음)"
     members ||--o{ deal_analyses : "분석 실행 관리자"
     deal_analyses ||--o{ deal_candidates : "후보/제외 상품 목록"
     members ||--o{ admin_audit_logs : "작업자"
@@ -497,6 +563,7 @@ erDiagram
         varchar model_version "모델 버전 (예: fc-v0.3)"
         datetime data_cutoff_at "데이터 기준 시각"
         datetime confirmed_at "실제 판매량 확정일시"
+        bit synthetic_data "가상(시연) 데이터 여부"
     }
 
     sales_forecasts {
@@ -511,6 +578,14 @@ erDiagram
         int actual_qty "실제 판매 수량"
     }
 
+    forecast_batch_runs {
+        bigint id PK "배치 시도 기록 ID"
+        date target_week_start UK "대상 주 월요일"
+        enum status "CREATED, ALREADY_EXISTS, NO_PRODUCTS, NO_TRAINING_SAMPLES, FAILED"
+        datetime attempted_at "마지막 시도 시각"
+        varchar failure_type "실패 종류"
+    }
+
     deal_analyses {
         bigint id PK "할인 후보 분석 ID"
         bigint member_id FK "분석한 관리자"
@@ -519,6 +594,9 @@ erDiagram
         int discount_rate "가상 할인율(%)"
         int min_stock "최소 재고 기준"
         varchar model_version "분석 모델 버전"
+        datetime data_cutoff_at "데이터 기준 시각"
+        datetime last_saved_at "검토 결과 마지막 저장"
+        bit synthetic_data "가상(시연) 데이터 여부"
     }
 
     deal_candidates {
@@ -530,9 +608,18 @@ erDiagram
         int discount_price "할인가"
         int current_stock "현재 재고"
         boolean is_excluded "제외 여부"
+        enum exclude_reason "TOP_SELLER_ON_DAY, LOW_STOCK"
+        int avg_sales_on_day "그 요일 평균 판매량"
+        int search_clicks "최근 4주 같은 요일 검색 클릭"
+        int purchases "최근 4주 같은 요일 구매"
+        varchar candidate_reason "후보 이유"
+        int expected_qty_regular "정상가 예상 판매량"
+        int expected_qty_discount "할인 예상 판매량"
+        int expected_increase "예상 증가량"
         enum review_status "UNREVIEWED, SELECTED, HELD"
         enum event_request_status "NONE, REQUESTED, APPROVED, REJECTED"
         bigint promotion_id "연계된 행사 ID"
+        datetime event_requested_at "행사 등록 시각"
     }
 
     admin_audit_logs {
@@ -542,6 +629,7 @@ erDiagram
         varchar target_type "대상 종류"
         bigint target_id "대상 ID"
         enum result "SUCCESS, FAILED, DENIED"
+        enum actor_role "작업 당시 역할 ADMIN, USER"
         json before_value "변경 전 값"
         json after_value "변경 후 값"
     }

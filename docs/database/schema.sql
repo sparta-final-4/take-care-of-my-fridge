@@ -17,6 +17,7 @@
 --   2026-11-06 fridge.product_id 추가 (구매 확정으로 들어온 줄의 상품 ID, 같은 밀키트 판단·다시 사기용)
 --   2026-11-07 chat_messages.filtered 추가 (안전 장치로 걸러진 메시지, AI 문맥·상담 내역 미리보기에서 제외)
 --   2026-11-11 search_click_histories, search_recipe_click_histories, search_zero_result_histories 추가 (통합검색 클릭·0건 기록)
+--   2026-11-11 실제 DB(dev)에 맞춤: forecast_batch_runs 추가, members.phone·admin_audit_logs.actor_role·notifications.deleted_at·order_items.confirmed_quantity·sale_events.ended_at·prediction_runs.synthetic_data·deal_analyses.synthetic_data·billing_keys.billing_key(암호화 전 평문, 지금은 NULL) 추가
 -- =========================================================
 
 SET NAMES utf8mb4;
@@ -67,6 +68,7 @@ DROP TABLE IF EXISTS admin_audit_logs;
 DROP TABLE IF EXISTS deal_candidates;
 DROP TABLE IF EXISTS deal_analyses;
 DROP TABLE IF EXISTS sales_forecasts;
+DROP TABLE IF EXISTS forecast_batch_runs;
 DROP TABLE IF EXISTS prediction_runs;
 DROP TABLE IF EXISTS refresh_sessions;
 DROP TABLE IF EXISTS member_tastes;
@@ -84,13 +86,15 @@ CREATE TABLE members (
     email         VARCHAR(255) NOT NULL COMMENT '로그인 이메일',
     password_hash VARCHAR(255) NOT NULL COMMENT '비밀번호 해시(복원 불가)',
     nickname      VARCHAR(30)  NOT NULL COMMENT '닉네임(후기 표시 이름)',
+    phone         VARCHAR(11)  NULL COMMENT '전화번호 숫자 11자리(가입 필수. 필수 이전 회원·첫 관리자는 NULL)',
     role          ENUM('USER', 'ADMIN') NOT NULL DEFAULT 'USER' COMMENT '역할(가입 시 USER, 관리자 승격 시 ADMIN)',
     status        ENUM('ACTIVE', 'SUSPENDED') NOT NULL DEFAULT 'ACTIVE' COMMENT '계정 상태(정상/정지)',
     created_at    DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '가입일시',
     updated_at    DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '수정일시',
     PRIMARY KEY (id),
     CONSTRAINT uk_members_email UNIQUE (email),
-    CONSTRAINT uk_members_nickname UNIQUE (nickname)
+    CONSTRAINT uk_members_nickname UNIQUE (nickname),
+    CONSTRAINT uk_members_phone UNIQUE (phone)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '회원';
 
 CREATE TABLE member_tastes (
@@ -129,6 +133,7 @@ CREATE TABLE prediction_runs (
     model_version     VARCHAR(50) NOT NULL COMMENT '예측 모델 버전(예: fc-v0.3)',
     data_cutoff_at    DATETIME(6) NOT NULL COMMENT '입력 데이터 기준 시각',
     confirmed_at      DATETIME(6) NULL COMMENT '실제 판매량 확정일시(다음 주 월요일 06:00)',
+    synthetic_data    BIT(1)      NOT NULL COMMENT '가상(시연) 데이터 여부',
     created_at        DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '예측 생성일시(일요일 22:00)',
     updated_at        DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '수정일시',
     PRIMARY KEY (id),
@@ -152,6 +157,19 @@ CREATE TABLE sales_forecasts (
     CONSTRAINT fk_sales_forecasts_prediction_run FOREIGN KEY (prediction_run_id) REFERENCES prediction_runs (id)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '상품별 판매 예측과 실제 판매량';
 
+CREATE TABLE forecast_batch_runs
+(
+    id                BIGINT       NOT NULL AUTO_INCREMENT COMMENT '배치 시도 기록 ID',
+    target_week_start DATE         NOT NULL COMMENT '예측 대상 주 시작일(월요일)',
+    status            ENUM('CREATED', 'ALREADY_EXISTS', 'NO_PRODUCTS', 'NO_TRAINING_SAMPLES', 'FAILED') NOT NULL COMMENT '마지막 시도 결과',
+    attempted_at      DATETIME(6)  NOT NULL COMMENT '마지막 시도 시각',
+    failure_type      VARCHAR(100) NULL COMMENT '실패 종류(예외 이름 등)',
+    created_at        DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '생성일시',
+    updated_at        DATETIME(6)  NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '수정일시',
+    PRIMARY KEY (id),
+    CONSTRAINT uk_forecast_batch_runs_target_week_start UNIQUE (target_week_start)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '주간 판매 예측 배치 시도 기록(대상 주마다 한 행, 최신 시도로 덮어씀)';
+
 CREATE TABLE deal_analyses (
     id                BIGINT      NOT NULL AUTO_INCREMENT COMMENT '할인 후보 분석 ID',
     member_id         BIGINT      NOT NULL COMMENT '분석한 관리자 회원 ID',
@@ -162,6 +180,7 @@ CREATE TABLE deal_analyses (
     model_version     VARCHAR(50) NOT NULL COMMENT '분석 모델 버전',
     data_cutoff_at    DATETIME(6) NOT NULL COMMENT '입력 데이터 기준 시각',
     last_saved_at     DATETIME(6) NULL COMMENT '검토 결과 마지막 저장일시',
+    synthetic_data    BIT(1)      NOT NULL COMMENT '가상(시연) 데이터 여부',
     created_at        DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '분석일시',
     updated_at        DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '수정일시',
     PRIMARY KEY (id),
@@ -203,6 +222,7 @@ CREATE TABLE admin_audit_logs (
     target_type  VARCHAR(50) NOT NULL COMMENT '작업 대상 종류(Product, DealCandidate, Member 등)',
     target_id    BIGINT      NULL COMMENT '작업 대상 ID(등록 실패처럼 대상이 없으면 NULL)',
     result       ENUM('SUCCESS', 'FAILED', 'DENIED') NOT NULL COMMENT '결과(성공/실패/권한 거부)',
+    actor_role   ENUM('ADMIN', 'USER') NULL COMMENT '작업 당시 역할(이 칸 도입 전 이력은 NULL, 조회 때 지금 역할로 대신)',
     before_value JSON        NULL COMMENT '변경 전 값',
     after_value  JSON        NULL COMMENT '변경 후 값',
     created_at   DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '작업일시',
@@ -377,6 +397,7 @@ CREATE TABLE sale_events (
     starts_at   DATETIME(6)  NOT NULL                                   COMMENT '시작 시각',
     ends_at     DATETIME(6)  NOT NULL                                   COMMENT '종료 시각',
     status      ENUM('SCHEDULED', 'ACTIVE', 'ENDED') NOT NULL DEFAULT 'SCHEDULED' COMMENT '상태 (예정/진행 중/종료)',
+    ended_at    DATETIME(6)  NULL                                       COMMENT '진행 중에 중간에 닫은 시각 (등록한 종료 시각까지 연 행사는 NULL)',
     created_at  DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6)      COMMENT '생성일시',
     updated_at  DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '수정일시',
     PRIMARY KEY (id),
@@ -460,6 +481,7 @@ CREATE TABLE order_items (
     product_name          VARCHAR(200)  NOT NULL                                   COMMENT '주문 당시 상품명',
     product_image_url     VARCHAR(500)  NULL                                       COMMENT '주문 당시 상품 이미지 (상품에 이미지가 없으면 NULL)',
     quantity              INT           NOT NULL DEFAULT 1                         COMMENT '수량',
+    confirmed_quantity    INT           NULL                                       COMMENT '구매 확정 수량 (주문 수량 − 완료된 환불 수량, 확정 전 NULL)',
     list_price            INT           NOT NULL DEFAULT 0                         COMMENT '주문 당시 정가',
     unit_price            INT           NOT NULL DEFAULT 0                         COMMENT '실제 단가 (할인가 또는 정가)',
     sale_type             ENUM('NONE', 'SPECIAL', 'FLASH_DROP') NOT NULL DEFAULT 'NONE' COMMENT '할인 구분 (일반/특가/번개 드롭, 번개 드롭은 환불 불가)',
@@ -498,6 +520,7 @@ CREATE TABLE billing_keys (
     status                 ENUM('ACTIVE','DELETED') NOT NULL DEFAULT 'ACTIVE' COMMENT '사용 중·삭제',
     deleted_at             DATETIME(6)  NULL COMMENT '삭제 시각',
     pg_deleted_at          DATETIME(6)  NULL COMMENT 'PortOne 빌링키 삭제 확인 시각. 삭제 상태인데 NULL이면 재시도 대상',
+    billing_key            VARCHAR(200) NULL COMMENT '암호화 전 평문 빌링키(엔티티 매핑 없음). 서버 기동 때 암호화하고 NULL로 비움',
     created_at             DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '생성일시(등록 시각)',
     updated_at             DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '수정일시',
     PRIMARY KEY (id),
@@ -799,6 +822,7 @@ CREATE TABLE notifications (
     link_url           VARCHAR(500)  NOT NULL                                   COMMENT '알림 클릭 시 이동 경로 (예: /fridge)',
     dedupe_key         VARCHAR(150)  NOT NULL                                   COMMENT '중복 방지 키 (예: EXPIRATION:123:2026-10-14)',
     is_read            BOOLEAN       NOT NULL DEFAULT FALSE                     COMMENT '읽음 여부',
+    deleted_at         DATETIME(6)   NULL                                       COMMENT '삭제일시 (지운 알림도 행을 남겨 같은 중복 방지 키로 되살아나지 않게 함)',
     created_at         DATETIME(6)   NOT NULL DEFAULT CURRENT_TIMESTAMP(6)      COMMENT '생성일시',
     updated_at         DATETIME(6)   NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '수정일시',
     PRIMARY KEY (id),
