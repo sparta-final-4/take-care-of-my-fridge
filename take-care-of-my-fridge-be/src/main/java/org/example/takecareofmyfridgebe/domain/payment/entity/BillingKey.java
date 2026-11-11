@@ -21,10 +21,12 @@ import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 import java.time.LocalDateTime;
 import java.util.Objects;
 
-// 회원이 등록한 카드. 카드 정보는 PortOne이 보관하고 우리는 빌링키와 화면 표시용 정보만 저장한다
+// 회원이 등록한 카드. 카드 정보는 PortOne이 보관하고 우리는 빌링키와 화면 표시용 정보만 저장한다.
+// 빌링키는 평문으로 두지 않는다. 암호문과 지문만 저장하고, 원문은 PortOne을 부르기 직전에 BillingKeyCrypto로 푼다
 @Entity
 @Table(name = "billing_keys",
-        uniqueConstraints = @UniqueConstraint(name = "uk_billing_keys_billing_key", columnNames = "billing_key"),
+        uniqueConstraints = @UniqueConstraint(name = "uk_billing_keys_billing_key_hash",
+                columnNames = "billing_key_hash"),
         indexes = {
                 @Index(name = "idx_billing_keys_member_status", columnList = "member_id, status"),
                 @Index(name = "idx_billing_keys_status_pg_deleted_at", columnList = "status, pg_deleted_at")
@@ -33,6 +35,9 @@ import java.util.Objects;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class BillingKey extends BaseTimeEntity {
 
+    // 암호화할 수 있는 빌링키 최대 바이트 수. 이 길이면 암호문이 billing_key_ciphertext(512자) 안에 들어간다
+    public static final int MAX_BILLING_KEY_BYTES = 200;
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -40,9 +45,13 @@ public class BillingKey extends BaseTimeEntity {
     @Column(name = "member_id", nullable = false)
     private Long memberId;
 
-    // PortOne 빌링키. 응답으로 내려주지 않는다
-    @Column(name = "billing_key", nullable = false, length = 200)
-    private String billingKey;
+    // PortOne 빌링키의 AES-256-GCM 암호문("v1:{키 ID}:{Base64}"). 응답으로 내려주지 않는다
+    @Column(name = "billing_key_ciphertext", nullable = false, length = 512)
+    private String billingKeyCiphertext;
+
+    // PortOne 빌링키의 HMAC-SHA256 지문(16진수 64자). 같은 빌링키를 두 번 저장하지 않게 하고, 등록 확정 중복을 찾는다
+    @Column(name = "billing_key_hash", nullable = false, columnDefinition = "CHAR(64)")
+    private String billingKeyHash;
 
     // 카드 상품명. PortOne 빌링키 조회의 card.name이며 카드사 이름이 아니다(PortOne은 카드사를 코드로만 준다)
     @Column(name = "card_name", length = 100)
@@ -79,10 +88,11 @@ public class BillingKey extends BaseTimeEntity {
     private LocalDateTime pgDeletedAt;
 
     @Builder
-    private BillingKey(Long memberId, String billingKey, String cardName, String cardLast4, String cardNumberMasked,
-                       String cardIssuerCode, CardType cardType, boolean isDefault) {
+    private BillingKey(Long memberId, EncryptedBillingKey encryptedBillingKey, String cardName, String cardLast4,
+                       String cardNumberMasked, String cardIssuerCode, CardType cardType, boolean isDefault) {
         this.memberId = memberId;
-        this.billingKey = billingKey;
+        this.billingKeyCiphertext = encryptedBillingKey.ciphertext();
+        this.billingKeyHash = encryptedBillingKey.hash();
         this.cardName = cardName;
         this.cardLast4 = cardLast4;
         this.cardNumberMasked = cardNumberMasked;

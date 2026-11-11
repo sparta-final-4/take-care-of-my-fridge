@@ -20,6 +20,8 @@ import org.example.takecareofmyfridgebe.domain.payment.port.BillingKeyPayResult;
 import org.example.takecareofmyfridgebe.domain.payment.port.PaymentCheckout;
 import org.example.takecareofmyfridgebe.domain.payment.port.PaymentGateway;
 import org.example.takecareofmyfridgebe.domain.payment.port.PaymentGatewayResponse;
+import org.example.takecareofmyfridgebe.domain.payment.service.BillingKeyCrypto;
+import org.example.takecareofmyfridgebe.domain.payment.service.BillingKeyCryptoException;
 import org.example.takecareofmyfridgebe.domain.payment.service.BillingKeyService;
 import org.example.takecareofmyfridgebe.domain.payment.service.PaymentCommandService;
 import org.example.takecareofmyfridgebe.domain.payment.service.PaymentHistoryRecorder;
@@ -47,6 +49,7 @@ public class PaymentFacade {
     private final PaymentGateway paymentGateway;
     private final PaymentHistoryRecorder paymentHistoryRecorder;
     private final BillingKeyService billingKeyService;
+    private final BillingKeyCrypto billingKeyCrypto;
     private final BillingKeyGateway billingKeyGateway;
     private final PaymentPinService paymentPinService;
 
@@ -89,17 +92,29 @@ public class PaymentFacade {
         BillingKey card = billingKeyService.getUsableCard(memberId, request.cardId());
         // PortOne에 청구하기 전에 확인한다. 틀리면 결제를 만들지 않고, 틀린 횟수는 따로 커밋된다
         paymentPinService.verify(memberId, request.pin());
+        // 이전 결제 대기 건을 닫기 전에 푼다. 풀지 못하면(키 설정 오류 등) 아무것도 바꾸지 않고 실패한다
+        String billingKey = decryptForPayment(card);
         closePreviousReady(orderId);
 
         // 빌링키는 토스페이먼츠 정기결제 채널로 발급했다. 승인할 때 PG가 알려 준 실제 결제대행사로 고친다
         Payment payment = paymentCommandService.create(orderId, PgProvider.TOSSPAYMENTS, card);
-        BillingKeyPayResult result = billingKeyGateway.pay(payment.getPortonePaymentId(), card.getBillingKey(),
+        BillingKeyPayResult result = billingKeyGateway.pay(payment.getPortonePaymentId(), billingKey,
                 paymentService.getOrderName(orderId), payment.getAmount(), BillingKeyService.customerIdOf(memberId));
 
         if (result == BillingKeyPayResult.PAID) {
             return confirmWithPg(payment);
         }
         return settleByPg(payment, result);
+    }
+
+    // 풀지 못하는 것은 회원 입력이 아니라 서버 키 설정·저장 값 문제다. 원인(키 ID 등)은 로그에만 남기고 서버 오류로 답한다
+    private String decryptForPayment(BillingKey card) {
+        try {
+            return billingKeyCrypto.decrypt(card);
+        } catch (BillingKeyCryptoException e) {
+            log.error("등록 카드 빌링키를 풀지 못함: cardId={}", card.getId(), e);
+            throw new BusinessException(ErrorCode.BILLING_KEY_UNAVAILABLE);
+        }
     }
 
     // 결제되지 않았거나(거절) 결과를 모를 때 PG를 한 번 조회해 실제 상태로 정한다.

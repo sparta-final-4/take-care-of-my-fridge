@@ -29,7 +29,8 @@ import static org.assertj.core.api.Assertions.tuple;
 
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({JpaAuditingConfig.class, QueryDslConfig.class, BillingKeyService.class, MemberRowLocker.class})
+@Import({JpaAuditingConfig.class, QueryDslConfig.class, BillingKeyService.class, MemberRowLocker.class,
+        BillingKeyCryptoFixture.Config.class})
 class BillingKeyServiceTest extends MySqlContainerSupport {
 
     private static final LocalDateTime NOW = LocalDateTime.of(2026, 11, 4, 12, 0);
@@ -62,6 +63,22 @@ class BillingKeyServiceTest extends MySqlContainerSupport {
         assertThat(response.cardName()).isEqualTo("신한카드 Deep Dream");
         assertThat(response.cardLast4()).isEqualTo("1234");
         assertThat(response.cardType()).isEqualTo(CardType.CREDIT);
+    }
+
+    @Test
+    @DisplayName("카드를 등록하면 빌링키는 암호문과 지문으로만 저장되고, 저장한 암호문을 풀면 원래 빌링키가 나온다")
+    void register_storeEncryptedOnly() {
+        BillingKeyResponse response = billingKeyService.register(memberId, info("billing-key-1"));
+        entityManager.flush();
+        entityManager.clear();
+
+        Object[] row = (Object[]) entityManager.createNativeQuery(
+                        "select billing_key_ciphertext, billing_key_hash from billing_keys where id = :id")
+                .setParameter("id", response.cardId())
+                .getSingleResult();
+        assertThat((String) row[0]).startsWith("v1:k1:").doesNotContain("billing-key-1");
+        assertThat((String) row[1]).isEqualTo(BillingKeyCryptoFixture.crypto().hash("billing-key-1"));
+        assertThat(BillingKeyCryptoFixture.crypto().decrypt(memberId, (String) row[0])).isEqualTo("billing-key-1");
     }
 
     @Test
@@ -117,7 +134,8 @@ class BillingKeyServiceTest extends MySqlContainerSupport {
             billingKeyService.register(memberId, info("billing-key-" + i));
         }
         BillingKey deleted = entityManager.createQuery(
-                        "select b from BillingKey b where b.billingKey = 'billing-key-3'", BillingKey.class)
+                        "select b from BillingKey b where b.billingKeyHash = :hash", BillingKey.class)
+                .setParameter("hash", BillingKeyCryptoFixture.crypto().hash("billing-key-3"))
                 .getSingleResult();
         deleted.delete(LocalDateTime.now());
         entityManager.flush();

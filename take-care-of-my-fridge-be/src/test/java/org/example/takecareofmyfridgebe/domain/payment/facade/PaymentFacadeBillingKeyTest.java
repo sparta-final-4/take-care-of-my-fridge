@@ -13,6 +13,8 @@ import org.example.takecareofmyfridgebe.domain.payment.port.BillingKeyGateway;
 import org.example.takecareofmyfridgebe.domain.payment.port.BillingKeyPayResult;
 import org.example.takecareofmyfridgebe.domain.payment.port.PaymentGateway;
 import org.example.takecareofmyfridgebe.domain.payment.port.PaymentGatewayResponse;
+import org.example.takecareofmyfridgebe.domain.payment.service.BillingKeyCrypto;
+import org.example.takecareofmyfridgebe.domain.payment.service.BillingKeyCryptoFixture;
 import org.example.takecareofmyfridgebe.domain.payment.service.BillingKeyService;
 import org.example.takecareofmyfridgebe.domain.payment.service.PaymentCommandService;
 import org.example.takecareofmyfridgebe.domain.payment.service.PaymentHistoryRecorder;
@@ -27,6 +29,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
@@ -79,6 +82,9 @@ class PaymentFacadeBillingKeyTest {
     @Mock
     private BillingKeyService billingKeyService;
 
+    @Spy
+    private BillingKeyCrypto billingKeyCrypto = BillingKeyCryptoFixture.crypto();
+
     @Mock
     private BillingKeyGateway billingKeyGateway;
 
@@ -93,7 +99,8 @@ class PaymentFacadeBillingKeyTest {
 
     @BeforeEach
     void setUp() {
-        card = BillingKey.builder().memberId(MEMBER_ID).billingKey(BILLING_KEY).isDefault(true).build();
+        card = BillingKey.builder().memberId(MEMBER_ID)
+                .encryptedBillingKey(BillingKeyCryptoFixture.encrypted(MEMBER_ID, BILLING_KEY)).isDefault(true).build();
         ReflectionTestUtils.setField(card, "id", CARD_ID);
         Order order = Order.builder().orderNumber("20261104-000001").memberId(MEMBER_ID).totalAmount(AMOUNT).build();
         ReflectionTestUtils.setField(order, "id", ORDER_ID);
@@ -198,6 +205,20 @@ class PaymentFacadeBillingKeyTest {
         assertError(ErrorCode.PAYMENT_IN_PROGRESS);
         verify(paymentCommandService, never()).fail(any(), any(), any());
         verify(paymentCommandService, never()).create(anyLong(), any(), any());
+    }
+
+    @Test
+    @DisplayName("저장된 빌링키를 풀지 못하면 이전 결제 대기 건을 닫지 않고, 결제를 만들지 않고, 카드 사용 불가 서버 오류로 응답한다")
+    void throwsBillingKeyUnavailable_whenBillingKeyCannotBeDecrypted() {
+        // 다른 회원 ID로 묶인 암호문이라 이 카드 주인 ID로는 풀리지 않는다
+        BillingKey broken = BillingKey.builder().memberId(MEMBER_ID)
+                .encryptedBillingKey(BillingKeyCryptoFixture.encrypted(MEMBER_ID + 1, BILLING_KEY)).build();
+        given(billingKeyService.getUsableCard(MEMBER_ID, CARD_ID)).willReturn(broken);
+
+        assertError(ErrorCode.BILLING_KEY_UNAVAILABLE);
+        verify(paymentService, never()).findReady(anyLong());
+        verify(paymentCommandService, never()).create(anyLong(), any(), any());
+        verify(billingKeyGateway, never()).pay(any(), any(), any(), anyLong(), any());
     }
 
     @Test
