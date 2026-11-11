@@ -130,3 +130,4 @@ gpt-4o-mini, 107문장 × 3번 다수결. 결과 파일: `build/reports/chat-int
 - 실제 커밋: `refactor: 의도 판단 서버 보정을 설정으로 끌 수 있게`, `test: 평가 세트 추가`,
   `fix: 새 추천에서는 앞 대화에서 따라온 맛만 빼기`, `fix: "스프"도 수프 분류로`, `fix: "찌개 끓이고 싶어"도 찌개 분류로`, `docs: 평가 결과 A·E와 결정`
 - 남은 작업: 수정 뒤 A를 다시 돌려 T11~T14·R14가 맞는지 확인. R10은 알려진 차이로 둠.
+- 이어진 작업 (2026-11-11): 보정을 `IntentCorrector`로 옮기고 요리 이름을 AI가 뽑게 바꿨다. 위 표의 `withDishFromKeywords`·`dish-from-keywords`는 `checkDishAndKeywords`·`dish-check`로 바뀌었고, R10은 띄어 쓴 묶음 말 찾기로 맞게 됐다. [의도 보정 정리 기록](work-chat-intent-corrector.md)

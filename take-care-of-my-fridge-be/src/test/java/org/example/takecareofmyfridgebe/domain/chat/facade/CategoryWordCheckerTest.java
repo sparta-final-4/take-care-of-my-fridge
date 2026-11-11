@@ -98,4 +98,20 @@ class CategoryWordCheckerTest {
         assertThat(CategoryWordChecker.check("국물 말고 안주로 볶음 추천", CATEGORIES, TasteWordCheckerTest.WORDS, GROUPS))
                 .contains(new CategoryStance("국", Stance.AVOID), new CategoryStance("볶음", Stance.WANT));
     }
+
+    @Test
+    @DisplayName("붙여 쓴 긴 묶음 말(간단한한끼)은 띄어 쓴 메시지(간단한 한 끼 추천해줘)에서도 찾고, 부정어가 붙으면 피한다")
+    void findsSpacedPhraseGroup() {
+        List<ChatCategoryWordProperties.Group> groups = List.of(
+                new ChatCategoryWordProperties.Group("간단한한끼", List.of("밥", "면류", "볶음")),
+                new ChatCategoryWordProperties.Group("면", List.of("면류")));
+
+        assertThat(CategoryWordChecker.check("간단한 한 끼 추천해줘", CATEGORIES, TasteWordCheckerTest.WORDS, groups))
+                .containsExactlyInAnyOrder(new CategoryStance("밥", Stance.WANT), new CategoryStance("면류", Stance.WANT),
+                        new CategoryStance("볶음", Stance.WANT));
+        assertThat(CategoryWordChecker.check("간단한 한 끼 말고 든든한 거", CATEGORIES, TasteWordCheckerTest.WORDS, groups))
+                .contains(new CategoryStance("밥", Stance.AVOID));
+        // 짧은 묶음 말은 다른 말 안에서 찾지 않는다 ("라면"의 면)
+        assertThat(CategoryWordChecker.check("라면 끓이는 법", CATEGORIES, TasteWordCheckerTest.WORDS, groups)).isEmpty();
+    }
 }

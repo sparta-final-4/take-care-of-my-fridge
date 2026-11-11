@@ -30,19 +30,13 @@ class IntentResultTest {
     }
 
     @Test
-    @DisplayName("키워드가 모두 고른 분류 이름이면 요리 이름이 아니므로 키워드를 비운다")
-    void clearsKeywords_whenAllKeywordsAreCategories() {
+    @DisplayName("분류 이름인 키워드도 정리에서는 그대로 둔다 (분류 이름 빼기는 서버 보정 IntentCorrector가 한 곳에서 한다)")
+    void keepsCategoryKeywords_whenSanitizing() {
         IntentResult copied = new IntentResult(ChatIntent.RECOMMEND, null, List.of("국", "찌개"), null,
                 null, null, null, List.of("국", "찌개"), null, null).sanitize(CATEGORIES);
-        IntentResult mixed = new IntentResult(ChatIntent.RECOMMEND, null, List.of("샐러드"), null,
-                null, null, null, List.of("샐러드", "시저샐러드"), null, null).sanitize(CATEGORIES);
-        IntentResult notChosen = new IntentResult(ChatIntent.RECOMMEND, null, List.of(), null,
-                null, null, null, List.of("샐러드"), null, null).sanitize(CATEGORIES);
 
-        assertThat(copied.keywords()).isEmpty();
+        assertThat(copied.keywords()).containsExactly("국", "찌개");
         assertThat(copied.moodCategories()).containsExactly("국", "찌개");
-        assertThat(mixed.keywords()).containsExactly("샐러드", "시저샐러드");
-        assertThat(notChosen.keywords()).containsExactly("샐러드");
     }
 
     @Test
@@ -149,18 +143,20 @@ class IntentResultTest {
                 List.of("김치찌개"), null, null, 0, null, List.of(), List.of(), null, "IMMINENT");
 
         assertThat(result.withTastes(List.of(), List.of("SPICY")).fridgeScope()).isEqualTo("IMMINENT");
-        assertThat(result.withNamed(List.of("두부"), List.of()).fridgeScope()).isEqualTo("IMMINENT");
-        assertThat(result.withDishFromKeywords("김치찌개 먹고 싶어").fridgeScope()).isEqualTo("IMMINENT");
+        assertThat(result.withNamed(List.of("두부"), List.of(), null).fridgeScope()).isEqualTo("IMMINENT");
+        assertThat(result.withCategories(List.of(), List.of("김치찌개"), "김치찌개", List.of()).fridgeScope()).isEqualTo("IMMINENT");
     }
 
     @Test
-    @DisplayName("요리 이름은 첫 키워드가 메시지에 띄어쓰기와 상관없이 그대로 있을 때만 그 이름이다")
-    void picksDish_whenFirstKeywordInMessage() {
-        IntentResult result = new IntentResult(ChatIntent.RECOMMEND, null, null, null, null, null, null,
-                List.of("장어 조림", "장어구이"), "엉뚱한 이름", null);
+    @DisplayName("서버가 이름만 말한 말로 채우면 추천이 되고 재료·키워드·요리 이름만 바뀐다")
+    void fillsNamed_whenServerNames() {
+        IntentResult result = new IntentResult(ChatIntent.GENERAL, List.of("SPICY"), null, null, null, null, null, null, null, null)
+                .withNamed(List.of(), List.of("닭볶음탕"), "닭볶음탕");
 
-        assertThat(result.withDishFromKeywords("장어조림 먹고 싶어").dishText()).isEqualTo("장어 조림");
-        assertThat(result.withDishFromKeywords("장어 요리 추천해줘").dishText()).isNull();
-        assertThat(IntentResult.general().withDishFromKeywords("뭐 먹지?").dishText()).isNull();
+        assertThat(result.intent()).isEqualTo(ChatIntent.RECOMMEND);
+        assertThat(result.wantedTastes()).containsExactly("SPICY");
+        assertThat(result.includeIngredients()).isEmpty();
+        assertThat(result.keywords()).containsExactly("닭볶음탕");
+        assertThat(result.dishText()).isEqualTo("닭볶음탕");
     }
 }

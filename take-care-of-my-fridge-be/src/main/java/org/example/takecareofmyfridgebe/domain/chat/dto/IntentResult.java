@@ -1,6 +1,5 @@
 package org.example.takecareofmyfridgebe.domain.chat.dto;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 
 import java.util.Arrays;
@@ -26,8 +25,9 @@ import java.util.stream.Collectors;
  * @param excludeIngredients 빼고 싶은 재료 이름 (말한 그대로)
  * @param useSelectedOnly    고른·말한 재료를 꼭 쓰는 레시피만 원하는지
  * @param keywords           레시피 이름에 나올 만한 구체적인 요리 이름 (예: 냉면, 막국수). 특징("차가운")도 요리 이름으로 바꾼 것
- * @param dishText           사용자가 말한 요리 이름 (예: "냉면"). 레시피 이름 비교와 카드 이유에 쓴다.
- *                           AI에 받지 않고(@JsonIgnore, 스키마에 없음) 서버가 첫 키워드로 정한다 (withDishFromKeywords)
+ * @param dishText           사용자가 말한 요리 이름 그대로 (예: "냉면"). 레시피 이름 비교와 카드 이유에 쓴다.
+ *                           AI가 뽑고(분류·특징이면 빈 문자열), 서버는 메시지에 그대로 있고 분류 이름·묶음 말이 아닌지만 확인한다
+ *                           (IntentCorrector.checkDishAndKeywords)
  * @param preferenceText     사용자가 원한 특징·요리 표현 그대로 (예: "차가운 요리", "냉면 같은 면 요리"). 요청에 못 맞췄을 때 안내에 쓴다
  * @param targetIndex        RECIPE_DETAIL일 때 직전 추천 카드 번호(1부터). 모르면 0
  * @param targetName         RECIPE_DETAIL일 때 말한 레시피 이름 (예: "깐풍기"). 없으면 빈 문자열
@@ -45,7 +45,7 @@ public record IntentResult(
         List<String> excludeIngredients,
         Boolean useSelectedOnly,
         List<String> keywords,
-        @JsonIgnore String dishText,
+        String dishText,
         String preferenceText,
         Integer targetIndex,
         String targetName,
@@ -143,13 +143,9 @@ public record IntentResult(
     public IntentResult sanitize(Collection<String> allowedCategories) {
         Set<String> categories = Set.copyOf(allowedCategories);
         List<String> cleanCategories = cleanNames(moodCategories, name -> name, categories);
+        // 분류 이름·묶음 말인 키워드("국", "디저트", "국물")는 서버 보정(IntentCorrector.moveCategoryKeywords)이 한 곳에서 분류로 옮긴다
         List<String> cleanKeywords = keywords == null ? null
                 : cleanNames(keywords, name -> name, null).stream().limit(MAX_KEYWORDS).toList();
-        // AI가 고른 분류를 키워드에 그대로 옮겨 적었으면("따뜻한 국물 요리" → 국, 찌개…) 요리 이름이 아니므로 키워드를 비운다
-        if (cleanKeywords != null && !cleanKeywords.isEmpty() && cleanCategories != null
-                && cleanCategories.containsAll(cleanKeywords)) {
-            cleanKeywords = List.of();
-        }
         return new IntentResult(
                 intent == null ? ChatIntent.GENERAL : intent,
                 cleanNames(wantedTastes, name -> name.toUpperCase(Locale.ROOT), TASTE_NAMES),
@@ -195,29 +191,11 @@ public record IntentResult(
                 fridgeScope);
     }
 
-    // 서버가 이름만 말한 말로 채운 추천 (재료 이름·요리 이름 키워드)
-    public IntentResult withNamed(List<String> includes, List<String> namedKeywords) {
+    // 서버가 이름만 말한 말·못 찾은 자세히 대상으로 채운 추천 (재료 이름, 요리 이름 키워드, 요리 이름)
+    public IntentResult withNamed(List<String> includes, List<String> namedKeywords, String dish) {
         return new IntentResult(ChatIntent.RECOMMEND, wantedTastes, moodCategories, maxMinutes, includes, excludeIngredients,
-                useSelectedOnly, namedKeywords, dishText, preferenceText, targetIndex, targetName, removed, avoidTastes,
+                useSelectedOnly, namedKeywords, dish, preferenceText, targetIndex, targetName, removed, avoidTastes,
                 detailQuestion, fridgeScope);
-    }
-
-    /**
-     * 요리 이름은 서버가 정한다: 첫 키워드가 메시지에 그대로 있으면 그 이름, 아니면 없음 (공백 빼고 비교).
-     * 예) "김피탕 같은 요리 추천해줘"(첫 키워드 김피탕) → 김피탕, "차가운 요리 추천해줘"(첫 키워드 샐러드) → 없음
-     */
-    public IntentResult withDishFromKeywords(String message) {
-        String dish = null;
-        if (message != null && keywords != null && !keywords.isEmpty()) {
-            String first = keywords.get(0);
-            String compactFirst = first.replaceAll("\\s+", "");
-            if (!compactFirst.isEmpty() && message.replaceAll("\\s+", "").contains(compactFirst)) {
-                dish = first;
-            }
-        }
-        return new IntentResult(intent, wantedTastes, moodCategories, maxMinutes, includeIngredients, excludeIngredients,
-                useSelectedOnly, keywords, dish, preferenceText, targetIndex, targetName, removed, avoidTastes, detailQuestion,
-                fridgeScope);
     }
 
     // 냉장고 보기 범위. sanitize한 뒤에 쓴다 (없거나 모르는 값이면 ALL)

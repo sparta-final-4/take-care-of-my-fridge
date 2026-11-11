@@ -224,9 +224,10 @@ class ChatIntentEvalManualTest {
         AllergyExclusionFinder allergyExclusionFinder = mock(AllergyExclusionFinder.class);
         when(allergyExclusionFinder.find(any(), any()))
                 .thenReturn(AllergyExclusionFinder.Allergens.NONE);
-        return new ChatIntentFacade(extractor, recipeService, ingredientMatcher, candidateProperties,
-                mock(ChatMessageService.class), tasteWords, mealkitWords, askWords, categoryWords, foodWords,
-                allergyExclusionFinder, tasteOpposites, fridgeShopWords, corrections);
+        IntentCorrector corrector = new IntentCorrector(recipeService, ingredientMatcher, mock(ChatMessageService.class),
+                tasteWords, mealkitWords, askWords, categoryWords, foodWords, fridgeShopWords, corrections);
+        return new ChatIntentFacade(extractor, recipeService, ingredientMatcher, candidateProperties, tasteWords, mealkitWords,
+                askWords, allergyExclusionFinder, tasteOpposites, fridgeShopWords, corrections, corrector);
     }
 
     private void write(EvalSet set, List<EvalCase> cases, List<RunRow> rows, int runs, Set<String> off) throws IOException {
@@ -240,7 +241,7 @@ class ChatIntentEvalManualTest {
         runLines.add(String.join(",", "id", "group", "context", "message", "run", "pass", "mismatch", "source",
                 "intent", "wanted", "avoid", "categories", "keywords", "dish", "preference", "maxMinutes", "include", "exclude",
                 "useSelectedOnly", "scope", "names", "saleOnly", "productType", "target", "question",
-                "aiIntent", "aiWanted", "aiAvoid", "aiCategories", "aiKeywords", "aiPreference", "aiMaxMinutes",
+                "aiIntent", "aiWanted", "aiAvoid", "aiCategories", "aiKeywords", "aiDish", "aiPreference", "aiMaxMinutes",
                 "aiInclude", "aiExclude", "aiUseSelectedOnly", "aiScope", "aiTargetIndex", "aiTargetName", "aiRemoved",
                 "aiQuestion", "inputTokens", "cachedTokens", "outputTokens", "ms"));
         rows.forEach(row -> runLines.add(row.line()));
@@ -336,12 +337,12 @@ class ChatIntentEvalManualTest {
                     csv(source)));
             cells.addAll(outcome.cells());
             if (ai == null) {
-                for (int i = 0; i < 15; i++) {
+                for (int i = 0; i < 16; i++) {
                     cells.add("");
                 }
             } else {
                 cells.addAll(List.of(csv(ai.intent()), csv(ai.wantedTastes()), csv(ai.avoidTastes()), csv(ai.moodCategories()),
-                        csv(ai.keywords()), csv(ai.preferenceText()), csv(ai.maxMinutes()),
+                        csv(ai.keywords()), csv(ai.dishText()), csv(ai.preferenceText()), csv(ai.maxMinutes()),
                         csv(ai.includeIngredients()), csv(ai.excludeIngredients()), csv(ai.useSelectedOnly()),
                         csv(ai.fridgeScope()), csv(ai.targetIndex()), csv(ai.targetName()), csv(ai.removed()),
                         csv(ai.detailQuestion())));

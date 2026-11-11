@@ -13,7 +13,7 @@ import java.util.Set;
 final class EvalCorrectionSwitches {
 
     static final List<String> NAMES = List.of("taste-words", "spoken-tastes-only", "keep-other-tastes", "refine-spoken-tastes",
-            "category-words", "dish-from-keywords", "name-only", "mealkit-request", "off-topic-revive", "fridge-shop-words");
+            "category-words", "dish-check", "name-only", "mealkit-request", "off-topic-revive", "fridge-shop-words");
 
     private EvalCorrectionSwitches() {
     }
@@ -44,7 +44,7 @@ final class EvalCorrectionSwitches {
                 !off.contains("keep-other-tastes"),
                 !off.contains("refine-spoken-tastes"),
                 !off.contains("category-words"),
-                !off.contains("dish-from-keywords"),
+                !off.contains("dish-check"),
                 !off.contains("name-only"),
                 !off.contains("mealkit-request"),
                 !off.contains("off-topic-revive"),

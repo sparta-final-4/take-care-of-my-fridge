@@ -22,7 +22,8 @@ import java.util.Set;
  *   <li>다음 단어가 요청하는 말({@link #REQUEST_WORDS}로 시작: 추천·먹·만들·말고 …)이거나 메시지 끝이어야 한다.
  *       "김치 넣은 요리", "떡 썰어서"처럼 재료로 말한 것을 뺀다</li>
  *   <li>분류 이름과 다른 흔한 말("국물" → 국·찌개·전골·수프·스튜, 설정 app.chat.category-words)도 같은 규칙으로 찾고, 맞으면 묶음의 분류를 모두 센다.
- *       "국수"는 묶음 말이 아니어서 국으로 보지 않는다</li>
+ *       "국수"는 묶음 말이 아니어서 국으로 보지 않는다.
+ *       {@value #MIN_PHRASE_LENGTH}글자 이상인 묶음 말(설정에 붙여 쓴 "간단한한끼")은 띄어 쓴 메시지("간단한 한 끼 추천해줘")에서도 찾는다</li>
  *   <li>대명사·끼니와 겹치는 분류({@link #SKIPPED}: "전 매운 거 좋아해"의 전, "밥 뭐 먹지"의 밥)는 서버가 채우지 않고 AI에 맡긴다</li>
  *   <li>부정어는 맛 단어와 같은 기준이다(TasteWordChecker): 분류 이름 바로 앞 "안·덜", 뒤 4글자 안 "말고·빼고·않·싫·없이"면 피함
  *       ("디저트 말고 국" → 디저트 피함, 국 원함)</li>
@@ -39,6 +40,8 @@ public final class CategoryWordChecker {
             "말고", "빼고", "싫", "위주", "줘", "알려", "골라", "땡", "당기", "원해", "좋아", "찾아", "밀키트", "끓");
     // 대명사(전 = 저는)·끼니(밥 = 식사)로 흔히 쓰여 서버가 채우지 않는 분류
     static final Set<String> SKIPPED = Set.of("전", "밥");
+    // 이 글자 수 이상인 묶음 말은 여러 낱말로 띄어 써도 찾는다 ("간단한 한 끼" ↔ 간단한한끼). 짧은 말("면", "국물")은 "라면"처럼 다른 말 안에 들어가 낱말 단위로만 본다
+    static final int MIN_PHRASE_LENGTH = 4;
 
     private static final String LEADING_MARKS = "\"'(“‘[";
     private static final String TRAILING_MARKS = "?!.,~…\"')”’]";
@@ -114,6 +117,22 @@ public final class CategoryWordChecker {
                 }
                 // 한 단어에서는 가장 긴 분류 이름 하나만 센다
                 break;
+            }
+        }
+        // 여러 낱말로 된 묶음 말("간단한한끼")은 낱말 단위로는 걸리지 않으므로 공백을 뺀 글에서 한 번 더 찾는다
+        for (ChatCategoryWordProperties.Group group : groups) {
+            String phrase = group.word() == null ? "" : group.word().replaceAll("\\s+", "");
+            int start = phrase.length() >= MIN_PHRASE_LENGTH ? compact.indexOf(phrase) : -1;
+            List<String> mapped = terms.get(group.word() == null ? "" : group.word().strip());
+            if (start < 0 || mapped == null) {
+                continue;
+            }
+            boolean avoid = TasteWordChecker.negatedBefore(compact.substring(0, start), words)
+                    || TasteWordChecker.negatedAfter(compact, start + phrase.length(), words);
+            Stance stance = avoid ? Stance.AVOID : Stance.WANT;
+            for (String category : mapped) {
+                stances.merge(category, stance,
+                        (before, now) -> before == Stance.AVOID || now == Stance.AVOID ? Stance.AVOID : Stance.WANT);
             }
         }
         List<CategoryStance> result = new ArrayList<>();

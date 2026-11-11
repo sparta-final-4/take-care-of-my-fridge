@@ -255,10 +255,10 @@ class ChatIntentFacadeTest {
         @Test
         @DisplayName("레시피 말은 띄어 써도 지운다 (닭볶음탕 만드는 법 → 닭볶음탕, 잡채 만 들 기 → 잡채)")
         void removesSpacedRecipeWords() {
-            assertThat(facade.withoutRecipeWords("닭볶음탕 만드는 법")).isEqualTo("닭볶음탕");
-            assertThat(facade.withoutRecipeWords("잡채 만 들 기")).isEqualTo("잡채");
-            assertThat(facade.withoutRecipeWords("닭볶음탕레시피")).isEqualTo("닭볶음탕");
-            assertThat(facade.withoutRecipeWords("레시피")).isEmpty();
+            assertThat(newCorrector(ChatCorrectionProperties.ALL_ON).withoutRecipeWords("닭볶음탕 만드는 법")).isEqualTo("닭볶음탕");
+            assertThat(newCorrector(ChatCorrectionProperties.ALL_ON).withoutRecipeWords("잡채 만 들 기")).isEqualTo("잡채");
+            assertThat(newCorrector(ChatCorrectionProperties.ALL_ON).withoutRecipeWords("닭볶음탕레시피")).isEqualTo("닭볶음탕");
+            assertThat(newCorrector(ChatCorrectionProperties.ALL_ON).withoutRecipeWords("레시피")).isEmpty();
         }
 
         @Test
@@ -325,7 +325,8 @@ class ChatIntentFacadeTest {
         @Test
         @DisplayName("일반 대화·레시피 자세히면 맛·분류 단어로 조건을 고치지 않고, 추천이면 지금처럼 고친다")
         void correctsConditions_onlyWhenRecommend() {
-            ChatIntentFacade spied = spy(facade);
+            IntentCorrector spiedCorrector = spy(newCorrector(ChatCorrectionProperties.ALL_ON));
+            ChatIntentFacade spied = newFacade(ChatCorrectionProperties.ALL_ON, spiedCorrector);
             givenExtracted(IntentResult.general());
             spied.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("찌개는 어떻게 골라? 매운 거 기준은?"));
             // 물어본 레시피가 직전 카드에 있는 레시피 자세히 (없으면 그 요리 추천으로 바뀌어 보정한다)
@@ -334,8 +335,8 @@ class ChatIntentFacadeTest {
             spied.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("매운 김치찌개 어떻게 만들어?"),
                     new ChatContext(List.of(), null, List.of(new CardName(10L, "김치찌개"))));
 
-            verify(spied, never()).correctTastes(any(), any(), any(), any());
-            verify(spied, never()).correctCategories(any(), any(), any(), any(), any(), any());
+            verify(spiedCorrector, never()).correctTastes(any(), any(), any(), any());
+            verify(spiedCorrector, never()).correctCategories(any(), any(), any(), any(), any(), any());
 
             givenExtracted(new IntentResult(ChatIntent.RECOMMEND, null, null, null, null, null, false, null, null, null));
             ChatIntentResolution recommend = spied.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("매운 찌개 추천해줘"));
@@ -424,17 +425,122 @@ class ChatIntentFacadeTest {
         }
 
         @Test
-        @DisplayName("요리 이름은 AI 값이 아니라 첫 키워드가 메시지에 그대로 있을 때 그 이름으로 정한다")
-        void picksDishFromFirstKeyword() {
+        @DisplayName("AI가 뽑은 요리 이름은 메시지에 띄어쓰기와 상관없이 그대로 있을 때만 쓰고, 메시지에 없으면 비운다")
+        void keepsAiDish_onlyWhenInMessage() {
             givenExtracted(new IntentResult(ChatIntent.RECOMMEND, null, List.of("튀김"), null, null, null, null,
-                    List.of("김피탕", "탕수육"), "", null));
+                    List.of("김피탕", "탕수육"), "김피탕", null));
             assertThat(facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("김피탕 같은 요리 추천해줘"))
                     .recipeQuery().keywordText()).isEqualTo("김피탕");
 
             givenExtracted(new IntentResult(ChatIntent.RECOMMEND, null, null, null, null, null, null,
-                    List.of("샐러드", "냉채"), "차가운 요리", "차가운 요리"));
+                    List.of("장어 조림", "장어구이"), "장어 조림", null));
+            assertThat(facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("장어조림 먹고 싶어"))
+                    .recipeQuery().keywordText()).isEqualTo("장어 조림");
+
+            // AI가 키워드로 늘린 이름을 요리 이름으로 내면 메시지에 없으므로 비운다
+            givenExtracted(new IntentResult(ChatIntent.RECOMMEND, null, null, null, null, null, null,
+                    List.of("냉채", "냉국"), "냉채", "차가운 요리"));
             assertThat(facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("차가운 요리 추천해줘"))
                     .recipeQuery().keywordText()).isNull();
+
+            // AI가 요리 이름을 비우면 키워드가 메시지에 있어도 요리 이름은 없다 (서버가 추측하지 않는다)
+            givenExtracted(new IntentResult(ChatIntent.RECOMMEND, null, List.of("찌개"), null, null, null, null,
+                    List.of("김치찌개"), "", null));
+            assertThat(facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("김치찌개 먹고 싶어"))
+                    .recipeQuery().keywordText()).isNull();
+        }
+
+        @Test
+        @DisplayName("\"디저트\"만 말해 AI가 키워드에 디저트를 넣어도 분류로만 쓰고 키워드·요리 이름에서 뺀다")
+        void removesCategoryKeyword_whenNameOnlyCategory() {
+            when(recipeService.getClassifications())
+                    .thenReturn(new RecipeClassificationResponse(List.of("한식"), List.of("국", "디저트", "찌개")));
+            givenExtracted(new IntentResult(ChatIntent.GENERAL, null, null, null, null, null, null, List.of("디저트"), null, null));
+
+            RecipeQuery query = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("디저트")).recipeQuery();
+
+            assertThat(query.moodCategories()).containsExactly("디저트");
+            assertThat(query.keywords()).isEmpty();
+            assertThat(query.keywordText()).isNull();
+        }
+
+        @Test
+        @DisplayName("\"디저트 추천해줘\"에서 AI가 키워드·요리 이름에 분류 이름을 넣어도 분류 이름은 키워드에서 빼고 요리 이름은 비운다")
+        void removesMixedCategoryKeyword() {
+            when(recipeService.getClassifications())
+                    .thenReturn(new RecipeClassificationResponse(List.of("한식"), List.of("국", "디저트", "찌개")));
+            givenExtracted(new IntentResult(ChatIntent.RECOMMEND, null, List.of("디저트"), null, null, null, null,
+                    List.of("디저트", "푸딩", "케이크"), "디저트", null));
+
+            RecipeQuery query = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("디저트 추천해줘")).recipeQuery();
+
+            assertThat(query.keywords()).containsExactly("푸딩", "케이크");
+            assertThat(query.keywordText()).isNull();
+        }
+
+        @Test
+        @DisplayName("\"국물\"처럼 묶음 말만 말하면 묶음의 분류로 바꾸고 키워드·요리 이름에서 뺀다")
+        void removesGroupWordKeyword() {
+            givenExtracted(new IntentResult(ChatIntent.GENERAL, null, null, null, null, null, null, List.of("국물"), null, null));
+
+            RecipeQuery query = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("국물")).recipeQuery();
+
+            assertThat(query.moodCategories()).containsExactlyInAnyOrder("국", "찌개");
+            assertThat(query.keywords()).isEmpty();
+            assertThat(query.keywordText()).isNull();
+        }
+
+        @Test
+        @DisplayName("분류 이름·묶음 말은 \"요리·메뉴\"가 붙어도 그 분류(묶음 말은 목록에 있는 분류들)이고, 다른 말이 붙은 요리 이름은 분류가 아니다")
+        void judgesCategoryWord() {
+            IntentCorrector corrector = newCorrector(ChatCorrectionProperties.ALL_ON);
+            List<String> categories = List.of("국", "디저트", "찌개", "면류");
+
+            for (String word : List.of("디저트", "디저트 메뉴", "디저트 종류")) {
+                assertThat(corrector.categoriesOf(word, categories)).as(word).contains(List.of("디저트"));
+            }
+            for (String word : List.of("국물 요리", "국물")) {
+                assertThat(corrector.categoriesOf(word, categories)).as(word).contains(List.of("국", "찌개"));
+            }
+            assertThat(corrector.categoriesOf("면", categories)).contains(List.of("면류"));
+            for (String word : List.of("김치찌개", "국수", "매운 국", "디저트 케이크", "요리", "푸딩")) {
+                assertThat(corrector.categoriesOf(word, categories)).as(word).isEmpty();
+            }
+        }
+
+        @Test
+        @DisplayName("\"차가운 요리\"에서 AI가 키워드에 분류 이름 샐러드를 넣으면 키워드에서 빼고 분류로 옮긴다")
+        void movesCategoryKeywordToCategories() {
+            givenExtracted(new IntentResult(ChatIntent.RECOMMEND, null, List.of(), null, null, null, null,
+                    List.of("샐러드", "냉채", "냉국"), null, "차가운 요리"));
+
+            RecipeQuery query = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("차가운 요리 추천해줘")).recipeQuery();
+
+            assertThat(query.moodCategories()).containsExactly("샐러드");
+            assertThat(query.keywords()).containsExactly("냉채", "냉국");
+            assertThat(query.keywordText()).isNull();
+        }
+
+        @Test
+        @DisplayName("묶음 말 키워드(국물)는 묶음의 분류로 옮기고, 이번 말에서 피하는 분류(\"디저트 말고\")인 키워드는 옮기지 않고 뺀다")
+        void movesGroupKeyword_butNotAvoidedCategory() {
+            when(recipeService.getClassifications())
+                    .thenReturn(new RecipeClassificationResponse(List.of("한식"), List.of("국", "디저트", "찌개", "볶음")));
+            givenExtracted(new IntentResult(ChatIntent.RECOMMEND, null, List.of("찌개"), null, null, null, null,
+                    List.of("국물", "김치찌개"), null, null));
+            RecipeQuery grouped = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("김치찌개 같은 거 추천해줘"))
+                    .recipeQuery();
+
+            assertThat(grouped.moodCategories()).containsExactly("찌개", "국");
+            assertThat(grouped.keywords()).containsExactly("김치찌개");
+
+            givenExtracted(new IntentResult(ChatIntent.RECOMMEND, null, List.of(), null, null, null, null,
+                    List.of("디저트", "볶음밥"), null, null));
+            RecipeQuery avoided = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("디저트 말고 볶음밥 같은 거"))
+                    .recipeQuery();
+
+            assertThat(avoided.moodCategories()).isEmpty();
+            assertThat(avoided.keywords()).containsExactly("볶음밥");
         }
 
         @Test
@@ -1826,11 +1932,20 @@ class ChatIntentFacadeTest {
 
     // 보정 켜고 끄기(app.chat.corrections)만 바꿔 만든다
     private ChatIntentFacade newFacade(ChatCorrectionProperties corrections) {
+        return newFacade(corrections, newCorrector(corrections));
+    }
+
+    private ChatIntentFacade newFacade(ChatCorrectionProperties corrections, IntentCorrector corrector) {
         return new ChatIntentFacade(extractor, recipeService, ingredientMatcher,
                 new ChatCandidateProperties(List.of("양념", "음료"), 0.4, List.of(), List.of("백김치", "물김치", "동치미", "나박김치"), List.of(), List.of()),
-                chatMessageService, TasteWordCheckerTest.WORDS, MealkitWordCheckerTest.WORDS, AskWordCheckerTest.WORDS,
-                new ChatCategoryWordProperties(CategoryWordCheckerTest.GROUPS), FOOD_WORDS, allergyExclusionFinder, TASTE_OPPOSITES,
-                FridgeShopWordCheckerTest.WORDS, corrections);
+                TasteWordCheckerTest.WORDS, MealkitWordCheckerTest.WORDS, AskWordCheckerTest.WORDS, allergyExclusionFinder,
+                TASTE_OPPOSITES, FridgeShopWordCheckerTest.WORDS, corrections, corrector);
+    }
+
+    private IntentCorrector newCorrector(ChatCorrectionProperties corrections) {
+        return new IntentCorrector(recipeService, ingredientMatcher, chatMessageService, TasteWordCheckerTest.WORDS,
+                MealkitWordCheckerTest.WORDS, AskWordCheckerTest.WORDS, new ChatCategoryWordProperties(CategoryWordCheckerTest.GROUPS),
+                FOOD_WORDS, FridgeShopWordCheckerTest.WORDS, corrections);
     }
 
     @Test
@@ -1949,14 +2064,14 @@ class ChatIntentFacadeTest {
         }
 
         @Test
-        @DisplayName("요리 이름 서버 계산을 끄면 요리 이름이 없다")
-        void noDish_whenDishFromKeywordsOff() {
-            givenExtracted(new IntentResult(ChatIntent.RECOMMEND, null, null, null, null, null, false, List.of("김치찌개"), null, null));
-            ChatMessageCreateRequest request = ChatMessageCreateRequest.of("김치찌개 추천해줘");
+        @DisplayName("요리 이름 확인을 끄면 메시지에 없는 AI 요리 이름도 그대로 쓴다")
+        void keepsAiDish_whenDishCheckOff() {
+            givenExtracted(new IntentResult(ChatIntent.RECOMMEND, null, null, null, null, null, false, List.of("냉채", "냉국"), "냉채", null));
+            ChatMessageCreateRequest request = ChatMessageCreateRequest.of("차가운 요리 추천해줘");
 
-            assertThat(facade.resolve(MEMBER_ID, SESSION_ID, request).recipeQuery().keywordText()).isEqualTo("김치찌개");
-            assertThat(newFacade(off("dish-from-keywords")).resolve(MEMBER_ID, SESSION_ID, request).recipeQuery().keywordText())
-                    .isNull();
+            assertThat(facade.resolve(MEMBER_ID, SESSION_ID, request).recipeQuery().keywordText()).isNull();
+            assertThat(newFacade(off("dish-check")).resolve(MEMBER_ID, SESSION_ID, request).recipeQuery().keywordText())
+                    .isEqualTo("냉채");
         }
     }
 

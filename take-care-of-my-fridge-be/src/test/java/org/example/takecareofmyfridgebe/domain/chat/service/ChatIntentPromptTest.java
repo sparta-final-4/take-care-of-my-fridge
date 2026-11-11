@@ -38,6 +38,18 @@ class ChatIntentPromptTest {
     }
 
     @Test
+    @DisplayName("요리 이름은 \"○○ 같은 요리\"도 말한 그대로 dishText에 쓰고, 분류·특징은 빈 문자열이되 keywords는 따로 채운다고 예시로 지시한다")
+    void instructsDishText() {
+        assertThat(prompt).contains("- dishText: 요리 이름을 말했으면 말한 그대로 쓴다. \"○○ 같은 요리\"도 ○○이 요리 이름이다",
+                "분류·요리 종류(\"디저트\", \"국물\", \"반찬\")나 특징(\"따뜻한 국물\", \"매운 요리\")은 요리 이름이 아니라 빈 문자열이다",
+                "keywords와는 따로 정한다. 특징만 말했으면 dishText는 비우고 keywords는 그 특징에 맞는 요리 이름으로 채운다",
+                "\"김피탕 같은 요리 추천해줘\" → dishText: 김피탕 / keywords: 김피탕, 탕수육, 깐풍기",
+                "\"시원한 국물 요리\" → dishText: 빈 문자열 / keywords: 냉국, 오이냉국, 냉면, 물회",
+                "\"디저트 추천해줘\" → dishText: 빈 문자열 / keywords: 빈 목록 / moodCategories: 디저트",
+                "dishText·preferenceText 빈 문자열");
+    }
+
+    @Test
     @DisplayName("묻는 말 없이 이름만 말해도 보여 달라는 뜻이라 RECOMMEND라고 첫 질문·이어지는 말 모두 지시한다")
     void instructsNameOnlyIsRecommend() throws IOException {
         String followUp = new ClassPathResource("prompts/chat-intent-followup.txt").getContentAsString(StandardCharsets.UTF_8);
@@ -173,9 +185,9 @@ class ChatIntentPromptTest {
     }
 
     @Test
-    @DisplayName("서버 안전망이 하는 일을 되풀이하지 않아 첫 질문 프롬프트를 2,800자 아래로 둔다 (4,905자에서 줄임)")
+    @DisplayName("서버 안전망이 하는 일을 되풀이하지 않아 첫 질문 프롬프트를 3,300자 아래로 둔다 (4,905자에서 줄이고, 요리 이름 규칙·예시 여섯 줄을 더함)")
     void keepsIntentPromptShort() {
-        assertThat(prompt.length()).isLessThan(2_800);
-        assertThat(prompt).doesNotContain("dishText", "주식으로 먹을 거", "장보기 목록 짜줘", "술안주", "말하지 않았으면 빈 목록");
+        assertThat(prompt.length()).isLessThan(3_300);
+        assertThat(prompt).doesNotContain("주식으로 먹을 거", "장보기 목록 짜줘", "술안주", "말하지 않았으면 빈 목록");
     }
 }

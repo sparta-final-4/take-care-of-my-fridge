@@ -90,6 +90,11 @@ cases:
   - { id: R15, group: 추천, message: "오이 빼고 반찬 추천해줘", expect: { intent: RECOMMEND, exclude: [오이], categories: [무침, 조림, 볶음, 김치, 절임] } }
   - { id: R16, group: 추천, message: "땅콩 알레르기 있어 간식 추천해줘", expect: { intent: RECOMMEND, exclude: [땅콩], categories: [디저트, 과자, 빵, 떡] } }
   - { id: R17, group: 추천, message: "주식으로 먹을 거 추천해줘", expect: { intent: RECOMMEND } }
+  # 분류 이름·묶음 말은 분류로만 쓰고 요리 이름이 되지 않는다 (요리 이름이면 "디저트 레시피는 없어서…" 안내가 붙는다)
+  - { id: R18, group: 추천, message: "디저트 추천해줘", expect: { intent: RECOMMEND, categories: [디저트], dishEmpty: true } }
+  - { id: R19, group: 추천, message: "반찬 추천해줘", expect: { intent: RECOMMEND, categories: [무침, 조림, 볶음, 김치, 절임], dishEmpty: true } }
+  # 레시피에 없을 법한 요리 이름도 AI가 요리 이름으로 낸다 (서버는 메시지에 있는지만 확인). "김피탕 같은 요리"는 R06
+  - { id: R20, group: 추천, message: "탕짜면 먹고 싶어", expect: { intent: RECOMMEND, keywordsFirst: 탕짜면, dish: 탕짜면 } }
 
   # ── 맛 ──
   - { id: T01, group: 맛, message: "매운 거 먹고 싶어", expect: { intent: RECOMMEND, wanted: [SPICY], avoid: [], categories: [] } }
@@ -116,10 +121,13 @@ cases:
   - { id: N01, group: 이름만, message: "국물 밀키트", expect: { intent: RECOMMEND } }
   - { id: N02, group: 이름만, message: "김치찌개", expect: { intent: RECOMMEND, keywordsFirst: 김치찌개 } }
   - { id: N03, group: 이름만, message: "두부", expect: { intent: RECOMMEND, include: [두부] } }
-  - { id: N04, group: 이름만, message: "디저트", expect: { intent: RECOMMEND, categories: [디저트] } }
+  - { id: N04, group: 이름만, message: "디저트", expect: { intent: RECOMMEND, categories: [디저트], dishEmpty: true } }
   - { id: N05, group: 이름만, message: "마라탕", expect: { intent: RECOMMEND, keywordsFirst: 마라탕 } }
   # 직전 카드 없음. AI가 일반 답이나 레시피 자세히로 봐도 서버가 레시피 말·맛 단어를 빼고 닭볶음탕 추천으로 바꾼다
   - { id: N06, group: 이름만, message: "매운 닭볶음탕 레시피", expect: { intent: RECOMMEND, keywordsFirst: 닭볶음탕, dish: 닭볶음탕 } }
+  # 맛 단어 + 분류 이름, 묶음 말만 말해도 분류로만 쓰고 요리 이름은 비운다
+  - { id: N07, group: 이름만, message: "달달한 디저트", expect: { intent: RECOMMEND, wanted: [SWEET], categories: [디저트], dishEmpty: true } }
+  - { id: N08, group: 이름만, message: "국물", expect: { intent: RECOMMEND, categories: [국, 찌개, 전골, 수프, 스튜], dishEmpty: true } }
 
   # ── 일반 답 ──
   - { id: G01, group: 일반, message: "안녕", expect: { intent: GENERAL } }

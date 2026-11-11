@@ -76,7 +76,7 @@ class OpenAiChatIntentExtractorTest {
     }
 
     @Test
-    @DisplayName("응답 모양을 IntentResult의 JSON 스키마로 강제하고, 서버가 정하는 요리 이름 칸은 스키마에 넣지 않는다")
+    @DisplayName("응답 모양을 IntentResult의 JSON 스키마로 강제하고, AI가 뽑는 요리 이름 칸도 스키마에 넣는다")
     void sendsOutputSchema() {
         chatModel.reply = RECOMMEND_JSON;
 
@@ -84,20 +84,18 @@ class OpenAiChatIntentExtractorTest {
 
         assertThat(chatModel.lastPrompt.getOptions()).isInstanceOf(StructuredOutputChatOptions.class);
         String schema = ((StructuredOutputChatOptions) chatModel.lastPrompt.getOptions()).getOutputSchema();
-        assertThat(schema).contains("\"intent\"", "\"wantedTastes\"", "\"useSelectedOnly\"");
-        // 요리 이름은 서버가 첫 키워드로 정하므로 AI에 받지 않는다
-        assertThat(schema).doesNotContain("dishText");
+        assertThat(schema).contains("\"intent\"", "\"wantedTastes\"", "\"useSelectedOnly\"", "\"dishText\"");
     }
 
     @Test
-    @DisplayName("응답 JSON을 IntentResult로 바꾸고, AI가 요리 이름 칸을 보내도 받지 않는다 (서버가 첫 키워드로 정함)")
+    @DisplayName("응답 JSON을 요리 이름 칸까지 IntentResult로 바꾼다 (서버는 요리 이름이 메시지에 있는지만 확인한다)")
     void parsesIntentResult() {
         chatModel.reply = RECOMMEND_JSON;
 
         IntentResult result = extractor.extract(1L, 10L, "두부로 할 수 있는 매운 국 30분 안에", List.of("국"), null);
 
         assertThat(result).isEqualTo(new IntentResult(ChatIntent.RECOMMEND, List.of("SPICY"), List.of("국"), 30,
-                List.of("두부"), null, true, List.of("냉면"), null, "냉면 같은 면 요리"));
+                List.of("두부"), null, true, List.of("냉면"), "냉면", "냉면 같은 면 요리"));
     }
 
     @Test

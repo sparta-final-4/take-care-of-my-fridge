@@ -28,7 +28,7 @@ class EvalCorrectionSwitchesTest {
         assertThat(properties.tasteWords()).isFalse();
         assertThat(properties.spokenTastesOnly()).isFalse();
         assertThat(properties.keepOtherTastes()).isTrue();
-        assertThat(properties.dishFromKeywords()).isTrue();
+        assertThat(properties.dishCheck()).isTrue();
         assertThat(EvalCorrectionSwitches.describe(off)).isEqualTo("보정: 끈 설정 taste-words, spoken-tastes-only");
     }
 
