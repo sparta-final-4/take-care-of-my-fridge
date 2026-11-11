@@ -49,6 +49,7 @@ take-care-of-my-fridge-be/ 개발 규칙. 이 문서와 기존 코드의 패턴�
 - 설정 값 클래스(@ConfigurationProperties) 위치
     - 한 도메인에서만 쓰는 설정은 domain/{도메인}/config에 둘 수 있다. 예: domain/search/config/RecipeSearchProperties, domain/chat/config/ChatProperties
     - 여러 도메인이 같이 쓰는 설정은 global/config에 둔다. 예: global/config/SseProperties
+- 도메인이 커져 facade/service에 역할이 다른 클래스가 많이 섞이면, 도메인 안에 기능 단위 하위 폴더를 둘 수 있다 (예: chat/intent, chat/recommend, chat/reply, chat/safety, chat/ai)
 
 4. 레이어별 구현 규칙
 
