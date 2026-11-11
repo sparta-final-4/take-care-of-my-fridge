@@ -1,6 +1,6 @@
 package org.example.takecareofmyfridgebe.domain.chat.intent;
 
-import org.example.takecareofmyfridgebe.domain.chat.config.ChatFridgeShopWordProperties;
+import org.example.takecareofmyfridgebe.domain.chat.config.ChatWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntent;
 import org.example.takecareofmyfridgebe.domain.chat.dto.FridgeScope;
 import org.junit.jupiter.api.DisplayName;
@@ -13,8 +13,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 public class FridgeShopWordCheckerTest {
 
-    // config/chat-words.yml의 app.chat.fridge-shop-words와 같은 값
-    public static final ChatFridgeShopWordProperties WORDS = new ChatFridgeShopWordProperties(
+    // config/chat-words.yml의 app.chat.words.fridge-shop과 같은 값
+    public static final ChatWordProperties.FridgeShop WORDS = new ChatWordProperties.FridgeShop(
             List.of("남았", "아직있", "냉장고에뭐", "냉장고에있", "냉장고에서", "버려야", "유통기한지난", "소비기한지난", "처리해야할거", "처리할거"),
             List.of("버려야", "지난", "임박", "유통기한", "소비기한", "상한", "상할", "상했", "오래된", "오래됐", "처리해야"),
             List.of("기본양념", "조미료"),

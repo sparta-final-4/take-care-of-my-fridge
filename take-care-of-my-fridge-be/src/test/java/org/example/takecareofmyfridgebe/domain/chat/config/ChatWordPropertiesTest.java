@@ -8,9 +8,9 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class ChatTasteOppositePropertiesTest {
+class ChatWordPropertiesTest {
 
-    private final ChatTasteOppositeProperties opposites = new ChatTasteOppositeProperties(List.of(
+    private final ChatWordProperties.TasteOpposites opposites = new ChatWordProperties.TasteOpposites(List.of(
             List.of(Taste.MILD, Taste.SPICY), List.of(Taste.MILD, Taste.SALTY)));
 
     @Test

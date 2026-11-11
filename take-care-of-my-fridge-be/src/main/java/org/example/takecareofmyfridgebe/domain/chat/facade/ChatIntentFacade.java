@@ -3,12 +3,8 @@ package org.example.takecareofmyfridgebe.domain.chat.facade;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatCandidateProperties;
-import org.example.takecareofmyfridgebe.domain.chat.config.ChatAskWordProperties;
+import org.example.takecareofmyfridgebe.domain.chat.config.ChatWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatCorrectionProperties;
-import org.example.takecareofmyfridgebe.domain.chat.config.ChatFridgeShopWordProperties;
-import org.example.takecareofmyfridgebe.domain.chat.config.ChatTasteOppositeProperties;
-import org.example.takecareofmyfridgebe.domain.chat.config.ChatMealkitWordProperties;
-import org.example.takecareofmyfridgebe.domain.chat.config.ChatTasteWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext.CardName;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntent;
@@ -84,12 +80,8 @@ public class ChatIntentFacade {
     private final RecipeService recipeService;
     private final IngredientMatcher ingredientMatcher;
     private final ChatCandidateProperties chatCandidateProperties;
-    private final ChatTasteWordProperties chatTasteWordProperties;
-    private final ChatMealkitWordProperties chatMealkitWordProperties;
-    private final ChatAskWordProperties chatAskWordProperties;
+    private final ChatWordProperties chatWordProperties;
     private final AllergyExclusionFinder allergyExclusionFinder;
-    private final ChatTasteOppositeProperties chatTasteOppositeProperties;
-    private final ChatFridgeShopWordProperties chatFridgeShopWordProperties;
     // 다시 추천 맛 따르기(refineSpokenTastes)만 여기서 본다. 나머지 보정 켜고 끄기는 IntentCorrector가 본다
     private final ChatCorrectionProperties corrections;
     // AI 결과를 서버 단어 규칙으로 고친다
@@ -146,7 +138,7 @@ public class ChatIntentFacade {
                 return new Decision(ChatIntentResolution.general(Source.FALLBACK));
             }
             // 선택 재료가 있어도 "두부 얼마나 보관돼?"처럼 묻는 말이면 추천으로 바꾸지 않는다
-            if (AskWordChecker.asks(request.content(), chatAskWordProperties)) {
+            if (AskWordChecker.asks(request.content(), chatWordProperties.ask())) {
                 log.info("상담 의도 뽑기 실패, 묻는 말이라 추천으로 바꾸지 않음 - memberId: {}, sessionId: {}", memberId, sessionId);
                 return new Decision(ChatIntentResolution.general(Source.FALLBACK));
             }
@@ -186,12 +178,12 @@ public class ChatIntentFacade {
         } else if (result.scope() != FridgeScope.ALL) {
             scope = result.scope();
         } else {
-            scope = FridgeShopWordChecker.scope(message, chatFridgeShopWordProperties, chatMealkitWordProperties);
+            scope = FridgeShopWordChecker.scope(message, chatWordProperties.fridgeShop(), chatWordProperties.mealkit());
         }
         List<String> names = orEmpty(result.includeIngredients());
         // 냉장고 보기에서 "기본 양념·조미료"는 찾을 재료 이름이 아니라 범위다 ("기본 양념 뭐 있어?" → SEASONING)
         if (result.intent() == ChatIntent.FRIDGE) {
-            names = names.stream().filter(name -> !FridgeShopWordChecker.seasoningWord(name, chatFridgeShopWordProperties)).toList();
+            names = names.stream().filter(name -> !FridgeShopWordChecker.seasoningWord(name, chatWordProperties.fridgeShop())).toList();
         }
         if (names.isEmpty() && scope == FridgeScope.ALL && message != null) {
             String text = message.strip().replaceAll("[?!.~…,]+$", "").strip();
@@ -202,13 +194,13 @@ public class ChatIntentFacade {
         }
         // 사기: "재료·밀키트·상품"은 찾을 이름이 아니다 ("세일하는 재료 있어?"). 할인 말이 있으면 할인 중인 상품만, 종류는 단어로 나눈다
         List<String> itemNames = names.stream().filter(name -> !SHOP_GENERIC_NAMES.contains(compact(name))).toList();
-        boolean saleOnly = FridgeShopWordChecker.asksSale(message, chatFridgeShopWordProperties);
+        boolean saleOnly = FridgeShopWordChecker.asksSale(message, chatWordProperties.fridgeShop());
         return new ItemLookup(scope, itemNames, saleOnly, saleOnly ? saleProductType(message) : null);
     }
 
     // 할인 상품을 물을 때 종류: 밀키트 단어 → MEALKIT, "재료" → INGREDIENT, 둘 다 없거나 둘 다 있으면 null(모두)
     private ProductType saleProductType(String message) {
-        boolean mealkit = MealkitWordChecker.check(message, chatMealkitWordProperties, chatTasteWordProperties)
+        boolean mealkit = MealkitWordChecker.check(message, chatWordProperties.mealkit(), chatWordProperties.taste())
                 == MealkitWordChecker.Mode.ONLY;
         boolean ingredient = message != null && compact(message).contains(INGREDIENT_WORD);
         if (mealkit == ingredient) {
@@ -239,7 +231,7 @@ public class ChatIntentFacade {
     /**
      * 다시 추천에서 맛이 부딪히면 이번 말에 나온 맛을 따른다 (맛 전체, TasteWordChecker.stances로 이번 말의 맛만 본다).
      * <ul>
-     *   <li>이번 말에 원한 맛: 원하는 맛에 넣고 피할 맛에서 빼며, 그 맛과 반대인 맛(app.chat.taste-opposites)은 원하는 맛에서 지운다
+     *   <li>이번 말에 원한 맛: 원하는 맛에 넣고 피할 맛에서 빼며, 그 맛과 반대인 맛(app.chat.words.taste-opposites)은 원하는 맛에서 지운다
      *       ("짭짤한 거" → "담백한 거로" → 순한맛만, "매운 거 말고" → "좀 더 매운 걸로" → 매운맛 원함·피할 맛 없음).
      *       피할 맛에 든 맛은 원하는 말이 붙었을 때만 푼다 (TasteWordChecker.surelyWanted, "매운 건 별로야"는 그대로 피함)</li>
      *   <li>이번 말에 피한 맛: 피할 맛에 넣고 원하는 맛에서 뺀다 ("매운 거 추천해줘" → "매운 거 말고")</li>
@@ -248,7 +240,7 @@ public class ChatIntentFacade {
      * 알레르기 재료는 맛과 상관없이 resolve에서 계속 뺀다.
      */
     RecipeQuery followSpokenTastes(Long memberId, Long sessionId, String message, RecipeQuery merged) {
-        List<TasteWordChecker.TasteStance> spoken = TasteWordChecker.stances(message, chatTasteWordProperties);
+        List<TasteWordChecker.TasteStance> spoken = TasteWordChecker.stances(message, chatWordProperties.taste());
         if (spoken.isEmpty()) {
             return merged;
         }
@@ -258,10 +250,10 @@ public class ChatIntentFacade {
             if (stance.stance() == TasteWordChecker.Stance.WANT) {
                 // 맛 단어만 있고 원하는 말이 없으면("매운 건 별로야") 피할 맛에 든 맛을 풀지 않는다 (correctTastes와 같은 기준)
                 if (avoid.contains(stance.taste())
-                        && !TasteWordChecker.surelyWanted(message, stance.taste(), chatTasteWordProperties)) {
+                        && !TasteWordChecker.surelyWanted(message, stance.taste(), chatWordProperties.taste())) {
                     continue;
                 }
-                wanted.removeAll(chatTasteOppositeProperties.oppositesOf(stance.taste()));
+                wanted.removeAll(chatWordProperties.tasteOpposites().oppositesOf(stance.taste()));
                 wanted.add(stance.taste());
                 avoid.remove(stance.taste());
             } else {

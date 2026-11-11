@@ -25,7 +25,7 @@ import java.util.function.Function;
  *                       후보의 요청 일치 수(Ranking.requestMatches)와 같은 기준으로 센다
  * @param categories     말한 분류. 비어 있으면 분류는 보지 않는다
  * @param wantedTastes   원하는 맛
- * @param oppositeTastes 원하는 맛과 반대인 맛 (ChatTasteOppositeProperties, 예: 매운맛 ↔ 순한맛)
+ * @param oppositeTastes 원하는 맛과 반대인 맛 (ChatWordProperties.TasteOpposites, 예: 매운맛 ↔ 순한맛)
  * @param recipeTastes   후보 레시피 ID별 맛 (확실히 매운 레시피면 SPICY가 들어 있다)
  * @param maybeSpicyIds  매울 수 있는 레시피 ID (매운 정도 MILD·HOT)
  * @param temperatureMismatched 온도 말과 반대인 레시피 ID (TemperatureWordChecker.mismatched). 빈자리를 채우는 데 쓰지 않는다
@@ -67,7 +67,7 @@ public record PickRule(
     }
 
     /**
-     * @param opposites 맛 하나와 반대인 맛 (ChatTasteOppositeProperties::oppositesOf)
+     * @param opposites 맛 하나와 반대인 맛 (ChatWordProperties.TasteOpposites::oppositesOf)
      */
     public static PickRule of(RecipeQuery query, RecipeCandidates found,
                               Function<Member.Taste, Collection<Member.Taste>> opposites) {

@@ -1,6 +1,6 @@
 package org.example.takecareofmyfridgebe.domain.chat.intent;
 
-import org.example.takecareofmyfridgebe.domain.chat.config.ChatTemperatureWordProperties;
+import org.example.takecareofmyfridgebe.domain.chat.config.ChatWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate.Ranking;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate.Reason;
@@ -15,8 +15,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 public class TemperatureWordCheckerTest {
 
-    // config/chat-words.yml app.chat.temperature-words와 같은 목록
-    public static final ChatTemperatureWordProperties WORDS = new ChatTemperatureWordProperties(
+    // config/chat-words.yml app.chat.words.temperature와 같은 목록
+    public static final ChatWordProperties.Temperature WORDS = new ChatWordProperties.Temperature(
             List.of("따뜻", "따듯", "뜨끈", "뜨뜻", "따끈", "뜨거운", "뜨겁"),
             List.of("차가운", "차갑", "시원", "찬거", "찬걸", "찬음식"),
             List.of("냉국", "냉채", "냉면", "냉스프", "냉수프", "냉파스타", "냉우동", "냉소바", "냉메밀", "냉모밀", "냉라면", "냉짬뽕",

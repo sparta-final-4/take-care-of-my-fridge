@@ -16,9 +16,6 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeDetailReply;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeQuery;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecommendationReply;
 import org.example.takecareofmyfridgebe.domain.chat.dto.SavedRecommendation;
-import org.example.takecareofmyfridgebe.domain.chat.intent.MealkitWordCheckerTest;
-import org.example.takecareofmyfridgebe.domain.chat.intent.TasteWordCheckerTest;
-import org.example.takecareofmyfridgebe.domain.chat.intent.TemperatureWordCheckerTest;
 import org.example.takecareofmyfridgebe.domain.chat.recommend.MealkitPicker;
 import org.example.takecareofmyfridgebe.domain.chat.safety.AllergyWordCheckerTest;
 import org.example.takecareofmyfridgebe.domain.chat.service.ChatMessageService;
@@ -88,8 +85,7 @@ class ChatRecommendationFacadeTest {
         saleEventReader = mock(SaleEventReader.class);
         chatMessageService = mock(ChatMessageService.class);
         facade = new ChatRecommendationFacade(recipeCandidateFacade, recipeService, ingredientService, productService,
-                saleEventReader, chatMessageService, MealkitWordCheckerTest.WORDS, TasteWordCheckerTest.WORDS, AllergyWordCheckerTest.WORDS,
-                ChatIntentFacadeTest.TASTE_OPPOSITES, TemperatureWordCheckerTest.WORDS);
+                saleEventReader, chatMessageService, ChatIntentFacadeTest.WORDS, AllergyWordCheckerTest.WORDS);
         when(ingredientService.getIngredientsByIds(any())).thenReturn(Map.of());
     }
 

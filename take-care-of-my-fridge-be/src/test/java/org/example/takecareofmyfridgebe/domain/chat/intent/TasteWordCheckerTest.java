@@ -1,6 +1,6 @@
 package org.example.takecareofmyfridgebe.domain.chat.intent;
 
-import org.example.takecareofmyfridgebe.domain.chat.config.ChatTasteWordProperties;
+import org.example.takecareofmyfridgebe.domain.chat.config.ChatWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.intent.TasteWordChecker.Stance;
 import org.example.takecareofmyfridgebe.domain.chat.intent.TasteWordChecker.TasteStance;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member.Taste;
@@ -13,7 +13,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 public class TasteWordCheckerTest {
 
-    public static final ChatTasteWordProperties WORDS = new ChatTasteWordProperties(
+    public static final ChatWordProperties.Taste WORDS = new ChatWordProperties.Taste(
             List.of("매운", "맵게", "맵지", "매콤", "얼큰", "칼칼"), List.of("달달", "달게", "단거", "단걸", "단것", "달콤", "단맛"),
             List.of("안", "덜"), List.of("말고", "빼고", "않", "싫", "없이", "못먹", "빼줘", "빼주", "빼달", "제외", "안들어간", "없는"),
             List.of("짠", "짭짤", "짜게", "짭조름"), List.of("감칠", "고소"), List.of("순한", "담백", "슴슴", "심심", "자극적이지"),

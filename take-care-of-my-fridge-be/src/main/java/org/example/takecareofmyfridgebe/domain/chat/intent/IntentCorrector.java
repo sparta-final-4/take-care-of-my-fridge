@@ -2,13 +2,8 @@ package org.example.takecareofmyfridgebe.domain.chat.intent;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.example.takecareofmyfridgebe.domain.chat.config.ChatAskWordProperties;
-import org.example.takecareofmyfridgebe.domain.chat.config.ChatCategoryWordProperties;
+import org.example.takecareofmyfridgebe.domain.chat.config.ChatWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatCorrectionProperties;
-import org.example.takecareofmyfridgebe.domain.chat.config.ChatFoodWordProperties;
-import org.example.takecareofmyfridgebe.domain.chat.config.ChatFridgeShopWordProperties;
-import org.example.takecareofmyfridgebe.domain.chat.config.ChatMealkitWordProperties;
-import org.example.takecareofmyfridgebe.domain.chat.config.ChatTasteWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext.CardName;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntent;
@@ -67,12 +62,7 @@ public class IntentCorrector {
     private final RecipeService recipeService;
     private final IngredientMatcher ingredientMatcher;
     private final ChatMessageService chatMessageService;
-    private final ChatTasteWordProperties chatTasteWordProperties;
-    private final ChatMealkitWordProperties chatMealkitWordProperties;
-    private final ChatAskWordProperties chatAskWordProperties;
-    private final ChatCategoryWordProperties chatCategoryWordProperties;
-    private final ChatFoodWordProperties chatFoodWordProperties;
-    private final ChatFridgeShopWordProperties chatFridgeShopWordProperties;
+    private final ChatWordProperties chatWordProperties;
     // 보정마다 켜고 끄기 (기본 모두 켜짐). 평가로 AI만으로 충분한지 비교할 때 끈다
     private final ChatCorrectionProperties corrections;
 
@@ -160,7 +150,7 @@ public class IntentCorrector {
         List<String> aiCategories = orEmpty(result.moodCategories());
         List<String> kept = new ArrayList<>();
         List<String> moved = new ArrayList<>(aiCategories);
-        Set<String> avoided = CategoryWordChecker.check(message, categories, chatTasteWordProperties, chatCategoryWordProperties.groups())
+        Set<String> avoided = CategoryWordChecker.check(message, categories, chatWordProperties.taste(), chatWordProperties.category().groups())
                 .stream()
                 .filter(stance -> stance.stance() == CategoryWordChecker.Stance.AVOID)
                 .map(CategoryWordChecker.CategoryStance::category)
@@ -188,7 +178,7 @@ public class IntentCorrector {
     }
 
     /**
-     * 분류 이름(categories)이나 묶음 말(app.chat.category-words: 국물·반찬·간식…)이면 그 말이 뜻하는 분류(분류 목록에 있는 것만),
+     * 분류 이름(categories)이나 묶음 말(app.chat.words.category: 국물·반찬·간식…)이면 그 말이 뜻하는 분류(분류 목록에 있는 것만),
      * 아니면 비어 있음. 공백을 빼고 비교하고, 뒤에 붙은 "요리·메뉴·종류"는 떼고 본다 ("디저트 메뉴", "국물 요리").
      * "김치찌개"·"국수"·"매운 국"처럼 다른 말이 붙으면 분류가 아니다.
      */
@@ -208,7 +198,7 @@ public class IntentCorrector {
         if (category.isPresent()) {
             return Optional.of(List.of(category.get()));
         }
-        return chatCategoryWordProperties.groups().stream()
+        return chatWordProperties.category().groups().stream()
                 .filter(group -> group.word() != null && compact(group.word()).equals(name))
                 .findFirst()
                 .map(group -> group.categories().stream().filter(categories::contains).toList());
@@ -217,7 +207,7 @@ public class IntentCorrector {
     /**
      * AI가 상관없는 질문(OFF_TOPIC)이라고 본 말에 음식 말이 있으면 되살린다. 달라는 말이 있으면 RECOMMEND, 없으면 GENERAL.
      * <ul>
-     *   <li>음식 말(app.chat.food-words, 공백 빼고) → 분류 단어(묶음 말 포함) → 재료 사전 이름 → 레시피 이름 순으로 보고, 앞에서 찾으면 뒤는 보지 않는다</li>
+     *   <li>음식 말(app.chat.words.food, 공백 빼고) → 분류 단어(묶음 말 포함) → 재료 사전 이름 → 레시피 이름 순으로 보고, 앞에서 찾으면 뒤는 보지 않는다</li>
      *   <li>예) "주식으로 먹을 거 추천해줘" → RECOMMEND, "장보기 목록 짜줘" → GENERAL, "주식 추천해줘"·"파이썬 코드 짜줘" → OFF_TOPIC 그대로</li>
      *   <li>재료·레시피 이름 찾기가 실패하면(DB·검색 장애) 찾지 못한 것으로 본다</li>
      * </ul>
@@ -227,39 +217,39 @@ public class IntentCorrector {
         if (found.isEmpty()) {
             return result;
         }
-        ChatIntent intent = AskWordChecker.requests(message, chatAskWordProperties) ? ChatIntent.RECOMMEND : ChatIntent.GENERAL;
+        ChatIntent intent = AskWordChecker.requests(message, chatWordProperties.ask()) ? ChatIntent.RECOMMEND : ChatIntent.GENERAL;
         log.info("상담 음식 말이 있어 상관없는 질문을 되살림 - memberId: {}, sessionId: {}, 찾은 것: {}, 의도: {}",
                 memberId, sessionId, found.get(), intent);
         return result.withIntent(intent);
     }
 
     /**
-     * 냉장고 보기·사기 말(app.chat.fridge-shop-words)로 의도를 한 번 더 정한다 (FridgeShopWordChecker).
+     * 냉장고 보기·사기 말(app.chat.words.fridge-shop)로 의도를 한 번 더 정한다 (FridgeShopWordChecker).
      * <ul>
      *   <li>AI가 추천·일반 대화로 본 말에 냉장고 보기 말이 있으면 FRIDGE ("밀키트 뭐 남았어", "두부 아직 있어?")</li>
      *   <li>냉장고 보기 말이 없고 사기 말이 있으면 SHOP ("당근 사고 싶어", "대파 장바구니에 담아줘")</li>
      *   <li>묻는 말("어떻게 해동해?", "먹어도 돼?")이나 요리 말("뭐 먹지", "요리 추천")이 있으면 바꾸지 않는다</li>
      *   <li>AI가 냉장고 보기·사기로 봤어도 요리 말이 있으면 추천으로 둔다 ("두부 있으면 두부 요리 추천해줘")</li>
-     *   <li>AI가 냉장고 보기·사기로 봤어도 묻는 말(fridge-shop-words.general)이 있으면 일반 답으로 ("유통기한 지난 거 먹어도 돼?", "주문한 거 언제 와?")</li>
+     *   <li>AI가 냉장고 보기·사기로 봤어도 묻는 말(fridge-shop.general)이 있으면 일반 답으로 ("유통기한 지난 거 먹어도 돼?", "주문한 거 언제 와?")</li>
      * </ul>
      * 다시 추천·레시피 자세히·거절 의도는 건드리지 않는다. 바꿨으면 INFO로 남긴다.
      */
     IntentResult applyFridgeShopWords(Long memberId, Long sessionId, String message, IntentResult result) {
         ChatIntent intent = result.intent();
         if ((intent == ChatIntent.FRIDGE || intent == ChatIntent.SHOP)
-                && FridgeShopWordChecker.cooks(message, chatFridgeShopWordProperties)) {
+                && FridgeShopWordChecker.cooks(message, chatWordProperties.fridgeShop())) {
             log.info("상담 요리 말이 있어 {}를 추천으로 - memberId: {}, sessionId: {}", intent, memberId, sessionId);
             return result.withIntent(ChatIntent.RECOMMEND);
         }
         if ((intent == ChatIntent.FRIDGE || intent == ChatIntent.SHOP)
-                && FridgeShopWordChecker.asksGeneral(message, chatFridgeShopWordProperties)) {
+                && FridgeShopWordChecker.asksGeneral(message, chatWordProperties.fridgeShop())) {
             log.info("상담 묻는 말이 있어 {}를 일반 답으로 - memberId: {}, sessionId: {}", intent, memberId, sessionId);
             return result.withIntent(ChatIntent.GENERAL);
         }
         if (intent != ChatIntent.RECOMMEND && intent != ChatIntent.GENERAL) {
             return result;
         }
-        Optional<ChatIntent> changed = FridgeShopWordChecker.check(message, chatFridgeShopWordProperties, chatAskWordProperties);
+        Optional<ChatIntent> changed = FridgeShopWordChecker.check(message, chatWordProperties.fridgeShop(), chatWordProperties.ask());
         if (changed.isEmpty()) {
             return result;
         }
@@ -274,11 +264,11 @@ public class IntentCorrector {
             return Optional.empty();
         }
         String compact = message.replaceAll("\\s+", "");
-        if (chatFoodWordProperties.food().stream().map(word -> word.replaceAll("\\s+", ""))
+        if (chatWordProperties.food().food().stream().map(word -> word.replaceAll("\\s+", ""))
                 .anyMatch(word -> !word.isEmpty() && compact.contains(word))) {
             return Optional.of("음식 말");
         }
-        if (!CategoryWordChecker.check(message, categories, chatTasteWordProperties, chatCategoryWordProperties.groups()).isEmpty()) {
+        if (!CategoryWordChecker.check(message, categories, chatWordProperties.taste(), chatWordProperties.category().groups()).isEmpty()) {
             return Optional.of("분류");
         }
         String text = message.strip().replaceAll("[?!.~…,]+$", "").strip();
@@ -301,16 +291,16 @@ public class IntentCorrector {
      * "국물 밀키트"처럼 달라는 말이 없는 짧은 말은 이름만 말한 말(nameOnly)에서 본다.
      */
     private boolean mealkitRequested(Long memberId, Long sessionId, String message) {
-        boolean mealkit = MealkitWordChecker.check(message, chatMealkitWordProperties, chatTasteWordProperties)
+        boolean mealkit = MealkitWordChecker.check(message, chatWordProperties.mealkit(), chatWordProperties.taste())
                 == MealkitWordChecker.Mode.ONLY;
         if (!mealkit) {
             return false;
         }
-        if (AskWordChecker.requestsMealkit(message, chatAskWordProperties)) {
+        if (AskWordChecker.requestsMealkit(message, chatWordProperties.ask())) {
             log.info("상담 밀키트를 달라고 해 일반 대화를 추천으로 - memberId: {}, sessionId: {}", memberId, sessionId);
             return true;
         }
-        if (AskWordChecker.asks(message, chatAskWordProperties)) {
+        if (AskWordChecker.asks(message, chatWordProperties.ask())) {
             log.info("상담 밀키트를 말했지만 묻는 말이라 일반 대화 그대로 - memberId: {}, sessionId: {}", memberId, sessionId);
         }
         return false;
@@ -329,8 +319,8 @@ public class IntentCorrector {
      * </ul>
      */
     Optional<IntentResult> nameOnly(Long memberId, Long sessionId, String message, List<String> categories, IntentResult result) {
-        if (message == null || AskWordChecker.asks(message, chatAskWordProperties)
-                || AskWordChecker.greets(message, chatAskWordProperties)) {
+        if (message == null || AskWordChecker.asks(message, chatWordProperties.ask())
+                || AskWordChecker.greets(message, chatWordProperties.ask())) {
             return Optional.empty();
         }
         String text = message.strip().replaceAll("[?!.~…,]+$", "").strip();
@@ -341,9 +331,9 @@ public class IntentCorrector {
         String found = null;
         List<String> includes = List.of();
         List<String> keywords = List.of();
-        if (MealkitWordChecker.check(message, chatMealkitWordProperties, chatTasteWordProperties) == MealkitWordChecker.Mode.ONLY) {
+        if (MealkitWordChecker.check(message, chatWordProperties.mealkit(), chatWordProperties.taste()) == MealkitWordChecker.Mode.ONLY) {
             found = "밀키트";
-        } else if (CategoryWordChecker.check(message, categories, chatTasteWordProperties, chatCategoryWordProperties.groups())
+        } else if (CategoryWordChecker.check(message, categories, chatWordProperties.taste(), chatWordProperties.category().groups())
                 .stream().anyMatch(stance -> stance.stance() == CategoryWordChecker.Stance.WANT)) {
             found = "분류";
         } else {
@@ -395,11 +385,11 @@ public class IntentCorrector {
     public IntentResult correctTastes(Long memberId, Long sessionId, String message, IntentResult result) {
         List<String> wanted = new ArrayList<>(result.wantedTastes() == null ? List.of() : result.wantedTastes());
         List<String> avoid = new ArrayList<>(result.avoidTastes() == null ? List.of() : result.avoidTastes());
-        for (TasteWordChecker.TasteStance stance : TasteWordChecker.stances(message, chatTasteWordProperties)) {
+        for (TasteWordChecker.TasteStance stance : TasteWordChecker.stances(message, chatWordProperties.taste())) {
             String taste = stance.taste().name();
             boolean want = stance.stance() == TasteWordChecker.Stance.WANT;
             if (want && avoid.contains(taste) && !wanted.contains(taste)
-                    && !TasteWordChecker.surelyWanted(message, stance.taste(), chatTasteWordProperties)) {
+                    && !TasteWordChecker.surelyWanted(message, stance.taste(), chatWordProperties.taste())) {
                 log.debug("상담 맛 단어가 애매해 AI 피할 맛을 그대로 둠 - memberId: {}, sessionId: {}, 맛: {}", memberId, sessionId, taste);
                 continue;
             }
@@ -418,10 +408,10 @@ public class IntentCorrector {
         return result.withTastes(wanted, avoid);
     }
 
-    // 요리를 달라는 말(ask-words.recipe: 레시피·만드는법…)을 띄어쓰기와 상관없이 지운 글 ("닭볶음탕 만드는 법" → "닭볶음탕")
+    // 요리를 달라는 말(ask.recipe: 레시피·만드는법…)을 띄어쓰기와 상관없이 지운 글 ("닭볶음탕 만드는 법" → "닭볶음탕")
     public String withoutRecipeWords(String text) {
         String result = text;
-        for (String word : chatAskWordProperties.recipe()) {
+        for (String word : chatWordProperties.ask().recipe()) {
             String compact = word.replaceAll("\\s+", "");
             if (compact.isEmpty()) {
                 continue;
@@ -449,8 +439,8 @@ public class IntentCorrector {
 
     // 맛 단어(매운·달달·순한…)로 시작하는 낱말을 뺀 글
     private String withoutTasteWords(String text) {
-        List<String> tasteWords = Stream.of(chatTasteWordProperties.spicy(), chatTasteWordProperties.sweet(),
-                        chatTasteWordProperties.salty(), chatTasteWordProperties.umami(), chatTasteWordProperties.mild())
+        List<String> tasteWords = Stream.of(chatWordProperties.taste().spicy(), chatWordProperties.taste().sweet(),
+                        chatWordProperties.taste().salty(), chatWordProperties.taste().umami(), chatWordProperties.taste().mild())
                 .flatMap(List::stream)
                 .toList();
         return Stream.of(text.split("\\s+"))
@@ -466,10 +456,10 @@ public class IntentCorrector {
      */
     IntentResult keepOtherTastes(Long memberId, Long sessionId, String message, IntentResult result) {
         List<String> removed = orEmpty(result.removed());
-        if (!removed.contains(RefineCondition.TASTE.name()) || TasteWordChecker.clearsTastes(message, chatTasteWordProperties)) {
+        if (!removed.contains(RefineCondition.TASTE.name()) || TasteWordChecker.clearsTastes(message, chatWordProperties.taste())) {
             return result;
         }
-        boolean avoids = TasteWordChecker.stances(message, chatTasteWordProperties).stream()
+        boolean avoids = TasteWordChecker.stances(message, chatWordProperties.taste()).stream()
                 .anyMatch(stance -> stance.stance() == TasteWordChecker.Stance.AVOID);
         if (!avoids) {
             return result;
@@ -495,7 +485,7 @@ public class IntentCorrector {
         if (previous.avoidTastes() != null) {
             carried.addAll(previous.avoidTastes());
         }
-        Set<Member.Taste> spoken = TasteWordChecker.mentioned(message, chatTasteWordProperties);
+        Set<Member.Taste> spoken = TasteWordChecker.mentioned(message, chatWordProperties.taste());
         List<String> wanted = orEmpty(result.wantedTastes()).stream().filter(taste -> !carriedOnly(carried, spoken, taste)).toList();
         List<String> avoid = orEmpty(result.avoidTastes()).stream().filter(taste -> !carriedOnly(carried, spoken, taste)).toList();
         if (wanted.size() == orEmpty(result.wantedTastes()).size() && avoid.size() == orEmpty(result.avoidTastes()).size()) {
@@ -528,8 +518,8 @@ public class IntentCorrector {
      */
     public IntentResult correctCategories(Long memberId, Long sessionId, String message, List<String> categories, ChatContext context,
                                    IntentResult result) {
-        List<CategoryWordChecker.CategoryStance> stances = CategoryWordChecker.check(message, categories, chatTasteWordProperties,
-                chatCategoryWordProperties.groups());
+        List<CategoryWordChecker.CategoryStance> stances = CategoryWordChecker.check(message, categories, chatWordProperties.taste(),
+                chatWordProperties.category().groups());
         if (stances.isEmpty()) {
             return result;
         }

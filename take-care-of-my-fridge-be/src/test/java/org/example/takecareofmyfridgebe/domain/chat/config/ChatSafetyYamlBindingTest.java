@@ -11,11 +11,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 // config/chat-words.yml(맛 반대 쌍)·config/chat-safety.yml(알레르기 묶음)을 application.yml의 spring.config.import로 불러와 설정 값으로 묶이는지 본다 (목록 안의 목록·객체 목록)
 @SpringBootTest(classes = ChatSafetyYamlBindingTest.class)
-@EnableConfigurationProperties({ChatTasteOppositeProperties.class, ChatAllergyGroupProperties.class, ChatAllergyWordProperties.class})
+@EnableConfigurationProperties({ChatWordProperties.class, ChatAllergyGroupProperties.class, ChatAllergyWordProperties.class})
 class ChatSafetyYamlBindingTest {
 
     @Autowired
-    private ChatTasteOppositeProperties tasteOpposites;
+    private ChatWordProperties words;
 
     @Autowired
     private ChatAllergyGroupProperties allergyGroups;
@@ -26,7 +26,7 @@ class ChatSafetyYamlBindingTest {
     @Test
     @DisplayName("맛 반대 쌍(MILD ↔ SPICY, MILD ↔ SALTY)이 yml에서 묶인다")
     void bindsTasteOpposites() {
-        assertThat(tasteOpposites.oppositesOf(Taste.MILD)).containsExactlyInAnyOrder(Taste.SPICY, Taste.SALTY);
+        assertThat(words.tasteOpposites().oppositesOf(Taste.MILD)).containsExactlyInAnyOrder(Taste.SPICY, Taste.SALTY);
     }
 
     @Test

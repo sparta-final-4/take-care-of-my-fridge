@@ -1,6 +1,6 @@
 package org.example.takecareofmyfridgebe.domain.chat.intent;
 
-import org.example.takecareofmyfridgebe.domain.chat.config.ChatTasteWordProperties;
+import org.example.takecareofmyfridgebe.domain.chat.config.ChatWordProperties;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 
 import java.util.ArrayList;
@@ -33,7 +33,7 @@ public final class TasteWordChecker {
     /**
      * @return 맛마다 원하는지·피하는지. 맛 단어가 없는 맛은 담지 않는다
      */
-    public static List<TasteStance> check(String message, ChatTasteWordProperties words) {
+    public static List<TasteStance> check(String message, ChatWordProperties.Taste words) {
         String text = compact(message);
         List<TasteStance> result = new ArrayList<>();
         stance(text, words.spicy(), words).ifPresent(stance -> result.add(new TasteStance(Member.Taste.SPICY, stance)));
@@ -50,7 +50,7 @@ public final class TasteWordChecker {
      *
      * @return 맛마다 원하는지·피하는지. 맛 단어가 없는 맛은 담지 않는다
      */
-    public static List<TasteStance> stances(String message, ChatTasteWordProperties words) {
+    public static List<TasteStance> stances(String message, ChatWordProperties.Taste words) {
         String text = compact(message);
         List<TasteStance> result = new ArrayList<>();
         stance(text, words.spicy(), words).ifPresent(stance -> result.add(new TasteStance(Member.Taste.SPICY, stance)));
@@ -69,7 +69,7 @@ public final class TasteWordChecker {
      * 메시지에 단어가 나온 맛 (원하든 피하든). 새 추천에서 이번 말에 없는 맛을 조건에서 뺄 때 쓴다.
      * 매운맛·단맛은 맛 단어, 짠맛·감칠맛·순한맛은 그 맛을 말하는 단어로 본다.
      */
-    public static Set<Member.Taste> mentioned(String message, ChatTasteWordProperties words) {
+    public static Set<Member.Taste> mentioned(String message, ChatWordProperties.Taste words) {
         String text = compact(message);
         Set<Member.Taste> tastes = EnumSet.noneOf(Member.Taste.class);
         addIfAny(tastes, text, Member.Taste.SPICY, words.spicy());
@@ -88,7 +88,7 @@ public final class TasteWordChecker {
     }
 
     // 맛 단어가 하나라도 부정어와 붙어 있으면 피함, 맛 단어만 있으면 원함
-    private static Optional<Stance> stance(String text, List<String> tasteWords, ChatTasteWordProperties words) {
+    private static Optional<Stance> stance(String text, List<String> tasteWords, ChatWordProperties.Taste words) {
         boolean found = false;
         for (String word : tasteWords) {
             String tasteWord = compact(word);
@@ -108,13 +108,13 @@ public final class TasteWordChecker {
     }
 
     // 단어 바로 앞에 부정어("안·덜")가 붙었는지. 분류 단어 확인(CategoryWordChecker)도 같은 기준을 쓴다
-    static boolean negatedBefore(String before, ChatTasteWordProperties words) {
+    static boolean negatedBefore(String before, ChatWordProperties.Taste words) {
         return words.negationBefore().stream().map(TasteWordChecker::compact)
                 .anyMatch(negation -> !negation.isEmpty() && before.endsWith(negation));
     }
 
     // 단어 뒤 AFTER_WINDOW글자 안에서 부정어("말고·빼고·않·싫·없이·빼줘·제외·안들어간")가 시작하는지 ("매운게안들어간"처럼 부정어가 창 밖으로 이어져도 본다)
-    static boolean negatedAfter(String text, int from, ChatTasteWordProperties words) {
+    static boolean negatedAfter(String text, int from, ChatWordProperties.Taste words) {
         return startsWithin(text, from, words.negationAfter()) >= 0;
     }
 
@@ -124,7 +124,7 @@ public final class TasteWordChecker {
      * 원하는 말 앞에 "안·덜"이 끼면("매운 거 안 먹고 싶어") 확실하지 않다.
      * 맛 단어만 있고 둘 다 없으면("매운 건 별로") 서버 판단이 애매하므로 false다.
      */
-    public static boolean surelyWanted(String message, Member.Taste taste, ChatTasteWordProperties words) {
+    public static boolean surelyWanted(String message, Member.Taste taste, ChatWordProperties.Taste words) {
         String text = compact(message);
         for (String word : orEmpty(tasteWords(taste, words))) {
             String tasteWord = compact(word);
@@ -152,13 +152,13 @@ public final class TasteWordChecker {
     }
 
     // 맛 조건을 지우라는 말("맛 상관없이", "맛은 아무거나")이 있는지 (공백 빼고 비교)
-    public static boolean clearsTastes(String message, ChatTasteWordProperties words) {
+    public static boolean clearsTastes(String message, ChatWordProperties.Taste words) {
         String text = compact(message);
         return orEmpty(words.clear()).stream().map(TasteWordChecker::compact)
                 .anyMatch(word -> !word.isEmpty() && text.contains(word));
     }
 
-    private static List<String> tasteWords(Member.Taste taste, ChatTasteWordProperties words) {
+    private static List<String> tasteWords(Member.Taste taste, ChatWordProperties.Taste words) {
         return switch (taste) {
             case SPICY -> words.spicy();
             case SWEET -> words.sweet();

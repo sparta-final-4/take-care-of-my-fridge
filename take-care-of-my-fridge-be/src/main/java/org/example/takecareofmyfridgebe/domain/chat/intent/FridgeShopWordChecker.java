@@ -1,8 +1,6 @@
 package org.example.takecareofmyfridgebe.domain.chat.intent;
 
-import org.example.takecareofmyfridgebe.domain.chat.config.ChatAskWordProperties;
-import org.example.takecareofmyfridgebe.domain.chat.config.ChatFridgeShopWordProperties;
-import org.example.takecareofmyfridgebe.domain.chat.config.ChatMealkitWordProperties;
+import org.example.takecareofmyfridgebe.domain.chat.config.ChatWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntent;
 import org.example.takecareofmyfridgebe.domain.chat.dto.FridgeScope;
 
@@ -24,7 +22,7 @@ public final class FridgeShopWordChecker {
     }
 
     // 서버가 바꿀 의도. 바꾸지 않으면 빈 값
-    public static Optional<ChatIntent> check(String message, ChatFridgeShopWordProperties words, ChatAskWordProperties askWords) {
+    public static Optional<ChatIntent> check(String message, ChatWordProperties.FridgeShop words, ChatWordProperties.Ask askWords) {
         String text = compact(message);
         if (text.isEmpty() || AskWordChecker.asks(message, askWords) || cooks(message, words)) {
             return Optional.empty();
@@ -44,17 +42,17 @@ public final class FridgeShopWordChecker {
     }
 
     // 할인 말("세일·할인·특가·번개")이 있는지. 있으면 사기에서 할인 중인 상품만 보여 준다
-    public static boolean asksSale(String message, ChatFridgeShopWordProperties words) {
+    public static boolean asksSale(String message, ChatWordProperties.FridgeShop words) {
         return containsAny(compact(message), words.sale());
     }
 
     // 요리 말("추천·만들·해먹·뭐 먹지")이 있는지. 있으면 냉장고 말이 있어도 추천으로 둔다
-    public static boolean cooks(String message, ChatFridgeShopWordProperties words) {
+    public static boolean cooks(String message, ChatWordProperties.FridgeShop words) {
         return containsAny(compact(message), words.cook());
     }
 
     // 냉장고 보기 범위: 양념 말("기본 양념·조미료") → SEASONING, 밀키트 단어 → MEALKIT, 임박 말("버려야·지난·임박") → IMMINENT, 그 밖은 ALL
-    public static FridgeScope scope(String message, ChatFridgeShopWordProperties words, ChatMealkitWordProperties mealkitWords) {
+    public static FridgeScope scope(String message, ChatWordProperties.FridgeShop words, ChatWordProperties.Mealkit mealkitWords) {
         String text = compact(message);
         if (containsAny(text, words.seasoning())) {
             return FridgeScope.SEASONING;
@@ -69,12 +67,12 @@ public final class FridgeShopWordChecker {
     }
 
     // 냉장고 보기·사기가 아니라 일반 답으로 볼 묻는 말이 있는지 ("유통기한 지난 거 먹어도 돼?", "주문한 거 언제 와?")
-    public static boolean asksGeneral(String message, ChatFridgeShopWordProperties words) {
+    public static boolean asksGeneral(String message, ChatWordProperties.FridgeShop words) {
         return message != null && containsAny(compact(message), words.general());
     }
 
     // 양념 말("기본 양념", "조미료")이 들어간 이름인지. 냉장고 보기에서 찾을 재료 이름으로 보지 않는다
-    public static boolean seasoningWord(String name, ChatFridgeShopWordProperties words) {
+    public static boolean seasoningWord(String name, ChatWordProperties.FridgeShop words) {
         return containsAny(compact(name), words.seasoning());
     }
 

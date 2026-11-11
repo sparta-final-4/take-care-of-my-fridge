@@ -1,10 +1,8 @@
 package org.example.takecareofmyfridgebe.domain.chat.facade;
 
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatCandidateProperties;
-import org.example.takecareofmyfridgebe.domain.chat.config.ChatCategoryWordProperties;
+import org.example.takecareofmyfridgebe.domain.chat.config.ChatWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatCorrectionProperties;
-import org.example.takecareofmyfridgebe.domain.chat.config.ChatFoodWordProperties;
-import org.example.takecareofmyfridgebe.domain.chat.config.ChatTasteOppositeProperties;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext.CardName;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext.ContextMessage;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext;
@@ -30,6 +28,7 @@ import org.example.takecareofmyfridgebe.domain.chat.intent.FridgeShopWordChecker
 import org.example.takecareofmyfridgebe.domain.chat.intent.IntentCorrector;
 import org.example.takecareofmyfridgebe.domain.chat.intent.MealkitWordCheckerTest;
 import org.example.takecareofmyfridgebe.domain.chat.intent.TasteWordCheckerTest;
+import org.example.takecareofmyfridgebe.domain.chat.intent.TemperatureWordCheckerTest;
 import org.example.takecareofmyfridgebe.domain.chat.reply.RecommendationPromptBuilder;
 import org.example.takecareofmyfridgebe.domain.chat.safety.AllergyExclusionFinder;
 import org.example.takecareofmyfridgebe.domain.chat.ai.ChatIntentExtractor;
@@ -73,13 +72,18 @@ public class ChatIntentFacadeTest {
     private static final Long MUSHROOM = 161L;
     private static final Long CUCUMBER = 15L;
 
-    // config/chat-words.yml app.chat.taste-opposites와 같은 쌍
-    public static final ChatTasteOppositeProperties TASTE_OPPOSITES = new ChatTasteOppositeProperties(List.of(
+    // config/chat-words.yml app.chat.words.taste-opposites와 같은 쌍
+    public static final ChatWordProperties.TasteOpposites TASTE_OPPOSITES = new ChatWordProperties.TasteOpposites(List.of(
             List.of(Taste.MILD, Taste.SPICY), List.of(Taste.MILD, Taste.SALTY)));
 
-    // config/chat-words.yml app.chat.food-words와 같은 목록
-    static final ChatFoodWordProperties FOOD_WORDS = new ChatFoodWordProperties(List.of("먹", "요리", "레시피", "밥", "반찬",
+    // config/chat-words.yml app.chat.words.food와 같은 목록
+    static final ChatWordProperties.Food FOOD_WORDS = new ChatWordProperties.Food(List.of("먹", "요리", "레시피", "밥", "반찬",
             "끼니", "아침", "점심", "저녁", "야식", "간식", "재료", "냉장고", "장보기", "밀키트"));
+
+    // 단어 설정 전체. 묶음별 고정값은 각 WordCheckerTest가 가진다
+    public static final ChatWordProperties WORDS = new ChatWordProperties(TasteWordCheckerTest.WORDS, TASTE_OPPOSITES,
+            AskWordCheckerTest.WORDS, new ChatWordProperties.Category(CategoryWordCheckerTest.GROUPS), FOOD_WORDS,
+            MealkitWordCheckerTest.WORDS, FridgeShopWordCheckerTest.WORDS, TemperatureWordCheckerTest.WORDS);
 
     private ChatIntentExtractor extractor;
     private RecipeService recipeService;
@@ -1946,14 +1950,11 @@ public class ChatIntentFacadeTest {
     private ChatIntentFacade newFacade(ChatCorrectionProperties corrections, IntentCorrector corrector) {
         return new ChatIntentFacade(extractor, recipeService, ingredientMatcher,
                 new ChatCandidateProperties(List.of("양념", "음료"), 0.4, List.of(), List.of("백김치", "물김치", "동치미", "나박김치"), List.of(), List.of()),
-                TasteWordCheckerTest.WORDS, MealkitWordCheckerTest.WORDS, AskWordCheckerTest.WORDS, allergyExclusionFinder,
-                TASTE_OPPOSITES, FridgeShopWordCheckerTest.WORDS, corrections, corrector);
+                WORDS, allergyExclusionFinder, corrections, corrector);
     }
 
     private IntentCorrector newCorrector(ChatCorrectionProperties corrections) {
-        return new IntentCorrector(recipeService, ingredientMatcher, chatMessageService, TasteWordCheckerTest.WORDS,
-                MealkitWordCheckerTest.WORDS, AskWordCheckerTest.WORDS, new ChatCategoryWordProperties(CategoryWordCheckerTest.GROUPS),
-                FOOD_WORDS, FridgeShopWordCheckerTest.WORDS, corrections);
+        return new IntentCorrector(recipeService, ingredientMatcher, chatMessageService, WORDS, corrections);
     }
 
     @Test
