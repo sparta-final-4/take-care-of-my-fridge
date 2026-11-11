@@ -59,17 +59,21 @@ src/
 │   │   ├─ errors.ts         # 에러 분류·메시지 변환
 │   │   ├─ types.ts          # ApiResponse<T>, PageResponse<T> 등 공통 응답 타입
 │   │   └─ generated/        # openapi-generator-cli 생성 결과(커밋함), 직접 수정 금지
-│   └─ auth/                 # 8.4 인증: authStore, initialize, session, sessionId, RequireAuth 등
-├─ layout/                   # MainLayout, Header
-├─ pages/                    # XxxPage.tsx: 섹션을 배치만 함 (MainPage, NotFoundPage)
+│   ├─ auth/                 # 8.4 인증: authStore, initialize, session, sessionId, RequireAuth 등
+│   ├─ hooks/                # 공통 훅 (useScreens)
+│   ├─ scroll/               # 부드러운 스크롤
+│   └─ sse/                  # 회원 이벤트 SSE 구독 (useMemberEventStream)
+├─ layout/                   # MainLayout, Header, CartDrawer(장바구니 서랍), MyPageLayout, SiteFooter
+├─ pages/                    # XxxPage.tsx: 섹션을 배치만 함 (MainPage, NotFoundPage와 main·fridge·recipe·search·product·order·mypage·member·auth·admin 폴더)
 ├─ styles/                   # global.scss, _variables.scss, _mixins.scss
 └─ domains/                  # 백엔드 도메인과 같은 이름
-    └─ <domain>/             # fridge(재료 입력·내 냉장고), review(후기), notification(헤더 알림),
-        │                    # chat(AI 상담), recipe(레시피 추천), product(밀키트 큐레이션)
+    └─ <domain>/             # admin, auth, cart, chat, cooking, deal, forecast, fridge, member, notification,
+        │                    # order, payment, product, recipe, refund, review, sale, search, settlement
         ├─ api.ts            # API 함수와 요청·응답 타입 (8.1)
         ├─ queries.ts        # queryKey·queryOptions (8.2)
         ├─ components/
-        └─ hooks/            # 도메인 UI 로직 훅 (쿼리를 감싸기만 하는 훅은 두지 않음)
+        ├─ hooks/            # 도메인 UI 로직 훅 (쿼리를 감싸기만 하는 훅은 두지 않음)
+        └─ model/            # 그 도메인만 쓰는 Zustand 스토어 (chat, fridge)
 ```
 
 - import는 `@/` alias(`src/`), 같은 폴더는 `./`. alias는 Vite `resolve.alias`와 `tsconfig` `paths`에 똑같이 설정한다. 배럴 파일(`index.ts` 재export) 금지. 예외: `src/common/api/clients.ts`는 생성 모델 타입을 재export한다(도메인이 `generated` 경로를 직접 import하지 않게 하기 위해).
@@ -242,7 +246,7 @@ const handleSave = (values: UpdatePageRequest) =>
 
 인증 구현은 `src/common/auth/`의 `authStore.ts`, `initialize.ts`, `interceptors.ts`, `session.ts`, `sessionId.ts`, `RequireAuth.tsx`, `IdleLogout.tsx`에 있다. 로그인 복귀 경로 검증은 `LoginPage.tsx`에서 한다.
 
-- HttpOnly 쿠키 기반(`withCredentials: true`). 토큰을 브라우저 저장소에 두지 않는다. CSRF·CORS는 백엔드와 함께 정한다.
+- HttpOnly 쿠키 기반(`withCredentials: true`). 토큰을 브라우저 저장소에 두지 않는다. CSRF는 `GET /auth/csrf`로 받은 토큰을 `X-XSRF-TOKEN` 헤더로 보낸다([회원 API 명세](../docs/api/member-auth-admin-api.md#인증-쿠키)). 같은 출처로 호출하므로 CORS 설정은 없다.
 - 상태(`useAuthStore`의 `status`): `initializing` / `authenticated` / `anonymous` / `error`.
 - **초기화**: `src/app/App.tsx`에서 `initSession()` 호출. 성공 → `authenticated`, 401 → `anonymous`, 그 외 오류 → `error`. 진행 중인 Promise를 재사용해 중복 요청을 막는다(StrictMode를 끄지 않는다).
 - **`RequireAuth`**: `initializing`이면 로딩, `error`면 재시도 버튼, `anonymous`면 현재 경로를 `redirect`로 붙여 로그인으로 이동.

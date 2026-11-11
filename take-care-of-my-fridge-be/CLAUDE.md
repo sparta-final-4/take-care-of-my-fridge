@@ -14,7 +14,7 @@ take-care-of-my-fridge-be/ 개발 규칙. 이 문서와 기존 코드의 패턴�
 - 작업 보고: 변경 파일 목록, 신규/수정된 API 명세(Request/Response DTO), 신규 ErrorCode, 프론트엔드에 전달해야 할 변경 사항, 검증하지 못한 항목.
 
 1. 기술 스택
-   Java 17 · Spring Boot 3.x · Gradle · Spring Data JPA · QueryDSL 5.x · Redis & Redisson · Apache Kafka · Spring Security · JUnit 5 + Mockito
+   Java 17 · Spring Boot 4.1.1 · Gradle · Spring Data JPA · QueryDSL 5.x · Redis · Apache Kafka · Spring Security · JUnit 5 + Mockito
 - Java 17 최신 문법(record, pattern matching, switch expressions)을 적극 사용한다.
 - 롬복은 최소화한다: @Getter, @Builder, @RequiredArgsConstructor, @NoArgsConstructor(access = AccessLevel.PROTECTED)만 허용.
 - 금지: @Setter, @Data, @AllArgsConstructor, 필드 인젝션(@Autowired), FQCN(코드 본문 풀 패키지 경로 작성), 와일드카드 import(import java.util.*).
@@ -24,7 +24,7 @@ take-care-of-my-fridge-be/ 개발 규칙. 이 문서와 기존 코드의 패턴�
 - 도메인 중심 패키지 구조: 계층형(Layered) 분리가 아닌 비즈니스 도메인 단위(domain/{domain_name})로 격리한다.
 - 불변성과 안정성: DTO 및 이벤트 메시지는 Java record를 사용하고, 엔티티는 @Setter 없이 도메인 메서드로만 상태를 변경한다.
 - 공통 응답 및 에러 표준화: 모든 HTTP API 응답은 ApiResponse<T>, 모든 비즈니스 예외는 ErrorCode를 품은 BusinessException으로 통일한다.
-- 관심사 분리 및 트랜잭션 경계: 다중 도메인 조율 및 분산 락 제어는 facade 계층을 통하고, 외부 I/O 및 비동기 작업은 트랜잭션 커밋 후(AFTER_COMMIT) 이벤트로 분리한다.
+- 관심사 분리 및 트랜잭션 경계: 다중 도메인 조율은 facade 계층을 통하고, 외부 I/O 및 비동기 작업은 트랜잭션 커밋 후(AFTER_COMMIT) 이벤트로 분리한다.
 
 3. 구조
 ```
@@ -32,20 +32,26 @@ take-care-of-my-fridge-be/ 개발 규칙. 이 문서와 기존 코드의 패턴�
    ├── domain/{domain_name}
    │   ├── controller       # REST API 엔드포인트
    │   ├── service          # 단일 도메인 비즈니스 로직 및 트랜잭션 단위
-   │   ├── facade           # 다중 서비스 오케스트레이션 / 분산 락 / 트랜잭션 경계 분리
+   │   ├── facade           # 다중 서비스 오케스트레이션 / 트랜잭션 경계 분리
    │   ├── repository       # Spring Data JPA 및 QueryDSL Custom 구현체
    │   ├── entity           # JPA Entity
    │   ├── dto              # Request / Response records
-   │   └── event            # 이벤트 발행(Producer), 리스너(Listener), 컨슈머(Consumer)
-   ├── infra                # 외부 연동 모듈 (PG, SMS, 외부 메시징 등)
+   │   ├── event            # 이벤트 발행(Producer), 리스너(Listener), 컨슈머(Consumer)
+   │   ├── scheduler        # @Scheduled 작업 (order, payment, refund, sale, settlement, forecast, review, search)
+   │   ├── push             # Redis Pub/Sub으로 SSE를 다른 서버에 전달 (chat, notification)
+   │   ├── config           # 그 도메인만 쓰는 @ConfigurationProperties (chat, search, ingredient)
+   │   ├── port             # 외부 연동 인터페이스 (payment)
+   │   └── demo             # dev 시연 데이터 넣기 (admin)
+   ├── infra                # 외부 연동 구현 (elasticsearch, portone, s3)
    └── global
-   ├── config           # Security, Redis, Kafka, QueryDSL, Jackson, Auditing 설정
+   ├── config           # Security, Redis, Kafka, QueryDSL, 캐시, ShedLock, AI, Auditing 설정
    ├── error            # ErrorCode, BusinessException, GlobalExceptionHandler
    ├── response         # ApiResponse, PageResponse
    ├── filter           # JWT 인증/인가 필터
+   ├── sse              # SSE 연결 관리
    └── entity           # BaseTimeEntity (createdAt, updatedAt 등 공통 엔티티)
 ```
-- 모든 인프라성 설정(JPA Auditing, QueryDSL, Redis, Redisson, Kafka 등)은 global/config/에 기술마다 Config 클래스 하나로 관리한다(예: RedisConfig, KafkaConfig). 같은 기술의 설정을 여러 클래스에 나누지 않고, 도메인 패키지 내부에는 @Configuration을 선언하지 않는다.
+- 모든 인프라성 설정(JPA Auditing, QueryDSL, Redis, Kafka 등)은 global/config/에 기술마다 Config 클래스 하나로 관리한다(예: RedisConfig, KafkaConfig). 같은 기술의 설정을 여러 클래스에 나누지 않고, 도메인 패키지 내부에는 @Configuration을 선언하지 않는다.
 - 설정 값 클래스(@ConfigurationProperties) 위치
     - 한 도메인에서만 쓰는 설정은 domain/{도메인}/config에 둘 수 있다. 예: domain/search/config/RecipeSearchProperties, domain/chat/config/ChatProperties
     - 여러 도메인이 같이 쓰는 설정은 global/config에 둔다. 예: global/config/SseProperties
@@ -84,11 +90,12 @@ take-care-of-my-fridge-be/ 개발 규칙. 이 문서와 기존 코드의 패턴�
 - N+1 문제 방지를 위해 연관 엔티티 조회 시 join().fetchJoin()을 적극 사용한다.
 - 대량 배치 수정/삭제는 건당 쿼리 방지를 위해 Bulk 연산(execute() 또는 @Modifying)을 적용하고 영속성 컨텍스트 초기화를 처리한다.
 
-4.6 Redis & Redisson 분산 락
+4.6 Redis와 잠금
 - Key 네이밍: 콜론(:) 계층형 구조 통일 ({도메인}:{목적}:{식별자}).
 - TTL 필수: 캐시 및 임시 데이터 저장 시 만료 시간(TTL)을 반드시 지정한다.
-- Redisson 분산 락 원칙: 트랜잭션과 락의 생명주기 충돌을 방지하기 위해 락 획득/해제는 반드시 Facade 레이어에서 수행한다.
-    - 구조: Facade(Lock 획득) -> Service(@Transactional 비즈니스 로직 실행) -> Facade(Lock 해제)
+- 잠금은 두 가지를 쓴다. 분산 락 라이브러리(Redisson)는 쓰지 않는다.
+    - 같은 행을 동시에 바꾸는 요청: DB 비관적 락(`@Lock(PESSIMISTIC_WRITE)`, `SELECT ... FOR UPDATE`). Service 트랜잭션 안에서 잡는다.
+    - 짧은 중복 실행 방지(예: 상담 답 하나씩): Redis `SETNX` + TTL. 트랜잭션 밖에서 잡고 푼다.
 
 4.7 Kafka 이벤트
 - 토픽 네이밍: 케밥 케이스(-) 및 행위 중심 (order-created, payment-completed).
