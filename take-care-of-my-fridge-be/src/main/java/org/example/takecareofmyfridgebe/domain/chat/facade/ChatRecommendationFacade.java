@@ -23,6 +23,8 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.RecommendationReply;
 import org.example.takecareofmyfridgebe.domain.chat.dto.SavedRecommendation;
 import org.example.takecareofmyfridgebe.domain.chat.dto.TasteLabel;
 import org.example.takecareofmyfridgebe.domain.chat.facade.RecipeCandidateFacade.MealkitRecipes;
+import org.example.takecareofmyfridgebe.domain.chat.intent.MealkitWordChecker;
+import org.example.takecareofmyfridgebe.domain.chat.intent.TemperatureWordChecker;
 import org.example.takecareofmyfridgebe.domain.chat.service.ChatMessageService;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.Ingredient;
 import org.example.takecareofmyfridgebe.domain.ingredient.service.IngredientService;

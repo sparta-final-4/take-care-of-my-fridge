@@ -1,8 +1,8 @@
-package org.example.takecareofmyfridgebe.domain.chat.facade;
+package org.example.takecareofmyfridgebe.domain.chat.intent;
 
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatCategoryWordProperties;
-import org.example.takecareofmyfridgebe.domain.chat.facade.CategoryWordChecker.CategoryStance;
-import org.example.takecareofmyfridgebe.domain.chat.facade.CategoryWordChecker.Stance;
+import org.example.takecareofmyfridgebe.domain.chat.intent.CategoryWordChecker.CategoryStance;
+import org.example.takecareofmyfridgebe.domain.chat.intent.CategoryWordChecker.Stance;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -10,12 +10,12 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class CategoryWordCheckerTest {
+public class CategoryWordCheckerTest {
 
     private static final List<String> CATEGORIES = List.of(
             "밥", "구이", "국", "면류", "볶음", "샐러드", "무침", "찜", "튀김", "김치", "디저트", "전", "찌개", "조림", "전골", "떡", "만두");
 
-    static final List<ChatCategoryWordProperties.Group> GROUPS = List.of(
+    public static final List<ChatCategoryWordProperties.Group> GROUPS = List.of(
             new ChatCategoryWordProperties.Group("국물", List.of("국", "찌개", "전골", "수프", "스튜")),
             new ChatCategoryWordProperties.Group("스프", List.of("수프")),
             new ChatCategoryWordProperties.Group("면", List.of("면류")),

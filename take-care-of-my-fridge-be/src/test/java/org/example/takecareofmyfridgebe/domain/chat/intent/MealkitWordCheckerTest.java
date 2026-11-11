@@ -1,7 +1,7 @@
-package org.example.takecareofmyfridgebe.domain.chat.facade;
+package org.example.takecareofmyfridgebe.domain.chat.intent;
 
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatMealkitWordProperties;
-import org.example.takecareofmyfridgebe.domain.chat.facade.MealkitWordChecker.Mode;
+import org.example.takecareofmyfridgebe.domain.chat.intent.MealkitWordChecker.Mode;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -9,9 +9,9 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class MealkitWordCheckerTest {
+public class MealkitWordCheckerTest {
 
-    static final ChatMealkitWordProperties WORDS = new ChatMealkitWordProperties(
+    public static final ChatMealkitWordProperties WORDS = new ChatMealkitWordProperties(
             List.of("밀키트"), List.of("간단", "간편", "빨리", "귀찮", "요리하기싫"));
 
     private static Mode check(String message) {

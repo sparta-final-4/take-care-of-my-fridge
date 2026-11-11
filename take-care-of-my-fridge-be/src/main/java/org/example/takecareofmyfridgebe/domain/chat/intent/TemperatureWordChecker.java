@@ -1,4 +1,4 @@
-package org.example.takecareofmyfridgebe.domain.chat.facade;
+package org.example.takecareofmyfridgebe.domain.chat.intent;
 
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatTemperatureWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate;
