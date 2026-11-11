@@ -197,7 +197,6 @@ export function PopularSaleSection() {
     <SectionCard
       title="지금 뜨는 할인"
       titleVariant="page"
-      bracket={false}
       extra={
         <Flex vertical gap="middle" className={styles.extra}>
           <Typography.Text type="secondary" className={styles.description}>

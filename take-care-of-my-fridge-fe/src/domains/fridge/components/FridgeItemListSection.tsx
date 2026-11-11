@@ -249,7 +249,7 @@ export function FridgeItemListSection({ onAdd }: FridgeItemListSectionProps) {
           description="냉장고가 비어 있어요"
         >
           <Typography.Paragraph type="secondary">
-            [재료 추가]로 남은 재료를 담아 보세요.
+            재료 추가로 남은 재료를 담아 보세요.
           </Typography.Paragraph>
           <Button onClick={onAdd}>재료 추가</Button>
         </Empty>
@@ -302,7 +302,7 @@ export function FridgeItemListSection({ onAdd }: FridgeItemListSectionProps) {
   const checkedItems = data?.filter((item) => checkedIds.includes(item.id ?? 0)) ?? [];
 
   return (
-    <SectionCard title="재료 목록" bracket={false}>
+    <SectionCard title="재료 목록">
       <Flex vertical gap="middle" className={styles.container}>
         {/* 도구 줄: 보관 탭 + 정렬. 목록이 길어 스크롤해도 상단바 바로 아래에 붙어 있다. */}
         <div className={styles.toolbar}>

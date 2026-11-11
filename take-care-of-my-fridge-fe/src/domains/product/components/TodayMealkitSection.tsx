@@ -26,7 +26,6 @@ export function TodayMealkitSection() {
     <SectionCard
       title="오늘의 밀키트"
       titleVariant="page"
-      bracket={false}
       extra={
         <Flex vertical gap="middle">
           <Typography.Text type="secondary" className={styles.description}>
