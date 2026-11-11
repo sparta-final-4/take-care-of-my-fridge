@@ -262,13 +262,18 @@ AI 맞춤 추천을 위해 레시피가 가진 맛 특성을 정의합니다.
 
 ### `billing_keys` — 등록 카드 (빌링키)
 간편 결제를 위해 발급받은 PortOne 빌링키 및 카드 정보입니다.
+빌링키는 평문으로 두지 않고 암호문(`billing_key_ciphertext`)과 지문(`billing_key_hash`)으로만 저장합니다. 암호화 키와 지문 키는 DB 밖(배포 서버는 Parameter Store)에 둡니다.
+암호화 전 DB에 남은 평문 `billing_key` 컬럼은 서버 기동 때 `LegacyBillingKeyEncryptor`가 NULL 허용으로 바꾸고 옛 UK를 지운 뒤 값을 옮기고 비웁니다. 컬럼은 이후 별도 배포에서 지우며, 새로 만드는 DB에는 없습니다.
 
 | 컬럼 | 물리 타입 | NULL | 기본값 | 제약 | 비즈니스 의미 및 설명 |
 |---|---|---|---|---|---|
 | `member_id` | `BIGINT` | N | | `FK (members.id), INDEX` | 카드 소유 회원 ID |
-| `billing_key` | `VARCHAR(200)` | N | | `UK` | PortOne 발급 빌링키 (외부 비공개) |
+| `billing_key_ciphertext` | `VARCHAR(512)` | N | | | PortOne 빌링키의 AES-256-GCM 암호문 (`v1:{키 ID}:{Base64(IV+암호문+태그)}`). 회원 ID를 추가 인증 데이터로 묶어 다른 회원 행에서는 풀리지 않음. 결제·PG 삭제 직전에만 복호화 (외부 비공개) |
+| `billing_key_hash` | `CHAR(64)` | N | | `UK` | PortOne 빌링키의 HMAC-SHA256 지문 (16진수 64자). 같은 빌링키 중복 저장 방지·등록 확정 중복 조회. 되돌릴 수 없음 |
 | `card_name` | `VARCHAR(100)` | Y | `NULL` | | 카드 상품명 (예: 신한카드) |
 | `card_last4` | `CHAR(4)` | Y | `NULL` | | 카드 번호 끝 4자리 (화면 표시용) |
+| `card_number_masked` | `VARCHAR(30)` | Y | `NULL` | | 마스킹된 카드 번호 (PortOne `card.number`). 같은 카드 중복 등록 확인용, 외부 비공개 |
+| `card_issuer_code` | `VARCHAR(30)` | Y | `NULL` | | 카드 발급사 코드 (PortOne `card.issuer`). 마스킹 번호와 함께 같은 카드 확인 |
 | `card_type` | `ENUM('CREDIT','DEBIT','GIFT')` | Y | `NULL` | | 카드 종류 (신용 / 체크 / 기프트) |
 | `is_default` | `BOOLEAN` | N | `FALSE` | | 대표 카드 여부 |
 | `status` | `ENUM('ACTIVE','DELETED')` | N | `'ACTIVE'` | `INDEX` | 카드 사용 상태 (사용중 / 삭제됨) |

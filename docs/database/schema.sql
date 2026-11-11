@@ -475,21 +475,26 @@ CREATE TABLE order_items (
 -- ---------------------------------------------------------
 -- [용범] 결제 · 환불 · 정산
 -- ---------------------------------------------------------
+-- 빌링키는 암호문과 지문으로만 저장한다. 암호화 전 DB에 남은 평문 billing_key 컬럼은 서버 기동 때
+-- LegacyBillingKeyEncryptor가 NULL 허용으로 바꾸고 비운다(컬럼 삭제는 이후 따로 한다). 새로 만드는 DB에는 없다
 CREATE TABLE billing_keys (
-    id            BIGINT       NOT NULL AUTO_INCREMENT COMMENT '등록 카드 ID',
-    member_id     BIGINT       NOT NULL COMMENT '카드 주인 회원 ID',
-    billing_key   VARCHAR(200) NOT NULL COMMENT 'PortOne 빌링키(응답으로 내려주지 않음)',
-    card_name     VARCHAR(100) NULL COMMENT '카드 상품명(PortOne 빌링키 조회 card.name)',
-    card_last4    CHAR(4)      NULL COMMENT '카드 번호 끝 4자리(PortOne 마스킹 카드 번호 card.number에서 추출)',
-    card_type     ENUM('CREDIT','DEBIT','GIFT') NULL COMMENT '신용·체크·기프트. PortOne이 주지 않으면 NULL',
-    is_default    BOOLEAN      NOT NULL DEFAULT FALSE COMMENT '대표 카드 여부(회원당 사용 중 카드 중 하나)',
-    status        ENUM('ACTIVE','DELETED') NOT NULL DEFAULT 'ACTIVE' COMMENT '사용 중·삭제',
-    deleted_at    DATETIME(6)  NULL COMMENT '삭제 시각',
-    pg_deleted_at DATETIME(6)  NULL COMMENT 'PortOne 빌링키 삭제 확인 시각. 삭제 상태인데 NULL이면 재시도 대상',
-    created_at    DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '생성일시(등록 시각)',
-    updated_at    DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '수정일시',
+    id                     BIGINT       NOT NULL AUTO_INCREMENT COMMENT '등록 카드 ID',
+    member_id              BIGINT       NOT NULL COMMENT '카드 주인 회원 ID',
+    billing_key_ciphertext VARCHAR(512) NOT NULL COMMENT 'PortOne 빌링키 AES-256-GCM 암호문(v1:{키ID}:{Base64}). 응답으로 내려주지 않음',
+    billing_key_hash       CHAR(64)     NOT NULL COMMENT 'PortOne 빌링키 HMAC-SHA256 지문(16진수 64자). 같은 빌링키 중복 저장 방지·조회용',
+    card_name              VARCHAR(100) NULL COMMENT '카드 상품명(PortOne 빌링키 조회 card.name)',
+    card_last4             CHAR(4)      NULL COMMENT '카드 번호 끝 4자리(PortOne 마스킹 카드 번호 card.number에서 추출)',
+    card_number_masked     VARCHAR(30)  NULL COMMENT '마스킹된 카드 번호(PortOne card.number). 같은 카드 중복 등록 확인용',
+    card_issuer_code       VARCHAR(30)  NULL COMMENT '카드 발급사 코드(PortOne card.issuer). 같은 카드 중복 등록 확인용',
+    card_type              ENUM('CREDIT','DEBIT','GIFT') NULL COMMENT '신용·체크·기프트. PortOne이 주지 않으면 NULL',
+    is_default             BOOLEAN      NOT NULL DEFAULT FALSE COMMENT '대표 카드 여부(회원당 사용 중 카드 중 하나)',
+    status                 ENUM('ACTIVE','DELETED') NOT NULL DEFAULT 'ACTIVE' COMMENT '사용 중·삭제',
+    deleted_at             DATETIME(6)  NULL COMMENT '삭제 시각',
+    pg_deleted_at          DATETIME(6)  NULL COMMENT 'PortOne 빌링키 삭제 확인 시각. 삭제 상태인데 NULL이면 재시도 대상',
+    created_at             DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '생성일시(등록 시각)',
+    updated_at             DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '수정일시',
     PRIMARY KEY (id),
-    CONSTRAINT uk_billing_keys_billing_key UNIQUE (billing_key),
+    CONSTRAINT uk_billing_keys_billing_key_hash UNIQUE (billing_key_hash),
     INDEX idx_billing_keys_member_status (member_id, status),
     INDEX idx_billing_keys_status_pg_deleted_at (status, pg_deleted_at),
     CONSTRAINT fk_billing_keys_member FOREIGN KEY (member_id) REFERENCES members (id)

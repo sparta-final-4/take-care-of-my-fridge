@@ -9,6 +9,7 @@
 - 이 도메인이 소유하는 데이터와 정책: 등록 카드(billing_keys), 결제 비밀번호(payment_pins), 회원당 카드 수 제한, 같은 카드 중복 등록 막기, 대표 카드, 결제 비밀번호 확인·잠김, 등록 카드 결제 요청.
 - 다른 도메인에 맡기는 책임: 카드 번호·유효기간·인증 정보 보관(PortOne·카드사), 로그인 비밀번호(회원), 주문 상태·재고(주문), 환불(환불), 매출 집계(정산).
 - 카드 정보는 우리 서버에 저장하지 않습니다. PortOne이 발급한 빌링키와 화면 표시·중복 확인용 정보(카드 상품명, 끝 4자리, 마스킹 번호, 발급사 코드, 신용·체크 구분)만 저장합니다. 카드 정보가 우리 서버를 거치지 않도록 결제창 방식으로 발급합니다. 빌링키 값은 응답으로 내려주지 않습니다.
+- 빌링키는 평문으로 저장하지 않습니다. AES-256-GCM 암호문과 HMAC-SHA256 지문만 저장하고, PortOne 결제·삭제를 부르기 직전에만 풉니다(아래 "빌링키 암호화").
 - 결제 비밀번호는 원래 값을 저장하지 않고 BCrypt 해시만 저장합니다.
 - 지금 결제와 같이 PortOne 테스트 채널로 결제합니다. 실제 돈은 나가지 않습니다.
 
@@ -27,7 +28,7 @@
 | 빌링키 채널 | 토스페이먼츠 정기결제 테스트 채널 하나를 결제창 방식(`requestIssueBillingKey`, `billingKeyMethod: CARD`)으로 씁니다. 일반 결제 채널과 별도입니다. 채널 키는 설정 `portone.billing-channel-key`(환경변수 `PORTONE_CHANNEL_BILLING`)로 읽고, 비어 있으면 서버가 뜨지 않습니다. 카카오페이·토스페이 직연동은 빌링키를 지원하지 않고, 토스페이먼츠는 KG이니시스·이지페이보다 발급 필수 값이 적어 골랐습니다 | `PortOneProperties.billingChannelKey` | 구현 완료 |
 | 카드 등록 준비 | 카드 수를 확인한 뒤 채널 키, 발급 ID(`billing-` + UUID), 창 제목, 고객 ID(`member-{회원 ID}`)를 내려줍니다. 프론트는 이 값으로 PortOne 카드 등록 창을 엽니다. 모바일은 창 대신 결제대행사 페이지로 이동했다가 돌아오고, 결과는 주소의 쿼리로 받습니다 | `BillingKeyFacade.prepare`, FE `useCardRegistration` | 구현 완료 |
 | 카드 등록 확정 | 프론트가 넘긴 빌링키를 그대로 믿지 않고 PortOne에서 조회합니다. 발급 상태이고 고객 ID가 본인이면 저장합니다. 조회 실패·발급 상태 아님·남의 빌링키는 저장하지 않고 `BILLING_003`입니다. 남의 빌링키는 그 회원의 정상 카드라 PortOne에서 지우지 않습니다 | `BillingKeyFacade.register`, `findIssued` | 구현 완료 |
-| 등록 확정 중복 | 같은 빌링키는 한 번만 저장합니다(`billing_key` UNIQUE). 같은 빌링키로 다시 오면 처음 저장한 카드를 돌려줍니다. 다른 회원이나 삭제한 카드로 저장된 빌링키면 `BILLING_003`입니다 | `BillingKeyService.register` | 구현 완료 |
+| 등록 확정 중복 | 같은 빌링키는 한 번만 저장합니다(지문 `billing_key_hash` UNIQUE). 같은 빌링키인지는 지문으로 찾습니다. 같은 빌링키로 다시 오면 처음 저장한 카드를 돌려줍니다. 다른 회원이나 삭제한 카드로 저장된 빌링키면 `BILLING_003`입니다 | `BillingKeyService.register` | 구현 완료 |
 | 같은 카드 중복 | 같은 실물 카드라도 등록할 때마다 새 빌링키가 나오므로, 사용 중 카드 중 마스킹 번호와 발급사 코드가 같은 카드가 있으면 `BILLING_005`로 거절합니다 | `BillingKey.isSameCard` | 구현 완료 |
 | 카드 수 제한 | 회원당 사용 중 카드는 최대 5장입니다. 등록 준비와 저장 때 모두 확인합니다(`BILLING_002`) | `BillingKeyService.MAX_CARDS` | 구현 완료 |
 | 저장하지 않은 빌링키 | 5장 초과·같은 카드로 저장하지 않은 것이 확실한 본인 빌링키는 PortOne에서 바로 지웁니다. DB 오류처럼 저장됐는지 모르는 실패에서는 지우지 않습니다(저장된 카드를 못 쓰게 될 수 있음). 남은 빌링키는 결제에 쓰이지 않아 돈 문제는 없습니다 | `BillingKeyFacade.deleteIfNotSaved` | 구현 완료 |
@@ -172,7 +173,7 @@ sequenceDiagram
 ## 데이터·API·이벤트
 - ERD·데이터 사전: `billing_keys`, `payment_pins`, `payments.billing_key_id`. 컬럼 정의는 [data-dictionary.md](../../database/data-dictionary.md#billing_keys--등록-카드), 관계는 [erd.md](../../database/erd.md#결제-테이블-관계)에 있습니다.
 - 제공 API: [결제 API 명세](../../api/payment-api.md)의 등록 카드 결제, 카드 등록 준비·확정, 카드 목록, 대표 카드 지정, 카드 삭제, 결제 비밀번호 상태·설정·변경·재설정.
-- 오류 코드: 카드 `BILLING_002`(5장 초과), `BILLING_003`(빌링키 확인 실패), `BILLING_004`(없는·남의·삭제한 카드), `BILLING_005`(이미 등록한 카드). 비밀번호 `PIN_001`(잠김), `PIN_002`(미설정), `PIN_003`(틀림), `PIN_004`(쉬운 비밀번호), `PIN_005`(이미 설정), `PIN_006`(로그인 비밀번호 틀림), `PIN_007`(재설정 시도 초과), `PIN_008`(현재와 같음), `PIN_009`(재설정 불가). 결제 `PAYMENT_010`(카드 거절), `PAYMENT_011`(결과 모름)과 기존 `PAYMENT_00x`.
+- 오류 코드: 카드 `BILLING_002`(5장 초과), `BILLING_003`(빌링키 확인 실패), `BILLING_004`(없는·남의·삭제한 카드), `BILLING_005`(이미 등록한 카드), `BILLING_006`(저장된 빌링키를 풀지 못함. 서버 키 설정·저장 값 문제라 500). 비밀번호 `PIN_001`(잠김), `PIN_002`(미설정), `PIN_003`(틀림), `PIN_004`(쉬운 비밀번호), `PIN_005`(이미 설정), `PIN_006`(로그인 비밀번호 틀림), `PIN_007`(재설정 시도 초과), `PIN_008`(현재와 같음), `PIN_009`(재설정 불가). 결제 `PAYMENT_010`(카드 거절), `PAYMENT_011`(결과 모름)과 기존 `PAYMENT_00x`.
 - PortOne 호출(공식 OpenAPI 스펙 v1.16.0 기준):
   - 빌링키 조회 `GET /billing-keys/{billingKey}?storeId=`: `status`(`ISSUED`·`DELETED`), `customer.id`, `methods[].card`(`name` 상품명, `number` 마스킹 번호, `type`, `issuer` 발급사 코드). 없으면 404 `BillingKeyNotFoundError`.
   - 빌링키 삭제 `DELETE /billing-keys/{billingKey}?storeId=&reason=`: 이미 삭제됐다는 응답은 삭제된 것으로 봅니다.
@@ -184,6 +185,17 @@ sequenceDiagram
 - 구조: 카드는 `BillingKeyFacade`(PortOne 조회·삭제) → `BillingKeyService`(저장·대표·삭제)입니다. 결제 비밀번호는 `PaymentPinService`, 재설정은 `PaymentPinFacade`가 Redis 시도 제한 → 로그인 비밀번호 확인 → 재설정 순서로 조율합니다. 등록 카드 결제는 `PaymentFacade.payWithBillingKey`입니다.
 - 트랜잭션 범위: PortOne 호출(빌링키 조회·삭제·결제)과 Redis 호출은 트랜잭션 밖에서 하고, 카드 저장·삭제·비밀번호 변경·결제 상태 변경은 각각 한 트랜잭션에서 합니다. 비밀번호 해시(BCrypt)는 회원 행을 잠그기 전에 만들어 잠금을 오래 잡지 않습니다.
 - 동시성 제어: 카드·비밀번호 변경은 회원 행 잠금(`MemberRowLocker`)을 트랜잭션의 첫 조회로 합니다. 결제 승인은 결제 설계와 같이 주문 → 결제 순서로 잠급니다.
+
+## 빌링키 암호화
+| 항목 | 정책 | 구현 위치 |
+|---|---|---|
+| 암호문 | AES-256-GCM. 저장할 때마다 IV 12바이트를 새로 만들고, `billing_keys.member_id=`+회원 ID를 추가 인증 데이터로 묶습니다. 형식은 `v1:{키 ID}:{Base64(IV+암호문+태그)}`이고, 바뀌거나 다른 회원 행에 옮긴 암호문은 풀리지 않습니다 | `BillingKeyCrypto.encrypt`·`decrypt` |
+| 지문 | HMAC-SHA256(16진수 64자). 같은 빌링키는 늘 같은 값이라 UNIQUE와 중복 조회에 씁니다. 지문 키를 바꾸면 기존 지문과 맞지 않으므로 바꾸지 않습니다 | `BillingKeyCrypto.hash` |
+| 푸는 곳 | 등록 카드 결제 직전(이전 결제 대기를 닫기 전)과 PortOne 빌링키 삭제 직전뿐입니다. 결제에서 풀지 못하면 결제를 만들지 않고 `BILLING_006`입니다 | `PaymentFacade.decryptForPayment`, `BillingKeyFacade.deleteAtPg` |
+| 키 | 배포 서버(prod 프로필)는 Parameter Store `/imhungry/{dev, main}/`의 `BILLING_KEY_ENCRYPTION_KEY`(32바이트 Base64), `BILLING_KEY_HMAC_KEY`(32바이트 이상 Base64)를 읽고, 없거나 형식이 틀리면 기동하지 않습니다. 로컬·테스트는 값이 없으면 `~/.imhungry/billing-key/`에 키 파일을 한 번 만들어 계속 씁니다 | `BillingKeyCryptoConfig` |
+| 키 교체 | 새 키를 `BILLING_KEY_ENCRYPTION_KEY`에, 새 키 ID를 `BILLING_KEY_ENCRYPTION_KEY_ID`에 넣고 옛 키는 `BILLING_KEY_RETIRED_ENCRYPTION_KEYS`(`k1=Base64,…`)에 둡니다. 새 카드는 새 키로 잠그고 옛 암호문은 앞의 키 ID로 옛 키를 골라 풉니다. 옛 키와 지금 키의 ID가 같으면 기동하지 않습니다 | `BillingKeyCryptoConfig` |
+| 기존 평문 옮기기 | 서버 기동 때 웹 요청·스케줄러가 시작되기 전에 돕니다. 옛 `billing_key`를 NULL 허용으로 바꾸고 옛 UK를 지운 뒤, 평문 행을 암호문·지문으로 옮기고 평문을 지웁니다. 다 옮기면 지문 UK가 없을 때 만듭니다. 각 단계는 현재 구조를 보고 필요할 때만 하므로 다시 돌거나 여러 서버가 같이 돌아도 결과가 같습니다. 실패해도 기동은 막지 않고, 남은 평문 건수를 ERROR 로그로 남깁니다 | `LegacyBillingKeyEncryptor` |
+| 로그 | 빌링키 원문과 키 값은 예외 메시지·로그에 넣지 않습니다. 키 ID와 카드 ID만 남깁니다 | `BillingKeyCryptoException`, `LegacyBillingKeyEncryptor.describe` |
 - 외부 I/O 및 실패 복구: 결과를 모르는 빌링키 결제는 결제 대기로 두고 웹훅·만료 스케줄러가 마무리합니다. PortOne 빌링키 삭제 실패는 1시간 주기 재시도가 맡습니다. 등록 확정이 오지 않은 빌링키는 발급 웹훅이 저장합니다.
 - 설정: 빌링 채널 키는 다른 채널 키와 같이 환경변수와 AWS Parameter Store(`/imhungry/<APP_ENV>/`)에서 읽습니다.
 
