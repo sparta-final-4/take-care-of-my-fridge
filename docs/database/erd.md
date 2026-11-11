@@ -298,7 +298,7 @@ erDiagram
         varchar order_number UK "주문 번호"
         bigint member_id FK "회원 ID"
         varchar idempotency_key "중복 주문 방지 키"
-        enum status "PENDING, PAID, CANCELLED, CONFIRMED"
+        enum status "PENDING, PAID, CANCELLED, CONFIRMED, REFUNDED"
         bigint total_amount "총 결제 금액"
         datetime paid_at "결제 완료 일시"
         datetime confirmed_at "구매 확정 일시"
@@ -625,7 +625,7 @@ erDiagram
     admin_audit_logs {
         bigint id PK "감사 로그 ID"
         bigint member_id FK "작업 회원"
-        enum action "PRODUCT_CREATE, PRICE_UPDATE, ROLE_CHANGE 등"
+        enum action "PRODUCT_CREATE, PRICE_UPDATE, DEAL_ANALYSIS, ROLE_CHANGE 등"
         varchar target_type "대상 종류"
         bigint target_id "대상 ID"
         enum result "SUCCESS, FAILED, DENIED"

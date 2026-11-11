@@ -247,7 +247,7 @@ AI 맞춤 추천을 위해 레시피가 가진 맛 특성을 정의합니다.
 | `order_number` | `VARCHAR(20)` | N | | `UK` | 주문 번호 (예: `20261013-000123`) |
 | `member_id` | `BIGINT` | N | | `FK (members.id), INDEX` | 주문한 회원 ID |
 | `idempotency_key` | `VARCHAR(64)` | Y | `NULL` | `UK(member_id, idempotency_key)` | 클라이언트 발급 중복 주문 방지 키 |
-| `status` | `ENUM('PENDING','PAID','CANCELLED','CONFIRMED')` | N | `'PENDING'` | `INDEX` | 주문 상태 (대기 / 결제완료 / 취소 / 구매확정) |
+| `status` | `ENUM('PENDING','PAID','CANCELLED','CONFIRMED','REFUNDED')` | N | `'PENDING'` | `INDEX` | 주문 상태 (대기 / 결제완료 / 취소 / 구매확정 / 전액 환불) |
 | `total_amount` | `BIGINT` | N | `0` | | 최종 결제 확정 금액(원) |
 | `paid_at` | `DATETIME(6)` | Y | `NULL` | `INDEX` | 결제 완료 일시 (7일 후 자동 구매 확정 기준) |
 | `confirmed_at` | `DATETIME(6)` | Y | `NULL` | | 구매 확정 일시 |
@@ -492,7 +492,7 @@ PyTorch 딥러닝 모델의 주간 판매량 예측 배치 실행 단위입니�
 |---|---|---|---|---|---|
 | `prediction_run_id` | `BIGINT` | N | | `FK (prediction_runs.id)` | 소속 예측 실행 ID |
 | `product_id` | `BIGINT` | N | | `UK(prediction_run_id, product_id)` | 대상 상품 ID |
-| `product_name` | `VARCHAR(200)` | N | | | 예측 시점의 상품명 스냅샷 |
+| `product_name` | `VARCHAR(100)` | N | | | 예측 시점의 상품명 스냅샷 |
 | `predicted_rank` | `INT` | Y | `NULL` | | 예상 판매 순위 |
 | `predicted_qty` | `INT` | Y | `NULL` | | 예상 판매 수량 |
 | `baseline_qty` | `INT` | N | `0` | | 기준선 예측 수량 (전주 동일 요일 판매량) |
@@ -531,7 +531,7 @@ PyTorch 딥러닝 모델의 주간 판매량 예측 배치 실행 단위입니�
 |---|---|---|---|---|---|
 | `deal_analysis_id` | `BIGINT` | N | | `FK (deal_analyses.id)` | 소속 분석 세션 ID |
 | `product_id` | `BIGINT` | N | | `UK(deal_analysis_id, product_id)` | 대상 상품 ID |
-| `product_name` | `VARCHAR(200)` | N | | | 분석 당시 상품명 스냅샷 |
+| `product_name` | `VARCHAR(100)` | N | | | 분석 당시 상품명 스냅샷 |
 | `regular_price` | `INT` | N | `0` | | 분석 당시 정상 판매가(원) |
 | `discount_price` | `INT` | N | `0` | | 가상 할인가(원) |
 | `current_stock` | `INT` | N | `0` | | 분석 당시 재고 수량 |
@@ -555,7 +555,7 @@ PyTorch 딥러닝 모델의 주간 판매량 예측 배치 실행 단위입니�
 | 컬럼 | 물리 타입 | NULL | 기본값 | 제약 | 비즈니스 의미 및 설명 |
 |---|---|---|---|---|---|
 | `member_id` | `BIGINT` | N | | `FK (members.id)` | 작업을 수행한 회원 ID |
-| `action` | `ENUM('PRODUCT_CREATE','PRODUCT_DELETE','PRICE_UPDATE','DEAL_REVIEW','EVENT_REQUEST','ROLE_CHANGE')` | N | | | 수행한 작업 유형 |
+| `action` | `ENUM('PRODUCT_CREATE','PRODUCT_DELETE','PRICE_UPDATE','DEAL_ANALYSIS','DEAL_REVIEW','EVENT_REQUEST','ROLE_CHANGE')` | N | | | 수행한 작업 유형 |
 | `target_type` | `VARCHAR(50)` | N | | | 작업 대상 개체 타입 (`Product`, `Member` 등) |
 | `target_id` | `BIGINT` | Y | `NULL` | | 작업 대상 개체의 고유 식별자 |
 | `result` | `ENUM('SUCCESS','FAILED','DENIED')` | N | | | 작업 결과 (성공 / 실패 / 권한 거부) |
