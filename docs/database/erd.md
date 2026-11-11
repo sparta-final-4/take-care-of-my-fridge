@@ -311,7 +311,8 @@ erDiagram
     billing_keys {
         bigint id PK
         bigint member_id FK
-        varchar billing_key UK
+        varchar billing_key_ciphertext
+        char billing_key_hash UK
         varchar card_name
         char card_last4
         varchar card_number_masked

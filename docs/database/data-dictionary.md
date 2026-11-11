@@ -306,14 +306,17 @@
 ## billing_keys — 등록 카드
 
 - 회원이 등록한 카드입니다. 카드 번호·유효기간은 PG가 보관하고 우리는 PortOne 빌링키와 화면 표시용 정보만 저장합니다. 설계는 [등록 카드 결제 설계](../architecture/domains/payment-card.md).
+- 빌링키는 평문으로 두지 않고 암호문(`billing_key_ciphertext`)과 지문(`billing_key_hash`)으로만 저장합니다. 암호화 키와 지문 키는 DB 밖(배포 서버는 Parameter Store)에 둡니다.
+- 암호화 전 DB에 남은 평문 `billing_key` 컬럼은 서버 기동 때 `LegacyBillingKeyEncryptor`가 NULL 허용으로 바꾸고 옛 UK를 지운 뒤 값을 옮기고 비웁니다. 컬럼은 이후 별도 배포에서 지웁니다. 새로 만드는 DB에는 없습니다.
 - 삭제해도 행은 지우지 않고 `DELETED`로 남깁니다. 결제(`payments.billing_key_id`)가 카드를 참조하기 때문입니다.
 - 대표 카드는 회원당 사용 중 카드 중 하나이며, DB 제약이 아니라 회원 행 잠금 뒤 서비스 로직으로 지킵니다.
-- 제약 이름: UK `uk_billing_keys_billing_key`. 인덱스 `idx_billing_keys_member_status`(member_id, status), `idx_billing_keys_status_pg_deleted_at`(status, pg_deleted_at). FK `fk_billing_keys_member`.
+- 제약 이름: UK `uk_billing_keys_billing_key_hash`. 인덱스 `idx_billing_keys_member_status`(member_id, status), `idx_billing_keys_status_pg_deleted_at`(status, pg_deleted_at). FK `fk_billing_keys_member`.
 
 | 컬럼 | 타입 | NULL | 기본값 | 제약 | 의미 |
 |---|---|---|---|---|---|
 | member_id | BIGINT | 불가 | | FK, 인덱스 | 카드 주인 |
-| billing_key | VARCHAR(200) | 불가 | | UK | PortOne 빌링키. 응답으로 내려주지 않음 |
+| billing_key_ciphertext | VARCHAR(512) | 불가 | | | PortOne 빌링키의 AES-256-GCM 암호문(`v1:{키 ID}:{Base64(IV+암호문+태그)}`). 회원 ID를 추가 인증 데이터로 묶어 다른 회원 행에서는 풀리지 않음. 결제·PortOne 삭제 직전에만 풀고 응답으로 내려주지 않음 |
+| billing_key_hash | CHAR(64) | 불가 | | UK | PortOne 빌링키의 HMAC-SHA256 지문(16진수 64자). 같은 빌링키 중복 저장을 막고 등록 확정 중복을 찾음. 되돌릴 수 없음 |
 | card_name | VARCHAR(100) | 허용 | NULL | | 카드 상품명(PortOne 빌링키 조회 `card.name`). 카드사 이름이 아님 |
 | card_last4 | CHAR(4) | 허용 | NULL | | 카드 번호 끝 4자리(PortOne 마스킹 번호 `card.number`에서 추출) |
 | card_number_masked | VARCHAR(30) | 허용 | NULL | | PortOne 마스킹 번호(`card.number`). 같은 카드 중복 등록 확인용, 응답으로 내려주지 않음 |
