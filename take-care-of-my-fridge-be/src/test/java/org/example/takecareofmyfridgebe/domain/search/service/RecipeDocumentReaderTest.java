@@ -45,7 +45,8 @@ class RecipeDocumentReaderTest extends MySqlContainerSupport {
     static class EmbeddingDisabled {
         @Bean
         ChatCandidateProperties chatCandidateProperties() {
-            return new ChatCandidateProperties(List.of(), 0.4, List.of("청양고추"), List.of(), List.of("홍고추"), List.of());
+            // 빈 목록은 설정 검증(@NotEmpty)에 걸리므로 이 테스트 레시피에 없는 이름으로 채운다
+            return new ChatCandidateProperties(List.of("양념"), 0.4, List.of("청양고추"), List.of(), List.of("홍고추"), List.of("고추냉이"));
         }
 
         @Bean

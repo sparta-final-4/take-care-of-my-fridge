@@ -4,22 +4,30 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
+
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.validation.annotation.Validated;
 
 /**
  * AI 상담 안전 장치 설정 (config/chat-safety.yml). 금지어·자해·탈취 단어, 건강 말, 알레르기 말과 묶음을 중첩 record로 둔다.
+ * 목록은 비면 서버가 뜨지 않는다 (@NotEmpty). 제외 목록(words.exclusions·health.exclusions)과 넓히지 않을 이름(allergy.notSameKind)만 비어도 된다.
  *
  * @param words         AI를 부르기 전에 거르는 단어 (SafetyWordChecker)
  * @param health        건강 관련 말 (HealthWordChecker)
  * @param allergy       알레르기 재료를 찾는 말 (AllergyWordChecker, AllergyExclusionFinder)
  * @param allergyGroups 알레르기 묶음 말과 재료 (AllergyExclusionFinder)
  */
+@Validated
 @ConfigurationProperties(prefix = "app.chat.safety")
 public record ChatSafetyProperties(
-        Words words,
-        Health health,
-        Allergy allergy,
-        List<AllergyGroup> allergyGroups
+        @Valid @NotNull Words words,
+        @Valid @NotNull Health health,
+        @Valid @NotNull Allergy allergy,
+        @NotEmpty List<@Valid AllergyGroup> allergyGroups
 ) {
     public ChatSafetyProperties {
         allergyGroups = allergyGroups == null ? List.of() : List.copyOf(allergyGroups);
@@ -35,9 +43,9 @@ public record ChatSafetyProperties(
      * @param exclusions 걸리는 말이 들어 있어도 음식 이름 등이라 지우고 보는 말
      */
     public record Words(
-            List<String> banned,
-            List<String> selfHarm,
-            List<String> injection,
+            @NotEmpty List<String> banned,
+            @NotEmpty List<String> selfHarm,
+            @NotEmpty List<String> injection,
             List<String> exclusions
     ) {
     }
@@ -51,7 +59,7 @@ public record ChatSafetyProperties(
      * @param exclusions 건강 말이 들어 있어도 요리 말 등이라 지우고 보는 말
      */
     public record Health(
-            List<String> health,
+            @NotEmpty List<String> health,
             List<String> exclusions
     ) {
     }
@@ -66,9 +74,9 @@ public record ChatSafetyProperties(
      *                    ("땅콩" → 땅콩호박, "굴" → 굴비, "마" → 마늘). 그 재료를 넓힐 때만 본다 ("마늘 알레르기"면 마늘가루는 뺀다)
      */
     public record Allergy(
-            List<String> markers,
-            List<String> particles,
-            List<NotSameKind> notSameKind
+            @NotEmpty List<String> markers,
+            @NotEmpty List<String> particles,
+            List<@Valid NotSameKind> notSameKind
     ) {
         public Allergy {
             notSameKind = notSameKind == null ? List.of() : List.copyOf(notSameKind);
@@ -101,7 +109,7 @@ public record ChatSafetyProperties(
          * @param word  알레르기 재료 이름 ("굴")
          * @param names 그 재료를 넓힐 때 빼는 재료 사전 이름 ("굴비")
          */
-        public record NotSameKind(String word, List<String> names) {
+        public record NotSameKind(@NotBlank String word, @NotEmpty List<String> names) {
             public NotSameKind {
                 names = names == null ? List.of() : List.copyOf(names);
             }
@@ -115,7 +123,7 @@ public record ChatSafetyProperties(
      * @param word        묶음 말 ("견과류", "계란")
      * @param ingredients 그 말이 뜻하는 재료 사전 이름 ("호두", "아몬드", …)
      */
-    public record AllergyGroup(String word, List<String> ingredients) {
+    public record AllergyGroup(@NotBlank String word, @NotEmpty List<String> ingredients) {
         public AllergyGroup {
             ingredients = ingredients == null ? List.of() : List.copyOf(ingredients);
         }

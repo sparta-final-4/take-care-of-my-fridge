@@ -4,12 +4,19 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
 
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
+
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.validation.annotation.Validated;
 
 /**
  * AI 상담 단어 설정 (config/chat-words.yml). 맛·분류·묻는 말·음식 말·밀키트·냉장고 보기·온도 단어를 묶음마다 중첩 record로 둔다.
  * 비교는 모두 공백을 뺀 글로 한다.
+ * 목록은 비면 서버가 뜨지 않는다 (@NotEmpty). 온도의 제외 목록(hotDishExclusions)만 비어도 된다.
  *
  * @param taste          맛 단어 (TasteWordChecker)
  * @param tasteOpposites 서로 반대인 맛
@@ -20,16 +27,17 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @param fridgeShop     냉장고 보기·사기 단어 (FridgeShopWordChecker)
  * @param temperature    온도 말 (TemperatureWordChecker)
  */
+@Validated
 @ConfigurationProperties(prefix = "app.chat.words")
 public record ChatWordProperties(
-        Taste taste,
-        TasteOpposites tasteOpposites,
-        Ask ask,
-        Category category,
-        Food food,
-        Mealkit mealkit,
-        FridgeShop fridgeShop,
-        Temperature temperature
+        @Valid @NotNull Taste taste,
+        @Valid @NotNull TasteOpposites tasteOpposites,
+        @Valid @NotNull Ask ask,
+        @Valid @NotNull Category category,
+        @Valid @NotNull Food food,
+        @Valid @NotNull Mealkit mealkit,
+        @Valid @NotNull FridgeShop fridgeShop,
+        @Valid @NotNull Temperature temperature
 ) {
 
     /**
@@ -49,16 +57,16 @@ public record ChatWordProperties(
      *                       AI가 넣은 뺄 조건 TASTE를 서버가 지운다 ("매운 건 빼줘"가 직전에 원한 짠맛까지 지우지 않게)
      */
     public record Taste(
-            List<String> spicy,
-            List<String> sweet,
-            List<String> negationBefore,
-            List<String> negationAfter,
-            List<String> salty,
-            List<String> umami,
-            List<String> mild,
-            List<String> wantBefore,
-            List<String> wantAfter,
-            List<String> clear
+            @NotEmpty List<String> spicy,
+            @NotEmpty List<String> sweet,
+            @NotEmpty List<String> negationBefore,
+            @NotEmpty List<String> negationAfter,
+            @NotEmpty List<String> salty,
+            @NotEmpty List<String> umami,
+            @NotEmpty List<String> mild,
+            @NotEmpty List<String> wantBefore,
+            @NotEmpty List<String> wantAfter,
+            @NotEmpty List<String> clear
     ) {
     }
 
@@ -69,7 +77,7 @@ public record ChatWordProperties(
      * @param pairs 반대인 두 맛 (예: [MILD, SPICY], [MILD, SALTY]). 단맛·감칠맛은 반대가 없다
      */
     public record TasteOpposites(
-            List<List<Member.Taste>> pairs
+            @NotEmpty List<List<Member.Taste>> pairs
     ) {
         public TasteOpposites {
             pairs = pairs == null ? List.of() : pairs.stream().map(List::copyOf).toList();
@@ -99,11 +107,11 @@ public record ChatWordProperties(
      *                       찾기 전에 지운다 (맛 단어도 같이 지운다)
      */
     public record Ask(
-            List<String> question,
-            List<String> request,
-            List<String> mealkitRequest,
-            List<String> greeting,
-            List<String> recipe
+            @NotEmpty List<String> question,
+            @NotEmpty List<String> request,
+            @NotEmpty List<String> mealkitRequest,
+            @NotEmpty List<String> greeting,
+            @NotEmpty List<String> recipe
     ) {
     }
 
@@ -114,7 +122,7 @@ public record ChatWordProperties(
      * @param groups 묶음 말과 그 말이 뜻하는 분류
      */
     public record Category(
-            List<Group> groups
+            @NotEmpty List<@Valid Group> groups
     ) {
         public Category {
             groups = groups == null ? List.of() : List.copyOf(groups);
@@ -124,7 +132,7 @@ public record ChatWordProperties(
          * @param word       묶음 말 ("국물")
          * @param categories 그 말이 뜻하는 분류 ("국", "찌개", …)
          */
-        public record Group(String word, List<String> categories) {
+        public record Group(@NotBlank String word, @NotEmpty List<String> categories) {
             public Group {
                 categories = categories == null ? List.of() : List.copyOf(categories);
             }
@@ -138,7 +146,7 @@ public record ChatWordProperties(
      * @param food 음식·요리·장보기를 말하는 말 ("주식으로 먹을 거 추천해줘"의 "먹", "장보기 목록 짜줘"의 "장보기")
      */
     public record Food(
-            List<String> food
+            @NotEmpty List<String> food
     ) {
     }
 
@@ -150,8 +158,8 @@ public record ChatWordProperties(
      * @param easy    요리를 번거로워하는 말 ("간단하게", "귀찮아"). 있으면 레시피 카드 아래 밀키트 한 장을 붙인다
      */
     public record Mealkit(
-            List<String> mealkit,
-            List<String> easy
+            @NotEmpty List<String> mealkit,
+            @NotEmpty List<String> easy
     ) {
     }
 
@@ -173,13 +181,13 @@ public record ChatWordProperties(
      *                 "얼마나"·"가격"은 넣지 않는다 ("두부 얼마나 남았어?", "두부 가격 얼마야?"는 냉장고 보기·사기)
      */
     public record FridgeShop(
-            List<String> fridge,
-            List<String> imminent,
-            List<String> seasoning,
-            List<String> shop,
-            List<String> sale,
-            List<String> cook,
-            List<String> general
+            @NotEmpty List<String> fridge,
+            @NotEmpty List<String> imminent,
+            @NotEmpty List<String> seasoning,
+            @NotEmpty List<String> shop,
+            @NotEmpty List<String> sale,
+            @NotEmpty List<String> cook,
+            @NotEmpty List<String> general
     ) {
     }
 
@@ -193,10 +201,10 @@ public record ChatWordProperties(
      * @param hotDishExclusions 끝말이 맞아도 뜨거운 국물 요리가 아닌 이름 ("그라탕")
      */
     public record Temperature(
-            List<String> warm,
-            List<String> cold,
-            List<String> coldDishes,
-            List<String> hotDishEndings,
+            @NotEmpty List<String> warm,
+            @NotEmpty List<String> cold,
+            @NotEmpty List<String> coldDishes,
+            @NotEmpty List<String> hotDishEndings,
             List<String> hotDishExclusions
     ) {
         public Temperature {
