@@ -1,411 +1,547 @@
-# ERD 초안
+# 냉장고를 부탁해 ERD (전체 도메인 물리 설계)
 
-상태: 개인 담당 물리 설계 초안 · DDL 미실행 · 근거: S2, S4, 2026-10-14 사용자 결정
+> 기준: 최신 전체 스키마 DDL ([schema.sql](schema.sql))  
+> 총 39개 테이블에 대한 도메인별 데이터 개체, 외래키(FK) 및 연관 관계를 정의합니다.
 
-## 개인 담당 테이블 관계
+---
 
-회원·인증·관리자 범위의 테이블 9개입니다. 상품·할인 행사·주문 등 다른 도메인의 테이블은 포함하지 않습니다. 컬럼 정의는 [데이터 사전](data-dictionary.md), DDL 초안은 [member-auth-admin.sql](member-auth-admin.sql)에 있습니다.
+## 1. 전체 도메인 개요
+
+| 도메인 | 테이블 목록 (총 39개) | 주요 설명 |
+|---|---|---|
+| **회원 · 인증** (3) | `members`, `member_tastes`, `refresh_sessions` | 회원 계정, 선호 맛, 로그인 세션 |
+| **운영 · 분석** (5) | `prediction_runs`, `sales_forecasts`, `deal_analyses`, `deal_candidates`, `admin_audit_logs` | PyTorch 판매 예측, 요일별 할인 후보 분석, 관리자 작업 감사 로그 |
+| **표준 재료 · 상품** (4) | `ingredients`, `products`, `ingredient_products`, `mealkit_products` | 표준 재료 사전, 판매 상품 공통, 재료 상품 상세, 밀키트 상품 상세 |
+| **레시피** (4) | `recipes`, `recipe_ingredients`, `recipe_steps`, `recipe_tastes` | 레시피 기본 정보, 레시피-재료 연결, 조리 단계, 레시피 맛 |
+| **할인 행사** (2) | `sale_events`, `sale_event_items` | 특가 및 번개 드롭 행사, 행사 대상 상품 |
+| **장바구니 · 주문** (4) | `carts`, `cart_items`, `orders`, `order_items` | 회원 장바구니 및 품목, 주문 정보 스냅샷 및 주문 상품 |
+| **결제 · 환불 · 정산** (8) | `payments`, `payment_histories`, `refunds`, `refund_items`, `webhook_events`, `daily_sales`, `billing_keys`, `payment_pins` | PortOne 결제, 결제 원장 이력, 부분/전체 환불, 포트원 웹훅, 일별 정산 집계, 등록 카드 및 결제 PIN |
+| **냉장고** (2) | `fridge`, `fridge_commerce_histories` | 회원 냉장고 재료 및 소비기한, 커머스 구매 확정 자동 입고 이력 |
+| **AI 상담** (3) | `chat_sessions`, `chat_messages`, `chat_recommendations` | AI 상담 세션, 대화 메시지 내역, 레시피/상품 추천 결과 |
+| **요리 · 후기** (3) | `cooking_logs`, `fridge_item_logs`, `recipe_reviews` | 요리 완료 기록, 재료 소진/폐기 이력, 레시피 별점 및 후기 |
+| **알림** (1) | `notifications` | 인앱 실시간/비동기 알림 (소비기한, 번개드롭, 입고) |
+
+---
+
+## 2. 통합 서비스 핵심 관계도 (Core Architecture)
+
+핵심 도메인(회원, 냉장고, 레시피, 상품, 주문, 결제) 간의 유기적인 참조 관계입니다.
 
 ```mermaid
 erDiagram
-    members ||--o{ member_tastes : "선택"
-    members ||--o{ refresh_sessions : "로그인"
-    members ||--o{ deal_analyses : "분석"
-    members ||--o{ admin_audit_logs : "작업"
-    prediction_runs ||--o{ sales_forecasts : "포함"
-    deal_analyses ||--o{ deal_candidates : "결과"
+    members ||--o{ fridge : "보유 재료"
+    members ||--o{ orders : "주문"
+    members ||--o{ cooking_logs : "요리 기록"
+    members ||--o{ chat_sessions : "AI 상담"
+    
+    ingredients ||--o{ fridge : "표준 재료 매핑"
+    ingredients ||--o{ recipe_ingredients : "필요 재료"
+    ingredients ||--o{ ingredient_products : "원재료 매핑"
+
+    recipes ||--o{ recipe_ingredients : "포함"
+    recipes ||--o{ recipe_steps : "조리 단계"
+    recipes ||--o{ cooking_logs : "요리 대상"
+    recipes ||--o{ recipe_reviews : "후기"
+    recipes |o--o{ mealkit_products : "동일 요리 연결"
+
+    products ||--o| ingredient_products : "재료 상품 상세"
+    products ||--o| mealkit_products : "밀키트 상품 상세"
+    products ||--o{ order_items : "주문 대상"
+
+    orders ||--o{ order_items : "주문 품목"
+    orders ||--o{ payments : "결제 시도"
+    order_items |o--o| fridge : "구매 확정 자동 입고"
+
+    payments ||--o{ refunds : "환불"
+    payments ||--o{ payment_histories : "상태 변경 원장"
+```
+
+---
+
+## 3. 도메인별 세부 ERD
+
+### 3.1 회원 · 인증 도메인
+회원 계정 정보와 회원의 선호 맛(1:N), 로그인 세션(1:N)을 관리합니다.
+
+```mermaid
+erDiagram
+    members ||--o{ member_tastes : "선호 맛 선택"
+    members ||--o{ refresh_sessions : "로그인 세션 발급"
 
     members {
-        bigint id PK
-        varchar email UK
-        varchar nickname UK
-        varchar phone UK
-        enum role
-        enum status
+        bigint id PK "회원 ID"
+        varchar email UK "로그인 이메일"
+        varchar password_hash "비밀번호 해시"
+        varchar nickname UK "닉네임"
+        enum role "USER / ADMIN"
+        enum status "ACTIVE / SUSPENDED"
+        datetime created_at
+        datetime updated_at
     }
+
     member_tastes {
-        bigint id PK
-        bigint member_id FK
-        enum taste
+        bigint id PK "맛 선호 ID"
+        bigint member_id FK "회원 ID"
+        enum taste "SALTY, SWEET, SPICY, UMAMI, MILD"
     }
+
     refresh_sessions {
-        bigint id PK
-        bigint member_id FK
-        varchar token_hash UK
-        datetime last_used_at
-        datetime revoked_at
-    }
-    prediction_runs {
-        bigint id PK
-        date target_week_start UK
-        varchar model_version
-        datetime data_cutoff_at
-    }
-    forecast_batch_runs {
-        bigint id PK
-        date target_week_start UK
-        varchar status
-        datetime attempted_at
-        varchar failure_type
-    }
-    sales_forecasts {
-        bigint id PK
-        bigint prediction_run_id FK
-        bigint product_id "외부 참조"
-        int predicted_rank
-        int actual_rank
-    }
-    deal_analyses {
-        bigint id PK
-        bigint member_id FK
-        enum day_of_week
-        int discount_rate
-    }
-    deal_candidates {
-        bigint id PK
-        bigint deal_analysis_id FK
-        bigint product_id "외부 참조"
-        boolean is_excluded
-        enum review_status
-        bigint promotion_id "외부 참조"
-    }
-    admin_audit_logs {
-        bigint id PK
-        bigint member_id FK
-        enum action
-        enum result
+        bigint id PK "세션 ID"
+        bigint member_id FK "회원 ID"
+        varchar token_hash UK "갱신 토큰 해시"
+        boolean keep_logged_in "로그인 유지 여부"
+        varchar device_info "기기 정보"
+        datetime last_used_at "마지막 사용일시"
+        datetime expires_at "만료일시"
+        datetime revoked_at "폐기일시"
     }
 ```
 
-그림에는 관계를 이해하는 데 필요한 컬럼만 넣었습니다. 모든 테이블에는 created_at, updated_at이 있습니다.
+---
 
-## 관계 설명
-
-| 관계 | 의미 | 필수 여부 |
-|---|---|---|
-| members 1 : N member_tastes | 회원은 맛 선호를 0개 이상 고릅니다. (member_id, taste)는 중복 불가 | 맛 선호에는 회원이 반드시 있음 |
-| members 1 : N refresh_sessions | 로그인할 때마다 세션 1건. 로그아웃·비밀번호 변경 시 revoked_at 기록 | 세션에는 회원이 반드시 있음 |
-| members 1 : N deal_analyses | 할인 후보 분석을 실행한 관리자 | 필수 |
-| members 1 : N admin_audit_logs | 작업한 회원. 권한 없이 시도한 일반 회원도 포함 | 필수 |
-| prediction_runs 1 : N sales_forecasts | 주간 예측 1건에 상품별 예측 여러 건 | 필수 |
-| deal_analyses 1 : N deal_candidates | 분석 1건에 후보·제외 상품 여러 건. is_excluded로 구분 | 필수 |
-
-## 다른 도메인 참조
-
-물리 FK 없이 ID만 저장합니다. 예측·분석 시점의 상품명·가격·재고는 복사해 두어 나중에 상품이 바뀌어도 기록이 유지됩니다.
-
-| 컬럼 | 가리키는 대상 | 소유 도메인 |
-|---|---|---|
-| sales_forecasts.product_id | 상품 | 상품 |
-| deal_candidates.product_id | 상품 | 상품 |
-| deal_candidates.promotion_id | 등록된 할인 행사 | 할인 행사(담당 협의 중, Q-05) |
-| admin_audit_logs.target_id | 작업 대상(상품·후보·회원 등) | target_type에 따라 다름 |
-
-같은 DB를 쓰기로 정하면 product_id에 물리 FK를 추가할지 다시 검토합니다([DB 규칙](../conventions/database.md)).
-
-## 연결 시 확인할 관계
-
-- 회원과 후기: 닉네임·맛 선호 변경이 기존 후기 표시에 반영되어야 합니다.
-- 상품과 주문 상품: 현재 상품 정보와 주문 당시 스냅샷을 구분합니다.
-- 주문 상품과 환불: 누적 환불 수량·금액을 추적합니다.
-- 할인 후보와 행사 등록: 선택된 후보를 기존 행사 생성 서비스로 직접 등록합니다. 성공 시 deal_candidates.event_request_status를 APPROVED로 바꾸고 promotion_id에 생성된 sale_events ID를 기록합니다.
-- 예측 실행과 실적: 대상 주·입력 기준 시각·실적 확정 시각(confirmed_at)을 연결합니다.
-
-## 장바구니 테이블 관계
-
-장바구니 테이블 2개입니다. 컬럼 정의는 [데이터 사전](data-dictionary.md#carts--장바구니)에 있습니다.
+### 3.2 표준 재료 & 상품 도메인
+표준 재료는 다양한 상품명을 하나의 표준 명칭으로 통합하여 레시피 및 냉장고와 연계하는 기준점입니다. 상품은 재료 상품과 밀키트 상품으로 나뉩니다.
 
 ```mermaid
 erDiagram
-    carts ||--o{ cart_items : "담음"
+    ingredients ||--o{ ingredient_products : "기본 재료"
+    products ||--o| ingredient_products : "재료 상품 상세 (1:1)"
+    products ||--o| mealkit_products : "밀키트 상품 상세 (1:1)"
+    recipes ||--o{ mealkit_products : "관련 레시피 (논리적 연결)"
 
-    carts {
-        bigint id PK
-        bigint member_id UK "외부 참조"
+    ingredients {
+        bigint id PK "표준 재료 ID"
+        varchar ingredient_code UK "표준 코드 (ING_RCP_xxx)"
+        varchar name UK "대표 명칭 (대파, 마늘 등)"
+        varchar base_unit "기본 단위 (개, g, ml 등)"
+        decimal unit_weight_g "1개당 무게(g)"
+        enum default_storage "REFRIGERATED, FROZEN, ROOM_TEMP"
+        int default_shelf_days "권장 보관일수"
+        boolean is_basic_seasoning "기본 양념 여부"
     }
-    cart_items {
+
+    products {
+        bigint id PK "상품 ID"
+        enum product_type "INGREDIENT / MEALKIT"
+        varchar name "상품명"
+        text description "상품 설명"
+        varchar image_url "상품 이미지"
+        int price "판매가(원)"
+        int stock "재고 수량"
+        enum storage "보관 방식"
+        int shelf_days "권장 보관일수"
+        enum status "ON_SALE, SOLD_OUT, STOPPED"
+    }
+
+    ingredient_products {
         bigint id PK
-        bigint cart_id FK
-        bigint product_id "외부 참조"
-        int quantity
+        bigint product_id FK, UK "상품 ID"
+        bigint ingredient_id FK "표준 재료 ID"
+        decimal unit_amount "용량 수치"
+        varchar unit "용량 단위"
+        decimal base_quantity "단위당 갯수"
+    }
+
+    mealkit_products {
+        bigint id PK
+        bigint product_id FK, UK "상품 ID"
+        int servings "인분"
+        bigint recipe_id "동일 요리 레시피 ID"
     }
 ```
 
-| 관계 | 의미 | 필수 여부 |
-|---|---|---|
-| carts 1 : N cart_items | 장바구니 하나에 상품 여러 개. (cart_id, product_id)는 중복 불가 | 항목에는 장바구니가 반드시 있음 |
+---
 
-| 컬럼 | 가리키는 대상 | 소유 도메인 |
-|---|---|---|
-| carts.member_id | 장바구니 주인 | 회원 |
-| cart_items.product_id | 담은 상품 | 상품 |
-
-## 주문 테이블 관계
-
-주문 테이블 2개입니다. 컬럼 정의는 [데이터 사전](data-dictionary.md#orders--주문)에 있습니다.
+### 3.3 레시피 도메인
+레시피 기본 정보와 필요 재료(N:M), 조리 단계(1:N 순서), 그리고 AI 추천 매칭을 위한 레시피 맛(1:N)을 관리합니다.
 
 ```mermaid
 erDiagram
-    orders ||--o{ order_items : "포함"
+    recipes ||--o{ recipe_ingredients : "필요 재료 목록"
+    recipes ||--o{ recipe_steps : "조리 단계"
+    recipes ||--o{ recipe_tastes : "맛 특성"
+    ingredients ||--o{ recipe_ingredients : "표준 재료 참조"
+
+    recipes {
+        bigint id PK "레시피 ID"
+        varchar source "출처 (MAFRA / MFDS)"
+        varchar source_id "원본 레시피 코드"
+        varchar name "레시피 이름"
+        text summary "간략 소개"
+        varchar cuisine_type "음식 종류"
+        varchar category "요리 분류"
+        varchar cook_method "조리 방법"
+        int cook_time_min "조리시간(분)"
+        int servings "인분"
+        tinyint difficulty "난이도 (1~10)"
+        text tip "조리 팁"
+        text tip_summary "AI 후기 요약"
+        varchar image_url "대표 이미지 URL"
+    }
+
+    recipe_ingredients {
+        bigint id PK
+        bigint recipe_id FK
+        bigint ingredient_id FK
+        int seq "순서"
+        varchar display_name "표기 재료명"
+        varchar amount "원문 용량 (1/2큰술 등)"
+        decimal quantity "기본단위 수량"
+        varchar role "주재료/부재료/양념"
+    }
+
+    recipe_steps {
+        bigint id PK
+        bigint recipe_id FK
+        int step_no "조리 순서"
+        text description "조리 설명"
+        varchar image_url "단계 이미지"
+        text tip "단계별 팁"
+    }
+
+    recipe_tastes {
+        bigint id PK
+        bigint recipe_id FK
+        enum taste "SALTY, SWEET, SPICY, UMAMI, MILD"
+    }
+```
+
+---
+
+### 3.4 냉장고 도메인
+회원의 현재 냉장고 보관 재료와 커머스 구매 확정에 따른 자동 입고 중복 방지 이력을 관리합니다.
+
+```mermaid
+erDiagram
+    members ||--o{ fridge : "소유"
+    ingredients ||--o{ fridge : "표준 재료 매핑"
+    order_items |o--o| fridge : "주문 상품 연계 (커머스 입고 시)"
+    members ||--o{ fridge_commerce_histories : "이력 소유"
+    order_items ||--o| fridge_commerce_histories : "입고 중복 방지 (UK)"
+
+    fridge {
+        bigint id PK "냉장고 재료 ID"
+        bigint member_id FK "회원 ID"
+        bigint ingredient_id FK "표준 재료 ID"
+        bigint order_item_id FK "주문 상품 ID (커머스 자동입고 시)"
+        bigint product_id "상품 ID (재구매/밀키트 판별용)"
+        varchar raw_name "재료명 원문"
+        decimal quantity "수량"
+        enum storage "보관 방식"
+        date expiration_date "소비기한"
+        enum source "MANUAL (직접등록) / COMMERCE (자동입고)"
+    }
+
+    fridge_commerce_histories {
+        bigint id PK "입고 이력 ID"
+        bigint member_id FK "회원 ID"
+        bigint order_item_id FK, UK "구매 확정된 주문 상품 ID"
+        datetime created_at "입고 시각"
+    }
+```
+
+---
+
+### 3.5 장바구니 · 주문 · 할인 행사 도메인
+특가 및 번개 드롭 프로모션과 장바구니, 그리고 주문 생성 시점의 상품 스냅샷을 보존하는 주문 모델입니다.
+
+```mermaid
+erDiagram
+    members ||--o| carts : "보유 (1:1)"
+    carts ||--o{ cart_items : "담은 상품"
+    products ||--o{ cart_items : "상품 참조"
+
+    sale_events ||--o{ sale_event_items : "행사 대상 상품"
+    products ||--o{ sale_event_items : "대상 상품"
+
+    members ||--o{ orders : "주문자"
+    orders ||--o{ order_items : "주문 품목"
+    products ||--o{ order_items : "상품 참조"
+    sale_event_items |o--o{ order_items : "적용된 할인 행사 (선택)"
+    members |o--o{ order_items : "번개드롭 1인1개 확인 회원"
+
+    sale_events {
+        bigint id PK "행사 ID"
+        enum type "SPECIAL (특가) / FLASH_DROP (번개드롭)"
+        datetime starts_at "시작 시각"
+        datetime ends_at "종료 시각"
+        enum status "SCHEDULED, ACTIVE, ENDED"
+    }
+
+    sale_event_items {
+        bigint id PK
+        bigint sale_event_id FK
+        bigint product_id FK
+        int list_price "등록 당시 정가"
+        int sale_price "할인가"
+        int discount_rate "할인율(%)"
+        int limited_quantity "한정 수량"
+        int remaining_quantity "남은 수량"
+    }
 
     orders {
-        bigint id PK
-        varchar order_number UK
-        bigint member_id "외부 참조"
-        varchar idempotency_key
-        enum status
-        bigint total_amount
+        bigint id PK "주문 ID"
+        varchar order_number UK "주문 번호"
+        bigint member_id FK "회원 ID"
+        varchar idempotency_key "중복 주문 방지 키"
+        enum status "PENDING, PAID, CANCELLED, CONFIRMED"
+        bigint total_amount "총 결제 금액"
+        datetime paid_at "결제 완료 일시"
+        datetime confirmed_at "구매 확정 일시"
     }
+
     order_items {
-        bigint id PK
-        bigint order_id FK
-        bigint product_id "외부 참조"
-        int quantity
-        int list_price
-        int unit_price
-        enum sale_type
-        bigint sale_event_item_id "외부 참조"
-        bigint flash_drop_member_id "외부 참조"
-        int confirmed_quantity
+        bigint id PK "주문 상품 ID"
+        bigint order_id FK "주문 ID"
+        bigint product_id FK "상품 ID"
+        varchar product_name "주문 당시 상품명"
+        varchar product_image_url "주문 당시 상품 이미지"
+        int quantity "수량"
+        int list_price "주문 당시 정가"
+        int unit_price "실제 단가 (할인가 또는 정가)"
+        enum sale_type "NONE, SPECIAL, FLASH_DROP"
+        bigint sale_event_item_id FK "할인 행사 상품 ID"
+        bigint flash_drop_member_id FK "번개 드롭 구매 회원 ID"
     }
 ```
 
-| 관계 | 의미 | 필수 여부 |
-|---|---|---|
-| orders 1 : N order_items | 주문 하나에 주문 상품 여러 건 | 주문 상품에는 주문이 반드시 있음 |
+---
 
-| 컬럼 | 가리키는 대상 | 소유 도메인 |
-|---|---|---|
-| orders.member_id | 주문한 회원 | 회원 |
-| order_items.product_id | 주문한 상품 | 상품 |
-| order_items.sale_event_item_id | 할인으로 샀을 때의 행사 항목 | 할인 행사 |
-| order_items.flash_drop_member_id | 번개 드롭 1인 1개 확인용 회원 | 회원 |
-
-## 환불 테이블 관계
-
-환불 테이블 2개입니다. 컬럼 정의는 [데이터 사전](data-dictionary.md#refunds--환불)에 있습니다.
+### 3.6 결제 · 환불 · 정산 도메인
+PortOne PG 연동, 등록 카드 결제(빌링키), 결제 상태 변경 원장(이력), 상품 단위 부분/전체 환불, 그리고 일별 정산 집계 모델입니다.
 
 ```mermaid
 erDiagram
-    payments ||--o{ refunds : "부분 환불"
-    refunds ||--|{ refund_items : "포함"
-    order_items ||--o{ refund_items : "환불 수량"
+    orders ||--o{ payments : "결제 시도 (1:N)"
+    members ||--o{ billing_keys : "등록 카드"
+    members ||--o| payment_pins : "결제 비밀번호 (1:1)"
+    billing_keys |o--o{ payments : "카드 간편결제"
+
+    payments ||--o{ payment_histories : "상태 변경 원장"
+    payments ||--o{ refunds : "환불 건"
+    payments |o--o{ webhook_events : "수신 웹훅"
+
+    refunds ||--|{ refund_items : "환불 품목"
+    order_items ||--o{ refund_items : "환불 대상 주문 품목"
 
     payments {
-        bigint id PK
-        bigint order_id FK
-        bigint amount
-        enum status
+        bigint id PK "결제 ID"
+        bigint order_id FK "주문 ID"
+        bigint billing_key_id FK "등록 카드 ID (선택)"
+        varchar portone_payment_id UK "포트원 결제 고유 ID"
+        bigint amount "결제 금액"
+        enum pg_provider "KAKAOPAY, KICC, INICIS, TOSSPAYMENTS, TOSSPAY"
+        enum status "READY, PAID, FAILED"
+        enum fail_reason "실패 사유"
+        datetime expires_at "만료 시각 (10분)"
+        datetime paid_at "완료 시각"
     }
-    refunds {
+
+    payment_histories {
         bigint id PK
         bigint payment_id FK
-        bigint refund_amount
-        enum reason_type
-        enum status
-        varchar portone_cancellation_id
-        datetime refunded_at
+        enum event_type "READY, PAID, FAILED, PARTIAL_CANCELLED, CANCELLED"
+        bigint amount "변동 금액"
+        bigint cancelled_amount "누적 취소 금액"
+        bigint refund_id "연관 환불 ID"
+        varchar pg_cancellation_id "PG 취소 번호"
+        enum changed_by "USER, WEBHOOK, SCHEDULER"
+        varchar reason "사유"
     }
+
+    refunds {
+        bigint id PK "환불 ID"
+        bigint payment_id FK
+        bigint refund_amount "환불 금액"
+        enum reason_type "사유 구분"
+        enum status "REQUESTED, COMPLETED, FAILED"
+        varchar portone_cancellation_id "포트원 취소 ID"
+        datetime refunded_at "환불 완료 시각"
+    }
+
     refund_items {
         bigint id PK
         bigint refund_id FK
         bigint order_item_id FK
-        int quantity
-        int unit_price
-        bigint amount
+        int quantity "환불 수량"
+        int unit_price "단가"
+        bigint amount "환불 금액"
     }
-    order_items {
-        bigint id PK
-        bigint order_id FK
-        int quantity
-        int unit_price
-        enum sale_type
-    }
-```
 
-| 관계 | 의미 | 필수 여부 |
-|---|---|---|
-| payments 1 : N refunds | 결제 완료 결제 하나에 부분 환불 여러 건 | 환불에는 결제가 반드시 있음 |
-| refunds 1 : N refund_items | 환불 한 건에 상품 여러 개 | 환불 상품은 한 개 이상 |
-| order_items 1 : N refund_items | 주문 상품 하나를 여러 번 나눠 환불 | 환불 상품에는 주문 상품이 반드시 있음 |
-
-- 환불은 주문이 아니라 결제에 붙습니다. 한 주문의 결제 완료 결제는 한 건이라 주문별 환불은 그 결제를 거쳐 찾습니다.
-- 환불이 완료되면 결제 이력(`payment_histories.refund_id`)에 PG 취소가 남습니다.
-
-## 할인 행사 테이블 관계
-
-할인 행사 테이블 2개입니다. 컬럼 정의는 [데이터 사전](data-dictionary.md#sale_events--할인-행사)에 있습니다.
-
-```mermaid
-erDiagram
-    sale_events ||--o{ sale_event_items : "포함"
-
-    sale_events {
-        bigint id PK
-        enum type
-        datetime starts_at
-        datetime ends_at
-        enum status
-        datetime ended_at
-    }
-    sale_event_items {
-        bigint id PK
-        bigint sale_event_id FK
-        bigint product_id "외부 참조"
-        int list_price
-        int sale_price
-        int discount_rate
-        int limited_quantity
-        int remaining_quantity
-    }
-```
-
-| 관계 | 의미 | 필수 여부 |
-|---|---|---|
-| sale_events 1 : N sale_event_items | 할인 행사 하나에 행사 항목 | 행사 항목에는 할인 행사가 반드시 있음 |
-
-| 컬럼 | 가리키는 대상 | 소유 도메인 |
-|---|---|---|
-| sale_event_items.product_id | 할인 상품 | 상품 |
-
-## 알림 테이블 관계
-
-알림 테이블 1개입니다. 같은 도메인 안의 관계는 없습니다. 컬럼 정의는 [데이터 사전](data-dictionary.md#notifications--알림)에 있습니다.
-
-```mermaid
-erDiagram
-    notifications {
-        bigint id PK
-        bigint member_id "외부 참조"
-        enum notification_type
-        varchar content
-        varchar link_url
-        varchar dedupe_key
-        boolean is_read
-        datetime deleted_at
-    }
-```
-
-| 컬럼 | 가리키는 대상 | 소유 도메인 |
-|---|---|---|
-| notifications.member_id | 알림을 받는 회원 | 회원 |
-
-## 결제 테이블 관계
-
-결제 테이블 5개입니다. 컬럼 정의는 [데이터 사전](data-dictionary.md#payments--결제)에 있습니다.
-
-```mermaid
-erDiagram
-    orders ||--o{ payments : "결제 시도"
-    members ||--o{ billing_keys : "등록 카드"
-    members ||--o| payment_pins : "결제 비밀번호"
-    billing_keys |o--o{ payments : "등록 카드 결제"
-    payments ||--o{ payment_histories : "이력"
-    payments |o--o{ webhook_events : "웹훅"
-
-    orders {
-        bigint id PK
-        enum status
-        bigint total_amount
-    }
-    billing_keys {
-        bigint id PK
-        bigint member_id FK
-        varchar billing_key UK
-        varchar card_name
-        char card_last4
-        varchar card_number_masked
-        varchar card_issuer_code
-        enum card_type
-        boolean is_default
-        enum status
-        datetime pg_deleted_at
-    }
-    payment_pins {
-        bigint id PK
-        bigint member_id UK
-        varchar pin_hash
-        int failed_count
-        datetime locked_at
-    }
-    payments {
-        bigint id PK
-        bigint order_id FK
-        bigint billing_key_id FK
-        varchar portone_payment_id UK
-        bigint amount
-        enum pg_provider
-        enum status
-        datetime expires_at
-        enum fail_reason
-    }
-    payment_histories {
-        bigint id PK
-        bigint payment_id FK
-        enum event_type
-        bigint amount
-        bigint cancelled_amount
-        bigint refund_id "외부 참조"
-        enum changed_by
-        datetime created_at
-    }
-    webhook_events {
-        bigint id PK
-        bigint payment_id FK
-        varchar webhook_id UK
-        varchar event_type
-        enum process_status
-    }
-```
-
-| 관계 | 의미 | 필수 여부 |
-|---|---|---|
-| orders 1 : N payments | 주문 하나에 결제 시도 여러 건(재결제). 결제 완료는 한 건만 | 결제에는 주문이 반드시 있음 |
-| payments 1 : N payment_histories | 결제 하나에 사건 여러 건 | 이력에는 결제가 반드시 있음 |
-| payments 1 : N webhook_events | 결제 하나에 웹훅 여러 건 | 결제를 못 찾은 웹훅은 결제 없음 |
-| members 1 : N billing_keys | 회원 하나에 등록 카드 여러 장(사용 중 최대 5장) | 카드에는 회원이 반드시 있음 |
-| billing_keys 1 : N payments | 등록 카드 하나로 결제 여러 건 | 결제창 결제는 카드 없음 |
-| members 1 : 0..1 payment_pins | 회원 하나에 결제 비밀번호 최대 하나 | 설정하지 않은 회원은 없음 |
-
-| 컬럼 | 가리키는 대상 | 소유 도메인 |
-|---|---|---|
-| payment_histories.refund_id | 취소를 일으킨 환불 | 환불 |
-
-- 결제가 붙은 주문은 지우지 않습니다. 결제를 시도한 결제 대기 주문은 정리될 때 취소 상태로 남습니다.
-
-## 정산 테이블 관계
-
-정산 테이블 1개입니다. 컬럼 정의는 [데이터 사전](data-dictionary.md#daily_sales--일별-매출-집계)에 있습니다.
-
-```mermaid
-erDiagram
-    payment_histories }o..o| daily_sales : "그날 created_at으로 집계"
-
-    payment_histories {
-        bigint id PK
-        bigint payment_id FK
-        enum event_type
-        bigint amount
-        datetime created_at
-    }
     daily_sales {
-        bigint id PK
-        date sales_date UK
-        bigint paid_amount
-        bigint refunded_amount
-        bigint net_amount "생성 컬럼"
-        int paid_count
-        int refunded_count
+        bigint id PK "일별 매출 ID"
+        date sales_date UK "매출 날짜"
+        bigint paid_amount "결제 금액 합계"
+        bigint refunded_amount "환불 금액 합계"
+        bigint net_amount "순매출 (자동 계산 컬럼)"
+        int paid_count "결제 건수"
+        int refunded_count "환불 건수"
     }
 ```
 
-| 관계 | 의미 | 필수 여부 |
-|---|---|---|
-| payment_histories N : 1 daily_sales | 하루(한국 시간) 동안 남은 결제 이력을 합쳐 그날 한 행을 만듦 | 키로 잇지 않는 집계 관계. FK 없음 |
+---
 
-- daily_sales는 다른 테이블을 FK로 가리키지 않습니다. `sales_date`로 날짜마다 한 행입니다.
-- 결제 상태가 `PAID`인 결제의 `PAID`·`PARTIAL_CANCELLED`·`CANCELLED` 이력만 셉니다. 주·월 합계는 저장하지 않습니다.
+### 3.7 AI 상담 도메인
+사용자와 AI 간의 메뉴 추천 상담 세션(회원당 진행 중 1건 보장)과 메시지 내역, 그리고 추천된 레시피/상품 카드 결과를 관리합니다.
 
-## 확정 절차
+```mermaid
+erDiagram
+    members ||--o{ chat_sessions : "상담 세션"
+    chat_sessions ||--o{ chat_messages : "메시지 순서 (1:N)"
+    chat_messages ||--o{ chat_recommendations : "추천 카드"
+    recipes |o--o{ chat_recommendations : "추천 레시피"
+    products |o--o{ chat_recommendations : "추천 상품"
 
-담당자·도메인 정책 확인 → 데이터 사전 → 관계 필수성·삭제 정책 → 키·인덱스 → 마이그레이션 검토. [DB 규칙](../conventions/database.md)의 미결정 항목(Q-06, Q-07)을 먼저 해결합니다.
+    chat_sessions {
+        bigint id PK "상담 세션 ID"
+        bigint member_id FK "회원 ID"
+        enum status "ACTIVE, COMPLETED, EXPIRED"
+        datetime last_message_at "마지막 대화 일시"
+        bigint active_member_id UK "진행 중 회원 ID (회원당 1개 보장 계산 컬럼)"
+    }
+
+    chat_messages {
+        bigint id PK "메시지 ID"
+        bigint chat_session_id FK
+        int sequence "대화 순서 (1, 2, ...)"
+        enum role "USER / ASSISTANT"
+        text content "메시지 원문"
+        boolean filtered "안전 장치 필터링 여부"
+    }
+
+    chat_recommendations {
+        bigint id PK "추천 ID"
+        bigint chat_message_id FK
+        bigint recipe_id FK "추천 레시피 ID"
+        bigint product_id FK "추천 상품 ID"
+        int display_order "카드 표시 순서"
+        text description "추천 사유 AI 설명"
+    }
+```
+
+---
+
+### 3.8 요리 기록 · 재료 이력 · 후기 & 알림 도메인
+레시피 조리 완료 기록과 그에 따른 냉장고 재료 소진/폐기 이력, 레시피 별점/후기, 그리고 인앱 알림을 관리합니다.
+
+```mermaid
+erDiagram
+    members ||--o{ cooking_logs : "요리 완료 기록"
+    recipes ||--o{ cooking_logs : "조리한 레시피"
+    chat_sessions |o--o{ cooking_logs : "상담 연계 (선택)"
+
+    members ||--o{ fridge_item_logs : "재료 변동 이력"
+    ingredients ||--o{ fridge_item_logs : "표준 재료"
+    cooking_logs |o--o{ fridge_item_logs : "요리로 소진된 경우"
+
+    members ||--o{ recipe_reviews : "후기 작성"
+    recipes ||--o{ recipe_reviews : "대상 레시피"
+
+    members ||--o{ notifications : "인앱 알림 수신"
+
+    cooking_logs {
+        bigint id PK "요리 기록 ID"
+        bigint member_id FK
+        bigint recipe_id FK
+        bigint chat_session_id FK "상담 추천인 경우"
+        enum result "SUCCESS / FAILED"
+        varchar memo "요리 메모"
+    }
+
+    fridge_item_logs {
+        bigint id PK "재료 이력 ID"
+        bigint member_id FK
+        bigint ingredient_id FK
+        bigint cooking_log_id FK "요리로 사용된 경우"
+        bigint fridge_id "원래 냉장고 재료 ID (참고용)"
+        varchar raw_name "재료명 원문"
+        decimal quantity "빠진 수량"
+        enum action "CONSUMED (소진) / DISCARDED (폐기)"
+    }
+
+    recipe_reviews {
+        bigint id PK "후기 ID"
+        bigint member_id FK
+        bigint recipe_id FK
+        int rating "별점 (1~5)"
+        varchar content "한 줄 후기 (최대 100자)"
+    }
+
+    notifications {
+        bigint id PK "알림 ID"
+        bigint member_id FK
+        enum notification_type "EXPIRATION, FLASH_DROP, COMMERCE_STOCKED"
+        varchar content "알림 문구"
+        varchar link_url "이동 경로"
+        varchar dedupe_key UK "중복 방지 키"
+        boolean is_read "읽음 여부"
+    }
+```
+
+---
+
+### 3.9 판매 예측 · 할인 후보 분석 & 감사 이력
+PyTorch 머신러닝 주간 판매 예측 결과와 요일별 할인 후보 시뮬레이션 및 관리자 작업 감사 로그입니다.
+
+```mermaid
+erDiagram
+    prediction_runs ||--o{ sales_forecasts : "상품별 주간 예측"
+    members ||--o{ deal_analyses : "분석 실행 관리자"
+    deal_analyses ||--o{ deal_candidates : "후보/제외 상품 목록"
+    members ||--o{ admin_audit_logs : "작업자"
+
+    prediction_runs {
+        bigint id PK "예측 실행 ID"
+        date target_week_start UK "대상 주 월요일"
+        varchar model_version "모델 버전 (예: fc-v0.3)"
+        datetime data_cutoff_at "데이터 기준 시각"
+        datetime confirmed_at "실제 판매량 확정일시"
+    }
+
+    sales_forecasts {
+        bigint id PK
+        bigint prediction_run_id FK
+        bigint product_id "상품 ID"
+        varchar product_name "예측 시점 상품명"
+        int predicted_rank "예상 순위"
+        int predicted_qty "예상 판매 수량"
+        int baseline_qty "기준선 예측 (전주 판매량)"
+        int actual_rank "실제 순위"
+        int actual_qty "실제 판매 수량"
+    }
+
+    deal_analyses {
+        bigint id PK "할인 후보 분석 ID"
+        bigint member_id FK "분석한 관리자"
+        date target_week_start "대상 주 월요일"
+        enum day_of_week "적용 요일"
+        int discount_rate "가상 할인율(%)"
+        int min_stock "최소 재고 기준"
+        varchar model_version "분석 모델 버전"
+    }
+
+    deal_candidates {
+        bigint id PK
+        bigint deal_analysis_id FK
+        bigint product_id "상품 ID"
+        varchar product_name "분석 시점 상품명"
+        int regular_price "정상가"
+        int discount_price "할인가"
+        int current_stock "현재 재고"
+        boolean is_excluded "제외 여부"
+        enum review_status "UNREVIEWED, SELECTED, HELD"
+        enum event_request_status "NONE, REQUESTED, APPROVED, REJECTED"
+        bigint promotion_id "연계된 행사 ID"
+    }
+
+    admin_audit_logs {
+        bigint id PK "감사 로그 ID"
+        bigint member_id FK "작업 회원"
+        enum action "PRODUCT_CREATE, PRICE_UPDATE, ROLE_CHANGE 등"
+        varchar target_type "대상 종류"
+        bigint target_id "대상 ID"
+        enum result "SUCCESS, FAILED, DENIED"
+        json before_value "변경 전 값"
+        json after_value "변경 후 값"
+    }
+```

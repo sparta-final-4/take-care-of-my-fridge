@@ -146,7 +146,7 @@
 |---|---|
 | **역할** | 테이블의 각 컬럼이 무엇을 뜻하고 어떤 값을 저장하는지 설명합니다. |
 | **작성할 내용** | 테이블·컬럼명, 물리 타입·길이, NULL, 기본값, PK·FK·유일성, 값의 단위·허용 범위, 인덱스, 시간대, 보관·삭제·마이그레이션 영향을 적습니다. |
-| **현재 내용** | 개인 담당 테이블 8개의 컬럼 표(타입·NULL·기본값·제약·의미)가 있습니다. 같은 내용의 DDL 초안이 [member-auth-admin.sql](../docs/database/member-auth-admin.sql)에 있습니다. 상품·주문·재고·검색·후기 도메인에 요청할 데이터 목록과 새 테이블 작성 양식도 있습니다. |
+| **현재 내용** | 개인 담당 테이블 8개의 컬럼 표(타입·NULL·기본값·제약·의미)가 있습니다. 전체 스키마는 [schema.sql](../docs/database/schema.sql), 초기 DDL 초안은 [member-auth-admin.sql](../docs/database/history/member-auth-admin.sql)에 있습니다. 상품·주문·재고·검색·후기 도메인에 요청할 데이터 목록과 새 테이블 작성 양식도 있습니다. |
 | **보완할 내용** | 인덱스, 시간대, 감사 시각 관리 주체(Q-06), DB 제품(Q-07)이 미정입니다. 다른 도메인의 테이블은 각 담당이 같은 양식으로 추가합니다. DDL은 DB가 확정된 뒤 실행합니다. |
 | **작성 시점** | 스키마 생성·변경 전에 작성합니다. 테이블을 만들거나 데이터 의미를 해석할 때 추가 추측이 없어야 합니다. |
 
@@ -309,7 +309,7 @@ README의 안내 목록 외에 다음 파일도 있습니다.
 | [take-care-of-my-fridge-fe/CLAUDE.md](../take-care-of-my-fridge-fe/CLAUDE.md) | 프론트 규칙 기준본(구조·API·UI·검증 명령) | 규칙이 바뀌면 여기만 고침 |
 | [take-care-of-my-fridge-be/CLAUDE.md](../take-care-of-my-fridge-be/CLAUDE.md) | 백엔드 규칙 기준본(구조·레이어·응답·테스트·검증 명령) | 규칙이 바뀌면 여기만 고침 |
 | [도메인 설계 템플릿](../docs/architecture/domains/_template.md) | 도메인 책임·정책·상태 전이·연동·검증 양식 | 회원은 작성됨. 할인 후보·판매 예측 등 다른 도메인 문서 작성 |
-| [DDL 초안](../docs/database/member-auth-admin.sql) | 개인 담당 8개 테이블의 CREATE TABLE 초안 | DB 확정 후 실행, 데이터 사전과 함께 갱신 |
+| [전체 DDL 스키마](../docs/database/schema.sql) | 전체 도메인 39개 테이블의 CREATE TABLE 스키마 (초안: [history](../docs/database/history/)) | DB 확정 후 실행, 데이터 사전과 함께 갱신 |
 
 시스템 설계는 서비스 전체 연결을, 도메인 설계는 한 도메인 내부의 정책·상태·트랜잭션을 설명합니다. DB 규칙은 공통 기준, ERD는 관계, 데이터 사전은 컬럼의 상세 의미를 다룹니다.
 

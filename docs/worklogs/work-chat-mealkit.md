@@ -46,7 +46,7 @@
 - AI에 맡긴 작업: 상품·냉장고·상담 저장 구조 조사, 구현·테스트, SQL 작성, oag 갱신
 - oag 갱신: PR 1과 같이 임시 `@SpringBootTest`(Testcontainers MySQL)로 `/v3/api-docs`를 받아 스크립트와 같은 정리 후 `pnpm oag:generate:offline`. 스펙 변경은 `RecommendedMealkit`과 `ChatMessageResponse.mealkits`뿐이다. 임시 테스트는 지웠다
 - 조사에서 확인한 것:
-  - 상품 테이블 DDL·데이터 사전 문서가 없다 → 새 SQL 파일(`docs/database/product-mealkit-recipe.sql`)과 이 기록으로 대신한다
+  - 상품 테이블 DDL·데이터 사전 문서가 없다 → 새 SQL 파일(`docs/database/history/product-mealkit-recipe.sql`)과 이 기록으로 대신한다
   - `chat_recommendations`에 이미 `product_id` 칸이 있다 (recipe_id·product_id 중 하나만). 테이블 변경 없음
   - 냉장고 밀키트 줄은 모두 밀키트 재료(ING_MEALKIT) 하나로 들어가고 상품 ID가 없다. `raw_name`(구매 때 상품 이름)으로 같은 밀키트를 가린다 (사용자 확인)
   - dev 밀키트 상품 이름은 끝에 " 밀키트"가 붙어 있어("된장국 밀키트") 레시피 이름("된장국")과 이름으로 맞출 수 없다. 처음 쓴 이름 매칭 채우기 SQL은 dev에서 0건이었다. 조회 결과에 이미 " 밀키트"가 보였는데 대조하지 않았다. 상품 ID → 레시피 ID 직접 매핑(24→544, 25→543, 26→542, 27→539, 28→555)으로 바꿨다
@@ -56,7 +56,7 @@
 - 상품 도메인:
   - `MealkitProduct.recipeId`(null 허용, FK 없이 ID만, 인덱스 `idx_mealkit_products_recipe_id`)
   - `ProductService.getOnSaleMealkits()`(판매 중만), `getPublicMealkits(productIds)`(판매 중·품절, 판매 중지 제외)
-  - SQL: `docs/database/product-mealkit-recipe.sql`(ALTER + dev 채우기 5개, 상품 ID → 레시피 ID 직접 매핑), `docs/database/dev-product-cleanup.sql`(감자 상품 재료, 29·30 판매 중지, 배추·돼지고기 예시)
+  - SQL: `docs/database/history/product-mealkit-recipe.sql`(ALTER + dev 채우기 5개, 상품 ID → 레시피 ID 직접 매핑), `docs/database/history/dev-product-cleanup.sql`(감자 상품 재료, 29·30 판매 중지, 배추·돼지고기 예시)
 - 상담:
   - `MealkitWordChecker`, `ChatMealkitWordProperties`
   - `MealkitPicker`
@@ -84,7 +84,7 @@
 
 ## 연결과 남은 작업
 - 커밋: `615709d2`(칸·SQL), `ba173cd3`(dev 정리 SQL), `75a9196b`(단어 확인·고르기), `3299a8ae`(이벤트·저장·다시 불러오기), `cb55cd05`(oag), `662e507d`(프론트), 이 문서 커밋
-- 사용자가 실행할 것: `product-mealkit-recipe.sql`(dev는 앱을 새 코드로 띄우기 전에 1번 ALTER 먼저, ddl-auto=validate), `dev-product-cleanup.sql`
+- 사용자가 실행할 것: `docs/database/history/product-mealkit-recipe.sql`(dev는 앱을 새 코드로 띄우기 전에 1번 ALTER 먼저, ddl-auto=validate), `docs/database/history/dev-product-cleanup.sql`
 - 나중에 할 것:
   - 냉장고 입고를 주문 시점 정보로 바꾸는 리뷰 피드백(`FridgeFacade#stockPurchasedItems`)과 함께, 냉장고 줄에 상품 ID를 남기면 같은 밀키트 판단을 이름 비교에서 ID 비교로 바꾼다
   - 관리자 밀키트 등록·수정에서 레시피 고르기

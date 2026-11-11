@@ -127,7 +127,7 @@ sequenceDiagram
 ```
 
 ## 데이터·API·이벤트
-- ERD·데이터 사전: [erd.md](../../database/erd.md#결제-테이블-관계), [data-dictionary.md](../../database/data-dictionary.md#payments--결제), DDL [payment.sql](../../database/payment.sql)
+- ERD·데이터 사전: [erd.md](../../database/erd.md#36-결제--환불--정산-도메인), [data-dictionary.md](../../database/data-dictionary.md#6-결제--환불--정산-도메인), DDL [schema.sql](../../database/schema.sql) (초안: [payment.sql](../../database/history/payment.sql))
 - 제공 API: [결제 API](../../api/payment-api.md) (결제 준비, 결제 확정, 결제창 닫기, PortOne 웹훅, 등록 카드 결제, 카드, 결제 비밀번호)
 - 수신 이벤트와 중복 처리: PortOne 웹훅. `webhook_id`로 한 번만 처리하고, 처리 실패(`FAILED`)와 수신 중(`RECEIVED`)은 재전송 때 다시 처리합니다.
 - 발행 이벤트: `PaymentCompletedEvent`(orderId, memberId). 처음 승인한 요청만 발행하고, 장바구니가 커밋 뒤(`AFTER_COMMIT`) 받습니다.
