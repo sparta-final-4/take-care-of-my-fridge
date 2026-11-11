@@ -386,22 +386,5 @@ pnpm dev
 <br/>
 
 ## 11. 문서 안내
-
-프로젝트의 상세 설계 문서, API 규격, 데이터베이스 모델링 및 개발 컨벤션 안내입니다.
-
+프로젝트의 상세 설계 문서, API 규격, 데이터베이스 모델링 및 개발 컨벤션은 위키에서 확인 가능합니다.
 - 📚 **프로젝트 위키**: [GitHub Wiki 바로가기](https://github.com/sparta-final-4/take-care-of-my-fridge/wiki)
-- 📋 **API 명세서**: 
-  - [통합 API 명세 (docs/api/api-spec.md)](docs/api/api-spec.md)
-  - [도메인별 API 명세 (docs/api/)](docs/api/)
-  - [Swagger UI 명세서](https://api-dev.imhungry.click/swagger-ui/index.html)
-- 🗄️ **데이터베이스 문서**:
-  - [데이터베이스 ERD (docs/database/erd.md)](docs/database/erd.md)
-  - [데이터 사전 (docs/database/data-dictionary.md)](docs/database/data-dictionary.md)
-- 🏛️ **아키텍처 및 도메인 설계**:
-  - [시스템 전체 설계 (docs/architecture/system-design.md)](docs/architecture/system-design.md)
-  - [도메인별 세부 설계 (docs/architecture/domains/)](docs/architecture/domains/)
-- 🤝 **개발 규칙 및 컨벤션**:
-  - [백엔드 개발 규칙 (CLAUDE.md)](take-care-of-my-fridge-be/CLAUDE.md)
-  - [프론트엔드 개발 규칙 (CLAUDE.md)](take-care-of-my-fridge-fe/CLAUDE.md)
-  - [Git 협업 및 브랜치 규칙 (docs/conventions/git.md)](docs/conventions/git.md)
-  - [공통 작업 지침 (AGENTS.md)](AGENTS.md)
