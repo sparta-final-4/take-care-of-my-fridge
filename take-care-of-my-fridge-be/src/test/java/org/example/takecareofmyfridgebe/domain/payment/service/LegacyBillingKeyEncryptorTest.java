@@ -24,7 +24,9 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-// 암호화 전 DB(평문 billing_key 컬럼이 남아 있고 새 컬럼은 NULL 허용)를 만들어 옮기기를 확인한다.
+// 암호화 전 DB를 만들어 옮기기를 확인한다. 두 경우를 본다.
+// - 손으로 DDL을 먼저 돌린 DB: 평문 billing_key가 NULL 허용으로 남고 새 컬럼도 NULL 허용
+// - 배포 DB(ddl-auto: update): 평문 billing_key가 NOT NULL·UNIQUE로 남고, 새 컬럼은 NOT NULL에 기존 행은 '', 지문 UNIQUE는 못 만든 상태
 // 컬럼을 바꾸는 DDL은 MySQL에서 바로 커밋되므로 테스트 트랜잭션을 끄고, 끝나면 테이블을 원래대로 되돌린다
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
@@ -47,13 +49,68 @@ class LegacyBillingKeyEncryptorTest extends MySqlContainerSupport {
         this.encryptor = new LegacyBillingKeyEncryptor(jdbcTemplate, CRYPTO);
     }
 
+    // 엔티티가 만든 원래 구조로 되돌린다: 평문 컬럼 없음, 새 컬럼 NOT NULL, 지문 UNIQUE 있음
     @AfterEach
     void tearDown() {
         jdbcTemplate.update("DELETE FROM billing_keys");
         if (legacySchema) {
             jdbcTemplate.execute("ALTER TABLE billing_keys DROP COLUMN billing_key, "
                     + "MODIFY billing_key_ciphertext VARCHAR(512) NOT NULL, MODIFY billing_key_hash CHAR(64) NOT NULL");
+            if (!hasUniqueOn("billing_key_hash")) {
+                jdbcTemplate.execute("ALTER TABLE billing_keys ADD CONSTRAINT uk_billing_keys_billing_key_hash "
+                        + "UNIQUE (billing_key_hash)");
+            }
         }
+    }
+
+    @Test
+    @DisplayName("배포 DB처럼 평문 컬럼이 NOT NULL·UNIQUE로 남고 새 컬럼이 ''로 채워져 있어도, 구조를 고쳐 옮기고 지문 UNIQUE를 만들며 새 카드를 넣을 수 있다")
+    void migratesAndFixesSchema_whenLegacyColumnStillNotNullAndUnique() {
+        toUpdatedByHibernateSchema();
+        long first = insertLegacyWithEmptyNewColumns(7L, "billing-key-legacy-1");
+        insertLegacyWithEmptyNewColumns(8L, "billing-key-legacy-2");
+
+        int migrated = encryptor.migrate();
+
+        assertThat(migrated).isEqualTo(2);
+        assertThat(encryptor.countLegacyRows()).isZero();
+        assertThat(jdbcTemplate.queryForObject("SELECT is_nullable FROM information_schema.columns "
+                + "WHERE table_schema = DATABASE() AND table_name = 'billing_keys' AND column_name = 'billing_key'",
+                String.class)).isEqualTo("YES");
+        assertThat(hasUniqueOn("billing_key")).isFalse();
+        assertThat(hasUniqueOn("billing_key_hash")).isTrue();
+        assertThat(CRYPTO.decrypt(billingKeyRepository.findByBillingKeyHash(CRYPTO.hash("billing-key-legacy-1"))
+                .orElseThrow())).isEqualTo("billing-key-legacy-1");
+        assertThat(billingKeyRepository.findById(first)).isPresent();
+
+        // 평문 컬럼에 값을 넣지 않는 새 엔티티로 카드를 저장할 수 있다
+        BillingKey saved = billingKeyRepository.saveAndFlush(BillingKey.builder().memberId(9L)
+                .encryptedBillingKey(CRYPTO.encrypt(9L, "billing-key-new")).isDefault(true).build());
+        assertThat(saved.getId()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("구조를 이미 고친 뒤 다시 돌려도 아무것도 바꾸지 않는다")
+    void doesNothing_whenMigrateRunAgainAfterSchemaFixed() {
+        toUpdatedByHibernateSchema();
+        insertLegacyWithEmptyNewColumns(7L, "billing-key-legacy-1");
+        encryptor.migrate();
+
+        assertThat(encryptor.migrate()).isZero();
+        assertThat(hasUniqueOn("billing_key_hash")).isTrue();
+    }
+
+    @Test
+    @DisplayName("옮기지 못한 평문 행이 남으면 지문 UNIQUE를 만들지 않는다('' 중복으로 실패하지 않게)")
+    void skipsHashUnique_whenLegacyRowsRemain() {
+        toUpdatedByHibernateSchema();
+        insertLegacyWithEmptyNewColumns(7L, "billing-key-legacy-1");
+        // 컬럼(200자)에는 들어가지만 암호화 한도(200바이트)를 넘는 평문이라 이 행은 옮겨지지 않는다
+        insertLegacyWithEmptyNewColumns(8L, "가".repeat(100));
+
+        assertThat(encryptor.migrate()).isEqualTo(1);
+        assertThat(encryptor.countLegacyRows()).isEqualTo(1);
+        assertThat(hasUniqueOn("billing_key_hash")).isFalse();
     }
 
     @Test
@@ -124,7 +181,28 @@ class LegacyBillingKeyEncryptorTest extends MySqlContainerSupport {
         assertThat(encryptor.encryptLegacyRows()).isZero();
     }
 
-    // 배포 1단계 DDL을 적용한 상태: 새 컬럼은 NULL 허용, 옛 평문 컬럼은 NULL 허용으로 남음
+    // 옛 엔티티 그대로의 테이블에 Hibernate update가 새 컬럼만 더한 상태.
+    // 평문 컬럼은 NOT NULL·UNIQUE, 지문 UNIQUE는 기존 행의 '' 중복 때문에 만들지 못했다
+    private void toUpdatedByHibernateSchema() {
+        jdbcTemplate.execute("ALTER TABLE billing_keys DROP INDEX uk_billing_keys_billing_key_hash");
+        jdbcTemplate.execute("ALTER TABLE billing_keys ADD COLUMN billing_key VARCHAR(200) NOT NULL, "
+                + "ADD CONSTRAINT uk_billing_keys_billing_key UNIQUE (billing_key)");
+        legacySchema = true;
+    }
+
+    private long insertLegacyWithEmptyNewColumns(long memberId, String billingKey) {
+        jdbcTemplate.update("INSERT INTO billing_keys (member_id, billing_key, billing_key_ciphertext, billing_key_hash, "
+                + "is_default, status, created_at, updated_at) VALUES (?, ?, '', '', TRUE, 'ACTIVE', NOW(6), NOW(6))",
+                memberId, billingKey);
+        return jdbcTemplate.queryForObject("SELECT id FROM billing_keys WHERE billing_key = ?", Long.class, billingKey);
+    }
+
+    private boolean hasUniqueOn(String column) {
+        return !jdbcTemplate.queryForList(LegacyBillingKeyEncryptor.SINGLE_COLUMN_UNIQUE_INDEXES, String.class, column)
+                .isEmpty();
+    }
+
+    // 손으로 1단계 DDL을 적용한 상태: 새 컬럼은 NULL 허용, 옛 평문 컬럼은 NULL 허용으로 남음
     private void toLegacySchema() {
         jdbcTemplate.execute("ALTER TABLE billing_keys ADD COLUMN billing_key VARCHAR(200) NULL, "
                 + "MODIFY billing_key_ciphertext VARCHAR(512) NULL, MODIFY billing_key_hash CHAR(64) NULL");

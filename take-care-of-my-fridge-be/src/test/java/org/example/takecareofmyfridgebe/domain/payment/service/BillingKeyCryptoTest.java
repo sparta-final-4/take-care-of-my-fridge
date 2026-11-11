@@ -46,7 +46,7 @@ class BillingKeyCryptoTest {
         EncryptedBillingKey encrypted = crypto.encrypt(1L, BILLING_KEY);
 
         assertThatThrownBy(() -> crypto.decrypt(2L, encrypted.ciphertext()))
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(BillingKeyCryptoException.class)
                 .hasMessageNotContaining(BILLING_KEY);
     }
 
@@ -59,19 +59,19 @@ class BillingKeyCryptoTest {
         payload[payload.length - 1] ^= 0x01;
         String tampered = parts[0] + ":" + parts[1] + ":" + Base64.getEncoder().encodeToString(payload);
 
-        assertThatThrownBy(() -> crypto.decrypt(1L, tampered)).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> crypto.decrypt(1L, tampered)).isInstanceOf(BillingKeyCryptoException.class);
     }
 
     @Test
     @DisplayName("형식이 틀리거나 모르는 키 ID의 암호문은 풀지 않는다")
     void throwsException_whenFormatInvalidOrKeyUnknown() {
-        assertThatThrownBy(() -> crypto.decrypt(1L, BILLING_KEY)).isInstanceOf(IllegalStateException.class)
+        assertThatThrownBy(() -> crypto.decrypt(1L, BILLING_KEY)).isInstanceOf(BillingKeyCryptoException.class)
                 .hasMessageNotContaining(BILLING_KEY);
-        assertThatThrownBy(() -> crypto.decrypt(1L, "v2:k1:AAAA")).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> crypto.decrypt(1L, "v2:k1:AAAA")).isInstanceOf(BillingKeyCryptoException.class);
         assertThatThrownBy(() -> crypto.decrypt(1L, "v1:k9:AAAAAAAAAAAAAAAAAAAAAAAA"))
-                .isInstanceOf(IllegalStateException.class);
-        assertThatThrownBy(() -> crypto.decrypt(1L, "v1:k1:!!!")).isInstanceOf(IllegalStateException.class);
-        assertThatThrownBy(() -> crypto.decrypt(1L, "v1:k1:AAAA")).isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(BillingKeyCryptoException.class);
+        assertThatThrownBy(() -> crypto.decrypt(1L, "v1:k1:!!!")).isInstanceOf(BillingKeyCryptoException.class);
+        assertThatThrownBy(() -> crypto.decrypt(1L, "v1:k1:AAAA")).isInstanceOf(BillingKeyCryptoException.class);
     }
 
     @Test

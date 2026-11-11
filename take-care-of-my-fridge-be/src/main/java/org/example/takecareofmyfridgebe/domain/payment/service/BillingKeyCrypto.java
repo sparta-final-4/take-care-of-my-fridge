@@ -78,7 +78,7 @@ public class BillingKeyCrypto {
             String ciphertext = FORMAT_VERSION + ":" + currentKeyId + ":" + Base64.getEncoder().encodeToString(payload);
             return new EncryptedBillingKey(ciphertext, hash(billingKey));
         } catch (GeneralSecurityException e) {
-            throw new IllegalStateException("빌링키를 암호화하지 못했습니다.", e);
+            throw new BillingKeyCryptoException("빌링키를 암호화하지 못했습니다.", e);
         }
     }
 
@@ -89,24 +89,25 @@ public class BillingKeyCrypto {
 
     public String decrypt(Long memberId, String ciphertext) {
         if (memberId == null || ciphertext == null) {
-            throw new IllegalStateException("복호화할 빌링키가 없습니다.");
+            throw new BillingKeyCryptoException("복호화할 빌링키가 없습니다.");
         }
+        // 키 ID에는 ':'가 들어갈 수 없으므로(KEY_ID_PATTERN) 앞 두 개의 ':'로 버전·키 ID·본문을 정확히 나눈다. Base64 본문에도 ':'는 없다
         String[] parts = ciphertext.split(":", 3);
         if (parts.length != 3 || !FORMAT_VERSION.equals(parts[0])) {
-            throw new IllegalStateException("빌링키 암호문 형식이 올바르지 않습니다.");
+            throw new BillingKeyCryptoException("빌링키 암호문 형식이 올바르지 않습니다.");
         }
         SecretKey key = encryptionKeys.get(parts[1]);
         if (key == null) {
-            throw new IllegalStateException("빌링키 암호문의 키를 찾을 수 없습니다: keyId=" + parts[1]);
+            throw new BillingKeyCryptoException("빌링키 암호문의 키를 찾을 수 없습니다: keyId=" + parts[1]);
         }
         byte[] payload;
         try {
             payload = Base64.getDecoder().decode(parts[2]);
         } catch (IllegalArgumentException e) {
-            throw new IllegalStateException("빌링키 암호문 형식이 올바르지 않습니다.");
+            throw new BillingKeyCryptoException("빌링키 암호문 형식이 올바르지 않습니다.");
         }
         if (payload.length <= IV_BYTES) {
-            throw new IllegalStateException("빌링키 암호문 형식이 올바르지 않습니다.");
+            throw new BillingKeyCryptoException("빌링키 암호문 형식이 올바르지 않습니다.");
         }
         try {
             Cipher cipher = Cipher.getInstance(CIPHER_ALGORITHM);
@@ -116,9 +117,10 @@ public class BillingKeyCrypto {
             return new String(plain, StandardCharsets.UTF_8);
         } catch (AEADBadTagException e) {
             // 키가 다르거나, 암호문이 바뀌었거나, 다른 회원 행의 암호문이다. 원인은 메시지에 남기지 않는다
-            throw new IllegalStateException("빌링키 암호문을 검증하지 못했습니다: keyId=" + parts[1]);
+            throw new BillingKeyCryptoException("빌링키 암호문을 검증하지 못했습니다: keyId=" + parts[1]);
         } catch (GeneralSecurityException e) {
-            throw new IllegalStateException("빌링키를 복호화하지 못했습니다: keyId=" + parts[1]);
+            // JCE 예외에는 빌링키 원문이 없으므로 원인을 붙여 키 설정 문제를 추적할 수 있게 한다
+            throw new BillingKeyCryptoException("빌링키를 복호화하지 못했습니다: keyId=" + parts[1], e);
         }
     }
 
@@ -131,7 +133,7 @@ public class BillingKeyCrypto {
             mac.init(hmacKey);
             return HexFormat.of().formatHex(mac.doFinal(billingKey.getBytes(StandardCharsets.UTF_8)));
         } catch (GeneralSecurityException e) {
-            throw new IllegalStateException("빌링키 지문을 만들지 못했습니다.", e);
+            throw new BillingKeyCryptoException("빌링키 지문을 만들지 못했습니다.", e);
         }
     }
 

@@ -21,6 +21,7 @@ import org.example.takecareofmyfridgebe.domain.payment.port.PaymentCheckout;
 import org.example.takecareofmyfridgebe.domain.payment.port.PaymentGateway;
 import org.example.takecareofmyfridgebe.domain.payment.port.PaymentGatewayResponse;
 import org.example.takecareofmyfridgebe.domain.payment.service.BillingKeyCrypto;
+import org.example.takecareofmyfridgebe.domain.payment.service.BillingKeyCryptoException;
 import org.example.takecareofmyfridgebe.domain.payment.service.BillingKeyService;
 import org.example.takecareofmyfridgebe.domain.payment.service.PaymentCommandService;
 import org.example.takecareofmyfridgebe.domain.payment.service.PaymentHistoryRecorder;
@@ -110,7 +111,7 @@ public class PaymentFacade {
     private String decryptForPayment(BillingKey card) {
         try {
             return billingKeyCrypto.decrypt(card);
-        } catch (IllegalStateException e) {
+        } catch (BillingKeyCryptoException e) {
             log.error("등록 카드 빌링키를 풀지 못함: cardId={}", card.getId(), e);
             throw new BusinessException(ErrorCode.BILLING_KEY_UNAVAILABLE);
         }
