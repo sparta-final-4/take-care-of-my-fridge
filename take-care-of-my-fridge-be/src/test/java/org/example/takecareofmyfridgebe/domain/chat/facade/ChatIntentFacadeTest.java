@@ -24,7 +24,15 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeQuery;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RefineCondition;
 import org.example.takecareofmyfridgebe.domain.chat.entity.ChatMessageRole;
-import org.example.takecareofmyfridgebe.domain.chat.service.ChatIntentExtractor;
+import org.example.takecareofmyfridgebe.domain.chat.intent.AskWordCheckerTest;
+import org.example.takecareofmyfridgebe.domain.chat.intent.CategoryWordCheckerTest;
+import org.example.takecareofmyfridgebe.domain.chat.intent.FridgeShopWordCheckerTest;
+import org.example.takecareofmyfridgebe.domain.chat.intent.IntentCorrector;
+import org.example.takecareofmyfridgebe.domain.chat.intent.MealkitWordCheckerTest;
+import org.example.takecareofmyfridgebe.domain.chat.intent.TasteWordCheckerTest;
+import org.example.takecareofmyfridgebe.domain.chat.reply.RecommendationPromptBuilder;
+import org.example.takecareofmyfridgebe.domain.chat.safety.AllergyExclusionFinder;
+import org.example.takecareofmyfridgebe.domain.chat.ai.ChatIntentExtractor;
 import org.example.takecareofmyfridgebe.domain.chat.service.ChatMessageService;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.Ingredient;
 import org.example.takecareofmyfridgebe.domain.ingredient.service.IngredientMatcher;
@@ -57,7 +65,7 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-class ChatIntentFacadeTest {
+public class ChatIntentFacadeTest {
 
     private static final Long MEMBER_ID = 1L;
     private static final Long SESSION_ID = 10L;
@@ -66,7 +74,7 @@ class ChatIntentFacadeTest {
     private static final Long CUCUMBER = 15L;
 
     // config/chat-words.yml app.chat.taste-opposites와 같은 쌍
-    static final ChatTasteOppositeProperties TASTE_OPPOSITES = new ChatTasteOppositeProperties(List.of(
+    public static final ChatTasteOppositeProperties TASTE_OPPOSITES = new ChatTasteOppositeProperties(List.of(
             List.of(Taste.MILD, Taste.SPICY), List.of(Taste.MILD, Taste.SALTY)));
 
     // config/chat-words.yml app.chat.food-words와 같은 목록

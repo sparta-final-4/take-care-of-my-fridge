@@ -1,6 +1,6 @@
 package org.example.takecareofmyfridgebe.domain.chat.facade;
 
-import org.example.takecareofmyfridgebe.domain.chat.facade.MealkitPicker.FridgeMealkits;
+import org.example.takecareofmyfridgebe.domain.chat.recommend.MealkitPicker.FridgeMealkits;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse.RecommendedMealkit;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse.RecommendedRecipe;
@@ -16,6 +16,11 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeDetailReply;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeQuery;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecommendationReply;
 import org.example.takecareofmyfridgebe.domain.chat.dto.SavedRecommendation;
+import org.example.takecareofmyfridgebe.domain.chat.intent.MealkitWordCheckerTest;
+import org.example.takecareofmyfridgebe.domain.chat.intent.TasteWordCheckerTest;
+import org.example.takecareofmyfridgebe.domain.chat.intent.TemperatureWordCheckerTest;
+import org.example.takecareofmyfridgebe.domain.chat.recommend.MealkitPicker;
+import org.example.takecareofmyfridgebe.domain.chat.safety.AllergyWordCheckerTest;
 import org.example.takecareofmyfridgebe.domain.chat.service.ChatMessageService;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.Ingredient;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.StorageType;

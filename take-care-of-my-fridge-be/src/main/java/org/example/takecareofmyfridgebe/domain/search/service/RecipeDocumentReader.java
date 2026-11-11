@@ -3,7 +3,7 @@ package org.example.takecareofmyfridgebe.domain.search.service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatCandidateProperties;
-import org.example.takecareofmyfridgebe.domain.chat.facade.SpicyRecipeDetector;
+import org.example.takecareofmyfridgebe.domain.chat.recommend.SpicyRecipeDetector;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeIndexSource;
 import org.example.takecareofmyfridgebe.domain.recipe.service.RecipeIndexSourceService;

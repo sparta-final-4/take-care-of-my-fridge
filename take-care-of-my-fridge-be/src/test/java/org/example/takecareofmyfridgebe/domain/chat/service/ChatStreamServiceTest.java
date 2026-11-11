@@ -1,5 +1,6 @@
 package org.example.takecareofmyfridgebe.domain.chat.service;
 
+import org.example.takecareofmyfridgebe.domain.chat.ai.ChatReplyGenerator;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatHealthWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatSafetyWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext;
