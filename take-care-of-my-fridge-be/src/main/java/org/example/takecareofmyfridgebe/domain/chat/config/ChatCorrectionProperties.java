@@ -12,7 +12,7 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * @param keepOtherTastes    피할 맛만 말하면 맛 조건 지우기를 뺀다(keepOtherTastes)
  * @param refineSpokenTastes 다시 추천에서 맛이 부딪히면 이번 말의 맛 단어를 따른다(followSpokenTastes)
  * @param categoryWords      분류 단어·묶음 말로 분류를 정한다(correctCategories)
- * @param dishFromKeywords   요리 이름을 첫 키워드로 서버가 정한다(withDishFromKeywords). 끄면 요리 이름 없음
+ * @param dishCheck          AI 요리 이름을 확인한다(checkDishAndKeywords): 메시지에 그대로 있고 분류 이름·묶음 말이 아닐 때만 둔다. 끄면 AI 값 그대로
  * @param nameOnly           이름만 말한 짧은 말을 추천으로(nameOnly)
  * @param mealkitRequest     밀키트를 달라는 말을 추천으로(mealkitRequested)
  * @param offTopicRevive     음식 말이 있으면 상관없는 질문을 되살린다(reviveOffTopic)
@@ -25,7 +25,7 @@ public record ChatCorrectionProperties(
         @DefaultValue("true") boolean keepOtherTastes,
         @DefaultValue("true") boolean refineSpokenTastes,
         @DefaultValue("true") boolean categoryWords,
-        @DefaultValue("true") boolean dishFromKeywords,
+        @DefaultValue("true") boolean dishCheck,
         @DefaultValue("true") boolean nameOnly,
         @DefaultValue("true") boolean mealkitRequest,
         @DefaultValue("true") boolean offTopicRevive,

@@ -100,7 +100,7 @@ app:
       keep-other-tastes: true
       refine-spoken-tastes: true
       category-words: true
-      dish-from-keywords: true
+      dish-check: true
       name-only: true
       mealkit-request: true
       off-topic-revive: true

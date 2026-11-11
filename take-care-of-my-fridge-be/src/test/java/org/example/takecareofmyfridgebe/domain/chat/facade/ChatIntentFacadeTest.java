@@ -425,16 +425,28 @@ class ChatIntentFacadeTest {
         }
 
         @Test
-        @DisplayName("요리 이름은 AI 값이 아니라 첫 키워드가 메시지에 그대로 있을 때 그 이름으로 정한다")
-        void picksDishFromFirstKeyword() {
+        @DisplayName("AI가 뽑은 요리 이름은 메시지에 띄어쓰기와 상관없이 그대로 있을 때만 쓰고, 메시지에 없으면 비운다")
+        void keepsAiDish_onlyWhenInMessage() {
             givenExtracted(new IntentResult(ChatIntent.RECOMMEND, null, List.of("튀김"), null, null, null, null,
-                    List.of("김피탕", "탕수육"), "", null));
+                    List.of("김피탕", "탕수육"), "김피탕", null));
             assertThat(facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("김피탕 같은 요리 추천해줘"))
                     .recipeQuery().keywordText()).isEqualTo("김피탕");
 
             givenExtracted(new IntentResult(ChatIntent.RECOMMEND, null, null, null, null, null, null,
-                    List.of("샐러드", "냉채"), "차가운 요리", "차가운 요리"));
+                    List.of("장어 조림", "장어구이"), "장어 조림", null));
+            assertThat(facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("장어조림 먹고 싶어"))
+                    .recipeQuery().keywordText()).isEqualTo("장어 조림");
+
+            // AI가 키워드로 늘린 이름을 요리 이름으로 내면 메시지에 없으므로 비운다
+            givenExtracted(new IntentResult(ChatIntent.RECOMMEND, null, null, null, null, null, null,
+                    List.of("냉채", "냉국"), "냉채", "차가운 요리"));
             assertThat(facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("차가운 요리 추천해줘"))
+                    .recipeQuery().keywordText()).isNull();
+
+            // AI가 요리 이름을 비우면 키워드가 메시지에 있어도 요리 이름은 없다 (서버가 추측하지 않는다)
+            givenExtracted(new IntentResult(ChatIntent.RECOMMEND, null, List.of("찌개"), null, null, null, null,
+                    List.of("김치찌개"), "", null));
+            assertThat(facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("김치찌개 먹고 싶어"))
                     .recipeQuery().keywordText()).isNull();
         }
 
@@ -453,12 +465,12 @@ class ChatIntentFacadeTest {
         }
 
         @Test
-        @DisplayName("\"디저트 추천해줘\"에서 AI가 키워드에 분류 이름을 섞어 줘도 분류 이름만 빼고 요리 이름은 정하지 않는다")
+        @DisplayName("\"디저트 추천해줘\"에서 AI가 키워드·요리 이름에 분류 이름을 넣어도 분류 이름은 키워드에서 빼고 요리 이름은 비운다")
         void removesMixedCategoryKeyword() {
             when(recipeService.getClassifications())
                     .thenReturn(new RecipeClassificationResponse(List.of("한식"), List.of("국", "디저트", "찌개")));
             givenExtracted(new IntentResult(ChatIntent.RECOMMEND, null, List.of("디저트"), null, null, null, null,
-                    List.of("디저트", "푸딩", "케이크"), null, null));
+                    List.of("디저트", "푸딩", "케이크"), "디저트", null));
 
             RecipeQuery query = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("디저트 추천해줘")).recipeQuery();
 
@@ -2052,14 +2064,14 @@ class ChatIntentFacadeTest {
         }
 
         @Test
-        @DisplayName("요리 이름 서버 계산을 끄면 요리 이름이 없다")
-        void noDish_whenDishFromKeywordsOff() {
-            givenExtracted(new IntentResult(ChatIntent.RECOMMEND, null, null, null, null, null, false, List.of("김치찌개"), null, null));
-            ChatMessageCreateRequest request = ChatMessageCreateRequest.of("김치찌개 추천해줘");
+        @DisplayName("요리 이름 확인을 끄면 메시지에 없는 AI 요리 이름도 그대로 쓴다")
+        void keepsAiDish_whenDishCheckOff() {
+            givenExtracted(new IntentResult(ChatIntent.RECOMMEND, null, null, null, null, null, false, List.of("냉채", "냉국"), "냉채", null));
+            ChatMessageCreateRequest request = ChatMessageCreateRequest.of("차가운 요리 추천해줘");
 
-            assertThat(facade.resolve(MEMBER_ID, SESSION_ID, request).recipeQuery().keywordText()).isEqualTo("김치찌개");
-            assertThat(newFacade(off("dish-from-keywords")).resolve(MEMBER_ID, SESSION_ID, request).recipeQuery().keywordText())
-                    .isNull();
+            assertThat(facade.resolve(MEMBER_ID, SESSION_ID, request).recipeQuery().keywordText()).isNull();
+            assertThat(newFacade(off("dish-check")).resolve(MEMBER_ID, SESSION_ID, request).recipeQuery().keywordText())
+                    .isEqualTo("냉채");
         }
     }
 

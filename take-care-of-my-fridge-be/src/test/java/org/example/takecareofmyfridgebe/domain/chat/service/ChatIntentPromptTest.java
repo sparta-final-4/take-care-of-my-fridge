@@ -38,6 +38,15 @@ class ChatIntentPromptTest {
     }
 
     @Test
+    @DisplayName("요리 이름은 말한 그대로 dishText에 쓰고, 분류·요리 종류·특징은 요리 이름이 아니라 빈 문자열이라고 예시와 함께 지시한다")
+    void instructsDishText() {
+        assertThat(prompt).contains("- dishText: 요리 이름을 말했으면 말한 그대로 쓴다",
+                "분류·요리 종류(\"디저트\", \"국물\", \"반찬\")나 특징(\"따뜻한 국물\", \"매운 요리\")은 요리 이름이 아니라 빈 문자열이다",
+                "\"김피탕 같은 요리 추천해줘\" → \"김피탕\"", "\"디저트 추천해줘\" → 빈 문자열", "\"시원한 국물 요리\" → 빈 문자열",
+                "dishText·preferenceText 빈 문자열");
+    }
+
+    @Test
     @DisplayName("묻는 말 없이 이름만 말해도 보여 달라는 뜻이라 RECOMMEND라고 첫 질문·이어지는 말 모두 지시한다")
     void instructsNameOnlyIsRecommend() throws IOException {
         String followUp = new ClassPathResource("prompts/chat-intent-followup.txt").getContentAsString(StandardCharsets.UTF_8);
@@ -173,9 +182,9 @@ class ChatIntentPromptTest {
     }
 
     @Test
-    @DisplayName("서버 안전망이 하는 일을 되풀이하지 않아 첫 질문 프롬프트를 2,800자 아래로 둔다 (4,905자에서 줄임)")
+    @DisplayName("서버 안전망이 하는 일을 되풀이하지 않아 첫 질문 프롬프트를 3,000자 아래로 둔다 (4,905자에서 줄이고, 요리 이름 규칙 두 줄을 더함)")
     void keepsIntentPromptShort() {
-        assertThat(prompt.length()).isLessThan(2_800);
-        assertThat(prompt).doesNotContain("dishText", "주식으로 먹을 거", "장보기 목록 짜줘", "술안주", "말하지 않았으면 빈 목록");
+        assertThat(prompt.length()).isLessThan(3_000);
+        assertThat(prompt).doesNotContain("주식으로 먹을 거", "장보기 목록 짜줘", "술안주", "말하지 않았으면 빈 목록");
     }
 }

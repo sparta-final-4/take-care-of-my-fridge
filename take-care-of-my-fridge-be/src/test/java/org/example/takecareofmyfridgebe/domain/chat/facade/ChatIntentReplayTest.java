@@ -160,7 +160,7 @@ class ChatIntentReplayTest {
                 list(row.get("aiExclude")),
                 blankToNull(row.get("aiUseSelectedOnly")) == null ? null : Boolean.valueOf(row.get("aiUseSelectedOnly")),
                 list(row.get("aiKeywords")),
-                null,
+                blankToNull(row.get("aiDish")),
                 blankToNull(row.get("aiPreference")),
                 integer(row.get("aiTargetIndex")),
                 blankToNull(row.get("aiTargetName")),

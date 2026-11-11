@@ -42,14 +42,14 @@ import java.util.stream.Stream;
  *   <li>냉장고 보기·사기 말 (fridgeShopWords): 의도를 FRIDGE·SHOP·RECOMMEND·GENERAL로. 4·5보다 먼저</li>
  *   <li>밀키트 요청 (mealkitRequest): 일반 답이지만 밀키트를 달라는 말이면 추천으로 표시 (의도는 GENERAL 그대로)</li>
  *   <li>이름만 말하기 (nameOnly): 일반 답인 짧은 이름 → 추천 (4가 아닐 때)</li>
- *   <li>분류 키워드 옮기기 (moveCategoryKeywords): 분류 이름·묶음 말인 키워드는 분류로 옮기고, 요리 이름이면 뺌 (추천·다시 추천·밀키트 추천)</li>
- *   <li>요리 이름 (dishFromKeywords): 첫 키워드가 메시지에 있으면 요리 이름 (추천·다시 추천·밀키트 추천)</li>
+ *   <li>요리 이름·분류 키워드 확인 (checkDishAndKeywords, 스위치 dishCheck): AI 요리 이름은 메시지에 그대로 있고 분류 이름·묶음 말이
+ *       아닐 때만 두고, 분류 이름·묶음 말인 키워드는 분류로 옮김 (추천·다시 추천·밀키트 추천)</li>
  *   <li>다른 맛 지키기 (keepOtherTastes): 피하는 맛만 말했으면 뺄 조건 TASTE를 지움</li>
  *   <li>맛 단어 (tasteWords): 원하는 맛·피할 맛</li>
  *   <li>분류 단어 (categoryWords): 분류, 앞 대화에서 이어진 키워드·요리 이름</li>
  *   <li>말한 맛만 (spokenTastesOnly): 새 추천에서 앞 대화에서 따라온 맛을 뺌</li>
  * </ol>
- * 맛·분류 보정(6~9)은 추천·다시 추천·밀키트 추천일 때만 한다. 일반 답·레시피 자세히는 AI 결과를 그대로 쓴다.
+ * 요리 이름·맛·분류 보정(6~9)은 추천·다시 추천·밀키트 추천일 때만 한다. 일반 답·레시피 자세히는 AI 결과를 그대로 쓴다.
  * 결과를 추천 조건(RecipeQuery)으로 바꾸고 다시 추천을 합치는 일은 ChatIntentFacade가 한다.
  */
 @Slf4j
@@ -105,7 +105,7 @@ public class IntentCorrector {
             if (detailTarget == null && result.targetName() != null) {
                 log.info("상담 레시피 자세히 대상이 이 상담 추천에 없어 그 요리로 추천 - memberId: {}, sessionId: {}, 이름: {}",
                         memberId, sessionId, result.targetName());
-                result = result.withNamed(result.includeIngredients(), List.of(result.targetName()));
+                result = result.withNamed(result.includeIngredients(), List.of(result.targetName()), result.targetName());
             }
         }
         // 냉장고 보기 말이면 AI가 추천·일반 대화로 봐도(되살린 것 포함) 냉장고 보기로 바꾼다. 아래 밀키트·이름만 말하기 규칙보다 먼저 본다
@@ -123,12 +123,8 @@ public class IntentCorrector {
         }
         // 맛·분류 단어로 조건을 고치는 것은 추천·다시 추천일 때만 한다. 일반 답·레시피 자세히는 AI 결과를 그대로 쓴다
         if (result.intent() == ChatIntent.RECOMMEND || result.intent() == ChatIntent.REFINE || mealkitRecommend) {
-            // 분류 이름·묶음 말("디저트", "국물")은 키워드·요리 이름이 아니라 분류다. 요리 이름을 정하기 전에 옮긴다
-            result = moveCategoryKeywords(memberId, sessionId, message, categories, result);
-            // 요리 이름은 AI가 아니라 서버가 정한다 (첫 키워드가 메시지에 그대로 있을 때만)
-            if (corrections.dishFromKeywords()) {
-                result = result.withDishFromKeywords(message);
-            }
+            // AI 요리 이름은 메시지에 있는지만 확인하고, 분류 이름·묶음 말("디저트", "국물")은 키워드·요리 이름이 아니라 분류다
+            result = checkDishAndKeywords(memberId, sessionId, message, categories, result);
             if (corrections.keepOtherTastes()) {
                 result = keepOtherTastes(memberId, sessionId, message, result);
             }
@@ -147,16 +143,19 @@ public class IntentCorrector {
     }
 
     /**
-     * 분류 이름·묶음 말인 키워드는 키워드에서 빼고 분류로 옮긴다. 요리 이름이 분류 이름·묶음 말이면 뺀다.
+     * AI가 뽑은 요리 이름을 확인하고, 분류 이름·묶음 말인 키워드는 키워드에서 빼고 분류로 옮긴다.
      * <ul>
+     *   <li>요리 이름(dishText)은 메시지에 그대로 있고(공백 무시) 분류 이름·묶음 말이 아닐 때만 둔다. 아니면 비운다
+     *       ("김피탕 같은 요리 추천해줘" → 김피탕 그대로, AI가 "디저트"·메시지에 없는 "냉채"를 내면 없음).
+     *       스위치 dishCheck를 끄면 AI 값을 그대로 쓴다 (평가 비교용)</li>
      *   <li>"차가운 요리"의 키워드 [샐러드, 냉채, 냉국] → 키워드 [냉채, 냉국], 분류에 샐러드를 더함 (이미 있으면 그대로)</li>
      *   <li>묶음 말("국물", "반찬")은 묶음의 분류(분류 목록에 있는 것)로 옮긴다</li>
      *   <li>이번 말에서 피하는 분류("디저트 말고")는 옮기지 않고 빼기만 한다 (CategoryWordChecker)</li>
      * </ul>
-     * 분류는 분류 조건으로만 쓴다. 키워드에 남으면 요리 이름이 되어 "디저트 레시피는 없어서…" 안내가 붙는다.
+     * 분류는 분류 조건으로만 쓴다. 키워드에 남으면 요리 이름 후보가 되어 "디저트 레시피는 없어서…" 안내가 붙는다.
      * "이 말이 분류·묶음 말인지"는 {@link #categoriesOf}에서만 본다. 바꿨으면 INFO로 남긴다.
      */
-    IntentResult moveCategoryKeywords(Long memberId, Long sessionId, String message, List<String> categories, IntentResult result) {
+    IntentResult checkDishAndKeywords(Long memberId, Long sessionId, String message, List<String> categories, IntentResult result) {
         List<String> keywords = orEmpty(result.keywords());
         List<String> aiCategories = orEmpty(result.moodCategories());
         List<String> kept = new ArrayList<>();
@@ -174,12 +173,16 @@ public class IntentCorrector {
             }
             mapped.get().stream().filter(category -> !avoided.contains(category)).forEach(category -> addOnce(moved, category));
         }
-        String dishText = result.dishText() != null && categoriesOf(result.dishText(), categories).isPresent() ? null : result.dishText();
+        String dishText = result.dishText();
+        if (corrections.dishCheck() && dishText != null
+                && (!compact(message).contains(compact(dishText)) || categoriesOf(dishText, categories).isPresent())) {
+            dishText = null;
+        }
         if (kept.size() == keywords.size() && moved.size() == aiCategories.size() && Objects.equals(dishText, result.dishText())) {
             return result;
         }
-        log.info("상담 분류 이름 키워드를 분류로 옮김 - memberId: {}, sessionId: {}, 키워드: {} → {}, 분류: {} → {}, 요리 이름: {} → {}",
-                memberId, sessionId, keywords, kept, aiCategories, moved, result.dishText(), dishText);
+        log.info("상담 요리 이름 확인·분류 키워드 옮김 - memberId: {}, sessionId: {}, 요리 이름: {} → {}, 키워드: {} → {}, 분류: {} → {}",
+                memberId, sessionId, result.dishText(), dishText, keywords, kept, aiCategories, moved);
         return result.withCategories(result.moodCategories() == null && moved.isEmpty() ? null : moved,
                 result.keywords() == null ? null : kept, dishText, result.removed());
     }
@@ -318,7 +321,7 @@ public class IntentCorrector {
      * <ul>
      *   <li>묻는 말이 없고(AskWordChecker), 공백·끝 문장 부호를 뺀 글이 {@value #NAME_ONLY_MAX_LENGTH}자 이하일 때만 본다</li>
      *   <li>밀키트 단어, 분류 단어(묶음 말 포함), 재료 사전 이름, 레시피 이름 중 하나가 있으면 바꾼다 (앞에서 찾으면 뒤는 보지 않는다).
-     *       재료 이름이면 그 재료를 말한 재료로, 레시피 이름이면 그 이름을 요리 이름 키워드로 채운다.
+     *       재료 이름이면 그 재료를 말한 재료로, 레시피 이름이면 그 이름을 키워드와 요리 이름으로 채운다.
      *       재료·레시피 이름은 요리를 달라는 말("레시피", "만드는 법")을 지우고 찾고, 레시피 이름은 맛 단어 낱말을 뺀 이름으로도 찾는다
      *       ("매운 닭볶음탕 레시피" → 닭볶음탕). 분류·맛은 추천 조건 보정(correctCategories·correctTastes)이 채운다</li>
      *   <li>인사 말("안녕 밥은?")이 있거나 지난 일을 묻는 말("밥 먹었어?")이면 바꾸지 않는다</li>
@@ -361,9 +364,9 @@ public class IntentCorrector {
         }
         log.info("상담 이름만 말해 일반 대화를 추천으로 - memberId: {}, sessionId: {}, 찾은 것: {}, 재료: {}, 키워드: {}",
                 memberId, sessionId, found, includes, keywords);
-        // 요리 이름은 뒤에서 첫 키워드로 정한다 (레시피 이름이면 그 이름이 첫 키워드)
+        // 레시피 이름을 찾았으면 그 이름이 요리 이름이다 (AI는 일반 답으로 봐서 요리 이름을 내지 않았다)
         return Optional.of(result.withNamed(includes.isEmpty() ? result.includeIngredients() : includes,
-                keywords.isEmpty() ? result.keywords() : keywords));
+                keywords.isEmpty() ? result.keywords() : keywords, keywords.isEmpty() ? result.dishText() : keywords.get(0)));
     }
 
     // 재료 사전에 있는 이름만 (직접 입력·밀키트 재료로 잡힌 이름은 뺀다). 매칭이 실패하면(DB·검색 장애) 빈 목록
