@@ -8,7 +8,7 @@
 ## 📌 공통 규칙
 
 - **기본키(PK)**: 모든 테이블은 `id BIGINT NOT NULL AUTO_INCREMENT`를 기본키로 사용합니다.
-- **감사 컬럼**: 모든 테이블은 `created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6)` 및 `updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6)`를 포함합니다 (아래 테이블별 상세 목록에서는 가독성을 위해 생략 또는 특이사항만 기재).
+- **감사 컬럼**: 모든 테이블은 `created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6)` 및 `updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6)`를 포함합니다 (아래 테이블별 상세 목록에서는 가독성을 위해 생략 또는 특이사항만 기재). 예외: 부모 행에 딸린 연결·상세 테이블 `ingredient_products`, `mealkit_products`, `recipe_steps`에는 없습니다.
 - **문자열 인코딩**: `utf8mb4` (다국어 및 이모지 지원), Collation: `utf8mb4_0900_ai_ci`.
 - **금액 및 수량**: 금액은 원 단위 `INT` 또는 `BIGINT`(`DEFAULT 0`, `CHECK >= 0`), 수량은 `INT` 또는 소수점 수량을 지원하는 `DECIMAL(10, 2)`을 사용합니다.
 - **외래키(FK)**: 도메인 격리 원칙에 따라 동일 도메인 또는 긴밀한 연관 관계는 물리 FK를 맺고, 도메인 간 경계가 명확한 참조는 물리 FK 없이 식별자(ID)만 저장하여 결합도를 낮춥니다.

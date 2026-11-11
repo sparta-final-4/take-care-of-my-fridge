@@ -66,6 +66,7 @@ take-care-of-my-fridge-be/ 개발 규칙. 이 문서와 기존 코드의 패턴�
 
 4.2 Service & Transaction
 - 클래스 상단에 @Transactional(readOnly = true)를 기본 선언하고, CUD 메서드에만 @Transactional을 명시한다.
+    - 예외: 쓰기 위주 서비스(예: 로그인·결제 처리·예측 저장)는 클래스에 붙이지 않고 메서드마다 @Transactional 또는 @Transactional(readOnly = true)를 붙여도 된다.
 - 더티 체킹(Dirty Checking): 엔티티 수정 시 repository.save()를 명시적으로 호출하지 않고, 영속 상태 엔티티의 비즈니스 메서드를 호출한다.
 - 외부 API 통신이나 카프카 메시지 발행은 DB 트랜잭션과 묶지 않으며, @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)를 활용한다.
 
@@ -218,3 +219,5 @@ public enum ErrorCode {
 - 테스트 메서드 이름은 영어 동사로 시작하는 카멜 표기로 쓴다. 결과를 먼저 쓰고 조건은 _when 뒤에 쓴다.
     - 형식: {동사}{결과}_when{조건} (조건이 없으면 _when을 생략)
     - 예: returnsCustomIngredient_whenNoCandidate, throwsNotFound_whenSessionIsOthers, decreasesQuantityInExpiryOrder
+    - 대상 메서드 이름 뒤에 결과 끝말(_throw·_throws·_return·_returns·_success 등)을 붙여도 된다: {대상}_{결과}_when{조건}
+    - 예: delete_throwException_whenAlreadyDeleted, cancelPayment_returnCancellationId, confirmPayment_success

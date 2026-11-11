@@ -8,6 +8,7 @@
 ### 1. 네이밍(Naming) 규칙
 
 - **테이블명:** 소문자 `snake_case`를 사용하며, **복수형** 명사를 사용합니다. (예: `refunds`, `payments`)
+    - 예외: `fridge`는 단수입니다. 바꾸면 엔티티·쿼리·문서·운영 DB까지 바꿔야 해서 그대로 둡니다.
 - **컬럼명:** 소문자 `snake_case`를 사용합니다. (예: `cancel_reason`)
 
 ---
@@ -39,6 +40,7 @@
 ### 5. 공통 컬럼 규칙 (`BaseTimeEntity`)
 
 - **컬럼 구성:** 모든 테이블에 `created_at`(생성일시)과 `updated_at`(수정일시)을 필수로 포함합니다.
+    - 예외: 부모 행에 딸린 연결·상세 테이블 `ingredient_products`, `mealkit_products`, `recipe_steps`는 두지 않습니다.
 - **데이터 타입:** 마이크로초 단위까지 정확하게 기록하기 위해 `DATETIME(6)`을 사용합니다.
 - **자동 생성:**
     - 생성 시: `DEFAULT CURRENT_TIMESTAMP(6)`
