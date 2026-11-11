@@ -1,4 +1,4 @@
-package org.example.takecareofmyfridgebe.domain.chat.service;
+package org.example.takecareofmyfridgebe.domain.chat.reply;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

@@ -1,4 +1,4 @@
-package org.example.takecareofmyfridgebe.domain.chat.facade;
+package org.example.takecareofmyfridgebe.domain.chat.reply;
 
 import org.example.takecareofmyfridgebe.domain.chat.dto.FridgeScope;
 
@@ -29,7 +29,7 @@ public final class FridgeReplyWriter {
     static final int SOON_SHOWN = 3;
     private static final int LABEL_DAYS = 3;
     // 기본 양념 보기 끝에 붙이는 사기 안내
-    static final String SEASONING_SHOP_HINT = "살 수 있는 조미료가 궁금하시면 '간장 사고 싶어'처럼 이름으로 말씀해 주세요.";
+    public static final String SEASONING_SHOP_HINT = "살 수 있는 조미료가 궁금하시면 '간장 사고 싶어'처럼 이름으로 말씀해 주세요.";
 
     private FridgeReplyWriter() {
     }

@@ -1,7 +1,7 @@
-package org.example.takecareofmyfridgebe.domain.chat.facade;
+package org.example.takecareofmyfridgebe.domain.chat.reply;
 
 import org.example.takecareofmyfridgebe.domain.chat.dto.FridgeScope;
-import org.example.takecareofmyfridgebe.domain.chat.facade.FridgeReplyWriter.Line;
+import org.example.takecareofmyfridgebe.domain.chat.reply.FridgeReplyWriter.Line;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
