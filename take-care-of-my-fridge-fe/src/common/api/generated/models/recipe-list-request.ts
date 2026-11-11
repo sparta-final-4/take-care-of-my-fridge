@@ -16,8 +16,8 @@
 
 
 export interface RecipeListRequest {
-    'category'?: string;
-    'cuisineType'?: string;
+    'category'?: Array<string>;
+    'cuisineType'?: Array<string>;
     'keyword'?: string;
     'maxCookTimeMin'?: number;
     'maxDifficulty'?: number;

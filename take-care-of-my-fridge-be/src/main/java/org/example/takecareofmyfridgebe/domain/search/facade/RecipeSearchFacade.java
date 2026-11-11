@@ -86,8 +86,8 @@ public class RecipeSearchFacade {
     private boolean isPlainFirstPage(RecipeListRequest request) {
         return request.keyword() != null
                 && request.page() == 1
-                && request.cuisineType() == null
-                && request.category() == null
+                && request.cuisineType().isEmpty()
+                && request.category().isEmpty()
                 && request.maxCookTimeMin() == null
                 && request.maxDifficulty() == null;
     }

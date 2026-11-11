@@ -45,8 +45,8 @@ public class RecipeRepositoryImpl implements RecipeRepositoryCustom {
     public Page<Recipe> findRecipesByCondition(RecipeListRequest condition, Pageable pageable) {
         BooleanExpression[] where = {
                 nameContains(condition.keyword()),
-                cuisineTypeEq(condition.cuisineType()),
-                categoryEq(condition.category()),
+                cuisineTypeIn(condition.cuisineType()),
+                categoryIn(condition.category()),
                 cookTimeLoe(condition.maxCookTimeMin()),
                 difficultyLoe(condition.maxDifficulty())
         };
@@ -231,12 +231,13 @@ public class RecipeRepositoryImpl implements RecipeRepositoryCustom {
         return recipe.name.likeIgnoreCase("%" + escapeLike(keyword) + "%", LIKE_ESCAPE);
     }
 
-    private BooleanExpression cuisineTypeEq(String cuisineType) {
-        return cuisineType == null ? null : recipe.cuisineType.eq(cuisineType);
+    // 고른 값 중 하나와 같으면 포함한다. 고른 값이 없으면 조건을 걸지 않는다.
+    private BooleanExpression cuisineTypeIn(List<String> cuisineTypes) {
+        return cuisineTypes.isEmpty() ? null : recipe.cuisineType.in(cuisineTypes);
     }
 
-    private BooleanExpression categoryEq(String category) {
-        return category == null ? null : recipe.category.eq(category);
+    private BooleanExpression categoryIn(List<String> categories) {
+        return categories.isEmpty() ? null : recipe.category.in(categories);
     }
 
     // 조리 시간이 비어 있는 레시피는 조건을 걸면 제외된다.

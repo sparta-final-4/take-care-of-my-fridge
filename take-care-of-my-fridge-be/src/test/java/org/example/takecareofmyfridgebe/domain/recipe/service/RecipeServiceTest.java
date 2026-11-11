@@ -82,7 +82,7 @@ class RecipeServiceTest {
     void getRecipes_convertsPageAndPassesCondition() {
         // given
         RecipeListRequest request = new RecipeListRequest(
-                RecipeSort.DIFFICULTY_ASC, "찌개", "한식", "국", 30, 5, 3, 10);
+                RecipeSort.DIFFICULTY_ASC, "찌개", List.of("한식"), List.of("국"), 30, 5, 3, 10);
         when(recipeRepository.findRecipesByCondition(any(RecipeListRequest.class), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of()));
 

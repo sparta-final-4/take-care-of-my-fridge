@@ -1,6 +1,7 @@
 package org.example.takecareofmyfridgebe.domain.search.service;
 
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
+import co.elastic.clients.elasticsearch._types.FieldValue;
 import co.elastic.clients.elasticsearch._types.KnnSearch;
 import co.elastic.clients.elasticsearch._types.SortOrder;
 import co.elastic.clients.elasticsearch._types.query_dsl.MultiMatchQuery;
@@ -86,16 +87,21 @@ class RecipeSearchServiceTest {
     @DisplayName("분류와 최댓값 조건은 점수에 영향 없는 filter로 건다")
     void keywordRequest_appliesConditionsAsFilters() {
         // Given
-        RecipeListRequest request = new RecipeListRequest(null, "찌개", "한식", "국", 30, 3, null, null);
+        RecipeListRequest request = new RecipeListRequest(null, "찌개", List.of("한식"), List.of("국", "찌개"), 30, 3, null, null);
 
         // When
         List<Query> filters = service.keywordRequest(request).query().bool().filter();
 
         // Then
         assertThat(filters.size()).isEqualTo(4);
-        assertThat(filters.get(0).term().field()).isEqualTo("cuisine_type");
-        assertThat(filters.get(0).term().value().stringValue()).isEqualTo("한식");
-        assertThat(filters.get(1).term().field()).isEqualTo("category");
+        assertThat(filters.get(0).terms().field()).isEqualTo("cuisine_type");
+        assertThat(filters.get(0).terms().terms().value())
+                .extracting(FieldValue::stringValue)
+                .containsExactly("한식");
+        assertThat(filters.get(1).terms().field()).isEqualTo("category");
+        assertThat(filters.get(1).terms().terms().value())
+                .extracting(FieldValue::stringValue)
+                .containsExactly("국", "찌개");
         assertThat(filters.get(2).range().number().field()).isEqualTo("cook_time_min");
         assertThat(filters.get(2).range().number().lte()).isEqualTo(30.0);
         assertThat(filters.get(3).range().number().field()).isEqualTo("difficulty");
@@ -222,7 +228,7 @@ class RecipeSearchServiceTest {
     @DisplayName("벡터 검색은 키워드 검색과 같은 filter, 정렬, 페이지를 쓰고 검색어 조건만 kNN으로 바꾼다")
     void vectorRequest_keepsFiltersSortAndPage() {
         // Given
-        RecipeListRequest request = new RecipeListRequest(RecipeSort.NAME_ASC, "칼칼한 국물", "한식", null, 30, null, 2, 10);
+        RecipeListRequest request = new RecipeListRequest(RecipeSort.NAME_ASC, "칼칼한 국물", List.of("한식"), null, 30, null, 2, 10);
 
         // When
         SearchRequest search = service.vectorRequest(request, new float[]{1, 0, 0});
@@ -237,7 +243,7 @@ class RecipeSearchServiceTest {
         assertThat(knn.numCandidates()).isEqualTo(100);
         assertThat(knn.similarity()).isEqualTo(0.5f);
         assertThat(knn.filter().size()).isEqualTo(2);
-        assertThat(knn.filter().get(0).term().field()).isEqualTo("cuisine_type");
+        assertThat(knn.filter().get(0).terms().field()).isEqualTo("cuisine_type");
         assertThat(knn.filter().get(1).range().number().field()).isEqualTo("cook_time_min");
         assertThat(search.sort().get(0).field().field()).isEqualTo("name.keyword");
         assertThat(search.from()).isEqualTo(10);

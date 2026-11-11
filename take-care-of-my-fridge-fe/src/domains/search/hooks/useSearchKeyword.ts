@@ -52,7 +52,8 @@ export function useSearchKeyword() {
   const recipeRequest: RecipeListRequest = {
     sort: 'RELEVANCE',
     keyword,
-    cuisineType,
+    // 통합 검색은 음식 종류를 하나만 고르고, API는 여러 값을 받으므로 한 개짜리 목록으로 보낸다.
+    cuisineType: cuisineType ? [cuisineType] : undefined,
     maxCookTimeMin: cookTime?.maxCookTimeMin,
     page,
     size: SEARCH_RECIPE_PAGE_SIZE,

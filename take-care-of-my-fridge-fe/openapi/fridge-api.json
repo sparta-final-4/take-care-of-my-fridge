@@ -7915,14 +7915,24 @@
         "type": "object",
         "properties": {
           "category": {
-            "type": "string",
-            "maxLength": 50,
-            "minLength": 0
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 50,
+              "minLength": 0
+            },
+            "maxItems": 50,
+            "minItems": 0
           },
           "cuisineType": {
-            "type": "string",
-            "maxLength": 20,
-            "minLength": 0
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 20,
+              "minLength": 0
+            },
+            "maxItems": 20,
+            "minItems": 0
           },
           "keyword": {
             "type": "string",
