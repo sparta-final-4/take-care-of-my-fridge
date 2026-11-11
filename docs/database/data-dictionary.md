@@ -1,489 +1,526 @@
-# 데이터 사전 초안
+# 데이터 사전 (Data Dictionary)
 
-상태: 개인 담당 8개 테이블 컬럼 초안 · DDL 미실행 · 근거: S2, S4, 2026-10-14 사용자 결정
+> 기준: 최신 전체 데이터베이스 스키마 ([schema.sql](schema.sql))  
+> 전체 39개 테이블의 컬럼 정의, 물리 타입, 제약조건 및 비즈니스 규칙을 명세합니다.
 
-개인 담당(회원·인증·관리자) 테이블의 컬럼을 정의합니다. 관계는 [ERD](erd.md), 실행용 DDL 초안은 [member-auth-admin.sql](member-auth-admin.sql)에 있습니다. 공통 규칙은 [DB 규칙](../conventions/database.md)을 따릅니다.
+---
 
-## 공통 사항
+## 📌 공통 규칙
 
-- 모든 테이블: `id BIGINT AUTO_INCREMENT PK`, `created_at`·`updated_at DATETIME(6)`, 테이블·컬럼 한국어 COMMENT.
-- 아래 표에는 공통 컬럼(id, created_at, updated_at)을 생략합니다. 의미가 다른 경우만 따로 적습니다.
-- 금액·수량은 원·개 단위 INT입니다. 금액은 `NOT NULL DEFAULT 0`입니다.
-- 다른 도메인 ID(product_id, promotion_id)는 물리 FK 없이 저장합니다.
-- 시간대, 감사 시각 관리 주체(Q-06), DB 제품(Q-07)은 미정입니다.
+- **기본키(PK)**: 모든 테이블은 `id BIGINT NOT NULL AUTO_INCREMENT`를 기본키로 사용합니다.
+- **감사 컬럼**: 모든 테이블은 `created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6)` 및 `updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6)`를 포함합니다 (아래 테이블별 상세 목록에서는 가독성을 위해 생략 또는 특이사항만 기재).
+- **문자열 인코딩**: `utf8mb4` (다국어 및 이모지 지원), Collation: `utf8mb4_0900_ai_ci`.
+- **금액 및 수량**: 금액은 원 단위 `INT` 또는 `BIGINT`(`DEFAULT 0`, `CHECK >= 0`), 수량은 `INT` 또는 소수점 수량을 지원하는 `DECIMAL(10, 2)`을 사용합니다.
+- **외래키(FK)**: 도메인 격리 원칙에 따라 동일 도메인 또는 긴밀한 연관 관계는 물리 FK를 맺고, 도메인 간 경계가 명확한 참조는 물리 FK 없이 식별자(ID)만 저장하여 결합도를 낮춥니다.
 
-## members — 회원
+---
 
-| 컬럼 | 타입 | NULL | 기본값 | 제약 | 의미 |
+## 1. 회원 · 인증 도메인
+
+### `members` — 회원 계정
+회원의 기본 로그인 계정 정보, 역할 및 상태를 관리합니다.
+
+| 컬럼 | 물리 타입 | NULL | 기본값 | 제약 | 비즈니스 의미 및 설명 |
 |---|---|---|---|---|---|
-| email | VARCHAR(255) | 불가 | | UK | 로그인 이메일 |
-| password_hash | VARCHAR(255) | 불가 | | | 비밀번호 해시(복원 불가) |
-| nickname | VARCHAR(30) | 불가 | | UK | 닉네임. 필수·중복 불가, 후기에 표시 |
-| phone | VARCHAR(11) | 허용 | NULL | UK | 가입 시 필수인 010 전화번호. 하이픈을 제외한 숫자 11자리로 저장. 기존 회원·초기 관리자 NULL 허용 |
-| role | ENUM('USER','ADMIN') | 불가 | 'USER' | | 공개 가입은 USER. 관리자 승격 시 ADMIN |
-| status | ENUM('ACTIVE','SUSPENDED') | 불가 | 'ACTIVE' | | 정상·정지. 회원 탈퇴 기능이 없어 WITHDRAWN 없음 |
-| created_at | DATETIME(6) | 불가 | 현재 시각 | | 가입일시 |
+| `email` | `VARCHAR(255)` | N | | `UK` | 로그인 이메일 (계정 식별자) |
+| `password_hash` | `VARCHAR(255)` | N | | | 단방향 암호화 해시 (BCrypt) |
+| `nickname` | `VARCHAR(30)` | N | | `UK` | 서비스 내 활동명 (후기 및 화면 노출) |
+| `role` | `ENUM('USER','ADMIN')` | N | `'USER'` | | 회원 권한 (일반회원: USER, 관리자: ADMIN) |
+| `status` | `ENUM('ACTIVE','SUSPENDED')` | N | `'ACTIVE'` | | 계정 상태 (정상: ACTIVE, 활동 정지: SUSPENDED) |
 
-- 이메일 대소문자·공백 정규화 규칙은 Q-09에서 정합니다.
-- 정지는 누가 처리할지 미정입니다. 정해지면 A-10 회원 권한 관리 화면에 추가합니다.
+### `member_tastes` — 회원 맛 선호
+회원이 선택한 개인 맞춤 맛 선호 목록입니다. (0개 이상 다중 선택 가능)
 
-## member_tastes — 회원 맛 선호
-
-| 컬럼 | 타입 | NULL | 기본값 | 제약 | 의미 |
+| 컬럼 | 물리 타입 | NULL | 기본값 | 제약 | 비즈니스 의미 및 설명 |
 |---|---|---|---|---|---|
-| member_id | BIGINT | 불가 | | FK fk_member_tastes_member | 회원 |
-| taste | ENUM('SALTY','SWEET','SPICY','UMAMI','MILD') | 불가 | | UK(member_id, taste) | 짠맛·단맛·매운맛·감칠맛·슴슴한맛 |
+| `member_id` | `BIGINT` | N | | `FK (members.id)` | 맛 선호를 등록한 회원 |
+| `taste` | `ENUM('SALTY','SWEET','SPICY','UMAMI','MILD')` | N | | `UK(member_id, taste)` | 짠맛, 단맛, 매운맛, 감칠맛, 슴슴한맛 |
 
-- 회원은 0개 이상 고를 수 있습니다. 하나도 고르지 않으면 행이 없습니다.
-- 후기 화면은 이 테이블을 읽어 표시하므로, 수정하면 이미 쓴 후기에도 바뀐 맛이 보입니다.
+### `refresh_sessions` — 로그인 세션
+JWT Refresh 토큰의 발급 및 유효성을 관리하는 세션 테이블입니다.
 
-## refresh_sessions — 로그인 세션
-
-| 컬럼 | 타입 | NULL | 기본값 | 제약 | 의미 |
+| 컬럼 | 물리 타입 | NULL | 기본값 | 제약 | 비즈니스 의미 및 설명 |
 |---|---|---|---|---|---|
-| member_id | BIGINT | 불가 | | FK fk_refresh_sessions_member | 회원 |
-| token_hash | VARCHAR(255) | 불가 | | UK | 갱신 토큰 해시. 원문 토큰은 저장하지 않음 |
-| keep_logged_in | BOOLEAN | 불가 | FALSE | | 현재 로그인 요청에서는 항상 FALSE. 선택 입력은 제외 |
-| device_info | VARCHAR(255) | 허용 | NULL | | 기기별 로그아웃용(제안 기능) |
-| last_used_at | DATETIME(6) | 불가 | 현재 시각 | | 마지막 사용일시. 30분 미사용이면 만료 |
-| expires_at | DATETIME(6) | 불가 | | | 로그인 후 최대 7일 만료일시 |
-| revoked_at | DATETIME(6) | 허용 | NULL | | 로그아웃·비밀번호 변경·정지 시 폐기일시 |
-| created_at | DATETIME(6) | 불가 | 현재 시각 | | 로그인일시 |
+| `member_id` | `BIGINT` | N | | `FK (members.id)` | 로그인한 회원 |
+| `token_hash` | `VARCHAR(255)` | N | | `UK` | Refresh 토큰의 단방향 해시 |
+| `keep_logged_in` | `BOOLEAN` | N | `FALSE` | | 로그인 상태 유지 체크 여부 |
+| `device_info` | `VARCHAR(255)` | Y | `NULL` | | 접속 기기/브라우저 식별 정보 |
+| `last_used_at` | `DATETIME(6)` | N | `NOW(6)` | | 마지막 활동 시각 (30분 미사용 시 세션 만료) |
+| `expires_at` | `DATETIME(6)` | N | | | 세션 절대 만료 일시 |
+| `revoked_at` | `DATETIME(6)` | Y | `NULL` | | 로그아웃 또는 강제 폐기된 일시 |
 
-- 토큰 회전·동시 갱신 처리는 Q-08에서 정합니다.
+---
 
-## prediction_runs — 주간 판매 예측 실행
+## 2. 표준 재료 & 상품 도메인
 
-| 컬럼 | 타입 | NULL | 기본값 | 제약 | 의미 |
+### `ingredients` — 표준 재료 사전
+제각각인 상품명과 레시피 재료를 통합 비교하기 위한 표준 재료 사전입니다.
+
+| 컬럼 | 물리 타입 | NULL | 기본값 | 제약 | 비즈니스 의미 및 설명 |
 |---|---|---|---|---|---|
-| target_week_start | DATE | 불가 | | UK | 예측 대상 주의 월요일 |
-| model_version | VARCHAR(50) | 불가 | | | 예측 모델 버전(예: fc-v0.3) |
-| data_cutoff_at | DATETIME(6) | 불가 | | | 입력 데이터 기준 시각 |
-| confirmed_at | DATETIME(6) | 허용 | NULL | | 실제 판매량 확정일시(다음 주 월요일 06:00) |
-| synthetic_data | BOOLEAN | 불가 | false | | 가상 데이터 사용 여부 |
-| created_at | DATETIME(6) | 불가 | 현재 시각 | | 예측 생성일시(일요일 22:00) |
+| `ingredient_code` | `VARCHAR(50)` | N | | `UK` | 표준 코드 (예: `ING_RCP_0003`, `ING_CUSTOM`, `ING_MEALKIT`) |
+| `name` | `VARCHAR(100)` | N | | `UK` | 표준 대표 명칭 (예: '대파', '마늘') |
+| `base_unit` | `VARCHAR(20)` | N | | | 기본 단위 (개, 대, 모, 장, g, ml 등) |
+| `unit_weight_g` | `DECIMAL(8, 2)` | Y | `NULL` | | 기본 단위 1개당 무게(g) (g 수량을 기본 단위로 환산 시 활용) |
+| `default_storage` | `ENUM('REFRIGERATED','FROZEN','ROOM_TEMP')` | N | | | 권장 보관 방식 (냉장 / 냉동 / 실온) |
+| `default_shelf_days` | `INT` | N | `0` | | 권장 보관 일수 (등록일 + 일수 = 소비기한 자동 계산) |
+| `is_basic_seasoning` | `BOOLEAN` | N | `FALSE` | | 기본 양념 여부 (소금, 설탕 등은 요리 자동 차감에서 제외) |
 
-- 주 1건만 저장하며, 주가 시작되면 예측을 바꾸지 않습니다.
+### `products` — 판매 상품 공통 정보
+쇼핑몰에서 판매 중인 재료 상품 및 밀키트의 공통 카탈로그 정보입니다.
 
-## forecast_batch_runs — 주간 예측 배치 시도
-
-| 컬럼 | 타입 | NULL | 기본값 | 제약 | 의미 |
+| 컬럼 | 물리 타입 | NULL | 기본값 | 제약 | 비즈니스 의미 및 설명 |
 |---|---|---|---|---|---|
-| id | BIGINT | 불가 | 자동 증가 | PK | 기록 ID |
-| target_week_start | DATE | 불가 | | UK | 예측 대상 주의 월요일 |
-| status | VARCHAR(30) | 불가 | | | CREATED·ALREADY_EXISTS·NO_PRODUCTS·NO_TRAINING_SAMPLES·FAILED |
-| attempted_at | DATETIME(6) | 불가 | | | 마지막 시도 시각(Asia/Seoul) |
-| failure_type | VARCHAR(100) | 허용 | NULL | | 실패 예외의 종류만 저장. 메시지·민감 값 제외 |
-| created_at | DATETIME(6) | 불가 | 현재 시각 | | 최초 기록 시각 |
-| updated_at | DATETIME(6) | 불가 | 현재 시각 | | 마지막 변경 시각 |
+| `product_type` | `ENUM('INGREDIENT','MEALKIT')` | N | | | 상품 구분 (단일 재료 상품 / 밀키트) |
+| `name` | `VARCHAR(200)` | N | | | 판매 상품명 (예: "국산 무농약 깐마늘 200g") |
+| `description` | `TEXT` | Y | `NULL` | | 상품 상세 설명 |
+| `image_url` | `VARCHAR(500)` | Y | `NULL` | | 대표 이미지 URL |
+| `price` | `INT` | N | `0` | `CHECK(>= 0)` | 기본 판매 정가(원) |
+| `stock` | `INT` | N | `0` | `CHECK(>= 0)` | 현재 판매 가능 재고 수량 |
+| `storage` | `ENUM('REFRIGERATED','FROZEN','ROOM_TEMP')` | N | | | 보관 방식 (냉장 / 냉동 / 실온) |
+| `shelf_days` | `INT` | N | `0` | | 권장 보관 일수 (구매 확정일 + 일수 = 냉장고 입고 소비기한) |
+| `status` | `ENUM('ON_SALE','SOLD_OUT','STOPPED')` | N | `'ON_SALE'` | `INDEX` | 판매 상태 (판매중 / 품절 / 판매중지) |
 
-- 대상 주마다 최근 배치 결과 1건을 유지합니다. 성공 후 재확인한 ALREADY_EXISTS는 CREATED 상태를 덮어쓰지 않습니다.
+### `ingredient_products` — 재료 상품 상세
+일반 식재료 상품이 표준 재료 사전에 어떻게 매핑되는지 정의합니다.
 
-## sales_forecasts — 상품별 예측과 실제 판매량
-
-| 컬럼 | 타입 | NULL | 기본값 | 제약 | 의미 |
+| 컬럼 | 물리 타입 | NULL | 기본값 | 제약 | 비즈니스 의미 및 설명 |
 |---|---|---|---|---|---|
-| prediction_run_id | BIGINT | 불가 | | FK fk_sales_forecasts_prediction_run | 예측 실행 |
-| product_id | BIGINT | 불가 | | UK(prediction_run_id, product_id) | 상품 ID(상품 도메인, FK 없음) |
-| product_name | VARCHAR(100) | 불가 | | | 예측 시점 상품명 |
-| predicted_rank | INT | 허용 | NULL | | 예상 순위. 예상 TOP 10 밖이었다가 실제 진입한 상품은 NULL |
-| predicted_qty | INT | 허용 | NULL | | 예상 판매 수량 |
-| baseline_qty | INT | 불가 | 0 | | 기준선 예측(전주 판매량) |
-| actual_rank | INT | 허용 | NULL | | 실제 순위. 확정 후 입력 |
-| actual_qty | INT | 허용 | NULL | | 실제 판매 수량(결제 완료 − 취소·환불). 확정 후 입력 |
+| `product_id` | `BIGINT` | N | | `FK (products.id), UK` | 상품 ID (1:1 매핑) |
+| `ingredient_id` | `BIGINT` | N | | `FK (ingredients.id), INDEX` | 연결된 표준 재료 ID |
+| `unit_amount` | `DECIMAL(8, 2)` | N | | `CHECK(> 0)` | 상품 포장 용량 수치 (예: 200.00) |
+| `unit` | `VARCHAR(20)` | N | | | 용량 단위 (g, ml, 개, 팩 등) |
+| `base_quantity` | `DECIMAL(10, 2)` | N | | | 기본 단위 환산 갯수 (예: 마늘 200g ➔ 10개 상당) |
 
-- 기준선 TOP 10 비교를 위해 예측 대상 상품의 기준선 수량을 저장합니다. 실적 확정 시 예상 TOP 10 상품의 실제 판매 수량이 0이어도 0으로 저장합니다.
+### `mealkit_products` — 밀키트 상품 상세
+밀키트 상품의 인분 수 및 연결된 원본 레시피를 정의합니다.
 
-## deal_analyses — 요일별 할인 후보 분석
-
-"후보 분석" 버튼을 한 번 누를 때마다 1건이 생깁니다.
-
-| 컬럼 | 타입 | NULL | 기본값 | 제약 | 의미 |
+| 컬럼 | 물리 타입 | NULL | 기본값 | 제약 | 비즈니스 의미 및 설명 |
 |---|---|---|---|---|---|
-| member_id | BIGINT | 불가 | | FK fk_deal_analyses_member | 분석한 관리자 |
-| target_week_start | DATE | 불가 | | | 대상 주의 월요일 |
-| day_of_week | ENUM('MON'~'SUN') | 불가 | | | 적용 요일 |
-| discount_rate | INT | 불가 | 0 | | 가상 할인율(%, 10~40) |
-| min_stock | INT | 불가 | 50 | | 최소 재고 기준(개) |
-| model_version | VARCHAR(50) | 불가 | | | 분석 모델 버전 |
-| data_cutoff_at | DATETIME(6) | 불가 | | | 입력 데이터 기준 시각 |
-| synthetic_data | BOOLEAN | 불가 | FALSE | | 가상 데이터 사용 여부 |
-| last_saved_at | DATETIME(6) | 허용 | NULL | | 검토 결과 마지막 저장일시 |
-| created_at | DATETIME(6) | 불가 | 현재 시각 | | 분석일시 |
+| `product_id` | `BIGINT` | N | | `FK (products.id), UK` | 상품 ID (1:1 매핑) |
+| `servings` | `INT` | N | `1` | `CHECK(> 0)` | 밀키트 구성 인분 수 |
+| `recipe_id` | `BIGINT` | Y | `NULL` | `INDEX` | 연결된 원본 레시피 ID (논리 참조) |
 
-## deal_candidates — 분석 결과 상품(후보·제외)
+---
 
-후보 상품과 제외 상품을 한 테이블에 저장하고 `is_excluded`로 구분합니다. 두 경우 모두 "이 분석에서 이 상품을 어떻게 판단했는지"를 담기 때문입니다.
+## 3. 레시피 도메인
 
-| 컬럼 | 타입 | NULL | 기본값 | 제약 | 의미 |
+### `recipes` — 레시피 기본 정보
+공공 공공데이터(농식품, 식약처) 및 자체 등록 레시피 정보입니다.
+
+| 컬럼 | 물리 타입 | NULL | 기본값 | 제약 | 비즈니스 의미 및 설명 |
 |---|---|---|---|---|---|
-| deal_analysis_id | BIGINT | 불가 | | FK fk_deal_candidates_deal_analysis | 분석 |
-| product_id | BIGINT | 불가 | | UK(deal_analysis_id, product_id) | 상품 ID(FK 없음) |
-| product_name | VARCHAR(100) | 불가 | | | 분석 시점 상품명 |
-| regular_price | INT | 불가 | 0 | | 분석 당시 정상가(원) |
-| discount_price | INT | 불가 | 0 | | 가상 할인가(원) |
-| current_stock | INT | 불가 | 0 | | 분석 당시 재고(개) |
-| avg_sales_on_day | INT | 불가 | 0 | | 해당 요일 평균 판매량 |
-| search_clicks | INT | 불가 | 0 | | 최근 4주 같은 요일 검색 클릭 수 |
-| purchases | INT | 불가 | 0 | | 최근 4주 같은 요일 구매 확정 후 환불을 뺀 상품 수량 |
-| is_excluded | BOOLEAN | 불가 | FALSE | | TRUE면 제외된 상품 |
-| exclude_reason | ENUM('TOP_SELLER_ON_DAY','LOW_STOCK') | 허용 | NULL | | 평소 그 요일 판매 상위 / 재고 50개 미만. 제외 상품만 |
-| candidate_reason | VARCHAR(255) | 허용 | NULL | | 후보 사유(예: 검색 클릭 대비 구매 적음). 후보만 |
-| expected_qty_regular | INT | 허용 | NULL | | 정상가일 때 예상 판매 수량. 후보만 |
-| expected_qty_discount | INT | 허용 | NULL | | 할인가일 때 예상 판매 수량. 후보만 |
-| expected_increase | INT | 허용 | NULL | | 예상 판매 증가량. 후보만 |
-| review_status | ENUM('UNREVIEWED','SELECTED','HELD') | 허용 | NULL | | 미검토·선택·보류. 후보만 |
-| event_request_status | ENUM('NONE','REQUESTED','APPROVED','REJECTED') | 불가 | 'NONE' | | 행사 등록 상태. 현재 직접 등록 성공 시 APPROVED |
-| event_requested_at | DATETIME(6) | 허용 | NULL | | 요청일시 |
-| promotion_id | BIGINT | 허용 | NULL | | 생성된 sale_events ID(FK 없음) |
+| `source` | `VARCHAR(20)` | N | | `UK(source, source_id)` | 레시피 출처 (`MAFRA`, `MFDS` 등) |
+| `source_id` | `VARCHAR(20)` | N | | `UK(source, source_id)` | 원본 레시피 고유 코드 |
+| `name` | `VARCHAR(200)` | N | | `INDEX` | 레시피 요리명 (예: "마늘종 볶음") |
+| `summary` | `TEXT` | Y | `NULL` | | 레시피 간략 소개 |
+| `cuisine_type` | `VARCHAR(20)` | Y | `NULL` | | 요리 종류 (한식 / 양식 / 중식 등) |
+| `category` | `VARCHAR(50)` | Y | `NULL` | `INDEX` | 요리 분류 (밥 / 국 / 반찬 / 일품 등) |
+| `cook_method` | `VARCHAR(20)` | Y | `NULL` | | 조리 방법 (끓이기, 굽기, 볶기 등) |
+| `cook_time_min` | `INT` | Y | `NULL` | | 예상 조리 시간 (분 단위) |
+| `servings` | `INT` | Y | `NULL` | | 기준 분량 (인분) |
+| `difficulty` | `TINYINT` | N | | `CHECK(1~10)` | 조리 난이도 (1: 가장 쉬움 ~ 10: 전문가) |
+| `calories` | `DECIMAL(8, 2)` | Y | `NULL` | | 열량 (kcal) |
+| `tip` | `TEXT` | Y | `NULL` | | 나트륨 저감 등 조리 팁 |
+| `tip_summary` | `TEXT` | Y | `NULL` | | 사용자 후기 기반 AI 요약 팁 |
+| `image_url` | `VARCHAR(500)` | Y | `NULL` | | 대표 완성 요리 이미지 URL |
 
-- 이 화면은 실제 상품 가격을 바꾸지 않습니다. 가격 변경은 할인 행사 등록 후 행사 쪽에서 일어납니다.
+### `recipe_ingredients` — 레시피 재료 목록 (N:M)
+레시피에 들어가는 재료와 표준 재료 사전을 매핑합니다.
 
-## admin_audit_logs — 관리자 작업 이력
-
-| 컬럼 | 타입 | NULL | 기본값 | 제약 | 의미 |
+| 컬럼 | 물리 타입 | NULL | 기본값 | 제약 | 비즈니스 의미 및 설명 |
 |---|---|---|---|---|---|
-| member_id | BIGINT | 불가 | | FK fk_admin_audit_logs_member | 작업한 회원. 권한 없이 시도한 일반 회원 포함 |
-| actor_role | ENUM('USER','ADMIN') | 허용 | NULL | | 작업 당시 역할. 기존 기록은 NULL |
-| action | ENUM('PRODUCT_CREATE','PRODUCT_DELETE','PRICE_UPDATE','DEAL_REVIEW','EVENT_REQUEST','ROLE_CHANGE') | 불가 | | | 작업 종류 |
-| target_type | VARCHAR(50) | 불가 | | | 대상 종류(Product, DealCandidate, Member 등) |
-| target_id | BIGINT | 허용 | NULL | | 대상 ID. 등록 실패처럼 대상이 없으면 NULL. FK 아님 |
-| result | ENUM('SUCCESS','FAILED','DENIED') | 불가 | | | 성공·실패·권한 거부 |
-| before_value | JSON | 허용 | NULL | | 변경 전 값. 비밀번호 등 민감 값 제외 |
-| after_value | JSON | 허용 | NULL | | 변경 후 값. 민감 값 제외 |
-| created_at | DATETIME(6) | 불가 | 현재 시각 | | 작업일시 |
+| `recipe_id` | `BIGINT` | N | | `FK (recipes.id) ON DELETE CASCADE` | 레시피 ID |
+| `ingredient_id` | `BIGINT` | N | | `FK (ingredients.id), INDEX` | 표준 재료 ID |
+| `seq` | `INT` | N | | `UK(recipe_id, seq)` | 재료 표기 순서 |
+| `display_name` | `VARCHAR(100)` | Y | `NULL` | | 레시피 원문에 표기된 재료명 (예: "다진 마늘") |
+| `amount` | `VARCHAR(100)` | Y | `NULL` | | 원문 용량 표기 (예: "1/2큰술", "약간") |
+| `quantity` | `DECIMAL(10, 2)` | Y | `NULL` | | 기본 단위 기준 수량 |
+| `role` | `VARCHAR(20)` | Y | `NULL` | | 재료 역할 (주재료 / 부재료 / 양념) |
 
-- 일반 작업 기록 서비스는 작업자·동작·대상·결과만 받습니다. 관리자 승격 기록은 role의 변경 전후 값만 JSON 컬럼에 저장합니다. 비밀번호 등 민감 값은 저장하지 않습니다.
-- 기록은 수정·삭제하지 않습니다. 보관 기간은 미정입니다.
-- 미인증 요청(로그인 전)의 실패는 회원을 특정할 수 없어 이 테이블에 남기지 않습니다. 필요하면 별도 로그로 다룹니다.
+### `recipe_steps` — 레시피 조리 단계
+레시피의 순차적인 조리 과정과 단계별 안내입니다.
 
-## carts — 장바구니
-
-- 회원당 장바구니 하나입니다. 처음 상품을 담을 때 만들고, 상품이 모두 지워져도 남깁니다.
-- 제약 이름: `uk_carts_member_id`.
-
-| 컬럼 | 타입 | NULL | 기본값 | 제약 | 의미 |
+| 컬럼 | 물리 타입 | NULL | 기본값 | 제약 | 비즈니스 의미 및 설명 |
 |---|---|---|---|---|---|
-| member_id | BIGINT | 불가 | | UK | 장바구니 주인. 물리 FK 없이 회원 번호만 저장 |
+| `recipe_id` | `BIGINT` | N | | `FK (recipes.id) ON DELETE CASCADE` | 레시피 ID |
+| `step_no` | `INT` | N | | `UK(recipe_id, step_no)` | 조리 순서 번호 (1부터 시작) |
+| `description` | `TEXT` | N | | | 조리 설명 원문 |
+| `image_url` | `VARCHAR(500)` | Y | `NULL` | | 해당 단계 조리 사진 URL |
+| `tip` | `TEXT` | Y | `NULL` | | 단계별 주의점 및 팁 |
 
-## cart_items — 장바구니 상품
+### `recipe_tastes` — 레시피 맛
+AI 맞춤 추천을 위해 레시피가 가진 맛 특성을 정의합니다.
 
-- 같은 장바구니에 같은 상품은 하나입니다. 다시 담으면 수량을 더합니다.
-- 제약 이름: FK `fk_cart_items_cart`, UK `uk_cart_items_cart_id_product_id`.
-
-| 컬럼 | 타입 | NULL | 기본값 | 제약 | 의미 |
+| 컬럼 | 물리 타입 | NULL | 기본값 | 제약 | 비즈니스 의미 및 설명 |
 |---|---|---|---|---|---|
-| cart_id | BIGINT | 불가 | | FK, UK(cart_id, product_id) | 소속 장바구니 |
-| product_id | BIGINT | 불가 | | UK(cart_id, product_id) | 담은 상품. 물리 FK 없이 상품 번호만 저장 |
-| quantity | INT | 불가 | | | 담은 수량(1 이상) |
+| `recipe_id` | `BIGINT` | N | | `FK (recipes.id) ON DELETE CASCADE` | 레시피 ID |
+| `taste` | `ENUM('SALTY','SWEET','SPICY','UMAMI','MILD')` | N | | `UK(recipe_id, taste)` | 레시피가 지닌 맛 속성 |
 
-- 가격·할인은 저장하지 않습니다. 조회할 때 상품의 현재 정가와 진행 중인 할인을 읽습니다.
-- 실행용 DDL 초안은 [cart.sql](cart.sql)에 있습니다.
+---
 
-## orders — 주문
+## 4. 냉장고 도메인
 
-- 결제 대기에서 시작해 결제 완료, 취소, 구매 확정, 전액 환불로 바뀝니다. 전액 환불과 환불 뒤 바로 구매 확정은 환불 도메인이 환불 완료 때 판단해 바꿉니다. 주문 한 건에 주문 상품 여러 건이 있습니다.
-- 제약 이름: UK `uk_orders_order_number`, `uk_orders_member_id_idempotency_key`. 인덱스 `idx_orders_member_id_status`(member_id, status), `idx_orders_status_created_at`(status, created_at), `idx_orders_status_paid_at`(status, paid_at).
+### `fridge` — 냉장고 보관 재료
+회원이 현재 보관 중인 식재료 실물 목록입니다.
 
-| 컬럼 | 타입 | NULL | 기본값 | 제약 | 의미 |
+| 컬럼 | 물리 타입 | NULL | 기본값 | 제약 | 비즈니스 의미 및 설명 |
 |---|---|---|---|---|---|
-| order_number | VARCHAR(20) | 불가 | | UK | 주문번호. 밀리초 시각 17자리와 순번 3자리의 숫자 20자리(한국 시각) |
-| member_id | BIGINT | 불가 | | UK(member_id, idempotency_key), 인덱스 | 주문한 회원. 물리 FK 없이 회원 번호만 저장 |
-| idempotency_key | VARCHAR(64) | 허용 | NULL | UK(member_id, idempotency_key) | 주문하기 클릭마다 프론트가 만든 값. 같은 회원이 같은 값으로 다시 보내면 새 주문을 만들지 않음. 기존 주문은 NULL |
-| status | ENUM('PENDING','PAID','CANCELLED','CONFIRMED','REFUNDED') | 불가 | 'PENDING' | 인덱스 | 결제 대기·결제 완료·취소·구매 확정·전액 환불 |
-| total_amount | BIGINT | 불가 | | | 결제할 금액(할인 후). 주문을 만들 때 확정 |
-| paid_at | DATETIME(6) | 허용 | NULL | | 결제 완료 시각. 결제 전에는 NULL |
-| confirmed_at | DATETIME(6) | 허용 | NULL | | 구매 확정 시각. 확정 전에는 NULL |
+| `member_id` | `BIGINT` | N | | `FK (members.id)` | 냉장고 주인 회원 ID |
+| `ingredient_id` | `BIGINT` | N | | `FK (ingredients.id)` | 매핑된 표준 재료 ID |
+| `order_item_id` | `BIGINT` | Y | `NULL` | `FK (order_items.id)` | 커머스 자동 입고된 경우 주문 상품 ID |
+| `product_id` | `BIGINT` | Y | `NULL` | | 입고된 상품 ID (밀키트 판별 및 재구매 링크용) |
+| `raw_name` | `VARCHAR(200)` | N | | | 입력 재료명 (직접 입력 또는 상품명) |
+| `quantity` | `DECIMAL(10, 2)` | N | `0` | | 현재 잔여 수량 (단위: `ingredients.base_unit`) |
+| `storage` | `ENUM('REFRIGERATED','FROZEN','ROOM_TEMP')` | N | | | 실제 보관 방식 (냉장 / 냉동 / 실온) |
+| `expiration_date` | `DATE` | N | | `INDEX(expiration_date, member_id)` | 소비기한 |
+| `source` | `ENUM('MANUAL','COMMERCE')` | N | `'MANUAL'` | | 등록 경로 (직접 등록 / 커머스 구매 확정 자동 입고) |
 
-## order_items — 주문 상품
+### `fridge_commerce_histories` — 커머스 자동 입고 이력
+구매 확정된 주문 상품이 냉장고에 중복으로 입고되는 것을 방지하는 이력 원장입니다.
 
-- 주문할 때의 상품 이름·이미지·가격을 복사해 저장합니다. 이후 상품이 바뀌어도 주문 화면은 이 값을 씁니다.
-- 제약 이름: UK `uk_order_items_sale_event_item_id_flash_drop_member_id`.
-
-| 컬럼 | 타입 | NULL | 기본값 | 제약 | 의미 |
+| 컬럼 | 물리 타입 | NULL | 기본값 | 제약 | 비즈니스 의미 및 설명 |
 |---|---|---|---|---|---|
-| order_id | BIGINT | 불가 | | FK | 소속 주문 |
-| product_id | BIGINT | 불가 | | | 주문한 상품. 물리 FK 없이 상품 번호만 저장 |
-| product_name | VARCHAR(200) | 불가 | | | 주문 당시 상품 이름 |
-| product_image_url | VARCHAR(500) | 허용 | NULL | | 주문 당시 상품 이미지. 없으면 NULL |
-| quantity | INT | 불가 | | | 주문 수량 |
-| list_price | INT | 불가 | | | 주문 당시 정가(원) |
-| unit_price | INT | 불가 | | | 실제 단가(원). 할인 중이면 할인가, 아니면 정가 |
-| sale_type | ENUM('NONE','SPECIAL','FLASH_DROP') | 불가 | | | 주문 당시 할인 구분 |
-| sale_event_item_id | BIGINT | 허용 | NULL | | 할인으로 샀을 때의 행사 항목. 일반 상품은 NULL. 물리 FK 없음 |
-| flash_drop_member_id | BIGINT | 허용 | NULL | UK(sale_event_item_id, flash_drop_member_id) | 번개 드롭 1인 1개 확인용 회원. 번개 드롭 항목에만 값이 있고 주문을 취소하면 NULL |
-| confirmed_quantity | INT | 허용 | NULL | | 구매 확정 수량. 구매 확정 때 주문 수량에서 완료된 환불 수량을 뺀 값. 확정 전에는 NULL이고 확정 뒤에는 바뀌지 않음 |
+| `member_id` | `BIGINT` | N | | `FK (members.id)` | 회원 ID |
+| `order_item_id` | `BIGINT` | N | | `FK (order_items.id), UK` | 입고 완료된 주문 상품 ID (중복 입고 차단) |
 
-- 같은 행사 항목에 같은 회원은 한 번만 들어갈 수 있습니다(번개 드롭 1인 1개). NULL은 여러 건 가능합니다.
+---
 
-## refunds — 환불
+## 5. 장바구니 · 주문 · 할인 행사 도메인
 
-- 환불 신청 한 번에 한 건입니다. 한 결제에 부분 환불이 여러 건 생길 수 있고, 같은 주문에 요청 상태 환불은 한 건만 둡니다.
-- 요청에서 완료 또는 실패로 한 번만 바뀝니다. 실패한 환불은 지우지 않고 남기며, 그 수량은 다시 신청할 수 있습니다.
-- 제약 이름: 인덱스 `idx_refunds_refunded_at`(refunded_at). FK `fk_refunds_payment`.
+### `carts` — 장바구니
+회원당 1개씩 보유하는 장바구니 엔티티입니다.
 
-| 컬럼 | 타입 | NULL | 기본값 | 제약 | 의미 |
+| 컬럼 | 물리 타입 | NULL | 기본값 | 제약 | 비즈니스 의미 및 설명 |
 |---|---|---|---|---|---|
-| payment_id | BIGINT | 불가 | | FK | 환불할 결제. 주문의 결제 완료 결제 |
-| refund_amount | BIGINT | 불가 | | | 환불 금액(원). 환불 상품 금액의 합 |
-| reason_type | ENUM('CHANGE_OF_MIND','ORDER_MISTAKE','NO_LONGER_NEEDED','ETC') | 불가 | | | 단순 변심·주문 실수·더 이상 필요 없음·기타. 설명 문구를 PG 취소 사유로 보냄 |
-| reason_detail | VARCHAR(500) | 허용 | NULL | | 상세 사유 |
-| status | ENUM('REQUESTED','COMPLETED','FAILED') | 불가 | | | 요청(PG 취소 대기)·완료·실패 |
-| portone_cancellation_id | VARCHAR(200) | 허용 | NULL | | PG 취소 건 ID. 완료 전이나 찾지 못하면 NULL |
-| fail_reason | VARCHAR(255) | 허용 | NULL | | 실패 사유(PG 오류 원문). 길면 255자에서 잘라 저장. 사용자에게 보여 주지 않음 |
-| refunded_at | DATETIME(6) | 허용 | NULL | 인덱스 | 환불 완료 시각. 완료 전에는 NULL. 정산은 이 값이 아니라 결제 이력의 `created_at`으로 셉니다 |
+| `member_id` | `BIGINT` | N | | `FK (members.id), UK` | 장바구니 소유 회원 ID |
 
-- `created_at`이 신청 시각입니다.
-- 실행용 DDL 초안은 [refund.sql](refund.sql)에 있습니다.
+### `cart_items` — 장바구니 상품
+장바구니에 담긴 상품 품목입니다. 가격과 재고는 실시간 조회를 원칙으로 합니다.
 
-## refund_items — 환불 상품
-
-- 환불 한 건에 포함된 주문 상품과 수량입니다. 단가는 주문 상품에서 복사합니다.
-- 제약 이름: UK `uk_refund_items_refund_id_order_item_id`. 인덱스 `idx_refund_items_order_item_id`(order_item_id). FK `fk_refund_items_refund`, `fk_refund_items_order_item`.
-
-| 컬럼 | 타입 | NULL | 기본값 | 제약 | 의미 |
+| 컬럼 | 물리 타입 | NULL | 기본값 | 제약 | 비즈니스 의미 및 설명 |
 |---|---|---|---|---|---|
-| refund_id | BIGINT | 불가 | | FK, UK(refund_id, order_item_id) | 소속 환불 |
-| order_item_id | BIGINT | 불가 | | FK, UK(refund_id, order_item_id), 인덱스 | 환불할 주문 상품. 일반 상품만 |
-| quantity | INT | 불가 | | | 환불 수량(1 이상) |
-| unit_price | INT | 불가 | | | 주문 당시 단가(원) |
-| amount | BIGINT | 불가 | | | 환불 금액(원). 단가 × 수량 |
+| `cart_id` | `BIGINT` | N | | `FK (carts.id)` | 소속 장바구니 ID |
+| `product_id` | `BIGINT` | N | | `FK (products.id), UK(cart_id, product_id)` | 담은 상품 ID |
+| `quantity` | `INT` | N | `1` | | 담은 수량 (1 이상) |
 
-- 상품별 누적 환불 수량은 요청·완료 상태 환불의 수량 합입니다. 이 값이 주문 수량을 넘지 않게 신청 때 확인합니다.
-- 한 환불에 같은 주문 상품은 한 번만 들어갑니다.
+### `sale_events` — 할인 행사
+특가 프로모션 및 타임 한정 번개 드롭 이벤트 정보입니다.
 
-## sale_events — 할인 행사
-
-- 상품 하나에 대한 한 번의 할인 기간입니다. 등록하면 상품마다 한 건씩 만들어지고, 예정에서 진행 중, 종료로 바뀝니다.
-- 제약 이름: 인덱스 `idx_sale_events_status_starts_at`(status, starts_at), `idx_sale_events_status_ends_at`(status, ends_at).
-
-| 컬럼 | 타입 | NULL | 기본값 | 제약 | 의미 |
+| 컬럼 | 물리 타입 | NULL | 기본값 | 제약 | 비즈니스 의미 및 설명 |
 |---|---|---|---|---|---|
-| type | ENUM('SPECIAL','FLASH_DROP') | 불가 | | | 특가·번개 드롭 |
-| starts_at | DATETIME(6) | 불가 | | 인덱스 | 시작 시각(한국 시각) |
-| ends_at | DATETIME(6) | 불가 | | 인덱스 | 종료 시각. 중간에 종료해도 바뀌지 않음 |
-| status | ENUM('SCHEDULED','ACTIVE','ENDED') | 불가 | | 인덱스 | 예정·진행 중·종료 |
-| ended_at | DATETIME(6) | 가능 | NULL | | 중간에 종료한 시각. 등록한 종료 시각까지 연 행사는 NULL. 할인 효과 학습은 이 시각까지만 판매한 것으로 본다 |
+| `type` | `ENUM('SPECIAL','FLASH_DROP')` | N | | | 행사 종류 (SPECIAL: 기간 특가 / FLASH_DROP: 번개 드롭) |
+| `starts_at` | `DATETIME(6)` | N | | `INDEX` | 행사 오픈 일시 |
+| `ends_at` | `DATETIME(6)` | N | | `INDEX` | 행사 마감 일시 |
+| `status` | `ENUM('SCHEDULED','ACTIVE','ENDED')` | N | `'SCHEDULED'` | `INDEX` | 행사 진행 상태 (예정 / 진행 중 / 종료) |
 
-## sale_event_items — 할인 행사 항목
+### `sale_event_items` — 할인 행사 상품
+행사에 포함된 대상 상품 및 특별 할인가 정보입니다.
 
-- 할인 행사에 든 상품과 가격입니다. 등록은 상품마다 행사를 하나씩 만들어서 지금은 행사 하나에 항목 하나입니다.
-- 제약 이름: 인덱스 `idx_sale_event_items_product_id`(product_id).
-
-| 컬럼 | 타입 | NULL | 기본값 | 제약 | 의미 |
+| 컬럼 | 물리 타입 | NULL | 기본값 | 제약 | 비즈니스 의미 및 설명 |
 |---|---|---|---|---|---|
-| sale_event_id | BIGINT | 불가 | | FK | 소속 할인 행사 |
-| product_id | BIGINT | 불가 | | 인덱스 | 할인 상품. 물리 FK 없이 상품 번호만 저장 |
-| list_price | INT | 불가 | | | 등록(수정) 때 읽은 정가(원). 종료된 행사의 정가 표시에 씀 |
-| sale_price | INT | 불가 | | | 할인가(원). 정가 × (100 − 할인율) / 100의 원 아래 버림 |
-| discount_rate | INT | 불가 | | | 할인율(1~99) |
-| limited_quantity | INT | 허용 | NULL | | 번개 드롭 한정 수량. 특가는 NULL |
-| remaining_quantity | INT | 허용 | NULL | | 번개 드롭 남은 수량. 특가는 NULL. 주문하면 줄고 취소하면 한정 수량까지 늘어남 |
+| `sale_event_id` | `BIGINT` | N | | `FK (sale_events.id)` | 소속 행사 ID |
+| `product_id` | `BIGINT` | N | | `FK (products.id), INDEX` | 대상 상품 ID |
+| `list_price` | `INT` | N | `0` | | 행사 등록 당시 기준 정상가(원) |
+| `sale_price` | `INT` | N | `0` | | 실제 행사 판매가(원) |
+| `discount_rate` | `INT` | N | `0` | | 정가 대비 할인율(%) |
+| `limited_quantity` | `INT` | Y | `NULL` | | 번개 드롭 한정 총 수량 (특가는 NULL) |
+| `remaining_quantity` | `INT` | Y | `NULL` | | 번개 드롭 현재 잔여 수량 |
 
-- 번개 드롭 1인 1개는 `order_items`의 UK(sale_event_item_id, flash_drop_member_id)가 막습니다.
-- 실행용 DDL 초안은 [sale-event.sql](sale-event.sql)에 있습니다.
+### `orders` — 주문
+사용자가 작성한 주문 정보 및 결제·구매 확정 상태입니다.
 
-## payments — 결제
-
-- 결제하기를 누를 때마다 한 건씩 만듭니다. 한 주문에 결제가 여러 건 있을 수 있고(재결제), 결제 완료는 주문 잠금으로 한 건만 남습니다.
-- 상태는 결제 대기·결제 완료·실패만 갖습니다. 결제 완료 뒤의 취소(환불·보상 취소)는 결제 이력과 환불 도메인에 남깁니다.
-- 제약 이름: UK `uk_payments_portone_payment_id`. 인덱스 `idx_payments_status_expires_at`(status, expires_at). FK `fk_payments_order`.
-
-| 컬럼 | 타입 | NULL | 기본값 | 제약 | 의미 |
+| 컬럼 | 물리 타입 | NULL | 기본값 | 제약 | 비즈니스 의미 및 설명 |
 |---|---|---|---|---|---|
-| order_id | BIGINT | 불가 | | FK | 결제할 주문 |
-| billing_key_id | BIGINT | 허용 | NULL | FK `fk_payments_billing_key`, 인덱스 | 등록 카드로 결제했으면 그 카드([billing_keys](#billing_keys--등록-카드)). 결제창 결제는 NULL |
-| portone_payment_id | VARCHAR(100) | 불가 | | UK | PortOne 결제 ID. 서버가 `payment-` + 하이픈 없는 UUID로 만든 40자. PortOne 결제의 멱등 키 역할 |
-| amount | BIGINT | 불가 | | | 결제 금액(원). 클라이언트 값이 아니라 주문 금액(`orders.total_amount`) |
-| pg_provider | ENUM('KAKAOPAY','KICC','INICIS','TOSSPAYMENTS','TOSSPAY') | 불가 | | | 결제대행사. 결제 준비 때 고른 값이고, 승인할 때 PG 조회로 확인한 실제 결제대행사가 다르면 그 값으로 고침 |
-| status | ENUM('READY','PAID','FAILED') | 불가 | | 인덱스 | 결제 대기·결제 완료·실패 |
-| paid_at | DATETIME(6) | 허용 | NULL | | 결제 완료 시각(서버가 승인한 시각). 결제 완료 전에는 NULL |
-| expires_at | DATETIME(6) | 불가 | | 인덱스 | 결제 대기 만료 시각. 생성 10분 뒤. 이 시각 이후 PG에서 결제되면 받지 않고 취소 |
-| fail_reason | ENUM('PG_FAILED','USER_CANCELLED','AMOUNT_MISMATCH','TIMEOUT','ORDER_NOT_PAYABLE','SUPERSEDED') | 허용 | NULL | | 실패 사유. PG 실패·결제창 닫기·금액 불일치·만료·결제할 수 없는 주문·새 결제로 정리. 실패가 아니면 NULL |
+| `order_number` | `VARCHAR(20)` | N | | `UK` | 주문 번호 (예: `20261013-000123`) |
+| `member_id` | `BIGINT` | N | | `FK (members.id), INDEX` | 주문한 회원 ID |
+| `idempotency_key` | `VARCHAR(64)` | Y | `NULL` | `UK(member_id, idempotency_key)` | 클라이언트 발급 중복 주문 방지 키 |
+| `status` | `ENUM('PENDING','PAID','CANCELLED','CONFIRMED')` | N | `'PENDING'` | `INDEX` | 주문 상태 (대기 / 결제완료 / 취소 / 구매확정) |
+| `total_amount` | `BIGINT` | N | `0` | | 최종 결제 확정 금액(원) |
+| `paid_at` | `DATETIME(6)` | Y | `NULL` | `INDEX` | 결제 완료 일시 (7일 후 자동 구매 확정 기준) |
+| `confirmed_at` | `DATETIME(6)` | Y | `NULL` | | 구매 확정 일시 |
 
-- 실행용 DDL 초안은 [payment.sql](payment.sql)에 있습니다. `pg_provider`와 `idx_payment_histories_created_at`은 아직 이 초안에 없고, 위 정의는 엔티티 기준입니다.
+### `order_items` — 주문 상품 스냅샷
+주문 당시의 상품명, 이미지, 정가 및 실제 결제 단가를 불변 스냅샷으로 보존합니다.
 
-## billing_keys — 등록 카드
-
-- 회원이 등록한 카드입니다. 카드 번호·유효기간은 PG가 보관하고 우리는 PortOne 빌링키와 화면 표시용 정보만 저장합니다. 설계는 [등록 카드 결제 설계](../architecture/domains/payment-card.md).
-- 삭제해도 행은 지우지 않고 `DELETED`로 남깁니다. 결제(`payments.billing_key_id`)가 카드를 참조하기 때문입니다.
-- 대표 카드는 회원당 사용 중 카드 중 하나이며, DB 제약이 아니라 회원 행 잠금 뒤 서비스 로직으로 지킵니다.
-- 제약 이름: UK `uk_billing_keys_billing_key`. 인덱스 `idx_billing_keys_member_status`(member_id, status), `idx_billing_keys_status_pg_deleted_at`(status, pg_deleted_at). FK `fk_billing_keys_member`.
-
-| 컬럼 | 타입 | NULL | 기본값 | 제약 | 의미 |
+| 컬럼 | 물리 타입 | NULL | 기본값 | 제약 | 비즈니스 의미 및 설명 |
 |---|---|---|---|---|---|
-| member_id | BIGINT | 불가 | | FK, 인덱스 | 카드 주인 |
-| billing_key | VARCHAR(200) | 불가 | | UK | PortOne 빌링키. 응답으로 내려주지 않음 |
-| card_name | VARCHAR(100) | 허용 | NULL | | 카드 상품명(PortOne 빌링키 조회 `card.name`). 카드사 이름이 아님 |
-| card_last4 | CHAR(4) | 허용 | NULL | | 카드 번호 끝 4자리(PortOne 마스킹 번호 `card.number`에서 추출) |
-| card_number_masked | VARCHAR(30) | 허용 | NULL | | PortOne 마스킹 번호(`card.number`). 같은 카드 중복 등록 확인용, 응답으로 내려주지 않음 |
-| card_issuer_code | VARCHAR(30) | 허용 | NULL | | 발급사 코드(`card.issuer`). 마스킹 번호와 함께 같은 카드인지 확인 |
-| card_type | ENUM('CREDIT','DEBIT','GIFT') | 허용 | NULL | | 신용·체크·기프트. PortOne이 주지 않으면 NULL |
-| is_default | BOOLEAN | 불가 | FALSE | | 대표 카드 여부 |
-| status | ENUM('ACTIVE','DELETED') | 불가 | 'ACTIVE' | 인덱스 | 사용 중·삭제 |
-| deleted_at | DATETIME(6) | 허용 | NULL | | 삭제 시각 |
-| pg_deleted_at | DATETIME(6) | 허용 | NULL | 인덱스 | PortOne 빌링키 삭제 확인 시각. 삭제 상태인데 NULL이면 PortOne 삭제 재시도 대상 |
+| `order_id` | `BIGINT` | N | | `FK (orders.id)` | 소속 주문 ID |
+| `product_id` | `BIGINT` | N | | `FK (products.id)` | 상품 ID |
+| `product_name` | `VARCHAR(200)` | N | | | 주문 당시 상품명 스냅샷 |
+| `product_image_url` | `VARCHAR(500)` | Y | `NULL` | | 주문 당시 상품 이미지 스냅샷 |
+| `quantity` | `INT` | N | `1` | | 주문 수량 |
+| `list_price` | `INT` | N | `0` | | 주문 당시 정상 정가 |
+| `unit_price` | `INT` | N | `0` | | 실제 구매 단가 (할인가 적용) |
+| `sale_type` | `ENUM('NONE','SPECIAL','FLASH_DROP')` | N | `'NONE'` | | 적용된 행사 구분 (번개 드롭은 환불 제한) |
+| `sale_event_item_id` | `BIGINT` | Y | `NULL` | `FK (sale_event_items.id)` | 연계된 행사 상품 ID |
+| `flash_drop_member_id` | `BIGINT` | Y | `NULL` | `FK (members.id), UK` | 번개 드롭 1인 1개 구매 제한 검증용 회원 ID |
 
-## payment_pins — 결제 비밀번호
+---
 
-- 등록 카드로 결제할 때 넣는 숫자 6자리 비밀번호입니다. 회원당 하나이고 원래 값은 저장하지 않고 BCrypt 해시만 둡니다. 설계는 [등록 카드 결제 설계](../architecture/domains/payment-card.md).
-- 행을 지우지 않고 변경·재설정 때 고쳐 씁니다. 쓰기는 회원 행 잠금 뒤 서비스 로직으로 처리합니다.
-- 제약 이름: UK `uk_payment_pins_member_id`.
-- 위 정의는 엔티티(`PaymentPin`) 기준입니다. `billing_keys`의 `card_number_masked`·`card_issuer_code`도 엔티티 기준입니다.
+## 6. 결제 · 환불 · 정산 도메인
 
-| 컬럼 | 타입 | NULL | 기본값 | 제약 | 의미 |
+### `billing_keys` — 등록 카드 (빌링키)
+간편 결제를 위해 발급받은 PortOne 빌링키 및 카드 정보입니다.
+
+| 컬럼 | 물리 타입 | NULL | 기본값 | 제약 | 비즈니스 의미 및 설명 |
 |---|---|---|---|---|---|
-| member_id | BIGINT | 불가 | | UK | 비밀번호 주인 |
-| pin_hash | VARCHAR(100) | 불가 | | | 결제 비밀번호 BCrypt 해시(복원 불가) |
-| failed_count | INT | 불가 | 0 | | 연속으로 틀린 횟수. 맞히거나 변경·재설정하면 0 |
-| locked_at | DATETIME(6) | 허용 | NULL | | 5번 틀려 잠긴 시각. NULL이면 잠기지 않음. 재설정하면 NULL |
+| `member_id` | `BIGINT` | N | | `FK (members.id), INDEX` | 카드 소유 회원 ID |
+| `billing_key` | `VARCHAR(200)` | N | | `UK` | PortOne 발급 빌링키 (외부 비공개) |
+| `card_name` | `VARCHAR(100)` | Y | `NULL` | | 카드 상품명 (예: 신한카드) |
+| `card_last4` | `CHAR(4)` | Y | `NULL` | | 카드 번호 끝 4자리 (화면 표시용) |
+| `card_type` | `ENUM('CREDIT','DEBIT','GIFT')` | Y | `NULL` | | 카드 종류 (신용 / 체크 / 기프트) |
+| `is_default` | `BOOLEAN` | N | `FALSE` | | 대표 카드 여부 |
+| `status` | `ENUM('ACTIVE','DELETED')` | N | `'ACTIVE'` | `INDEX` | 카드 사용 상태 (사용중 / 삭제됨) |
+| `deleted_at` | `DATETIME(6)` | Y | `NULL` | | 회원 삭제 일시 |
+| `pg_deleted_at` | `DATETIME(6)` | Y | `NULL` | `INDEX` | PG사 빌링키 폐기 확인 일시 |
 
-## payment_histories — 결제 이력
+### `payment_pins` — 결제 비밀번호
+등록 카드로 결제 시 입력하는 6자리 비밀번호 해시입니다.
 
-- 결제 한 건에 일어난 사건을 시간순으로 추가만 합니다. 수정·삭제하지 않습니다.
-- 결제 상태 변경과 같은 트랜잭션에서 남기므로 상태 변경이 롤백되면 이력도 남지 않습니다.
-- 제약 이름: 인덱스 `idx_payment_histories_payment_id`(payment_id, created_at), `idx_payment_histories_refund_id`(refund_id), `idx_payment_histories_created_at`(created_at, 정산 기간 조회). FK `fk_payment_histories_payment`.
-
-| 컬럼 | 타입 | NULL | 기본값 | 제약 | 의미 |
+| 컬럼 | 물리 타입 | NULL | 기본값 | 제약 | 비즈니스 의미 및 설명 |
 |---|---|---|---|---|---|
-| payment_id | BIGINT | 불가 | | FK, 인덱스 | 대상 결제 |
-| event_type | ENUM('READY','PAID','FAILED','PARTIAL_CANCELLED','CANCELLED') | 불가 | | | 결제 시도 생성·PG 결제됨·실패·PG 부분 취소·PG 전액 취소. 받지 않은 결제가 PG에서 결제되면 `PAID`를 남겨 보상 취소 대상으로 표시 |
-| amount | BIGINT | 허용 | NULL | | 이번 사건 금액(원). 실패는 돈이 움직이지 않아 NULL |
-| cancelled_amount | BIGINT | 불가 | | | 사건 직후 누적 취소 금액(원) |
-| refund_id | BIGINT | 허용 | NULL | 인덱스 | 환불로 생긴 취소면 환불 ID. 보상 취소·콘솔 취소는 NULL. 물리 FK 없음 |
-| pg_cancellation_id | VARCHAR(200) | 허용 | NULL | | PG 취소 건 ID. 환불 쪽이 PG 취소 목록과 맞춰 볼 때 씀 |
-| changed_by | ENUM('USER','WEBHOOK','SCHEDULER') | 불가 | | | 사건을 일으킨 주체 |
-| reason | VARCHAR(255) | 허용 | NULL | | 사유. 길면 255자에서 잘라 저장 |
+| `member_id` | `BIGINT` | N | | `FK (members.id), UK` | 회원 ID (1:1 매핑) |
+| `pin_hash` | `VARCHAR(100)` | N | | | 비밀번호 단방향 해시 (BCrypt) |
+| `failed_count` | `INT` | N | `0` | | 연속 오입력 횟수 (성공 시 0 리셋) |
+| `locked_at` | `DATETIME(6)` | Y | `NULL` | | 5회 실패로 계정 잠금된 일시 |
 
-- `created_at`이 사건 시각입니다.
-- 결제 상태와 사건 종류는 다릅니다. 결제는 `FAILED`인데 이력에 `PAID`가 있고 `CANCELLED`가 없으면 보상 취소가 끝나지 않은 결제로 보고 스케줄러가 다시 취소합니다.
-- 정산이 이 테이블을 매출 원장으로 읽습니다. 결제 상태가 `PAID`인 결제의 `PAID`(결제)·`PARTIAL_CANCELLED`·`CANCELLED`(환불·콘솔 취소) 이력을 `created_at` 기준으로 셉니다.
+### `payments` — 결제
+주문 건에 대한 결제 시도 및 승인 정보입니다. (재결제 시도로 1 주문당 N 결제 가능)
 
-## webhook_events — PortOne 웹훅 수신 기록
-
-- 서명 검증을 통과한 웹훅만 저장합니다. 결제 처리와 다른 트랜잭션에서 저장해 처리가 실패해도 기록이 남습니다.
-- 제약 이름: UK `uk_webhook_events_webhook_id`. FK `fk_webhook_events_payment`.
-
-| 컬럼 | 타입 | NULL | 기본값 | 제약 | 의미 |
+| 컬럼 | 물리 타입 | NULL | 기본값 | 제약 | 비즈니스 의미 및 설명 |
 |---|---|---|---|---|---|
-| payment_id | BIGINT | 허용 | NULL | FK | 매칭된 결제. 결제를 못 찾았거나 처리 대상이 아닌 웹훅은 NULL |
-| webhook_id | VARCHAR(200) | 불가 | | UK | PortOne `webhook-id` 헤더. 같은 웹훅을 한 번만 처리 |
-| event_type | VARCHAR(50) | 불가 | | | 웹훅 type 원문(예: `Transaction.Paid`). SDK가 모르는 type도 그대로 저장 |
-| process_status | ENUM('RECEIVED','PROCESSED','FAILED','IGNORED') | 불가 | | | 수신 후 처리 중·상태 반영·처리 실패·바꿀 것 없음. `RECEIVED`·`FAILED`는 재전송 때 다시 처리 |
-| raw_payload | TEXT | 불가 | | | 웹훅 본문 원문 |
-| fail_reason | VARCHAR(500) | 허용 | NULL | | 처리 실패 사유. 길면 500자에서 잘라 저장 |
-| processed_at | DATETIME(6) | 허용 | NULL | | 처리 완료 시각(`PROCESSED`·`IGNORED`) |
+| `order_id` | `BIGINT` | N | | `FK (orders.id), INDEX` | 대상 주문 ID |
+| `billing_key_id` | `BIGINT` | Y | `NULL` | `FK (billing_keys.id)` | 사용된 등록 카드 ID (일반 결제 시 NULL) |
+| `portone_payment_id` | `VARCHAR(100)` | N | | `UK` | 서버 발급 포트원 결제 식별자 (`payment-` + UUID) |
+| `amount` | `BIGINT` | N | `0` | | 결제 요청/승인 금액(원) |
+| `pg_provider` | `ENUM('KAKAOPAY','KICC','INICIS','TOSSPAYMENTS','TOSSPAY')` | N | | | PG사 구분 |
+| `status` | `ENUM('READY','PAID','FAILED')` | N | `'READY'` | `INDEX` | 결제 상태 (대기 / 완료 / 실패) |
+| `fail_reason` | `ENUM('PG_FAILED','USER_CANCELLED','AMOUNT_MISMATCH','TIMEOUT','ORDER_NOT_PAYABLE','SUPERSEDED')` | Y | `NULL` | | 결제 실패 사유 |
+| `expires_at` | `DATETIME(6)` | N | | `INDEX` | 결제 대기 만료 일시 (생성 시각 + 10분) |
+| `paid_at` | `DATETIME(6)` | Y | `NULL` | `INDEX` | PG 결제 승인 완료 일시 |
 
-## daily_sales — 일별 매출 집계
+### `payment_histories` — 결제 이력 원장
+결제 및 취소/환불로 인해 발생하는 모든 금융 사건을 기록하는 감사 원장입니다.
 
-- 담당 도메인: 정산. 설계는 [정산 설계](../architecture/domains/settlement.md)입니다.
-- 하루(한국 시간 0시 ~ 다음 날 0시)의 결제·환불 합계를 날짜마다 한 행으로 둡니다. 매일 00:10에 어제 행을 만들고, 정산 조회가 행 없는 날을 채웁니다. 오늘 행은 만들지 않습니다.
-- 다시 집계하면 같은 행을 새 합계로 덮어씁니다. 지우지 않습니다. 주·월 합계는 저장하지 않습니다.
-- 제약 이름: UK `uk_daily_sales_sales_date`(sales_date).
-
-| 컬럼 | 타입 | NULL | 기본값 | 제약 | 의미 |
+| 컬럼 | 물리 타입 | NULL | 기본값 | 제약 | 비즈니스 의미 및 설명 |
 |---|---|---|---|---|---|
-| sales_date | DATE | 불가 | | UK | 매출 날짜(한국 시간) |
-| paid_amount | BIGINT | 불가 | | | 그날 결제 금액 합(원). 결제 이력 `PAID` |
-| refunded_amount | BIGINT | 불가 | | | 그날 환불 금액 합(원). 결제 이력 `PARTIAL_CANCELLED`·`CANCELLED`(환불·콘솔 취소) |
-| net_amount | 미확인(BIGINT로 봄) | 미확인 | | 생성 컬럼 | 순매출(paid_amount − refunded_amount). DB가 계산하며 엔티티는 매핑하지 않고 `getNetAmount()`로 계산. 음수 가능 |
-| paid_count | INT | 불가 | | | 결제 건수(`PAID` 이력 수) |
-| refunded_count | INT | 불가 | | | 환불 건수(취소 이력 수). 같은 결제를 두 번 부분 환불하면 2 |
+| `payment_id` | `BIGINT` | N | | `FK (payments.id), INDEX` | 소속 결제 ID |
+| `event_type` | `ENUM('READY','PAID','FAILED','PARTIAL_CANCELLED','CANCELLED')` | N | | | 발생 사건 종류 |
+| `amount` | `BIGINT` | Y | `NULL` | | 이번 사건의 결제 또는 취소 금액 |
+| `cancelled_amount` | `BIGINT` | N | `0` | | 해당 시점 기준 누적 취소 금액 |
+| `refund_id` | `BIGINT` | Y | `NULL` | `INDEX` | 환불로 인한 취소인 경우 환불 ID |
+| `pg_cancellation_id` | `VARCHAR(200)` | Y | `NULL` | | PG사 취소 고유 번호 |
+| `changed_by` | `ENUM('USER','WEBHOOK','SCHEDULER')` | N | | | 상태 변경 주체 |
+| `reason` | `VARCHAR(255)` | Y | `NULL` | | 변경/취소 사유 |
 
-- 결제 상태가 `PAID`인 결제의 이력만 셉니다. 받지 않은 결제와 그 보상 취소는 빠집니다.
-- 환불 금액이 있는데 환불 건수가 0인 행은 환불 건수 칸이 생기기 전에 집계된 행으로 보고, 정산 조회 때 다시 집계합니다.
-- 저장소에 이 테이블의 DDL 파일은 없습니다. 타입은 엔티티(`DailySales`) 기준이고, `net_amount`의 타입·식과 기본값은 엔티티 주석 외에는 확인하지 못했습니다.
+### `refunds` — 환불
+주문 취소 및 반품에 따른 환불 요청 단위입니다.
 
-## search_click_histories — 검색 결과 상품 클릭 기록
-
-- 검색 결과에서 상품을 누르면 한 건씩 쌓습니다. 수정·삭제하지 않습니다.
-- 클릭 시각은 공통 컬럼 `created_at`(서버 저장 시각, 한국 시각)입니다. 클라이언트 시각은 쓰지 않습니다.
-- 반복 클릭은 저장 전에 Redis로 거릅니다. 상품이 실제로 있는지는 확인하지 않습니다.
-  - 로그인: 같은 회원·상품·검색어는 10분 안에 한 번만 저장합니다.
-  - 비로그인: 사람을 구분할 수 없어 상품별로 1분에 30건까지만 저장합니다.
-  - Redis 장애 중에는 거르지 않고 모두 저장합니다.
-- 제약 이름: 인덱스 `idx_search_click_histories_created_at_product_id`(created_at, product_id). 기간·기준 시각 범위의 상품별 클릭 수 집계용입니다.
-
-| 컬럼 | 타입 | NULL | 기본값 | 제약 | 의미 |
+| 컬럼 | 물리 타입 | NULL | 기본값 | 제약 | 비즈니스 의미 및 설명 |
 |---|---|---|---|---|---|
-| product_id | BIGINT | 불가 | | 인덱스 | 클릭한 상품. 물리 FK 없이 상품 번호만 저장 |
-| member_id | BIGINT | 허용 | NULL | | 클릭한 회원. 비로그인 클릭은 NULL. 물리 FK 없음 |
-| keyword | VARCHAR(100) | 불가 | | | 클릭 당시 검색어(앞뒤 공백 제거) |
+| `payment_id` | `BIGINT` | N | | `FK (payments.id)` | 대상 결제 ID |
+| `refund_amount` | `BIGINT` | N | `0` | | 이번 요청 환불 금액 합계 |
+| `reason_type` | `ENUM('CHANGE_OF_MIND','ORDER_MISTAKE','NO_LONGER_NEEDED','ETC')` | N | | | 환불 사유 구분 |
+| `reason_detail` | `VARCHAR(500)` | Y | `NULL` | | 상세 환불 사유 |
+| `status` | `ENUM('REQUESTED','COMPLETED','FAILED')` | N | `'REQUESTED'` | | 환불 진행 상태 |
+| `portone_cancellation_id` | `VARCHAR(200)` | Y | `NULL` | | PortOne 취소 식별자 |
+| `refunded_at` | `DATETIME(6)` | Y | `NULL` | `INDEX` | 환불 완료 일시 |
 
-- 저장소에 이 테이블의 DDL 파일은 없습니다. 타입은 엔티티(`SearchClickHistory`) 기준입니다.
+### `refund_items` — 환불 상품 품목
+주문 상품 단위 부분 환불을 지원하기 위한 세부 환불 항목입니다.
 
-## search_recipe_click_histories — 검색 결과 레시피 클릭 기록
-
-- 통합검색 결과에서 레시피를 누를 때마다 한 건씩 쌓습니다. 검색 품질(검색어별로 어떤 레시피를 고르는지)을 보는 데 씁니다. 수정·삭제하지 않습니다.
-- 할인 분석과 메인 "지금 뜨는 할인"이 읽는 `search_click_histories`와 섞지 않으려고 따로 둡니다.
-- 클릭 시각은 공통 컬럼 `created_at`(서버 저장 시각, 한국 시각)입니다. 중복 클릭은 제거하지 않고, 레시피가 실제로 있는지는 확인하지 않습니다.
-- 제약 이름: 인덱스 `idx_search_recipe_click_histories_created_at_recipe_id`(created_at, recipe_id). 기간별 레시피 클릭 수 집계용입니다.
-
-| 컬럼 | 타입 | NULL | 기본값 | 제약 | 의미 |
+| 컬럼 | 물리 타입 | NULL | 기본값 | 제약 | 비즈니스 의미 및 설명 |
 |---|---|---|---|---|---|
-| recipe_id | BIGINT | 불가 | | 인덱스 | 클릭한 레시피. 물리 FK 없이 레시피 번호만 저장 |
-| member_id | BIGINT | 허용 | NULL | | 클릭한 회원. 비로그인 클릭은 NULL. 물리 FK 없음 |
-| keyword | VARCHAR(100) | 불가 | | | 클릭 당시 검색어(앞뒤 공백 제거) |
+| `refund_id` | `BIGINT` | N | | `FK (refunds.id)` | 소속 환불 ID |
+| `order_item_id` | `BIGINT` | N | | `FK (order_items.id), INDEX` | 환불 대상 주문 상품 ID |
+| `quantity` | `INT` | N | `0` | | 환불 수량 |
+| `unit_price` | `INT` | N | `0` | | 주문 당시 단가 스냅샷 |
+| `amount` | `BIGINT` | N | `0` | | 환불 금액 (`unit_price * quantity`) |
 
-## search_zero_result_histories — 결과 0건 검색어 기록
+### `webhook_events` — 포트원 웹훅 수신 이력
+외부 PG 웹훅의 중복 수신 방지 및 감사 추적을 위한 원문 수신 로그입니다.
 
-- 통합검색 결과가 0건이었던 검색어를 한 건씩 쌓습니다. 동의어·사전에 넣을 검색어나 추가할 레시피·상품을 찾는 데 씁니다. 수정·삭제하지 않습니다.
-- 필터 없이 첫 페이지를 검색했을 때만 기록합니다. 필터 때문에 0건이 된 경우와 2페이지 이후 요청은 남기지 않습니다.
-- ES 결과든 MySQL 대체 검색 결과든 최종 응답이 0건이면 기록합니다. 저장이 실패해도 검색 응답에는 영향이 없습니다.
-- 같은 검색어도 검색할 때마다 쌓습니다. 회원은 남기지 않습니다.
-- 제약 이름: 인덱스 `idx_search_zero_result_histories_created_at`(created_at). 기간별 집계용입니다.
-
-| 컬럼 | 타입 | NULL | 기본값 | 제약 | 의미 |
+| 컬럼 | 물리 타입 | NULL | 기본값 | 제약 | 비즈니스 의미 및 설명 |
 |---|---|---|---|---|---|
-| target | VARCHAR(20) | 불가 | | | 검색 대상. `RECIPE` 또는 `PRODUCT` |
-| keyword | VARCHAR(50) | 불가 | | | 검색어(앞뒤 공백 제거) |
+| `payment_id` | `BIGINT` | Y | `NULL` | `FK (payments.id), INDEX` | 매핑된 결제 ID (매칭 실패 시 NULL) |
+| `webhook_id` | `VARCHAR(200)` | N | | `UK` | PortOne 웹훅 고유 식별자 (중복 수신 차단) |
+| `event_type` | `VARCHAR(50)` | N | | | 웹훅 이벤트 타입 (예: `Transaction.Paid`) |
+| `process_status` | `ENUM('RECEIVED','PROCESSED','FAILED','IGNORED')` | N | `'RECEIVED'` | `INDEX` | 처리 상태 |
+| `raw_payload` | `TEXT` | N | | | 웹훅 원문 페이로드 (서명 검증용 원본 보존) |
+| `processed_at` | `DATETIME(6)` | Y | `NULL` | | 처리 완료 시각 |
 
-## notifications — 알림
+### `daily_sales` — 일별 매출 정산
+자정에 집계되는 일별 매출 통계 원장입니다.
 
-- 회원 한 명에게 보이는 알림 하나입니다. 다른 도메인이 보낸 알림 요청(`notification-requested`)을 받아 저장합니다.
-- 수정은 읽음 여부와 지운 시각만 바뀝니다. 회원이 지워도 행은 남깁니다.
-- 같은 회원에게 같은 중복 방지 키는 하나만 저장합니다. 같은 요청이 두 번 와도 알림은 하나입니다.
-- 제약 이름: UK `uk_notifications_member_id_dedupe_key`(member_id, dedupe_key). 회원별 목록·안 읽은 수 조회도 이 인덱스의 앞부분(member_id)을 씁니다.
-
-| 컬럼 | 타입 | NULL | 기본값 | 제약 | 의미 |
+| 컬럼 | 물리 타입 | NULL | 기본값 | 제약 | 비즈니스 의미 및 설명 |
 |---|---|---|---|---|---|
-| member_id | BIGINT | 불가 | | UK(member_id, dedupe_key) | 받는 회원. 물리 FK 없이 회원 번호만 저장 |
-| notification_type | ENUM('EXPIRATION','FLASH_DROP','COMMERCE_STOCKED') | 불가 | | | 유통기한 임박·번개 드롭·입고 |
-| content | VARCHAR(200) | 불가 | | | 알림 문구 |
-| link_url | VARCHAR(500) | 불가 | | | 누르면 이동할 화면 경로(예: `/products/{상품 ID}`) |
-| dedupe_key | VARCHAR(150) | 불가 | | UK(member_id, dedupe_key) | 보낸 도메인이 정한 중복 방지 키 |
-| is_read | BOOLEAN | 불가 | FALSE | | 읽음 여부 |
-| deleted_at | DATETIME(6) | 가능 | | | 회원이 지운 시각. 값이 있으면 목록과 안 읽은 알림 수에서 뺍니다 |
+| `sales_date` | `DATE` | N | | `UK` | 매출 기준 일자 (한국 시각) |
+| `paid_amount` | `BIGINT` | N | `0` | | 결제 완료 금액 총합 |
+| `refunded_amount` | `BIGINT` | N | `0` | | 환불 완료 금액 총합 |
+| `net_amount` | `BIGINT` | N | | `GENERATED STORED` | 순매출 (`paid_amount - refunded_amount`, 자동 계산) |
+| `paid_count` | `INT` | N | `0` | | 결제 완료 건수 |
+| `refunded_count` | `INT` | N | `0` | | 환불 발생 건수 |
 
-- 목록 순서와 "더 보기" 기준은 id입니다. 클수록 나중에 저장된 알림입니다.
-- 지운 알림도 중복 방지 키를 가지고 있어, 같은 알림 요청이 다시 와도 새로 저장되지 않습니다.
-- 전부 읽음과 모두 지우기는 일괄 UPDATE라 updated_at이 바뀌지 않습니다.
-- 실행용 DDL 초안은 [notification.sql](notification.sql)에 있습니다.
+---
 
-## 다른 도메인에 요청할 컬럼
+## 7. AI 상담 도메인
 
-| 도메인 | 필요한 데이터 | 근거 |
-|---|---|---|
-| 상품 | 유통기한(DATE, 필수), 보관 방법(ENUM 상온/냉장/냉동, 필수), 정상가 수정 | Q-03, Q-04 |
-| 주문·결제 | 상품별 확정 판매 수량(취소·환불 제외)과 집계 기준 시각 | 판매 예측 |
-| 재고 | 상품별 현재 재고와 기준 시각 | 할인 후보, 상품 상세 |
-| 검색·추천 | 상품별·요일별 검색 클릭·구매 수와 집계 기준 시각 | 할인 후보 |
-| 후기 | 작성자 닉네임·맛 선호를 회원 정보에서 읽어 표시 | 맛 선호 |
+### `chat_sessions` — AI 상담 세션
+회원의 대화형 메뉴 추천 상담 세션입니다.
 
-## 새 테이블 작성 템플릿
-
-### <테이블명> — <한국어 설명>
-
-- 담당 도메인:
-- 상태·근거:
-- 보관·논리 삭제 정책:
-
-| 컬럼 | 물리 타입 | NULL | 기본값 | PK/FK/UNIQUE | 의미·단위·허용값 |
+| 컬럼 | 물리 타입 | NULL | 기본값 | 제약 | 비즈니스 의미 및 설명 |
 |---|---|---|---|---|---|
-| 작성 필요 | 미정 | 미정 | 미정 | 미정 | 작성 필요 |
+| `member_id` | `BIGINT` | N | | `FK (members.id), INDEX` | 상담을 진행 중인 회원 ID |
+| `status` | `ENUM('ACTIVE','COMPLETED','EXPIRED')` | N | `'ACTIVE'` | `INDEX` | 세션 상태 (진행 중 / 완료 / 만료) |
+| `last_message_at` | `DATETIME(6)` | N | `NOW(6)` | `INDEX` | 마지막 메시지 교환 일시 |
+| `active_member_id` | `BIGINT` | Y | | `GENERATED STORED, UK` | `status = 'ACTIVE'`일 때만 `member_id`를 갖는 계산 컬럼 (회원당 활성 세션 1개 보장) |
 
-- 인덱스와 대상 조회:
-- FK 대상·삭제·갱신 동작:
-- 업무 검증과 DB 제약:
-- 시간대·정밀도:
-- 마이그레이션·기존 데이터 영향:
+### `chat_messages` — AI 대화 메시지
+상담 세션 내에서 사용자와 AI 어시스턴트가 주고받은 텍스트 내역입니다.
+
+| 컬럼 | 물리 타입 | NULL | 기본값 | 제약 | 비즈니스 의미 및 설명 |
+|---|---|---|---|---|---|
+| `chat_session_id` | `BIGINT` | N | | `FK (chat_sessions.id)` | 소속 세션 ID |
+| `sequence` | `INT` | N | `0` | `UK(chat_session_id, sequence)` | 세션 내 메시지 순번 (1부터 증가) |
+| `role` | `ENUM('USER','ASSISTANT')` | N | | | 발화 주체 (USER: 사용자 / ASSISTANT: AI) |
+| `content` | `TEXT` | N | | | 메시지 내용 원문 |
+| `filtered` | `BOOLEAN` | N | `FALSE` | | 유해성/안전 가드레일에 의해 필터링된 메시지 여부 |
+
+### `chat_recommendations` — AI 상담 추천 결과
+AI 답변 메시지 아래에 첨부되는 추천 레시피 및 상품 카드입니다.
+
+| 컬럼 | 물리 타입 | NULL | 기본값 | 제약 | 비즈니스 의미 및 설명 |
+|---|---|---|---|---|---|
+| `chat_message_id` | `BIGINT` | N | | `FK (chat_messages.id)` | 추천이 포함된 메시지 ID |
+| `recipe_id` | `BIGINT` | Y | `NULL` | `FK (recipes.id)` | 추천 레시피 ID (레시피 추천 시) |
+| `product_id` | `BIGINT` | Y | `NULL` | `FK (products.id)` | 추천 상품 ID (부족 재료/밀키트 추천 시) |
+| `display_order` | `INT` | N | `0` | `UK(chat_message_id, display_order)` | 카드 노출 순서 |
+| `description` | `TEXT` | Y | `NULL` | | 추천 사유에 대한 AI 부가 설명 |
+
+---
+
+## 8. 요리 · 후기 & 알림 도메인
+
+### `cooking_logs` — 요리 완료 기록
+회원이 레시피를 보고 요리를 완료했을 때 생성되는 기록입니다.
+
+| 컬럼 | 물리 타입 | NULL | 기본값 | 제약 | 비즈니스 의미 및 설명 |
+|---|---|---|---|---|---|
+| `member_id` | `BIGINT` | N | | `FK (members.id), INDEX` | 요리한 회원 ID |
+| `recipe_id` | `BIGINT` | N | | `FK (recipes.id), INDEX` | 조리한 레시피 ID |
+| `chat_session_id` | `BIGINT` | Y | `NULL` | `FK (chat_sessions.id)` | AI 상담 추천을 통해 요리한 경우 세션 ID |
+| `result` | `ENUM('SUCCESS','FAILED')` | N | | | 요리 성공/실패 여부 |
+| `memo` | `VARCHAR(50)` | Y | `NULL` | | 개인 조리 메모 (작성자 본인만 열람) |
+
+### `fridge_item_logs` — 재료 소진/폐기 이력
+요리 완성 또는 수동 관리를 통해 냉장고에서 재료가 차감/삭제된 이력입니다.
+
+| 컬럼 | 물리 타입 | NULL | 기본값 | 제약 | 비즈니스 의미 및 설명 |
+|---|---|---|---|---|---|
+| `member_id` | `BIGINT` | N | | `FK (members.id), INDEX` | 회원 ID |
+| `ingredient_id` | `BIGINT` | N | | `FK (ingredients.id)` | 표준 재료 ID |
+| `cooking_log_id` | `BIGINT` | Y | `NULL` | `FK (cooking_logs.id)` | 요리로 인해 소진된 경우 요리 기록 ID |
+| `fridge_id` | `BIGINT` | N | | | 원본 냉장고 재료 행 ID (참고용 식별자) |
+| `raw_name` | `VARCHAR(200)` | N | | | 재료명 스냅샷 |
+| `quantity` | `DECIMAL(10, 2)` | N | `0` | | 차감된 수량 |
+| `action` | `ENUM('CONSUMED','DISCARDED')` | N | | | 처리 구분 (소진: CONSUMED / 폐기: DISCARDED) |
+
+### `recipe_reviews` — 레시피 후기
+회원이 레시피에 남긴 별점과 한 줄 후기입니다. (회원당 레시피 1건 작성 및 수정 가능)
+
+| 컬럼 | 물리 타입 | NULL | 기본값 | 제약 | 비즈니스 의미 및 설명 |
+|---|---|---|---|---|---|
+| `member_id` | `BIGINT` | N | | `FK (members.id)` | 작성 회원 ID |
+| `recipe_id` | `BIGINT` | N | | `FK (recipes.id), INDEX` | 대상 레시피 ID |
+| `rating` | `INT` | N | `0` | `CHECK(1~5)` | 별점 평점 (1점 ~ 5점) |
+| `content` | `VARCHAR(100)` | N | | | 한 줄 후기 본문 (최대 100자) |
+
+### `notifications` — 인앱 알림
+소비기한 임박, 번개 드롭 시작, 구매 상품 입고 알림입니다.
+
+| 컬럼 | 물리 타입 | NULL | 기본값 | 제약 | 비즈니스 의미 및 설명 |
+|---|---|---|---|---|---|
+| `member_id` | `BIGINT` | N | | `FK (members.id), INDEX` | 알림을 수신하는 회원 ID |
+| `notification_type` | `ENUM('EXPIRATION','FLASH_DROP','COMMERCE_STOCKED')` | N | | `INDEX` | 알림 종류 (소비기한 임박 / 번개드롭 / 입고) |
+| `content` | `VARCHAR(200)` | N | | | 알림 노출 문구 |
+| `link_url` | `VARCHAR(500)` | N | | | 클릭 시 이동할 화면 URL |
+| `dedupe_key` | `VARCHAR(150)` | N | | `UK(member_id, dedupe_key)` | 중복 발송 방지 고유 키 |
+| `is_read` | `BOOLEAN` | N | `FALSE` | `INDEX` | 읽음 확인 여부 |
+
+---
+
+## 9. 판매 예측 · 할인 후보 분석 & 감사 도메인
+
+### `prediction_runs` — 주간 판매 예측 실행
+PyTorch 딥러닝 모델의 주간 판매량 예측 배치 실행 단위입니다.
+
+| 컬럼 | 물리 타입 | NULL | 기본값 | 제약 | 비즈니스 의미 및 설명 |
+|---|---|---|---|---|---|
+| `target_week_start` | `DATE` | N | | `UK` | 예측 대상 주의 월요일 날짜 |
+| `model_version` | `VARCHAR(50)` | N | | | 사용된 머신러닝 모델 버전 (예: `fc-v0.3`) |
+| `data_cutoff_at` | `DATETIME(6)` | N | | | 모델 입력에 사용된 데이터 기준 시각 |
+| `confirmed_at` | `DATETIME(6)` | Y | `NULL` | | 실제 판매량이 집계되어 확정된 일시 (다음 주 월요일 06:00) |
+
+### `sales_forecasts` — 상품별 판매 예측 및 실제 판매량
+각 상품별 예상 판매 순위/수량과 사후 집계된 실제 판매량 비교 결과입니다.
+
+| 컬럼 | 물리 타입 | NULL | 기본값 | 제약 | 비즈니스 의미 및 설명 |
+|---|---|---|---|---|---|
+| `prediction_run_id` | `BIGINT` | N | | `FK (prediction_runs.id)` | 소속 예측 실행 ID |
+| `product_id` | `BIGINT` | N | | `UK(prediction_run_id, product_id)` | 대상 상품 ID |
+| `product_name` | `VARCHAR(200)` | N | | | 예측 시점의 상품명 스냅샷 |
+| `predicted_rank` | `INT` | Y | `NULL` | | 예상 판매 순위 |
+| `predicted_qty` | `INT` | Y | `NULL` | | 예상 판매 수량 |
+| `baseline_qty` | `INT` | N | `0` | | 기준선 예측 수량 (전주 동일 요일 판매량) |
+| `actual_rank` | `INT` | Y | `NULL` | | 실제 달성 판매 순위 (실적 확정 시 입력) |
+| `actual_qty` | `INT` | Y | `NULL` | | 실제 판매량 (환불 제외 순판매량) |
+
+### `deal_analyses` — 요일별 할인 후보 분석
+관리자가 실행한 가격 탄력성 기반 할인 후보 시뮬레이션 세션입니다.
+
+| 컬럼 | 물리 타입 | NULL | 기본값 | 제약 | 비즈니스 의미 및 설명 |
+|---|---|---|---|---|---|
+| `member_id` | `BIGINT` | N | | `FK (members.id)` | 분석을 실행한 관리자 회원 ID |
+| `target_week_start` | `DATE` | N | | | 분석 대상 주의 월요일 |
+| `day_of_week` | `ENUM('MON','TUE','WED','THU','FRI','SAT','SUN')` | N | | | 할인 적용 대상 요일 |
+| `discount_rate` | `INT` | N | `0` | | 시뮬레이션 가상 할인율(%, 10~40) |
+| `min_stock` | `INT` | N | `50` | | 최소 재고 보유 기준 수량 |
+| `model_version` | `VARCHAR(50)` | N | | | 분석 알고리즘 버전 |
+| `data_cutoff_at` | `DATETIME(6)` | N | | | 분석 입력 데이터 기준 시각 |
+| `last_saved_at` | `DATETIME(6)` | Y | `NULL` | | 관리자 검토 결과 최종 저장 일시 |
+
+### `deal_candidates` — 할인 후보 상품 및 검토 결과
+분석 모델이 도출한 할인 추천 상품 및 제외된 상품 목록입니다.
+
+| 컬럼 | 물리 타입 | NULL | 기본값 | 제약 | 비즈니스 의미 및 설명 |
+|---|---|---|---|---|---|
+| `deal_analysis_id` | `BIGINT` | N | | `FK (deal_analyses.id)` | 소속 분석 세션 ID |
+| `product_id` | `BIGINT` | N | | `UK(deal_analysis_id, product_id)` | 대상 상품 ID |
+| `product_name` | `VARCHAR(200)` | N | | | 분석 당시 상품명 스냅샷 |
+| `regular_price` | `INT` | N | `0` | | 분석 당시 정상 판매가(원) |
+| `discount_price` | `INT` | N | `0` | | 가상 할인가(원) |
+| `current_stock` | `INT` | N | `0` | | 분석 당시 재고 수량 |
+| `avg_sales_on_day` | `INT` | N | `0` | | 평소 해당 요일 평균 판매량 |
+| `search_clicks` | `INT` | N | `0` | | 최근 4주간 동일 요일 검색 클릭 수 |
+| `purchases` | `INT` | N | `0` | | 최근 4주간 동일 요일 실제 구매 수 |
+| `is_excluded` | `BOOLEAN` | N | `FALSE` | | 후보 제외 여부 (TRUE: 제외 상품) |
+| `exclude_reason` | `ENUM('TOP_SELLER_ON_DAY','LOW_STOCK')` | Y | `NULL` | | 제외 사유 (평소 상위 판매 / 재고 부족) |
+| `candidate_reason` | `VARCHAR(255)` | Y | `NULL` | | 추천 사유 (예: "검색량 대비 구매율 저조") |
+| `expected_increase` | `INT` | Y | `NULL` | | 할인 적용 시 예상 판매 증가량 |
+| `review_status` | `ENUM('UNREVIEWED','SELECTED','HELD')` | Y | `NULL` | | 관리자 검토 상태 (미검토 / 선택 / 보류) |
+| `event_request_status` | `ENUM('NONE','REQUESTED','APPROVED','REJECTED')` | N | `'NONE'` | | 할인 프로모션 등록 요청 상태 |
+| `promotion_id` | `BIGINT` | Y | `NULL` | | 등록 완료된 행사 ID (`sale_events.id`) |
+
+### `admin_audit_logs` — 관리자 작업 감사 이력
+관리자의 상품 등록/수정/삭제, 가격 변경, 할인 행사 연동, 권한 변경 등 주요 작업의 변경 전후 감사 기록입니다.
+
+| 컬럼 | 물리 타입 | NULL | 기본값 | 제약 | 비즈니스 의미 및 설명 |
+|---|---|---|---|---|---|
+| `member_id` | `BIGINT` | N | | `FK (members.id)` | 작업을 수행한 회원 ID |
+| `action` | `ENUM('PRODUCT_CREATE','PRODUCT_DELETE','PRICE_UPDATE','DEAL_REVIEW','EVENT_REQUEST','ROLE_CHANGE')` | N | | | 수행한 작업 유형 |
+| `target_type` | `VARCHAR(50)` | N | | | 작업 대상 개체 타입 (`Product`, `Member` 등) |
+| `target_id` | `BIGINT` | Y | `NULL` | | 작업 대상 개체의 고유 식별자 |
+| `result` | `ENUM('SUCCESS','FAILED','DENIED')` | N | | | 작업 결과 (성공 / 실패 / 권한 거부) |
+| `before_value` | `JSON` | Y | `NULL` | | 변경 이전 데이터 스냅샷 (JSON) |
+| `after_value` | `JSON` | Y | `NULL` | | 변경 이후 데이터 스냅샷 (JSON) |

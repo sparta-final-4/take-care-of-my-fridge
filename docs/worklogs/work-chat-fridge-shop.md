@@ -15,7 +15,7 @@
   - 밀키트 추천에서 냉장고 밀키트를 빼지 않고 요청 조건 다음으로 앞에 두며, 같은 밀키트는 fridge.product_id로 가린다
 
 ## 근거와 범위
-- 선행: fridge.product_id (docs/database/fridge-product-id.sql, dev 반영됨)
+- 선행: fridge.product_id (docs/database/history/fridge-product-id.sql, dev 반영됨)
 - 변경 영역: chat(의도·카드·저장·다시 불러오기), fridge(FridgeItemResponse.productId), 프론트 chat 카드
 - DB 변경 없음 (냉장고 카드는 저장하지 않고, 상품 카드는 기존 chat_recommendations.product_id에 저장)
 - 정한 것(사용자):

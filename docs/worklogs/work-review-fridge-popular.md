@@ -52,7 +52,7 @@
 
 - 구매 확정으로 들어온 줄에 상품 ID를 남긴다. 입고 메시지의 productId(주문 상품의 product_id)로 채우고, 직접 등록한 줄은 NULL이다.
 - `Fridge.productId`(BIGINT NULL, 물리 FK 없이 ID만, `order_item_id`와 같은 방식). 응답(`FridgeItemResponse`)은 바꾸지 않았다.
-- SQL: `docs/database/fridge-product-id.sql` (ALTER, 기존 커머스 입고 줄을 `order_items.product_id`로 채우기, 실행 전·후 확인 SELECT, product_id가 빈 줄만 채워 다시 실행해도 같다). dev는 ddl-auto=validate라 앱을 새 코드로 띄우기 전에 ALTER를 먼저 실행한다.
+- SQL: `docs/database/history/fridge-product-id.sql` (ALTER, 기존 커머스 입고 줄을 `order_items.product_id`로 채우기, 실행 전·후 확인 SELECT, product_id가 빈 줄만 채워 다시 실행해도 같다). dev는 ddl-auto=validate라 앱을 새 코드로 띄우기 전에 ALTER를 먼저 실행한다.
 - 인덱스는 두지 않았다. 지금 냉장고를 읽는 곳(목록, 상담 후보)은 회원의 냉장고 전체를 읽고 메모리에서 거른다. "회원 + 상품"으로 찾는 쿼리가 생기면 그때 `idx_fridge_member_id_product_id (member_id, product_id)`를 둔다.
 - 테스트: 입고 때 재료 상품·밀키트 줄에 상품 ID 저장(단위, Kafka·MySQL 통합), 직접 등록한 줄은 NULL.
 

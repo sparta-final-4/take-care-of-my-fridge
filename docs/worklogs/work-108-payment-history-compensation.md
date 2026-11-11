@@ -35,4 +35,4 @@
 
 ## 연결과 남은 작업
 
-- 배포 전 dev·prod DB에 `payment_histories` 테이블이 있어야 한다. DDL은 [payment.sql](../database/payment.sql).
+- 배포 전 dev·prod DB에 `payment_histories` 테이블이 있어야 한다. DDL은 [payment.sql](../database/history/payment.sql) (전체: [schema.sql](../database/schema.sql)).

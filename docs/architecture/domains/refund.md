@@ -105,7 +105,7 @@ sequenceDiagram
 ```
 
 ## 데이터·API·이벤트
-- ERD·데이터 사전: [erd.md](../../database/erd.md#환불-테이블-관계), [data-dictionary.md](../../database/data-dictionary.md#refunds--환불), DDL [refund.sql](../../database/refund.sql)
+- ERD·데이터 사전: [erd.md](../../database/erd.md#36-결제--환불--정산-도메인), [data-dictionary.md](../../database/data-dictionary.md#6-결제--환불--정산-도메인), DDL [schema.sql](../../database/schema.sql) (초안: [refund.sql](../../database/history/refund.sql))
 - 제공 API: [환불 API](../../api/refund-api.md) (환불 신청, 환불 내역, 환불 요약, 환불 가능 수량)
 - 수신 이벤트와 중복 처리: PortOne 취소·부분 취소 웹훅을 결제 도메인의 웹훅 처리에서 넘겨받습니다. 웹훅 중복은 결제 쪽이 `webhook_id`로 막고, 환불 쪽은 PG 상태를 다시 조회해 판단하므로 여러 번 받아도 결과가 같습니다.
 - 보관 기간·삭제 정책: 환불·환불 상품은 지우지 않습니다. 실패한 환불도 내역에 남기고 화면에서만 뺍니다.
