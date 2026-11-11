@@ -335,4 +335,3 @@
 | M006 | 409 | PROMOTION_SUSPENDED | 정지된 회원은 관리자로 승격할 수 없습니다. |
 | M007 | 409 | ALREADY_ADMIN | 이미 관리자인 회원입니다. |
 | M009 | 409 | DUPLICATE_PHONE | 이미 사용 중인 전화번호입니다. |
-

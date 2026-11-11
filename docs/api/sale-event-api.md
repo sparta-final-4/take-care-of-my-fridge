@@ -222,7 +222,7 @@
 | price | int | N | 정가 |
 | sale | `SaleResponse` | N | 진행 중 할인 |
 
-`SaleResponse`는 상품 목록·상세와 같은 모양이며 [상품 할인·품절 필드](api-spec.md#상품-할인품절-필드)를 따릅니다.
+`SaleResponse`는 상품 목록·상세와 같은 모양이며 [상품 할인·품절 필드](product-api.md#상품-할인품절-필드)를 따릅니다.
 
 `SaleCandidateProductResponse` (등록 후보 상품)
 

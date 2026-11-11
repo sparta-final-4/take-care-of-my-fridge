@@ -109,7 +109,7 @@
   - 과거 할인 판매 기록을 분석해 할인율에 따른 판매량 증가율(가격 탄력성)을 계산하고, 요일별 최적의 할인 후보 상품을 추천합니다.
   - 검토한 추천 상품은 번거로운 입력 없이 특가나 번개 드롭 행사로 즉시 원클릭 등록할 수 있습니다.
   - 관리자 접근 권한(Role) 제어 및 주요 관리자 작업 로그를 감사 이력으로 투명하게 남깁니다.
-- 📖 [관리자 & 판매 분석 상세 Wiki](https://github.com/sparta-final-4/take-care-of-my-fridge/wiki/Admin-Analytics) *(관련 문서: [회원·관리자 API](docs/api/member-auth-admin-api.md))*
+- 📖 [관리자 & 판매 분석 상세 Wiki](https://github.com/sparta-final-4/take-care-of-my-fridge/wiki/Admin-Analytics) *(관련 문서: [회원·관리자 API](docs/api/member-auth-admin-api.md), [판매 예측 API](docs/api/forecast-api.md), [할인 후보 API](docs/api/deal-analysis-api.md))*
 
 <br/>
 
