@@ -1,13 +1,13 @@
 # 냉장고를 부탁해 ERD (전체 도메인 물리 설계)
 
 > 기준: 최신 전체 스키마 DDL ([schema.sql](schema.sql))  
-> 총 39개 테이블에 대한 도메인별 데이터 개체, 외래키(FK) 및 연관 관계를 정의합니다.
+> 총 42개 테이블에 대한 도메인별 데이터 개체, 외래키(FK) 및 연관 관계를 정의합니다.
 
 ---
 
 ## 1. 전체 도메인 개요
 
-| 도메인 | 테이블 목록 (총 39개) | 주요 설명 |
+| 도메인 | 테이블 목록 (총 42개) | 주요 설명 |
 |---|---|---|
 | **회원 · 인증** (3) | `members`, `member_tastes`, `refresh_sessions` | 회원 계정, 선호 맛, 로그인 세션 |
 | **운영 · 분석** (5) | `prediction_runs`, `sales_forecasts`, `deal_analyses`, `deal_candidates`, `admin_audit_logs` | PyTorch 판매 예측, 요일별 할인 후보 분석, 관리자 작업 감사 로그 |
@@ -20,6 +20,7 @@
 | **AI 상담** (3) | `chat_sessions`, `chat_messages`, `chat_recommendations` | AI 상담 세션, 대화 메시지 내역, 레시피/상품 추천 결과 |
 | **요리 · 후기** (3) | `cooking_logs`, `fridge_item_logs`, `recipe_reviews` | 요리 완료 기록, 재료 소진/폐기 이력, 레시피 별점 및 후기 |
 | **알림** (1) | `notifications` | 인앱 실시간/비동기 알림 (소비기한, 번개드롭, 입고) |
+| **통합검색 기록** (3) | `search_click_histories`, `search_recipe_click_histories`, `search_zero_result_histories` | 검색 결과 상품·레시피 클릭 기록, 결과 0건 검색어 기록 |
 
 ---
 
@@ -543,5 +544,36 @@ erDiagram
         enum result "SUCCESS, FAILED, DENIED"
         json before_value "변경 전 값"
         json after_value "변경 후 값"
+    }
+```
+
+---
+
+### 3.10 통합검색 기록 도메인
+통합검색 결과의 상품·레시피 클릭과 결과가 0건이었던 검색어를 남깁니다. 로그 테이블이라 상품·레시피·회원에 물리 FK를 걸지 않고 ID만 저장하므로 관계선이 없습니다.
+
+```mermaid
+erDiagram
+    search_click_histories {
+        bigint id PK "상품 클릭 기록 ID"
+        bigint product_id "클릭한 상품 ID (FK 없음)"
+        bigint member_id "클릭한 회원 ID (비로그인은 NULL, FK 없음)"
+        varchar keyword "검색어"
+        datetime created_at "클릭 시각"
+    }
+
+    search_recipe_click_histories {
+        bigint id PK "레시피 클릭 기록 ID"
+        bigint recipe_id "클릭한 레시피 ID (FK 없음)"
+        bigint member_id "클릭한 회원 ID (비로그인은 NULL, FK 없음)"
+        varchar keyword "검색어"
+        datetime created_at "클릭 시각"
+    }
+
+    search_zero_result_histories {
+        bigint id PK "0건 검색 기록 ID"
+        enum target "RECIPE / PRODUCT"
+        varchar keyword "검색어"
+        datetime created_at "검색 시각"
     }
 ```

@@ -1,7 +1,7 @@
 # 데이터 사전 (Data Dictionary)
 
 > 기준: 최신 전체 데이터베이스 스키마 ([schema.sql](schema.sql))  
-> 전체 39개 테이블의 컬럼 정의, 물리 타입, 제약조건 및 비즈니스 규칙을 명세합니다.
+> 전체 42개 테이블의 컬럼 정의, 물리 타입, 제약조건 및 비즈니스 규칙을 명세합니다.
 
 ---
 
@@ -524,3 +524,35 @@ PyTorch 딥러닝 모델의 주간 판매량 예측 배치 실행 단위입니�
 | `result` | `ENUM('SUCCESS','FAILED','DENIED')` | N | | | 작업 결과 (성공 / 실패 / 권한 거부) |
 | `before_value` | `JSON` | Y | `NULL` | | 변경 이전 데이터 스냅샷 (JSON) |
 | `after_value` | `JSON` | Y | `NULL` | | 변경 이후 데이터 스냅샷 (JSON) |
+
+---
+
+## 10. 통합검색 기록 도메인
+
+검색 기록은 로그 테이블이라 상품·레시피·회원에 물리 FK를 걸지 않고 ID만 저장합니다. 기록 시각은 `created_at`입니다.
+
+### `search_click_histories` — 검색 결과 상품 클릭 기록
+통합검색 결과에서 상품을 클릭한 기록입니다. 할인 분석이 읽으므로 레시피 클릭과 섞지 않고 따로 둡니다.
+
+| 컬럼 | 물리 타입 | NULL | 기본값 | 제약 | 비즈니스 의미 및 설명 |
+|---|---|---|---|---|---|
+| `product_id` | `BIGINT` | N | | `INDEX(created_at, product_id)` | 클릭한 상품 ID (`products.id`, FK 없음) |
+| `member_id` | `BIGINT` | Y | `NULL` | | 클릭한 회원 ID (비로그인 클릭은 NULL, FK 없음) |
+| `keyword` | `VARCHAR(100)` | N | | | 클릭 당시 검색어 |
+
+### `search_recipe_click_histories` — 검색 결과 레시피 클릭 기록
+통합검색 결과에서 레시피를 클릭한 기록입니다.
+
+| 컬럼 | 물리 타입 | NULL | 기본값 | 제약 | 비즈니스 의미 및 설명 |
+|---|---|---|---|---|---|
+| `recipe_id` | `BIGINT` | N | | `INDEX(created_at, recipe_id)` | 클릭한 레시피 ID (`recipes.id`, FK 없음) |
+| `member_id` | `BIGINT` | Y | `NULL` | | 클릭한 회원 ID (비로그인 클릭은 NULL, FK 없음) |
+| `keyword` | `VARCHAR(100)` | N | | | 클릭 당시 검색어 |
+
+### `search_zero_result_histories` — 결과 0건 검색 기록
+결과가 0건이었던 통합검색 기록입니다. 동의어·사전에 넣을 검색어를 찾는 데 씁니다. (`created_at` 단독 `INDEX`)
+
+| 컬럼 | 물리 타입 | NULL | 기본값 | 제약 | 비즈니스 의미 및 설명 |
+|---|---|---|---|---|---|
+| `target` | `ENUM('RECIPE','PRODUCT')` | N | | | 검색 대상 (레시피 / 상품) |
+| `keyword` | `VARCHAR(50)` | N | | | 결과가 0건이었던 검색어 |
