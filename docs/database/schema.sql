@@ -16,6 +16,7 @@
 --   2026-11-06 mealkit_products.recipe_id 추가 (밀키트와 같은 레시피, AI 상담 밀키트 추천에서 분류·맛·재료 비교)
 --   2026-11-06 fridge.product_id 추가 (구매 확정으로 들어온 줄의 상품 ID, 같은 밀키트 판단·다시 사기용)
 --   2026-11-07 chat_messages.filtered 추가 (안전 장치로 걸러진 메시지, AI 문맥·상담 내역 미리보기에서 제외)
+--   2026-11-11 search_click_histories, search_recipe_click_histories, search_zero_result_histories 추가 (통합검색 클릭·0건 기록)
 -- =========================================================
 
 SET NAMES utf8mb4;
@@ -23,6 +24,10 @@ SET NAMES utf8mb4;
 -- =========================================================
 -- 1. DROP (역순)
 -- =========================================================
+DROP TABLE IF EXISTS search_zero_result_histories;
+DROP TABLE IF EXISTS search_recipe_click_histories;
+DROP TABLE IF EXISTS search_click_histories;
+
 DROP TABLE IF EXISTS notifications;
 DROP TABLE IF EXISTS recipe_reviews;
 DROP TABLE IF EXISTS fridge_item_logs;
@@ -39,6 +44,8 @@ DROP TABLE IF EXISTS refund_items;
 DROP TABLE IF EXISTS refunds;
 DROP TABLE IF EXISTS payment_histories;
 DROP TABLE IF EXISTS payments;
+DROP TABLE IF EXISTS payment_pins;
+DROP TABLE IF EXISTS billing_keys;
 
 DROP TABLE IF EXISTS order_items;
 DROP TABLE IF EXISTS orders;
@@ -796,3 +803,38 @@ CREATE TABLE notifications (
     CONSTRAINT fk_notifications_member
         FOREIGN KEY (member_id) REFERENCES members (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='인앱 알림 (모든 도메인 공통)';
+
+-- ---------------------------------------------------------
+-- [준모] 통합검색 기록 (로그 테이블이라 FK를 걸지 않는다)
+-- ---------------------------------------------------------
+CREATE TABLE search_click_histories (
+    id          BIGINT        NOT NULL AUTO_INCREMENT                    COMMENT '상품 클릭 기록 ID',
+    product_id  BIGINT        NOT NULL                                   COMMENT '클릭한 상품 ID (참고용, FK 아님)',
+    member_id   BIGINT        NULL                                       COMMENT '클릭한 회원 ID (비로그인 클릭은 NULL, FK 아님)',
+    keyword     VARCHAR(100)  NOT NULL                                   COMMENT '검색어',
+    created_at  DATETIME(6)   NOT NULL DEFAULT CURRENT_TIMESTAMP(6)      COMMENT '생성일시 (클릭 시각)',
+    updated_at  DATETIME(6)   NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '수정일시',
+    PRIMARY KEY (id),
+    KEY idx_search_click_histories_created_at_product_id (created_at, product_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='통합검색 결과 상품 클릭 기록 (할인 분석이 읽음)';
+
+CREATE TABLE search_recipe_click_histories (
+    id          BIGINT        NOT NULL AUTO_INCREMENT                    COMMENT '레시피 클릭 기록 ID',
+    recipe_id   BIGINT        NOT NULL                                   COMMENT '클릭한 레시피 ID (참고용, FK 아님)',
+    member_id   BIGINT        NULL                                       COMMENT '클릭한 회원 ID (비로그인 클릭은 NULL, FK 아님)',
+    keyword     VARCHAR(100)  NOT NULL                                   COMMENT '검색어',
+    created_at  DATETIME(6)   NOT NULL DEFAULT CURRENT_TIMESTAMP(6)      COMMENT '생성일시 (클릭 시각)',
+    updated_at  DATETIME(6)   NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '수정일시',
+    PRIMARY KEY (id),
+    KEY idx_search_recipe_click_histories_created_at_recipe_id (created_at, recipe_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='통합검색 결과 레시피 클릭 기록 (상품 클릭과 분리)';
+
+CREATE TABLE search_zero_result_histories (
+    id          BIGINT        NOT NULL AUTO_INCREMENT                    COMMENT '0건 검색 기록 ID',
+    target      ENUM('RECIPE', 'PRODUCT') NOT NULL                       COMMENT '검색 대상 (레시피/상품)',
+    keyword     VARCHAR(50)   NOT NULL                                   COMMENT '검색어',
+    created_at  DATETIME(6)   NOT NULL DEFAULT CURRENT_TIMESTAMP(6)      COMMENT '생성일시 (검색 시각)',
+    updated_at  DATETIME(6)   NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '수정일시',
+    PRIMARY KEY (id),
+    KEY idx_search_zero_result_histories_created_at (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='결과가 0건이었던 통합검색 기록 (동의어·사전 보강용)';
