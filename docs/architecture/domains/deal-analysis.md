@@ -58,5 +58,5 @@
 
 ## 검증과 증거
 
-- 구현 전 협의 기록: [할인 후보 분석 입력 협의안](deal-analysis-input-discussion.md). 입력 정의·제공 방식을 정하려고 쓴 문서이며, 정해진 결과는 이 문서에 반영했습니다.
+- 구현 전 협의 기록: [할인 후보 분석 입력 협의안](../../archive/deal-analysis-input-discussion.md). 입력 정의·제공 방식을 정하려고 쓴 문서이며, 정해진 결과는 이 문서에 반영했습니다.
 - 관련 작업 기록: `docs/worklogs/work-deal-*.md`, `work-056`~`work-065`, `work-096`.
