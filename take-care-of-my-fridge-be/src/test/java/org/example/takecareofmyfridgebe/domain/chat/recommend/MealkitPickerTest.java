@@ -1,12 +1,12 @@
-package org.example.takecareofmyfridgebe.domain.chat.facade;
+package org.example.takecareofmyfridgebe.domain.chat.recommend;
 
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate.Ranking;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate.Reason;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeQuery;
-import org.example.takecareofmyfridgebe.domain.chat.facade.MealkitPicker.FridgeMealkits;
-import org.example.takecareofmyfridgebe.domain.chat.facade.MealkitPicker.Input;
-import org.example.takecareofmyfridgebe.domain.chat.facade.MealkitPicker.Picked;
+import org.example.takecareofmyfridgebe.domain.chat.recommend.MealkitPicker.FridgeMealkits;
+import org.example.takecareofmyfridgebe.domain.chat.recommend.MealkitPicker.Input;
+import org.example.takecareofmyfridgebe.domain.chat.recommend.MealkitPicker.Picked;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.StorageType;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member.Taste;
 import org.example.takecareofmyfridgebe.domain.product.entity.MealkitProduct;

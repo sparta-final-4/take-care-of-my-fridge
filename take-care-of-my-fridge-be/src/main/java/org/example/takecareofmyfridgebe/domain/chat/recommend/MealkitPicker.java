@@ -1,4 +1,4 @@
-package org.example.takecareofmyfridgebe.domain.chat.facade;
+package org.example.takecareofmyfridgebe.domain.chat.recommend;
 
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeQuery;
@@ -175,7 +175,7 @@ public final class MealkitPicker {
         return query.avoidTastes().stream().anyMatch(tastes::contains);
     }
 
-    static String compact(String text) {
+    public static String compact(String text) {
         return text == null ? "" : text.replaceAll("\s+", "");
     }
 

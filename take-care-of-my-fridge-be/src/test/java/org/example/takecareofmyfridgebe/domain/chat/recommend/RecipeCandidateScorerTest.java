@@ -1,4 +1,4 @@
-package org.example.takecareofmyfridgebe.domain.chat.facade;
+package org.example.takecareofmyfridgebe.domain.chat.recommend;
 
 import org.example.takecareofmyfridgebe.domain.chat.dto.KeywordMatch;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate;
@@ -6,7 +6,7 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate.Imminent
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate.MissingIngredient;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidates;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeQuery;
-import org.example.takecareofmyfridgebe.domain.chat.facade.RecipeCandidateScorer.FridgeStock;
+import org.example.takecareofmyfridgebe.domain.chat.recommend.RecipeCandidateScorer.FridgeStock;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemResponse;
 import org.example.takecareofmyfridgebe.domain.fridge.entity.FridgeItemStatus;
 import org.example.takecareofmyfridgebe.domain.fridge.entity.FridgeSource;

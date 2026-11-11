@@ -7,6 +7,7 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate.Imminent
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate.MissingIngredient;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidates;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeQuery;
+import org.example.takecareofmyfridgebe.domain.chat.recommend.RecommendationPicker;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemResponse;
 import org.example.takecareofmyfridgebe.domain.fridge.entity.FridgeItemStatus;
 import org.example.takecareofmyfridgebe.domain.fridge.entity.FridgeSource;

@@ -64,7 +64,7 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-class ChatIntentFacadeTest {
+public class ChatIntentFacadeTest {
 
     private static final Long MEMBER_ID = 1L;
     private static final Long SESSION_ID = 10L;
@@ -73,7 +73,7 @@ class ChatIntentFacadeTest {
     private static final Long CUCUMBER = 15L;
 
     // config/chat-words.yml app.chat.taste-opposites와 같은 쌍
-    static final ChatTasteOppositeProperties TASTE_OPPOSITES = new ChatTasteOppositeProperties(List.of(
+    public static final ChatTasteOppositeProperties TASTE_OPPOSITES = new ChatTasteOppositeProperties(List.of(
             List.of(Taste.MILD, Taste.SPICY), List.of(Taste.MILD, Taste.SALTY)));
 
     // config/chat-words.yml app.chat.food-words와 같은 목록

@@ -1,4 +1,4 @@
-package org.example.takecareofmyfridgebe.domain.chat.facade;
+package org.example.takecareofmyfridgebe.domain.chat.recommend;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

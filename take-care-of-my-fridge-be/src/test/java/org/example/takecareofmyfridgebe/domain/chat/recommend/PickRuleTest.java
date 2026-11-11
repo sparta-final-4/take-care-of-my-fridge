@@ -1,7 +1,8 @@
-package org.example.takecareofmyfridgebe.domain.chat.facade;
+package org.example.takecareofmyfridgebe.domain.chat.recommend;
 
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidates;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeQuery;
+import org.example.takecareofmyfridgebe.domain.chat.facade.ChatIntentFacadeTest;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member.Taste;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
