@@ -233,6 +233,7 @@ take-care-of-my-fridge/
 │       │   ├── notification/   # 실시간 알림 (SSE)
 │       │   ├── admin/          # 관리자 상품 관리 및 감사 이력
 │       │   └── forecast/       # 주간 판매량 예측 및 할인 후보 추천
+│       │   └── webhook/        # 포트원 결제 웹훅 수신 및 검증
 │       ├── global/             # 공통 인프라, 시큐리티, 예외 처리, 공통 응답
 │       │   ├── config/         # Security, Redis, Kafka, QueryDSL, Jackson 설정
 │       │   ├── error/          # ErrorCode, BusinessException, GlobalExceptionHandler
