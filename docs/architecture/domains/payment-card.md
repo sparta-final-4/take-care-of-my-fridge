@@ -171,7 +171,7 @@ sequenceDiagram
 ```
 
 ## 데이터·API·이벤트
-- ERD·데이터 사전: `billing_keys`, `payment_pins`, `payments.billing_key_id`. 컬럼 정의는 [data-dictionary.md](../../database/data-dictionary.md#billing_keys--등록-카드), 관계는 [erd.md](../../database/erd.md#결제-테이블-관계)에 있습니다.
+- ERD·데이터 사전: `billing_keys`, `payment_pins`, `payments.billing_key_id`. 컬럼 정의는 [data-dictionary.md](../../database/data-dictionary.md#billing_keys--등록-카드-빌링키), 관계는 [erd.md](../../database/erd.md#36-결제--환불--정산-도메인)에 있습니다.
 - 제공 API: [결제 API 명세](../../api/payment-api.md)의 등록 카드 결제, 카드 등록 준비·확정, 카드 목록, 대표 카드 지정, 카드 삭제, 결제 비밀번호 상태·설정·변경·재설정.
 - 오류 코드: 카드 `BILLING_002`(5장 초과), `BILLING_003`(빌링키 확인 실패), `BILLING_004`(없는·남의·삭제한 카드), `BILLING_005`(이미 등록한 카드), `BILLING_006`(저장된 빌링키를 풀지 못함. 서버 키 설정·저장 값 문제라 500). 비밀번호 `PIN_001`(잠김), `PIN_002`(미설정), `PIN_003`(틀림), `PIN_004`(쉬운 비밀번호), `PIN_005`(이미 설정), `PIN_006`(로그인 비밀번호 틀림), `PIN_007`(재설정 시도 초과), `PIN_008`(현재와 같음), `PIN_009`(재설정 불가). 결제 `PAYMENT_010`(카드 거절), `PAYMENT_011`(결과 모름)과 기존 `PAYMENT_00x`.
 - PortOne 호출(공식 OpenAPI 스펙 v1.16.0 기준):

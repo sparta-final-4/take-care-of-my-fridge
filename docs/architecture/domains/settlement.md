@@ -96,7 +96,7 @@ sequenceDiagram
 ```
 
 ## 데이터·API·이벤트
-- ERD·데이터 사전: [erd.md](../../database/erd.md#정산-테이블-관계), [data-dictionary.md](../../database/data-dictionary.md#daily_sales--일별-매출-집계). 저장소에 daily_sales DDL 파일은 없습니다.
+- ERD·데이터 사전: [erd.md](../../database/erd.md#36-결제--환불--정산-도메인), [data-dictionary.md](../../database/data-dictionary.md#daily_sales--일별-매출-정산). 저장소에 daily_sales DDL 파일은 없습니다.
 - 제공 API: [정산 API](../../api/settlement-api.md) (정산 조회, 결제 건별 조회, 오늘 매출)
 - 읽는 데이터: `payment_histories`(이벤트 종류·금액·`created_at`), `payments`(상태·결제 시각), `orders`(주문번호), `members`(닉네임). 결제 이력 인덱스 `idx_payment_histories_created_at`을 기간 조회에 씁니다.
 - 이벤트: 발행·수신하지 않습니다. 결제·환불이 이력을 남기면 다음 집계·조회가 읽습니다.

@@ -65,7 +65,7 @@ sequenceDiagram
 ```
 
 ## 데이터·API·이벤트
-- ERD·데이터 사전: [erd.md](../../database/erd.md#장바구니-테이블-관계), [data-dictionary.md](../../database/data-dictionary.md#carts--장바구니)
+- ERD·데이터 사전: [erd.md](../../database/erd.md#35-장바구니--주문--할인-행사-도메인), [data-dictionary.md](../../database/data-dictionary.md#carts--장바구니)
 - 제공 API: [장바구니 API](../../api/cart-api.md) (담기, 조회, 수량 변경, 삭제)
 - 발행·수신 이벤트: 결제 완료 이벤트(`PaymentCompletedEvent`)를 커밋 뒤 받아, 그 주문에 든 상품의 장바구니 항목을 지웁니다. 새 트랜잭션에서 지우고, 실패해도 결제는 되돌리지 않고 주문 ID를 로그로 남깁니다(`PaymentCompletedEventListener`, `CartService.removePaidItems`).
 - 보관 기간·삭제 정책: 항목을 지우면 바로 사라집니다. 장바구니는 항목을 모두 지워도 남습니다. 주문하기는 장바구니 항목을 지우지 않고, 결제가 끝나면 결제한 상품의 항목을 지웁니다. 주문 뒤 수량을 바꿨어도 같은 상품이면 지웁니다.

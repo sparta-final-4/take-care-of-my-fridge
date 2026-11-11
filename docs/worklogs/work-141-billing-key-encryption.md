@@ -7,7 +7,7 @@
 - 확인 가능한 완료 조건: DB에는 빌링키 암호문과 지문만 남고, 결제·PortOne 삭제 직전에만 풀며, 기존 평문 행은 배포 후 기동만으로 옮겨진다. 배포 DB(`ddl-auto: update`)에서 손으로 DDL을 돌리지 않아도 카드 등록·결제가 된다.
 
 ## 근거와 범위
-- 요구사항·화면 ID·설계 문서: [등록 카드 결제 설계](../architecture/domains/payment-card.md#빌링키-암호화), [데이터 사전](../database/data-dictionary.md#billing_keys--등록-카드), [schema.sql](../database/schema.sql).
+- 요구사항·화면 ID·설계 문서: [등록 카드 결제 설계](../architecture/domains/payment-card.md#빌링키-암호화), [데이터 사전](../database/data-dictionary.md#billing_keys--등록-카드-빌링키), [schema.sql](../database/schema.sql).
 - 변경할 영역: BE `domain/payment`(엔티티·서비스·파사드), `global/config/BillingKeyCryptoConfig`, `ErrorCode`(`BILLING_006`), 결제 문서.
 - 다른 도메인 영향·기존 승인 범위: 정산은 `payments.billing_key_id`가 있는지만 보고 빌링키 값은 읽지 않아 영향이 없다. 카드 행 ID는 바뀌지 않는다.
 - 미정 정책·가정: 옛 `billing_key` 컬럼 삭제는 이후 별도 배포에서 한다. 웹훅 원문(`webhook_events.raw_payload`)과 PortOne 클라이언트 예외 메시지의 빌링키 가리기는 이번 범위가 아니다.
