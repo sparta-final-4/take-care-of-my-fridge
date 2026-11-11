@@ -84,7 +84,7 @@ class ChatRecommendationFacadeTest {
         chatMessageService = mock(ChatMessageService.class);
         facade = new ChatRecommendationFacade(recipeCandidateFacade, recipeService, ingredientService, productService,
                 saleEventReader, chatMessageService, MealkitWordCheckerTest.WORDS, TasteWordCheckerTest.WORDS, AllergyWordCheckerTest.WORDS,
-                ChatIntentFacadeTest.TASTE_OPPOSITES, TemperatureWordCheckerTest.WORDS, FeaturePhraseCheckerTest.WORDS);
+                ChatIntentFacadeTest.TASTE_OPPOSITES, TemperatureWordCheckerTest.WORDS);
         when(ingredientService.getIngredientsByIds(any())).thenReturn(Map.of());
     }
 
@@ -384,12 +384,14 @@ class ChatRecommendationFacadeTest {
     }
 
     @Test
-    @DisplayName("AI가 요리 이름을 비웠어도 말에 있는 키워드(탕짜면)가 레시피 이름에 없으면 요리 이름으로 채워 못 찾았다는 안내와 비슷한 요리 이유를 쓴다")
-    void fillsDishText_whenSpokenKeywordHasNoRecipe() {
-        givenKeywordCandidates(keywordCandidate(10L, "탕수육", "튀김", "탕수육"),
-                keywordCandidate(20L, "황태볶음면", "면류", "볶음면"));
+    @DisplayName("요리 이름(탕짜면)이 레시피 이름에 없으면 못 찾았다는 안내와 비슷한 요리 이유를 쓴다")
+    void writesNotFoundNotice_whenDishHasNoRecipe() {
+        // 요리 이름 키워드를 찾지 못했다는 판단(keywordsNotFound)은 후보 찾기(RecipeCandidateFacade)가 한다
+        when(recipeCandidateFacade.findCandidates(any())).thenReturn(new RecipeCandidates(List.of(
+                keywordCandidate(10L, "탕수육", "튀김", "탕수육"), keywordCandidate(20L, "황태볶음면", "면류", "볶음면")), true, true));
+        when(recipeService.findSummaries(any())).thenReturn(Map.of());
         RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, null, null, null, false,
-                List.of("탕짜면", "탕수육", "볶음면"), null);
+                List.of("탕짜면", "탕수육", "볶음면"), "탕짜면");
 
         RecommendationReply reply = facade.recommend("탕짜면 먹고 싶어", query);
 
@@ -398,7 +400,22 @@ class ChatRecommendationFacadeTest {
     }
 
     @Test
-    @DisplayName("특징만 말했으면(시원한 국물) 키워드에 그 말이 있어도 요리 이름으로 채우지 않고, 없다는 안내 없이 원한 특징으로 넘긴다")
+    @DisplayName("AI가 요리 이름을 비웠으면 말에 있는 키워드(탕짜면)가 레시피 이름에 없어도 서버가 요리 이름을 채우지 않아 안내가 없다")
+    void keepsDishTextEmpty_whenAiLeftItEmpty() {
+        givenKeywordCandidates(keywordCandidate(10L, "탕수육", "튀김", "탕수육"),
+                keywordCandidate(20L, "황태볶음면", "면류", "볶음면"));
+        RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, null, null, null, false,
+                List.of("탕짜면", "탕수육", "볶음면"), null);
+
+        RecommendationReply reply = facade.recommend("탕짜면 먹고 싶어", query);
+
+        assertThat(reply.notices()).isEmpty();
+        assertThat(reply.event().recipes().get(0).reason()).isEqualTo("탕수육 요리예요");
+        verify(recipeCandidateFacade).findCandidates(argThat(sent -> sent.keywordText() == null));
+    }
+
+    @Test
+    @DisplayName("특징만 말해 요리 이름이 없으면(시원한 국물) 키워드에 그 말이 있어도 없다는 안내 없이 원한 특징으로 넘긴다")
     void skipsNotFoundNotice_whenOnlyFeatureSpoken() {
         givenKeywordCandidates(keywordCandidate(10L, "오이냉국", "국", "냉국"),
                 keywordCandidate(20L, "미역냉국", "국", "냉국"), keywordCandidate(30L, "다시마냉국", "국", "냉국"));
@@ -411,19 +428,6 @@ class ChatRecommendationFacadeTest {
         assertThat(reply.candidateInfo()).contains("사용자가 원한 특징: 시원한 국물")
                 .doesNotContain("없어서", "찾지 못해서", "[이미 안내한 말]");
         assertThat(reply.event().recipes().get(0).reason()).doesNotContain("시원한 국물과 비슷한");
-    }
-
-    @Test
-    @DisplayName("AI가 특징 표현(시원한 국물)을 요리 이름으로 줘도 비우고 없다는 안내를 붙이지 않는다")
-    void clearsFeatureDishText() {
-        givenKeywordCandidates(keywordCandidate(10L, "오이냉국", "국", "냉국"));
-        RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, null, null, null, false,
-                List.of("시원한 국물", "냉국"), "시원한 국물", "시원한 국물");
-
-        RecommendationReply reply = facade.recommend("시원한 국물 요리", query);
-
-        assertThat(reply.notices()).isEmpty();
-        verify(recipeCandidateFacade).findCandidates(argThat(sent -> sent.keywordText() == null));
     }
 
     @Test
@@ -451,17 +455,6 @@ class ChatRecommendationFacadeTest {
 
         assertThat(reply.notices()).isEmpty();
         assertThat(reply.event().recipes().get(0).reason()).isEqualTo("탕수육 요리예요");
-    }
-
-    @Test
-    @DisplayName("말에 없는 키워드(AI가 늘린 이름)로는 요리 이름을 채우지 않는다")
-    void skipsFill_whenKeywordNotSpoken() {
-        assertThat(ChatRecommendationFacade.spokenDishWithoutRecipe("차가운 요리 추천해줘",
-                new RecipeQuery(MEMBER_ID, List.of(), null, null, null, null, false, List.of("냉면", "냉국"), null),
-                List.of())).isEmpty();
-        assertThat(ChatRecommendationFacade.spokenDishWithoutRecipe("김피탕 같은 메뉴 추천해줘",
-                new RecipeQuery(MEMBER_ID, List.of(), null, null, null, null, false, List.of("김피탕", "탕수육"), null),
-                List.of(keywordCandidate(10L, "탕수육", "튀김", "탕수육")))).contains("김피탕");
     }
 
     @Test

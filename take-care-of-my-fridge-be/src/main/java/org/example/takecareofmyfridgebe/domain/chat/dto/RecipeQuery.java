@@ -136,13 +136,6 @@ public record RecipeQuery(
                 alreadyRecommendedIds, avoidTastes);
     }
 
-    // 요리 이름을 채운 검색 조건 (AI가 비웠을 때 서버가 채운다)
-    public RecipeQuery withKeywordText(String dishText) {
-        return new RecipeQuery(memberId, selectedIngredientIds, wantedTastes, moodCategories, maxMinutes,
-                excludeIngredientIds, useSelectedOnly, keywords, dishText, preferenceText, selectedIngredientGroups,
-                keywordMatches, alreadyRecommendedIds, avoidTastes);
-    }
-
     /**
      * 주어진 단어("밀키트")가 들어간 키워드·요리 이름을 뺀 검색 조건 (공백 무시).
      * AI가 "밀키트 추천해줘"의 밀키트를 요리 이름으로 뽑아 레시피 검색이 "밀키트"를 찾거나 "밀키트 레시피는 없어서…" 안내가 나가지 않게 한다.
