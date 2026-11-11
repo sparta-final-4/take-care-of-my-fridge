@@ -1,0 +1,131 @@
+package org.example.takecareofmyfridgebe.domain.chat.config;
+
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
+
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.validation.annotation.Validated;
+
+/**
+ * AI 상담 안전 장치 설정 (config/chat-safety.yml). 금지어·자해·탈취 단어, 건강 말, 알레르기 말과 묶음을 중첩 record로 둔다.
+ * 목록은 비면 서버가 뜨지 않는다 (@NotEmpty). 제외 목록(words.exclusions·health.exclusions)과 넓히지 않을 이름(allergy.notSameKind)만 비어도 된다.
+ *
+ * @param words         AI를 부르기 전에 거르는 단어 (SafetyWordChecker)
+ * @param health        건강 관련 말 (HealthWordChecker)
+ * @param allergy       알레르기 재료를 찾는 말 (AllergyWordChecker, AllergyExclusionFinder)
+ * @param allergyGroups 알레르기 묶음 말과 재료 (AllergyExclusionFinder)
+ */
+@Validated
+@ConfigurationProperties(prefix = "app.chat.safety")
+public record ChatSafetyProperties(
+        @Valid @NotNull Words words,
+        @Valid @NotNull Health health,
+        @Valid @NotNull Allergy allergy,
+        @NotEmpty List<@Valid AllergyGroup> allergyGroups
+) {
+    public ChatSafetyProperties {
+        allergyGroups = allergyGroups == null ? List.of() : List.copyOf(allergyGroups);
+    }
+
+    /**
+     * AI를 부르기 전에 거르는 단어 (SafetyWordChecker). 비교는 소문자로 바꾸고 공백·숫자·기호를 뺀 글로 한다 ("시1발" → "시발").
+     * 제외 목록에 있는 말은 먼저 지우고 본다 ("마약김밥", "폭탄주", "죽 먹고"는 걸리지 않는다).
+     *
+     * @param banned     욕설·불법·위험한 말
+     * @param selfHarm   자해·자살을 말하는 말. 금지어보다 먼저 보고 안내를 다르게 한다
+     * @param injection  지시를 무시하라거나 프롬프트를 공개하라는 말. 역할만 정하는 말("너는 이제부터 ~야")은 넣지 않는다
+     * @param exclusions 걸리는 말이 들어 있어도 음식 이름 등이라 지우고 보는 말
+     */
+    public record Words(
+            @NotEmpty List<String> banned,
+            @NotEmpty List<String> selfHarm,
+            @NotEmpty List<String> injection,
+            List<String> exclusions
+    ) {
+    }
+
+    /**
+     * 건강 관련 말 (HealthWordChecker). 사용자가 보낸 말에 있으면 답 끝에 서버가 상담 안내를 붙인다 (막지 않고 하루 횟수도 센다).
+     * 비교는 공백을 뺀 글로 하고, 제외 목록에 있는 말은 먼저 지우고 본다 ("약불", "약간"은 걸리지 않는다).
+     * "약"·"신장" 한 글자·두 글자는 넣지 않는다 ("약 10분", "신장 170cm"). 다이어트는 생활 요청이라 넣지 않는다.
+     *
+     * @param health     질환·알레르기·임신·약을 말하는 말
+     * @param exclusions 건강 말이 들어 있어도 요리 말 등이라 지우고 보는 말
+     */
+    public record Health(
+            @NotEmpty List<String> health,
+            List<String> exclusions
+    ) {
+    }
+
+    /**
+     * 알레르기 재료를 찾는 말 (AllergyWordChecker, AllergyExclusionFinder).
+     * "○○ 알레르기", "○○ 못 먹어", "○○ 먹으면 안 돼"처럼 말 바로 앞 낱말을 ○○로 보고, 묶음 말이거나 재료 사전에 있는 이름일 때만 뺄 재료로 쓴다.
+     *
+     * @param markers     ○○ 뒤에 오는 말 (글자 사이 공백은 무시: "못먹" = "못 먹")
+     * @param particles   ○○ 끝에서 떼어 보는 조사 ("새우를" → "새우"). 뗀 이름보다 붙은 이름("오이")을 먼저 본다
+     * @param notSameKind 재료마다 이름에 그 재료 이름이 들어 있거나(두 글자 이상) 그 글자로 시작해도(한 글자) 다른 재료라 넓히지 않을 이름
+     *                    ("땅콩" → 땅콩호박, "굴" → 굴비, "마" → 마늘). 그 재료를 넓힐 때만 본다 ("마늘 알레르기"면 마늘가루는 뺀다)
+     */
+    public record Allergy(
+            @NotEmpty List<String> markers,
+            @NotEmpty List<String> particles,
+            List<@Valid NotSameKind> notSameKind
+    ) {
+        public Allergy {
+            notSameKind = notSameKind == null ? List.of() : List.copyOf(notSameKind);
+        }
+
+        // 그 재료를 넓힐 때 빼는 이름 (공백 뺀 이름)
+        public Set<String> notSameKindOf(String word) {
+            String key = compact(word);
+            return notSameKind.stream()
+                    .filter(entry -> compact(entry.word()).equals(key))
+                    .flatMap(entry -> entry.names().stream())
+                    .map(Allergy::compact)
+                    .collect(Collectors.toUnmodifiableSet());
+        }
+
+        // 모든 재료의 넓히지 않을 이름 (공백 뺀 이름). 밀키트 상품 이름을 볼 때 쓴다
+        public Set<String> allNotSameKindNames() {
+            return notSameKind.stream()
+                    .flatMap(entry -> entry.names().stream())
+                    .map(Allergy::compact)
+                    .filter(name -> !name.isEmpty())
+                    .collect(Collectors.toUnmodifiableSet());
+        }
+
+        private static String compact(String text) {
+            return text == null ? "" : text.replaceAll("\\s+", "");
+        }
+
+        /**
+         * @param word  알레르기 재료 이름 ("굴")
+         * @param names 그 재료를 넓힐 때 빼는 재료 사전 이름 ("굴비")
+         */
+        public record NotSameKind(@NotBlank String word, @NotEmpty List<String> names) {
+            public NotSameKind {
+                names = names == null ? List.of() : List.copyOf(names);
+            }
+        }
+    }
+
+    /**
+     * 알레르기 묶음 말 ("견과류 알레르기" → 호두·아몬드·잣·캐슈넛·피스타치오·땅콩). 재료는 실제 재료 사전 이름으로 쓴다.
+     * 묶음의 재료도 이름에 들어 있는 재료로 넓힌다 (땅콩 → 땅콩버터). 재료 사전에 없는 이름은 무시한다.
+     *
+     * @param word        묶음 말 ("견과류", "계란")
+     * @param ingredients 그 말이 뜻하는 재료 사전 이름 ("호두", "아몬드", …)
+     */
+    public record AllergyGroup(@NotBlank String word, @NotEmpty List<String> ingredients) {
+        public AllergyGroup {
+            ingredients = ingredients == null ? List.of() : List.copyOf(ingredients);
+        }
+    }
+}

@@ -1,6 +1,6 @@
 package org.example.takecareofmyfridgebe.domain.chat.intent;
 
-import org.example.takecareofmyfridgebe.domain.chat.config.ChatTemperatureWordProperties;
+import org.example.takecareofmyfridgebe.domain.chat.config.ChatWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate;
 
 import java.util.List;
@@ -32,7 +32,7 @@ public final class TemperatureWordChecker {
      * @param texts 메시지와 원한 표현 (null은 건너뛴다)
      * @return 원하는 온도. 따뜻한 말과 차가운 말이 둘 다 있거나 둘 다 없으면 빈 값
      */
-    public static Optional<Temperature> wanted(ChatTemperatureWordProperties words, String... texts) {
+    public static Optional<Temperature> wanted(ChatWordProperties.Temperature words, String... texts) {
         String text = Stream.of(texts)
                 .filter(value -> value != null && !value.isBlank())
                 .map(TemperatureWordChecker::compact)
@@ -46,12 +46,12 @@ public final class TemperatureWordChecker {
     }
 
     // 이름에 찬 요리 말이 들어 있는지 ("오이냉국", "물냉면")
-    public static boolean coldDish(String name, ChatTemperatureWordProperties words) {
+    public static boolean coldDish(String name, ChatWordProperties.Temperature words) {
         return name != null && containsAny(compact(name), words.coldDishes());
     }
 
     // 이름이 뜨거운 국물 끝말로 끝나는지 ("꽃게해물탕", "김치찌개"). 제외 이름("가지그라탕")은 아니다
-    public static boolean hotDish(String name, ChatTemperatureWordProperties words) {
+    public static boolean hotDish(String name, ChatWordProperties.Temperature words) {
         if (name == null) {
             return false;
         }
@@ -64,7 +64,7 @@ public final class TemperatureWordChecker {
      * 원하는 온도로 후보를 정리한다. 따뜻하면 찬 요리를 빼고, 차가우면 뜨거운 국물 요리를 순서를 지킨 채 뒤로 보낸다.
      */
     public static List<RecipeCandidate> arrange(List<RecipeCandidate> candidates, Optional<Temperature> temperature,
-                                                ChatTemperatureWordProperties words) {
+                                                ChatWordProperties.Temperature words) {
         if (temperature.isEmpty()) {
             return candidates;
         }
@@ -81,7 +81,7 @@ public final class TemperatureWordChecker {
      * 원하는 온도와 반대인 후보 ID. 빈자리를 채우는 데 쓰지 않는다 (차가우면 뜨거운 국물 요리, 따뜻하면 찬 요리).
      */
     public static Set<Long> mismatched(List<RecipeCandidate> candidates, Optional<Temperature> temperature,
-                                       ChatTemperatureWordProperties words) {
+                                       ChatWordProperties.Temperature words) {
         if (temperature.isEmpty()) {
             return Set.of();
         }

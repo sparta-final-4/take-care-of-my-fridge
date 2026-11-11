@@ -1,14 +1,8 @@
 package org.example.takecareofmyfridgebe.domain.chat.facade;
 
-import org.example.takecareofmyfridgebe.domain.chat.config.ChatAskWordProperties;
+import org.example.takecareofmyfridgebe.domain.chat.config.ChatWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatCandidateProperties;
-import org.example.takecareofmyfridgebe.domain.chat.config.ChatCategoryWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatCorrectionProperties;
-import org.example.takecareofmyfridgebe.domain.chat.config.ChatFoodWordProperties;
-import org.example.takecareofmyfridgebe.domain.chat.config.ChatFridgeShopWordProperties;
-import org.example.takecareofmyfridgebe.domain.chat.config.ChatMealkitWordProperties;
-import org.example.takecareofmyfridgebe.domain.chat.config.ChatTasteOppositeProperties;
-import org.example.takecareofmyfridgebe.domain.chat.config.ChatTasteWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntent;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntentResolution;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageCreateRequest;
@@ -63,9 +57,7 @@ import static org.mockito.Mockito.when;
  * 집합인 칸은 정렬해서 적는다 (실행마다 순서가 달라지지 않게).
  */
 @SpringBootTest(classes = ChatIntentReplayTest.class)
-@EnableConfigurationProperties({ChatTasteWordProperties.class, ChatMealkitWordProperties.class, ChatAskWordProperties.class,
-        ChatCategoryWordProperties.class, ChatFoodWordProperties.class, ChatTasteOppositeProperties.class,
-        ChatFridgeShopWordProperties.class, ChatCandidateProperties.class})
+@EnableConfigurationProperties({ChatWordProperties.class, ChatCandidateProperties.class})
 class ChatIntentReplayTest {
 
     private static final Long MEMBER_ID = 1L;
@@ -75,19 +67,7 @@ class ChatIntentReplayTest {
     private static final String LIST_DELIMITER = " / ";
 
     @Autowired
-    private ChatTasteWordProperties tasteWords;
-    @Autowired
-    private ChatMealkitWordProperties mealkitWords;
-    @Autowired
-    private ChatAskWordProperties askWords;
-    @Autowired
-    private ChatCategoryWordProperties categoryWords;
-    @Autowired
-    private ChatFoodWordProperties foodWords;
-    @Autowired
-    private ChatTasteOppositeProperties tasteOpposites;
-    @Autowired
-    private ChatFridgeShopWordProperties fridgeShopWords;
+    private ChatWordProperties words;
     @Autowired
     private ChatCandidateProperties candidateProperties;
 
@@ -145,9 +125,9 @@ class ChatIntentReplayTest {
         when(allergyExclusionFinder.find(any(), any())).thenReturn(AllergyExclusionFinder.Allergens.NONE);
         ChatCorrectionProperties corrections = EvalCorrectionSwitches.properties(Set.of());
         IntentCorrector corrector = new IntentCorrector(recipeService, ingredientMatcher, mock(ChatMessageService.class),
-                tasteWords, mealkitWords, askWords, categoryWords, foodWords, fridgeShopWords, corrections);
-        return new ChatIntentFacade(extractor, recipeService, ingredientMatcher, candidateProperties, tasteWords, mealkitWords,
-                askWords, allergyExclusionFinder, tasteOpposites, fridgeShopWords, corrections, corrector);
+                words, corrections);
+        return new ChatIntentFacade(extractor, recipeService, ingredientMatcher, candidateProperties, words,
+                allergyExclusionFinder, corrections, corrector);
     }
 
     // 기록한 칸으로 AI 원래 결과를 다시 만든다 (평가 CSV의 AI 칸과 같은 모양, 목록은 " / "로 이어 씀)

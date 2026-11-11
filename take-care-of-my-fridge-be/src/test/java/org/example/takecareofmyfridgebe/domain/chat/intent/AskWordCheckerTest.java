@@ -1,6 +1,6 @@
 package org.example.takecareofmyfridgebe.domain.chat.intent;
 
-import org.example.takecareofmyfridgebe.domain.chat.config.ChatAskWordProperties;
+import org.example.takecareofmyfridgebe.domain.chat.config.ChatWordProperties;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -10,7 +10,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 public class AskWordCheckerTest {
 
-    public static final ChatAskWordProperties WORDS = new ChatAskWordProperties(
+    public static final ChatWordProperties.Ask WORDS = new ChatWordProperties.Ask(
             List.of("기준", "어떻게", "왜", "방법", "얼마나", "보관", "가격", "차이", "뭐가달라", "뭐가다른",
                     "먹었어", "먹었니", "먹었냐", "했어", "했니", "먹어도돼", "괜찮", "영양소", "영양성분", "효능"),
             List.of("추천", "뭐있", "보여줘", "먹고싶", "사고싶", "골라줘"),

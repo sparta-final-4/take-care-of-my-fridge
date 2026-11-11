@@ -1,7 +1,6 @@
 package org.example.takecareofmyfridgebe.domain.chat.intent;
 
-import org.example.takecareofmyfridgebe.domain.chat.config.ChatMealkitWordProperties;
-import org.example.takecareofmyfridgebe.domain.chat.config.ChatTasteWordProperties;
+import org.example.takecareofmyfridgebe.domain.chat.config.ChatWordProperties;
 
 import java.util.List;
 
@@ -32,7 +31,7 @@ public final class MealkitWordChecker {
         }
     }
 
-    public static Mode check(String message, ChatMealkitWordProperties words, ChatTasteWordProperties negations) {
+    public static Mode check(String message, ChatWordProperties.Mealkit words, ChatWordProperties.Taste negations) {
         String text = compact(message);
         Stance mealkit = stance(text, words.mealkit(), negations);
         if (mealkit == Stance.AVOID) {
@@ -47,7 +46,7 @@ public final class MealkitWordChecker {
     private enum Stance { NONE, WANT, AVOID }
 
     // 단어가 하나라도 부정과 붙어 있으면 AVOID, 단어만 있으면 WANT
-    private static Stance stance(String text, List<String> targets, ChatTasteWordProperties negations) {
+    private static Stance stance(String text, List<String> targets, ChatWordProperties.Taste negations) {
         boolean found = false;
         for (String target : targets) {
             String word = compact(target);

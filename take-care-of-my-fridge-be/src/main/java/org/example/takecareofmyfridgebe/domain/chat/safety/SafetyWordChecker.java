@@ -1,6 +1,6 @@
 package org.example.takecareofmyfridgebe.domain.chat.safety;
 
-import org.example.takecareofmyfridgebe.domain.chat.config.ChatSafetyWordProperties;
+import org.example.takecareofmyfridgebe.domain.chat.config.ChatSafetyProperties;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatSafetyBlock;
 
 import java.util.List;
@@ -26,7 +26,7 @@ public final class SafetyWordChecker {
     /**
      * @return 걸린 종류. 걸리지 않으면 빈 값
      */
-    public static Optional<ChatSafetyBlock> check(String message, ChatSafetyWordProperties words) {
+    public static Optional<ChatSafetyBlock> check(String message, ChatSafetyProperties.Words words) {
         String text = normalize(message);
         for (String exclusion : words.exclusions()) {
             String word = normalize(exclusion);

@@ -1,7 +1,6 @@
 package org.example.takecareofmyfridgebe.domain.chat.safety;
 
-import org.example.takecareofmyfridgebe.domain.chat.config.ChatAllergyGroupProperties;
-import org.example.takecareofmyfridgebe.domain.chat.config.ChatAllergyGroupProperties.Group;
+import org.example.takecareofmyfridgebe.domain.chat.config.ChatSafetyProperties.AllergyGroup;
 import org.example.takecareofmyfridgebe.domain.chat.service.ChatMessageService;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.Ingredient;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.StorageType;
@@ -29,14 +28,14 @@ class AllergyExclusionFinderTest {
 
     private static final Long SESSION_ID = 7L;
 
-    // config/chat-safety.yml app.chat.allergy-groups와 같은 묶음
-    static final ChatAllergyGroupProperties GROUPS = new ChatAllergyGroupProperties(List.of(
-            new Group("견과류", List.of("호두", "아몬드", "잣", "캐슈넛", "피스타치오", "마카다미아", "땅콩")),
-            new Group("갑각류", List.of("새우", "게", "꽃게", "게살", "게맛살", "가재새우")),
-            new Group("유제품", List.of("우유", "치즈", "버터", "생크림", "요거트")),
-            new Group("달걀", List.of("달걀", "메추리알", "마요네즈")),
-            new Group("계란", List.of("달걀", "메추리알", "마요네즈")),
-            new Group("밀가루", List.of("밀가루", "부침가루", "튀김가루", "빵가루"))));
+    // config/chat-safety.yml app.chat.safety.allergy-groups와 같은 묶음
+    static final List<AllergyGroup> GROUPS = List.of(
+            new AllergyGroup("견과류", List.of("호두", "아몬드", "잣", "캐슈넛", "피스타치오", "마카다미아", "땅콩")),
+            new AllergyGroup("갑각류", List.of("새우", "게", "꽃게", "게살", "게맛살", "가재새우")),
+            new AllergyGroup("유제품", List.of("우유", "치즈", "버터", "생크림", "요거트")),
+            new AllergyGroup("달걀", List.of("달걀", "메추리알", "마요네즈")),
+            new AllergyGroup("계란", List.of("달걀", "메추리알", "마요네즈")),
+            new AllergyGroup("밀가루", List.of("밀가루", "부침가루", "튀김가루", "빵가루")));
 
     // 재료 사전 (이름 → 재료). dev DB의 실제 이름 일부
     private static final Map<String, Ingredient> DICTIONARY = new HashMap<>();
@@ -68,7 +67,7 @@ class AllergyExclusionFinderTest {
             }
             return result;
         });
-        finder = new AllergyExclusionFinder(chatMessageService, ingredientService, AllergyWordCheckerTest.WORDS, GROUPS);
+        finder = new AllergyExclusionFinder(chatMessageService, ingredientService, SafetyWordCheckerTest.ALL);
     }
 
     @Test

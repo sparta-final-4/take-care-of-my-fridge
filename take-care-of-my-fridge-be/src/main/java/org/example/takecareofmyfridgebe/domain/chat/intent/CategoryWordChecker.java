@@ -1,7 +1,6 @@
 package org.example.takecareofmyfridgebe.domain.chat.intent;
 
-import org.example.takecareofmyfridgebe.domain.chat.config.ChatCategoryWordProperties;
-import org.example.takecareofmyfridgebe.domain.chat.config.ChatTasteWordProperties;
+import org.example.takecareofmyfridgebe.domain.chat.config.ChatWordProperties;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -21,7 +20,7 @@ import java.util.Set;
  *       "로·으로"는 재료로 쓰는 말("김치로", "떡으로")과 겹쳐 넣지 않는다</li>
  *   <li>다음 단어가 요청하는 말({@link #REQUEST_WORDS}로 시작: 추천·먹·만들·말고 …)이거나 메시지 끝이어야 한다.
  *       "김치 넣은 요리", "떡 썰어서"처럼 재료로 말한 것을 뺀다</li>
- *   <li>분류 이름과 다른 흔한 말("국물" → 국·찌개·전골·수프·스튜, 설정 app.chat.category-words)도 같은 규칙으로 찾고, 맞으면 묶음의 분류를 모두 센다.
+ *   <li>분류 이름과 다른 흔한 말("국물" → 국·찌개·전골·수프·스튜, 설정 app.chat.words.category)도 같은 규칙으로 찾고, 맞으면 묶음의 분류를 모두 센다.
  *       "국수"는 묶음 말이 아니어서 국으로 보지 않는다.
  *       {@value #MIN_PHRASE_LENGTH}글자 이상인 묶음 말(설정에 붙여 쓴 "간단한한끼")은 띄어 쓴 메시지("간단한 한 끼 추천해줘")에서도 찾는다</li>
  *   <li>대명사·끼니와 겹치는 분류({@link #SKIPPED}: "전 매운 거 좋아해"의 전, "밥 뭐 먹지"의 밥)는 서버가 채우지 않고 AI에 맡긴다</li>
@@ -58,7 +57,7 @@ public final class CategoryWordChecker {
      * @param categories 고를 수 있는 분류 (AI에 준 분류 목록과 같은 것, "기타" 제외)
      * @return 메시지에 나온 순서대로 분류마다 원하는지·피하는지. 같은 분류가 한 번이라도 부정어와 붙으면 피함
      */
-    public static List<CategoryStance> check(String message, Collection<String> categories, ChatTasteWordProperties words) {
+    public static List<CategoryStance> check(String message, Collection<String> categories, ChatWordProperties.Taste words) {
         return check(message, categories, words, List.of());
     }
 
@@ -66,8 +65,8 @@ public final class CategoryWordChecker {
      * @param groups 분류 이름과 다른 묶음 말 ("국물" → 국·찌개·전골·수프·스튜). 분류 이름과 같은 규칙으로 찾고, 맞으면 묶음의 분류 모두를 센다.
      *               categories에 없는 분류는 뺀다
      */
-    public static List<CategoryStance> check(String message, Collection<String> categories, ChatTasteWordProperties words,
-                                             List<ChatCategoryWordProperties.Group> groups) {
+    public static List<CategoryStance> check(String message, Collection<String> categories, ChatWordProperties.Taste words,
+                                             List<ChatWordProperties.Category.Group> groups) {
         if (message == null || message.isBlank()) {
             return List.of();
         }
@@ -76,7 +75,7 @@ public final class CategoryWordChecker {
         categories.stream()
                 .filter(name -> name != null && !name.isBlank() && !SKIPPED.contains(name))
                 .forEach(name -> terms.put(name, List.of(name)));
-        for (ChatCategoryWordProperties.Group group : groups) {
+        for (ChatWordProperties.Category.Group group : groups) {
             List<String> mapped = group.categories().stream().filter(categories::contains).toList();
             if (group.word() != null && !group.word().isBlank() && !mapped.isEmpty()) {
                 terms.putIfAbsent(group.word().strip(), mapped);
@@ -120,7 +119,7 @@ public final class CategoryWordChecker {
             }
         }
         // 여러 낱말로 된 묶음 말("간단한한끼")은 낱말 단위로는 걸리지 않으므로 공백을 뺀 글에서 한 번 더 찾는다
-        for (ChatCategoryWordProperties.Group group : groups) {
+        for (ChatWordProperties.Category.Group group : groups) {
             String phrase = group.word() == null ? "" : group.word().replaceAll("\\s+", "");
             int start = phrase.length() >= MIN_PHRASE_LENGTH ? compact.indexOf(phrase) : -1;
             List<String> mapped = terms.get(group.word() == null ? "" : group.word().strip());

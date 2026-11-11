@@ -1,6 +1,6 @@
 package org.example.takecareofmyfridgebe.domain.chat.intent;
 
-import org.example.takecareofmyfridgebe.domain.chat.config.ChatMealkitWordProperties;
+import org.example.takecareofmyfridgebe.domain.chat.config.ChatWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.intent.MealkitWordChecker.Mode;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -11,7 +11,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 public class MealkitWordCheckerTest {
 
-    public static final ChatMealkitWordProperties WORDS = new ChatMealkitWordProperties(
+    public static final ChatWordProperties.Mealkit WORDS = new ChatWordProperties.Mealkit(
             List.of("밀키트"), List.of("간단", "간편", "빨리", "귀찮", "요리하기싫"));
 
     private static Mode check(String message) {

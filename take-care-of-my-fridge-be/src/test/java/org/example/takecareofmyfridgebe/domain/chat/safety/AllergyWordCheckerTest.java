@@ -1,7 +1,7 @@
 package org.example.takecareofmyfridgebe.domain.chat.safety;
 
-import org.example.takecareofmyfridgebe.domain.chat.config.ChatAllergyWordProperties;
-import org.example.takecareofmyfridgebe.domain.chat.config.ChatAllergyWordProperties.NotSameKind;
+import org.example.takecareofmyfridgebe.domain.chat.config.ChatSafetyProperties;
+import org.example.takecareofmyfridgebe.domain.chat.config.ChatSafetyProperties.Allergy.NotSameKind;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -11,8 +11,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 public class AllergyWordCheckerTest {
 
-    // config/chat-safety.yml app.chat.allergy-words와 같은 목록
-    public static final ChatAllergyWordProperties WORDS = new ChatAllergyWordProperties(
+    // config/chat-safety.yml app.chat.safety.allergy와 같은 목록
+    public static final ChatSafetyProperties.Allergy WORDS = new ChatSafetyProperties.Allergy(
             List.of("알레르기", "알러지", "못먹", "먹으면안"),
             List.of("에는", "에도", "은", "는", "이", "가", "을", "를", "에", "도"),
             List.of(

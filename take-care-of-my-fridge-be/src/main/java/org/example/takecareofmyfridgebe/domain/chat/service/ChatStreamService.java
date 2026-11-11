@@ -3,8 +3,7 @@ package org.example.takecareofmyfridgebe.domain.chat.service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.takecareofmyfridgebe.domain.chat.ai.ChatReplyGenerator;
-import org.example.takecareofmyfridgebe.domain.chat.config.ChatHealthWordProperties;
-import org.example.takecareofmyfridgebe.domain.chat.config.ChatSafetyWordProperties;
+import org.example.takecareofmyfridgebe.domain.chat.config.ChatSafetyProperties;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatDoneEventResponse;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatErrorEventResponse;
@@ -73,8 +72,7 @@ public class ChatStreamService {
     private final ChatFridgeShopFacade chatFridgeShopFacade;
     private final ChatContextFacade chatContextFacade;
     private final ChatContextStore chatContextStore;
-    private final ChatSafetyWordProperties chatSafetyWordProperties;
-    private final ChatHealthWordProperties chatHealthWordProperties;
+    private final ChatSafetyProperties chatSafetyProperties;
     private final ObjectMapper objectMapper;
 
     /**
@@ -107,7 +105,7 @@ public class ChatStreamService {
         String lockToken = chatStreamLockService.acquire(sessionId);
 
         // 3. AI를 부르기 전에 단어로 거른다 (잠금 뒤, 하루 횟수 전). 걸리면 하루 횟수를 세지 않고 안내 답을 보낸다
-        Optional<ChatSafetyBlock> block = SafetyWordChecker.check(content, chatSafetyWordProperties);
+        Optional<ChatSafetyBlock> block = SafetyWordChecker.check(content, chatSafetyProperties.words());
         if (block.isPresent()) {
             return blockedReply(memberId, sessionId, content, block.get(), lockToken);
         }
@@ -176,7 +174,7 @@ public class ChatStreamService {
                 });
 
         // 건강 안내: 보낸 말만 본다 (AI 답은 보지 않는다). 답이 끝난 뒤 빈 줄 하나를 두고 붙여 화면·저장 모두 답 끝에 둔다
-        boolean healthMentioned = HealthWordChecker.mentions(content, chatHealthWordProperties);
+        boolean healthMentioned = HealthWordChecker.mentions(content, chatSafetyProperties.health());
         // 알레르기 안내(추천 답에서 재료를 뺐을 때)가 있으면 건강 안내 앞에 한 메시지로 붙인다
         Flux<ServerSentEvent<String>> healthNotice = Flux.defer(() -> {
             ReplyPlan plan = planRef.get();

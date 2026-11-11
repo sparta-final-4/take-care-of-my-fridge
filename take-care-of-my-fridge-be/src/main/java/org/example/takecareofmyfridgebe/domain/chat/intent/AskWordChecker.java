@@ -1,6 +1,6 @@
 package org.example.takecareofmyfridgebe.domain.chat.intent;
 
-import org.example.takecareofmyfridgebe.domain.chat.config.ChatAskWordProperties;
+import org.example.takecareofmyfridgebe.domain.chat.config.ChatWordProperties;
 
 import java.util.List;
 
@@ -15,23 +15,23 @@ public final class AskWordChecker {
     }
 
     // 묻는 말("기준·어떻게·왜·방법·얼마나·보관·가격·차이·뭐가 달라")이 있는지
-    public static boolean asks(String message, ChatAskWordProperties words) {
+    public static boolean asks(String message, ChatWordProperties.Ask words) {
         return containsAny(compact(message), words.question());
     }
 
     // 달라는 말("추천·뭐 있·보여줘·먹고 싶·사고 싶·골라줘")이 있고 묻는 말이 없는지
-    public static boolean requests(String message, ChatAskWordProperties words) {
+    public static boolean requests(String message, ChatWordProperties.Ask words) {
         String text = compact(message);
         return containsAny(text, words.request()) && !containsAny(text, words.question());
     }
 
     // 인사 말("안녕·반가워·고마워·잘 지내")이 있는지
-    public static boolean greets(String message, ChatAskWordProperties words) {
+    public static boolean greets(String message, ChatWordProperties.Ask words) {
         return containsAny(compact(message), words.greeting());
     }
 
     // 밀키트와 같이 쓴 말: 달라는 말에 "있어·있나·없어·뭐가 좋아·살 만한"도 더하고, 묻는 말이 없는지 ("국물 밀키트 있어?")
-    public static boolean requestsMealkit(String message, ChatAskWordProperties words) {
+    public static boolean requestsMealkit(String message, ChatWordProperties.Ask words) {
         String text = compact(message);
         return (containsAny(text, words.request()) || containsAny(text, words.mealkitRequest()))
                 && !containsAny(text, words.question());

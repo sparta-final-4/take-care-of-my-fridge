@@ -1,6 +1,6 @@
 package org.example.takecareofmyfridgebe.domain.chat.intent;
 
-import org.example.takecareofmyfridgebe.domain.chat.config.ChatCategoryWordProperties;
+import org.example.takecareofmyfridgebe.domain.chat.config.ChatWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.intent.CategoryWordChecker.CategoryStance;
 import org.example.takecareofmyfridgebe.domain.chat.intent.CategoryWordChecker.Stance;
 import org.junit.jupiter.api.DisplayName;
@@ -15,11 +15,11 @@ public class CategoryWordCheckerTest {
     private static final List<String> CATEGORIES = List.of(
             "밥", "구이", "국", "면류", "볶음", "샐러드", "무침", "찜", "튀김", "김치", "디저트", "전", "찌개", "조림", "전골", "떡", "만두");
 
-    public static final List<ChatCategoryWordProperties.Group> GROUPS = List.of(
-            new ChatCategoryWordProperties.Group("국물", List.of("국", "찌개", "전골", "수프", "스튜")),
-            new ChatCategoryWordProperties.Group("스프", List.of("수프")),
-            new ChatCategoryWordProperties.Group("면", List.of("면류")),
-            new ChatCategoryWordProperties.Group("안주", List.of("구이", "전", "튀김")));
+    public static final List<ChatWordProperties.Category.Group> GROUPS = List.of(
+            new ChatWordProperties.Category.Group("국물", List.of("국", "찌개", "전골", "수프", "스튜")),
+            new ChatWordProperties.Category.Group("스프", List.of("수프")),
+            new ChatWordProperties.Category.Group("면", List.of("면류")),
+            new ChatWordProperties.Category.Group("안주", List.of("구이", "전", "튀김")));
 
     private static List<CategoryStance> check(String message) {
         return CategoryWordChecker.check(message, CATEGORIES, TasteWordCheckerTest.WORDS);
@@ -102,9 +102,9 @@ public class CategoryWordCheckerTest {
     @Test
     @DisplayName("붙여 쓴 긴 묶음 말(간단한한끼)은 띄어 쓴 메시지(간단한 한 끼 추천해줘)에서도 찾고, 부정어가 붙으면 피한다")
     void findsSpacedPhraseGroup() {
-        List<ChatCategoryWordProperties.Group> groups = List.of(
-                new ChatCategoryWordProperties.Group("간단한한끼", List.of("밥", "면류", "볶음")),
-                new ChatCategoryWordProperties.Group("면", List.of("면류")));
+        List<ChatWordProperties.Category.Group> groups = List.of(
+                new ChatWordProperties.Category.Group("간단한한끼", List.of("밥", "면류", "볶음")),
+                new ChatWordProperties.Category.Group("면", List.of("면류")));
 
         assertThat(CategoryWordChecker.check("간단한 한 끼 추천해줘", CATEGORIES, TasteWordCheckerTest.WORDS, groups))
                 .containsExactlyInAnyOrder(new CategoryStance("밥", Stance.WANT), new CategoryStance("면류", Stance.WANT),

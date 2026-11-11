@@ -1,6 +1,6 @@
 package org.example.takecareofmyfridgebe.domain.chat.safety;
 
-import org.example.takecareofmyfridgebe.domain.chat.config.ChatHealthWordProperties;
+import org.example.takecareofmyfridgebe.domain.chat.config.ChatSafetyProperties;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -10,8 +10,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class HealthWordCheckerTest {
 
-    // config/chat-safety.yml app.chat.health-words와 같은 목록
-    public static final ChatHealthWordProperties WORDS = new ChatHealthWordProperties(
+    // config/chat-safety.yml app.chat.safety.health와 같은 목록
+    public static final ChatSafetyProperties.Health WORDS = new ChatSafetyProperties.Health(
             List.of("당뇨", "혈당", "고혈압", "혈압", "고지혈", "콜레스테롤", "신장질환", "신장병", "신장기능", "콩팥", "투석",
                     "통풍", "요산", "질환", "환자", "위염", "역류성", "항암", "알레르기", "알러지", "아토피", "임신", "임산부", "산모",
                     "수유", "모유", "복용", "처방", "약먹", "약을먹", "약드시"),
