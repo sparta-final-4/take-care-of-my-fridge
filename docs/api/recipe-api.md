@@ -21,8 +21,8 @@
 |---|---|---|---|
 | sort (query) | `LATEST`·`RELEVANCE`·`NAME_ASC`·`DIFFICULTY_ASC` | N | 기본 `LATEST`(최신순). `RELEVANCE`는 이 API에서 `LATEST`와 같음 |
 | keyword (query) | string | N | 50자 이하. 레시피 이름에 들어 있는지 봄 |
-| cuisineType (query) | string | N | 20자 이하. 값이 같은 것만 |
-| category (query) | string | N | 50자 이하. 값이 같은 것만 |
+| cuisineType (query) | string[] | N | 최대 20개, 각 20자 이하. 이름을 반복해 여러 값(`?cuisineType=한식&cuisineType=중식`), 그중 하나와 같은 것 |
+| category (query) | string[] | N | 최대 50개, 각 50자 이하. 이름을 반복해 여러 값(`?category=국&category=찌개`), 그중 하나와 같은 것 |
 | maxCookTimeMin (query) | int | N | 1 이상. 이 값 이하 |
 | maxDifficulty (query) | int | N | 1~10. 이 값 이하 |
 | page (query) | int | N | 기본 1, 1 이상 |

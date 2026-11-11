@@ -108,7 +108,27 @@ class SearchControllerTest {
         ArgumentCaptor<RecipeListRequest> captor = ArgumentCaptor.forClass(RecipeListRequest.class);
         verify(recipeSearchFacade).getRecipes(captor.capture(), isNull());
         assertThat(captor.getValue().keyword()).isEqualTo("계란");
-        assertThat(captor.getValue().cuisineType()).isEqualTo("한식");
+        assertThat(captor.getValue().cuisineType()).containsExactly("한식");
+    }
+
+    @Test
+    @DisplayName("음식 종류·요리 분류는 같은 이름을 여러 번 보내 여러 값을 고를 수 있고, 빈 값과 중복은 뺀다")
+    void searchRecipes_bindsMultipleClassificationValues() throws Exception {
+        // Given
+        PageResponse<RecipeListItemResponse> page = new PageResponse<>(List.of(), 1, 20, 0, 0, true);
+        when(recipeSearchFacade.getRecipes(any(RecipeListRequest.class), isNull())).thenReturn(page);
+
+        // When & Then
+        mvc.perform(get("/api/search/recipes")
+                        .param("keyword", "찌개")
+                        .param("category", "국", "찌개", " ", "국")
+                        .param("cuisineType", "한식", "중식"))
+                .andExpect(status().isOk());
+
+        ArgumentCaptor<RecipeListRequest> captor = ArgumentCaptor.forClass(RecipeListRequest.class);
+        verify(recipeSearchFacade).getRecipes(captor.capture(), isNull());
+        assertThat(captor.getValue().category()).containsExactly("국", "찌개");
+        assertThat(captor.getValue().cuisineType()).containsExactly("한식", "중식");
     }
 
     @Test

@@ -2,7 +2,7 @@
 @use '@/styles/mixins' as *;
 
 // 레시피 검색 조건 칸(재료/밀키트 화면과 같은 모양): 상자 없이 묶음마다 얇은 선으로 나눈다.
-// 음식 종류·조리 시간·요리 분류는 묶음마다 드롭다운 하나로 고른다.
+// 음식 종류·요리 분류는 드롭다운에서 여러 개 고르고 고른 값을 아래 칩으로 보인다. 조리 시간은 하나만 고른다.
 .facets {
   display: flex;
   flex-direction: column;
@@ -54,4 +54,27 @@
 // 필터 드롭다운: 칸 너비를 꽉 채운다.
 .select {
   width: 100%;
+}
+
+// 고른 값 칩: [국 ×] [그라탕 ×] … 칸 너비를 넘으면 다음 줄로 넘긴다.
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ant-margin-xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+:global(.ant-tag).chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: $touch-target-size;
+  margin: 0;
+  color: var(--ant-color-text);
+
+  // 마우스로 고르는 PC는 터치 영역이 필요 없어 칩을 낮춘다.
+  @media #{$desktop-pointer} {
+    min-height: auto;
+  }
 }

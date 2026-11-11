@@ -1,5 +1,6 @@
+import { CloseOutlined } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
-import { Button, Input, Select, Typography } from 'antd';
+import { Button, Input, Select, Tag, Typography } from 'antd';
 
 import { COOK_TIME_OPTIONS } from '@/domains/recipe/format';
 import { useRecipeFilters } from '@/domains/recipe/hooks/useRecipeFilters';
@@ -9,9 +10,12 @@ import styles from './RecipeSearchSection.module.scss';
 
 interface FilterRow {
   label: string;
-  value: string | undefined;
   options: Array<{ value: string; label: string }>;
-  onChange: (value: string | undefined) => void;
+  // 여러 개 고르는 묶음(음식 종류·요리 분류)은 values, 하나만 고르는 묶음(조리 시간)은 value를 쓴다.
+  values?: string[];
+  onChangeValues?: (values: string[]) => void;
+  value?: string;
+  onChangeValue?: (value: string | undefined) => void;
   // 항목이 많은 묶음은 글자를 쳐서 찾을 수 있게 한다.
   searchable?: boolean;
 }
@@ -19,12 +23,12 @@ interface FilterRow {
 export function RecipeSearchSection() {
   const {
     keyword,
-    cuisineType,
-    category,
+    cuisineTypes,
+    categories,
     cookTimeKey,
     setKeyword,
-    setCuisineType,
-    setCategory,
+    setCuisineTypes,
+    setCategories,
     setCookTime,
     filtered,
     reset,
@@ -35,27 +39,27 @@ export function RecipeSearchSection() {
   const toOptions = (values: string[] | undefined) =>
     (values ?? []).map((value) => ({ value, label: value }));
 
-  // 묶음마다 드롭다운 하나에서 값을 하나 고르고, 지우기(×)로 해제한다.
-  // 항목이 많은 요리 분류는 맨 아래에 둬 짧은 조건이 먼저 보이게 한다.
+  // 음식 종류·요리 분류는 드롭다운에서 여러 개 체크하고, 고른 값은 드롭다운 아래 칩(×로 해제)으로 보인다.
+  // 조리 시간은 '최대 n분'이라 하나만 고른다. 항목이 많은 요리 분류는 맨 아래에 둔다.
   const filterRows: FilterRow[] = [
     {
       label: '음식 종류',
-      value: cuisineType,
       options: toOptions(classifications?.cuisineTypes),
-      onChange: setCuisineType,
+      values: cuisineTypes,
+      onChangeValues: setCuisineTypes,
     },
     {
       label: '조리 시간',
-      value: cookTimeKey,
       options: COOK_TIME_OPTIONS.map((option) => ({ value: option.key, label: option.label })),
-      onChange: (value) =>
+      value: cookTimeKey,
+      onChangeValue: (value) =>
         setCookTime(COOK_TIME_OPTIONS.find((option) => option.key === value)?.key),
     },
     {
       label: '요리 분류',
-      value: category,
       options: toOptions(classifications?.categories),
-      onChange: setCategory,
+      values: categories,
+      onChangeValues: setCategories,
       searchable: true,
     },
   ];
@@ -89,16 +93,58 @@ export function RecipeSearchSection() {
         .map((row) => (
           <div key={row.label} className={styles.group}>
             <Typography.Text className={styles.groupLabel}>{row.label}</Typography.Text>
-            <Select
-              aria-label={row.label}
-              placeholder="전체"
-              allowClear
-              showSearch={row.searchable ? { optionFilterProp: 'label' } : false}
-              options={row.options}
-              value={row.value ?? null}
-              onChange={(value: string | null | undefined) => row.onChange(value ?? undefined)}
-              className={styles.select}
-            />
+            {row.onChangeValues ? (
+              <>
+                <Select
+                  mode="multiple"
+                  aria-label={row.label}
+                  placeholder="전체"
+                  allowClear
+                  showSearch={row.searchable ? { optionFilterProp: 'label' } : false}
+                  options={row.options}
+                  value={row.values}
+                  onChange={row.onChangeValues}
+                  // 고른 값은 아래 칩으로 보여 주므로 상자 안에는 개수만 둔다.
+                  maxTagCount={0}
+                  maxTagPlaceholder={(omitted) => `${omitted.length}개 선택`}
+                  className={styles.select}
+                />
+                {row.values && row.values.length > 0 && (
+                  <ul className={styles.chips} aria-label={`고른 ${row.label}`}>
+                    {row.values.map((value) => (
+                      <li key={value}>
+                        <Tag
+                          closable
+                          closeIcon={<CloseOutlined aria-label={`${value} 해제`} />}
+                          onClose={(event) => {
+                            // Tag가 스스로 숨지 않게 막고, URL에서 값을 빼 다시 그린다.
+                            event.preventDefault();
+                            row.onChangeValues?.(
+                              row.values?.filter((item) => item !== value) ?? [],
+                            );
+                          }}
+                          className={styles.chip}
+                        >
+                          {value}
+                        </Tag>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </>
+            ) : (
+              <Select
+                aria-label={row.label}
+                placeholder="전체"
+                allowClear
+                options={row.options}
+                value={row.value ?? null}
+                onChange={(value: string | null | undefined) =>
+                  row.onChangeValue?.(value ?? undefined)
+                }
+                className={styles.select}
+              />
+            )}
           </div>
         ))}
     </section>

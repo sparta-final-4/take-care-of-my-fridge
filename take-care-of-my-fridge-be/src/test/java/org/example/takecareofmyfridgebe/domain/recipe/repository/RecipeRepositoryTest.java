@@ -1,6 +1,8 @@
 package org.example.takecareofmyfridgebe.domain.recipe.repository;
 
 import jakarta.persistence.EntityManager;
+import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeListRequest;
+import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeSort;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeStepImageDto;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeUpdatedAtDto;
 import org.example.takecareofmyfridgebe.domain.recipe.entity.Recipe;
@@ -14,6 +16,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.PageRequest;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -141,5 +144,38 @@ class RecipeRepositoryTest extends MySqlContainerSupport {
 
         // then
         assertThat(result).containsExactly(new RecipeStepImageDto(withLastImage.getId(), "https://img.example/2.jpg"));
+    }
+
+    private Recipe createClassifiedRecipe(String name, String cuisineType, String category) {
+        Recipe recipe = Recipe.builder()
+                .source("TEST")
+                .sourceId("SRC_" + System.nanoTime())
+                .name(name)
+                .cuisineType(cuisineType)
+                .category(category)
+                .difficulty(3)
+                .build();
+        em.persist(recipe);
+        return recipe;
+    }
+
+    @Test
+    @DisplayName("음식 종류·요리 분류를 여러 개 고르면 그중 하나와 같은 레시피를 찾고, 두 조건은 함께 만족해야 한다")
+    void findRecipesByConditionMatchesAnyOfSelectedClassifications() {
+        // given
+        Recipe soup = createClassifiedRecipe("미역국", "한식", "국");
+        Recipe stew = createClassifiedRecipe("김치찌개", "한식", "찌개");
+        createClassifiedRecipe("볶음밥", "한식", "볶음");
+        createClassifiedRecipe("마라탕", "중식", "국");
+        em.flush();
+        em.clear();
+        RecipeListRequest request = new RecipeListRequest(
+                RecipeSort.NAME_ASC, null, List.of("한식"), List.of("국", "찌개"), null, null, 1, 10);
+
+        // when
+        List<Recipe> result = recipeRepository.findRecipesByCondition(request, PageRequest.of(0, 10)).getContent();
+
+        // then
+        assertThat(result).extracting(Recipe::getId).containsExactly(stew.getId(), soup.getId());
     }
 }

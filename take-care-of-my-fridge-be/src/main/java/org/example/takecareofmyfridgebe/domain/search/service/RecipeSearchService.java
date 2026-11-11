@@ -1,6 +1,7 @@
 package org.example.takecareofmyfridgebe.domain.search.service;
 
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
+import co.elastic.clients.elasticsearch._types.FieldValue;
 import co.elastic.clients.elasticsearch._types.SortOptions;
 import co.elastic.clients.elasticsearch._types.SortOrder;
 import co.elastic.clients.elasticsearch._types.query_dsl.Operator;
@@ -191,11 +192,11 @@ public class RecipeSearchService {
     // 값이 있는 조건만 건다. 조리 시간이 비어 있는 레시피는 MySQL 검색과 같이 조건을 걸면 제외된다
     private static List<Query> filters(RecipeListRequest request) {
         List<Query> filters = new ArrayList<>();
-        if (request.cuisineType() != null) {
-            filters.add(term("cuisine_type", request.cuisineType()));
+        if (!request.cuisineType().isEmpty()) {
+            filters.add(terms("cuisine_type", request.cuisineType()));
         }
-        if (request.category() != null) {
-            filters.add(term("category", request.category()));
+        if (!request.category().isEmpty()) {
+            filters.add(terms("category", request.category()));
         }
         if (request.maxCookTimeMin() != null) {
             filters.add(atMost("cook_time_min", request.maxCookTimeMin()));
@@ -206,8 +207,10 @@ public class RecipeSearchService {
         return filters;
     }
 
-    private static Query term(String field, String value) {
-        return Query.of(q -> q.term(t -> t.field(field).value(value)));
+    // 값 중 하나와 같으면 맞는다
+    private static Query terms(String field, List<String> values) {
+        List<FieldValue> fieldValues = values.stream().map(FieldValue::of).toList();
+        return Query.of(q -> q.terms(t -> t.field(field).terms(v -> v.value(fieldValues))));
     }
 
     // field <= max

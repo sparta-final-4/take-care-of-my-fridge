@@ -139,7 +139,7 @@ class RecipeSearchFacadeTest {
     @DisplayName("음식 종류 필터를 걸어 0건이면 기록하지 않는다")
     void getRecipes_skipsZeroResult_whenFiltered() {
         // Given
-        RecipeListRequest request = new RecipeListRequest(null, "김치", "한식", null, null, null, null, null);
+        RecipeListRequest request = new RecipeListRequest(null, "김치", List.of("한식"), null, null, null, null, null);
         when(recipeService.getRecipes(request)).thenReturn(emptyPage(1));
 
         // When
@@ -182,7 +182,7 @@ class RecipeSearchFacadeTest {
     void getRecipes_skipsPopularKeyword_whenZeroOrFilteredOrNotFirstPage() {
         // Given
         RecipeListRequest zero = request("김치");
-        RecipeListRequest filtered = new RecipeListRequest(null, "김치", "한식", null, null, null, null, null);
+        RecipeListRequest filtered = new RecipeListRequest(null, "김치", List.of("한식"), null, null, null, null, null);
         RecipeListRequest secondPage = new RecipeListRequest(null, "김치", null, null, null, null, 2, null);
         PageResponse<RecipeListItemResponse> hits = new PageResponse<>(List.of(), 1, 20, 3, 1, true);
         when(recipeService.getRecipes(zero)).thenReturn(emptyPage(1));
