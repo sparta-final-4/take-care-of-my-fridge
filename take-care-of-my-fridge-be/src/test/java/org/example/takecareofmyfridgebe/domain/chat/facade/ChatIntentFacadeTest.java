@@ -221,6 +221,47 @@ class ChatIntentFacadeTest {
         }
 
         @Test
+        @DisplayName("\"매운 닭볶음탕 레시피\"는 레시피 말과 맛 단어를 빼고 닭볶음탕을 찾아 닭볶음탕 매운맛 추천으로 바꾼다")
+        void recommendsDish_whenNameOnlyWithTasteAndRecipeWords() {
+            when(recipeService.getClassifications()).thenReturn(
+                    new RecipeClassificationResponse(List.of("한식"), List.of("국", "찜", "찌개")));
+            when(ingredientMatcher.matchAll(anyList())).thenReturn(Map.of());
+            when(recipeService.suggestNames(any(), anyInt())).thenReturn(List.of());
+            when(recipeService.suggestNames("닭볶음탕", 1)).thenReturn(List.of("토마토시금치 닭볶음탕"));
+            givenExtracted(IntentResult.general());
+
+            ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("매운 닭볶음탕 레시피"));
+
+            assertThat(resolution.intent()).isEqualTo(ChatIntent.RECOMMEND);
+            assertThat(resolution.recipeQuery().keywords()).containsExactly("닭볶음탕");
+            assertThat(resolution.recipeQuery().keywordText()).isEqualTo("닭볶음탕");
+            assertThat(resolution.recipeQuery().wantedTastes()).containsExactly(Taste.SPICY);
+            verify(recipeService).suggestNames("매운 닭볶음탕", 1);
+        }
+
+        @Test
+        @DisplayName("\"매운탕 레시피\"처럼 맛 단어로 시작하는 요리 이름은 맛 단어를 빼지 않고 그대로 찾는다")
+        void keepsDishStartingWithTasteWord() {
+            when(ingredientMatcher.matchAll(anyList())).thenReturn(Map.of());
+            when(recipeService.suggestNames("매운탕", 1)).thenReturn(List.of("우럭 매운탕"));
+            givenExtracted(IntentResult.general());
+
+            ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("매운탕 레시피"));
+
+            assertThat(resolution.intent()).isEqualTo(ChatIntent.RECOMMEND);
+            assertThat(resolution.recipeQuery().keywords()).containsExactly("매운탕");
+        }
+
+        @Test
+        @DisplayName("레시피 말은 띄어 써도 지운다 (닭볶음탕 만드는 법 → 닭볶음탕, 잡채 만 들 기 → 잡채)")
+        void removesSpacedRecipeWords() {
+            assertThat(facade.withoutRecipeWords("닭볶음탕 만드는 법")).isEqualTo("닭볶음탕");
+            assertThat(facade.withoutRecipeWords("잡채 만 들 기")).isEqualTo("잡채");
+            assertThat(facade.withoutRecipeWords("닭볶음탕레시피")).isEqualTo("닭볶음탕");
+            assertThat(facade.withoutRecipeWords("레시피")).isEmpty();
+        }
+
+        @Test
         @DisplayName("인사·지난 일을 묻는 짧은 말(밥 먹었어?, 안녕 밥은?)은 재료 이름이 있어도 일반 답 그대로 두고, \"밥 추천\"은 추천으로 바꾼다")
         void keepsGeneral_whenGreetingOrPastQuestion() {
             Ingredient rice = ingredient(70L, "ING_RICE", "밥");
@@ -287,9 +328,11 @@ class ChatIntentFacadeTest {
             ChatIntentFacade spied = spy(facade);
             givenExtracted(IntentResult.general());
             spied.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("찌개는 어떻게 골라? 매운 거 기준은?"));
+            // 물어본 레시피가 직전 카드에 있는 레시피 자세히 (없으면 그 요리 추천으로 바뀌어 보정한다)
             givenExtracted(new IntentResult(ChatIntent.RECIPE_DETAIL, null, null, null, null, null, null, null, null, null,
                     null, "김치찌개", null, null, null));
-            spied.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("매운 김치찌개 어떻게 만들어?"));
+            spied.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("매운 김치찌개 어떻게 만들어?"),
+                    new ChatContext(List.of(), null, List.of(new CardName(10L, "김치찌개"))));
 
             verify(spied, never()).correctTastes(any(), any(), any(), any());
             verify(spied, never()).correctCategories(any(), any(), any(), any(), any(), any());
@@ -612,8 +655,8 @@ class ChatIntentFacadeTest {
         }
 
         @Test
-        @DisplayName("물어본 레시피를 직전 카드에서도 상담 전체 추천에서도 못 찾으면 일반 답으로 한다")
-        void answersGeneral_whenTargetNotFound() {
+        @DisplayName("물어본 레시피 이름을 직전 카드에서도 상담 전체 추천에서도 못 찾으면 그 요리 이름으로 새 추천을 한다")
+        void recommendsNamedDish_whenTargetNotFound() {
             givenExtracted(detail(5, "마파두부"));
             when(chatMessageService.findRecentRecommendedRecipeIds(List.of(SESSION_ID), 30))
                     .thenReturn(Map.of(SESSION_ID, List.of(10L)));
@@ -621,6 +664,36 @@ class ChatIntentFacadeTest {
 
             ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID,
                     ChatMessageCreateRequest.of("마파두부 어떻게 해?"), context);
+
+            assertThat(resolution.intent()).isEqualTo(ChatIntent.RECOMMEND);
+            assertThat(resolution.targetRecipeId()).isNull();
+            assertThat(resolution.recipeQuery().keywords()).containsExactly("마파두부");
+            assertThat(resolution.recipeQuery().keywordText()).isEqualTo("마파두부");
+        }
+
+        @Test
+        @DisplayName("직전 카드가 없는 상담에서 \"매운 닭볶음탕 레시피\"를 자세히로 봐도 닭볶음탕 매운맛 추천으로 바꾼다")
+        void recommendsSpicyDish_whenNoLastCards() {
+            ChatContext noCards = new ChatContext(List.of(), null, List.of());
+            givenExtracted(detail(null, "닭볶음탕"));
+            when(chatMessageService.findRecentRecommendedRecipeIds(List.of(SESSION_ID), 30)).thenReturn(Map.of());
+
+            ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID,
+                    ChatMessageCreateRequest.of("매운 닭볶음탕 레시피"), noCards);
+
+            assertThat(resolution.intent()).isEqualTo(ChatIntent.RECOMMEND);
+            assertThat(resolution.recipeQuery().keywords()).containsExactly("닭볶음탕");
+            assertThat(resolution.recipeQuery().keywordText()).isEqualTo("닭볶음탕");
+            assertThat(resolution.recipeQuery().wantedTastes()).containsExactly(Taste.SPICY);
+        }
+
+        @Test
+        @DisplayName("물어본 레시피의 이름도 없고 번호도 직전 카드보다 크면 일반 답으로 한다")
+        void answersGeneral_whenNoNameAndIndexOutOfRange() {
+            givenExtracted(detail(5, null));
+
+            ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID,
+                    ChatMessageCreateRequest.of("다섯 번째 거 어떻게 해?"), context);
 
             assertThat(resolution.intent()).isEqualTo(ChatIntent.GENERAL);
             assertThat(resolution.targetRecipeId()).isNull();

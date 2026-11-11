@@ -3,8 +3,11 @@ package org.example.takecareofmyfridgebe.domain.chat.facade;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatAllergyWordProperties;
+import org.example.takecareofmyfridgebe.domain.chat.config.ChatFeatureWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatMealkitWordProperties;
+import org.example.takecareofmyfridgebe.domain.chat.config.ChatTasteOppositeProperties;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatTasteWordProperties;
+import org.example.takecareofmyfridgebe.domain.chat.config.ChatTemperatureWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse.ImminentIngredient;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse.MissingIngredient;
@@ -49,6 +52,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -86,6 +90,9 @@ public class ChatRecommendationFacade {
     private final ChatMealkitWordProperties chatMealkitWordProperties;
     private final ChatTasteWordProperties chatTasteWordProperties;
     private final ChatAllergyWordProperties chatAllergyWordProperties;
+    private final ChatTasteOppositeProperties chatTasteOppositeProperties;
+    private final ChatTemperatureWordProperties chatTemperatureWordProperties;
+    private final ChatFeatureWordProperties chatFeatureWordProperties;
 
     /**
      * @param content 사용자 메시지 원문 (설명 프롬프트에 넣는다)
@@ -224,20 +231,56 @@ public class ChatRecommendationFacade {
                 .toList());
     }
 
-    private RecommendationReply recommendRecipes(String content, RecipeQuery request, Collection<Long> previousCardIds) {
+    private RecommendationReply recommendRecipes(String content, RecipeQuery spoken, Collection<Long> previousCardIds) {
+        // "시원한 국물"처럼 특징만 말한 표현은 요리 이름이 아니다 (요리 이름이면 "○○ 레시피는 없어서" 안내가 붙는다)
+        RecipeQuery request = spoken;
+        if (spoken.keywordText() != null && isFeature(spoken.keywordText())) {
+            log.info("상담 요리 이름이 특징 표현이라 비움 - memberId: {}, 표현: {}", spoken.memberId(), spoken.keywordText());
+            request = spoken.withKeywordText(null);
+        }
         RecipeCandidates found = recipeCandidateFacade.findCandidates(request);
         RecipeQuery query = request;
         // AI가 요리 이름을 비웠는데 말에 그대로 있는 키워드가 레시피 이름에 하나도 없으면 그 이름을 요리 이름으로 쓴다
-        // ("탕짜면 먹고 싶어" → "탕짜면 레시피는 없어서…" 안내, 카드 이유 "탕짜면과 비슷한 탕수육이에요")
-        Optional<String> spokenDish = spokenDishWithoutRecipe(content, request, found.candidates());
+        // ("탕짜면 먹고 싶어" → "탕짜면 레시피는 없어서…" 안내, 카드 이유 "탕짜면과 비슷한 탕수육이에요"). 특징 표현은 채우지 않는다
+        Optional<String> spokenDish = spokenDishWithoutRecipe(content, request, found.candidates(), this::isFeature);
         if (spokenDish.isPresent()) {
             query = request.withKeywordText(spokenDish.get());
-            found = new RecipeCandidates(found.candidates(), found.fallback(), true, found.keptAvoidTastes());
+            found = new RecipeCandidates(found.candidates(), found.fallback(), true, found.keptAvoidTastes())
+                    .withTasteDetails(found.recipeTastes(), found.maybeSpicyIds());
             log.info("상담 요리 이름 채움 - memberId: {}, 요리 이름: {} (AI가 비움, 레시피 이름에 없음)", request.memberId(), spokenDish.get());
         }
         List<RecipeCandidate> candidates = withoutPrevious(found.candidates(), previousCardIds);
+        // 온도 말: 따뜻하면 찬 요리(냉국 등)를 빼고, 차가우면 뜨거운 국물 요리를 뒤로 보낸다 (다시 추천은 원한 표현으로 이어 간다)
+        Optional<TemperatureWordChecker.Temperature> temperature =
+                TemperatureWordChecker.wanted(chatTemperatureWordProperties, content, query.preferenceText());
+        List<RecipeCandidate> arranged = TemperatureWordChecker.arrange(candidates, temperature, chatTemperatureWordProperties);
+        if (temperature.isPresent()) {
+            log.info("상담 추천 온도 말 - memberId: {}, 온도: {}, 뺀 찬 요리: {}, 뒤로 보낸 뜨거운 국물: {}",
+                    query.memberId(), temperature.get(),
+                    candidates.stream().filter(c -> !arranged.contains(c)).map(RecipeCandidate::name).toList(),
+                    temperature.get() == TemperatureWordChecker.Temperature.COLD
+                            ? candidates.stream().filter(c -> TemperatureWordChecker.hotDish(c.name(), chatTemperatureWordProperties))
+                            .map(RecipeCandidate::name).toList()
+                            : List.of());
+        }
+        candidates = arranged;
         logCandidates(query, candidates);
-        List<RecipeCandidate> picked = RecommendationPicker.pick(candidates, query.keywords());
+        // 말한 조건이 있으면 조건을 모두 맞춘 후보부터 고르고, 모자라면 분류가 맞고 반대 맛·온도가 아닌 후보로만 채운다
+        PickRule rule = PickRule.of(query, found, chatTasteOppositeProperties::oppositesOf)
+                .withTemperatureMismatched(
+                        TemperatureWordChecker.mismatched(candidates, temperature, chatTemperatureWordProperties));
+        List<RecipeCandidate> picked = RecommendationPicker.pick(candidates, query.keywords(), rule);
+        // 조건에 맞는 후보가 하나도 없으면 같은 후보에서 조건 없이 고르고(냉장고 재료 순), 맞는 레시피가 없었다고 안내한다
+        boolean unconditioned = rule.hasRequest() && picked.isEmpty() && !candidates.isEmpty();
+        if (unconditioned) {
+            picked = RecommendationPicker.pick(candidates, query.keywords(), PickRule.NONE);
+            log.info("상담 추천 조건에 맞는 후보가 없어 조건 없이 고름 - memberId: {}, 조건 수: {}, 후보 {}개, 카드 {}장",
+                    query.memberId(), rule.requestCount(), candidates.size(), picked.size());
+        } else if (rule.hasRequest() && picked.size() < RecommendationPicker.PICK_COUNT) {
+            log.info("상담 추천 조건에 맞는 후보가 모자라 카드를 줄임 - memberId: {}, 조건 수: {}, 후보 {}개 중 모두 맞음 {}개, 카드 {}장",
+                    query.memberId(), rule.requestCount(), candidates.size(),
+                    candidates.stream().filter(rule::matchesAll).count(), picked.size());
+        }
 
         Map<Long, RecipeSummary> summaries = recipeService.findSummaries(
                 picked.stream().map(RecipeCandidate::recipeId).toList());
@@ -254,11 +297,11 @@ public class ChatRecommendationFacade {
         logPicked(query, picked, recipes);
 
         String candidateInfo = RecommendationPromptBuilder.build(
-                content, query, ingredientNames(query), picked, found.keywordsNotFound(), reasons);
+                content, query, ingredientNames(query), picked, found.keywordsNotFound(), reasons, unconditioned);
         // 안내 문장은 AI가 아니라 서버가 소개 맨 앞에 직접 보낸다 (후보가 없으면 정해진 답만 나가므로 붙이지 않는다)
         List<String> notices = picked.isEmpty()
                 ? List.of()
-                : RecommendationPromptBuilder.notices(query, picked, found.keywordsNotFound());
+                : RecommendationPromptBuilder.notices(query, picked, found.keywordsNotFound(), unconditioned);
         return new RecommendationReply(ChatRecommendationsEventResponse.of(recipes), candidateInfo, notices);
     }
 
@@ -267,15 +310,33 @@ public class ChatRecommendationFacade {
      * 고른 후보 레시피 이름에 그 이름이 하나도 없을 때만 돌려준다. 레시피 이름에 있으면 늘린 이름으로 맞은 그대로 둔다.
      */
     static Optional<String> spokenDishWithoutRecipe(String content, RecipeQuery query, List<RecipeCandidate> candidates) {
+        return spokenDishWithoutRecipe(content, query, candidates, keyword -> false);
+    }
+
+    /**
+     * @param isFeature 특징 표현인지 ("시원한 국물"). 특징 표현인 키워드로는 요리 이름을 채우지 않는다
+     */
+    static Optional<String> spokenDishWithoutRecipe(String content, RecipeQuery query, List<RecipeCandidate> candidates,
+                                                    Predicate<String> isFeature) {
         if (query.keywordText() != null || content == null) {
             return Optional.empty();
         }
         String message = compact(content);
         return query.keywords().stream()
                 .filter(keyword -> compact(keyword).length() >= 2 && message.contains(compact(keyword)))
+                .filter(isFeature.negate())
                 .findFirst()
                 .filter(keyword -> candidates.stream()
                         .noneMatch(candidate -> candidate.name() != null && compact(candidate.name()).contains(compact(keyword))));
+    }
+
+    // 맛·온도 낱말과 일반 말로만 된 특징 표현인지 ("시원한 국물", "매운 요리"). "매운탕"·"김치찌개"는 아니다
+    private boolean isFeature(String phrase) {
+        List<String> stems = FeaturePhraseChecker.stems(
+                chatTasteWordProperties.spicy(), chatTasteWordProperties.sweet(), chatTasteWordProperties.salty(),
+                chatTasteWordProperties.umami(), chatTasteWordProperties.mild(),
+                chatTemperatureWordProperties.warm(), chatTemperatureWordProperties.cold());
+        return FeaturePhraseChecker.isFeature(phrase, stems, chatFeatureWordProperties);
     }
 
     /**

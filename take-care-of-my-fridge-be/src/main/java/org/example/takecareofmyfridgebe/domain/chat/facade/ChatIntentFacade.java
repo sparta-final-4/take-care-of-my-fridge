@@ -42,6 +42,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -163,6 +164,16 @@ public class ChatIntentFacade {
         if (result.intent() == ChatIntent.OFF_TOPIC && corrections.offTopicRevive()) {
             result = reviveOffTopic(memberId, sessionId, request.content(), categories, result);
         }
+        // 레시피 자세히인데 물어본 레시피가 이 상담 추천에 없으면, 그 요리 이름으로 새 추천을 한다 (아래 맛·분류 보정을 거치게 여기서 바꾼다)
+        Long detailTarget = null;
+        if (result.intent() == ChatIntent.RECIPE_DETAIL) {
+            detailTarget = findTarget(sessionId, result, context);
+            if (detailTarget == null && result.targetName() != null) {
+                log.info("상담 레시피 자세히 대상이 이 상담 추천에 없어 그 요리로 추천 - memberId: {}, sessionId: {}, 이름: {}",
+                        memberId, sessionId, result.targetName());
+                result = result.withNamed(result.includeIngredients(), List.of(result.targetName()));
+            }
+        }
         // 냉장고 보기 말이면 AI가 추천·일반 대화로 봐도(되살린 것 포함) 냉장고 보기로 바꾼다. 아래 밀키트·이름만 말하기 규칙보다 먼저 본다
         if (corrections.fridgeShopWords()) {
             result = applyFridgeShopWords(memberId, sessionId, request.content(), result);
@@ -199,7 +210,7 @@ public class ChatIntentFacade {
         ChatIntentResolution resolution = switch (result.intent()) {
             case RECOMMEND -> ChatIntentResolution.recommend(Source.AI, toRecipeQuery(memberId, sessionId, request, result));
             case REFINE -> refine(memberId, sessionId, request, result, context);
-            case RECIPE_DETAIL -> recipeDetail(memberId, sessionId, result, context);
+            case RECIPE_DETAIL -> recipeDetail(memberId, sessionId, result, detailTarget);
             case FRIDGE -> ChatIntentResolution.fridge(Source.AI, lookupOf(request.content(), result));
             case SHOP -> ChatIntentResolution.shop(Source.AI, lookupOf(request.content(), result));
             case GENERAL -> mealkitRecommend
@@ -361,7 +372,8 @@ public class ChatIntentFacade {
      *   <li>묻는 말이 없고(AskWordChecker), 공백·끝 문장 부호를 뺀 글이 {@value #NAME_ONLY_MAX_LENGTH}자 이하일 때만 본다</li>
      *   <li>밀키트 단어, 분류 단어(묶음 말 포함), 재료 사전 이름, 레시피 이름 중 하나가 있으면 바꾼다 (앞에서 찾으면 뒤는 보지 않는다).
      *       재료 이름이면 그 재료를 말한 재료로, 레시피 이름이면 그 이름을 요리 이름 키워드로 채운다.
-     *       분류·맛은 추천 조건 보정(correctCategories·correctTastes)이 채운다</li>
+     *       재료·레시피 이름은 요리를 달라는 말("레시피", "만드는 법")을 지우고 찾고, 레시피 이름은 맛 단어 낱말을 뺀 이름으로도 찾는다
+     *       ("매운 닭볶음탕 레시피" → 닭볶음탕). 분류·맛은 추천 조건 보정(correctCategories·correctTastes)이 채운다</li>
      *   <li>인사 말("안녕 밥은?")이 있거나 지난 일을 묻는 말("밥 먹었어?")이면 바꾸지 않는다</li>
      *   <li>"안녕"처럼 음식 말이 없으면 그대로 일반 답이다</li>
      * </ul>
@@ -385,13 +397,16 @@ public class ChatIntentFacade {
                 .stream().anyMatch(stance -> stance.stance() == CategoryWordChecker.Stance.WANT)) {
             found = "분류";
         } else {
-            List<String> ingredients = ingredientNames(List.of(text.split("\\s+")));
+            // "닭볶음탕 레시피"의 "레시피"처럼 요리를 달라는 말은 지우고 찾는다
+            String name = withoutRecipeWords(text);
+            List<String> ingredients = name.isEmpty() ? List.of() : ingredientNames(List.of(name.split("\\s+")));
+            Optional<String> recipeName = ingredients.isEmpty() ? recipeNameIn(name) : Optional.empty();
             if (!ingredients.isEmpty()) {
                 found = "재료";
                 includes = ingredients;
-            } else if (!recipeService.suggestNames(text, 1).isEmpty()) {
+            } else if (recipeName.isPresent()) {
                 found = "레시피 이름";
-                keywords = List.of(text);
+                keywords = List.of(recipeName.get());
             }
         }
         if (found == null) {
@@ -451,6 +466,47 @@ public class ChatIntentFacade {
         log.debug("상담 맛 단어로 맛 조건 바꿈 - memberId: {}, sessionId: {}, AI 원하는 맛: {}, AI 피할 맛: {}, 바꾼 원하는 맛: {}, 바꾼 피할 맛: {}",
                 memberId, sessionId, result.wantedTastes(), result.avoidTastes(), wanted, avoid);
         return result.withTastes(wanted, avoid);
+    }
+
+    // 요리를 달라는 말(ask-words.recipe: 레시피·만드는법…)을 띄어쓰기와 상관없이 지운 글 ("닭볶음탕 만드는 법" → "닭볶음탕")
+    String withoutRecipeWords(String text) {
+        String result = text;
+        for (String word : chatAskWordProperties.recipe()) {
+            String compact = word.replaceAll("\\s+", "");
+            if (compact.isEmpty()) {
+                continue;
+            }
+            String spaced = compact.chars()
+                    .mapToObj(ch -> Pattern.quote(String.valueOf((char) ch)))
+                    .collect(Collectors.joining("\\s*"));
+            result = result.replaceAll(spaced, " ");
+        }
+        return result.replaceAll("\\s+", " ").strip();
+    }
+
+    /**
+     * 레시피 이름을 찾는다: 이름 그대로 → 맛 단어로 시작하는 낱말을 뺀 이름 순 (앞에서 찾으면 뒤는 보지 않는다).
+     * "매운탕"은 그대로 찾고, "매운 닭볶음탕"은 "매운"을 빼고 "닭볶음탕"으로 찾는다 (레시피 검색은 모든 낱말이 이름에 있어야 한다).
+     */
+    private Optional<String> recipeNameIn(String name) {
+        for (String candidate : new LinkedHashSet<>(List.of(name, withoutTasteWords(name)))) {
+            if (!candidate.isEmpty() && !recipeService.suggestNames(candidate, 1).isEmpty()) {
+                return Optional.of(candidate);
+            }
+        }
+        return Optional.empty();
+    }
+
+    // 맛 단어(매운·달달·순한…)로 시작하는 낱말을 뺀 글
+    private String withoutTasteWords(String text) {
+        List<String> tasteWords = Stream.of(chatTasteWordProperties.spicy(), chatTasteWordProperties.sweet(),
+                        chatTasteWordProperties.salty(), chatTasteWordProperties.umami(), chatTasteWordProperties.mild())
+                .flatMap(List::stream)
+                .toList();
+        return Stream.of(text.split("\\s+"))
+                .filter(token -> tasteWords.stream().noneMatch(token::startsWith))
+                .collect(Collectors.joining(" "))
+                .strip();
     }
 
     /**
@@ -696,9 +752,8 @@ public class ChatIntentFacade {
         return removed || !current.isEmpty() ? current : previous;
     }
 
-    // 레시피 자세히. 물어본 레시피를 못 찾으면 일반 답
-    private ChatIntentResolution recipeDetail(Long memberId, Long sessionId, IntentResult result, ChatContext context) {
-        Long recipeId = findTarget(sessionId, result, context);
+    // 레시피 자세히. 이름도 번호도 맞지 않으면 일반 답 (이름만 못 찾았으면 decide에서 그 요리 추천으로 이미 바꿨다)
+    private ChatIntentResolution recipeDetail(Long memberId, Long sessionId, IntentResult result, Long recipeId) {
         if (recipeId == null) {
             log.info("상담 레시피 자세히 대상을 못 찾아 일반 답으로 - memberId: {}, sessionId: {}, 번호: {}, 이름: {}",
                     memberId, sessionId, result.targetIndex(), result.targetName());

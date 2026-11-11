@@ -145,8 +145,14 @@ public class RecipeCandidateFacade {
                 : readNonBasicRows(
                 ranked.candidates().candidates().stream().map(RecipeCandidate::recipeId).toList());
         RecipeCandidates result = RecipeCandidateScorer.withMissingIngredients(ranked.candidates(), fridge, nonBasicRows);
+        // 요청 조건이 있는 추천에서 빈자리를 채울 때 반대 맛·매운 정도를 보도록 후보의 맛을 함께 넘긴다
+        Map<Long, Set<Member.Taste>> candidateTastes = new HashMap<>();
+        for (RecipeCandidate candidate : result.candidates()) {
+            candidateTastes.put(candidate.recipeId(), details.tastes().getOrDefault(candidate.recipeId(), Set.of()));
+        }
         return new RecipeCandidates(result.candidates(), result.fallback(), ranked.query().keywordsNotFound(),
-                ranked.candidates().keptAvoidTastes());
+                ranked.candidates().keptAvoidTastes())
+                .withTasteDetails(candidateTastes, details.spicy().maybe());
     }
 
     /**

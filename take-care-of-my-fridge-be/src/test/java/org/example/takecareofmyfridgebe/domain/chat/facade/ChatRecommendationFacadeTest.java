@@ -83,7 +83,8 @@ class ChatRecommendationFacadeTest {
         saleEventReader = mock(SaleEventReader.class);
         chatMessageService = mock(ChatMessageService.class);
         facade = new ChatRecommendationFacade(recipeCandidateFacade, recipeService, ingredientService, productService,
-                saleEventReader, chatMessageService, MealkitWordCheckerTest.WORDS, TasteWordCheckerTest.WORDS, AllergyWordCheckerTest.WORDS);
+                saleEventReader, chatMessageService, MealkitWordCheckerTest.WORDS, TasteWordCheckerTest.WORDS, AllergyWordCheckerTest.WORDS,
+                ChatIntentFacadeTest.TASTE_OPPOSITES, TemperatureWordCheckerTest.WORDS, FeaturePhraseCheckerTest.WORDS);
         when(ingredientService.getIngredientsByIds(any())).thenReturn(Map.of());
     }
 
@@ -142,6 +143,56 @@ class ChatRecommendationFacadeTest {
         assertThat(recipes.get(1).reason()).doesNotContain("매운 요리예요");
         assertThat(recipes.get(2).reason()).doesNotContain("매운 요리예요");
         assertThat(reply.candidateInfo()).contains(recipes.get(0).reason());
+    }
+
+    @Test
+    @DisplayName("분류와 원하는 맛을 말했는데 둘 다 맞은 후보가 2개뿐이면 다른 분류로 채우지 않고 카드 2장과 후보 수 2개를 넘긴다")
+    void returnsTwoCards_whenOnlyTwoMatchAllConditions() {
+        when(recipeCandidateFacade.findCandidates(any())).thenReturn(new RecipeCandidates(List.of(
+                requested(10L, "꽃게해물탕", "국", 2),
+                requested(20L, "토마토 해물누룽지탕", "국", 2),
+                requested(30L, "오이무침", "무침", 0)), false));
+        when(recipeService.findSummaries(any())).thenReturn(Map.of());
+
+        RecommendationReply reply = facade.recommend("맵고 따뜻한 국물 레시피 추천해줘", new RecipeQuery(MEMBER_ID, List.of(),
+                List.of(Taste.SPICY), List.of("국"), null, null, false, List.of(), null, "따뜻한 국물"));
+
+        assertThat(reply.event().recipes()).extracting(RecommendedRecipe::recipeId).containsExactly(10L, 20L);
+        assertThat(reply.candidateInfo()).contains("후보 수: 2개").doesNotContain("오이무침");
+    }
+
+    @Test
+    @DisplayName("조건에 맞는 후보도 채울 후보도 없으면 0장이 아니라 같은 후보에서 조건 없이 3장을 고르고 맞는 레시피가 없었다고 안내한다")
+    void picksUnconditioned_whenNothingMatches() {
+        when(recipeCandidateFacade.findCandidates(any())).thenReturn(new RecipeCandidates(List.of(
+                requested(10L, "오이무침", "무침", 0),
+                requested(20L, "두부조림", "조림", 0),
+                requested(30L, "버섯볶음", "볶음", 0),
+                requested(40L, "가지구이", "구이", 0)), false));
+        when(recipeService.findSummaries(any())).thenReturn(Map.of());
+
+        RecommendationReply reply = facade.recommend("시원한 국물 요리", new RecipeQuery(MEMBER_ID, List.of(),
+                null, List.of("국"), null, null, false, List.of(), null, "시원한 국물"));
+
+        assertThat(reply.event().recipes()).extracting(RecommendedRecipe::recipeId).containsExactly(10L, 20L, 30L);
+        assertThat(reply.notices())
+                .containsExactly("시원한 국물에 딱 맞는 레시피가 없어서, 냉장고 재료로 만들 수 있는 요리를 골랐어요");
+    }
+
+    @Test
+    @DisplayName("따뜻한 국물을 원하면 분류가 맞은 오이냉국은 빼고, 이름에 냉이가 든 찌개는 남긴다")
+    void removesColdSoup_whenWarmRequested() {
+        when(recipeCandidateFacade.findCandidates(any())).thenReturn(new RecipeCandidates(List.of(
+                requested(10L, "꽃게해물탕", "국", 2),
+                requested(20L, "토마토 해물누룽지탕", "국", 2),
+                requested(30L, "오이냉국", "국", 1),
+                requested(40L, "냉이된장국", "국", 1)), false));
+        when(recipeService.findSummaries(any())).thenReturn(Map.of());
+
+        RecommendationReply reply = facade.recommend("맵고 따뜻한 국물 레시피 추천해줘", new RecipeQuery(MEMBER_ID, List.of(),
+                List.of(Taste.SPICY), List.of("국"), null, null, false, List.of(), null, "따뜻한 국물"));
+
+        assertThat(reply.event().recipes()).extracting(RecommendedRecipe::recipeId).containsExactly(10L, 20L, 40L);
     }
 
     @Test
@@ -344,6 +395,50 @@ class ChatRecommendationFacadeTest {
 
         assertThat(reply.notices()).containsExactly("탕짜면 레시피는 없어서, 비슷한 탕수육과 볶음면을 골랐어요");
         assertThat(reply.event().recipes().get(0).reason()).isEqualTo("탕짜면과 비슷한 탕수육이에요");
+    }
+
+    @Test
+    @DisplayName("특징만 말했으면(시원한 국물) 키워드에 그 말이 있어도 요리 이름으로 채우지 않고, 없다는 안내 없이 원한 특징으로 넘긴다")
+    void skipsNotFoundNotice_whenOnlyFeatureSpoken() {
+        givenKeywordCandidates(keywordCandidate(10L, "오이냉국", "국", "냉국"),
+                keywordCandidate(20L, "미역냉국", "국", "냉국"), keywordCandidate(30L, "다시마냉국", "국", "냉국"));
+        RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, null, null, null, false,
+                List.of("시원한 국물", "냉국"), null, "시원한 국물");
+
+        RecommendationReply reply = facade.recommend("시원한 국물 요리", query);
+
+        assertThat(reply.notices()).isEmpty();
+        assertThat(reply.candidateInfo()).contains("사용자가 원한 특징: 시원한 국물")
+                .doesNotContain("없어서", "찾지 못해서", "[이미 안내한 말]");
+        assertThat(reply.event().recipes().get(0).reason()).doesNotContain("시원한 국물과 비슷한");
+    }
+
+    @Test
+    @DisplayName("AI가 특징 표현(시원한 국물)을 요리 이름으로 줘도 비우고 없다는 안내를 붙이지 않는다")
+    void clearsFeatureDishText() {
+        givenKeywordCandidates(keywordCandidate(10L, "오이냉국", "국", "냉국"));
+        RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, null, null, null, false,
+                List.of("시원한 국물", "냉국"), "시원한 국물", "시원한 국물");
+
+        RecommendationReply reply = facade.recommend("시원한 국물 요리", query);
+
+        assertThat(reply.notices()).isEmpty();
+        verify(recipeCandidateFacade).findCandidates(argThat(sent -> sent.keywordText() == null));
+    }
+
+    @Test
+    @DisplayName("요리 이름(닭볶음탕)을 말했는데 키워드로 맞은 레시피가 없으면 지금처럼 못 찾았다는 안내를 붙인다")
+    void keepsNotFoundNotice_whenDishSpoken() {
+        // 요리 이름은 못 찾았지만 다른 요청(분류 등)에는 맞은 후보
+        when(recipeCandidateFacade.findCandidates(any())).thenReturn(new RecipeCandidates(List.of(
+                requested(10L, "닭조림", "조림", 1)), true, true));
+        when(recipeService.findSummaries(any())).thenReturn(Map.of());
+        RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, null, null, null, false,
+                List.of("닭볶음탕"), "닭볶음탕", "매운 닭볶음탕");
+
+        RecommendationReply reply = facade.recommend("매운 닭볶음탕 레시피", query);
+
+        assertThat(reply.notices()).containsExactly("말씀하신 닭볶음탕은 찾지 못해서 비슷한 걸 골랐어요");
     }
 
     @Test
@@ -665,5 +760,10 @@ class ChatRecommendationFacadeTest {
 
     private static Reason reason(List<Taste> tastes) {
         return new Reason(List.of(), List.of(), tastes, List.of(), List.of(), false, false, List.of(), List.of(), List.of(), null);
+    }
+
+    // 요청 일치 수만 정한 후보
+    private static RecipeCandidate requested(Long id, String name, String category, int requestMatches) {
+        return new RecipeCandidate(id, name, category, 20, new Ranking(requestMatches, 0, 0, 0, 1, 1, 0), reason(List.of()));
     }
 }

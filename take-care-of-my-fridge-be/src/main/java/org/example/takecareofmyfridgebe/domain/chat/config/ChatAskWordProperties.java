@@ -13,6 +13,8 @@ import java.util.List;
  * @param request        달라는 말 ("밀키트 추천해줘", "뭐 있어", "먹고 싶어")
  * @param mealkitRequest 밀키트와 같이 있을 때만 달라는 말로 보는 말 ("국물 밀키트 있어?", "밀키트 뭐가 좋아?")
  * @param greeting       인사 말 ("안녕", "고마워"). 있으면 이름만 말한 짧은 말이어도 추천으로 바꾸지 않는다 ("안녕 밥은?")
+ * @param recipe         요리 이름에 붙어 그 요리를 보여 달라는 말 ("닭볶음탕 레시피", "잡채 만드는 법"). 이름만 말한 말에서 레시피 이름을
+ *                       찾기 전에 지운다 (맛 단어도 같이 지운다)
  */
 @ConfigurationProperties(prefix = "app.chat.ask-words")
 public record ChatAskWordProperties(
@@ -24,6 +26,8 @@ public record ChatAskWordProperties(
         @DefaultValue({"있어", "있나", "있을까", "없어", "뭐가좋아", "살만한"})
         List<String> mealkitRequest,
         @DefaultValue({"안녕", "반가워", "반갑", "고마워", "고맙", "감사", "잘지내", "잘자", "좋은아침"})
-        List<String> greeting
+        List<String> greeting,
+        @DefaultValue({"레시피", "만드는법", "만들기", "요리법", "조리법"})
+        List<String> recipe
 ) {
 }
