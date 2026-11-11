@@ -25,10 +25,9 @@
   - 부족한 재료를 장바구니에 담아 바로 주문하고, 신뢰할 수 있는 결제·환불·정산 경험 제공하기
   - 관리자를 위한 머신러닝(PyTorch) 판매량 예측 모델과 데이터 기반 할인 행사 추천 체계 구축
 - **진행 기간**: 2026년 10월 ~ 2026년 11월 (4주)
-- **서비스 배포 및 문서 링크**:
+- **서비스 배포**:
   - 🌐 **웹 서비스 (Dev)**: [https://dev.imhungry.click](https://dev.imhungry.click)
   - ⚙️ **API 서버 (Dev)**: [https://api-dev.imhungry.click](https://api-dev.imhungry.click)
-  - 📑 **Swagger API 명세**: [https://api-dev.imhungry.click/swagger-ui/index.html](https://api-dev.imhungry.click/swagger-ui/index.html)
 
 <br/>
 
@@ -73,7 +72,7 @@
   - 추천받은 레시피를 직접 만들어 보고 요리 완료 기록과 함께 생생한 후기와 별점을 남깁니다.
   - 누적된 수많은 후기는 AI가 핵심 장단점만 쏙 뽑아 짧은 팁으로 요약하여 레시피 상세 화면에 보여줍니다.
 - **인기 레시피 통계**
-  - 회원들이 가장 많이 만들어 본 인기 레시피 순위와 요리 통계를 실시간으로 집계해 제공합니다.
+  - 회원들이 가장 많이 만들어 본 인기 레시피 순위와 요리 통계를 집계해 제공합니다.
 - 📖 [요리 기록 & 후기 상세 Wiki](https://github.com/sparta-final-4/take-care-of-my-fridge/wiki/Cooking-Review) *(관련 문서: [요리 API](docs/api/cooking-api.md) · [후기 API](docs/api/review-api.md))*
 
 ### 💳 5. 부족한 재료는 장바구니로, 결제부터 환불까지 안전하게!
@@ -147,10 +146,10 @@ flowchart TD
     end
 
     subgraph AWS["☁️ AWS Cloud Infrastructure"]
-        subgraph CDN["CDN & Storage"]
-            CF["AWS CloudFront"]
+        CF["AWS CloudFront (CDN & Unified Domain)"]
+
+        subgraph Storage["Storage"]
             S3["AWS S3 (FE Hosting)"]
-            CF --> S3
         end
 
         subgraph Server["AWS EC2 (t4g.small / Ubuntu arm64)"]
@@ -164,28 +163,34 @@ flowchart TD
     end
 
     subgraph DataStores["💾 Data & Messaging Platform"]
-        MySQL[("MySQL 8.4<br/>(Transactional RDBMS)")]
-        Redis[("Redis 7<br/>(Cache & Redisson Lock)")]
-        ES[("Elasticsearch 9.2<br/>(Nori 형태소 & kNN)")]
-        Kafka["Apache Kafka 3.8<br/>(Event Streaming Broker)"]
+        MySQL[("MySQL 8.4<br/>Transactional RDBMS")]
+        Redis[("Redis 7<br/>Cache & Redisson Lock")]
+        ES[("Elasticsearch 9.2<br/>Nori 형태소 & kNN")]
+        Kafka["Apache Kafka 3.8<br/>Event Streaming Broker"]
     end
 
     subgraph External["🌐 External Services"]
-        OpenAI["OpenAI API<br/>(GPT Intent & Summary)"]
-        PortOne["PortOne Payment Gateway<br/>(결제 승인 & Webhook)"]
+        OpenAI["OpenAI API<br/>GPT Intent & Summary"]
+        PortOne["PortOne Payment Gateway<br/>결제 승인 & Webhook"]
     end
 
+    %% Client Routing
     Browser -->|HTTPS| CF
-    Browser -->|REST API & SSE / HTTPS| ReverseProxy
     
+    %% CloudFront Origins
+    CF -->|"Default Behavior /*"| S3
+    CF -->|"API Behavior /api/* & SSE"| ReverseProxy
+    
+    %% Application Connections
     App --> MySQL
     App --> Redis
     App --> ES
     App <--> Kafka
     
-    App -->|Prompt & Stream| OpenAI
-    App <-->|Payment Verification| PortOne
-    Browser -.->|PG 결제창 호출| PortOne
+    %% External Connections
+    App -->|"Prompt & Stream"| OpenAI
+    App <-->|"Payment Verification"| PortOne
+    Browser -.->|"PG 결제창 호출"| PortOne
 ```
 
 ### 📊 데이터베이스 모델링 (ERD)
@@ -268,80 +273,17 @@ take-care-of-my-fridge/
 
 <br/>
 
-## 6. 핵심 흐름 (시퀀스 다이어그램)
-
-### 🛒 1. 주문 생성부터 PortOne 결제 확정까지
-사용자가 장바구니에서 상품을 주문하고, 외부 PG 결제 완료 후 웹훅을 통해 결제가 안전하게 확정되는 흐름입니다.
-
-```mermaid
-sequenceDiagram
-    autonumber
-    actor User as 사용자
-    participant Front as 프론트엔드
-    participant Order as OrderFacade/Service
-    participant PG as PortOne 결제창
-    participant Webhook as PaymentWebhook
-    participant Payment as PaymentFacade/Service
-    participant Kafka as Kafka (payment-completed)
-
-    User->>Front: 1. 주문서 작성 및 결제 요청
-    Front->>Order: POST /api/orders (주문 생성)
-    Order->>Order: 가격 스냅샷 생성 & 재고/행사 조건 검증
-    Order-->>Front: 주문 생성 완료 (orderId, 결제 준비 정보)
-    
-    Front->>PG: PortOne SDK 결제창 호출 및 결제 진행
-    PG-->>User: 결제 완료 안내
-    PG->>Webhook: POST /api/webhooks/portone (결제 승인 웹훅 전송)
-    
-    Webhook->>Payment: 웹훅 서명 검증 & 결제 확정 위임
-    Payment->>Payment: 멱등성 검증 (중복 결제 여부 확인)
-    Payment->>Payment: 결제 원장(payment_history) 기록 & 상태 완료 처리
-    Payment-->>Webhook: 200 OK
-    Payment->>Kafka: 결제 완료 도메인 이벤트 발행
-```
 
 <br/>
 
-### 📦 2. 구매 확정부터 냉장고 자동 입고까지
-주문이 구매 확정(수동 확정 또는 결제 7일 후 자동 확정)되었을 때, Kafka 이벤트를 통해 표준 재료로 변환되어 냉장고에 자동 입고되는 흐름입니다.
-
-```mermaid
-sequenceDiagram
-    autonumber
-    actor User as 사용자 (또는 배치 스케줄러)
-    participant Order as OrderStatusService
-    participant Kafka as Kafka (purchase-confirmed)
-    participant Consumer as PurchaseConfirmedConsumer
-    participant Fridge as FridgeFacade/Service
-    participant DB as MySQL DB
-
-    User->>Order: 구매 확정 요청 (또는 결제 7일 경과 자동 확정)
-    Order->>DB: 주문 상태를 PURCHASE_CONFIRMED로 갱신
-    Order->>Kafka: purchase-confirmed 이벤트 발행 (orderItemId, productId, 수량)
-    
-    Kafka->>Consumer: 이벤트 수신
-    Consumer->>Fridge: stockPurchasedItems(items) 호출
-    Fridge->>DB: getStockedOrderItemIds() 조회 (이미 입고된 주문 상품인지 멱등성 체크)
-    alt 이미 입고된 주문 상품인 경우
-        Fridge-->>Consumer: 입고 생략 (중복 입고 차단)
-    else 신규 입고 상품인 경우
-        Fridge->>DB: 상품 상세(보관 방법, 권장 일수, 표준 재료 ID) 조회
-        Fridge->>Fridge: 소비기한 계산 (확정일 + 권장 보관일수) 및 표준 재료 변환
-        Fridge->>DB: 냉장고(fridge) 테이블에 입고 데이터 저장
-        Fridge->>DB: 입고 이력 테이블에 order_item_id 기록
-    end
-```
-
-<br/>
-
-## 7. 기술적 고민과 해결
+## 6. 기술적 고민과 해결
 
 | # | 문제 상황 | 기술적 해결 방안 | 결과 (개선 수치) | 관련 상세 문서 |
 |---|---|---|---|---|
 
 <br/>
 
-## 8. 실행 방법
+## 7. 실행 방법
 
 ### 1) 요구 환경
 - **Docker & Docker Compose** (MySQL, Redis, Elasticsearch, Kafka 구동)
@@ -416,9 +358,9 @@ pnpm dev
 
 <br/>
 
-## 9. CI/CD
+## 8. CI/CD
 
-> **"GitHub Actions를 기반으로 Pull Request 단위 정적 분석·단위 테스트·OpenAPI 명세 정합성 검사를 자동 실행하며, `dev` 브랜치 병합 시 AWS EC2 App 서버(SSM + Docker Compose)와 S3/CloudFront로 무중단 자동 배포합니다."**
+> **"GitHub Actions를 기반으로 Pull Request 단위 정적 분석·단위 테스트·OpenAPI 명세 정합성 검사를 자동 실행하며, `dev` 브랜치 병합 시 AWS EC2 App 서버(SSM + Docker Compose)와 S3/CloudFront로 자동 배포합니다."**
 
 - **CI 파이프라인**:
   - **백엔드 (`be-ci.yml`)**: `./gradlew check`를 통해 Java 17 컴파일, Checkstyle, 단위/통합 테스트 자동 수행
@@ -431,7 +373,7 @@ pnpm dev
 
 <br/>
 
-## 10. 팀원과 역할
+## 9. 팀원과 역할
 
 | 이름 | GitHub 프로필 | 담당 역할 및 도메인 |
 |:---:|:---:|---|
