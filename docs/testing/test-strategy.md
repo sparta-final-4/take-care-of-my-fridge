@@ -1,6 +1,6 @@
 # 테스트 전략
 
-상태: 계획 · 테스트 코드·실행 결과 없음 · 근거: S1, S4, S5
+상태: 사용 중 · 테스트 코드는 take-care-of-my-fridge-be/src/test, take-care-of-my-fridge-fe/src · 근거: S1, S4, S5
 
 ## 검증 범위
 

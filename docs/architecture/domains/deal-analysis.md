@@ -1,6 +1,6 @@
 # 할인 후보 설계
 
-상태: 구현 완료 · 담당: cookiez · 관련 화면: A-06 · API: [할인 후보 API 명세](../../api/deal-analysis-api.md)
+상태: 구현 완료 · 담당: 이현정 · 관련 화면: A-06 · API: [할인 후보 API 명세](../../api/deal-analysis-api.md)
 
 ## 목적과 책임
 

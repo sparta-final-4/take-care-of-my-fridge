@@ -1,6 +1,6 @@
 # 할인 후보 API 명세
 
-상태: 구현 완료 · 담당: cookiez · 공통 규칙: [API 계약](api-spec.md#공통-규칙) · 자세한 동작: [할인 후보 설계](../architecture/domains/deal-analysis.md)
+상태: 구현 완료 · 담당: 이현정 · 공통 규칙: [API 계약](api-spec.md#공통-규칙) · 자세한 동작: [할인 후보 설계](../architecture/domains/deal-analysis.md)
 
 공통 응답·오류 코드·페이지·날짜 형식은 [공통 규칙](api-spec.md#공통-규칙)을 따릅니다. 이 문서의 경로는 `/api`를 뺀 값이고, 오류 표에는 공통 오류(401 `A003`, 403 `A004`, 400 `C001`)를 빼고 이 API만의 오류를 적습니다. 모든 API는 ADMIN 전용입니다. 이 API들은 상품 가격을 바꾸지 않습니다.
 

@@ -1,6 +1,6 @@
 # 회원·인증·관리자 API 명세
 
-상태: 구현 완료 · 담당: cookiez · 공통 규칙: [API 계약](api-spec.md#공통-규칙) · 자세한 동작: [회원 설계](../architecture/domains/member.md)
+상태: 구현 완료 · 담당: 이현정 · 공통 규칙: [API 계약](api-spec.md#공통-규칙) · 자세한 동작: [회원 설계](../architecture/domains/member.md)
 
 공통 응답·오류 코드·페이지·날짜 형식은 [공통 규칙](api-spec.md#공통-규칙)을 따릅니다. 이 문서의 경로는 `/api`를 뺀 값이고, 오류 표에는 공통 오류(401 `A003`, 400 `C001`)를 빼고 이 API만의 오류를 적습니다. 관리자 API(`/admin/**`)는 USER가 부르면 403 `A004`입니다.
 

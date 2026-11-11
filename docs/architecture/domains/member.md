@@ -1,6 +1,6 @@
 # 회원 도메인 설계
 
-상태: 구현 완료 · 담당: cookiez · 관련 화면: U-01~U-05, A-09, A-10 · API: [회원·인증·관리자 API 명세](../../api/member-auth-admin-api.md)
+상태: 구현 완료 · 담당: 이현정 · 관련 화면: U-01~U-05, A-09, A-10 · API: [회원·인증·관리자 API 명세](../../api/member-auth-admin-api.md)
 
 ## 목적과 책임
 
