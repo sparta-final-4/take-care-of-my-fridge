@@ -177,6 +177,11 @@ portone:
 
 springdoc:
   writer-with-order-by-keys: true
+  # Swagger UI의 Try it out 요청에 XSRF-TOKEN 쿠키 값을 X-XSRF-TOKEN 헤더로 붙인다(SecurityConfig의 csrf.spa()와 같은 이름).
+  # 로그인 후 POST/PUT/PATCH/DELETE를 Swagger에서 실행할 수 있게 한다. CSRF 검사 자체는 그대로 유지된다.
+  swagger-ui:
+    csrf:
+      enabled: true
 
 # 주간 판매 예측 워커(forecast_model). 로컬은 루트 docker-compose가 8091 포트를 연다.
 forecast:
