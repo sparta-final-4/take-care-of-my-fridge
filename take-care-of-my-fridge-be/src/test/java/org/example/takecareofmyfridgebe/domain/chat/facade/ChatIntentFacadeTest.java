@@ -479,17 +479,56 @@ class ChatIntentFacadeTest {
         }
 
         @Test
-        @DisplayName("분류 이름·묶음 말은 \"요리·메뉴\"가 붙어도 분류로 보고, 다른 말이 붙은 요리 이름은 분류로 보지 않는다")
+        @DisplayName("분류 이름·묶음 말은 \"요리·메뉴\"가 붙어도 그 분류(묶음 말은 목록에 있는 분류들)이고, 다른 말이 붙은 요리 이름은 분류가 아니다")
         void judgesCategoryWord() {
             IntentCorrector corrector = newCorrector(ChatCorrectionProperties.ALL_ON);
             List<String> categories = List.of("국", "디저트", "찌개", "면류");
 
-            for (String word : List.of("디저트", "디저트 메뉴", "국물 요리", "국물", "면", "찌개 종류")) {
-                assertThat(corrector.categoryWord(word, categories)).as(word).isTrue();
+            for (String word : List.of("디저트", "디저트 메뉴", "디저트 종류")) {
+                assertThat(corrector.categoriesOf(word, categories)).as(word).contains(List.of("디저트"));
             }
+            for (String word : List.of("국물 요리", "국물")) {
+                assertThat(corrector.categoriesOf(word, categories)).as(word).contains(List.of("국", "찌개"));
+            }
+            assertThat(corrector.categoriesOf("면", categories)).contains(List.of("면류"));
             for (String word : List.of("김치찌개", "국수", "매운 국", "디저트 케이크", "요리", "푸딩")) {
-                assertThat(corrector.categoryWord(word, categories)).as(word).isFalse();
+                assertThat(corrector.categoriesOf(word, categories)).as(word).isEmpty();
             }
+        }
+
+        @Test
+        @DisplayName("\"차가운 요리\"에서 AI가 키워드에 분류 이름 샐러드를 넣으면 키워드에서 빼고 분류로 옮긴다")
+        void movesCategoryKeywordToCategories() {
+            givenExtracted(new IntentResult(ChatIntent.RECOMMEND, null, List.of(), null, null, null, null,
+                    List.of("샐러드", "냉채", "냉국"), null, "차가운 요리"));
+
+            RecipeQuery query = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("차가운 요리 추천해줘")).recipeQuery();
+
+            assertThat(query.moodCategories()).containsExactly("샐러드");
+            assertThat(query.keywords()).containsExactly("냉채", "냉국");
+            assertThat(query.keywordText()).isNull();
+        }
+
+        @Test
+        @DisplayName("묶음 말 키워드(국물)는 묶음의 분류로 옮기고, 이번 말에서 피하는 분류(\"디저트 말고\")인 키워드는 옮기지 않고 뺀다")
+        void movesGroupKeyword_butNotAvoidedCategory() {
+            when(recipeService.getClassifications())
+                    .thenReturn(new RecipeClassificationResponse(List.of("한식"), List.of("국", "디저트", "찌개", "볶음")));
+            givenExtracted(new IntentResult(ChatIntent.RECOMMEND, null, List.of("찌개"), null, null, null, null,
+                    List.of("국물", "김치찌개"), null, null));
+            RecipeQuery grouped = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("김치찌개 같은 거 추천해줘"))
+                    .recipeQuery();
+
+            assertThat(grouped.moodCategories()).containsExactly("찌개", "국");
+            assertThat(grouped.keywords()).containsExactly("김치찌개");
+
+            givenExtracted(new IntentResult(ChatIntent.RECOMMEND, null, List.of(), null, null, null, null,
+                    List.of("디저트", "볶음밥"), null, null));
+            RecipeQuery avoided = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("디저트 말고 볶음밥 같은 거"))
+                    .recipeQuery();
+
+            assertThat(avoided.moodCategories()).isEmpty();
+            assertThat(avoided.keywords()).containsExactly("볶음밥");
         }
 
         @Test

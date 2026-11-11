@@ -42,7 +42,7 @@ import java.util.stream.Stream;
  *   <li>냉장고 보기·사기 말 (fridgeShopWords): 의도를 FRIDGE·SHOP·RECOMMEND·GENERAL로. 4·5보다 먼저</li>
  *   <li>밀키트 요청 (mealkitRequest): 일반 답이지만 밀키트를 달라는 말이면 추천으로 표시 (의도는 GENERAL 그대로)</li>
  *   <li>이름만 말하기 (nameOnly): 일반 답인 짧은 이름 → 추천 (4가 아닐 때)</li>
- *   <li>분류 이름 빼기: 분류 이름·묶음 말인 키워드·요리 이름을 뺌 (추천·다시 추천·밀키트 추천)</li>
+ *   <li>분류 키워드 옮기기 (moveCategoryKeywords): 분류 이름·묶음 말인 키워드는 분류로 옮기고, 요리 이름이면 뺌 (추천·다시 추천·밀키트 추천)</li>
  *   <li>요리 이름 (dishFromKeywords): 첫 키워드가 메시지에 있으면 요리 이름 (추천·다시 추천·밀키트 추천)</li>
  *   <li>다른 맛 지키기 (keepOtherTastes): 피하는 맛만 말했으면 뺄 조건 TASTE를 지움</li>
  *   <li>맛 단어 (tasteWords): 원하는 맛·피할 맛</li>
@@ -123,8 +123,8 @@ public class IntentCorrector {
         }
         // 맛·분류 단어로 조건을 고치는 것은 추천·다시 추천일 때만 한다. 일반 답·레시피 자세히는 AI 결과를 그대로 쓴다
         if (result.intent() == ChatIntent.RECOMMEND || result.intent() == ChatIntent.REFINE || mealkitRecommend) {
-            // 분류 이름·묶음 말("디저트", "국물")은 키워드·요리 이름이 아니다. 요리 이름을 정하기 전에 뺀다
-            result = withoutCategoryNames(memberId, sessionId, categories, result);
+            // 분류 이름·묶음 말("디저트", "국물")은 키워드·요리 이름이 아니라 분류다. 요리 이름을 정하기 전에 옮긴다
+            result = moveCategoryKeywords(memberId, sessionId, message, categories, result);
             // 요리 이름은 AI가 아니라 서버가 정한다 (첫 키워드가 메시지에 그대로 있을 때만)
             if (corrections.dishFromKeywords()) {
                 result = result.withDishFromKeywords(message);
@@ -147,30 +147,51 @@ public class IntentCorrector {
     }
 
     /**
-     * 분류 이름·묶음 말인 키워드와 요리 이름을 뺀다 ("디저트 추천해줘"의 키워드 [디저트, 푸딩] → [푸딩], "국물" → 키워드 없음).
-     * 분류는 분류 조건(분류 단어 보정)으로만 쓴다. 키워드에 남으면 요리 이름이 되어 "디저트 레시피는 없어서…" 안내가 붙는다.
-     * "이 말이 분류·묶음 말인지"는 {@link #categoryWord}에서만 본다. 뺐으면 INFO로 남긴다.
+     * 분류 이름·묶음 말인 키워드는 키워드에서 빼고 분류로 옮긴다. 요리 이름이 분류 이름·묶음 말이면 뺀다.
+     * <ul>
+     *   <li>"차가운 요리"의 키워드 [샐러드, 냉채, 냉국] → 키워드 [냉채, 냉국], 분류에 샐러드를 더함 (이미 있으면 그대로)</li>
+     *   <li>묶음 말("국물", "반찬")은 묶음의 분류(분류 목록에 있는 것)로 옮긴다</li>
+     *   <li>이번 말에서 피하는 분류("디저트 말고")는 옮기지 않고 빼기만 한다 (CategoryWordChecker)</li>
+     * </ul>
+     * 분류는 분류 조건으로만 쓴다. 키워드에 남으면 요리 이름이 되어 "디저트 레시피는 없어서…" 안내가 붙는다.
+     * "이 말이 분류·묶음 말인지"는 {@link #categoriesOf}에서만 본다. 바꿨으면 INFO로 남긴다.
      */
-    IntentResult withoutCategoryNames(Long memberId, Long sessionId, List<String> categories, IntentResult result) {
+    IntentResult moveCategoryKeywords(Long memberId, Long sessionId, String message, List<String> categories, IntentResult result) {
         List<String> keywords = orEmpty(result.keywords());
-        List<String> kept = keywords.stream().filter(keyword -> !categoryWord(keyword, categories)).toList();
-        String dishText = result.dishText() != null && categoryWord(result.dishText(), categories) ? null : result.dishText();
-        if (kept.size() == keywords.size() && Objects.equals(dishText, result.dishText())) {
+        List<String> aiCategories = orEmpty(result.moodCategories());
+        List<String> kept = new ArrayList<>();
+        List<String> moved = new ArrayList<>(aiCategories);
+        Set<String> avoided = CategoryWordChecker.check(message, categories, chatTasteWordProperties, chatCategoryWordProperties.groups())
+                .stream()
+                .filter(stance -> stance.stance() == CategoryWordChecker.Stance.AVOID)
+                .map(CategoryWordChecker.CategoryStance::category)
+                .collect(Collectors.toSet());
+        for (String keyword : keywords) {
+            Optional<List<String>> mapped = categoriesOf(keyword, categories);
+            if (mapped.isEmpty()) {
+                kept.add(keyword);
+                continue;
+            }
+            mapped.get().stream().filter(category -> !avoided.contains(category)).forEach(category -> addOnce(moved, category));
+        }
+        String dishText = result.dishText() != null && categoriesOf(result.dishText(), categories).isPresent() ? null : result.dishText();
+        if (kept.size() == keywords.size() && moved.size() == aiCategories.size() && Objects.equals(dishText, result.dishText())) {
             return result;
         }
-        log.info("상담 분류 이름은 키워드·요리 이름에서 뺌 - memberId: {}, sessionId: {}, 키워드: {} → {}, 요리 이름: {} → {}",
-                memberId, sessionId, keywords, kept, result.dishText(), dishText);
-        return result.withCategories(result.moodCategories(), result.keywords() == null ? null : kept, dishText,
-                result.removed());
+        log.info("상담 분류 이름 키워드를 분류로 옮김 - memberId: {}, sessionId: {}, 키워드: {} → {}, 분류: {} → {}, 요리 이름: {} → {}",
+                memberId, sessionId, keywords, kept, aiCategories, moved, result.dishText(), dishText);
+        return result.withCategories(result.moodCategories() == null && moved.isEmpty() ? null : moved,
+                result.keywords() == null ? null : kept, dishText, result.removed());
     }
 
     /**
-     * 분류 이름(categories)이나 묶음 말(app.chat.category-words: 국물·반찬·간식…)인지. 공백을 빼고 비교하고,
-     * 뒤에 붙은 "요리·메뉴·종류"는 떼고 본다 ("디저트 메뉴", "국물 요리"). "김치찌개"·"국수"·"매운 국"처럼 다른 말이 붙으면 아니다.
+     * 분류 이름(categories)이나 묶음 말(app.chat.category-words: 국물·반찬·간식…)이면 그 말이 뜻하는 분류(분류 목록에 있는 것만),
+     * 아니면 비어 있음. 공백을 빼고 비교하고, 뒤에 붙은 "요리·메뉴·종류"는 떼고 본다 ("디저트 메뉴", "국물 요리").
+     * "김치찌개"·"국수"·"매운 국"처럼 다른 말이 붙으면 분류가 아니다.
      */
-    boolean categoryWord(String phrase, List<String> categories) {
+    Optional<List<String>> categoriesOf(String phrase, List<String> categories) {
         if (phrase == null) {
-            return false;
+            return Optional.empty();
         }
         String compact = compact(phrase);
         for (String suffix : CATEGORY_SUFFIXES) {
@@ -180,12 +201,14 @@ public class IntentCorrector {
             }
         }
         String name = compact;
-        return categories.stream().map(IntentCorrector::compact).anyMatch(name::equals)
-                || chatCategoryWordProperties.groups().stream()
-                .map(ChatCategoryWordProperties.Group::word)
-                .filter(Objects::nonNull)
-                .map(IntentCorrector::compact)
-                .anyMatch(name::equals);
+        Optional<String> category = categories.stream().filter(value -> compact(value).equals(name)).findFirst();
+        if (category.isPresent()) {
+            return Optional.of(List.of(category.get()));
+        }
+        return chatCategoryWordProperties.groups().stream()
+                .filter(group -> group.word() != null && compact(group.word()).equals(name))
+                .findFirst()
+                .map(group -> group.categories().stream().filter(categories::contains).toList());
     }
 
     /**
