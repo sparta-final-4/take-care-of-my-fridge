@@ -1,6 +1,6 @@
 # 데이터베이스 설계 규칙
 
-> **데이터베이스 기준 스키마**: [docs/database/schema.sql](../database/schema.sql)  
+> **스키마 기준**: 실제 테이블은 JPA 엔티티가 만듭니다(`ddl-auto`). [docs/database/schema.sql](../database/schema.sql)은 dev DB에 맞춰 옮겨 적은 DDL입니다.  
 > 프로젝트의 모든 RDBMS(MySQL 8.4) 테이블 및 컬럼 설계 시 반드시 준수해야 하는 공통 도메인 규칙입니다.
 
 ---
@@ -36,7 +36,7 @@
 
 ---
 
-### 5. 공통 컬럼 규칙 (`BaseEntity`)
+### 5. 공통 컬럼 규칙 (`BaseTimeEntity`)
 
 - **컬럼 구성:** 모든 테이블에 `created_at`(생성일시)과 `updated_at`(수정일시)을 필수로 포함합니다.
 - **데이터 타입:** 마이크로초 단위까지 정확하게 기록하기 위해 `DATETIME(6)`을 사용합니다.
