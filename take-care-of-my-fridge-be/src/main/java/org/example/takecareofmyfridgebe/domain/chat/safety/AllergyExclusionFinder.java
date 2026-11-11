@@ -1,4 +1,4 @@
-package org.example.takecareofmyfridgebe.domain.chat.facade;
+package org.example.takecareofmyfridgebe.domain.chat.safety;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

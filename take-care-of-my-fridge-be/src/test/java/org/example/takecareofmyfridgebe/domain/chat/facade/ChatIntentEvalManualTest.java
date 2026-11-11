@@ -25,6 +25,8 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.LastRecommendation;
 import org.example.takecareofmyfridgebe.domain.chat.dto.LastRecommendation.QuerySnapshot;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeQuery;
 import org.example.takecareofmyfridgebe.domain.chat.intent.IntentCorrector;
+import org.example.takecareofmyfridgebe.domain.chat.safety.AllergyExclusionFinder;
+import org.example.takecareofmyfridgebe.domain.chat.safety.SafetyWordChecker;
 import org.example.takecareofmyfridgebe.domain.chat.service.ChatIntentExtractor;
 import org.example.takecareofmyfridgebe.domain.chat.service.ChatMessageService;
 import org.example.takecareofmyfridgebe.domain.chat.service.OpenAiChatIntentExtractor;

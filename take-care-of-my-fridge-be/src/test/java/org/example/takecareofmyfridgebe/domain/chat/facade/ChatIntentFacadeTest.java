@@ -30,6 +30,7 @@ import org.example.takecareofmyfridgebe.domain.chat.intent.FridgeShopWordChecker
 import org.example.takecareofmyfridgebe.domain.chat.intent.IntentCorrector;
 import org.example.takecareofmyfridgebe.domain.chat.intent.MealkitWordCheckerTest;
 import org.example.takecareofmyfridgebe.domain.chat.intent.TasteWordCheckerTest;
+import org.example.takecareofmyfridgebe.domain.chat.safety.AllergyExclusionFinder;
 import org.example.takecareofmyfridgebe.domain.chat.service.ChatIntentExtractor;
 import org.example.takecareofmyfridgebe.domain.chat.service.ChatMessageService;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.Ingredient;

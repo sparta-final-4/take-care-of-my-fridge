@@ -1,4 +1,4 @@
-package org.example.takecareofmyfridgebe.domain.chat.facade;
+package org.example.takecareofmyfridgebe.domain.chat.safety;
 
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatAllergyWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatAllergyWordProperties.NotSameKind;
@@ -9,7 +9,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class AllergyWordCheckerTest {
+public class AllergyWordCheckerTest {
 
     // config/chat-safety.yml app.chat.allergy-words와 같은 목록
     public static final ChatAllergyWordProperties WORDS = new ChatAllergyWordProperties(

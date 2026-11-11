@@ -1,4 +1,4 @@
-package org.example.takecareofmyfridgebe.domain.chat.facade;
+package org.example.takecareofmyfridgebe.domain.chat.safety;
 
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatAllergyWordProperties;
 
