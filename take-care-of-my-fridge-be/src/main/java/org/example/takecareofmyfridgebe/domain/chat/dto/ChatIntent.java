@@ -6,7 +6,7 @@ package org.example.takecareofmyfridgebe.domain.chat.dto;
  * REFINE·RECIPE_DETAIL은 직전 추천이 있을 때만 쓴다 (의도 판단에 [직전 추천]을 넘긴 경우).
  * FRIDGE는 냉장고 데이터로, SHOP은 판매 상품으로 서버가 카드와 문장을 만들어 답한다 (답 생성 AI 없음).
  * OFF_TOPIC·BLOCKED·SELF_HARM은 답 생성 AI 없이 서버 안내로 답한다. 의도 판단 AI를 썼으므로 하루 횟수는 센다.
- * BLOCKED·SELF_HARM은 서버 단어 목록(app.chat.safety-words)에 없지만 AI가 그렇게 본 말이다. 보낸 말과 안내 답을 걸러진 메시지(filtered)로 저장한다.
+ * BLOCKED·SELF_HARM은 서버 단어 목록(app.chat.safety.words)에 없지만 AI가 그렇게 본 말이다. 보낸 말과 안내 답을 걸러진 메시지(filtered)로 저장한다.
  */
 public enum ChatIntent {
     RECOMMEND,

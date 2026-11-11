@@ -1,6 +1,6 @@
 package org.example.takecareofmyfridgebe.domain.chat.safety;
 
-import org.example.takecareofmyfridgebe.domain.chat.config.ChatSafetyWordProperties;
+import org.example.takecareofmyfridgebe.domain.chat.config.ChatSafetyProperties;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatSafetyBlock;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -9,10 +9,10 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class SafetyWordCheckerTest {
+public class SafetyWordCheckerTest {
 
-    // config/chat-safety.yml app.chat.safety-words와 같은 목록
-    static final ChatSafetyWordProperties WORDS = new ChatSafetyWordProperties(
+    // config/chat-safety.yml app.chat.safety.words와 같은 목록
+    public static final ChatSafetyProperties.Words WORDS = new ChatSafetyProperties.Words(
             List.of("씨발", "시발", "씨바", "ㅅㅂ", "ㅆㅂ", "개새끼", "개새기", "병신", "ㅂㅅ", "좆", "존나", "ㅈㄴ",
                     "미친놈", "미친년", "닥쳐", "폭탄", "마약", "필로폰", "대마초", "살인", "사람죽이", "독극물", "독약", "총기", "해킹"),
             List.of("죽고싶", "죽어버리고싶", "자살", "자해", "극단적선택", "목숨을끊", "살기싫", "사라지고싶", "손목긋",
@@ -23,6 +23,10 @@ class SafetyWordCheckerTest {
                     "ignoreyourinstructions", "systemprompt", "developermode", "개발자모드", "jailbreak", "탈옥"),
             List.of("죽먹고", "마약김밥", "마약계란장", "마약계란", "마약달걀", "마약떡볶이", "마약옥수수", "마약소스", "마약토스트",
                     "폭탄주", "폭탄계란찜", "폭탄달걀찜", "폭탄주먹밥", "칼국수", "독일", "약불", "약간"));
+
+    // 안전 설정 전체. 묶음별 고정값은 각 테스트가 가진다
+    public static final ChatSafetyProperties ALL = new ChatSafetyProperties(WORDS, HealthWordCheckerTest.WORDS,
+            AllergyWordCheckerTest.WORDS, AllergyExclusionFinderTest.GROUPS);
 
     @Test
     @DisplayName("자해·자살을 말하면 자해로 거른다 (죽고 싶어, 자해하고 싶어)")

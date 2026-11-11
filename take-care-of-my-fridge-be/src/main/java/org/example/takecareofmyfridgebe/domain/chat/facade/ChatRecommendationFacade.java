@@ -2,7 +2,7 @@ package org.example.takecareofmyfridgebe.domain.chat.facade;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.example.takecareofmyfridgebe.domain.chat.config.ChatAllergyWordProperties;
+import org.example.takecareofmyfridgebe.domain.chat.config.ChatSafetyProperties;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse.ImminentIngredient;
@@ -92,7 +92,7 @@ public class ChatRecommendationFacade {
     private final SaleEventReader saleEventReader;
     private final ChatMessageService chatMessageService;
     private final ChatWordProperties chatWordProperties;
-    private final ChatAllergyWordProperties chatAllergyWordProperties;
+    private final ChatSafetyProperties chatSafetyProperties;
 
     /**
      * @param content 사용자 메시지 원문 (설명 프롬프트에 넣는다)
@@ -307,7 +307,7 @@ public class ChatRecommendationFacade {
                 .distinct()
                 .toList();
         // 뺄 재료 자신인 이름은 끊지 않는다 ("마늘 알레르기"면 "마늘빵 밀키트"의 마늘을 끊으면 안 된다)
-        List<String> otherKinds = chatAllergyWordProperties.allNotSameKindNames().stream()
+        List<String> otherKinds = chatSafetyProperties.allergy().allNotSameKindNames().stream()
                 .filter(name -> !excludedNames.contains(name))
                 .toList();
         List<MealkitProduct> kept = mealkits.stream()

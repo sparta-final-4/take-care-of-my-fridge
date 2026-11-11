@@ -7,7 +7,7 @@ import com.openai.models.completions.CompletionUsage;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatCandidateProperties;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatCorrectionProperties;
-import org.example.takecareofmyfridgebe.domain.chat.config.ChatSafetyWordProperties;
+import org.example.takecareofmyfridgebe.domain.chat.config.ChatSafetyProperties;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext.CardName;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntent;
@@ -94,7 +94,7 @@ import static org.mockito.Mockito.when;
  * 일치율만 보고하고 기대와 달라도 실패시키지 않는다 (기대가 애매한 문장이 있어서). 평가 세트가 비었을 때만 실패한다.
  */
 @SpringBootTest(classes = ChatIntentEvalManualTest.class)
-@EnableConfigurationProperties({ChatWordProperties.class, ChatCandidateProperties.class, ChatSafetyWordProperties.class})
+@EnableConfigurationProperties({ChatWordProperties.class, ChatCandidateProperties.class, ChatSafetyProperties.class})
 @EnabledIfEnvironmentVariable(named = "OPENAI_INTENT_EVAL", matches = "true")
 class ChatIntentEvalManualTest {
 
@@ -109,7 +109,7 @@ class ChatIntentEvalManualTest {
     @Autowired
     private ChatCandidateProperties candidateProperties;
     @Autowired
-    private ChatSafetyWordProperties safetyWords;
+    private ChatSafetyProperties safety;
 
     @Test
     @DisplayName("평가 세트를 실제 AI로 돌려 서버 안전망을 거친 최종 결과를 기대와 비교하고 CSV로 남긴다")
@@ -141,7 +141,7 @@ class ChatIntentEvalManualTest {
 
     private RunRow runOnce(EvalSet set, ChatIntentFacade facade, RecordingExtractor extractor, UsageRecorder usage,
                            EvalCase evalCase, int run) {
-        Optional<ChatSafetyBlock> block = SafetyWordChecker.check(evalCase.message(), safetyWords);
+        Optional<ChatSafetyBlock> block = SafetyWordChecker.check(evalCase.message(), safety.words());
         if (block.isPresent()) {
             Outcome outcome = Outcome.blocked(block.get() == ChatSafetyBlock.SELF_HARM ? ChatIntent.SELF_HARM : ChatIntent.BLOCKED);
             return new RunRow(evalCase, run, outcome, "WORD_" + block.get(), null, 0, 0, 0, 0,

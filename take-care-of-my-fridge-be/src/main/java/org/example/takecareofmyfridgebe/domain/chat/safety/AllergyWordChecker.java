@@ -1,6 +1,6 @@
 package org.example.takecareofmyfridgebe.domain.chat.safety;
 
-import org.example.takecareofmyfridgebe.domain.chat.config.ChatAllergyWordProperties;
+import org.example.takecareofmyfridgebe.domain.chat.config.ChatSafetyProperties;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -26,7 +26,7 @@ public final class AllergyWordChecker {
     /**
      * @return 표시 말마다 ○○ 후보 (낱말 그대로, 조사를 뗀 것 순). 없으면 빈 목록
      */
-    public static List<List<String>> mentions(String message, ChatAllergyWordProperties words) {
+    public static List<List<String>> mentions(String message, ChatSafetyProperties.Allergy words) {
         if (message == null || message.isBlank() || words.markers().isEmpty()) {
             return List.of();
         }

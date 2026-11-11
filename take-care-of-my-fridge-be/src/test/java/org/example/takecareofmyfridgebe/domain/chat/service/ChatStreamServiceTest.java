@@ -1,8 +1,7 @@
 package org.example.takecareofmyfridgebe.domain.chat.service;
 
 import org.example.takecareofmyfridgebe.domain.chat.ai.ChatReplyGenerator;
-import org.example.takecareofmyfridgebe.domain.chat.config.ChatHealthWordProperties;
-import org.example.takecareofmyfridgebe.domain.chat.config.ChatSafetyWordProperties;
+import org.example.takecareofmyfridgebe.domain.chat.config.ChatSafetyProperties;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext.CardName;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext.ContextMessage;
@@ -30,6 +29,7 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.ChatSafetyBlock;
 import org.example.takecareofmyfridgebe.domain.chat.entity.ChatMessageRole;
 import org.example.takecareofmyfridgebe.domain.chat.facade.ChatContextFacade;
 import org.example.takecareofmyfridgebe.domain.chat.facade.ChatFridgeShopFacade;
+import org.example.takecareofmyfridgebe.domain.chat.safety.AllergyWordCheckerTest;
 import org.example.takecareofmyfridgebe.domain.fridge.entity.FridgeItemStatus;
 import org.example.takecareofmyfridgebe.domain.chat.facade.ChatIntentFacade;
 import org.example.takecareofmyfridgebe.domain.chat.facade.ChatRecommendationFacade;
@@ -109,12 +109,10 @@ class ChatStreamServiceTest {
     private ObjectMapper objectMapper = new ObjectMapper();
 
     @Spy
-    private ChatHealthWordProperties chatHealthWordProperties = new ChatHealthWordProperties(
-            List.of("당뇨", "알레르기", "임신", "약먹"), List.of("약불", "약간"));
-
-    @Spy
-    private ChatSafetyWordProperties chatSafetyWordProperties = new ChatSafetyWordProperties(
-            List.of("ㅅㅂ", "폭탄"), List.of("죽고싶"), List.of("지시무시", "시스템프롬프트"), List.of("폭탄주"));
+    private ChatSafetyProperties chatSafetyProperties = new ChatSafetyProperties(
+            new ChatSafetyProperties.Words(List.of("ㅅㅂ", "폭탄"), List.of("죽고싶"), List.of("지시무시", "시스템프롬프트"), List.of("폭탄주")),
+            new ChatSafetyProperties.Health(List.of("당뇨", "알레르기", "임신", "약먹"), List.of("약불", "약간")),
+            AllergyWordCheckerTest.WORDS, List.of());
 
     @InjectMocks
     private ChatStreamService chatStreamService;
