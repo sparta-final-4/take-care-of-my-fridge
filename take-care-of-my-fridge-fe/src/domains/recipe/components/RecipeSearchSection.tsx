@@ -1,6 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { Button, Input, Tag, Typography } from 'antd';
-import { useState } from 'react';
+import { Button, Input, Select, Typography } from 'antd';
 
 import { COOK_TIME_OPTIONS } from '@/domains/recipe/format';
 import { useRecipeFilters } from '@/domains/recipe/hooks/useRecipeFilters';
@@ -8,19 +7,13 @@ import { recipeQueries } from '@/domains/recipe/queries';
 
 import styles from './RecipeSearchSection.module.scss';
 
-const CATEGORY_PREVIEW_COUNT = 10;
-
 interface FilterRow {
   label: string;
-  chips: Array<{
-    key: string;
-    label: string;
-    checked: boolean;
-    onChange: (checked: boolean) => void;
-  }>;
-  toggle?: { expanded: boolean; onToggle: () => void };
-  // 칩을 두 칸으로 나눠 세로로 너무 길어지지 않게 한다.
-  twoColumns?: boolean;
+  value: string | undefined;
+  options: Array<{ value: string; label: string }>;
+  onChange: (value: string | undefined) => void;
+  // 항목이 많은 묶음은 글자를 쳐서 찾을 수 있게 한다.
+  searchable?: boolean;
 }
 
 export function RecipeSearchSection() {
@@ -36,53 +29,34 @@ export function RecipeSearchSection() {
     filtered,
     reset,
   } = useRecipeFilters();
-  // 분류를 못 받아 오면 해당 칩 줄만 비워 두고 검색, 조리 시간 필터는 그대로 쓴다.
+  // 분류를 못 받아 오면 해당 드롭다운만 감추고 검색, 조리 시간 필터는 그대로 쓴다.
   const { data: classifications } = useQuery(recipeQueries.classifications());
-  const [showAllCategories, setShowAllCategories] = useState(false);
 
-  // 요리 분류는 수가 많아 앞부분만 보이고, 접혀 있어도 고른 분류는 함께 보인다.
-  const categories = classifications?.categories ?? [];
-  const visibleCategories = showAllCategories
-    ? categories
-    : categories.filter((value, index) => index < CATEGORY_PREVIEW_COUNT || value === category);
+  const toOptions = (values: string[] | undefined) =>
+    (values ?? []).map((value) => ({ value, label: value }));
 
-  // 칩은 하나만 고를 수 있고, 고른 칩을 다시 누르면 해제한다.
+  // 묶음마다 드롭다운 하나에서 값을 하나 고르고, 지우기(×)로 해제한다.
   // 항목이 많은 요리 분류는 맨 아래에 둬 짧은 조건이 먼저 보이게 한다.
   const filterRows: FilterRow[] = [
     {
       label: '음식 종류',
-      chips: (classifications?.cuisineTypes ?? []).map((value) => ({
-        key: value,
-        label: value,
-        checked: cuisineType === value,
-        onChange: (checked: boolean) => setCuisineType(checked ? value : undefined),
-      })),
+      value: cuisineType,
+      options: toOptions(classifications?.cuisineTypes),
+      onChange: setCuisineType,
     },
     {
       label: '조리 시간',
-      chips: COOK_TIME_OPTIONS.map((option) => ({
-        key: option.key,
-        label: option.label,
-        checked: cookTimeKey === option.key,
-        onChange: (checked: boolean) => setCookTime(checked ? option.key : undefined),
-      })),
+      value: cookTimeKey,
+      options: COOK_TIME_OPTIONS.map((option) => ({ value: option.key, label: option.label })),
+      onChange: (value) =>
+        setCookTime(COOK_TIME_OPTIONS.find((option) => option.key === value)?.key),
     },
     {
       label: '요리 분류',
-      chips: visibleCategories.map((value) => ({
-        key: value,
-        label: value,
-        checked: category === value,
-        onChange: (checked: boolean) => setCategory(checked ? value : undefined),
-      })),
-      toggle:
-        categories.length > CATEGORY_PREVIEW_COUNT
-          ? {
-              expanded: showAllCategories,
-              onToggle: () => setShowAllCategories((prev) => !prev),
-            }
-          : undefined,
-      twoColumns: true,
+      value: category,
+      options: toOptions(classifications?.categories),
+      onChange: setCategory,
+      searchable: true,
     },
   ];
 
@@ -111,34 +85,20 @@ export function RecipeSearchSection() {
       </div>
       {/* 분류를 못 받아 와 고를 것이 없는 묶음은 감춘다. */}
       {filterRows
-        .filter((row) => row.chips.length > 0)
+        .filter((row) => row.options.length > 0)
         .map((row) => (
           <div key={row.label} className={styles.group}>
             <Typography.Text className={styles.groupLabel}>{row.label}</Typography.Text>
-            <div
-              className={row.twoColumns ? `${styles.options} ${styles.twoColumns}` : styles.options}
-            >
-              {row.chips.map((chip) => (
-                <Tag.CheckableTag
-                  key={chip.key}
-                  checked={chip.checked}
-                  onChange={chip.onChange}
-                  className={styles.option}
-                >
-                  {chip.label}
-                </Tag.CheckableTag>
-              ))}
-              {row.toggle && (
-                <Button
-                  type="link"
-                  className={styles.toggle}
-                  aria-expanded={row.toggle.expanded}
-                  onClick={row.toggle.onToggle}
-                >
-                  {row.toggle.expanded ? '접기' : '더보기'}
-                </Button>
-              )}
-            </div>
+            <Select
+              aria-label={row.label}
+              placeholder="전체"
+              allowClear
+              showSearch={row.searchable ? { optionFilterProp: 'label' } : false}
+              options={row.options}
+              value={row.value ?? null}
+              onChange={(value: string | null | undefined) => row.onChange(value ?? undefined)}
+              className={styles.select}
+            />
           </div>
         ))}
     </section>
