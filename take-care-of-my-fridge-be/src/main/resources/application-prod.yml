@@ -3,6 +3,12 @@
 #   compose는 접속 정보를 넘기지 않는다. 키가 하나라도 없으면 기동에 실패한다.
 #   EC2 역할에 이 경로 읽기 권한이 있고, 컨테이너도 인스턴스 메타데이터로 역할 자격 증명을 쓴다.
 # APP_ENV는 기본값을 두지 않는다. 빠지면 다른 환경의 시크릿을 읽는 대신 기동에 실패한다.
+
+# 앞단 Caddy(HTTPS)가 붙여 주는 X-Forwarded-* 를 읽어 원래 요청이 https임을 알게 한다(Swagger 서버 주소 등).
+# native(Tomcat)는 내부 IP 대역 프록시가 보낸 X-Forwarded-* 만 믿고, Caddy가 걸러 주지 않는 Forwarded 헤더는 무시한다.
+server:
+  forward-headers-strategy: native
+
 spring:
   config:
     import: "aws-parameterstore:/imhungry/${APP_ENV}/"
@@ -44,6 +50,16 @@ app:
   # 배포 서버는 실제 AI로 답한다. 장애 때 CHAT_REPLY_GENERATOR=stub으로 가짜 답변기로 돌릴 수 있다
   chat:
     reply-generator: ${CHAT_REPLY_GENERATOR:openai}
+  # Swagger UI·OpenAPI 문서를 켤 배포 환경. 여기에 없는 APP_ENV(main 등)는 꺼진다.
+  swagger-enabled:
+    dev: true
+
+# dev·main이 같은 prod 프로파일을 쓰므로 APP_ENV로 구분한다. main(운영)에서는 API 구조를 외부에 공개하지 않는다.
+springdoc:
+  api-docs:
+    enabled: ${app.swagger-enabled.${APP_ENV}:false}
+  swagger-ui:
+    enabled: ${app.swagger-enabled.${APP_ENV}:false}
 
 # 배포 compose에서는 같은 네트워크의 forecast-worker 컨테이너로 붙는다(기존 코드 기본값과 같다).
 forecast:
