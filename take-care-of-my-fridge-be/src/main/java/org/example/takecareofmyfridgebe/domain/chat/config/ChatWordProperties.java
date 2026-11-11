@@ -6,7 +6,6 @@ import java.util.Set;
 
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.boot.context.properties.bind.DefaultValue;
 
 /**
  * AI 상담 단어 설정 (config/chat-words.yml). 맛·분류·묻는 말·음식 말·밀키트·냉장고 보기·온도 단어를 묶음마다 중첩 record로 둔다.
@@ -50,25 +49,15 @@ public record ChatWordProperties(
      *                       AI가 넣은 뺄 조건 TASTE를 서버가 지운다 ("매운 건 빼줘"가 직전에 원한 짠맛까지 지우지 않게)
      */
     public record Taste(
-            @DefaultValue({"매운", "맵게", "맵지", "매콤", "얼큰", "칼칼"})
             List<String> spicy,
-            @DefaultValue({"달달", "달게", "단거", "단걸", "단것", "달콤", "단맛"})
             List<String> sweet,
-            @DefaultValue({"안", "덜"})
             List<String> negationBefore,
-            @DefaultValue({"말고", "빼고", "않", "싫", "없이", "못먹", "빼줘", "빼주", "빼달", "제외", "안들어간", "없는"})
             List<String> negationAfter,
-            @DefaultValue({"짠", "짭짤", "짜게", "짭조름"})
             List<String> salty,
-            @DefaultValue({"감칠", "고소"})
             List<String> umami,
-            @DefaultValue({"순한", "담백", "슴슴", "심심", "자극적이지"})
             List<String> mild,
-            @DefaultValue({"더"})
             List<String> wantBefore,
-            @DefaultValue({"걸로", "거로", "것으로", "먹고싶", "땡", "좋아", "원해", "당겨"})
             List<String> wantAfter,
-            @DefaultValue({"맛상관없", "맛은상관없", "맛아무거나", "맛은아무거나"})
             List<String> clear
     ) {
     }
@@ -110,16 +99,10 @@ public record ChatWordProperties(
      *                       찾기 전에 지운다 (맛 단어도 같이 지운다)
      */
     public record Ask(
-            @DefaultValue({"기준", "어떻게", "왜", "방법", "얼마나", "보관", "가격", "차이", "뭐가달라", "뭐가다른",
-                    "먹었어", "먹었니", "먹었냐", "했어", "했니", "먹어도돼", "괜찮", "영양소", "영양성분", "효능"})
             List<String> question,
-            @DefaultValue({"추천", "뭐있", "보여줘", "먹고싶", "사고싶", "골라줘"})
             List<String> request,
-            @DefaultValue({"있어", "있나", "있을까", "없어", "뭐가좋아", "살만한"})
             List<String> mealkitRequest,
-            @DefaultValue({"안녕", "반가워", "반갑", "고마워", "고맙", "감사", "잘지내", "잘자", "좋은아침"})
             List<String> greeting,
-            @DefaultValue({"레시피", "만드는법", "만들기", "요리법", "조리법"})
             List<String> recipe
     ) {
     }
@@ -155,8 +138,6 @@ public record ChatWordProperties(
      * @param food 음식·요리·장보기를 말하는 말 ("주식으로 먹을 거 추천해줘"의 "먹", "장보기 목록 짜줘"의 "장보기")
      */
     public record Food(
-            @DefaultValue({"먹", "요리", "레시피", "밥", "반찬", "끼니", "아침", "점심", "저녁", "야식", "간식", "재료", "냉장고",
-                    "장보기", "밀키트"})
             List<String> food
     ) {
     }
@@ -169,9 +150,7 @@ public record ChatWordProperties(
      * @param easy    요리를 번거로워하는 말 ("간단하게", "귀찮아"). 있으면 레시피 카드 아래 밀키트 한 장을 붙인다
      */
     public record Mealkit(
-            @DefaultValue({"밀키트"})
             List<String> mealkit,
-            @DefaultValue({"간단", "간편", "빨리", "귀찮", "요리하기싫"})
             List<String> easy
     ) {
     }
@@ -194,19 +173,12 @@ public record ChatWordProperties(
      *                 "얼마나"·"가격"은 넣지 않는다 ("두부 얼마나 남았어?", "두부 가격 얼마야?"는 냉장고 보기·사기)
      */
     public record FridgeShop(
-            @DefaultValue({"남았", "아직있", "냉장고에뭐", "냉장고에있", "냉장고에서", "버려야", "유통기한지난", "소비기한지난", "처리해야할거", "처리할거"})
             List<String> fridge,
-            @DefaultValue({"버려야", "지난", "임박", "유통기한", "소비기한", "상한", "상할", "상했", "오래된", "오래됐", "처리해야"})
             List<String> imminent,
-            @DefaultValue({"기본양념", "조미료"})
             List<String> seasoning,
-            @DefaultValue({"사고싶", "어디서사", "장바구니", "담아", "주문해"})
             List<String> shop,
-            @DefaultValue({"세일", "할인", "특가", "번개"})
             List<String> sale,
-            @DefaultValue({"추천", "만들", "해먹", "요리", "레시피", "뭐먹", "먹지", "먹을까"})
             List<String> cook,
-            @DefaultValue({"어떻게", "방법", "보관", "해동", "먹어도돼", "괜찮", "왜", "언제와", "언제도착", "배송", "짜줘", "짜줄"})
             List<String> general
     ) {
     }

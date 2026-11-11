@@ -1,7 +1,6 @@
 package org.example.takecareofmyfridgebe.domain.chat.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.boot.context.properties.bind.DefaultValue;
 
 /**
  * 의도 판단 뒤 서버가 AI 값을 고치는 보정(ChatIntentFacade)을 보정마다 켜고 끈다. 기본은 모두 켜짐(지금 동작).
@@ -20,16 +19,16 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  */
 @ConfigurationProperties(prefix = "app.chat.corrections")
 public record ChatCorrectionProperties(
-        @DefaultValue("true") boolean tasteWords,
-        @DefaultValue("true") boolean spokenTastesOnly,
-        @DefaultValue("true") boolean keepOtherTastes,
-        @DefaultValue("true") boolean refineSpokenTastes,
-        @DefaultValue("true") boolean categoryWords,
-        @DefaultValue("true") boolean dishCheck,
-        @DefaultValue("true") boolean nameOnly,
-        @DefaultValue("true") boolean mealkitRequest,
-        @DefaultValue("true") boolean offTopicRevive,
-        @DefaultValue("true") boolean fridgeShopWords
+        boolean tasteWords,
+        boolean spokenTastesOnly,
+        boolean keepOtherTastes,
+        boolean refineSpokenTastes,
+        boolean categoryWords,
+        boolean dishCheck,
+        boolean nameOnly,
+        boolean mealkitRequest,
+        boolean offTopicRevive,
+        boolean fridgeShopWords
 ) {
 
     // 모두 켜짐 (지금 동작)

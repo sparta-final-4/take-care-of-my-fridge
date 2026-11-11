@@ -1,7 +1,6 @@
 package org.example.takecareofmyfridgebe.domain.chat.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.boot.context.properties.bind.DefaultValue;
 
 import java.util.List;
 
@@ -21,18 +20,11 @@ import java.util.List;
  */
 @ConfigurationProperties(prefix = "app.chat.candidate")
 public record ChatCandidateProperties(
-        @DefaultValue({"양념", "음료"})
         List<String> excludedCategories,
-        @DefaultValue("0.4")
         double minOwnedRatio,
-        @DefaultValue({"청양고추", "고춧가루", "고추장", "고추기름", "건고추", "베트남고추", "페퍼론치노", "핫소스",
-                "김치", "배추김치", "깍두기", "열무김치", "총각김치", "파김치", "갓김치"})
         List<String> spicyIngredients,
-        @DefaultValue({"백김치", "물김치", "동치미", "나박김치"})
         List<String> spicyExclusions,
-        @DefaultValue({"홍고추", "청고추"})
         List<String> mildSpicyIngredients,
-        @DefaultValue({"고추", "붉은고추", "고추냉이"})
         List<String> mildSpicyExactIngredients
 ) {
 }

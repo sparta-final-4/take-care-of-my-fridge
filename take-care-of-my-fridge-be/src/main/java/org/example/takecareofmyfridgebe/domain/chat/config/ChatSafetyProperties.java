@@ -5,7 +5,6 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.boot.context.properties.bind.DefaultValue;
 
 /**
  * AI 상담 안전 장치 설정 (config/chat-safety.yml). 금지어·자해·탈취 단어, 건강 말, 알레르기 말과 묶음을 중첩 record로 둔다.
@@ -36,19 +35,9 @@ public record ChatSafetyProperties(
      * @param exclusions 걸리는 말이 들어 있어도 음식 이름 등이라 지우고 보는 말
      */
     public record Words(
-            @DefaultValue({"씨발", "시발", "씨바", "ㅅㅂ", "ㅆㅂ", "개새끼", "개새기", "병신", "ㅂㅅ", "좆", "존나", "ㅈㄴ",
-                    "미친놈", "미친년", "닥쳐", "폭탄", "마약", "필로폰", "대마초", "살인", "사람죽이", "독극물", "독약", "총기", "해킹"})
             List<String> banned,
-            @DefaultValue({"죽고싶", "죽어버리고싶", "자살", "자해", "극단적선택", "목숨을끊", "살기싫", "사라지고싶", "손목긋",
-                    "뛰어내리고싶"})
             List<String> selfHarm,
-            @DefaultValue({"지시무시", "지시를무시", "지시는무시", "지시사항무시", "명령무시", "명령을무시", "시스템프롬프트",
-                    "프롬프트보여", "프롬프트를보여", "프롬프트알려", "프롬프트를알려", "프롬프트공개", "프롬프트를공개", "프롬프트출력",
-                    "지시보여", "지시를보여", "지시알려", "지시를알려", "ignoreprevious", "ignoreallprevious", "ignoretheabove",
-                    "ignoreyourinstructions", "systemprompt", "developermode", "개발자모드", "jailbreak", "탈옥"})
             List<String> injection,
-            @DefaultValue({"죽먹고", "마약김밥", "마약계란장", "마약계란", "마약달걀", "마약떡볶이", "마약옥수수", "마약소스", "마약토스트",
-                    "폭탄주", "폭탄계란찜", "폭탄달걀찜", "폭탄주먹밥", "칼국수", "독일", "약불", "약간"})
             List<String> exclusions
     ) {
     }
@@ -62,11 +51,7 @@ public record ChatSafetyProperties(
      * @param exclusions 건강 말이 들어 있어도 요리 말 등이라 지우고 보는 말
      */
     public record Health(
-            @DefaultValue({"당뇨", "혈당", "고혈압", "혈압", "고지혈", "콜레스테롤", "신장질환", "신장병", "신장기능", "콩팥", "투석",
-                    "통풍", "요산", "질환", "환자", "위염", "역류성", "항암", "알레르기", "알러지", "아토피", "임신", "임산부", "산모",
-                    "수유", "모유", "복용", "처방", "약먹", "약을먹", "약드시"})
             List<String> health,
-            @DefaultValue({"약불", "약간", "약한불", "신장개업", "수유역"})
             List<String> exclusions
     ) {
     }
@@ -81,9 +66,7 @@ public record ChatSafetyProperties(
      *                    ("땅콩" → 땅콩호박, "굴" → 굴비, "마" → 마늘). 그 재료를 넓힐 때만 본다 ("마늘 알레르기"면 마늘가루는 뺀다)
      */
     public record Allergy(
-            @DefaultValue({"알레르기", "알러지", "못먹", "먹으면안"})
             List<String> markers,
-            @DefaultValue({"에는", "에도", "은", "는", "이", "가", "을", "를", "에", "도"})
             List<String> particles,
             List<NotSameKind> notSameKind
     ) {
