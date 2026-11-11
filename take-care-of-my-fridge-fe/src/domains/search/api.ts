@@ -11,7 +11,7 @@ import {
 } from '@/common/api/clients';
 import { unwrap } from '@/common/api/unwrap';
 
-// 상단 통합 검색 전용. 레시피·상품 화면의 검색창은 각 도메인의 목록 API를 쓴다.
+// 상단 통합 검색 전용. 레시피·상품 화면도 검색어가 있으면 같은 검색 API를 쓴다(각 도메인 api.ts).
 export async function searchRecipes(
   request: RecipeListRequest,
   signal?: AbortSignal,

@@ -4,7 +4,7 @@ import { Button, Drawer, Empty, Pagination, Result, Select, Skeleton, Typography
 import { useState } from 'react';
 
 import { SectionLoading } from '@/common/components/SectionLoading';
-import { RECIPE_SORT_OPTIONS, useRecipeFilters } from '@/domains/recipe/hooks/useRecipeFilters';
+import { useRecipeFilters } from '@/domains/recipe/hooks/useRecipeFilters';
 import { recipeQueries } from '@/domains/recipe/queries';
 
 import { RecipeCard } from './RecipeCard';
@@ -17,7 +17,8 @@ const PAGE_SIZE = 12;
 // 넓은 화면의 조건은 화면 왼쪽 칸(RecipesPage)에 있고, 좁은 화면은 같은 조건을 서랍으로 연다.
 
 export function RecipeListSection() {
-  const { keyword, request, filtered, sort, page, setSort, setPage, reset } = useRecipeFilters();
+  const { keyword, request, filtered, sort, sortOptions, page, setSort, setPage, reset } =
+    useRecipeFilters();
   const { data, isPending, isError, isPlaceholderData, refetch } = useQuery(
     recipeQueries.list({ ...request, size: PAGE_SIZE }),
   );
@@ -51,7 +52,7 @@ export function RecipeListSection() {
         </Typography.Text>
         <Select
           variant="borderless"
-          options={RECIPE_SORT_OPTIONS}
+          options={sortOptions}
           value={sort}
           onChange={setSort}
           aria-label="정렬"

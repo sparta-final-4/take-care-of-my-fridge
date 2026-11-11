@@ -13,6 +13,11 @@ export const PRODUCT_SORT_OPTIONS: Array<{ value: ProductListRequestSortEnum; la
   { value: 'PRICE_DESC', label: '높은 가격순' },
 ];
 
+const RELEVANCE_SORT_OPTION: { value: ProductListRequestSortEnum; label: string } = {
+  value: 'RELEVANCE',
+  label: '정확도순',
+};
+
 // 검색어·종류·가격대·정렬·페이지는 URL 쿼리에 두어 새로고침·뒤로 가기에도 유지한다.
 // 기본값은 URL에서 지워 주소를 짧게 둔다.
 export function useProductFilters() {
@@ -22,9 +27,13 @@ export function useProductFilters() {
   const type: ProductListRequestTypeEnum | undefined =
     typeParam === 'INGREDIENT' || typeParam === 'MEALKIT' ? typeParam : undefined;
   const priceRange = PRICE_RANGES.find((range) => range.key === searchParams.get('price'));
+  // 검색어가 있으면 Elasticsearch 점수로 줄 세우는 정확도순을 고를 수 있고 기본값도 정확도순이다.
+  const sortOptions = keyword
+    ? [RELEVANCE_SORT_OPTION, ...PRODUCT_SORT_OPTIONS]
+    : PRODUCT_SORT_OPTIONS;
+  const defaultSort: ProductListRequestSortEnum = keyword ? 'RELEVANCE' : 'LATEST';
   const sort =
-    PRODUCT_SORT_OPTIONS.find((option) => option.value === searchParams.get('sort'))?.value ??
-    'LATEST';
+    sortOptions.find((option) => option.value === searchParams.get('sort'))?.value ?? defaultSort;
   const pageParam = Number(searchParams.get('page'));
   const page = Number.isInteger(pageParam) && pageParam > 0 ? pageParam : 1;
 
@@ -43,7 +52,7 @@ export function useProductFilters() {
     update({ type: value, page: undefined });
   const setPriceRange = (key: PriceRangeKey | undefined) => update({ price: key, page: undefined });
   const setSort = (value: ProductListRequestSortEnum) =>
-    update({ sort: value === 'LATEST' ? undefined : value, page: undefined });
+    update({ sort: value === defaultSort ? undefined : value, page: undefined });
   const setPage = (value: number) => update({ page: value === 1 ? undefined : String(value) });
   const reset = () => setSearchParams({});
 
@@ -61,6 +70,7 @@ export function useProductFilters() {
     type,
     priceRangeKey: priceRange?.key,
     sort,
+    sortOptions,
     page,
     request,
     filtered: Boolean(keyword || type || priceRange),

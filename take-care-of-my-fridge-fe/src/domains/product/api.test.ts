@@ -8,6 +8,7 @@ vi.mock('@/common/api/clients', () => ({
   adminImageApi: { createProductImageUploadUrl: vi.fn() },
   adminProductApi: {},
   productApi: {},
+  searchApi: {},
 }));
 
 describe('uploadProductImage', () => {
