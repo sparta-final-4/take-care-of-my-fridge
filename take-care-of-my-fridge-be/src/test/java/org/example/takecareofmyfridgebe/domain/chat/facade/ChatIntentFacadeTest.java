@@ -32,7 +32,7 @@ import org.example.takecareofmyfridgebe.domain.chat.intent.MealkitWordCheckerTes
 import org.example.takecareofmyfridgebe.domain.chat.intent.TasteWordCheckerTest;
 import org.example.takecareofmyfridgebe.domain.chat.reply.RecommendationPromptBuilder;
 import org.example.takecareofmyfridgebe.domain.chat.safety.AllergyExclusionFinder;
-import org.example.takecareofmyfridgebe.domain.chat.service.ChatIntentExtractor;
+import org.example.takecareofmyfridgebe.domain.chat.ai.ChatIntentExtractor;
 import org.example.takecareofmyfridgebe.domain.chat.service.ChatMessageService;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.Ingredient;
 import org.example.takecareofmyfridgebe.domain.ingredient.service.IngredientMatcher;

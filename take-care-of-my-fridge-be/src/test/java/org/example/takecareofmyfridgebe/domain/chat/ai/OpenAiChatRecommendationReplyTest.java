@@ -1,4 +1,4 @@
-package org.example.takecareofmyfridgebe.domain.chat.service;
+package org.example.takecareofmyfridgebe.domain.chat.ai;
 
 import org.example.takecareofmyfridgebe.global.config.ai.LlmCostCalculator;
 import org.junit.jupiter.api.DisplayName;

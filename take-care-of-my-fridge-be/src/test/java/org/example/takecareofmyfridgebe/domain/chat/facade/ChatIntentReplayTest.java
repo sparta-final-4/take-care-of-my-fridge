@@ -17,7 +17,7 @@ import org.example.takecareofmyfridgebe.domain.chat.facade.ChatIntentEvalManualT
 import org.example.takecareofmyfridgebe.domain.chat.facade.ChatIntentEvalManualTest.Outcome;
 import org.example.takecareofmyfridgebe.domain.chat.intent.IntentCorrector;
 import org.example.takecareofmyfridgebe.domain.chat.safety.AllergyExclusionFinder;
-import org.example.takecareofmyfridgebe.domain.chat.service.ChatIntentExtractor;
+import org.example.takecareofmyfridgebe.domain.chat.ai.ChatIntentExtractor;
 import org.example.takecareofmyfridgebe.domain.chat.service.ChatMessageService;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.Ingredient;
 import org.example.takecareofmyfridgebe.domain.ingredient.service.IngredientMatcher;

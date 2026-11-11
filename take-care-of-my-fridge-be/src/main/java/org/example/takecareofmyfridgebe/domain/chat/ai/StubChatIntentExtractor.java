@@ -1,4 +1,4 @@
-package org.example.takecareofmyfridgebe.domain.chat.service;
+package org.example.takecareofmyfridgebe.domain.chat.ai;
 
 import org.example.takecareofmyfridgebe.domain.chat.dto.IntentResult;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;

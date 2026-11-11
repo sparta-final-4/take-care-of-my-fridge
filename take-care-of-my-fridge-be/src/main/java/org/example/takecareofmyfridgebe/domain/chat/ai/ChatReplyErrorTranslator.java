@@ -1,4 +1,4 @@
-package org.example.takecareofmyfridgebe.domain.chat.service;
+package org.example.takecareofmyfridgebe.domain.chat.ai;
 
 import com.openai.errors.InternalServerException;
 import com.openai.errors.OpenAIException;

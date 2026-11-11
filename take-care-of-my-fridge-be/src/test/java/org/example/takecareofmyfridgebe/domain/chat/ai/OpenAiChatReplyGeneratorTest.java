@@ -1,4 +1,4 @@
-package org.example.takecareofmyfridgebe.domain.chat.service;
+package org.example.takecareofmyfridgebe.domain.chat.ai;
 
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
