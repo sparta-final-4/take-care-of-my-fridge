@@ -7,6 +7,8 @@ import org.example.takecareofmyfridgebe.domain.payment.entity.BillingKeyStatus;
 import org.example.takecareofmyfridgebe.domain.payment.entity.CardType;
 import org.example.takecareofmyfridgebe.domain.payment.entity.Payment;
 import org.example.takecareofmyfridgebe.domain.payment.entity.PgProvider;
+import org.example.takecareofmyfridgebe.domain.payment.service.BillingKeyCrypto;
+import org.example.takecareofmyfridgebe.domain.payment.service.BillingKeyCryptoFixture;
 import org.example.takecareofmyfridgebe.global.config.jpa.JpaAuditingConfig;
 import org.example.takecareofmyfridgebe.global.config.jpa.QueryDslConfig;
 import org.example.takecareofmyfridgebe.support.MySqlContainerSupport;
@@ -27,6 +29,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({JpaAuditingConfig.class, QueryDslConfig.class})
 class BillingKeyRepositoryTest extends MySqlContainerSupport {
+
+    private static final BillingKeyCrypto CRYPTO = BillingKeyCryptoFixture.crypto();
 
     private final BillingKeyRepository billingKeyRepository;
     private final PaymentRepository paymentRepository;
@@ -49,7 +53,9 @@ class BillingKeyRepositoryTest extends MySqlContainerSupport {
         BillingKey found = billingKeyRepository.findById(saved.getId()).orElseThrow();
 
         assertThat(found.getMemberId()).isEqualTo(1L);
-        assertThat(found.getBillingKey()).isEqualTo("billing-key-1");
+        assertThat(found.getBillingKeyCiphertext()).startsWith("v1:k1:").doesNotContain("billing-key-1");
+        assertThat(found.getBillingKeyHash()).hasSize(64).doesNotContain("billing-key-1");
+        assertThat(CRYPTO.decrypt(found)).isEqualTo("billing-key-1");
         assertThat(found.getCardName()).isEqualTo("신한카드 Deep Dream");
         assertThat(found.getCardLast4()).isEqualTo("1234");
         assertThat(found.getCardType()).isEqualTo(CardType.CREDIT);
@@ -59,7 +65,19 @@ class BillingKeyRepositoryTest extends MySqlContainerSupport {
     }
 
     @Test
-    @DisplayName("같은 빌링키를 두 번 저장하면 UNIQUE 제약으로 거절된다")
+    @DisplayName("빌링키 지문으로 저장된 카드를 찾는다")
+    void findByBillingKeyHash_success() {
+        BillingKey saved = billingKeyRepository.save(billingKey("billing-key-1"));
+        billingKeyRepository.save(billingKey("billing-key-2"));
+        flushAndClear();
+
+        assertThat(billingKeyRepository.findByBillingKeyHash(CRYPTO.hash("billing-key-1")))
+                .get().extracting(BillingKey::getId).isEqualTo(saved.getId());
+        assertThat(billingKeyRepository.findByBillingKeyHash(CRYPTO.hash("billing-key-3"))).isEmpty();
+    }
+
+    @Test
+    @DisplayName("같은 빌링키를 두 번 저장하면 암호문은 달라도 지문 UNIQUE 제약으로 거절된다")
     void save_throwException_whenBillingKeyDuplicated() {
         billingKeyRepository.saveAndFlush(billingKey("billing-key-1"));
 
@@ -83,7 +101,7 @@ class BillingKeyRepositoryTest extends MySqlContainerSupport {
     }
 
     private BillingKey billingKey(String key) {
-        return BillingKey.builder().memberId(1L).billingKey(key).cardName("신한카드 Deep Dream").cardLast4("1234")
+        return BillingKey.builder().memberId(1L).encryptedBillingKey(CRYPTO.encrypt(1L, key)).cardName("신한카드 Deep Dream").cardLast4("1234")
                 .cardType(CardType.CREDIT).isDefault(true).build();
     }
 

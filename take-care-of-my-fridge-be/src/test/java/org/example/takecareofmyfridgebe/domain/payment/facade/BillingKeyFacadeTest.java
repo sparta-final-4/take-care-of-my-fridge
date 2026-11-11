@@ -7,6 +7,7 @@ import org.example.takecareofmyfridgebe.domain.payment.entity.BillingKey;
 import org.example.takecareofmyfridgebe.domain.payment.entity.CardType;
 import org.example.takecareofmyfridgebe.domain.payment.port.BillingKeyGateway;
 import org.example.takecareofmyfridgebe.domain.payment.port.BillingKeyInfo;
+import org.example.takecareofmyfridgebe.domain.payment.service.BillingKeyCryptoFixture;
 import org.example.takecareofmyfridgebe.domain.payment.service.BillingKeyService;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
@@ -47,7 +48,7 @@ class BillingKeyFacadeTest {
     void setUp() {
         billingKeyService = mock(BillingKeyService.class);
         billingKeyGateway = mock(BillingKeyGateway.class);
-        billingKeyFacade = new BillingKeyFacade(billingKeyService, billingKeyGateway);
+        billingKeyFacade = new BillingKeyFacade(billingKeyService, BillingKeyCryptoFixture.crypto(), billingKeyGateway);
     }
 
     @Test
@@ -177,6 +178,21 @@ class BillingKeyFacadeTest {
     }
 
     @Test
+    @DisplayName("저장된 빌링키를 풀지 못해도 카드 삭제는 성공으로 끝나고 PortOne 삭제 재시도 대상으로 남는다")
+    void delete_success_whenBillingKeyCannotBeDecrypted() {
+        BillingKey broken = BillingKey.builder().memberId(MEMBER_ID)
+                .encryptedBillingKey(BillingKeyCryptoFixture.encrypted(MEMBER_ID + 1, BILLING_KEY)).build();
+        ReflectionTestUtils.setField(broken, "id", 1L);
+        broken.delete(LocalDateTime.of(2026, 11, 4, 10, 0));
+        given(billingKeyService.delete(eq(MEMBER_ID), eq(1L), any())).willReturn(broken);
+
+        billingKeyFacade.delete(MEMBER_ID, 1L);
+
+        verify(billingKeyGateway, never()).deleteBillingKey(anyString(), anyString());
+        verify(billingKeyService, never()).markPgDeleted(anyLong(), any());
+    }
+
+    @Test
     @DisplayName("PortOne 삭제 뒤 확인 기록이 실패해도 카드 삭제는 성공으로 끝난다")
     void delete_success_whenMarkPgDeletedFails() {
         given(billingKeyService.delete(eq(MEMBER_ID), eq(1L), any())).willReturn(deletedCard(1L));
@@ -290,7 +306,8 @@ class BillingKeyFacadeTest {
     }
 
     private BillingKey deletedCard(Long id) {
-        BillingKey card = BillingKey.builder().memberId(MEMBER_ID).billingKey(BILLING_KEY).build();
+        BillingKey card = BillingKey.builder().memberId(MEMBER_ID)
+                .encryptedBillingKey(BillingKeyCryptoFixture.encrypted(MEMBER_ID, BILLING_KEY)).build();
         ReflectionTestUtils.setField(card, "id", id);
         card.delete(LocalDateTime.of(2026, 11, 4, 10, 0));
         return card;

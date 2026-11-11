@@ -1,5 +1,6 @@
 package org.example.takecareofmyfridgebe.domain.payment.entity;
 
+import org.example.takecareofmyfridgebe.domain.payment.service.BillingKeyCryptoFixture;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 import org.junit.jupiter.api.DisplayName;
@@ -14,7 +15,7 @@ class BillingKeyTest {
 
     private static final LocalDateTime NOW = LocalDateTime.of(2026, 11, 4, 10, 0);
 
-    private final BillingKey billingKey = BillingKey.builder().memberId(1L).billingKey("billing-key-1")
+    private final BillingKey billingKey = BillingKey.builder().memberId(1L).encryptedBillingKey(BillingKeyCryptoFixture.encrypted(1L, "billing-key-1"))
             .cardName("신한카드 Deep Dream").cardLast4("1234").cardType(CardType.CREDIT).isDefault(true).build();
 
     @Test
@@ -54,7 +55,7 @@ class BillingKeyTest {
     @Test
     @DisplayName("대표가 아닌 사용 중 카드를 대표로 지정하면 대표 카드가 되고, 해제하면 대표에서 빠진다")
     void markDefault_switchDefault() {
-        BillingKey other = BillingKey.builder().memberId(1L).billingKey("billing-key-2").isDefault(false).build();
+        BillingKey other = BillingKey.builder().memberId(1L).encryptedBillingKey(BillingKeyCryptoFixture.encrypted(1L, "billing-key-2")).isDefault(false).build();
 
         other.markDefault();
         assertThat(other.isDefault()).isTrue();
@@ -115,7 +116,7 @@ class BillingKeyTest {
     @Test
     @DisplayName("마스킹 번호와 발급사 코드가 모두 같으면 같은 카드다")
     void isSameCard_returnTrue_whenNumberAndIssuerMatch() {
-        BillingKey card = BillingKey.builder().memberId(1L).billingKey("billing-key-9")
+        BillingKey card = BillingKey.builder().memberId(1L).encryptedBillingKey(BillingKeyCryptoFixture.encrypted(1L, "billing-key-9"))
                 .cardNumberMasked("53275012****1234").cardIssuerCode("SHINHAN_CARD").build();
 
         assertThat(card.isSameCard("53275012****1234", "SHINHAN_CARD")).isTrue();
@@ -124,9 +125,9 @@ class BillingKeyTest {
     @Test
     @DisplayName("마스킹 번호나 발급사 코드가 다르거나, 두 값을 모르는 카드는 같은 카드로 보지 않는다")
     void isSameCard_returnFalse_whenDifferentOrUnknown() {
-        BillingKey card = BillingKey.builder().memberId(1L).billingKey("billing-key-9")
+        BillingKey card = BillingKey.builder().memberId(1L).encryptedBillingKey(BillingKeyCryptoFixture.encrypted(1L, "billing-key-9"))
                 .cardNumberMasked("53275012****1234").cardIssuerCode("SHINHAN_CARD").build();
-        BillingKey unknown = BillingKey.builder().memberId(1L).billingKey("billing-key-8").build();
+        BillingKey unknown = BillingKey.builder().memberId(1L).encryptedBillingKey(BillingKeyCryptoFixture.encrypted(1L, "billing-key-8")).build();
 
         assertThat(card.isSameCard("53275012****5678", "SHINHAN_CARD")).isFalse();
         assertThat(card.isSameCard("53275012****1234", "KOOKMIN_CARD")).isFalse();
@@ -136,7 +137,7 @@ class BillingKeyTest {
     @Test
     @DisplayName("발급사 코드를 모르면 마스킹 번호가 같고 상대도 발급사를 모를 때만 같은 카드다")
     void isSameCard_compareNumberOnly_whenIssuerUnknown() {
-        BillingKey noIssuer = BillingKey.builder().memberId(1L).billingKey("billing-key-9")
+        BillingKey noIssuer = BillingKey.builder().memberId(1L).encryptedBillingKey(BillingKeyCryptoFixture.encrypted(1L, "billing-key-9"))
                 .cardNumberMasked("53275012****1234").build();
 
         assertThat(noIssuer.isSameCard("53275012****1234", null)).isTrue();

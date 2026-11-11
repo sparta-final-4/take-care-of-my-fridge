@@ -7,10 +7,11 @@ import org.example.takecareofmyfridgebe.domain.payment.entity.BillingKey;
 import org.example.takecareofmyfridgebe.domain.payment.entity.CardType;
 import org.example.takecareofmyfridgebe.domain.payment.entity.FailReason;
 import org.example.takecareofmyfridgebe.domain.payment.entity.Payment;
-import org.example.takecareofmyfridgebe.domain.payment.entity.PgProvider;
 import org.example.takecareofmyfridgebe.domain.payment.entity.PaymentChangedBy;
 import org.example.takecareofmyfridgebe.domain.payment.entity.PaymentEventType;
 import org.example.takecareofmyfridgebe.domain.payment.entity.PaymentHistory;
+import org.example.takecareofmyfridgebe.domain.payment.entity.PgProvider;
+import org.example.takecareofmyfridgebe.domain.payment.service.BillingKeyCryptoFixture;
 import org.example.takecareofmyfridgebe.domain.settlement.dto.DailySalesSum;
 import org.example.takecareofmyfridgebe.domain.settlement.dto.PaymentMethodSalesSum;
 import org.example.takecareofmyfridgebe.domain.settlement.dto.PaymentSalesRow;
@@ -223,7 +224,8 @@ class SalesHistoryRepositoryTest extends MySqlContainerSupport {
     }
 
     private BillingKey registeredCard() {
-        BillingKey card = BillingKey.builder().memberId(member.getId()).billingKey("billing-key-" + ++sequence)
+        BillingKey card = BillingKey.builder().memberId(member.getId())
+                .encryptedBillingKey(BillingKeyCryptoFixture.encrypted(member.getId(), "billing-key-" + ++sequence))
                 .cardName("농협카드").cardType(CardType.CREDIT).isDefault(true).build();
         entityManager.persist(card);
         return card;

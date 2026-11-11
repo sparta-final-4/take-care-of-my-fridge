@@ -26,6 +26,7 @@ public class BillingKeyService {
 
     private final BillingKeyRepository billingKeyRepository;
     private final MemberRowLocker memberRowLocker;
+    private final BillingKeyCrypto billingKeyCrypto;
 
     // 등록 창을 열기 전에 막는다. 동시 등록은 저장할 때 회원 행 잠금으로 다시 막는다
     public void validateRegistrable(Long memberId) {
@@ -38,8 +39,9 @@ public class BillingKeyService {
     public BillingKeyResponse register(Long memberId, BillingKeyInfo info) {
         memberRowLocker.lock(memberId);
 
-        // 같은 등록 확정이 두 번 오면 처음 저장한 카드를 돌려준다
-        Optional<BillingKey> existing = billingKeyRepository.findByBillingKey(info.billingKey());
+        // 같은 등록 확정이 두 번 오면 처음 저장한 카드를 돌려준다. 빌링키는 지문으로 찾는다
+        Optional<BillingKey> existing =
+                billingKeyRepository.findByBillingKeyHash(billingKeyCrypto.hash(info.billingKey()));
         if (existing.isPresent()) {
             BillingKey card = existing.get();
             if (card.getMemberId().equals(memberId) && card.isActive()) {
@@ -57,7 +59,7 @@ public class BillingKeyService {
         validateLimit(activeCount);
         BillingKey card = billingKeyRepository.save(BillingKey.builder()
                 .memberId(memberId)
-                .billingKey(info.billingKey())
+                .encryptedBillingKey(billingKeyCrypto.encrypt(memberId, info.billingKey()))
                 .cardName(info.cardName())
                 .cardLast4(info.cardLast4())
                 .cardNumberMasked(info.cardNumber())

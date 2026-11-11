@@ -14,7 +14,8 @@ public interface BillingKeyRepository extends JpaRepository<BillingKey, Long> {
 
     long countByMemberIdAndStatus(Long memberId, BillingKeyStatus status);
 
-    Optional<BillingKey> findByBillingKey(String billingKey);
+    // 빌링키 원문이 아니라 지문으로 찾는다(BillingKeyCrypto.hash)
+    Optional<BillingKey> findByBillingKeyHash(String billingKeyHash);
 
     Optional<BillingKey> findByIdAndMemberIdAndStatus(Long id, Long memberId, BillingKeyStatus status);
 

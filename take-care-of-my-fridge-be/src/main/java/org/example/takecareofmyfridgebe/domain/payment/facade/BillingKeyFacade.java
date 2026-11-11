@@ -8,6 +8,7 @@ import org.example.takecareofmyfridgebe.domain.payment.dto.BillingKeyResponse;
 import org.example.takecareofmyfridgebe.domain.payment.entity.BillingKey;
 import org.example.takecareofmyfridgebe.domain.payment.port.BillingKeyGateway;
 import org.example.takecareofmyfridgebe.domain.payment.port.BillingKeyInfo;
+import org.example.takecareofmyfridgebe.domain.payment.service.BillingKeyCrypto;
 import org.example.takecareofmyfridgebe.domain.payment.service.BillingKeyService;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
@@ -33,6 +34,7 @@ public class BillingKeyFacade {
     static final int PG_DELETE_BATCH_SIZE = 100;
 
     private final BillingKeyService billingKeyService;
+    private final BillingKeyCrypto billingKeyCrypto;
     private final BillingKeyGateway billingKeyGateway;
 
     // 카드 등록을 누를 때 프론트가 호출한다. 응답 값으로 PortOne 카드 등록 창을 연다
@@ -115,7 +117,7 @@ public class BillingKeyFacade {
     // 사용자에게는 삭제 성공으로 답하고, 남은 빌링키는 재시도 스케줄러가 지운다
     public void delete(Long memberId, Long cardId) {
         BillingKey deleted = billingKeyService.delete(memberId, cardId, LocalDateTime.now());
-        deleteAtPg(deleted.getId(), deleted.getBillingKey());
+        deleteAtPg(deleted);
     }
 
     // 우리 쪽에서는 삭제했지만 PortOne 삭제를 확인하지 못한 카드를 다시 지운다. 한 건이 실패해도 나머지는 계속 처리한다
@@ -124,7 +126,7 @@ public class BillingKeyFacade {
         while (true) {
             List<BillingKey> pending = billingKeyService.findPgDeletePending(afterId, PG_DELETE_BATCH_SIZE);
             for (BillingKey card : pending) {
-                deleteAtPg(card.getId(), card.getBillingKey());
+                deleteAtPg(card);
             }
             if (pending.size() < PG_DELETE_BATCH_SIZE) {
                 return;
@@ -149,10 +151,12 @@ public class BillingKeyFacade {
         return info;
     }
 
-    // PortOne 삭제(이미 삭제됨 포함)가 확인되면 기록한다. 실패하면 기록하지 않아 재시도 대상으로 남는다
-    private void deleteAtPg(Long cardId, String billingKey) {
+    // PortOne 삭제(이미 삭제됨 포함)가 확인되면 기록한다. 실패하면 기록하지 않아 재시도 대상으로 남는다.
+    // 복호화도 이 안에서 한다. 풀지 못한 카드도 삭제 응답과 다른 카드의 재시도를 막지 않고 재시도 대상으로 남는다
+    private void deleteAtPg(BillingKey card) {
+        Long cardId = card.getId();
         try {
-            billingKeyGateway.deleteBillingKey(billingKey, CUSTOMER_DELETE_REASON);
+            billingKeyGateway.deleteBillingKey(billingKeyCrypto.decrypt(card), CUSTOMER_DELETE_REASON);
         } catch (RuntimeException e) {
             log.warn("PortOne 빌링키 삭제 실패, 재시도 대상으로 남김: cardId={}", cardId, e);
             return;
