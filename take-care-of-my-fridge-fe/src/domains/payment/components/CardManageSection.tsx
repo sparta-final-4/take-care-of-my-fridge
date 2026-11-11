@@ -69,7 +69,6 @@ export function CardManageSection() {
   return (
     <SectionCard
       title="카드 관리"
-      bracket={false}
       titleVariant="page"
       extra={cardsQuery.isSuccess && cards.length > 0 ? registerButton : undefined}
     >

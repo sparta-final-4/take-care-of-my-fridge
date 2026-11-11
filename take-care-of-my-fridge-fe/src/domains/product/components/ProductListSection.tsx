@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { useLocation } from 'react-router';
 
 import { SectionLoading } from '@/common/components/SectionLoading';
-import { PRODUCT_SORT_OPTIONS, useProductFilters } from '@/domains/product/hooks/useProductFilters';
+import { useProductFilters } from '@/domains/product/hooks/useProductFilters';
 import { productQueries } from '@/domains/product/queries';
 
 import { ProductCard } from './ProductCard';
@@ -17,7 +17,8 @@ const PAGE_SIZE = 12;
 // 레퍼런스(row7seeds.com 상품 목록)처럼 목록 위에 붙는 도구 줄: [필터(좁은 화면)] [개수] [정렬].
 // 넓은 화면의 필터는 화면 왼쪽 칸(ProductsPage)에 있고, 좁은 화면은 필터 버튼이 같은 필터를 서랍으로 연다.
 export function ProductListSection() {
-  const { keyword, request, filtered, sort, page, setSort, setPage, reset } = useProductFilters();
+  const { keyword, request, filtered, sort, sortOptions, page, setSort, setPage, reset } =
+    useProductFilters();
   const { data, isPending, isError, isPlaceholderData, refetch } = useQuery(
     productQueries.list({ ...request, size: PAGE_SIZE }),
   );
@@ -48,7 +49,7 @@ export function ProductListSection() {
         </Typography.Text>
         <Select
           variant="borderless"
-          options={PRODUCT_SORT_OPTIONS}
+          options={sortOptions}
           value={sort}
           onChange={setSort}
           aria-label="정렬"

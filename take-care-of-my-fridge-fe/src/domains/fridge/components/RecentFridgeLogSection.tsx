@@ -52,9 +52,5 @@ export function RecentFridgeLogSection() {
     );
   };
 
-  return (
-    <SectionCard title="최근 기록" bracket={false}>
-      {renderBody()}
-    </SectionCard>
-  );
+  return <SectionCard title="최근 기록">{renderBody()}</SectionCard>;
 }

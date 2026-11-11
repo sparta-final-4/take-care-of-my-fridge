@@ -9,6 +9,11 @@ export const RECIPE_SORT_OPTIONS: Array<{ value: RecipeListRequestSortEnum; labe
   { value: 'NAME_ASC', label: '이름순' },
 ];
 
+const RELEVANCE_SORT_OPTION: { value: RecipeListRequestSortEnum; label: string } = {
+  value: 'RELEVANCE',
+  label: '정확도순',
+};
+
 // 검색어·필터·정렬·페이지는 URL 쿼리에 두어 새로고침·뒤로 가기에도 유지한다.
 // 기본값은 URL에서 지워 주소를 짧게 둔다.
 export function useRecipeFilters() {
@@ -18,9 +23,13 @@ export function useRecipeFilters() {
   const cuisineType = searchParams.get('cuisine') || undefined;
   const category = searchParams.get('category') || undefined;
   const cookTime = COOK_TIME_OPTIONS.find((option) => option.key === searchParams.get('time'));
+  // 검색어가 있으면 Elasticsearch 점수로 줄 세우는 정확도순을 고를 수 있고 기본값도 정확도순이다.
+  const sortOptions = keyword
+    ? [RELEVANCE_SORT_OPTION, ...RECIPE_SORT_OPTIONS]
+    : RECIPE_SORT_OPTIONS;
+  const defaultSort: RecipeListRequestSortEnum = keyword ? 'RELEVANCE' : 'LATEST';
   const sort =
-    RECIPE_SORT_OPTIONS.find((option) => option.value === searchParams.get('sort'))?.value ??
-    'LATEST';
+    sortOptions.find((option) => option.value === searchParams.get('sort'))?.value ?? defaultSort;
   const pageParam = Number(searchParams.get('page'));
   const page = Number.isInteger(pageParam) && pageParam > 0 ? pageParam : 1;
 
@@ -39,7 +48,7 @@ export function useRecipeFilters() {
   const setCategory = (value: string | undefined) => update({ category: value, page: undefined });
   const setCookTime = (key: CookTimeKey | undefined) => update({ time: key, page: undefined });
   const setSort = (value: RecipeListRequestSortEnum) =>
-    update({ sort: value === 'LATEST' ? undefined : value, page: undefined });
+    update({ sort: value === defaultSort ? undefined : value, page: undefined });
   const setPage = (value: number) => update({ page: value === 1 ? undefined : String(value) });
   const reset = () => setSearchParams({});
 
@@ -58,6 +67,7 @@ export function useRecipeFilters() {
     category,
     cookTimeKey: cookTime?.key,
     sort,
+    sortOptions,
     page,
     request,
     filtered: Boolean(keyword || cuisineType || category || cookTime),

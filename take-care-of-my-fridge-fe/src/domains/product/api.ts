@@ -2,6 +2,7 @@ import {
   adminImageApi,
   adminProductApi,
   productApi,
+  searchApi,
   type AdminProductListRequest,
   type PageResponseProductListItemResponse,
   type ProductCreateRequest,
@@ -11,10 +12,12 @@ import {
 } from '@/common/api/clients';
 import { unwrap } from '@/common/api/unwrap';
 
+// 검색어가 있으면 Elasticsearch 검색 API로, 없으면 목록 API로 조회한다(레시피 목록과 같은 방식).
 export async function getProducts(
   request: ProductListRequest,
   signal?: AbortSignal,
 ): Promise<PageResponseProductListItemResponse> {
+  if (request.keyword) return unwrap(searchApi.searchProducts({ request }, { signal }));
   return unwrap(productApi.getProducts({ request }, { signal }));
 }
 

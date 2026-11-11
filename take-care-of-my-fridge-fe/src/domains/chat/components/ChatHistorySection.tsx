@@ -278,7 +278,7 @@ export function ChatHistorySection() {
   };
 
   return (
-    <SectionCard title="AI 상담 내역" bracket={false} titleVariant="page">
+    <SectionCard title="AI 상담 내역" titleVariant="page">
       {renderContent()}
     </SectionCard>
   );

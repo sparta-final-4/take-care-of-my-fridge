@@ -36,7 +36,7 @@ export function FridgeAiConsultSection() {
     : imminentConsultText(imminentItems);
 
   return (
-    <SectionCard title="AI 냉장고 상담" bracket={false}>
+    <SectionCard title="AI 냉장고 상담">
       <div className={styles.box}>
         <div className={styles.message}>
           <RobotOutlined aria-hidden className={styles.icon} />

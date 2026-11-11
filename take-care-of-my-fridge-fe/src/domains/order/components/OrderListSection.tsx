@@ -34,7 +34,7 @@ export function OrderListSection() {
   const orders = data?.content ?? [];
 
   return (
-    <SectionCard title="내 주문 내역" bracket={false} titleVariant="page">
+    <SectionCard title="내 주문 내역" titleVariant="page">
       {isPending ? (
         <Skeleton active paragraph={{ rows: 6 }} />
       ) : isError ? (

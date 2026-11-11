@@ -36,7 +36,7 @@ export function MyPageLayout() {
     <div className={styles.container}>
       {/* 오른쪽 내용과 같은 카드(SectionCard). md부터 스크롤해도 헤더 아래에 붙어 있다. */}
       <aside className={styles.sidebar} aria-label="마이페이지 메뉴">
-        <SectionCard title="마이페이지" bracket={false}>
+        <SectionCard title="마이페이지">
           <nav className={styles.nav}>
             {MYPAGE_NAV_ITEMS.map((item) => (
               <NavLink
