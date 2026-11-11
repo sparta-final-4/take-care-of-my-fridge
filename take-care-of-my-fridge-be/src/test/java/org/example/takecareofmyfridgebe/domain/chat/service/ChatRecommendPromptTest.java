@@ -54,11 +54,19 @@ class ChatRecommendPromptTest {
     }
 
     @Test
-    @DisplayName("임박 재료·소비기한 이야기는 소개·카드 설명 모두 쓰지 않게 하고(서버가 붙임), 출력 예시에도 없다")
+    @DisplayName("임박 재료·소비기한 이야기는 소개·카드 설명 모두 쓰지 않게 하고(카드에 있음), 서버가 임박 재료를 안내했다고 하지 않으며, 출력 예시에도 없다")
     void forbidsImminentTalk() {
         assertThat(prompt).contains("소개·카드 설명 모두 임박 재료·소비기한 이야기",
-                "필요하면 서버가 [이미 안내한 말]로 이미 했다. 카드 이유가 임박 재료 이야기여도 옮기지 않는다")
-                .doesNotContain("[소개] 냉면처럼 즐길 수 있는 면 요리를 골랐어요. 내일까지인 고추", "한 번만 말해도 된다");
+                "임박 재료는 카드에 이미 있다. 카드 이유가 임박 재료 이야기여도 옮기지 않는다")
+                .doesNotContain("[소개] 냉면처럼 즐길 수 있는 면 요리를 골랐어요. 내일까지인 고추", "한 번만 말해도 된다",
+                        "필요하면 서버가 [이미 안내한 말]로 이미 했다. 카드 이유가 임박");
+    }
+
+    @Test
+    @DisplayName("냉장고에 없는 재료는 장볼 재료는 카드에, 선택 재료만 서버 안내로 나갔다고 실제 동작대로 알려 준다")
+    void describesMissingIngredientNoticesAsServerDoes() {
+        assertThat(prompt).contains("장볼 재료는 카드에 있고, 냉장고에 없는 선택 재료는 서버가 [이미 안내한 말]로 이미 안내했다")
+                .doesNotContain("필요한 안내는 [이미 안내한 말]로 이미 나갔다");
     }
 
     @Test
