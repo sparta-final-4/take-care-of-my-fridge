@@ -2,6 +2,7 @@ package org.example.takecareofmyfridgebe.domain.chat.recommend;
 
 import org.example.takecareofmyfridgebe.domain.chat.dto.KeywordMatch;
 import org.example.takecareofmyfridgebe.domain.chat.dto.KeywordMatch.Type;
+import org.example.takecareofmyfridgebe.domain.chat.text.ChatTexts;
 
 import java.util.Collection;
 import java.util.List;
@@ -35,22 +36,22 @@ public final class KeywordMatchClassifier {
      */
     public static KeywordMatch classify(String dishText, List<String> keywords, boolean vectorOnly,
                                         String recipeName, Collection<String> ingredientNames) {
-        String name = compact(recipeName);
-        if (dishText != null && !compact(dishText).isEmpty() && name.contains(compact(dishText))) {
+        String name = ChatTexts.removeWhitespace(recipeName);
+        if (dishText != null && !ChatTexts.removeWhitespace(dishText).isEmpty() && name.contains(ChatTexts.removeWhitespace(dishText))) {
             return KeywordMatch.of(Type.NAME);
         }
         for (String keyword : keywords) {
-            if (!compact(keyword).isEmpty() && name.contains(compact(keyword))) {
+            if (!ChatTexts.removeWhitespace(keyword).isEmpty() && name.contains(ChatTexts.removeWhitespace(keyword))) {
                 return new KeywordMatch(Type.EXPANDED, keyword, null);
             }
         }
         for (String keyword : keywords) {
-            String word = compact(keyword);
+            String word = ChatTexts.removeWhitespace(keyword);
             if (word.length() < MIN_KEYWORD_LENGTH) {
                 continue;
             }
             for (String ingredient : ingredientNames) {
-                if (compact(ingredient).contains(word)) {
+                if (ChatTexts.removeWhitespace(ingredient).contains(word)) {
                     return new KeywordMatch(Type.INGREDIENT, keyword, ingredient);
                 }
             }
@@ -60,9 +61,5 @@ public final class KeywordMatchClassifier {
         // 분석기가 고쳐져도 카드 이유를 맞은 방식대로 쓰려면 이 비교는 필요해서 남긴다.
         // 걷어낼 것은 이 결과를 보고 벡터 보충을 정하는 우회(RecipeCandidateFacade.findCandidates)다
         return KeywordMatch.of(vectorOnly ? Type.VECTOR : Type.SPLIT);
-    }
-
-    private static String compact(String text) {
-        return text == null ? "" : text.replaceAll("\s+", "");
     }
 }

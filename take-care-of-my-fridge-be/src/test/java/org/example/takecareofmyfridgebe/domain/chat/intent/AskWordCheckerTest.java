@@ -66,4 +66,10 @@ public class AskWordCheckerTest {
         assertThat(AskWordChecker.requests("국물 밀키트", WORDS)).isFalse();
         assertThat(AskWordChecker.requests(null, WORDS)).isFalse();
     }
+
+    @Test
+    @DisplayName("묻는 말이 줄바꿈으로 나뉘어 있어도 묻는 말로 본다 (뭐가\n달라)")
+    void returnsAsk_whenQuestionWordSplitByNewline() {
+        assertThat(AskWordChecker.asks("김치찌개랑 된장찌개 뭐가\n달라?", WORDS)).isTrue();
+    }
 }

@@ -9,12 +9,12 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidates;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeQuery;
 import org.example.takecareofmyfridgebe.domain.chat.recommend.KeywordMatchClassifier;
 import org.example.takecareofmyfridgebe.domain.chat.recommend.MealkitPicker.FridgeMealkits;
-import org.example.takecareofmyfridgebe.domain.chat.recommend.MealkitPicker;
 import org.example.takecareofmyfridgebe.domain.chat.recommend.RecipeCandidateConditions;
 import org.example.takecareofmyfridgebe.domain.chat.recommend.RecipeCandidateScorer.FridgeStock;
 import org.example.takecareofmyfridgebe.domain.chat.recommend.RecipeCandidateScorer;
 import org.example.takecareofmyfridgebe.domain.chat.recommend.RecommendationPicker;
 import org.example.takecareofmyfridgebe.domain.chat.recommend.SpicyRecipeDetector;
+import org.example.takecareofmyfridgebe.domain.chat.text.ChatTexts;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemResponse;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeSortType;
 import org.example.takecareofmyfridgebe.domain.fridge.service.FridgeService;
@@ -350,7 +350,7 @@ public class RecipeCandidateFacade {
             if (item.productId() != null) {
                 byProduct.merge(item.productId(), item.dDay(), Math::min);
             } else if (item.rawName() != null) {
-                byName.merge(MealkitPicker.compact(item.rawName()), item.dDay(), Math::min);
+                byName.merge(ChatTexts.removeWhitespace(item.rawName()), item.dDay(), Math::min);
             }
         }
         return new FridgeMealkits(byProduct, byName);

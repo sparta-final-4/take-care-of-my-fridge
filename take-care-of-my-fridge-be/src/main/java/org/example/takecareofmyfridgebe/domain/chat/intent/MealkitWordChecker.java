@@ -1,6 +1,7 @@
 package org.example.takecareofmyfridgebe.domain.chat.intent;
 
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatWordProperties;
+import org.example.takecareofmyfridgebe.domain.chat.text.ChatTexts;
 
 import java.util.List;
 
@@ -32,7 +33,7 @@ public final class MealkitWordChecker {
     }
 
     public static Mode check(String message, ChatWordProperties.Mealkit words, ChatWordProperties.Taste negations) {
-        String text = compact(message);
+        String text = ChatTexts.removeWhitespace(message);
         Stance mealkit = stance(text, words.mealkit(), negations);
         if (mealkit == Stance.AVOID) {
             return Mode.NONE;
@@ -49,7 +50,7 @@ public final class MealkitWordChecker {
     private static Stance stance(String text, List<String> targets, ChatWordProperties.Taste negations) {
         boolean found = false;
         for (String target : targets) {
-            String word = compact(target);
+            String word = ChatTexts.removeWhitespace(target);
             if (word.isEmpty()) {
                 continue;
             }
@@ -64,9 +65,5 @@ public final class MealkitWordChecker {
             }
         }
         return found ? Stance.WANT : Stance.NONE;
-    }
-
-    private static String compact(String text) {
-        return text == null ? "" : text.replaceAll("\s+", "");
     }
 }

@@ -1,5 +1,7 @@
 package org.example.takecareofmyfridgebe.domain.chat.reply;
 
+import org.example.takecareofmyfridgebe.domain.chat.text.ChatTexts;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
@@ -68,7 +70,7 @@ public class RecommendationTextSplitter {
         this.cardCount = cardCount;
         this.alreadySaid = alreadySaid.stream().map(String::strip).filter(line -> !line.isEmpty()).toList();
         this.repeatChecked = this.alreadySaid.isEmpty();
-        this.cardNames = cardNames.stream().map(name -> name == null ? "" : compact(name)).toList();
+        this.cardNames = cardNames.stream().map(name -> name == null ? "" : ChatTexts.removeWhitespace(name)).toList();
     }
 
     /**
@@ -144,7 +146,7 @@ public class RecommendationTextSplitter {
 
     // 모아 둔 첫머리로 이름을 지울지 정할 수 있는지: 이름과 다르게 시작하거나, 이름 뒤로 몇 글자를 받았으면 정할 수 있다
     private boolean nameDecidable(String name) {
-        String head = compact(cardHead.toString());
+        String head = ChatTexts.removeWhitespace(cardHead.toString());
         if (head.isEmpty() || name.startsWith(head)) {
             return false;
         }
@@ -182,10 +184,6 @@ public class RecommendationTextSplitter {
             return rest.substring(subject.end());
         }
         return text;
-    }
-
-    private static String compact(String text) {
-        return text.replaceAll("\\s+", "");
     }
 
     private static int skipSpaces(String text, int from) {

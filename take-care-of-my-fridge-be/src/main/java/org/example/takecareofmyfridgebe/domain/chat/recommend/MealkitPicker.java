@@ -2,6 +2,7 @@ package org.example.takecareofmyfridgebe.domain.chat.recommend;
 
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeQuery;
+import org.example.takecareofmyfridgebe.domain.chat.text.ChatTexts;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 import org.example.takecareofmyfridgebe.domain.product.entity.MealkitProduct;
 import org.example.takecareofmyfridgebe.domain.product.entity.Product;
@@ -89,7 +90,7 @@ public final class MealkitPicker {
         // 이 밀키트가 냉장고에 있으면 남은 일수 (상품 ID → 등록 이름 순으로 본다). 없으면 null
         public Long dDayOf(Product product) {
             Long byId = dDayByProductId.get(product.getId());
-            return byId != null ? byId : dDayByName.get(compact(product.getName()));
+            return byId != null ? byId : dDayByName.get(ChatTexts.removeWhitespace(product.getName()));
         }
     }
 
@@ -155,8 +156,8 @@ public final class MealkitPicker {
             matches++;
         }
         matches += (int) query.wantedTastes().stream().filter(tastes::contains).count();
-        String name = compact(recipe != null && recipe.name() != null ? recipe.name() : product.getName());
-        if (query.keywords().stream().map(MealkitPicker::compact).anyMatch(keyword -> !keyword.isEmpty() && name.contains(keyword))) {
+        String name = ChatTexts.removeWhitespace(recipe != null && recipe.name() != null ? recipe.name() : product.getName());
+        if (query.keywords().stream().map(ChatTexts::removeWhitespace).anyMatch(keyword -> !keyword.isEmpty() && name.contains(keyword))) {
             matches++;
         }
         return matches;
@@ -173,10 +174,6 @@ public final class MealkitPicker {
         }
         Set<Member.Taste> tastes = input.recipeTastes().getOrDefault(recipeId, Set.of());
         return query.avoidTastes().stream().anyMatch(tastes::contains);
-    }
-
-    public static String compact(String text) {
-        return text == null ? "" : text.replaceAll("\s+", "");
     }
 
     private record Option(MealkitProduct mealkit, SellingPrice price, RecipeCandidate recipe, int requestMatches,

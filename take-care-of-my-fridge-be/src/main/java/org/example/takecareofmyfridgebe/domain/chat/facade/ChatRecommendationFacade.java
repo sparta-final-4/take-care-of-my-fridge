@@ -30,6 +30,7 @@ import org.example.takecareofmyfridgebe.domain.chat.reply.RecipeDetailPromptBuil
 import org.example.takecareofmyfridgebe.domain.chat.reply.RecommendationPromptBuilder;
 import org.example.takecareofmyfridgebe.domain.chat.reply.RecommendationReasonWriter;
 import org.example.takecareofmyfridgebe.domain.chat.service.ChatMessageService;
+import org.example.takecareofmyfridgebe.domain.chat.text.ChatTexts;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.Ingredient;
 import org.example.takecareofmyfridgebe.domain.ingredient.service.IngredientService;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
@@ -302,7 +303,7 @@ public class ChatRecommendationFacade {
                 .map(RecipeCandidateIngredient::recipeId)
                 .collect(Collectors.toSet());
         List<String> excludedNames = ingredientService.getIngredientsByIds(query.excludeIngredientIds()).values().stream()
-                .map(ingredient -> compact(ingredient.getName()))
+                .map(ingredient -> ChatTexts.removeWhitespace(ingredient.getName()))
                 .filter(name -> name.length() >= 2)
                 .distinct()
                 .toList();
@@ -323,15 +324,11 @@ public class ChatRecommendationFacade {
 
     // 넓히지 않을 이름(땅콩호박 등)은 끊어 두고 본다 ("땅콩호박 수프 밀키트"가 "땅콩"으로 빠지지 않게)
     private static String cutOtherKinds(String name, List<String> otherKinds) {
-        String text = compact(name);
+        String text = ChatTexts.removeWhitespace(name);
         for (String other : otherKinds) {
             text = text.replace(other, "|");
         }
         return text;
-    }
-
-    private static String compact(String text) {
-        return text.replaceAll("\\s+", "");
     }
 
     // 후보 10개의 정렬 단계별 값 (DEBUG). 정렬 순서: 요청 > 선택 > (선택이 있으면) 모자람 아님 > 임박 > 맛 > 보유 비율 > 없는 재료 수 > id

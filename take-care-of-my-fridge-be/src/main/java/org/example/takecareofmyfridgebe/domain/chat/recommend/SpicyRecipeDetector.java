@@ -1,5 +1,7 @@
 package org.example.takecareofmyfridgebe.domain.chat.recommend;
 
+import org.example.takecareofmyfridgebe.domain.chat.text.ChatTexts;
+
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -52,15 +54,11 @@ public final class SpicyRecipeDetector {
     }
 
     private static boolean isSpicy(String name, List<String> spicy, Set<String> exact, List<String> excluded) {
-        String text = compact(name);
+        String text = ChatTexts.removeWhitespace(name);
         return excluded.stream().noneMatch(text::contains) && (exact.contains(text) || spicy.stream().anyMatch(text::contains));
     }
 
     private static List<String> compactAll(Collection<String> names) {
-        return names == null ? List.of() : names.stream().map(SpicyRecipeDetector::compact).filter(name -> !name.isEmpty()).toList();
-    }
-
-    private static String compact(String text) {
-        return text == null ? "" : text.replaceAll("\s+", "");
+        return names == null ? List.of() : names.stream().map(ChatTexts::removeWhitespace).filter(name -> !name.isEmpty()).toList();
     }
 }

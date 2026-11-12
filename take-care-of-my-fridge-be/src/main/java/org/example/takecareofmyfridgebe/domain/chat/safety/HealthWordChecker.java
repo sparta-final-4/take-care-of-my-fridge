@@ -1,6 +1,7 @@
 package org.example.takecareofmyfridgebe.domain.chat.safety;
 
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatSafetyProperties;
+import org.example.takecareofmyfridgebe.domain.chat.text.ChatTexts;
 
 /**
  * 사용자가 보낸 말에 건강 관련 말(질환·알레르기·임신·약)이 있는지 본다. 스프링에 의존하지 않는 순수 클래스.
@@ -16,22 +17,18 @@ public final class HealthWordChecker {
     }
 
     public static boolean mentions(String message, ChatSafetyProperties.Health words) {
-        String text = compact(message);
+        String text = ChatTexts.removeWhitespace(message);
         if (text.isEmpty()) {
             return false;
         }
         for (String exclusion : words.exclusions()) {
-            String word = compact(exclusion);
+            String word = ChatTexts.removeWhitespace(exclusion);
             if (!word.isEmpty()) {
                 text = text.replace(word, CUT);
             }
         }
         String checked = text;
-        return words.health().stream().map(HealthWordChecker::compact)
+        return words.health().stream().map(ChatTexts::removeWhitespace)
                 .anyMatch(word -> !word.isEmpty() && checked.contains(word));
-    }
-
-    private static String compact(String text) {
-        return text == null ? "" : text.replaceAll("\\s+", "");
     }
 }
