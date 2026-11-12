@@ -5,16 +5,20 @@ import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 import org.example.takecareofmyfridgebe.domain.member.repository.MemberRepository;
 import org.example.takecareofmyfridgebe.domain.review.dto.RecipeReviewContentDto;
 import org.example.takecareofmyfridgebe.domain.review.dto.RecipeReviewSummaryCandidate;
+import org.example.takecareofmyfridgebe.domain.review.dto.ReviewSearchRequest;
+import org.example.takecareofmyfridgebe.domain.review.dto.ReviewSortType;
 import org.example.takecareofmyfridgebe.domain.review.entity.RecipeReview;
 import org.example.takecareofmyfridgebe.global.config.jpa.JpaAuditingConfig;
 import org.example.takecareofmyfridgebe.global.config.jpa.QueryDslConfig;
 import org.example.takecareofmyfridgebe.support.MySqlContainerSupport;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.Page;
 
 import java.util.List;
 
@@ -93,6 +97,104 @@ class RecipeReviewRepositoryTest extends MySqlContainerSupport {
         assertThat(reviews).hasSize(2);
         assertThat(reviews.get(0).rating()).isPositive();
         assertThat(reviews.get(0).content()).isNotEmpty();
+    }
+
+    @Nested
+    @DisplayName("후기 목록 조회 (findReviewsByCondition)")
+    class FindReviewsByCondition {
+
+        @Test
+        @DisplayName("레시피 ID를 주면 그 레시피의 후기만 나온다")
+        void returnsOnlyRecipeReviews_whenRecipeIdGiven() {
+            Member member1 = createMember("list1@test.com", "list1");
+            Member member2 = createMember("list2@test.com", "list2");
+            createReview(member1, 10L, 4, "레시피10 후기1");
+            createReview(member2, 10L, 5, "레시피10 후기2");
+            createReview(member1, 20L, 3, "레시피20 후기");
+            entityManager.flush();
+            entityManager.clear();
+
+            Page<RecipeReview> page = recipeReviewRepository.findReviewsByCondition(
+                    new ReviewSearchRequest(10L, false, ReviewSortType.LATEST, 1, 10), null);
+
+            assertThat(page.getContent()).extracting(RecipeReview::getRecipeId).containsOnly(10L);
+            assertThat(page.getTotalElements()).isEqualTo(2L);
+        }
+
+        @Test
+        @DisplayName("내 후기만 보기를 켜고 회원 ID를 주면 그 회원의 후기만 나온다")
+        void returnsOnlyMyReviews_whenMineAndMemberGiven() {
+            Member me = createMember("mine1@test.com", "mine1");
+            Member other = createMember("mine2@test.com", "mine2");
+            createReview(me, 10L, 4, "내 후기1");
+            createReview(other, 10L, 5, "다른 사람 후기");
+            createReview(me, 20L, 3, "내 후기2");
+            entityManager.flush();
+            entityManager.clear();
+
+            Page<RecipeReview> page = recipeReviewRepository.findReviewsByCondition(
+                    new ReviewSearchRequest(null, true, ReviewSortType.LATEST, 1, 10), me.getId());
+
+            assertThat(page.getContent()).extracting(review -> review.getMember().getId()).containsOnly(me.getId());
+            assertThat(page.getContent()).extracting(RecipeReview::getContent).containsExactly("내 후기2", "내 후기1");
+        }
+
+        @Test
+        @DisplayName("최신순이면 나중에 쓴 후기가 먼저 나온다")
+        void sortsByLatest_whenSortIsLatest() {
+            Member member1 = createMember("latest1@test.com", "latest1");
+            Member member2 = createMember("latest2@test.com", "latest2");
+            Member member3 = createMember("latest3@test.com", "latest3");
+            createReview(member1, 30L, 5, "첫 번째");
+            createReview(member2, 30L, 3, "두 번째");
+            createReview(member3, 30L, 4, "세 번째");
+            entityManager.flush();
+            entityManager.clear();
+
+            Page<RecipeReview> page = recipeReviewRepository.findReviewsByCondition(
+                    new ReviewSearchRequest(30L, false, ReviewSortType.LATEST, 1, 10), null);
+
+            assertThat(page.getContent()).extracting(RecipeReview::getContent).containsExactly("세 번째", "두 번째", "첫 번째");
+        }
+
+        @Test
+        @DisplayName("별점순이면 별점이 높은 후기가 먼저 나오고, 별점이 같으면 나중에 쓴 후기가 먼저 나온다")
+        void sortsByRatingThenLatest_whenSortIsRating() {
+            Member member1 = createMember("rating1@test.com", "rating1");
+            Member member2 = createMember("rating2@test.com", "rating2");
+            Member member3 = createMember("rating3@test.com", "rating3");
+            Member member4 = createMember("rating4@test.com", "rating4");
+            createReview(member1, 40L, 3, "별점3");
+            createReview(member2, 40L, 5, "별점5 먼저");
+            createReview(member3, 40L, 5, "별점5 나중");
+            createReview(member4, 40L, 4, "별점4");
+            entityManager.flush();
+            entityManager.clear();
+
+            Page<RecipeReview> page = recipeReviewRepository.findReviewsByCondition(
+                    new ReviewSearchRequest(40L, false, ReviewSortType.RATING, 1, 10), null);
+
+            assertThat(page.getContent()).extracting(RecipeReview::getContent)
+                    .containsExactly("별점5 나중", "별점5 먼저", "별점4", "별점3");
+        }
+
+        @Test
+        @DisplayName("페이지 크기 2로 2페이지를 보면 3·4번째 후기와 전체 개수·페이지 수가 나온다")
+        void returnsSecondPage_whenPageAndSizeGiven() {
+            for (int i = 1; i <= 5; i++) {
+                createReview(createMember("page" + i + "@test.com", "page" + i), 50L, 4, "후기" + i);
+            }
+            entityManager.flush();
+            entityManager.clear();
+
+            Page<RecipeReview> page = recipeReviewRepository.findReviewsByCondition(
+                    new ReviewSearchRequest(50L, false, ReviewSortType.LATEST, 2, 2), null);
+
+            assertThat(page.getContent()).extracting(RecipeReview::getContent).containsExactly("후기3", "후기2");
+            assertThat(page.getNumber()).isEqualTo(1);
+            assertThat(page.getTotalElements()).isEqualTo(5L);
+            assertThat(page.getTotalPages()).isEqualTo(3);
+        }
     }
 
     private Member createMember(String email, String nickname) {
