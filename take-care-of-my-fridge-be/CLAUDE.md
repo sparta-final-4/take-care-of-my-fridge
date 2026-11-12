@@ -94,9 +94,11 @@ take-care-of-my-fridge-be/ 개발 규칙. 이 문서와 기존 코드의 패턴�
 4.6 Redis와 잠금
 - Key 네이밍: 콜론(:) 계층형 구조 통일 ({도메인}:{목적}:{식별자}).
 - TTL 필수: 캐시 및 임시 데이터 저장 시 만료 시간(TTL)을 반드시 지정한다.
-- 잠금은 두 가지를 쓴다. 분산 락 라이브러리(Redisson)는 쓰지 않는다.
+- 잠금은 세 가지를 쓴다. Redisson 같은 범용 분산 락 라이브러리는 쓰지 않는다.
+  (초기에는 Facade에서 Redisson으로 잠그는 규칙이었으나, 실제 구현이 모두 아래 방식으로 정리되어 도입하지 않았다.)
     - 같은 행을 동시에 바꾸는 요청: DB 비관적 락(`@Lock(PESSIMISTIC_WRITE)`, `SELECT ... FOR UPDATE`). Service 트랜잭션 안에서 잡는다.
-    - 짧은 중복 실행 방지(예: 상담 답 하나씩): Redis `SETNX` + TTL. 트랜잭션 밖에서 잡고 푼다.
+    - 짧은 중복 실행 방지(예: 상담 답 하나씩): Redis `SETNX` + TTL. 트랜잭션 밖에서 잡고 푼다. 푸는 쪽이 다른 스레드일 수 있으면 요청마다 만든 토큰으로 주인을 확인하고 Lua로 지운다.
+    - 스케줄러 중복 실행 방지: ShedLock(`@SchedulerLock`, Redis 저장소). 서버가 여러 대여도 한 대만 실행한다.
 
 4.7 Kafka 이벤트
 - 토픽 네이밍: 케밥 케이스(-) 및 행위 중심 (order-created, payment-completed).
