@@ -35,7 +35,7 @@
 ## 인증·트랜잭션
 
 - 인증은 HttpOnly 쿠키(JWT)와 서버 세션으로 서버에서 합니다. 쿠키·CSRF 계약은 [회원 API 명세](../api/member-auth-admin-api.md#인증-쿠키), 토큰·세션 동작은 [회원 설계](domains/member.md#인증-쿠키토큰세션)에 있습니다. 프론트 라우트 보호는 사용자 흐름만 맡습니다.
-- 동시성은 위 표처럼 DB 비관적 락과 Redis `SETNX`로 막습니다. 분산 락 라이브러리(Redisson)는 쓰지 않습니다.
+- 동시성은 위 표처럼 DB 비관적 락과 Redis `SETNX`로 막고, 스케줄러 중복 실행은 ShedLock(`@SchedulerLock`, Redis 저장소)으로 막습니다. Redisson 같은 범용 분산 락 라이브러리는 쓰지 않습니다. 규칙은 [백엔드 규칙 4.6](../../take-care-of-my-fridge-be/CLAUDE.md)에 있습니다.
 - 외부 I/O와 비동기 작업은 커밋 뒤(`@TransactionalEventListener(AFTER_COMMIT)`) 이벤트로 분리합니다. 재시도·중복 처리·유실 복구는 도메인마다 설계 문서에 적습니다.
 
 ## 환경·운영
