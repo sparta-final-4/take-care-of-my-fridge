@@ -208,6 +208,7 @@ public enum ErrorCode {
 ```
 
 6. 테스트 작성
+- 실제 MySQL·Redis·Kafka가 필요한 테스트는 support의 컨테이너 베이스 클래스를 상속한다: [DB 테스트 작성 지침](../docs/testing/db-test-guide.md)
 - 검증은 AssertJ만 쓴다.
     - 값: assertThat(...).isEqualTo(...) / containsExactly(...) / isEmpty() 등
     - 예외: assertThatThrownBy(...).isInstanceOf(...) 또는 assertThatExceptionOfType(...)
