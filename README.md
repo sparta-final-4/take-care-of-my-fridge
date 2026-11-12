@@ -33,38 +33,43 @@
 
 ## 2. 주요 기능
 
-### 🧊 1. 넣는 순간부터 다 먹을 때까지, 냉장고를 한눈에!
+## 2. 주요 기능
+
+### 🔐 1. 가입부터 로그인 유지까지, 안전한 회원 인증!
+이메일로 가입하며 맛 선호를 함께 등록하고, HttpOnly 쿠키 JWT와 서버 세션(30분 미사용 시 만료, 갱신 토큰 회전)·CSRF 보호로 로그인을 유지하며, 역할(USER/ADMIN) 기반으로 API 접근을 제어합니다.
+- 📖 [회원 & 인증 상세 Wiki](https://github.com/sparta-final-4/take-care-of-my-fridge/wiki/Member-Auth)
+
+### 🧊 2. 넣는 순간부터 다 먹을 때까지, 냉장고를 한눈에!
 재료를 등록하면 소비기한을 자동 계산하고 제각각인 상품명을 표준 재료로 매핑해, 부분 소진·폐기·삭제 이력과 구매 확정 주문의 자동 입고(입고 이력 원장으로 중복 입고 차단)까지 한 곳에서 관리합니다.
 - 📖 [냉장고 기능 상세 Wiki](https://github.com/sparta-final-4/take-care-of-my-fridge/wiki/Fridge)
 
-### 🔎 2. 내 냉장고 재료로 만들 수 있는 레시피를 바로!
+### 🔎 3. 내 냉장고 재료로 만들 수 있는 레시피를 바로!
 표준 재료를 기준으로 냉장고 재료와 레시피 재료를 대조해 지금 만들 수 있는 요리를 추천하고, Elasticsearch nori 형태소 분석·자동완성과 임베딩 kNN 벡터 검색, 최근 7일 검색 횟수 기준 인기 검색어로 레시피와 상품을 찾습니다.
 - 📖 [검색 & 레시피 상세 Wiki](https://github.com/sparta-final-4/take-care-of-my-fridge/wiki/Search-and-Recipe)
 
-### 🤖 3. 오늘 뭐 먹지? 고민될 땐 실시간 AI 상담!
+### 🤖 4. 오늘 뭐 먹지? 고민될 땐 실시간 AI 상담!
 자연어 질문에서 의도(Intent)와 선호를 뽑아 냉장고 재료에 맞는 레시피·상품을 SSE 스트리밍으로 답하고, 세션별 상담 보관·회원별 1일 횟수 제한·Redis 잠금(SET NX)으로 같은 세션의 중복 답변 생성을 막습니다.
 - 📖 [AI 상담 상세 Wiki](https://github.com/sparta-final-4/take-care-of-my-fridge/wiki/AI-Chat)
 
-### 🍳 4. 만들어 보고, 남기고, 나누는 요리 기록!
+### 🍳 5. 만들어 보고, 남기고, 나누는 요리 기록!
 레시피를 만든 뒤 요리 완료 기록과 후기·별점을 남기면 AI가 후기를 짧은 팁으로 요약해 레시피 상세에 보여 주고, 많이 만든 인기 레시피 순위와 요리 통계를 제공합니다.
 - 📖 [요리 기록 & 후기 상세 Wiki](https://github.com/sparta-final-4/take-care-of-my-fridge/wiki/Cooking-Review)
 
-### 💳 5. 부족한 재료는 장바구니로, 결제부터 환불까지 안전하게!
+### 💳 6. 부족한 재료는 장바구니로, 결제부터 환불까지 안전하게!
 장바구니 주문의 가격 스냅샷 보존·미결제 자동 만료·7일 자동 구매 확정부터, 결제 요청과 승인 확정을 분리한 PortOne 결제(웹훅 서명 검증·멱등 처리), 상품 단위 부분·전체 환불, 결제 이력 원장 기반 PG 대사·일별 매출 정산까지 제공합니다.
 - 📖 [주문 & 결제 상세 Wiki](https://github.com/sparta-final-4/take-care-of-my-fridge/wiki/Order-Payment)
 
-### ⚡ 6. 놓치면 아쉬운 특가와 번개 드롭!
+### ⚡ 7. 놓치면 아쉬운 특가와 번개 드롭!
 기간 한정 특가와 1인 1개로 제한한 수량 한정 번개 드롭을 운영하며, 행사 시작·종료 시각에 맞춰 상품 가격과 재고 노출을 자동으로 스케줄링합니다.
 - 📖 [할인 프로모션 상세 Wiki](https://github.com/sparta-final-4/take-care-of-my-fridge/wiki/Sale-Event)
 
-### 🔔 7. 버려지기 전에, 놓치기 전에 먼저 알려드리는 실시간 알림!
+### 🔔 8. 버려지기 전에, 놓치기 전에 먼저 알려드리는 실시간 알림!
 번개 드롭이 시작되면 정지되지 않은 일반 회원 전체에게 Apache Kafka로 알림을 중계해 SSE로 실시간 전송하고, 읽지 않은 알림 수 확인·전체 읽음·알림 삭제 기능을 제공합니다.
 - 📖 [실시간 알림 상세 Wiki](https://github.com/sparta-final-4/take-care-of-my-fridge/wiki/Notification)
 
-### 📈 8. 관리자를 위한 판매 예측과 할인 후보 추천!
+### 📈 9. 관리자를 위한 판매 예측과 할인 후보 추천!
 PyTorch 모델로 다음 주 판매 TOP 10을 예측해 실제 판매량과 비교하고, 과거 할인 판매 기록의 가격 탄력성으로 요일별 할인 후보를 추천해 특가·번개 드롭으로 바로 등록하며, 관리자 권한 제어와 작업 감사 이력을 남깁니다.
 - 📖 [관리자 & 판매 분석 상세 Wiki](https://github.com/sparta-final-4/take-care-of-my-fridge/wiki/Admin-Analytics)
-
 <br/>
 
 ## 3. 기술 스택
