@@ -1,6 +1,7 @@
-# TIL: PyTorch로 주간 판매량 예측 모델 만들기
+# forecast_model: PyTorch 주간 판매량 예측 모델
 
-작성일: 2026-10-19 · 예제 코드: PR #118~#121 (`forecast_model/`)
+작성: 안상윤 · 작성일: 2026-10-19 · 예제 코드: PR #118~#121, 배치 연결 #299 · 옮긴 날: 2026-11-12 (`docs/til/`에서)
+지금 설계(집계 기준·배치 시각·저장 방식)는 [판매 예측 설계](../docs/architecture/domains/sales-forecast.md)를 봅니다. 이 문서는 모델 코드를 읽고 실행하는 방법을 다룹니다.
 
 최근 28일 일별 판매량으로 다음 7일 총판매량을 예측하는 PyTorch 모델을 예제로 정리했습니다. 딥러닝 코드를 셋팅하고, 읽고, 검증하는 방법을 다룹니다. 처음 보는 팀원도 이 문서만 보고 같은 구조로 모델을 만들 수 있도록 썼습니다.
 
@@ -15,7 +16,7 @@
 7. [코드 읽기 4: artifact.py](#7-코드-읽기-4-artifactpy--모델-저장과-로드)
 8. [테스트 작성법](#8-테스트-작성법)
 9. [중점적으로 볼 체크리스트](#9-중점적으로-볼-체크리스트)
-10. [우리 서비스에 적용하는 다음 단계](#10-우리-서비스에-적용하는-다음-단계)
+10. [남은 작업](#10-남은-작업)
 
 ---
 
@@ -44,7 +45,9 @@ flowchart LR
 | `forecast_model/training.py` | 입력 검증, 정규화, 학습 루프 | #119 |
 | `forecast_model/inference.py` | 상품 1개의 다음 7일 판매량 예측 | #120 |
 | `forecast_model/artifact.py` | 학습된 가중치 저장·로드 | #121 |
-| `forecast_model/tests/` | 각 단계 단위 테스트 (총 6개) | #118~#121 |
+| `forecast_model/worker.py` | 학습·예측 HTTP 작업(`POST /predict`). Java 예측 배치가 부름 | #299 |
+| `forecast_model/Dockerfile` | worker 이미지 (CPU용 PyTorch, 포트 8091) | #299 |
+| `forecast_model/tests/` | 각 단계 단위 테스트 (총 7개) | #118~#121, #299 |
 
 ---
 
@@ -110,13 +113,16 @@ take-care-of-my-fridge/
 │   ├── training.py
 │   ├── inference.py
 │   ├── artifact.py
+│   ├── worker.py                # 학습·예측 HTTP 작업
+│   ├── Dockerfile
 │   ├── requirements.txt
 │   └── tests/
 │       ├── test_model.py
 │       ├── test_training.py
 │       ├── test_inference.py
-│       └── test_artifact.py
-├── take-care-of-my-fridge-be/   # Spring Boot (아직 모델과 연결 안 됨)
+│       ├── test_artifact.py
+│       └── test_worker.py
+├── take-care-of-my-fridge-be/   # Spring Boot (예측 배치가 worker를 HTTP로 부름)
 └── take-care-of-my-fridge-fe/   # React
 ```
 
@@ -186,8 +192,9 @@ test_restores_sales_scale ... ok
 test_returns_nonnegative_forecast_for_each_product ... ok
 test_rejects_empty_training_data ... ok
 test_training_reduces_error_on_synthetic_sales ... ok
+test_trains_predicts_and_saves_real_run_artifact ... ok
 ----------------------------------------------------------------------
-Ran 6 tests in 1.151s
+Ran 7 tests in ...s
 
 OK
 ```
@@ -377,6 +384,7 @@ def load_model(path):
 | `test_inference` | 정규화를 되돌리는 계산이 정확하다 | 항상 7을 내는 가짜 모델 `ConstantModel` → 평균 10이면 70 |
 | `test_inference` | 27일 입력, 음수 입력을 거부한다 | `assertRaises(ValueError)` |
 | `test_artifact` | 저장 전후 예측이 같다 | `tempfile.TemporaryDirectory()`에 저장 후 비교 |
+| `test_worker` | 학습·예측 후 모델 버전과 0 이상 예측을 돌려주고, 대상 주 이름의 모델 파일을 남긴다 | 임시 폴더에 저장 후 `load_model`로 다시 읽기 |
 
 ### 배울 만한 테스트 기법
 
@@ -427,22 +435,13 @@ gh pr edit 119 --repo sparta-final-4/take-care-of-my-fridge --base dev
 
 ---
 
-## 10. 우리 서비스에 적용하는 다음 단계
+## 10. 남은 작업
 
-```mermaid
-flowchart LR
-    A["주문·환불 집계<br/>(asOf 기준 순판매량)"] --> B["상품×날짜<br/>28일 이력 생성"]
-    B --> C["시간 순 학습/검증 분할<br/>+ 기준선 비교"]
-    C --> D["학습 + 메타데이터 포함 저장<br/>(dataCutoffAt 등)"]
-    D --> E["일요일 22시 배치 예측"]
-    E --> F["관리자 화면:<br/>예측 vs 실제 판매량"]
-```
+처음 정리할 때 적은 다음 단계 중 입력 데이터 연결, 모델 메타데이터 저장, 일요일 배치 연결은 구현됐습니다. 지금 방식은 [판매 예측 설계](../docs/architecture/domains/sales-forecast.md)에 있습니다.
 
-1. **입력 데이터 연결**: 주문·환불 담당자와 `asOf` 기준 순판매량 제공 방식을 합의합니다(`docs/architecture/domains/sales-forecast.md` 참고). 결제일 기준이며, 환불은 차감합니다.
-2. **평가 체계**: 시간 순 학습/검증 분할을 하고, 원래 단위 오차(MAE 등)로 기준선과 비교합니다.
-3. **아티팩트 메타데이터**: 모델 버전, `dataCutoffAt`, 학습 기간을 함께 저장합니다.
-4. **배치 연결**: 입력은 일요일 18시에 마감하고, 22시에 예측을 생성합니다. 실제 판매량은 월요일 06시에 확정합니다. 상품을 하나씩 예측하지 말고 `(N, 28)` 배치로 한 번에 예측하는 방식을 검토합니다.
-5. **CI**: Python 테스트를 GitHub Actions에 추가합니다.
+1. **CI**: Python 테스트를 GitHub Actions에 추가합니다. 지금 CI는 백엔드·프론트만 검사합니다.
+
+실제 운영 이력으로 모델 품질을 평가하는 일은 [판매 예측 설계의 남은 검증](../docs/architecture/domains/sales-forecast.md#남은-검증)에 있습니다.
 
 ### 새 딥러닝 기능을 만들 때 따라 할 순서
 
@@ -457,8 +456,8 @@ flowchart LR
 
 ## 참고
 
-- 기획서 Q-13, Q-15: `docs/requirements/project-plan.md`
-- 판매 예측 데이터 협의: `docs/architecture/domains/sales-forecast.md`
+- 기획서 Q-13, Q-15: [프로젝트 기획](../docs/requirements/project-plan.md#결정-대기-목록)
+- 판매 예측 설계: [sales-forecast.md](../docs/architecture/domains/sales-forecast.md)
 - 작업 기록: `docs/worklogs/work-043` ~ `work-046`
 - PyTorch 공식 튜토리얼: <https://pytorch.org/tutorials/beginner/basics/intro.html>
 - PyTorch 모델 저장 가이드: <https://pytorch.org/tutorials/beginner/saving_loading_models.html>

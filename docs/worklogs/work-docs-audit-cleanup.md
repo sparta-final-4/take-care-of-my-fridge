@@ -25,7 +25,9 @@
 | 7ab25f4f | 할인 후보 협의안을 docs/archive로 | 협의안(안상윤) |
 | ee82e5e4 | 작업 기록 | |
 | b1bfde51 | DB 문서 칸 타입을 dev에 맞춤 | data-dictionary.md(최용범), erd.md(강준모) |
-| (이 기록 갱신) | 테스트 이름·readOnly·감사 칸·fridge 규칙 예외 정리 | 없음 |
+| 886677d3 | 테스트 이름·readOnly·감사 칸·fridge 규칙 예외 정리 | 없음 |
+| 237ac728 | 문서 머리말·링크 정리 (잘 안 쓰이는 문서 조사 후속) | recipe-vector·search(강준모), screens·db-test-guide(장준혁), project-plan(최용범) |
+| (이 기록 갱신) | til 문서를 forecast_model/README.md로 옮기고 docs/til 삭제 | til(작성자 안상윤) |
 
 ## 깃 아이디와 실명
 커밋 이메일과 README 팀원 표로 확인했다.
@@ -95,6 +97,11 @@
 | 애플리케이션 테스트 | 미실행 | 문서만 바꿈. schema.sql을 읽는 테스트 없음 |
 
 ## 연결과 남은 작업
+- 잘 안 쓰이는 문서 조사(11-12)에서 이번에 하지 않기로 한 것:
+  - test-strategy.md 다시 쓰기: 시나리오 ID 99개를 테스트 코드와 잇거나 빼기, 빠진 도메인(fridge·cooking·review·chat·recipe·product·search), Testcontainers·재생(ChatIntentReplayTest)·평가(ChatIntentEvalManualTest) 테스트 설명.
+  - troubleshooting 채우기: worklogs 중 원인 절이 있는 5개(예: work-dev-backend-deploy-disk-space, work-forecast-clear-previous-demo)를 문제 기록으로 정리하고 README 6장 표 "관련 상세 문서"에 연결.
+  - docs/archive 구조 정리: archive/README.md 목록(문서·보관일·이유·대신 볼 문서), 원래 경로 따라 하위 폴더, 파일마다 "보관됨" 안내. 옮기면 domains/deal-analysis.md:61과 worklogs/work-065 링크 수정.
+  - guide/document-guide.md 갱신: 10-14 시점 상태(ERD 초안, 검증 실행 결과 없음 등)가 남아 있음.
 - 테스트 코드를 AssertJ·@DisplayName 규칙에 맞추기(위 "코드가 규칙과 다름").
 - billing_keys.billing_key 평문 칸 정리(결제 담당 최용범).
 - screens.md A-06의 "보류 버튼 없음"은 화면을 확인하지 않아 그대로 두었다(검토 상태 `HELD`는 서버에 있음).
