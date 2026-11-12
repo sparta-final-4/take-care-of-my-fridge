@@ -66,6 +66,7 @@ class ChatRecommendationFacadeTest {
     private static final Long MEMBER_ID = 1L;
 
     private RecipeCandidateFacade recipeCandidateFacade;
+    private RecipeCardDescriber recipeCardDescriber;
     private RecipeService recipeService;
     private IngredientService ingredientService;
     private ProductService productService;
@@ -76,13 +77,14 @@ class ChatRecommendationFacadeTest {
     @BeforeEach
     void setUp() {
         recipeCandidateFacade = mock(RecipeCandidateFacade.class);
+        recipeCardDescriber = mock(RecipeCardDescriber.class);
         recipeService = mock(RecipeService.class);
         ingredientService = mock(IngredientService.class);
         productService = mock(ProductService.class);
         saleEventReader = mock(SaleEventReader.class);
         chatMessageService = mock(ChatMessageService.class);
-        facade = new ChatRecommendationFacade(recipeCandidateFacade, recipeService, ingredientService, productService,
-                saleEventReader, chatMessageService, ChatIntentFixture.WORDS, SafetyWordCheckerTest.ALL);
+        facade = new ChatRecommendationFacade(recipeCandidateFacade, recipeCardDescriber, recipeService, ingredientService,
+                productService, saleEventReader, chatMessageService, ChatIntentFixture.WORDS, SafetyWordCheckerTest.ALL);
         when(ingredientService.getIngredientsByIds(any())).thenReturn(Map.of());
     }
 
@@ -265,7 +267,7 @@ class ChatRecommendationFacadeTest {
                 .recipeId(20L).name("두부조림").category("조림").cookTimeMin(20)
                 .ingredients(List.of()).steps(List.of(new StepItem(1, "두부를 굽는다.", null, null))).build();
         when(recipeService.getRecipe(20L)).thenReturn(recipe);
-        when(recipeCandidateFacade.describeRecipes(MEMBER_ID, List.of(20L))).thenReturn(Map.of(
+        when(recipeCardDescriber.describeRecipes(MEMBER_ID, List.of(20L))).thenReturn(Map.of(
                 20L, candidate(20L, "두부조림", "조림", 20, missing(new MissingIngredient(21L, "두부")))));
         givenProducts(product(22L, 21L, "부침용 두부 1모", 2000, null));
 
@@ -313,7 +315,7 @@ class ChatRecommendationFacadeTest {
                 .recipeId(20L).name("깐풍기").category("튀김").cookTimeMin(40).imageUrl("https://img/20.jpg")
                 .ingredients(List.of()).steps(List.of(new StepItem(1, "닭을 튀긴다.", null, null))).build();
         when(recipeService.getRecipe(20L)).thenReturn(recipe);
-        when(recipeCandidateFacade.describeRecipes(MEMBER_ID, List.of(20L))).thenReturn(Map.of(
+        when(recipeCardDescriber.describeRecipes(MEMBER_ID, List.of(20L))).thenReturn(Map.of(
                 20L, candidate(20L, "깐풍기", "튀김", 40, reason(List.of()))));
 
         RecipeDetailReply reply = facade.describe(MEMBER_ID, 20L).orElseThrow();
@@ -510,7 +512,7 @@ class ChatRecommendationFacadeTest {
         assertThat(reply.fixedReply()).isNull();
         verify(recipeCandidateFacade).findCandidates(argThat(
                 query -> query.keywords().isEmpty() && query.keywordText() == null));
-        verify(recipeCandidateFacade, never()).describeMealkitRecipes(any(), any());
+        verify(recipeCardDescriber, never()).describeMealkitRecipes(any(), any());
     }
 
     @Test
@@ -566,8 +568,8 @@ class ChatRecommendationFacadeTest {
             }
         }
         when(saleEventReader.findSellingPrices(any())).thenReturn(prices);
-        when(recipeCandidateFacade.describeMealkitRecipes(any(), any()))
-                .thenReturn(new RecipeCandidateFacade.MealkitRecipes(recipes, Map.of(), Set.of(), FridgeMealkits.NONE));
+        when(recipeCardDescriber.describeMealkitRecipes(any(), any()))
+                .thenReturn(new RecipeCardDescriber.MealkitRecipes(recipes, Map.of(), Set.of(), FridgeMealkits.NONE));
     }
 
     private static Ingredient ingredient(Long id, String name) {

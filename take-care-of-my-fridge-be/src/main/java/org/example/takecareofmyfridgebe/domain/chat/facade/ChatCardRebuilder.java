@@ -33,7 +33,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ChatCardRebuilder {
 
-    private final RecipeCandidateFacade recipeCandidateFacade;
+    private final RecipeCardDescriber recipeCardDescriber;
     private final RecipeService recipeService;
     private final ProductService productService;
     private final SaleEventReader saleEventReader;
@@ -52,7 +52,7 @@ public class ChatCardRebuilder {
             return Map.of();
         }
         List<Long> recipeIds = saved.stream().map(SavedRecommendation::recipeId).distinct().toList();
-        Map<Long, RecipeCandidate> candidates = recipeCandidateFacade.describeRecipes(memberId, recipeIds);
+        Map<Long, RecipeCandidate> candidates = recipeCardDescriber.describeRecipes(memberId, recipeIds);
         Map<Long, RecipeSummary> summaries = recipeService.findSummaries(recipeIds);
         // 상품·판매가는 메시지 수와 상관없이 한 번씩, 지금 가격·품절 기준
         Map<Long, ShoppingProduct> products = RecommendationCards.shoppingProducts(candidates.values(), productService,
@@ -103,7 +103,7 @@ public class ChatCardRebuilder {
                 mealkits.values().stream().map(MealkitProduct::getProduct).toList());
         Map<Long, RecipeSummary> recipes = recipeService.findSummaries(
                 mealkits.values().stream().map(MealkitProduct::getRecipeId).filter(Objects::nonNull).distinct().toList());
-        MealkitPicker.FridgeMealkits fridge = recipeCandidateFacade.findFridgeMealkits(memberId);
+        MealkitPicker.FridgeMealkits fridge = recipeCardDescriber.findFridgeMealkits(memberId);
 
         Map<Long, List<RecommendedMealkit>> cards = new LinkedHashMap<>();
         saved.stream()

@@ -39,7 +39,7 @@ class ChatCardRebuilderTest {
 
     private static final Long MEMBER_ID = 1L;
 
-    private RecipeCandidateFacade recipeCandidateFacade;
+    private RecipeCardDescriber recipeCardDescriber;
     private RecipeService recipeService;
     private ProductService productService;
     private SaleEventReader saleEventReader;
@@ -47,11 +47,11 @@ class ChatCardRebuilderTest {
 
     @BeforeEach
     void setUp() {
-        recipeCandidateFacade = mock(RecipeCandidateFacade.class);
+        recipeCardDescriber = mock(RecipeCardDescriber.class);
         recipeService = mock(RecipeService.class);
         productService = mock(ProductService.class);
         saleEventReader = mock(SaleEventReader.class);
-        facade = new ChatCardRebuilder(recipeCandidateFacade, recipeService, productService, saleEventReader);
+        facade = new ChatCardRebuilder(recipeCardDescriber, recipeService, productService, saleEventReader);
     }
 
     @Test
@@ -62,7 +62,7 @@ class ChatCardRebuilderTest {
                 new SavedRecommendation(2L, 10L, 0, "첫째 설명"),
                 new SavedRecommendation(2L, 99L, 2, "지워진 레시피"),
                 new SavedRecommendation(4L, 30L, 0, null));
-        when(recipeCandidateFacade.describeRecipes(1L, List.of(20L, 10L, 99L, 30L))).thenReturn(Map.of(
+        when(recipeCardDescriber.describeRecipes(1L, List.of(20L, 10L, 99L, 30L))).thenReturn(Map.of(
                 10L, candidate(10L, "두부조림", "조림", 20, reason(List.of(Taste.SALTY))),
                 20L, candidate(20L, "두부국", "국", null, reason(List.of())),
                 30L, candidate(30L, "장어조림", "조림", 30, reason(List.of()))));
@@ -76,7 +76,7 @@ class ChatCardRebuilderTest {
         assertThat(cards.get(2L).get(0).imageUrl()).isEqualTo("https://img/10.jpg");
         assertThat(cards.get(2L).get(0).missingSelectedIngredients()).isEmpty();
         assertThat(cards.get(4L)).extracting(RecommendedRecipe::recipeId).containsExactly(30L);
-        verify(recipeCandidateFacade, times(1)).describeRecipes(any(), any());
+        verify(recipeCardDescriber, times(1)).describeRecipes(any(), any());
     }
 
     @Test
@@ -85,7 +85,7 @@ class ChatCardRebuilderTest {
         List<SavedRecommendation> saved = List.of(
                 new SavedRecommendation(2L, 10L, 0, "첫째 설명"),
                 new SavedRecommendation(4L, 20L, 0, "둘째 설명"));
-        when(recipeCandidateFacade.describeRecipes(1L, List.of(10L, 20L))).thenReturn(Map.of(
+        when(recipeCardDescriber.describeRecipes(1L, List.of(10L, 20L))).thenReturn(Map.of(
                 10L, candidate(10L, "두부조림", "조림", 20, missing(new MissingIngredient(21L, "두부"))),
                 20L, candidate(20L, "대파전", "전", 20, missing(new MissingIngredient(3L, "대파")))));
         when(recipeService.findSummaries(any())).thenReturn(Map.of());
@@ -118,7 +118,7 @@ class ChatCardRebuilderTest {
         when(recipeService.findSummaries(any())).thenReturn(Map.of(
                 543L, new RecipeSummary(543L, "황태해장국", null, null),
                 544L, new RecipeSummary(544L, "된장국", null, null)));
-        when(recipeCandidateFacade.findFridgeMealkits(MEMBER_ID)).thenReturn(new FridgeMealkits(Map.of(40L, 1L), Map.of()));
+        when(recipeCardDescriber.findFridgeMealkits(MEMBER_ID)).thenReturn(new FridgeMealkits(Map.of(40L, 1L), Map.of()));
 
         Map<Long, List<RecommendedMealkit>> cards = facade.rebuildMealkitCards(MEMBER_ID, saved);
 
@@ -139,7 +139,7 @@ class ChatCardRebuilderTest {
         Map<Long, List<RecommendedRecipe>> cards = facade.rebuildCards(1L, List.of(new SavedRecommendation(4L, null, 40L, 0, null)));
 
         assertThat(cards).isEmpty();
-        verify(recipeCandidateFacade, never()).describeRecipes(any(), any());
+        verify(recipeCardDescriber, never()).describeRecipes(any(), any());
     }
 
     // 상품 조회는 받은 연결을 돌려주고, 판매가는 상품마다 계산해 둔 값을 돌려준다

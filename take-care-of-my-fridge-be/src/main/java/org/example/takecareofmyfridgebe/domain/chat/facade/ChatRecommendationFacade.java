@@ -14,7 +14,7 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidates;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeDetailReply;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeQuery;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecommendationReply;
-import org.example.takecareofmyfridgebe.domain.chat.facade.RecipeCandidateFacade.MealkitRecipes;
+import org.example.takecareofmyfridgebe.domain.chat.facade.RecipeCardDescriber.MealkitRecipes;
 import org.example.takecareofmyfridgebe.domain.chat.intent.MealkitWordChecker;
 import org.example.takecareofmyfridgebe.domain.chat.recommend.TemperatureWordChecker;
 import org.example.takecareofmyfridgebe.domain.chat.recommend.MealkitPicker;
@@ -76,6 +76,7 @@ public class ChatRecommendationFacade {
     private static final int FINAL_RIEUL = 8;
 
     private final RecipeCandidateFacade recipeCandidateFacade;
+    private final RecipeCardDescriber recipeCardDescriber;
     private final RecipeService recipeService;
     private final IngredientService ingredientService;
     private final ProductService productService;
@@ -143,7 +144,7 @@ public class ChatRecommendationFacade {
             return List.of();
         }
         List<Long> recipeIds = mealkits.stream().map(MealkitProduct::getRecipeId).filter(Objects::nonNull).distinct().toList();
-        MealkitRecipes recipes = recipeCandidateFacade.describeMealkitRecipes(query.memberId(), recipeIds);
+        MealkitRecipes recipes = recipeCardDescriber.describeMealkitRecipes(query.memberId(), recipeIds);
         Map<Long, SellingPrice> prices = saleEventReader.findSellingPrices(
                 mealkits.stream().map(MealkitProduct::getProduct).toList());
         return MealkitPicker.pick(new MealkitPicker.Input(mealkits, prices, recipes.recipes(), recipes.recipeTastes(),
@@ -351,7 +352,7 @@ public class ChatRecommendationFacade {
             }
             throw e;
         }
-        RecipeCandidate candidate = recipeCandidateFacade.describeRecipes(memberId, List.of(recipeId)).get(recipeId);
+        RecipeCandidate candidate = recipeCardDescriber.describeRecipes(memberId, List.of(recipeId)).get(recipeId);
         String recipeInfo = RecipeDetailPromptBuilder.build(recipe, candidate);
         if (log.isDebugEnabled()) {
             log.debug("상담 레시피 정보 - recipeId: {}, 글자 수: {}, 앞 300자: {}", recipeId, recipeInfo.length(),

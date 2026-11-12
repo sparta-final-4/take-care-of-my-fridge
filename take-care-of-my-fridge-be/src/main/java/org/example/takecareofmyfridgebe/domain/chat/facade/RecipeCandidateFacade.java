@@ -8,32 +8,23 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidates;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeQuery;
 import org.example.takecareofmyfridgebe.domain.chat.facade.RecipeCandidateCollector.CandidatePool;
+import org.example.takecareofmyfridgebe.domain.chat.facade.RecipeTasteReader.SpicyRecipes;
+import org.example.takecareofmyfridgebe.domain.chat.facade.RecipeTasteReader.TasteDetails;
 import org.example.takecareofmyfridgebe.domain.chat.recommend.KeywordMatchClassifier;
-import org.example.takecareofmyfridgebe.domain.chat.recommend.MealkitPicker.FridgeMealkits;
 import org.example.takecareofmyfridgebe.domain.chat.recommend.RecipeCandidateScorer.FridgeStock;
 import org.example.takecareofmyfridgebe.domain.chat.recommend.RecipeCandidateScorer;
 import org.example.takecareofmyfridgebe.domain.chat.recommend.RecommendationPicker;
-import org.example.takecareofmyfridgebe.domain.chat.recommend.SpicyRecipeDetector;
-import org.example.takecareofmyfridgebe.domain.chat.text.ChatTexts;
-import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemResponse;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeSortType;
 import org.example.takecareofmyfridgebe.domain.fridge.service.FridgeService;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.Ingredient;
-import org.example.takecareofmyfridgebe.domain.ingredient.entity.IngredientType;
 import org.example.takecareofmyfridgebe.domain.ingredient.service.IngredientService;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 import org.example.takecareofmyfridgebe.domain.member.service.MemberService;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeCandidateIngredient;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeCandidateInfo;
 import org.example.takecareofmyfridgebe.domain.recipe.service.RecipeService;
-import org.example.takecareofmyfridgebe.domain.search.config.RecipeSearchProperties;
-import org.example.takecareofmyfridgebe.domain.search.dto.RecipeTasteLevel;
-import org.example.takecareofmyfridgebe.domain.search.service.RecipeCandidateSearchService;
 import org.springframework.stereotype.Component;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -48,8 +39,9 @@ import java.util.stream.Stream;
  * 냉장고·회원·레시피 서비스에서 필요한 값을 모으고, 거르기·정렬은 RecipeCandidateScorer에 맡긴다.
  * 선택 재료는 재료 서비스로 같은 종류 재료를 찾아 묶는다 (예: 버섯 → 표고버섯·양송이버섯).
  * <p>
- * 후보 모으기(ES·DB 경로, 보충)는 RecipeCandidateCollector가 한다.
- * 모은 후보의 재료·정보는 한 번씩 읽어 지금처럼 정렬한다. 맛·매운 정도는 ES 검색 결과(색인 때 정한 tastes·spicy_level)를 쓴다.
+ * 후보 모으기(ES·DB 경로, 보충)는 RecipeCandidateCollector, 맛·매운 정도 읽기는 RecipeTasteReader가 한다.
+ * 모은 후보의 재료·정보는 한 번씩 읽어 지금처럼 정렬한다.
+ * 정해진 레시피의 카드 설명 재료(지금 냉장고 기준 계산)는 RecipeCardDescriber가 만든다.
  */
 @Slf4j
 @Component
@@ -60,10 +52,9 @@ public class RecipeCandidateFacade {
     private final MemberService memberService;
     private final RecipeService recipeService;
     private final IngredientService ingredientService;
-    private final RecipeCandidateSearchService recipeCandidateSearchService;
-    private final RecipeSearchProperties recipeSearchProperties;
     private final ChatCandidateProperties chatCandidateProperties;
     private final RecipeCandidateCollector recipeCandidateCollector;
+    private final RecipeTasteReader recipeTasteReader;
 
     /**
      * 회원 냉장고와 선택 재료·선호 맛·임박 재료로 레시피 후보를 최대 10개 고른다.
@@ -176,84 +167,9 @@ public class RecipeCandidateFacade {
         }
         Map<Long, RecipeCandidateInfo> infos = recipeService.findCandidateInfos(recipeIds);
         // rowsNonBasicComplete는 ES 경로(ES 검색·벡터 보충·피할 맛 다시 검색)에서만 true다
-        TasteDetails tastes = tasteDetails(recipeIds, pool.tasteLevels(), pool.rowsNonBasicComplete(),
-                spicyMatters(query, memberTastes), query.memberId());
+        TasteDetails tastes = recipeTasteReader.readForCandidates(recipeIds, pool.tasteLevels(),
+                pool.rowsNonBasicComplete(), query, memberTastes);
         return new PoolDetails(infos, tastes.tastes(), tastes.spicy());
-    }
-
-    /**
-     * 레시피 맛·매운 정도. 이미 아는 값(ES 검색 결과)을 쓰고, readEs면 모르는 레시피를 ES에서 id로 한 번에 읽는다.
-     * 그래도 모르는 레시피(ES를 쓰지 않음·조회 실패·인덱스에 없음)만 DB로 계산한다.
-     */
-    private TasteDetails tasteDetails(Collection<Long> recipeIds, Map<Long, RecipeTasteLevel> known, boolean readEs,
-                                      boolean spicyMatters, Long memberId) {
-        Map<Long, RecipeTasteLevel> levels = new HashMap<>();
-        List<Long> unknown = new ArrayList<>();
-        for (Long id : recipeIds) {
-            RecipeTasteLevel level = known.get(id);
-            if (level == null) {
-                unknown.add(id);
-            } else {
-                levels.put(id, level);
-            }
-        }
-        if (!unknown.isEmpty() && readEs) {
-            Map<Long, RecipeTasteLevel> read = readTasteLevels(unknown, memberId);
-            levels.putAll(read);
-            unknown = unknown.stream().filter(id -> !read.containsKey(id)).toList();
-        }
-        TasteDetails tastes = TasteDetails.of(levels);
-        return unknown.isEmpty() ? tastes : tastes.plus(tasteDetailsFromDb(unknown, spicyMatters));
-    }
-
-    /**
-     * 레시피별 맛과 매운 레시피 두 단계.
-     *
-     * @param tastes 레시피 ID별 맛 (확실히 매운 레시피면 SPICY가 들어 있다)
-     */
-    private record TasteDetails(Map<Long, Set<Member.Taste>> tastes, SpicyRecipes spicy) {
-
-        // ES 값: HOT = 확실히 매움, MILD 이상 = 매울 수 있음. 색인할 때 HOT이면 맛에 SPICY를 더해 두었다
-        static TasteDetails of(Map<Long, RecipeTasteLevel> levels) {
-            Map<Long, Set<Member.Taste>> tastes = new HashMap<>();
-            Set<Long> definite = new HashSet<>();
-            Set<Long> maybe = new HashSet<>();
-            levels.forEach((id, level) -> {
-                if (!level.tastes().isEmpty()) {
-                    tastes.put(id, level.tastes());
-                }
-                if (level.definitelySpicy()) {
-                    definite.add(id);
-                }
-                if (level.maybeSpicy()) {
-                    maybe.add(id);
-                }
-            });
-            return new TasteDetails(tastes, new SpicyRecipes(Set.copyOf(definite), Set.copyOf(maybe)));
-        }
-
-        TasteDetails plus(TasteDetails other) {
-            Map<Long, Set<Member.Taste>> merged = new HashMap<>(tastes);
-            merged.putAll(other.tastes());
-            return new TasteDetails(merged, spicy.plus(other.spicy()));
-        }
-    }
-
-    // ES에서 레시피 id로 맛·매운 정도를 읽는다. 실패하면 빈 값을 돌려줘 호출하는 쪽이 DB로 계산하게 한다
-    private Map<Long, RecipeTasteLevel> readTasteLevels(Collection<Long> recipeIds, Long memberId) {
-        try {
-            return recipeCandidateSearchService.findTasteLevels(recipeIds);
-        } catch (IOException | RuntimeException e) {
-            log.warn("레시피 맛·매운 정도 ES 조회 실패, DB로 계산 - memberId: {}, 레시피 수: {}, 원인: {}",
-                    memberId, recipeIds.size(), e.toString());
-            return Map.of();
-        }
-    }
-
-    // DB 대체 경로와 ES에서 읽지 못한 레시피: 맛 데이터를 읽고, 매운맛이 중요하면 재료 이름으로 매운 정도를 계산해 확실히 매우면 SPICY를 더한다
-    private TasteDetails tasteDetailsFromDb(Collection<Long> recipeIds, boolean spicyMatters) {
-        SpicyRecipes spicy = spicyMatters ? spicyRecipes(recipeIds) : SpicyRecipes.NONE;
-        return new TasteDetails(withDefinitelySpicy(recipeService.findTastesByRecipeIds(recipeIds), spicy), spicy);
     }
 
     // 정렬한 후보와, 키워드 결과(이름·재료 등으로 맞은 방식)를 채운 검색 조건
@@ -268,94 +184,6 @@ public class RecipeCandidateFacade {
         RecipeCandidates ranked = rankAvoiding(scorer, query, fridge, memberTastes, pool.rows(), details.infos(),
                 details.tastes(), details.spicy(), knownAvoided, pool.recipeIds());
         return new Ranked(query, ranked);
-    }
-
-    /**
-     * 정해진 레시피들을 지금 냉장고·회원 선호 맛 기준으로 계산한다 (거르기·정렬 없이). 저장된 추천 카드를 다시 보여 줄 때 쓴다.
-     * 레시피 정보·재료·맛·냉장고·회원 조회는 레시피 수와 상관없이 한 번씩이다. 없는(지워진) 레시피는 결과에서 빠진다.
-     *
-     * @return 레시피 ID별 후보 (임박·쓰는 재료·장볼 재료·모자람이 채워짐)
-     */
-    public Map<Long, RecipeCandidate> describeRecipes(Long memberId, Collection<Long> recipeIds) {
-        if (recipeIds.isEmpty()) {
-            return Map.of();
-        }
-        List<FridgeStock> fridge = RecipeCandidateScorer.prepareFridge(
-                fridgeService.getItems(memberId, FridgeSortType.EXPIRATION));
-        return describe(memberId, fridge, recipeIds, recipeService.findTastesByRecipeIds(recipeIds));
-    }
-
-    /**
-     * 밀키트 추천 재료: 밀키트에 연결된 레시피의 지금 냉장고 기준 계산(가진 재료 수)과 레시피 맛·매울 수 있는 레시피, 냉장고에 있는 밀키트.
-     * 맛·매운 정도는 후보와 같은 기준으로 ES에서 id로 읽고, ES를 쓰지 않거나 읽지 못한 레시피는 DB 맛 데이터·재료 이름으로 계산한다.
-     * 냉장고 조회는 한 번이고, 레시피가 없으면 레시피 조회를 하지 않는다.
-     */
-    public MealkitRecipes describeMealkitRecipes(Long memberId, Collection<Long> recipeIds) {
-        List<FridgeItemResponse> items = fridgeService.getItems(memberId, FridgeSortType.EXPIRATION);
-        FridgeMealkits fridgeMealkits = toFridgeMealkits(items);
-        if (recipeIds.isEmpty()) {
-            return new MealkitRecipes(Map.of(), Map.of(), Set.of(), fridgeMealkits);
-        }
-        // 피할 맛·원하는 맛을 여기서 모르므로 DB로 계산할 때도 매운 정도를 늘 계산한다 (밀키트 연결 레시피는 몇 건뿐이다)
-        TasteDetails tastes = tasteDetails(recipeIds, Map.of(), recipeSearchProperties.useElasticSearch(), true, memberId);
-        Map<Long, RecipeCandidate> recipes = describe(memberId, RecipeCandidateScorer.prepareFridge(items), recipeIds,
-                tastes.tastes());
-        return new MealkitRecipes(recipes, tastes.tastes(), tastes.spicy().maybe(), fridgeMealkits);
-    }
-
-    // 냉장고에 있는 밀키트 (저장된 밀키트 카드를 다시 보여 줄 때도 지금 냉장고 기준으로 쓴다). 냉장고 조회 1번
-    public FridgeMealkits findFridgeMealkits(Long memberId) {
-        return toFridgeMealkits(fridgeService.getItems(memberId, FridgeSortType.EXPIRATION));
-    }
-
-    /**
-     * 냉장고 밀키트 줄을 상품 ID(fridge.product_id)로, 상품 ID가 없는 예전 줄은 등록 이름(raw_name)으로 묶는다.
-     * 기한이 지난 줄은 뺀다. 같은 밀키트가 여러 줄이면 소비기한이 가장 가까운 줄의 남은 일수를 둔다.
-     */
-    private static FridgeMealkits toFridgeMealkits(List<FridgeItemResponse> items) {
-        Map<Long, Long> byProduct = new HashMap<>();
-        Map<String, Long> byName = new HashMap<>();
-        for (FridgeItemResponse item : items) {
-            if (item.ingredientType() != IngredientType.MEALKIT || item.dDay() < 0) {
-                continue;
-            }
-            if (item.productId() != null) {
-                byProduct.merge(item.productId(), item.dDay(), Math::min);
-            } else if (item.rawName() != null) {
-                byName.merge(ChatTexts.removeWhitespace(item.rawName()), item.dDay(), Math::min);
-            }
-        }
-        return new FridgeMealkits(byProduct, byName);
-    }
-
-    /**
-     * @param recipes             레시피 ID별 지금 냉장고 기준 계산 (지워진 레시피는 없다)
-     * @param recipeTastes        레시피 ID별 맛 (확실히 매운 레시피면 SPICY가 들어 있다)
-     * @param maybeSpicyRecipeIds 매울 수 있는 레시피 ID (매운 정도 MILD·HOT)
-     * @param fridgeMealkits      냉장고에 있는 밀키트 (기한 지난 줄 제외)
-     */
-    public record MealkitRecipes(
-            Map<Long, RecipeCandidate> recipes,
-            Map<Long, Set<Member.Taste>> recipeTastes,
-            Set<Long> maybeSpicyRecipeIds,
-            FridgeMealkits fridgeMealkits
-    ) {
-    }
-
-    private Map<Long, RecipeCandidate> describe(Long memberId, List<FridgeStock> fridge, Collection<Long> recipeIds,
-                                                Map<Long, Set<Member.Taste>> recipeTastes) {
-        RecipeCandidateScorer scorer = new RecipeCandidateScorer(
-                chatCandidateProperties.excludedCategories(), chatCandidateProperties.minOwnedRatio());
-        List<Member.Taste> memberTastes = memberService.getMyInfo(memberId).tastes();
-        List<RecipeCandidateIngredient> rows = recipeService.findNonBasicIngredients(recipeIds);
-        Map<Long, RecipeCandidateInfo> infos = recipeService.findCandidateInfos(recipeIds);
-
-        List<RecipeCandidate> scored = scorer.scoreAll(memberId, fridge, memberTastes, rows, infos, recipeTastes, recipeIds);
-        RecipeCandidates withMissing = RecipeCandidateScorer.withMissingIngredients(
-                new RecipeCandidates(scored, false), fridge, rows);
-        Map<Long, RecipeCandidate> byId = new LinkedHashMap<>();
-        withMissing.candidates().forEach(candidate -> byId.put(candidate.recipeId(), candidate));
-        return byId;
     }
 
     // 키워드로 이름·늘린 이름·재료가 맞은 레시피가 있는지 (쪼개짐·벡터는 맞은 것으로 치지 않는다)
@@ -422,57 +250,6 @@ public class RecipeCandidateFacade {
                         || (taste == Member.Taste.SPICY && spicy.maybe().contains(id)))
                 .toList();
         return tastes.isEmpty() ? query.avoidTastes() : tastes;
-    }
-
-    /**
-     * 재료로 가른 매운 레시피 두 단계.
-     *
-     * @param definite 확실히 매운 레시피 (청양고추·고춧가루·고추장·김치류 등). 원하는 맛 매운맛과 맞은 것으로 센다
-     * @param maybe    매울 수 있는 레시피 (확실히 매운 것 + 홍고추·청고추, 정확한 이름 고추·붉은고추·고추냉이). 피할 맛 매운맛이면 이것까지 뺀다
-     */
-    private record SpicyRecipes(Set<Long> definite, Set<Long> maybe) {
-        private static final SpicyRecipes NONE = new SpicyRecipes(Set.of(), Set.of());
-
-        SpicyRecipes plus(SpicyRecipes other) {
-            return new SpicyRecipes(
-                    Stream.concat(definite.stream(), other.definite().stream()).collect(Collectors.toUnmodifiableSet()),
-                    Stream.concat(maybe.stream(), other.maybe().stream()).collect(Collectors.toUnmodifiableSet()));
-        }
-    }
-
-    // 원하는 맛·피할 맛·회원 선호 맛 어디에 매운맛이 있는지. 없으면 DB로 매운 정도를 계산하지 않는다
-    private static boolean spicyMatters(RecipeQuery query, List<Member.Taste> memberTastes) {
-        return query.wantedTastes().contains(Member.Taste.SPICY)
-                || query.avoidTastes().contains(Member.Taste.SPICY)
-                || memberTastes.contains(Member.Taste.SPICY);
-    }
-
-    // 재료 이름으로 매운 정도를 계산한다 (재료 이름 조회 1번). 레시피 색인(RecipeDocumentReader)과 같은 기준이다
-    private SpicyRecipes spicyRecipes(Collection<Long> recipeIds) {
-        if (recipeIds.isEmpty()) {
-            return SpicyRecipes.NONE;
-        }
-        Map<Long, List<String>> texts = recipeService.findIngredientTexts(recipeIds);
-        List<String> definiteWords = chatCandidateProperties.spicyIngredients();
-        List<String> maybeWords = Stream.concat(definiteWords.stream(), chatCandidateProperties.mildSpicyIngredients().stream()).toList();
-        return new SpicyRecipes(
-                SpicyRecipeDetector.spicyRecipeIds(texts, definiteWords, chatCandidateProperties.spicyExclusions()),
-                SpicyRecipeDetector.spicyRecipeIds(texts, maybeWords, chatCandidateProperties.mildSpicyExactIngredients(),
-                        chatCandidateProperties.spicyExclusions()));
-    }
-
-    // 맛 데이터에 매운맛이 없어도 확실히 매운 재료가 들어 있으면 매운맛을 더한다 (매울 수 있는 것은 더하지 않는다)
-    private static Map<Long, Set<Member.Taste>> withDefinitelySpicy(Map<Long, Set<Member.Taste>> recipeTastes, SpicyRecipes spicy) {
-        if (spicy.definite().isEmpty()) {
-            return recipeTastes;
-        }
-        Map<Long, Set<Member.Taste>> merged = new HashMap<>(recipeTastes);
-        for (Long id : spicy.definite()) {
-            Set<Member.Taste> tastes = new HashSet<>(merged.getOrDefault(id, Set.of()));
-            tastes.add(Member.Taste.SPICY);
-            merged.put(id, tastes);
-        }
-        return merged;
     }
 
     // 키워드로 찾은 레시피가 이름·늘린 이름·재료·쪼개짐·벡터 중 어떻게 맞았는지 가른다 (레시피 정보·재료는 후보 전체를 읽은 것을 쓴다)
