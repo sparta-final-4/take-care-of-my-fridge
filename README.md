@@ -189,11 +189,33 @@ take-care-of-my-fridge/
 
 ## 6. 기술적 고민과 해결
 
-각 항목의 자세한 과정은 위키의 '기술적 고민'에 정리합니다. 📖 [프로젝트 위키](https://github.com/sparta-final-4/take-care-of-my-fridge/wiki)
+> 개발하면서 마주친 문제와 해결, 성능 개선, 기술 선택의 이유를 정리했습니다. 각 항목을 누르면 위키의 자세한 글로 이동합니다.
 
-| # | 문제 상황 | 기술적 해결 방안 | 결과 (개선 수치) | 관련 상세 문서 |
-|---|---|---|---|---|
+#### 🛠️ 트러블 슈팅
 
+| 문제 | 해결 | 결과 |
+|---|---|---|
+| [SSE 스트리밍의 숨은 Access Denied](https://github.com/sparta-final-4/take-care-of-my-fridge/wiki/SSE-스트리밍의-숨은-Access-Denied) | 스트림 종료 후 ASYNC 디스패치에서 인증이 비는 문제를 ASYNC·ERROR 디스패치 허용으로 해결 | 답이 나가기 전 실패해도 연결이 끊기지 않음 |
+| [상품명과 키워드 간의 자동 매칭 불일치](https://github.com/sparta-final-4/take-care-of-my-fridge/wiki/상품명과-키워드-간의-자동-매칭-불일치) | 키워드 결과가 0건일 때만 kNN 벡터 검색으로 폴백 (기준선 0.5, 검색어 28개 평가) | 오타 검색 정답 김치찌개 8/10, 된장찌개 4/4 |
+| [비관적 락을 걸었는데도 예전 상태로 판단](https://github.com/sparta-final-4/take-care-of-my-fridge/wiki/비관적-락을-걸었는데도-예전-상태로-판단) | 잠근 뒤 refresh, 잠금 조회를 트랜잭션의 첫 조회로 | 동시 환불 4건 테스트 재고 12·16 → 항상 10 |
+| [CloudFront 프록시로 CSRF 쿠키 문제 해결](https://github.com/sparta-final-4/take-care-of-my-fridge/wiki/CloudFront-프록시로-CSRF-쿠키-문제-해결) | CloudFront에서 /api/* 경로를 백엔드로 프록시해 프론트와 같은 도메인으로 | CORS 설정 없이 배포 환경에서 쿠키 인증·CSRF 동작 |
+
+#### ⚡ 성능 개선
+
+| 개선 | 방법 | 결과 |
+|---|---|---|
+| [이번 달 많이 만든 레시피 API](https://github.com/sparta-final-4/take-care-of-my-fridge/wiki/이번-달-많이-만든-레시피-API-성능-개선) | 30일 집계를 Redis에 캐시 (응답 전체 → 집계만 캐시로 범위 축소) | p95 **4,094ms → 5.9ms** (동시 20명) |
+| [레시피 분류 조회 Redis 캐시](https://github.com/sparta-final-4/take-care-of-my-fridge/wiki/레시피-분류-조회에-Redis-캐시-적용) | 필터 칩 값을 Redis에 캐시하고 레시피 등록·수정 커밋 뒤에만 비움 | p95 **26.7ms → 5.3ms** |
+
+#### 💡 기술적 의사 결정
+
+| 결정 | 선택 | 이유 |
+|---|---|---|
+| [AI 답변 동시 전송 잠금](https://github.com/sparta-final-4/take-care-of-my-fridge/wiki/AI-답변-동시-전송-잠금) | Redis SET NX + 요청 토큰 Lua 해제 | 잠그는 스레드와 푸는 스레드가 달라 스레드 기반 락을 쓸 수 없음 |
+| [실시간 알림 전송 구조](https://github.com/sparta-final-4/take-care-of-my-fridge/wiki/실시간-알림-전송-구조) | Kafka 요청 + Redis Pub/Sub(회원 ID만) + SSE | 서버가 여러 대여도 연결을 가진 서버가 신호를 보내고, 신호에 내용을 싣지 않음 |
+| [검색은 Elasticsearch, 인기 검색어는 Redis](https://github.com/sparta-final-4/take-care-of-my-fridge/wiki/검색은-Elasticsearch,-인기-검색어는-Redis) | ES + nori(BM25) + kNN 폴백, Redis Set + ZSet | 한국어 형태소·순위·동의어·벡터를 한 곳에서, 인기 검색어는 중복 방지와 상위 10개 조회를 명령 하나씩으로 |
+| [결제·환불 분리와 결제 이력 원장](https://github.com/sparta-final-4/take-care-of-my-fridge/wiki/결제·환불-분리와-결제-이력-원장) | 결제 상태에 환불을 넣지 않고 추가만 하는 원장으로 정산 | 여러 번의 부분 환불, 콘솔·보상 취소까지 빠짐없이 다시 계산 가능 |
+---
 <br/>
 
 ## 7. 실행 방법
