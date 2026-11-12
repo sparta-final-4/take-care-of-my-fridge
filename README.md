@@ -33,8 +33,6 @@
 
 ## 2. 주요 기능
 
-## 2. 주요 기능
-
 ### 🔐 1. 가입부터 로그인 유지까지, 안전한 회원 인증!
 이메일로 가입하며 맛 선호를 함께 등록하고, HttpOnly 쿠키 JWT와 서버 세션(30분 미사용 시 만료, 갱신 토큰 회전)·CSRF 보호로 로그인을 유지하며, 역할(USER/ADMIN) 기반으로 API 접근을 제어합니다.
 - 📖 [회원 & 인증 상세 Wiki](https://github.com/sparta-final-4/take-care-of-my-fridge/wiki/Member-Auth)
