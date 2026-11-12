@@ -307,38 +307,22 @@ public class RecipeCandidateScorer {
     private RecipeCandidate score(ScoringContext context, RecipeCandidateInfo info) {
         RecipeQuery query = context.query();
         List<RecipeCandidateIngredient> recipeRows = context.rowsOf(info.recipeId());
-        Map<Long, FridgeStock> fridgeById = context.fridgeById();
         Set<Member.Taste> tastes = context.tastesOf(info.recipeId());
         List<RecipeCandidateIngredient> nonBasic = recipeRows.stream()
                 .filter(row -> !row.basicSeasoning())
                 .toList();
-
-        // 냉장고에 있는 재료 (임박한 순, 같으면 이름 순)
-        List<FridgeStock> owned = nonBasic.stream()
-                .map(row -> fridgeById.get(row.ingredientId()))
-                .filter(stock -> stock != null)
-                .distinct()
-                .sorted(Comparator.comparingLong(FridgeStock::dDay).thenComparing(FridgeStock::name))
-                .toList();
+        List<FridgeStock> owned = ownedStocks(context, nonBasic);
 
         int selectedMatches = countSelectedMatches(context, recipeRows);
         List<String> missingSelected = missingSelectedNames(context, nonBasic);
         List<String> usedSelected = usedSelectedNames(context, nonBasic);
 
-        // 1단계: 사용자 요청 (요리 이름 키워드 + 원하는 맛 + 분류 일치). 말한 재료는 선택 재료로 합쳐져 2단계에서 센다
-        List<String> matchedRequests = new ArrayList<>();
         List<Member.Taste> matchedWantedTastes = query.wantedTastes().stream()
                 .distinct()
                 .filter(tastes::contains)
                 .toList();
         KeywordMatch keywordMatch = query.keywordMatches().get(info.recipeId());
-        if (keywordMatch != null && keywordMatch.strong()) {
-            matchedRequests.add("키워드: " + keywordMatch.type().label());
-        }
-        matchedWantedTastes.forEach(taste -> matchedRequests.add("맛: " + taste));
-        if (info.category() != null && query.moodCategories().contains(info.category())) {
-            matchedRequests.add("분류: " + info.category());
-        }
+        List<String> matchedRequests = matchedRequests(query, info, matchedWantedTastes, keywordMatch);
 
         List<Member.Taste> matchedTastes = context.preferred().stream()
                 .filter(tastes::contains)
@@ -378,6 +362,30 @@ public class RecipeCandidateScorer {
                 keywordMatch
         );
         return new RecipeCandidate(info.recipeId(), info.name(), info.category(), info.cookTimeMin(), ranking, reason);
+    }
+
+    // 냉장고에 있는 재료 (임박한 순, 같으면 이름 순)
+    private static List<FridgeStock> ownedStocks(ScoringContext context, List<RecipeCandidateIngredient> nonBasic) {
+        return nonBasic.stream()
+                .map(row -> context.fridgeById().get(row.ingredientId()))
+                .filter(stock -> stock != null)
+                .distinct()
+                .sorted(Comparator.comparingLong(FridgeStock::dDay).thenComparing(FridgeStock::name))
+                .toList();
+    }
+
+    // 1단계: 사용자 요청 (요리 이름 키워드 + 원하는 맛 + 분류 일치). 말한 재료는 선택 재료로 합쳐져 2단계에서 센다
+    private static List<String> matchedRequests(RecipeQuery query, RecipeCandidateInfo info,
+                                                List<Member.Taste> matchedWantedTastes, KeywordMatch keywordMatch) {
+        List<String> matched = new ArrayList<>();
+        if (keywordMatch != null && keywordMatch.strong()) {
+            matched.add("키워드: " + keywordMatch.type().label());
+        }
+        matchedWantedTastes.forEach(taste -> matched.add("맛: " + taste));
+        if (info.category() != null && query.moodCategories().contains(info.category())) {
+            matched.add("분류: " + info.category());
+        }
+        return matched;
     }
 
     // D-0 12, D-1 10, D-2 8, D-3 6. 임박 목록에는 D-3 이내만 들어온다
