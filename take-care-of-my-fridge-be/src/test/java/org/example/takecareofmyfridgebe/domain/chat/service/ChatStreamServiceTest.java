@@ -408,6 +408,64 @@ class ChatStreamServiceTest {
     }
 
     @Test
+    @DisplayName("done 이벤트를 받는 순간에는 아직 잠금을 풀지 않고, 스트림이 끝난 뒤에 푼다")
+    void releasesLockAfterDoneEvent_whenStreamCompletes() {
+        Long sessionId = 10L;
+        when(chatStreamLockService.acquire(sessionId)).thenReturn(LOCK_TOKEN);
+        when(chatReplyGenerator.generate(1L, sessionId, "질문", List.of())).thenReturn(Flux.just("답"));
+        when(chatMessageService.saveExchange(sessionId, "질문", "답")).thenReturn(List.of(
+                new ChatMessageResponse(100L, 1, ChatMessageRole.USER, "질문", LocalDateTime.now()),
+                new ChatMessageResponse(101L, 2, ChatMessageRole.ASSISTANT, "답", LocalDateTime.now())
+        ));
+
+        StepVerifier.create(chatStreamService.streamMessage(1L, sessionId, ChatMessageCreateRequest.of("질문")))
+                .expectNextMatches(event -> "message".equals(event.event()))
+                .assertNext(event -> {
+                    assertThat(event.event()).isEqualTo("done");
+                    verify(chatStreamLockService, never()).release(any(), any());
+                })
+                .verifyComplete();
+
+        verify(chatStreamLockService, timeout(1_000).times(1)).release(sessionId, LOCK_TOKEN);
+    }
+
+    @Test
+    @DisplayName("error 이벤트를 받는 순간에는 아직 잠금을 풀지 않고, 스트림이 끝난 뒤에 푼다")
+    void releasesLockAfterErrorEvent_whenStreamErrors() {
+        Long sessionId = 10L;
+        when(chatStreamLockService.acquire(sessionId)).thenReturn(LOCK_TOKEN);
+        when(chatReplyGenerator.generate(1L, sessionId, "질문", List.of()))
+                .thenReturn(Flux.error(new RuntimeException("AI API Connection Timeout")));
+
+        StepVerifier.create(chatStreamService.streamMessage(1L, sessionId, ChatMessageCreateRequest.of("질문")))
+                .assertNext(event -> {
+                    assertThat(event.event()).isEqualTo("error");
+                    verify(chatStreamLockService, never()).release(any(), any());
+                })
+                .verifyComplete();
+
+        verify(chatStreamLockService, timeout(1_000).times(1)).release(sessionId, LOCK_TOKEN);
+    }
+
+    @Test
+    @DisplayName("첫 조각 전에 연결이 끊겨도(cancel) 잠금을 한 번 풀고, 하루 횟수는 돌려주지 않는다")
+    void releasesLockWithoutRefund_whenCancelledBeforeFirstChunk() {
+        Long sessionId = 10L;
+        when(chatStreamLockService.acquire(sessionId)).thenReturn(LOCK_TOKEN);
+        when(chatDailyLimitService.checkAndIncrement(1L)).thenReturn(LIMIT_KEY);
+        when(chatReplyGenerator.generate(1L, sessionId, "질문", List.of())).thenReturn(Flux.never());
+
+        // 의도 판단은 다른 스레드에서 돌므로, 답 생성을 시작한 뒤(첫 조각 전)에 끊는다
+        StepVerifier.create(chatStreamService.streamMessage(1L, sessionId, ChatMessageCreateRequest.of("질문")))
+                .then(() -> verify(chatReplyGenerator, timeout(1_000)).generate(1L, sessionId, "질문", List.of()))
+                .thenCancel()
+                .verify();
+
+        verify(chatStreamLockService, timeout(1_000).times(1)).release(sessionId, LOCK_TOKEN);
+        verify(chatDailyLimitService, never()).refund(any());
+    }
+
+    @Test
     @DisplayName("답 조각을 하나도 받기 전에 생성이 실패하면 그 오류 코드를 보내고 하루 횟수를 돌려준다")
     void refundsDailyCount_whenFailsBeforeFirstChunk() {
         Long sessionId = 10L;
