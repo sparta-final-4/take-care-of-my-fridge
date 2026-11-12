@@ -322,6 +322,7 @@ VITE_PORTONE_STORE_ID=store-e0d4f767-f9dd-4a26-b211-43eec5270bc2
 export OPENAI_API_KEY="your-openai-api-key"
 export PORTONE_API_SECRET="your-portone-api-secret"
 ```
+첫 관리자 계정은 `ADMIN_BOOTSTRAP_EMAIL`·`ADMIN_BOOTSTRAP_PASSWORD`·`ADMIN_BOOTSTRAP_NICKNAME`으로 서버 시작 때 만듭니다. 자세한 내용은 [회원 설계의 첫 관리자 계정](docs/architecture/domains/member.md#첫-관리자-계정)을 봅니다.
 
 <br/>
 

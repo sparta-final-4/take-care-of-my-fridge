@@ -27,7 +27,8 @@
 | b1bfde51 | DB 문서 칸 타입을 dev에 맞춤 | data-dictionary.md(최용범), erd.md(강준모) |
 | 886677d3 | 테스트 이름·readOnly·감사 칸·fridge 규칙 예외 정리 | 없음 |
 | 237ac728 | 문서 머리말·링크 정리 (잘 안 쓰이는 문서 조사 후속) | recipe-vector·search(강준모), screens·db-test-guide(장준혁), project-plan(최용범) |
-| (이 기록 갱신) | til 문서를 forecast_model/README.md로 옮기고 docs/til 삭제 | til(작성자 안상윤) |
+| cd50bbe9 | til 문서를 forecast_model/README.md로 옮기고 docs/til 삭제 | til(작성자 안상윤) |
+| (이 기록 갱신) | decisions·operations 폴더 삭제: ADR 대신 도메인 문서 '변경 이력'·'남은 결정', initial-admin.md를 member.md '첫 관리자 계정'으로 | documentation-standard·ADR 템플릿·guide·initial-admin(안상윤) |
 
 ## 깃 아이디와 실명
 커밋 이메일과 README 팀원 표로 확인했다.

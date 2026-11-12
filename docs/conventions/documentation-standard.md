@@ -13,7 +13,7 @@
 
 ## 이름과 링크
 
-- 문서 파일명은 소문자 kebab-case. 예외: AGENTS.md, CLAUDE.md, README.md, ADR-NNN-주제.md, 복사해 쓰는 양식인 `_template.md`(밑줄로 시작해 목록 맨 위에 보이게 함).
+- 문서 파일명은 소문자 kebab-case. 예외: AGENTS.md, CLAUDE.md, README.md, 복사해 쓰는 양식인 `_template.md`(밑줄로 시작해 목록 맨 위에 보이게 함).
 - 문서 링크는 저장소 상대 경로를 사용합니다. 개인 PC·임시 첨부 파일 경로를 문서 링크로 남기지 않습니다.
 - 화면 ID는 기존 U-01, A-01 등을 유지합니다. 전체 자료의 절 번호는 출처 표시로 쓰며 도메인 ID로 간주하지 않습니다.
 - 템플릿의 <domain> 등은 치환할 자리이며, 아직 존재하지 않는 문서 링크를 만들지 않습니다.
@@ -25,7 +25,7 @@
 | 기능·범위·정책 | project-plan.md, screens.md, 관련 도메인 |
 | 요청·응답·권한 | api-spec.md, 관련 화면·테스트 |
 | 테이블·컬럼·관계 | erd.md, data-dictionary.md |
-| 구조·기술 선택 | system-design.md, 필요 시 ADR |
+| 구조·기술 선택 | system-design.md. 중요한 결정은 도메인 문서의 '변경 이력'과 '남은 결정'에 남긴다(절이 없으면 새로 만든다) |
 | 오류 해결 | 재현·원인·재검증이 담긴 문제 기록 |
 | 기능 완료 | 작업 기록, 근거 커밋·PR, README 기여 |
 
