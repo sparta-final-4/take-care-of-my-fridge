@@ -21,6 +21,7 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeQuery;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RefineCondition;
 import org.example.takecareofmyfridgebe.domain.chat.intent.AskWordChecker;
 import org.example.takecareofmyfridgebe.domain.chat.intent.FridgeShopWordChecker;
+import org.example.takecareofmyfridgebe.domain.chat.intent.CorrectionInput;
 import org.example.takecareofmyfridgebe.domain.chat.intent.IntentCorrector;
 import org.example.takecareofmyfridgebe.domain.chat.intent.MealkitWordChecker;
 import org.example.takecareofmyfridgebe.domain.chat.intent.TasteWordChecker;
@@ -148,8 +149,8 @@ public class ChatIntentFacade {
         }
 
         // 서버 단어 규칙으로 고친다 (단계 순서와 의존 관계는 IntentCorrector)
-        IntentCorrector.Corrected corrected = intentCorrector.correct(memberId, sessionId, request.content(), categories,
-                context, result);
+        IntentCorrector.Corrected corrected = intentCorrector.correct(
+                new CorrectionInput(memberId, sessionId, request.content(), categories, context), result);
         result = corrected.result();
         boolean mealkitRecommend = corrected.mealkitRecommend();
         Long detailTarget = corrected.detailTarget();

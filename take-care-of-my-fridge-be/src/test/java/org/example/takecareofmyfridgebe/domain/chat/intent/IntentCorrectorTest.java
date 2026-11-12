@@ -232,8 +232,8 @@ class IntentCorrectorTest {
             spied.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("매운 김치찌개 어떻게 만들어?"),
                     new ChatContext(List.of(), null, List.of(new CardName(10L, "김치찌개"))));
 
-            verify(spiedCorrector, never()).correctTastes(any(), any(), any(), any());
-            verify(spiedCorrector, never()).correctCategories(any(), any(), any(), any(), any(), any());
+            verify(spiedCorrector, never()).correctTastes(any(), any());
+            verify(spiedCorrector, never()).correctCategories(any(), any());
 
             givenExtracted(new IntentResult(ChatIntent.RECOMMEND, null, null, null, null, null, false, null, null, null));
             ChatIntentResolution recommend = spied.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("매운 찌개 추천해줘"));
