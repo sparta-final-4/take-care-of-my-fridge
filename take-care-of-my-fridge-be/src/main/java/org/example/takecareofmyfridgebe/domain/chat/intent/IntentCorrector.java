@@ -11,6 +11,7 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.IntentResult;
 import org.example.takecareofmyfridgebe.domain.chat.dto.LastRecommendation.QuerySnapshot;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RefineCondition;
 import org.example.takecareofmyfridgebe.domain.chat.service.ChatMessageService;
+import org.example.takecareofmyfridgebe.domain.chat.text.ChatTexts;
 import org.example.takecareofmyfridgebe.domain.ingredient.service.IngredientMatcher;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeSummary;
@@ -165,7 +166,7 @@ public class IntentCorrector {
         }
         String dishText = result.dishText();
         if (corrections.dishCheck() && dishText != null
-                && (!compact(message).contains(compact(dishText)) || categoriesOf(dishText, categories).isPresent())) {
+                && (!ChatTexts.removeWhitespace(message).contains(ChatTexts.removeWhitespace(dishText)) || categoriesOf(dishText, categories).isPresent())) {
             dishText = null;
         }
         if (kept.size() == keywords.size() && moved.size() == aiCategories.size() && Objects.equals(dishText, result.dishText())) {
@@ -186,7 +187,7 @@ public class IntentCorrector {
         if (phrase == null) {
             return Optional.empty();
         }
-        String compact = compact(phrase);
+        String compact = ChatTexts.removeWhitespace(phrase);
         for (String suffix : CATEGORY_SUFFIXES) {
             if (compact.length() > suffix.length() && compact.endsWith(suffix)) {
                 compact = compact.substring(0, compact.length() - suffix.length());
@@ -194,12 +195,12 @@ public class IntentCorrector {
             }
         }
         String name = compact;
-        Optional<String> category = categories.stream().filter(value -> compact(value).equals(name)).findFirst();
+        Optional<String> category = categories.stream().filter(value -> ChatTexts.removeWhitespace(value).equals(name)).findFirst();
         if (category.isPresent()) {
             return Optional.of(List.of(category.get()));
         }
         return chatWordProperties.category().groups().stream()
-                .filter(group -> group.word() != null && compact(group.word()).equals(name))
+                .filter(group -> group.word() != null && ChatTexts.removeWhitespace(group.word()).equals(name))
                 .findFirst()
                 .map(group -> group.categories().stream().filter(categories::contains).toList());
     }
@@ -540,12 +541,12 @@ public class IntentCorrector {
             finalCategories = wanted;
             QuerySnapshot previous = context.lastRecommendation() == null ? null : context.lastRecommendation().query();
             List<String> previousKeywords = previous == null ? List.of() : previous.keywords();
-            String compactMessage = compact(message);
+            String compactMessage = ChatTexts.removeWhitespace(message);
             // 직전 조건에서 끌려온 키워드(이번 말에 없는 것)만 뺀다. 이번 말로 AI가 늘린 키워드는 둔다
             keywords = keywords == null ? null : keywords.stream()
-                    .filter(keyword -> !previousKeywords.contains(keyword) || compactMessage.contains(compact(keyword)))
+                    .filter(keyword -> !previousKeywords.contains(keyword) || compactMessage.contains(ChatTexts.removeWhitespace(keyword)))
                     .toList();
-            dishText = dishText != null && compactMessage.contains(compact(dishText)) ? dishText : null;
+            dishText = dishText != null && compactMessage.contains(ChatTexts.removeWhitespace(dishText)) ? dishText : null;
             if (previous == null || !previous.moodCategories().containsAll(wanted)) {
                 addOnce(removed, RefineCondition.KEYWORD.name());
             }
@@ -610,18 +611,14 @@ public class IntentCorrector {
         if (name == null) {
             return Optional.empty();
         }
-        String target = compact(name);
+        String target = ChatTexts.removeWhitespace(name);
         return cards.stream()
                 .filter(card -> {
-                    String cardName = compact(card.name());
+                    String cardName = ChatTexts.removeWhitespace(card.name());
                     return cardName.contains(target) || target.contains(cardName);
                 })
                 .map(CardName::recipeId)
                 .findFirst();
-    }
-
-    private static String compact(String text) {
-        return text.replaceAll("\\s+", "");
     }
 
     private static List<String> orEmpty(List<String> values) {

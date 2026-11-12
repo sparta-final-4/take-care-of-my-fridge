@@ -12,6 +12,7 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.RecommendationReply;
 import org.example.takecareofmyfridgebe.domain.chat.dto.SavedRecommendation;
 import org.example.takecareofmyfridgebe.domain.chat.recommend.ShoppingProductPicker;
 import org.example.takecareofmyfridgebe.domain.chat.reply.FridgeReplyWriter;
+import org.example.takecareofmyfridgebe.domain.chat.text.ChatTexts;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemResponse;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeSortType;
 import org.example.takecareofmyfridgebe.domain.fridge.entity.FridgeItemStatus;
@@ -332,9 +333,9 @@ public class ChatFridgeShopFacade {
             Ingredient ingredient = dictionary.get(name);
             Predicate<FridgeItemResponse> matches;
             if (ingredient == null) {
-                String target = compact(name);
-                matches = item -> compact(item.rawName()).contains(target)
-                        || (item.ingredientName() != null && compact(item.ingredientName()).contains(target));
+                String target = ChatTexts.removeWhitespace(name);
+                matches = item -> ChatTexts.removeWhitespace(item.rawName()).contains(target)
+                        || (item.ingredientName() != null && ChatTexts.removeWhitespace(item.ingredientName()).contains(target));
             } else {
                 Set<Long> ids = new HashSet<>(sameKind.getOrDefault(ingredient.getName().trim(), List.of()));
                 ids.add(ingredient.getId());
@@ -391,9 +392,5 @@ public class ChatFridgeShopFacade {
                     mealkit && item.productId() != null ? images.get(item.productId()) : null));
         }
         return cards;
-    }
-
-    private static String compact(String text) {
-        return text == null ? "" : text.replaceAll("\\s+", "");
     }
 }

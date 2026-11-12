@@ -26,6 +26,7 @@ import org.example.takecareofmyfridgebe.domain.chat.intent.MealkitWordChecker;
 import org.example.takecareofmyfridgebe.domain.chat.intent.TasteWordChecker;
 import org.example.takecareofmyfridgebe.domain.chat.safety.AllergyExclusionFinder;
 import org.example.takecareofmyfridgebe.domain.chat.ai.ChatIntentExtractor;
+import org.example.takecareofmyfridgebe.domain.chat.text.ChatTexts;
 import org.example.takecareofmyfridgebe.domain.ingredient.service.IngredientMatcher;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 import org.example.takecareofmyfridgebe.domain.product.entity.ProductType;
@@ -193,7 +194,7 @@ public class ChatIntentFacade {
             return new ItemLookup(scope, names);
         }
         // 사기: "재료·밀키트·상품"은 찾을 이름이 아니다 ("세일하는 재료 있어?"). 할인 말이 있으면 할인 중인 상품만, 종류는 단어로 나눈다
-        List<String> itemNames = names.stream().filter(name -> !SHOP_GENERIC_NAMES.contains(compact(name))).toList();
+        List<String> itemNames = names.stream().filter(name -> !SHOP_GENERIC_NAMES.contains(ChatTexts.removeWhitespace(name))).toList();
         boolean saleOnly = FridgeShopWordChecker.asksSale(message, chatWordProperties.fridgeShop());
         return new ItemLookup(scope, itemNames, saleOnly, saleOnly ? saleProductType(message) : null);
     }
@@ -202,7 +203,7 @@ public class ChatIntentFacade {
     private ProductType saleProductType(String message) {
         boolean mealkit = MealkitWordChecker.check(message, chatWordProperties.mealkit(), chatWordProperties.taste())
                 == MealkitWordChecker.Mode.ONLY;
-        boolean ingredient = message != null && compact(message).contains(INGREDIENT_WORD);
+        boolean ingredient = message != null && ChatTexts.removeWhitespace(message).contains(INGREDIENT_WORD);
         if (mealkit == ingredient) {
             return null;
         }
@@ -337,10 +338,6 @@ public class ChatIntentFacade {
             return ChatIntentResolution.general(Source.AI);
         }
         return ChatIntentResolution.recipeDetail(Source.AI, recipeId, result.question());
-    }
-
-    private static String compact(String text) {
-        return text.replaceAll("\\s+", "");
     }
 
     /**

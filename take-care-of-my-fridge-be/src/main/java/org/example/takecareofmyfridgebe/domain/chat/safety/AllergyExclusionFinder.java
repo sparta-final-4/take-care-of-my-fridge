@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatSafetyProperties;
 import org.example.takecareofmyfridgebe.domain.chat.service.ChatMessageService;
+import org.example.takecareofmyfridgebe.domain.chat.text.ChatTexts;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.Ingredient;
 import org.example.takecareofmyfridgebe.domain.ingredient.service.IngredientService;
 import org.springframework.stereotype.Component;
@@ -104,13 +105,9 @@ public class AllergyExclusionFinder {
     private void addSameKind(Set<Long> ids, String word, List<Ingredient> ingredients) {
         Set<String> otherKinds = chatSafetyProperties.allergy().notSameKindOf(word);
         for (Ingredient ingredient : ingredients) {
-            if (!otherKinds.contains(compact(ingredient.getName()))) {
+            if (!otherKinds.contains(ChatTexts.removeWhitespace(ingredient.getName()))) {
                 ids.add(ingredient.getId());
             }
         }
-    }
-
-    private static String compact(String text) {
-        return text == null ? "" : text.replaceAll("\\s+", "");
     }
 }

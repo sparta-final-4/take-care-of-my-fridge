@@ -1,6 +1,7 @@
 package org.example.takecareofmyfridgebe.domain.chat.intent;
 
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatWordProperties;
+import org.example.takecareofmyfridgebe.domain.chat.text.ChatTexts;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 
 import java.util.ArrayList;
@@ -34,7 +35,7 @@ public final class TasteWordChecker {
      * @return 맛마다 원하는지·피하는지. 맛 단어가 없는 맛은 담지 않는다
      */
     public static List<TasteStance> check(String message, ChatWordProperties.Taste words) {
-        String text = compact(message);
+        String text = ChatTexts.removeWhitespace(message);
         List<TasteStance> result = new ArrayList<>();
         stance(text, words.spicy(), words).ifPresent(stance -> result.add(new TasteStance(Member.Taste.SPICY, stance)));
         stance(text, words.sweet(), words).ifPresent(stance -> result.add(new TasteStance(Member.Taste.SWEET, stance)));
@@ -51,7 +52,7 @@ public final class TasteWordChecker {
      * @return 맛마다 원하는지·피하는지. 맛 단어가 없는 맛은 담지 않는다
      */
     public static List<TasteStance> stances(String message, ChatWordProperties.Taste words) {
-        String text = compact(message);
+        String text = ChatTexts.removeWhitespace(message);
         List<TasteStance> result = new ArrayList<>();
         stance(text, words.spicy(), words).ifPresent(stance -> result.add(new TasteStance(Member.Taste.SPICY, stance)));
         stance(text, words.sweet(), words).ifPresent(stance -> result.add(new TasteStance(Member.Taste.SWEET, stance)));
@@ -70,7 +71,7 @@ public final class TasteWordChecker {
      * 매운맛·단맛은 맛 단어, 짠맛·감칠맛·순한맛은 그 맛을 말하는 단어로 본다.
      */
     public static Set<Member.Taste> mentioned(String message, ChatWordProperties.Taste words) {
-        String text = compact(message);
+        String text = ChatTexts.removeWhitespace(message);
         Set<Member.Taste> tastes = EnumSet.noneOf(Member.Taste.class);
         addIfAny(tastes, text, Member.Taste.SPICY, words.spicy());
         addIfAny(tastes, text, Member.Taste.SWEET, words.sweet());
@@ -81,7 +82,7 @@ public final class TasteWordChecker {
     }
 
     private static void addIfAny(Set<Member.Taste> tastes, String text, Member.Taste taste, List<String> tasteWords) {
-        if (tasteWords != null && tasteWords.stream().map(TasteWordChecker::compact)
+        if (tasteWords != null && tasteWords.stream().map(ChatTexts::removeWhitespace)
                 .anyMatch(word -> !word.isEmpty() && text.contains(word))) {
             tastes.add(taste);
         }
@@ -91,7 +92,7 @@ public final class TasteWordChecker {
     private static Optional<Stance> stance(String text, List<String> tasteWords, ChatWordProperties.Taste words) {
         boolean found = false;
         for (String word : tasteWords) {
-            String tasteWord = compact(word);
+            String tasteWord = ChatTexts.removeWhitespace(word);
             if (tasteWord.isEmpty()) {
                 continue;
             }
@@ -109,7 +110,7 @@ public final class TasteWordChecker {
 
     // 단어 바로 앞에 부정어("안·덜")가 붙었는지. 분류 단어 확인(CategoryWordChecker)도 같은 기준을 쓴다
     static boolean negatedBefore(String before, ChatWordProperties.Taste words) {
-        return words.negationBefore().stream().map(TasteWordChecker::compact)
+        return words.negationBefore().stream().map(ChatTexts::removeWhitespace)
                 .anyMatch(negation -> !negation.isEmpty() && before.endsWith(negation));
     }
 
@@ -125,9 +126,9 @@ public final class TasteWordChecker {
      * 맛 단어만 있고 둘 다 없으면("매운 건 별로") 서버 판단이 애매하므로 false다.
      */
     public static boolean surelyWanted(String message, Member.Taste taste, ChatWordProperties.Taste words) {
-        String text = compact(message);
+        String text = ChatTexts.removeWhitespace(message);
         for (String word : orEmpty(tasteWords(taste, words))) {
-            String tasteWord = compact(word);
+            String tasteWord = ChatTexts.removeWhitespace(word);
             if (tasteWord.isEmpty()) {
                 continue;
             }
@@ -136,10 +137,10 @@ public final class TasteWordChecker {
                 int end = at + tasteWord.length();
                 if (!negatedBefore(text.substring(0, at), words) && !negatedAfter(text, end, words)) {
                     String before = text.substring(0, at);
-                    boolean wantBefore = orEmpty(words.wantBefore()).stream().map(TasteWordChecker::compact)
+                    boolean wantBefore = orEmpty(words.wantBefore()).stream().map(ChatTexts::removeWhitespace)
                             .anyMatch(marker -> !marker.isEmpty() && before.endsWith(marker));
                     int marker = startsWithin(text, end, orEmpty(words.wantAfter()));
-                    boolean wantAfter = marker >= 0 && words.negationBefore().stream().map(TasteWordChecker::compact)
+                    boolean wantAfter = marker >= 0 && words.negationBefore().stream().map(ChatTexts::removeWhitespace)
                             .noneMatch(negation -> !negation.isEmpty() && text.substring(end, end + marker).contains(negation));
                     if (wantBefore || wantAfter) {
                         return true;
@@ -153,8 +154,8 @@ public final class TasteWordChecker {
 
     // 맛 조건을 지우라는 말("맛 상관없이", "맛은 아무거나")이 있는지 (공백 빼고 비교)
     public static boolean clearsTastes(String message, ChatWordProperties.Taste words) {
-        String text = compact(message);
-        return orEmpty(words.clear()).stream().map(TasteWordChecker::compact)
+        String text = ChatTexts.removeWhitespace(message);
+        return orEmpty(words.clear()).stream().map(ChatTexts::removeWhitespace)
                 .anyMatch(word -> !word.isEmpty() && text.contains(word));
     }
 
@@ -173,16 +174,12 @@ public final class TasteWordChecker {
         int limit = Math.min(text.length(), from + AFTER_WINDOW);
         for (int i = from; i < limit; i++) {
             for (String target : targets) {
-                String compactTarget = compact(target);
+                String compactTarget = ChatTexts.removeWhitespace(target);
                 if (!compactTarget.isEmpty() && text.startsWith(compactTarget, i)) {
                     return i - from;
                 }
             }
         }
         return -1;
-    }
-
-    private static String compact(String text) {
-        return text == null ? "" : text.replaceAll("\\s+", "");
     }
 }

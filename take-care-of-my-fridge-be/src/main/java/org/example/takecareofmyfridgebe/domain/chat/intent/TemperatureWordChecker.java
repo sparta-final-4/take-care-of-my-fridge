@@ -2,6 +2,7 @@ package org.example.takecareofmyfridgebe.domain.chat.intent;
 
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate;
+import org.example.takecareofmyfridgebe.domain.chat.text.ChatTexts;
 
 import java.util.List;
 import java.util.Optional;
@@ -35,7 +36,7 @@ public final class TemperatureWordChecker {
     public static Optional<Temperature> wanted(ChatWordProperties.Temperature words, String... texts) {
         String text = Stream.of(texts)
                 .filter(value -> value != null && !value.isBlank())
-                .map(TemperatureWordChecker::compact)
+                .map(ChatTexts::removeWhitespace)
                 .collect(Collectors.joining(" "));
         boolean warm = containsAny(text, words.warm());
         boolean cold = containsAny(text, words.cold());
@@ -47,7 +48,7 @@ public final class TemperatureWordChecker {
 
     // 이름에 찬 요리 말이 들어 있는지 ("오이냉국", "물냉면")
     public static boolean coldDish(String name, ChatWordProperties.Temperature words) {
-        return name != null && containsAny(compact(name), words.coldDishes());
+        return name != null && containsAny(ChatTexts.removeWhitespace(name), words.coldDishes());
     }
 
     // 이름이 뜨거운 국물 끝말로 끝나는지 ("꽃게해물탕", "김치찌개"). 제외 이름("가지그라탕")은 아니다
@@ -55,7 +56,7 @@ public final class TemperatureWordChecker {
         if (name == null) {
             return false;
         }
-        String compact = compact(name);
+        String compact = ChatTexts.removeWhitespace(name);
         return words.hotDishEndings().stream().anyMatch(compact::endsWith)
                 && !containsAny(compact, words.hotDishExclusions());
     }
@@ -93,10 +94,6 @@ public final class TemperatureWordChecker {
     }
 
     private static boolean containsAny(String text, List<String> words) {
-        return words.stream().map(TemperatureWordChecker::compact).filter(word -> !word.isEmpty()).anyMatch(text::contains);
-    }
-
-    private static String compact(String text) {
-        return text.replaceAll("\\s+", "");
+        return words.stream().map(ChatTexts::removeWhitespace).filter(word -> !word.isEmpty()).anyMatch(text::contains);
     }
 }

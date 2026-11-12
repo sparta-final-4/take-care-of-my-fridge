@@ -8,6 +8,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import org.example.takecareofmyfridgebe.domain.chat.text.ChatTexts;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
@@ -84,11 +85,11 @@ public record ChatSafetyProperties(
 
         // 그 재료를 넓힐 때 빼는 이름 (공백 뺀 이름)
         public Set<String> notSameKindOf(String word) {
-            String key = compact(word);
+            String key = ChatTexts.removeWhitespace(word);
             return notSameKind.stream()
-                    .filter(entry -> compact(entry.word()).equals(key))
+                    .filter(entry -> ChatTexts.removeWhitespace(entry.word()).equals(key))
                     .flatMap(entry -> entry.names().stream())
-                    .map(Allergy::compact)
+                    .map(ChatTexts::removeWhitespace)
                     .collect(Collectors.toUnmodifiableSet());
         }
 
@@ -96,13 +97,9 @@ public record ChatSafetyProperties(
         public Set<String> allNotSameKindNames() {
             return notSameKind.stream()
                     .flatMap(entry -> entry.names().stream())
-                    .map(Allergy::compact)
+                    .map(ChatTexts::removeWhitespace)
                     .filter(name -> !name.isEmpty())
                     .collect(Collectors.toUnmodifiableSet());
-        }
-
-        private static String compact(String text) {
-            return text == null ? "" : text.replaceAll("\\s+", "");
         }
 
         /**
