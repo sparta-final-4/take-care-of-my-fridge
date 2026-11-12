@@ -110,11 +110,11 @@ public class RecommendationTextSplitter {
             String text = buffer.toString();
             int start = headStart(text);
             if (start < 0) {
+                // 끝났으면 더 받을 게 없으므로 확인을 마친다
                 if (end) {
                     repeatChecked = true;
-                    return true;
                 }
-                return false;
+                return end;
             }
             String head = text.substring(start);
             String repeated = alreadySaid.stream().filter(head::startsWith).findFirst().orElse(null);
@@ -198,34 +198,36 @@ public class RecommendationTextSplitter {
     private void drain(List<Piece> pieces, boolean end) {
         while (true) {
             Matcher matcher = MARKER.matcher(buffer);
-            if (matcher.find()) {
-                // 버퍼를 고치기 전에 표시 위치·글자를 먼저 읽어 둔다 (Matcher는 버퍼를 그대로 본다)
-                String label = matcher.group(1);
-                int start = matcher.start();
-                int markerLength = matcher.end() - start;
-                emit(pieces, section, take(start), false);
-                buffer.delete(0, markerLength);
-                int next = INTRO_MARKER.equals("[" + label + "]") ? INTRO : Integer.parseInt(label) - 1;
-                // 첫 표시 앞 소개 글 뒤에 [소개]가 오면 같은 소개로 이어 쓴다 (한 칸 띄움)
-                if (next == section && sectionStarted) {
-                    if (!buffer.isEmpty() && !Character.isWhitespace(buffer.charAt(0))) {
-                        buffer.insert(0, ' ');
-                    }
-                } else {
-                    section = next;
-                    sectionStarted = false;
-                    cardHead.setLength(0);
-                    nameChecked = next == INTRO || next >= cardNames.size() || cardNames.get(next).isEmpty();
+            if (!matcher.find()) {
+                int keep = end ? partialKnownMarkerLength() : partialMarkerLength();
+                emit(pieces, section, take(buffer.length() - keep), !end);
+                if (end) {
+                    buffer.setLength(0);
                 }
-                continue;
+                return;
             }
-            int keep = end ? partialKnownMarkerLength() : partialMarkerLength();
-            emit(pieces, section, take(buffer.length() - keep), !end);
-            if (end) {
-                buffer.setLength(0);
+            // 버퍼를 고치기 전에 표시 위치·글자를 먼저 읽어 둔다 (Matcher는 버퍼를 그대로 본다)
+            String label = matcher.group(1);
+            int start = matcher.start();
+            int markerLength = matcher.end() - start;
+            emit(pieces, section, take(start), false);
+            buffer.delete(0, markerLength);
+            moveToSection(INTRO_MARKER.equals("[" + label + "]") ? INTRO : Integer.parseInt(label) - 1);
+        }
+    }
+
+    // 표시가 가리키는 칸으로 옮긴다. 첫 표시 앞 소개 글 뒤에 [소개]가 오면 같은 소개로 이어 쓴다 (한 칸 띄움)
+    private void moveToSection(int next) {
+        if (next == section && sectionStarted) {
+            if (!buffer.isEmpty() && !Character.isWhitespace(buffer.charAt(0))) {
+                buffer.insert(0, ' ');
             }
             return;
         }
+        section = next;
+        sectionStarted = false;
+        cardHead.setLength(0);
+        nameChecked = next == INTRO || next >= cardNames.size() || cardNames.get(next).isEmpty();
     }
 
     // 버퍼 끝에 닫히지 않은 "["로 시작하는 짧은 끝부분 ("[", "[소", "[2", "[다른 제")

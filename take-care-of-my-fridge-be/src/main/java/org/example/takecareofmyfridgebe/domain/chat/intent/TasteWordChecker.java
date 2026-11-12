@@ -132,21 +132,20 @@ public final class TasteWordChecker {
             if (tasteWord.isEmpty()) {
                 continue;
             }
-            int at = text.indexOf(tasteWord);
-            while (at >= 0) {
+            for (int at = text.indexOf(tasteWord); at >= 0; at = text.indexOf(tasteWord, at + 1)) {
                 int end = at + tasteWord.length();
-                if (!negatedBefore(text.substring(0, at), words) && !negatedAfter(text, end, words)) {
-                    String before = text.substring(0, at);
-                    boolean wantBefore = orEmpty(words.wantBefore()).stream().map(ChatTexts::removeWhitespace)
-                            .anyMatch(marker -> !marker.isEmpty() && before.endsWith(marker));
-                    int marker = startsWithin(text, end, orEmpty(words.wantAfter()));
-                    boolean wantAfter = marker >= 0 && words.negationBefore().stream().map(ChatTexts::removeWhitespace)
-                            .noneMatch(negation -> !negation.isEmpty() && text.substring(end, end + marker).contains(negation));
-                    if (wantBefore || wantAfter) {
-                        return true;
-                    }
+                String before = text.substring(0, at);
+                if (negatedBefore(before, words) || negatedAfter(text, end, words)) {
+                    continue;
                 }
-                at = text.indexOf(tasteWord, at + 1);
+                boolean wantBefore = orEmpty(words.wantBefore()).stream().map(ChatTexts::removeWhitespace)
+                        .anyMatch(marker -> !marker.isEmpty() && before.endsWith(marker));
+                int marker = startsWithin(text, end, orEmpty(words.wantAfter()));
+                boolean wantAfter = marker >= 0 && words.negationBefore().stream().map(ChatTexts::removeWhitespace)
+                        .noneMatch(negation -> !negation.isEmpty() && text.substring(end, end + marker).contains(negation));
+                if (wantBefore || wantAfter) {
+                    return true;
+                }
             }
         }
         return false;

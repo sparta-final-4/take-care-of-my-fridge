@@ -703,15 +703,16 @@ public class RecipeCandidateFacade {
                 result.recipeIds().forEach(recipeId ->
                         hits.merge(recipeId, result.vectorFallback(), (before, now) -> before && now));
                 summary.add(keyword + " " + result.recipeIds().size() + "건" + (result.vectorFallback() ? "(벡터)" : ""));
-                // 벡터 검색(글자로 0건)은 한 번의 추천에서 한 번만 쓴다. 그다음 키워드는 찾지 않는다
-                if (result.vectorFallback()) {
-                    vectorCalled = true;
-                    int skipped = keywords.size() - i - 1;
-                    if (skipped > 0) {
-                        summary.add("나머지 " + skipped + "개 생략");
-                    }
-                    break;
+                if (!result.vectorFallback()) {
+                    continue;
                 }
+                // 벡터 검색(글자로 0건)은 한 번의 추천에서 한 번만 쓴다. 그다음 키워드는 찾지 않는다
+                vectorCalled = true;
+                int skipped = keywords.size() - i - 1;
+                if (skipped > 0) {
+                    summary.add("나머지 " + skipped + "개 생략");
+                }
+                break;
             } catch (IOException | RuntimeException e) {
                 summary.add(keyword + " 실패");
                 log.warn("상담 추천 키워드 검색 실패, 건너뜀 - memberId: {}, keyword: {}, 원인: {}",

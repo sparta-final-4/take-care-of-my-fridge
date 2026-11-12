@@ -537,6 +537,7 @@ public class ChatStreamService {
         try {
             return objectMapper.writeValueAsString(value);
         } catch (Exception e) {
+            log.warn("상담 SSE 데이터 JSON 변환 실패, 빈 객체로 보냄 - 종류: {}", value.getClass().getSimpleName(), e);
             return "{}";
         }
     }
