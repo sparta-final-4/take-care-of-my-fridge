@@ -299,7 +299,7 @@ pnpm dev
 
 ## 10. 문서 안내
 - 📚 **[프로젝트 위키](https://github.com/sparta-final-4/take-care-of-my-fridge/wiki)**: 도메인별 상세 기능·흐름과 기술적 고민·트러블슈팅
-- 📄 **[docs/api/](docs/api/)**: 도메인별 API 명세
+- 📄 **[docs/api/api-spec.md](docs/api/api-spec.md)**: 도메인별 API 명세
 - 🧩 **[docs/architecture/domains/](docs/architecture/domains/)**: 도메인별 정책과 상태 전이
 - 🗄️ **[docs/database/](docs/database/)**: [ERD](docs/database/erd.md), [데이터 사전](docs/database/data-dictionary.md), [스키마](docs/database/schema.sql)
 - 📏 **[docs/conventions/](docs/conventions/)**: 백엔드·프론트엔드 규칙, Git 브랜치·커밋·PR 규칙
