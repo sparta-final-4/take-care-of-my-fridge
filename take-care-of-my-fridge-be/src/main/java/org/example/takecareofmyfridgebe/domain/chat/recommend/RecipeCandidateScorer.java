@@ -18,7 +18,6 @@ import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeCandidateInfo;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
-import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -151,41 +150,25 @@ public class RecipeCandidateScorer {
      * 보유 비율 기준 이상인 레시피와 선택 재료(기본 양념 제외 2개 이상)를 전부 쓰는 레시피를 먼저 고르고, 10개가 안 되면 나머지로 채운다.
      * 부족한 재료 목록은 비워 두고, withMissingIngredients로 채운다.
      *
-     * @param rows         후보 레시피의 재료 줄
+     * @param context      정렬 동안 바뀌지 않는 값 (검색 조건·냉장고·재료 줄·맛)
      * @param infos        후보 레시피 정보 (없는 레시피는 건너뛴다)
-     * @param recipeTastes 레시피별 맛 (비어 있으면 맛 단계는 모두 0)
      * @param candidateIds 정렬할 후보 레시피 ID (DB 경로는 candidateRecipeIds, ES 경로는 검색 결과)
      */
-    public RecipeCandidates rank(
-            RecipeQuery query,
-            List<FridgeStock> fridge,
-            Collection<Member.Taste> memberTastes,
-            List<RecipeCandidateIngredient> rows,
-            Map<Long, RecipeCandidateInfo> infos,
-            Map<Long, Set<Member.Taste>> recipeTastes,
-            Collection<Long> candidateIds
-    ) {
-        Map<Long, FridgeStock> fridgeById = fridge.stream()
-                .collect(Collectors.toMap(FridgeStock::ingredientId, stock -> stock, (a, b) -> a, LinkedHashMap::new));
-        Map<Long, List<RecipeCandidateIngredient>> rowsByRecipe = rows.stream()
-                .collect(Collectors.groupingBy(RecipeCandidateIngredient::recipeId, LinkedHashMap::new, Collectors.toList()));
-        Set<Member.Taste> preferred = toTasteSet(memberTastes);
-
+    public RecipeCandidates rank(ScoringContext context, Map<Long, RecipeCandidateInfo> infos, Collection<Long> candidateIds) {
+        RecipeQuery query = context.query();
         // 선택 재료만 쓰기는 기본 양념 뺀 선택 재료가 있을 때만 건다 (없으면 모든 레시피가 빠지므로)
-        List<Long> nonBasicSelected = nonBasicSelectedIds(query, rows);
-        int selectedCount = nonBasicSelected.size();
+        int selectedCount = context.nonBasicSelected().size();
         boolean selectedOnly = query.useSelectedOnly() && selectedCount > 0;
 
         List<RecipeCandidate> scored = new ArrayList<>();
         for (Long recipeId : new LinkedHashSet<>(candidateIds)) {
             RecipeCandidateInfo info = infos.get(recipeId);
-            List<RecipeCandidateIngredient> recipeRows = rowsByRecipe.getOrDefault(recipeId, List.of());
+            List<RecipeCandidateIngredient> recipeRows = context.rowsOf(recipeId);
             if (info == null || isFilteredOut(query, info, recipeRows)
-                    || (selectedOnly && countSelectedMatches(query, nonBasicSelected, recipeRows) == 0)) {
+                    || (selectedOnly && countSelectedMatches(context, recipeRows) == 0)) {
                 continue;
             }
-            scored.add(score(query, nonBasicSelected, info, recipeRows, fridgeById, preferred,
-                    recipeTastes.getOrDefault(recipeId, Set.of())));
+            scored.add(score(context, info));
         }
 
         boolean fallback = query.selectedIngredientIds().isEmpty()
@@ -202,32 +185,18 @@ public class RecipeCandidateScorer {
     }
 
     /**
-     * 정해진 레시피를 거르기·정렬 없이 계산한다 (요청 조건·선택 재료 없음). 저장된 추천 카드를 지금 냉장고 기준으로 다시 보여 줄 때 쓴다.
+     * 정해진 레시피를 거르기·정렬 없이 계산한다 (요청 조건·선택 재료 없음, ScoringContext.withoutRequest). 저장된 추천 카드를 지금 냉장고 기준으로 다시 보여 줄 때 쓴다.
      * 정보가 없는(지워진) 레시피는 건너뛴다. 결과는 recipeIds 순서다.
      */
-    public List<RecipeCandidate> scoreAll(
-            Long memberId,
-            List<FridgeStock> fridge,
-            Collection<Member.Taste> memberTastes,
-            List<RecipeCandidateIngredient> rows,
-            Map<Long, RecipeCandidateInfo> infos,
-            Map<Long, Set<Member.Taste>> recipeTastes,
-            Collection<Long> recipeIds
-    ) {
-        RecipeQuery query = RecipeQuery.of(memberId, List.of());
-        Map<Long, FridgeStock> fridgeById = fridge.stream()
-                .collect(Collectors.toMap(FridgeStock::ingredientId, stock -> stock, (a, b) -> a, LinkedHashMap::new));
-        Map<Long, List<RecipeCandidateIngredient>> rowsByRecipe = rows.stream()
-                .collect(Collectors.groupingBy(RecipeCandidateIngredient::recipeId, LinkedHashMap::new, Collectors.toList()));
-        Set<Member.Taste> preferred = toTasteSet(memberTastes);
+    public List<RecipeCandidate> scoreAll(ScoringContext context, Map<Long, RecipeCandidateInfo> infos,
+                                          Collection<Long> recipeIds) {
         List<RecipeCandidate> scored = new ArrayList<>();
         for (Long recipeId : recipeIds) {
             RecipeCandidateInfo info = infos.get(recipeId);
             if (info == null) {
                 continue;
             }
-            scored.add(score(query, List.of(), info, rowsByRecipe.getOrDefault(recipeId, List.of()), fridgeById, preferred,
-                    recipeTastes.getOrDefault(recipeId, Set.of())));
+            scored.add(score(context, info));
         }
         return scored;
     }
@@ -250,28 +219,20 @@ public class RecipeCandidateScorer {
     }
 
     // 레시피가 쓰는 선택 재료 수. 선택 재료의 같은 종류 묶음 안 재료(기본 양념 제외)를 하나라도 쓰면 쓴 것으로 센다
-    private static int countSelectedMatches(
-            RecipeQuery query,
-            List<Long> nonBasicSelected,
-            List<RecipeCandidateIngredient> recipeRows
-    ) {
+    private static int countSelectedMatches(ScoringContext context, List<RecipeCandidateIngredient> recipeRows) {
         Set<Long> recipeIngredientIds = recipeRows.stream()
                 .filter(row -> !row.basicSeasoning())
                 .map(RecipeCandidateIngredient::ingredientId)
                 .collect(Collectors.toSet());
-        return (int) nonBasicSelected.stream()
-                .filter(selectedId -> query.selectedGroupOf(selectedId).stream().anyMatch(recipeIngredientIds::contains))
+        return (int) context.nonBasicSelected().stream()
+                .filter(selectedId -> context.query().selectedGroupOf(selectedId).stream().anyMatch(recipeIngredientIds::contains))
                 .count();
     }
 
     // 레시피가 쓰는 선택 재료(같은 종류 묶음 포함)의 이름. 레시피에 나온 순서이고 레시피에 실제로 쓰인 이름이다
-    private static List<String> usedSelectedNames(
-            RecipeQuery query,
-            List<Long> nonBasicSelected,
-            List<RecipeCandidateIngredient> nonBasic
-    ) {
+    private static List<String> usedSelectedNames(ScoringContext context, List<RecipeCandidateIngredient> nonBasic) {
         Set<Long> groupIds = new HashSet<>();
-        nonBasicSelected.forEach(selectedId -> groupIds.addAll(query.selectedGroupOf(selectedId)));
+        context.nonBasicSelected().forEach(selectedId -> groupIds.addAll(context.query().selectedGroupOf(selectedId)));
         return nonBasic.stream()
                 .filter(row -> groupIds.contains(row.ingredientId()))
                 .map(RecipeCandidateIngredient::ingredientName)
@@ -281,37 +242,19 @@ public class RecipeCandidateScorer {
 
     // 레시피가 쓰는 선택 재료 중 냉장고에 없는 것의 이름. 같은 종류 묶음에서 레시피에 쓰인 재료가 하나라도 냉장고에 있으면 가진 것으로 본다.
     // 이름은 레시피에 실제로 쓰인 재료 이름이다 (예: 선택 "버섯" → 레시피의 "표고버섯")
-    private static List<String> missingSelectedNames(
-            RecipeQuery query,
-            List<Long> nonBasicSelected,
-            List<RecipeCandidateIngredient> nonBasic,
-            Map<Long, FridgeStock> fridgeById
-    ) {
+    private static List<String> missingSelectedNames(ScoringContext context, List<RecipeCandidateIngredient> nonBasic) {
         Set<String> names = new LinkedHashSet<>();
-        for (Long selectedId : nonBasicSelected) {
-            Set<Long> group = query.selectedGroupOf(selectedId);
+        for (Long selectedId : context.nonBasicSelected()) {
+            Set<Long> group = context.query().selectedGroupOf(selectedId);
             List<RecipeCandidateIngredient> used = nonBasic.stream()
                     .filter(row -> group.contains(row.ingredientId()))
                     .toList();
-            if (used.isEmpty() || used.stream().anyMatch(row -> fridgeById.containsKey(row.ingredientId()))) {
+            if (used.isEmpty() || used.stream().anyMatch(row -> context.fridgeById().containsKey(row.ingredientId()))) {
                 continue;
             }
             used.forEach(row -> names.add(row.ingredientName()));
         }
         return List.copyOf(names);
-    }
-
-    // 기본 양념을 뺀 선택 재료 (중복 제거). 레시피 재료 줄에서 기본 양념으로 확인된 재료만 뺀다
-    // (어느 레시피에도 없는 재료는 기본 양념이 아닌 것으로 센다. 그런 재료를 전부 쓰는 레시피는 없으므로 예외도 생기지 않는다)
-    private static List<Long> nonBasicSelectedIds(RecipeQuery query, List<RecipeCandidateIngredient> rows) {
-        Set<Long> basicIds = rows.stream()
-                .filter(RecipeCandidateIngredient::basicSeasoning)
-                .map(RecipeCandidateIngredient::ingredientId)
-                .collect(Collectors.toSet());
-        return query.selectedIngredientIds().stream()
-                .distinct()
-                .filter(id -> !basicIds.contains(id))
-                .toList();
     }
 
     /**
@@ -361,47 +304,27 @@ public class RecipeCandidateScorer {
                 && info.cookTimeMin() > query.maxMinutes();
     }
 
-    private RecipeCandidate score(
-            RecipeQuery query,
-            List<Long> nonBasicSelected,
-            RecipeCandidateInfo info,
-            List<RecipeCandidateIngredient> recipeRows,
-            Map<Long, FridgeStock> fridgeById,
-            Set<Member.Taste> preferred,
-            Set<Member.Taste> tastes
-    ) {
+    private RecipeCandidate score(ScoringContext context, RecipeCandidateInfo info) {
+        RecipeQuery query = context.query();
+        List<RecipeCandidateIngredient> recipeRows = context.rowsOf(info.recipeId());
+        Set<Member.Taste> tastes = context.tastesOf(info.recipeId());
         List<RecipeCandidateIngredient> nonBasic = recipeRows.stream()
                 .filter(row -> !row.basicSeasoning())
                 .toList();
+        List<FridgeStock> owned = ownedStocks(context, nonBasic);
 
-        // 냉장고에 있는 재료 (임박한 순, 같으면 이름 순)
-        List<FridgeStock> owned = nonBasic.stream()
-                .map(row -> fridgeById.get(row.ingredientId()))
-                .filter(stock -> stock != null)
-                .distinct()
-                .sorted(Comparator.comparingLong(FridgeStock::dDay).thenComparing(FridgeStock::name))
-                .toList();
+        int selectedMatches = countSelectedMatches(context, recipeRows);
+        List<String> missingSelected = missingSelectedNames(context, nonBasic);
+        List<String> usedSelected = usedSelectedNames(context, nonBasic);
 
-        int selectedMatches = countSelectedMatches(query, nonBasicSelected, recipeRows);
-        List<String> missingSelected = missingSelectedNames(query, nonBasicSelected, nonBasic, fridgeById);
-        List<String> usedSelected = usedSelectedNames(query, nonBasicSelected, nonBasic);
-
-        // 1단계: 사용자 요청 (요리 이름 키워드 + 원하는 맛 + 분류 일치). 말한 재료는 선택 재료로 합쳐져 2단계에서 센다
-        List<String> matchedRequests = new ArrayList<>();
         List<Member.Taste> matchedWantedTastes = query.wantedTastes().stream()
                 .distinct()
                 .filter(tastes::contains)
                 .toList();
         KeywordMatch keywordMatch = query.keywordMatches().get(info.recipeId());
-        if (keywordMatch != null && keywordMatch.strong()) {
-            matchedRequests.add("키워드: " + keywordMatch.type().label());
-        }
-        matchedWantedTastes.forEach(taste -> matchedRequests.add("맛: " + taste));
-        if (info.category() != null && query.moodCategories().contains(info.category())) {
-            matchedRequests.add("분류: " + info.category());
-        }
+        List<String> matchedRequests = matchedRequests(query, info, matchedWantedTastes, keywordMatch);
 
-        List<Member.Taste> matchedTastes = preferred.stream()
+        List<Member.Taste> matchedTastes = context.preferred().stream()
                 .filter(tastes::contains)
                 .toList();
 
@@ -441,6 +364,30 @@ public class RecipeCandidateScorer {
         return new RecipeCandidate(info.recipeId(), info.name(), info.category(), info.cookTimeMin(), ranking, reason);
     }
 
+    // 냉장고에 있는 재료 (임박한 순, 같으면 이름 순)
+    private static List<FridgeStock> ownedStocks(ScoringContext context, List<RecipeCandidateIngredient> nonBasic) {
+        return nonBasic.stream()
+                .map(row -> context.fridgeById().get(row.ingredientId()))
+                .filter(stock -> stock != null)
+                .distinct()
+                .sorted(Comparator.comparingLong(FridgeStock::dDay).thenComparing(FridgeStock::name))
+                .toList();
+    }
+
+    // 1단계: 사용자 요청 (요리 이름 키워드 + 원하는 맛 + 분류 일치). 말한 재료는 선택 재료로 합쳐져 2단계에서 센다
+    private static List<String> matchedRequests(RecipeQuery query, RecipeCandidateInfo info,
+                                                List<Member.Taste> matchedWantedTastes, KeywordMatch keywordMatch) {
+        List<String> matched = new ArrayList<>();
+        if (keywordMatch != null && keywordMatch.strong()) {
+            matched.add("키워드: " + keywordMatch.type().label());
+        }
+        matchedWantedTastes.forEach(taste -> matched.add("맛: " + taste));
+        if (info.category() != null && query.moodCategories().contains(info.category())) {
+            matched.add("분류: " + info.category());
+        }
+        return matched;
+    }
+
     // D-0 12, D-1 10, D-2 8, D-3 6. 임박 목록에는 D-3 이내만 들어온다
     private static int imminentScoreOf(long dDay) {
         return IMMINENT_BASE_SCORE - IMMINENT_STEP * (int) dDay;
@@ -458,14 +405,6 @@ public class RecipeCandidateScorer {
         fridge.forEach(stock -> ids.add(stock.ingredientId()));
         query.selectedIngredientIds().forEach(selectedId -> ids.addAll(query.selectedGroupOf(selectedId)));
         return ids;
-    }
-
-    private static Set<Member.Taste> toTasteSet(Collection<Member.Taste> tastes) {
-        Set<Member.Taste> set = EnumSet.noneOf(Member.Taste.class);
-        if (tastes != null) {
-            tastes.stream().filter(taste -> taste != null).forEach(set::add);
-        }
-        return set;
     }
 
     /**

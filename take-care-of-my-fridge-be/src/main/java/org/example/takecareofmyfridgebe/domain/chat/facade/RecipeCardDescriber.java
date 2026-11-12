@@ -8,6 +8,7 @@ import org.example.takecareofmyfridgebe.domain.chat.facade.RecipeTasteReader.Tas
 import org.example.takecareofmyfridgebe.domain.chat.recommend.MealkitPicker.FridgeMealkits;
 import org.example.takecareofmyfridgebe.domain.chat.recommend.RecipeCandidateScorer.FridgeStock;
 import org.example.takecareofmyfridgebe.domain.chat.recommend.RecipeCandidateScorer;
+import org.example.takecareofmyfridgebe.domain.chat.recommend.ScoringContext;
 import org.example.takecareofmyfridgebe.domain.chat.text.ChatTexts;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemResponse;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeSortType;
@@ -121,7 +122,8 @@ public class RecipeCardDescriber {
         List<RecipeCandidateIngredient> rows = recipeService.findNonBasicIngredients(recipeIds);
         Map<Long, RecipeCandidateInfo> infos = recipeService.findCandidateInfos(recipeIds);
 
-        List<RecipeCandidate> scored = scorer.scoreAll(memberId, fridge, memberTastes, rows, infos, recipeTastes, recipeIds);
+        List<RecipeCandidate> scored = scorer.scoreAll(
+                ScoringContext.withoutRequest(memberId, fridge, memberTastes, rows, recipeTastes), infos, recipeIds);
         RecipeCandidates withMissing = RecipeCandidateScorer.withMissingIngredients(
                 new RecipeCandidates(scored, false), fridge, rows);
         Map<Long, RecipeCandidate> byId = new LinkedHashMap<>();
