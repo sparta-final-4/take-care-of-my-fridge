@@ -64,11 +64,8 @@ public class RecipeReviewService {
 
         Map<Long, RecipeSummary> summaries = recipeService.findSummaries(recipeIds);
 
-        return PageResponse.of(reviews.map(review -> {
-            RecipeSummary summary = summaries.get(review.getRecipeId());
-            String recipeName = summary != null ? summary.name() : null;
-            return ReviewResponse.from(review, currentMemberId, recipeName);
-        }));
+        return PageResponse.of(reviews.map(review ->
+                ReviewResponse.from(review, currentMemberId, recipeNameOf(summaries, review.getRecipeId()))));
     }
 
     /**
@@ -144,11 +141,19 @@ public class RecipeReviewService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.REVIEW_NOT_FOUND));
     }
 
+    // 후기 하나의 레시피 이름. 레시피 ID가 없으면 조회하지 않는다
     private String getRecipeName(Long recipeId) {
         if (recipeId == null) {
             return null;
         }
-        Map<Long, RecipeSummary> summaries = recipeService.findSummaries(List.of(recipeId));
+        return recipeNameOf(recipeService.findSummaries(List.of(recipeId)), recipeId);
+    }
+
+    /**
+     * 조회한 레시피 요약에서 이름을 꺼낸다. 레시피가 지워져 요약이 없으면 null이고,
+     * 응답의 recipeName도 null로 나간다 (이름을 모르는 후기). null을 돌려주는 곳은 여기 하나다.
+     */
+    private static String recipeNameOf(Map<Long, RecipeSummary> summaries, Long recipeId) {
         RecipeSummary summary = summaries.get(recipeId);
         return summary != null ? summary.name() : null;
     }
