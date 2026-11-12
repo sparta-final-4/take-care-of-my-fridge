@@ -110,7 +110,7 @@ sequenceDiagram
 ```
 
 ## 데이터·API·이벤트
-- ERD·데이터 사전: [erd.md](../../database/erd.md#주문-테이블-관계), [data-dictionary.md](../../database/data-dictionary.md#orders--주문)
+- ERD·데이터 사전: [erd.md](../../database/erd.md#35-장바구니--주문--할인-행사-도메인), [data-dictionary.md](../../database/data-dictionary.md#orders--주문)
 - 제공 API: [주문 API](../../api/order-api.md) (주문하기, 확인 조회, 취소, 목록, 상세, 구매 확정)
 - 발행 이벤트: `purchase-confirmed`(구매 확정). 키는 주문 ID이고, 주문 ID·회원 ID·확정 시각과 주문 상품 목록(주문 상품 ID, 상품 ID, 상품명, 확정 수량)을 싣습니다. 메시지 예시는 WORK-120에 있습니다.
 - 수신 이벤트: 없음.

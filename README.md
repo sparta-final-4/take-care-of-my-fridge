@@ -109,7 +109,7 @@
   - 과거 할인 판매 기록을 분석해 할인율에 따른 판매량 증가율(가격 탄력성)을 계산하고, 요일별 최적의 할인 후보 상품을 추천합니다.
   - 검토한 추천 상품은 번거로운 입력 없이 특가나 번개 드롭 행사로 즉시 원클릭 등록할 수 있습니다.
   - 관리자 접근 권한(Role) 제어 및 주요 관리자 작업 로그를 감사 이력으로 투명하게 남깁니다.
-- 📖 [관리자 & 판매 분석 상세 Wiki](https://github.com/sparta-final-4/take-care-of-my-fridge/wiki/Admin-Analytics) *(관련 문서: [회원·관리자 API](docs/api/member-auth-admin-api.md))*
+- 📖 [관리자 & 판매 분석 상세 Wiki](https://github.com/sparta-final-4/take-care-of-my-fridge/wiki/Admin-Analytics) *(관련 문서: [회원·관리자 API](docs/api/member-auth-admin-api.md), [판매 예측 API](docs/api/forecast-api.md), [할인 후보 API](docs/api/deal-analysis-api.md))*
 
 <br/>
 
@@ -122,7 +122,7 @@
 | **Backend** | ![Spring Framework](https://img.shields.io/badge/Spring_Framework-6DB33F?style=flat-square&logo=spring&logoColor=white) ![Spring Boot 4](https://img.shields.io/badge/Spring_Boot_4-6DB33F?style=flat-square&logo=springboot&logoColor=white) ![Spring Data JPA](https://img.shields.io/badge/Spring_Data_JPA-59666C?style=flat-square&logo=hibernate&logoColor=white) ![QueryDSL](https://img.shields.io/badge/QueryDSL-0769AD?style=flat-square) ![Spring AI](https://img.shields.io/badge/Spring_AI-6DB33F?style=flat-square&logo=spring&logoColor=white) | RESTful API 서버 구축, 객체 지향 도메인 모델링, 동적 쿼리 및 성능 최적화, 생성형 AI 서비스 연동 |
 | **Security** | ![Spring Security](https://img.shields.io/badge/Spring_Security-6DB33F?style=flat-square&logo=springsecurity&logoColor=white) ![JWT](https://img.shields.io/badge/JWT-000000?style=flat-square&logo=jsonwebtokens&logoColor=white) | 무상태(Stateless) 기반 사용자 인증/인가 및 역할(Role) 기반 API 엔드포인트 접근 제어 |
 | **Scheduler** | ![Spring Scheduler](https://img.shields.io/badge/Spring_Scheduler-6DB33F?style=flat-square&logo=spring&logoColor=white) ![ShedLock](https://img.shields.io/badge/ShedLock-4A4A4A?style=flat-square) | 정기 정산·판매 예측 배치 스케줄링 및 다중 인스턴스 환경에서의 중복 배치 실행 방지 분산 락 |
-| **Database** | ![MySQL 8.4](https://img.shields.io/badge/MySQL_8.4-4479A1?style=flat-square&logo=mysql&logoColor=white) ![Elasticsearch](https://img.shields.io/badge/Elasticsearch-005571?style=flat-square&logo=elasticsearch&logoColor=white) ![Redis](https://img.shields.io/badge/Redis-DC382D?style=flat-square&logo=redis&logoColor=white) | 영속적 RDBMS 데이터 관리, nori 한국어 형태소 분석 및 kNN 벡터 검색 엔진, 초고속 캐싱 및 Redisson 분산 락 |
+| **Database** | ![MySQL 8.4](https://img.shields.io/badge/MySQL_8.4-4479A1?style=flat-square&logo=mysql&logoColor=white) ![Elasticsearch](https://img.shields.io/badge/Elasticsearch-005571?style=flat-square&logo=elasticsearch&logoColor=white) ![Redis](https://img.shields.io/badge/Redis-DC382D?style=flat-square&logo=redis&logoColor=white) | 영속적 RDBMS 데이터 관리, nori 한국어 형태소 분석 및 kNN 벡터 검색 엔진, 캐싱·SETNX 잠금·Pub/Sub 메시지 전달 |
 | **Message Broker** | ![Apache Kafka](https://img.shields.io/badge/Apache_Kafka-231F20?style=flat-square&logo=apachekafka&logoColor=white) | 도메인 간 비동기 이벤트 발행/구독(Event-Driven) 및 대용량 스트리밍 처리 |
 | **AI** | ![OpenAI API](https://img.shields.io/badge/OpenAI_API-412991?style=flat-square&logo=data:image/svg%2bxml;base64,PHN2ZyBmaWxsPSJ3aGl0ZSIgZmlsbC1ydWxlPSJldmVub2RkIiBoZWlnaHQ9IjFlbSIgc3R5bGU9ImZsZXg6bm9uZTtsaW5lLWhlaWdodDoxIiB2aWV3Qm94PSIwIDAgMjQgMjQiIHdpZHRoPSIxZW0iIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHRpdGxlPk9wZW5BSTwvdGl0bGU+PHBhdGggZD0iTTkuMjA1IDguNjU4di0yLjI2YzAtLjE5LjA3Mi0uMzMzLjIzOC0uNDI4bDQuNTQzLTIuNjE2Yy42MTktLjM1NyAxLjM1Ni0uNTIzIDIuMTE3LS41MjMgMi44NTQgMCA0LjY2MiAyLjIxMiA0LjY2MiA0LjU2NiAwIC4xNjcgMCAuMzU3LS4wMjQuNTQ3bC00LjcxLTIuNzU5YS43OTcuNzk3IDAgMDAtLjg1NiAwbC01Ljk3IDMuNDczem0xMC42MDkgOC44VjEyLjA2YzAtLjMzMy0uMTQzLS41Ny0uNDI5LS43MzdsLTUuOTctMy40NzMgMS45NS0xLjExOGEuNDMzLjQzMyAwIDAxLjQ3NiAwbDQuNTQzIDIuNjE3YzEuMzA5Ljc2IDIuMTg5IDIuMzc4IDIuMTg5IDMuOTQ4IDAgMS44MDgtMS4wNyAzLjQ3My0yLjc2IDQuMTYzek03LjgwMiAxMi43MDNsLTEuOTUtMS4xNDJjLS4xNjctLjA5NS0uMjM5LS4yMzgtLjIzOS0uNDI4VjUuODk5YzAtMi41NDUgMS45NS00LjQ3MiA0LjU5MS00LjQ3MiAxIDAgMS45MjcuMzMzIDIuNzEyLjkyOEw4LjIzIDUuMDY3Yy0uMjg1LjE2Ni0uNDI4LjQwNC0uNDI4LjczN3Y2Ljg5OHpNMTIgMTUuMTI4bC0yLjc5NS0xLjU3di0zLjMzTDEyIDguNjU4bDIuNzk1IDEuNTd2My4zM0wxMiAxNS4xMjh6bTEuNzk2IDcuMjNjLTEgMC0xLjkyNy0uMzMyLTIuNzEyLS45MjdsNC42ODYtMi43MTJjLjI4NS0uMTY2LjQyOC0uNDA0LjQyOC0uNzM3di02Ljg5OGwxLjk3NCAxLjE0MmMuMTY3LjA5NS4yMzguMjM4LjIzOC40Mjh2NS4yMzNjMCAyLjU0NS0xLjk3NCA0LjQ3Mi00LjYxNCA0LjQ3MnptLTUuNjM3LTUuMzAzbC00LjU0NC0yLjYxN2MtMS4zMDgtLjc2MS0yLjE4OC0yLjM3OC0yLjE4OC0zLjk0OEE0LjQ4MiA0LjQ4MiAwIDAxNC4yMSA2LjMyN3Y1LjQyM2MwIC4zMzMuMTQzLjU3MS40MjguNzM4bDUuOTQ3IDMuNDQ5LTEuOTUgMS4xMThhLjQzMi40MzIgMCAwMS0uNDc2IDB6bS0uMjYyIDMuOWMtMi42ODggMC00LjY2Mi0yLjAyMS00LjY2Mi00LjUxOSAwLS4xOS4wMjQtLjM4LjA0Ny0uNTdsNC42ODYgMi43MWMuMjg2LjE2Ny41NzEuMTY3Ljg1NiAwbDUuOTctMy40NDh2Mi4yNmMwIC4xOS0uMDcuMzMzLS4yMzcuNDI4bC00LjU0MyAyLjYxNmMtLjYxOS4zNTctMS4zNTYuNTIzLTIuMTE3LjUyM3ptNS44OTkgMi44M2E1Ljk0NyA1Ljk0NyAwIDAwNS44MjctNC43NTZDMjIuMjg3IDE4LjMzOSAyNCAxNS44NCAyNCAxMy4yOTZjMC0xLjY2NS0uNzEzLTMuMjgyLTEuOTk4LTQuNDQ4LjExOS0uNS4xOS0uOTk5LjE5LTEuNDk4IDAtMy40MDEtMi43NTktNS45NDctNS45NDYtNS45NDctLjY0MiAwLTEuMjYuMDk1LTEuODguMzFBNS45NjIgNS45NjIgMCAwMDEwLjIwNSAwYTUuOTQ3IDUuOTQ3IDAgMDAtNS44MjcgNC43NTdDMS43MTMgNS40NDcgMCA3Ljk0NSAwIDEwLjQ5YzAgMS42NjYuNzEzIDMuMjgzIDEuOTk4IDQuNDQ4LS4xMTkuNS0uMTkgMS0uMTkgMS40OTkgMCAzLjQwMSAyLjc1OSA1Ljk0NiA1Ljk0NiA1Ljk0Ni42NDIgMCAxLjI2LS4wOTUgMS44OC0uMzA5YTUuOTYgNS45NiAwIDAwNC4xNjIgMS43MTN6Ij48L3BhdGg+PC9zdmc+) ![PyTorch](https://img.shields.io/badge/PyTorch-EE4C2C?style=flat-square&logo=pytorch&logoColor=white) | 대화 의도(Intent) 분석 및 조리 팁·리뷰 요약, 주간 상품 판매량 TOP 10 예측 딥러닝 모델 학습 및 추론 |
 | **Infra** | ![AWS EC2](https://img.shields.io/badge/AWS_EC2-FF9900?style=flat-square) ![AWS S3](https://img.shields.io/badge/AWS_S3-569A31?style=flat-square) ![CloudFront](https://img.shields.io/badge/CloudFront-8C4FFF?style=flat-square) ![AWS ECR](https://img.shields.io/badge/AWS_ECR-FF9900?style=flat-square) ![SSM Parameter Store](https://img.shields.io/badge/SSM_Parameter_Store-E7157B?style=flat-square) ![Caddy](https://img.shields.io/badge/Caddy-1F88C0?style=flat-square&logo=caddy&logoColor=white) ![Terraform](https://img.shields.io/badge/Terraform-844FBA?style=flat-square&logo=terraform&logoColor=white) | 클라우드 컴퓨팅 및 정적 웹 호스팅/CDN, 컨테이너 레지스트리, 보안 환경변수 관리, 자동 HTTPS 프록시, 코드 기반 인프라(IaC) 관리 |
@@ -154,7 +154,7 @@ flowchart TD
 
         subgraph Server["AWS EC2 (t4g.small / Ubuntu arm64)"]
             ReverseProxy["Caddy (Reverse Proxy & Auto HTTPS)"]
-            App["Spring Boot 3.x API Server"]
+            App["Spring Boot 4.1.1 API Server"]
             Worker["Python PyTorch Worker (Port 8091)"]
             
             ReverseProxy --> App
@@ -164,7 +164,7 @@ flowchart TD
 
     subgraph DataStores["💾 Data & Messaging Platform"]
         MySQL[("MySQL 8.4<br/>Transactional RDBMS")]
-        Redis[("Redis 7<br/>Cache & Redisson Lock")]
+        Redis[("Redis 7<br/>Cache · SETNX Lock · Pub/Sub")]
         ES[("Elasticsearch 9.2<br/>Nori 형태소 & kNN")]
         Kafka["Apache Kafka 3.8<br/>Event Streaming Broker"]
     end
@@ -208,14 +208,16 @@ flowchart TD
 take-care-of-my-fridge/
 ├── .github/workflows/          # CI/CD 및 OpenAPI Drift 검증 워크플로우
 ├── docs/                       # 기획, 시스템 설계, API 명세, DB 설계, 작업 기록
+├── guide/                      # 문서·에이전트 지침 작성 예시
 ├── docker-compose.yaml         # 로컬 통합 개발 환경 (MySQL, Redis, ES, Kafka 등)
 ├── forecast_model/             # PyTorch 기반 판매 예측 딥러닝 모델 및 워커
 │
-├── take-care-of-my-fridge-be/  # [Spring Boot 3.x 백엔드]
+├── take-care-of-my-fridge-be/  # [Spring Boot 4.1.1 백엔드]
 │   └── src/main/java/org/example/takecareofmyfridgebe/
 │       ├── domain/             # 비즈니스 도메인별 패키지 격리
-│       │   ├── auth/           # 회원가입, 로그인, JWT 인증
-│       │   ├── member/         # 회원 프로필, 선호도, 관리자 권한
+│       │   ├── auth/           # 로그인, 토큰 갱신, 로그아웃, CSRF
+│       │   ├── member/         # 회원가입, 내 정보, 맛 선호
+│       │   ├── admin/          # 회원 승격, 관리자 작업 이력
 │       │   ├── fridge/         # 냉장고 재료 관리, 입출고 이력
 │       │   ├── ingredient/     # 표준 식재료 매핑
 │       │   ├── recipe/         # 레시피 상세, 조리 단계
@@ -226,44 +228,38 @@ take-care-of-my-fridge/
 │       │   ├── product/        # 상품 카탈로그, 권장 보관일
 │       │   ├── cart/           # 장바구니
 │       │   ├── order/          # 주문 생성, 만료, 구매 확정
-│       │   ├── payment/        # 결제 승인, 웹훅 처리, 결제 원장
+│       │   ├── payment/        # 결제 승인, 등록 카드, 결제 원장
+│       │   ├── webhook/        # 포트원 결제 웹훅 수신 및 처리
 │       │   ├── refund/         # 부분·전체 환불 처리
 │       │   ├── settlement/     # 일별 매출 정산 집계
-│       │   ├── deal/           # 특가 및 번개 드롭 프로모션
+│       │   ├── sale/           # 특가 및 번개 드롭 할인 행사
 │       │   ├── notification/   # 실시간 알림 (SSE)
-│       │   ├── admin/          # 관리자 상품 관리 및 감사 이력
-│       │   └── forecast/       # 주간 판매량 예측 및 할인 후보 추천
-│       │   └── webhook/        # 포트원 결제 웹훅 수신 및 검증
+│       │   ├── forecast/       # 주간 판매량 예측
+│       │   └── deal/           # 할인 후보 분석과 행사 등록
 │       ├── global/             # 공통 인프라, 시큐리티, 예외 처리, 공통 응답
-│       │   ├── config/         # Security, Redis, Kafka, QueryDSL, Jackson 설정
+│       │   ├── config/         # Security, Redis, Kafka, QueryDSL, 캐시, ShedLock, AI 설정
+│       │   ├── entity/         # BaseTimeEntity (created_at, updated_at)
 │       │   ├── error/          # ErrorCode, BusinessException, GlobalExceptionHandler
+│       │   ├── filter/         # JWT 쿠키 인증 필터
 │       │   ├── response/       # ApiResponse<T>, PageResponse<T>
-│       │   └── sse/            # SSE Emitter 관리 및 스트리밍 처리기
-│       └── infra/              # 외부 인프라 연동 (Elasticsearch, PortOne, S3)
+│       │   └── sse/            # SSE 연결 관리
+│       └── infra/              # 외부 연동 (elasticsearch, portone, s3)
 │
 └── take-care-of-my-fridge-fe/  # [React 19 + Vite 프론트엔드]
     └── src/
-        ├── api/                # OpenAPI Generator 기반 자동 생성 API 클라이언트
-        ├── components/         # 공통 UI 컴포넌트 (모달, 버튼, 카드 등)
-        ├── hooks/              # 커스텀 훅 (인증, SSE 알림 수신 등)
-        ├── layout/             # 사이트 헤더, 내비게이션, 푸터
-        ├── pages/              # 라우트별 페이지 컴포넌트
-        │   ├── main/           # 메인 홈 화면 (인기 요리, 특가, 바로가기)
-        │   ├── fridge/         # 내 냉장고 화면 (소비기한, 재료 등록)
-        │   ├── recipe/         # 레시피 목록 및 상세
-        │   ├── search/         # 통합 검색 및 필터 화면
-        │   ├── chat/           # AI 상담 챗봇 화면
-        │   ├── cart/ & order/  # 장바구니, 주문서, 결제 화면
-        │   ├── mypage/         # 주문 내역, 요리 기록, 내 정보
-        │   └── admin/          # 관리자 대시보드, 판매 예측, 행사 등록
-        └── store/              # Zustand 클라이언트 전역 상태 스토어
+        ├── app/                # 라우터, Provider, 테마, QueryClient
+        ├── common/             # 공통 api(OpenAPI 생성 클라이언트 포함)·auth·components·hooks·scroll·sse
+        ├── domains/            # 백엔드 도메인과 같은 이름의 API·쿼리·컴포넌트·훅 (fridge, chat, order 등 19개)
+        ├── layout/             # 헤더, 장바구니 서랍, 마이페이지 레이아웃, 푸터
+        ├── pages/              # 라우트별 페이지 (main, fridge, recipe, search, product, order, mypage, member, auth, admin)
+        └── styles/             # 전역 스타일, 변수, 믹스인
 ```
 
 ### 📐 레이어별 아키텍처 규칙
 - **도메인 중심 격리 (Domain-Driven Package)**: 계층형 분리 대신 비즈니스 도메인 단위(`domain/{도메인명}`)로 격리하여 높은 응집도와 낮은 결합도를 유지합니다.
-- **Facade 패턴을 통한 트랜잭션 & 분산 락 경계 분리**: 
-  - 분산 락(Redisson)과 다중 서비스 조율은 Facade에서 담당하며, 실제 데이터베이스 변경 트랜잭션은 단일 Service의 `@Transactional` 단위로 안전하게 분리합니다.
-  - `Facade(Lock 획득) ➔ Service(@Transactional 비즈니스 로직 실행) ➔ Facade(Lock 해제)`
+- **Facade 패턴을 통한 트랜잭션 경계 분리**: 
+  - 다중 서비스 조율은 Facade에서 담당하며, 실제 데이터베이스 변경 트랜잭션은 단일 Service의 `@Transactional` 단위로 안전하게 분리합니다.
+  - 같은 행을 동시에 바꾸는 요청은 DB 비관적 락(`SELECT ... FOR UPDATE`)으로, 짧은 중복 실행 방지(상담 답 하나씩 등)는 Redis `SETNX`로 막습니다. 분산 락 라이브러리는 쓰지 않습니다.
 - **불변성과 캡슐화**:
   - DTO 및 이벤트 메시지는 Java `record`를 활용해 불변 객체로 관리합니다.
   - JPA Entity에 `@Setter` 사용을 전면 금지하고, 비즈니스 행위 메서드를 통해서만 상태를 전이합니다.
@@ -297,7 +293,7 @@ take-care-of-my-fridge/
 ### 2) 인프라 서비스 실행 (Docker Compose)
 프로젝트 루트 경로에서 필수 데이터베이스 및 미들웨어를 실행합니다.
 ```bash
-# MySQL, Redis, Elasticsearch(nori 포함), Kibana, Kafka, Kafka-UI, Forecast Worker 기동
+# MySQL, Redis, RedisInsight, Elasticsearch(nori 포함), Kibana, Kafka, Kafka-UI, Forecast Worker 기동
 docker compose up -d
 ```
 > [!NOTE]  
@@ -326,6 +322,7 @@ VITE_PORTONE_STORE_ID=store-e0d4f767-f9dd-4a26-b211-43eec5270bc2
 export OPENAI_API_KEY="your-openai-api-key"
 export PORTONE_API_SECRET="your-portone-api-secret"
 ```
+첫 관리자 계정은 `ADMIN_BOOTSTRAP_EMAIL`·`ADMIN_BOOTSTRAP_PASSWORD`·`ADMIN_BOOTSTRAP_NICKNAME`으로 서버 시작 때 만듭니다. 자세한 내용은 [회원 설계의 첫 관리자 계정](docs/architecture/domains/member.md#첫-관리자-계정)을 봅니다.
 
 <br/>
 
@@ -386,6 +383,6 @@ pnpm dev
 
 <br/>
 
-## 11. 문서 안내
+## 10. 문서 안내
 프로젝트의 상세 설계 문서, API 규격, 데이터베이스 모델링 및 개발 컨벤션은 위키에서 확인 가능합니다.
 - 📚 **프로젝트 위키**: [GitHub Wiki 바로가기](https://github.com/sparta-final-4/take-care-of-my-fridge/wiki)

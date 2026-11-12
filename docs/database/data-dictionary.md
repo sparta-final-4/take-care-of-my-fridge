@@ -1,14 +1,14 @@
 # 데이터 사전 (Data Dictionary)
 
 > 기준: 최신 전체 데이터베이스 스키마 ([schema.sql](schema.sql))  
-> 전체 42개 테이블의 컬럼 정의, 물리 타입, 제약조건 및 비즈니스 규칙을 명세합니다.
+> 전체 43개 테이블의 컬럼 정의, 물리 타입, 제약조건 및 비즈니스 규칙을 명세합니다. 실제 스키마는 JPA 엔티티가 만들며, 이 문서는 dev DB(information_schema)와 맞췄습니다.
 
 ---
 
 ## 📌 공통 규칙
 
 - **기본키(PK)**: 모든 테이블은 `id BIGINT NOT NULL AUTO_INCREMENT`를 기본키로 사용합니다.
-- **감사 컬럼**: 모든 테이블은 `created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6)` 및 `updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6)`를 포함합니다 (아래 테이블별 상세 목록에서는 가독성을 위해 생략 또는 특이사항만 기재).
+- **감사 컬럼**: 모든 테이블은 `created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6)` 및 `updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6)`를 포함합니다 (아래 테이블별 상세 목록에서는 가독성을 위해 생략 또는 특이사항만 기재). 예외: 부모 행에 딸린 연결·상세 테이블 `ingredient_products`, `mealkit_products`, `recipe_steps`에는 없습니다.
 - **문자열 인코딩**: `utf8mb4` (다국어 및 이모지 지원), Collation: `utf8mb4_0900_ai_ci`.
 - **금액 및 수량**: 금액은 원 단위 `INT` 또는 `BIGINT`(`DEFAULT 0`, `CHECK >= 0`), 수량은 `INT` 또는 소수점 수량을 지원하는 `DECIMAL(10, 2)`을 사용합니다.
 - **외래키(FK)**: 도메인 격리 원칙에 따라 동일 도메인 또는 긴밀한 연관 관계는 물리 FK를 맺고, 도메인 간 경계가 명확한 참조는 물리 FK 없이 식별자(ID)만 저장하여 결합도를 낮춥니다.
@@ -25,6 +25,7 @@
 | `email` | `VARCHAR(255)` | N | | `UK` | 로그인 이메일 (계정 식별자) |
 | `password_hash` | `VARCHAR(255)` | N | | | 단방향 암호화 해시 (BCrypt) |
 | `nickname` | `VARCHAR(30)` | N | | `UK` | 서비스 내 활동명 (후기 및 화면 노출) |
+| `phone` | `VARCHAR(11)` | Y | `NULL` | `UK` | 전화번호 숫자 11자리. 가입 때 필수이며, 필수가 되기 전 회원과 첫 관리자는 NULL |
 | `role` | `ENUM('USER','ADMIN')` | N | `'USER'` | | 회원 권한 (일반회원: USER, 관리자: ADMIN) |
 | `status` | `ENUM('ACTIVE','SUSPENDED')` | N | `'ACTIVE'` | | 계정 상태 (정상: ACTIVE, 활동 정지: SUSPENDED) |
 
@@ -44,7 +45,7 @@ JWT Refresh 토큰의 발급 및 유효성을 관리하는 세션 테이블입�
 | `member_id` | `BIGINT` | N | | `FK (members.id)` | 로그인한 회원 |
 | `token_hash` | `VARCHAR(255)` | N | | `UK` | Refresh 토큰의 단방향 해시 |
 | `keep_logged_in` | `BOOLEAN` | N | `FALSE` | | 로그인 상태 유지 체크 여부 |
-| `device_info` | `VARCHAR(255)` | Y | `NULL` | | 접속 기기/브라우저 식별 정보 |
+| `device_info` | `VARCHAR(255)` | Y | `NULL` | | 접속 기기/브라우저 식별 정보. 엔티티 매핑이 없어 항상 NULL (로그인 기기 관리 제안 기능용으로 만든 칸) |
 | `last_used_at` | `DATETIME(6)` | N | `NOW(6)` | | 마지막 활동 시각 (30분 미사용 시 세션 만료) |
 | `expires_at` | `DATETIME(6)` | N | | | 세션 절대 만료 일시 |
 | `revoked_at` | `DATETIME(6)` | Y | `NULL` | | 로그아웃 또는 강제 폐기된 일시 |
@@ -116,14 +117,22 @@ JWT Refresh 토큰의 발급 및 유효성을 관리하는 세션 테이블입�
 | `summary` | `TEXT` | Y | `NULL` | | 레시피 간략 소개 |
 | `cuisine_type` | `VARCHAR(20)` | Y | `NULL` | | 요리 종류 (한식 / 양식 / 중식 등) |
 | `category` | `VARCHAR(50)` | Y | `NULL` | `INDEX` | 요리 분류 (밥 / 국 / 반찬 / 일품 등) |
+| `main_ingredient_category` | `VARCHAR(30)` | Y | `NULL` | | 주재료 분류 (원본 데이터 값) |
 | `cook_method` | `VARCHAR(20)` | Y | `NULL` | | 조리 방법 (끓이기, 굽기, 볶기 등) |
 | `cook_time_min` | `INT` | Y | `NULL` | | 예상 조리 시간 (분 단위) |
 | `servings` | `INT` | Y | `NULL` | | 기준 분량 (인분) |
 | `difficulty` | `TINYINT` | N | | `CHECK(1~10)` | 조리 난이도 (1: 가장 쉬움 ~ 10: 전문가) |
 | `calories` | `DECIMAL(8, 2)` | Y | `NULL` | | 열량 (kcal) |
+| `weight_g` | `DECIMAL(8, 2)` | Y | `NULL` | | 1인분 중량 (g) |
+| `carbs_g` | `DECIMAL(8, 2)` | Y | `NULL` | | 탄수화물 (g) |
+| `protein_g` | `DECIMAL(8, 2)` | Y | `NULL` | | 단백질 (g) |
+| `fat_g` | `DECIMAL(8, 2)` | Y | `NULL` | | 지방 (g) |
+| `sodium_mg` | `DECIMAL(8, 2)` | Y | `NULL` | | 나트륨 (mg) |
 | `tip` | `TEXT` | Y | `NULL` | | 나트륨 저감 등 조리 팁 |
 | `tip_summary` | `TEXT` | Y | `NULL` | | 사용자 후기 기반 AI 요약 팁 |
 | `image_url` | `VARCHAR(500)` | Y | `NULL` | | 대표 완성 요리 이미지 URL |
+| `tags` | `VARCHAR(255)` | Y | `NULL` | | 해시태그 |
+| `ingredients_raw` | `TEXT` | Y | `NULL` | | 파싱 전 재료 원문 |
 
 ### `recipe_ingredients` — 레시피 재료 목록 (N:M)
 레시피에 들어가는 재료와 표준 재료 사전을 매핑합니다.
@@ -135,6 +144,8 @@ JWT Refresh 토큰의 발급 및 유효성을 관리하는 세션 테이블입�
 | `seq` | `INT` | N | | `UK(recipe_id, seq)` | 재료 표기 순서 |
 | `display_name` | `VARCHAR(100)` | Y | `NULL` | | 레시피 원문에 표기된 재료명 (예: "다진 마늘") |
 | `amount` | `VARCHAR(100)` | Y | `NULL` | | 원문 용량 표기 (예: "1/2큰술", "약간") |
+| `group_name` | `VARCHAR(50)` | Y | `NULL` | | 원문 재료 그룹명 (양념장, 고명 등) |
+| `raw_text` | `VARCHAR(255)` | Y | `NULL` | | 파싱 전 재료 항목 원문 |
 | `quantity` | `DECIMAL(10, 2)` | Y | `NULL` | | 기본 단위 기준 수량 |
 | `role` | `VARCHAR(20)` | Y | `NULL` | | 재료 역할 (주재료 / 부재료 / 양념) |
 
@@ -213,6 +224,7 @@ AI 맞춤 추천을 위해 레시피가 가진 맛 특성을 정의합니다.
 | `starts_at` | `DATETIME(6)` | N | | `INDEX` | 행사 오픈 일시 |
 | `ends_at` | `DATETIME(6)` | N | | `INDEX` | 행사 마감 일시 |
 | `status` | `ENUM('SCHEDULED','ACTIVE','ENDED')` | N | `'SCHEDULED'` | `INDEX` | 행사 진행 상태 (예정 / 진행 중 / 종료) |
+| `ended_at` | `DATETIME(6)` | Y | `NULL` | | 진행 중에 중간에 닫은 시각. 등록한 종료 시각까지 연 행사는 NULL |
 
 ### `sale_event_items` — 할인 행사 상품
 행사에 포함된 대상 상품 및 특별 할인가 정보입니다.
@@ -235,7 +247,7 @@ AI 맞춤 추천을 위해 레시피가 가진 맛 특성을 정의합니다.
 | `order_number` | `VARCHAR(20)` | N | | `UK` | 주문 번호 (예: `20261013-000123`) |
 | `member_id` | `BIGINT` | N | | `FK (members.id), INDEX` | 주문한 회원 ID |
 | `idempotency_key` | `VARCHAR(64)` | Y | `NULL` | `UK(member_id, idempotency_key)` | 클라이언트 발급 중복 주문 방지 키 |
-| `status` | `ENUM('PENDING','PAID','CANCELLED','CONFIRMED')` | N | `'PENDING'` | `INDEX` | 주문 상태 (대기 / 결제완료 / 취소 / 구매확정) |
+| `status` | `ENUM('PENDING','PAID','CANCELLED','CONFIRMED','REFUNDED')` | N | `'PENDING'` | `INDEX` | 주문 상태 (대기 / 결제완료 / 취소 / 구매확정 / 전액 환불) |
 | `total_amount` | `BIGINT` | N | `0` | | 최종 결제 확정 금액(원) |
 | `paid_at` | `DATETIME(6)` | Y | `NULL` | `INDEX` | 결제 완료 일시 (7일 후 자동 구매 확정 기준) |
 | `confirmed_at` | `DATETIME(6)` | Y | `NULL` | | 구매 확정 일시 |
@@ -250,6 +262,7 @@ AI 맞춤 추천을 위해 레시피가 가진 맛 특성을 정의합니다.
 | `product_name` | `VARCHAR(200)` | N | | | 주문 당시 상품명 스냅샷 |
 | `product_image_url` | `VARCHAR(500)` | Y | `NULL` | | 주문 당시 상품 이미지 스냅샷 |
 | `quantity` | `INT` | N | `1` | | 주문 수량 |
+| `confirmed_quantity` | `INT` | Y | `NULL` | | 구매 확정 수량 (주문 수량 − 완료된 환불 수량). 확정 전 NULL |
 | `list_price` | `INT` | N | `0` | | 주문 당시 정상 정가 |
 | `unit_price` | `INT` | N | `0` | | 실제 구매 단가 (할인가 적용) |
 | `sale_type` | `ENUM('NONE','SPECIAL','FLASH_DROP')` | N | `'NONE'` | | 적용된 행사 구분 (번개 드롭은 환불 제한) |
@@ -279,6 +292,7 @@ AI 맞춤 추천을 위해 레시피가 가진 맛 특성을 정의합니다.
 | `status` | `ENUM('ACTIVE','DELETED')` | N | `'ACTIVE'` | `INDEX` | 카드 사용 상태 (사용중 / 삭제됨) |
 | `deleted_at` | `DATETIME(6)` | Y | `NULL` | | 회원 삭제 일시 |
 | `pg_deleted_at` | `DATETIME(6)` | Y | `NULL` | `INDEX` | PG사 빌링키 폐기 확인 일시 |
+| `billing_key` | `VARCHAR(200)` | Y | `NULL` | | 암호화 전 평문 빌링키. 엔티티 매핑 없음. 서버 기동 때 암호화하고 NULL로 비움 (위 설명 참고) |
 
 ### `payment_pins` — 결제 비밀번호
 등록 카드로 결제 시 입력하는 6자리 비밀번호 해시입니다.
@@ -328,6 +342,7 @@ AI 맞춤 추천을 위해 레시피가 가진 맛 특성을 정의합니다.
 | `refund_amount` | `BIGINT` | N | `0` | | 이번 요청 환불 금액 합계 |
 | `reason_type` | `ENUM('CHANGE_OF_MIND','ORDER_MISTAKE','NO_LONGER_NEEDED','ETC')` | N | | | 환불 사유 구분 |
 | `reason_detail` | `VARCHAR(500)` | Y | `NULL` | | 상세 환불 사유 |
+| `fail_reason` | `VARCHAR(255)` | Y | `NULL` | | 환불 실패 사유 (PG 취소 실패 등) |
 | `status` | `ENUM('REQUESTED','COMPLETED','FAILED')` | N | `'REQUESTED'` | | 환불 진행 상태 |
 | `portone_cancellation_id` | `VARCHAR(200)` | Y | `NULL` | | PortOne 취소 식별자 |
 | `refunded_at` | `DATETIME(6)` | Y | `NULL` | `INDEX` | 환불 완료 일시 |
@@ -352,6 +367,7 @@ AI 맞춤 추천을 위해 레시피가 가진 맛 특성을 정의합니다.
 | `webhook_id` | `VARCHAR(200)` | N | | `UK` | PortOne 웹훅 고유 식별자 (중복 수신 차단) |
 | `event_type` | `VARCHAR(50)` | N | | | 웹훅 이벤트 타입 (예: `Transaction.Paid`) |
 | `process_status` | `ENUM('RECEIVED','PROCESSED','FAILED','IGNORED')` | N | `'RECEIVED'` | `INDEX` | 처리 상태 |
+| `fail_reason` | `VARCHAR(500)` | Y | `NULL` | | 처리 실패 사유 |
 | `raw_payload` | `TEXT` | N | | | 웹훅 원문 페이로드 (서명 검증용 원본 보존) |
 | `processed_at` | `DATETIME(6)` | Y | `NULL` | | 처리 완료 시각 |
 
@@ -452,6 +468,7 @@ AI 답변 메시지 아래에 첨부되는 추천 레시피 및 상품 카드입
 | `link_url` | `VARCHAR(500)` | N | | | 클릭 시 이동할 화면 URL |
 | `dedupe_key` | `VARCHAR(150)` | N | | `UK(member_id, dedupe_key)` | 중복 발송 방지 고유 키 |
 | `is_read` | `BOOLEAN` | N | `FALSE` | `INDEX` | 읽음 확인 여부 |
+| `deleted_at` | `DATETIME(6)` | Y | `NULL` | | 삭제 일시. 지운 알림도 행을 남겨 같은 중복 방지 키로 되살아나지 않게 함 |
 
 ---
 
@@ -466,6 +483,7 @@ PyTorch 딥러닝 모델의 주간 판매량 예측 배치 실행 단위입니�
 | `model_version` | `VARCHAR(50)` | N | | | 사용된 머신러닝 모델 버전 (예: `fc-v0.3`) |
 | `data_cutoff_at` | `DATETIME(6)` | N | | | 모델 입력에 사용된 데이터 기준 시각 |
 | `confirmed_at` | `DATETIME(6)` | Y | `NULL` | | 실제 판매량이 집계되어 확정된 일시 (다음 주 월요일 06:00) |
+| `synthetic_data` | `BIT(1)` | N | | | 가상(시연) 데이터 여부 |
 
 ### `sales_forecasts` — 상품별 판매 예측 및 실제 판매량
 각 상품별 예상 판매 순위/수량과 사후 집계된 실제 판매량 비교 결과입니다.
@@ -474,12 +492,22 @@ PyTorch 딥러닝 모델의 주간 판매량 예측 배치 실행 단위입니�
 |---|---|---|---|---|---|
 | `prediction_run_id` | `BIGINT` | N | | `FK (prediction_runs.id)` | 소속 예측 실행 ID |
 | `product_id` | `BIGINT` | N | | `UK(prediction_run_id, product_id)` | 대상 상품 ID |
-| `product_name` | `VARCHAR(200)` | N | | | 예측 시점의 상품명 스냅샷 |
+| `product_name` | `VARCHAR(100)` | N | | | 예측 시점의 상품명 스냅샷 |
 | `predicted_rank` | `INT` | Y | `NULL` | | 예상 판매 순위 |
 | `predicted_qty` | `INT` | Y | `NULL` | | 예상 판매 수량 |
 | `baseline_qty` | `INT` | N | `0` | | 기준선 예측 수량 (전주 동일 요일 판매량) |
 | `actual_rank` | `INT` | Y | `NULL` | | 실제 달성 판매 순위 (실적 확정 시 입력) |
 | `actual_qty` | `INT` | Y | `NULL` | | 실제 판매량 (환불 제외 순판매량) |
+
+### `forecast_batch_runs` — 주간 판매 예측 배치 시도 기록
+대상 주마다 한 행이며, 예측 배치를 다시 시도하면 최신 시도로 덮어씁니다. 예측이 없을 때 원인 안내(404 `F001` 메시지)에 씁니다.
+
+| 컬럼 | 물리 타입 | NULL | 기본값 | 제약 | 비즈니스 의미 및 설명 |
+|---|---|---|---|---|---|
+| `target_week_start` | `DATE` | N | | `UK` | 예측 대상 주 시작일 (월요일) |
+| `status` | `ENUM('ALREADY_EXISTS','CREATED','FAILED','NO_PRODUCTS','NO_TRAINING_SAMPLES')` | N | | | 마지막 시도 결과 |
+| `attempted_at` | `DATETIME(6)` | N | | | 마지막 시도 시각 |
+| `failure_type` | `VARCHAR(100)` | Y | `NULL` | | 실패 종류 (예외 이름 등) |
 
 ### `deal_analyses` — 요일별 할인 후보 분석
 관리자가 실행한 가격 탄력성 기반 할인 후보 시뮬레이션 세션입니다.
@@ -494,6 +522,7 @@ PyTorch 딥러닝 모델의 주간 판매량 예측 배치 실행 단위입니�
 | `model_version` | `VARCHAR(50)` | N | | | 분석 알고리즘 버전 |
 | `data_cutoff_at` | `DATETIME(6)` | N | | | 분석 입력 데이터 기준 시각 |
 | `last_saved_at` | `DATETIME(6)` | Y | `NULL` | | 관리자 검토 결과 최종 저장 일시 |
+| `synthetic_data` | `BIT(1)` | N | | | 가상(시연) 데이터 여부 |
 
 ### `deal_candidates` — 할인 후보 상품 및 검토 결과
 분석 모델이 도출한 할인 추천 상품 및 제외된 상품 목록입니다.
@@ -502,7 +531,7 @@ PyTorch 딥러닝 모델의 주간 판매량 예측 배치 실행 단위입니�
 |---|---|---|---|---|---|
 | `deal_analysis_id` | `BIGINT` | N | | `FK (deal_analyses.id)` | 소속 분석 세션 ID |
 | `product_id` | `BIGINT` | N | | `UK(deal_analysis_id, product_id)` | 대상 상품 ID |
-| `product_name` | `VARCHAR(200)` | N | | | 분석 당시 상품명 스냅샷 |
+| `product_name` | `VARCHAR(100)` | N | | | 분석 당시 상품명 스냅샷 |
 | `regular_price` | `INT` | N | `0` | | 분석 당시 정상 판매가(원) |
 | `discount_price` | `INT` | N | `0` | | 가상 할인가(원) |
 | `current_stock` | `INT` | N | `0` | | 분석 당시 재고 수량 |
@@ -513,8 +542,11 @@ PyTorch 딥러닝 모델의 주간 판매량 예측 배치 실행 단위입니�
 | `exclude_reason` | `ENUM('TOP_SELLER_ON_DAY','LOW_STOCK')` | Y | `NULL` | | 제외 사유 (평소 상위 판매 / 재고 부족) |
 | `candidate_reason` | `VARCHAR(255)` | Y | `NULL` | | 추천 사유 (예: "검색량 대비 구매율 저조") |
 | `expected_increase` | `INT` | Y | `NULL` | | 할인 적용 시 예상 판매 증가량 |
+| `expected_qty_regular` | `INT` | Y | `NULL` | | 정상가일 때 예상 판매량 |
+| `expected_qty_discount` | `INT` | Y | `NULL` | | 할인할 때 예상 판매량 |
 | `review_status` | `ENUM('UNREVIEWED','SELECTED','HELD')` | Y | `NULL` | | 관리자 검토 상태 (미검토 / 선택 / 보류) |
 | `event_request_status` | `ENUM('NONE','REQUESTED','APPROVED','REJECTED')` | N | `'NONE'` | | 할인 프로모션 등록 요청 상태 |
+| `event_requested_at` | `DATETIME(6)` | Y | `NULL` | | 행사 등록 시각 |
 | `promotion_id` | `BIGINT` | Y | `NULL` | | 등록 완료된 행사 ID (`sale_events.id`) |
 
 ### `admin_audit_logs` — 관리자 작업 감사 이력
@@ -523,10 +555,11 @@ PyTorch 딥러닝 모델의 주간 판매량 예측 배치 실행 단위입니�
 | 컬럼 | 물리 타입 | NULL | 기본값 | 제약 | 비즈니스 의미 및 설명 |
 |---|---|---|---|---|---|
 | `member_id` | `BIGINT` | N | | `FK (members.id)` | 작업을 수행한 회원 ID |
-| `action` | `ENUM('PRODUCT_CREATE','PRODUCT_DELETE','PRICE_UPDATE','DEAL_REVIEW','EVENT_REQUEST','ROLE_CHANGE')` | N | | | 수행한 작업 유형 |
+| `action` | `ENUM('PRODUCT_CREATE','PRODUCT_DELETE','PRICE_UPDATE','DEAL_ANALYSIS','DEAL_REVIEW','EVENT_REQUEST','ROLE_CHANGE')` | N | | | 수행한 작업 유형 |
 | `target_type` | `VARCHAR(50)` | N | | | 작업 대상 개체 타입 (`Product`, `Member` 등) |
 | `target_id` | `BIGINT` | Y | `NULL` | | 작업 대상 개체의 고유 식별자 |
 | `result` | `ENUM('SUCCESS','FAILED','DENIED')` | N | | | 작업 결과 (성공 / 실패 / 권한 거부) |
+| `actor_role` | `ENUM('ADMIN','USER')` | Y | `NULL` | | 작업 당시 역할. 이 칸 도입 전 이력은 NULL이고 조회 때 지금 역할로 대신함 |
 | `before_value` | `JSON` | Y | `NULL` | | 변경 이전 데이터 스냅샷 (JSON) |
 | `after_value` | `JSON` | Y | `NULL` | | 변경 이후 데이터 스냅샷 (JSON) |
 

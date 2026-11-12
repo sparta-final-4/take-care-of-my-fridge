@@ -118,8 +118,8 @@ sequenceDiagram
 ```
 
 ## 데이터·API·이벤트
-- ERD·데이터 사전: [erd.md](../../database/erd.md#할인-행사-테이블-관계), [data-dictionary.md](../../database/data-dictionary.md#sale_events--할인-행사)
-- 제공 API: [할인 행사 API](../../api/sale-event-api.md#할인-행사-api) (등록 2종, 후보 상품, 목록, 상세, 수정, 종료, 삭제), [클릭 수 기반 할인 상품 API](../../api/sale-event-api.md#클릭-수-기반-할인-상품-api)
+- ERD·데이터 사전: [erd.md](../../database/erd.md#35-장바구니--주문--할인-행사-도메인), [data-dictionary.md](../../database/data-dictionary.md#sale_events--할인-행사)
+- 제공 API: [할인 행사 API](../../api/sale-event-api.md) (등록 2종, 후보 상품, 목록, 상세, 수정, 종료, 삭제), [클릭 수 기반 할인 상품 API](../../api/sale-event-api.md#클릭-수-기반-할인-상품)
 - 발행 이벤트: `notification-requested`(알림 요청). 키는 회원 ID이고, 회원 한 명당 메시지 하나에 회원 ID·종류(`FLASH_DROP`)·문구·이동 경로(`/products/{상품 ID}`)·중복 방지 키를 싣습니다. 중복 방지 키는 `FLASH_DROP_STARTED:{행사 ID}:{상품 ID}`입니다. 메시지 예시는 WORK-124에 있습니다.
 - 수신 이벤트: 없음.
 - 보관 기간·삭제 정책: 시작 전 행사만 지웁니다. 시작한 행사는 종료로 남습니다.

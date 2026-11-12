@@ -7,7 +7,7 @@
 - 외부 도메인 계약이 확정되기 전에는 제공 메서드나 분석 결과를 임의로 구현하지 않는다.
 
 ## 구현 결과
-- [할인 분석 입력 협의안](../architecture/domains/deal-analysis-input-discussion.md)을 작성했다.
+- [할인 분석 입력 협의안](../archive/deal-analysis-input-discussion.md)을 작성했다.
 - 애플리케이션 코드와 API·DB 계약은 변경하지 않았다.
 
 ## 검증

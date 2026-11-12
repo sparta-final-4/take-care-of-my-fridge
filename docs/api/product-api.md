@@ -1,8 +1,8 @@
 # 상품 API 명세
 
-상태: 구현 완료 · 공통 규칙: [API 계약](api-spec.md#공통-규칙) · 자세한 동작: [상품 설계](../architecture/domains/product.md)
+상태: 구현 완료 · 담당: 강준모 · 공통 규칙: [API 계약](api-spec.md#공통-규칙) · 자세한 동작: [상품 설계](../architecture/domains/product.md)
 
-공통 응답·오류 코드·페이지·날짜 형식은 [공통 규칙](api-spec.md#공통-규칙)을 따릅니다. 이 문서의 경로는 `/api`를 뺀 값이고, 에러 표에는 공통 오류(401 `A003`, 403 `A004`, 400 `C001`)를 빼고 이 API만의 오류를 적습니다. 응답의 `sale`·`soldOut`은 [상품 할인·품절 필드](api-spec.md#상품-할인품절-필드)를 따릅니다.
+공통 응답·오류 코드·페이지·날짜 형식은 [공통 규칙](api-spec.md#공통-규칙)을 따릅니다. 이 문서의 경로는 `/api`를 뺀 값이고, 에러 표에는 공통 오류(401 `A003`, 403 `A004`, 400 `C001`)를 빼고 이 API만의 오류를 적습니다. 응답의 `sale`·`soldOut`은 [상품 할인·품절 필드](#상품-할인품절-필드)를 따릅니다.
 
 ## 목차
 
@@ -16,6 +16,7 @@
 - [상품 이미지 업로드 URL](#상품-이미지-업로드-url)
 - [상품 요청 DTO](#상품-요청-dto)
 - [상품 응답 DTO](#상품-응답-dto)
+- [상품 할인·품절 필드](#상품-할인품절-필드)
 
 ## 상품 목록
 `GET /products` · 공개
@@ -227,3 +228,16 @@
 | soldOut | boolean | N | 지금 보이는 가격으로 살 수 없음 |
 | ingredient | `IngredientInfo` | Y | 재료 상품만. unitAmount, unit |
 | mealkit | `MealkitInfo` | Y | 밀키트 상품만. servings |
+
+## 상품 할인·품절 필드
+
+상품 목록·상세(`/api/products`), 통합 검색의 상품 결과, 관리자 상품 목록·상세·등록·수정 응답(`ProductListItemResponse`, `ProductDetailResponse`)에 아래 두 필드가 있습니다. 기존 `price`(정가)와 `status`(상품 상태)는 그대로입니다.
+
+| 필드 | 설명 |
+|---|---|
+| sale | 진행 중인 할인(`SaleResponse`). 없으면 null |
+| soldOut | 지금 보이는 가격으로 살 수 없으면 true |
+
+- `SaleResponse`: type(`SPECIAL`·`FLASH_DROP`), salePrice(할인가), discountRate(할인율), endsAt(종료 시각, +09:00 포함), remainingQuantity(번개 드롭 남은 수량), limitedQuantity(번개 드롭 한정 수량). 특가는 remainingQuantity·limitedQuantity가 null입니다.
+- **품절**: 상품이 품절·판매 중지 상태이거나 번개 드롭 남은 수량이 0이면 `soldOut=true`입니다. 번개 드롭이 다 팔려도 `status`는 판매 중으로 남습니다. 장바구니의 `soldOut`과 같은 기준입니다.
+

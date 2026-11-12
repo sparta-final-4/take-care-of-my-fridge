@@ -1,6 +1,6 @@
 # 통합검색 설계
 
-상태: 구현 완료 · API: [통합검색 API 명세](../../api/search-api.md)
+상태: 구현 완료 · 담당: 강준모 · API: [통합검색 API 명세](../../api/search-api.md)
 
 ## 목적과 책임
 - 해결할 사용자 문제: 검색어 하나로 레시피와 상품을 찾고, 찾은 레시피를 내 냉장고 재료로 얼마나 만들 수 있는지 본다.
@@ -14,7 +14,7 @@
 | ES 결과 응답 | ES에서는 ID와 전체 건수만 받고, 그 ID 순서대로 DB에서 레시피·상품을 읽어 응답합니다. 가격·상태·할인은 DB 값이고, 색인이 늦어 섞여 온 판매 중지 상품은 이때 뺍니다 | `RecipeService.getRecipesByIds`, `ProductService.getProductsByIds` |
 | ES 장애 | ES 검색·자동완성이 실패하면 오류 없이 MySQL 조회로 대신하고 경고 로그를 남깁니다 | `RecipeSearchFacade`, `ProductSearchFacade` |
 | 레시피 키워드 검색 | 검색어의 단어가 이름(가중치 3)·재료(가중치 2)·요약 중 어딘가에 모두 있어야 합니다(cross_fields + AND). 최신순 등으로도 보여 주므로 OR로 넓히지 않습니다. 분류·조리 시간·난이도는 점수와 상관없는 필터로 겁니다 | `RecipeSearchService.keywordRequest` |
-| 레시피 벡터 검색 | 키워드 결과가 0건이고 벡터 검색을 켰으면 검색어 임베딩으로 kNN 검색을 다시 합니다(같은 필터·정렬). 임베딩·ES가 실패하거나 호출 제한에 걸리면 0건입니다. 응답에는 벡터 결과인지 표시하지 않습니다 | `RecipeSearchService.vectorSearch` |
+| 레시피 벡터 검색 | 키워드 결과가 0건이고 벡터 검색을 켰으면 검색어 임베딩으로 kNN 검색을 다시 합니다(같은 필터·정렬). 임베딩·ES가 실패하거나 호출 제한에 걸리면 0건입니다. 응답에는 벡터 결과인지 표시하지 않습니다. 기준선과 `k`의 근거는 [벡터 폴백 평가](../../testing/recipe-vector-fallback-evaluation.md) | `RecipeSearchService.vectorSearch` |
 | 상품 키워드 검색 | 검색어의 단어가 이름(가중치 3)·설명 중 어딘가에 모두 있어야 합니다. 공개 상태·종류·가격 범위는 필터로 겁니다 | `ProductSearchService` |
 | 자동완성 | 이름의 단어가 검색어로 시작하거나 이름에 검색어 단어(형태소)가 있는 레시피 이름을 최대 8개 고릅니다. 이름이 검색어로 시작하면 앞에 오고, 같은 이름은 한 번만 나옵니다. 벡터 검색은 하지 않습니다 | `RecipeSearchService.suggestRequest` |
 | 검색 기록 | 검색어가 있고 필터 없는 첫 페이지일 때만 기록합니다. 0건이면 대상(`RECIPE`·`PRODUCT`)과 함께 0건 검색어로 남기고(사전 보강 근거), 레시피 검색 결과가 있으면 인기 검색어로 셉니다. 상품 검색은 인기 검색어로 세지 않습니다 | `RecipeSearchFacade.isPlainFirstPage` |

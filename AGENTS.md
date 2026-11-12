@@ -34,7 +34,7 @@
 | DB 변경     | database.md, erd.md, data-dictionary.md, 관련 도메인    |
 | 오류 수정   | 재현 조건, 기존 테스트, 관련 작업·문제 기록             |
 
-위 파일의 실제 위치는 [README 문서 안내](README.md#문서-안내)에서 찾습니다.
+위 파일은 `docs/` 아래에 있습니다: 화면은 `docs/requirements/`, 규칙(frontend·backend·database)은 `docs/conventions/`, API는 `docs/api/`, ERD·데이터 사전은 `docs/database/`, 도메인 설계는 `docs/architecture/domains/`.
 
 ## API 정합성
 

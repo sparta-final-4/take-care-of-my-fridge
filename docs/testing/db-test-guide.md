@@ -1,6 +1,6 @@
 # DB 테스트 작성 지침
 
-상태: 제안 · 작성일: 2026-10-21 · 팀 검토 전
+상태: 사용 중 (DB 테스트가 MySqlContainerSupport를 상속) · 작성일: 2026-10-21
 
 실제 MySQL이 필요한 백엔드 테스트를 사람이나 AI가 새로 쓸 때 따르는 기준입니다. 무엇을 검증할지는 [테스트 전략](test-strategy.md)이 정하고, 이 문서는 DB 테스트를 어떻게 구성하는지만 다룹니다.
 
@@ -49,6 +49,13 @@ DB 테스트를 추가·수정하면 클래스 실행 순서를 바꿔도 통과
 junit.jupiter.testclass.order.default=org.junit.jupiter.api.ClassOrderer$Random
 ```
 
-## 미정
+## Redis·Kafka 테스트
 
-- 이 문서를 백엔드 `CLAUDE.md`와 `docs/conventions/backend.md`에서 가리킬지는 팀 합의 뒤 정합니다.
+MySQL과 같은 방식(컨테이너를 JVM에서 한 번만 띄우고 공유, `@Testcontainers`·`@Container` 없음)의 베이스 클래스가 `support/`에 있습니다.
+
+- `RedisContainerSupport`: Redis 7 컨테이너. 캐시·잠금·Pub/Sub·호출 제한 테스트 15개가 상속합니다(예: `ChatStreamLockServiceTest`, `SaleEventFacadeCacheIntegrationTest`, `SearchPopularKeywordServiceTest`).
+- `KafkaContainerSupport`: Kafka 3.8 컨테이너. `KafkaConfigTest`, `OrderConfirmedEventListenerTest`가 상속하고, `MySqlContainerSupport`를 상속하는 컨슈머 테스트(`PurchaseConfirmedConsumerTest`, `NotificationRequestedConsumerTest`)는 `KafkaContainerSupport.bootstrapServers()`로 주소만 씁니다.
+
+## 이 문서를 가리키는 곳
+
+[테스트 전략](test-strategy.md)과 백엔드 [CLAUDE.md](../../take-care-of-my-fridge-be/CLAUDE.md) 6장에서 가리킵니다. `docs/conventions/backend.md`는 백엔드 `CLAUDE.md`로 안내하는 문서라 따로 링크하지 않습니다.
