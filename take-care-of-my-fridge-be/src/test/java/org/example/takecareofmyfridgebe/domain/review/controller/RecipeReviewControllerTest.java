@@ -8,6 +8,7 @@ import org.example.takecareofmyfridgebe.domain.review.dto.ReviewResponse;
 import org.example.takecareofmyfridgebe.domain.review.dto.ReviewSearchRequest;
 import org.example.takecareofmyfridgebe.domain.review.dto.ReviewSortType;
 import org.example.takecareofmyfridgebe.domain.review.dto.ReviewUpdateRequest;
+import org.example.takecareofmyfridgebe.domain.review.facade.ReviewFacade;
 import org.example.takecareofmyfridgebe.domain.review.service.RecipeReviewService;
 import org.example.takecareofmyfridgebe.global.config.security.SecurityConfig;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
@@ -64,6 +65,9 @@ class RecipeReviewControllerTest {
     @Autowired
     private RecipeReviewService recipeReviewService;
 
+    @Autowired
+    private ReviewFacade reviewFacade;
+
     private UsernamePasswordAuthenticationToken auth(Long memberId) {
         AuthSessionService.AuthPrincipal principal = new AuthSessionService.AuthPrincipal(
                 memberId, 1L, Member.Role.USER);
@@ -73,7 +77,7 @@ class RecipeReviewControllerTest {
 
     @BeforeEach
     void resetMock() {
-        reset(recipeReviewService);
+        reset(recipeReviewService, reviewFacade);
     }
 
     /**
@@ -189,7 +193,7 @@ class RecipeReviewControllerTest {
         ReviewResponse review = new ReviewResponse(
                 100L, 10L, "김치찌개", 5, "맛있어요", "닉네임", true, LocalDateTime.now(), LocalDateTime.now());
 
-        when(recipeReviewService.createReview(eq(7L), any(ReviewCreateRequest.class)))
+        when(reviewFacade.createReview(eq(7L), any(ReviewCreateRequest.class)))
                 .thenReturn(review);
 
         // When & Then
@@ -215,7 +219,7 @@ class RecipeReviewControllerTest {
     @Test
     @DisplayName("없는 레시피에 후기를 작성하면 404를 반환한다")
     void returnsNotFound_whenRecipeIsMissing() throws Exception {
-        when(recipeReviewService.createReview(eq(7L), any(ReviewCreateRequest.class)))
+        when(reviewFacade.createReview(eq(7L), any(ReviewCreateRequest.class)))
                 .thenThrow(new BusinessException(ErrorCode.RECIPE_NOT_FOUND));
 
         mvc.perform(post("/api/reviews")
@@ -331,6 +335,11 @@ class RecipeReviewControllerTest {
         @Bean
         RecipeReviewService recipeReviewService() {
             return mock(RecipeReviewService.class);
+        }
+
+        @Bean
+        ReviewFacade reviewFacade() {
+            return mock(ReviewFacade.class);
         }
 
         @Bean

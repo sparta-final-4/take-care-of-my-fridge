@@ -1,9 +1,7 @@
 package org.example.takecareofmyfridgebe.domain.review.service;
 
 import lombok.RequiredArgsConstructor;
-import org.example.takecareofmyfridgebe.domain.cooking.service.CookingService;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
-import org.example.takecareofmyfridgebe.domain.member.repository.MemberRepository;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeSummary;
 import org.example.takecareofmyfridgebe.domain.recipe.service.RecipeService;
 import org.example.takecareofmyfridgebe.domain.review.dto.RecipeRatingStat;
@@ -36,9 +34,7 @@ import java.util.stream.Collectors;
 public class RecipeReviewService {
 
     private final RecipeReviewRepository recipeReviewRepository;
-    private final MemberRepository memberRepository;
     private final RecipeService recipeService;
-    private final CookingService cookingService;
 
     /**
      * 레시피 후기 목록을 검색 조건(recipeId, mine, sort, page, size)으로 조회한다.
@@ -76,32 +72,28 @@ public class RecipeReviewService {
     }
 
     /**
-     * 레시피 후기를 작성하여 저장한다.
-     * 레시피가 존재하지 않으면 404(RECIPE_NOT_FOUND) 예외를 발생시킨다.
-     * 요리 완료 기록이 없는 레시피면 403(REVIEW_NOT_COOKED) 예외를 발생시킨다.
-     * 회원당 동일 레시피에는 1개의 후기만 작성할 수 있으며, 이미 존재하는 경우 409(REVIEW_ALREADY_EXISTS) 예외를 발생시킨다.
-     * 동시 작성으로 인한 DB 유니크 제약 위반(DataIntegrityViolationException) 발생 시에도 409로 변환한다.
+     * 회원이 이 레시피에 이미 후기를 썼으면 409(REVIEW_ALREADY_EXISTS) 예외를 발생시킨다 (회원당 레시피 하나에 후기 1개).
      *
      * @param memberId 작성자 회원 ID
+     * @param recipeId 레시피 ID
+     */
+    public void validateNotReviewed(Long memberId, Long recipeId) {
+        if (recipeReviewRepository.existsByMemberIdAndRecipeId(memberId, recipeId)) {
+            throw new BusinessException(ErrorCode.REVIEW_ALREADY_EXISTS);
+        }
+    }
+
+    /**
+     * 레시피 후기를 저장한다. 레시피·요리 기록·회원 확인은 ReviewFacade.createReview가 먼저 한다.
+     * 동시 작성으로 인한 DB 유니크 제약 위반(DataIntegrityViolationException) 발생 시에도 409(REVIEW_ALREADY_EXISTS)로 변환한다.
+     *
+     * @param memberId 작성자 회원 ID
+     * @param member   작성자 회원
      * @param request  후기 생성 정보 (recipeId, rating, content)
      * @return 작성된 후기 상세 응답 (recipeName 포함)
      */
     @Transactional
-    public ReviewResponse createReview(Long memberId, ReviewCreateRequest request) {
-        if (!recipeService.existsById(request.recipeId())) {
-            throw new BusinessException(ErrorCode.RECIPE_NOT_FOUND);
-        }
-
-        if (!cookingService.hasCooked(memberId, request.recipeId())) {
-            throw new BusinessException(ErrorCode.REVIEW_NOT_COOKED);
-        }
-
-        if (recipeReviewRepository.existsByMemberIdAndRecipeId(memberId, request.recipeId())) {
-            throw new BusinessException(ErrorCode.REVIEW_ALREADY_EXISTS);
-        }
-
-        Member member = memberRepository.findById(memberId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
+    public ReviewResponse createReview(Long memberId, Member member, ReviewCreateRequest request) {
         RecipeReview review = request.toEntity(member);
 
         try {

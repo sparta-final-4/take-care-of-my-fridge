@@ -130,7 +130,7 @@ public class MemberService {
         return unique;
     }
 
-    private Member getMember(Long memberId) {
+    public Member getMember(Long memberId) {
         return memberRepository.findById(memberId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
     }
