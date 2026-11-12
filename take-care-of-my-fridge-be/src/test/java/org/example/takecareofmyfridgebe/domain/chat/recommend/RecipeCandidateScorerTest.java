@@ -80,8 +80,8 @@ class RecipeCandidateScorerTest {
             recipe(20L, "계란찜", "찜", 20, 1, EGG);
             RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, List.of("디저트"), null, null, false);
 
-            RecipeCandidates result = scorer.rank(query, List.of(stock(EGG, "계란", 10)), List.of(), rows, infos, tastes,
-                    List.of(10L, 20L));
+            RecipeCandidates result = scorer.rank(ScoringContext.of(query, List.of(stock(EGG, "계란", 10)), List.of(), rows,
+                    tastes), infos, List.of(10L, 20L));
 
             assertThat(result.candidates()).extracting(RecipeCandidate::recipeId).containsExactly(10L, 20L);
             assertThat(result.candidates().get(0).ranking().requestMatches()).isEqualTo(1);
@@ -752,8 +752,8 @@ class RecipeCandidateScorerTest {
             recipe(20L, "약과", "디저트", 40, 5, PORK);
             RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, List.of("디저트"), null, null, false);
 
-            RecipeCandidates result = ratioScorer.rank(query, List.of(stock(EGG, "계란", 0)), List.of(), rows, infos, tastes,
-                    List.of(10L, 20L));
+            RecipeCandidates result = ratioScorer.rank(ScoringContext.of(query, List.of(stock(EGG, "계란", 0)), List.of(), rows,
+                    tastes), infos, List.of(10L, 20L));
 
             assertThat(result.candidates()).extracting(RecipeCandidate::recipeId).containsExactly(20L, 10L);
             assertThat(result.candidates().get(0).reason().lacksManyIngredients()).isTrue();
@@ -846,7 +846,8 @@ class RecipeCandidateScorerTest {
 
     private RecipeCandidates rank(RecipeCandidateScorer target, RecipeQuery query, List<FridgeStock> fridge,
                                   List<Taste> memberTastes) {
-        return target.rank(query, fridge, memberTastes, rows, infos, tastes, target.candidateRecipeIds(query, fridge, rows));
+        return target.rank(ScoringContext.of(query, fridge, memberTastes, rows, tastes), infos,
+                target.candidateRecipeIds(query, fridge, rows));
     }
 
     // 레시피 하나를 등록한다. ingredientIds는 기본 양념이 아닌 재료이고, 이름은 재료 ID로 정한다

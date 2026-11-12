@@ -14,6 +14,7 @@ import org.example.takecareofmyfridgebe.domain.chat.recommend.KeywordMatchClassi
 import org.example.takecareofmyfridgebe.domain.chat.recommend.RecipeCandidateScorer.FridgeStock;
 import org.example.takecareofmyfridgebe.domain.chat.recommend.RecipeCandidateScorer;
 import org.example.takecareofmyfridgebe.domain.chat.recommend.RecommendationPicker;
+import org.example.takecareofmyfridgebe.domain.chat.recommend.ScoringContext;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeSortType;
 import org.example.takecareofmyfridgebe.domain.fridge.service.FridgeService;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.Ingredient;
@@ -264,7 +265,7 @@ public class RecipeCandidateFacade {
     ) {
         // 정보가 있는 레시피만 정렬한다 (infos로 피할 맛 레시피를 빼거나 그것만 남긴다)
         RecipeCandidates rank(RecipeCandidateScorer scorer, Map<Long, RecipeCandidateInfo> rankedInfos) {
-            return scorer.rank(query, fridge, memberTastes, rows, rankedInfos, recipeTastes, candidateIds);
+            return scorer.rank(ScoringContext.of(query, fridge, memberTastes, rows, recipeTastes), rankedInfos, candidateIds);
         }
     }
 
