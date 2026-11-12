@@ -7,6 +7,7 @@ import org.example.takecareofmyfridgebe.domain.review.dto.ReviewCreateRequest;
 import org.example.takecareofmyfridgebe.domain.review.dto.ReviewResponse;
 import org.example.takecareofmyfridgebe.domain.review.dto.ReviewSearchRequest;
 import org.example.takecareofmyfridgebe.domain.review.dto.ReviewUpdateRequest;
+import org.example.takecareofmyfridgebe.domain.review.facade.ReviewFacade;
 import org.example.takecareofmyfridgebe.domain.review.service.RecipeReviewService;
 import org.example.takecareofmyfridgebe.global.response.ApiResponse;
 import org.example.takecareofmyfridgebe.global.response.PageResponse;
@@ -28,6 +29,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class RecipeReviewController {
 
     private final RecipeReviewService recipeReviewService;
+    private final ReviewFacade reviewFacade;
 
     /**
      * 레시피 후기 목록을 검색 조건(recipeId, mine, sort, page, size)으로 조회한다.
@@ -59,7 +61,7 @@ public class RecipeReviewController {
             @AuthenticationPrincipal AuthPrincipal principal,
             @Valid @RequestBody ReviewCreateRequest request
     ) {
-        ReviewResponse response = recipeReviewService.createReview(principal.memberId(), request);
+        ReviewResponse response = reviewFacade.createReview(principal.memberId(), request);
         return ResponseEntity.ok(ApiResponse.ok(response));
     }
 
