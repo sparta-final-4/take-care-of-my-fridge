@@ -55,15 +55,9 @@ public final class CategoryWordChecker {
 
     /**
      * @param categories 고를 수 있는 분류 (AI에 준 분류 목록과 같은 것, "기타" 제외)
+     * @param groups     분류 이름과 다른 묶음 말 ("국물" → 국·찌개·전골·수프·스튜). 분류 이름과 같은 규칙으로 찾고, 맞으면 묶음의 분류 모두를 센다.
+     *                   categories에 없는 분류는 뺀다
      * @return 메시지에 나온 순서대로 분류마다 원하는지·피하는지. 같은 분류가 한 번이라도 부정어와 붙으면 피함
-     */
-    public static List<CategoryStance> check(String message, Collection<String> categories, ChatWordProperties.Taste words) {
-        return check(message, categories, words, List.of());
-    }
-
-    /**
-     * @param groups 분류 이름과 다른 묶음 말 ("국물" → 국·찌개·전골·수프·스튜). 분류 이름과 같은 규칙으로 찾고, 맞으면 묶음의 분류 모두를 센다.
-     *               categories에 없는 분류는 뺀다
      */
     public static List<CategoryStance> check(String message, Collection<String> categories, ChatWordProperties.Taste words,
                                              List<ChatWordProperties.Category.Group> groups) {

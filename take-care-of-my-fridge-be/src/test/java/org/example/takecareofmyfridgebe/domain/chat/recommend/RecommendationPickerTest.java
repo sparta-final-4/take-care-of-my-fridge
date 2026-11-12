@@ -19,7 +19,7 @@ class RecommendationPickerTest {
     @Test
     @DisplayName("분류가 섞여 있으면 위에서 3개를 그대로 고른다")
     void picksTopThree_whenCategoriesDiffer() {
-        List<RecipeCandidate> picked = RecommendationPicker.pick(List.of(
+        List<RecipeCandidate> picked = pick(List.of(
                 candidate(1L, "국"), candidate(2L, "찜"), candidate(3L, "국"), candidate(4L, "볶음")));
 
         assertThat(picked).extracting(RecipeCandidate::recipeId).containsExactly(1L, 2L, 3L);
@@ -29,7 +29,7 @@ class RecommendationPickerTest {
     @Test
     @DisplayName("3개가 모두 같은 분류면 4~10위에서 처음 나오는 다른 분류로 3위를 바꾼다")
     void replacesThird_whenTopThreeShareCategory() {
-        List<RecipeCandidate> picked = RecommendationPicker.pick(List.of(
+        List<RecipeCandidate> picked = pick(List.of(
                 candidate(1L, "국"), candidate(2L, "국"), candidate(3L, "국"),
                 candidate(4L, "국"), candidate(5L, null), candidate(6L, "볶음"), candidate(7L, "찜")));
 
@@ -41,7 +41,7 @@ class RecommendationPickerTest {
     @Test
     @DisplayName("3개가 같은 분류여도 아래에 다른 분류가 없으면 그대로 둔다")
     void keepsTopThree_whenNoOtherCategory() {
-        List<RecipeCandidate> picked = RecommendationPicker.pick(List.of(
+        List<RecipeCandidate> picked = pick(List.of(
                 candidate(1L, "국"), candidate(2L, "국"), candidate(3L, "국"), candidate(4L, "국")));
 
         assertThat(picked).extracting(RecipeCandidate::recipeId).containsExactly(1L, 2L, 3L);
@@ -50,9 +50,9 @@ class RecommendationPickerTest {
     @Test
     @DisplayName("후보가 3개보다 적으면 있는 만큼, 없으면 빈 목록을 고른다")
     void picksAvailable_whenFewerThanThree() {
-        assertThat(RecommendationPicker.pick(List.of(candidate(1L, "국"), candidate(2L, "국"))))
+        assertThat(pick(List.of(candidate(1L, "국"), candidate(2L, "국"))))
                 .extracting(RecipeCandidate::recipeId).containsExactly(1L, 2L);
-        assertThat(RecommendationPicker.pick(List.of())).isEmpty();
+        assertThat(pick(List.of())).isEmpty();
     }
 
     @Test
@@ -62,7 +62,7 @@ class RecommendationPickerTest {
                 keyword(1L, "면류", "볶음면"), keyword(2L, "면류", "볶음면"), keyword(3L, "면류", "볶음면"),
                 keyword(4L, "튀김", "탕수육"), candidate(5L, "찜"));
 
-        List<RecipeCandidate> picked = RecommendationPicker.pick(ranked, List.of("탕짜면", "짜장면", "탕수육", "볶음면"));
+        List<RecipeCandidate> picked = pick(ranked, List.of("탕짜면", "짜장면", "탕수육", "볶음면"));
 
         // AI 키워드 순서(탕수육 → 볶음면)로 하나씩, 남는 자리는 정렬 순서(2번 볶음면)
         assertThat(picked).extracting(RecipeCandidate::recipeId).containsExactly(4L, 1L, 2L);
@@ -75,7 +75,7 @@ class RecommendationPickerTest {
                 reason(KeywordMatch.of(KeywordMatch.Type.NAME)));
         List<RecipeCandidate> ranked = List.of(keyword(1L, "튀김", "탕수육"), keyword(2L, "면류", "볶음면"), byName);
 
-        assertThat(RecommendationPicker.pick(ranked, List.of("탕수육", "볶음면")))
+        assertThat(pick(ranked, List.of("탕수육", "볶음면")))
                 .extracting(RecipeCandidate::recipeId).containsExactly(9L, 1L, 2L);
     }
 
@@ -85,7 +85,7 @@ class RecommendationPickerTest {
         List<RecipeCandidate> ranked = List.of(
                 keyword(1L, "튀김", "탕수육"), keyword(2L, "튀김", "깐풍기"), candidate(3L, "튀김"), candidate(4L, "찜"));
 
-        List<RecipeCandidate> picked = RecommendationPicker.pick(ranked, List.of("김피탕", "탕수육", "깐풍기"));
+        List<RecipeCandidate> picked = pick(ranked, List.of("김피탕", "탕수육", "깐풍기"));
 
         assertThat(picked).extracting(RecipeCandidate::recipeId).containsExactly(1L, 2L, 4L);
         assertThat(picked.get(0).alternative()).isFalse();
@@ -98,7 +98,7 @@ class RecommendationPickerTest {
         List<RecipeCandidate> ranked = List.of(
                 keyword(1L, "튀김", "탕수육"), keyword(2L, "튀김", "깐풍기"), keyword(3L, "튀김", "꿔바로우"), candidate(4L, "찜"));
 
-        assertThat(RecommendationPicker.pick(ranked, List.of("탕수육", "깐풍기", "꿔바로우")))
+        assertThat(pick(ranked, List.of("탕수육", "깐풍기", "꿔바로우")))
                 .extracting(RecipeCandidate::recipeId).containsExactly(1L, 2L, 3L);
     }
 
@@ -108,7 +108,7 @@ class RecommendationPickerTest {
         List<RecipeCandidate> ranked = List.of(
                 keyword(1L, "면류", "볶음면"), keyword(2L, "면류", "볶음면"), candidate(3L, "찜"), keyword(4L, "면류", "볶음면"));
 
-        assertThat(RecommendationPicker.pick(ranked, List.of("볶음면")))
+        assertThat(pick(ranked, List.of("볶음면")))
                 .extracting(RecipeCandidate::recipeId).containsExactly(1L, 2L, 3L);
     }
 
@@ -118,7 +118,7 @@ class RecommendationPickerTest {
         List<RecipeCandidate> ranked = List.of(
                 keyword(1L, "면류", "볶음면"), keyword(2L, "면류", "볶음면"), keyword(3L, "면류", "볶음면"), keyword(4L, "튀김", "탕수육"));
 
-        List<RecipeCandidate> picked = RecommendationPicker.pick(ranked);
+        List<RecipeCandidate> picked = pick(ranked);
 
         assertThat(picked).extracting(RecipeCandidate::recipeId).containsExactly(1L, 2L, 4L);
         assertThat(picked.get(2).alternative()).isFalse();
@@ -221,5 +221,13 @@ class RecommendationPickerTest {
         return new RecipeCandidate(id, "레시피" + id, category, 20,
                 new Ranking(0, 0, 0, 0, 1, 1, 0),
                 new Reason(List.of(), List.of(), List.of(), List.of(), List.of(), false, false, List.of(), List.of(), List.of(), null));
+    }
+
+    private static List<RecipeCandidate> pick(List<RecipeCandidate> ranked) {
+        return pick(ranked, List.of());
+    }
+
+    private static List<RecipeCandidate> pick(List<RecipeCandidate> ranked, List<String> keywords) {
+        return RecommendationPicker.pick(ranked, keywords, PickRule.NONE);
     }
 }

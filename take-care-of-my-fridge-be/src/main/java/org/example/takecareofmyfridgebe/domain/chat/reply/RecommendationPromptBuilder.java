@@ -53,23 +53,8 @@ public final class RecommendationPromptBuilder {
      * @param ingredientNames 선택·뺄 재료 ID별 이름 (없는 ID는 건너뛴다)
      * @param picked          추천할 레시피 (RecommendationPicker가 고른 순서)
      * @param keywordsNotFound 요리 이름 키워드로 레시피를 하나도 찾지 못했는지
-     */
-    public static String build(String content, RecipeQuery query, Map<Long, String> ingredientNames,
-                               List<RecipeCandidate> picked, boolean keywordsNotFound) {
-        return build(content, query, ingredientNames, picked, keywordsNotFound,
-                RecommendationReasonWriter.writeDistinct(picked, query.keywordText(), !query.hasRequest()));
-    }
-
-    /**
-     * @param reasons 카드 이유 (카드와 같은 문장. 콕 집어 남긴 피할 맛 요리의 "매운 요리예요"가 붙어 있다)
-     */
-    public static String build(String content, RecipeQuery query, Map<Long, String> ingredientNames,
-                               List<RecipeCandidate> picked, boolean keywordsNotFound, List<String> reasons) {
-        return build(content, query, ingredientNames, picked, keywordsNotFound, reasons, false);
-    }
-
-    /**
-     * @param unconditioned 조건에 맞는 후보가 하나도 없어 조건 없이 고른 카드인지. 맞으면 맞는 레시피가 없었다는 안내를 꼭 붙인다
+     * @param reasons          카드 이유 (카드와 같은 문장. 콕 집어 남긴 피할 맛 요리의 "매운 요리예요"가 붙어 있다)
+     * @param unconditioned    조건에 맞는 후보가 하나도 없어 조건 없이 고른 카드인지. 맞으면 맞는 레시피가 없었다는 안내를 꼭 붙인다
      */
     public static String build(String content, RecipeQuery query, Map<Long, String> ingredientNames,
                                List<RecipeCandidate> picked, boolean keywordsNotFound, List<String> reasons,
@@ -108,12 +93,7 @@ public final class RecommendationPromptBuilder {
      * 원한 게 있었는데 고른 레시피가 요청(키워드·분류·맛)에 하나도 안 맞으면 그렇다고 먼저 말하고,
      * 그렇지 않고 키워드로 이름·재료가 맞은 레시피만 없으면 비슷한 걸 골랐다고 말한다. 냉장고에 없는 선택 재료 안내는 따로 붙인다.
      * 임박 재료는 카드의 임박 태그로 충분해 안내하지 않는다
-     */
-    public static List<String> notices(RecipeQuery query, List<RecipeCandidate> picked, boolean keywordsNotFound) {
-        return notices(query, picked, keywordsNotFound, false);
-    }
-
-    /**
+     *
      * @param unconditioned 조건에 맞는 후보가 하나도 없어 조건 없이 고른 카드인지. 맞으면 맞는 레시피가 없었다는 안내를 꼭 붙인다
      */
     public static List<String> notices(RecipeQuery query, List<RecipeCandidate> picked, boolean keywordsNotFound,

@@ -641,8 +641,8 @@ public class ChatIntentFacadeTest {
             assertThat(merged.keywordText()).isNull();
             assertThat(merged.preferenceText()).isNull();
             assertThat(merged.keywords()).containsExactly("김피탕", "탕수육", "깐풍기");
-            assertThat(RecommendationPromptBuilder.notices(merged, List.of(sweetSour), merged.keywordsNotFound())).isEmpty();
-            assertThat(RecommendationPromptBuilder.notices(original, List.of(sweetSour), original.keywordsNotFound()))
+            assertThat(notices(merged, List.of(sweetSour), merged.keywordsNotFound())).isEmpty();
+            assertThat(notices(original, List.of(sweetSour), original.keywordsNotFound()))
                     .containsExactly("김피탕 레시피는 없어서, 비슷한 탕수육을 골랐어요");
         }
 
@@ -1260,5 +1260,9 @@ public class ChatIntentFacadeTest {
 
     private static Ingredient ingredient(Long id, String code, String name) {
         return ChatIntentFixture.ingredient(id, code, name);
+    }
+
+    private static List<String> notices(RecipeQuery query, List<RecipeCandidate> picked, boolean keywordsNotFound) {
+        return RecommendationPromptBuilder.notices(query, picked, keywordsNotFound, false);
     }
 }

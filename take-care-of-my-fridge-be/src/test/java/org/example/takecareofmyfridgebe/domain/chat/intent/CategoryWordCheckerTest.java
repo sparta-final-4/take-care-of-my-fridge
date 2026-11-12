@@ -22,7 +22,7 @@ public class CategoryWordCheckerTest {
             new ChatWordProperties.Category.Group("안주", List.of("구이", "전", "튀김")));
 
     private static List<CategoryStance> check(String message) {
-        return CategoryWordChecker.check(message, CATEGORIES, TasteWordCheckerTest.WORDS);
+        return CategoryWordChecker.check(message, CATEGORIES, TasteWordCheckerTest.WORDS, List.of());
     }
 
     @Test

@@ -96,19 +96,6 @@ public class ChatRecommendationFacade {
     private final ChatSafetyProperties chatSafetyProperties;
 
     /**
-     * @param content 사용자 메시지 원문 (설명 프롬프트에 넣는다)
-     * @param query   의도 판단에서 만든 추천 조건
-     * @return 카드 이벤트(후보가 없으면 empty=true)와 설명용 후보 정보
-     */
-    public RecommendationReply recommend(String content, RecipeQuery query) {
-        return recommend(content, query, List.of());
-    }
-
-    public RecommendationReply recommend(String content, RecipeQuery request, Collection<Long> previousCardIds) {
-        return recommend(content, request, previousCardIds, null);
-    }
-
-    /**
      * 추천 답. 말에 밀키트 단어가 있으면(MealkitWordChecker) 밀키트를 함께 고른다.
      * <ul>
      *   <li>"밀키트"를 말함: 밀키트만 최대 {@value #MEALKIT_ONLY_COUNT}장, 레시피 카드 없음. 글은 AI 없이 서버가 쓴다.
@@ -119,8 +106,11 @@ public class ChatRecommendationFacade {
      * 다시 추천이면 직전 카드(previousCardIds)는 후보에서 빼고 고른다. 빼서 후보가 3개보다 적어지면 그때만 뒤에 다시 넣는다.
      * 새 추천은 previousCardIds 없이 부르고, 이미 추천한 레시피는 정렬에서 뒤로 간다 (RecipeQuery.alreadyRecommendedIds).
      *
+     * @param content         사용자 메시지 원문 (설명 프롬프트에 넣는다)
+     * @param request         의도 판단에서 만든 추천 조건
      * @param previousCardIds 직전 추천 카드 레시피 ID ("다른 거 없어?"에서 같은 카드가 다시 나오지 않게)
      * @param sessionId       상담 ID. 이 상담에서 이미 보여 준 밀키트를 뒤로 보낼 때 쓴다 (null이면 보지 않는다)
+     * @return 카드 이벤트(후보가 없으면 empty=true)와 설명용 후보 정보
      */
     public RecommendationReply recommend(String content, RecipeQuery request, Collection<Long> previousCardIds, Long sessionId) {
         MealkitWordChecker.Mode mode = MealkitWordChecker.check(content, chatWordProperties.mealkit(), chatWordProperties.taste());

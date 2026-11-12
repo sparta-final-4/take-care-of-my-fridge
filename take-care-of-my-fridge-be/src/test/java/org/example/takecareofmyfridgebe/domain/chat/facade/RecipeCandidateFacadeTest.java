@@ -7,6 +7,7 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate.Imminent
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate.MissingIngredient;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidates;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeQuery;
+import org.example.takecareofmyfridgebe.domain.chat.recommend.PickRule;
 import org.example.takecareofmyfridgebe.domain.chat.recommend.RecommendationPicker;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemResponse;
 import org.example.takecareofmyfridgebe.domain.fridge.entity.FridgeItemStatus;
@@ -595,9 +596,9 @@ class RecipeCandidateFacadeTest {
                 60L, new RecipeCandidateInfo(60L, "현미 크레이프", "디저트", 30, 1)));
         RecipeQuery dessert = new RecipeQuery(MEMBER_ID, List.of(), null, List.of("디저트"), null, null, false);
 
-        List<RecipeCandidate> first = RecommendationPicker.pick(esFacade.findCandidates(dessert).candidates());
+        List<RecipeCandidate> first = pick(esFacade.findCandidates(dessert).candidates());
         Set<Long> firstIds = first.stream().map(RecipeCandidate::recipeId).collect(Collectors.toSet());
-        List<RecipeCandidate> second = RecommendationPicker.pick(
+        List<RecipeCandidate> second = pick(
                 esFacade.findCandidates(dessert.withAlreadyRecommended(firstIds)).candidates());
 
         assertThat(second).extracting(RecipeCandidate::category).containsOnly("디저트");
@@ -1079,5 +1080,9 @@ class RecipeCandidateFacadeTest {
                 LocalDate.now().plusDays(dDay), FridgeSource.MANUAL, null,
                 status == FridgeItemStatus.IMMINENT, status == FridgeItemStatus.EXPIRED, dDay, status,
                 IngredientType.NORMAL, false, LocalDateTime.now(), LocalDateTime.now());
+    }
+
+    private static List<RecipeCandidate> pick(List<RecipeCandidate> ranked) {
+        return RecommendationPicker.pick(ranked, List.of(), PickRule.NONE);
     }
 }
