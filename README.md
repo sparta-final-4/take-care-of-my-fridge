@@ -31,7 +31,7 @@
 
 <br/>
 
-<video src="docs/images/demo.mp4" width="100%" controls muted></video>
+https://github.com/user-attachments/assets/f22f5ec3-625d-4eb9-b735-f444c218af0e
 
 <br/>
 
