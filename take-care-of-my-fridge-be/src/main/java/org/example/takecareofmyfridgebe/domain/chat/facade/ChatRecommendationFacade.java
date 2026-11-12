@@ -215,15 +215,7 @@ public class ChatRecommendationFacade {
         Optional<TemperatureWordChecker.Temperature> temperature =
                 TemperatureWordChecker.wanted(chatWordProperties.temperature(), content, query.preferenceText());
         List<RecipeCandidate> arranged = TemperatureWordChecker.arrange(candidates, temperature, chatWordProperties.temperature());
-        if (temperature.isPresent()) {
-            log.info("상담 추천 온도 말 - memberId: {}, 온도: {}, 뺀 찬 요리: {}, 뒤로 보낸 뜨거운 국물: {}",
-                    query.memberId(), temperature.get(),
-                    candidates.stream().filter(c -> !arranged.contains(c)).map(RecipeCandidate::name).toList(),
-                    temperature.get() == TemperatureWordChecker.Temperature.COLD
-                            ? candidates.stream().filter(c -> TemperatureWordChecker.hotDish(c.name(), chatWordProperties.temperature()))
-                            .map(RecipeCandidate::name).toList()
-                            : List.of());
-        }
+        logTemperature(query, temperature, candidates, arranged);
         candidates = arranged;
         logCandidates(query, candidates);
         // 말한 조건이 있으면 조건을 모두 맞춘 후보부터 고르고, 모자라면 분류가 맞고 반대 맛·온도가 아닌 후보로만 채운다
@@ -265,6 +257,21 @@ public class ChatRecommendationFacade {
                 ? List.of()
                 : RecommendationPromptBuilder.notices(query, picked, found.keywordsNotFound(), unconditioned);
         return new RecommendationReply(ChatRecommendationsEventResponse.of(recipes), candidateInfo, notices);
+    }
+
+    // 온도 말이 있으면 뺀 찬 요리와 (차가운 것을 원할 때) 뒤로 보낸 뜨거운 국물 요리를 남긴다
+    private void logTemperature(RecipeQuery query, Optional<TemperatureWordChecker.Temperature> temperature,
+                                List<RecipeCandidate> candidates, List<RecipeCandidate> arranged) {
+        if (temperature.isEmpty()) {
+            return;
+        }
+        log.info("상담 추천 온도 말 - memberId: {}, 온도: {}, 뺀 찬 요리: {}, 뒤로 보낸 뜨거운 국물: {}",
+                query.memberId(), temperature.get(),
+                candidates.stream().filter(c -> !arranged.contains(c)).map(RecipeCandidate::name).toList(),
+                temperature.get() == TemperatureWordChecker.Temperature.COLD
+                        ? candidates.stream().filter(c -> TemperatureWordChecker.hotDish(c.name(), chatWordProperties.temperature()))
+                        .map(RecipeCandidate::name).toList()
+                        : List.of());
     }
 
     /**
