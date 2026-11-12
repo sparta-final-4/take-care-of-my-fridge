@@ -111,74 +111,116 @@ public class ChatStreamFacade {
         }
 
         // 4. 일일 메시지 횟수 검증 (잠금 획득 후 카운트 증가 및 30개 초과 시 429 JSON 에러). 실패하면 잠금을 풀고 던진다
-        String limitKey;
+        String limitKey = countOrRelease(memberId, sessionId, lockToken);
+
+        // 5~8. 답 스트림 조립. 여기까지는 동기로 끝나고, 아래 단계는 구독한 뒤에 실행된다
+        return replyStream(memberId, sessionId, request, lockToken, limitKey);
+    }
+
+    private String countOrRelease(Long memberId, Long sessionId, String lockToken) {
         try {
-            limitKey = chatDailyLimitService.checkAndIncrement(memberId);
+            return chatDailyLimitService.checkAndIncrement(memberId);
         } catch (RuntimeException e) {
             chatStreamLockService.release(sessionId, lockToken);
             throw e;
         }
+    }
 
-        StringBuilder accumulated = new StringBuilder();
-        AtomicBoolean firstChunkReceived = new AtomicBoolean(false);
-        // 이 답의 계획(추천이면 조건·카드)과 카드별 설명. 답이 끝나면 AI 메시지와 함께 저장한다
-        AtomicReference<ReplyPlan> planRef = new AtomicReference<>();
-        List<StringBuilder> descriptions = new ArrayList<>();
+    // 답 하나의 상태. 요청마다 새로 만들고, 아래 단계들이 함께 읽고 쓴다. 답이 끝나면 AI 메시지와 함께 저장한다
+    private static final class ReplyState {
+        // 화면에 보낸 글 (저장할 AI 메시지)
+        private final StringBuilder accumulated = new StringBuilder();
+        // 답 글 첫 조각을 받았는지 (하루 횟수 돌려주기·빈 답 판단 기준. 카드·안내는 치지 않는다)
+        private final AtomicBoolean firstChunkReceived = new AtomicBoolean(false);
+        // 이 답의 계획(추천이면 조건·카드)
+        private final AtomicReference<ReplyPlan> plan = new AtomicReference<>();
+        // 카드별 설명
+        private final List<StringBuilder> descriptions = new ArrayList<>();
+    }
 
-        // 5. 의도·조건 뽑기 → (추천이면) 후보 검색 → 카드 (event: recommendations) → 답변 스트리밍 조각 (event: message)
-        // 의도 판단·후보 검색은 AI·DB·검색을 부르는 블로킹 작업이라 boundedElastic에서 실행한다.
-        // 의도 판단이 실패하면 일반 답(ChatIntentFacade), 후보 검색이 실패하면 일반 답으로 넘어간다. 하루 횟수는 위에서 센 1회에 포함된다
-        Flux<ServerSentEvent<String>> messageStream = Mono.fromCallable(() -> planReply(memberId, sessionId, request))
+    private Flux<ServerSentEvent<String>> replyStream(Long memberId, Long sessionId, ChatMessageCreateRequest request,
+                                                      String lockToken, String limitKey) {
+        ReplyState state = new ReplyState();
+        Flux<ServerSentEvent<String>> messageStream = messageStream(memberId, sessionId, request, state);
+        Flux<ServerSentEvent<String>> noticeStream = noticeStream(memberId, sessionId, request.content(), state);
+        Mono<ServerSentEvent<String>> doneStream = doneStream(memberId, sessionId, request.content(), state);
+
+        // 7. 실패 시 에러 이벤트 (event: error) 및 로깅. 첫 조각 전 실패면 하루 횟수를 돌려준다
+        // 의도 판단으로 서버 안내를 보낸 답(OFF_TOPIC·BLOCKED·SELF_HARM)은 의도 판단 AI를 썼으므로 센다 (안내 글이 첫 조각이라 돌려주지 않는다)
+        return Flux.concat(messageStream, noticeStream, doneStream)
+                .onErrorResume(e -> {
+                    if (!state.firstChunkReceived.get()) {
+                        chatDailyLimitService.refund(limitKey);
+                    }
+                    return Flux.just(errorEvent(sessionId, e));
+                })
+                // 8. 완료·오류·끊김(cancel) 어느 쪽으로 끝나도 잠금을 푼다
+                .doFinally(signal -> chatStreamLockService.release(sessionId, lockToken));
+    }
+
+    // 5. 의도·조건 뽑기 → (추천이면) 후보 검색 → 카드 (event: recommendations) → 답변 스트리밍 조각 (event: message)
+    // 의도 판단·후보 검색은 AI·DB·검색을 부르는 블로킹 작업이라 boundedElastic에서 실행한다.
+    // 의도 판단이 실패하면 일반 답(ChatIntentFacade), 후보 검색이 실패하면 일반 답으로 넘어간다. 하루 횟수는 위에서 센 1회에 포함된다
+    private Flux<ServerSentEvent<String>> messageStream(Long memberId, Long sessionId, ChatMessageCreateRequest request,
+                                                        ReplyState state) {
+        return Mono.fromCallable(() -> planReply(memberId, sessionId, request))
                 .subscribeOn(Schedulers.boundedElastic())
                 .flatMapMany(plan -> {
-                    planRef.set(plan);
-                    Flux<String> reply = replyText(memberId, sessionId, content, plan);
-                    // 레시피 자세히: 그 레시피 카드 하나를 먼저 보내고 글은 표시 없이 그대로 message로 보낸다
-                    if (plan.detail() != null) {
-                        ServerSentEvent<String> card = ServerSentEvent.<String>builder()
-                                .event("recommendations")
-                                .data(toJson(plan.detail().event()))
-                                .build();
-                        // 생략 괄호 글("(뒤 단계 생략)")은 화면·저장 모두에서 지운다
-                        OmissionNoteFilter omissionFilter = new OmissionNoteFilter();
-                        Flux<String> text = reply
-                                .doOnNext(chunk -> firstChunkReceived.set(true))
-                                .map(omissionFilter::feed)
-                                .concatWith(Flux.defer(() -> Flux.just(omissionFilter.finish())))
-                                .filter(piece -> !piece.isEmpty())
-                                .doOnNext(accumulated::append);
-                        return Flux.concat(Mono.just(card), text.map(this::messageEvent));
-                    }
-                    if (plan.recommendation() == null) {
-                        return reply
-                                .doOnNext(chunk -> {
-                                    firstChunkReceived.set(true);
-                                    accumulated.append(chunk);
-                                })
-                                .map(this::messageEvent);
-                    }
-                    // 카드가 없거나(정해진 답) 밀키트만 보여 주는 답(서버 글)은 표시 없이 그대로 message로 보낸다
-                    Flux<ServerSentEvent<String>> textEvents = plan.recommendation().event().empty()
-                            || plan.recommendation().fixedReply() != null
-                            ? reply.doOnNext(chunk -> {
-                                firstChunkReceived.set(true);
-                                accumulated.append(chunk);
-                            }).map(this::messageEvent)
-                            : splitRecommendationText(reply, plan.recommendation(), descriptions, accumulated,
-                            firstChunkReceived);
-                    ServerSentEvent<String> cards = ServerSentEvent.<String>builder()
-                            .event("recommendations")
-                            .data(toJson(plan.recommendation().event()))
-                            .build();
-                    return Flux.concat(Mono.just(cards), textEvents);
+                    state.plan.set(plan);
+                    Flux<String> reply = replyText(memberId, sessionId, request.content(), plan);
+                    return planEvents(plan, reply, state);
                 });
+    }
 
-        // 건강 안내: 보낸 말만 본다 (AI 답은 보지 않는다). 답이 끝난 뒤 빈 줄 하나를 두고 붙여 화면·저장 모두 답 끝에 둔다
+    // 계획에 따라 카드·답 글 이벤트를 만든다 (레시피 자세히 / 일반 답 / 추천)
+    private Flux<ServerSentEvent<String>> planEvents(ReplyPlan plan, Flux<String> reply, ReplyState state) {
+        // 레시피 자세히: 그 레시피 카드 하나를 먼저 보내고 글은 표시 없이 그대로 message로 보낸다
+        if (plan.detail() != null) {
+            ServerSentEvent<String> card = ServerSentEvent.<String>builder()
+                    .event("recommendations")
+                    .data(toJson(plan.detail().event()))
+                    .build();
+            // 생략 괄호 글("(뒤 단계 생략)")은 화면·저장 모두에서 지운다
+            OmissionNoteFilter omissionFilter = new OmissionNoteFilter();
+            Flux<String> text = reply
+                    .doOnNext(chunk -> state.firstChunkReceived.set(true))
+                    .map(omissionFilter::feed)
+                    .concatWith(Flux.defer(() -> Flux.just(omissionFilter.finish())))
+                    .filter(piece -> !piece.isEmpty())
+                    .doOnNext(state.accumulated::append);
+            return Flux.concat(Mono.just(card), text.map(this::messageEvent));
+        }
+        if (plan.recommendation() == null) {
+            return reply
+                    .doOnNext(chunk -> {
+                        state.firstChunkReceived.set(true);
+                        state.accumulated.append(chunk);
+                    })
+                    .map(this::messageEvent);
+        }
+        // 카드가 없거나(정해진 답) 밀키트만 보여 주는 답(서버 글)은 표시 없이 그대로 message로 보낸다
+        Flux<ServerSentEvent<String>> textEvents = plan.recommendation().event().empty()
+                || plan.recommendation().fixedReply() != null
+                ? reply.doOnNext(chunk -> {
+                    state.firstChunkReceived.set(true);
+                    state.accumulated.append(chunk);
+                }).map(this::messageEvent)
+                : splitRecommendationText(reply, plan.recommendation(), state.descriptions, state.accumulated,
+                state.firstChunkReceived);
+        ServerSentEvent<String> cards = ServerSentEvent.<String>builder()
+                .event("recommendations")
+                .data(toJson(plan.recommendation().event()))
+                .build();
+        return Flux.concat(Mono.just(cards), textEvents);
+    }
+
+    // 건강 안내: 보낸 말만 본다 (AI 답은 보지 않는다). 답이 끝난 뒤 빈 줄 하나를 두고 붙여 화면·저장 모두 답 끝에 둔다
+    // 알레르기 안내(추천 답에서 재료를 뺐을 때)가 있으면 건강 안내 앞에 한 메시지로 붙인다
+    private Flux<ServerSentEvent<String>> noticeStream(Long memberId, Long sessionId, String content, ReplyState state) {
         boolean healthMentioned = HealthWordChecker.mentions(content, chatSafetyProperties.health());
-        // 알레르기 안내(추천 답에서 재료를 뺐을 때)가 있으면 건강 안내 앞에 한 메시지로 붙인다
-        Flux<ServerSentEvent<String>> healthNotice = Flux.defer(() -> {
-            ReplyPlan plan = planRef.get();
-            if (plan == null || plan.serverNotice() || !firstChunkReceived.get()) {
+        return Flux.defer(() -> {
+            ReplyPlan plan = state.plan.get();
+            if (plan == null || plan.serverNotice() || !state.firstChunkReceived.get()) {
                 return Flux.empty();
             }
             List<String> lines = new ArrayList<>();
@@ -193,33 +235,23 @@ public class ChatStreamFacade {
                 return Flux.empty();
             }
             String text = String.join("\n", lines);
-            String notice = accumulated.isEmpty() ? text : HEALTH_NOTICE_SEPARATOR + text;
-            accumulated.append(notice);
+            String notice = state.accumulated.isEmpty() ? text : HEALTH_NOTICE_SEPARATOR + text;
+            state.accumulated.append(notice);
             return Flux.just(messageEvent(notice));
         });
+    }
 
-        // 6. 스트림 정상 완료 시 DB 저장 후 종료 이벤트 (event: done)
-        // 블로킹 I/O(DB 저장)가 Reactor 계산/이벤트루프 스레드를 점유하지 않도록 Schedulers.boundedElastic()에서 실행
-        // 조각 없이 끝난 빈 답은 저장하지 않고 오류로 보낸다 (아래 7에서 하루 횟수를 돌려준다)
-        Mono<ServerSentEvent<String>> doneStream = Mono.defer(() -> {
-            if (!firstChunkReceived.get()) {
+    // 6. 스트림 정상 완료 시 DB 저장 후 종료 이벤트 (event: done)
+    // 블로킹 I/O(DB 저장)가 Reactor 계산/이벤트루프 스레드를 점유하지 않도록 Schedulers.boundedElastic()에서 실행
+    // 조각 없이 끝난 빈 답은 저장하지 않고 오류로 보낸다 (replyStream의 7에서 하루 횟수를 돌려준다)
+    private Mono<ServerSentEvent<String>> doneStream(Long memberId, Long sessionId, String content, ReplyState state) {
+        return Mono.defer(() -> {
+            if (!state.firstChunkReceived.get()) {
                 log.warn("상담 답이 비어 있음 - memberId: {}, sessionId: {}", memberId, sessionId);
                 return Mono.error(new BusinessException(ErrorCode.CHAT_AI_UNAVAILABLE));
             }
-            return saveExchange(sessionId, content, accumulated, planRef.get(), descriptions);
+            return saveExchange(sessionId, content, state.accumulated, state.plan.get(), state.descriptions);
         });
-
-        // 7. 실패 시 에러 이벤트 (event: error) 및 로깅. 첫 조각 전 실패면 하루 횟수를 돌려준다
-        // 의도 판단으로 서버 안내를 보낸 답(OFF_TOPIC·BLOCKED·SELF_HARM)은 의도 판단 AI를 썼으므로 센다 (안내 글이 첫 조각이라 돌려주지 않는다)
-        return Flux.concat(messageStream, healthNotice, doneStream)
-                .onErrorResume(e -> {
-                    if (!firstChunkReceived.get()) {
-                        chatDailyLimitService.refund(limitKey);
-                    }
-                    return Flux.just(errorEvent(sessionId, e));
-                })
-                // 8. 완료·오류·끊김(cancel) 어느 쪽으로 끝나도 잠금을 푼다
-                .doFinally(signal -> chatStreamLockService.release(sessionId, lockToken));
     }
 
     // 답 방식 정하기: 상담 문맥(최근 대화)을 읽고, 의도가 추천이면 후보를 찾아 카드·설명 재료를 만든다. 후보 검색이 실패하면 일반 답
