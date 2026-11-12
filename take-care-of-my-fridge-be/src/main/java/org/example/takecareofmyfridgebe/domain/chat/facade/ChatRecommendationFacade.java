@@ -21,7 +21,7 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.SavedRecommendation;
 import org.example.takecareofmyfridgebe.domain.chat.dto.TasteLabel;
 import org.example.takecareofmyfridgebe.domain.chat.facade.RecipeCandidateFacade.MealkitRecipes;
 import org.example.takecareofmyfridgebe.domain.chat.intent.MealkitWordChecker;
-import org.example.takecareofmyfridgebe.domain.chat.intent.TemperatureWordChecker;
+import org.example.takecareofmyfridgebe.domain.chat.recommend.TemperatureWordChecker;
 import org.example.takecareofmyfridgebe.domain.chat.recommend.MealkitPicker;
 import org.example.takecareofmyfridgebe.domain.chat.recommend.PickRule;
 import org.example.takecareofmyfridgebe.domain.chat.recommend.RecommendationPicker;

@@ -1,10 +1,10 @@
-package org.example.takecareofmyfridgebe.domain.chat.intent;
+package org.example.takecareofmyfridgebe.domain.chat.recommend;
 
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate.Ranking;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate.Reason;
-import org.example.takecareofmyfridgebe.domain.chat.intent.TemperatureWordChecker.Temperature;
+import org.example.takecareofmyfridgebe.domain.chat.recommend.TemperatureWordChecker.Temperature;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
