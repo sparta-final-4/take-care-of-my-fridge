@@ -2,7 +2,7 @@ package org.example.takecareofmyfridgebe.domain.chat.recommend;
 
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidates;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeQuery;
-import org.example.takecareofmyfridgebe.domain.chat.facade.ChatIntentFacadeTest;
+import org.example.takecareofmyfridgebe.domain.chat.ChatIntentFixture;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member.Taste;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -22,7 +22,7 @@ class PickRuleTest {
         RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), List.of(Taste.SPICY), List.of("국", "찌개"), null, null,
                 false, List.of("닭볶음탕"), "닭볶음탕");
 
-        PickRule rule = PickRule.of(query, EMPTY, ChatIntentFacadeTest.TASTE_OPPOSITES::oppositesOf);
+        PickRule rule = PickRule.of(query, EMPTY, ChatIntentFixture.TASTE_OPPOSITES::oppositesOf);
 
         assertThat(rule.requestCount()).isEqualTo(3);
         assertThat(rule.oppositeTastes()).containsExactly(Taste.MILD);
@@ -33,7 +33,7 @@ class PickRuleTest {
     @DisplayName("조건 없이 추천해 달라고 하면 조건 수는 0이다")
     void hasNoRequest_whenNothingSpoken() {
         PickRule rule = PickRule.of(RecipeQuery.of(MEMBER_ID, List.of()), EMPTY,
-                ChatIntentFacadeTest.TASTE_OPPOSITES::oppositesOf);
+                ChatIntentFixture.TASTE_OPPOSITES::oppositesOf);
 
         assertThat(rule.hasRequest()).isFalse();
     }
