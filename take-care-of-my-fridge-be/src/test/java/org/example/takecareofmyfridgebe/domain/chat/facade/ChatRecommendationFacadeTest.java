@@ -1,9 +1,10 @@
 package org.example.takecareofmyfridgebe.domain.chat.facade;
 
 import org.example.takecareofmyfridgebe.domain.chat.ChatIntentFixture;
+import org.example.takecareofmyfridgebe.domain.chat.facade.RecommendationCardFixture.MealkitWithPrice;
+import org.example.takecareofmyfridgebe.domain.chat.facade.RecommendationCardFixture.ProductWithPrice;
 import org.example.takecareofmyfridgebe.domain.chat.recommend.MealkitPicker.FridgeMealkits;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse;
-import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse.RecommendedMealkit;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse.RecommendedRecipe;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse.ShoppingProduct;
 import org.example.takecareofmyfridgebe.domain.chat.dto.KeywordMatch;
@@ -16,26 +17,18 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidates;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeDetailReply;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeQuery;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecommendationReply;
-import org.example.takecareofmyfridgebe.domain.chat.dto.SavedRecommendation;
 import org.example.takecareofmyfridgebe.domain.chat.recommend.MealkitPicker;
 import org.example.takecareofmyfridgebe.domain.chat.safety.SafetyWordCheckerTest;
 import org.example.takecareofmyfridgebe.domain.chat.service.ChatMessageService;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.Ingredient;
-import org.example.takecareofmyfridgebe.domain.ingredient.entity.StorageType;
 import org.example.takecareofmyfridgebe.domain.ingredient.service.IngredientService;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member.Taste;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeDetailResponse.StepItem;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeDetailResponse;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeCandidateIngredient;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeSummary;
-import org.example.takecareofmyfridgebe.domain.product.entity.IngredientProduct;
-import org.example.takecareofmyfridgebe.domain.product.entity.MealkitProduct;
-import org.example.takecareofmyfridgebe.domain.product.entity.Product;
-import org.example.takecareofmyfridgebe.domain.product.entity.ProductStatus;
-import org.example.takecareofmyfridgebe.domain.product.entity.ProductType;
 import org.example.takecareofmyfridgebe.domain.product.service.ProductService;
 import org.example.takecareofmyfridgebe.domain.recipe.service.RecipeService;
-import org.example.takecareofmyfridgebe.domain.sale.dto.ActiveSale;
 import org.example.takecareofmyfridgebe.domain.sale.dto.SellingPrice;
 import org.example.takecareofmyfridgebe.domain.sale.entity.SaleEventType;
 import org.example.takecareofmyfridgebe.domain.sale.service.SaleEventReader;
@@ -47,8 +40,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 import tools.jackson.databind.ObjectMapper;
 
-import java.math.BigDecimal;
-import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
@@ -57,7 +48,11 @@ import java.util.Map;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.tuple;
+import static org.example.takecareofmyfridgebe.domain.chat.facade.RecommendationCardFixture.candidate;
+import static org.example.takecareofmyfridgebe.domain.chat.facade.RecommendationCardFixture.mealkit;
+import static org.example.takecareofmyfridgebe.domain.chat.facade.RecommendationCardFixture.missing;
+import static org.example.takecareofmyfridgebe.domain.chat.facade.RecommendationCardFixture.product;
+import static org.example.takecareofmyfridgebe.domain.chat.facade.RecommendationCardFixture.reason;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.mock;
@@ -71,6 +66,7 @@ class ChatRecommendationFacadeTest {
     private static final Long MEMBER_ID = 1L;
 
     private RecipeCandidateFacade recipeCandidateFacade;
+    private RecipeCardDescriber recipeCardDescriber;
     private RecipeService recipeService;
     private IngredientService ingredientService;
     private ProductService productService;
@@ -81,13 +77,14 @@ class ChatRecommendationFacadeTest {
     @BeforeEach
     void setUp() {
         recipeCandidateFacade = mock(RecipeCandidateFacade.class);
+        recipeCardDescriber = mock(RecipeCardDescriber.class);
         recipeService = mock(RecipeService.class);
         ingredientService = mock(IngredientService.class);
         productService = mock(ProductService.class);
         saleEventReader = mock(SaleEventReader.class);
         chatMessageService = mock(ChatMessageService.class);
-        facade = new ChatRecommendationFacade(recipeCandidateFacade, recipeService, ingredientService, productService,
-                saleEventReader, chatMessageService, ChatIntentFixture.WORDS, SafetyWordCheckerTest.ALL);
+        facade = new ChatRecommendationFacade(recipeCandidateFacade, recipeCardDescriber, recipeService, ingredientService,
+                productService, saleEventReader, chatMessageService, ChatIntentFixture.WORDS, SafetyWordCheckerTest.ALL);
         when(ingredientService.getIngredientsByIds(any())).thenReturn(Map.of());
     }
 
@@ -226,31 +223,6 @@ class ChatRecommendationFacadeTest {
     }
 
     @Test
-    @DisplayName("저장된 카드를 순서·설명 그대로 다시 만들고, 지워진 레시피는 빼며, 레시피 계산은 한 번에 한다")
-    void rebuildsCardsInOrder_skippingDeletedRecipe() {
-        List<SavedRecommendation> saved = List.of(
-                new SavedRecommendation(2L, 20L, 1, "둘째 설명"),
-                new SavedRecommendation(2L, 10L, 0, "첫째 설명"),
-                new SavedRecommendation(2L, 99L, 2, "지워진 레시피"),
-                new SavedRecommendation(4L, 30L, 0, null));
-        when(recipeCandidateFacade.describeRecipes(1L, List.of(20L, 10L, 99L, 30L))).thenReturn(Map.of(
-                10L, candidate(10L, "두부조림", "조림", 20, reason(List.of(Taste.SALTY))),
-                20L, candidate(20L, "두부국", "국", null, reason(List.of())),
-                30L, candidate(30L, "장어조림", "조림", 30, reason(List.of()))));
-        when(recipeService.findSummaries(List.of(20L, 10L, 99L, 30L)))
-                .thenReturn(Map.of(10L, new RecipeSummary(10L, "두부조림", "https://img/10.jpg", null)));
-
-        Map<Long, List<RecommendedRecipe>> cards = facade.rebuildCards(1L, saved);
-
-        assertThat(cards.get(2L)).extracting(RecommendedRecipe::recipeId).containsExactly(10L, 20L);
-        assertThat(cards.get(2L)).extracting(RecommendedRecipe::description).containsExactly("첫째 설명", "둘째 설명");
-        assertThat(cards.get(2L).get(0).imageUrl()).isEqualTo("https://img/10.jpg");
-        assertThat(cards.get(2L).get(0).missingSelectedIngredients()).isEmpty();
-        assertThat(cards.get(4L)).extracting(RecommendedRecipe::recipeId).containsExactly(30L);
-        verify(recipeCandidateFacade, times(1)).describeRecipes(any(), any());
-    }
-
-    @Test
     @DisplayName("고른 카드들의 장볼 재료를 모아 상품 조회·판매가 계산을 한 번씩 하고, 재료마다 상품을 붙이며 상품이 없는 재료는 비운다")
     void attachesProductsToMissingIngredients_withOneLookup() {
         when(recipeCandidateFacade.findCandidates(any())).thenReturn(new RecipeCandidates(List.of(
@@ -289,33 +261,13 @@ class ChatRecommendationFacadeTest {
     }
 
     @Test
-    @DisplayName("저장된 카드를 다시 만들 때도 장볼 재료 상품을 지금 품절 기준으로 붙이고, 메시지가 여럿이어도 한 번씩 조회한다")
-    void attachesCurrentProducts_whenRebuildingCards() {
-        List<SavedRecommendation> saved = List.of(
-                new SavedRecommendation(2L, 10L, 0, "첫째 설명"),
-                new SavedRecommendation(4L, 20L, 0, "둘째 설명"));
-        when(recipeCandidateFacade.describeRecipes(1L, List.of(10L, 20L))).thenReturn(Map.of(
-                10L, candidate(10L, "두부조림", "조림", 20, missing(new MissingIngredient(21L, "두부"))),
-                20L, candidate(20L, "대파전", "전", 20, missing(new MissingIngredient(3L, "대파")))));
-        when(recipeService.findSummaries(any())).thenReturn(Map.of());
-        givenProducts(product(22L, 21L, "부침용 두부 1모", 2000, null), soldOutProduct(16L, 3L, "대파 1단", 3000));
-
-        Map<Long, List<RecommendedRecipe>> cards = facade.rebuildCards(1L, saved);
-
-        assertThat(cards.get(2L).get(0).missingIngredients().get(0).product().soldOut()).isFalse();
-        assertThat(cards.get(4L).get(0).missingIngredients().get(0).product().soldOut()).isTrue();
-        verify(productService, times(1)).getPublicIngredientProducts(any());
-        verify(saleEventReader, times(1)).findSellingPrices(any());
-    }
-
-    @Test
     @DisplayName("레시피 자세히 카드의 장볼 재료에도 상품을 붙인다")
     void attachesProducts_whenRecipeDetail() {
         RecipeDetailResponse recipe = RecipeDetailResponse.builder()
                 .recipeId(20L).name("두부조림").category("조림").cookTimeMin(20)
                 .ingredients(List.of()).steps(List.of(new StepItem(1, "두부를 굽는다.", null, null))).build();
         when(recipeService.getRecipe(20L)).thenReturn(recipe);
-        when(recipeCandidateFacade.describeRecipes(MEMBER_ID, List.of(20L))).thenReturn(Map.of(
+        when(recipeCardDescriber.describeRecipes(MEMBER_ID, List.of(20L))).thenReturn(Map.of(
                 20L, candidate(20L, "두부조림", "조림", 20, missing(new MissingIngredient(21L, "두부")))));
         givenProducts(product(22L, 21L, "부침용 두부 1모", 2000, null));
 
@@ -363,7 +315,7 @@ class ChatRecommendationFacadeTest {
                 .recipeId(20L).name("깐풍기").category("튀김").cookTimeMin(40).imageUrl("https://img/20.jpg")
                 .ingredients(List.of()).steps(List.of(new StepItem(1, "닭을 튀긴다.", null, null))).build();
         when(recipeService.getRecipe(20L)).thenReturn(recipe);
-        when(recipeCandidateFacade.describeRecipes(MEMBER_ID, List.of(20L))).thenReturn(Map.of(
+        when(recipeCardDescriber.describeRecipes(MEMBER_ID, List.of(20L))).thenReturn(Map.of(
                 20L, candidate(20L, "깐풍기", "튀김", 40, reason(List.of()))));
 
         RecipeDetailReply reply = facade.describe(MEMBER_ID, 20L).orElseThrow();
@@ -560,7 +512,7 @@ class ChatRecommendationFacadeTest {
         assertThat(reply.fixedReply()).isNull();
         verify(recipeCandidateFacade).findCandidates(argThat(
                 query -> query.keywords().isEmpty() && query.keywordText() == null));
-        verify(recipeCandidateFacade, never()).describeMealkitRecipes(any(), any());
+        verify(recipeCardDescriber, never()).describeMealkitRecipes(any(), any());
     }
 
     @Test
@@ -576,49 +528,6 @@ class ChatRecommendationFacadeTest {
                 .event().mealkits()).isEmpty();
         verify(productService, never()).getOnSaleMealkits();
         verify(chatMessageService, never()).findRecommendedProductIds(any());
-    }
-
-    @Test
-    @DisplayName("저장된 밀키트 카드를 메시지별 순서·설명 그대로 지금 가격으로 다시 만들고, 판매 중지된 밀키트는 빼며 조회는 한 번씩 한다")
-    void rebuildsMealkitCards_withCurrentPrice() {
-        List<SavedRecommendation> saved = List.of(
-                new SavedRecommendation(2L, 10L, null, 0, "레시피 설명"),
-                new SavedRecommendation(2L, null, 41L, 1, "요리하기 번거로우면 황태해장국 밀키트로 간편하게 드셔 보세요."),
-                new SavedRecommendation(4L, null, 43L, 1, null),
-                new SavedRecommendation(4L, null, 40L, 0, null),
-                new SavedRecommendation(4L, null, 99L, 2, null));
-        MealkitWithPrice hwangtae = mealkit(41L, "황태해장국", 9000, 543L);
-        MealkitWithPrice doenjang = mealkit(40L, "된장국", 7000, 544L);
-        MealkitWithPrice soldOut = soldOutMealkit(43L, "부추 콩가루 찜", 8000);
-        when(productService.getPublicMealkits(List.of(41L, 43L, 40L, 99L)))
-                .thenReturn(List.of(hwangtae.mealkit(), doenjang.mealkit(), soldOut.mealkit()));
-        when(saleEventReader.findSellingPrices(any())).thenReturn(Map.of(
-                41L, hwangtae.price(), 40L, doenjang.price(), 43L, soldOut.price()));
-        when(recipeService.findSummaries(any())).thenReturn(Map.of(
-                543L, new RecipeSummary(543L, "황태해장국", null, null),
-                544L, new RecipeSummary(544L, "된장국", null, null)));
-        when(recipeCandidateFacade.findFridgeMealkits(MEMBER_ID)).thenReturn(new FridgeMealkits(Map.of(40L, 1L), Map.of()));
-
-        Map<Long, List<RecommendedMealkit>> cards = facade.rebuildMealkitCards(MEMBER_ID, saved);
-
-        assertThat(cards.get(2L)).extracting(m -> m.product().productId(), RecommendedMealkit::description)
-                .containsExactly(tuple(41L, "요리하기 번거로우면 황태해장국 밀키트로 간편하게 드셔 보세요."));
-        assertThat(cards.get(4L)).extracting(m -> m.product().productId()).containsExactly(40L, 43L);
-        assertThat(cards.get(4L).get(0).recipeName()).isEqualTo("된장국");
-        assertThat(cards.get(4L).get(1).product().soldOut()).isTrue();
-        // 냉장고에 있는지는 지금 냉장고 기준 (된장국 밀키트가 냉장고에 있음)
-        assertThat(cards.get(4L)).extracting(RecommendedMealkit::inFridge, RecommendedMealkit::fridgeDDay)
-                .containsExactly(tuple(true, 1L), tuple(false, null));
-        verify(productService, times(1)).getPublicMealkits(any());
-    }
-
-    @Test
-    @DisplayName("레시피 카드를 다시 만들 때 밀키트 카드는 건너뛰고, 밀키트만 있는 답이면 레시피를 조회하지 않는다")
-    void skipsMealkitRows_whenRebuildingRecipeCards() {
-        Map<Long, List<RecommendedRecipe>> cards = facade.rebuildCards(1L, List.of(new SavedRecommendation(4L, null, 40L, 0, null)));
-
-        assertThat(cards).isEmpty();
-        verify(recipeCandidateFacade, never()).describeRecipes(any(), any());
     }
 
     @Test
@@ -659,8 +568,8 @@ class ChatRecommendationFacadeTest {
             }
         }
         when(saleEventReader.findSellingPrices(any())).thenReturn(prices);
-        when(recipeCandidateFacade.describeMealkitRecipes(any(), any()))
-                .thenReturn(new RecipeCandidateFacade.MealkitRecipes(recipes, Map.of(), Set.of(), FridgeMealkits.NONE));
+        when(recipeCardDescriber.describeMealkitRecipes(any(), any()))
+                .thenReturn(new RecipeCardDescriber.MealkitRecipes(recipes, Map.of(), Set.of(), FridgeMealkits.NONE));
     }
 
     private static Ingredient ingredient(Long id, String name) {
@@ -669,24 +578,9 @@ class ChatRecommendationFacadeTest {
         return ingredient;
     }
 
-    private record MealkitWithPrice(MealkitProduct mealkit, SellingPrice price) {
-    }
-
-    private static MealkitWithPrice mealkit(long productId, String name, int price, Long recipeId) {
-        return mealkitWith(productId, name, price, recipeId, ProductStatus.ON_SALE);
-    }
-
-    private static MealkitWithPrice soldOutMealkit(long productId, String name, int price) {
-        return mealkitWith(productId, name, price, 539L, ProductStatus.SOLD_OUT);
-    }
-
-    private static MealkitWithPrice mealkitWith(long productId, String name, int price, Long recipeId, ProductStatus status) {
-        Product product = Product.builder().productType(ProductType.MEALKIT).name(name).price(price)
-                .stock(status == ProductStatus.SOLD_OUT ? 0 : 10).storage(StorageType.REFRIGERATED).shelfDays(3).status(status)
-                .build();
-        ReflectionTestUtils.setField(product, "id", productId);
-        MealkitProduct mealkit = MealkitProduct.builder().product(product).servings(2).recipeId(recipeId).build();
-        return new MealkitWithPrice(mealkit, SellingPrice.of(product, null));
+    // 상품 조회는 받은 연결을 돌려주고, 판매가는 상품마다 계산해 둔 값을 돌려준다
+    private void givenProducts(ProductWithPrice... products) {
+        RecommendationCardFixture.givenProducts(productService, saleEventReader, products);
     }
 
     private void givenKeywordCandidates(RecipeCandidate... candidates) {
@@ -703,59 +597,6 @@ class ChatRecommendationFacadeTest {
     private static Reason expanded(String keyword) {
         return new Reason(List.of(), List.of(), List.of(), List.of(), List.of("키워드: 늘린 이름"), false, true, List.of(),
                 List.of(), List.of(), new KeywordMatch(KeywordMatch.Type.EXPANDED, keyword, null));
-    }
-
-    // 장볼 재료만 있는 근거
-    private static Reason missing(MissingIngredient... ingredients) {
-        return new Reason(List.of(), List.of(), List.of(), List.of(), List.of(), false, false, List.of(ingredients),
-                List.of(), List.of(), null);
-    }
-
-    // 상품 조회는 받은 연결을 돌려주고, 판매가는 상품마다 계산해 둔 값을 돌려준다
-    private void givenProducts(ProductWithPrice... products) {
-        when(productService.getPublicIngredientProducts(any()))
-                .thenReturn(Arrays.stream(products).map(ProductWithPrice::link).toList());
-        Map<Long, SellingPrice> prices = new HashMap<>();
-        for (ProductWithPrice product : products) {
-            prices.put(product.link().getProduct().getId(), product.price());
-        }
-        when(saleEventReader.findSellingPrices(any())).thenReturn(prices);
-    }
-
-    private record ProductWithPrice(IngredientProduct link, SellingPrice price) {
-    }
-
-    private static ProductWithPrice product(long productId, long ingredientId, String name, int price, Integer salePrice) {
-        Product product = productEntity(productId, name, price, ProductStatus.ON_SALE);
-        ActiveSale sale = salePrice == null ? null
-                : new ActiveSale(productId, 900L, SaleEventType.SPECIAL, salePrice, 25, LocalDateTime.now().plusDays(1), null, null);
-        return new ProductWithPrice(link(product, ingredientId), SellingPrice.of(product, sale));
-    }
-
-    private static ProductWithPrice soldOutProduct(long productId, long ingredientId, String name, int price) {
-        Product product = productEntity(productId, name, price, ProductStatus.SOLD_OUT);
-        return new ProductWithPrice(link(product, ingredientId), SellingPrice.of(product, null));
-    }
-
-    private static Product productEntity(long productId, String name, int price, ProductStatus status) {
-        Product product = Product.builder().productType(ProductType.INGREDIENT).name(name).price(price)
-                .stock(status == ProductStatus.SOLD_OUT ? 0 : 10).storage(StorageType.REFRIGERATED).shelfDays(7).status(status)
-                .build();
-        ReflectionTestUtils.setField(product, "id", productId);
-        return product;
-    }
-
-    private static IngredientProduct link(Product product, long ingredientId) {
-        return IngredientProduct.builder().product(product).ingredientId(ingredientId).unitAmount(BigDecimal.ONE).unit("개")
-                .baseQuantity(BigDecimal.ONE).build();
-    }
-
-    private static RecipeCandidate candidate(Long id, String name, String category, Integer cookTimeMin, Reason reason) {
-        return new RecipeCandidate(id, name, category, cookTimeMin, new Ranking(0, 0, 0, 0, 1, 1, 0), reason);
-    }
-
-    private static Reason reason(List<Taste> tastes) {
-        return new Reason(List.of(), List.of(), tastes, List.of(), List.of(), false, false, List.of(), List.of(), List.of(), null);
     }
 
     // 요청 일치 수만 정한 후보

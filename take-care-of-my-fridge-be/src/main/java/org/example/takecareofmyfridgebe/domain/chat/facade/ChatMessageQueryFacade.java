@@ -22,7 +22,7 @@ import java.util.Map;
 public class ChatMessageQueryFacade {
 
     private final ChatMessageService chatMessageService;
-    private final ChatRecommendationFacade chatRecommendationFacade;
+    private final ChatCardRebuilder chatCardRebuilder;
     private final ChatFridgeShopFacade chatFridgeShopFacade;
 
     public List<ChatMessageResponse> getMessages(Long memberId, Long sessionId) {
@@ -35,8 +35,8 @@ public class ChatMessageQueryFacade {
         if (saved.isEmpty()) {
             return messages;
         }
-        Map<Long, List<RecommendedRecipe>> cards = chatRecommendationFacade.rebuildCards(memberId, saved);
-        Map<Long, List<RecommendedMealkit>> mealkits = chatRecommendationFacade.rebuildMealkitCards(memberId, saved);
+        Map<Long, List<RecommendedRecipe>> cards = chatCardRebuilder.rebuildCards(memberId, saved);
+        Map<Long, List<RecommendedMealkit>> mealkits = chatCardRebuilder.rebuildMealkitCards(memberId, saved);
         Map<Long, List<ProductCard>> products = chatFridgeShopFacade.rebuildProductCards(saved);
         return messages.stream()
                 .map(message -> message.withRecommendations(cards.getOrDefault(message.id(), List.of()),

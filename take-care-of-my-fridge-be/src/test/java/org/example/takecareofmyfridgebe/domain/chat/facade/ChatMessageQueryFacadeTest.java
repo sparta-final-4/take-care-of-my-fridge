@@ -30,16 +30,16 @@ class ChatMessageQueryFacadeTest {
     private static final Long SESSION_ID = 10L;
 
     private ChatMessageService chatMessageService;
-    private ChatRecommendationFacade chatRecommendationFacade;
+    private ChatCardRebuilder chatCardRebuilder;
     private ChatFridgeShopFacade chatFridgeShopFacade;
     private ChatMessageQueryFacade facade;
 
     @BeforeEach
     void setUp() {
         chatMessageService = mock(ChatMessageService.class);
-        chatRecommendationFacade = mock(ChatRecommendationFacade.class);
+        chatCardRebuilder = mock(ChatCardRebuilder.class);
         chatFridgeShopFacade = mock(ChatFridgeShopFacade.class);
-        facade = new ChatMessageQueryFacade(chatMessageService, chatRecommendationFacade, chatFridgeShopFacade);
+        facade = new ChatMessageQueryFacade(chatMessageService, chatCardRebuilder, chatFridgeShopFacade);
     }
 
     @Test
@@ -51,7 +51,7 @@ class ChatMessageQueryFacadeTest {
         List<SavedRecommendation> saved = List.of(
                 new SavedRecommendation(2L, 30L, 0, "설명"), new SavedRecommendation(4L, 40L, 0, null));
         when(chatMessageService.findRecommendations(List.of(2L, 4L))).thenReturn(saved);
-        when(chatRecommendationFacade.rebuildCards(MEMBER_ID, saved)).thenReturn(Map.of(
+        when(chatCardRebuilder.rebuildCards(MEMBER_ID, saved)).thenReturn(Map.of(
                 2L, List.of(card(30L, "설명")), 4L, List.of(card(40L, null))));
 
         List<ChatMessageResponse> messages = facade.getMessages(MEMBER_ID, SESSION_ID);
@@ -61,7 +61,7 @@ class ChatMessageQueryFacadeTest {
         assertThat(messages.get(1).recommendations().get(0).description()).isEqualTo("설명");
         assertThat(messages.get(3).recommendations()).extracting(RecommendedRecipe::recipeId).containsExactly(40L);
         verify(chatMessageService, times(1)).findRecommendations(any());
-        verify(chatRecommendationFacade, times(1)).rebuildCards(any(), any());
+        verify(chatCardRebuilder, times(1)).rebuildCards(any(), any());
     }
 
     @Test
@@ -71,7 +71,7 @@ class ChatMessageQueryFacadeTest {
         when(chatMessageService.findRecommendations(List.of(2L))).thenReturn(List.of());
 
         assertThat(facade.getMessages(MEMBER_ID, SESSION_ID).get(0).recommendations()).isEmpty();
-        verify(chatRecommendationFacade, never()).rebuildCards(any(), any());
+        verify(chatCardRebuilder, never()).rebuildCards(any(), any());
     }
 
     @Test
@@ -80,10 +80,10 @@ class ChatMessageQueryFacadeTest {
         when(chatMessageService.getMessages(MEMBER_ID, SESSION_ID)).thenReturn(List.of(message(2L, ChatMessageRole.ASSISTANT)));
         List<SavedRecommendation> saved = List.of(new SavedRecommendation(2L, null, 41L, 0, null));
         when(chatMessageService.findRecommendations(List.of(2L))).thenReturn(saved);
-        when(chatRecommendationFacade.rebuildCards(MEMBER_ID, saved)).thenReturn(Map.of());
+        when(chatCardRebuilder.rebuildCards(MEMBER_ID, saved)).thenReturn(Map.of());
         RecommendedMealkit mealkit = new RecommendedMealkit(
                 new ShoppingProduct(41L, "황태해장국", null, 9000, null, null, false, null, null), 2, 543L, "황태해장국", null);
-        when(chatRecommendationFacade.rebuildMealkitCards(MEMBER_ID, saved)).thenReturn(Map.of(2L, List.of(mealkit)));
+        when(chatCardRebuilder.rebuildMealkitCards(MEMBER_ID, saved)).thenReturn(Map.of(2L, List.of(mealkit)));
 
         ChatMessageResponse answer = facade.getMessages(MEMBER_ID, SESSION_ID).get(0);
 
