@@ -9,6 +9,7 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeQuery;
 import org.example.takecareofmyfridgebe.domain.chat.recommend.PickRule;
 import org.example.takecareofmyfridgebe.domain.chat.recommend.RecommendationPicker;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemResponse;
+import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemResponseFixture;
 import org.example.takecareofmyfridgebe.domain.fridge.entity.FridgeItemStatus;
 import org.example.takecareofmyfridgebe.domain.fridge.entity.FridgeSource;
 import org.example.takecareofmyfridgebe.domain.fridge.service.FridgeService;
@@ -956,7 +957,7 @@ class RecipeCandidateFacadeTest {
 
     static FridgeItemResponse fridgeItem(long ingredientId, String name, long dDay) {
         FridgeItemStatus status = FridgeItemStatus.of(dDay);
-        return new FridgeItemResponse(
+        return FridgeItemResponseFixture.withoutProductId(
                 ingredientId * 10, ingredientId, name, "개", name, BigDecimal.ONE, StorageType.REFRIGERATED,
                 LocalDate.now().plusDays(dDay), FridgeSource.MANUAL, null,
                 status == FridgeItemStatus.IMMINENT, status == FridgeItemStatus.EXPIRED, dDay, status,
