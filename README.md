@@ -31,6 +31,11 @@
 
 <br/>
 
+https://github.com/user-attachments/assets/f22f5ec3-625d-4eb9-b735-f444c218af0e
+
+<br/>
+
+
 ## 2. 주요 기능
 
 ### 🔐 1. 가입부터 로그인 유지까지, 안전한 회원 인증!
