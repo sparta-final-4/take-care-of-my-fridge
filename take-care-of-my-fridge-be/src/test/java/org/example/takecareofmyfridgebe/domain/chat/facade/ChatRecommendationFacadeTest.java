@@ -1,5 +1,6 @@
 package org.example.takecareofmyfridgebe.domain.chat.facade;
 
+import org.example.takecareofmyfridgebe.domain.chat.ChatIntentFixture;
 import org.example.takecareofmyfridgebe.domain.chat.recommend.MealkitPicker.FridgeMealkits;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatRecommendationsEventResponse.RecommendedMealkit;
@@ -85,7 +86,7 @@ class ChatRecommendationFacadeTest {
         saleEventReader = mock(SaleEventReader.class);
         chatMessageService = mock(ChatMessageService.class);
         facade = new ChatRecommendationFacade(recipeCandidateFacade, recipeService, ingredientService, productService,
-                saleEventReader, chatMessageService, ChatIntentFacadeTest.WORDS, SafetyWordCheckerTest.ALL);
+                saleEventReader, chatMessageService, ChatIntentFixture.WORDS, SafetyWordCheckerTest.ALL);
         when(ingredientService.getIngredientsByIds(any())).thenReturn(Map.of());
     }
 

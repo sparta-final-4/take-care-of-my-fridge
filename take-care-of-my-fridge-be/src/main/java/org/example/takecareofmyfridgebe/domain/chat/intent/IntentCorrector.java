@@ -183,7 +183,7 @@ public class IntentCorrector {
      * 아니면 비어 있음. 공백을 빼고 비교하고, 뒤에 붙은 "요리·메뉴·종류"는 떼고 본다 ("디저트 메뉴", "국물 요리").
      * "김치찌개"·"국수"·"매운 국"처럼 다른 말이 붙으면 분류가 아니다.
      */
-    public Optional<List<String>> categoriesOf(String phrase, List<String> categories) {
+    Optional<List<String>> categoriesOf(String phrase, List<String> categories) {
         if (phrase == null) {
             return Optional.empty();
         }
@@ -383,7 +383,7 @@ public class IntentCorrector {
      * 원하는 맛으로 바꾸지 않는다. 원하는 말("더", "걸로", "먹고 싶어")이 붙어 있을 때만 바꾼다 (TasteWordChecker.surelyWanted).
      * 모르는 부정어("매운 건 별로야")에서 AI가 맞게 본 피할 맛을 서버가 뒤집지 않게 하기 위해서다.
      */
-    public IntentResult correctTastes(Long memberId, Long sessionId, String message, IntentResult result) {
+    IntentResult correctTastes(Long memberId, Long sessionId, String message, IntentResult result) {
         List<String> wanted = new ArrayList<>(result.wantedTastes() == null ? List.of() : result.wantedTastes());
         List<String> avoid = new ArrayList<>(result.avoidTastes() == null ? List.of() : result.avoidTastes());
         for (TasteWordChecker.TasteStance stance : TasteWordChecker.stances(message, chatWordProperties.taste())) {
@@ -410,7 +410,7 @@ public class IntentCorrector {
     }
 
     // 요리를 달라는 말(ask.recipe: 레시피·만드는법…)을 띄어쓰기와 상관없이 지운 글 ("닭볶음탕 만드는 법" → "닭볶음탕")
-    public String withoutRecipeWords(String text) {
+    String withoutRecipeWords(String text) {
         String result = text;
         for (String word : chatWordProperties.ask().recipe()) {
             String compact = word.replaceAll("\\s+", "");
@@ -517,7 +517,7 @@ public class IntentCorrector {
      * </ul>
      * 바꿨으면 INFO로 남긴다 (채움: AI가 비움, 바꿈: AI와 다름).
      */
-    public IntentResult correctCategories(Long memberId, Long sessionId, String message, List<String> categories, ChatContext context,
+    IntentResult correctCategories(Long memberId, Long sessionId, String message, List<String> categories, ChatContext context,
                                    IntentResult result) {
         List<CategoryWordChecker.CategoryStance> stances = CategoryWordChecker.check(message, categories, chatWordProperties.taste(),
                 chatWordProperties.category().groups());

@@ -10,7 +10,7 @@ import java.util.Set;
  * 평가(ChatIntentEvalManualTest)에서 끌 보정. 이름은 application.yml app.chat.corrections의 설정 이름과 같다.
  * 예) "taste-words,spoken-tastes-only" → 맛 보정 두 개만 끄고 나머지는 켬. 모르는 이름이 있으면 오타로 보고 멈춘다.
  */
-final class EvalCorrectionSwitches {
+public final class EvalCorrectionSwitches {
 
     static final List<String> NAMES = List.of("taste-words", "spoken-tastes-only", "keep-other-tastes", "refine-spoken-tastes",
             "category-words", "dish-check", "name-only", "mealkit-request", "off-topic-revive", "fridge-shop-words");
@@ -37,7 +37,7 @@ final class EvalCorrectionSwitches {
         return names;
     }
 
-    static ChatCorrectionProperties properties(Set<String> off) {
+    public static ChatCorrectionProperties properties(Set<String> off) {
         return new ChatCorrectionProperties(
                 !off.contains("taste-words"),
                 !off.contains("spoken-tastes-only"),
