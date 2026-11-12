@@ -66,6 +66,10 @@ import static org.mockito.Mockito.when;
 class RecipeCandidateFacadeTest {
 
     private static final Long MEMBER_ID = 1L;
+    private static final ChatCandidateProperties CANDIDATE_PROPERTIES = new ChatCandidateProperties(List.of("양념", "음료"), 0.4,
+            List.of("청양고추", "고춧가루", "고추장", "고추기름", "건고추", "베트남고추", "페퍼론치노", "핫소스", "김치", "깍두기"),
+            List.of("백김치", "물김치", "동치미", "나박김치"), List.of("홍고추", "청고추"),
+            List.of("고추", "붉은고추", "고추냉이"));
 
     private MemberService memberService;
     private FridgeService fridgeService;
@@ -91,13 +95,13 @@ class RecipeCandidateFacadeTest {
         when(fridgeService.getItems(any(), any())).thenReturn(List.of());
     }
 
+    // 후보 모으기(Collector)는 같은 목으로 만든 실제 객체를 넣는다
     private RecipeCandidateFacade facadeWith(SearchEngine engine) {
-        return new RecipeCandidateFacade(fridgeService, memberService, recipeService, ingredientService, recipeSearchService,
-                candidateSearchService, new RecipeSearchProperties(engine, null, null),
-                new ChatCandidateProperties(List.of("양념", "음료"), 0.4,
-                List.of("청양고추", "고춧가루", "고추장", "고추기름", "건고추", "베트남고추", "페퍼론치노", "핫소스", "김치", "깍두기"),
-                List.of("백김치", "물김치", "동치미", "나박김치"), List.of("홍고추", "청고추"),
-                List.of("고추", "붉은고추", "고추냉이")));
+        RecipeSearchProperties searchProperties = new RecipeSearchProperties(engine, null, null);
+        RecipeCandidateCollector collector = new RecipeCandidateCollector(recipeService, recipeSearchService,
+                candidateSearchService, searchProperties, CANDIDATE_PROPERTIES);
+        return new RecipeCandidateFacade(fridgeService, memberService, recipeService, ingredientService,
+                candidateSearchService, searchProperties, CANDIDATE_PROPERTIES, collector);
     }
 
     @Test
