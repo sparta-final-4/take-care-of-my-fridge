@@ -1,6 +1,8 @@
 package org.example.takecareofmyfridgebe.domain.review.facade;
 
 import lombok.extern.slf4j.Slf4j;
+import net.javacrumbs.shedlock.core.LockConfiguration;
+import net.javacrumbs.shedlock.core.LockingTaskExecutor;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeSummary;
 import org.example.takecareofmyfridgebe.domain.recipe.service.RecipeService;
 import org.example.takecareofmyfridgebe.domain.review.dto.RecipeReviewContentDto;
@@ -11,6 +13,8 @@ import org.example.takecareofmyfridgebe.domain.review.dto.ReviewSummaryResult;
 import org.example.takecareofmyfridgebe.domain.review.service.RecipeReviewService;
 import org.example.takecareofmyfridgebe.global.config.ai.LlmCost;
 import org.example.takecareofmyfridgebe.global.config.ai.LlmCostCalculator;
+import org.example.takecareofmyfridgebe.global.error.BusinessException;
+import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
@@ -55,10 +59,26 @@ public class ReviewSummaryFacade {
     private static final String REASON_ABORTED_BY_RATE_LIMIT = "429로 중단";
     private static final String REASON_TIME_BUDGET = "시간 초과로 다음 실행";
 
+    // 관리자 수동 실행 잠금. 새벽 스케줄러(ReviewSummaryScheduler)와 같은 이름이라 둘이 겹쳐 돌지 않는다
+    private static final String LOCK_NAME = "reviewSummary";
+    private static final Duration LOCK_AT_MOST_FOR = Duration.ofMinutes(30);
+    /**
+     * 관리자 수동 실행은 작업이 끝나면 바로 다시 실행할 수 있도록 lockAtLeastFor를 0으로 설정한다.
+     * (정기 스케줄러는 중복 실행 방지를 위해 5분 유지)
+     */
+    private static final Duration LOCK_AT_LEAST_FOR = Duration.ZERO;
+    /**
+     * 관리자 실행의 시간 예산(20초). 예산은 레시피를 새로 시작하기 전에만 확인하므로, 마지막 AI 호출(보통 수 초)까지
+     * CloudFront 기본 응답 대기 시간(30초) 안에 끝나도록 여유를 두고,
+     * 남은 레시피는 결과에 SKIPPED(시간 초과로 다음 실행)로 돌려준다. 다시 실행하면 이어서 요약한다.
+     */
+    private static final Duration ADMIN_TIME_BUDGET = Duration.ofSeconds(20);
+
     private final RecipeReviewService recipeReviewService;
     private final RecipeService recipeService;
     private final ChatClient chatClient;
     private final LlmCostCalculator costCalculator;
+    private final LockingTaskExecutor lockingTaskExecutor;
     private final Clock clock;
 
     @Autowired
@@ -66,9 +86,10 @@ public class ReviewSummaryFacade {
             RecipeReviewService recipeReviewService,
             RecipeService recipeService,
             @Qualifier("reviewSummaryChatClient") ChatClient chatClient,
-            LlmCostCalculator costCalculator
+            LlmCostCalculator costCalculator,
+            LockingTaskExecutor lockingTaskExecutor
     ) {
-        this(recipeReviewService, recipeService, chatClient, costCalculator, Clock.systemDefaultZone());
+        this(recipeReviewService, recipeService, chatClient, costCalculator, lockingTaskExecutor, Clock.systemDefaultZone());
     }
 
     public ReviewSummaryFacade(
@@ -76,13 +97,52 @@ public class ReviewSummaryFacade {
             RecipeService recipeService,
             @Qualifier("reviewSummaryChatClient") ChatClient chatClient,
             LlmCostCalculator costCalculator,
+            LockingTaskExecutor lockingTaskExecutor,
             Clock clock
     ) {
         this.recipeReviewService = recipeReviewService;
         this.recipeService = recipeService;
         this.chatClient = chatClient;
         this.costCalculator = costCalculator;
+        this.lockingTaskExecutor = lockingTaskExecutor;
         this.clock = clock;
+    }
+
+    /**
+     * 관리자 수동 실행. 새벽 스케줄러와 동일한 분산 락(reviewSummary)으로 중복 실행을 막고, 시간 예산 20초로 runOnce를 실행한다.
+     * 이미 작업이 진행 중이면 409 Conflict(REVIEW_SUMMARY_RUNNING)를,
+     * 잠금·실행 중 예외가 나면 로그를 남기고 500(INTERNAL_SERVER_ERROR)을 던진다. Error는 잡지 않고 그대로 던진다.
+     */
+    public ReviewSummaryResult runWithLock() {
+        LockConfiguration lockConfiguration = new LockConfiguration(
+                Instant.now(),
+                LOCK_NAME,
+                LOCK_AT_MOST_FOR,
+                LOCK_AT_LEAST_FOR
+        );
+
+        try {
+            LockingTaskExecutor.TaskResult<ReviewSummaryResult> taskResult = lockingTaskExecutor.executeWithLock(
+                    (LockingTaskExecutor.TaskWithResult<ReviewSummaryResult>) () -> runOnce(ADMIN_TIME_BUDGET),
+                    lockConfiguration
+            );
+
+            if (!taskResult.wasExecuted()) {
+                throw new BusinessException(ErrorCode.REVIEW_SUMMARY_RUNNING);
+            }
+
+            return taskResult.getResult();
+        } catch (BusinessException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("관리자 후기 요약 작업 실행 중 예외 발생", e);
+            throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR);
+        } catch (Throwable t) {
+            if (t instanceof Error error) {
+                throw error;
+            }
+            throw new RuntimeException(t);
+        }
     }
 
     /**

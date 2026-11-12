@@ -5,12 +5,16 @@ import net.javacrumbs.shedlock.core.LockingTaskExecutor;
 import org.example.takecareofmyfridgebe.domain.auth.service.AuthSessionService;
 import org.example.takecareofmyfridgebe.domain.auth.service.JwtTokenService;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
+import org.example.takecareofmyfridgebe.domain.recipe.service.RecipeService;
 import org.example.takecareofmyfridgebe.domain.review.dto.ReviewSummaryResult;
 import org.example.takecareofmyfridgebe.domain.review.facade.ReviewSummaryFacade;
+import org.example.takecareofmyfridgebe.domain.review.service.RecipeReviewService;
+import org.example.takecareofmyfridgebe.global.config.ai.LlmCostCalculator;
 import org.example.takecareofmyfridgebe.global.config.security.SecurityConfig;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -29,6 +33,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
@@ -221,9 +226,11 @@ class ReviewSummaryAdminControllerTest {
             return mock(LockingTaskExecutor.class);
         }
 
+        // 잠금·예외 처리(runWithLock)는 실제로 돌리고, 의존은 목이다. 잠금 목이 작업을 실행하지 않아 runOnce는 불리지 않는다
         @Bean
-        ReviewSummaryFacade reviewSummaryFacade() {
-            return mock(ReviewSummaryFacade.class);
+        ReviewSummaryFacade reviewSummaryFacade(LockingTaskExecutor lockingTaskExecutor) {
+            return spy(new ReviewSummaryFacade(mock(RecipeReviewService.class), mock(RecipeService.class),
+                    mock(ChatClient.class), new LlmCostCalculator(0.15, 0.60), lockingTaskExecutor));
         }
     }
 }

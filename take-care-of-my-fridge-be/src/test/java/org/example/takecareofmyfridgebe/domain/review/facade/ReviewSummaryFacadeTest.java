@@ -1,5 +1,6 @@
 package org.example.takecareofmyfridgebe.domain.review.facade;
 
+import net.javacrumbs.shedlock.core.LockingTaskExecutor;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeSummary;
 import org.example.takecareofmyfridgebe.domain.recipe.service.RecipeService;
 import org.example.takecareofmyfridgebe.domain.review.dto.RecipeReviewContentDto;
@@ -64,6 +65,10 @@ class ReviewSummaryFacadeTest {
     @Mock
     private ChatClient chatClient;
 
+    // 관리자 수동 실행(runWithLock)용. 여기서는 runOnce만 시험한다
+    @Mock
+    private LockingTaskExecutor lockingTaskExecutor;
+
     private ChatClient.ChatClientRequestSpec requestSpec;
     private ChatClient.CallResponseSpec responseSpec;
 
@@ -78,7 +83,8 @@ class ReviewSummaryFacadeTest {
                 recipeReviewService,
                 recipeService,
                 chatClient,
-                costCalculator
+                costCalculator,
+                lockingTaskExecutor
         );
     }
 
@@ -253,6 +259,7 @@ class ReviewSummaryFacadeTest {
                 recipeService,
                 chatClient,
                 costCalculator,
+                lockingTaskExecutor,
                 mockClock
         );
 
@@ -542,6 +549,7 @@ class ReviewSummaryFacadeTest {
                 recipeService,
                 chatClient,
                 costCalculator,
+                lockingTaskExecutor,
                 mockClock
         );
 
