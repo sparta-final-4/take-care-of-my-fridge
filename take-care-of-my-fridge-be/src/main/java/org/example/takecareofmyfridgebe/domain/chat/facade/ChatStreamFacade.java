@@ -1,4 +1,4 @@
-package org.example.takecareofmyfridgebe.domain.chat.service;
+package org.example.takecareofmyfridgebe.domain.chat.facade;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,19 +22,19 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeQuery;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecommendationReply;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecommendationToSave;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatSafetyBlock;
-import org.example.takecareofmyfridgebe.domain.chat.facade.ChatContextFacade;
-import org.example.takecareofmyfridgebe.domain.chat.facade.ChatFridgeShopFacade;
-import org.example.takecareofmyfridgebe.domain.chat.facade.ChatIntentFacade;
-import org.example.takecareofmyfridgebe.domain.chat.facade.ChatRecommendationFacade;
 import org.example.takecareofmyfridgebe.domain.chat.reply.LinkFilter;
 import org.example.takecareofmyfridgebe.domain.chat.reply.OmissionNoteFilter;
 import org.example.takecareofmyfridgebe.domain.chat.reply.RecommendationTextSplitter;
 import org.example.takecareofmyfridgebe.domain.chat.safety.HealthWordChecker;
 import org.example.takecareofmyfridgebe.domain.chat.safety.SafetyWordChecker;
+import org.example.takecareofmyfridgebe.domain.chat.service.ChatContextStore;
+import org.example.takecareofmyfridgebe.domain.chat.service.ChatDailyLimitService;
+import org.example.takecareofmyfridgebe.domain.chat.service.ChatMessageService;
+import org.example.takecareofmyfridgebe.domain.chat.service.ChatStreamLockService;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
 import org.example.takecareofmyfridgebe.global.error.ErrorCode;
 import org.springframework.http.codec.ServerSentEvent;
-import org.springframework.stereotype.Service;
+import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
@@ -47,9 +47,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 @Slf4j
-@Service
+@Component
 @RequiredArgsConstructor
-public class ChatStreamService {
+public class ChatStreamFacade {
 
     // 추천 후보가 하나도 없을 때 답 (AI를 부르지 않는다)
     static final String NO_RECIPE_REPLY = "조건에 맞는 레시피를 찾지 못했어요. 시간을 늘리거나, 선택 재료를 줄이거나, 다른 요리 종류로 다시 물어봐 주세요.";

@@ -64,7 +64,7 @@ class ChatDailyLimitServiceTest extends RedisContainerSupport {
                 .extracting(e -> ((BusinessException) e).getErrorCode())
                 .isEqualTo(ErrorCode.CHAT_DAILY_LIMIT_EXCEEDED);
 
-        // 한도 초과로 거절돼도 카운트는 31로 유지 (돌려주기는 답 생성이 첫 조각 전에 실패했을 때만 ChatStreamService가 한다)
+        // 한도 초과로 거절돼도 카운트는 31로 유지 (돌려주기는 답 생성이 첫 조각 전에 실패했을 때만 ChatStreamFacade가 한다)
         String today = ZonedDateTime.now(SEOUL_ZONE).format(DATE_FORMATTER);
         String key = "chat:limit:" + memberId + ":" + today;
         String countStr = stringRedisTemplate.opsForValue().get(key);

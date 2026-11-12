@@ -6,7 +6,7 @@ import org.example.takecareofmyfridgebe.domain.auth.service.AuthSessionService.A
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageCreateRequest;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageResponse;
 import org.example.takecareofmyfridgebe.domain.chat.facade.ChatMessageQueryFacade;
-import org.example.takecareofmyfridgebe.domain.chat.service.ChatStreamService;
+import org.example.takecareofmyfridgebe.domain.chat.facade.ChatStreamFacade;
 import org.example.takecareofmyfridgebe.global.response.ApiResponse;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -28,7 +28,7 @@ import java.util.List;
 @RequestMapping("/api/chat-sessions/{sessionId}/messages")
 public class ChatMessageController {
 
-    private final ChatStreamService chatStreamService;
+    private final ChatStreamFacade chatStreamFacade;
     private final ChatMessageQueryFacade chatMessageQueryFacade;
 
     /**
@@ -40,7 +40,7 @@ public class ChatMessageController {
             @AuthenticationPrincipal AuthPrincipal principal,
             @PathVariable Long sessionId,
             @Valid @RequestBody ChatMessageCreateRequest request) {
-        Flux<ServerSentEvent<String>> stream = chatStreamService.streamMessage(principal.memberId(), sessionId, request);
+        Flux<ServerSentEvent<String>> stream = chatStreamFacade.streamMessage(principal.memberId(), sessionId, request);
 
         return ResponseEntity.ok()
                 .contentType(new MediaType("text", "event-stream", StandardCharsets.UTF_8))
