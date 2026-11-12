@@ -31,6 +31,11 @@
 
 <br/>
 
+<video src="docs/images/demo.mp4" width="100%" controls muted></video>
+
+<br/>
+
+
 ## 2. 주요 기능
 
 ### 🔐 1. 가입부터 로그인 유지까지, 안전한 회원 인증!
