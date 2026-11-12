@@ -39,17 +39,6 @@ public final class RecommendationPicker {
     private RecommendationPicker() {
     }
 
-    public static List<RecipeCandidate> pick(List<RecipeCandidate> ranked) {
-        return pick(ranked, List.of());
-    }
-
-    /**
-     * @param keywords AI가 뽑은 키워드 (순서대로 고른다)
-     */
-    public static List<RecipeCandidate> pick(List<RecipeCandidate> ranked, List<String> keywords) {
-        return pick(ranked, keywords, PickRule.NONE);
-    }
-
     /**
      * @param keywords AI가 뽑은 키워드 (순서대로 고른다)
      * @param rule     말한 조건으로 고르는 기준. 조건이 없으면(PickRule.NONE) 정렬 순서대로 채운다

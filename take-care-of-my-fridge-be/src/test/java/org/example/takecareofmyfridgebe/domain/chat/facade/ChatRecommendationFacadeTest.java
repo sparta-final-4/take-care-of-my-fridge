@@ -50,6 +50,7 @@ import tools.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -104,7 +105,7 @@ class ChatRecommendationFacadeTest {
         when(recipeService.findSummaries(List.of(10L, 20L, 30L))).thenReturn(Map.of(
                 10L, new RecipeSummary(10L, "두부찌개", "https://img/10.jpg", null)));
 
-        RecommendationReply reply = facade.recommend("두부로 매운 거", RecipeQuery.of(MEMBER_ID, List.of()));
+        RecommendationReply reply = recommend("두부로 매운 거", RecipeQuery.of(MEMBER_ID, List.of()));
 
         ChatRecommendationsEventResponse event = reply.event();
         assertThat(event.empty()).isFalse();
@@ -137,7 +138,7 @@ class ChatRecommendationFacadeTest {
                 candidate(40L, "청국장찌개", "찌개", 30, reason(List.of()))), false, false, Map.of(10L, List.of(Taste.SPICY))));
         when(recipeService.findSummaries(any())).thenReturn(Map.of());
 
-        RecommendationReply reply = facade.recommend("매운 거 말고 김치찌개 줘", new RecipeQuery(MEMBER_ID, List.of(), null, null,
+        RecommendationReply reply = recommend("매운 거 말고 김치찌개 줘", new RecipeQuery(MEMBER_ID, List.of(), null, null,
                 null, null, false, List.of("김치찌개"), "김치찌개").withAvoidTastes(List.of(Taste.SPICY)));
 
         List<RecommendedRecipe> recipes = reply.event().recipes();
@@ -156,7 +157,7 @@ class ChatRecommendationFacadeTest {
                 requested(30L, "오이무침", "무침", 0)), false));
         when(recipeService.findSummaries(any())).thenReturn(Map.of());
 
-        RecommendationReply reply = facade.recommend("맵고 따뜻한 국물 레시피 추천해줘", new RecipeQuery(MEMBER_ID, List.of(),
+        RecommendationReply reply = recommend("맵고 따뜻한 국물 레시피 추천해줘", new RecipeQuery(MEMBER_ID, List.of(),
                 List.of(Taste.SPICY), List.of("국"), null, null, false, List.of(), null, "따뜻한 국물"));
 
         assertThat(reply.event().recipes()).extracting(RecommendedRecipe::recipeId).containsExactly(10L, 20L);
@@ -173,7 +174,7 @@ class ChatRecommendationFacadeTest {
                 requested(40L, "가지구이", "구이", 0)), false));
         when(recipeService.findSummaries(any())).thenReturn(Map.of());
 
-        RecommendationReply reply = facade.recommend("시원한 국물 요리", new RecipeQuery(MEMBER_ID, List.of(),
+        RecommendationReply reply = recommend("시원한 국물 요리", new RecipeQuery(MEMBER_ID, List.of(),
                 null, List.of("국"), null, null, false, List.of(), null, "시원한 국물"));
 
         assertThat(reply.event().recipes()).extracting(RecommendedRecipe::recipeId).containsExactly(10L, 20L, 30L);
@@ -191,7 +192,7 @@ class ChatRecommendationFacadeTest {
                 requested(40L, "냉이된장국", "국", 1)), false));
         when(recipeService.findSummaries(any())).thenReturn(Map.of());
 
-        RecommendationReply reply = facade.recommend("맵고 따뜻한 국물 레시피 추천해줘", new RecipeQuery(MEMBER_ID, List.of(),
+        RecommendationReply reply = recommend("맵고 따뜻한 국물 레시피 추천해줘", new RecipeQuery(MEMBER_ID, List.of(),
                 List.of(Taste.SPICY), List.of("국"), null, null, false, List.of(), null, "따뜻한 국물"));
 
         assertThat(reply.event().recipes()).extracting(RecommendedRecipe::recipeId).containsExactly(10L, 20L, 40L);
@@ -203,7 +204,7 @@ class ChatRecommendationFacadeTest {
         when(recipeCandidateFacade.findCandidates(any())).thenReturn(new RecipeCandidates(List.of(), true));
         when(recipeService.findSummaries(List.of())).thenReturn(Map.of());
 
-        RecommendationReply reply = facade.recommend("뭐 먹지?", RecipeQuery.of(MEMBER_ID, List.of()));
+        RecommendationReply reply = recommend("뭐 먹지?", RecipeQuery.of(MEMBER_ID, List.of()));
 
         assertThat(reply.event().recipes()).isEmpty();
         assertThat(reply.event().empty()).isTrue();
@@ -259,7 +260,7 @@ class ChatRecommendationFacadeTest {
         when(recipeService.findSummaries(any())).thenReturn(Map.of());
         givenProducts(product(16L, 3L, "대파 1단", 3000, null), product(22L, 21L, "부침용 두부 1모", 2000, 1500));
 
-        RecommendationReply reply = facade.recommend("뭐 먹지?", RecipeQuery.of(MEMBER_ID, List.of()));
+        RecommendationReply reply = recommend("뭐 먹지?", RecipeQuery.of(MEMBER_ID, List.of()));
 
         List<RecommendedRecipe> cards = reply.event().recipes();
         ShoppingProduct tofu = cards.get(0).missingIngredients().get(0).product();
@@ -281,7 +282,7 @@ class ChatRecommendationFacadeTest {
                 candidate(10L, "계란찜", "찜", 20, missing())), false));
         when(recipeService.findSummaries(any())).thenReturn(Map.of());
 
-        facade.recommend("뭐 먹지?", RecipeQuery.of(MEMBER_ID, List.of()));
+        recommend("뭐 먹지?", RecipeQuery.of(MEMBER_ID, List.of()));
 
         verify(productService, never()).getPublicIngredientProducts(any());
         verify(saleEventReader, never()).findSellingPrices(any());
@@ -335,7 +336,7 @@ class ChatRecommendationFacadeTest {
                 candidate(60L, "제육볶음", "볶음", 20, reason(List.of()))), false));
         when(recipeService.findSummaries(any())).thenReturn(Map.of());
 
-        RecommendationReply reply = facade.recommend("다른 거 없어?", RecipeQuery.of(MEMBER_ID, List.of()), List.of(10L, 20L, 30L));
+        RecommendationReply reply = recommend("다른 거 없어?", RecipeQuery.of(MEMBER_ID, List.of()), List.of(10L, 20L, 30L));
 
         assertThat(reply.event().recipes()).extracting(RecommendedRecipe::recipeId).containsExactly(40L, 50L, 60L);
     }
@@ -395,7 +396,7 @@ class ChatRecommendationFacadeTest {
         RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, null, null, null, false,
                 List.of("탕짜면", "탕수육", "볶음면"), "탕짜면");
 
-        RecommendationReply reply = facade.recommend("탕짜면 먹고 싶어", query);
+        RecommendationReply reply = recommend("탕짜면 먹고 싶어", query);
 
         assertThat(reply.notices()).containsExactly("탕짜면 레시피는 없어서, 비슷한 탕수육과 볶음면을 골랐어요");
         assertThat(reply.event().recipes().get(0).reason()).isEqualTo("탕짜면과 비슷한 탕수육이에요");
@@ -409,7 +410,7 @@ class ChatRecommendationFacadeTest {
         RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, null, null, null, false,
                 List.of("탕짜면", "탕수육", "볶음면"), null);
 
-        RecommendationReply reply = facade.recommend("탕짜면 먹고 싶어", query);
+        RecommendationReply reply = recommend("탕짜면 먹고 싶어", query);
 
         assertThat(reply.notices()).isEmpty();
         assertThat(reply.event().recipes().get(0).reason()).isEqualTo("탕수육 요리예요");
@@ -424,7 +425,7 @@ class ChatRecommendationFacadeTest {
         RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, null, null, null, false,
                 List.of("시원한 국물", "냉국"), null, "시원한 국물");
 
-        RecommendationReply reply = facade.recommend("시원한 국물 요리", query);
+        RecommendationReply reply = recommend("시원한 국물 요리", query);
 
         assertThat(reply.notices()).isEmpty();
         assertThat(reply.candidateInfo()).contains("사용자가 원한 특징: 시원한 국물")
@@ -442,7 +443,7 @@ class ChatRecommendationFacadeTest {
         RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, null, null, null, false,
                 List.of("닭볶음탕"), "닭볶음탕", "매운 닭볶음탕");
 
-        RecommendationReply reply = facade.recommend("매운 닭볶음탕 레시피", query);
+        RecommendationReply reply = recommend("매운 닭볶음탕 레시피", query);
 
         assertThat(reply.notices()).containsExactly("말씀하신 닭볶음탕은 찾지 못해서 비슷한 걸 골랐어요");
     }
@@ -453,7 +454,7 @@ class ChatRecommendationFacadeTest {
         givenKeywordCandidates(keywordCandidate(10L, "탕수육", "튀김", "탕수육"));
         RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, null, null, null, false, List.of("탕수육"), null);
 
-        RecommendationReply reply = facade.recommend("탕수육 먹고 싶어", query);
+        RecommendationReply reply = recommend("탕수육 먹고 싶어", query);
 
         assertThat(reply.notices()).isEmpty();
         assertThat(reply.event().recipes().get(0).reason()).isEqualTo("탕수육 요리예요");
@@ -760,5 +761,13 @@ class ChatRecommendationFacadeTest {
     // 요청 일치 수만 정한 후보
     private static RecipeCandidate requested(Long id, String name, String category, int requestMatches) {
         return new RecipeCandidate(id, name, category, 20, new Ranking(requestMatches, 0, 0, 0, 1, 1, 0), reason(List.of()));
+    }
+
+    private RecommendationReply recommend(String content, RecipeQuery query) {
+        return recommend(content, query, List.of());
+    }
+
+    private RecommendationReply recommend(String content, RecipeQuery query, Collection<Long> previousCardIds) {
+        return facade.recommend(content, query, previousCardIds, null);
     }
 }
