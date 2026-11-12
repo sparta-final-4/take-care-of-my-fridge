@@ -7,7 +7,7 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageMode;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageResponse;
 import org.example.takecareofmyfridgebe.domain.chat.entity.ChatMessageRole;
 import org.example.takecareofmyfridgebe.domain.chat.facade.ChatMessageQueryFacade;
-import org.example.takecareofmyfridgebe.domain.chat.service.ChatStreamService;
+import org.example.takecareofmyfridgebe.domain.chat.facade.ChatStreamFacade;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 import org.example.takecareofmyfridgebe.global.config.security.SecurityConfig;
 import org.example.takecareofmyfridgebe.global.error.BusinessException;
@@ -60,14 +60,14 @@ class ChatMessageControllerTest {
     private MockMvc mvc;
 
     @Autowired
-    private ChatStreamService chatStreamService;
+    private ChatStreamFacade chatStreamFacade;
 
     @Autowired
     private ChatMessageQueryFacade chatMessageQueryFacade;
 
     @BeforeEach
     void setUp() {
-        reset(chatStreamService, chatMessageQueryFacade);
+        reset(chatStreamFacade, chatMessageQueryFacade);
     }
 
     @Test
@@ -82,7 +82,7 @@ class ChatMessageControllerTest {
     }
 
     @Test
-    @DisplayName("정상: 컨트롤러가 ChatStreamService를 호출하고 X-Accel-Buffering: no 헤더와 함께 SSE 스트림을 반환한다")
+    @DisplayName("정상: 컨트롤러가 ChatStreamFacade를 호출하고 X-Accel-Buffering: no 헤더와 함께 SSE 스트림을 반환한다")
     void streamsSseWithNoBufferingHeader() throws Exception {
         Long memberId = 1L;
         Long sessionId = 10L;
@@ -93,7 +93,7 @@ class ChatMessageControllerTest {
                 ServerSentEvent.<String>builder().event("done").data("{\"userMessageId\":100,\"assistantMessageId\":101}").build()
         );
 
-        when(chatStreamService.streamMessage(eq(memberId), eq(sessionId), eq(ChatMessageCreateRequest.of(userContent))))
+        when(chatStreamFacade.streamMessage(eq(memberId), eq(sessionId), eq(ChatMessageCreateRequest.of(userContent))))
                 .thenReturn(mockStream);
 
         MvcResult mvcResult = mvc.perform(post("/api/chat-sessions/{sessionId}/messages", sessionId)
@@ -112,7 +112,7 @@ class ChatMessageControllerTest {
         assertThat(responseContent).contains("event:message\ndata:{\"text\":\"된장\"}");
         assertThat(responseContent).contains("event:done\ndata:{\"userMessageId\":100,\"assistantMessageId\":101}");
 
-        verify(chatStreamService).streamMessage(memberId, sessionId, ChatMessageCreateRequest.of(userContent));
+        verify(chatStreamFacade).streamMessage(memberId, sessionId, ChatMessageCreateRequest.of(userContent));
     }
 
     @Test
@@ -122,7 +122,7 @@ class ChatMessageControllerTest {
         Long sessionId = 10L;
         ChatMessageCreateRequest expected = new ChatMessageCreateRequest(
                 "이 재료로 추천해줘", ChatMessageMode.RECOMMEND, List.of(3L, 5L), true);
-        when(chatStreamService.streamMessage(eq(memberId), eq(sessionId), eq(expected)))
+        when(chatStreamFacade.streamMessage(eq(memberId), eq(sessionId), eq(expected)))
                 .thenReturn(Flux.empty());
 
         mvc.perform(post("/api/chat-sessions/{sessionId}/messages", sessionId)
@@ -133,7 +133,7 @@ class ChatMessageControllerTest {
                                 + " \"selectedIngredientIds\": [3, 5, 3, null], \"useSelectedOnly\": true}"))
                 .andExpect(request().asyncStarted());
 
-        verify(chatStreamService).streamMessage(memberId, sessionId, expected);
+        verify(chatStreamFacade).streamMessage(memberId, sessionId, expected);
     }
 
     @Test
@@ -143,7 +143,7 @@ class ChatMessageControllerTest {
         Long sessionId = 10L;
         ChatMessageCreateRequest expected = new ChatMessageCreateRequest(
                 "뭐 먹지?", ChatMessageMode.AUTO, List.of(), false);
-        when(chatStreamService.streamMessage(eq(memberId), eq(sessionId), eq(expected)))
+        when(chatStreamFacade.streamMessage(eq(memberId), eq(sessionId), eq(expected)))
                 .thenReturn(Flux.empty());
 
         mvc.perform(post("/api/chat-sessions/{sessionId}/messages", sessionId)
@@ -153,7 +153,7 @@ class ChatMessageControllerTest {
                         .content("{\"content\": \"뭐 먹지?\"}"))
                 .andExpect(request().asyncStarted());
 
-        verify(chatStreamService).streamMessage(memberId, sessionId, expected);
+        verify(chatStreamFacade).streamMessage(memberId, sessionId, expected);
     }
 
     @Test
@@ -169,7 +169,7 @@ class ChatMessageControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false));
 
-        verify(chatStreamService, never()).streamMessage(any(), any(), any());
+        verify(chatStreamFacade, never()).streamMessage(any(), any(), any());
     }
 
     @Test
@@ -194,7 +194,7 @@ class ChatMessageControllerTest {
         Long sessionId = 10L;
         String content500 = "a".repeat(500);
 
-        when(chatStreamService.streamMessage(eq(memberId), eq(sessionId), eq(ChatMessageCreateRequest.of(content500))))
+        when(chatStreamFacade.streamMessage(eq(memberId), eq(sessionId), eq(ChatMessageCreateRequest.of(content500))))
                 .thenReturn(Flux.empty());
 
         mvc.perform(post("/api/chat-sessions/{sessionId}/messages", sessionId)
@@ -227,7 +227,7 @@ class ChatMessageControllerTest {
         Long memberId = 1L;
         Long sessionId = 10L;
 
-        when(chatStreamService.streamMessage(eq(memberId), eq(sessionId), eq(ChatMessageCreateRequest.of("안녕하세요"))))
+        when(chatStreamFacade.streamMessage(eq(memberId), eq(sessionId), eq(ChatMessageCreateRequest.of("안녕하세요"))))
                 .thenThrow(new BusinessException(ErrorCode.CHAT_SESSION_EXPIRED));
 
         mvc.perform(post("/api/chat-sessions/{sessionId}/messages", sessionId)
@@ -246,7 +246,7 @@ class ChatMessageControllerTest {
         Long memberId = 1L;
         Long sessionId = 10L;
 
-        when(chatStreamService.streamMessage(eq(memberId), eq(sessionId), eq(ChatMessageCreateRequest.of("안녕하세요"))))
+        when(chatStreamFacade.streamMessage(eq(memberId), eq(sessionId), eq(ChatMessageCreateRequest.of("안녕하세요"))))
                 .thenThrow(new BusinessException(ErrorCode.CHAT_DAILY_LIMIT_EXCEEDED));
 
         mvc.perform(post("/api/chat-sessions/{sessionId}/messages", sessionId)
@@ -265,7 +265,7 @@ class ChatMessageControllerTest {
         Long memberId = 1L;
         Long sessionId = 10L;
 
-        when(chatStreamService.streamMessage(eq(memberId), eq(sessionId), eq(ChatMessageCreateRequest.of("안녕하세요"))))
+        when(chatStreamFacade.streamMessage(eq(memberId), eq(sessionId), eq(ChatMessageCreateRequest.of("안녕하세요"))))
                 .thenThrow(new BusinessException(ErrorCode.CHAT_SERVICE_UNAVAILABLE));
 
         mvc.perform(post("/api/chat-sessions/{sessionId}/messages", sessionId)
@@ -284,7 +284,7 @@ class ChatMessageControllerTest {
         Long memberId = 1L;
         Long sessionId = 999L;
 
-        when(chatStreamService.streamMessage(eq(memberId), eq(sessionId), eq(ChatMessageCreateRequest.of("안녕하세요"))))
+        when(chatStreamFacade.streamMessage(eq(memberId), eq(sessionId), eq(ChatMessageCreateRequest.of("안녕하세요"))))
                 .thenThrow(new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND));
 
         mvc.perform(post("/api/chat-sessions/{sessionId}/messages", sessionId)
@@ -303,7 +303,7 @@ class ChatMessageControllerTest {
         Long memberId = 1L;
         Long sessionId = 10L;
 
-        when(chatStreamService.streamMessage(eq(memberId), eq(sessionId), eq(ChatMessageCreateRequest.of("안녕하세요"))))
+        when(chatStreamFacade.streamMessage(eq(memberId), eq(sessionId), eq(ChatMessageCreateRequest.of("안녕하세요"))))
                 .thenThrow(new BusinessException(ErrorCode.CHAT_ROOM_ALREADY_COMPLETED));
 
         mvc.perform(post("/api/chat-sessions/{sessionId}/messages", sessionId)
@@ -373,8 +373,8 @@ class ChatMessageControllerTest {
         }
 
         @Bean
-        ChatStreamService chatStreamService() {
-            return mock(ChatStreamService.class);
+        ChatStreamFacade chatStreamFacade() {
+            return mock(ChatStreamFacade.class);
         }
 
         @Bean
