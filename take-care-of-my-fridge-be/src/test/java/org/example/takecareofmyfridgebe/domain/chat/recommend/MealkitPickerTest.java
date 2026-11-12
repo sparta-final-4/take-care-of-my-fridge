@@ -7,6 +7,7 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeQuery;
 import org.example.takecareofmyfridgebe.domain.chat.recommend.MealkitPicker.FridgeMealkits;
 import org.example.takecareofmyfridgebe.domain.chat.recommend.MealkitPicker.Input;
 import org.example.takecareofmyfridgebe.domain.chat.recommend.MealkitPicker.Picked;
+import org.example.takecareofmyfridgebe.domain.chat.text.ChatTexts;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.StorageType;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member.Taste;
 import org.example.takecareofmyfridgebe.domain.product.entity.MealkitProduct;
@@ -227,7 +228,7 @@ class MealkitPickerTest {
     private Input input(RecipeQuery query, Set<Long> cardRecipeIds, Set<String> fridgeNames, Set<Long> shown) {
         // 냉장고 밀키트 이름은 product_id가 없는 예전 줄로 본다 (남은 일수 5)
         Map<String, Long> byName = new HashMap<>();
-        fridgeNames.forEach(name -> byName.put(MealkitPicker.compact(name), 5L));
+        fridgeNames.forEach(name -> byName.put(ChatTexts.removeWhitespace(name), 5L));
         return new Input(mealkits, prices, recipes, tastes, maybeSpicy, query, cardRecipeIds,
                 new FridgeMealkits(Map.of(), byName), shown);
     }
@@ -274,5 +275,16 @@ class MealkitPickerTest {
     private static ActiveSale sale(long productId, int salePrice) {
         return new ActiveSale(productId, 900L + productId, SaleEventType.SPECIAL, salePrice, 10,
                 LocalDateTime.now().plusDays(1), null, null);
+    }
+
+    @Test
+    @DisplayName("상품 이름에 줄바꿈이 있어도 공백처럼 빼고 냉장고 등록 이름과 비교한다")
+    void matchesFridgeMealkitByName_whenProductNameHasNewline() {
+        FridgeMealkits fridge = new FridgeMealkits(Map.of(), Map.of("된장국밀키트", 1L));
+        Product product = Product.builder().productType(ProductType.MEALKIT).name("된장국\n밀키트").price(9000).stock(1)
+                .storage(StorageType.REFRIGERATED).shelfDays(3).status(ProductStatus.ON_SALE).build();
+        ReflectionTestUtils.setField(product, "id", 24L);
+
+        assertThat(fridge.dDayOf(product)).isEqualTo(1L);
     }
 }

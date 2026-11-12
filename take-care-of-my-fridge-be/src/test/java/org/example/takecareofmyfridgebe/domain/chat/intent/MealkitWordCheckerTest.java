@@ -50,4 +50,10 @@ public class MealkitWordCheckerTest {
         }
         assertThat(check(null)).isEqualTo(Mode.NONE);
     }
+
+    @Test
+    @DisplayName("번거로워하는 말이 줄바꿈으로 나뉘어 있어도 찾아서 레시피 카드와 밀키트 한 장을 보여 준다 (요리하기\\n싫어)")
+    void returnsWithRecipes_whenEasyWordSplitByNewline() {
+        assertThat(check("요리하기\n싫어")).isEqualTo(Mode.WITH_RECIPES);
+    }
 }

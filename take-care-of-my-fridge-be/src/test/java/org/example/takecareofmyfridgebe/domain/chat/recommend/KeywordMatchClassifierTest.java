@@ -72,4 +72,11 @@ class KeywordMatchClassifierTest {
     private static KeywordMatch classify(String recipeName, List<String> ingredients, boolean vectorOnly) {
         return KeywordMatchClassifier.classify("냉면", KEYWORDS, vectorOnly, recipeName, ingredients);
     }
+
+    @Test
+    @DisplayName("사용자가 말한 이름에 줄바꿈이 있어도 공백처럼 빼고 레시피 이름과 비교한다")
+    void classifiesName_whenDishTextHasNewline() {
+        assertThat(KeywordMatchClassifier.classify("함흥\n냉면", List.of(), false, "함흥냉면", List.of()).type())
+                .isEqualTo(Type.NAME);
+    }
 }

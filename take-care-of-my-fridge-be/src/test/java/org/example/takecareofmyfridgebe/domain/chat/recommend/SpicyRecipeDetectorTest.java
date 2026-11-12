@@ -88,4 +88,10 @@ class SpicyRecipeDetectorTest {
                 1L, List.of("고추장"), 2L, List.of("청양고추"), 3L, List.of("고추")), HOT, EXCLUSIONS))
                 .containsExactlyInAnyOrder(1L, 2L);
     }
+
+    @Test
+    @DisplayName("재료 이름에 줄바꿈이 있어도 공백처럼 빼고 매운 재료를 잡는다 (청양\n고추)")
+    void detectsSpicy_whenIngredientNameHasNewline() {
+        assertThat(SpicyRecipeDetector.spicyRecipeIds(Map.of(1L, List.of("청양\n고추")), SPICY, EXCLUSIONS)).containsExactly(1L);
+    }
 }
