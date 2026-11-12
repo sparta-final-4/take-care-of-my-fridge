@@ -15,6 +15,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 
 @Slf4j
 @Component
@@ -42,10 +43,10 @@ public class CookingFacade {
     @Transactional
     public CookingCompleteResponse completeCooking(Long memberId, CookingCompleteRequest request) {
         // 1. 이을 상담 찾기
-        Long chatSessionId = findChatSessionId(memberId, request);
+        Optional<Long> chatSessionId = findChatSessionId(memberId, request);
 
-        // 2. 요리 기록 저장
-        CookingLog cookingLog = cookingService.saveCookingLog(memberId, request, chatSessionId);
+        // 2. 요리 기록 저장 (이을 상담이 없으면 상담 칸은 비운다)
+        CookingLog cookingLog = cookingService.saveCookingLog(memberId, request, chatSessionId.orElse(null));
 
         // 3. 냉장고 재료 차감
         List<IngredientDeductionResponse> deductions = fridgeService.consumeForCooking(
@@ -55,22 +56,21 @@ public class CookingFacade {
         );
 
         // 4. 상담 종료는 커밋 뒤 (진행 중일 때만 끝내고, 이미 끝난 상담은 건너뜀)
-        if (chatSessionId != null) {
-            eventPublisher.publishEvent(new CookingCompletedEvent(memberId, chatSessionId, cookingLog.getId()));
-        }
+        chatSessionId.ifPresent(sessionId ->
+                eventPublisher.publishEvent(new CookingCompletedEvent(memberId, sessionId, cookingLog.getId())));
 
         return new CookingCompleteResponse(cookingLog.getId(), deductions);
     }
 
     // 상담 연결은 덤이라, 찾다가 오류가 나도 요리 완료를 막지 않는다
-    private Long findChatSessionId(Long memberId, CookingCompleteRequest request) {
+    // 조회가 실패해도 요리 완료는 진행한다 (상담을 잇지 않음)
+    private Optional<Long> findChatSessionId(Long memberId, CookingCompleteRequest request) {
         try {
-            return chatSessionService.findCookingSessionId(memberId, request.chatSessionId(), request.recipeId())
-                    .orElse(null);
+            return chatSessionService.findCookingSessionId(memberId, request.chatSessionId(), request.recipeId());
         } catch (RuntimeException e) {
             log.warn("요리 완료 상담 연결 조회 실패, 잇지 않고 진행: memberId={}, recipeId={}",
                     memberId, request.recipeId(), e);
-            return null;
+            return Optional.empty();
         }
     }
 }

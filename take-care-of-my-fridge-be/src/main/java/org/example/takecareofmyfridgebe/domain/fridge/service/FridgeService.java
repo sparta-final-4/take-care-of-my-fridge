@@ -36,6 +36,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -246,46 +247,59 @@ public class FridgeService {
                 .toList();
 
         List<IngredientDeductionResponse> deductions = new ArrayList<>();
-
         for (UsedIngredientRequest request : sortedRequests) {
-            Long ingredientId = request.ingredientId();
-            List<Fridge> items = fridgeRepository.findForUpdateByMemberIdAndIngredientId(memberId, ingredientId);
-            if (items.isEmpty()) {
-                continue;
-            }
+            deductIngredient(memberId, cookingLogId, request).ifPresent(deductions::add);
+        }
+        return deductions;
+    }
 
-            BigDecimal totalAvailable = items.stream()
-                    .map(Fridge::getQuantity)
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-            BigDecimal needed = request.quantity();
-            boolean takeAll = needed == null || needed.compareTo(totalAvailable) >= 0;
-            BigDecimal remainingToDeduct = takeAll ? totalAvailable : needed;
-
-            BigDecimal actuallyDeducted = BigDecimal.ZERO;
-
-            for (Fridge item : items) {
-                if (remainingToDeduct.compareTo(BigDecimal.ZERO) <= 0) {
-                    break;
-                }
-                BigDecimal before = item.getQuantity();
-                BigDecimal deductForThisItem = remainingToDeduct.compareTo(before) >= 0 ? before : remainingToDeduct;
-
-                BigDecimal deductedFromItem = deductAndLog(item, deductForThisItem, FridgeItemAction.CONSUMED, cookingLogId);
-                actuallyDeducted = actuallyDeducted.add(deductedFromItem);
-                remainingToDeduct = remainingToDeduct.subtract(deductForThisItem);
-            }
-
-            if (actuallyDeducted.compareTo(BigDecimal.ZERO) > 0) {
-                BigDecimal remainingTotal = items.stream()
-                        .filter(item -> !item.isEmpty())
-                        .map(Fridge::getQuantity)
-                        .reduce(BigDecimal.ZERO, BigDecimal::add);
-                deductions.add(new IngredientDeductionResponse(ingredientId, actuallyDeducted, remainingTotal));
-            }
+    /**
+     * 재료 하나를 차감한다: 그 재료의 냉장고 줄을 잠가 조회 → 합계 → 소비기한 빠른 줄부터 차감(줄마다 이력 저장).
+     * 요청 수량이 없거나 가진 양 이상이면 전부 뺀다.
+     *
+     * @return 실제로 뺀 양과 남은 양. 냉장고에 없거나 뺀 양이 0이면 빈 값
+     */
+    private Optional<IngredientDeductionResponse> deductIngredient(
+            Long memberId,
+            Long cookingLogId,
+            UsedIngredientRequest request
+    ) {
+        Long ingredientId = request.ingredientId();
+        List<Fridge> items = fridgeRepository.findForUpdateByMemberIdAndIngredientId(memberId, ingredientId);
+        if (items.isEmpty()) {
+            return Optional.empty();
         }
 
-        return deductions;
+        BigDecimal totalAvailable = items.stream()
+                .map(Fridge::getQuantity)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal needed = request.quantity();
+        boolean takeAll = needed == null || needed.compareTo(totalAvailable) >= 0;
+        BigDecimal remainingToDeduct = takeAll ? totalAvailable : needed;
+
+        BigDecimal actuallyDeducted = BigDecimal.ZERO;
+
+        for (Fridge item : items) {
+            if (remainingToDeduct.compareTo(BigDecimal.ZERO) <= 0) {
+                break;
+            }
+            BigDecimal before = item.getQuantity();
+            BigDecimal deductForThisItem = remainingToDeduct.compareTo(before) >= 0 ? before : remainingToDeduct;
+
+            BigDecimal deductedFromItem = deductAndLog(item, deductForThisItem, FridgeItemAction.CONSUMED, cookingLogId);
+            actuallyDeducted = actuallyDeducted.add(deductedFromItem);
+            remainingToDeduct = remainingToDeduct.subtract(deductForThisItem);
+        }
+
+        if (actuallyDeducted.compareTo(BigDecimal.ZERO) <= 0) {
+            return Optional.empty();
+        }
+        BigDecimal remainingTotal = items.stream()
+                .filter(item -> !item.isEmpty())
+                .map(Fridge::getQuantity)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        return Optional.of(new IngredientDeductionResponse(ingredientId, actuallyDeducted, remainingTotal));
     }
 
     /**

@@ -6,6 +6,7 @@ import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemCreateReques
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemLogResponse;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemLogSearchRequest;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemResponse;
+import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemResponseFixture;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemTakeOutRequest;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemTakeOutResponse;
 import org.example.takecareofmyfridgebe.domain.fridge.dto.FridgeItemUpdateRequest;
@@ -108,7 +109,7 @@ class FridgeControllerTest {
     @DisplayName("정렬을 빈 값으로 보내면 기본 정렬과 토큰의 회원 ID로 목록을 조회한다")
     void usesDefaultSortAndTokenMemberId_whenSortIsEmpty() throws Exception {
         // Given: 7번 회원의 기본 조건 조회 시 반환할 응답 DTO 준비
-        FridgeItemResponse item = new FridgeItemResponse(
+        FridgeItemResponse item = FridgeItemResponseFixture.withoutProductId(
                 1L,
                 10L,
                 "두부",
@@ -213,7 +214,7 @@ class FridgeControllerTest {
     @DisplayName("재료 등록을 요청하면 토큰의 회원 ID로 등록하고 등록된 재료 목록을 반환한다")
     void createsItemsWithTokenMemberId() throws Exception {
         // Given
-        FridgeItemResponse saved = new FridgeItemResponse(
+        FridgeItemResponse saved = FridgeItemResponseFixture.withoutProductId(
                 10L,
                 1L,
                 "두부",
@@ -318,7 +319,7 @@ class FridgeControllerTest {
     @DisplayName("재료 수정을 요청하면 토큰의 회원 ID로 수정하고 수정된 재료를 반환한다")
     void updatesItemWithTokenMemberId() throws Exception {
         // Given
-        FridgeItemResponse updated = new FridgeItemResponse(
+        FridgeItemResponse updated = FridgeItemResponseFixture.withoutProductId(
                 100L,
                 1L,
                 "두부",
