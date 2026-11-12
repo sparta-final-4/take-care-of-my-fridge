@@ -169,50 +169,11 @@ public class ReviewSummaryFacade {
                 break;
             }
 
-            Target target = targets.get(i);
-            Long recipeId = target.recipeId();
-            Integer reviewCount = null;
-            try {
-                List<RecipeReviewContentDto> reviews = fetchRecentReviews(recipeId);
-                reviewCount = reviews.size();
-                if (reviews.isEmpty()) {
-                    log.info("요약 대상 후기가 없어 건너뜁니다. recipeId={}", recipeId);
-                    items.add(target.item(ReviewSummaryItemStatus.SKIPPED, REASON_NO_REVIEWS, reviewCount, null, null));
-                    continue;
-                }
-
-                AiSummary aiSummary = generateSummaryWithAi(reviews);
-                String summary = aiSummary.text();
-                if (summary == null || summary.isBlank()) {
-                    log.info("생성된 요약이 비어 있어 저장을 건너뜁니다. recipeId={}", recipeId);
-                    items.add(target.item(ReviewSummaryItemStatus.SKIPPED, REASON_BLANK_SUMMARY, reviewCount,
-                            aiSummary.cost(), null));
-                    continue;
-                }
-
-                String cleaned = stripQuotes(summary);
-                if (cleaned.isBlank()) {
-                    log.info("따옴표 제거 후 요약이 비어 있어 저장을 건너뜁니다. recipeId={}", recipeId);
-                    items.add(target.item(ReviewSummaryItemStatus.SKIPPED, REASON_BLANK_SUMMARY, reviewCount,
-                            aiSummary.cost(), null));
-                    continue;
-                }
-
-                String finalSummary = truncateSummary(cleaned);
-
-                recipeService.updateTipSummary(recipeId, finalSummary);
-                items.add(target.item(ReviewSummaryItemStatus.SUCCESS, null, reviewCount, aiSummary.cost(),
-                        finalSummary));
-            } catch (Exception e) {
-                if (isRateLimitException(e)) {
-                    log.warn("OpenAI API 한도 초과(429)가 발생하여 남은 레시피 요약을 중단하고 종료합니다. recipeId={}, error={}",
-                            recipeId, e.getMessage(), e);
-                    items.add(target.item(ReviewSummaryItemStatus.FAILED, REASON_RATE_LIMITED, reviewCount, null, null));
-                    skipRemaining(targets, i + 1, REASON_ABORTED_BY_RATE_LIMIT, items);
-                    break;
-                }
-                log.warn("레시피 후기 요약 처리 실패. recipeId={}, cause={}", recipeId, e.getMessage(), e);
-                items.add(target.item(ReviewSummaryItemStatus.FAILED, firstLine(e), reviewCount, null, null));
+            Outcome outcome = summarizeOne(targets.get(i));
+            items.add(outcome.item());
+            if (outcome.rateLimited()) {
+                skipRemaining(targets, i + 1, REASON_ABORTED_BY_RATE_LIMIT, items);
+                break;
             }
         }
 
@@ -224,6 +185,63 @@ public class ReviewSummaryFacade {
                 String.format("%.6f", result.totalCostUsd()), elapsedMillis);
 
         return result;
+    }
+
+    /**
+     * 레시피 하나의 결과. rateLimited면 남은 레시피는 요약하지 않는다.
+     */
+    private record Outcome(ReviewSummaryItem item, boolean rateLimited) {
+    }
+
+    /**
+     * 레시피 하나: 후기 조회 → AI 요약 → 따옴표 제거·길이 자르기 → 저장.
+     * 후기나 요약이 비면 SKIPPED, 예외가 나면 FAILED. 429면 rateLimited로 알려 runOnce가 남은 레시피를 멈추게 한다.
+     */
+    private Outcome summarizeOne(Target target) {
+        Long recipeId = target.recipeId();
+        Integer reviewCount = null;
+        try {
+            List<RecipeReviewContentDto> reviews = fetchRecentReviews(recipeId);
+            reviewCount = reviews.size();
+            if (reviews.isEmpty()) {
+                log.info("요약 대상 후기가 없어 건너뜁니다. recipeId={}", recipeId);
+                return done(target.item(ReviewSummaryItemStatus.SKIPPED, REASON_NO_REVIEWS, reviewCount, null, null));
+            }
+
+            AiSummary aiSummary = generateSummaryWithAi(reviews);
+            String summary = aiSummary.text();
+            if (summary == null || summary.isBlank()) {
+                log.info("생성된 요약이 비어 있어 저장을 건너뜁니다. recipeId={}", recipeId);
+                return done(target.item(ReviewSummaryItemStatus.SKIPPED, REASON_BLANK_SUMMARY, reviewCount,
+                        aiSummary.cost(), null));
+            }
+
+            String cleaned = stripQuotes(summary);
+            if (cleaned.isBlank()) {
+                log.info("따옴표 제거 후 요약이 비어 있어 저장을 건너뜁니다. recipeId={}", recipeId);
+                return done(target.item(ReviewSummaryItemStatus.SKIPPED, REASON_BLANK_SUMMARY, reviewCount,
+                        aiSummary.cost(), null));
+            }
+
+            String finalSummary = truncateSummary(cleaned);
+
+            recipeService.updateTipSummary(recipeId, finalSummary);
+            return done(target.item(ReviewSummaryItemStatus.SUCCESS, null, reviewCount, aiSummary.cost(),
+                    finalSummary));
+        } catch (Exception e) {
+            if (isRateLimitException(e)) {
+                log.warn("OpenAI API 한도 초과(429)가 발생하여 남은 레시피 요약을 중단하고 종료합니다. recipeId={}, error={}",
+                        recipeId, e.getMessage(), e);
+                return new Outcome(target.item(ReviewSummaryItemStatus.FAILED, REASON_RATE_LIMITED, reviewCount, null, null),
+                        true);
+            }
+            log.warn("레시피 후기 요약 처리 실패. recipeId={}, cause={}", recipeId, e.getMessage(), e);
+            return done(target.item(ReviewSummaryItemStatus.FAILED, firstLine(e), reviewCount, null, null));
+        }
+    }
+
+    private static Outcome done(ReviewSummaryItem item) {
+        return new Outcome(item, false);
     }
 
     private void skipRemaining(List<Target> targets, int fromIndex, String reason, List<ReviewSummaryItem> items) {
