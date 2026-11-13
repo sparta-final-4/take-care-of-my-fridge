@@ -630,6 +630,71 @@ class RecipeCandidateFacadeTest {
         assertThat(request.getValue().keyword()).isEqualTo("탕짜면");
     }
 
+    // 현재 동작 고정 (버그). 1단계에서 뒤집을 예정: 첫 키워드가 벡터로 갔어도 뒤의 "짬뽕"은 글자 검색으로 찾아 짬뽕해물탕밥을 후보에 넣어야 한다.
+    // 로컬 색인(2026-11-13): "나가사키 짬뽕" 글자 검색 0건(이름에 둘이 함께 든 레시피가 없음), "짬뽕" 1건(짬뽕해물탕밥).
+    // ES 후보 검색에는 짬뽕 레시피가 없다고 둔다 (피할 맛·시간 조건에 걸리거나 100건 밖인 경우). 기준 기록: docs/testing/chat-recipe-search-baseline.md
+    @Test
+    @DisplayName("ES 경로(현재 동작): 첫 키워드가 글자로 0건이라 벡터로 찾으면 뒤의 \"짬뽕\"은 찾지 않아 짬뽕 레시피가 후보에 없다")
+    void skipsLaterKeyword_whenFirstKeywordFallsBackToVector_현재동작(CapturedOutput output) throws Exception {
+        when(memberService.getMyInfo(MEMBER_ID)).thenReturn(mock(MyInfoResponse.class));
+        when(fridgeService.getItems(any(), any())).thenReturn(List.of(fridgeItem(1L, "두부", 5)));
+        when(candidateSearchService.search(any())).thenReturn(List.of(hit(10L, RecipeCandidateSearchService.MATCH_FRIDGE)));
+        when(recipeSearchService.search(any(RecipeListRequest.class))).thenAnswer(invocation -> {
+            RecipeListRequest request = invocation.getArgument(0);
+            return switch (request.keyword()) {
+                case "나가사키 짬뽕" -> new RecipeSearchResult(List.of(90L), 1, true);
+                case "짬뽕" -> new RecipeSearchResult(List.of(91L), 1);
+                default -> new RecipeSearchResult(List.of(), 0);
+            };
+        });
+        givenEsRecipes(Map.of(
+                10L, new RecipeCandidateInfo(10L, "두부조림", "조림", 20, 1),
+                90L, new RecipeCandidateInfo(90L, "나가사키부대찌개", "찌개", 30, 1),
+                91L, new RecipeCandidateInfo(91L, "짬뽕해물탕밥", "밥", 30, 1)));
+        RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, null, null, null, false,
+                List.of("나가사키 짬뽕", "짬뽕"), "나가사키 짬뽕");
+
+        RecipeCandidates result = esFacade.findCandidates(query);
+
+        ArgumentCaptor<RecipeListRequest> requests = ArgumentCaptor.forClass(RecipeListRequest.class);
+        verify(recipeSearchService, times(1)).search(requests.capture());
+        assertThat(requests.getAllValues()).extracting(RecipeListRequest::keyword).containsExactly("나가사키 짬뽕");
+        assertThat(output).contains("나가사키 짬뽕 1건(벡터), 나머지 1개 생략");
+        assertThat(result.candidates()).extracting(RecipeCandidate::recipeId).doesNotContain(91L).contains(90L);
+        RecipeCandidate vectorHit = result.candidates().stream().filter(c -> c.recipeId() == 90L).findFirst().orElseThrow();
+        assertThat(vectorHit.reason().keywordMatch().type()).isEqualTo(KeywordMatch.Type.VECTOR);
+        assertThat(result.keywordsNotFound()).isTrue();
+    }
+
+    // 현재 동작 고정. 1단계에서 뒤집을 예정: 요리 이름이 하나도 맞지 않으면 분류·냉장고 점수 후보로 카드를 채우지 않고
+    // "그 요리 레시피는 없어요"를 먼저 알려야 한다. 로컬 색인(2026-11-13): "김피탕"은 korean_search가 김/피/탕으로 쪼개 글자 검색 0건.
+    // 벡터도 기준선(0.5) 위가 없다고 둔다. 기준 기록: docs/testing/chat-recipe-search-baseline.md
+    @Test
+    @DisplayName("ES 경로(현재 동작): 키워드가 하나도 맞지 않으면 분류·냉장고 점수로 모은 후보로 카드 3장이 채워진다")
+    void fillsCardsWithCategoryAndFridgeHits_whenNoKeywordMatches_현재동작() throws Exception {
+        when(memberService.getMyInfo(MEMBER_ID)).thenReturn(mock(MyInfoResponse.class));
+        when(fridgeService.getItems(any(), any())).thenReturn(List.of(fridgeItem(1L, "두부", 5)));
+        when(candidateSearchService.search(any())).thenReturn(List.of(
+                hit(10L, RecipeCandidateSearchService.MATCH_CATEGORY, RecipeCandidateSearchService.MATCH_FRIDGE),
+                hit(11L, RecipeCandidateSearchService.MATCH_CATEGORY),
+                hit(12L, RecipeCandidateSearchService.MATCH_FRIDGE)));
+        when(recipeSearchService.search(any(RecipeListRequest.class))).thenReturn(new RecipeSearchResult(List.of(), 0, true));
+        givenEsRecipes(Map.of(
+                10L, new RecipeCandidateInfo(10L, "두부튀김", "튀김", 20, 1),
+                11L, new RecipeCandidateInfo(11L, "새우튀김", "튀김", 30, 1),
+                12L, new RecipeCandidateInfo(12L, "두부조림", "조림", 20, 1)));
+        RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, List.of("튀김"), null, null, false,
+                List.of("김피탕"), "김피탕");
+
+        RecipeCandidates result = esFacade.findCandidates(query);
+
+        verify(recipeSearchService, times(1)).search(any());
+        assertThat(result.keywordsNotFound()).isTrue();
+        assertThat(result.candidates()).extracting(RecipeCandidate::recipeId).containsExactlyInAnyOrder(10L, 11L, 12L);
+        assertThat(result.candidates()).allSatisfy(candidate -> assertThat(candidate.reason().keywordMatch()).isNull());
+        assertThat(pick(result.candidates())).hasSize(RecommendationPicker.PICK_COUNT);
+    }
+
     @Test
     @DisplayName("ES 경로: 키워드 결과로 표시된 후보만 키워드로 맞은 것으로 보고, 표시 없이 온 후보는 이름에 키워드가 있어도 세지 않는다")
     void countsOnlyEsMarkedKeywordHits() throws Exception {
