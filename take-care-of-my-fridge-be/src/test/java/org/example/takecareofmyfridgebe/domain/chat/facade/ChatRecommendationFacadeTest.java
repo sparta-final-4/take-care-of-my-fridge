@@ -206,6 +206,35 @@ class ChatRecommendationFacadeTest {
         assertThat(reply.event().recipes()).isEmpty();
         assertThat(reply.event().empty()).isTrue();
         assertThat(reply.candidateInfo()).endsWith("[추천 후보]\n후보 없음");
+        // 이유 없는 0장은 서버 글을 정하지 않아 ChatStreamFacade의 정해진 답(NO_RECIPE_REPLY)이 나간다
+        assertThat(reply.fixedReply()).isNull();
+    }
+
+    @Test
+    @DisplayName("말한 요리를 못 찾아 후보가 없으면 빈 카드와 함께 요리 이름을 넣은 서버 글을 정해 AI를 부르지 않게 한다")
+    void returnsFixedReply_whenDishNotFound() {
+        when(recipeCandidateFacade.findCandidates(any())).thenReturn(new RecipeCandidates(List.of(), true, true)
+                .withEmptyReason(RecipeCandidates.EmptyReason.notFound("김피탕")));
+
+        RecommendationReply reply = recommend("김피탕", new RecipeQuery(MEMBER_ID, List.of(), null, null, null, null, false,
+                List.of("김피탕"), "김피탕"));
+
+        assertThat(reply.event().empty()).isTrue();
+        assertThat(reply.fixedReply()).isEqualTo("김피탕 레시피는 아직 없어요. 다른 요리 이름이나 갖고 있는 재료로 물어봐 주세요.");
+        verify(recipeService, never()).findSummaries(any());
+    }
+
+    @Test
+    @DisplayName("말한 요리가 뺄 재료 때문에 빠져 후보가 없으면 그 재료를 넣은 서버 글을 정한다")
+    void returnsFixedReply_whenDishExcluded() {
+        when(recipeCandidateFacade.findCandidates(any())).thenReturn(new RecipeCandidates(List.of(), true, true)
+                .withEmptyReason(RecipeCandidates.EmptyReason.excluded("새우볶음밥", List.of("새우"))));
+
+        RecommendationReply reply = recommend("새우볶음밥", new RecipeQuery(MEMBER_ID, List.of(), null, null, null, List.of(50L), false,
+                List.of("새우볶음밥"), "새우볶음밥"));
+
+        assertThat(reply.event().empty()).isTrue();
+        assertThat(reply.fixedReply()).isEqualTo("새우볶음밥에는 새우가 들어 있어서 추천에서 뺐어요. 다른 요리를 물어봐 주세요.");
     }
 
     @Test

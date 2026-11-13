@@ -109,7 +109,7 @@ public final class RecommendationReasonWriter {
             // 사용자가 요리 이름을 말하지 않았으면("차가운 요리") 비교할 이름 없이 맞은 것만 쓴다
             return Optional.of(switch (match.type()) {
                 case NAME, SPLIT, VECTOR -> kind + "예요";
-                case EXPANDED -> match.keyword() + " 요리예요";
+                case EXPANDED, FRAGMENT -> match.keyword() + " 요리예요";
                 case INGREDIENT -> match.ingredientName() + objectParticle(match.ingredientName()) + " 쓰는 요리예요";
             });
         }
@@ -118,6 +118,8 @@ public final class RecommendationReasonWriter {
             case NAME -> "찾으신 " + dish + copula(dish);
             case EXPANDED -> dish + withParticle(dish) + " 비슷한 " + match.keyword() + copula(match.keyword());
             case INGREDIENT -> dish + "처럼 " + match.ingredientName() + objectParticle(match.ingredientName()) + " 쓰는 요리예요";
+            // 말한 요리 그 자체는 아니므로 "찾으신 ○○"로 쓰지 않는다 ("나가사키 짬뽕과 이름이 비슷한 요리예요")
+            case FRAGMENT -> dish + withParticle(dish) + " 이름이 비슷한 요리예요";
             case SPLIT, VECTOR -> dish + withParticle(dish) + " 비슷한 " + kind + "예요";
         });
     }

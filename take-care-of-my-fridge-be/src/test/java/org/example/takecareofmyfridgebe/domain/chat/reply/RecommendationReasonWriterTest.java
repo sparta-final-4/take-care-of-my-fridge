@@ -31,6 +31,15 @@ class RecommendationReasonWriterTest {
     }
 
     @Test
+    @DisplayName("요리 이름 조각으로 맞았으면 말한 요리라고 하지 않고 이름이 비슷한 요리라고 쓴다")
+    void writesFragment() {
+        KeywordMatch match = new KeywordMatch(Type.FRAGMENT, "짬뽕", null);
+
+        assertThat(writeKeyword(match, "나가사키 짬뽕", "밥")).isEqualTo("나가사키 짬뽕과 이름이 비슷한 요리예요");
+        assertThat(writeKeyword(match, null, "밥")).isEqualTo("짬뽕 요리예요");
+    }
+
+    @Test
     @DisplayName("키워드 속 재료가 레시피 재료에 있으면 그 재료를 쓰는 요리라고 쓴다")
     void writesIngredient() {
         assertThat(writeKeyword(new KeywordMatch(Type.INGREDIENT, "냉메밀", "메밀면"), "냉면", "면류"))

@@ -3,11 +3,14 @@ package org.example.takecareofmyfridgebe.domain.chat.facade;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatCandidateProperties;
+import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidates.EmptyReason;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeQuery;
 import org.example.takecareofmyfridgebe.domain.chat.recommend.RecipeCandidateConditions;
 import org.example.takecareofmyfridgebe.domain.chat.recommend.RecipeCandidateScorer.FridgeStock;
 import org.example.takecareofmyfridgebe.domain.chat.recommend.RecipeCandidateScorer;
+import org.example.takecareofmyfridgebe.domain.chat.text.ChatTexts;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeCandidateIngredient;
+import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeCandidateInfo;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeListRequest;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeSort;
 import org.example.takecareofmyfridgebe.domain.recipe.service.RecipeService;
@@ -22,6 +25,7 @@ import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -39,7 +43,7 @@ import java.util.stream.Stream;
  * 후보는 레시피 후보 검색(ES, RecipeCandidateSearchService)으로 모은다. 분류·키워드를 말했으면 요청 조건만 넣은 검색을 한 번 더 해서 합친다
  * (냉장고 재료가 많이 겹치는 레시피에 밀려 "디저트"만 맞은 레시피가 빠지지 않게).
  * ES를 쓰지 않는 설정이거나 검색이 실패하면 DB 경로(냉장고·선택 재료로 레시피 역조회 + 키워드마다 레시피 검색)로 모은다.
- * 보충: 키워드로 맞은 레시피가 없을 때 레시피 검색(벡터는 한 번만), 피할 맛 때문에 모자랄 때 피할 맛 없이 다시 검색.
+ * 보충: 키워드로 맞은 레시피가 없을 때 레시피 검색(벡터는 한 번만, 요리 이름이 0건이면 이름 조각도), 피할 맛 때문에 모자랄 때 피할 맛 없이 다시 검색.
  */
 @Slf4j
 @Component
@@ -48,6 +52,8 @@ public class RecipeCandidateCollector {
 
     // 키워드 하나당 레시피 검색 결과 수 (관련도 순)
     private static final int KEYWORD_SEARCH_SIZE = 10;
+    // 요리 이름 조각으로 쓸 토큰의 최소 글자 수. 한 글자("탕", "피")는 상관없는 레시피를 너무 많이 건다
+    private static final int MIN_FRAGMENT_LENGTH = 2;
 
     private final RecipeService recipeService;
     private final RecipeSearchService recipeSearchService;
@@ -83,6 +89,7 @@ public class RecipeCandidateCollector {
      * @param counts               검색별로 더한 후보 수. 로그용
      * @param esCalls              ES 후보 검색 호출 수 (전체 1 + 요청만 0~1). 로그용
      * @param vectorCalled         레시피 검색에서 벡터 검색을 불렀는지. 로그용
+     * @param fragments            요리 이름 조각 (키워드 보충에서 요리 이름을 분석기로 나눈 것. 없으면 빈 목록). 맞은 방식을 가를 때 쓴다
      */
     record CandidatePool(
             Set<Long> recipeIds,
@@ -93,9 +100,11 @@ public class RecipeCandidateCollector {
             String route,
             String counts,
             int esCalls,
-            boolean vectorCalled
+            boolean vectorCalled,
+            List<String> fragments
     ) {
-        static final CandidatePool EMPTY = new CandidatePool(Set.of(), List.of(), Map.of(), Map.of(), true, "", "", 0, false);
+        static final CandidatePool EMPTY = new CandidatePool(Set.of(), List.of(), Map.of(), Map.of(), true, "", "", 0, false,
+                List.of());
 
         // 다른 후보를 뒤에 합친다 (같은 레시피는 앞의 것을 둔다)
         CandidatePool plus(CandidatePool other) {
@@ -106,13 +115,14 @@ public class RecipeCandidateCollector {
             Map<Long, RecipeTasteLevel> levels = new HashMap<>(tasteLevels);
             other.tasteLevels().forEach(levels::putIfAbsent);
             List<RecipeCandidateIngredient> mergedRows = Stream.concat(rows.stream(), other.rows().stream()).distinct().toList();
+            List<String> mergedFragments = Stream.concat(fragments.stream(), other.fragments().stream()).distinct().toList();
             return new CandidatePool(ids, mergedRows, hits, levels, rowsNonBasicComplete && other.rowsNonBasicComplete(), route,
-                    counts, esCalls, vectorCalled || other.vectorCalled());
+                    counts, esCalls, vectorCalled || other.vectorCalled(), mergedFragments);
         }
 
         CandidatePool withLog(String newRoute, String newCounts) {
             return new CandidatePool(recipeIds, rows, keywordHits, tasteLevels, rowsNonBasicComplete, newRoute, newCounts, esCalls,
-                    vectorCalled);
+                    vectorCalled, fragments);
         }
     }
 
@@ -162,19 +172,23 @@ public class RecipeCandidateCollector {
             counts.add("요청만 새로 " + (recipeIds.size() - before));
         }
         return new CandidatePool(recipeIds, readNonBasicRows(recipeIds), keywordHits, tasteLevels, true,
-                String.join("+", route), String.join(", ", counts), esCalls, false);
+                String.join("+", route), String.join(", ", counts), esCalls, false, List.of());
     }
 
     /**
      * ES 경로의 키워드 보충. 레시피 검색으로 키워드를 AI가 뽑은 순서대로 찾되, 벡터 검색은 한 번만 쓴다
-     * (글자로 0건인 키워드 중 앞의 1개만 벡터로 찾고, 그다음 키워드는 찾지 않는다. 글자로 걸리는 레시피는 ES 후보에 이미 있다).
+     * (글자로 0건인 키워드 중 앞의 1개만 벡터로 찾고, 그다음 키워드는 글자로만 찾는다).
+     * 요리 이름이 글자로 0건이면 분석기로 나눈 조각(두 글자 이상)도 글자로 찾는다 ("나가사키 짬뽕" → "나가사키", "짬뽕").
      * 이미 모은 레시피는 빼고, 재료는 새로 찾은 레시피만 읽는다.
      */
     CandidatePool searchKeywordsOnce(RecipeQuery query, Set<Long> skipIds) {
         Set<Long> recipeIds = new LinkedHashSet<>();
         Map<Long, Boolean> keywordHits = new LinkedHashMap<>();
         KeywordSearch search = searchKeywords(query);
-        search.hits().forEach((recipeId, vectorOnly) -> {
+        DishFragments fragments = searchDishFragments(query, search);
+        Map<Long, Boolean> found = new LinkedHashMap<>(search.hits());
+        fragments.hits().forEach(recipeId -> found.merge(recipeId, false, (before, now) -> false));
+        found.forEach((recipeId, vectorOnly) -> {
             if (!skipIds.contains(recipeId)) {
                 recipeIds.add(recipeId);
                 keywordHits.put(recipeId, vectorOnly);
@@ -185,7 +199,130 @@ public class RecipeCandidateCollector {
         // 정렬 단계의 재료 줄에는 기본 양념이 없어서, 뺄 재료가 기본 양념이면 여기서 뺀다
         removeWithExcludedIngredients(query, recipeIds, keywordHits);
         return new CandidatePool(recipeIds, readNonBasicRows(recipeIds), keywordHits, Map.of(), true, "", "", 0,
-                search.vectorCalled());
+                search.vectorCalled(), fragments.fragments());
+    }
+
+    /**
+     * 요리 이름 조각으로 찾은 결과.
+     *
+     * @param fragments 글자로 찾은 조각 (요리 이름을 나눈 두 글자 이상 토큰 중 키워드에 없던 것. 나누지 않았으면 빈 목록)
+     * @param hits      조각이나 요리 이름 글자 검색으로 찾은 레시피 ID
+     */
+    private record DishFragments(List<String> fragments, Set<Long> hits) {
+        static final DishFragments NONE = new DishFragments(List.of(), Set.of());
+    }
+
+    // 요리 이름(없으면 첫 키워드)이 글자로 0건일 때만 분석기 토큰으로 나눠 조각마다 글자로 찾는다 (벡터는 쓰지 않는다).
+    // 원래 이름이 글자로 찾혔으면 나누지 않는다 ("김치찌개"가 김치/찌개로 넓어지지 않게).
+    // 토큰이 1개뿐이거나 두 글자 이상 토큰이 없으면 나누지 않는다 ("김피탕" → 김/피/탕: 한 글자로는 상관없는 레시피가 걸린다)
+    private DishFragments searchDishFragments(RecipeQuery query, KeywordSearch search) {
+        String dish = query.keywordText() != null ? query.keywordText()
+                : query.keywords().isEmpty() ? null : query.keywords().get(0);
+        if (dish == null || dish.isBlank() || search.foundByText().contains(dish)) {
+            return DishFragments.NONE;
+        }
+        // 요리 이름이 키워드에 없어 아직 찾지 않았으면 글자로 먼저 찾는다. 찾히면 나누지 않는다
+        if (!search.searched().contains(dish)) {
+            Set<Long> named = searchTextOnly(query, dish);
+            if (!named.isEmpty()) {
+                return new DishFragments(List.of(), named);
+            }
+        }
+        List<String> tokens = tokensOf(query, dish);
+        if (tokens.size() < 2) {
+            return DishFragments.NONE;
+        }
+        List<String> fragments = tokens.stream()
+                .filter(token -> token.length() >= MIN_FRAGMENT_LENGTH)
+                .filter(token -> !search.searched().contains(token))
+                .distinct()
+                .toList();
+        if (fragments.isEmpty()) {
+            return DishFragments.NONE;
+        }
+        Set<Long> hits = new LinkedHashSet<>();
+        List<String> summary = new ArrayList<>();
+        for (String fragment : fragments) {
+            Set<Long> found = searchTextOnly(query, fragment);
+            hits.addAll(found);
+            summary.add(fragment + " " + found.size() + "건");
+        }
+        log.info("상담 추천 요리 이름 조각 - memberId: {}, 요리 이름: {}, 토큰: {}, 검색: {}",
+                query.memberId(), dish, tokens, summary);
+        return new DishFragments(fragments, hits);
+    }
+
+    // 레시피 인덱스 분석기 토큰. 분석이 실패하면 공백으로 나눈 단어로 대신한다
+    private List<String> tokensOf(RecipeQuery query, String dish) {
+        try {
+            return recipeSearchService.analyzeTokens(dish);
+        } catch (IOException | RuntimeException e) {
+            log.warn("상담 추천 요리 이름 분석 실패, 공백으로 나눔 - memberId: {}, 요리 이름: {}, 원인: {}",
+                    query.memberId(), dish, e.toString());
+            return Arrays.stream(dish.strip().split("\\s+")).filter(word -> !word.isEmpty()).toList();
+        }
+    }
+
+    // 글자로만 찾는다. 실패하면 빈 결과
+    private Set<Long> searchTextOnly(RecipeQuery query, String keyword) {
+        try {
+            return new LinkedHashSet<>(recipeSearchService.searchKeywordOnly(keywordRequest(keyword)).recipeIds());
+        } catch (IOException | RuntimeException e) {
+            log.warn("상담 추천 글자 검색 실패, 건너뜀 - memberId: {}, keyword: {}, 원인: {}", query.memberId(), keyword, e.toString());
+            return Set.of();
+        }
+    }
+
+    private static RecipeListRequest keywordRequest(String keyword) {
+        return new RecipeListRequest(RecipeSort.RELEVANCE, keyword, null, null, null, null, 1, KEYWORD_SEARCH_SIZE);
+    }
+
+    /**
+     * 요리 이름을 말했는데 카드가 0장일 때 그 이유를 본다. 요리 이름을 글자로 찾아(뺄 재료·시간 조건 없이)
+     * 이름에 요리 이름이 통째로 든 레시피가 없으면 못 찾음, 있고 그 레시피에 뺄 재료가 들어 있으면 뺄 재료 때문에 뺌(재료 이름)이다.
+     * 이름이 맞은 레시피가 있는데 뺄 재료가 없으면(시간 등 다른 조건으로 빠짐) null을 돌려 정해진 답을 그대로 쓰게 한다.
+     * 확인 검색(요리 이름 글자 검색·레시피 이름 조회)이 실패하면 레시피가 없는지 모르므로 null을 돌려 정해진 답을 쓰게 한다
+     * (검색 장애를 "레시피가 없다"고 말하지 않게). 레시피가 있다는 건 확인했는데 뺄 재료 조회만 실패하면 재료 이름 없이 뺄 재료 때문에 뺌으로 본다.
+     */
+    EmptyReason explainEmpty(RecipeQuery query, String dish) {
+        String compactDish = ChatTexts.removeWhitespace(dish);
+        Set<Long> named;
+        try {
+            List<Long> found = recipeSearchService.searchKeywordOnly(keywordRequest(dish)).recipeIds();
+            named = found.isEmpty() ? Set.of() : recipeService.findCandidateInfos(found).values().stream()
+                    .filter(info -> ChatTexts.removeWhitespace(info.name()).contains(compactDish))
+                    .map(RecipeCandidateInfo::recipeId)
+                    .collect(Collectors.toSet());
+        } catch (IOException | RuntimeException e) {
+            log.warn("상담 추천 카드 0장 이유 확인 검색 실패, 이유 없이 정해진 답 - memberId: {}, 요리 이름: {}, 원인: {}",
+                    query.memberId(), dish, e.toString());
+            return null;
+        }
+        if (named.isEmpty()) {
+            return EmptyReason.notFound(dish);
+        }
+        if (query.excludeIngredientIds().isEmpty()) {
+            return null;
+        }
+        try {
+            List<RecipeCandidateIngredient> excludedRows = recipeService.findCandidateIngredients(query.excludeIngredientIds())
+                    .stream()
+                    .filter(row -> named.contains(row.recipeId()))
+                    .toList();
+            if (excludedRows.isEmpty()) {
+                return null;
+            }
+            return EmptyReason.excluded(dish, excludedRows.stream()
+                    .map(RecipeCandidateIngredient::ingredientName)
+                    .filter(name -> name != null && !name.isBlank())
+                    .map(String::strip)
+                    .distinct()
+                    .toList());
+        } catch (RuntimeException e) {
+            log.warn("상담 추천 뺄 재료 조회 실패, 재료 이름 없이 안내 - memberId: {}, 요리 이름: {}, 원인: {}",
+                    query.memberId(), dish, e.toString());
+            return EmptyReason.excluded(dish, List.of());
+        }
     }
 
     // 기본 양념 뺀 재료 줄. 후보가 없으면 조회하지 않는다 (RecipeService도 빈 입력이면 빈 목록이지만 호출부에서 먼저 막는다)
@@ -239,48 +376,48 @@ public class RecipeCandidateCollector {
         Set<Long> recipeIds = new LinkedHashSet<>(scorer.candidateRecipeIds(query, fridge, rows));
         recipeIds.addAll(keywordHits.keySet());
         return new CandidatePool(recipeIds, rows, keywordHits, Map.of(), false, "DB 대체",
-                "재료 역조회·키워드 " + recipeIds.size(), 0, search.vectorCalled());
+                "재료 역조회·키워드 " + recipeIds.size(), 0, search.vectorCalled(), List.of());
     }
 
-    // 키워드마다 레시피 검색(관련도 순)으로 레시피를 찾는다. 레시피 ID별로 벡터 검색으로만 찾았는지(true)를 돌려준다.
-    // 한 키워드라도 키워드 검색으로 찾았으면 false. 검색이 실패한 키워드는 건너뛴다
     /**
      * 키워드마다 레시피 검색으로 찾은 결과.
      *
      * @param hits         레시피 ID별 벡터 검색으로만 찾았는지
      * @param vectorCalled 벡터 검색을 불렀는지 (로그용)
+     * @param searched     찾아 본 키워드 (실패한 키워드 포함)
+     * @param foundByText  글자 검색으로 1건 이상 찾은 키워드
      */
-    private record KeywordSearch(Map<Long, Boolean> hits, boolean vectorCalled) {
+    private record KeywordSearch(Map<Long, Boolean> hits, boolean vectorCalled, Set<String> searched, Set<String> foundByText) {
     }
 
+    // 키워드마다 레시피 검색(관련도 순)으로 레시피를 찾는다. 레시피 ID별로 벡터 검색으로만 찾았는지(true)를 돌려준다.
+    // 한 키워드라도 키워드 검색으로 찾았으면 false. 검색이 실패한 키워드는 건너뛴다.
+    // 벡터 검색(글자로 0건)은 한 번의 추천에서 한 번만 쓰고, 그 뒤 키워드는 글자로만 찾는다 (뒤 키워드 "짬뽕"을 놓치지 않게).
     // 키워드 중복은 의도 결과 정리(IntentResult.sanitize)에서 빼지만, 여기서도 순서를 지키며 한 번 더 뺀다
     private KeywordSearch searchKeywords(RecipeQuery query) {
         Map<Long, Boolean> hits = new LinkedHashMap<>();
         List<String> keywords = query.keywords().stream().distinct().toList();
         if (keywords.isEmpty()) {
-            return new KeywordSearch(hits, false);
+            return new KeywordSearch(hits, false, Set.of(), Set.of());
         }
         List<String> summary = new ArrayList<>();
+        Set<String> foundByText = new LinkedHashSet<>();
         boolean vectorCalled = false;
-        for (int i = 0; i < keywords.size(); i++) {
-            String keyword = keywords.get(i);
+        for (String keyword : keywords) {
+            boolean textOnly = vectorCalled;
             try {
-                RecipeListRequest request = new RecipeListRequest(
-                        RecipeSort.RELEVANCE, keyword, null, null, null, null, 1, KEYWORD_SEARCH_SIZE);
-                RecipeSearchResult result = recipeSearchService.search(request);
+                RecipeListRequest request = keywordRequest(keyword);
+                RecipeSearchResult result = textOnly
+                        ? recipeSearchService.searchKeywordOnly(request)
+                        : recipeSearchService.search(request);
                 result.recipeIds().forEach(recipeId ->
                         hits.merge(recipeId, result.vectorFallback(), (before, now) -> before && now));
-                summary.add(keyword + " " + result.recipeIds().size() + "건" + (result.vectorFallback() ? "(벡터)" : ""));
-                if (!result.vectorFallback()) {
-                    continue;
+                if (!result.vectorFallback() && !result.recipeIds().isEmpty()) {
+                    foundByText.add(keyword);
                 }
-                // 벡터 검색(글자로 0건)은 한 번의 추천에서 한 번만 쓴다. 그다음 키워드는 찾지 않는다
-                vectorCalled = true;
-                int skipped = keywords.size() - i - 1;
-                if (skipped > 0) {
-                    summary.add("나머지 " + skipped + "개 생략");
-                }
-                break;
+                summary.add(keyword + " " + result.recipeIds().size() + "건"
+                        + (result.vectorFallback() ? "(벡터)" : textOnly ? "(글자만)" : ""));
+                vectorCalled = vectorCalled || result.vectorFallback();
             } catch (IOException | RuntimeException e) {
                 summary.add(keyword + " 실패");
                 log.warn("상담 추천 키워드 검색 실패, 건너뜀 - memberId: {}, keyword: {}, 원인: {}",
@@ -288,6 +425,6 @@ public class RecipeCandidateCollector {
             }
         }
         log.info("상담 추천 키워드 - memberId: {}, 요리 표현: {}, 검색: {}", query.memberId(), query.keywordText(), summary);
-        return new KeywordSearch(hits, vectorCalled);
+        return new KeywordSearch(hits, vectorCalled, Set.copyOf(keywords), foundByText);
     }
 }

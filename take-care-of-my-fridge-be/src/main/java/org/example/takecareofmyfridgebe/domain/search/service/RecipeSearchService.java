@@ -9,6 +9,8 @@ import co.elastic.clients.elasticsearch._types.query_dsl.Query;
 import co.elastic.clients.elasticsearch._types.query_dsl.TextQueryType;
 import co.elastic.clients.elasticsearch.core.SearchRequest;
 import co.elastic.clients.elasticsearch.core.SearchResponse;
+import co.elastic.clients.elasticsearch.indices.AnalyzeRequest;
+import co.elastic.clients.elasticsearch.indices.analyze.AnalyzeToken;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeListRequest;
@@ -35,17 +37,44 @@ public class RecipeSearchService {
 
     // 이름이 가장 중요하고, 재료가 그다음이다
     private static final List<String> KEYWORD_FIELDS = List.of("name^3", "ingredients.text^2", "summary");
+    // 레시피 인덱스 매핑(recipes_index.json)의 검색 분석기
+    private static final String SEARCH_ANALYZER = "korean_search";
 
     private final ElasticsearchClient esClient;
     private final RecipeSearchProperties properties;
     private final QueryEmbeddingService queryEmbedding;
 
     public RecipeSearchResult search(RecipeListRequest request) throws IOException {
-        RecipeSearchResult keywordResult = toResult(esClient.search(keywordRequest(request), Void.class));
+        RecipeSearchResult keywordResult = searchKeywordOnly(request);
         if (keywordResult.total() > 0 || !properties.useVector()) {
             return keywordResult;
         }
         return vectorSearch(request);
+    }
+
+    /**
+     * 글자 검색만 한다 (0건이어도 벡터 검색을 하지 않는다). 검색 조건은 search와 같다.
+     * 상담 추천이 벡터 검색을 이미 한 번 쓴 뒤의 키워드와 요리 이름 조각을 찾을 때 쓴다.
+     */
+    public RecipeSearchResult searchKeywordOnly(RecipeListRequest request) throws IOException {
+        return toResult(esClient.search(keywordRequest(request), Void.class));
+    }
+
+    /**
+     * 레시피 인덱스의 검색 분석기(korean_search, nori)로 글을 토큰으로 나눈다. 순서는 분석기가 낸 그대로다.
+     * 상담 추천이 레시피 이름에 그대로 없는 요리 이름("나가사키 짬뽕")을 조각("나가사키", "짬뽕")으로 나눌 때 쓴다.
+     */
+    public List<String> analyzeTokens(String text) throws IOException {
+        return esClient.indices().analyze(analyzeRequest(text)).tokens().stream()
+                .map(AnalyzeToken::token)
+                .toList();
+    }
+
+    AnalyzeRequest analyzeRequest(String text) {
+        return AnalyzeRequest.of(a -> a
+                .index(properties.indexProperties().recipe().alias())
+                .analyzer(SEARCH_ANALYZER)
+                .text(text));
     }
 
     /**

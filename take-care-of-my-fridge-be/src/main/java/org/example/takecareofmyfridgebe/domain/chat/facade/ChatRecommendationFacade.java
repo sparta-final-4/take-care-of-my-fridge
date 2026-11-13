@@ -20,6 +20,7 @@ import org.example.takecareofmyfridgebe.domain.chat.recommend.TemperatureWordChe
 import org.example.takecareofmyfridgebe.domain.chat.recommend.MealkitPicker;
 import org.example.takecareofmyfridgebe.domain.chat.recommend.PickRule;
 import org.example.takecareofmyfridgebe.domain.chat.recommend.RecommendationPicker;
+import org.example.takecareofmyfridgebe.domain.chat.reply.NoRecipeReplyWriter;
 import org.example.takecareofmyfridgebe.domain.chat.reply.RecipeDetailPromptBuilder;
 import org.example.takecareofmyfridgebe.domain.chat.reply.RecommendationPromptBuilder;
 import org.example.takecareofmyfridgebe.domain.chat.reply.RecommendationReasonWriter;
@@ -210,6 +211,11 @@ public class ChatRecommendationFacade {
     // 요리 이름(keywordText)은 의도 단계(IntentCorrector)에서 정해진 그대로 쓴다. 여기서 추측하거나 비우지 않는다
     private RecommendationReply recommendRecipes(String content, RecipeQuery query, Collection<Long> previousCardIds) {
         RecipeCandidates found = recipeCandidateFacade.findCandidates(query);
+        // 말한 요리를 못 찾았거나 뺄 재료 때문에 뺐으면 AI 없이 그 이유를 말하는 서버 글을 보낸다 (그 밖의 0장은 정해진 답)
+        if (found.candidates().isEmpty() && found.emptyReason() != null) {
+            return RecommendationReply.fixed(ChatRecommendationsEventResponse.of(List.of()),
+                    NoRecipeReplyWriter.write(found.emptyReason()));
+        }
         List<RecipeCandidate> candidates = withoutPrevious(found.candidates(), previousCardIds);
         // 온도 말: 따뜻하면 찬 요리(냉국 등)를 빼고, 차가우면 뜨거운 국물 요리를 뒤로 보낸다 (다시 추천은 원한 표현으로 이어 간다)
         Optional<TemperatureWordChecker.Temperature> temperature =

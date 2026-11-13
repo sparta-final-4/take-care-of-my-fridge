@@ -70,7 +70,49 @@ public class RecipeCandidateFacade {
         collected = supplementKeywords(context, collected);
         collected = refillAvoided(context, collected);
         logCollected(context, collected, started);
-        return toResult(context, collected);
+        RecipeCandidates result = toResult(context, collected);
+        RecipeQuery query = context.query();
+        if (!dishAsked(query) || hasStrongCandidate(result)) {
+            return result;
+        }
+        RecipeCandidates kept = result.candidates().isEmpty() ? result : onlyVectorHits(query, result);
+        return kept.candidates().isEmpty() ? withEmptyReason(query, kept) : kept;
+    }
+
+    // 6. 못 찾음: 요리 이름을 말했는지 (요리 이름, 또는 특징 없이 키워드만).
+    // 특징만 말한 추천("시원한 국물" → 냉국·냉면 키워드)은 요리 이름을 말한 것이 아니어서 지금처럼 분류·냉장고 후보로 카드를 채운다
+    private static boolean dishAsked(RecipeQuery query) {
+        return query.keywordText() != null || (!query.keywords().isEmpty() && query.preferenceText() == null);
+    }
+
+    // 보충까지 거쳐 키워드로 제대로 맞은(이름·늘린 이름·재료·이름 조각) 후보가 있는지
+    private static boolean hasStrongCandidate(RecipeCandidates result) {
+        return result.candidates().stream()
+                .map(candidate -> candidate.reason().keywordMatch())
+                .anyMatch(match -> match != null && match.strong());
+    }
+
+    // 카드가 0장이면 상담 답 문구를 고르도록 이유(못 찾음 / 뺄 재료 때문에 뺌)를 담는다. 그 밖이면 이유 없이 정해진 답이 나간다
+    private RecipeCandidates withEmptyReason(RecipeQuery query, RecipeCandidates empty) {
+        String dish = query.keywordText() != null ? query.keywordText() : query.keywords().get(0);
+        RecipeCandidates.EmptyReason reason = recipeCandidateCollector.explainEmpty(query, dish);
+        log.info("상담 후보 0개 이유 - memberId: {}, 요리 이름: {}, 이유: {}", query.memberId(), dish,
+                reason == null ? "그 밖(다른 조건)" : reason.type() + " " + reason.excludedIngredients());
+        return empty.withEmptyReason(reason);
+    }
+
+    // 분류·냉장고 점수로만 걸린 후보와 글자 일부로만 걸린(쪼개짐) 후보로 카드를 채우지 않는다.
+    // 벡터로 찾은 후보("김치찌게" → 김치찌개)는 남겨 "찾지 못해서 비슷한 걸 골랐어요"와 함께 보여 준다.
+    // 남는 후보가 없으면 카드가 0장이 되어 withEmptyReason으로 답 문구의 이유를 담는다
+    private static RecipeCandidates onlyVectorHits(RecipeQuery query, RecipeCandidates result) {
+        List<RecipeCandidate> kept = result.candidates().stream()
+                .filter(candidate -> candidate.reason().keywordMatch() != null
+                        && candidate.reason().keywordMatch().type() == KeywordMatch.Type.VECTOR)
+                .toList();
+        log.info("상담 후보 요리 이름이 맞은 레시피가 없어 벡터 후보만 남김 - memberId: {}, 요리 이름: {}, 키워드: {}, 뺀 후보 {}건, 남은 후보 {}건",
+                query.memberId(), query.keywordText(), query.keywords(), result.candidates().size() - kept.size(), kept.size());
+        return new RecipeCandidates(kept, result.fallback(), true, result.keptAvoidTastes())
+                .withTasteDetails(result.recipeTastes(), result.maybeSpicyIds());
     }
 
     /**
@@ -131,7 +173,8 @@ public class RecipeCandidateFacade {
         }
         CandidatePool supplement = recipeCandidateCollector.searchKeywordsOnce(query, pool.recipeIds());
         String route = pool.route() + "+벡터";
-        String counts = pool.counts() + ", 벡터 보충 새로 " + supplement.recipeIds().size();
+        String counts = pool.counts() + ", 벡터 보충 새로 " + supplement.recipeIds().size()
+                + (supplement.fragments().isEmpty() ? "" : " (이름 조각 " + supplement.fragments() + ")");
         // 새로 찾은 게 없어도 합친다 (벡터를 불렀는지 로그에 남기려고)
         CandidatePool merged = pool.plus(supplement);
         PoolDetails details = collected.details();
@@ -234,7 +277,7 @@ public class RecipeCandidateFacade {
 
     private static Ranked rankPool(Context context, CandidatePool pool, PoolDetails details, Set<Long> knownAvoided) {
         RecipeQuery query = context.query().withKeywordMatches(
-                classifyKeywordHits(context.query(), pool.keywordHits(), pool.rows(), details.infos()));
+                classifyKeywordHits(context.query(), pool.keywordHits(), pool.fragments(), pool.rows(), details.infos()));
         RankInput input = new RankInput(query, context.fridge(), context.memberTastes(), pool.rows(), details.infos(),
                 details.tastes(), details.spicy(), knownAvoided, pool.recipeIds());
         return new Ranked(query, rankAvoiding(context.scorer(), input));
@@ -323,10 +366,11 @@ public class RecipeCandidateFacade {
         return tastes.isEmpty() ? input.query().avoidTastes() : tastes;
     }
 
-    // 키워드로 찾은 레시피가 이름·늘린 이름·재료·쪼개짐·벡터 중 어떻게 맞았는지 가른다 (레시피 정보·재료는 후보 전체를 읽은 것을 쓴다)
+    // 키워드로 찾은 레시피가 이름·늘린 이름·재료·이름 조각·쪼개짐·벡터 중 어떻게 맞았는지 가른다 (레시피 정보·재료는 후보 전체를 읽은 것을 쓴다)
     private static Map<Long, KeywordMatch> classifyKeywordHits(
             RecipeQuery query,
             Map<Long, Boolean> keywordHits,
+            List<String> fragments,
             List<RecipeCandidateIngredient> rows,
             Map<Long, RecipeCandidateInfo> infos
     ) {
@@ -341,8 +385,8 @@ public class RecipeCandidateFacade {
         keywordHits.forEach((recipeId, vectorOnly) -> {
             RecipeCandidateInfo info = infos.get(recipeId);
             if (info != null) {
-                matches.put(recipeId, KeywordMatchClassifier.classify(query.keywordText(), query.keywords(), vectorOnly,
-                        info.name(), ingredientNames.getOrDefault(recipeId, List.of())));
+                matches.put(recipeId, KeywordMatchClassifier.classify(query.keywordText(), query.keywords(), fragments,
+                        vectorOnly, info.name(), ingredientNames.getOrDefault(recipeId, List.of())));
             }
         });
         return matches;
