@@ -57,6 +57,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -84,6 +85,8 @@ import static org.mockito.Mockito.when;
  * (선택) OPENAI_INTENT_EVAL_OFF=taste-words,spoken-tastes-only  이 서버 보정을 끄고 돌린다
  *        (이름은 application.yml app.chat.corrections = EvalCorrectionSwitches.NAMES. 안전 단어 차단·알레르기는 끄지 않는다)
  * (선택) OPENAI_INTENT_EVAL_LABEL=B  결과 파일 이름에 붙일 이름 (eval-{시각}-B-summary.txt)
+ * (선택) OPENAI_INTENT_EVAL_JEV_MODE=on  Jev on 모드로 정한다 (기본 off). TYPESAFE_API_KEY가 필요하다 (ChatIntentEvalJevOn)
+ * (선택) OPENAI_INTENT_EVAL_SKIP_TASTE_STEPS=true  on 모드에서 맛 단계(keep-other-tastes·spoken-tastes-only)도 건너뛴다
  * </pre>
  * 결과: build/reports/chat-intent-eval/eval-{시각}-runs.csv (한 번 돌린 결과마다 한 줄, AI 원래 값과 최종 값),
  * eval-{시각}-cases.csv (문장마다 다수결 결과), eval-{시각}-summary.txt (묶음별 일치율·토큰·시간). 같은 요약을 콘솔에도 찍는다.
@@ -120,18 +123,32 @@ class ChatIntentEvalManualTest {
         int runs = Integer.parseInt(Optional.ofNullable(System.getenv("OPENAI_INTENT_EVAL_RUNS")).orElse("3"));
 
         Set<String> off = EvalCorrectionSwitches.parse(System.getenv("OPENAI_INTENT_EVAL_OFF"));
+        boolean jevOn = ChatIntentEvalJevOn.on();
+        boolean skipTasteSteps = jevOn && ChatIntentEvalJevOn.skipTasteSteps();
+        if (skipTasteSteps) {
+            // on 모드의 서비스 규칙 중 맛 단계 둘을 끈다 (보정 스위치로 끈다. main 코드는 그대로)
+            Set<String> withTasteSteps = new LinkedHashSet<>(off);
+            withTasteSteps.addAll(ChatIntentEvalJevOn.TASTE_STEPS);
+            off = EvalCorrectionSwitches.parse(String.join(",", withTasteSteps));
+        }
 
         UsageRecorder usage = new UsageRecorder();
         RecordingExtractor extractor = new RecordingExtractor(openAiExtractor(usage));
-        ChatIntentFacade facade = facade(set, extractor, EvalCorrectionSwitches.properties(off));
-
+        ChatIntentEvalJevOn jev = jevOn ? ChatIntentEvalJevOn.create(words) : null;
         List<RunRow> rows = new ArrayList<>();
-        for (EvalCase evalCase : cases) {
-            for (int run = 1; run <= runs; run++) {
-                rows.add(runOnce(set, facade, extractor, usage, evalCase, run));
+        try {
+            ChatIntentFacade facade = facade(set, extractor, EvalCorrectionSwitches.properties(off), jev);
+            for (EvalCase evalCase : cases) {
+                for (int run = 1; run <= runs; run++) {
+                    rows.add(runOnce(set, facade, extractor, usage, jev, evalCase, run));
+                }
+            }
+        } finally {
+            if (jev != null) {
+                jev.close();
             }
         }
-        write(set, cases, rows, runs, off);
+        write(set, cases, rows, runs, off, jevOn, skipTasteSteps);
 
         // AI 호출이 실패하면 서버가 일반 답으로 정해 결과가 의미 없으므로, 파일을 남긴 뒤 실패시킨다
         List<RunRow> failed = rows.stream().filter(row -> row.source().startsWith("AI_FAILED")).toList();
@@ -140,16 +157,19 @@ class ChatIntentEvalManualTest {
     }
 
     private RunRow runOnce(EvalSet set, ChatIntentFacade facade, RecordingExtractor extractor, UsageRecorder usage,
-                           EvalCase evalCase, int run) {
+                           ChatIntentEvalJevOn jev, EvalCase evalCase, int run) {
         Optional<ChatSafetyBlock> block = SafetyWordChecker.check(evalCase.message(), safety.words());
         if (block.isPresent()) {
             Outcome outcome = Outcome.blocked(block.get() == ChatSafetyBlock.SELF_HARM ? ChatIntent.SELF_HARM : ChatIntent.BLOCKED);
             return new RunRow(evalCase, run, outcome, "WORD_" + block.get(), null, 0, 0, 0, 0,
-                    evalCase.expect().mismatches(outcome, set));
+                    evalCase.expect().mismatches(outcome, set), null);
         }
         extractor.last = null;
         extractor.failure = null;
         usage.clear();
+        if (jev != null) {
+            jev.clear();
+        }
         long startedAt = System.nanoTime();
         Outcome outcome;
         String error = null;
@@ -162,9 +182,12 @@ class ChatIntentEvalManualTest {
             error = e.toString();
         }
         long ms = (System.nanoTime() - startedAt) / 1_000_000;
+        ChatIntentEvalJevOn.Info info = jev == null ? null : jev.info();
+        List<String> mismatches = info == null ? evalCase.expect().mismatches(outcome, set)
+                : ChatIntentEvalJevOn.mismatches(evalCase.expect(), outcome, set, info);
         return new RunRow(evalCase, run, outcome, error != null ? "ERROR " + error
                 : extractor.failure != null ? "AI_FAILED " + extractor.failure : "AI", extractor.last,
-                usage.input, usage.output, usage.cached, ms, evalCase.expect().mismatches(outcome, set));
+                usage.input, usage.output, usage.cached, ms, mismatches, info);
     }
 
     private static Set<String> onlyIds() {
@@ -189,7 +212,9 @@ class ChatIntentEvalManualTest {
                 new ClassPathResource("prompts/chat-intent-followup.txt"));
     }
 
-    private ChatIntentFacade facade(EvalSet set, ChatIntentExtractor extractor, ChatCorrectionProperties corrections) {
+    // jev가 있으면 on 모드 (실제 Jev·넓은 요청 요리 이름 AI)
+    private ChatIntentFacade facade(EvalSet set, ChatIntentExtractor extractor, ChatCorrectionProperties corrections,
+                                    ChatIntentEvalJevOn jev) {
         RecipeService recipeService = mock(RecipeService.class);
         when(recipeService.getClassifications()).thenReturn(new RecipeClassificationResponse(List.of("한식"), set.categories()));
         when(recipeService.suggestNames(anyString(), anyInt())).thenAnswer(invocation -> {
@@ -209,11 +234,16 @@ class ChatIntentEvalManualTest {
                 .thenReturn(AllergyExclusionFinder.Allergens.NONE);
         IntentCorrector corrector = new IntentCorrector(recipeService, ingredientMatcher, mock(ChatMessageService.class),
                 words, corrections);
+        if (jev != null) {
+            return new ChatIntentFacade(extractor, recipeService, ingredientMatcher, candidateProperties, words,
+                    allergyExclusionFinder, corrections, corrector, jev.shadow(), jev.resolver());
+        }
         return new ChatIntentFacade(extractor, recipeService, ingredientMatcher, candidateProperties, words,
                 allergyExclusionFinder, corrections, corrector);
     }
 
-    private void write(EvalSet set, List<EvalCase> cases, List<RunRow> rows, int runs, Set<String> off) throws IOException {
+    private void write(EvalSet set, List<EvalCase> cases, List<RunRow> rows, int runs, Set<String> off, boolean jevOn,
+                       boolean skipTasteSteps) throws IOException {
         Files.createDirectories(OUT_DIR);
         String label = Optional.ofNullable(System.getenv("OPENAI_INTENT_EVAL_LABEL")).map(String::strip)
                 .filter(value -> !value.isEmpty()).map(value -> value.replaceAll("[^A-Za-z0-9_-]", "_")).orElse(null);
@@ -221,13 +251,17 @@ class ChatIntentEvalManualTest {
                 + (label == null ? "" : "-" + label);
 
         List<String> runLines = new ArrayList<>();
-        runLines.add(String.join(",", "id", "group", "context", "message", "run", "pass", "mismatch", "source",
+        List<String> header = new ArrayList<>(List.of("id", "group", "context", "message", "run", "pass", "mismatch", "source",
                 "intent", "wanted", "avoid", "categories", "keywords", "dish", "preference", "maxMinutes", "include", "exclude",
                 "useSelectedOnly", "scope", "names", "saleOnly", "productType", "target", "question",
                 "aiIntent", "aiWanted", "aiAvoid", "aiCategories", "aiKeywords", "aiDish", "aiPreference", "aiMaxMinutes",
                 "aiInclude", "aiExclude", "aiUseSelectedOnly", "aiScope", "aiTargetIndex", "aiTargetName", "aiRemoved",
                 "aiQuestion", "inputTokens", "cachedTokens", "outputTokens", "ms"));
-        rows.forEach(row -> runLines.add(row.line()));
+        if (jevOn) {
+            header.addAll(ChatIntentEvalJevOn.Info.HEADER);
+        }
+        runLines.add(String.join(",", header));
+        rows.forEach(row -> runLines.add(row.line(jevOn)));
 
         List<String> caseLines = new ArrayList<>();
         caseLines.add(String.join(",", "id", "group", "context", "message", "passRuns", "runs", "pass", "mismatches", "expect"));
@@ -255,7 +289,7 @@ class ChatIntentEvalManualTest {
         List<RunRow> aiRows = rows.stream().filter(row -> row.inputTokens() > 0).toList();
         List<String> summary = new ArrayList<>();
         // 맨 위: 이번에 끈 서버 보정 (A~E 비교용)
-        summary.add(EvalCorrectionSwitches.describe(off) + (label == null ? "" : " · 이름 " + label));
+        summary.add(EvalCorrectionSwitches.describe(off) + (label == null ? "" : " · 이름 " + label) + (jevOn ? " · Jev on" : ""));
         summary.add("AI 상담 의도 평가 " + stamp + " · 모델 " + MODEL + " · 문장 " + cases.size() + "개 × " + runs + "번 (다수결)");
         summary.add(promptSize(set));
         summary.add(String.format("전체 일치: %d / %d (%.1f%%)", passedCases, cases.size(), 100.0 * passedCases / cases.size()));
@@ -272,6 +306,9 @@ class ChatIntentEvalManualTest {
                 aiRows.stream().mapToLong(RunRow::outputTokens).average().orElse(0),
                 aiRows.stream().mapToLong(RunRow::ms).average().orElse(0),
                 aiRows.stream().mapToLong(RunRow::ms).max().orElse(0)));
+        if (jevOn) {
+            summary.addAll(ChatIntentEvalJevOn.summary(cases, rows, skipTasteSteps));
+        }
         summary.add("틀린 문장:");
         summary.addAll(failedLines);
 
@@ -308,13 +345,15 @@ class ChatIntentEvalManualTest {
 
     // 한 번 돌린 결과
     record RunRow(EvalCase evalCase, int run, Outcome outcome, String source, IntentResult ai,
-                  long inputTokens, long outputTokens, long cachedTokens, long ms, List<String> mismatches) {
+                  long inputTokens, long outputTokens, long cachedTokens, long ms, List<String> mismatches,
+                  ChatIntentEvalJevOn.Info jev) {
 
         boolean pass() {
             return mismatches.isEmpty();
         }
 
-        String line() {
+        // withJev면 Jev on 모드 칸(ChatIntentEvalJevOn.Info.HEADER)을 뒤에 붙인다 (단어 차단 줄은 빈 칸)
+        String line(boolean withJev) {
             List<String> cells = new ArrayList<>(List.of(csv(evalCase.id()), csv(evalCase.group()), csv(evalCase.context()),
                     csv(evalCase.message()), String.valueOf(run), String.valueOf(pass()), csv(String.join(" | ", mismatches)),
                     csv(source)));
@@ -332,6 +371,13 @@ class ChatIntentEvalManualTest {
             }
             cells.addAll(List.of(String.valueOf(inputTokens), String.valueOf(cachedTokens), String.valueOf(outputTokens),
                     String.valueOf(ms)));
+            if (withJev) {
+                if (jev == null) {
+                    ChatIntentEvalJevOn.Info.HEADER.forEach(name -> cells.add(""));
+                } else {
+                    cells.addAll(jev.cells(evalCase.expect().raw()));
+                }
+            }
             return String.join(",", cells);
         }
     }

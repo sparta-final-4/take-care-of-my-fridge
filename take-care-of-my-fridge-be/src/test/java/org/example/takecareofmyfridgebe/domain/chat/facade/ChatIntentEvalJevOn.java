@@ -1,0 +1,366 @@
+package org.example.takecareofmyfridgebe.domain.chat.facade;
+
+import org.example.takecareofmyfridgebe.domain.chat.ai.JevIntentClassifier;
+import org.example.takecareofmyfridgebe.domain.chat.ai.JevIntentShadow;
+import org.example.takecareofmyfridgebe.domain.chat.ai.OpenAiSimilarDishGenerator;
+import org.example.takecareofmyfridgebe.domain.chat.ai.SimilarDishGenerator;
+import org.example.takecareofmyfridgebe.domain.chat.config.ChatJevProperties;
+import org.example.takecareofmyfridgebe.domain.chat.config.ChatWordProperties;
+import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntentResolution;
+import org.example.takecareofmyfridgebe.domain.chat.dto.DishListKind;
+import org.example.takecareofmyfridgebe.domain.chat.dto.JevDecision;
+import org.example.takecareofmyfridgebe.domain.chat.dto.JevIntentJudgement;
+import org.example.takecareofmyfridgebe.domain.chat.dto.JevIntentJudgement.RequestKind;
+import org.example.takecareofmyfridgebe.domain.chat.facade.ChatIntentEvalManualTest.EvalSet;
+import org.example.takecareofmyfridgebe.domain.chat.facade.ChatIntentEvalManualTest.Expect;
+import org.example.takecareofmyfridgebe.domain.chat.facade.ChatIntentEvalManualTest.Outcome;
+import org.example.takecareofmyfridgebe.domain.chat.facade.ChatIntentEvalManualTest.UsageRecorder;
+import org.example.takecareofmyfridgebe.domain.chat.intent.JevIntentResolver;
+import org.example.takecareofmyfridgebe.domain.chat.service.SimilarDishStore;
+import org.example.takecareofmyfridgebe.domain.chat.text.ChatTexts;
+import org.example.takecareofmyfridgebe.global.config.TypeSafeConfig;
+import org.example.takecareofmyfridgebe.global.config.TypeSafeProperties;
+import org.example.takecareofmyfridgebe.global.config.TypeSafeShadowExecutor;
+import org.example.takecareofmyfridgebe.global.config.ai.ChatClientConfig;
+import org.example.takecareofmyfridgebe.infra.typesafe.client.TypeSafeClient;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.openai.OpenAiChatModel;
+import org.springframework.ai.openai.OpenAiChatOptions;
+import org.springframework.core.io.ClassPathResource;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+/**
+ * ChatIntentEvalManualTest의 Jev on 모드 (OPENAI_INTENT_EVAL_JEV_MODE=on). 설계: docs/testing/jev-on-design.md 8절
+ * <ul>
+ *   <li>실제 JevIntentShadow(on)·JevIntentClassifier(TypeSafe)·JevIntentResolver·OpenAiSimilarDishGenerator(넓은 요청 프롬프트)를 만든다.
+ *       넓은 요청 요리 이름 캐시는 메모리에 둔다(운영 Redis처럼 같은 표현이면 다시 부르지 않는다. 그래서 문장마다 첫 회차만 AI를 부른다)</li>
+ *   <li>회차마다 정한 방법(decision), Jev 판단, 쓴 요청 종류·값, 넓은 요청 AI 호출 여부·시간·토큰을 남긴다</li>
+ *   <li>기대 kind가 넓은 요청(BROAD)인 문장은 분류·키워드 기대값 대신 "Jev로 정했고 쓴 요청 종류가 BROAD이며 요리 이름이 비어 있지 않음"으로 비교한다.
+ *       요청 종류 일치(kind)는 따로 세고 일치 판단에는 넣지 않는다(all-on과 같은 칸으로 비교하려고)</li>
+ * </ul>
+ */
+final class ChatIntentEvalJevOn {
+
+    static final String MODE_ENV = "OPENAI_INTENT_EVAL_JEV_MODE";
+    static final String SKIP_TASTE_STEPS_ENV = "OPENAI_INTENT_EVAL_SKIP_TASTE_STEPS";
+    // 맛 단계 건너뛰기 변형에서 끄는 서비스 규칙 (TasteWordChecker로 AI 맛을 거르는 두 단계)
+    static final List<String> TASTE_STEPS = List.of("keep-other-tastes", "spoken-tastes-only");
+    // 넓은 요청 기대값을 대신하는 칸 (분류·키워드 기대값은 비교하지 않는다)
+    private static final Set<String> BROAD_REPLACED = Set.of("categories", "keywordsEmpty", "keywordsAny");
+    private static final String MODEL = "gpt-4o-mini";
+    // Jev 입력 100만 토큰당 비용 (USD, JevIntentEvalManualTest와 같다)
+    private static final double JEV_USD_PER_MILLION_INPUT = 0.04;
+
+    private final RecordingJevShadow shadow;
+    private final RecordingDishGenerator broadGenerator;
+    private final JevIntentResolver resolver;
+    private final TypeSafeShadowExecutor executor;
+
+    private ChatIntentEvalJevOn(RecordingJevShadow shadow, RecordingDishGenerator broadGenerator, JevIntentResolver resolver,
+                                TypeSafeShadowExecutor executor) {
+        this.shadow = shadow;
+        this.broadGenerator = broadGenerator;
+        this.resolver = resolver;
+        this.executor = executor;
+    }
+
+    // OPENAI_INTENT_EVAL_JEV_MODE: off(기본) / on. 그 밖의 값이면 오타로 보고 멈춘다
+    static boolean on() {
+        String mode = Optional.ofNullable(System.getenv(MODE_ENV)).map(String::strip).orElse("off").toLowerCase(Locale.ROOT);
+        assertThat(mode).as(MODE_ENV + "는 off 또는 on").isIn("off", "on", "");
+        return mode.equals("on");
+    }
+
+    static boolean skipTasteSteps() {
+        return "true".equalsIgnoreCase(Optional.ofNullable(System.getenv(SKIP_TASTE_STEPS_ENV)).map(String::strip).orElse(""));
+    }
+
+    static ChatIntentEvalJevOn create(ChatWordProperties words) {
+        String typeSafeKey = System.getenv("TYPESAFE_API_KEY");
+        assertThat(typeSafeKey).as("Jev on 모드에는 TYPESAFE_API_KEY가 필요함").isNotBlank();
+        TypeSafeProperties properties = new TypeSafeProperties(null, typeSafeKey, null, null);
+        TypeSafeClient client = new TypeSafeClient(new TypeSafeConfig().typeSafeRestClient(properties), properties);
+        TypeSafeShadowExecutor executor = new TypeSafeShadowExecutor(2, 4);
+        RecordingJevShadow shadow = new RecordingJevShadow(new ChatJevProperties(ChatJevProperties.Mode.ON),
+                new JevIntentClassifier(client), client, executor);
+
+        UsageRecorder broadUsage = new UsageRecorder();
+        OpenAiChatModel model = OpenAiChatModel.builder()
+                .options(OpenAiChatOptions.builder().apiKey(System.getenv("OPENAI_INTENT_EVAL_KEY")).model(MODEL).build())
+                .build();
+        ChatClient chatClient = new ChatClientConfig().chatSimilarDishChatClient(ChatClient.builder(model), broadUsage);
+        RecordingDishGenerator broadGenerator = new RecordingDishGenerator(new OpenAiSimilarDishGenerator(chatClient, broadUsage,
+                new ClassPathResource("prompts/chat-similar-dishes.txt")), broadUsage);
+        JevIntentResolver resolver = new JevIntentResolver(new SimilarDishFinder(new MemoryDishStore(), broadGenerator), words);
+        return new ChatIntentEvalJevOn(shadow, broadGenerator, resolver, executor);
+    }
+
+    JevIntentShadow shadow() {
+        return shadow;
+    }
+
+    JevIntentResolver resolver() {
+        return resolver;
+    }
+
+    void close() {
+        executor.close();
+    }
+
+    // 회차마다 지운다
+    void clear() {
+        shadow.judgement = null;
+        shadow.decision = null;
+        broadGenerator.called = false;
+        broadGenerator.ms = 0;
+        broadGenerator.input = 0;
+        broadGenerator.output = 0;
+    }
+
+    Info info() {
+        JevDecision decision = shadow.decision;
+        return new Info(decision == null ? null : decision.decision(), shadow.judgement,
+                decision == null ? null : decision.usedKind(), decision == null ? List.of() : decision.usedValues(),
+                broadGenerator.called, broadGenerator.ms, broadGenerator.input, broadGenerator.output);
+    }
+
+    /**
+     * 한 회차의 Jev 쪽 기록.
+     *
+     * @param decision    정한 방법 (OpenAI 의도 판단이 실패해 비교 로그를 남기지 않았으면 null)
+     * @param judgement   Jev 판단 (실패·제한 시간이면 null)
+     * @param usedKind    Jev로 정했을 때 쓴 요청 종류
+     * @param usedValues  그 요청 종류로 쓴 값 (넓은 요청이면 요리 이름)
+     * @param broadAi     넓은 요청 요리 이름 AI를 불렀는지 (캐시 미스)
+     */
+    record Info(JevDecision.Decision decision, JevIntentJudgement judgement, RequestKind usedKind, List<String> usedValues,
+                boolean broadAi, long broadMs, long broadInput, long broadOutput) {
+
+        static final List<String> HEADER = List.of("decision", "jevIntent", "jevIntentConfidence", "jevRequestKind", "usedKind",
+                "broadDishes", "kindMatch", "broadAi", "broadMs", "broadInputTokens", "broadOutputTokens", "jevInputTokens", "jevMs");
+
+        long jevInputTokens() {
+            if (judgement == null) {
+                return 0;
+            }
+            long first = judgement.first().call().inputTokens() == null ? 0 : judgement.first().call().inputTokens();
+            long second = judgement.hasSecond() && judgement.second().call().inputTokens() != null
+                    ? judgement.second().call().inputTokens() : 0;
+            return first + second;
+        }
+
+        // 요청 종류 일치. 기대 kind가 없거나 Jev로 정하지 않았으면 null (세지 않는다)
+        Boolean kindMatch(Map<String, Object> expect) {
+            Object expected = expect.get("kind");
+            if (expected == null || decision != JevDecision.Decision.JEV || usedKind == null) {
+                return null;
+            }
+            return usedKind.name().equals(String.valueOf(expected));
+        }
+
+        List<String> cells(Map<String, Object> expect) {
+            return List.of(ChatIntentEvalManualTest.csv(decision),
+                    ChatIntentEvalManualTest.csv(judgement == null ? null : judgement.first().answeredIntent()),
+                    judgement == null ? "" : String.valueOf(judgement.first().intentConfidence()),
+                    ChatIntentEvalManualTest.csv(judgement == null || !judgement.hasSecond() ? null : judgement.second().requestKind()),
+                    ChatIntentEvalManualTest.csv(usedKind),
+                    ChatIntentEvalManualTest.csv(usedKind == RequestKind.BROAD ? usedValues : null),
+                    ChatIntentEvalManualTest.csv(kindMatch(expect)),
+                    String.valueOf(broadAi), String.valueOf(broadMs), String.valueOf(broadInput), String.valueOf(broadOutput),
+                    String.valueOf(jevInputTokens()),
+                    judgement == null ? "" : String.valueOf(judgement.totalLatencyMs()));
+        }
+    }
+
+    /**
+     * on 모드 비교: 기대 kind가 BROAD면 분류·키워드 기대값 대신 "Jev로 정했고 쓴 종류 BROAD, 요리 이름 있음"으로 본다.
+     */
+    static List<String> mismatches(Expect expect, Outcome outcome, EvalSet set, Info info) {
+        if (!"BROAD".equals(String.valueOf(expect.raw().get("kind")))) {
+            return expect.mismatches(outcome, set);
+        }
+        Map<String, Object> raw = new LinkedHashMap<>(expect.raw());
+        BROAD_REPLACED.forEach(raw::remove);
+        List<String> result = new ArrayList<>(new Expect(raw).mismatches(outcome, set));
+        boolean broad = info.decision() == JevDecision.Decision.JEV && info.usedKind() == RequestKind.BROAD
+                && !info.usedValues().isEmpty();
+        if (!broad) {
+            result.add("broad: 기대 JEV·BROAD·요리 이름, 실제 " + info.decision() + "·" + info.usedKind() + "·" + info.usedValues());
+        }
+        return result;
+    }
+
+    // 정한 방법과 Jev 판단을 남기는 JevIntentShadow (on). 기다리기·비교 로그는 실제 동작 그대로
+    static final class RecordingJevShadow extends JevIntentShadow {
+
+        private JevIntentJudgement judgement;
+        private JevDecision decision;
+
+        RecordingJevShadow(ChatJevProperties properties, JevIntentClassifier classifier, TypeSafeClient client,
+                           TypeSafeShadowExecutor executor) {
+            super(properties, classifier, client, executor);
+        }
+
+        @Override
+        public Optional<JevIntentJudgement> await(Run run) {
+            Optional<JevIntentJudgement> judged = super.await(run);
+            judgement = judged.orElse(null);
+            return judged;
+        }
+
+        @Override
+        public void compareWhenDone(Run run, Long memberId, Long sessionId, int messageLength, ChatIntentResolution resolution,
+                                    boolean mealkit, JevDecision decision) {
+            this.decision = decision;
+            super.compareWhenDone(run, memberId, sessionId, messageLength, resolution, mealkit, decision);
+        }
+    }
+
+    // 넓은 요청 요리 이름 AI 호출 여부·시간·토큰을 남긴다
+    static final class RecordingDishGenerator implements SimilarDishGenerator {
+
+        private final SimilarDishGenerator delegate;
+        private final UsageRecorder usage;
+        private boolean called;
+        private long ms;
+        private long input;
+        private long output;
+
+        RecordingDishGenerator(SimilarDishGenerator delegate, UsageRecorder usage) {
+            this.delegate = delegate;
+            this.usage = usage;
+        }
+
+        @Override
+        public List<String> generate(Long memberId, DishListKind kind, String text) {
+            long startedAt = System.nanoTime();
+            usage.clear();
+            try {
+                return delegate.generate(memberId, kind, text);
+            } finally {
+                called = true;
+                ms = (System.nanoTime() - startedAt) / 1_000_000;
+                input = usage.input();
+                output = usage.output();
+            }
+        }
+    }
+
+    /**
+     * 요약에 더할 on 모드 줄: 정한 방법 분포와 정답률, 요청 종류 일치, 넓은 요청 요리 이름, 지연, 비용.
+     */
+    static List<String> summary(List<ChatIntentEvalManualTest.EvalCase> cases, List<ChatIntentEvalManualTest.RunRow> rows,
+                                boolean skipTasteSteps) {
+        List<String> lines = new ArrayList<>();
+        List<ChatIntentEvalManualTest.RunRow> judged = rows.stream().filter(row -> row.jev() != null).toList();
+        lines.add("");
+        lines.add("[Jev on] " + (skipTasteSteps ? "맛 단계(keep-other-tastes·spoken-tastes-only)도 건너뜀" : "서비스 규칙 단계 모두 거침")
+                + " · 의도 confidence 기준 " + ChatIntentFacade.MIN_JEV_INTENT_CONFIDENCE);
+        Map<String, int[]> byDecision = new LinkedHashMap<>();
+        for (JevDecision.Decision decision : JevDecision.Decision.values()) {
+            byDecision.put(decision.name(), new int[2]);
+        }
+        for (ChatIntentEvalManualTest.RunRow row : judged) {
+            int[] counts = byDecision.computeIfAbsent(String.valueOf(row.jev().decision()), name -> new int[2]);
+            counts[0]++;
+            counts[1] += row.pass() ? 1 : 0;
+        }
+        lines.add(String.format("정한 방법 (Jev를 부른 회차 %d, 단어 차단 제외): 회차 수 · 비율 · 그중 기대와 일치", judged.size()));
+        byDecision.forEach((decision, counts) -> {
+            if (counts[0] > 0 || !decision.equals("SHADOW")) {
+                lines.add(String.format("  %-22s %4d · %5.1f%% · 일치 %d (%.1f%%)", decision, counts[0], percent(counts[0], judged.size()),
+                        counts[1], percent(counts[1], counts[0])));
+            }
+        });
+        List<Boolean> kindMatches = judged.stream().map(row -> row.jev().kindMatch(row.evalCase().expect().raw()))
+                .filter(match -> match != null).toList();
+        lines.add(String.format("요청 종류 일치 (Jev로 정한 회차 중 기대 kind가 있는 것, 일치 판단에는 넣지 않음): %d / %d",
+                kindMatches.stream().filter(Boolean::booleanValue).count(), kindMatches.size()));
+
+        lines.add("넓은 요청 요리 이름 (기대 kind BROAD이거나 Jev가 BROAD로 쓴 문장, 회차별 정한 방법·쓴 종류·요리 이름):");
+        for (ChatIntentEvalManualTest.EvalCase evalCase : cases) {
+            List<ChatIntentEvalManualTest.RunRow> caseRows = judged.stream().filter(row -> row.evalCase() == evalCase).toList();
+            boolean broad = "BROAD".equals(String.valueOf(evalCase.expect().raw().get("kind")))
+                    || caseRows.stream().anyMatch(row -> row.jev().usedKind() == RequestKind.BROAD);
+            if (!broad || caseRows.isEmpty()) {
+                continue;
+            }
+            List<String> runs = caseRows.stream().map(row -> row.jev().decision() + "·" + row.jev().usedKind()
+                    + (row.jev().usedKind() == RequestKind.BROAD ? row.jev().usedValues().toString() : "")).toList();
+            lines.add(String.format("  %s %s (기대 %s) → %s", evalCase.id(), evalCase.message(), evalCase.expect().raw().get("kind"),
+                    String.join(" / ", runs)));
+        }
+
+        List<ChatIntentEvalManualTest.RunRow> resolved = rows.stream().filter(row -> row.source().equals("AI")).toList();
+        lines.add("의도 결정까지 시간 ms (중앙값 / 95% / 최대): 전체 " + percentiles(resolved.stream().map(ChatIntentEvalManualTest.RunRow::ms).toList())
+                + " · 넓은 요청 AI 호출(캐시 미스) " + percentiles(resolved.stream().filter(row -> row.jev() != null && row.jev().broadAi())
+                .map(ChatIntentEvalManualTest.RunRow::ms).toList())
+                + " · 그 밖 " + percentiles(resolved.stream().filter(row -> row.jev() == null || !row.jev().broadAi())
+                .map(ChatIntentEvalManualTest.RunRow::ms).toList()));
+        long intentInput = rows.stream().mapToLong(ChatIntentEvalManualTest.RunRow::inputTokens).sum();
+        long intentOutput = rows.stream().mapToLong(ChatIntentEvalManualTest.RunRow::outputTokens).sum();
+        long broadInput = judged.stream().mapToLong(row -> row.jev().broadInput()).sum();
+        long broadOutput = judged.stream().mapToLong(row -> row.jev().broadOutput()).sum();
+        long broadCalls = judged.stream().filter(row -> row.jev().broadAi()).count();
+        long jevInput = judged.stream().mapToLong(row -> row.jev().jevInputTokens()).sum();
+        lines.add(String.format("비용 (전체 회차 합, 캐시 할인 전): OpenAI 의도 입력 %d·출력 %d토큰 $%.4f · 넓은 요청 AI %d번 입력 %d·출력 %d토큰 $%.4f"
+                        + " · Jev 입력 %d토큰 $%.4f",
+                intentInput, intentOutput, openAiCost(intentInput, intentOutput), broadCalls, broadInput, broadOutput,
+                openAiCost(broadInput, broadOutput), jevInput, jevInput * JEV_USD_PER_MILLION_INPUT / 1_000_000));
+        return lines;
+    }
+
+    // gpt-4o-mini 단가 (USD / 1M 토큰, UsageRecorder와 같다)
+    private static double openAiCost(long input, long output) {
+        return (input * 0.15 + output * 0.60) / 1_000_000;
+    }
+
+    private static String percentiles(List<Long> values) {
+        if (values.isEmpty()) {
+            return "-";
+        }
+        List<Long> sorted = values.stream().sorted().toList();
+        return sorted.get((sorted.size() - 1) / 2) + " / " + sorted.get((int) Math.ceil(sorted.size() * 0.95) - 1)
+                + " / " + sorted.get(sorted.size() - 1);
+    }
+
+    private static double percent(long part, long whole) {
+        return whole == 0 ? 0 : 100.0 * part / whole;
+    }
+
+    // 운영 Redis 대신 메모리 캐시 (키는 SimilarDishStore와 같게 종류 접두어 + 공백 제거·소문자, 빈 목록은 두지 않는다)
+    static final class MemoryDishStore extends SimilarDishStore {
+
+        private final Map<String, List<String>> cache = new HashMap<>();
+
+        MemoryDishStore() {
+            super(null, null);
+        }
+
+        @Override
+        public Optional<List<String>> find(Long memberId, DishListKind kind, String dishText) {
+            return Optional.ofNullable(cache.get(key(kind, dishText)));
+        }
+
+        @Override
+        public void save(Long memberId, DishListKind kind, String dishText, List<String> dishes) {
+            if (dishes != null && !dishes.isEmpty()) {
+                cache.put(key(kind, dishText), List.copyOf(dishes));
+            }
+        }
+
+        private static String key(DishListKind kind, String text) {
+            return kind.keyPrefix() + ChatTexts.removeWhitespace(text).toLowerCase(Locale.ROOT);
+        }
+    }
+}
