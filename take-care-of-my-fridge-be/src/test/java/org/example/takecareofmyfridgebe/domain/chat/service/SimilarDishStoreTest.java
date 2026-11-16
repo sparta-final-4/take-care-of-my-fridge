@@ -41,7 +41,7 @@ class SimilarDishStoreTest {
     @Test
     @DisplayName("요리 이름(공백 제거·소문자) 키에 저장된 비슷한 요리를 읽는다")
     void findsCachedDishes() {
-        when(values.get("chat:similar-dishes:나가사키짬뽕")).thenReturn("[\"짬뽕\",\"짬뽕밥\"]");
+        when(values.get("chat:similar-dishes:v3:나가사키짬뽕")).thenReturn("[\"짬뽕\",\"짬뽕밥\"]");
 
         assertThat(store.find(MEMBER_ID, "나가사키 짬뽕")).contains(List.of("짬뽕", "짬뽕밥"));
     }
@@ -51,7 +51,7 @@ class SimilarDishStoreTest {
     void returnsEmpty_whenNotCachedOrEmptyList() {
         assertThat(store.find(MEMBER_ID, "김피탕")).isEmpty();
 
-        when(values.get("chat:similar-dishes:김피탕")).thenReturn("[]");
+        when(values.get("chat:similar-dishes:v3:김피탕")).thenReturn("[]");
         assertThat(store.find(MEMBER_ID, "김피탕")).isEmpty();
     }
 
@@ -60,7 +60,7 @@ class SimilarDishStoreTest {
     void savesWithTtl_inLowercaseKey() {
         store.save(MEMBER_ID, "Fish Taco", List.of("타코", "부리토"));
 
-        verify(values).set("chat:similar-dishes:fishtaco", "[\"타코\",\"부리토\"]", TTL);
+        verify(values).set("chat:similar-dishes:v3:fishtaco", "[\"타코\",\"부리토\"]", TTL);
     }
 
     @Test

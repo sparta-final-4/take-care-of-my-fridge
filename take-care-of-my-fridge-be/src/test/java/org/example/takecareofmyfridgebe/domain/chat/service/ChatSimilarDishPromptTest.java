@@ -13,13 +13,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ChatSimilarDishPromptTest {
 
     @Test
-    @DisplayName("받은 요리와 비슷한 요리 이름 3~5개만 내고, 자기 이름·분류 이름은 빼며, 처음 듣는 이름도 짐작하라고 지시하고 조건 칸은 없다")
+    @DisplayName("비슷한 요리 3~5개만 내되 모르는 요리는 빈 목록으로, 오타는 고친 이름을 맨 앞에 쓰고 설명하는 말은 빼라고 지시하며 평가 대상은 예시에 없다")
     void instructsSimilarDishesOnly() throws IOException {
         String prompt = new ClassPathResource("prompts/chat-similar-dishes.txt").getContentAsString(StandardCharsets.UTF_8);
 
         assertThat(prompt).contains("- dishes: 받은 요리와 비슷한 요리 이름 3~5개",
-                "받은 요리를 처음 들어도 이름에서 짐작해 비슷한 요리를 고른다",
-                "받은 요리 이름 자신, 분류 이름");
-        assertThat(prompt).doesNotContain("김피탕", "나가사키", "avoidTastes", "maxMinutes");
+                "어떤 요리인지 확실히 모르면 dishes를 빈 목록으로 낸다",
+                "이름 글자만 보고 짐작하지 않는다",
+                "받은 요리 이름 자신, 분류 이름",
+                "흔한 요리 이름의 오타면 바르게 고친 이름을 맨 앞에 쓴다",
+                "요리를 설명하는 말");
+        assertThat(prompt).doesNotContain("처음 들어도", "김피탕", "나가사키", "꿔바로우", "마라샹궈", "김치찌게",
+                "avoidTastes", "maxMinutes");
     }
 }

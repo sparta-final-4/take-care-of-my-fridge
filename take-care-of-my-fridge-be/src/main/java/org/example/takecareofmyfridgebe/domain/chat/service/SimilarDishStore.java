@@ -14,7 +14,7 @@ import java.util.Locale;
 import java.util.Optional;
 
 /**
- * 요리 이름별 비슷한 요리 이름(비슷한 요리 AI가 낸 값)을 Redis에 둔다. 키는 chat:similar-dishes:{요리 이름, 공백 제거·소문자}, 값은 JSON 목록.
+ * 요리 이름별 비슷한 요리 이름(비슷한 요리 AI가 낸 값)을 Redis에 둔다. 키는 chat:similar-dishes:v3:{요리 이름, 공백 제거·소문자}, 값은 JSON 목록.
  * 같은 요리 이름이면 AI를 다시 부르지 않고 같은 비슷한 요리로 검색하게 한다 (SimilarDishFinder).
  * 유지 시간은 app.chat.similar-dishes-ttl (기본 7일)이고, 읽어도 늘리지 않는다.
  * Redis 장애면 WARN만 남기고 캐시가 없는 것처럼 동작한다 (에러로 끝내지 않음).
@@ -25,7 +25,7 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class SimilarDishStore {
 
-    static final String KEY_PREFIX = "chat:similar-dishes:";
+    static final String KEY_PREFIX = "chat:similar-dishes:v3:";
     // 문자열 목록만 담으므로 기본 설정으로 충분하다 (ChatContextStore와 같은 방식)
     private static final JsonMapper JSON = JsonMapper.builder().build();
     private static final TypeReference<List<String>> STRING_LIST = new TypeReference<>() {
