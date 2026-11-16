@@ -26,6 +26,7 @@ import org.example.takecareofmyfridgebe.domain.chat.service.ChatMessageService;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.Ingredient;
 import org.example.takecareofmyfridgebe.domain.ingredient.service.IngredientMatcher;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member.Taste;
+import org.example.takecareofmyfridgebe.domain.product.entity.ProductType;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeClassificationResponse;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeSummary;
 import org.example.takecareofmyfridgebe.domain.recipe.service.RecipeService;
@@ -1251,6 +1252,24 @@ public class ChatIntentFacadeTest {
 
             assertThat(resolution.lookup().saleOnly()).isFalse();
             assertThat(resolution.lookup().productType()).isNull();
+        }
+
+        @Test
+        @DisplayName("AI가 사기로 본 \"지금 세일하는 재료·밀키트 있어?\"는 서버 보정 뒤에도 할인 상품을 묻는 사기다")
+        void keepsSaleShop_whenAskingSaleItemsNow() {
+            Map<String, ProductType> messages = Map.of(
+                    "지금 세일하는 재료 있어?", ProductType.INGREDIENT,
+                    "지금 세일하는 밀키트 있어?", ProductType.MEALKIT);
+            messages.forEach((message, productType) -> {
+                givenExtracted(new IntentResult(ChatIntent.SHOP, List.of(), List.of(), 0, List.of(), List.of(), false, null, null, null));
+
+                ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of(message));
+
+                assertThat(resolution.intent()).as(message).isEqualTo(ChatIntent.SHOP);
+                assertThat(resolution.lookup().saleOnly()).as(message).isTrue();
+                assertThat(resolution.lookup().names()).as(message).isEmpty();
+                assertThat(resolution.lookup().productType()).as(message).isEqualTo(productType);
+            });
         }
     }
 

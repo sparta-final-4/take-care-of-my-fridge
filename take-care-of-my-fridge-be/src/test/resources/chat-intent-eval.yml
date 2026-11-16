@@ -7,7 +7,8 @@
 #   categories      분류 (같은 집합)
 #   kind            요청 종류 (Jev 평가만 본다): DISH 특정 요리 / CATEGORY 특정 분류 / BROAD 넓은 요청 / NONE 없음.
 #                   추천 계열 문장에 기존 기대값으로 정했다: dish가 있으면 DISH, categories가 하나면 CATEGORY, 여럿이면 BROAD, 둘 다 없으면 NONE
-#                   (2026-11-17 자동 지정, 사람 검토 전)
+#                   그 뒤 사람이 고쳤다(2026-11-17): 문장에 요리 이름이 있으면 DISH, 넓은 말·특징·쓰임새만 말하면 BROAD,
+#                   이어지는 말은 이번 말만 본다(직전 조건에서 온 분류는 보지 않음), 밀키트·재료만 말하면 NONE
 #   keywordsFirst   첫 키워드
 #   keywordsAny     키워드 중 하나라도 이 목록에 있으면 맞음
 #   keywordsEmpty   true면 키워드가 없어야 함
@@ -79,20 +80,20 @@ cases:
   - { id: R01, group: 추천, message: "김치찌개 먹고 싶어", expect: { kind: DISH, intent: RECOMMEND, keywordsFirst: 김치찌개, categories: [찌개], dish: 김치찌개 } }
   - { id: R02, group: 추천, message: "뭐 먹지?", expect: { kind: NONE, intent: RECOMMEND, categories: [], keywordsEmpty: true, wanted: [], maxMinutes: none, preferenceEmpty: true } }
   - { id: R03, group: 추천, message: "저녁 뭐 해 먹을까", expect: { kind: NONE, intent: RECOMMEND, categories: [], keywordsEmpty: true } }
-  - { id: R04, group: 추천, message: "차가운 요리 추천해줘", expect: { kind: NONE, intent: RECOMMEND, keywordsAny: [샐러드, 냉채, 냉국, 무침, 냉파스타, 냉면], preference: 차가운, dishEmpty: true } }
+  - { id: R04, group: 추천, message: "차가운 요리 추천해줘", expect: { kind: BROAD, intent: RECOMMEND, keywordsAny: [샐러드, 냉채, 냉국, 무침, 냉파스타, 냉면], preference: 차가운, dishEmpty: true } }
   - { id: R05, group: 추천, message: "차가운 면", expect: { kind: CATEGORY, intent: RECOMMEND, categories: [면류], keywordsAny: [냉면, 막국수, 콩국수, 냉메밀] } }
   - { id: R06, group: 추천, message: "김피탕 같은 요리 추천해줘", expect: { kind: DISH, intent: RECOMMEND, dish: 김피탕 } }
   - { id: R07, group: 추천, message: "따뜻한 국물 요리", expect: { kind: BROAD, intent: RECOMMEND, categories: [국, 찌개, 전골, 수프, 스튜], keywordsEmpty: true } }
   - { id: R08, group: 추천, message: "30분 안에 만들 수 있는 거", expect: { kind: NONE, intent: RECOMMEND, maxMinutes: 30 } }
-  - { id: R09, group: 추천, message: "빨리 먹을 수 있는 거 추천해줘", expect: { kind: NONE, intent: RECOMMEND, maxMinutes: 30 } }
+  - { id: R09, group: 추천, message: "빨리 먹을 수 있는 거 추천해줘", expect: { kind: BROAD, intent: RECOMMEND, maxMinutes: 30 } }
   - { id: R10, group: 추천, message: "간단한 한 끼 추천해줘", expect: { kind: BROAD, intent: RECOMMEND, categories: [밥, 면류, 볶음] } }
-  - { id: R11, group: 추천, message: "다이어트 메뉴 추천해줘", expect: { kind: CATEGORY, intent: RECOMMEND, categories: [샐러드], maxMinutes: none } }
+  - { id: R11, group: 추천, message: "다이어트 메뉴 추천해줘", expect: { kind: BROAD, intent: RECOMMEND, categories: [샐러드], maxMinutes: none } }
   - { id: R12, group: 추천, message: "술안주 추천해줘", expect: { kind: BROAD, intent: RECOMMEND, categories: [구이, 전, 튀김] } }
   - { id: R13, group: 추천, message: "버섯 두부로 할 수 있는 요리", expect: { kind: NONE, intent: RECOMMEND, include: [버섯, 두부], useSelectedOnly: true } }
   - { id: R14, group: 추천, message: "두부도 넣어서 찌개 끓이고 싶어", expect: { kind: CATEGORY, intent: RECOMMEND, include: [두부], useSelectedOnly: false, categories: [찌개] } }
   - { id: R15, group: 추천, message: "오이 빼고 반찬 추천해줘", expect: { kind: BROAD, intent: RECOMMEND, exclude: [오이], categories: [무침, 조림, 볶음, 김치, 절임] } }
   - { id: R16, group: 추천, message: "땅콩 알레르기 있어 간식 추천해줘", expect: { kind: BROAD, intent: RECOMMEND, exclude: [땅콩], categories: [디저트, 과자, 빵, 떡] } }
-  - { id: R17, group: 추천, message: "주식으로 먹을 거 추천해줘", expect: { kind: NONE, intent: RECOMMEND } }
+  - { id: R17, group: 추천, message: "주식으로 먹을 거 추천해줘", expect: { kind: BROAD, intent: RECOMMEND } }
   # 분류 이름·묶음 말은 분류로만 쓰고 요리 이름이 되지 않는다 (요리 이름이면 "디저트 레시피는 없어서…" 안내가 붙는다)
   - { id: R18, group: 추천, message: "디저트 추천해줘", expect: { kind: CATEGORY, intent: RECOMMEND, categories: [디저트], dishEmpty: true } }
   - { id: R19, group: 추천, message: "반찬 추천해줘", expect: { kind: BROAD, intent: RECOMMEND, categories: [무침, 조림, 볶음, 김치, 절임], dishEmpty: true } }
@@ -104,10 +105,10 @@ cases:
   - { id: T02, group: 맛, message: "칼칼한 국물 요리", expect: { kind: BROAD, intent: RECOMMEND, wanted: [SPICY], categories: [국, 찌개, 전골, 수프, 스튜] } }
   - { id: T03, group: 맛, message: "매운 거 말고 짭짤하게", expect: { kind: NONE, intent: RECOMMEND, wanted: [SALTY], avoid: [SPICY] } }
   - { id: T04, group: 맛, message: "안 달게 해줘", expect: { kind: NONE, intent: RECOMMEND, wanted: [], avoid: [SWEET] } }
-  - { id: T05, group: 맛, message: "단 거 싫어 반찬 추천해줘", expect: { kind: NONE, intent: RECOMMEND, avoid: [SWEET] } }
+  - { id: T05, group: 맛, message: "단 거 싫어 반찬 추천해줘", expect: { kind: BROAD, intent: RECOMMEND, avoid: [SWEET] } }
   - { id: T06, group: 맛, message: "짠 거 말고 담백한 거", expect: { kind: NONE, intent: RECOMMEND, wanted: [MILD], avoid: [SALTY] } }
   - { id: T07, group: 맛, message: "고소한 요리 추천해줘", expect: { kind: NONE, intent: RECOMMEND, wanted: [UMAMI], avoid: [] } }
-  - { id: T08, group: 맛, message: "김피탕 같은 메뉴에서 매운 건 빼줘", expect: { kind: NONE, intent: RECOMMEND, wanted: [], avoid: [SPICY], keywordsFirst: 김피탕 } }
+  - { id: T08, group: 맛, message: "김피탕 같은 메뉴에서 매운 건 빼줘", expect: { kind: DISH, intent: RECOMMEND, wanted: [], avoid: [SPICY], keywordsFirst: 김피탕 } }
   - { id: T09, group: 맛, message: "단 거 빼주세요", expect: { kind: NONE, wanted: [], avoid: [SWEET] } }
   - { id: T10, group: 맛, message: "매운 거 제외하고 추천해줘", expect: { kind: NONE, intent: RECOMMEND, wanted: [], avoid: [SPICY] } }
   # 맛 단어 목록(words.taste)에 없는 매운맛 표현. 서버 보정이 AI의 맞는 값을 지우는지 본다
@@ -116,19 +117,19 @@ cases:
   - { id: T13, group: 맛, message: "화끈한 거 먹고 싶어", expect: { kind: NONE, intent: RECOMMEND, wanted: [SPICY], avoid: [] } }
   - { id: T14, group: 맛, message: "얼얼한 거", expect: { kind: NONE, intent: RECOMMEND, wanted: [SPICY] } }
   # 온도 말. "따뜻한"은 서버가 카드에서 찬 요리를 거르고(TemperatureWordChecker), 의도에서는 맛·추천만 본다
-  - { id: T15, group: 맛, message: "맵고 따뜻한 국물 레시피 추천해줘", expect: { kind: NONE, intent: RECOMMEND, wanted: [SPICY] } }
+  - { id: T15, group: 맛, message: "맵고 따뜻한 국물 레시피 추천해줘", expect: { kind: BROAD, intent: RECOMMEND, wanted: [SPICY] } }
   # "시원한"은 차가운 국물 쪽 요리 이름으로 바꾸고 원한 표현에 남긴다
-  - { id: T16, group: 맛, message: "시원한 국물 요리", expect: { kind: NONE, intent: RECOMMEND, preference: 시원한, keywordsAny: [냉국, 오이냉국, 냉면, 물냉면, 콩국수, 냉모밀, 냉메밀, 물회, 냉채] } }
+  - { id: T16, group: 맛, message: "시원한 국물 요리", expect: { kind: BROAD, intent: RECOMMEND, preference: 시원한, keywordsAny: [냉국, 오이냉국, 냉면, 물냉면, 콩국수, 냉모밀, 냉메밀, 물회, 냉채] } }
   # 피할 맛 + 요리 이름. 콕 집은 요리는 피할 맛이어도 요리 이름으로 남는다 (기준 기록: docs/testing/chat-recipe-search-baseline.md)
   - { id: T17, group: 맛, message: "매운 거 말고 짬뽕 같은 거", expect: { kind: DISH, intent: RECOMMEND, avoid: [SPICY], dish: 짬뽕 } }
   - { id: T18, group: 맛, message: "매운 거 말고 김치찌개", expect: { kind: DISH, intent: RECOMMEND, avoid: [SPICY], dish: 김치찌개 } }
 
   # ── 이름만 말하기 ──
-  - { id: N01, group: 이름만, message: "국물 밀키트", expect: { kind: NONE, intent: RECOMMEND } }
-  - { id: N02, group: 이름만, message: "김치찌개", expect: { kind: NONE, intent: RECOMMEND, keywordsFirst: 김치찌개 } }
+  - { id: N01, group: 이름만, message: "국물 밀키트", expect: { kind: BROAD, intent: RECOMMEND } }
+  - { id: N02, group: 이름만, message: "김치찌개", expect: { kind: DISH, intent: RECOMMEND, keywordsFirst: 김치찌개 } }
   - { id: N03, group: 이름만, message: "두부", expect: { kind: NONE, intent: RECOMMEND, include: [두부] } }
   - { id: N04, group: 이름만, message: "디저트", expect: { kind: CATEGORY, intent: RECOMMEND, categories: [디저트], dishEmpty: true } }
-  - { id: N05, group: 이름만, message: "마라탕", expect: { kind: NONE, intent: RECOMMEND, keywordsFirst: 마라탕 } }
+  - { id: N05, group: 이름만, message: "마라탕", expect: { kind: DISH, intent: RECOMMEND, keywordsFirst: 마라탕 } }
   # 직전 카드 없음. AI가 일반 답이나 레시피 자세히로 봐도 서버가 레시피 말·맛 단어를 빼고 닭볶음탕 추천으로 바꾼다
   - { id: N06, group: 이름만, message: "매운 닭볶음탕 레시피", expect: { kind: DISH, intent: RECOMMEND, keywordsFirst: 닭볶음탕, dish: 닭볶음탕 } }
   # 맛 단어 + 분류 이름, 묶음 말만 말해도 분류로만 쓰고 요리 이름은 비운다
@@ -198,16 +199,18 @@ cases:
   - { id: P06, group: 사기, message: "할인하는 밀키트 뭐 있어?", expect: { intent: SHOP, saleOnly: true, names: [], productType: MEALKIT } }
   - { id: P07, group: 사기, message: "두부 세일해?", expect: { intent: SHOP, saleOnly: true, names: [두부] } }
   - { id: P08, group: 사기, message: "조미료 세일해?", expect: { intent: SHOP, saleOnly: true } }
+  # 실제 사용자 질문. P05("세일하는 재료 있어?")와 비슷한 "지금 세일하는 재료 있어?"는 넣지 않았다
+  - { id: P12, group: 사기, message: "지금 세일하는 밀키트 있어?", expect: { intent: SHOP, saleOnly: true, names: [], productType: MEALKIT } }
   - { id: P09, group: 사기아님, message: "주문한 거 언제 와?", expect: { intent: GENERAL } }
   - { id: P10, group: 사기아님, message: "남은 국은 밀폐용기에 담아 보관해?", expect: { intent: GENERAL } }
   - { id: P11, group: 사기아님, message: "두부 사서 만들 요리 추천해줘", expect: { kind: NONE, intent: RECOMMEND } }
 
   # ── 이어지는 말 ──
-  - { id: U01, group: 후속, context: jjigae, message: "좀 더 매운 걸로", expect: { kind: CATEGORY, intent: REFINE, wanted: [SPICY], avoid: [], categories: [찌개] } }
-  - { id: U02, group: 후속, context: jjigae, message: "다른 거 없어?", expect: { kind: CATEGORY, intent: REFINE, categories: [찌개] } }
+  - { id: U01, group: 후속, context: jjigae, message: "좀 더 매운 걸로", expect: { kind: NONE, intent: REFINE, wanted: [SPICY], avoid: [], categories: [찌개] } }
+  - { id: U02, group: 후속, context: jjigae, message: "다른 거 없어?", expect: { kind: NONE, intent: REFINE, categories: [찌개] } }
   - { id: U03, group: 후속, context: jjigae, message: "국물 말고 볶음으로", expect: { kind: CATEGORY, intent: REFINE, categories: [볶음] } }
   - { id: U04, group: 후속, context: jjigae, message: "매운 거 말고", expect: { kind: NONE, intent: REFINE, wanted: [], avoid: [SPICY] } }
-  - { id: U05, group: 후속, context: jjigae, message: "시간 상관없이", expect: { kind: CATEGORY, intent: REFINE, maxMinutes: none, categories: [찌개] } }
+  - { id: U05, group: 후속, context: jjigae, message: "시간 상관없이", expect: { kind: NONE, intent: REFINE, maxMinutes: none, categories: [찌개] } }
   - { id: U06, group: 후속, context: jjigae, message: "두 번째 거 어떻게 만들어?", expect: { intent: RECIPE_DETAIL, target: 102, question: HOW_TO } }
   - { id: U07, group: 후속, context: jjigae, message: "아까 그 순두부찌개 시간 얼마나 걸려?", expect: { intent: RECIPE_DETAIL, target: 103, question: TIME } }
   - { id: U08, group: 후속, context: single, message: "그거 재료 뭐 들어가?", expect: { intent: RECIPE_DETAIL, target: 401, question: INGREDIENTS } }
@@ -217,7 +220,7 @@ cases:
   - { id: U12, group: 후속, context: jjigae, message: "김치찌개 말고 다른 찌개", expect: { kind: CATEGORY, intent: REFINE, categories: [찌개] } }
   - { id: U13, group: 후속, context: dessert, message: "다른 디저트", expect: { kind: CATEGORY, intent: REFINE, categories: [디저트] } }
   - { id: U14, group: 후속, context: dessert, message: "디저트 말고 국", expect: { kind: CATEGORY, intent: REFINE, categories: [국] } }
-  - { id: U15, group: 후속, context: dessert, message: "매운 거 말고", expect: { kind: CATEGORY, intent: REFINE, categories: [디저트], avoid: [SPICY] } }
+  - { id: U15, group: 후속, context: dessert, message: "매운 거 말고", expect: { kind: NONE, intent: REFINE, categories: [디저트], avoid: [SPICY] } }
   - { id: U16, group: 후속, context: kimpi, message: "디저트 추천해줘", expect: { kind: CATEGORY, intent: RECOMMEND, categories: [디저트], keywordsEmpty: true } }
   - { id: U17, group: 후속, context: kimpi, message: "매운 건 빼줘", expect: { kind: NONE, intent: REFINE, wanted: [], avoid: [SPICY], keywordsFirst: 김피탕 } }
-  - { id: U18, group: 후속, context: salty, message: "매운 건 빼줘", expect: { kind: CATEGORY, intent: REFINE, wanted: [SALTY], avoid: [SPICY], categories: [조림] } }
+  - { id: U18, group: 후속, context: salty, message: "매운 건 빼줘", expect: { kind: NONE, intent: REFINE, wanted: [SALTY], avoid: [SPICY], categories: [조림] } }
