@@ -1,5 +1,6 @@
 package org.example.takecareofmyfridgebe.domain.chat.ai;
 
+import org.example.takecareofmyfridgebe.domain.chat.dto.DishListKind;
 import org.example.takecareofmyfridgebe.global.config.ai.LlmCostCalculator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -47,6 +48,19 @@ class OpenAiSimilarDishGeneratorTest {
                 .containsExactly(MessageType.SYSTEM, MessageType.USER);
         assertThat(chatModel.lastPrompt.getSystemMessage().getText()).contains("비슷한 요리 이름 3~5개");
         assertThat(chatModel.lastPrompt.getUserMessage().getText()).startsWith("김피탕");
+    }
+
+    @Test
+    @DisplayName("넓은 요청 요리는 넓은 요청 프롬프트(prompts/chat-broad-dishes.txt)와 요청 표현 하나만 보낸다")
+    void sendsBroadPromptAndRequestOnly() {
+        chatModel.reply = "{\"dishes\":[\"오징어볶음\",\"계란찜\"]}";
+
+        List<String> dishes = generator.generate(1L, DishListKind.BROAD, "술안주");
+
+        assertThat(dishes).containsExactly("오징어볶음", "계란찜");
+        assertThat(chatModel.lastPrompt.getSystemMessage().getText()).contains("요청에 맞는 요리 이름 5개")
+                .doesNotContain("비슷한 요리 이름 3~5개");
+        assertThat(chatModel.lastPrompt.getUserMessage().getText()).startsWith("술안주");
     }
 
     @Test

@@ -1,6 +1,7 @@
 package org.example.takecareofmyfridgebe.domain.chat.service;
 
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatProperties;
+import org.example.takecareofmyfridgebe.domain.chat.dto.DishListKind;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -43,31 +44,42 @@ class SimilarDishStoreTest {
     void findsCachedDishes() {
         when(values.get("chat:similar-dishes:v3:나가사키짬뽕")).thenReturn("[\"짬뽕\",\"짬뽕밥\"]");
 
-        assertThat(store.find(MEMBER_ID, "나가사키 짬뽕")).contains(List.of("짬뽕", "짬뽕밥"));
+        assertThat(store.find(MEMBER_ID, DishListKind.SIMILAR, "나가사키 짬뽕")).contains(List.of("짬뽕", "짬뽕밥"));
     }
 
     @Test
     @DisplayName("저장된 값이 없거나 빈 목록이면 비어 있다")
     void returnsEmpty_whenNotCachedOrEmptyList() {
-        assertThat(store.find(MEMBER_ID, "김피탕")).isEmpty();
+        assertThat(store.find(MEMBER_ID, DishListKind.SIMILAR, "김피탕")).isEmpty();
 
         when(values.get("chat:similar-dishes:v3:김피탕")).thenReturn("[]");
-        assertThat(store.find(MEMBER_ID, "김피탕")).isEmpty();
+        assertThat(store.find(MEMBER_ID, DishListKind.SIMILAR, "김피탕")).isEmpty();
     }
 
     @Test
     @DisplayName("비슷한 요리를 유지 시간과 함께 저장하고, 영문 요리 이름은 소문자 키로 저장한다")
     void savesWithTtl_inLowercaseKey() {
-        store.save(MEMBER_ID, "Fish Taco", List.of("타코", "부리토"));
+        store.save(MEMBER_ID, DishListKind.SIMILAR, "Fish Taco", List.of("타코", "부리토"));
 
         verify(values).set("chat:similar-dishes:v3:fishtaco", "[\"타코\",\"부리토\"]", TTL);
     }
 
     @Test
+    @DisplayName("넓은 요청 요리는 chat:broad-dishes:v1: 키(요청 표현, 공백 제거·소문자)에 같은 유지 시간으로 두고 읽는다")
+    void savesAndFindsBroadDishes_inBroadKey() {
+        store.save(MEMBER_ID, DishListKind.BROAD, "간단한 한 끼 Menu", List.of("김치볶음밥", "비빔국수"));
+        when(values.get("chat:broad-dishes:v1:간단한한끼menu")).thenReturn("[\"김치볶음밥\",\"비빔국수\"]");
+
+        verify(values).set("chat:broad-dishes:v1:간단한한끼menu", "[\"김치볶음밥\",\"비빔국수\"]", TTL);
+        assertThat(store.find(MEMBER_ID, DishListKind.BROAD, "간단한 한 끼 Menu")).contains(List.of("김치볶음밥", "비빔국수"));
+        assertThat(store.find(MEMBER_ID, DishListKind.SIMILAR, "간단한 한 끼 Menu")).isEmpty();
+    }
+
+    @Test
     @DisplayName("빈 목록이나 빈 요리 이름은 저장하지 않는다")
     void skipsSaving_whenEmpty() {
-        store.save(MEMBER_ID, "김피탕", List.of());
-        store.save(MEMBER_ID, " ", List.of("탕수육"));
+        store.save(MEMBER_ID, DishListKind.SIMILAR, "김피탕", List.of());
+        store.save(MEMBER_ID, DishListKind.SIMILAR, " ", List.of("탕수육"));
 
         verify(values, never()).set(anyString(), anyString(), any(Duration.class));
     }
@@ -78,8 +90,8 @@ class SimilarDishStoreTest {
         when(values.get(anyString())).thenThrow(new RedisConnectionFailureException("redis down"));
         doThrow(new RedisConnectionFailureException("redis down")).when(values).set(anyString(), anyString(), any(Duration.class));
 
-        assertThat(store.find(MEMBER_ID, "김피탕")).isEmpty();
-        assertThatCode(() -> store.save(MEMBER_ID, "김피탕", List.of("탕수육"))).doesNotThrowAnyException();
+        assertThat(store.find(MEMBER_ID, DishListKind.SIMILAR, "김피탕")).isEmpty();
+        assertThatCode(() -> store.save(MEMBER_ID, DishListKind.SIMILAR, "김피탕", List.of("탕수육"))).doesNotThrowAnyException();
     }
 
     @Test
@@ -87,6 +99,6 @@ class SimilarDishStoreTest {
     void returnsEmpty_whenCachedValueIsBroken() {
         when(values.get(anyString())).thenReturn("[\"탕수육\"");
 
-        assertThat(store.find(MEMBER_ID, "김피탕")).isEmpty();
+        assertThat(store.find(MEMBER_ID, DishListKind.SIMILAR, "김피탕")).isEmpty();
     }
 }
