@@ -130,10 +130,15 @@ class JevIntentClassifierTest {
                 .containsEntry("instructions", "특정 요리 이름을 말했나");
         Map<String, Object> spicy = map(questions.get("taste_spicy"));
         assertThat(spicy.get("type")).isEqualTo("choice");
-        assertThat((String) spicy.get("instructions")).startsWith("매운맛(매운맛·얼큰한·칼칼한)에 대해");
-        assertThat(map(spicy.get("criteria")).keySet()).containsExactly("원함", "피함", "언급 없음");
+        assertThat(spicy.get("instructions")).isEqualTo("사용자가 매운맛(얼큰하고 칼칼한 맛)을 원하나, 피하고 싶어 하나, 말하지 않았나?");
+        assertThat(map(spicy.get("criteria"))).containsExactly(
+                Map.entry("원함", "매운맛을 원한다"),
+                Map.entry("피함", "매운맛을 피하고 싶다"),
+                Map.entry("언급 없음", "매운맛에 대해 말하지 않았다. 다른 맛을 원하거나 피하는 말은 매운맛과 상관없다"));
+        // 단어 규칙("말고", "안", "덜", "싫어")을 보내지 않는다
+        assertThat(questions.values().stream().map(String::valueOf)).noneMatch(text -> text.contains("말고"));
         assertThat(map(questions.get("category_2"))).containsEntry("type", "noul")
-                .containsEntry("instructions", "원하는 요리 분류가 '국'인가");
+                .containsEntry("instructions", "이 요청에 '국' 요리가 어울리나?");
     }
 
     @Test

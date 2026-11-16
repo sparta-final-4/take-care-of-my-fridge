@@ -6,6 +6,7 @@
 호출 설정은 `app.typesafe`(`TypeSafeProperties`), 상담에서 켤지는 `app.chat.jev.enabled`(`ChatJevProperties`)에 있다. 이 문서에는 API 키를 쓰지 않는다. curl에서는 `"$TYPESAFE_API_KEY"`로만 참조한다.
 
 > 키 없는 호출 2건, 사용자가 직접 한 키 있는 호출 2건(모델 목록, Choice 하나), 이 작업에서 한 키 있는 호출 7건(a~g)을 [실제 호출](#실제-호출-2026-11-16)에 적었다.
+> 글에서 부분을 꺼낼 수 있는지 본 Box 호출 1건(h)은 [Box로 글에서 부분 꺼내기](#box로-글에서-부분-꺼내기-h)에 적었다.
 > 각 경우는 **한 번씩만** 호출했다. 지연·확률은 한 번 측정한 값이라 흔들릴 수 있다.
 
 > **한글 본문은 UTF-8로 보내야 한다.** Windows에서 `curl -d '{"state":"김피탕…"}'`처럼 한글을 명령줄로 넘기면 인코딩이 깨져
@@ -23,6 +24,7 @@
 | https://docs.typesafe.ai/api/list-models.md | `GET /v1/models` |
 | https://docs.typesafe.ai/api/errors.md | 오류 코드 |
 | https://docs.typesafe.ai/primitives/choice.md · score.md · noul.md | 질문 종류 |
+| https://docs.typesafe.ai/primitives/box.md | Box (이미지 안 위치) |
 | https://docs.typesafe.ai/models.md | 모델 이름·가격·문맥 한도 |
 | https://api.typesafe.ai/openapi.json | 전체 OpenAPI (이번에 읽지 않음) |
 | https://console.typesafe.ai/rate-limits | 조직별 속도 제한 (콘솔, 읽지 않음) |
@@ -45,7 +47,7 @@
 | `choice` | `instructions`(질문), `criteria`(필수, **선택지 이름 → 설명** 객체, 1~255개) | 선택지 중 하나. 설명은 `criteria`의 값으로 넣는다 (따로 `description` 칸은 없다) |
 | `score` | `instructions`, `criteria`(필수, **순서 있는 단계 설명 배열**) | 단계 위 점수. 단계 번호는 0부터. OpenAPI는 1~10개, 설명 페이지는 "2개 이상, 10개까지" |
 | `noul` | `instructions`(예/아니오 질문 문장), `criteria`(선택, `"true"`·`"false"` 설명) | **예/아니오 확률**. "확인 필요"라는 뜻이 아니다 |
-| `box` | `instructions` | 이미지 위치. `TypeSafe-Danger-Zone-Images: true` 헤더가 필요 |
+| `box` | `instructions` | **이미지 안** 위치(위·아래·왼·오른 가장자리, 이미지 크기에 대한 0~1 비율). 이미지가 필요하고 `TypeSafe-Danger-Zone-Images: true` 헤더가 필요. 글에서 부분을 꺼내지 못한다 (아래 h) |
 
 긴 문맥은 `TypeSafe-Danger-Zone-Long-Context: true` 헤더로 늘린다.
 
@@ -311,6 +313,39 @@ a의 `intent` 질문 하나만 `"model":"jev-1.14.0"`으로 보냈다.
 {"model":"jev-1.14.0","answers":{"intent":{"type":"choice","choice":"추천","confidence":1.0,"probabilities":{"추천":1.0,"일반 질문":0.0,"냉장고 보기":0.0,"장보기":0.0,"상관없는 말":0.0}}},"usage":{"input_tokens":417,"output_tokens":66}}
 ```
 200으로 답했다. 별칭(`jev-latest`)과 결과·지연이 같다.
+
+## Box로 글에서 부분 꺼내기 (h)
+
+요리 이름·재료 이름·"30분" 같은 부분을 문장에서 꺼낼 수 있는지 확인했다. **꺼낼 수 없다.**
+
+- 공식 문서(`primitives/box.md`, 2026-11-16 읽음): Box는 "이미지에서 무언가가 어디 있는지" 찾는 질문이다. 답은 이미지 너비·높이에 대한 비율로 준 상자 네 변(`top`·`bottom`·`left`·`right`)과 `confidence`다.
+  요청에 이미지가 있어야 하고(`assets`), `TypeSafe-Danger-Zone-Images: true` 헤더가 필요하다. 문서는 아직 운영용이 아니라고 적었다("Dreamer-ready").
+  "찾지 못함" 답이 없어서 없는 것을 물어도 상자를 준다.
+- 글에서 값을 꺼내는 공식 방법은 코드로 후보를 먼저 찾고 Jev가 그중 하나를 고르게 하는 것이다(`cookbooks/pre_parsed_value_extraction_cookbook.md`, `date_extraction_cookbook.md`). Box가 아니다.
+
+실제 호출 1건: 글만 있는 state에 Box를 물었다(이미지 없음, 이미지 헤더 있음). 본문은 Node로 UTF-8 파일을 만들어 `--data-binary`로 보냈다.
+
+```bash
+curl -sS -i -w "\ntime=%{time_total}\n" -X POST https://api.typesafe.ai/v1/systemone \
+  -H "Authorization: Bearer $TYPESAFE_API_KEY" -H "Content-Type: application/json; charset=utf-8" \
+  -H "TypeSafe-Danger-Zone-Images: true" --data-binary @box.json
+```
+```json
+{"model":"jev-1.14.0","state":"두부 넣고 김치찌개 30분 안에 만들 수 있는 거 추천해줘","questions":{
+ "dish_text":{"type":"box","instructions":"사용자가 말한 요리 이름 (state 글에서)"},
+ "dish_named":{"type":"noul","instructions":"특정 요리 이름을 말했나"}}}
+```
+```
+HTTP/1.1 200 OK
+x-typesafe-request-id: req_01a1e4b7fb5e7649b6d458848535a7bd
+
+{"model":"jev-1.14.0","answers":{"dish_text":{"type":"box","box":{"top":0.11,"bottom":0.95,"left":0.1,"right":0.95},"confidence":0.01},
+ "dish_named":{"type":"noul","noul":0.86}},"usage":{"input_tokens":320,"output_tokens":38}}
+time=0.201509
+```
+- 오류 없이 200으로 답하지만, 답은 이미지 비율 상자이고 거의 전체(0.1~0.95)를 덮는다. `confidence` 0.01이다. 글의 어느 글자인지 알 수 없다.
+- 같은 요청의 Noul(`dish_named` 0.86)은 정상이다.
+- 그래서 2차 질문에 `dish_text` Box를 더하지 않았다. 요리 이름을 꺼내려면 코드로 후보(레시피 이름 사전 등)를 찾고 Choice·Noul로 고르게 해야 한다.
 
 ## 다시 확인하는 법
 
