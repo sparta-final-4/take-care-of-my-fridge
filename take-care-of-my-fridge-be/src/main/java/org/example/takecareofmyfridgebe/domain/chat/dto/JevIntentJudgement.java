@@ -26,12 +26,16 @@ public record JevIntentJudgement(
     /**
      * 1차: 의도, 정보를 묻는 말인지, 냉장고 보기 범위.
      *
-     * @param intentProbabilities 의도별 확률 (ChatIntent 순서)
+     * @param intent              서비스 규칙을 적용한 의도. 직전 추천이 없는데 REFINE·RECIPE_DETAIL로 답했으면 RECOMMEND
+     *                            (JevIntentClassifier.serviceIntent, ChatIntentFacade와 같은 규칙). 2차를 물을지도 이 값으로 정한다
+     * @param answeredIntent      Jev가 고른 의도 그대로
+     * @param intentProbabilities 의도별 확률 (ChatIntent 순서, Jev 답 그대로)
      * @param asksQuestion        정보를 묻는 말일 확률 (Noul)
      * @param fridgeScope         냉장고 보기 범위. FRIDGE가 아닐 때도 답이 온다
      */
     public record First(
             ChatIntent intent,
+            ChatIntent answeredIntent,
             double intentConfidence,
             Map<ChatIntent, Double> intentProbabilities,
             double asksQuestion,

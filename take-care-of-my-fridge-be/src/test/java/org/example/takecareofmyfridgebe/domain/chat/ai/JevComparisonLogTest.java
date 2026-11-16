@@ -122,7 +122,7 @@ class JevComparisonLogTest {
     static JevIntentJudgement judgement(ChatIntent intent, boolean withSecond) {
         Map<ChatIntent, Double> probabilities = new EnumMap<>(ChatIntent.class);
         Arrays.stream(ChatIntent.values()).forEach(each -> probabilities.put(each, each == intent ? 0.98 : 0.0));
-        JevIntentJudgement.First first = new JevIntentJudgement.First(intent, 0.97, probabilities, 0.05, FridgeScope.ALL, 0.9,
+        JevIntentJudgement.First first = new JevIntentJudgement.First(intent, intent, 0.97, probabilities, 0.05, FridgeScope.ALL, 0.9,
                 new JevIntentJudgement.Call("jev-1.14.0", "req_first", 210L, 417));
         if (!withSecond) {
             return new JevIntentJudgement(first, null, 230L);

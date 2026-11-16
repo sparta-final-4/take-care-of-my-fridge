@@ -66,7 +66,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  * <p>
  * 비교 칸 (Jev가 판단하지 않는 요리 이름·키워드·시간·재료 등은 비교하지 않는다):
  * <ul>
- *   <li>intent: 직전 추천이 없는데 REFINE·RECIPE_DETAIL이면 RECOMMEND로 본다(ChatIntentFacade 서비스 규칙). 그 밖의 서버 보정은 하지 않는다</li>
+ *   <li>intent: JevIntentClassifier가 서비스 규칙을 적용한 의도(직전 추천이 없는데 REFINE·RECIPE_DETAIL이면 RECOMMEND, 이때 2차도 묻는다).
+ *       그 밖의 서버 보정은 하지 않는다</li>
  *   <li>kind: 요청 종류 (기대 칸 kind)</li>
  *   <li>category: 기대 kind가 특정 분류(CATEGORY)이고 기대 분류가 하나인 문장만, Jev 1등 분류와 비교한다.
  *       넓은 요청 문장의 분류 기대값은 비교하지 않는다</li>
@@ -85,8 +86,6 @@ class JevIntentEvalManualTest {
     static final List<String> COMPARED = List.of("intent", "kind", "category", "wanted", "avoid");
     // OpenAI 결과와 함께 비교할 수 있는 칸 (OpenAI는 요청 종류·1등 분류를 내지 않는다)
     private static final List<String> SHARED = List.of("intent", "wanted", "avoid");
-    // 직전 추천이 없을 때 이어지는 말(REFINE·RECIPE_DETAIL)은 새 추천으로 본다 (ChatIntentFacade 서비스 규칙)
-    private static final Set<ChatIntent> FOLLOW_UP_INTENTS = Set.of(ChatIntent.REFINE, ChatIntent.RECIPE_DETAIL);
     private static final double[] CONFIDENCE_EDGES = {0.95, 0.9, 0.8, 0.7};
     // 입력 100만 토큰당 비용 (USD)
     private static final double USD_PER_MILLION_INPUT = 0.04;
@@ -131,7 +130,7 @@ class JevIntentEvalManualTest {
         Optional<ChatSafetyBlock> block = SafetyWordChecker.check(evalCase.message(), safety.words());
         if (block.isPresent()) {
             ChatIntent intent = block.get() == ChatSafetyBlock.SELF_HARM ? ChatIntent.SELF_HARM : ChatIntent.BLOCKED;
-            return new JevRun(evalCase, run, "WORD_" + block.get(), intent, null, false, 0);
+            return new JevRun(evalCase, run, "WORD_" + block.get(), intent, null, 0);
         }
         String followUp = ChatIntentFacade.followUp(set.context(evalCase.context()));
         long startedAt = System.nanoTime();
@@ -139,7 +138,7 @@ class JevIntentEvalManualTest {
         long ms = (System.nanoTime() - startedAt) / 1_000_000;
         String status = judgement.map(found -> SECOND_INTENTS.contains(found.first().intent()) && !found.hasSecond()
                 ? "SECOND_FAILED" : "OK").orElse("FIRST_FAILED");
-        return new JevRun(evalCase, run, status, null, judgement.orElse(null), followUp != null, ms);
+        return new JevRun(evalCase, run, status, null, judgement.orElse(null), ms);
     }
 
     private static Set<String> onlyIds() {
@@ -218,11 +217,10 @@ class JevIntentEvalManualTest {
      * @param status        OK / FIRST_FAILED / SECOND_FAILED / WORD_{차단 종류}
      * @param blockedIntent 단어 차단에 걸렸을 때의 의도 (Jev를 부르지 않음)
      * @param judgement     Jev 결과 (단어 차단·1차 실패면 null)
-     * @param followUp      직전 추천 정보를 넘겼는지
      * @param ms            classify 전체 시간
      */
     record JevRun(EvalCase evalCase, int run, String status, ChatIntent blockedIntent,
-                  JevIntentJudgement judgement, boolean followUp, long ms) {
+                  JevIntentJudgement judgement, long ms) {
 
         boolean judged() {
             return judgement != null;
@@ -241,17 +239,11 @@ class JevIntentEvalManualTest {
                 return null;
             }
             JevIntentJudgement.Second second = judgement.second();
-            return new Answer(intent(),
+            return new Answer(judgement.first().intent(),
                     second == null ? Set.of() : tastes(second, TasteStance.WANTED),
                     second == null ? Set.of() : tastes(second, TasteStance.AVOIDED),
                     second == null ? null : second.requestKind(),
                     second == null ? null : second.category());
-        }
-
-        // 직전 추천이 없는데 이어지는 말(REFINE·RECIPE_DETAIL)이면 새 추천으로 본다
-        ChatIntent intent() {
-            ChatIntent intent = judgement.first().intent();
-            return !followUp && FOLLOW_UP_INTENTS.contains(intent) ? ChatIntent.RECOMMEND : intent;
         }
 
         List<String> mismatches(List<String> fields) {
@@ -295,7 +287,7 @@ class JevIntentEvalManualTest {
         summary.add("Jev 상담 의도 평가 " + stamp + " · 모델 " + model + " · 문장 " + cases.size() + "개 × " + runs
                 + "번 (다수결) · 분류 선택지 " + categoryCount + "개 + 없음");
         summary.add("비교 칸: " + String.join(", ", COMPARED) + " (밀키트는 평가 세트에 기대 칸이 없어 비교하지 않음)");
-        summary.add("- intent: 직전 추천이 없는데 REFINE·RECIPE_DETAIL이면 RECOMMEND로 본다");
+        summary.add("- intent: JevIntentClassifier의 서비스 규칙 적용 값 (직전 추천이 없는데 REFINE·RECIPE_DETAIL이면 RECOMMEND, 이때 2차도 묻는다)");
         summary.add("- kind: 요청 종류(DISH 특정 요리 / CATEGORY 특정 분류 / BROAD 넓은 요청 / NONE 없음)");
         summary.add("- category: 기대 kind가 CATEGORY이고 기대 분류가 하나인 문장만 Jev 1등 분류와 비교 (넓은 요청의 분류 기대값은 비교하지 않음)");
         summary.add("- wanted·avoid (기준 변경): 매운맛 피함 + 순한맛 원함, 매운맛 원함 + 순한맛 피함으로 답한 순한맛은 틀림으로 세지 않는다"
@@ -561,7 +553,7 @@ class JevIntentEvalManualTest {
             JevIntentJudgement.Second second = judgement == null ? null : judgement.second();
             Answer answer = row.answer();
             cells.add(csv(answer == null ? null : answer.intent()));
-            cells.add(csv(first == null ? null : first.intent()));
+            cells.add(csv(first == null ? null : first.answeredIntent()));
             cells.add(first == null ? "" : String.valueOf(first.intentConfidence()));
             cells.add(csv(first == null ? null : first.intentProbabilities().entrySet().stream()
                     .sorted(Map.Entry.<ChatIntent, Double>comparingByValue().reversed()).limit(3)
@@ -685,10 +677,14 @@ class JevIntentEvalManualTest {
             SHARED.forEach(field -> fieldCounts.put(field, new int[4]));
             int[] overall = new int[4];
             List<String> jevOnlyWrong = new ArrayList<>();
+            // OpenAI 평가 뒤에 평가 세트에 넣은 문장 (OpenAI 결과가 없어 비교 표에 넣지 않는다)
+            List<String> noOpenAi = new ArrayList<>();
             for (Map.Entry<EvalCase, List<JevRun>> entry : byCase.entrySet()) {
                 EvalCase evalCase = entry.getKey();
                 List<Answer[]> openAiRows = openAi.get(evalCase.id());
                 if (openAiRows == null) {
+                    boolean jevPass = majority(entry.getValue(), row -> row.mismatches(SHARED).isEmpty());
+                    noOpenAi.add(evalCase.id() + " " + evalCase.message() + " → Jev " + (jevPass ? "맞음" : "틀림"));
                     continue;
                 }
                 Map<String, Object> expect = evalCase.expect().raw();
@@ -726,6 +722,8 @@ class JevIntentEvalManualTest {
             lines.add(String.format("  intent·wanted·avoid 모두: %d / %d / %d", overall[1], overall[2], overall[3]));
             fieldCounts.forEach((field, counts) -> lines.add(String.format("  %s (%d문장): %d / %d / %d", field, counts[0],
                     counts[1], counts[2], counts[3])));
+            lines.add("OpenAI 결과가 없는 문장 (위 표에서 뺌, intent·wanted·avoid 기준): " + noOpenAi.size());
+            noOpenAi.forEach(line -> lines.add("  " + line));
             lines.add("Jev만 틀림 (OpenAI 보정 전·후 모두 맞음): " + jevOnlyWrong.size());
             jevOnlyWrong.forEach(line -> lines.add("  " + line));
             return lines;

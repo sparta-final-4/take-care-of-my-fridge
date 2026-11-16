@@ -76,6 +76,9 @@ class JevIntentClassifierTest {
     private static final String FIRST_GENERAL = firstResponse(
             "{\"type\":\"choice\",\"choice\":\"일반 질문\",\"confidence\":0.95,\"probabilities\":"
                     + "{\"추천\":0.03,\"일반 질문\":0.96,\"냉장고 보기\":0.01}}");
+    private static final String FIRST_RECIPE_DETAIL = firstResponse(
+            "{\"type\":\"choice\",\"choice\":\"레시피 자세히\",\"confidence\":0.83,\"probabilities\":"
+                    + "{\"추천\":0.12,\"레시피 자세히\":0.86,\"일반 질문\":0.02}}");
     private static final String SECOND = secondResponse(CATEGORY_GUK);
 
     private final List<byte[]> sentBodies = new ArrayList<>();
@@ -231,6 +234,36 @@ class JevIntentClassifierTest {
 
         server.verify();
         assertThat(judgement.first().intent()).isEqualTo(ChatIntent.GENERAL);
+        assertThat(judgement.hasSecond()).isFalse();
+    }
+
+    @Test
+    @DisplayName("직전 추천이 없는데 레시피 자세히로 답하면 서비스 규칙대로 추천으로 보고 2차를 묻는다")
+    void asksSecondAsRecommend_whenRecipeDetailWithoutFollowUp() {
+        JevIntentClassifier classifier = classifier(withKey());
+        expectCall(FIRST_RECIPE_DETAIL, "req_first");
+        expectCall(SECOND, "req_second");
+
+        JevIntentJudgement judgement = classifier.classify("매운 닭볶음탕 레시피", CATEGORIES, null).orElseThrow();
+
+        server.verify();
+        assertThat(judgement.first().intent()).isEqualTo(ChatIntent.RECOMMEND);
+        assertThat(judgement.first().answeredIntent()).isEqualTo(ChatIntent.RECIPE_DETAIL);
+        assertThat(judgement.hasSecond()).isTrue();
+    }
+
+    @Test
+    @DisplayName("직전 추천이 있으면 레시피 자세히를 그대로 두고 2차를 묻지 않는다")
+    void keepsRecipeDetail_whenFollowUpExists() {
+        JevIntentClassifier classifier = classifier(withKey());
+        expectCall(FIRST_RECIPE_DETAIL, "req_first");
+
+        JevIntentJudgement judgement = classifier.classify("두 번째 거 어떻게 만들어?", CATEGORIES,
+                "[직전 추천] 1. 김치찌개 / 2. 순두부찌개").orElseThrow();
+
+        server.verify();
+        assertThat(judgement.first().intent()).isEqualTo(ChatIntent.RECIPE_DETAIL);
+        assertThat(judgement.first().answeredIntent()).isEqualTo(ChatIntent.RECIPE_DETAIL);
         assertThat(judgement.hasSecond()).isFalse();
     }
 

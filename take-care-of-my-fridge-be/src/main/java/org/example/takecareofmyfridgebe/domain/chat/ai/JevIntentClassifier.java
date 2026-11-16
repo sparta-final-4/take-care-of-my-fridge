@@ -18,8 +18,10 @@ import java.util.function.Function;
  * Jev(TypeSafe 분류 모델)로 상담 메시지의 의도 판단 질문에 답을 받는다. 그림자 모드용이라 결과를 상담 흐름에 쓰지 않는다.
  * <ol>
  *   <li>1차(모든 메시지): 의도, 정보를 묻는 말인지, 냉장고 보기 범위 (JevFirstQuestions)</li>
- *   <li>2차(1차 의도가 RECOMMEND·REFINE일 때만): 요리 이름·특징·재료·밀키트, 맛 5개, 분류 (JevSecondQuestions)</li>
+ *   <li>2차(1차 의도가 RECOMMEND·REFINE일 때만): 요리 이름·특징·재료·밀키트, 맛 5개, 요청 종류, 1등 분류 (JevSecondQuestions)</li>
  * </ol>
+ * 1차 의도에는 서비스 규칙을 적용한다: 직전 추천이 없는데 REFINE·RECIPE_DETAIL로 답하면 RECOMMEND로 보고(ChatIntentFacade와 같다) 2차도 묻는다.
+ * 그림자 비교 로그와 평가(JevIntentEvalManualTest)가 이 값을 그대로 쓴다.
  * 1차가 실패하면 빈 값, 2차만 실패하면 1차만 있는 결과다. 예외는 밖으로 내지 않고 WARN 로그를 남긴다.
  * HTTP 실패 로그는 TypeSafeClient가, 답 형식 오류 로그는 여기서 남긴다. 로그에 메시지 원문은 쓰지 않는다.
  */
@@ -33,6 +35,8 @@ public class JevIntentClassifier {
     // 직전 추천 정보 뒤에 이번 메시지를 붙일 때 쓰는 머리말
     static final String MESSAGE_HEADER = "\n[이번 말] ";
     private static final Set<ChatIntent> NEEDS_SECOND = Set.of(ChatIntent.RECOMMEND, ChatIntent.REFINE);
+    // 직전 추천이 있어야 뜻이 있는 이어지는 말. 직전 추천이 없으면 새 추천으로 본다
+    private static final Set<ChatIntent> FOLLOW_UP_INTENTS = Set.of(ChatIntent.REFINE, ChatIntent.RECIPE_DETAIL);
 
     private final TypeSafeClient typeSafeClient;
 
@@ -45,9 +49,10 @@ public class JevIntentClassifier {
     public Optional<JevIntentJudgement> classify(String message, List<String> categories, String followUp) {
         long startedAt = System.nanoTime();
         String state = state(message, followUp);
+        boolean hasFollowUp = followUp != null && !followUp.isBlank();
 
         Optional<JevIntentJudgement.First> first = typeSafeClient.ask(FIRST, state, JevFirstQuestions.questions())
-                .flatMap(call -> read(FIRST, call, JevFirstQuestions::read));
+                .flatMap(call -> read(FIRST, call, answered -> JevFirstQuestions.read(answered, hasFollowUp)));
         if (first.isEmpty()) {
             return Optional.empty();
         }
@@ -67,7 +72,15 @@ public class JevIntentClassifier {
         return Optional.of(judgement);
     }
 
-    // 2차(추천 조건)를 묻는 의도인지
+    /**
+     * 서비스 규칙을 적용한 의도. 직전 추천이 없는데 REFINE·RECIPE_DETAIL이면 RECOMMEND다
+     * (ChatIntentFacade: 직전 조건이 없는 다시 추천은 새 추천, 이 상담 추천에 없는 레시피 자세히는 그 요리로 추천).
+     */
+    static ChatIntent serviceIntent(ChatIntent answered, boolean hasFollowUp) {
+        return !hasFollowUp && FOLLOW_UP_INTENTS.contains(answered) ? ChatIntent.RECOMMEND : answered;
+    }
+
+    // 2차(추천 조건)를 묻는 의도인지 (서비스 규칙을 적용한 의도로 본다)
     static boolean asksSecond(ChatIntent intent) {
         return NEEDS_SECOND.contains(intent);
     }
@@ -92,9 +105,9 @@ public class JevIntentClassifier {
     private void logJudgement(JevIntentJudgement judgement, int messageLength) {
         JevIntentJudgement.First first = judgement.first();
         JevIntentJudgement.Second second = judgement.second();
-        log.info("Jev 의도 판단 - intent: {}, confidence: {}, 메시지 길이: {}, model: {}, "
+        log.info("Jev 의도 판단 - intent: {} (Jev 답 {}), confidence: {}, 메시지 길이: {}, model: {}, "
                         + "1차: {}ms·입력 {}·{}, 2차: {}, 합계: {}ms",
-                first.intent(), first.intentConfidence(), messageLength, first.call().model(),
+                first.intent(), first.answeredIntent(), first.intentConfidence(), messageLength, first.call().model(),
                 first.call().latencyMs(), first.call().inputTokens(), first.call().requestId(),
                 second == null ? "없음" : second.call().latencyMs() + "ms·입력 " + second.call().inputTokens() + "·" + second.call().requestId(),
                 judgement.totalLatencyMs());

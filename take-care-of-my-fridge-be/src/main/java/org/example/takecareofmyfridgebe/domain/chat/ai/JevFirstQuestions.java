@@ -26,15 +26,17 @@ final class JevFirstQuestions {
             new Option<>("추천", ChatIntent.RECOMMEND,
                     "메뉴·레시피·요리를 정해 달라는 말. \"뭐 먹지?\", \"~ 먹고 싶어\", 음식·재료·요리 종류·밀키트 이름만 말한 것도 추천이다"),
             new Option<>("일반 질문", ChatIntent.GENERAL,
-                    "보관법·손질법·영양·재료 질문, 인사, 짧은 잡담, 주문·배송 질문. 역할을 정하는 말과 \"배고파 죽겠어\" 같은 과장도 여기다"),
+                    "보관법·손질법·영양·재료 질문, 인사, 짧은 잡담, 주문·배송 질문. 역할을 정하는 말과 \"배고파 죽겠어\" 같은 과장도 여기다. "
+                            + "목록이나 계획을 글로 짜 달라는 말(장보기 목록, 식단표)도 일반 질문이다"),
             new Option<>("조건 바꾸기", ChatIntent.REFINE,
                     "[직전 추천]을 조건을 바꿔 다시 받고 싶은 말. 예) \"좀 더 매운 걸로\", \"다른 거 없어?\", \"국물 말고 볶음으로\""),
             new Option<>("레시피 자세히", ChatIntent.RECIPE_DETAIL,
                     "[직전 추천]의 레시피 하나의 만드는 법·시간·재료·팁을 묻는 말. 예) \"두 번째 거 어떻게 만들어?\""),
             new Option<>("냉장고 보기", ChatIntent.FRIDGE,
-                    "내 냉장고에 무엇이 있는지 보려는 말. 예) \"냉장고에 뭐 있어\", \"두부 아직 있어?\", \"밀키트 뭐 남았어\""),
+                    "내 냉장고에 있는 재료를 확인하는 말. 무엇이 있는지, 얼마나 남았는지, 소비기한이 언제인지, "
+                            + "곧 버려야 하거나 먼저 써야 할 것이 무엇인지 묻는다"),
             new Option<>("장보기", ChatIntent.SHOP,
-                    "재료·상품을 사려는 말, 세일·할인 중인 상품을 묻는 말. 예) \"당근 사고 싶어\", \"대파 장바구니에 담아줘\""),
+                    "재료나 밀키트를 사려는 말. 살 수 있는 상품, 세일 중인 상품, 장바구니에 담기를 묻는다"),
             new Option<>("상관없는 말", ChatIntent.OFF_TOPIC,
                     "요리·식재료·냉장고·장보기·밀키트와 상관없는 일을 해 달라는 말. 예) \"주식 추천해줘\", \"파이썬 코드 짜줘\""),
             new Option<>("막을 말", ChatIntent.BLOCKED,
@@ -61,12 +63,16 @@ final class JevFirstQuestions {
         return Collections.unmodifiableMap(questions);
     }
 
-    static JevIntentJudgement.First read(SystemOneCall call) {
+    /**
+     * @param hasFollowUp 직전 추천 정보를 넘겼는지 (서비스 규칙으로 의도를 정할 때 쓴다)
+     */
+    static JevIntentJudgement.First read(SystemOneCall call, boolean hasFollowUp) {
         JevAnswers answers = new JevAnswers(call);
         JevAnswers.Choice<ChatIntent> intent = answers.choice(INTENT, INTENTS);
         JevAnswers.Choice<FridgeScope> fridgeScope = answers.choice(FRIDGE_SCOPE, FRIDGE_SCOPES);
         return new JevIntentJudgement.First(
-                intent.value(), intent.confidence(), intent.probabilities(),
+                JevIntentClassifier.serviceIntent(intent.value(), hasFollowUp), intent.value(),
+                intent.confidence(), intent.probabilities(),
                 answers.noul(ASKS_QUESTION),
                 fridgeScope.value(), fridgeScope.confidence(),
                 answers.call());
