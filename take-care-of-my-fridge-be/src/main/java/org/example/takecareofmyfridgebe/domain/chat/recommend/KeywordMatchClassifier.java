@@ -28,12 +28,6 @@ public final class KeywordMatchClassifier {
     private KeywordMatchClassifier() {
     }
 
-    // 요리 이름 조각 없이 가른다
-    public static KeywordMatch classify(String dishText, List<String> keywords, boolean vectorOnly,
-                                        String recipeName, Collection<String> ingredientNames) {
-        return classify(dishText, keywords, List.of(), vectorOnly, recipeName, ingredientNames);
-    }
-
     /**
      * @param dishText        사용자가 말한 요리 이름 (없으면 null)
      * @param keywords        AI가 늘린 키워드 전체

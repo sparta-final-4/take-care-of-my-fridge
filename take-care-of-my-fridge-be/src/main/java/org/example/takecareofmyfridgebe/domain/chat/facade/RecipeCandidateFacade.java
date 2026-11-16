@@ -85,27 +85,24 @@ public class RecipeCandidateFacade {
             ranked = collected.refilled() > 0 ? rankPool(context, collected) : ranked;
         }
         logCollected(context, collected, ranked, started);
-        RecipeCandidates result = toResult(context, collected, ranked);
         RecipeQuery query = context.query();
-        if (!dishAsked(query) || hasStrongCandidate(result)) {
-            return result;
-        }
         // 요리 이름을 말했는데 제대로 맞은 후보가 없으면(벡터 후보만 남음, 또는 0장) 못 찾은 것으로 알린다
-        RecipeCandidates notFound = new RecipeCandidates(result.candidates(), result.fallback(), true, result.keptAvoidTastes())
-                .withTasteDetails(result.recipeTastes(), result.maybeSpicyIds());
-        if (!notFound.candidates().isEmpty()) {
-            log.info("상담 후보 요리 이름이 맞은 레시피가 없어 벡터 후보만 씀 - memberId: {}, 요리 이름: {}, 키워드: {}, 후보 {}건",
-                    query.memberId(), query.keywordText(), query.keywords(), notFound.candidates().size());
-            return notFound;
+        boolean dishNotFound = dishAsked(query)
+                && !anyStrong(ranked.candidates().stream().map(candidate -> candidate.reason().keywordMatch()));
+        RecipeCandidates result = toResult(context, collected, ranked, dishNotFound);
+        if (dishNotFound && result.candidates().isEmpty()) {
+            return withEmptyReason(query, result);
         }
-        return withEmptyReason(query, notFound);
+        if (dishNotFound) {
+            log.info("상담 후보 요리 이름이 맞은 레시피가 없어 벡터 후보만 씀 - memberId: {}, 요리 이름: {}, 키워드: {}, 후보 {}건",
+                    query.memberId(), query.keywordText(), query.keywords(), result.candidates().size());
+        }
+        return result;
     }
 
-    // 키워드로 제대로 맞은(이름·늘린 이름·재료·이름 조각) 후보가 있는지
-    private static boolean hasStrongCandidate(RecipeCandidates result) {
-        return result.candidates().stream()
-                .map(candidate -> candidate.reason().keywordMatch())
-                .anyMatch(match -> match != null && match.strong());
+    // 키워드로 제대로 맞은(이름·늘린 이름·재료·이름 조각) 것이 있는지 (쪼개짐·벡터는 맞은 것으로 치지 않는다)
+    private static boolean anyStrong(Stream<KeywordMatch> matches) {
+        return matches.anyMatch(match -> match != null && match.strong());
     }
 
     // 요리 이름을 말했는지 (요리 이름, 또는 특징 없이 키워드만).
@@ -231,7 +228,7 @@ public class RecipeCandidateFacade {
     // 분석기가 고쳐지면 ES 키워드 표시만으로 정하도록 걷어낸다
     private static boolean needsKeywordSupplement(Context context, Collected collected) {
         return collected.pool().rowsNonBasicComplete() && !context.query().keywords().isEmpty()
-                && !hasStrongKeywordMatch(collected.query());
+                && !anyStrong(collected.query().keywordMatches().values().stream());
     }
 
     private Collected supplementKeywords(Context context, Collected collected) {
@@ -291,8 +288,8 @@ public class RecipeCandidateFacade {
                 (System.nanoTime() - started) / 1_000_000);
     }
 
-    // 5. 결과: 고른 후보에 부족한 재료와 후보의 맛을 채운다
-    private RecipeCandidates toResult(Context context, Collected collected, RecipeCandidates ranked) {
+    // 5. 결과: 고른 후보에 부족한 재료와 후보의 맛을 채운다. 요리 이름을 못 찾았으면(dishNotFound) 못 찾음으로 표시한다
+    private RecipeCandidates toResult(Context context, Collected collected, RecipeCandidates ranked, boolean dishNotFound) {
         CandidatePool pool = collected.pool();
         // 부족한 재료: ES 경로는 후보의 기본 양념 뺀 재료를 이미 다 읽었고, DB 경로는 고른 10개만 조회한다
         List<RecipeCandidateIngredient> nonBasicRows = pool.rowsNonBasicComplete()
@@ -305,7 +302,7 @@ public class RecipeCandidateFacade {
             candidateTastes.put(candidate.recipeId(),
                     collected.details().tastes().getOrDefault(candidate.recipeId(), Set.of()));
         }
-        return new RecipeCandidates(result.candidates(), result.fallback(), collected.query().keywordsNotFound(),
+        return new RecipeCandidates(result.candidates(), result.fallback(), dishNotFound || collected.query().keywordsNotFound(),
                 ranked.keptAvoidTastes())
                 .withTasteDetails(candidateTastes, collected.details().spicy().maybe());
     }
@@ -352,11 +349,6 @@ public class RecipeCandidateFacade {
         log.debug("상담 후보 요리 이름을 말해 키워드로 찾은 후보만 정렬 - memberId: {}, 요리 이름: {}, 후보 {}건 중 {}건",
                 query.memberId(), query.keywordText(), infos.size(), kept.size());
         return kept;
-    }
-
-    // 키워드로 이름·늘린 이름·재료가 맞은 레시피가 있는지 (쪼개짐·벡터는 맞은 것으로 치지 않는다)
-    private static boolean hasStrongKeywordMatch(RecipeQuery query) {
-        return query.keywordMatches().values().stream().anyMatch(KeywordMatch::strong);
     }
 
     /**
