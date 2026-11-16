@@ -42,7 +42,7 @@
   - `hasStrongCandidate`와 `hasStrongKeywordMatch`를 `anyStrong` 하나로. 요리 이름 못 찾음(`dishNotFound`)은 정렬 결과로 정하고 `toResult`에서 표시한다(결과를 다시 만들지 않음).
 - `KeywordMatchClassifier`: 이름 조각 없이 가르는 5개 인자 `classify` 오버로드 제거(main에서 쓰지 않았음).
 - 로그 문구는 그대로다(`상담 후보 모으기 - … 경로: …, ES 호출 전체 …·요청만 …·피할 맛 재검색 …, 벡터 …`).
-- 지금 동작 그대로 둔 것: 키워드 보충이 새 레시피를 하나도 못 찾으면 맞은 방식을 다시 가르지 않는다(아래 "남은 작업" 참고).
+- 정리 커밋에서는 키워드 보충이 새 레시피를 하나도 못 찾으면 맞은 방식을 다시 가르지 않는 동작을 그대로 두었고, 뒤 커밋에서 고쳤다(아래 "남은 작업" 참고).
 
 ### 줄 수
 
@@ -80,5 +80,6 @@ wc -l facade/RecipeCandidateFacade.java facade/RecipeCandidateCollector.java ser
 - 실제 커밋: `9b7c8ad3`(테스트), `773e62aa`(합치기·정렬 도우미), `a4b5358b`(겹치는 판정 제거), 이 기록. push는 하지 않았다.
 - 남은 일:
   - 감사 페이지 작업 때 `CandidatePool` 로그용 칸(`route`, `counts`, `esCalls`, `vectorCalled`)을 문자열 대신 기록용 record로 바꾸고 구조화된 로그(JSON 등)로 남기기.
-  - 키워드 보충이 이미 모은 레시피만 찾으면(새 레시피 0건) 그 레시피의 키워드 결과 표시가 맞은 방식에 반영되지 않는다. `foundPool`은 표시하라고 되어 있어(요리 이름 추천은 키워드로 찾은 후보만 카드에 쓰므로) 의도와 다르다. 예: "김치찌게"를 벡터로 찾은 김치찌개가 이미 냉장고 점수로 후보에 있으면 카드에서 빠질 수 있다. 이번에는 동작을 지키려고 그대로 두었다(`supplementKeywords`의 새 레시피 0건 분기). 고칠지 결정이 필요하다.
+  - 키워드 보충이 이미 모은 레시피만 찾으면(새 레시피 0건) 그 레시피의 키워드 결과 표시가 맞은 방식에 반영되지 않는다. `foundPool`은 표시하라고 되어 있어(요리 이름 추천은 키워드로 찾은 후보만 카드에 쓰므로) 의도와 다르다. 예: "김치찌게"를 벡터로 찾은 김치찌개가 이미 냉장고 점수로 후보에 있으면 카드에서 빠질 수 있다. 정리 커밋에서는 동작을 지키려고 그대로 두었다(`supplementKeywords`의 새 레시피 0건 분기).
+    - (해결) 그 분기를 없애고 키워드 보충 결과를 늘 합쳐 맞은 방식을 다시 가른다. 비슷한 요리 검색처럼(`foundPool`) 이미 모은 후보를 다시 찾으면 키워드 결과(벡터로만 찾았으면 VECTOR)로 표시돼 요리 이름 추천 카드에 남는다. 테스트: `RecipeCandidateFacadeTest.keepsPooledRecipeAsVector_whenVectorSupplementFindsItAgain`(고치기 전 코드에서는 실패). 기존 테스트는 고치지 않았다.
   - 계획에서 하지 않기로 한 것: 피할 맛 boosting(search 도메인), 이름 조각 검색 합치기, 요청만 2차 검색, DB 경로.

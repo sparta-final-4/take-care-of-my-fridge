@@ -236,12 +236,8 @@ public class RecipeCandidateFacade {
         CandidatePool supplement = recipeCandidateCollector.searchKeywordsOnce(context.query(), pool.recipeIds());
         String counts = ", 벡터 보충 새로 " + supplement.recipeIds().size()
                 + (supplement.fragments().isEmpty() ? "" : " (이름 조각 " + supplement.fragments() + ")");
-        if (!supplement.recipeIds().isEmpty()) {
-            return merge(context, collected, supplement, "+벡터", counts);
-        }
-        // 새로 찾은 게 없어도 합친다 (벡터를 불렀는지 로그에 남기려고). 이때 맞은 방식은 다시 가르지 않는다 (지금 동작 그대로)
-        return new Collected(pool.plus(supplement).withLog(pool.route() + "+벡터", pool.counts() + counts),
-                collected.details(), collected.query(), Set.of(), 0, 0);
+        // 새로 찾은 게 없어도 합친다 (벡터를 불렀는지 로그에 남기고, 이미 모은 후보를 다시 찾았으면 키워드 결과로 표시하려고)
+        return merge(context, collected, supplement, "+벡터", counts);
     }
 
     // 2-1. 이름 조각: 키워드 보충을 하지 않았어도(비슷한 요리가 맞음) 요리 이름 그대로 맞은 레시피(KeywordMatch NAME)가 없으면

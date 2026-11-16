@@ -750,6 +750,28 @@ class RecipeCandidateFacadeTest {
     }
 
     @Test
+    @DisplayName("ES 경로: 냉장고 점수로 이미 후보에 있는 레시피(김치찌개)를 벡터 보충이 다시 찾으면 요리 이름 추천에서 벡터로 찾은 후보로 카드에 남는다")
+    void keepsPooledRecipeAsVector_whenVectorSupplementFindsItAgain() throws Exception {
+        when(memberService.getMyInfo(MEMBER_ID)).thenReturn(mock(MyInfoResponse.class));
+        when(fridgeService.getItems(any(), any())).thenReturn(List.of(fridgeItem(1L, "두부", 5)));
+        when(candidateSearchService.search(any())).thenReturn(List.of(
+                hit(12L, RecipeCandidateSearchService.MATCH_FRIDGE), hit(40L, RecipeCandidateSearchService.MATCH_FRIDGE)));
+        when(recipeSearchService.search(any(RecipeListRequest.class))).thenReturn(new RecipeSearchResult(List.of(40L), 1, true));
+        when(recipeSearchService.analyzeTokens("김치찌게")).thenReturn(List.of("김치찌게"));
+        givenEsRecipes(Map.of(
+                12L, new RecipeCandidateInfo(12L, "두부조림", "조림", 20, 1),
+                40L, new RecipeCandidateInfo(40L, "김치찌개", "찌개", 30, 1)));
+        RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, null, null, null, false,
+                List.of("김치찌게"), "김치찌게");
+
+        RecipeCandidates result = esFacade.findCandidates(query);
+
+        assertThat(result.candidates()).extracting(RecipeCandidate::recipeId).containsExactly(40L);
+        assertThat(matchOf(result, 40L).type()).isEqualTo(KeywordMatch.Type.VECTOR);
+        assertThat(result.keywordsNotFound()).isTrue();
+    }
+
+    @Test
     @DisplayName("특징만 말한 추천(원한 표현 있음, 요리 이름 없음)은 키워드로 맞은 레시피가 없어도 냉장고 후보로 카드를 채운다")
     void keepsFridgeCandidates_whenOnlyFeatureAsked() throws Exception {
         givenNoKeywordMatchInEs();
