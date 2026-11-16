@@ -158,6 +158,13 @@ public record RecipeQuery(
                 alreadyRecommendedIds, avoidTastes);
     }
 
+    // 키워드를 바꾼 검색 조건 (후보 검색에서 비슷한 요리를 키워드 뒤에 더할 때)
+    public RecipeQuery withKeywords(List<String> newKeywords) {
+        return new RecipeQuery(memberId, selectedIngredientIds, wantedTastes, moodCategories, maxMinutes,
+                excludeIngredientIds, useSelectedOnly, newKeywords, keywordText, preferenceText, selectedIngredientGroups,
+                keywordMatches, alreadyRecommendedIds, avoidTastes);
+    }
+
     // 키워드 검색 결과를 채운 검색 조건
     public RecipeQuery withKeywordMatches(Map<Long, KeywordMatch> matches) {
         return new RecipeQuery(memberId, selectedIngredientIds, wantedTastes, moodCategories, maxMinutes,

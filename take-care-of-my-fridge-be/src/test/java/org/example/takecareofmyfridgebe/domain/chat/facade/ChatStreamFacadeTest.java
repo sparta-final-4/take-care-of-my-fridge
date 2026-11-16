@@ -802,6 +802,50 @@ class ChatStreamFacadeTest {
     }
 
     @Test
+    @DisplayName("일반 답을 추천으로 시도한 것(DISH_TRY)이 카드 0장이면 \"찾지 못했어요\"·못 찾음 문구 대신 일반 답을 보낸다")
+    void sendsGeneralReply_whenDishTryFindsNoCards() {
+        Long sessionId = 10L;
+        ChatMessageCreateRequest request = ChatMessageCreateRequest.of("오늘은 김피탕이 땡기네");
+        RecipeQuery query = new RecipeQuery(1L, List.of(), null, null, null, null, false, List.of("김피탕"), "김피탕");
+        when(chatIntentFacade.resolve(eq(1L), eq(sessionId), eq(request), any()))
+                .thenReturn(ChatIntentResolution.recommend(Source.DISH_TRY, query));
+        when(chatMessageService.findRecommendedRecipeIds(sessionId)).thenReturn(Set.of());
+        when(chatRecommendationFacade.recommend(request.content(), query.withAlreadyRecommended(Set.of()), List.of(), sessionId))
+                .thenReturn(RecommendationReply.fixed(ChatRecommendationsEventResponse.of(List.of()),
+                        "김피탕 레시피는 아직 없어요. 다른 요리를 물어봐 주세요."));
+        when(chatReplyGenerator.generate(1L, sessionId, "오늘은 김피탕이 땡기네", List.of())).thenReturn(Flux.just("김피탕 맛있죠"));
+        when(chatMessageService.saveExchange(sessionId, "오늘은 김피탕이 땡기네", "김피탕 맛있죠")).thenReturn(List.of(
+                new ChatMessageResponse(100L, 1, ChatMessageRole.USER, "오늘은 김피탕이 땡기네", LocalDateTime.now()),
+                new ChatMessageResponse(101L, 2, ChatMessageRole.ASSISTANT, "김피탕 맛있죠", LocalDateTime.now())
+        ));
+
+        List<ServerSentEvent<String>> events = chatStreamFacade.streamMessage(1L, sessionId, request).collectList().block();
+
+        assertThat(events).extracting(ServerSentEvent::event).containsExactly("message", "done");
+        assertThat(events).extracting(ServerSentEvent::data)
+                .noneMatch(data -> data.contains("아직 없어요") || data.contains(ChatStreamFacade.NO_RECIPE_REPLY));
+        verify(chatReplyGenerator, never()).generateRecommendation(any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("AI가 처음부터 추천으로 본 요리 이름이 카드 0장이면 지금처럼 못 찾음 문구를 보낸다 (일반 답으로 돌리지 않는다)")
+    void sendsNotFoundReply_whenAiRecommendFindsNoCards() {
+        Long sessionId = 10L;
+        ChatMessageCreateRequest request = ChatMessageCreateRequest.of("김피탕 추천해줘");
+        RecipeQuery query = new RecipeQuery(1L, List.of(), null, null, null, null, false, List.of("김피탕"), "김피탕");
+        givenRecommend(sessionId, request, query, RecommendationReply.fixed(ChatRecommendationsEventResponse.of(List.of()),
+                "김피탕 레시피는 아직 없어요. 다른 요리를 물어봐 주세요."));
+        when(chatMessageService.saveExchange(any(), any(), any())).thenReturn(List.of(
+                new ChatMessageResponse(100L, 1, ChatMessageRole.USER, "q", LocalDateTime.now()),
+                new ChatMessageResponse(101L, 2, ChatMessageRole.ASSISTANT, "a", LocalDateTime.now())));
+
+        List<ServerSentEvent<String>> events = chatStreamFacade.streamMessage(1L, sessionId, request).collectList().block();
+
+        assertThat(events).extracting(ServerSentEvent::data).anyMatch(data -> data != null && data.contains("아직 없어요"));
+        verify(chatReplyGenerator, never()).generate(any(), any(), any(), any());
+    }
+
+    @Test
     @DisplayName("카드가 있으면 AI 소개를 받고, 정해진 \"찾지 못했어요\" 답은 카드와 같이 나가지 않는다")
     void neverSendsNotFoundReply_whenCardsExist() {
         Long sessionId = 10L;

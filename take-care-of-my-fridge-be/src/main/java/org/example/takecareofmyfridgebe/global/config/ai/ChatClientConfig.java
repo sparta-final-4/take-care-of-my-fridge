@@ -28,6 +28,12 @@ public class ChatClientConfig {
     private static final int CHAT_INTENT_MAX_TOKENS = 200;
     private static final Duration CHAT_INTENT_TIMEOUT = Duration.ofSeconds(10);
 
+    // 비슷한 요리 묻기 옵션. 요리 이름 3~5개만 받으므로 출력 토큰을 작게, 추천 답이 늦어지지 않게 타임아웃을 짧게 둔다
+    private static final String CHAT_SIMILAR_DISH_MODEL = "gpt-4o-mini";
+    private static final double CHAT_SIMILAR_DISH_TEMPERATURE = 0.0;
+    private static final int CHAT_SIMILAR_DISH_MAX_TOKENS = 100;
+    private static final Duration CHAT_SIMILAR_DISH_TIMEOUT = Duration.ofSeconds(5);
+
     /**
      * 레시피 후기 요약용. defaultSystem 프롬프트와 토큰 비용 로깅용 CostAdvisor를 기본 적용한다.
      */
@@ -75,6 +81,25 @@ public class ChatClientConfig {
                         .temperature(CHAT_INTENT_TEMPERATURE)
                         .maxTokens(CHAT_INTENT_MAX_TOKENS)
                         .timeout(CHAT_INTENT_TIMEOUT))
+                .defaultAdvisors(new CostAdvisor(llmCostCalculator, 100))
+                .build();
+    }
+
+    /**
+     * 상담 추천에서 요리 이름과 비슷한 요리 묻기용 (스트리밍 없음). 시스템 프롬프트는 OpenAiSimilarDishGenerator가 prompts/chat-similar-dishes.txt에서 읽는다.
+     * 같은 요리 이름에 같은 결과가 나오도록 temperature를 0으로 두고, 토큰 비용은 의도 뽑기와 같이 CostAdvisor가 기록한다.
+     */
+    @Bean("chatSimilarDishChatClient")
+    public ChatClient chatSimilarDishChatClient(
+            ChatClient.Builder builder,
+            LlmCostCalculator llmCostCalculator
+    ) {
+        return builder
+                .defaultOptions(OpenAiChatOptions.builder()
+                        .model(CHAT_SIMILAR_DISH_MODEL)
+                        .temperature(CHAT_SIMILAR_DISH_TEMPERATURE)
+                        .maxTokens(CHAT_SIMILAR_DISH_MAX_TOKENS)
+                        .timeout(CHAT_SIMILAR_DISH_TIMEOUT))
                 .defaultAdvisors(new CostAdvisor(llmCostCalculator, 100))
                 .build();
     }

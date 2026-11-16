@@ -262,7 +262,7 @@ class IntentCorrectorTest {
         }
 
         @Test
-        @DisplayName("AI가 뽑은 요리 이름은 메시지에 띄어쓰기와 상관없이 그대로 있을 때만 쓰고, 메시지에 없으면 비운다")
+        @DisplayName("AI가 뽑은 요리 이름은 메시지에 띄어쓰기와 상관없이 그대로 있을 때만 쓰고, 메시지에 없으면 비우며, AI가 비웠으면 메시지에 있는 첫 키워드로 채운다")
         void keepsAiDish_onlyWhenInMessage() {
             givenExtracted(new IntentResult(ChatIntent.RECOMMEND, null, List.of("튀김"), null, null, null, null,
                     List.of("김피탕", "탕수육"), "김피탕", null));
@@ -280,11 +280,11 @@ class IntentCorrectorTest {
             assertThat(facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("차가운 요리 추천해줘"))
                     .recipeQuery().keywordText()).isNull();
 
-            // AI가 요리 이름을 비우면 키워드가 메시지에 있어도 요리 이름은 없다 (서버가 추측하지 않는다)
+            // AI가 요리 이름을 비우면 메시지에 그대로 있는 첫 키워드를 요리 이름으로 쓴다
             givenExtracted(new IntentResult(ChatIntent.RECOMMEND, null, List.of("찌개"), null, null, null, null,
                     List.of("김치찌개"), "", null));
             assertThat(facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("김치찌개 먹고 싶어"))
-                    .recipeQuery().keywordText()).isNull();
+                    .recipeQuery().keywordText()).isEqualTo("김치찌개");
         }
 
         @Test

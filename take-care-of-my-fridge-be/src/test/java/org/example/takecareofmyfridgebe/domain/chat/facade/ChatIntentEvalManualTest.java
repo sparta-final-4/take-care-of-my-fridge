@@ -576,6 +576,15 @@ class ChatIntentEvalManualTest {
             cached = 0;
         }
 
+        // 마지막 호출의 입력·출력 토큰 (비슷한 요리 평가 SimilarDishEvalManualTest도 쓴다)
+        long input() {
+            return input;
+        }
+
+        long output() {
+            return output;
+        }
+
         @Override
         public Optional<LlmCost> calculate(ChatResponse chatResponse) {
             Optional<LlmCost> cost = super.calculate(chatResponse);

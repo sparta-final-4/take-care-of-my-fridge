@@ -155,7 +155,9 @@ public class ChatIntentFacade {
         boolean mealkitRecommend = corrected.mealkitRecommend();
         Long detailTarget = corrected.detailTarget();
         ChatIntentResolution resolution = switch (result.intent()) {
-            case RECOMMEND -> ChatIntentResolution.recommend(Source.AI, toRecipeQuery(memberId, sessionId, request, result));
+            // 일반 답을 추천 시도로 바꾼 것(tryDish)은 출처를 DISH_TRY로 남겨, 카드가 0장이면 일반 답으로 돌린다
+            case RECOMMEND -> ChatIntentResolution.recommend(corrected.dishTry() ? Source.DISH_TRY : Source.AI,
+                    toRecipeQuery(memberId, sessionId, request, result));
             case REFINE -> refine(memberId, sessionId, request, result, context);
             case RECIPE_DETAIL -> recipeDetail(memberId, sessionId, result, detailTarget);
             case FRIDGE -> ChatIntentResolution.fridge(Source.AI, lookupOf(request.content(), result));
@@ -407,6 +409,10 @@ public class ChatIntentFacade {
                 .toList();
     }
 
+    /**
+     * 추천 조건. 키워드는 [요리 이름] + AI 키워드 중 남은 것으로 합친다 (IntentResult.searchKeywords).
+     * 비슷한 요리는 여기서 정하지 않고, 후보 검색에서 요리 이름 그대로 맞은 레시피가 없을 때 따로 묻는다 (SimilarDishFinder).
+     */
     private RecipeQuery toRecipeQuery(Long memberId, Long sessionId, ChatMessageCreateRequest request, IntentResult result) {
         List<String> includeNames = orEmpty(result.includeIngredients());
         List<String> excludeNames = orEmpty(result.excludeIngredients());
@@ -429,7 +435,7 @@ public class ChatIntentFacade {
                 result.maxMinutes(),
                 excludeIds,
                 useSelectedOnly,
-                result.keywords(),
+                result.searchKeywords(),
                 result.dishText(),
                 result.preferenceText()
         ).withAvoidTastes(result.avoidedTastes());

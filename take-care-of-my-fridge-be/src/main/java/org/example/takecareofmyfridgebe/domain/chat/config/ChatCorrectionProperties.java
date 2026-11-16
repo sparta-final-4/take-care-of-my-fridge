@@ -12,7 +12,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @param refineSpokenTastes 다시 추천에서 맛이 부딪히면 이번 말의 맛 단어를 따른다(followSpokenTastes)
  * @param categoryWords      분류 단어·묶음 말로 분류를 정한다(correctCategories)
  * @param dishCheck          AI 요리 이름을 확인한다(checkDishAndKeywords): 메시지에 그대로 있고 분류 이름·묶음 말이 아닐 때만 둔다. 끄면 AI 값 그대로
- * @param nameOnly           이름만 말한 짧은 말을 추천으로(nameOnly)
+ * @param nameOnly           이름만 말한 짧은 말을 추천으로(nameOnly), 요리 이름이 있고 묻는 말이 없으면 추천 시도(tryDish)
  * @param mealkitRequest     밀키트를 달라는 말을 추천으로(mealkitRequested)
  * @param offTopicRevive     음식 말이 있으면 상관없는 질문을 되살린다(reviveOffTopic)
  * @param fridgeShopWords    냉장고 보기·사기 단어로 의도를 바꾼다(applyFridgeShopWords)

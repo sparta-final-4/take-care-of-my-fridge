@@ -64,7 +64,7 @@ public final class KeywordMatchClassifier {
                 }
             }
         }
-        // 이름 조각은 이름·늘린 이름·재료로 맞지 않았을 때만 본다 (조각은 원래 이름이 0건일 때만 있다)
+        // 이름 조각은 이름·늘린 이름·재료로 맞지 않았을 때만 본다 (조각은 요리 이름 그대로 맞은 레시피가 없을 때만 있다)
         for (String fragment : fragments) {
             String word = ChatTexts.removeWhitespace(fragment);
             if (word.length() >= MIN_KEYWORD_LENGTH && name.contains(word)) {
