@@ -71,8 +71,8 @@ class JevIntentClassifierTest {
             "{\"type\":\"choice\",\"choice\":\"추천\",\"confidence\":1.0,\"probabilities\":"
                     + "{\"추천\":1.0,\"일반 질문\":0.0,\"냉장고 보기\":0.0,\"장보기\":0.0,\"상관없는 말\":0.0}}");
     private static final String FIRST_REFINE = firstResponse(
-            "{\"type\":\"choice\",\"choice\":\"조건 바꾸기\",\"confidence\":0.88,\"probabilities\":"
-                    + "{\"추천\":0.08,\"조건 바꾸기\":0.9,\"레시피 자세히\":0.02}}");
+            "{\"type\":\"choice\",\"choice\":\"이어서 다시\",\"confidence\":0.88,\"probabilities\":"
+                    + "{\"추천\":0.08,\"이어서 다시\":0.9,\"레시피 자세히\":0.02}}");
     private static final String FIRST_GENERAL = firstResponse(
             "{\"type\":\"choice\",\"choice\":\"일반 질문\",\"confidence\":0.95,\"probabilities\":"
                     + "{\"추천\":0.03,\"일반 질문\":0.96,\"냉장고 보기\":0.01}}");
@@ -85,7 +85,7 @@ class JevIntentClassifierTest {
     private MockRestServiceServer server;
 
     @Test
-    @DisplayName("1차 요청은 model·키·UTF-8 한글 state와 의도·묻는 말·냉장고 범위 질문 3개를 보낸다")
+    @DisplayName("1차 요청은 model·키·UTF-8 한글 state와 의도·묻는 말·냉장고 범위 질문 3개를 보내고, 직전 추천이 없으면 의도 선택지는 7개다")
     void sendsFirstQuestionsInUtf8_whenClassify() {
         JevIntentClassifier classifier = classifier(withKey());
         expectCall(FIRST_GENERAL, "req_first");
@@ -102,8 +102,12 @@ class JevIntentClassifierTest {
         Map<String, Object> questions = map(body.get("questions"));
         assertThat(questions).containsOnlyKeys("intent", "asks_question", "fridge_scope");
         assertThat(map(questions.get("intent")).get("type")).isEqualTo("choice");
+        // 직전 추천이 없으면 이어서 다시·레시피 자세히는 고를 수 없어 뺀다
         assertThat(map(map(questions.get("intent")).get("criteria")).keySet()).containsExactly(
-                "추천", "일반 질문", "조건 바꾸기", "레시피 자세히", "냉장고 보기", "장보기", "상관없는 말", "막을 말", "자해");
+                "추천", "일반 질문", "냉장고 보기", "장보기", "상관없는 말", "막을 말", "자해");
+        assertThat(map(map(questions.get("intent")).get("criteria"))).containsEntry("추천",
+                "메뉴·레시피·요리를 정해 달라는 말. \"뭐 먹지?\", \"~ 먹고 싶어\", 음식·재료·요리 종류·밀키트 이름만 말한 것도 추천이다. "
+                        + "무엇을 빼거나 피해 달라는 조건이 붙어도 추천이다");
         assertThat(map(questions.get("asks_question")))
                 .containsEntry("type", "noul")
                 .containsEntry("instructions", "정보를 묻는 말인가(보관법·손질법·뜻 등). 요리를 정해 달라는 말은 아니다")
@@ -207,7 +211,7 @@ class JevIntentClassifierTest {
     }
 
     @Test
-    @DisplayName("직전 추천이 있으면 그 정보 뒤에 이번 메시지를 붙인 state로 묻고, 조건 바꾸기면 2차도 부른다")
+    @DisplayName("직전 추천이 있으면 그 정보 뒤에 이번 메시지를 붙인 state로 의도 선택지 9개를 묻고, 이어서 다시면 2차도 부른다")
     void callsSecondWithFollowUpState_whenIntentIsRefine() {
         JevIntentClassifier classifier = classifier(withKey());
         expectCall(FIRST_REFINE, "req_first");
@@ -222,10 +226,16 @@ class JevIntentClassifierTest {
         String expectedState = "[직전 추천] 1. 김치찌개 / 2. 순두부찌개\n[직전 조건] 분류 찌개\n[이번 말] 좀 더 매운 걸로";
         assertThat(parse(sentBodies.get(0)).get("state")).isEqualTo(expectedState);
         assertThat(parse(sentBodies.get(1)).get("state")).isEqualTo(expectedState);
+        Map<String, Object> intentCriteria = map(map(map(parse(sentBodies.get(0)).get("questions")).get("intent")).get("criteria"));
+        assertThat(intentCriteria.keySet()).containsExactly(
+                "추천", "일반 질문", "이어서 다시", "레시피 자세히", "냉장고 보기", "장보기", "상관없는 말", "막을 말", "자해");
+        assertThat(intentCriteria).containsEntry("이어서 다시",
+                "[직전 추천]에 이어서 하는 말. 직전 추천을 보고 다른 것을 달라거나, 직전 추천의 조건을 조금 바꿔 달라는 말이다. "
+                        + "무엇을 빼 달라는 말이라도 직전 추천과 상관없이 새로 요리를 정해 달라는 말이면 추천이다");
     }
 
     @Test
-    @DisplayName("1차 의도가 추천·조건 바꾸기가 아니면 2차를 부르지 않는다")
+    @DisplayName("1차 의도가 추천·이어서 다시가 아니면 2차를 부르지 않는다")
     void skipsSecond_whenIntentIsGeneral() {
         JevIntentClassifier classifier = classifier(withKey());
         expectCall(FIRST_GENERAL, "req_first");
@@ -238,7 +248,7 @@ class JevIntentClassifierTest {
     }
 
     @Test
-    @DisplayName("직전 추천이 없는데 레시피 자세히로 답하면 서비스 규칙대로 추천으로 보고 2차를 묻는다")
+    @DisplayName("직전 추천이 없는데 (선택지에 없던) 레시피 자세히로 답해도 안전망으로 추천으로 보고 2차를 묻는다")
     void asksSecondAsRecommend_whenRecipeDetailWithoutFollowUp() {
         JevIntentClassifier classifier = classifier(withKey());
         expectCall(FIRST_RECIPE_DETAIL, "req_first");

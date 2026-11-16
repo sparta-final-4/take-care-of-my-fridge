@@ -51,7 +51,7 @@ public class JevIntentClassifier {
         String state = state(message, followUp);
         boolean hasFollowUp = followUp != null && !followUp.isBlank();
 
-        Optional<JevIntentJudgement.First> first = typeSafeClient.ask(FIRST, state, JevFirstQuestions.questions())
+        Optional<JevIntentJudgement.First> first = typeSafeClient.ask(FIRST, state, JevFirstQuestions.questions(hasFollowUp))
                 .flatMap(call -> read(FIRST, call, answered -> JevFirstQuestions.read(answered, hasFollowUp)));
         if (first.isEmpty()) {
             return Optional.empty();
