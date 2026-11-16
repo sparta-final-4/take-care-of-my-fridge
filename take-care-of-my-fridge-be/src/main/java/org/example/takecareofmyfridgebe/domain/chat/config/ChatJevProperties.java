@@ -11,7 +11,7 @@ import java.time.Duration;
  * @param enabled 켤지 (기본 꺼짐)
  * @param baseUrl API 주소 (기본 https://api.typesafe.ai)
  * @param apiKey  API 키. 환경 변수 TYPESAFE_API_KEY에서만 받는다. 없으면 빈 값. toString에 나오지 않는다
- * @param model   모델 이름. jev-latest·jev-preview만 있고 버전 고정 이름은 없다
+ * @param model   모델 이름. 버전 고정 이름(기본 jev-1.14.0)을 쓴다. 별칭 jev-latest는 바뀔 수 있다
  * @param timeout 호출 제한 시간
  */
 @ConfigurationProperties(prefix = "app.chat.jev")
@@ -24,7 +24,7 @@ public record ChatJevProperties(
 ) {
 
     static final String DEFAULT_BASE_URL = "https://api.typesafe.ai";
-    static final String DEFAULT_MODEL = "jev-latest";
+    static final String DEFAULT_MODEL = "jev-1.14.0";
     static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(3);
 
     public ChatJevProperties {

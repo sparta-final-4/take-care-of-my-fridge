@@ -25,7 +25,7 @@ class ChatJevPropertiesTest {
     private static final String FAKE_KEY = "fake-test-key-0000";
 
     @Test
-    @DisplayName("환경 변수가 없으면 application.yml 기본값으로 꺼져 있고 jev-latest, 3초, 빈 키, TypeSafe 주소로 묶인다")
+    @DisplayName("환경 변수가 없으면 application.yml 기본값으로 꺼져 있고 jev-1.14.0, 3초, 빈 키, TypeSafe 주소로 묶인다")
     void bindsDefaults_whenNoEnvironmentVariables() throws IOException {
         List<PropertySource<?>> yaml = new YamlPropertySourceLoader()
                 .load("application.yml", new ClassPathResource("application.yml"));
@@ -36,7 +36,7 @@ class ChatJevPropertiesTest {
         assertThat(jev.enabled()).isFalse();
         assertThat(jev.baseUrl()).isEqualTo("https://api.typesafe.ai");
         assertThat(jev.apiKey()).isEmpty();
-        assertThat(jev.model()).isEqualTo("jev-latest");
+        assertThat(jev.model()).isEqualTo("jev-1.14.0");
         assertThat(jev.timeout()).isEqualTo(Duration.ofSeconds(3));
     }
 
@@ -65,7 +65,7 @@ class ChatJevPropertiesTest {
         ChatJevProperties withKey = new ChatJevProperties(true, null, FAKE_KEY, null, null);
         ChatJevProperties withoutKey = new ChatJevProperties(false, null, null, null, null);
 
-        assertThat(withKey.toString()).doesNotContain(FAKE_KEY).contains("apiKey=(설정됨)", "model=jev-latest", "timeout=PT3S");
+        assertThat(withKey.toString()).doesNotContain(FAKE_KEY).contains("apiKey=(설정됨)", "model=jev-1.14.0", "timeout=PT3S");
         assertThat(withoutKey.toString()).contains("apiKey=(없음)");
     }
 }
