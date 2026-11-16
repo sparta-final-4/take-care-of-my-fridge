@@ -1,12 +1,12 @@
 package org.example.takecareofmyfridgebe.domain.chat.ai;
 
-import org.example.takecareofmyfridgebe.domain.chat.config.ChatJevProperties;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntent;
 import org.example.takecareofmyfridgebe.domain.chat.dto.FridgeScope;
 import org.example.takecareofmyfridgebe.domain.chat.dto.JevIntentJudgement;
 import org.example.takecareofmyfridgebe.domain.chat.dto.JevIntentJudgement.TasteAnswer;
 import org.example.takecareofmyfridgebe.domain.chat.dto.JevIntentJudgement.TasteStance;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
+import org.example.takecareofmyfridgebe.global.config.TypeSafeProperties;
 import org.example.takecareofmyfridgebe.infra.typesafe.client.TypeSafeClient;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -83,7 +83,7 @@ class JevIntentClassifierTest {
     @Test
     @DisplayName("1차 요청은 model·키·UTF-8 한글 state와 의도·묻는 말·냉장고 범위 질문 3개를 보낸다")
     void sendsFirstQuestionsInUtf8_whenClassify() {
-        JevIntentClassifier classifier = classifier(enabled());
+        JevIntentClassifier classifier = classifier(withKey());
         expectCall(FIRST_GENERAL, "req_first");
 
         classifier.classify(MESSAGE, CATEGORIES, null);
@@ -111,7 +111,7 @@ class JevIntentClassifierTest {
     @Test
     @DisplayName("1차 의도가 추천이면 2차로 요리 이름·특징·재료·밀키트 Noul, 맛 Choice 5개, 분류마다 Noul을 순번 이름으로 보낸다")
     void sendsSecondQuestions_whenIntentIsRecommend() {
-        JevIntentClassifier classifier = classifier(enabled());
+        JevIntentClassifier classifier = classifier(withKey());
         expectCall(FIRST_RECOMMEND, "req_first");
         expectCall(SECOND, "req_second");
 
@@ -139,7 +139,7 @@ class JevIntentClassifierTest {
     @Test
     @DisplayName("1차·2차 답을 읽어 의도·확률·맛·Noul을 담고 분류 순번을 분류 이름으로 되돌린다")
     void readsAnswersAndMapsCategoryNames_whenBothCallsSucceed() {
-        JevIntentClassifier classifier = classifier(enabled());
+        JevIntentClassifier classifier = classifier(withKey());
         expectCall(FIRST_RECOMMEND, "req_first");
         expectCall(SECOND, "req_second");
 
@@ -174,7 +174,7 @@ class JevIntentClassifierTest {
     @Test
     @DisplayName("직전 추천이 있으면 그 정보 뒤에 이번 메시지를 붙인 state로 묻고, 조건 바꾸기면 2차도 부른다")
     void callsSecondWithFollowUpState_whenIntentIsRefine() {
-        JevIntentClassifier classifier = classifier(enabled());
+        JevIntentClassifier classifier = classifier(withKey());
         expectCall(FIRST_REFINE, "req_first");
         expectCall(SECOND, "req_second");
         String followUp = "[직전 추천] 1. 김치찌개 / 2. 순두부찌개\n[직전 조건] 분류 찌개";
@@ -192,7 +192,7 @@ class JevIntentClassifierTest {
     @Test
     @DisplayName("1차 의도가 추천·조건 바꾸기가 아니면 2차를 부르지 않는다")
     void skipsSecond_whenIntentIsGeneral() {
-        JevIntentClassifier classifier = classifier(enabled());
+        JevIntentClassifier classifier = classifier(withKey());
         expectCall(FIRST_GENERAL, "req_first");
 
         JevIntentJudgement judgement = classifier.classify("두부 보관 어떻게 해?", CATEGORIES, null).orElseThrow();
@@ -205,7 +205,7 @@ class JevIntentClassifierTest {
     @Test
     @DisplayName("2차 호출이 실패하면 예외 없이 1차 결과만 돌려준다")
     void returnsFirstOnly_whenSecondFails() {
-        JevIntentClassifier classifier = classifier(enabled());
+        JevIntentClassifier classifier = classifier(withKey());
         expectCall(FIRST_RECOMMEND, "req_first");
         expect(withStatus(HttpStatus.INTERNAL_SERVER_ERROR).header(REQUEST_ID, "req_second"));
 
@@ -240,7 +240,7 @@ class JevIntentClassifierTest {
     @MethodSource("firstFailures")
     @DisplayName("1차 호출이 타임아웃·HTTP 오류·응답 형식 오류면 예외 없이 빈 결과를 돌려주고 2차를 부르지 않는다")
     void returnsEmpty_whenFirstFails(String caseName, ResponseCreator response) {
-        JevIntentClassifier classifier = classifier(enabled());
+        JevIntentClassifier classifier = classifier(withKey());
         expect(response);
 
         Optional<JevIntentJudgement> judgement = classifier.classify(MESSAGE, CATEGORIES, null);
@@ -250,18 +250,9 @@ class JevIntentClassifierTest {
     }
 
     @Test
-    @DisplayName("꺼져 있으면 호출하지 않고 빈 결과를 돌려준다")
-    void returnsEmptyWithoutCall_whenDisabled() {
-        JevIntentClassifier classifier = classifier(new ChatJevProperties(false, BASE_URL, FAKE_KEY, MODEL, Duration.ofSeconds(3)));
-
-        assertThat(classifier.classify(MESSAGE, CATEGORIES, null)).isEmpty();
-        server.verify();
-    }
-
-    @Test
     @DisplayName("키가 비어 있으면 호출하지 않고 빈 결과를 돌려준다")
     void returnsEmptyWithoutCall_whenApiKeyBlank() {
-        JevIntentClassifier classifier = classifier(new ChatJevProperties(true, BASE_URL, " ", MODEL, Duration.ofSeconds(3)));
+        JevIntentClassifier classifier = classifier(new TypeSafeProperties(BASE_URL, " ", MODEL, Duration.ofSeconds(3)));
 
         assertThat(classifier.classify(MESSAGE, CATEGORIES, null)).isEmpty();
         server.verify();
@@ -271,7 +262,7 @@ class JevIntentClassifierTest {
     @ExtendWith(OutputCaptureExtension.class)
     @DisplayName("호출이 실패하면 상태 코드와 request-id를 WARN 로그로 남기고 메시지 원문과 키는 쓰지 않는다")
     void logsStatusWithoutMessageAndKey_whenCallFails(CapturedOutput output) {
-        JevIntentClassifier classifier = classifier(enabled());
+        JevIntentClassifier classifier = classifier(withKey());
         expect(withStatus(HttpStatus.UNPROCESSABLE_CONTENT).header(REQUEST_ID, "req_fail")
                 .contentType(MediaType.APPLICATION_JSON)
                 .body("{\"detail\":[{\"type\":\"too_short\",\"input\":\"" + MESSAGE + "\"}]}"));
@@ -283,14 +274,14 @@ class JevIntentClassifierTest {
                 .doesNotContain(FAKE_KEY);
     }
 
-    private JevIntentClassifier classifier(ChatJevProperties properties) {
+    private JevIntentClassifier classifier(TypeSafeProperties properties) {
         RestClient.Builder builder = RestClient.builder().baseUrl(BASE_URL);
         server = MockRestServiceServer.bindTo(builder).build();
         return new JevIntentClassifier(new TypeSafeClient(builder.build(), properties));
     }
 
-    private static ChatJevProperties enabled() {
-        return new ChatJevProperties(true, BASE_URL, FAKE_KEY, MODEL, Duration.ofSeconds(3));
+    private static TypeSafeProperties withKey() {
+        return new TypeSafeProperties(BASE_URL, FAKE_KEY, MODEL, Duration.ofSeconds(3));
     }
 
     private void expectCall(String responseBody, String requestId) {

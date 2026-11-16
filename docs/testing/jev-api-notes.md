@@ -3,7 +3,7 @@
 상태: **실제 호출로 확인 완료** · 조사일: 2026-11-16 · 브랜치: `feat/chat-jev-shadow`
 
 상담 의도 판단에 Jev(TypeSafe AI의 분류 전용 "System One" 모델)를 그림자 모드로 붙이기 전에 API 사용법을 정리한다.
-설정 값은 `app.chat.jev`(`ChatJevProperties`)에 있다. 이 문서에는 API 키를 쓰지 않는다. curl에서는 `"$TYPESAFE_API_KEY"`로만 참조한다.
+호출 설정은 `app.typesafe`(`TypeSafeProperties`), 상담에서 켤지는 `app.chat.jev.enabled`(`ChatJevProperties`)에 있다. 이 문서에는 API 키를 쓰지 않는다. curl에서는 `"$TYPESAFE_API_KEY"`로만 참조한다.
 
 > 키 없는 호출 2건, 사용자가 직접 한 키 있는 호출 2건(모델 목록, Choice 하나), 이 작업에서 한 키 있는 호출 7건(a~g)을 [실제 호출](#실제-호출-2026-11-16)에 적었다.
 > 각 경우는 **한 번씩만** 호출했다. 지연·확률은 한 번 측정한 값이라 흔들릴 수 있다.
@@ -109,7 +109,7 @@
 `GET /v1/models` 응답(문서): `{"models":[{"name":"jev-latest","description":"General-purpose system one model.","release_date":"2026-09-15"}]}`
 
 실제 확인: `model: "jev-1.14.0"`으로 보낸 호출(g)이 200으로 답했고 응답 `model`도 `jev-1.14.0`이었다.
-그래서 `app.chat.jev.model`을 `jev-1.14.0`으로 고정했다. 버전을 올릴 때는 평가를 다시 돌린 뒤 바꾼다.
+그래서 `app.typesafe.model`을 `jev-1.14.0`으로 고정했다. 버전을 올릴 때는 평가를 다시 돌린 뒤 바꾼다.
 
 ## 오류
 
@@ -358,7 +358,7 @@ curl -sS -i -w "\ntime=%{time_total}\n" -X POST https://api.typesafe.ai/v1/syste
 
 ### 그 밖
 
-- **버전 고정**: `jev-1.14.0`으로 고정했다(`app.chat.jev.model`). `jev-latest`는 바뀔 수 있으므로, 버전을 올릴 때는 평가를 다시 돌린 뒤 바꾼다. 응답 `model`을 로그에 남겨 실제 답한 버전을 확인한다.
+- **버전 고정**: `jev-1.14.0`으로 고정했다(`app.typesafe.model`). `jev-latest`는 바뀔 수 있으므로, 버전을 올릴 때는 평가를 다시 돌린 뒤 바꾼다. 응답 `model`을 로그에 남겨 실제 답한 버전을 확인한다.
 - **UTF-8 본문**: 요청 본문은 UTF-8 바이트로 보낸다(`Content-Type: application/json; charset=utf-8`). 기본 문자셋으로 바꾸면 한글이 깨져 `There was an error parsing the body`가 난다.
 - **확인 질문**: Noul은 "확인 필요"가 아니라 예/아니오 확률이다. "확실하지 않음"은 Choice·Score의 `confidence`로 판단한다(Noul에는 `confidence`가 없다). `confidence`는 1등 확률보다 낮게 나오므로 기준값은 `confidence`로 정한다(a의 매운맛: 1등 0.61, confidence 0.42).
 - **맛 같은 "말했나"**: Score는 언급 없음을 나타낼 수 없어(e) Choice에 `언급 없음`을 넣는다.

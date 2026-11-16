@@ -2,7 +2,7 @@ package org.example.takecareofmyfridgebe.infra.typesafe.client;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.example.takecareofmyfridgebe.domain.chat.config.ChatJevProperties;
+import org.example.takecareofmyfridgebe.global.config.TypeSafeProperties;
 import org.example.takecareofmyfridgebe.infra.typesafe.dto.SystemOneCall;
 import org.example.takecareofmyfridgebe.infra.typesafe.dto.SystemOneQuestion;
 import org.example.takecareofmyfridgebe.infra.typesafe.dto.SystemOneRequest;
@@ -35,10 +35,10 @@ public class TypeSafeClient {
     private static final String NO_STATUS = "-";
 
     private final RestClient typeSafeRestClient;
-    private final ChatJevProperties properties;
+    private final TypeSafeProperties properties;
 
     /**
-     * 질문을 한 요청으로 묻는다. 꺼져 있거나 키가 없으면 부르지 않고 빈 값이다.
+     * 질문을 한 요청으로 묻는다. 키가 없으면 부르지 않고 빈 값이다. 어느 기능에서 쓸지(켜고 끄기)는 부르는 쪽이 정한다.
      *
      * @param purpose   로그에 남길 호출 이름 (예: "의도 1차")
      * @param state     질문들이 가리키는 글
@@ -46,7 +46,7 @@ public class TypeSafeClient {
      * @return 성공한 호출. 타임아웃·HTTP 오류(401·403·422·429·5xx·크레딧 부족 등)·응답 형식 오류면 빈 값
      */
     public Optional<SystemOneCall> ask(String purpose, String state, Map<String, SystemOneQuestion> questions) {
-        if (!properties.enabled() || properties.apiKey().isBlank()) {
+        if (!ready()) {
             return Optional.empty();
         }
         long startedAt = System.nanoTime();
@@ -73,6 +73,11 @@ public class TypeSafeClient {
             warn(purpose, NO_STATUS, null, state, startedAt, e.getClass().getSimpleName());
         }
         return Optional.empty();
+    }
+
+    // 키가 있어 부를 수 있는지
+    public boolean ready() {
+        return properties.hasApiKey();
     }
 
     private void warn(String purpose, String status, String requestId, String state, long startedAt, String cause) {
