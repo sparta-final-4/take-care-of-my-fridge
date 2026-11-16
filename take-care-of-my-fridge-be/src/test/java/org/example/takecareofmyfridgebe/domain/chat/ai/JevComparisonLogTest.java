@@ -32,7 +32,7 @@ class JevComparisonLogTest {
             List.of(Taste.SPICY), List.of(), List.of("찌개", "국"), false);
 
     @Test
-    @DisplayName("1차·2차가 모두 있으면 정해진 칸 이름 순서로 값을 남기고 0.5 이상인 분류·밀키트만 Jev 쪽으로 본다")
+    @DisplayName("1차·2차가 모두 있으면 정해진 칸 이름 순서로 값을 남기고 고르기 규칙으로 고른 분류와 0.5 이상인 밀키트만 Jev 쪽으로 본다")
     void writesAllFieldsInOrder_whenBothCallsSucceed() {
         String line = JevComparisonLog.line(OPENAI, JevSide.finished(Optional.of(judgement(ChatIntent.RECOMMEND, true)), 520L));
 
@@ -86,7 +86,7 @@ class JevComparisonLogTest {
     }
 
     @Test
-    @DisplayName("맛 원함·피함이나 0.5 이상 분류가 OpenAI와 다르면 tasteMatch·categoryMatch가 false다")
+    @DisplayName("맛 원함·피함이나 고른 분류가 OpenAI와 다르면 tasteMatch·categoryMatch가 false다")
     void writesMismatch_whenTastesOrCategoriesDiffer() {
         OpenAiSide avoidSpicy = new OpenAiSide(1L, 10L, 9, ChatIntent.RECOMMEND,
                 List.of(), List.of(Taste.SPICY), List.of("국"), true);
@@ -99,7 +99,7 @@ class JevComparisonLogTest {
                 .containsEntry("openaiMealkit", "true");
     }
 
-    // 1차: 의도 0.97, 묻는 말 0.05. 2차: 매운맛 원함, 국 0.83·찌개 0.5·수프 0.49, 밀키트 0.08
+    // 1차: 의도 0.97, 묻는 말 0.05. 2차: 매운맛 원함, 국 0.83·찌개 0.72·수프 0.49(1등과 0.15 넘게 차이 나 안 고름), 밀키트 0.08
     static JevIntentJudgement judgement(ChatIntent intent, boolean withSecond) {
         Map<ChatIntent, Double> probabilities = new EnumMap<>(ChatIntent.class);
         Arrays.stream(ChatIntent.values()).forEach(each -> probabilities.put(each, each == intent ? 0.98 : 0.0));
@@ -114,7 +114,7 @@ class JevComparisonLogTest {
         Map<String, Double> categories = new LinkedHashMap<>();
         categories.put("국", 0.83);
         categories.put("수프", 0.49);
-        categories.put("찌개", 0.5);
+        categories.put("찌개", 0.72);
         JevIntentJudgement.Second second = new JevIntentJudgement.Second(0.09, 0.74, 0.07, 0.08, tastes, categories,
                 new JevIntentJudgement.Call("jev-1.14.0", "req_second", 290L, 1893));
         return new JevIntentJudgement(first, second, 520L);

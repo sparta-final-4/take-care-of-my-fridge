@@ -21,14 +21,15 @@ import java.util.stream.Collectors;
  * "상담 의도 Jev 비교" 로그 한 줄. 감사 페이지에서 읽을 수 있게 칸 이름과 순서를 고정한 key=value 형식이다.
  * <ul>
  *   <li>값이 없으면(Jev 실패, 2차를 묻지 않음) {@value #NONE}, 빈 목록은 빈 값(openaiWanted=)</li>
- *   <li>목록은 쉼표로 잇는다. 맛은 Member.Taste 순서, 분류는 OpenAI는 고른 순서, Jev는 분류 목록 순서</li>
+ *   <li>목록은 쉼표로 잇는다. 맛은 Member.Taste 순서, 분류는 OpenAI는 고른 순서,
+ *       Jev는 JevIntentJudgement.CategoryRule로 고른 것(확률 높은 순)</li>
  *   <li>메시지 원문·직전 추천 글·키는 넣지 않는다</li>
  * </ul>
  */
 final class JevComparisonLog {
 
     static final String NAME = "상담 의도 Jev 비교";
-    // Noul "예"로 볼 기준. 임시 기준이다 (평가에서 정함)
+    // 밀키트 Noul을 "예"로 볼 기준. 임시 기준이다 (평가에서 정함). 분류는 CategoryRule로 고른다
     static final double YES_THRESHOLD = 0.5;
     static final String NONE = "-";
 
@@ -103,10 +104,7 @@ final class JevComparisonLog {
         Set<Member.Taste> openaiAvoided = tastes(openai.avoided());
         Set<Member.Taste> jevWanted = second == null ? null : jevTastes(second, TasteStance.WANTED);
         Set<Member.Taste> jevAvoided = second == null ? null : jevTastes(second, TasteStance.AVOIDED);
-        List<String> jevCategories = second == null ? null : second.categories().entrySet().stream()
-                .filter(entry -> entry.getValue() >= YES_THRESHOLD)
-                .map(Map.Entry::getKey)
-                .toList();
+        List<String> jevCategories = second == null ? null : second.pickedCategories();
 
         Map<String, Object> fields = new LinkedHashMap<>();
         fields.put("memberId", openai.memberId());

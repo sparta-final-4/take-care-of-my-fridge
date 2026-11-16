@@ -5,6 +5,7 @@ import org.example.takecareofmyfridgebe.domain.chat.config.ChatSafetyProperties;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntent;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatSafetyBlock;
 import org.example.takecareofmyfridgebe.domain.chat.dto.JevIntentJudgement;
+import org.example.takecareofmyfridgebe.domain.chat.dto.JevIntentJudgement.CategoryRule;
 import org.example.takecareofmyfridgebe.domain.chat.dto.JevIntentJudgement.TasteStance;
 import org.example.takecareofmyfridgebe.domain.chat.facade.ChatIntentEvalManualTest.EvalCase;
 import org.example.takecareofmyfridgebe.domain.chat.facade.ChatIntentEvalManualTest.EvalSet;
@@ -65,7 +66,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  * 걸리지 않으면 실제 JevIntentClassifier를 부른다. 분류 목록은 OpenAI 의도 판단과 같은 목록(평가 세트 분류에서 후보 제외·기타를 뺀 것),
  * 직전 추천 문맥이 있는 문장은 운영과 같은 직전 추천 글(ChatIntentFacade.followUp)을 넘긴다.
  * Jev가 판단하지 않는 칸(요리 이름·키워드·시간·재료 등)은 비교하지 않는다. 비교 칸: intent, wanted, avoid, categories.
- * 맛은 원함·피함 답, 분류는 기준값({@value #CATEGORY_THRESHOLD}) 이상인 분류를 쓴다.
+ * 맛은 원함·피함 답, 분류는 JevIntentJudgement.CategoryRule(기본값)로 고른 분류를 쓰고, 허용 기준과 정확히 같음 두 가지로 센다.
+ * 의도는 직전 추천이 없는데 REFINE·RECIPE_DETAIL이면 RECOMMEND로 본다(ChatIntentFacade 서비스 규칙). 그 밖의 서버 보정은 하지 않는다.
  * 일치율로 실패시키지 않는다. 평가 세트가 비었거나 Jev 호출이 실패했을 때만(결과 파일을 남긴 뒤) 실패한다.
  */
 @SpringBootTest(classes = JevIntentEvalManualTest.class)
@@ -76,9 +78,13 @@ class JevIntentEvalManualTest {
     private static final Path OUT_DIR = Path.of("build", "reports", "chat-intent-eval");
     // Jev가 답하는 비교 칸. 밀키트는 평가 세트에 기대 칸이 없어 비교하지 않는다
     private static final List<String> COMPARED = List.of("intent", "wanted", "avoid", "categories");
-    // 분류 Noul을 "예"로 볼 기준. 운영 비교 로그(JevComparisonLog.YES_THRESHOLD)와 같은 임시값
-    static final double CATEGORY_THRESHOLD = 0.5;
-    private static final double[] CATEGORY_SWEEP = {0.3, 0.4, 0.5, 0.6, 0.7};
+    // 분류 고르기 규칙. 운영 비교 로그와 같은 기본값이고, 아래 조합별 표로 다시 센다
+    static final CategoryRule RULE = CategoryRule.DEFAULT;
+    private static final double[] SWEEP_TOP = {0.6, 0.7, 0.8};
+    private static final double[] SWEEP_GAP = {0.1, 0.15, 0.2};
+    private static final int[] SWEEP_WIDEST = {3, 4, 5};
+    // 직전 추천이 없을 때 이어지는 말(REFINE·RECIPE_DETAIL)은 새 추천으로 본다 (ChatIntentFacade 서비스 규칙)
+    private static final Set<ChatIntent> FOLLOW_UP_INTENTS = Set.of(ChatIntent.REFINE, ChatIntent.RECIPE_DETAIL);
     private static final double[] CONFIDENCE_EDGES = {0.95, 0.9, 0.8, 0.7};
     // 입력 100만 토큰당 비용 (USD)
     private static final double USD_PER_MILLION_INPUT = 0.04;
@@ -122,7 +128,7 @@ class JevIntentEvalManualTest {
         Optional<ChatSafetyBlock> block = SafetyWordChecker.check(evalCase.message(), safety.words());
         if (block.isPresent()) {
             ChatIntent intent = block.get() == ChatSafetyBlock.SELF_HARM ? ChatIntent.SELF_HARM : ChatIntent.BLOCKED;
-            return new JevRun(evalCase, compared, run, "WORD_" + block.get(), intent, null, 0);
+            return new JevRun(evalCase, compared, run, "WORD_" + block.get(), intent, null, false, 0);
         }
         String followUp = ChatIntentFacade.followUp(set.context(evalCase.context()));
         long startedAt = System.nanoTime();
@@ -130,7 +136,7 @@ class JevIntentEvalManualTest {
         long ms = (System.nanoTime() - startedAt) / 1_000_000;
         String status = judgement.map(found -> SECOND_INTENTS.contains(found.first().intent()) && !found.hasSecond()
                 ? "SECOND_FAILED" : "OK").orElse("FIRST_FAILED");
-        return new JevRun(evalCase, compared, run, status, null, judgement.orElse(null), ms);
+        return new JevRun(evalCase, compared, run, status, null, judgement.orElse(null), followUp != null, ms);
     }
 
     private static Set<String> onlyIds() {
@@ -153,22 +159,51 @@ class JevIntentEvalManualTest {
     }
 
     /**
+     * 기대와 다른 칸. 분류는 두 가지로 센다.
+     * <ul>
+     *   <li>정확히 같음(allowed=false): 고른 분류 집합이 기대와 같다</li>
+     *   <li>허용(allowed=true): 고른 분류가 하나 이상이고 모두 기대 분류 안에 있다. 기대 밖이 하나라도 있으면 틀림.
+     *       기대가 비었으면 고르지 않아야 맞다</li>
+     * </ul>
+     */
+    static List<String> mismatches(Expect compared, Outcome outcome, EvalSet set, boolean allowed) {
+        if (!allowed || !compared.raw().containsKey("categories")) {
+            return compared.mismatches(outcome, set);
+        }
+        Map<String, Object> rest = new LinkedHashMap<>(compared.raw());
+        Object expected = rest.remove("categories");
+        List<String> result = new ArrayList<>(new Expect(rest).mismatches(outcome, set));
+        if (!categoriesAllowed(Set.copyOf(strings(expected)), outcome.categories())) {
+            result.add("categories: 기대 " + expected + " 안, 실제 " + outcome.categories());
+        }
+        return result;
+    }
+
+    static boolean categoriesAllowed(Set<String> expected, Set<String> actual) {
+        if (expected.isEmpty()) {
+            return actual.isEmpty();
+        }
+        return !actual.isEmpty() && expected.containsAll(actual);
+    }
+
+    /**
      * 한 번 돌린 결과.
      *
      * @param status       OK / FIRST_FAILED / SECOND_FAILED / WORD_{차단 종류}
      * @param blockedIntent 단어 차단에 걸렸을 때의 의도 (Jev를 부르지 않음)
      * @param judgement    Jev 결과 (단어 차단·1차 실패면 null)
+     * @param followUp     직전 추천 정보를 넘겼는지
      * @param ms           classify 전체 시간
      */
     record JevRun(EvalCase evalCase, Expect compared, int run, String status, ChatIntent blockedIntent,
-                  JevIntentJudgement judgement, long ms) {
+                  JevIntentJudgement judgement, boolean followUp, long ms) {
 
         boolean judged() {
             return judgement != null;
         }
 
-        // 분류 기준값 threshold로 본 Jev 결과. 1차 실패면 null
-        Outcome outcome(double threshold) {
+        // 분류 고르기 규칙 rule로 본 Jev 결과. 1차 실패면 null
+        Outcome outcome(CategoryRule rule) {
             if (blockedIntent != null) {
                 return Outcome.blocked(blockedIntent);
             }
@@ -176,35 +211,44 @@ class JevIntentEvalManualTest {
                 return null;
             }
             JevIntentJudgement.Second second = judgement.second();
-            return new Outcome(judgement.first().intent(),
+            return new Outcome(intent(),
                     second == null ? Set.of() : tastes(second, TasteStance.WANTED),
                     second == null ? Set.of() : tastes(second, TasteStance.AVOIDED),
-                    categoriesAbove(threshold),
+                    picked(rule),
                     List.of(), null, null, null, Set.of(), Set.of(), null, judgement.first().fridgeScope().name(),
                     Set.of(), null, null, null, null);
         }
 
-        Set<String> categoriesAbove(double threshold) {
+        // 직전 추천이 없는데 이어지는 말(REFINE·RECIPE_DETAIL)이면 새 추천으로 본다
+        ChatIntent intent() {
+            ChatIntent intent = judgement.first().intent();
+            return !followUp && FOLLOW_UP_INTENTS.contains(intent) ? ChatIntent.RECOMMEND : intent;
+        }
+
+        Set<String> picked(CategoryRule rule) {
             if (judgement == null || judgement.second() == null) {
                 return Set.of();
             }
-            return judgement.second().categories().entrySet().stream()
-                    .filter(entry -> entry.getValue() >= threshold)
-                    .map(Map.Entry::getKey)
-                    .collect(Collectors.toCollection(LinkedHashSet::new));
+            return new LinkedHashSet<>(rule.pick(judgement.second().categories()));
         }
 
-        List<String> mismatches(EvalSet set, double threshold) {
-            Outcome outcome = outcome(threshold);
+        // 분류는 allowed면 허용 기준, 아니면 정확히 같음으로 본다
+        List<String> mismatches(EvalSet set, CategoryRule rule, boolean allowed) {
+            Outcome outcome = outcome(rule);
             if (outcome == null) {
                 return List.of("status: " + status);
             }
-            return compared.mismatches(outcome, set);
+            return JevIntentEvalManualTest.mismatches(compared, outcome, set, allowed);
         }
 
-        // 결과를 비교할 때 쓰는 한 줄 (의도·맛·기준값 분류)
+        // 기본 규칙·허용 기준 (요약·CSV의 일치 판단)
+        List<String> mismatches(EvalSet set) {
+            return mismatches(set, RULE, true);
+        }
+
+        // 결과를 비교할 때 쓰는 한 줄 (의도·맛·고른 분류)
         String signature() {
-            Outcome outcome = outcome(CATEGORY_THRESHOLD);
+            Outcome outcome = outcome(RULE);
             return outcome == null ? status
                     : outcome.intent() + " " + new TreeSet<>(outcome.wanted()) + " " + new TreeSet<>(outcome.avoid())
                     + " " + new TreeSet<>(outcome.categories());
@@ -229,11 +273,13 @@ class JevIntentEvalManualTest {
 
         List<String> summary = new ArrayList<>();
         summary.add("Jev 상담 의도 평가 " + stamp + " · 모델 " + model + " · 문장 " + cases.size() + "개 × " + runs
-                + "번 (다수결) · 분류 기준값 " + CATEGORY_THRESHOLD);
+                + "번 (다수결) · 분류 고르기 " + RULE);
         summary.add("비교 칸: " + String.join(", ", COMPARED) + " (밀키트는 평가 세트에 기대 칸이 없어 비교하지 않음)");
+        summary.add("분류는 허용 기준(고른 분류가 하나 이상이고 모두 기대 안)으로 맞음을 센다. "
+                + "직전 추천이 없는데 REFINE·RECIPE_DETAIL이면 RECOMMEND로 본다");
         summary.addAll(accuracy(set, byCase));
         summary.addAll(confidenceBuckets(set, rows));
-        summary.addAll(categorySweep(set, rows));
+        summary.addAll(ruleSweep(set, byCase));
         summary.addAll(determinism(byCase));
         summary.addAll(latencyAndCost(rows));
         summary.addAll(failedCases(set, byCase));
@@ -263,7 +309,7 @@ class JevIntentEvalManualTest {
         Map<String, int[]> byGroup = new LinkedHashMap<>();
         int passed = 0;
         for (Map.Entry<EvalCase, List<JevRun>> entry : byCase.entrySet()) {
-            boolean pass = majority(entry.getValue(), row -> row.mismatches(set, CATEGORY_THRESHOLD).isEmpty());
+            boolean pass = majority(entry.getValue(), row -> row.mismatches(set).isEmpty());
             passed += pass ? 1 : 0;
             int[] counts = byGroup.computeIfAbsent(entry.getKey().group(), group -> new int[2]);
             counts[0] += pass ? 1 : 0;
@@ -273,20 +319,29 @@ class JevIntentEvalManualTest {
         lines.add("[a] 일치율 (문장 다수결)");
         lines.add(String.format("전체 일치: %d / %d (%.1f%%)", passed, byCase.size(), percent(passed, byCase.size())));
         byGroup.forEach((group, counts) -> lines.add(String.format("  %s: %d / %d", group, counts[0], counts[1])));
-        lines.add("칸별 (그 칸을 기대한 문장만):");
+        lines.add("칸별 (그 칸을 기대한 문장만, 분류는 허용 기준):");
         for (String field : COMPARED) {
-            int total = 0;
-            int ok = 0;
-            for (Map.Entry<EvalCase, List<JevRun>> entry : byCase.entrySet()) {
-                if (!entry.getKey().expect().raw().containsKey(field)) {
-                    continue;
-                }
-                total++;
-                ok += majority(entry.getValue(), row -> fieldPasses(row.mismatches(set, CATEGORY_THRESHOLD), field)) ? 1 : 0;
-            }
-            lines.add(String.format("  %s: %d / %d (%.1f%%)", field, ok, total, percent(ok, total)));
+            int[] counts = fieldCount(set, byCase, field, RULE, true);
+            lines.add(String.format("  %s: %d / %d (%.1f%%)", field, counts[0], counts[1], percent(counts[0], counts[1])));
         }
+        int[] exact = fieldCount(set, byCase, "categories", RULE, false);
+        lines.add(String.format("  categories 정확히 같음: %d / %d (%.1f%%)", exact[0], exact[1], percent(exact[0], exact[1])));
         return lines;
+    }
+
+    // 그 칸을 기대한 문장 중 다수결로 맞은 수 [맞음, 전체]
+    private static int[] fieldCount(EvalSet set, Map<EvalCase, List<JevRun>> byCase, String field, CategoryRule rule,
+                                    boolean allowed) {
+        int total = 0;
+        int ok = 0;
+        for (Map.Entry<EvalCase, List<JevRun>> entry : byCase.entrySet()) {
+            if (!entry.getKey().expect().raw().containsKey(field)) {
+                continue;
+            }
+            total++;
+            ok += majority(entry.getValue(), row -> fieldPasses(row.mismatches(set, rule, allowed), field)) ? 1 : 0;
+        }
+        return new int[]{ok, total};
     }
 
     // b. intent confidence 구간별 회차 수와 의도 정답률 (Jev를 부른 회차, 의도를 기대한 문장만)
@@ -307,7 +362,7 @@ class JevIntentEvalManualTest {
             }
             int bucket = bucket(row.judgement().first().intentConfidence());
             total[bucket]++;
-            ok[bucket] += fieldPasses(row.mismatches(set, CATEGORY_THRESHOLD), "intent") ? 1 : 0;
+            ok[bucket] += fieldPasses(row.mismatches(set), "intent") ? 1 : 0;
             caseIds.get(bucket).add(row.evalCase().id());
         }
         for (int i = 0; i < names.length; i++) {
@@ -339,27 +394,28 @@ class JevIntentEvalManualTest {
         return CONFIDENCE_EDGES.length;
     }
 
-    // c. 분류 기준값별 정확히 같은 회차 비율, 빠뜨린·잘못 넣은 분류 수 (분류를 기대한 문장, Jev를 부른 회차)
-    private static List<String> categorySweep(EvalSet set, List<JevRun> rows) {
+    // c. 분류 고르기 조합(top·gap·widest, floor는 기본값)별 분류 일치 (분류를 기대한 문장, 다수결). API를 다시 부르지 않고 저장된 확률로 센다
+    private static List<String> ruleSweep(EvalSet set, Map<EvalCase, List<JevRun>> byCase) {
         List<String> lines = new ArrayList<>();
         lines.add("");
-        lines.add("[c] 분류 기준값별 (분류를 기대한 문장의 회차, 정확히 같음 / 빠뜨림 / 잘못 넣음)");
-        List<JevRun> targets = rows.stream()
+        lines.add(String.format("[c] 분류 고르기 조합별 (floor %.2f, 분류를 기대한 문장 다수결, 허용 / 정확히 같음 / 고른 분류 수 평균)",
+                RULE.floor()));
+        lines.add("  top   gap   widest | 허용          | 정확히 같음   | 평균 개수");
+        List<JevRun> targets = byCase.values().stream().flatMap(List::stream)
                 .filter(row -> row.judged() && row.compared().raw().containsKey("categories"))
                 .toList();
-        for (double threshold : CATEGORY_SWEEP) {
-            int exact = 0;
-            int missing = 0;
-            int extra = 0;
-            for (JevRun row : targets) {
-                Set<String> expected = new LinkedHashSet<>(strings(row.compared().raw().get("categories")));
-                Set<String> actual = row.categoriesAbove(threshold);
-                exact += expected.equals(actual) ? 1 : 0;
-                missing += (int) expected.stream().filter(category -> !actual.contains(category)).count();
-                extra += (int) actual.stream().filter(category -> !expected.contains(category)).count();
+        for (double top : SWEEP_TOP) {
+            for (double gap : SWEEP_GAP) {
+                for (int widest : SWEEP_WIDEST) {
+                    CategoryRule rule = new CategoryRule(top, gap, RULE.floor(), widest);
+                    int[] allowed = fieldCount(set, byCase, "categories", rule, true);
+                    int[] exact = fieldCount(set, byCase, "categories", rule, false);
+                    double size = targets.stream().mapToInt(row -> row.picked(rule).size()).average().orElse(0);
+                    lines.add(String.format("  %.2f  %.2f  %d      | %2d / %d (%5.1f%%) | %2d / %d (%5.1f%%) | %.2f%s", top, gap, widest,
+                            allowed[0], allowed[1], percent(allowed[0], allowed[1]), exact[0], exact[1], percent(exact[0], exact[1]),
+                            size, rule.equals(RULE) ? "  (기본)" : ""));
+                }
             }
-            lines.add(String.format("  %.1f: 같음 %d / %d (%.1f%%) · 빠뜨림 %d · 잘못 넣음 %d%s", threshold, exact, targets.size(),
-                    percent(exact, targets.size()), missing, extra, threshold == CATEGORY_THRESHOLD ? "  (지금 기준)" : ""));
         }
         return lines;
     }
@@ -371,7 +427,7 @@ class JevIntentEvalManualTest {
         for (Map.Entry<EvalCase, List<JevRun>> entry : byCase.entrySet()) {
             Set<String> signatures = entry.getValue().stream().map(JevRun::signature).collect(Collectors.toSet());
             Set<String> intents = entry.getValue().stream()
-                    .map(row -> row.outcome(CATEGORY_THRESHOLD) == null ? row.status() : row.outcome(CATEGORY_THRESHOLD).intent().name())
+                    .map(row -> row.outcome(RULE) == null ? row.status() : row.outcome(RULE).intent().name())
                     .collect(Collectors.toSet());
             intentDiffers += intents.size() > 1 ? 1 : 0;
             if (signatures.size() > 1) {
@@ -423,11 +479,11 @@ class JevIntentEvalManualTest {
         lines.add("");
         lines.add("[f] 틀린 문장 (id 메시지 (맞은 회차/회차) 기대 → Jev 답):");
         byCase.forEach((evalCase, caseRows) -> {
-            long passRuns = caseRows.stream().filter(row -> row.mismatches(set, CATEGORY_THRESHOLD).isEmpty()).count();
+            long passRuns = caseRows.stream().filter(row -> row.mismatches(set).isEmpty()).count();
             if (passRuns * 2 > caseRows.size()) {
                 return;
             }
-            JevRun wrong = caseRows.stream().filter(row -> !row.mismatches(set, CATEGORY_THRESHOLD).isEmpty()).findFirst()
+            JevRun wrong = caseRows.stream().filter(row -> !row.mismatches(set).isEmpty()).findFirst()
                     .orElse(caseRows.get(0));
             lines.add(String.format("  %s %s (%d/%d) 기대 %s → %s", evalCase.id(), evalCase.message(), passRuns, caseRows.size(),
                     wrong.compared().raw(), answer(wrong)));
@@ -436,7 +492,7 @@ class JevIntentEvalManualTest {
     }
 
     private static String answer(JevRun row) {
-        Outcome outcome = row.outcome(CATEGORY_THRESHOLD);
+        Outcome outcome = row.outcome(RULE);
         if (outcome == null) {
             return row.status();
         }
@@ -464,12 +520,12 @@ class JevIntentEvalManualTest {
         for (Taste taste : Taste.values()) {
             header.add("taste" + taste.name());
         }
-        header.addAll(List.of("categoriesAbove" + CATEGORY_THRESHOLD, "categoryProbabilities", "dishNamed", "featureNamed",
+        header.addAll(List.of("categoriesPicked", "categoryProbabilities", "dishNamed", "featureNamed",
                 "ingredientNamed", "mealkitWanted", "firstMs", "secondMs", "totalMs", "firstInputTokens", "secondInputTokens",
                 "model", "requestIds"));
         lines.add(String.join(",", header));
         for (JevRun row : rows) {
-            List<String> mismatches = row.mismatches(set, CATEGORY_THRESHOLD);
+            List<String> mismatches = row.mismatches(set);
             List<String> cells = new ArrayList<>(List.of(csv(row.evalCase().id()), csv(row.evalCase().group()),
                     csv(row.evalCase().context()), csv(row.evalCase().message()), String.valueOf(row.run()),
                     String.valueOf(mismatches.isEmpty()), csv(String.join(" | ", mismatches)), csv(row.status())));
@@ -487,7 +543,7 @@ class JevIntentEvalManualTest {
             for (Taste taste : Taste.values()) {
                 cells.add(csv(second == null ? null : second.tastes().get(taste).stance() + "=" + second.tastes().get(taste).confidence()));
             }
-            cells.add(csv(row.categoriesAbove(CATEGORY_THRESHOLD)));
+            cells.add(csv(row.picked(RULE)));
             cells.add(csv(second == null ? null : second.categories().entrySet().stream()
                     .map(entry -> entry.getKey() + "=" + entry.getValue()).toList()));
             cells.add(second == null ? "" : String.valueOf(second.dishNamed()));
@@ -511,10 +567,10 @@ class JevIntentEvalManualTest {
         lines.add(String.join(",", "id", "group", "context", "message", "passRuns", "runs", "pass", "mismatches", "expect",
                 "intent", "wanted", "avoid", "categories", "intentConfidenceMin"));
         byCase.forEach((evalCase, caseRows) -> {
-            long passRuns = caseRows.stream().filter(row -> row.mismatches(set, CATEGORY_THRESHOLD).isEmpty()).count();
-            String mismatches = caseRows.stream().flatMap(row -> row.mismatches(set, CATEGORY_THRESHOLD).stream()).distinct()
+            long passRuns = caseRows.stream().filter(row -> row.mismatches(set).isEmpty()).count();
+            String mismatches = caseRows.stream().flatMap(row -> row.mismatches(set).stream()).distinct()
                     .collect(Collectors.joining(" | "));
-            List<Outcome> outcomes = caseRows.stream().map(row -> row.outcome(CATEGORY_THRESHOLD)).filter(outcome -> outcome != null).toList();
+            List<Outcome> outcomes = caseRows.stream().map(row -> row.outcome(RULE)).filter(outcome -> outcome != null).toList();
             String confidence = caseRows.stream().filter(JevRun::judged)
                     .map(row -> row.judgement().first().intentConfidence()).min(Comparator.naturalOrder())
                     .map(String::valueOf).orElse("");
@@ -593,6 +649,7 @@ class JevIntentEvalManualTest {
             Map<String, int[]> fieldCounts = new LinkedHashMap<>();
             COMPARED.forEach(field -> fieldCounts.put(field, new int[4]));
             int[] overall = new int[4];
+            int[] exactOverall = new int[3];
             List<String> jevOnlyWrong = new ArrayList<>();
             List<String> beforeOnlyWrong = new ArrayList<>();
             List<String> afterOnlyRight = new ArrayList<>();
@@ -603,9 +660,9 @@ class JevIntentEvalManualTest {
                     continue;
                 }
                 Expect compared = compared(evalCase.expect());
-                List<List<String>> before = openAiRows.stream().map(pair -> compared.mismatches(pair[0], set)).toList();
-                List<List<String>> after = openAiRows.stream().map(pair -> compared.mismatches(pair[1], set)).toList();
-                List<List<String>> jev = entry.getValue().stream().map(row -> row.mismatches(set, CATEGORY_THRESHOLD)).toList();
+                List<List<String>> before = openAiRows.stream().map(pair -> mismatches(compared, pair[0], set, true)).toList();
+                List<List<String>> after = openAiRows.stream().map(pair -> mismatches(compared, pair[1], set, true)).toList();
+                List<List<String>> jev = entry.getValue().stream().map(row -> row.mismatches(set)).toList();
                 boolean beforePass = majority(before, List::isEmpty);
                 boolean afterPass = majority(after, List::isEmpty);
                 boolean jevPass = majority(jev, List::isEmpty);
@@ -613,6 +670,9 @@ class JevIntentEvalManualTest {
                 overall[1] += beforePass ? 1 : 0;
                 overall[2] += afterPass ? 1 : 0;
                 overall[3] += jevPass ? 1 : 0;
+                exactOverall[0] += majority(openAiRows, pair -> mismatches(compared, pair[0], set, false).isEmpty()) ? 1 : 0;
+                exactOverall[1] += majority(openAiRows, pair -> mismatches(compared, pair[1], set, false).isEmpty()) ? 1 : 0;
+                exactOverall[2] += majority(entry.getValue(), row -> row.mismatches(set, RULE, false).isEmpty()) ? 1 : 0;
                 for (String field : COMPARED) {
                     if (!compared.raw().containsKey(field)) {
                         continue;
@@ -639,8 +699,10 @@ class JevIntentEvalManualTest {
             }
             Files.writeString(out, "﻿" + String.join("\n", csvLines) + "\n", StandardCharsets.UTF_8);
 
-            lines.add("[비교] OpenAI 평가 " + openAiRuns.getFileName() + "와 같은 id " + overall[0] + "개 (문장 다수결, 보정 전 / 보정 후 / Jev)");
+            lines.add("[비교] OpenAI 평가 " + openAiRuns.getFileName() + "와 같은 id " + overall[0]
+                    + "개 (문장 다수결, 보정 전 / 보정 후 / Jev, 분류는 셋 모두 허용 기준)");
             lines.add(String.format("  전체: %d / %d / %d", overall[1], overall[2], overall[3]));
+            lines.add(String.format("  전체 (분류 정확히 같음): %d / %d / %d", exactOverall[0], exactOverall[1], exactOverall[2]));
             fieldCounts.forEach((field, counts) -> lines.add(String.format("  %s (%d문장): %d / %d / %d", field, counts[0],
                     counts[1], counts[2], counts[3])));
             lines.add("Jev만 틀림 (OpenAI 보정 전·후 모두 맞음): " + jevOnlyWrong.size());
