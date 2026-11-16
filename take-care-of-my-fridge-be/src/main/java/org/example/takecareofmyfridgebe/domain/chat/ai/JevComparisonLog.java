@@ -3,6 +3,7 @@ package org.example.takecareofmyfridgebe.domain.chat.ai;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntent;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntentResolution;
 import org.example.takecareofmyfridgebe.domain.chat.dto.JevIntentJudgement;
+import org.example.takecareofmyfridgebe.domain.chat.dto.JevIntentJudgement.RequestKind;
 import org.example.takecareofmyfridgebe.domain.chat.dto.JevIntentJudgement.TasteStance;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeQuery;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
@@ -21,15 +22,16 @@ import java.util.stream.Collectors;
  * "상담 의도 Jev 비교" 로그 한 줄. 감사 페이지에서 읽을 수 있게 칸 이름과 순서를 고정한 key=value 형식이다.
  * <ul>
  *   <li>값이 없으면(Jev 실패, 2차를 묻지 않음) {@value #NONE}, 빈 목록은 빈 값(openaiWanted=)</li>
- *   <li>목록은 쉼표로 잇는다. 맛은 Member.Taste 순서, 분류는 OpenAI는 고른 순서,
- *       Jev는 JevIntentJudgement.CategoryRule로 고른 것(확률 높은 순)</li>
+ *   <li>목록은 쉼표로 잇는다. 맛은 Member.Taste 순서, OpenAI 분류는 고른 순서</li>
+ *   <li>Jev 분류는 요청 종류(jevRequestKind)와 1등 분류(jevCategory, "없음"이 1등이면 -)로 남긴다.
+ *       categoryMatch는 요청 종류가 특정 분류(CATEGORY)일 때만 OpenAI 분류가 1등 분류 하나와 같은지 본다</li>
  *   <li>메시지 원문·직전 추천 글·키는 넣지 않는다</li>
  * </ul>
  */
 final class JevComparisonLog {
 
     static final String NAME = "상담 의도 Jev 비교";
-    // 밀키트 Noul을 "예"로 볼 기준. 임시 기준이다 (평가에서 정함). 분류는 CategoryRule로 고른다
+    // 밀키트 Noul을 "예"로 볼 기준. 임시 기준이다 (평가에서 정함)
     static final double YES_THRESHOLD = 0.5;
     static final String NONE = "-";
 
@@ -104,7 +106,7 @@ final class JevComparisonLog {
         Set<Member.Taste> openaiAvoided = tastes(openai.avoided());
         Set<Member.Taste> jevWanted = second == null ? null : jevTastes(second, TasteStance.WANTED);
         Set<Member.Taste> jevAvoided = second == null ? null : jevTastes(second, TasteStance.AVOIDED);
-        List<String> jevCategories = second == null ? null : second.pickedCategories();
+        boolean categoryKind = second != null && second.requestKind() == RequestKind.CATEGORY;
 
         Map<String, Object> fields = new LinkedHashMap<>();
         fields.put("memberId", openai.memberId());
@@ -120,9 +122,12 @@ final class JevComparisonLog {
         fields.put("jevAvoided", jevAvoided == null ? null : join(jevAvoided));
         fields.put("tasteMatch", second == null ? null : openaiWanted.equals(jevWanted) && openaiAvoided.equals(jevAvoided));
         fields.put("openaiCategories", join(openai.categories()));
-        fields.put("jevCategories", jevCategories == null ? null : join(jevCategories));
-        fields.put("categoryMatch", jevCategories == null ? null
-                : new LinkedHashSet<>(openai.categories()).equals(new LinkedHashSet<>(jevCategories)));
+        fields.put("jevRequestKind", second == null ? null : second.requestKind());
+        fields.put("jevRequestKindConfidence", second == null ? null : second.requestKindConfidence());
+        fields.put("jevCategory", second == null ? null : second.category());
+        fields.put("jevCategoryConfidence", second == null ? null : second.categoryConfidence());
+        fields.put("categoryMatch", !categoryKind ? null
+                : new LinkedHashSet<>(openai.categories()).equals(Set.of(String.valueOf(second.category()))));
         fields.put("openaiMealkit", openai.mealkit());
         fields.put("jevMealkit", second == null ? null : second.mealkitWanted() >= YES_THRESHOLD);
         fields.put("jevAsksQuestion", first == null ? null : first.asksQuestion());

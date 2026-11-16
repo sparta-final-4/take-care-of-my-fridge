@@ -3,6 +3,7 @@ package org.example.takecareofmyfridgebe.domain.chat.ai;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntent;
 import org.example.takecareofmyfridgebe.domain.chat.dto.FridgeScope;
 import org.example.takecareofmyfridgebe.domain.chat.dto.JevIntentJudgement;
+import org.example.takecareofmyfridgebe.domain.chat.dto.JevIntentJudgement.RequestKind;
 import org.example.takecareofmyfridgebe.domain.chat.dto.JevIntentJudgement.TasteAnswer;
 import org.example.takecareofmyfridgebe.domain.chat.dto.JevIntentJudgement.TasteStance;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
@@ -34,7 +35,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -61,10 +61,11 @@ class JevIntentClassifierTest {
     private static final List<String> CATEGORIES = List.of(
             "과자", "구이", "국", "그라탕", "기타", "김치", "디저트", "떡", "만두", "말이", "면류", "무침", "밥", "볶음", "빵", "샌드위치",
             "샐러드", "수프", "스튜", "쌈", "양념", "음료", "전", "전골", "절임", "조림", "죽", "찌개", "찜", "튀김", "피자", "한과", "회");
-    // jev-api-notes.md c (state "따뜻한 국물 요리 추천해줘")의 분류별 noul, CATEGORIES 순서
-    private static final double[] CATEGORY_NOULS = {
-            0.02, 0.03, 0.83, 0.09, 0.27, 0.11, 0.03, 0.17, 0.12, 0.4, 0.31, 0.05, 0.25, 0.04, 0.02, 0.02,
-            0.02, 0.7, 0.42, 0.05, 0.13, 0.06, 0.06, 0.41, 0.03, 0.17, 0.24, 0.46, 0.17, 0.03, 0.02, 0.04, 0.04};
+    // jev-api-notes.md b (state "따뜻한 국물 요리 추천해줘")의 분류 Choice 답
+    private static final String CATEGORY_GUK = "\"category\":{\"type\":\"choice\",\"choice\":\"국\",\"confidence\":0.71,"
+            + "\"probabilities\":{\"국\":0.72,\"없음\":0.22,\"수프\":0.04,\"찌개\":0.01,\"기타\":0.01}}";
+    private static final String CATEGORY_NONE = "\"category\":{\"type\":\"choice\",\"choice\":\"없음\",\"confidence\":0.9,"
+            + "\"probabilities\":{\"없음\":0.93,\"국\":0.05,\"찌개\":0.02}}";
 
     private static final String FIRST_RECOMMEND = firstResponse(
             "{\"type\":\"choice\",\"choice\":\"추천\",\"confidence\":1.0,\"probabilities\":"
@@ -75,7 +76,7 @@ class JevIntentClassifierTest {
     private static final String FIRST_GENERAL = firstResponse(
             "{\"type\":\"choice\",\"choice\":\"일반 질문\",\"confidence\":0.95,\"probabilities\":"
                     + "{\"추천\":0.03,\"일반 질문\":0.96,\"냉장고 보기\":0.01}}");
-    private static final String SECOND = secondResponse();
+    private static final String SECOND = secondResponse(CATEGORY_GUK);
 
     private final List<byte[]> sentBodies = new ArrayList<>();
     private MockRestServiceServer server;
@@ -109,7 +110,7 @@ class JevIntentClassifierTest {
     }
 
     @Test
-    @DisplayName("1차 의도가 추천이면 2차로 요리 이름·특징·재료·밀키트 Noul, 맛 Choice 5개, 분류마다 Noul을 순번 이름으로 보낸다")
+    @DisplayName("1차 의도가 추천이면 2차로 요리 이름·특징·재료·밀키트 Noul, 맛 Choice 5개, 요청 종류 Choice, 분류 Choice를 보낸다")
     void sendsSecondQuestions_whenIntentIsRecommend() {
         JevIntentClassifier classifier = classifier(withKey());
         expectCall(FIRST_RECOMMEND, "req_first");
@@ -123,8 +124,7 @@ class JevIntentClassifierTest {
         assertThat(body.get("state")).isEqualTo(MESSAGE);
         Map<String, Object> questions = map(body.get("questions"));
         List<String> expectedNames = new ArrayList<>(List.of("dish_named", "feature_named", "ingredient_named", "mealkit_wanted",
-                "taste_salty", "taste_sweet", "taste_spicy", "taste_umami", "taste_mild"));
-        IntStream.range(0, CATEGORIES.size()).forEach(i -> expectedNames.add("category_" + i));
+                "taste_salty", "taste_sweet", "taste_spicy", "taste_umami", "taste_mild", "request_kind", "category"));
         assertThat(questions.keySet()).containsExactlyElementsOf(expectedNames);
         assertThat(map(questions.get("dish_named"))).containsEntry("type", "noul")
                 .containsEntry("instructions", "특정 요리 이름을 말했나");
@@ -137,13 +137,25 @@ class JevIntentClassifierTest {
                 Map.entry("언급 없음", "매운맛에 대해 말하지 않았다. 다른 맛을 원하거나 피하는 말은 매운맛과 상관없다"));
         // 단어 규칙("말고", "안", "덜", "싫어")을 보내지 않는다
         assertThat(questions.values().stream().map(String::valueOf)).noneMatch(text -> text.contains("말고"));
-        assertThat(map(questions.get("category_2"))).containsEntry("type", "noul")
-                .containsEntry("instructions", "이 요청에 '국' 요리가 어울리나?");
+        Map<String, Object> requestKind = map(questions.get("request_kind"));
+        assertThat(requestKind).containsEntry("type", "choice").containsEntry("instructions", "사용자는 원하는 요리를 어떻게 말했나?");
+        assertThat(map(requestKind.get("criteria"))).containsExactly(
+                Map.entry("특정 요리", "요리 하나의 이름을 말했다"),
+                Map.entry("특정 분류", "요리의 종류를 하나 말했다(찌개, 디저트처럼)"),
+                Map.entry("넓은 요청", "상황이나 쓰임새, 여러 종류에 걸친 말을 했다(술안주, 반찬, 국물, 간단한 한 끼처럼)"),
+                Map.entry("없음", "요리 종류나 이름을 말하지 않았다"));
+        Map<String, Object> category = map(questions.get("category"));
+        assertThat(category).containsEntry("type", "choice").containsEntry("instructions", "사용자가 원하는 요리는 어느 분류인가?");
+        List<String> expectedOptions = new ArrayList<>(CATEGORIES);
+        expectedOptions.add("없음");
+        assertThat(map(category.get("criteria")).keySet()).containsExactlyElementsOf(expectedOptions);
+        assertThat(map(category.get("criteria"))).containsEntry("국", "국 분류의 요리")
+                .containsEntry("없음", "요리 종류를 말하지 않았거나 맞는 분류가 없다");
     }
 
     @Test
-    @DisplayName("1차·2차 답을 읽어 의도·확률·맛·Noul을 담고 분류 순번을 분류 이름으로 되돌린다")
-    void readsAnswersAndMapsCategoryNames_whenBothCallsSucceed() {
+    @DisplayName("1차·2차 답을 읽어 의도·확률·맛·Noul·요청 종류·1등 분류를 담는다")
+    void readsAnswers_whenBothCallsSucceed() {
         JevIntentClassifier classifier = classifier(withKey());
         expectCall(FIRST_RECOMMEND, "req_first");
         expectCall(SECOND, "req_second");
@@ -169,11 +181,26 @@ class JevIntentClassifierTest {
         assertThat(second.tastes()).containsEntry(Member.Taste.SPICY, new TasteAnswer(TasteStance.NOT_MENTIONED, 0.98))
                 .containsEntry(Member.Taste.UMAMI, new TasteAnswer(TasteStance.NOT_MENTIONED, 0.89))
                 .hasSize(5);
-        assertThat(second.categories().keySet()).containsExactlyElementsOf(CATEGORIES);
-        assertThat(second.categories()).containsEntry("국", 0.83).containsEntry("수프", 0.7).containsEntry("말이", 0.4);
+        assertThat(second.requestKind()).isEqualTo(RequestKind.BROAD);
+        assertThat(second.requestKindConfidence()).isEqualTo(0.8);
+        assertThat(second.category()).isEqualTo("국");
+        assertThat(second.categoryConfidence()).isEqualTo(0.71);
         assertThat(second.call().requestId()).isEqualTo("req_second");
         assertThat(second.call().inputTokens()).isEqualTo(1893);
         assertThat(judgement.totalLatencyMs()).isGreaterThanOrEqualTo(first.call().latencyMs() + second.call().latencyMs());
+    }
+
+    @Test
+    @DisplayName("분류 Choice의 1등이 없음이면 1등 분류를 null로 담는다")
+    void readsNullCategory_whenNoneIsTop() {
+        JevIntentClassifier classifier = classifier(withKey());
+        expectCall(FIRST_RECOMMEND, "req_first");
+        expectCall(secondResponse(CATEGORY_NONE), "req_second");
+
+        JevIntentJudgement.Second second = classifier.classify("뭐 먹지?", CATEGORIES, null).orElseThrow().second();
+
+        assertThat(second.category()).isNull();
+        assertThat(second.categoryConfidence()).isEqualTo(0.9);
     }
 
     @Test
@@ -315,8 +342,8 @@ class JevIntentClassifierTest {
                 + "\"usage\":{\"input_tokens\":417,\"output_tokens\":66}}";
     }
 
-    // jev-api-notes.md d의 Noul·맛 답과 c의 분류별 noul
-    private static String secondResponse() {
+    // jev-api-notes.md d의 Noul·맛 답, 요청 종류는 넓은 요청 0.8, 분류는 category(위 CATEGORY_… 중 하나)
+    private static String secondResponse(String category) {
         StringBuilder json = new StringBuilder("{\"model\":\"jev-1.14.0\",\"answers\":{")
                 .append("\"dish_named\":{\"type\":\"noul\",\"noul\":0.09},")
                 .append("\"feature_named\":{\"type\":\"noul\",\"noul\":0.74},")
@@ -326,11 +353,10 @@ class JevIntentClassifierTest {
                 .append(taste("taste_sweet", 1.0, 0.0, 0.0, 1.0))
                 .append(taste("taste_salty", 1.0, 0.0, 0.0, 1.0))
                 .append(taste("taste_umami", 0.89, 0.07, 0.0, 0.93))
-                .append(taste("taste_mild", 0.97, 0.02, 0.0, 0.98));
-        for (int i = 0; i < CATEGORY_NOULS.length; i++) {
-            json.append(i == 0 ? "" : ",")
-                    .append("\"category_").append(i).append("\":{\"type\":\"noul\",\"noul\":").append(CATEGORY_NOULS[i]).append('}');
-        }
+                .append(taste("taste_mild", 0.97, 0.02, 0.0, 0.98))
+                .append("\"request_kind\":{\"type\":\"choice\",\"choice\":\"넓은 요청\",\"confidence\":0.8,\"probabilities\":"
+                        + "{\"특정 요리\":0.02,\"특정 분류\":0.12,\"넓은 요청\":0.84,\"없음\":0.02}},")
+                .append(category);
         return json.append("},\"usage\":{\"input_tokens\":1893,\"output_tokens\":770}}").toString();
     }
 

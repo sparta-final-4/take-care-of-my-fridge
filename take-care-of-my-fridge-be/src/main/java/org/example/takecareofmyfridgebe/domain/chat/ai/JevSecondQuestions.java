@@ -2,12 +2,14 @@ package org.example.takecareofmyfridgebe.domain.chat.ai;
 
 import org.example.takecareofmyfridgebe.domain.chat.ai.JevAnswers.Option;
 import org.example.takecareofmyfridgebe.domain.chat.dto.JevIntentJudgement;
+import org.example.takecareofmyfridgebe.domain.chat.dto.JevIntentJudgement.RequestKind;
 import org.example.takecareofmyfridgebe.domain.chat.dto.JevIntentJudgement.TasteAnswer;
 import org.example.takecareofmyfridgebe.domain.chat.dto.JevIntentJudgement.TasteStance;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 import org.example.takecareofmyfridgebe.infra.typesafe.dto.SystemOneCall;
 import org.example.takecareofmyfridgebe.infra.typesafe.dto.SystemOneQuestion;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.LinkedHashMap;
@@ -16,11 +18,10 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * Jev 2차 질문(1차 의도가 RECOMMEND·REFINE일 때): 요리 이름·특징·재료·밀키트를 말했는지, 맛 5개, 분류마다 Noul.
- * 맛·분류는 단어 규칙 없이 뜻만 묻는다. 서버는 단어 목록으로 Jev 답을 고치지 않는다.
- * 분류는 Choice 하나로 물으면 확률이 한 분류에 몰려서(jev-api-notes.md) 분류마다 "어울리나"를 따로 묻고,
- * 몇 개를 고를지는 JevIntentJudgement.CategoryRule이 정한다.
- * 질문 이름에 한글을 쓰지 않으려고 분류는 순번(category_0, category_1, …)으로 묻고, 결과는 분류 이름으로 되돌린다.
+ * Jev 2차 질문(1차 의도가 RECOMMEND·REFINE일 때): 요리 이름·특징·재료·밀키트를 말했는지, 맛 5개, 요청 종류, 1등 분류.
+ * 단어 규칙 없이 뜻만 묻는다. 서버는 단어 목록으로 Jev 답을 고치지 않는다.
+ * 분류는 고를 수 있는 분류 + "없음" 중 하나를 고르는 Choice다. 1등 하나만 쓰고, 요청 종류가 특정 분류일 때만 의미가 있다.
+ * (분류마다 "어울리나"를 묻는 방식은 거의 모든 분류에 "예"라고 해서 버렸다: docs/testing/eval-results/jev-v2)
  */
 final class JevSecondQuestions {
 
@@ -29,7 +30,16 @@ final class JevSecondQuestions {
     static final String INGREDIENT_NAMED = "ingredient_named";
     static final String MEALKIT_WANTED = "mealkit_wanted";
     static final String TASTE_PREFIX = "taste_";
-    static final String CATEGORY_PREFIX = "category_";
+    static final String REQUEST_KIND = "request_kind";
+    static final String CATEGORY = "category";
+    // 분류 Choice에서 맞는 분류가 없다는 선택지
+    static final String NO_CATEGORY = "없음";
+
+    static final List<Option<RequestKind>> REQUEST_KINDS = List.of(
+            new Option<>("특정 요리", RequestKind.DISH, "요리 하나의 이름을 말했다"),
+            new Option<>("특정 분류", RequestKind.CATEGORY, "요리의 종류를 하나 말했다(찌개, 디저트처럼)"),
+            new Option<>("넓은 요청", RequestKind.BROAD, "상황이나 쓰임새, 여러 종류에 걸친 말을 했다(술안주, 반찬, 국물, 간단한 한 끼처럼)"),
+            new Option<>("없음", RequestKind.NONE, "요리 종류나 이름을 말하지 않았다"));
 
     private JevSecondQuestions() {
     }
@@ -45,10 +55,17 @@ final class JevSecondQuestions {
                     "사용자가 " + tasteLabel(taste) + "(" + tasteDescription(taste) + ")을 원하나, 피하고 싶어 하나, 말하지 않았나?",
                     tasteStances(taste)));
         }
-        for (int i = 0; i < categories.size(); i++) {
-            questions.put(CATEGORY_PREFIX + i, SystemOneQuestion.noul("이 요청에 '" + categories.get(i) + "' 요리가 어울리나?"));
-        }
+        questions.put(REQUEST_KIND, JevAnswers.choiceQuestion("사용자는 원하는 요리를 어떻게 말했나?", REQUEST_KINDS));
+        questions.put(CATEGORY, JevAnswers.choiceQuestion("사용자가 원하는 요리는 어느 분류인가?", categoryOptions(categories)));
         return Collections.unmodifiableMap(questions);
+    }
+
+    // 고를 수 있는 분류 + 없음. 선택지 이름과 값은 분류 이름이다
+    static List<Option<String>> categoryOptions(List<String> categories) {
+        List<Option<String>> options = new ArrayList<>();
+        categories.forEach(category -> options.add(new Option<>(category, category, category + " 분류의 요리")));
+        options.add(new Option<>(NO_CATEGORY, NO_CATEGORY, "요리 종류를 말하지 않았거나 맞는 분류가 없다"));
+        return options;
     }
 
     static JevIntentJudgement.Second read(SystemOneCall call, List<String> categories) {
@@ -58,14 +75,14 @@ final class JevSecondQuestions {
             JevAnswers.Choice<TasteStance> stance = answers.choice(tasteName(taste), tasteStances(taste));
             tastes.put(taste, new TasteAnswer(stance.value(), stance.confidence()));
         }
-        Map<String, Double> categoryProbabilities = new LinkedHashMap<>();
-        for (int i = 0; i < categories.size(); i++) {
-            categoryProbabilities.put(categories.get(i), answers.noul(CATEGORY_PREFIX + i));
-        }
+        JevAnswers.Choice<RequestKind> requestKind = answers.choice(REQUEST_KIND, REQUEST_KINDS);
+        JevAnswers.Choice<String> category = answers.choice(CATEGORY, categoryOptions(categories));
         return new JevIntentJudgement.Second(
                 answers.noul(DISH_NAMED), answers.noul(FEATURE_NAMED),
                 answers.noul(INGREDIENT_NAMED), answers.noul(MEALKIT_WANTED),
-                Collections.unmodifiableMap(tastes), Collections.unmodifiableMap(categoryProbabilities),
+                Collections.unmodifiableMap(tastes),
+                requestKind.value(), requestKind.confidence(),
+                NO_CATEGORY.equals(category.value()) ? null : category.value(), category.confidence(),
                 answers.call());
     }
 

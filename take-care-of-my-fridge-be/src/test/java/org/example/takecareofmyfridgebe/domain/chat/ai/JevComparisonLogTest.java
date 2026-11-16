@@ -5,6 +5,7 @@ import org.example.takecareofmyfridgebe.domain.chat.ai.JevComparisonLog.OpenAiSi
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntent;
 import org.example.takecareofmyfridgebe.domain.chat.dto.FridgeScope;
 import org.example.takecareofmyfridgebe.domain.chat.dto.JevIntentJudgement;
+import org.example.takecareofmyfridgebe.domain.chat.dto.JevIntentJudgement.RequestKind;
 import org.example.takecareofmyfridgebe.domain.chat.dto.JevIntentJudgement.TasteAnswer;
 import org.example.takecareofmyfridgebe.domain.chat.dto.JevIntentJudgement.TasteStance;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member.Taste;
@@ -25,14 +26,15 @@ class JevComparisonLogTest {
 
     static final List<String> FIELDS = List.of("memberId", "sessionId", "messageLength", "openaiIntent", "jevIntent",
             "jevIntentConfidence", "intentMatch", "openaiWanted", "openaiAvoided", "jevWanted", "jevAvoided", "tasteMatch",
-            "openaiCategories", "jevCategories", "categoryMatch", "openaiMealkit", "jevMealkit", "jevAsksQuestion",
+            "openaiCategories", "jevRequestKind", "jevRequestKindConfidence", "jevCategory", "jevCategoryConfidence",
+            "categoryMatch", "openaiMealkit", "jevMealkit", "jevAsksQuestion",
             "jevDishNamed", "jevModel", "jevRequestIds", "jevLatencyMs", "jevInputTokens", "jevStatus");
 
     private static final OpenAiSide OPENAI = new OpenAiSide(1L, 10L, 10, ChatIntent.RECOMMEND,
-            List.of(Taste.SPICY), List.of(), List.of("찌개", "국"), false);
+            List.of(Taste.SPICY), List.of(), List.of("찌개"), false);
 
     @Test
-    @DisplayName("1차·2차가 모두 있으면 정해진 칸 이름 순서로 값을 남기고 고르기 규칙으로 고른 분류와 0.5 이상인 밀키트만 Jev 쪽으로 본다")
+    @DisplayName("1차·2차가 모두 있으면 정해진 칸 이름 순서로 값을 남기고 요청 종류·1등 분류와 0.5 이상인 밀키트를 Jev 쪽으로 본다")
     void writesAllFieldsInOrder_whenBothCallsSucceed() {
         String line = JevComparisonLog.line(OPENAI, JevSide.finished(Optional.of(judgement(ChatIntent.RECOMMEND, true)), 520L));
 
@@ -44,7 +46,8 @@ class JevComparisonLogTest {
                 .containsEntry("jevIntentConfidence", "0.97").containsEntry("intentMatch", "true")
                 .containsEntry("openaiWanted", "SPICY").containsEntry("openaiAvoided", "")
                 .containsEntry("jevWanted", "SPICY").containsEntry("jevAvoided", "").containsEntry("tasteMatch", "true")
-                .containsEntry("openaiCategories", "찌개,국").containsEntry("jevCategories", "국,찌개")
+                .containsEntry("openaiCategories", "찌개").containsEntry("jevRequestKind", "CATEGORY")
+                .containsEntry("jevRequestKindConfidence", "0.88").containsEntry("jevCategory", "찌개").containsEntry("jevCategoryConfidence", "0.81")
                 .containsEntry("categoryMatch", "true")
                 .containsEntry("openaiMealkit", "false").containsEntry("jevMealkit", "false")
                 .containsEntry("jevAsksQuestion", "0.05").containsEntry("jevDishNamed", "0.09")
@@ -62,7 +65,7 @@ class JevComparisonLogTest {
                 JevSide.finished(Optional.of(judgement(ChatIntent.FRIDGE, false)), 230L)));
 
         assertThat(values).containsEntry("intentMatch", "false").containsEntry("jevIntent", "FRIDGE")
-                .containsEntry("jevWanted", "-").containsEntry("tasteMatch", "-").containsEntry("jevCategories", "-")
+                .containsEntry("jevWanted", "-").containsEntry("tasteMatch", "-").containsEntry("jevRequestKind", "-").containsEntry("jevCategory", "-")
                 .containsEntry("categoryMatch", "-").containsEntry("jevMealkit", "-").containsEntry("jevDishNamed", "-")
                 .containsEntry("jevRequestIds", "req_first/-").containsEntry("jevLatencyMs", "210/-/230")
                 .containsEntry("jevInputTokens", "417/-").containsEntry("jevStatus", "OK");
@@ -86,7 +89,7 @@ class JevComparisonLogTest {
     }
 
     @Test
-    @DisplayName("맛 원함·피함이나 고른 분류가 OpenAI와 다르면 tasteMatch·categoryMatch가 false다")
+    @DisplayName("맛 원함·피함이나 특정 분류일 때 1등 분류가 OpenAI와 다르면 tasteMatch·categoryMatch가 false다")
     void writesMismatch_whenTastesOrCategoriesDiffer() {
         OpenAiSide avoidSpicy = new OpenAiSide(1L, 10L, 9, ChatIntent.RECOMMEND,
                 List.of(), List.of(Taste.SPICY), List.of("국"), true);
@@ -99,7 +102,23 @@ class JevComparisonLogTest {
                 .containsEntry("openaiMealkit", "true");
     }
 
-    // 1차: 의도 0.97, 묻는 말 0.05. 2차: 매운맛 원함, 국 0.83·찌개 0.72·수프 0.49(1등과 0.15 넘게 차이 나 안 고름), 밀키트 0.08
+    @Test
+    @DisplayName("요청 종류가 특정 분류가 아니면 1등 분류는 남기고 categoryMatch는 -로 남긴다")
+    void writesNoneCategoryMatch_whenRequestKindIsNotCategory() {
+        JevIntentJudgement broad = judgement(ChatIntent.RECOMMEND, true);
+        JevIntentJudgement.Second second = broad.second();
+        JevIntentJudgement withBroad = new JevIntentJudgement(broad.first(), new JevIntentJudgement.Second(
+                second.dishNamed(), second.featureNamed(), second.ingredientNamed(), second.mealkitWanted(), second.tastes(),
+                RequestKind.BROAD, 0.77, null, 0.6, second.call()), broad.totalLatencyMs());
+
+        Map<String, String> values = values(JevComparisonLog.line(OPENAI, JevSide.finished(Optional.of(withBroad), 520L)));
+
+        assertThat(values).containsEntry("jevRequestKind", "BROAD").containsEntry("jevRequestKindConfidence", "0.77")
+                .containsEntry("jevCategory", "-").containsEntry("jevCategoryConfidence", "0.6")
+                .containsEntry("categoryMatch", "-");
+    }
+
+    // 1차: 의도 0.97, 묻는 말 0.05. 2차: 매운맛 원함, 특정 분류 0.88, 1등 분류 찌개 0.81, 밀키트 0.08
     static JevIntentJudgement judgement(ChatIntent intent, boolean withSecond) {
         Map<ChatIntent, Double> probabilities = new EnumMap<>(ChatIntent.class);
         Arrays.stream(ChatIntent.values()).forEach(each -> probabilities.put(each, each == intent ? 0.98 : 0.0));
@@ -111,11 +130,8 @@ class JevComparisonLogTest {
         Map<Taste, TasteAnswer> tastes = new EnumMap<>(Taste.class);
         Arrays.stream(Taste.values()).forEach(taste -> tastes.put(taste,
                 new TasteAnswer(taste == Taste.SPICY ? TasteStance.WANTED : TasteStance.NOT_MENTIONED, 0.9)));
-        Map<String, Double> categories = new LinkedHashMap<>();
-        categories.put("국", 0.83);
-        categories.put("수프", 0.49);
-        categories.put("찌개", 0.72);
-        JevIntentJudgement.Second second = new JevIntentJudgement.Second(0.09, 0.74, 0.07, 0.08, tastes, categories,
+        JevIntentJudgement.Second second = new JevIntentJudgement.Second(0.09, 0.74, 0.07, 0.08, tastes,
+                RequestKind.CATEGORY, 0.88, "찌개", 0.81,
                 new JevIntentJudgement.Call("jev-1.14.0", "req_second", 290L, 1893));
         return new JevIntentJudgement(first, second, 520L);
     }
