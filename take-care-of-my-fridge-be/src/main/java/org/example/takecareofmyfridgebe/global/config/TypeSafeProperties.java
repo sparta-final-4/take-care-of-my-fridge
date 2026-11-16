@@ -5,7 +5,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import java.time.Duration;
 
 /**
- * TypeSafe(Jev 분류 모델) 호출 설정. 어느 기능에서 쓸지는 쓰는 쪽 설정이 정한다(예: 상담 그림자 모드 app.chat.jev.enabled).
+ * TypeSafe(Jev 분류 모델) 호출 설정. 어느 기능에서 쓸지는 쓰는 쪽 설정이 정한다(예: 상담 의도 판단 app.chat.jev.mode).
  * API 사용법 조사: docs/testing/jev-api-notes.md
  *
  * @param baseUrl API 주소 (기본 https://api.typesafe.ai)

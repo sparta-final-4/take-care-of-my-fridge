@@ -14,7 +14,7 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * 상담 의도 판단의 Jev 그림자 모드. app.chat.jev.enabled가 true일 때만 OpenAI 의도 판단과 함께 Jev를 다른 스레드에서 부르고,
+ * 상담 의도 판단의 Jev 그림자 모드. app.chat.jev.mode가 shadow·on일 때 OpenAI 의도 판단과 함께 Jev를 다른 스레드에서 부르고,
  * 두 결과가 모두 나오면 "상담 의도 Jev 비교" 로그를 한 줄 남긴다(JevComparisonLog). 결과는 상담에 쓰지 않는다.
  * <ul>
  *   <li>상담 응답은 Jev를 기다리지 않는다. 비교 로그는 Jev가 끝난 스레드(이미 끝났으면 부른 스레드)에서 남긴다</li>
@@ -40,7 +40,7 @@ public class JevIntentShadow {
 
     // 꺼진 그림자 모드. 아무것도 부르지 않는다 (ChatIntentFacade를 그림자 모드 없이 만들 때)
     public static JevIntentShadow off() {
-        return new JevIntentShadow(new ChatJevProperties(false), null, null, null);
+        return new JevIntentShadow(ChatJevProperties.OFF, null, null, null);
     }
 
     /**
@@ -52,7 +52,7 @@ public class JevIntentShadow {
      * @return 시작한 판단. 꺼져 있으면 null (비교 로그도 남기지 않는다)
      */
     public Run start(String message, List<String> categories, String followUp) {
-        if (!properties.enabled()) {
+        if (!properties.calls()) {
             return null;
         }
         try {

@@ -107,9 +107,9 @@ app:
       mealkit-request: true
       off-topic-revive: true
       fridge-shop-words: true
-    # Jev(TypeSafe) 의도 판단. 그림자 모드: 켜도 결과는 로그로만 남기고 쓰지 않는다. 호출 설정은 app.typesafe
+    # Jev(TypeSafe) 의도 판단. off: 부르지 않음 / shadow: 결과는 비교 로그로만 / on: Jev 판단으로 의도를 정함. 호출 설정은 app.typesafe
     jev:
-      enabled: ${CHAT_JEV_ENABLED:false}
+      mode: ${CHAT_JEV_MODE:off}
   # TypeSafe(Jev 분류 모델) 호출 설정. 키가 비어 있으면 호출하지 않는다
   typesafe:
     base-url: ${TYPESAFE_BASE_URL:https://api.typesafe.ai}

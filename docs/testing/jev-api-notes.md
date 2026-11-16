@@ -3,7 +3,7 @@
 상태: **실제 호출로 확인 완료** · 조사일: 2026-11-16 · 브랜치: `feat/chat-jev-shadow`
 
 상담 의도 판단에 Jev(TypeSafe AI의 분류 전용 "System One" 모델)를 그림자 모드로 붙이기 전에 API 사용법을 정리한다.
-호출 설정은 `app.typesafe`(`TypeSafeProperties`), 상담에서 켤지는 `app.chat.jev.enabled`(`ChatJevProperties`)에 있다. 이 문서에는 API 키를 쓰지 않는다. curl에서는 `"$TYPESAFE_API_KEY"`로만 참조한다.
+호출 설정은 `app.typesafe`(`TypeSafeProperties`), 상담에서 켤지는 `app.chat.jev.mode`(`ChatJevProperties`, off / shadow / on)에 있다. 이 문서에는 API 키를 쓰지 않는다. curl에서는 `"$TYPESAFE_API_KEY"`로만 참조한다.
 
 > 키 없는 호출 2건, 사용자가 직접 한 키 있는 호출 2건(모델 목록, Choice 하나), 이 작업에서 한 키 있는 호출 7건(a~g)을 [실제 호출](#실제-호출-2026-11-16)에 적었다.
 > 글에서 부분을 꺼낼 수 있는지 본 Box 호출 1건(h)은 [Box로 글에서 부분 꺼내기](#box로-글에서-부분-꺼내기-h)에 적었다.

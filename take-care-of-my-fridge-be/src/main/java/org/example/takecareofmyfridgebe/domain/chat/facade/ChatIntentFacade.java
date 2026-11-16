@@ -63,7 +63,7 @@ import java.util.stream.Stream;
  *       못 찾으면 일반 답(이전 대화를 보고 AI가 되묻는다)</li>
  * </ul>
  * <p>
- * Jev 그림자 모드(app.chat.jev.enabled)가 켜져 있으면 OpenAI 의도 판단과 함께 Jev를 다른 스레드에서 부르고, 최종 결과와 비교 로그만 남긴다.
+ * Jev 그림자 모드(app.chat.jev.mode=shadow)가 켜져 있으면 OpenAI 의도 판단과 함께 Jev를 다른 스레드에서 부르고, 최종 결과와 비교 로그만 남긴다.
  * 상담 결과와 응답 시간은 Jev와 상관없다 (JevIntentShadow).
  */
 @Slf4j

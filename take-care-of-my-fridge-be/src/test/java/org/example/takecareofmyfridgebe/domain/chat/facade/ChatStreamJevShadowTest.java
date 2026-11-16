@@ -84,7 +84,7 @@ class ChatStreamJevShadowTest {
 
     private ChatIntentFacade intentFacadeWithJev() {
         ChatCorrectionProperties corrections = ChatCorrectionProperties.ALL_ON;
-        JevIntentShadow shadow = new JevIntentShadow(new ChatJevProperties(true), classifier,
+        JevIntentShadow shadow = new JevIntentShadow(new ChatJevProperties(ChatJevProperties.Mode.SHADOW), classifier,
                 new TypeSafeClient(RestClient.create(), new TypeSafeProperties(null, FAKE_KEY, null, null)), executor);
         return new ChatIntentFacade(fixture.extractor, fixture.recipeService, fixture.ingredientMatcher,
                 new ChatCandidateProperties(List.of("양념", "음료"), 0.4, List.of(), List.of("백김치", "물김치", "동치미", "나박김치"), List.of(), List.of()),

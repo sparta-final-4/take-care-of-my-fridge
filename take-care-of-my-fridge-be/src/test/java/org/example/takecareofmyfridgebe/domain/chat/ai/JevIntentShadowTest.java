@@ -157,7 +157,7 @@ class JevIntentShadowTest {
             release.await(5, TimeUnit.SECONDS);
             return Optional.empty();
         });
-        JevIntentShadow shadow = new JevIntentShadow(new ChatJevProperties(true), classifier, client(FAKE_KEY), small);
+        JevIntentShadow shadow = new JevIntentShadow(new ChatJevProperties(ChatJevProperties.Mode.SHADOW), classifier, client(FAKE_KEY), small);
         try {
             JevIntentShadow.Run running = shadow.start(MESSAGE, CATEGORIES, null);
             verify(classifier, timeout(1_000)).classify(any(), any(), any());
@@ -176,7 +176,7 @@ class JevIntentShadowTest {
 
     private ChatIntentFacade facade(boolean enabled, String apiKey) {
         ChatCorrectionProperties corrections = ChatCorrectionProperties.ALL_ON;
-        JevIntentShadow shadow = new JevIntentShadow(new ChatJevProperties(enabled), classifier, client(apiKey), executor);
+        JevIntentShadow shadow = new JevIntentShadow(new ChatJevProperties(enabled ? ChatJevProperties.Mode.SHADOW : ChatJevProperties.Mode.OFF), classifier, client(apiKey), executor);
         return new ChatIntentFacade(fixture.extractor, fixture.recipeService, fixture.ingredientMatcher,
                 new ChatCandidateProperties(List.of("양념", "음료"), 0.4, List.of(), List.of("백김치", "물김치", "동치미", "나박김치"), List.of(), List.of()),
                 ChatIntentFixture.WORDS, fixture.allergyExclusionFinder, corrections, fixture.newCorrector(corrections), shadow);
