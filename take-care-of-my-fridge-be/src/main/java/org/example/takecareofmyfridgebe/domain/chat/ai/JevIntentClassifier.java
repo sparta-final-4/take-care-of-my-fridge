@@ -53,7 +53,7 @@ public class JevIntentClassifier {
         }
 
         JevIntentJudgement.Second second = null;
-        if (NEEDS_SECOND.contains(first.get().intent())) {
+        if (asksSecond(first.get().intent())) {
             second = typeSafeClient.ask(SECOND, state, JevSecondQuestions.questions(categories))
                     .flatMap(call -> read(SECOND, call, answered -> JevSecondQuestions.read(answered, categories)))
                     .orElse(null);
@@ -65,6 +65,11 @@ public class JevIntentClassifier {
         JevIntentJudgement judgement = new JevIntentJudgement(first.get(), second, elapsedMs(startedAt));
         logJudgement(judgement, message.length());
         return Optional.of(judgement);
+    }
+
+    // 2차(추천 조건)를 묻는 의도인지
+    static boolean asksSecond(ChatIntent intent) {
+        return NEEDS_SECOND.contains(intent);
     }
 
     // OpenAI 의도 판단처럼 직전 추천이 있을 때만 그 정보를 앞에 둔다
