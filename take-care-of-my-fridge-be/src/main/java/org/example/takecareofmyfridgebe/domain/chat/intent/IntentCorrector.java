@@ -47,6 +47,10 @@ import java.util.stream.Stream;
  *   <li>말한 맛만 (spokenTastesOnly): 새 추천에서 앞 대화에서 따라온 맛을 뺌</li>
  * </ol>
  * 요리 이름·맛·분류 보정(6~9)은 추천·다시 추천·밀키트 추천일 때만 한다. 일반 답·레시피 자세히는 AI 결과를 그대로 쓴다.
+ * <p>
+ * 단계는 "AI 실수 고치기"(1·3·4·5·6·8·9)와 "서비스 규칙"(2·7·10)으로 나뉜다. Jev on 모드는 {@link Steps#SERVICE_RULES}로 서비스 규칙만 거친다
+ * (Jev가 의도·맛·분류를 정하고, Jev를 못 쓴 메시지는 보정 없는 OpenAI 결과를 쓴다). 이때 6 대신 요리 이름이 메시지에 그대로 있는지만 본다.
+ * 보정 스위치(app.chat.corrections)는 바꾸지 않는다. off·shadow 모드는 {@link Steps#ALL}로 지금과 같다.
  * 결과를 추천 조건(RecipeQuery)으로 바꾸고 다시 추천을 합치는 일은 ChatIntentFacade가 한다.
  */
 @Slf4j
@@ -85,14 +89,32 @@ public class IntentCorrector {
     }
 
     /**
+     * 거칠 단계.
+     */
+    public enum Steps {
+        // 모든 단계 (off·shadow 모드)
+        ALL,
+        // 서비스 규칙만: 레시피 자세히 대상(2), 요리 이름이 메시지에 있는지, 다른 맛 지키기(7), 말한 맛만(10) (Jev on 모드)
+        SERVICE_RULES
+    }
+
+    /**
      * @param input     보정 한 번 동안 바뀌지 않는 입력 (회원·상담·메시지·AI에 준 분류 목록·대화 문맥)
      * @param sanitized AI 결과를 sanitize한 것
      */
     public Corrected correct(CorrectionInput input, IntentResult sanitized) {
+        return correct(input, sanitized, Steps.ALL);
+    }
+
+    /**
+     * @param steps 거칠 단계. SERVICE_RULES면 AI 실수 고치기 단계(1·3·4·5·6·8·9)를 건너뛴다 (보정 스위치와 상관없이)
+     */
+    public Corrected correct(CorrectionInput input, IntentResult sanitized, Steps steps) {
+        boolean fixes = steps == Steps.ALL;
         IntentResult result = sanitized;
         // AI가 상관없는 질문이라고 해도 음식 말이 있으면 거절하지 않는다 (정상 질문을 거절하는 게 상관없는 질문을 통과시키는 것보다 나쁘다).
         // 되살린 GENERAL·RECOMMEND는 아래에서 AI가 처음부터 그렇게 본 것처럼 처리한다. BLOCKED·SELF_HARM은 되살리지 않는다
-        if (result.intent() == ChatIntent.OFF_TOPIC && corrections.offTopicRevive()) {
+        if (fixes && result.intent() == ChatIntent.OFF_TOPIC && corrections.offTopicRevive()) {
             result = reviveOffTopic(input, result);
         }
         // 레시피 자세히인데 물어본 레시피가 이 상담 추천에 없으면, 그 요리 이름으로 새 추천을 한다 (아래 맛·분류 보정을 거치게 여기서 바꾼다)
@@ -106,15 +128,15 @@ public class IntentCorrector {
             }
         }
         // 냉장고 보기 말이면 AI가 추천·일반 대화로 봐도(되살린 것 포함) 냉장고 보기로 바꾼다. 아래 밀키트·이름만 말하기 규칙보다 먼저 본다
-        if (corrections.fridgeShopWords()) {
+        if (fixes && corrections.fridgeShopWords()) {
             result = applyFridgeShopWords(input, result);
         }
-        boolean mealkitRecommend = corrections.mealkitRequest() && result.intent() == ChatIntent.GENERAL
+        boolean mealkitRecommend = fixes && corrections.mealkitRequest() && result.intent() == ChatIntent.GENERAL
                 && mealkitRequested(input);
         // "국물 밀키트", "디저트", "두부"처럼 이름만 말한 짧은 말은 보여 달라는 뜻으로 보고 추천으로 바꾼다.
         // 그 밖에 요리 이름이 있고 묻는 말이 없으면 추천을 시도한다 ("김피탕" / "김피탕 같은 거"를 AI가 일반 답으로 봐도)
         boolean dishTry = false;
-        if (corrections.nameOnly() && result.intent() == ChatIntent.GENERAL && !mealkitRecommend) {
+        if (fixes && corrections.nameOnly() && result.intent() == ChatIntent.GENERAL && !mealkitRecommend) {
             Optional<IntentResult> named = nameOnly(input, result);
             Optional<IntentResult> tried = named.isPresent() ? Optional.empty() : tryDish(input, result);
             if (named.isPresent()) {
@@ -127,14 +149,14 @@ public class IntentCorrector {
         // 맛·분류 단어로 조건을 고치는 것은 추천·다시 추천일 때만 한다. 일반 답·레시피 자세히는 AI 결과를 그대로 쓴다
         if (result.intent() == ChatIntent.RECOMMEND || result.intent() == ChatIntent.REFINE || mealkitRecommend) {
             // AI 요리 이름은 메시지에 있는지만 확인하고, 분류 이름·묶음 말("디저트", "국물")은 키워드·요리 이름이 아니라 분류다
-            result = checkDishAndKeywords(input, result);
+            result = fixes ? checkDishAndKeywords(input, result) : keepSpokenDishOnly(input, result);
             if (corrections.keepOtherTastes()) {
                 result = keepOtherTastes(input, result);
             }
-            if (corrections.tasteWords()) {
+            if (fixes && corrections.tasteWords()) {
                 result = correctTastes(input, result);
             }
-            if (corrections.categoryWords()) {
+            if (fixes && corrections.categoryWords()) {
                 result = correctCategories(input, result);
             }
         }
@@ -221,8 +243,23 @@ public class IntentCorrector {
 
     // 메시지에 그대로 있고(공백 무시) 분류 이름·묶음 말이 아닌 요리 이름인지
     private boolean spokenDish(CorrectionInput input, String dish) {
-        return ChatTexts.removeWhitespace(input.message()).contains(ChatTexts.removeWhitespace(dish))
-                && categoriesOf(dish, input.categories()).isEmpty();
+        return dishInMessage(input.message(), dish) && categoriesOf(dish, input.categories()).isEmpty();
+    }
+
+    // 요리 이름이 메시지에 그대로 있는지 (공백 무시). 단어 목록을 쓰지 않는다 (Jev on 모드의 요리 이름 확인)
+    static boolean dishInMessage(String message, String dish) {
+        return message != null && dish != null && !dish.isBlank()
+                && ChatTexts.removeWhitespace(message).contains(ChatTexts.removeWhitespace(dish));
+    }
+
+    // 서비스 규칙만 거칠 때(Jev on 모드)의 요리 이름 확인: 메시지에 그대로 없으면 비운다. 분류 옮기기·요리 이름 채우기(첫 키워드·○○ 같은)는 하지 않는다
+    private IntentResult keepSpokenDishOnly(CorrectionInput input, IntentResult result) {
+        if (result.dishText() == null || dishInMessage(input.message(), result.dishText())) {
+            return result;
+        }
+        log.info("상담 요리 이름이 메시지에 없어 비움 - memberId: {}, sessionId: {}, 요리 이름: {}",
+                input.memberId(), input.sessionId(), result.dishText());
+        return result.withCategories(result.moodCategories(), result.keywords(), null, result.removed());
     }
 
     // AI 첫 키워드를 요리 이름으로 쓸 수 있는지: spokenDish에 더해 밀키트 말("국물 밀키트", "밀키트")이 아니고,

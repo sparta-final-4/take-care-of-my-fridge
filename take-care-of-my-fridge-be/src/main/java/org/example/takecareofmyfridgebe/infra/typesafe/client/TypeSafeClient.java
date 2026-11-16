@@ -16,6 +16,7 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.Map;
 import java.util.Optional;
 
@@ -78,6 +79,11 @@ public class TypeSafeClient {
     // 키가 있어 부를 수 있는지
     public boolean ready() {
         return properties.hasApiKey();
+    }
+
+    // 호출 하나의 제한 시간 (app.typesafe.timeout)
+    public Duration timeout() {
+        return properties.timeout();
     }
 
     private void warn(String purpose, String status, String requestId, String state, long startedAt, String cause) {

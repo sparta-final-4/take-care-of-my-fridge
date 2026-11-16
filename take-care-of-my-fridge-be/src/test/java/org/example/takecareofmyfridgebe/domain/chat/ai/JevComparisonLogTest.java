@@ -4,6 +4,7 @@ import org.example.takecareofmyfridgebe.domain.chat.ai.JevComparisonLog.JevSide;
 import org.example.takecareofmyfridgebe.domain.chat.ai.JevComparisonLog.OpenAiSide;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntent;
 import org.example.takecareofmyfridgebe.domain.chat.dto.FridgeScope;
+import org.example.takecareofmyfridgebe.domain.chat.dto.JevDecision;
 import org.example.takecareofmyfridgebe.domain.chat.dto.JevIntentJudgement;
 import org.example.takecareofmyfridgebe.domain.chat.dto.JevIntentJudgement.RequestKind;
 import org.example.takecareofmyfridgebe.domain.chat.dto.JevIntentJudgement.TasteAnswer;
@@ -28,7 +29,8 @@ class JevComparisonLogTest {
             "jevIntentConfidence", "intentMatch", "openaiWanted", "openaiAvoided", "jevWanted", "jevAvoided", "tasteMatch",
             "openaiCategories", "jevRequestKind", "jevRequestKindConfidence", "jevCategory", "jevCategoryConfidence",
             "categoryMatch", "openaiMealkit", "jevMealkit", "jevAsksQuestion",
-            "jevDishNamed", "jevModel", "jevRequestIds", "jevLatencyMs", "jevInputTokens", "jevStatus");
+            "jevDishNamed", "jevModel", "jevRequestIds", "jevLatencyMs", "jevInputTokens", "jevStatus", "decision", "jevUsedKind",
+            "jevUsedValues");
 
     private static final OpenAiSide OPENAI = new OpenAiSide(1L, 10L, 10, ChatIntent.RECOMMEND,
             List.of(Taste.SPICY), List.of(), List.of("찌개"), false);
@@ -53,7 +55,25 @@ class JevComparisonLogTest {
                 .containsEntry("jevAsksQuestion", "0.05").containsEntry("jevDishNamed", "0.09")
                 .containsEntry("jevModel", "jev-1.14.0").containsEntry("jevRequestIds", "req_first/req_second")
                 .containsEntry("jevLatencyMs", "210/290/520").containsEntry("jevInputTokens", "417/1893")
-                .containsEntry("jevStatus", "OK");
+                .containsEntry("jevStatus", "OK")
+                .containsEntry("decision", "SHADOW").containsEntry("jevUsedKind", "-").containsEntry("jevUsedValues", "-");
+    }
+
+    @Test
+    @DisplayName("on 모드에서 Jev로 정하면 decision=JEV와 쓴 요청 종류·값을 남기고, 값 안의 공백은 뺀다")
+    void writesDecisionAndUsedValues_whenJevDecides() {
+        JevDecision broad = new JevDecision(JevDecision.Decision.JEV, RequestKind.BROAD, List.of("오징어볶음", "토마토 스파게티"));
+
+        Map<String, String> values = values(JevComparisonLog.line(OPENAI,
+                JevSide.finished(Optional.of(judgement(ChatIntent.RECOMMEND, true)), 520L), broad));
+        Map<String, String> lowConfidence = values(JevComparisonLog.line(OPENAI,
+                JevSide.finished(Optional.of(judgement(ChatIntent.RECOMMEND, true)), 520L),
+                JevDecision.of(JevDecision.Decision.OPENAI_LOW_CONFIDENCE)));
+
+        assertThat(values).containsEntry("decision", "JEV").containsEntry("jevUsedKind", "BROAD")
+                .containsEntry("jevUsedValues", "오징어볶음,토마토스파게티");
+        assertThat(lowConfidence).containsEntry("decision", "OPENAI_LOW_CONFIDENCE").containsEntry("jevUsedKind", "-")
+                .containsEntry("jevUsedValues", "-");
     }
 
     @Test

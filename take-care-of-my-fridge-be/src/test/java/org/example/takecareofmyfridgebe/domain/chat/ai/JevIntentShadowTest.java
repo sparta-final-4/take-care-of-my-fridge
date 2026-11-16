@@ -8,7 +8,10 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntent;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntentResolution;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageCreateRequest;
 import org.example.takecareofmyfridgebe.domain.chat.dto.IntentResult;
+import org.example.takecareofmyfridgebe.domain.chat.dto.JevIntentJudgement;
 import org.example.takecareofmyfridgebe.domain.chat.facade.ChatIntentFacade;
+import org.example.takecareofmyfridgebe.domain.chat.facade.SimilarDishFinder;
+import org.example.takecareofmyfridgebe.domain.chat.intent.JevIntentResolver;
 import org.example.takecareofmyfridgebe.global.config.TypeSafeProperties;
 import org.example.takecareofmyfridgebe.global.config.TypeSafeShadowExecutor;
 import org.example.takecareofmyfridgebe.infra.typesafe.client.TypeSafeClient;
@@ -21,6 +24,7 @@ import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.web.client.RestClient;
 
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -122,6 +126,27 @@ class JevIntentShadowTest {
     }
 
     @Test
+    @DisplayName("on: Jev 결과로 정한 상담 결과와 decision=JEV·쓴 요청 종류·값을 비교 로그에 남긴다")
+    void logsJevDecision_whenOnModeDecides(CapturedOutput output) {
+        // 2차: 특정 분류 찌개 (JevComparisonLogTest.judgement)
+        when(classifier.classify(any(), any(), any())).thenReturn(Optional.of(JevComparisonLogTest.judgement(ChatIntent.RECOMMEND, true)));
+        ChatCorrectionProperties corrections = ChatCorrectionProperties.ALL_ON;
+        ChatIntentFacade facade = new ChatIntentFacade(fixture.extractor, fixture.recipeService, fixture.ingredientMatcher,
+                new ChatCandidateProperties(List.of("양념", "음료"), 0.4, List.of(), List.of("백김치", "물김치", "동치미", "나박김치"), List.of(), List.of()),
+                ChatIntentFixture.WORDS, fixture.allergyExclusionFinder, corrections, fixture.newCorrector(corrections),
+                onShadow(client(FAKE_KEY)), new JevIntentResolver(mock(SimilarDishFinder.class), ChatIntentFixture.WORDS));
+
+        ChatIntentResolution resolution = facade.resolve(MEMBER_ID, sessionId, request());
+
+        assertThat(resolution.recipeQuery().moodCategories()).containsExactly("찌개");
+        String line = awaitComparison(output, sessionId);
+        assertThat(JevComparisonLogTest.keys(line)).containsExactlyElementsOf(JevComparisonLogTest.FIELDS);
+        assertThat(JevComparisonLogTest.values(line)).containsEntry("decision", "JEV").containsEntry("jevUsedKind", "CATEGORY")
+                .containsEntry("jevUsedValues", "찌개").containsEntry("openaiCategories", "찌개").containsEntry("jevStatus", "OK");
+        assertThat(line).doesNotContain(MESSAGE).doesNotContain(FAKE_KEY);
+    }
+
+    @Test
     @DisplayName("비교 로그는 정해진 칸 이름으로 남고 메시지 원문과 키가 없다")
     void logsFixedFieldsWithoutMessageAndKey_whenJevSucceeds(CapturedOutput output) {
         when(classifier.classify(any(), any(), any())).thenReturn(Optional.of(JevComparisonLogTest.judgement(ChatIntent.RECOMMEND, true)));
@@ -180,6 +205,49 @@ class JevIntentShadowTest {
         return new ChatIntentFacade(fixture.extractor, fixture.recipeService, fixture.ingredientMatcher,
                 new ChatCandidateProperties(List.of("양념", "음료"), 0.4, List.of(), List.of("백김치", "물김치", "동치미", "나박김치"), List.of(), List.of()),
                 ChatIntentFixture.WORDS, fixture.allergyExclusionFinder, corrections, fixture.newCorrector(corrections), shadow);
+    }
+
+    @Test
+    @DisplayName("on: 1차·2차까지 성공한 Jev 판단을 기다려 돌려준다")
+    void awaitsJudgement_whenJevSucceeds() {
+        JevIntentJudgement judgement = JevComparisonLogTest.judgement(ChatIntent.RECOMMEND, true);
+        when(classifier.classify(any(), any(), any())).thenReturn(Optional.of(judgement));
+        JevIntentShadow shadow = onShadow(client(FAKE_KEY));
+
+        assertThat(shadow.on()).isTrue();
+        assertThat(shadow.await(shadow.start(MESSAGE, CATEGORIES, null))).contains(judgement);
+    }
+
+    @Test
+    @DisplayName("on: 추천인데 2차가 실패했으면 Jev 실패로 보고 빈 값이다")
+    void returnsEmpty_whenSecondFailed() {
+        when(classifier.classify(any(), any(), any()))
+                .thenReturn(Optional.of(JevComparisonLogTest.judgement(ChatIntent.RECOMMEND, false)));
+        JevIntentShadow shadow = onShadow(client(FAKE_KEY));
+
+        assertThat(shadow.await(shadow.start(MESSAGE, CATEGORIES, null))).isEmpty();
+        assertThat(shadow.await(null)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("on: Jev를 시작한 때부터 TypeSafe 제한 시간이 지나도 끝나지 않으면 더 기다리지 않고 빈 값이다")
+    void returnsEmpty_whenJevExceedsTimeout() {
+        when(classifier.classify(any(), any(), any())).thenAnswer(invocation -> {
+            release.await(5, TimeUnit.SECONDS);
+            return Optional.of(JevComparisonLogTest.judgement(ChatIntent.RECOMMEND, true));
+        });
+        JevIntentShadow shadow = onShadow(new TypeSafeClient(RestClient.create(),
+                new TypeSafeProperties(null, FAKE_KEY, null, Duration.ofMillis(200))));
+
+        long startedAt = System.nanoTime();
+        Optional<JevIntentJudgement> judged = shadow.await(shadow.start(MESSAGE, CATEGORIES, null));
+
+        assertThat(judged).isEmpty();
+        assertThat(Duration.ofNanos(System.nanoTime() - startedAt)).isLessThan(Duration.ofSeconds(2));
+    }
+
+    private JevIntentShadow onShadow(TypeSafeClient client) {
+        return new JevIntentShadow(new ChatJevProperties(ChatJevProperties.Mode.ON), classifier, client, executor);
     }
 
     // 실제로 부르지 않는다 (분류기를 흉내 낸다). 키가 있는지(ready)만 본다
