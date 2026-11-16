@@ -434,6 +434,8 @@ class ChatIntentEvalManualTest {
                         ? Optional.empty() : diff(field, expected, actual.productType());
                 case "target" -> Objects.equals(((Number) expected).longValue(), actual.target())
                         ? Optional.empty() : diff(field, expected, actual.target());
+                // 요청 종류는 Jev 평가(JevIntentEvalManualTest)만 본다. OpenAI 의도 판단에는 이 칸이 없다
+                case "kind" -> Optional.empty();
                 case "question" -> Objects.equals(expected, actual.question())
                         ? Optional.empty() : diff(field, expected, actual.question());
                 default -> throw new IllegalArgumentException("모르는 기대 칸: " + field);
