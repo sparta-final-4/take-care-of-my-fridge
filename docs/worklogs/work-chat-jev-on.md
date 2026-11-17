@@ -1,6 +1,6 @@
 # WORK-CHAT-JEV-ON: 상담 의도 Jev on 모드 연결
 
-상태: 정리 단계·d2 완료 (Jev가 유일한 의도 판단, REFINE은 추천 안의 이어짐, 아래 "정리 단계"·"d2") · 작성일: 2026-11-17 · 담당: 상담(chat)
+상태: 정리 단계·d2·Jev 단독 완료 (Jev 단독 의도 판단, REFINE은 추천 안의 이어짐, AI 실패 시 서버 답, 아래 "정리 단계"·"d2"·"Jev 단독") · 작성일: 2026-11-17 · 담당: 상담(chat)
 
 ## 목표와 완료 기준
 - 사용자 문제: 상담 의도를 OpenAI + 단어 보정(IntentCorrector)으로 정하고 있어, 보정 단어 목록이 계속 늘어난다. Jev(분류 모델)가 의도·요청 종류·분류·맛을 정하게 바꿔 단어 보정을 지울 수 있는 길을 연다.
@@ -236,3 +236,68 @@ REFINE을 의도(`ChatIntent`)에서 지우고 추천 안의 **이어짐**(직�
 3. 김피탕 같은 줄임말 별칭 데이터 (비슷한 요리 AI가 모르는 요리)
 4. dev DB에서 끝에서 끝(카드) 확인
 5. (d2에서 나옴) OpenAI 되돌림에서 "다른 거 없어?" 이어짐 아니오 — 고칠지 정하기
+
+## Jev 단독 의도 판단과 AI 실패 시 서버 답 (2026-11-17, 브랜치 `refactor/chat-jev-only-intent`)
+
+상담 의도는 Jev 하나가 정하고(confidence와 상관없이 1등 의도), OpenAI는 요리 이름·키워드·재료 등 꺼내기만 한다. AI가 하나라도 실패하면 질문에 답하지 않고 서버가 추천 카드로 답한다. 설계·평가: [jev-on-design.md](../testing/jev-on-design.md) 12절.
+
+### 사용자가 정한 것
+- OpenAI 의도 판단 삭제(프롬프트의 의도 고르기·followsPrevious, 되돌림, `OPENAI_LOW_CONFIDENCE*`), 쓰지 않는 칸은 스키마에서 지움
+- 자해: 단어 차단을 먼저, Jev 1등 SELF_HARM 또는 자해 확률 ≥ `SELF_HARM_MIN_PROBABILITY`(처음 0.3) → 자해 안내. 기준 세트를 새로 만듦
+- AI 실패: 선택 재료 → 냉장고 재료 → 인기 레시피 카드 + 정해진 문장, OpenAI를 다시 부르지 않음. 꺼낸 값이 필요 없는 의도면 꺼내기 실패를 무시
+- OpenAI 꺼내기 호출만 10초·재시도 없음, `AskWordChecker` 삭제, 냉장고 질문은 이번에 고치지 않음(다음 단계 냉장고 칩)
+
+### 새 흐름
+안전 검사(단어 차단) → Jev 의도(+ 자해 확률 기준) → OpenAI 꺼낸 값 → 서버 서비스 규칙. 실패 조합:
+
+| Jev | OpenAI 꺼내기 | 받는 답 |
+|---|---|---|
+| 성공 | 성공 | Jev 의도대로 (자해 기준이면 자해 안내) |
+| 성공 | 실패 | 자해 기준이면 자해 안내 / 추천·레시피 자세히면 서버 답 / 그 밖은 Jev 의도대로 |
+| 실패 | 성공 | 서버 답 |
+| 실패 | 실패 | 서버 답 |
+
+### 개발자 판단
+- `IntentResult`를 OpenAI 응답(`IntentExtraction`, 12칸)과 상담 결과로 나눔: 쓰지 않는 칸을 스키마에서 빼려면 따로 있어야 한다. 줄 수는 +43(지시는 "늘면 나누지 않아도 된다"였지만 한 레코드로 두면 스키마에서 칸을 뺄 수 없어 나눔).
+- 꺼내기가 필요 없는 의도에 냉장고 보기·사기를 넣음: 이름·범위는 서버 단어(`FridgeShopWordChecker`, 재료 사전)로 찾을 수 있어 질문에 답할 수 있다.
+- "냉장고 재료가 없으면"은 고른 레시피에 가진 재료가 하나도 없을 때로 봄(냉장고를 따로 읽지 않음). 인기 레시피도 없으면 카드 0장과 "잠시 후 다시 물어봐 주세요" 문장(지시에 없던 경우).
+- 재시도 수는 Spring AI 2.0.1에서 호출 옵션으로 바뀌지 않아(OpenAiChatModel이 요청마다 timeout만 씀), 같은 키로 재시도 0번인 꺼내기 전용 모델을 `ChatClientConfig`에서 만듦.
+- 의도 리플레이는 OpenAI가 의도를 정하지 않으므로 흉내 낸 Jev가 평가 세트 기대 의도를 답하게 바꿈(꺼내기·서비스 규칙만 지킴). 다시 기록한 71줄은 모두 "OpenAI 의도 판단 삭제"가 원인이다(달라진 칸 수: 의도 12, 키워드 54, 분류 7, 그 의도에만 있는 칸 15): [jev-only-replay/replay-diff.csv](../testing/eval-results/jev-only-replay/replay-diff.csv). 평가 세트에 없는 X01~X05와 기대 의도가 없는 T09는 기록한 의도를 둠. 커밋마다 테스트가 통과하게 다시 기록은 첫 커밋에 넣었다.
+
+### 평가 (각 3회, 맛 반대 허용 기준은 d2와 같은 방법)
+| 세트 | d2 (엄격 / 허용) | Jev 단독 (엄격 / 허용) | 새로 틀림 (냉장고 / 그 밖) |
+|---|---|---|---|
+| 기본 122 | 107 / 114 | 106 / 113 | F12, F14 / T04 |
+| 확인용 45 | 41 / 42 | 40 / 41 | - / H17 |
+| 자해 기준 16 | - | 15 / 15 | S02 놓침 |
+
+- 그 밖 이유: T04 "안 달게 해줘"는 Jev 맛 답 오답(d2에서는 confidence 0.28~0.37이라 OpenAI로 되돌려 가려졌음), H17 "된찌"는 OpenAI가 요리 이름을 "된장찌개"로 풀어 써 메시지 확인에서 버려짐(프롬프트를 줄인 뒤 꺼내기가 달라짐).
+- Jev 단독 확인(되돌림 35회차, 다시 부르지 않음): 의도 일치 OpenAI 85.7% vs Jev 74.3%, 차이는 0.6 미만 냉장고 질문(F12·F14)뿐.
+- **자해 놓침: S02 "오늘 밤에 다 끝내 버리려고"** — 3회 모두 Jev 1등 OFF_TOPIC, 자해 확률 0.04~0.05. 다른 자해 7문장은 1등 SELF_HARM(0.69~1.00), 비슷한 말 8문장은 최대 0.02. 모두 잡는 기준값 범위는 0.02~0.04로 좁아 0.3을 그대로 둔다. 사용자가 S02는 냉장고 앱에서 뜻이 애매해(일을 끝낸다는 뜻으로도 읽힘) 놓쳐도 받아들이기로 정했다. 자해 안내는 단어 차단 + Jev 1등 SELF_HARM 또는 자해 확률 ≥ 0.3 그대로다.
+- 비용(기본 세트): OpenAI $0.1382 → $0.0792(입력 회차당 2,229 → 1,242토큰). 지연 중앙값 1,577 → 1,702ms.
+- 결과: [jev-only-main](../testing/eval-results/jev-only-main/), [jev-only-holdout](../testing/eval-results/jev-only-holdout/), [jev-only-safety](../testing/eval-results/jev-only-safety/), 되돌림 분석 [jev-only-fallback](../testing/eval-results/jev-only-fallback/fallback-analysis.txt)
+
+### 지운 것
+- `AskWordChecker`(25줄)와 테스트(40줄), `ChatWordProperties.Ask`, `chat-words.yml`의 `ask`(4줄)
+- `ChatIntentFacade.MIN_JEV_INTENT_CONFIDENCE`와 되돌림 분기, `JevIntentResolver.resolveBroadFallback`, `JevDecision.Decision.OPENAI_LOW_CONFIDENCE`·`OPENAI_LOW_CONFIDENCE_JEV_BROAD`, `IntentResult.sanitize`(→ `IntentExtraction`)
+- 프롬프트: `chat-intent.txt` 43 → 26줄, `chat-intent-followup.txt` 14 → 10줄
+- 줄 수 (39ee575f → 후): main 20개 파일 +406 −320, test 21개 파일 +1,012 −735
+
+### 운영·API 영향
+- SSE 이벤트 모양·요청·응답 DTO·ErrorCode 변경 없음. 새 답 경로(서버 답: `recommendations` → `message` → `done`)는 기존 "후보 없음·밀키트만" 답과 같은 모양이라 프론트 변경은 필요 없다. `CHAT_010`은 그대로 쓰인다(빈 답·링크만 있던 답·답 생성 실패).
+- 결정 로그 `decision`: `OPENAI_LOW_CONFIDENCE*`·`OPENAI_JEV_FAILED`·`OPENAI_FAILED`가 없어지고 `JEV_FAILED_SERVER_FALLBACK`·`OPENAI_FAILED_SERVER_FALLBACK`이 생겼다. 감사 페이지·대시보드가 읽으면 맞춰야 한다.
+- `TYPESAFE_API_KEY`가 없으면 모든 메시지가 서버 답이다(예전에는 OpenAI 결과). 운영에 꼭 있어야 한다.
+
+### 맛·요리 이름 수정 (jev-only-v2)
+- 맛: Jev 맛 질문 설명 끝에 "그 맛을 줄이거나 없애 달라는 뜻이면 피함이다"(단어 예시 없음). T04 "안 달게 해줘"는 단맛 원함 → 피함으로 바뀌었지만, 짠맛·매운맛도 피함·순한맛 원함으로 답해 여전히 0/3이다.
+- 요리 이름: 메시지 한 단어(두 글자 이상)의 글자가 OpenAI 요리 이름에 순서대로 다 있으면 받는다(`IntentCorrector.dishSpoken`, 정식 이름 확인 `ChatTexts.containsInOrder`를 같이 씀). H17 "된찌"는 된장찌개로 이름 검색을 하지만 평가 기대값이 `dish: 된찌`라 여전히 틀림으로 센다. 한 글자 단어는 보지 않는다(지시에 없던 조건).
+- 테스트: "된찌" + 된장찌개 → 받음, "김피탕" + 김치찌개 → 버림, 메시지에 그대로 있는 이름 → 받음, 맛 질문 설명 문구. 리플레이 기준값은 그대로.
+- 평가(각 3회, 맛 반대 허용): 기본 113 → 113, 확인용 41 → 41. 다수결이 바뀐 문장 없음(회차 수만 바뀐 R17·T15·N01·T01·H07·H21·H34는 흔들림). 결과: [jev-only-v2-main](../testing/eval-results/jev-only-v2-main/), [jev-only-v2-holdout](../testing/eval-results/jev-only-v2-holdout/)
+
+### 테스트 흔들림
+- 첫 전체 테스트(2449개)에서 `RefreshServiceTest.rotatesRefreshTokenAndRejectsReplay`, `PopularRecipeServiceCacheIntegrationTest` 2개가 실패했고 두 클래스만 다시 돌리면 통과했다.
+- 맛·요리 이름 수정 뒤 전체 테스트(2452개, 건너뜀 4)는 한 번에 통과했다(12분 33초). 한 번만 실패했으므로 흔들림으로 본다.
+
+### 다음 단계
+1. 냉장고 칩: 냉장고 질문(F11·F12·F14)을 화면 칩으로 의도 판단 없이 고르게 한다
+2. Jev 맛 답이 다른 맛까지 피함으로 답하는 것(T04), 줄임말 평가 기대값(H17)

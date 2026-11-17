@@ -148,6 +148,7 @@ SSE 이벤트
 | 추천(`RECOMMEND`, 추천 칩, 이어짐 포함) | `recommendations` → `message`(소개) → `recommendation_text`(카드별) → `done` | [이어지는 말](../architecture/domains/chat.md#이어지는-말), [추천 카드](../architecture/domains/chat.md#추천-카드) |
 | 추천 후보 없음 | `recommendations`(`empty=true`) → `message`(서버 문장) → `done` | [추천 카드](../architecture/domains/chat.md#추천-카드) |
 | 밀키트만 | `recommendations`(`mealkits`만) → `message`(서버 문장 하나) → `done` | [밀키트 카드](../architecture/domains/chat.md#밀키트-카드) |
+| AI 실패 시 서버 답 (Jev 실패, 추천·레시피 자세히인데 OpenAI 꺼내기 실패) | `recommendations`(선택 재료·냉장고 재료 또는 인기 레시피 카드, 없으면 `empty=true`) → `message`(정해진 문장 하나) → `done`. 답 생성 AI를 부르지 않는다 | [AI 실패 시 서버 답](../architecture/domains/chat.md#ai-실패-시-서버-답) |
 | 일반(`GENERAL`) | `message` 조각 → `done` | [의도 판단](../architecture/domains/chat.md#의도-판단) |
 | 레시피 자세히(`RECIPE_DETAIL`) | `recommendations`(카드 1개) → `message` 조각 → `done`. 레시피가 지워졌으면 `message` → `done` | [RECIPE_DETAIL](../architecture/domains/chat.md#recipe_detail-레시피-자세히) |
 | 냉장고 보기(`FRIDGE`) | `recommendations`(`fridgeItems`, 없는 재료면 `products`) → `message`(서버 문장) → `done` | [냉장고 보기와 사기](../architecture/domains/chat.md#냉장고-보기와-사기) |
