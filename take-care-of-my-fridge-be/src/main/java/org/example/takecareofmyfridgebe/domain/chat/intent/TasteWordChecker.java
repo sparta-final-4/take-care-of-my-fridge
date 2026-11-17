@@ -108,7 +108,7 @@ public final class TasteWordChecker {
         return found ? Optional.of(Stance.WANT) : Optional.empty();
     }
 
-    // 단어 바로 앞에 부정어("안·덜")가 붙었는지. 분류 단어 확인(CategoryWordChecker)도 같은 기준을 쓴다
+    // 단어 바로 앞에 부정어("안·덜")가 붙었는지. 밀키트 단어 확인(MealkitWordChecker)도 같은 기준을 쓴다
     static boolean negatedBefore(String before, ChatWordProperties.Taste words) {
         return words.negationBefore().stream().map(ChatTexts::removeWhitespace)
                 .anyMatch(negation -> !negation.isEmpty() && before.endsWith(negation));

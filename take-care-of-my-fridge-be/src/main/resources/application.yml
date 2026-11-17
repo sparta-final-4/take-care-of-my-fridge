@@ -94,19 +94,6 @@ app:
     reply-lock-ttl: 150s
     # 요리 이름별 비슷한 요리 이름(의도 판단 AI가 낸 값) 캐시 유지 시간. 같은 요리 이름이면 같은 비슷한 요리로 검색하게 한다
     similar-dishes-ttl: 7d
-    # 의도 판단 뒤 서버가 AI 값을 고치는 보정. 보정마다 끌 수 있다(기본 모두 켜짐). AI만으로 충분한지 평가로 비교할 때 쓴다.
-    # 안전 단어 차단·알레르기 빼기는 여기서 끄지 않는다. 뜻은 ChatCorrectionProperties
-    corrections:
-      taste-words: true
-      spoken-tastes-only: true
-      keep-other-tastes: true
-      refine-spoken-tastes: true
-      category-words: true
-      dish-check: true
-      name-only: true
-      mealkit-request: true
-      off-topic-revive: true
-      fridge-shop-words: true
   # TypeSafe(Jev 분류 모델) 호출 설정. 상담 의도 판단은 Jev로 정한다. 키가 비어 있으면 호출하지 않고 항상 OpenAI 결과로 되돌린다(시작할 때 경고)
   typesafe:
     base-url: ${TYPESAFE_BASE_URL:https://api.typesafe.ai}

@@ -3,13 +3,11 @@ package org.example.takecareofmyfridgebe.domain.chat;
 import org.example.takecareofmyfridgebe.domain.chat.ai.ChatIntentExtractor;
 import org.example.takecareofmyfridgebe.domain.chat.ai.JevIntentRunner;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatCandidateProperties;
-import org.example.takecareofmyfridgebe.domain.chat.config.ChatCorrectionProperties;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.dto.IntentResult;
 import org.example.takecareofmyfridgebe.domain.chat.facade.ChatIntentFacade;
 import org.example.takecareofmyfridgebe.domain.chat.facade.SimilarDishFinder;
 import org.example.takecareofmyfridgebe.domain.chat.intent.AskWordCheckerTest;
-import org.example.takecareofmyfridgebe.domain.chat.intent.CategoryWordCheckerTest;
 import org.example.takecareofmyfridgebe.domain.chat.intent.FridgeShopWordCheckerTest;
 import org.example.takecareofmyfridgebe.domain.chat.intent.IntentCorrector;
 import org.example.takecareofmyfridgebe.domain.chat.intent.JevIntentResolver;
@@ -55,7 +53,8 @@ public class ChatIntentFixture {
 
     // 단어 설정 전체. 묶음별 고정값은 각 WordCheckerTest가 가진다
     public static final ChatWordProperties WORDS = new ChatWordProperties(TasteWordCheckerTest.WORDS, TASTE_OPPOSITES,
-            AskWordCheckerTest.WORDS, new ChatWordProperties.Category(CategoryWordCheckerTest.GROUPS), FOOD_WORDS,
+            AskWordCheckerTest.WORDS, new ChatWordProperties.Category(List.of(
+                    new ChatWordProperties.Category.Group("국물", List.of("국", "찌개", "전골", "수프", "스튜")))), FOOD_WORDS,
             MealkitWordCheckerTest.WORDS, FridgeShopWordCheckerTest.WORDS, TemperatureWordCheckerTest.WORDS);
 
     public final ChatIntentExtractor extractor = mock(ChatIntentExtractor.class);
@@ -67,33 +66,29 @@ public class ChatIntentFixture {
 
     public ChatIntentFixture() {
         when(allergyExclusionFinder.find(any(), any())).thenReturn(AllergyExclusionFinder.Allergens.NONE);
-        facade = newFacade(ChatCorrectionProperties.ALL_ON);
+        facade = newFacade(newCorrector());
         when(recipeService.getClassifications())
                 .thenReturn(new RecipeClassificationResponse(List.of("한식"), List.of("국", "기타", "샐러드", "양념", "음료", "찌개")));
     }
 
-    public ChatIntentFacade newFacade(ChatCorrectionProperties corrections) {
-        return newFacade(corrections, newCorrector(corrections));
-    }
-
     // Jev 없이(Jev 판단이 오지 않아 OpenAI 결과로 되돌림) 정하는 facade
-    public ChatIntentFacade newFacade(ChatCorrectionProperties corrections, IntentCorrector corrector) {
-        return newFacade(corrections, corrector, mock(JevIntentRunner.class));
+    public ChatIntentFacade newFacade(IntentCorrector corrector) {
+        return newFacade(corrector, mock(JevIntentRunner.class));
     }
 
-    // 주어진 Jev 호출로 정하는 facade (보정 모두 켬)
+    // 주어진 Jev 호출로 정하는 facade
     public ChatIntentFacade newFacade(JevIntentRunner jevIntentRunner) {
-        return newFacade(ChatCorrectionProperties.ALL_ON, newCorrector(ChatCorrectionProperties.ALL_ON), jevIntentRunner);
+        return newFacade(newCorrector(), jevIntentRunner);
     }
 
-    private ChatIntentFacade newFacade(ChatCorrectionProperties corrections, IntentCorrector corrector, JevIntentRunner jevIntentRunner) {
+    private ChatIntentFacade newFacade(IntentCorrector corrector, JevIntentRunner jevIntentRunner) {
         return new ChatIntentFacade(extractor, recipeService, ingredientMatcher,
                 new ChatCandidateProperties(List.of("양념", "음료"), 0.4, List.of(), List.of("백김치", "물김치", "동치미", "나박김치"), List.of(), List.of()),
-                WORDS, allergyExclusionFinder, corrections, corrector, jevIntentRunner, new JevIntentResolver(mock(SimilarDishFinder.class), WORDS));
+                WORDS, allergyExclusionFinder, corrector, jevIntentRunner, new JevIntentResolver(mock(SimilarDishFinder.class), WORDS));
     }
 
-    public IntentCorrector newCorrector(ChatCorrectionProperties corrections) {
-        return new IntentCorrector(recipeService, ingredientMatcher, chatMessageService, WORDS, corrections);
+    public IntentCorrector newCorrector() {
+        return new IntentCorrector(recipeService, ingredientMatcher, chatMessageService, WORDS);
     }
 
     public void givenExtracted(IntentResult result) {

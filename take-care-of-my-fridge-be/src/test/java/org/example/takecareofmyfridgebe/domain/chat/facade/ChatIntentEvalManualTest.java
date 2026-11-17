@@ -6,7 +6,6 @@ import com.knuddels.jtokkit.api.EncodingType;
 import com.openai.models.completions.CompletionUsage;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatCandidateProperties;
-import org.example.takecareofmyfridgebe.domain.chat.config.ChatCorrectionProperties;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatSafetyProperties;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext.CardName;
@@ -198,7 +197,6 @@ class ChatIntentEvalManualTest {
 
     // 실제 Jev·넓은 요청 요리 이름 AI로 정한다
     private ChatIntentFacade facade(EvalSet set, ChatIntentExtractor extractor, ChatIntentEvalJevOn jev) {
-        ChatCorrectionProperties corrections = ChatCorrectionProperties.ALL_ON;
         RecipeService recipeService = mock(RecipeService.class);
         when(recipeService.getClassifications()).thenReturn(new RecipeClassificationResponse(List.of("한식"), set.categories()));
         when(recipeService.suggestNames(anyString(), anyInt())).thenAnswer(invocation -> {
@@ -216,10 +214,9 @@ class ChatIntentEvalManualTest {
         AllergyExclusionFinder allergyExclusionFinder = mock(AllergyExclusionFinder.class);
         when(allergyExclusionFinder.find(any(), any()))
                 .thenReturn(AllergyExclusionFinder.Allergens.NONE);
-        IntentCorrector corrector = new IntentCorrector(recipeService, ingredientMatcher, mock(ChatMessageService.class),
-                words, corrections);
+        IntentCorrector corrector = new IntentCorrector(recipeService, ingredientMatcher, mock(ChatMessageService.class), words);
         return new ChatIntentFacade(extractor, recipeService, ingredientMatcher, candidateProperties, words,
-                allergyExclusionFinder, corrections, corrector, jev.runner(), jev.resolver());
+                allergyExclusionFinder, corrector, jev.runner(), jev.resolver());
     }
 
     private void write(EvalSet set, String setResource, List<EvalCase> cases, List<RunRow> rows, int runs) throws IOException {

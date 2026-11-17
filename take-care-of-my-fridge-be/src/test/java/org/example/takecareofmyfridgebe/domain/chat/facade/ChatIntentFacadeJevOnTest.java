@@ -3,7 +3,6 @@ package org.example.takecareofmyfridgebe.domain.chat.facade;
 import org.example.takecareofmyfridgebe.domain.chat.ChatIntentFixture;
 import org.example.takecareofmyfridgebe.domain.chat.ai.JevIntentRunner;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatCandidateProperties;
-import org.example.takecareofmyfridgebe.domain.chat.config.ChatCorrectionProperties;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext.CardName;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntent;
@@ -60,10 +59,9 @@ class ChatIntentFacadeJevOnTest {
     @BeforeEach
     void setUp() {
         when(jev.start(any(), any(), any())).thenReturn(run);
-        ChatCorrectionProperties corrections = ChatCorrectionProperties.ALL_ON;
         facade = new ChatIntentFacade(fixture.extractor, fixture.recipeService, fixture.ingredientMatcher,
                 new ChatCandidateProperties(List.of("양념", "음료"), 0.4, List.of(), List.of("백김치", "물김치", "동치미", "나박김치"), List.of(), List.of()),
-                ChatIntentFixture.WORDS, fixture.allergyExclusionFinder, corrections, fixture.newCorrector(corrections), jev,
+                ChatIntentFixture.WORDS, fixture.allergyExclusionFinder, fixture.newCorrector(), jev,
                 new JevIntentResolver(similarDishFinder, ChatIntentFixture.WORDS));
     }
 

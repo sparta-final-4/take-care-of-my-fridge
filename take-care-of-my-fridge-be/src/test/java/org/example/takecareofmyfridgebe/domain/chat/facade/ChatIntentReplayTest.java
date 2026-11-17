@@ -2,7 +2,6 @@ package org.example.takecareofmyfridgebe.domain.chat.facade;
 
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatCandidateProperties;
-import org.example.takecareofmyfridgebe.domain.chat.config.ChatCorrectionProperties;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntent;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntentResolution;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageCreateRequest;
@@ -35,7 +34,6 @@ import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.TreeSet;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -129,12 +127,10 @@ class ChatIntentReplayTest {
         });
         AllergyExclusionFinder allergyExclusionFinder = mock(AllergyExclusionFinder.class);
         when(allergyExclusionFinder.find(any(), any())).thenReturn(AllergyExclusionFinder.Allergens.NONE);
-        ChatCorrectionProperties corrections = EvalCorrectionSwitches.properties(Set.of());
-        IntentCorrector corrector = new IntentCorrector(recipeService, ingredientMatcher, mock(ChatMessageService.class),
-                words, corrections);
+        IntentCorrector corrector = new IntentCorrector(recipeService, ingredientMatcher, mock(ChatMessageService.class), words);
         // 기록에는 Jev 판단이 없다. Jev 판단이 오지 않으면 운영과 같게 OpenAI 결과로 되돌리고 서비스 규칙만 거친다
         return new ChatIntentFacade(extractor, recipeService, ingredientMatcher, candidateProperties, words,
-                allergyExclusionFinder, corrections, corrector, mock(JevIntentRunner.class),
+                allergyExclusionFinder, corrector, mock(JevIntentRunner.class),
                 new JevIntentResolver(mock(SimilarDishFinder.class), words));
     }
 

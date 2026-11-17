@@ -30,8 +30,8 @@ import java.util.stream.Stream;
  * @param keywords           특징만 말했을 때("차가운 요리") 그 특징에 맞는 요리 이름 (예: 냉면, 막국수). 요리 이름을 말했으면 그 이름만.
  *                           예전 기록에는 요리 이름과 비슷한 요리도 들어 있다. 비슷한 요리는 후보 검색 단계에서 따로 묻는다(SimilarDishFinder)
  * @param dishText           사용자가 말한 요리 이름 그대로 (예: "냉면"). 레시피 이름 비교와 카드 이유에 쓴다.
- *                           AI가 뽑고(분류·특징이면 빈 문자열), 서버는 메시지에 그대로 있고 분류 이름·묶음 말이 아닌지만 확인한다.
- *                           AI가 비웠으면 첫 키워드나 "○○ 같은 요리"의 ○○로 채운다 (IntentCorrector.checkDishAndKeywords)
+ *                           AI가 뽑고(분류·특징이면 빈 문자열), 서버는 메시지에 그대로 있는지만 확인한다 (IntentCorrector.keepSpokenDishOnly).
+ *                           Jev가 특정 요리로 봤는데 비었으면 메시지에 있는 첫 키워드를 쓴다 (JevIntentResolver)
  * @param preferenceText     사용자가 원한 특징·요리 표현 그대로 (예: "차가운 요리", "냉면 같은 면 요리"). 요청에 못 맞췄을 때 안내에 쓴다
  * @param targetIndex        RECIPE_DETAIL일 때 직전 추천 카드 번호(1부터). 모르면 0
  * @param targetName         RECIPE_DETAIL일 때 말한 레시피 이름 (예: "깐풍기"). 없으면 빈 문자열
@@ -116,13 +116,6 @@ public record IntentResult(
                 keywords, dishText, preferenceText, targetIndex, targetName, removed, avoidTastes, null);
     }
 
-    // 의도만 바꾼 결과 (조건 칸은 그대로)
-    public IntentResult withIntent(ChatIntent newIntent) {
-        return new IntentResult(newIntent, wantedTastes, moodCategories, maxMinutes, includeIngredients, excludeIngredients,
-                useSelectedOnly, keywords, dishText, preferenceText, targetIndex, targetName, removed, avoidTastes, detailQuestion,
-                fridgeScope);
-    }
-
     // 서버가 냉장고 보기·사기로 바꾼 결과. 범위와 말한 재료를 서버가 정한 값으로 바꾼다
     public IntentResult withLookup(ChatIntent newIntent, FridgeScope scope, List<String> names) {
         return new IntentResult(newIntent, wantedTastes, moodCategories, maxMinutes, names, excludeIngredients,
@@ -174,14 +167,14 @@ public record IntentResult(
         );
     }
 
-    // 서버가 메시지의 분류 단어로 분류·키워드·요리 이름·뺄 조건을 바로잡은 결과 (CategoryWordChecker)
+    // 분류·키워드·요리 이름·뺄 조건을 바꾼 결과 (요리 이름 확인, Jev 판단으로 만든 결과)
     public IntentResult withCategories(List<String> categories, List<String> keywords, String dishText, List<String> removed) {
         return new IntentResult(intent, wantedTastes, categories, maxMinutes, includeIngredients, excludeIngredients,
                 useSelectedOnly, keywords, dishText, preferenceText, targetIndex, targetName, removed, avoidTastes, detailQuestion,
                 fridgeScope);
     }
 
-    // 서버가 맛 단어로 바로잡은 원하는 맛·피할 맛
+    // 원하는 맛·피할 맛을 바꾼 결과 (말한 맛만 남기기)
     public IntentResult withTastes(List<String> wanted, List<String> avoid) {
         return new IntentResult(intent, wanted, moodCategories, maxMinutes, includeIngredients, excludeIngredients,
                 useSelectedOnly, keywords, dishText, preferenceText, targetIndex, targetName, removed, avoid, detailQuestion,
@@ -195,7 +188,7 @@ public record IntentResult(
                 fridgeScope);
     }
 
-    // 서버가 이름만 말한 말·못 찾은 자세히 대상으로 채운 추천 (재료 이름, 요리 이름 키워드, 요리 이름)
+    // 못 찾은 레시피 자세히 대상으로 채운 추천 (재료 이름, 요리 이름 키워드, 요리 이름)
     public IntentResult withNamed(List<String> includes, List<String> namedKeywords, String dish) {
         return new IntentResult(ChatIntent.RECOMMEND, wantedTastes, moodCategories, maxMinutes, includes, excludeIngredients,
                 useSelectedOnly, namedKeywords, dish, preferenceText, targetIndex, targetName, removed, avoidTastes,

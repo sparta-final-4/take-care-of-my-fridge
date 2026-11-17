@@ -3,7 +3,6 @@ package org.example.takecareofmyfridgebe.domain.chat.facade;
 import lombok.extern.slf4j.Slf4j;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatCandidateProperties;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatWordProperties;
-import org.example.takecareofmyfridgebe.domain.chat.config.ChatCorrectionProperties;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext.CardName;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntent;
@@ -97,9 +96,7 @@ public class ChatIntentFacade {
     private final ChatCandidateProperties chatCandidateProperties;
     private final ChatWordProperties chatWordProperties;
     private final AllergyExclusionFinder allergyExclusionFinder;
-    // 다시 추천 맛 따르기(refineSpokenTastes)만 여기서 본다. 나머지 보정 켜고 끄기는 IntentCorrector가 본다
-    private final ChatCorrectionProperties corrections;
-    // AI 결과를 서버 단어 규칙으로 고친다
+    // 정한 의도 결과에 서비스 규칙(레시피 자세히 대상, 요리 이름 확인, 맛 규칙)을 적용한다
     private final IntentCorrector intentCorrector;
     // Jev 호출 (시작·기다리기·결정 로그)
     private final JevIntentRunner jevIntentRunner;
@@ -109,15 +106,14 @@ public class ChatIntentFacade {
     @Autowired
     public ChatIntentFacade(ChatIntentExtractor chatIntentExtractor, RecipeService recipeService, IngredientMatcher ingredientMatcher,
                             ChatCandidateProperties chatCandidateProperties, ChatWordProperties chatWordProperties,
-                            AllergyExclusionFinder allergyExclusionFinder, ChatCorrectionProperties corrections,
-                            IntentCorrector intentCorrector, JevIntentRunner jevIntentRunner, JevIntentResolver jevIntentResolver) {
+                            AllergyExclusionFinder allergyExclusionFinder, IntentCorrector intentCorrector,
+                            JevIntentRunner jevIntentRunner, JevIntentResolver jevIntentResolver) {
         this.chatIntentExtractor = chatIntentExtractor;
         this.recipeService = recipeService;
         this.ingredientMatcher = ingredientMatcher;
         this.chatCandidateProperties = chatCandidateProperties;
         this.chatWordProperties = chatWordProperties;
         this.allergyExclusionFinder = allergyExclusionFinder;
-        this.corrections = corrections;
         this.intentCorrector = intentCorrector;
         this.jevIntentRunner = jevIntentRunner;
         this.jevIntentResolver = jevIntentResolver;
@@ -228,22 +224,15 @@ public class ChatIntentFacade {
         }
         log.info("상담 의도 Jev - memberId: {}, sessionId: {}, 결정: {}, 요청 종류: {}",
                 memberId, sessionId, jevDecision.decision(), jevDecision.usedKind());
-        IntentCorrector.Corrected corrected = intentCorrector.correct(input, result, IntentCorrector.Steps.SERVICE_RULES);
+        IntentCorrector.Corrected corrected = intentCorrector.correct(input, result);
         result = corrected.result();
-        boolean mealkitRecommend = corrected.mealkitRecommend();
-        Long detailTarget = corrected.detailTarget();
         ChatIntentResolution resolution = switch (result.intent()) {
-            // 일반 답을 추천 시도로 바꾼 것(tryDish)은 출처를 DISH_TRY로 남겨, 카드가 0장이면 일반 답으로 돌린다
-            case RECOMMEND -> ChatIntentResolution.recommend(corrected.dishTry() ? Source.DISH_TRY : Source.AI,
-                    toRecipeQuery(memberId, sessionId, request, result));
+            case RECOMMEND -> ChatIntentResolution.recommend(Source.AI, toRecipeQuery(memberId, sessionId, request, result));
             case REFINE -> refine(memberId, sessionId, request, result, context);
-            case RECIPE_DETAIL -> recipeDetail(memberId, sessionId, result, detailTarget);
+            case RECIPE_DETAIL -> recipeDetail(memberId, sessionId, result, corrected.detailTarget());
             case FRIDGE -> ChatIntentResolution.fridge(Source.AI, lookupOf(request.content(), result));
             case SHOP -> ChatIntentResolution.shop(Source.AI, lookupOf(request.content(), result));
-            case GENERAL -> mealkitRecommend
-                    ? ChatIntentResolution.recommend(Source.AI, toRecipeQuery(memberId, sessionId, request, result))
-                    : ChatIntentResolution.general(Source.AI);
-            // 이름만 말하기·밀키트처럼 의도를 바꾸는 규칙은 GENERAL에만 걸리므로 그대로 둔다
+            case GENERAL -> ChatIntentResolution.general(Source.AI);
             case OFF_TOPIC, BLOCKED, SELF_HARM -> ChatIntentResolution.declined(result.intent());
         };
         return new Decision(resolution, result.removed() == null ? List.of() : result.removed(), jev, jevDecision);
@@ -305,9 +294,7 @@ public class ChatIntentFacade {
             log.info("상담 다시 추천에서 뺄 조건 - memberId: {}, sessionId: {}, 조건: {}", memberId, sessionId, removed);
         }
         RecipeQuery merged = mergeRefine(previous, current, removed);
-        return ChatIntentResolution.refine(Source.AI, corrections.refineSpokenTastes()
-                ? followSpokenTastes(memberId, sessionId, request.content(), merged)
-                : merged);
+        return ChatIntentResolution.refine(Source.AI, followSpokenTastes(memberId, sessionId, request.content(), merged));
     }
 
     /**
@@ -330,7 +317,7 @@ public class ChatIntentFacade {
         Set<Member.Taste> avoid = new LinkedHashSet<>(merged.avoidTastes());
         for (TasteWordChecker.TasteStance stance : spoken) {
             if (stance.stance() == TasteWordChecker.Stance.WANT) {
-                // 맛 단어만 있고 원하는 말이 없으면("매운 건 별로야") 피할 맛에 든 맛을 풀지 않는다 (correctTastes와 같은 기준)
+                // 맛 단어만 있고 원하는 말이 없으면("매운 건 별로야") 피할 맛에 든 맛을 풀지 않는다
                 if (avoid.contains(stance.taste())
                         && !TasteWordChecker.surelyWanted(message, stance.taste(), chatWordProperties.taste())) {
                     continue;
