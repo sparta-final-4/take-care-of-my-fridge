@@ -82,7 +82,8 @@ import static org.mockito.Mockito.when;
  * (선택) OPENAI_INTENT_EVAL_RUNS=3  문장마다 돌릴 횟수 (다수결, 기본 3)
  * (선택) OPENAI_INTENT_EVAL_ONLY=F10,F11  이 id만 돌린다
  * (선택) OPENAI_INTENT_EVAL_LABEL=B  결과 파일 이름에 붙일 이름 (eval-{시각}-B-summary.txt)
- * (선택) OPENAI_INTENT_EVAL_SET=holdout  평가 세트 (main: chat-intent-eval.yml, 기본 / holdout: chat-intent-holdout.yml, 과적합 확인용)
+ * (선택) OPENAI_INTENT_EVAL_SET=holdout  평가 세트 (main: chat-intent-eval.yml, 기본 / holdout: chat-intent-holdout.yml, 과적합 확인용 /
+ *                                          safety: chat-intent-safety.yml, 자해 확률 기준값 확인용)
  * </pre>
  * 결과: build/reports/chat-intent-eval/eval-{시각}-runs.csv (한 번 돌린 결과마다 한 줄, AI 원래 값과 최종 값),
  * eval-{시각}-cases.csv (문장마다 다수결 결과), eval-{시각}-summary.txt (묶음별 일치율·토큰·시간). 같은 요약을 콘솔에도 찍는다.
@@ -281,7 +282,7 @@ class ChatIntentEvalManualTest {
                 aiRows.stream().mapToLong(RunRow::outputTokens).average().orElse(0),
                 aiRows.stream().mapToLong(RunRow::ms).average().orElse(0),
                 aiRows.stream().mapToLong(RunRow::ms).max().orElse(0)));
-        summary.addAll(ChatIntentEvalJevOn.summary(cases, rows));
+        summary.addAll(ChatIntentEvalJevOn.summary(cases, rows, EvalSet.SAFETY_SET.equals(setResource)));
         summary.add("틀린 문장:");
         summary.addAll(failedLines);
 
@@ -520,14 +521,16 @@ class ChatIntentEvalManualTest {
 
         static final String MAIN_SET = "chat-intent-eval.yml";
         static final String HOLDOUT_SET = "chat-intent-holdout.yml";
+        static final String SAFETY_SET = "chat-intent-safety.yml";
 
-        // OPENAI_INTENT_EVAL_SET 값(main|holdout, 없으면 main)을 읽을 평가 세트 파일로 바꾼다
+        // OPENAI_INTENT_EVAL_SET 값(main|holdout|safety, 없으면 main)을 읽을 평가 세트 파일로 바꾼다
         static String resource(String set) {
             String name = set == null ? "" : set.strip();
             return switch (name) {
                 case "", "main" -> MAIN_SET;
                 case "holdout" -> HOLDOUT_SET;
-                default -> throw new IllegalArgumentException("모르는 평가 세트: " + set + " (main|holdout)");
+                case "safety" -> SAFETY_SET;
+                default -> throw new IllegalArgumentException("모르는 평가 세트: " + set + " (main|holdout|safety)");
             };
         }
 
