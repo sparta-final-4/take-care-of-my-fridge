@@ -28,7 +28,8 @@ import java.util.Set;
  *       레시피 자세히 대상·질문 종류, 다시 추천 뺄 조건, 냉장고 범위. 버리는 칸: 의도·맛·분류·키워드</li>
  *   <li>추천·다시 추천은 요청 종류로 검색 조건을 정한다
  *     <ul>
- *       <li>특정 요리: OpenAI 요리 이름. 메시지에 그대로 없거나 비었으면 넓은 요청으로 본다</li>
+ *       <li>특정 요리: OpenAI 요리 이름과 Jev 1등 분류(없음이면 넣지 않는다). 분류는 거르는 조건이 아니라 점수를 올리는 조건이라
+ *           이름이 맞는 레시피와 비슷한 요리 중 같은 분류가 앞에 온다. 요리 이름이 메시지에 그대로 없거나 비었으면 넓은 요청으로 본다</li>
  *       <li>특정 분류: Jev 1등 분류. 1등이 없음이면 밀키트를 원하는 말(MealkitWordChecker)이면 없음, 아니면 넓은 요청</li>
  *       <li>넓은 요청: 넓은 요청 요리 이름 5개(SimilarDishFinder.findBroad, 캐시)를 키워드로, 원한 표현을 채워 요리 이름을 말한 추천으로 보지 않는다
  *           (카드가 모자라면 냉장고 후보로 채운다)</li>
@@ -93,8 +94,8 @@ public class JevIntentResolver {
         }
 
         return switch (kind) {
-            case DISH -> new Resolved(build(intent, openAi, wanted, avoid, null, null, dish, openAi.preferenceText()),
-                    new JevDecision(Decision.JEV, kind, List.of(dish)));
+            case DISH -> new Resolved(build(intent, openAi, wanted, avoid, category == null ? null : List.of(category), null, dish,
+                    openAi.preferenceText()), new JevDecision(Decision.JEV, kind, List.of(dish)));
             case CATEGORY -> new Resolved(build(intent, openAi, wanted, avoid, List.of(category), null, null, openAi.preferenceText()),
                     new JevDecision(Decision.JEV, kind, List.of(category)));
             case BROAD -> broad(input, intent, openAi, wanted, avoid, Decision.JEV);

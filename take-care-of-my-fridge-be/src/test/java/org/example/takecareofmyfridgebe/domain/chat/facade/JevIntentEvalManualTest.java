@@ -69,8 +69,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  *   <li>intent: JevIntentClassifier가 서비스 규칙을 적용한 의도(직전 추천이 없는데 REFINE·RECIPE_DETAIL이면 RECOMMEND, 이때 2차도 묻는다).
  *       그 밖의 서버 보정은 하지 않는다</li>
  *   <li>kind: 요청 종류 (기대 칸 kind)</li>
- *   <li>category: 기대 kind가 특정 분류(CATEGORY)이고 기대 분류가 하나인 문장만, Jev 1등 분류와 비교한다.
- *       넓은 요청 문장의 분류 기대값은 비교하지 않는다</li>
+ *   <li>category: 기대 kind가 특정 분류(CATEGORY)나 특정 요리(DISH)이고 기대 분류가 하나인 문장만, Jev 1등 분류와 비교한다.
+ *       특정 요리 문장에 기대 분류가 없으면 비교하지 않는다. 넓은 요청 문장의 분류 기대값은 비교하지 않는다</li>
  *   <li>wanted·avoid: 원함·피함 답. 매운맛을 피한다고 답하면서 순한맛을 원한다고 하거나, 매운맛을 원한다고 답하면서 순한맛을 피한다고 한 것은
  *       틀림으로 세지 않는다(그 칸의 기대에 순한맛이 없을 때 그 순한맛을 빼고 비교). 나머지 맛은 그대로 비교한다</li>
  * </ul>
@@ -200,9 +200,10 @@ class JevIntentEvalManualTest {
         return tastes.stream().filter(taste -> !taste.equals(MILD)).collect(Collectors.toSet());
     }
 
-    // 분류를 비교하는 문장: 기대 kind가 특정 분류이고 기대 분류가 하나
+    // 분류를 비교하는 문장: 기대 kind가 특정 분류·특정 요리(특정 요리도 1등 분류를 쓴다)이고 기대 분류가 하나
     static boolean expectsCategory(Map<String, Object> expect) {
-        return RequestKind.CATEGORY.name().equals(String.valueOf(expect.get("kind")))
+        String kind = String.valueOf(expect.get("kind"));
+        return (RequestKind.CATEGORY.name().equals(kind) || RequestKind.DISH.name().equals(kind))
                 && expect.containsKey("categories") && strings(expect.get("categories")).size() == 1;
     }
 
@@ -289,7 +290,7 @@ class JevIntentEvalManualTest {
         summary.add("비교 칸: " + String.join(", ", COMPARED) + " (밀키트는 평가 세트에 기대 칸이 없어 비교하지 않음)");
         summary.add("- intent: JevIntentClassifier의 서비스 규칙 적용 값 (직전 추천이 없는데 REFINE·RECIPE_DETAIL이면 RECOMMEND, 이때 2차도 묻는다)");
         summary.add("- kind: 요청 종류(DISH 특정 요리 / CATEGORY 특정 분류 / BROAD 넓은 요청 / NONE 없음)");
-        summary.add("- category: 기대 kind가 CATEGORY이고 기대 분류가 하나인 문장만 Jev 1등 분류와 비교 (넓은 요청의 분류 기대값은 비교하지 않음)");
+        summary.add("- category: 기대 kind가 CATEGORY·DISH이고 기대 분류가 하나인 문장만 Jev 1등 분류와 비교 (넓은 요청의 분류 기대값은 비교하지 않음)");
         summary.add("- wanted·avoid (기준 변경): 매운맛 피함 + 순한맛 원함, 매운맛 원함 + 순한맛 피함으로 답한 순한맛은 틀림으로 세지 않는다"
                 + " (\"순한맛은 직접 말해야만 원함\" 약속을 버림). 나머지 맛은 그대로 비교");
         summary.addAll(accuracy(byCase));

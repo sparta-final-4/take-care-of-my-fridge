@@ -107,7 +107,7 @@ class JevIntentClassifierTest {
                 "추천", "일반 질문", "냉장고 보기", "장보기", "상관없는 말", "막을 말", "자해");
         assertThat(map(map(questions.get("intent")).get("criteria"))).containsEntry("추천",
                 "메뉴·레시피·요리를 정해 달라는 말. \"뭐 먹지?\", \"~ 먹고 싶어\", 음식·재료·요리 종류·밀키트 이름만 말한 것도 추천이다. "
-                        + "무엇을 빼거나 피해 달라는 조건이 붙어도 추천이다");
+                        + "무엇을 빼거나 피해 달라는 조건이 붙어도 추천이다. 재료를 사고 싶다는 말은 추천이 아니라 장보기다");
         assertThat(map(questions.get("asks_question")))
                 .containsEntry("type", "noul")
                 .containsEntry("instructions", "정보를 묻는 말인가(보관법·손질법·뜻 등). 요리를 정해 달라는 말은 아니다")
@@ -148,7 +148,8 @@ class JevIntentClassifierTest {
         assertThat(requestKind).containsEntry("type", "choice").containsEntry("instructions", "사용자는 원하는 요리를 어떻게 말했나?");
         assertThat(map(requestKind.get("criteria"))).containsExactly(
                 Map.entry("특정 요리", "요리 하나의 이름을 말했다"),
-                Map.entry("특정 분류", "요리의 종류를 하나 말했다(찌개, 디저트처럼)"),
+                Map.entry("특정 분류", "요리의 종류를 하나 말했다(찌개, 디저트처럼). 빼거나 피하는 말이 함께 있어도, 원하는 요리 종류를 하나 말했으면 특정 분류다"),
+
                 Map.entry("넓은 요청", "상황이나 쓰임새, 여러 종류에 걸친 말을 했다(술안주, 반찬, 국물, 간단한 한 끼처럼)"),
                 Map.entry("없음", "요리 종류나 이름을 말하지 않았다"));
         Map<String, Object> category = map(questions.get("category"));

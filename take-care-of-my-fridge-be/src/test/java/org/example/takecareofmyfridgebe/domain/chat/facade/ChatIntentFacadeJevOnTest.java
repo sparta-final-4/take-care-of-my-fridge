@@ -86,6 +86,19 @@ class ChatIntentFacadeJevOnTest {
         }
 
         @Test
+        @DisplayName("특정 요리이고 Jev 1등 분류가 있으면 요리 이름과 함께 그 분류를 검색 조건에 넣는다")
+        void addsJevTopCategory_whenDishWithTopCategory() {
+            givenOpenAi(recommend("김치찌개", List.of("김치찌개"), List.of(), List.of(), null));
+            givenJev(RequestKind.DISH, "찌개");
+
+            ChatIntentResolution resolution = resolve("김치찌개 먹고 싶어");
+
+            assertThat(resolution.recipeQuery().keywordText()).isEqualTo("김치찌개");
+            assertThat(resolution.recipeQuery().moodCategories()).containsExactly("찌개");
+            verifyDecision(new JevDecision(Decision.JEV, RequestKind.DISH, List.of("김치찌개")));
+        }
+
+        @Test
         @DisplayName("직전 추천 없이 \"김치찌개 말고 다른 거\"에 OpenAI가 요리 이름을 비우면 on·off 모두 김치찌개를 검색 기준으로 쓰지 않는다")
         void skipsAvoidedDish_whenOpenAiLeavesDishEmpty() {
             givenOpenAi(recommend("", List.of(), List.of(), List.of(), ""));
