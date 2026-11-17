@@ -14,7 +14,6 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.JevIntentJudgement.Taste
 import org.example.takecareofmyfridgebe.domain.chat.dto.JevIntentJudgement.TasteStance;
 import org.example.takecareofmyfridgebe.domain.chat.facade.ChatIntentFacade;
 import org.example.takecareofmyfridgebe.domain.chat.facade.SimilarDishFinder;
-import org.example.takecareofmyfridgebe.domain.chat.intent.AskWordCheckerTest;
 import org.example.takecareofmyfridgebe.domain.chat.intent.FridgeShopWordCheckerTest;
 import org.example.takecareofmyfridgebe.domain.chat.intent.IntentCorrector;
 import org.example.takecareofmyfridgebe.domain.chat.intent.JevIntentResolver;
@@ -63,7 +62,7 @@ public class ChatIntentFixture {
 
     // 단어 설정 전체. 묶음별 고정값은 각 WordCheckerTest가 가진다
     public static final ChatWordProperties WORDS = new ChatWordProperties(TasteWordCheckerTest.WORDS, TASTE_OPPOSITES,
-            AskWordCheckerTest.WORDS, MealkitWordCheckerTest.WORDS, FridgeShopWordCheckerTest.WORDS, TemperatureWordCheckerTest.WORDS);
+            MealkitWordCheckerTest.WORDS, FridgeShopWordCheckerTest.WORDS, TemperatureWordCheckerTest.WORDS);
 
     public final ChatIntentExtractor extractor = mock(ChatIntentExtractor.class);
     public final RecipeService recipeService = mock(RecipeService.class);
