@@ -1,6 +1,6 @@
 # WORK-CHAT-JEV-ON: 상담 의도 Jev on 모드 연결
 
-상태: 정리 단계 완료 (Jev가 유일한 의도 판단, 아래 "정리 단계") · 작성일: 2026-11-17 · 담당: 상담(chat)
+상태: 정리 단계·d2 완료 (Jev가 유일한 의도 판단, REFINE은 추천 안의 이어짐, 아래 "정리 단계"·"d2") · 작성일: 2026-11-17 · 담당: 상담(chat)
 
 ## 목표와 완료 기준
 - 사용자 문제: 상담 의도를 OpenAI + 단어 보정(IntentCorrector)으로 정하고 있어, 보정 단어 목록이 계속 늘어난다. Jev(분류 모델)가 의도·요청 종류·분류·맛을 정하게 바꿔 단어 보정을 지울 수 있는 길을 연다.
@@ -120,8 +120,119 @@ off 모드 T04·N03 저하는 10회 재확인에서 흔들림으로 판정했다
 - API·ErrorCode·DTO 변경 없음. 프론트 영향 없음(상담 응답 모양 같음). `Source.DISH_TRY`를 지워 "요리 이름만 말했는데 카드 0장이면 일반 답"으로 돌리던 길이 없어졌다(그 출처를 만들던 추천 시도 단계를 지웠다).
 
 ### 다음 단계
-1. d2: REFINE을 ChatIntent와 OpenAI 프롬프트에서 없애고 추천의 이어짐 항목으로 바꾸기
+1. ~~d2: REFINE을 ChatIntent와 OpenAI 프롬프트에서 없애고 추천의 이어짐 항목으로 바꾸기~~ (아래 "d2"에서 함)
 2. 그다음: `MealkitWordChecker`·`TasteWordChecker`·`FridgeShopWordChecker` 나머지·`TemperatureWordChecker.wanted`를 Jev 질문으로 옮기기
 3. F11 "슬슬 처리해야 할 거 있어?" 냉장고 의도
 4. 김피탕 같은 줄임말 별칭 데이터 (비슷한 요리 AI가 모르는 요리)
 5. dev DB에서 끝에서 끝(카드) 확인
+
+## d2: REFINE을 추천 안의 이어짐으로 (2026-11-17, 브랜치 `refactor/chat-intent-cleanup`)
+
+REFINE을 의도(`ChatIntent`)에서 지우고 추천 안의 **이어짐**(직전 추천의 조건을 이어받아 일부만 바꾸는 추천인지, boolean)으로 바꿨다. 동작은 그대로다: 예전에 REFINE으로 가던 메시지는 "추천 + 이어짐 예"로 같은 처리(직전 조건 합치기·이번 말의 맛 따르기·직전 카드 빼기)를 받는다. 설계: [jev-on-design.md](../testing/jev-on-design.md) 11절.
+
+### 0단계 확인 (밖으로 나가거나 저장되는지)
+| 찾은 것 | 쓰는 곳 | 밖으로 나감·저장 |
+|---|---|---|
+| API 응답 DTO·SSE 이벤트 | `ChatRecommendationsEventResponse` 등 응답 DTO에 의도 칸 없음. `ChatStreamFacade`는 의도로 답 방식만 고른다 | 아니오 |
+| 프론트 | `take-care-of-my-fridge-fe/src`·`openapi`에 `REFINE`·intent 없음 | 아니오 |
+| DB | `ChatMessage`(role·content·filtered)·`ChatRecommendation`(recipe·product·순서·설명)에 의도 칸 없음 | 아니오 |
+| Redis | `chat:context:{세션}`은 `LastRecommendation`(조건 스냅숏·카드 ID)만, `chat:similar-dishes`·`chat:broad-dishes`·`chat:limit`·`chat:streaming`에도 의도 없음 | 아니오 |
+| "REFINE" 문자열을 읽는 곳 | OpenAI 구조화 출력(`IntentResult` 스키마의 intent enum), 평가·리플레이 CSV·평가 세트(테스트), 로그 | 로그·테스트·OpenAI 응답만 |
+| 문서 | `docs/api/chat-api.md`(이벤트 순서 표), `docs/architecture/domains/chat.md`(의도 종류 표) | 설명 글만 (이번에 고침) |
+
+### 바꾼 곳
+| 파일 | 메서드 | 바꾼 것 |
+|---|---|---|
+| `dto/IntentResult` | 칸 `followsPrevious`, `follows()`, `withFollows()`, `withNamed()`·`withLookup()` | 이어짐 칸(OpenAI 스키마 필수 칸). 추천일 때만 뜻이 있다. 레시피 자세히 대상을 못 찾아 바꾼 추천·냉장고 보기·사기는 아니오 |
+| `dto/ChatIntentResolution` | 칸 `follows`, `recommendFollowing()`(예전 `refine()`), `recommends()` | 결과에 이어짐. `recommends()`는 RECOMMEND만 |
+| `ai/JevIntentClassifier` | `serviceIntent()`, 새 `follows()` | 추천 + follows_previous ≥ 0.45를 REFINE으로 바꾸지 않고 이어짐으로 (조건 그대로). 2차 묻는 의도는 RECOMMEND만 |
+| `ai/JevFirstQuestions` | `read()` | `serviceIntent` 인자 정리 (질문 글은 그대로) |
+| `intent/JevIntentResolver` | `resolve()`, `resolveBroadFallback()`, `broad()`, `build()` | Jev 이어짐을 결과에 넣음. 되돌림의 넓은 요청 경로는 OpenAI 이어짐 그대로. `RECIPE_INTENTS`(RECOMMEND·REFINE) → RECOMMEND |
+| `intent/IntentCorrector` | `correct()` | 새 서비스 규칙: 직전 조건이 없으면 이어짐 아니오. 요리 이름 확인·다른 맛 지키기는 RECOMMEND(이어짐 포함), 말한 맛만은 이어짐이 아닌 추천만 (예전 RECOMMEND·REFINE 구분과 같다) |
+| `facade/ChatIntentFacade` | `decide()`, `recommendFollowing()`(예전 `refine()`), `resolve()` 로그 | `case REFINE` → `case RECOMMEND`에서 이어짐이면 직전 조건 합치기. 직전 조건 없음 처리는 IntentCorrector로 옮김. "상담 의도" 로그에 이어짐 |
+| `facade/ChatStreamFacade` | `planReply()` | `intent == REFINE` → `follows()` (직전 카드 빼기) |
+| `ai/JevDecisionLog` | `FinalSide`, `line()` | 결정 로그에 `finalFollows` 칸 (Jev 확률은 원래 있던 `jevFollowsPrevious`) |
+| `dto/ChatIntent` | | `REFINE` 삭제 |
+| 주석만 | `ChatRecommendationFacade.recommend`, `ChatIntentExtractor`, `JevIntentJudgement`, `JevSecondQuestions`, `RefineCondition` | REFINE·다시 추천 → 이어짐 |
+
+`RefineCondition`(이어짐에서 지울 조건 종류)과 `mergeRefine`은 이름을 그대로 뒀다(OpenAI `removed` 칸 값과 맞물림).
+
+### OpenAI 프롬프트 변경
+- `chat-intent.txt`(3,038 → 3,132자, 기준 3,300 안): `- followsPrevious: RECOMMEND이고 [직전 추천]의 조건(맛, 재료, 종류)을 이어받으면서 일부만 바꿔 달라는 말이면 true, 그 밖은 false` 한 줄을 더했다. 첫 질문 프롬프트에는 원래 REFINE이 없었다.
+- `chat-intent-followup.txt`(1,164 → 1,282자): REFINE 항목을 "followsPrevious true(이어짐)" 항목으로 바꾸고 뜻을 Jev follows_previous 질문과 같은 두 문장으로 썼다. 예전 REFINE 정의의 단어 예시(`"다른", "또", "말고 다른"`)와 문장 예시 한 줄(평가 세트 문장)은 지웠고 새 단어 예시는 넣지 않았다. 맨 아래 예시 두 줄은 `→ REFINE`을 `→ 이어짐`으로만 바꿨다. "그 밖은 … (followsPrevious false)".
+- 구조화 출력 스키마는 `IntentResult`에서 만들어져 `followsPrevious`가 필수 칸으로 더해지고 intent enum에서 REFINE이 빠졌다. 후속 규칙 길이 테스트 기준을 1,200 → 1,300자로 올렸다.
+
+### 의도 리플레이
+기준값 339줄 중 33줄이 달라졌다(U01~U05·U12~U15·U17·U18 × 3회). 모두 의도 칸만 `REFINE` → `RECOMMEND+FOLLOWS`이고 카드 조건 칸(맛·분류·키워드·재료·시간 등)은 모두 같다. 그래서 별도 커밋으로 다시 기록했다. 줄마다: [eval-results/d2-replay/replay-diff.csv](../testing/eval-results/d2-replay/replay-diff.csv). 리플레이 입력의 예전 `REFINE`은 추천 + 이어짐 예로 읽는다.
+
+### 평가 (각 3회, 의도 일치 = 의도와 이어짐이 둘 다 맞음)
+| 세트 | 비교 | 엄격 | 맛 반대 허용 |
+|---|---|---|---|
+| 기본 122문장 | cleanup-main → d2-main | 109 → 107 | 116 → 114 |
+| 확인용 45문장 | cleanup-holdout → d2-holdout | 41 → 41 | 42 → 42 |
+
+다수결이 바뀐 문장은 둘이다.
+- R17 "주식으로 먹을 거 추천해줘" 3/3 → 1/3: Jev 의도 confidence가 0.80·0.82·0.84 → 0.67·0.80·0.71로 기준 0.8 언저리에서 흔들려 두 회차가 OpenAI로 되돌았고, OpenAI는 전·후 모두 OFF_TOPIC이다(jev-on-v5에서도 0.74로 한 번 되돌림). 직전 추천이 없는 문장이라 이번 변경과 상관없다.
+- T15 "맵고 따뜻한 국물 레시피 추천해줘" 2/3 → 1/3: Jev 요청 종류가 넓은 요청·특정 분류 사이에서 흔들림(jev-on-v5도 1/3).
+- 그 밖 회차 수만 바뀐 문장: N01(1/3 → 0/3, 같은 흔들림), 확인용 H07(0/3 → 1/3)·H36(1/3 → 0/3).
+- Jev 요청은 바뀌지 않았다: Jev 입력 토큰이 문장마다 cleanup과 같다(합 251,540 / 356,994).
+
+이어지는 말 묶음 (Jev로 모두 정함, d2 의도는 3회 모두 같음):
+
+| id | 맥락 | 문장 | cleanup 엄격·허용 | d2 엄격·허용 | d2 의도 |
+|---|---|---|---|---|---|
+| U01 | jjigae | 좀 더 매운 걸로 | 0/3·3/3 | 0/3·3/3 | RECOMMEND+FOLLOWS |
+| U02 | jjigae | 다른 거 없어? | 3/3·3/3 | 3/3·3/3 | RECOMMEND+FOLLOWS |
+| U03 | jjigae | 국물 말고 볶음으로 | 3/3·3/3 | 3/3·3/3 | RECOMMEND+FOLLOWS |
+| U04 | jjigae | 매운 거 말고 | 0/3·3/3 | 0/3·3/3 | RECOMMEND+FOLLOWS |
+| U05 | jjigae | 시간 상관없이 | 3/3·3/3 | 3/3·3/3 | RECOMMEND+FOLLOWS |
+| U06 | jjigae | 두 번째 거 어떻게 만들어? | 3/3·3/3 | 3/3·3/3 | RECIPE_DETAIL |
+| U07 | jjigae | 아까 그 순두부찌개 시간 얼마나 걸려? | 3/3·3/3 | 3/3·3/3 | RECIPE_DETAIL |
+| U08 | single | 그거 재료 뭐 들어가? | 3/3·3/3 | 3/3·3/3 | RECIPE_DETAIL |
+| U09 | jjigae | 디저트도 추천해줘 | 3/3·3/3 | 3/3·3/3 | RECOMMEND |
+| U10 | jjigae | 냉장고에 두부 남았어? | 3/3·3/3 | 3/3·3/3 | FRIDGE |
+| U11 | jjigae | 고마워 | 3/3·3/3 | 3/3·3/3 | GENERAL |
+| U12 | jjigae | 김치찌개 말고 다른 찌개 | 3/3·3/3 | 3/3·3/3 | RECOMMEND+FOLLOWS |
+| U13 | dessert | 다른 디저트 | 3/3·3/3 | 3/3·3/3 | RECOMMEND+FOLLOWS |
+| U14 | dessert | 디저트 말고 국 | 3/3·3/3 | 3/3·3/3 | RECOMMEND+FOLLOWS |
+| U15 | dessert | 매운 거 말고 | 3/3·3/3 | 3/3·3/3 | RECOMMEND+FOLLOWS |
+| U16 | kimpi | 디저트 추천해줘 | 3/3·3/3 | 3/3·3/3 | RECOMMEND |
+| U17 | kimpi | 매운 건 빼줘 | 3/3·3/3 | 3/3·3/3 | RECOMMEND+FOLLOWS |
+| U18 | salty | 매운 건 빼줘 | 3/3·3/3 | 3/3·3/3 | RECOMMEND+FOLLOWS |
+| H12 | pasta | 좀 더 가벼운 걸로 다시 골라줘 | 3/3·3/3 | 3/3·3/3 | RECOMMEND+FOLLOWS |
+| H13 | braise | 이번엔 짠맛 대신 단맛 나는 걸로 바꿔줘 | 3/3·3/3 | 3/3·3/3 | RECOMMEND+FOLLOWS |
+| H38 | pasta | 이번엔 좀 더 매콤한 걸로 | 3/3·3/3 | 3/3·3/3 | RECOMMEND+FOLLOWS |
+| H39 | braise | 재료는 두부로 바꿔서 다시 | 3/3·3/3 | 3/3·3/3 | RECOMMEND+FOLLOWS |
+| H40 | pasta | 그건 됐고 오늘 저녁 반찬 추천해줘 | 3/3·3/3 | 3/3·3/3 | RECOMMEND |
+| H41 | braise | 따로 볶음밥 레시피도 하나 알려줘 | 3/3·3/3 | 3/3·3/3 | RECOMMEND |
+
+(U01·U04 엄격 0/3은 Jev 맛 반대(매운맛 ↔ 순한맛)로 cleanup과 같다.)
+
+**흔들림이 아닌 차이 하나 (최종 결과에는 영향 없음)**: OpenAI 원래 답만 보면 직전 추천이 있는 기본 세트 18문장의 의도 + 이어짐이 cleanup 18/18 → d2 17/18이다. U02 "다른 거 없어?"를 예전 OpenAI는 3/3 REFINE으로, 지금은 3/3 추천 + 이어짐 아니오로 답한다. 원인은 후속 규칙에서 REFINE 정의의 단어 예시(`"다른"` 등)를 지우고 Jev 질문 뜻("조건을 더하거나 빼거나 바꿔 달라는 말")으로 바꾼 것이다. 이 문장은 Jev가 정해(3/3 JEV) 평가 결과는 같지만, Jev가 실패하거나 confidence가 낮아 OpenAI로 되돌리는 경우에는 직전 조건을 잇지 않는 새 추천이 된다. 확인용 이어짐 문장의 OpenAI 답은 12/12·6/6 맞다. 직전 추천이 없는 문장에서 OpenAI가 이어짐 예라고 한 회차는 0이다. 레시피 자세히 3문장(U06~U08)에는 OpenAI가 이어짐 예를 붙이지만 추천이 아니라 쓰이지 않는다.
+
+비용·지연: OpenAI 의도 입력이 회차당 약 +58토큰(프롬프트 한 줄)·출력 +6토큰(이어짐 칸)으로 기본 세트 $0.1339 → $0.1382, 확인용 $0.0502 → $0.0519. Jev 비용은 같다. 의도 결정 중앙값 1,696 → 1,577ms(OpenAI 호출 평균 1,903 → 1,691ms, 외부 요인).
+결과: [eval-results/d2-main](../testing/eval-results/d2-main/), [eval-results/d2-holdout](../testing/eval-results/d2-holdout/).
+
+### 파일 수·줄 수 (전 68d528a8 → 후)
+| 범위 | 전 | 후 |
+|---|---|---|
+| main `domain/chat` | 130개, 13,248줄 | 130개, 13,284줄 (+36) |
+| main `domain/chat/intent` | 7개, 796줄 | 7개, 801줄 |
+| `ChatIntentFacade` | 556줄 | 554줄 |
+| `ChatStreamFacade` / `ChatRecommendationFacade` | 577 / 407줄 | 577 / 407줄 (한 줄씩 바뀜) |
+| `IntentCorrector` / `JevIntentResolver` | 229 / 221줄 | 235 / 220줄 |
+| `IntentResult` / `ChatIntentResolution` / `ChatIntent` | 276 / 114 / 28줄 | 300 / 118 / 27줄 |
+| test `domain/chat` | 87개, 20,451줄 | 87개, 20,697줄 |
+| git diff (main / test) | | +141 −105 / +375 −129 |
+
+### 운영·API 영향
+- API·ErrorCode·요청·응답 DTO·SSE 이벤트 변경 없음, 프론트 영향 없음, DB·Redis 저장값 변경 없음(0단계 표).
+- 결정 로그 "상담 의도 Jev 결정"에 `finalFollows` 칸이 `finalIntent` 바로 뒤에 더해졌고, `finalIntent`·`jevIntent`에 REFINE이 더는 나오지 않는다(이어짐이면 RECOMMEND + finalFollows=true). 칸 순서로 읽는 감사 페이지·대시보드가 있으면 맞춰야 한다.
+- "상담 의도" 로그에 `이어짐` 값이 더해졌다. 설정 변경 없음.
+
+### 남은 일
+1. `MealkitWordChecker`·`TasteWordChecker`·`FridgeShopWordChecker` 나머지·`TemperatureWordChecker.wanted`를 Jev 질문으로 옮기기
+2. F11 "슬슬 처리해야 할 거 있어?" 냉장고 의도
+3. 김피탕 같은 줄임말 별칭 데이터 (비슷한 요리 AI가 모르는 요리)
+4. dev DB에서 끝에서 끝(카드) 확인
+5. (d2에서 나옴) OpenAI 되돌림에서 "다른 거 없어?" 이어짐 아니오 — 고칠지 정하기

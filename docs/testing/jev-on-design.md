@@ -1,6 +1,6 @@
 # Jev 판단 연결 설계
 
-상태: **적용됨 (Jev가 유일한 의도 판단)** · 작성일: 2026-11-17 · 갱신: 2026-11-17 (정리 단계, 브랜치 `refactor/chat-intent-cleanup`)
+상태: **적용됨 (Jev가 유일한 의도 판단)** · 작성일: 2026-11-17 · 갱신: 2026-11-17 (정리 단계, d2: REFINE을 추천 안의 이어짐으로 — 11절, 브랜치 `refactor/chat-intent-cleanup`)
 
 상담 의도는 Jev(TypeSafe 분류 모델)로 정한다. 설정으로 고르던 모드(`app.chat.jev.mode` off / shadow / on)는 정리 단계에서 지웠다.
 지금 동작은 한 가지다: **Jev → (Jev를 못 쓰면) OpenAI로 되돌림 → 서버 서비스 규칙**. 아래 1·2·6·7절이 지금 동작이고,
@@ -23,12 +23,14 @@
  └─ OpenAI 의도 분석 (꺼낸 값만 씀) ────┤
                                         ▼
  Jev 의도 confidence < 0.8 또는 Jev 실패(키 없음 포함) → 보정 없는 OpenAI 결과 (넓은 요청이면 넓은 요청 경로)
- Jev 의도가 추천·다시 추천이면 Jev 2차 (요청 종류, 1등 분류, 맛, 밀키트, 요리 이름을 말했나)
+ Jev 의도가 추천이면 Jev 2차 (요청 종류, 1등 분류, 맛, 밀키트, 요리 이름을 말했나)
    ├ 특정 요리 (DISH)    → OpenAI dishText → 기존 이름 검색 → 못 찾으면 비슷한 요리(SimilarDishFinder, 기존)
    ├ 특정 분류 (CATEGORY) → Jev 1등 분류로 분류 조건
    ├ 넓은 요청 (BROAD)    → 넓은 요청 프롬프트로 요리 이름 5개(캐시) → 키워드 검색
    └ 없음 (NONE)          → 냉장고 기반 (기존)
  그 밖의 의도 → Jev 의도 + OpenAI가 꺼낸 값(냉장고·사기 이름, 레시피 자세히 대상 등)
+ 이어짐 (추천 안의 항목) → Jev면 추천 + follows_previous ≥ 0.45, 되돌림이면 OpenAI followsPrevious. 직전 조건(Redis)이 없으면 늘 아니오
+   └ 예면 직전 조건과 이번 말을 합치고(ChatIntentFacade.recommendFollowing) 직전 카드를 후보에서 뺀다 (예전 REFINE 처리 그대로)
  어느 쪽이든 → 서버 서비스 규칙 (레시피 자세히 대상, 요리 이름이 메시지에 있는지, 다른 맛 지키기, 말한 맛만, 알레르기)
  무엇으로 정했는지 → "상담 의도 Jev 결정" 로그 (JevDecisionLog)
 ```
@@ -48,6 +50,7 @@
 | 칸 (`IntentResult`) | on에서 | 이유 |
 |---|---|---|
 | `intent` | **버림** (Jev 되돌림일 때만 씀) | Jev 의도 116/120, 보정 전 OpenAI 117/120과 비슷하고 보정 없이 나온다 |
+| `followsPrevious` (이어짐, d2에서 더함) | **버림** (Jev 되돌림일 때만 씀) | Jev는 follows_previous로 따로 묻는다 |
 | `wantedTastes` · `avoidTastes` | **버림** | Jev 원함 19/21·피함 16/17 (보정 전 OpenAI 17·17) |
 | `moodCategories` | **버림** | 특정 분류는 Jev 1등 분류 12/12. 넓은 요청은 분류 대신 요리 이름 |
 | `keywords` | **버림** | 특징·넓은 요청은 넓은 요청 요리 이름으로, 요리 이름은 dishText로 |
@@ -56,7 +59,7 @@
 | `includeIngredients` · `excludeIngredients` · `useSelectedOnly` | **씀** | 재료 이름·조건 |
 | `maxMinutes` | **씀** | 시간 |
 | `targetIndex` · `targetName` · `detailQuestion` | **씀** | 레시피 자세히 대상 |
-| `removed` | **씀** | 다시 추천에서 지울 조건 |
+| `removed` | **씀** | 이어짐에서 지울 조건 |
 | `fridgeScope` | **씀** | Jev `fridge_scope`는 아직 평가하지 않았다(평가 세트 scope 칸을 Jev 평가에 넣은 뒤 다시 정한다) |
 
 **프롬프트는 이번에 그대로 두고 칸만 무시한다.** `on`에서 Jev confidence가 낮거나 Jev가 실패하면 OpenAI 결과로 되돌려야 해서, 의도·맛·분류를 뽑는 프롬프트(`chat-intent.txt`, 첫 질문 1,751토큰)가 계속 필요하다. 되돌림 비율이 낮다는 것을 운영 로그로 확인한 뒤 줄인다(8절 2단계).
@@ -70,12 +73,13 @@
 Optional<IntentResult> resolveWithJev(CorrectionInput input, JevIntentJudgement jev, IntentResult openAi)
 ```
 
-1. 의도 = `jev.first().intent()` (서비스 규칙 적용 값: 직전 추천이 없는 REFINE·RECIPE_DETAIL → RECOMMEND, 이미 `JevIntentClassifier.serviceIntent`).
+1. 의도 = `jev.first().intent()` (서비스 규칙 적용 값: 직전 추천이 없는 RECIPE_DETAIL → RECOMMEND, 이미 `JevIntentClassifier.serviceIntent`).
+   이어짐 = `JevIntentClassifier.follows(jev.first())` (추천이고 follows_previous ≥ 0.45). d2 전에는 이것을 REFINE 의도로 넘겼다.
 2. OpenAI 결과에서 3절의 "씀" 칸만 남긴 `IntentResult`를 만든다. 의도·맛·분류·키워드는 Jev 쪽 값으로 채운다.
    - 맛: Jev 원함·피함(Member.Taste 이름)
    - 분류: 요청 종류가 특정 분류이고 1등 분류가 있을 때만 `[1등 분류]`, 아니면 빈 목록
    - 키워드: 넓은 요청이면 넓은 요청 요리 이름(5절), 특정 요리면 `[dishText]`, 그 밖이면 빈 목록
-3. 그 결과를 지금 `ChatIntentFacade.decide()`의 `switch`(RECOMMEND → `toRecipeQuery`, REFINE → `refine`(직전 조건 합치기), RECIPE_DETAIL → `recipeDetail`, FRIDGE·SHOP → `lookupOf` …)에 그대로 넣는다. **결과 모양(`ChatIntentResolution`)과 그 뒤 흐름은 바꾸지 않는다.**
+3. 그 결과를 지금 `ChatIntentFacade.decide()`의 `switch`(RECOMMEND → 이어짐이면 `recommendFollowing`(직전 조건 합치기, d2 전 REFINE → `refine`) 아니면 `toRecipeQuery`, RECIPE_DETAIL → `recipeDetail`, FRIDGE·SHOP → `lookupOf` …)에 그대로 넣는다. **결과 모양(`ChatIntentResolution`)과 그 뒤 흐름은 바꾸지 않는다.**
 4. 출처(`Source`)에 `JEV`를 더해 로그·비교 로그에서 구분한다.
 
 넓은 요청 요리 이름은 `SimilarDishFinder`와 같은 모양으로 둔다.
@@ -119,7 +123,7 @@ Optional<IntentResult> resolveWithJev(CorrectionInput input, JevIntentJudgement 
 
 1. Jev 1차 실패(키 없음, 시간 초과 3초, HTTP 오류, 답 형식 오류, 실행기 자리 없음)
 2. Jev 의도 confidence < **0.9**
-3. 의도가 추천·다시 추천인데 Jev 2차가 실패
+3. 의도가 추천(이어짐 포함)인데 Jev 2차가 실패
 
 jev-v4로 다시 확인한 0.9 기준 (의도를 기대한 회차, 단어 차단 제외):
 
@@ -212,3 +216,17 @@ jev-v4로 다시 확인한 0.9 기준 (의도를 기대한 회차, 단어 차단
 7. **냉장고 범위**: OpenAI `fridgeScope` + 서버 보충을 그대로 쓴다. Jev `fridge_scope`는 평가에 넣은 뒤 정한다.
 8. **설정 이름 변경** (정리 단계에서 설정 자체를 지움): `CHAT_JEV_ENABLED` → `CHAT_JEV_MODE`를 한 번에 바꾼다(호환 코드 없음). 지금은 `CHAT_JEV_MODE`도 없고 `TYPESAFE_API_KEY`만 필요하다.
 9. **지금 남은 Jev 의도 오답**: P01 "당근 사고 싶어"(추천 0.96, 0.9 기준을 넘어 되돌리지 않음), F11·F12·F14(냉장고 → 일반·장보기). on에서 그대로 틀린다. 문구를 더 고칠지, P01처럼 confidence가 높은 오답을 받아들일지.
+
+## 11. 이어짐: REFINE을 추천 안의 항목으로 (d2, 2026-11-17)
+
+REFINE을 의도(`ChatIntent`)에서 지우고 추천 안의 **이어짐**(직전 추천의 조건을 이어받아 일부만 바꾸는 추천인지, boolean)으로 바꿨다. 동작은 그대로다: 예전에 REFINE으로 가던 메시지는 "추천 + 이어짐 예"로 같은 처리(직전 조건 합치기, 이번 말의 맛 따르기, 직전 카드 빼기)를 받는다.
+
+| 어디서 | 이어짐을 정하는 법 |
+|---|---|
+| Jev로 정함 | 추천이고 follows_previous ≥ 0.45 (`JevIntentClassifier.follows`, 예전 REFINE 조건 그대로) |
+| OpenAI로 되돌림 | OpenAI `followsPrevious` 칸 (추천일 때만 뜻이 있다, `IntentResult.follows()`) |
+| 서비스 규칙 | 직전 조건(Redis)이 없으면 늘 아니오 (`IntentCorrector`, 예전 "직전 조건이 없는 REFINE은 새 추천"과 같다) |
+
+- 값이 나가는 곳: `ChatIntentResolution.follows`, 결정 로그 `finalFollows`(Jev 확률은 원래 있던 `jevFollowsPrevious`). API 응답·SSE·DB·Redis에는 의도 값이 들어가지 않아 바뀌는 것이 없다.
+- OpenAI 프롬프트: `chat-intent.txt`에 `followsPrevious` 한 줄(뜻은 Jev follows_previous 질문과 같음), `chat-intent-followup.txt`의 REFINE 항목을 같은 뜻의 이어짐 항목으로 바꿨다. 구조화 출력 스키마는 `IntentResult`에서 만들어져 `followsPrevious`가 필수 칸으로 더해졌다.
+- 평가는 의도와 이어짐이 둘 다 맞아야 의도 일치로 센다(평가 세트 `follows: true`). 바꾼 곳·평가 비교: [work-chat-jev-on.md](../worklogs/work-chat-jev-on.md) "d2" 절.
