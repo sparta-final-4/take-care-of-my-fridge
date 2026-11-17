@@ -158,7 +158,7 @@ class JevIntentClassifierTest {
         assertThat(requestKind).containsEntry("type", "choice").containsEntry("instructions", "사용자는 원하는 요리를 어떻게 말했나?");
         assertThat(map(requestKind.get("criteria"))).containsExactly(
                 Map.entry("특정 요리", "요리 하나의 이름을 말했다"),
-                Map.entry("특정 분류", "요리의 종류를 말했고, 그 종류가 분류 목록의 하나에 맞는다(찌개, 디저트처럼). 빼거나 피하는 말이 함께 있어도 이 기준은 같다"),
+                Map.entry("특정 분류", "요리의 종류를 하나 말했다(찌개, 디저트처럼)"),
                 Map.entry("넓은 요청", "상황이나 쓰임새, 여러 종류에 걸친 말을 했다(술안주, 반찬, 국물, 간단한 한 끼처럼). 말한 종류가 여러 분류에 걸치면 넓은 요청이다"),
                 Map.entry("없음", "요리 종류나 이름을 말하지 않았다"));
         Map<String, Object> category = map(questions.get("category"));
