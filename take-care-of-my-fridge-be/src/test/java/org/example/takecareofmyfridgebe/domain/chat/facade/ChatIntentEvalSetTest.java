@@ -27,7 +27,7 @@ class ChatIntentEvalSetTest {
     }
 
     @Test
-    @DisplayName("holdout을 고르면 chat-intent-holdout.yml을 읽어 기본 세트에 없는 문장 15개를 돌린다")
+    @DisplayName("holdout을 고르면 chat-intent-holdout.yml을 읽어 기본 세트에 없는 문장 45개를 돌린다")
     void loadsHoldoutSet_whenHoldout() throws IOException {
         EvalSet holdout = EvalSet.load(EvalSet.resource("holdout"));
         Set<String> mainMessages = EvalSet.load().allCases().stream().map(EvalCase::message).collect(Collectors.toSet());
@@ -35,7 +35,7 @@ class ChatIntentEvalSetTest {
         List<EvalCase> cases = holdout.cases(Set.of());
 
         assertThat(EvalSet.resource("holdout")).isEqualTo("chat-intent-holdout.yml");
-        assertThat(cases).hasSize(15);
+        assertThat(cases).hasSize(45);
         assertThat(cases).extracting(EvalCase::message).doesNotContainAnyElementsOf(mainMessages);
         assertThat(holdout.contexts()).containsOnlyKeys("pasta", "braise");
     }
