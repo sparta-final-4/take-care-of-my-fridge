@@ -535,6 +535,69 @@ class ChatIntentFacadeJevOnTest {
     }
 
     @Nested
+    @DisplayName("자해 안내 (Jev 1등 의도 또는 자해 확률 기준)")
+    class SelfHarm {
+
+        @Test
+        @DisplayName("Jev 1등 의도가 자해면 자해 안내로 정한다")
+        void declinesSelfHarm_whenTopIntentIsSelfHarm() {
+            givenOpenAi(IntentResult.general());
+            givenJevWithSelfHarm(ChatIntent.SELF_HARM, 0.66, 0.66);
+
+            ChatIntentResolution resolution = resolve("요즘 살 이유가 없는 것 같아");
+
+            assertThat(resolution.intent()).isEqualTo(ChatIntent.SELF_HARM);
+            assertThat(resolution.declines()).isTrue();
+        }
+
+        @Test
+        @DisplayName("Jev 1등 의도가 일반 질문이어도 자해 확률이 0.35(기준 0.3 이상)면 자해 안내로 정한다")
+        void declinesSelfHarm_whenSelfHarmProbabilityAboveThreshold() {
+            givenOpenAi(IntentResult.general());
+            givenJevWithSelfHarm(ChatIntent.GENERAL, 0.6, 0.35);
+
+            ChatIntentResolution resolution = resolve("다 그만두고 싶어");
+
+            assertThat(resolution.intent()).isEqualTo(ChatIntent.SELF_HARM);
+            assertThat(resolution.declines()).isTrue();
+        }
+
+        @Test
+        @DisplayName("Jev 1등 의도가 일반 질문이고 자해 확률이 0.2(기준 미만)면 일반 질문으로 정한다")
+        void answersGeneral_whenSelfHarmProbabilityBelowThreshold() {
+            givenOpenAi(IntentResult.general());
+            givenJevWithSelfHarm(ChatIntent.GENERAL, 0.75, 0.2);
+
+            ChatIntentResolution resolution = resolve("배고파 죽겠어");
+
+            assertThat(resolution.intent()).isEqualTo(ChatIntent.GENERAL);
+            assertThat(resolution.declines()).isFalse();
+        }
+
+        @Test
+        @DisplayName("OpenAI 꺼내기가 실패해도 Jev 1등 의도가 자해면 자해 안내로 정한다")
+        void declinesSelfHarm_whenOpenAiFailsAndJevSaysSelfHarm() {
+            when(fixture.extractor.extract(eq(MEMBER_ID), eq(SESSION_ID), any(), any())).thenThrow(new IllegalStateException("timeout"));
+            givenJevWithSelfHarm(ChatIntent.SELF_HARM, 0.7, 0.7);
+
+            ChatIntentResolution resolution = resolve("요즘 살 이유가 없는 것 같아");
+
+            assertThat(resolution.intent()).isEqualTo(ChatIntent.SELF_HARM);
+            assertThat(resolution.declines()).isTrue();
+        }
+
+        // 1차만: 1등 의도와 confidence, 자해 확률 (1등 의도 확률은 confidence)
+        private void givenJevWithSelfHarm(ChatIntent intent, double confidence, double selfHarm) {
+            Map<ChatIntent, Double> probabilities = new EnumMap<>(ChatIntent.class);
+            Arrays.stream(ChatIntent.values()).forEach(each -> probabilities.put(each, 0.0));
+            probabilities.put(intent, confidence);
+            probabilities.put(ChatIntent.SELF_HARM, selfHarm);
+            when(jev.await(run)).thenReturn(Optional.of(new JevIntentJudgement(
+                    ChatIntentFixture.first(intent, confidence, probabilities, null), null, 200L)));
+        }
+    }
+
+    @Nested
     @DisplayName("서비스 규칙")
     class ServiceRules {
 

@@ -71,6 +71,8 @@ import java.util.stream.Stream;
  * 의도는 Jev 하나가 정한다: OpenAI 꺼내기와 함께 Jev를 다른 스레드에서 시작하고(JevIntentRunner), 꺼내기가 끝난 뒤 Jev 결과를 기다려
  * (제한 시간 안에서) Jev 1등 의도(confidence와 상관없이)와 OpenAI가 꺼낸 값으로 의도 결과를 만든다 (JevIntentResolver).
  * 그 뒤 서버 서비스 규칙(IntentCorrector)을 거친다.
+ * Jev 1등 의도가 자해(SELF_HARM)이거나 자해 확률이 {@value #SELF_HARM_MIN_PROBABILITY} 이상이면 자해 안내를 보낸다 (OpenAI 꺼내기가 실패했어도).
+ * 단어 차단(SafetyWordChecker)은 이보다 먼저 ChatStreamFacade가 본다.
  * 무엇으로 정했는지는 "상담 의도 Jev 결정" 로그로 남긴다. 설계: docs/testing/jev-on-design.md
  */
 @Slf4j
@@ -79,6 +81,9 @@ public class ChatIntentFacade {
 
     // Jev가 고를 분류 목록에서만 뺄 분류. 뜻이 없어 조건으로 쓸 수 없다 (레시피 후보에서는 빼지 않는다)
     private static final Set<String> PROMPT_EXCLUDED_CATEGORIES = Set.of("기타");
+    // Jev 자해(SELF_HARM) 확률이 이 값 이상이면 1등 의도가 아니어도 자해 안내를 보낸다. 평가로 정함
+    // (처음 값 0.3. 자해 기준 세트 chat-intent-safety.yml로 자해 문장을 모두 잡고 아닌 문장은 잡지 않는 범위를 본다)
+    static final double SELF_HARM_MIN_PROBABILITY = 0.3;
     // 의도 판단에 넘길 [이전 추천] 이름 수
     private static final int EARLIER_CARDS_SHOWN = 6;
     private static final String NAME_DELIMITER = ", ";
@@ -187,6 +192,13 @@ public class ChatIntentFacade {
             log.warn("상담 Jev 의도 판단 실패, AI 실패 처리로 - memberId: {}, sessionId: {}", memberId, sessionId);
             return failed(memberId, sessionId, request, jev, JevDecision.of(JevDecision.Decision.JEV_FAILED));
         }
+        // 자해는 꺼낸 값이 필요 없으므로 OpenAI 꺼내기가 실패했어도 자해 안내를 보낸다
+        JevIntentJudgement.First first = judged.get().first();
+        if (selfHarm(first)) {
+            log.info("상담 Jev 자해 판단으로 자해 안내 - memberId: {}, sessionId: {}, 1등 의도: {}, 자해 확률: {}",
+                    memberId, sessionId, first.intent(), selfHarmProbability(first));
+            return new Decision(ChatIntentResolution.declined(ChatIntent.SELF_HARM), jev, JevDecision.of(JevDecision.Decision.JEV));
+        }
         if (extraction == null) {
             return failed(memberId, sessionId, request, jev, JevDecision.of(JevDecision.Decision.OPENAI_FAILED));
         }
@@ -210,6 +222,17 @@ public class ChatIntentFacade {
             case OFF_TOPIC, BLOCKED, SELF_HARM -> ChatIntentResolution.declined(result.intent());
         };
         return new Decision(resolution, result.removed() == null ? List.of() : result.removed(), jev, jevDecision);
+    }
+
+    // 자해 안내를 보낼지: Jev 1등 의도가 자해이거나 자해 확률이 기준 이상
+    static boolean selfHarm(JevIntentJudgement.First first) {
+        return first.intent() == ChatIntent.SELF_HARM || selfHarmProbability(first) >= SELF_HARM_MIN_PROBABILITY;
+    }
+
+    // Jev 의도별 확률의 자해 확률 (답에 없으면 0)
+    private static double selfHarmProbability(JevIntentJudgement.First first) {
+        Double probability = first.intentProbabilities() == null ? null : first.intentProbabilities().get(ChatIntent.SELF_HARM);
+        return probability == null ? 0.0 : probability;
     }
 
     // OpenAI 꺼내기. 실패하면(오류·시간 초과·JSON 깨짐) null
