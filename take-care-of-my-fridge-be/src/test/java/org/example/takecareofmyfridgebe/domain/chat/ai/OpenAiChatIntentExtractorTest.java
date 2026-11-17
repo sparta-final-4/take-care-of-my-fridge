@@ -81,6 +81,22 @@ class OpenAiChatIntentExtractorTest {
     }
 
     @Test
+    @DisplayName("이어짐 칸(followsPrevious)이 true인 추천 답은 추천 + 이어짐으로 읽는다")
+    void readsFollowsPrevious_whenAnswered() {
+        chatModel.reply = """
+                {"intent":"RECOMMEND","wantedTastes":["SPICY"],"moodCategories":[],"maxMinutes":0,
+                 "includeIngredients":[],"excludeIngredients":[],"useSelectedOnly":false,
+                 "keywords":[],"dishText":"","preferenceText":"","followsPrevious":true}
+                """;
+
+        IntentResult result = extractor.extract(1L, 10L, "좀 더 매운 걸로", List.of("국"), "[직전 추천] 1. 김치찌개");
+
+        assertThat(result.intent()).isEqualTo(ChatIntent.RECOMMEND);
+        assertThat(result.followsPrevious()).isTrue();
+        assertThat(result.follows()).isTrue();
+    }
+
+    @Test
     @DisplayName("응답 모양을 IntentResult의 JSON 스키마로 강제하고, AI가 뽑는 요리 이름 칸도 스키마에 넣는다")
     void sendsOutputSchema() {
         chatModel.reply = RECOMMEND_JSON;
@@ -140,14 +156,14 @@ class OpenAiChatIntentExtractorTest {
     }
 
     @Test
-    @DisplayName("응답 모양에 레시피 자세히 대상 칸(targetIndex, targetName)이 있다")
+    @DisplayName("응답 모양에 레시피 자세히 대상 칸(targetIndex, targetName)과 이어짐 칸(followsPrevious)이 있다")
     void sendsTargetFieldsInSchema() {
         chatModel.reply = RECOMMEND_JSON;
 
         extractor.extract(1L, 10L, "매운 국", List.of("국"), null);
 
         String schema = ((StructuredOutputChatOptions) chatModel.lastPrompt.getOptions()).getOutputSchema();
-        assertThat(schema).contains("\"targetIndex\"", "\"targetName\"", "\"removed\"", "RECIPE_DETAIL", "REFINE");
+        assertThat(schema).contains("\"targetIndex\"", "\"targetName\"", "\"removed\"", "RECIPE_DETAIL", "\"followsPrevious\"");
     }
 
     @Test
@@ -167,7 +183,7 @@ class OpenAiChatIntentExtractorTest {
         assertThat(intents).containsExactlyInAnyOrder(Arrays.stream(ChatIntent.values()).map(Enum::name).toArray(String[]::new));
         List<String> required = new ArrayList<>();
         schema.get("required").forEach(value -> required.add(value.asString()));
-        assertThat(required).contains("intent", "dishText", "keywords").doesNotContain("similarDishes");
+        assertThat(required).contains("intent", "dishText", "keywords", "followsPrevious").doesNotContain("similarDishes");
         assertThat(schema.get("properties").has("similarDishes")).isFalse();
         assertThat(schema.get("additionalProperties").asBoolean()).isFalse();
     }
