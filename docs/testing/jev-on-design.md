@@ -1,9 +1,11 @@
-# Jev 판단 연결 설계 (app.chat.jev.mode)
+# Jev 판단 연결 설계
 
-상태: **설계 (코드 변경 없음)** · 작성일: 2026-11-17 · 브랜치: `feat/chat-jev-shadow`
+상태: **적용됨 (Jev가 유일한 의도 판단)** · 작성일: 2026-11-17 · 갱신: 2026-11-17 (정리 단계, 브랜치 `refactor/chat-intent-cleanup`)
 
-지금 Jev는 그림자 모드(`app.chat.jev.enabled`)로만 돈다. 결과는 비교 로그에만 남고 상담에 쓰지 않는다.
-이 문서는 설정을 `app.chat.jev.mode`(`off` / `shadow` / `on`, 기본 `off`)로 바꾸고, `on`이면 Jev 판단으로 상담 의도를 정하는 방법을 정한다.
+상담 의도는 Jev(TypeSafe 분류 모델)로 정한다. 설정으로 고르던 모드(`app.chat.jev.mode` off / shadow / on)는 정리 단계에서 지웠다.
+지금 동작은 한 가지다: **Jev → (Jev를 못 쓰면) OpenAI로 되돌림 → 서버 서비스 규칙**. 아래 1·2·6·7절이 지금 동작이고,
+3~5절은 Jev 판단으로 의도 결과를 만드는 규칙(JevIntentResolver), 9절 이후는 설계 때의 어림과 정리 결과다.
+평가 기록: [jev-on-eval.md](jev-on-eval.md), 정리 작업 기록: [work-chat-jev-on.md](../worklogs/work-chat-jev-on.md)
 
 근거 자료:
 - Jev 평가: [jev-v4 summary](eval-results/jev-v4/) (122문장 × 3회). 요청 종류·1등 분류·맛·의도 일치율, confidence 구간
@@ -17,16 +19,18 @@
 
 ```
 메시지
- ├─ Jev 1차 (의도·묻는 말·냉장고 범위) ─┐        ← 둘을 함께 시작한다 (지금 그림자 모드와 같은 스레드 구조)
+ ├─ Jev 1차 (의도·묻는 말·냉장고 범위) ─┐        ← 둘을 함께 시작한다 (JevIntentRunner, TypeSafeExecutor 스레드)
  └─ OpenAI 의도 분석 (꺼낸 값만 씀) ────┤
                                         ▼
- Jev 의도 confidence < 0.9 또는 Jev 실패 → OpenAI 결과 + 기존 보정 (지금 흐름 그대로)
+ Jev 의도 confidence < 0.8 또는 Jev 실패(키 없음 포함) → 보정 없는 OpenAI 결과 (넓은 요청이면 넓은 요청 경로)
  Jev 의도가 추천·다시 추천이면 Jev 2차 (요청 종류, 1등 분류, 맛, 밀키트, 요리 이름을 말했나)
    ├ 특정 요리 (DISH)    → OpenAI dishText → 기존 이름 검색 → 못 찾으면 비슷한 요리(SimilarDishFinder, 기존)
    ├ 특정 분류 (CATEGORY) → Jev 1등 분류로 분류 조건
    ├ 넓은 요청 (BROAD)    → 넓은 요청 프롬프트로 요리 이름 5개(캐시) → 키워드 검색
    └ 없음 (NONE)          → 냉장고 기반 (기존)
  그 밖의 의도 → Jev 의도 + OpenAI가 꺼낸 값(냉장고·사기 이름, 레시피 자세히 대상 등)
+ 어느 쪽이든 → 서버 서비스 규칙 (레시피 자세히 대상, 요리 이름이 메시지에 있는지, 다른 맛 지키기, 말한 맛만, 알레르기)
+ 무엇으로 정했는지 → "상담 의도 Jev 결정" 로그 (JevDecisionLog)
 ```
 
 - 지연: Jev 1·2차 합계는 중앙값 355ms·95% 417ms(jev-v4)이고 OpenAI 의도 분석(1~2초)과 함께 돈다. 넓은 요청 요리 이름 호출도 Jev 2차가 끝난 직후 시작하면 OpenAI를 기다리는 동안 끝난다(캐시면 0). 그래서 `on`의 응답 시간은 지금과 거의 같다.
@@ -34,14 +38,10 @@
 
 ## 2. 설정
 
-| 값 | 동작 |
-|---|---|
-| `off` (기본) | Jev를 부르지 않는다. 지금 `enabled: false`와 같다 |
-| `shadow` | 지금 `enabled: true`와 같다. 결과는 비교 로그에만 |
-| `on` | Jev 결과로 의도·조건을 정한다. 비교 로그는 계속 남긴다(되돌린 경우 포함) |
-
-- `ChatJevProperties(boolean enabled)` → `ChatJevProperties(Mode mode)`, `enum Mode { OFF, SHADOW, ON }`. 환경 변수 `CHAT_JEV_MODE`(기본 `off`).
-- 기존 `CHAT_JEV_ENABLED`는 한 번에 바꾼다(배포 설정에서 `CHAT_JEV_ENABLED=true` → `CHAT_JEV_MODE=shadow`). 둘 다 읽는 호환 코드는 두지 않는다.
+- 모드 설정은 없다. 정리 단계에서 `app.chat.jev.mode`(`CHAT_JEV_MODE`)와 `ChatJevProperties`를 지웠다.
+- 필요한 것은 TypeSafe 키 하나다: `app.typesafe.api-key` = 환경 변수 `TYPESAFE_API_KEY`. 운영은 Parameter Store `/imhungry/<APP_ENV>/TYPESAFE_API_KEY`.
+- **키가 없으면 앱은 시작되지만** 시작할 때 경고를 한 번 남기고, 모든 메시지를 Jev 없이 OpenAI 결과로 되돌린다(결정 로그 `jevStatus=SKIPPED`, `decision=OPENAI_JEV_FAILED`). 단어로 의도를 고치던 보정은 지웠으므로 키가 없을 때 정확도는 jev-on 평가의 되돌림 회차 수준이다.
+- 의도 confidence 기준 0.8(`ChatIntentFacade.MIN_JEV_INTENT_CONFIDENCE`), 이어짐 기준 0.45(`JevIntentClassifier.MIN_FOLLOWS_PREVIOUS`), 1등 분류 기준 0.7(`JevIntentResolver.MIN_CATEGORY_CONFIDENCE`)은 상수다. 호출 제한 시간은 `app.typesafe.timeout`(3s), 실행기는 `TypeSafeExecutor`(스레드 4, 대기 50, 넘치면 건너뜀).
 
 ## 3. OpenAI 의도 분석: on에서 쓰는 칸과 버리는 칸
 
@@ -112,7 +112,10 @@ Optional<IntentResult> resolveWithJev(CorrectionInput input, JevIntentJudgement 
 
 ## 6. Jev 실패·confidence 낮음 → OpenAI로 되돌리는 조건
 
-아래 중 하나면 그 메시지는 **지금 흐름(OpenAI 결과 + IntentCorrector 전체)**으로 정한다. 비교 로그에는 되돌린 이유를 남긴다.
+> 지금 동작: 아래 중 하나면 그 메시지는 **보정 없는 OpenAI 결과 + 서비스 규칙**으로 정한다(설계 때의 "보정 전체로 되돌림"은 B안으로 바꿨고, 보정은 정리 단계에서 지웠다). 기준은 0.8이다(jev-on 평가로 정함). 결정 로그에 되돌린 이유(`decision`)를 남긴다.
+> 아래 표와 0.9 기준은 설계 때의 검토 기록이다.
+
+아래 중 하나면 그 메시지는 OpenAI 결과로 되돌린다.
 
 1. Jev 1차 실패(키 없음, 시간 초과 3초, HTTP 오류, 답 형식 오류, 실행기 자리 없음)
 2. Jev 의도 confidence < **0.9**
@@ -129,9 +132,9 @@ jev-v4로 다시 확인한 0.9 기준 (의도를 기대한 회차, 단어 차단
 
 - 0.9 이상에서 틀린 회차는 3번이다(P01 "당근 사고 싶어" 0.96 → 추천). 0.8로 내려도 정답률은 98.1%로 비슷하지만 더 많이 쓰는 이득이 크지 않아 처음에는 0.9로 시작하고 운영 비교 로그로 다시 본다.
 - **요청 종류 confidence로는 되돌리지 않는다.** jev-v4에서 0.7 미만 구간도 83.6%가 맞았고(종류 전체 63/68), 되돌릴 OpenAI 쪽에 요청 종류가 없다. 경계 규칙(5절)만 둔다.
-- 설정: `app.chat.jev.min-intent-confidence: 0.9`.
+- (설계 때) 설정: `app.chat.jev.min-intent-confidence: 0.9`. → 지금은 상수 0.8 (`ChatIntentFacade.MIN_JEV_INTENT_CONFIDENCE`).
 
-## 7. on에서 IntentCorrector 단계
+## 7. IntentCorrector 단계 (설계 때 표, 정리 단계에서 "건너뜀" 단계는 코드에서 지웠다)
 
 효과 숫자: 보정 하나만 껐을 때 OpenAI 평가 일치 문장 수(all-on 120/121 기준, 2026-11-16, 3회 다수결). "AI 실수 고치기"는 AI 판단을 단어로 고치는 것, "서비스 규칙"은 AI가 맞아도 서비스가 정한 약속이다.
 
@@ -151,12 +154,12 @@ jev-v4로 다시 확인한 0.9 기준 (의도를 기대한 회차, 단어 차단
 | 알레르기 재료 빼기 (스위치 없음) | 서비스 규칙 | - | **거침** | 안전 |
 
 - 모두 껐을 때(all-off) 104 (−16). 의도·맛·분류를 고치는 단계(1·3·4·5·8·9)가 그중 대부분이다.
-- `on`에서 되돌린 메시지(6절)는 모든 단계를 지금처럼 거친다.
+- 지금: "거침" 단계(2, 6의 요리 이름 확인, 7, 10, 다시 추천 맛 따르기, 알레르기)만 남았고 늘 켜져 있다(보정 스위치 `app.chat.corrections`도 지웠다). 되돌린 메시지도 같은 단계만 거친다.
 
 ## 8. 평가
 
 ### 방법
-- `ChatIntentEvalManualTest`에 모드를 준다: `OPENAI_INTENT_EVAL_JEV_MODE=on`(기본 off). on이면 `TYPESAFE_API_KEY`도 필요하고, 같은 평가 세트를 `ChatIntentFacade.resolve`(Jev 연결 포함)로 돌린다. 넓은 요청 요리 이름 생성기도 실제 OpenAI로 부른다(캐시 없음).
+- (지금) `ChatIntentEvalManualTest`는 늘 Jev로 정하고 `TYPESAFE_API_KEY`가 필요하다. 모드·보정 끄기 옵션은 지웠다. (설계 때) 모드를 주고, 같은 평가 세트를 `ChatIntentFacade.resolve`(Jev 연결 포함)로 돌린다. 넓은 요청 요리 이름 생성기도 실제 OpenAI로 부른다(캐시 없음).
 - 비교 칸은 지금 OpenAI 평가 그대로(intent, wanted, avoid, categories, dish, keywords…)이고, 다음만 바꾼다.
   - **넓은 요청 문장**(기대 kind BROAD, 17문장): `categories` 대신 "요청 종류 BROAD + 넓은 요청 요리 이름이 비어 있지 않음"으로 비교한다. `keywordsEmpty`·`keywordsAny`도 넓은 요청 문장에서는 보지 않는다(키워드가 넓은 요청 요리 이름이 되므로).
   - 결과 CSV에 출처(JEV / 되돌림 이유)와 요청 종류, 넓은 요청 요리 이름을 더한다.
@@ -182,9 +185,11 @@ jev-v4로 다시 확인한 0.9 기준 (의도를 기대한 회차, 단어 차단
 | 평가 (`ChatIntentEvalManualTest` 모드) | | +120 |
 | 단위 테스트 | Resolver 요청 종류·경계·되돌림, 넓은 요청 캐시, 모드 | +500 |
 
-### on 전환 후 지울 수 있는 코드 (2단계)
+### on 전환 후 지울 수 있는 코드 (2단계) → 정리 단계에서 지웠다
 
-**전제: 되돌림(6절)을 OpenAI 결과 + 보정 전체로 하는 동안은 지울 수 없다.** 운영 비교 로그로 되돌림 비율과 되돌린 메시지의 정확도를 본 뒤, 되돌림을 "보정 없는 OpenAI 결과" 또는 "Jev 낮은 confidence 그대로"로 바꾸기로 정하면 아래를 지운다.
+> 결과: 아래 표 중 IntentCorrector 고치기 단계, CategoryWordChecker, chat-words.yml의 분류 묶음·음식 말·의도 단어, 보정 스위치·EvalCorrectionSwitches를 지웠다. TasteWordChecker·MealkitWordChecker·FridgeShopWordChecker(범위·할인·양념)·prompts/chat-intent.txt는 남겼다. 줄 수와 이유: [work-chat-jev-on.md](../worklogs/work-chat-jev-on.md)
+
+**(설계 때) 전제: 되돌림(6절)을 OpenAI 결과 + 보정 전체로 하는 동안은 지울 수 없다.** 운영 비교 로그로 되돌림 비율과 되돌린 메시지의 정확도를 본 뒤, 되돌림을 "보정 없는 OpenAI 결과" 또는 "Jev 낮은 confidence 그대로"로 바꾸기로 정하면 아래를 지운다.
 
 | 대상 | 줄 수 (2026-11-17) | 비고 |
 |---|---|---|
@@ -198,12 +203,12 @@ jev-v4로 다시 확인한 0.9 기준 (의도를 기대한 회차, 단어 차단
 
 ## 10. 확인이 필요한 결정
 
-1. **되돌림 방식**: `on`에서 Jev confidence가 낮을 때 OpenAI 결과 + 보정 전체로 되돌린다(이 문서의 안). 이러면 보정 코드를 바로 지울 수 없다. 처음부터 "보정 없는 OpenAI"로 되돌리면 지울 수 있지만, 되돌린 메시지(약 28%)에서 정확도가 떨어진다(all-off 104/121).
+1. **되돌림 방식** (정함: 보정 없는 OpenAI, 보정은 지움): `on`에서 Jev confidence가 낮을 때 OpenAI 결과 + 보정 전체로 되돌린다(이 문서의 안). 이러면 보정 코드를 바로 지울 수 없다. 처음부터 "보정 없는 OpenAI"로 되돌리면 지울 수 있지만, 되돌린 메시지(약 28%)에서 정확도가 떨어진다(all-off 104/121).
 2. **의도 confidence 기준**: 0.9로 시작(쓰는 회차 72%, 정답 98.8%). 0.8이면 86%를 쓰고 98.1%.
 3. **넓은 요청 캐시 키**: OpenAI `preferenceText`(없으면 메시지). 같은 "술안주"라도 "술안주 추천해줘"·"술안주 뭐 있어"가 같은 키가 되게 할지.
 4. **넓은 요청 프롬프트 v2의 남은 문제**: 분류 이름(김치·튀김·샐러드)·묶음 말(스테이크·파스타·치킨)·설명형 이름이 여전히 나온다(v2 26/180). 그대로 연결하고 검색(SPLIT 빼기, 0건 이름 버리기)으로 막을지, 프롬프트를 더 고친 뒤 연결할지.
 5. **요청 종류 경계**: 특정 분류 + 1등 분류 없음 → 밀키트면 없음, 아니면 넓은 요청(5절). 특정 요리 + dishText 없음 → 넓은 요청.
 6. **밀키트 판단**: 지금처럼 단어로(Jev `mealkit_wanted`는 평가 전이라 쓰지 않음).
 7. **냉장고 범위**: OpenAI `fridgeScope` + 서버 보충을 그대로 쓴다. Jev `fridge_scope`는 평가에 넣은 뒤 정한다.
-8. **설정 이름 변경**: `CHAT_JEV_ENABLED` → `CHAT_JEV_MODE`를 한 번에 바꾼다(호환 코드 없음). 배포 설정 변경이 같이 필요하다.
+8. **설정 이름 변경** (정리 단계에서 설정 자체를 지움): `CHAT_JEV_ENABLED` → `CHAT_JEV_MODE`를 한 번에 바꾼다(호환 코드 없음). 지금은 `CHAT_JEV_MODE`도 없고 `TYPESAFE_API_KEY`만 필요하다.
 9. **지금 남은 Jev 의도 오답**: P01 "당근 사고 싶어"(추천 0.96, 0.9 기준을 넘어 되돌리지 않음), F11·F12·F14(냉장고 → 일반·장보기). on에서 그대로 틀린다. 문구를 더 고칠지, P01처럼 confidence가 높은 오답을 받아들일지.

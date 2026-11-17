@@ -1,6 +1,6 @@
 # WORK-CHAT-JEV-ON: 상담 의도 Jev on 모드 연결
 
-상태: 검증 대기 (단위 테스트 통과, 실제 키 평가 c2 전) · 작성일: 2026-11-17 · 담당: 상담(chat)
+상태: 정리 단계 완료 (Jev가 유일한 의도 판단, 아래 "정리 단계") · 작성일: 2026-11-17 · 담당: 상담(chat)
 
 ## 목표와 완료 기준
 - 사용자 문제: 상담 의도를 OpenAI + 단어 보정(IntentCorrector)으로 정하고 있어, 보정 단어 목록이 계속 늘어난다. Jev(분류 모델)가 의도·요청 종류·분류·맛을 정하게 바꿔 단어 보정을 지울 수 있는 길을 연다.
@@ -51,3 +51,77 @@
 - 커밋: 56f7d737(설정), 16009d8d(넓은 요청 요리 이름), on 모드 연결 커밋 (push 안 함)
 - 다음: c2 평가 — `ChatIntentEvalManualTest`에 Jev 모드를 주고 on 모드 전체 흐름을 all-on(120)과 비교 (설계 문서 8절)
 - 결정 대기: on을 기본으로 바꿀 시점, 되돌림 비율을 본 뒤 IntentCorrector 고치기 단계·단어 체커 삭제(설계 문서 9절)
+
+## 정리 단계: Jev를 유일한 의도 판단으로 (2026-11-17, 브랜치 `refactor/chat-intent-cleanup`)
+
+jev-on-v5가 통과해(확인용 45문장 차이 0, 기본 세트의 엉뚱한 결과는 실패로 인정한 F11뿐) Jev on을 유일한 동작으로 만들고, on에서 쓰지 않는 의도 보정 코드를 지웠다.
+off 모드 T04·N03 저하는 10회 재확인에서 흔들림으로 판정했다([jev-on-eval.md](../testing/jev-on-eval.md)).
+
+### 지금 동작
+메시지 → Jev와 OpenAI 의도 판단을 함께 시작 → Jev 의도 confidence ≥ 0.8이면 Jev 판단 + OpenAI가 꺼낸 값으로 의도 결과(JevIntentResolver),
+아니면(키 없음·실패·제한 시간·confidence 미만) 보정 없는 OpenAI 결과(넓은 요청이면 넓은 요청 경로) → 서버 서비스 규칙(IntentCorrector) → "상담 의도 Jev 결정" 로그.
+
+### 지운 것
+| 묶음 | 지운 것 |
+|---|---|
+| 모드 | `app.chat.jev.mode`(`CHAT_JEV_MODE`), `ChatJevProperties`, off·shadow 분기, `JevIntentShadow.off()·on()`, 그림자 비교만 하던 `compareWhenDone`(결정 없음), `JevDecision.SHADOW` |
+| 결정 로그 칸 | `intentMatch`, `tasteMatch`, `categoryMatch` (OpenAI와 Jev를 비교하던 칸) |
+| IntentCorrector 단계 | 상관없는 질문 되살리기, 냉장고 보기·사기 말, 밀키트 요청, 이름만 말하기·추천 시도, 요리 이름·분류 키워드 확인(분류 옮기기·첫 키워드·○○ 같은 요리 채우기), 맛 단어, 분류 단어, `Steps`(ALL/SERVICE_RULES) |
+| 그 밖 main | `CategoryWordChecker`, `AskWordChecker`의 달라는 말·인사·밀키트 요청, `FridgeShopWordChecker`의 의도 판단(check·cooks·asksGeneral), `Source.DISH_TRY`(추천 시도 카드 0장 → 일반 답), `IntentResult.withIntent`, `Corrected.mealkitRecommend·dishTry` |
+| 설정 | 보정 스위치 `app.chat.corrections`·`ChatCorrectionProperties`(남은 규칙은 늘 켬), `chat-words.yml`의 분류 묶음(category)·음식 말(food)·달라는 말·밀키트 요청·인사·레시피 말(ask), 냉장고 보기·사기·요리·묻는 말(fridge-shop의 fridge·shop·cook·general) |
+| 테스트 | `ChatJevPropertiesTest`, `ChatStreamJevShadowTest`, `CategoryWordCheckerTest`, `EvalCorrectionSwitches(Test)`, off 모드 보정에 기대던 facade 테스트 9개·IntentCorrectorTest 보정 단계 테스트 45개, AskWordChecker·FridgeShopWordChecker의 지운 메서드 테스트, ChatStreamFacadeTest의 DISH_TRY 테스트 1개, 평가 옵션 `OPENAI_INTENT_EVAL_OFF`·`_JEV_MODE`·`_SKIP_TASTE_STEPS` |
+
+이름 바꿈(동작은 같다): `JevIntentShadow` → `JevIntentRunner`, `JevComparisonLog` → `JevDecisionLog`(로그 이름 "상담 의도 Jev 비교" → **"상담 의도 Jev 결정"**, `openai…` 칸 → `final…` 칸), `TypeSafeShadowExecutor` → `TypeSafeExecutor`(스레드 이름 `typesafe-jev-`).
+
+### 파일 수·줄 수 (전 4d96b950 → 후)
+| 범위 | 전 | 후 |
+|---|---|---|
+| main `domain/chat` | 133개, 14,224줄 | 130개, 13,248줄 (−976) |
+| main `domain/chat/intent` | 8개, 1,546줄 | 7개, 796줄 (−750) |
+| `IntentCorrector` | 768줄 | 229줄 |
+| test `domain/chat` | 91개, 21,622줄 | 86개, 20,244줄 (−1,378) |
+| `config/chat-words.yml` | 112줄 | 58줄 |
+| git diff (main / test) | | +199 −1,245 / +520 −1,898 |
+
+### 남긴 것과 이유
+| 남긴 것 | 쓰는 곳 | 이유 |
+|---|---|---|
+| `IntentCorrector`: 레시피 자세히 대상(findTarget), 요리 이름 확인(keepSpokenDishOnly·dishInMessage), 다른 맛 지키기, 말한 맛만, 재료 이름 찾기 | ChatIntentFacade, JevIntentResolver | 서비스 규칙 (AI가 맞아도 서비스가 정한 약속) |
+| `AskWordChecker.asks`, `ask.question` | ChatIntentFacade (OpenAI 의도 판단 실패 처리) | 선택 재료가 있어도 묻는 말이면 추천으로 바꾸지 않는다. on에서도 쓰는 길이다 |
+| `FridgeShopWordChecker`의 범위·할인·양념 말, `fridge-shop`의 imminent·seasoning·sale | ChatIntentFacade.lookupOf | 냉장고 보기 범위·할인 상품 조회 (다음에) |
+| `MealkitWordChecker`, `mealkit` 단어 | ChatRecommendationFacade, ChatIntentFacade(결정 로그·할인 종류), JevIntentResolver(특정 분류 경계) | 밀키트만 보여 줄지 (다음에) |
+| `TasteWordChecker`, `taste`·`taste-opposites` | 다시 추천 맛 따르기, 다른 맛 지키기, 말한 맛만, MealkitWordChecker 부정어 | 서비스 규칙 (다음에) |
+| `TemperatureWordChecker.wanted`, `temperature` | ChatRecommendationFacade | 온도 말로 카드 거르기 (다음에) |
+| `CorrectionInput` 칸 모두 | 회원·상담(로그), 메시지(요리 이름 확인·맛 규칙), 분류 목록(Resolver의 분류 이름 처리), 대화 문맥(자세히 대상·말한 맛만) | 안 쓰는 칸이 없다 |
+| `prompts/chat-intent.txt` | OpenAI 의도 판단 | 이번 범위 밖(바꾸지 않음) |
+
+### 의도 리플레이
+보정을 지워 기준값 339줄 중 79줄이 달라졌다. 다시 기록하기 전에 지우기 전 코드(4d96b950)로 확인했다.
+- 지우기 전 코드의 "서비스 규칙만" 결과가 새 결과와 339줄 모두 같다 → 달라진 이유는 모두 지운 보정 단계다.
+- 보정 스위치를 하나씩 끈 결과로 줄마다 원인을 갈랐다: 분류 단어 44, 분류 키워드 옮기기(끌 수 없던 부분) 17, 요리 이름 채우기 6, 상관없는 질문 되살리기 5, 맛 단어 4, 냉장고 보기·사기 말 4 (한 줄은 두 단계).
+- 줄마다 문장·이전 값·새 값·원인: [eval-results/cleanup-replay/replay-diff.csv](../testing/eval-results/cleanup-replay/replay-diff.csv). 기준값은 별도 커밋으로 다시 기록했다.
+
+### 평가 (정리 뒤, 각 3회)
+| 세트 | 비교 | 엄격 | 맛 반대 허용 |
+|---|---|---|---|
+| 기본 122문장 | jev-on-v5 → cleanup-main | 108 → 109 | 114 → 116 |
+| 확인용 45문장 | jev-on-holdout-v2 → cleanup-holdout | 41 → 41 | 42 → 42 |
+
+- 문장 단위로 다수결이 바뀐 문장: 기본 T04(1/3 → 3/3, 둘 다 OpenAI 되돌림), R17(2/3 → 3/3), F12(2/3 → 3/3, OpenAI 되돌림), T15(1/3 → 2/3), T01(2/3 → 1/3, Jev가 피할 맛에 순한맛). 확인용 H34(3/3 → 2/3), H36(0/3 → 1/3).
+- 모두 같은 결정 경로(Jev 또는 OpenAI 되돌림)에서 AI 답이 회차마다 달라진 흔들림이다. 코드 차이는 없다(리플레이로 서비스 규칙 경로가 같음을 확인).
+- 의도 결정 중앙값은 1,294ms → 1,696ms로 늘었는데, OpenAI 의도 호출 평균이 1,388ms → 1,903ms로 느려진 탓이다(코드 경로는 같다).
+- 결과: [eval-results/cleanup-main](../testing/eval-results/cleanup-main/), [eval-results/cleanup-holdout](../testing/eval-results/cleanup-holdout/).
+
+### 운영 설정 영향
+- `CHAT_JEV_MODE` 환경 변수가 없어진다(남아 있어도 읽지 않는다). 배포 설정에서 지운다.
+- 운영에는 Parameter Store `/imhungry/<APP_ENV>/TYPESAFE_API_KEY`(→ `TYPESAFE_API_KEY`)가 필요하다. **키가 없으면 앱은 시작되지만** 시작할 때 경고를 한 번 남기고, 모든 메시지를 Jev 없이 보정 없는 OpenAI 결과로 정한다. 단어 보정을 지웠으므로 이때 정확도는 예전 off 모드(all-on)보다 낮다.
+- 보정 스위치 `app.chat.corrections.*`도 없어졌다(배포 설정에 있었다면 지운다).
+- 결정 로그 이름이 "상담 의도 Jev 비교"에서 "상담 의도 Jev 결정"으로, 칸 `openai…`이 `final…`로 바뀌고 비교 칸 셋이 빠졌다. 이 로그를 읽는 감사 페이지·대시보드가 있으면 맞춰야 한다(저장소 안에서 읽는 코드는 없다).
+- API·ErrorCode·DTO 변경 없음. 프론트 영향 없음(상담 응답 모양 같음). `Source.DISH_TRY`를 지워 "요리 이름만 말했는데 카드 0장이면 일반 답"으로 돌리던 길이 없어졌다(그 출처를 만들던 추천 시도 단계를 지웠다).
+
+### 다음 단계
+1. d2: REFINE을 ChatIntent와 OpenAI 프롬프트에서 없애고 추천의 이어짐 항목으로 바꾸기
+2. 그다음: `MealkitWordChecker`·`TasteWordChecker`·`FridgeShopWordChecker` 나머지·`TemperatureWordChecker.wanted`를 Jev 질문으로 옮기기
+3. F11 "슬슬 처리해야 할 거 있어?" 냉장고 의도
+4. 김피탕 같은 줄임말 별칭 데이터 (비슷한 요리 AI가 모르는 요리)
+5. dev DB에서 끝에서 끝(카드) 확인
