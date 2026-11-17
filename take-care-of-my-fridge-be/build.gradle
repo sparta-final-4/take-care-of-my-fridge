@@ -1,3 +1,5 @@
+import java.time.Duration
+
 plugins {
     id 'java'
     id 'jacoco'
@@ -92,6 +94,11 @@ dependencies {
 
 tasks.named('test') {
     useJUnitPlatform()
+
+    // 캐시된 Spring 테스트 컨텍스트가 기본 512MB를 넘겨 OOM이 났다
+    maxHeapSize = '1g'
+    // OOM 등으로 테스트 JVM이 멈추면 끝없이 기다리지 않게 한다
+    timeout = Duration.ofMinutes(30)
 
     environment 'OPENAI_API_KEY', 'test-dummy-key'
 
