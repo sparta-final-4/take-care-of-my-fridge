@@ -2,6 +2,7 @@ package org.example.takecareofmyfridgebe.domain.chat.service;
 
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatProperties;
 import org.example.takecareofmyfridgebe.domain.chat.dto.DishListKind;
+import org.example.takecareofmyfridgebe.domain.chat.dto.SimilarDishes;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -40,46 +41,54 @@ class SimilarDishStoreTest {
     }
 
     @Test
-    @DisplayName("요리 이름(공백 제거·소문자) 키에 저장된 비슷한 요리를 읽는다")
+    @DisplayName("요리 이름(공백 제거·소문자) 키에 저장된 정식 이름과 비슷한 요리를 읽는다")
     void findsCachedDishes() {
-        when(values.get("chat:similar-dishes:v3:나가사키짬뽕")).thenReturn("[\"짬뽕\",\"짬뽕밥\"]");
+        when(values.get("chat:similar-dishes:v4:나가사키짬뽕")).thenReturn("{\"formalName\":null,\"dishes\":[\"짬뽕\",\"짬뽕밥\"]}");
+        when(values.get("chat:similar-dishes:v4:김피탕")).thenReturn("{\"formalName\":\"김치피자탕수육\",\"dishes\":[\"탕수육\"]}");
 
-        assertThat(store.find(MEMBER_ID, DishListKind.SIMILAR, "나가사키 짬뽕")).contains(List.of("짬뽕", "짬뽕밥"));
+        assertThat(store.find(MEMBER_ID, DishListKind.SIMILAR, "나가사키 짬뽕")).contains(SimilarDishes.of(List.of("짬뽕", "짬뽕밥")));
+        assertThat(store.find(MEMBER_ID, DishListKind.SIMILAR, "김피탕"))
+                .contains(new SimilarDishes("김치피자탕수육", List.of("탕수육")));
     }
 
     @Test
-    @DisplayName("저장된 값이 없거나 빈 목록이면 비어 있다")
+    @DisplayName("저장된 값이 없거나 정식 이름·요리 이름이 모두 비었거나 예전 모양(목록)이면 비어 있다")
     void returnsEmpty_whenNotCachedOrEmptyList() {
         assertThat(store.find(MEMBER_ID, DishListKind.SIMILAR, "김피탕")).isEmpty();
 
-        when(values.get("chat:similar-dishes:v3:김피탕")).thenReturn("[]");
+        when(values.get("chat:similar-dishes:v4:김피탕")).thenReturn("{\"formalName\":null,\"dishes\":[]}");
+        assertThat(store.find(MEMBER_ID, DishListKind.SIMILAR, "김피탕")).isEmpty();
+
+        when(values.get("chat:similar-dishes:v4:김피탕")).thenReturn("[\"탕수육\"]");
         assertThat(store.find(MEMBER_ID, DishListKind.SIMILAR, "김피탕")).isEmpty();
     }
 
     @Test
     @DisplayName("비슷한 요리를 유지 시간과 함께 저장하고, 영문 요리 이름은 소문자 키로 저장한다")
     void savesWithTtl_inLowercaseKey() {
-        store.save(MEMBER_ID, DishListKind.SIMILAR, "Fish Taco", List.of("타코", "부리토"));
+        store.save(MEMBER_ID, DishListKind.SIMILAR, "Fish Taco", SimilarDishes.of(List.of("타코", "부리토")));
 
-        verify(values).set("chat:similar-dishes:v3:fishtaco", "[\"타코\",\"부리토\"]", TTL);
+        verify(values).set("chat:similar-dishes:v4:fishtaco", "{\"formalName\":null,\"dishes\":[\"타코\",\"부리토\"]}", TTL);
     }
 
     @Test
-    @DisplayName("넓은 요청 요리는 chat:broad-dishes:v1: 키(요청 표현, 공백 제거·소문자)에 같은 유지 시간으로 두고 읽는다")
+    @DisplayName("넓은 요청 요리는 chat:broad-dishes:v2: 키(요청 표현, 공백 제거·소문자)에 같은 유지 시간으로 두고 읽는다")
     void savesAndFindsBroadDishes_inBroadKey() {
-        store.save(MEMBER_ID, DishListKind.BROAD, "간단한 한 끼 Menu", List.of("김치볶음밥", "비빔국수"));
-        when(values.get("chat:broad-dishes:v1:간단한한끼menu")).thenReturn("[\"김치볶음밥\",\"비빔국수\"]");
+        String json = "{\"formalName\":null,\"dishes\":[\"김치볶음밥\",\"비빔국수\"]}";
+        store.save(MEMBER_ID, DishListKind.BROAD, "간단한 한 끼 Menu", SimilarDishes.of(List.of("김치볶음밥", "비빔국수")));
+        when(values.get("chat:broad-dishes:v2:간단한한끼menu")).thenReturn(json);
 
-        verify(values).set("chat:broad-dishes:v1:간단한한끼menu", "[\"김치볶음밥\",\"비빔국수\"]", TTL);
-        assertThat(store.find(MEMBER_ID, DishListKind.BROAD, "간단한 한 끼 Menu")).contains(List.of("김치볶음밥", "비빔국수"));
+        verify(values).set("chat:broad-dishes:v2:간단한한끼menu", json, TTL);
+        assertThat(store.find(MEMBER_ID, DishListKind.BROAD, "간단한 한 끼 Menu"))
+                .contains(SimilarDishes.of(List.of("김치볶음밥", "비빔국수")));
         assertThat(store.find(MEMBER_ID, DishListKind.SIMILAR, "간단한 한 끼 Menu")).isEmpty();
     }
 
     @Test
     @DisplayName("빈 목록이나 빈 요리 이름은 저장하지 않는다")
     void skipsSaving_whenEmpty() {
-        store.save(MEMBER_ID, DishListKind.SIMILAR, "김피탕", List.of());
-        store.save(MEMBER_ID, DishListKind.SIMILAR, " ", List.of("탕수육"));
+        store.save(MEMBER_ID, DishListKind.SIMILAR, "김피탕", SimilarDishes.NONE);
+        store.save(MEMBER_ID, DishListKind.SIMILAR, " ", SimilarDishes.of(List.of("탕수육")));
 
         verify(values, never()).set(anyString(), anyString(), any(Duration.class));
     }
@@ -91,7 +100,7 @@ class SimilarDishStoreTest {
         doThrow(new RedisConnectionFailureException("redis down")).when(values).set(anyString(), anyString(), any(Duration.class));
 
         assertThat(store.find(MEMBER_ID, DishListKind.SIMILAR, "김피탕")).isEmpty();
-        assertThatCode(() -> store.save(MEMBER_ID, DishListKind.SIMILAR, "김피탕", List.of("탕수육"))).doesNotThrowAnyException();
+        assertThatCode(() -> store.save(MEMBER_ID, DishListKind.SIMILAR, "김피탕", SimilarDishes.of(List.of("탕수육")))).doesNotThrowAnyException();
     }
 
     @Test

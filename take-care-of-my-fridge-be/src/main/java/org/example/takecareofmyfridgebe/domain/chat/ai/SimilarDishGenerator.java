@@ -1,8 +1,7 @@
 package org.example.takecareofmyfridgebe.domain.chat.ai;
 
 import org.example.takecareofmyfridgebe.domain.chat.dto.DishListKind;
-
-import java.util.List;
+import org.example.takecareofmyfridgebe.domain.chat.dto.SimilarDishes;
 
 public interface SimilarDishGenerator {
 
@@ -13,13 +12,13 @@ public interface SimilarDishGenerator {
      * @param memberId 회원 ID (로그용)
      * @param kind     목록 종류. 비슷한 요리면 받은 글은 요리 이름, 넓은 요청 요리면 요청 표현("술안주")
      * @param text     받은 글
-     * @return AI가 낸 요리 이름 (정리 전). 없으면 빈 목록
+     * @return AI가 낸 요리 이름 (정리 전)과, 비슷한 요리면 줄임말의 정식 이름. 없으면 빈 목록·null
      * @throws RuntimeException AI 호출 실패, 시간 초과, 응답 JSON이 깨진 경우
      */
-    List<String> generate(Long memberId, DishListKind kind, String text);
+    SimilarDishes generate(Long memberId, DishListKind kind, String text);
 
-    // 요리 이름과 비슷한 요리
-    default List<String> generate(Long memberId, String dishText) {
+    // 요리 이름과 비슷한 요리 (정식 이름 포함)
+    default SimilarDishes generate(Long memberId, String dishText) {
         return generate(memberId, DishListKind.SIMILAR, dishText);
     }
 }

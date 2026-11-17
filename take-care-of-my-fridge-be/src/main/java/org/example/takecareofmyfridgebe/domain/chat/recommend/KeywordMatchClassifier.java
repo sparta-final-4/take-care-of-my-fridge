@@ -11,7 +11,7 @@ import java.util.List;
  * 요리 이름 키워드로 찾은 레시피가 어떻게 맞았는지 가른다. 스프링에 의존하지 않는 순수 클래스.
  * 검색(ES 이름·재료·소개)은 넓게 걸리므로, 카드 이유를 정확하게 쓰려고 이름·재료를 직접 비교한다. 공백은 빼고 비교한다.
  * <ol>
- *   <li>NAME: 사용자가 말한 요리 이름(dishText)이 레시피 이름에 통째로 있음 ("냉면" → "물냉면")</li>
+ *   <li>NAME: 사용자가 말한 요리 이름(dishText)이나 그 정식 이름(줄임말일 때)이 레시피 이름에 통째로 있음 ("냉면" → "물냉면")</li>
  *   <li>EXPANDED: AI가 늘린 키워드가 레시피 이름에 통째로 있음 ("막국수" → "들기름 막국수")</li>
  *   <li>INGREDIENT: 키워드(두 글자 이상)가 레시피 재료 이름과 같거나 재료 이름에 통째로 있음 ("메밀면" ↔ "메밀면", "버섯" ↔ "표고버섯").
  *       글자 일부만 겹치는 것("중국음식" ↔ "중국부추", "냉메밀" ↔ "메밀면")은 검색이 키워드를 쪼개 걸린 것이라 재료로 맞은 것으로 보지 않는다</li>
@@ -38,8 +38,17 @@ public final class KeywordMatchClassifier {
      */
     public static KeywordMatch classify(String dishText, List<String> keywords, List<String> fragments, boolean vectorOnly,
                                         String recipeName, Collection<String> ingredientNames) {
+        return classify(dishText, null, keywords, fragments, vectorOnly, recipeName, ingredientNames);
+    }
+
+    /**
+     * @param formalName 요리 이름이 줄임말일 때의 정식 이름 (비슷한 요리 AI가 같은 호출로 준다. 없으면 null).
+     *                   정식 이름으로 맞은 레시피는 요리 이름으로 맞은 것과 같이 NAME으로 본다
+     */
+    public static KeywordMatch classify(String dishText, String formalName, List<String> keywords, List<String> fragments,
+                                        boolean vectorOnly, String recipeName, Collection<String> ingredientNames) {
         String name = ChatTexts.removeWhitespace(recipeName);
-        if (dishText != null && !ChatTexts.removeWhitespace(dishText).isEmpty() && name.contains(ChatTexts.removeWhitespace(dishText))) {
+        if (containsWhole(name, dishText) || containsWhole(name, formalName)) {
             return KeywordMatch.of(Type.NAME);
         }
         for (String keyword : keywords) {
@@ -70,5 +79,11 @@ public final class KeywordMatchClassifier {
         // 분석기가 고쳐져도 카드 이유를 맞은 방식대로 쓰려면 이 비교는 필요해서 남긴다.
         // 걷어낼 것은 이 결과를 보고 벡터 보충을 정하는 우회(RecipeCandidateFacade.findCandidates)다
         return KeywordMatch.of(vectorOnly ? Type.VECTOR : Type.SPLIT);
+    }
+
+    // 레시피 이름(공백 뺀 것)에 이름이 통째로 있는지 (이름이 없거나 비었으면 false)
+    private static boolean containsWhole(String compactRecipeName, String dishName) {
+        return dishName != null && !ChatTexts.removeWhitespace(dishName).isEmpty()
+                && compactRecipeName.contains(ChatTexts.removeWhitespace(dishName));
     }
 }

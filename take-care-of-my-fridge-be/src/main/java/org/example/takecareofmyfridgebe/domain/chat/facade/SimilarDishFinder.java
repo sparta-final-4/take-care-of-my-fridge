@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.takecareofmyfridgebe.domain.chat.ai.SimilarDishGenerator;
 import org.example.takecareofmyfridgebe.domain.chat.dto.DishListKind;
+import org.example.takecareofmyfridgebe.domain.chat.dto.SimilarDishes;
 import org.example.takecareofmyfridgebe.domain.chat.service.SimilarDishStore;
 import org.example.takecareofmyfridgebe.domain.chat.text.ChatTexts;
 import org.springframework.stereotype.Component;
@@ -19,7 +20,8 @@ import java.util.Set;
  * 없으면 AI(SimilarDishGenerator)를 한 번 부르고, 정리한 값이 있으면 캐시에 둔다(빈 목록은 두지 않는다).
  * AI 호출이 실패하면(오류·시간 초과·JSON 깨짐) WARN만 남기고 빈 목록으로 진행한다.
  * <ul>
- *   <li>비슷한 요리 ({@link #find}): 요리 이름 그대로 맞은 레시피가 없을 때 RecipeCandidateFacade가 부른다 (이름 조각·벡터 보충은 그대로 돈다)</li>
+ *   <li>비슷한 요리 ({@link #find}): 요리 이름 그대로 맞은 레시피가 없을 때 RecipeCandidateFacade가 부른다 (이름 조각·벡터 보충은 그대로 돈다).
+ *       같은 호출에서 요리 이름이 줄임말이면 정식 이름도 받는다 (호출은 늘지 않는다)</li>
  *   <li>넓은 요청 요리 ({@link #findBroad}): Jev on 모드에서 요청 종류가 넓은 요청일 때 JevIntentResolver가 부른다</li>
  * </ul>
  * Redis(캐시)와 AI 두 곳을 조율해서 facade 층에 둔다.
@@ -37,9 +39,9 @@ public class SimilarDishFinder {
 
     /**
      * @param dishText 사용자가 말한 요리 이름
-     * @return 비슷한 요리 이름 (캐시 또는 AI). 없거나 AI가 실패하면 빈 목록
+     * @return 정식 이름(줄임말일 때)과 비슷한 요리 이름 (캐시 또는 AI). 없거나 AI가 실패하면 SimilarDishes.NONE
      */
-    public List<String> find(Long memberId, String dishText) {
+    public SimilarDishes find(Long memberId, String dishText) {
         return find(memberId, DishListKind.SIMILAR, dishText);
     }
 
@@ -48,38 +50,73 @@ public class SimilarDishFinder {
      * @return 요청에 맞는 요리 이름 (캐시 또는 AI). 없거나 AI가 실패하면 빈 목록
      */
     public List<String> findBroad(Long memberId, String request) {
-        return find(memberId, DishListKind.BROAD, request);
+        return find(memberId, DishListKind.BROAD, request).dishes();
     }
 
-    private List<String> find(Long memberId, DishListKind kind, String text) {
+    private SimilarDishes find(Long memberId, DishListKind kind, String text) {
         if (text == null || text.isBlank()) {
-            return List.of();
+            return SimilarDishes.NONE;
         }
-        Optional<List<String>> cached = similarDishStore.find(memberId, kind, text);
+        Optional<SimilarDishes> cached = similarDishStore.find(memberId, kind, text);
         if (cached.isPresent()) {
             log.info("상담 {} 캐시 사용 - memberId: {}, 글: {}, 요리: {}", kind.label(), memberId, text, cached.get());
             return cached.get();
         }
-        List<String> generated;
+        SimilarDishes generated;
         try {
             generated = similarDishGenerator.generate(memberId, kind, text);
         } catch (RuntimeException e) {
             log.warn("상담 {} AI 실패, 빈 목록으로 - memberId: {}, 글: {}, 원인: {}", kind.label(), memberId, text, e.toString());
-            return List.of();
+            return SimilarDishes.NONE;
         }
-        List<String> dishes = clean(text, generated);
+        SimilarDishes dishes = clean(text, generated);
         log.info("상담 {} AI - memberId: {}, 글: {}, AI: {}, 쓴 값: {}", kind.label(), memberId, text, generated, dishes);
         similarDishStore.save(memberId, kind, text, dishes);
         return dishes;
     }
 
+    // 정식 이름은 받은 글과 띄어쓰기만 다르거나 받은 글의 글자가 정식 이름에 순서대로 다 있지 않으면 버리고,
+    // 요리 이름은 받은 글·정식 이름과 겹치지 않게 정리한다
+    static SimilarDishes clean(String text, SimilarDishes generated) {
+        if (generated == null) {
+            return SimilarDishes.NONE;
+        }
+        String formalName = generated.formalName() == null
+                || ChatTexts.removeWhitespace(generated.formalName()).equals(ChatTexts.removeWhitespace(text))
+                || !containsInOrder(generated.formalName(), text) ? null : generated.formalName();
+        if (generated.formalName() != null && formalName == null) {
+            log.info("상담 비슷한 요리 정식 이름 버림 - 글: {}, 정식 이름: {}", text, generated.formalName());
+        }
+        List<String> known = formalName == null ? List.of(text) : List.of(text, formalName);
+        return new SimilarDishes(formalName, clean(known, generated.dishes()));
+    }
+
+    // 줄임말의 글자가 정식 이름에 순서대로 다 있는지 (띄어쓰기 무시). 김볶밥 → 김치볶음밥은 맞고, 김피탕 → 김치찌개는 맞지 않는다.
+    // AI가 모르는 줄임말에 글자만 보고 엉뚱한 요리를 정식 이름으로 낼 때(김피탕 → 김치찌개) 그 이름이 요리 이름처럼 앞에 오지 않게 한다
+    static boolean containsInOrder(String formalName, String abbreviation) {
+        String formal = ChatTexts.removeWhitespace(formalName);
+        int at = 0;
+        for (char letter : ChatTexts.removeWhitespace(abbreviation).toCharArray()) {
+            at = formal.indexOf(letter, at);
+            if (at < 0) {
+                return false;
+            }
+            at++;
+        }
+        return true;
+    }
+
     // 앞뒤 공백·빈 이름을 빼고, 받은 글 자신과 띄어쓰기만 다른 중복을 빼서 최대 5개
     static List<String> clean(String dishText, List<String> dishes) {
+        return clean(List.of(dishText), dishes);
+    }
+
+    private static List<String> clean(List<String> known, List<String> dishes) {
         if (dishes == null) {
             return List.of();
         }
         Set<String> seen = new HashSet<>();
-        seen.add(ChatTexts.removeWhitespace(dishText));
+        known.forEach(name -> seen.add(ChatTexts.removeWhitespace(name)));
         return dishes.stream()
                 .filter(Objects::nonNull)
                 .map(String::strip)

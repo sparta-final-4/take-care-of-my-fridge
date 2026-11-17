@@ -7,6 +7,7 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate.MissingI
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidates;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidates.EmptyReason;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeQuery;
+import org.example.takecareofmyfridgebe.domain.chat.dto.SimilarDishes;
 import org.example.takecareofmyfridgebe.domain.chat.recommend.PickRule;
 import org.example.takecareofmyfridgebe.domain.chat.recommend.RecommendationPicker;
 import org.example.takecareofmyfridgebe.domain.chat.reply.NoRecipeReplyWriter;
@@ -95,7 +96,7 @@ class RecipeCandidateFacadeTest {
         recipeSearchService = mock(RecipeSearchService.class);
         candidateSearchService = mock(RecipeCandidateSearchService.class);
         similarDishFinder = mock(SimilarDishFinder.class);
-        when(similarDishFinder.find(any(), any())).thenReturn(List.of());
+        when(similarDishFinder.find(any(), any())).thenReturn(SimilarDishes.NONE);
         facade = facadeWith(SearchEngine.MYSQL);
         esFacade = facadeWith(SearchEngine.ELASTICSEARCH);
         when(fridgeService.getItems(any(), any())).thenReturn(List.of());
@@ -866,7 +867,7 @@ class RecipeCandidateFacadeTest {
         when(fridgeService.getItems(any(), any())).thenReturn(List.of(fridgeItem(1L, "두부", 1)));
         when(candidateSearchService.search(any())).thenReturn(List.of(
                 hit(12L, RecipeCandidateSearchService.MATCH_FRIDGE), hit(13L, RecipeCandidateSearchService.MATCH_FRIDGE)));
-        when(similarDishFinder.find(MEMBER_ID, "나가사키짬뽕")).thenReturn(List.of("짬뽕"));
+        when(similarDishFinder.find(MEMBER_ID, "나가사키짬뽕")).thenReturn(SimilarDishes.of(List.of("짬뽕")));
         when(recipeSearchService.analyzeTokens("나가사키짬뽕")).thenReturn(List.of("나가사키", "짬뽕"));
         givenTextSearch(Map.of("짬뽕", List.of(91L), "나가사키", List.of(90L, 92L)));
         givenEsRecipes(Map.of(
@@ -888,6 +889,55 @@ class RecipeCandidateFacadeTest {
         assertThat(matchOf(result, 91L)).isEqualTo(new KeywordMatch(KeywordMatch.Type.EXPANDED, "짬뽕", null));
         assertThat(matchOf(result, 90L)).isEqualTo(new KeywordMatch(KeywordMatch.Type.FRAGMENT, "나가사키", null));
         assertThat(matchOf(result, 92L).type()).isEqualTo(KeywordMatch.Type.FRAGMENT);
+        assertThat(result.keywordsNotFound()).isTrue();
+    }
+
+    @Test
+    @DisplayName("ES 경로: 요리 이름이 줄임말이라 그대로 안 맞고 같은 호출로 정식 이름을 받으면 요리 이름 → 정식 이름 → 비슷한 요리 순으로 찾고, "
+            + "정식 이름으로 맞은 레시피는 요리 이름으로 맞은 것(NAME)과 같이 앞에 둔다")
+    void searchesFormalNameBeforeSimilarDishes_whenAbbreviated() throws Exception {
+        when(memberService.getMyInfo(MEMBER_ID)).thenReturn(mock(MyInfoResponse.class));
+        when(candidateSearchService.search(any())).thenReturn(List.of(hit(12L, RecipeCandidateSearchService.MATCH_FRIDGE)));
+        when(similarDishFinder.find(MEMBER_ID, "김피탕")).thenReturn(new SimilarDishes("김치피자탕수육", List.of("탕수육", "유린기")));
+        givenTextSearch(Map.of("김치피자탕수육", List.of(70L), "탕수육", List.of(80L), "유린기", List.of(81L)));
+        givenEsRecipes(Map.of(
+                12L, new RecipeCandidateInfo(12L, "두부조림", "조림", 20, 1),
+                70L, new RecipeCandidateInfo(70L, "치즈 김치피자탕수육", "튀김", 40, 1),
+                80L, new RecipeCandidateInfo(80L, "탕수육", "튀김", 30, 1),
+                81L, new RecipeCandidateInfo(81L, "유린기", "튀김", 30, 1)));
+        RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, null, null, null, false, List.of("김피탕"), "김피탕");
+
+        RecipeCandidates result = esFacade.findCandidates(query);
+
+        verify(similarDishFinder).find(MEMBER_ID, "김피탕");
+        assertThat(textSearchedKeywords()).containsExactly("김치피자탕수육", "탕수육", "유린기");
+        assertThat(matchOf(result, 70L).type()).isEqualTo(KeywordMatch.Type.NAME);
+        assertThat(matchOf(result, 80L)).isEqualTo(new KeywordMatch(KeywordMatch.Type.EXPANDED, "탕수육", null));
+        assertThat(result.candidates()).extracting(RecipeCandidate::recipeId).startsWith(70L);
+        // 정식 이름으로 찾았으므로 "김피탕 레시피는 없어서…" 안내를 붙이지 않고, 이름 조각·벡터 보충도 하지 않는다
+        assertThat(result.keywordsNotFound()).isFalse();
+        verify(recipeSearchService, never()).analyzeTokens(any());
+        verify(recipeSearchService, never()).search(any());
+    }
+
+    @Test
+    @DisplayName("ES 경로: 비슷한 요리 호출의 정식 이름이 빈 값이면 지금처럼 비슷한 요리만 찾는다")
+    void searchesSimilarDishesOnly_whenNoFormalName() throws Exception {
+        when(memberService.getMyInfo(MEMBER_ID)).thenReturn(mock(MyInfoResponse.class));
+        when(candidateSearchService.search(any())).thenReturn(List.of(hit(12L, RecipeCandidateSearchService.MATCH_FRIDGE)));
+        when(similarDishFinder.find(MEMBER_ID, "김피탕")).thenReturn(new SimilarDishes(null, List.of("탕수육")));
+        when(recipeSearchService.analyzeTokens("김피탕")).thenReturn(List.of("김", "피", "탕"));
+        givenTextSearch(Map.of("탕수육", List.of(80L)));
+        givenEsRecipes(Map.of(
+                12L, new RecipeCandidateInfo(12L, "두부조림", "조림", 20, 1),
+                80L, new RecipeCandidateInfo(80L, "탕수육", "튀김", 30, 1)));
+        RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, null, null, null, false, List.of("김피탕"), "김피탕");
+
+        RecipeCandidates result = esFacade.findCandidates(query);
+
+        assertThat(textSearchedKeywords()).containsExactly("탕수육");
+        assertThat(result.candidates()).extracting(RecipeCandidate::recipeId).containsExactly(80L);
+        assertThat(matchOf(result, 80L)).isEqualTo(new KeywordMatch(KeywordMatch.Type.EXPANDED, "탕수육", null));
         assertThat(result.keywordsNotFound()).isTrue();
     }
 
@@ -939,7 +989,7 @@ class RecipeCandidateFacadeTest {
         when(fridgeService.getItems(any(), any())).thenReturn(List.of(fridgeItem(1L, "두부", 1)));
         when(candidateSearchService.search(any())).thenReturn(List.of(hit(12L, RecipeCandidateSearchService.MATCH_FRIDGE)));
         // 비슷한 요리 "우동"은 이름에 우동이 없는 레시피(쪼개짐)만 찾아 키워드로 맞은 것이 없으므로 키워드 보충을 한다
-        when(similarDishFinder.find(MEMBER_ID, "나가사키짬뽕")).thenReturn(List.of("우동"));
+        when(similarDishFinder.find(MEMBER_ID, "나가사키짬뽕")).thenReturn(SimilarDishes.of(List.of("우동")));
         when(recipeSearchService.search(any(RecipeListRequest.class))).thenReturn(new RecipeSearchResult(List.of(80L), 1, true));
         when(recipeSearchService.analyzeTokens("나가사키짬뽕")).thenReturn(List.of("나가사키", "짬뽕"));
         givenTextSearch(Map.of("우동", List.of(93L), "짬뽕", List.of(91L), "나가사키", List.of(90L)));

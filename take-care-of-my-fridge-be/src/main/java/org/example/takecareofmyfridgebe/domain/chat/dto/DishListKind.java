@@ -7,9 +7,11 @@ package org.example.takecareofmyfridgebe.domain.chat.dto;
 public enum DishListKind {
 
     // 요리 이름과 비슷한 요리 ("김피탕" → 탕수육, 깐풍기). prompts/chat-similar-dishes.txt
-    SIMILAR("chat:similar-dishes:v3:", "비슷한 요리"),
+    // v4: 값에 정식 이름을 더해 목록이 아니라 객체로 둔다 (SimilarDishes)
+    SIMILAR("chat:similar-dishes:v4:", "비슷한 요리"),
     // 넓은 요청에 맞는 요리 ("술안주" → 오징어볶음, 계란찜). prompts/chat-broad-dishes.txt
-    BROAD("chat:broad-dishes:v1:", "넓은 요청 요리");
+    // v2: 값 모양을 비슷한 요리와 같은 객체로 바꿨다
+    BROAD("chat:broad-dishes:v2:", "넓은 요청 요리");
 
     private final String keyPrefix;
     private final String label;

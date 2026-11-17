@@ -2,6 +2,8 @@ package org.example.takecareofmyfridgebe.domain.chat.ai;
 
 import lombok.extern.slf4j.Slf4j;
 import org.example.takecareofmyfridgebe.domain.chat.dto.DishListKind;
+import org.example.takecareofmyfridgebe.domain.chat.dto.BroadDishesResult;
+import org.example.takecareofmyfridgebe.domain.chat.dto.SimilarDishes;
 import org.example.takecareofmyfridgebe.domain.chat.dto.SimilarDishesResult;
 import org.example.takecareofmyfridgebe.global.config.ai.LlmCostCalculator;
 import org.springframework.ai.chat.client.AdvisorParams;
@@ -21,13 +23,13 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.EnumMap;
-import java.util.List;
 import java.util.Map;
 
 /**
  * OpenAI(Spring AI)로 요리 이름 목록을 묻는다. app.chat.reply-generator=openai일 때만 빈이 된다.
  * 종류(DishListKind)마다 시스템 프롬프트만 다르다: 비슷한 요리 prompts/chat-similar-dishes.txt, 넓은 요청 요리 prompts/chat-broad-dishes.txt.
- * 응답 모양은 SimilarDishesResult의 JSON 스키마로 강제한다(ENABLE_NATIVE_STRUCTURED_OUTPUT, strict json_schema).
+ * 응답 모양은 JSON 스키마로 강제한다(ENABLE_NATIVE_STRUCTURED_OUTPUT, strict json_schema): 비슷한 요리는 SimilarDishesResult(정식 이름 + 요리 이름),
+ * 넓은 요청 요리는 BroadDishesResult(요리 이름).
  * 시스템 프롬프트는 종류마다 고정이라 OpenAI 프롬프트 캐시가 되고, 사용자 메시지는 받은 글 하나다(요리 이름 또는 요청 표현).
  */
 @Slf4j
@@ -60,22 +62,26 @@ public class OpenAiSimilarDishGenerator implements SimilarDishGenerator {
     }
 
     @Override
-    public List<String> generate(Long memberId, DishListKind kind, String text) {
+    public SimilarDishes generate(Long memberId, DishListKind kind, String text) {
+        if (kind == DishListKind.SIMILAR) {
+            SimilarDishesResult result = call(memberId, kind, text, SimilarDishesResult.class);
+            return result == null ? SimilarDishes.NONE : new SimilarDishes(result.formalName(), result.dishes());
+        }
+        BroadDishesResult result = call(memberId, kind, text, BroadDishesResult.class);
+        return result == null ? SimilarDishes.NONE : SimilarDishes.of(result.dishes());
+    }
+
+    private <T> T call(Long memberId, DishListKind kind, String text, Class<T> type) {
         long startedAt = System.nanoTime();
-        ResponseEntity<ChatResponse, SimilarDishesResult> response = chatClient.prompt()
+        ResponseEntity<ChatResponse, T> response = chatClient.prompt()
                 .system(systemPrompts.get(kind))
                 .user(text)
                 .advisors(AdvisorParams.ENABLE_NATIVE_STRUCTURED_OUTPUT)
                 .call()
-                .responseEntity(SimilarDishesResult.class);
+                .responseEntity(type);
         long elapsedMs = (System.nanoTime() - startedAt) / 1_000_000;
-
         logUsage(memberId, kind, response.response(), elapsedMs);
-        SimilarDishesResult result = response.entity();
-        if (result == null || result.dishes() == null) {
-            return List.of();
-        }
-        return result.dishes();
+        return response.entity();
     }
 
     private void logUsage(Long memberId, DishListKind kind, ChatResponse response, long elapsedMs) {

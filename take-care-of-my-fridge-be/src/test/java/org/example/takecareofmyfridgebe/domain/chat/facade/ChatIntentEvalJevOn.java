@@ -8,6 +8,7 @@ import org.example.takecareofmyfridgebe.domain.chat.config.ChatJevProperties;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntentResolution;
 import org.example.takecareofmyfridgebe.domain.chat.dto.DishListKind;
+import org.example.takecareofmyfridgebe.domain.chat.dto.SimilarDishes;
 import org.example.takecareofmyfridgebe.domain.chat.dto.JevDecision;
 import org.example.takecareofmyfridgebe.domain.chat.dto.JevIntentJudgement;
 import org.example.takecareofmyfridgebe.domain.chat.dto.JevIntentJudgement.RequestKind;
@@ -249,7 +250,7 @@ final class ChatIntentEvalJevOn {
         }
 
         @Override
-        public List<String> generate(Long memberId, DishListKind kind, String text) {
+        public SimilarDishes generate(Long memberId, DishListKind kind, String text) {
             long startedAt = System.nanoTime();
             usage.clear();
             try {
@@ -348,21 +349,21 @@ final class ChatIntentEvalJevOn {
     // 운영 Redis 대신 메모리 캐시 (키는 SimilarDishStore와 같게 종류 접두어 + 공백 제거·소문자, 빈 목록은 두지 않는다)
     static final class MemoryDishStore extends SimilarDishStore {
 
-        private final Map<String, List<String>> cache = new HashMap<>();
+        private final Map<String, SimilarDishes> cache = new HashMap<>();
 
         MemoryDishStore() {
             super(null, null);
         }
 
         @Override
-        public Optional<List<String>> find(Long memberId, DishListKind kind, String dishText) {
+        public Optional<SimilarDishes> find(Long memberId, DishListKind kind, String dishText) {
             return Optional.ofNullable(cache.get(key(kind, dishText)));
         }
 
         @Override
-        public void save(Long memberId, DishListKind kind, String dishText, List<String> dishes) {
+        public void save(Long memberId, DishListKind kind, String dishText, SimilarDishes dishes) {
             if (dishes != null && !dishes.isEmpty()) {
-                cache.put(key(kind, dishText), List.copyOf(dishes));
+                cache.put(key(kind, dishText), dishes);
             }
         }
 
