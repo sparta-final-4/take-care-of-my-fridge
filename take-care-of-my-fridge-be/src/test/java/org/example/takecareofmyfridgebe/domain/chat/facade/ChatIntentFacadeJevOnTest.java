@@ -38,6 +38,8 @@ import static org.example.takecareofmyfridgebe.domain.chat.ChatIntentFixture.SES
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -231,6 +233,23 @@ class ChatIntentFacadeJevOnTest {
             assertThat(resolution.recipeQuery().keywordText()).isNull();
             assertThat(resolution.recipeQuery().keywords()).containsExactly("탕수육", "깐풍기");
             verifyDecision(new JevDecision(Decision.JEV, RequestKind.BROAD, List.of("탕수육", "깐풍기")));
+        }
+
+        @Test
+        @DisplayName("특정 요리인데 OpenAI가 요리 이름을 비우고 Jev 1등 분류가 있으면 특정 분류 경로로 그 분류와 맛·재료를 넘기고 넓은 요청 요리 이름을 받지 않는다")
+        void usesTopCategory_whenDishIsEmptyWithTopCategory() {
+            givenOpenAi(recommend(null, List.of("냉면", "막국수"), List.of("면류", "국"), List.of(), null));
+            givenJev(RequestKind.DISH, "면류", Taste.MILD);
+
+            ChatIntentResolution resolution = resolve("차가운 면");
+
+            assertThat(resolution.intent()).isEqualTo(ChatIntent.RECOMMEND);
+            assertThat(resolution.recipeQuery().keywordText()).isNull();
+            assertThat(resolution.recipeQuery().keywords()).isEmpty();
+            assertThat(resolution.recipeQuery().moodCategories()).containsExactly("면류");
+            assertThat(resolution.recipeQuery().wantedTastes()).containsExactly(Taste.MILD);
+            verify(similarDishFinder, never()).findBroad(anyLong(), anyString());
+            verifyDecision(new JevDecision(Decision.JEV, RequestKind.CATEGORY, List.of("면류")));
         }
 
         @Test

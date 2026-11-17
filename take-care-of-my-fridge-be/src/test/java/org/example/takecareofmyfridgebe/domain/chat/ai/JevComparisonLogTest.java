@@ -95,6 +95,22 @@ class JevComparisonLogTest {
     }
 
     @Test
+    @DisplayName("특정 요리인데 요리 이름이 없어 1등 분류로 가면 Jev 원래 요청 종류와 바뀐 뒤 쓴 요청 종류를 따로 남긴다")
+    void writesOriginalAndUsedKind_whenDishFallsBackToTopCategory() {
+        JevIntentJudgement base = judgement(ChatIntent.RECOMMEND, true);
+        JevIntentJudgement.Second second = base.second();
+        JevIntentJudgement dish = new JevIntentJudgement(base.first(), new JevIntentJudgement.Second(0.81, second.featureNamed(),
+                second.ingredientNamed(), second.mealkitWanted(), second.tastes(), RequestKind.DISH, 0.77, "면류", 0.83, second.call()),
+                base.totalLatencyMs());
+        JevDecision category = new JevDecision(JevDecision.Decision.JEV, RequestKind.CATEGORY, List.of("면류"));
+
+        Map<String, String> values = values(JevComparisonLog.line(OPENAI, JevSide.finished(Optional.of(dish), 520L), category));
+
+        assertThat(values).containsEntry("jevRequestKind", "DISH").containsEntry("jevCategory", "면류")
+                .containsEntry("decision", "JEV").containsEntry("jevUsedKind", "CATEGORY").containsEntry("jevUsedValues", "면류");
+    }
+
+    @Test
     @DisplayName("의도가 다르면 intentMatch=false이고, 2차를 묻지 않은 의도면 2차 칸은 -로 남긴다")
     void writesNoneForSecondFields_whenSecondNotAsked() {
         OpenAiSide general = new OpenAiSide(1L, 10L, 12, ChatIntent.GENERAL, List.of(), List.of(), List.of(), false);

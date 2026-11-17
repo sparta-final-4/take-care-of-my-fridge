@@ -31,7 +31,8 @@ import java.util.Set;
  *   <li>추천·다시 추천은 요청 종류로 검색 조건을 정한다
  *     <ul>
  *       <li>특정 요리: OpenAI 요리 이름과 Jev 1등 분류(없음이면 넣지 않는다). 분류는 거르는 조건이 아니라 점수를 올리는 조건이라
- *           이름이 맞는 레시피와 비슷한 요리 중 같은 분류가 앞에 온다. 요리 이름이 메시지에 그대로 없거나 비었으면 넓은 요청으로 본다</li>
+ *           이름이 맞는 레시피와 비슷한 요리 중 같은 분류가 앞에 온다. 요리 이름이 메시지에 그대로 없거나 비었으면
+ *           1등 분류가 있을 때 특정 분류로, 없음이면 넓은 요청으로 본다 (맛·재료 칸은 그대로 넘긴다)</li>
  *       <li>특정 분류: Jev 1등 분류. 1등이 없음이면 밀키트를 원하는 말(MealkitWordChecker)이면 없음, 아니면 넓은 요청</li>
  *       <li>넓은 요청: 넓은 요청 요리 이름 5개(SimilarDishFinder.findBroad, 캐시)를 키워드로, 원한 표현을 채워 요리 이름을 말한 추천으로 보지 않는다
  *           (카드가 모자라면 냉장고 후보로 채운다)</li>
@@ -84,7 +85,7 @@ public class JevIntentResolver {
         String dish = IntentCorrector.dishInMessage(input.message(), openAi.dishText()) ? openAi.dishText() : null;
         String category = second.category();
         if (kind == RequestKind.DISH && dish == null) {
-            kind = RequestKind.BROAD;
+            kind = category == null ? RequestKind.BROAD : RequestKind.CATEGORY;
         }
         if (kind == RequestKind.CATEGORY && category == null) {
             kind = MealkitWordChecker.check(input.message(), chatWordProperties.mealkit(), chatWordProperties.taste())
