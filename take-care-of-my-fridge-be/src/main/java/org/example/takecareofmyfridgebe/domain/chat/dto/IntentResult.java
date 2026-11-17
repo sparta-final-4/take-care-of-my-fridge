@@ -140,7 +140,7 @@ public record IntentResult(
     public IntentResult sanitize(Collection<String> allowedCategories) {
         Set<String> categories = Set.copyOf(allowedCategories);
         List<String> cleanCategories = cleanNames(moodCategories, name -> name, categories);
-        // 분류 이름·묶음 말인 키워드("국", "디저트", "국물")는 서버 보정(IntentCorrector.moveCategoryKeywords)이 한 곳에서 분류로 옮긴다
+        // 키워드는 이름만 다듬고 분류로 옮기지 않는다
         List<String> cleanKeywords = keywords == null ? null
                 : cleanNames(keywords, name -> name, null).stream().limit(MAX_KEYWORDS).toList();
         return new IntentResult(

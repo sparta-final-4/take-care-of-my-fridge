@@ -47,15 +47,9 @@ public class ChatIntentFixture {
     public static final ChatWordProperties.TasteOpposites TASTE_OPPOSITES = new ChatWordProperties.TasteOpposites(List.of(
             List.of(Taste.MILD, Taste.SPICY), List.of(Taste.MILD, Taste.SALTY)));
 
-    // config/chat-words.yml app.chat.words.food와 같은 목록
-    public static final ChatWordProperties.Food FOOD_WORDS = new ChatWordProperties.Food(List.of("먹", "요리", "레시피", "밥", "반찬",
-            "끼니", "아침", "점심", "저녁", "야식", "간식", "재료", "냉장고", "장보기", "밀키트"));
-
     // 단어 설정 전체. 묶음별 고정값은 각 WordCheckerTest가 가진다
     public static final ChatWordProperties WORDS = new ChatWordProperties(TasteWordCheckerTest.WORDS, TASTE_OPPOSITES,
-            AskWordCheckerTest.WORDS, new ChatWordProperties.Category(List.of(
-                    new ChatWordProperties.Category.Group("국물", List.of("국", "찌개", "전골", "수프", "스튜")))), FOOD_WORDS,
-            MealkitWordCheckerTest.WORDS, FridgeShopWordCheckerTest.WORDS, TemperatureWordCheckerTest.WORDS);
+            AskWordCheckerTest.WORDS, MealkitWordCheckerTest.WORDS, FridgeShopWordCheckerTest.WORDS, TemperatureWordCheckerTest.WORDS);
 
     public final ChatIntentExtractor extractor = mock(ChatIntentExtractor.class);
     public final RecipeService recipeService = mock(RecipeService.class);
