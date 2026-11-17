@@ -27,8 +27,9 @@ import java.util.stream.Collectors;
  *   <li>목록은 쉼표로 잇는다. 맛은 Member.Taste 순서, OpenAI 분류는 고른 순서</li>
  *   <li>Jev 분류는 요청 종류(jevRequestKind)와 1등 분류(jevCategory, "없음"이 1등이면 -)로 남긴다.
  *       categoryMatch는 요청 종류가 특정 분류(CATEGORY)일 때만 OpenAI 분류가 1등 분류 하나와 같은지 본다</li>
- *   <li>decision은 상담 의도를 무엇으로 정했는지(SHADOW / JEV / OPENAI_LOW_CONFIDENCE / OPENAI_JEV_FAILED),
- *       jevUsedKind·jevUsedValues는 Jev로 정했을 때 쓴 요청 종류와 값(특정 요리면 요리 이름, 특정 분류면 분류, 넓은 요청이면 요리 이름 목록)</li>
+ *   <li>decision은 상담 의도를 무엇으로 정했는지(SHADOW / JEV / OPENAI_LOW_CONFIDENCE / OPENAI_LOW_CONFIDENCE_JEV_BROAD /
+ *       OPENAI_JEV_FAILED / OPENAI_FAILED), jevUsedKind·jevUsedValues는 Jev로 정했을 때(또는 되돌림에서 넓은 요청 경로를 탔을 때)
+ *       쓴 요청 종류와 값(특정 요리면 요리 이름, 특정 분류면 분류, 넓은 요청이면 요리 이름 목록)</li>
  *   <li>openai… 칸은 상담 최종 결과다. on 모드에서 decision=JEV면 Jev로 정한 결과, 그 밖이면 OpenAI 결과다</li>
  *   <li>메시지 원문·직전 추천 글·넓은 요청 표현·키는 넣지 않는다</li>
  * </ul>

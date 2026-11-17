@@ -86,6 +86,41 @@ class ChatIntentFacadeJevOnTest {
         }
 
         @Test
+        @DisplayName("직전 추천 없이 \"김치찌개 말고 다른 거\"에 OpenAI가 요리 이름을 비우면 on·off 모두 김치찌개를 검색 기준으로 쓰지 않는다")
+        void skipsAvoidedDish_whenOpenAiLeavesDishEmpty() {
+            givenOpenAi(recommend("", List.of(), List.of(), List.of(), ""));
+            givenJev(RequestKind.DISH, "찌개");
+            when(similarDishFinder.findBroad(MEMBER_ID, "김치찌개 말고 다른 거 추천해줘")).thenReturn(List.of("된장찌개", "제육볶음"));
+
+            ChatIntentResolution resolution = resolve("김치찌개 말고 다른 거 추천해줘");
+            fixture.givenExtracted(recommend("", List.of(), List.of(), List.of(), ""));
+            ChatIntentResolution off = fixture.facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("김치찌개 말고 다른 거 추천해줘"));
+
+            assertThat(resolution.recipeQuery().keywordText()).isNull();
+            assertThat(resolution.recipeQuery().keywords()).doesNotContain("김치찌개");
+            assertThat(off.recipeQuery().keywordText()).isNull();
+            assertThat(off.recipeQuery().keywords()).doesNotContain("김치찌개");
+        }
+
+        @Test
+        @DisplayName("\"매운 거 말고 짬뽕 같은 거\"에 OpenAI가 요리 이름 짬뽕을 주면 on·off 모두 요리 이름 짬뽕과 피할 맛 매운맛으로 찾는다")
+        void usesDishAndAvoidedTaste_whenTasteIsAvoidedBeforeDish() {
+            IntentResult openAi = new IntentResult(ChatIntent.RECOMMEND, List.of(), List.of(), 0, List.of(), List.of(), false,
+                    List.of("짬뽕"), "짬뽕", "", 0, "", List.of(), List.of("SPICY"), "", "ALL");
+            givenOpenAi(openAi);
+            givenJev(RequestKind.DISH, null, 0.95, Map.of(Taste.SPICY, TasteStance.AVOIDED));
+
+            ChatIntentResolution resolution = resolve("매운 거 말고 짬뽕 같은 거");
+            fixture.givenExtracted(openAi);
+            ChatIntentResolution off = fixture.facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("매운 거 말고 짬뽕 같은 거"));
+
+            assertThat(resolution.recipeQuery().keywordText()).isEqualTo("짬뽕");
+            assertThat(resolution.recipeQuery().avoidTastes()).containsExactly(Taste.SPICY);
+            assertThat(off.recipeQuery().keywordText()).isEqualTo("짬뽕");
+            assertThat(off.recipeQuery().avoidTastes()).containsExactly(Taste.SPICY);
+        }
+
+        @Test
         @DisplayName("넓은 요청이면 원한 표현으로 넓은 요청 요리 이름을 받아 키워드로 쓰고, 요리 이름을 말한 추천으로 보지 않는다")
         void usesBroadDishes_whenBroad() {
             givenOpenAi(recommend(null, List.of("구이", "튀김"), List.of(), List.of(), "술안주"));
@@ -249,6 +284,51 @@ class ChatIntentFacadeJevOnTest {
         }
 
         @Test
+        @DisplayName("confidence가 낮아 되돌릴 때 OpenAI가 추천이고 Jev 2차가 넓은 요청이면 의도·맛은 OpenAI 것으로 두고 넓은 요청 요리 이름으로 찾는다")
+        void usesBroadDishesWithOpenAiIntent_whenFallingBackWithJevBroad() {
+            givenOpenAi(recommend(null, List.of("밥"), List.of("밥"), List.of("SALTY"), "주식으로 먹을 거"));
+            givenJev(RequestKind.BROAD, null, 0.6, Taste.SPICY);
+            when(similarDishFinder.findBroad(MEMBER_ID, "주식으로 먹을 거")).thenReturn(List.of("김치볶음밥", "칼국수"));
+
+            ChatIntentResolution resolution = resolve("주식으로 먹을 거 추천해줘");
+
+            assertThat(resolution.intent()).isEqualTo(ChatIntent.RECOMMEND);
+            assertThat(resolution.recipeQuery().keywords()).containsExactly("김치볶음밥", "칼국수");
+            assertThat(resolution.recipeQuery().moodCategories()).isEmpty();
+            assertThat(resolution.recipeQuery().keywordText()).isNull();
+            assertThat(resolution.recipeQuery().preferenceText()).isEqualTo("주식으로 먹을 거");
+            assertThat(resolution.recipeQuery().wantedTastes()).containsExactly(Taste.SALTY);
+            verifyDecision(new JevDecision(Decision.OPENAI_LOW_CONFIDENCE_JEV_BROAD, RequestKind.BROAD, List.of("김치볶음밥", "칼국수")));
+        }
+
+        @Test
+        @DisplayName("confidence가 낮아 되돌릴 때 Jev 2차가 특정 분류면 지금처럼 OpenAI 결과를 쓰고 넓은 요청 요리 이름을 받지 않는다")
+        void usesOpenAi_whenFallingBackWithJevCategory() {
+            givenOpenAi(recommend(null, null, List.of("국"), List.of(), null));
+            givenJev(RequestKind.CATEGORY, "찌개", 0.6);
+
+            ChatIntentResolution resolution = resolve("국 추천해줘");
+
+            assertThat(resolution.recipeQuery().moodCategories()).containsExactly("국");
+            verify(similarDishFinder, never()).findBroad(any(), any());
+            verifyDecision(JevDecision.of(Decision.OPENAI_LOW_CONFIDENCE));
+        }
+
+        @Test
+        @DisplayName("confidence가 낮아 되돌릴 때 OpenAI가 일반 질문이면 Jev 2차가 넓은 요청이어도 넓은 요청 경로를 타지 않는다")
+        void keepsOpenAiGeneral_whenFallingBackWithJevBroad() {
+            givenOpenAi(new IntentResult(ChatIntent.GENERAL, List.of(), List.of(), 0, List.of(), List.of(), false, List.of(), "", "",
+                    0, "", List.of(), List.of(), "", "ALL"));
+            givenJev(RequestKind.BROAD, null, 0.6);
+
+            ChatIntentResolution resolution = resolve("두부는 어떻게 보관해?");
+
+            assertThat(resolution.intent()).isEqualTo(ChatIntent.GENERAL);
+            verify(similarDishFinder, never()).findBroad(any(), any());
+            verifyDecision(JevDecision.of(Decision.OPENAI_LOW_CONFIDENCE));
+        }
+
+        @Test
         @DisplayName("Jev 의도 confidence가 0.8이면 Jev로 정한다")
         void usesJev_whenConfidenceAtThreshold() {
             givenOpenAi(recommend(null, null, List.of("국"), List.of(), null));
@@ -358,9 +438,16 @@ class ChatIntentFacadeJevOnTest {
 
     // 추천 0.95(또는 confidence), 2차: 요청 종류·1등 분류, 원하는 맛
     private void givenJev(RequestKind kind, String category, double confidence, Taste... wanted) {
+        Map<Taste, TasteStance> stances = new EnumMap<>(Taste.class);
+        Arrays.stream(wanted).forEach(taste -> stances.put(taste, TasteStance.WANTED));
+        givenJev(kind, category, confidence, stances);
+    }
+
+    // 추천 confidence, 2차: 요청 종류·1등 분류, 맛별 답 (없는 맛은 언급 없음)
+    private void givenJev(RequestKind kind, String category, double confidence, Map<Taste, TasteStance> stances) {
         Map<Taste, TasteAnswer> tastes = new EnumMap<>(Taste.class);
-        Arrays.stream(Taste.values()).forEach(taste -> tastes.put(taste, new TasteAnswer(
-                Arrays.asList(wanted).contains(taste) ? TasteStance.WANTED : TasteStance.NOT_MENTIONED, 0.9)));
+        Arrays.stream(Taste.values()).forEach(taste -> tastes.put(taste,
+                new TasteAnswer(stances.getOrDefault(taste, TasteStance.NOT_MENTIONED), 0.9)));
         JevIntentJudgement.Second second = new JevIntentJudgement.Second(0.1, 0.1, 0.1, 0.1, tastes, kind, 0.9, category, 0.9,
                 call("req_second"));
         when(jev.await(run)).thenReturn(Optional.of(new JevIntentJudgement(first(ChatIntent.RECOMMEND, confidence), second, 300L)));

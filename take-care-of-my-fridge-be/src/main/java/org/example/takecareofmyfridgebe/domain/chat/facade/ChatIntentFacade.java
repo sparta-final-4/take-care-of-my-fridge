@@ -72,7 +72,8 @@ import java.util.stream.Stream;
  * <p>
  * on 모드(app.chat.jev.mode=on)면 OpenAI 의도 판단이 끝난 뒤 Jev 결과를 기다려(제한 시간 안에서) Jev로 의도를 정한다 (JevIntentResolver).
  * Jev가 실패하거나 의도 confidence가 {@value #MIN_JEV_INTENT_CONFIDENCE} 미만이면 OpenAI 결과를 쓴다. 두 경우 모두 서버 보정은
- * 서비스 규칙만 거친다(IntentCorrector.Steps.SERVICE_RULES). 설계: docs/testing/jev-on-design.md
+ * 서비스 규칙만 거친다(IntentCorrector.Steps.SERVICE_RULES). confidence가 낮아 되돌릴 때도 OpenAI 의도가 추천 계열이고 Jev 2차 요청 종류가
+ * 넓은 요청이면 넓은 요청 요리 이름 경로를 탄다(JevIntentResolver.resolveBroadFallback). 설계: docs/testing/jev-on-design.md
  */
 @Slf4j
 @Component
@@ -233,7 +234,14 @@ public class ChatIntentFacade {
             if (judged.isEmpty()) {
                 jevDecision = JevDecision.of(JevDecision.Decision.OPENAI_JEV_FAILED);
             } else if (judged.get().first().intentConfidence() < MIN_JEV_INTENT_CONFIDENCE) {
-                jevDecision = JevDecision.of(JevDecision.Decision.OPENAI_LOW_CONFIDENCE);
+                // 이미 받아 둔 Jev 2차가 넓은 요청이면 의도는 OpenAI 것으로 두고 넓은 요청 경로만 탄다 (OpenAI를 다시 부르지 않는다)
+                Optional<JevIntentResolver.Resolved> broad = jevIntentResolver.resolveBroadFallback(input, judged.get(), result);
+                if (broad.isPresent()) {
+                    result = broad.get().result();
+                    jevDecision = broad.get().decision();
+                } else {
+                    jevDecision = JevDecision.of(JevDecision.Decision.OPENAI_LOW_CONFIDENCE);
+                }
             } else {
                 JevIntentResolver.Resolved resolved = jevIntentResolver.resolve(input, judged.get(), result);
                 result = resolved.result();

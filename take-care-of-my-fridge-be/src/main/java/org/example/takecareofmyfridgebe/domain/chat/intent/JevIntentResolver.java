@@ -15,6 +15,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -36,6 +37,8 @@ import java.util.Set;
  *   </li>
  * </ul>
  * Jev를 쓸지(실패·confidence)는 부르는 쪽(ChatIntentFacade)이 정한다. 서비스 규칙(레시피 자세히 대상, 알레르기 등)은 그 뒤에 따로 거친다.
+ * Jev 의도 confidence가 낮아 OpenAI 결과로 되돌릴 때도, OpenAI 의도가 추천 계열이고 Jev 2차 요청 종류가 넓은 요청이면
+ * 넓은 요청 경로만 탄다 ({@link #resolveBroadFallback}).
  */
 @Slf4j
 @Component
@@ -94,16 +97,34 @@ public class JevIntentResolver {
                     new JevDecision(Decision.JEV, kind, List.of(dish)));
             case CATEGORY -> new Resolved(build(intent, openAi, wanted, avoid, List.of(category), null, null, openAi.preferenceText()),
                     new JevDecision(Decision.JEV, kind, List.of(category)));
-            case BROAD -> {
-                String request = broadRequest(input.message(), openAi.preferenceText());
-                List<String> dishes = similarDishFinder.findBroad(input.memberId(), request);
-                // 원한 표현을 채워 두면 요리 이름을 말한 추천이 아니다 (RecipeCandidateFacade.dishAsked)
-                yield new Resolved(build(intent, openAi, wanted, avoid, null, dishes.isEmpty() ? null : dishes, null, request),
-                        new JevDecision(Decision.JEV, kind, dishes));
-            }
+            case BROAD -> broad(input, intent, openAi, wanted, avoid, Decision.JEV);
             case NONE -> new Resolved(build(intent, openAi, wanted, avoid, null, null, null, openAi.preferenceText()),
                     new JevDecision(Decision.JEV, kind, List.of()));
         };
+    }
+
+    /**
+     * Jev 의도 confidence가 낮아 OpenAI 결과로 되돌릴 때: OpenAI 의도가 추천 계열(RECOMMEND·REFINE)이고 이미 받아 둔 Jev 2차 요청 종류가
+     * 넓은 요청이면, 의도·맛 등은 OpenAI 것을 쓰고 검색 조건만 넓은 요청 요리 이름(캐시)으로 바꾼다. OpenAI를 다시 부르지 않는다.
+     *
+     * @return 넓은 요청 경로를 탄 결과 (decision OPENAI_LOW_CONFIDENCE_JEV_BROAD). 아니면 빈 값 (지금처럼 OpenAI 결과를 쓴다)
+     */
+    public Optional<Resolved> resolveBroadFallback(CorrectionInput input, JevIntentJudgement jev, IntentResult openAi) {
+        JevIntentJudgement.Second second = jev.second();
+        if (!RECIPE_INTENTS.contains(openAi.intent()) || second == null || second.requestKind() != RequestKind.BROAD) {
+            return Optional.empty();
+        }
+        return Optional.of(broad(input, openAi.intent(), openAi, openAi.wantedTastes(), openAi.avoidTastes(),
+                Decision.OPENAI_LOW_CONFIDENCE_JEV_BROAD));
+    }
+
+    // 넓은 요청: 넓은 요청 요리 이름 5개를 키워드로 쓰고, 원한 표현을 채워 요리 이름을 말한 추천으로 보지 않는다 (RecipeCandidateFacade.dishAsked)
+    private Resolved broad(CorrectionInput input, ChatIntent intent, IntentResult openAi, List<String> wanted, List<String> avoid,
+                           Decision decision) {
+        String request = broadRequest(input.message(), openAi.preferenceText());
+        List<String> dishes = similarDishFinder.findBroad(input.memberId(), request);
+        return new Resolved(build(intent, openAi, wanted, avoid, null, dishes.isEmpty() ? null : dishes, null, request),
+                new JevDecision(decision, RequestKind.BROAD, dishes));
     }
 
     // 넓은 요청 표현: OpenAI 원한 표현, 없으면 메시지에서 끝 문장 부호를 뺀 것. 넓은 요청 요리 이름의 캐시 키가 된다

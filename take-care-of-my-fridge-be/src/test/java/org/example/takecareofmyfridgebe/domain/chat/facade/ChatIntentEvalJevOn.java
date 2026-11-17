@@ -45,7 +45,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  *   <li>실제 JevIntentShadow(on)·JevIntentClassifier(TypeSafe)·JevIntentResolver·OpenAiSimilarDishGenerator(넓은 요청 프롬프트)를 만든다.
  *       넓은 요청 요리 이름 캐시는 메모리에 둔다(운영 Redis처럼 같은 표현이면 다시 부르지 않는다. 그래서 문장마다 첫 회차만 AI를 부른다)</li>
  *   <li>회차마다 정한 방법(decision), Jev 판단, 쓴 요청 종류·값, 넓은 요청 AI 호출 여부·시간·토큰을 남긴다</li>
- *   <li>기대 kind가 넓은 요청(BROAD)인 문장은 분류·키워드 기대값 대신 "Jev로 정했고 쓴 요청 종류가 BROAD이며 요리 이름이 비어 있지 않음"으로 비교한다.
+ *   <li>기대 kind가 넓은 요청(BROAD)인 문장은 분류·키워드 기대값 대신 "Jev로 정했거나 되돌림에서 넓은 요청 경로를 탔고(OPENAI_LOW_CONFIDENCE_JEV_BROAD)
+ *       쓴 요청 종류가 BROAD이며 요리 이름이 비어 있지 않음"으로 비교한다.
  *       요청 종류 일치(kind)는 따로 세고 일치 판단에는 넣지 않는다(all-on과 같은 칸으로 비교하려고)</li>
  * </ul>
  */
@@ -162,7 +163,7 @@ final class ChatIntentEvalJevOn {
         // 요청 종류 일치. 기대 kind가 없거나 Jev로 정하지 않았으면 null (세지 않는다)
         Boolean kindMatch(Map<String, Object> expect) {
             Object expected = expect.get("kind");
-            if (expected == null || decision != JevDecision.Decision.JEV || usedKind == null) {
+            if (expected == null || !usesJevKind(decision) || usedKind == null) {
                 return null;
             }
             return usedKind.name().equals(String.valueOf(expected));
@@ -192,12 +193,17 @@ final class ChatIntentEvalJevOn {
         Map<String, Object> raw = new LinkedHashMap<>(expect.raw());
         BROAD_REPLACED.forEach(raw::remove);
         List<String> result = new ArrayList<>(new Expect(raw).mismatches(outcome, set));
-        boolean broad = info.decision() == JevDecision.Decision.JEV && info.usedKind() == RequestKind.BROAD
+        boolean broad = usesJevKind(info.decision()) && info.usedKind() == RequestKind.BROAD
                 && !info.usedValues().isEmpty();
         if (!broad) {
             result.add("broad: 기대 JEV·BROAD·요리 이름, 실제 " + info.decision() + "·" + info.usedKind() + "·" + info.usedValues());
         }
         return result;
+    }
+
+    // Jev 요청 종류로 검색 조건을 정한 결정 (Jev로 정함, 되돌림에서 넓은 요청 경로)
+    static boolean usesJevKind(JevDecision.Decision decision) {
+        return decision == JevDecision.Decision.JEV || decision == JevDecision.Decision.OPENAI_LOW_CONFIDENCE_JEV_BROAD;
     }
 
     // 정한 방법과 Jev 판단을 남기는 JevIntentShadow (on). 기다리기·비교 로그는 실제 동작 그대로
