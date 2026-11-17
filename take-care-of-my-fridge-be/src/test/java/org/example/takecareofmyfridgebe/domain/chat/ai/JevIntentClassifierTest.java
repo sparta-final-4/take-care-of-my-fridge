@@ -70,22 +70,23 @@ class JevIntentClassifierTest {
     private static final String FIRST_RECOMMEND = firstResponse(
             "{\"type\":\"choice\",\"choice\":\"추천\",\"confidence\":1.0,\"probabilities\":"
                     + "{\"추천\":1.0,\"일반 질문\":0.0,\"냉장고 보기\":0.0,\"장보기\":0.0,\"상관없는 말\":0.0}}");
-    private static final String FIRST_REFINE = firstResponse(
-            "{\"type\":\"choice\",\"choice\":\"이어서 다시\",\"confidence\":0.88,\"probabilities\":"
-                    + "{\"추천\":0.08,\"이어서 다시\":0.9,\"레시피 자세히\":0.02}}");
+    // 직전 추천이 있을 때 추천 0.9 (이어짐 확률은 테스트마다 붙인다)
+    private static final String RECOMMEND_ANSWER = "{\"type\":\"choice\",\"choice\":\"추천\",\"confidence\":0.9,\"probabilities\":"
+            + "{\"추천\":0.92,\"레시피 자세히\":0.06,\"일반 질문\":0.02}}";
     private static final String FIRST_GENERAL = firstResponse(
             "{\"type\":\"choice\",\"choice\":\"일반 질문\",\"confidence\":0.95,\"probabilities\":"
                     + "{\"추천\":0.03,\"일반 질문\":0.96,\"냉장고 보기\":0.01}}");
-    private static final String FIRST_RECIPE_DETAIL = firstResponse(
+    private static final String FIRST_RECIPE_DETAIL_ANSWER =
             "{\"type\":\"choice\",\"choice\":\"레시피 자세히\",\"confidence\":0.83,\"probabilities\":"
-                    + "{\"추천\":0.12,\"레시피 자세히\":0.86,\"일반 질문\":0.02}}");
+                    + "{\"추천\":0.12,\"레시피 자세히\":0.86,\"일반 질문\":0.02}}";
+    private static final String FIRST_RECIPE_DETAIL = firstResponse(FIRST_RECIPE_DETAIL_ANSWER);
     private static final String SECOND = secondResponse(CATEGORY_GUK);
 
     private final List<byte[]> sentBodies = new ArrayList<>();
     private MockRestServiceServer server;
 
     @Test
-    @DisplayName("1차 요청은 model·키·UTF-8 한글 state와 의도·묻는 말·냉장고 범위 질문 3개를 보내고, 직전 추천이 없으면 의도 선택지는 7개다")
+    @DisplayName("직전 추천이 없으면 1차 요청은 UTF-8 한글 state와 의도·묻는 말·냉장고 범위 질문 3개를 보내고, 의도 선택지에 이어서 다시·레시피 자세히가 없다")
     void sendsFirstQuestionsInUtf8_whenClassify() {
         JevIntentClassifier classifier = classifier(withKey());
         expectCall(FIRST_GENERAL, "req_first");
@@ -102,11 +103,12 @@ class JevIntentClassifierTest {
         Map<String, Object> questions = map(body.get("questions"));
         assertThat(questions).containsOnlyKeys("intent", "asks_question", "fridge_scope");
         assertThat(map(questions.get("intent")).get("type")).isEqualTo("choice");
-        // 직전 추천이 없으면 이어서 다시·레시피 자세히는 고를 수 없어 뺀다
+        // 이어짐은 추천 안의 항목이라 이어서 다시 선택지가 없고, 직전 추천이 없으면 레시피 자세히도 고를 수 없어 뺀다. 이어짐 질문도 없다
         assertThat(map(map(questions.get("intent")).get("criteria")).keySet()).containsExactly(
                 "추천", "일반 질문", "냉장고 보기", "장보기", "상관없는 말", "막을 말", "자해");
         assertThat(map(map(questions.get("intent")).get("criteria"))).containsEntry("추천",
-                "메뉴·레시피·요리를 정해 달라는 말. \"뭐 먹지?\", \"~ 먹고 싶어\", 음식·재료·요리 종류·밀키트 이름만 말한 것도 추천이다. "
+                "메뉴·레시피·요리를 정해 달라는 말. 새로 정해 달라는 말과, [직전 추천]에 이어서 다른 것을 달라거나 조건을 바꿔 달라는 말 모두 추천이다. "
+                        + "\"뭐 먹지?\", \"~ 먹고 싶어\", 음식·재료·요리 종류·밀키트 이름만 말한 것도 추천이다. "
                         + "무엇을 빼거나 피해 달라는 조건이 붙어도 추천이다. 재료를 사고 싶다는 말은 추천이 아니라 장보기다");
         assertThat(map(questions.get("asks_question")))
                 .containsEntry("type", "noul")
@@ -149,7 +151,6 @@ class JevIntentClassifierTest {
         assertThat(map(requestKind.get("criteria"))).containsExactly(
                 Map.entry("특정 요리", "요리 하나의 이름을 말했다"),
                 Map.entry("특정 분류", "요리의 종류를 하나 말했다(찌개, 디저트처럼). 빼거나 피하는 말이 함께 있어도, 원하는 요리 종류를 하나 말했으면 특정 분류다"),
-
                 Map.entry("넓은 요청", "상황이나 쓰임새, 여러 종류에 걸친 말을 했다(술안주, 반찬, 국물, 간단한 한 끼처럼)"),
                 Map.entry("없음", "요리 종류나 이름을 말하지 않았다"));
         Map<String, Object> category = map(questions.get("category"));
@@ -173,9 +174,11 @@ class JevIntentClassifierTest {
         JevIntentJudgement.First first = judgement.first();
         assertThat(first.intent()).isEqualTo(ChatIntent.RECOMMEND);
         assertThat(first.intentConfidence()).isEqualTo(1.0);
-        assertThat(first.intentProbabilities()).hasSize(9)
+        // 이어서 다시는 의도 선택지가 아니라(이어짐은 따로 묻는다) 확률에 없다
+        assertThat(first.intentProbabilities()).hasSize(8)
                 .containsEntry(ChatIntent.RECOMMEND, 1.0)
-                .containsEntry(ChatIntent.REFINE, 0.0);
+                .doesNotContainKey(ChatIntent.REFINE);
+        assertThat(first.followsPrevious()).isNull();
         assertThat(first.asksQuestion()).isEqualTo(0.09);
         assertThat(first.fridgeScope()).isEqualTo(FridgeScope.ALL);
         assertThat(first.fridgeScopeConfidence()).isEqualTo(0.9);
@@ -212,10 +215,10 @@ class JevIntentClassifierTest {
     }
 
     @Test
-    @DisplayName("직전 추천이 있으면 그 정보 뒤에 이번 메시지를 붙인 state로 의도 선택지 9개를 묻고, 이어서 다시면 2차도 부른다")
-    void callsSecondWithFollowUpState_whenIntentIsRefine() {
+    @DisplayName("직전 추천이 있으면 이번 메시지를 붙인 state로 레시피 자세히가 있는 의도 선택지와 이어짐 질문을 보내고, 추천 + 이어짐 0.8이면 REFINE으로 넘기고 2차도 부른다")
+    void passesRefineAndCallsSecond_whenRecommendFollowsPrevious() {
         JevIntentClassifier classifier = classifier(withKey());
-        expectCall(FIRST_REFINE, "req_first");
+        expectCall(firstResponse(RECOMMEND_ANSWER, 0.8), "req_first");
         expectCall(SECOND, "req_second");
         String followUp = "[직전 추천] 1. 김치찌개 / 2. 순두부찌개\n[직전 조건] 분류 찌개";
 
@@ -223,20 +226,40 @@ class JevIntentClassifierTest {
 
         server.verify();
         assertThat(judgement.first().intent()).isEqualTo(ChatIntent.REFINE);
+        assertThat(judgement.first().answeredIntent()).isEqualTo(ChatIntent.RECOMMEND);
+        assertThat(judgement.first().intentConfidence()).isEqualTo(0.9);
+        assertThat(judgement.first().followsPrevious()).isEqualTo(0.8);
         assertThat(judgement.hasSecond()).isTrue();
         String expectedState = "[직전 추천] 1. 김치찌개 / 2. 순두부찌개\n[직전 조건] 분류 찌개\n[이번 말] 좀 더 매운 걸로";
         assertThat(parse(sentBodies.get(0)).get("state")).isEqualTo(expectedState);
         assertThat(parse(sentBodies.get(1)).get("state")).isEqualTo(expectedState);
-        Map<String, Object> intentCriteria = map(map(map(parse(sentBodies.get(0)).get("questions")).get("intent")).get("criteria"));
-        assertThat(intentCriteria.keySet()).containsExactly(
-                "추천", "일반 질문", "이어서 다시", "레시피 자세히", "냉장고 보기", "장보기", "상관없는 말", "막을 말", "자해");
-        assertThat(intentCriteria).containsEntry("이어서 다시",
-                "[직전 추천]에 이어서 하는 말. 직전 추천을 보고 다른 것을 달라거나, 직전 추천의 조건을 조금 바꿔 달라는 말이다. "
-                        + "무엇을 빼 달라는 말이라도 직전 추천과 상관없이 새로 요리를 정해 달라는 말이면 추천이다");
+        Map<String, Object> questions = map(parse(sentBodies.get(0)).get("questions"));
+        assertThat(questions).containsOnlyKeys("intent", "asks_question", "fridge_scope", "follows_previous");
+        assertThat(map(map(questions.get("intent")).get("criteria")).keySet()).containsExactly(
+                "추천", "일반 질문", "레시피 자세히", "냉장고 보기", "장보기", "상관없는 말", "막을 말", "자해");
+        assertThat(map(questions.get("follows_previous")))
+                .containsEntry("type", "noul")
+                .containsEntry("instructions", "[직전 추천]에 이어서 하는 말인가? 직전 추천을 보고 다른 것을 달라거나, "
+                        + "직전 추천의 조건을 조금 바꿔 달라는 말이면 예다. 직전 추천과 상관없이 새로 요리를 정해 달라는 말이면 아니오다");
     }
 
     @Test
-    @DisplayName("1차 의도가 추천·이어서 다시가 아니면 2차를 부르지 않는다")
+    @DisplayName("직전 추천이 있어도 추천 + 이어짐 0.3이면 새 추천(RECOMMEND)으로 두고 2차를 부른다")
+    void keepsRecommendAndCallsSecond_whenRecommendDoesNotFollowPrevious() {
+        JevIntentClassifier classifier = classifier(withKey());
+        expectCall(firstResponse(RECOMMEND_ANSWER, 0.3), "req_first");
+        expectCall(SECOND, "req_second");
+
+        JevIntentJudgement judgement = classifier.classify("디저트도 추천해줘", CATEGORIES, "[직전 추천] 1. 김치찌개").orElseThrow();
+
+        server.verify();
+        assertThat(judgement.first().intent()).isEqualTo(ChatIntent.RECOMMEND);
+        assertThat(judgement.first().followsPrevious()).isEqualTo(0.3);
+        assertThat(judgement.hasSecond()).isTrue();
+    }
+
+    @Test
+    @DisplayName("1차 의도가 추천이 아니면 2차를 부르지 않는다")
     void skipsSecond_whenIntentIsGeneral() {
         JevIntentClassifier classifier = classifier(withKey());
         expectCall(FIRST_GENERAL, "req_first");
@@ -264,10 +287,10 @@ class JevIntentClassifierTest {
     }
 
     @Test
-    @DisplayName("직전 추천이 있으면 레시피 자세히를 그대로 두고 2차를 묻지 않는다")
+    @DisplayName("직전 추천이 있으면 레시피 자세히는 이어짐 확률과 상관없이 그대로 두고 2차를 묻지 않는다")
     void keepsRecipeDetail_whenFollowUpExists() {
         JevIntentClassifier classifier = classifier(withKey());
-        expectCall(FIRST_RECIPE_DETAIL, "req_first");
+        expectCall(firstResponse(FIRST_RECIPE_DETAIL_ANSWER, 0.9), "req_first");
 
         JevIntentJudgement judgement = classifier.classify("두 번째 거 어떻게 만들어?", CATEGORIES,
                 "[직전 추천] 1. 김치찌개 / 2. 순두부찌개").orElseThrow();
@@ -378,8 +401,14 @@ class JevIntentClassifierTest {
     }
 
     private static String firstResponse(String intentAnswer) {
+        return firstResponse(intentAnswer, null);
+    }
+
+    // followsPrevious가 있으면 이어짐 Noul 답을 붙인다 (직전 추천이 있을 때)
+    private static String firstResponse(String intentAnswer, Double followsPrevious) {
         return "{\"model\":\"jev-1.14.0\",\"answers\":{"
                 + "\"intent\":" + intentAnswer + ","
+                + (followsPrevious == null ? "" : "\"follows_previous\":{\"type\":\"noul\",\"noul\":" + followsPrevious + "},")
                 + "\"asks_question\":{\"type\":\"noul\",\"noul\":0.09},"
                 + "\"fridge_scope\":{\"type\":\"choice\",\"choice\":\"전체\",\"confidence\":0.9,"
                 + "\"probabilities\":{\"전체\":0.92,\"밀키트\":0.06,\"임박\":0.01,\"양념\":0.01}}},"

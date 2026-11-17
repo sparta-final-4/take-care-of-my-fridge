@@ -30,6 +30,7 @@ import java.util.stream.Collectors;
  *   <li>decision은 상담 의도를 무엇으로 정했는지(SHADOW / JEV / OPENAI_LOW_CONFIDENCE / OPENAI_LOW_CONFIDENCE_JEV_BROAD /
  *       OPENAI_JEV_FAILED / OPENAI_FAILED), jevUsedKind·jevUsedValues는 Jev로 정했을 때(또는 되돌림에서 넓은 요청 경로를 탔을 때)
  *       쓴 요청 종류와 값(특정 요리면 요리 이름, 특정 분류면 분류, 넓은 요청이면 요리 이름 목록)</li>
+ *   <li>jevFollowsPrevious는 직전 추천에 이어지는 말일 확률(직전 추천이 없어 묻지 않았으면 -)</li>
  *   <li>openai… 칸은 상담 최종 결과다. on 모드에서 decision=JEV면 Jev로 정한 결과, 그 밖이면 OpenAI 결과다</li>
  *   <li>메시지 원문·직전 추천 글·넓은 요청 표현·키는 넣지 않는다</li>
  * </ul>
@@ -125,6 +126,7 @@ final class JevComparisonLog {
         fields.put("openaiIntent", openai.intent());
         fields.put("jevIntent", first == null ? null : first.intent());
         fields.put("jevIntentConfidence", first == null ? null : first.intentConfidence());
+        fields.put("jevFollowsPrevious", first == null ? null : first.followsPrevious());
         fields.put("intentMatch", first == null ? null : first.intent() == openai.intent());
         fields.put("openaiWanted", join(openaiWanted));
         fields.put("openaiAvoided", join(openaiAvoided));

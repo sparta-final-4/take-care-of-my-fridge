@@ -14,25 +14,27 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Jev 1차 질문(모든 메시지): 의도, 정보를 묻는 말인지, 냉장고 보기 범위.
+ * Jev 1차 질문(모든 메시지): 의도, 정보를 묻는 말인지, 냉장고 보기 범위. 직전 추천이 있으면 그에 이어지는 말인지(follows_previous)도 묻는다.
  * 선택지 설명은 prompts/chat-intent.txt·chat-intent-followup.txt의 의도 설명을 줄인 것이다.
+ * <p>
+ * 새 추천과 이어서 받는 추천은 둘 다 추천해 달라는 뜻이라 의도 선택지는 "추천" 하나로 묻는다(선택지가 둘이면 확률이 나뉘어 confidence가 낮아진다).
+ * 이어짐은 follows_previous로 따로 묻고, 서비스 흐름에는 추천 + 이어짐을 ChatIntent.REFINE으로 넘긴다 (JevIntentClassifier.serviceIntent).
  */
 final class JevFirstQuestions {
 
     static final String INTENT = "intent";
     static final String ASKS_QUESTION = "asks_question";
     static final String FRIDGE_SCOPE = "fridge_scope";
+    static final String FOLLOWS_PREVIOUS = "follows_previous";
 
     static final List<Option<ChatIntent>> INTENTS = List.of(
             new Option<>("추천", ChatIntent.RECOMMEND,
-                    "메뉴·레시피·요리를 정해 달라는 말. \"뭐 먹지?\", \"~ 먹고 싶어\", 음식·재료·요리 종류·밀키트 이름만 말한 것도 추천이다. "
+                    "메뉴·레시피·요리를 정해 달라는 말. 새로 정해 달라는 말과, [직전 추천]에 이어서 다른 것을 달라거나 조건을 바꿔 달라는 말 모두 추천이다. "
+                            + "\"뭐 먹지?\", \"~ 먹고 싶어\", 음식·재료·요리 종류·밀키트 이름만 말한 것도 추천이다. "
                             + "무엇을 빼거나 피해 달라는 조건이 붙어도 추천이다. 재료를 사고 싶다는 말은 추천이 아니라 장보기다"),
             new Option<>("일반 질문", ChatIntent.GENERAL,
                     "보관법·손질법·영양·재료 질문, 인사, 짧은 잡담, 이미 한 주문의 배송·결제 상태를 묻는 말. 역할을 정하는 말과 \"배고파 죽겠어\" 같은 과장도 여기다. "
                             + "목록이나 계획을 글로 짜 달라는 말(장보기 목록, 식단표)도 일반 질문이다"),
-            new Option<>("이어서 다시", ChatIntent.REFINE,
-                    "[직전 추천]에 이어서 하는 말. 직전 추천을 보고 다른 것을 달라거나, 직전 추천의 조건을 조금 바꿔 달라는 말이다. "
-                            + "무엇을 빼 달라는 말이라도 직전 추천과 상관없이 새로 요리를 정해 달라는 말이면 추천이다"),
             new Option<>("레시피 자세히", ChatIntent.RECIPE_DETAIL,
                     "[직전 추천]의 레시피 하나의 만드는 법·시간·재료·팁을 묻는 말. 예) \"두 번째 거 어떻게 만들어?\""),
             new Option<>("냉장고 보기", ChatIntent.FRIDGE,
@@ -48,7 +50,7 @@ final class JevFirstQuestions {
                     "자해·자살을 말함. 과장한 말은 아니다"));
 
     // 직전 추천이 있어야 고를 수 있는 의도
-    private static final Set<ChatIntent> FOLLOW_UP_ONLY = Set.of(ChatIntent.REFINE, ChatIntent.RECIPE_DETAIL);
+    private static final Set<ChatIntent> FOLLOW_UP_ONLY = Set.of(ChatIntent.RECIPE_DETAIL);
 
     static final List<Option<FridgeScope>> FRIDGE_SCOPES = List.of(
             new Option<>("전체", FridgeScope.ALL, "기본 양념을 뺀 냉장고 전체. 아래 셋이 아니면 이것이다"),
@@ -60,8 +62,8 @@ final class JevFirstQuestions {
     }
 
     /**
-     * @param hasFollowUp 직전 추천 정보를 넘기는지. 없으면 이어서 다시(REFINE)·레시피 자세히(RECIPE_DETAIL)를 선택지에서 뺀다
-     *                    (고를 수 없는 답에 확률이 나뉘어 confidence가 떨어지지 않게)
+     * @param hasFollowUp 직전 추천 정보를 넘기는지. 없으면 레시피 자세히(RECIPE_DETAIL)를 선택지에서 빼고
+     *                    (고를 수 없는 답에 확률이 나뉘어 confidence가 떨어지지 않게), 있으면 이어지는 말인지(follows_previous)를 더 묻는다
      */
     static Map<String, SystemOneQuestion> questions(boolean hasFollowUp) {
         Map<String, SystemOneQuestion> questions = new LinkedHashMap<>();
@@ -70,10 +72,15 @@ final class JevFirstQuestions {
         questions.put(ASKS_QUESTION, SystemOneQuestion.noul(
                 "정보를 묻는 말인가(보관법·손질법·뜻 등). 요리를 정해 달라는 말은 아니다"));
         questions.put(FRIDGE_SCOPE, JevAnswers.choiceQuestion("냉장고에서 무엇을 보려 하나?", FRIDGE_SCOPES));
+        if (hasFollowUp) {
+            questions.put(FOLLOWS_PREVIOUS, SystemOneQuestion.noul(
+                    "[직전 추천]에 이어서 하는 말인가? 직전 추천을 보고 다른 것을 달라거나, 직전 추천의 조건을 조금 바꿔 달라는 말이면 예다. "
+                            + "직전 추천과 상관없이 새로 요리를 정해 달라는 말이면 아니오다"));
+        }
         return Collections.unmodifiableMap(questions);
     }
 
-    // 묻는 의도 선택지. 직전 추천이 없으면 직전 추천에 기대는 두 의도를 뺀다
+    // 묻는 의도 선택지. 직전 추천이 없으면 직전 추천에 기대는 레시피 자세히를 뺀다
     static List<Option<ChatIntent>> intents(boolean hasFollowUp) {
         if (hasFollowUp) {
             return INTENTS;
@@ -82,8 +89,8 @@ final class JevFirstQuestions {
     }
 
     /**
-     * 답은 모든 선택지(INTENTS)로 읽는다. 직전 추천이 없는데 이어서 다시·레시피 자세히가 오면(선택지에 없었어도)
-     * 서비스 규칙으로 추천으로 본다(안전망).
+     * 답은 모든 선택지(INTENTS)로 읽는다. 직전 추천이 없는데 레시피 자세히가 오면(선택지에 없었어도) 서비스 규칙으로 추천으로 본다(안전망).
+     * 직전 추천이 있으면 follows_previous 답도 읽어 추천 + 이어짐을 REFINE으로 넘긴다.
      *
      * @param hasFollowUp 직전 추천 정보를 넘겼는지 (서비스 규칙으로 의도를 정할 때 쓴다)
      */
@@ -91,9 +98,10 @@ final class JevFirstQuestions {
         JevAnswers answers = new JevAnswers(call);
         JevAnswers.Choice<ChatIntent> intent = answers.choice(INTENT, INTENTS);
         JevAnswers.Choice<FridgeScope> fridgeScope = answers.choice(FRIDGE_SCOPE, FRIDGE_SCOPES);
+        Double followsPrevious = hasFollowUp ? answers.noul(FOLLOWS_PREVIOUS) : null;
         return new JevIntentJudgement.First(
-                JevIntentClassifier.serviceIntent(intent.value(), hasFollowUp), intent.value(),
-                intent.confidence(), intent.probabilities(),
+                JevIntentClassifier.serviceIntent(intent.value(), hasFollowUp, followsPrevious), intent.value(),
+                intent.confidence(), intent.probabilities(), followsPrevious,
                 answers.noul(ASKS_QUESTION),
                 fridgeScope.value(), fridgeScope.confidence(),
                 answers.call());

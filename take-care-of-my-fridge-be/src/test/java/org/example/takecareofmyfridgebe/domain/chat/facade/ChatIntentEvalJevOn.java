@@ -147,7 +147,7 @@ final class ChatIntentEvalJevOn {
     record Info(JevDecision.Decision decision, JevIntentJudgement judgement, RequestKind usedKind, List<String> usedValues,
                 boolean broadAi, long broadMs, long broadInput, long broadOutput) {
 
-        static final List<String> HEADER = List.of("decision", "jevIntent", "jevIntentConfidence", "jevRequestKind", "usedKind",
+        static final List<String> HEADER = List.of("decision", "jevIntent", "jevIntentConfidence", "jevFollowsPrevious", "jevRequestKind", "usedKind",
                 "broadDishes", "kindMatch", "broadAi", "broadMs", "broadInputTokens", "broadOutputTokens", "jevInputTokens", "jevMs");
 
         long jevInputTokens() {
@@ -173,6 +173,7 @@ final class ChatIntentEvalJevOn {
             return List.of(ChatIntentEvalManualTest.csv(decision),
                     ChatIntentEvalManualTest.csv(judgement == null ? null : judgement.first().answeredIntent()),
                     judgement == null ? "" : String.valueOf(judgement.first().intentConfidence()),
+                    ChatIntentEvalManualTest.csv(judgement == null ? null : judgement.first().followsPrevious()),
                     ChatIntentEvalManualTest.csv(judgement == null || !judgement.hasSecond() ? null : judgement.second().requestKind()),
                     ChatIntentEvalManualTest.csv(usedKind),
                     ChatIntentEvalManualTest.csv(usedKind == RequestKind.BROAD ? usedValues : null),

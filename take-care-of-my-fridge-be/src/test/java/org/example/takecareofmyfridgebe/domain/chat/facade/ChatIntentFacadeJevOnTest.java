@@ -473,7 +473,7 @@ class ChatIntentFacadeJevOnTest {
     private static JevIntentJudgement.First first(ChatIntent intent, double confidence) {
         Map<ChatIntent, Double> probabilities = new EnumMap<>(ChatIntent.class);
         Arrays.stream(ChatIntent.values()).forEach(each -> probabilities.put(each, each == intent ? confidence : 0.0));
-        return new JevIntentJudgement.First(intent, intent, confidence, probabilities, 0.05, FridgeScope.ALL, 0.9, call("req_first"));
+        return new JevIntentJudgement.First(intent, intent, confidence, probabilities, null, 0.05, FridgeScope.ALL, 0.9, call("req_first"));
     }
 
     private static JevIntentJudgement.Call call(String requestId) {
