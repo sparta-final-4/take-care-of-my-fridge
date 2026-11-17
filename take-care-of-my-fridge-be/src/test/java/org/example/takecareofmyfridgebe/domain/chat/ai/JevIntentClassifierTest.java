@@ -156,7 +156,8 @@ class JevIntentClassifierTest {
                 .containsEntry("instructions", "특정 요리 이름을 말했나");
         Map<String, Object> spicy = map(questions.get("taste_spicy"));
         assertThat(spicy.get("type")).isEqualTo("choice");
-        assertThat(spicy.get("instructions")).isEqualTo("사용자가 매운맛(얼큰하고 칼칼한 맛)을 원하나, 피하고 싶어 하나, 말하지 않았나?");
+        assertThat(spicy.get("instructions")).isEqualTo("사용자가 매운맛(얼큰하고 칼칼한 맛)을 원하나, 피하고 싶어 하나, 말하지 않았나? "
+                + "그 맛을 줄이거나 없애 달라는 뜻이면 피함이다");
         assertThat(map(spicy.get("criteria"))).containsExactly(
                 Map.entry("원함", "매운맛을 원한다"),
                 Map.entry("피함", "매운맛을 피하고 싶다"),

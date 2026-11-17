@@ -30,6 +30,8 @@ final class JevSecondQuestions {
     static final String INGREDIENT_NAMED = "ingredient_named";
     static final String MEALKIT_WANTED = "mealkit_wanted";
     static final String TASTE_PREFIX = "taste_";
+    // 맛을 줄이거나 없애 달라는 말("안 달게")을 그 맛 원함으로 답하지 않게 맛 질문 설명 끝에 붙인다. 단어 예시는 넣지 않는다
+    static final String TASTE_REDUCE_IS_AVOID = "그 맛을 줄이거나 없애 달라는 뜻이면 피함이다";
     static final String REQUEST_KIND = "request_kind";
     static final String CATEGORY = "category";
     // 분류 Choice에서 맞는 분류가 없다는 선택지
@@ -53,7 +55,8 @@ final class JevSecondQuestions {
         questions.put(MEALKIT_WANTED, SystemOneQuestion.noul("밀키트를 원하나"));
         for (Member.Taste taste : Member.Taste.values()) {
             questions.put(tasteName(taste), JevAnswers.choiceQuestion(
-                    "사용자가 " + tasteLabel(taste) + "(" + tasteDescription(taste) + ")을 원하나, 피하고 싶어 하나, 말하지 않았나?",
+                    "사용자가 " + tasteLabel(taste) + "(" + tasteDescription(taste) + ")을 원하나, 피하고 싶어 하나, 말하지 않았나? "
+                            + TASTE_REDUCE_IS_AVOID,
                     tasteStances(taste)));
         }
         questions.put(REQUEST_KIND, JevAnswers.choiceQuestion("사용자는 원하는 요리를 어떻게 말했나?", REQUEST_KINDS));
