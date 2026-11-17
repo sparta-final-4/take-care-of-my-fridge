@@ -1,0 +1,76 @@
+# AI 상담 의도 판단 확인용 문장 세트 (과적합 확인). chat-intent-eval.yml과 같은 형식이고 칸 뜻은 그 파일 머리말과 같다.
+# ChatIntentEvalManualTest를 OPENAI_INTENT_EVAL_SET=holdout으로 돌리면 이 파일을 읽는다.
+# 기본 세트에 없는 새 문장 15개다 (2026-11-17). 기대값은 문장 뜻으로 정했다.
+# 확인용으로만 쓴다: 이 세트 결과를 보고 프롬프트나 Jev 선택지 설명을 고치지 않는다.
+# 재료 사전·레시피 이름·분류는 기본 세트와 같고, 맥락은 이 세트에만 있는 것이다.
+
+# 재료 사전 (IngredientMatcher 대신). 여기 없는 이름은 직접 입력(ING_CUSTOM)으로 본다
+ingredients:
+  두부: 21
+  버섯: 161
+  오이: 15
+  땅콩: 30
+  당근: 40
+  대파: 41
+  우유: 42
+  양파: 43
+  브로콜리: 44
+  돼지고기: 45
+  간장: 46
+
+# 레시피 이름 (이름만 말하기·음식 말 찾기의 레시피 이름 검색 대신, 이름에 말이 들어 있으면 찾음)
+recipes:
+  - 김치찌개
+  - 부대찌개
+  - 순두부찌개
+  - 된장찌개
+  - 마라탕
+  - 탕수육
+  - 깐풍기
+  - 김피탕
+  - 두부조림
+  - 버섯전
+  - 냉면
+  - 막국수
+  # 이름이 딱 "닭볶음탕"인 레시피는 없다 (로컬 색인 2026-11-07 기준)
+  - 토마토시금치 닭볶음탕
+
+# 레시피 분류 (dev /api/recipes/classifications, 2026-11-09). 양념·음료·기타는 서버가 AI 목록에서 뺀다
+categories: [과자, 구이, 국, 그라탕, 기타, 김치, 디저트, 떡, 만두, 말이, 면류, 무침, 밥, 볶음, 빵, 샌드위치, 샐러드, 수프, 스튜, 쌈, 양념, 음료, 전, 전골, 절임, 조림, 죽, 찌개, 찜, 튀김, 피자, 한과, 회]
+
+# 이어지는 말 맥락: 직전 추천 카드(ID, 이름)와 직전 조건
+contexts:
+  pasta:
+    cards: [[601, 토마토 파스타], [602, 크림 파스타], [603, 알리오 올리오]]
+    condition: { categories: [면류] }
+  braise:
+    cards: [[701, 고등어조림], [702, 갈치조림], [703, 감자조림]]
+    condition: { wanted: [SALTY], categories: [조림] }
+
+cases:
+  # ── 특정 요리 ──
+  - { id: H01, group: 특정요리, message: "오늘 저녁엔 제육볶음 해 먹을래", expect: { kind: DISH, intent: RECOMMEND, dish: 제육볶음 } }
+  - { id: H02, group: 특정요리, message: "잡채 만드는 레시피 추천해줘", expect: { kind: DISH, intent: RECOMMEND, dish: 잡채 } }
+  - { id: H03, group: 특정요리, message: "주말에 감바스 해 먹고 싶은데 추천해줘", expect: { kind: DISH, intent: RECOMMEND, dish: 감바스 } }
+
+  # ── 특정 분류 ──
+  - { id: H04, group: 특정분류, message: "속이 안 좋아서 죽 먹고 싶어", expect: { kind: CATEGORY, intent: RECOMMEND, categories: [죽], dishEmpty: true } }
+  - { id: H05, group: 특정분류, message: "비 오는데 전 부쳐 먹을까", expect: { kind: CATEGORY, intent: RECOMMEND, categories: [전], dishEmpty: true } }
+  - { id: H06, group: 특정분류, message: "기름진 거 말고 찜 요리로 추천해줘", expect: { kind: CATEGORY, intent: RECOMMEND, categories: [찜], dishEmpty: true } }
+
+  # ── 넓은 요청 (H09는 여러 분류에 걸치는 말) ──
+  - { id: H07, group: 넓은요청, message: "손님 초대 요리 추천해줘", expect: { kind: BROAD, intent: RECOMMEND, dishEmpty: true } }
+  - { id: H08, group: 넓은요청, message: "야식으로 먹을 만한 거 추천해줘", expect: { kind: BROAD, intent: RECOMMEND, dishEmpty: true } }
+  - { id: H09, group: 넓은요청, message: "면이나 밥 종류로 아무거나 골라줘", expect: { kind: BROAD, intent: RECOMMEND, categories: [면류, 밥], dishEmpty: true } }
+
+  # ── 맛 피하기가 붙은 추천 ──
+  - { id: H10, group: 맛피하기, message: "안 매운 걸로 저녁 메뉴 골라줘", expect: { kind: NONE, intent: RECOMMEND, wanted: [], avoid: [SPICY] } }
+  - { id: H11, group: 맛피하기, message: "너무 짜지 않은 조림 요리 추천해줘", expect: { kind: CATEGORY, intent: RECOMMEND, avoid: [SALTY], categories: [조림] } }
+
+  # ── 이어지는 말 (직전 추천 있음) ──
+  - { id: H12, group: 후속, context: pasta, message: "좀 더 가벼운 걸로 다시 골라줘", expect: { kind: NONE, intent: REFINE, categories: [면류] } }
+  - { id: H13, group: 후속, context: braise, message: "이번엔 짠맛 대신 단맛 나는 걸로 바꿔줘", expect: { kind: NONE, intent: REFINE, wanted: [SWEET], avoid: [SALTY], categories: [조림] } }
+
+  # ── 추천이 아닌 의도 ──
+  - { id: H14, group: 추천아님, message: "계란 한 판 장바구니에 넣어줘", expect: { intent: SHOP } }
+  - { id: H15, group: 추천아님, message: "냉동한 밥 데우는 방법 알려줘", expect: { intent: GENERAL } }

@@ -87,6 +87,7 @@ import static org.mockito.Mockito.when;
  * (선택) OPENAI_INTENT_EVAL_LABEL=B  결과 파일 이름에 붙일 이름 (eval-{시각}-B-summary.txt)
  * (선택) OPENAI_INTENT_EVAL_JEV_MODE=on  Jev on 모드로 정한다 (기본 off). TYPESAFE_API_KEY가 필요하다 (ChatIntentEvalJevOn)
  * (선택) OPENAI_INTENT_EVAL_SKIP_TASTE_STEPS=true  on 모드에서 맛 단계(keep-other-tastes·spoken-tastes-only)도 건너뛴다
+ * (선택) OPENAI_INTENT_EVAL_SET=holdout  평가 세트 (main: chat-intent-eval.yml, 기본 / holdout: chat-intent-holdout.yml, 과적합 확인용)
  * </pre>
  * 결과: build/reports/chat-intent-eval/eval-{시각}-runs.csv (한 번 돌린 결과마다 한 줄, AI 원래 값과 최종 값),
  * eval-{시각}-cases.csv (문장마다 다수결 결과), eval-{시각}-summary.txt (묶음별 일치율·토큰·시간). 같은 요약을 콘솔에도 찍는다.
@@ -117,7 +118,8 @@ class ChatIntentEvalManualTest {
     @Test
     @DisplayName("평가 세트를 실제 AI로 돌려 서버 안전망을 거친 최종 결과를 기대와 비교하고 CSV로 남긴다")
     void runsEvalSet() throws IOException {
-        EvalSet set = EvalSet.load();
+        String setResource = EvalSet.resource(System.getenv("OPENAI_INTENT_EVAL_SET"));
+        EvalSet set = EvalSet.load(setResource);
         List<EvalCase> cases = set.cases(onlyIds());
         assertThat(cases).as("평가 세트").isNotEmpty();
         int runs = Integer.parseInt(Optional.ofNullable(System.getenv("OPENAI_INTENT_EVAL_RUNS")).orElse("3"));
@@ -148,7 +150,7 @@ class ChatIntentEvalManualTest {
                 jev.close();
             }
         }
-        write(set, cases, rows, runs, off, jevOn, skipTasteSteps);
+        write(set, setResource, cases, rows, runs, off, jevOn, skipTasteSteps);
 
         // AI 호출이 실패하면 서버가 일반 답으로 정해 결과가 의미 없으므로, 파일을 남긴 뒤 실패시킨다
         List<RunRow> failed = rows.stream().filter(row -> row.source().startsWith("AI_FAILED")).toList();
@@ -242,7 +244,7 @@ class ChatIntentEvalManualTest {
                 allergyExclusionFinder, corrections, corrector);
     }
 
-    private void write(EvalSet set, List<EvalCase> cases, List<RunRow> rows, int runs, Set<String> off, boolean jevOn,
+    private void write(EvalSet set, String setResource, List<EvalCase> cases, List<RunRow> rows, int runs, Set<String> off, boolean jevOn,
                        boolean skipTasteSteps) throws IOException {
         Files.createDirectories(OUT_DIR);
         String label = Optional.ofNullable(System.getenv("OPENAI_INTENT_EVAL_LABEL")).map(String::strip)
@@ -289,7 +291,8 @@ class ChatIntentEvalManualTest {
         List<RunRow> aiRows = rows.stream().filter(row -> row.inputTokens() > 0).toList();
         List<String> summary = new ArrayList<>();
         // 맨 위: 이번에 끈 서버 보정 (A~E 비교용)
-        summary.add(EvalCorrectionSwitches.describe(off) + (label == null ? "" : " · 이름 " + label) + (jevOn ? " · Jev on" : ""));
+        summary.add(EvalCorrectionSwitches.describe(off) + (label == null ? "" : " · 이름 " + label) + (jevOn ? " · Jev on" : "")
+                + (EvalSet.MAIN_SET.equals(setResource) ? "" : " · 세트 " + setResource));
         summary.add("AI 상담 의도 평가 " + stamp + " · 모델 " + MODEL + " · 문장 " + cases.size() + "개 × " + runs + "번 (다수결)");
         summary.add(promptSize(set));
         summary.add(String.format("전체 일치: %d / %d (%.1f%%)", passedCases, cases.size(), 100.0 * passedCases / cases.size()));
@@ -505,15 +508,32 @@ class ChatIntentEvalManualTest {
     }
 
     /**
-     * chat-intent-eval.yml. 재료 사전·레시피 이름·분류·맥락·문장.
+     * chat-intent-eval.yml(기본) 또는 chat-intent-holdout.yml(확인용). 재료 사전·레시피 이름·분류·맥락·문장.
      */
     record EvalSet(Map<String, Long> ingredients, List<String> recipes, List<String> categories,
                    Map<String, ChatContext> contexts, List<EvalCase> allCases, Set<String> promptExcluded) {
 
-        @SuppressWarnings("unchecked")
+        static final String MAIN_SET = "chat-intent-eval.yml";
+        static final String HOLDOUT_SET = "chat-intent-holdout.yml";
+
+        // OPENAI_INTENT_EVAL_SET 값(main|holdout, 없으면 main)을 읽을 평가 세트 파일로 바꾼다
+        static String resource(String set) {
+            String name = set == null ? "" : set.strip();
+            return switch (name) {
+                case "", "main" -> MAIN_SET;
+                case "holdout" -> HOLDOUT_SET;
+                default -> throw new IllegalArgumentException("모르는 평가 세트: " + set + " (main|holdout)");
+            };
+        }
+
         static EvalSet load() throws IOException {
+            return load(MAIN_SET);
+        }
+
+        @SuppressWarnings("unchecked")
+        static EvalSet load(String resource) throws IOException {
             Map<String, Object> root;
-            try (InputStream in = new ClassPathResource("chat-intent-eval.yml").getInputStream()) {
+            try (InputStream in = new ClassPathResource(resource).getInputStream()) {
                 root = new Yaml().load(in);
             }
             Map<String, Long> ingredients = new LinkedHashMap<>();
