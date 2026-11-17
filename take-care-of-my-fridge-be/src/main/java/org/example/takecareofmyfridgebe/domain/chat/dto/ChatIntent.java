@@ -3,7 +3,8 @@ package org.example.takecareofmyfridgebe.domain.chat.dto;
 /**
  * 상담 메시지의 의도.
  * RECOMMEND: 메뉴·레시피 추천 요청, GENERAL: 그 밖의 질문(보관법·손질법·인사 등).
- * REFINE·RECIPE_DETAIL은 직전 추천이 있을 때만 쓴다 (의도 판단에 [직전 추천]을 넘긴 경우).
+ * 직전 추천의 조건을 이어받아 일부만 바꾸는 추천("좀 더 매운 걸로")은 의도가 아니라 추천 안의 이어짐 항목이다 (IntentResult.followsPrevious).
+ * RECIPE_DETAIL은 직전 추천이 있을 때만 쓴다 (의도 판단에 [직전 추천]을 넘긴 경우).
  * FRIDGE는 냉장고 데이터로, SHOP은 판매 상품으로 서버가 카드와 문장을 만들어 답한다 (답 생성 AI 없음).
  * OFF_TOPIC·BLOCKED·SELF_HARM은 답 생성 AI 없이 서버 안내로 답한다. 의도 판단 AI를 썼으므로 하루 횟수는 센다.
  * BLOCKED·SELF_HARM은 서버 단어 목록(app.chat.safety.words)에 없지만 AI가 그렇게 본 말이다. 보낸 말과 안내 답을 걸러진 메시지(filtered)로 저장한다.
@@ -11,8 +12,6 @@ package org.example.takecareofmyfridgebe.domain.chat.dto;
 public enum ChatIntent {
     RECOMMEND,
     GENERAL,
-    // 직전 추천을 조건을 바꿔 다시 받고 싶은 말 ("좀 더 매운 걸로", "다른 거 없어?", "국물 말고 볶음으로")
-    REFINE,
     // 추천한 레시피 하나를 자세히 묻는 말 ("두 번째 거 어떻게 만들어?", "깐풍기 시간 얼마나 걸려?")
     RECIPE_DETAIL,
     // 냉장고에 무엇이 있는지 보려는 말 ("냉장고에 뭐 있어", "밀키트 뭐 남았어", "두부 아직 있어?", "곧 버려야 할 거 있어?")

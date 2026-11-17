@@ -20,7 +20,7 @@ import java.util.stream.Stream;
  * 0은 sanitize에서 null로 바꾸고, 빈 목록은 말하지 않은 것과 같게 다룬다. 테스트·스텁에서는 null로 올 수도 있다.
  * AI 응답을 그대로 받는 모양이라 값이 틀릴 수 있으므로 sanitize로 정리해서 쓴다.
  *
- * @param intent             RECOMMEND / GENERAL / REFINE / RECIPE_DETAIL / OFF_TOPIC / BLOCKED / SELF_HARM (ChatIntent)
+ * @param intent             RECOMMEND / GENERAL / RECIPE_DETAIL / FRIDGE / SHOP / OFF_TOPIC / BLOCKED / SELF_HARM (ChatIntent)
  * @param wantedTastes       원하는 맛 (Member.Taste 이름)
  * @param moodCategories     원하는 레시피 분류 (recipes.category 값)
  * @param maxMinutes         최대 조리 시간(분). 말하지 않았으면 0
@@ -35,7 +35,7 @@ import java.util.stream.Stream;
  * @param preferenceText     사용자가 원한 특징·요리 표현 그대로 (예: "차가운 요리", "냉면 같은 면 요리"). 요청에 못 맞췄을 때 안내에 쓴다
  * @param targetIndex        RECIPE_DETAIL일 때 직전 추천 카드 번호(1부터). 모르면 0
  * @param targetName         RECIPE_DETAIL일 때 말한 레시피 이름 (예: "깐풍기"). 없으면 빈 문자열
- * @param removed            REFINE일 때 지우라고 한 조건 종류 (RefineCondition 이름, "시간 상관없이" → MAX_MINUTES). 없으면 빈 목록
+ * @param removed            이어짐일 때 지우라고 한 조건 종류 (RefineCondition 이름, "시간 상관없이" → MAX_MINUTES). 없으면 빈 목록
  * @param avoidTastes        피할 맛 (Member.Taste 이름, "매운 거 말고" → SPICY). 말하지 않았으면 빈 목록
  * @param detailQuestion     RECIPE_DETAIL일 때 질문 종류 (DetailQuestion 이름: HOW_TO, TIME, INGREDIENTS, TIP, OTHER). 다른 의도면 빈 값
  * @param fridgeScope        FRIDGE일 때 보여 줄 범위 (FridgeScope 이름: ALL, MEALKIT, IMMINENT). 다른 의도면 ALL
@@ -151,13 +151,11 @@ public record IntentResult(
     public IntentResult sanitize(Collection<String> allowedCategories) {
         Set<String> categories = Set.copyOf(allowedCategories);
         List<String> cleanCategories = cleanNames(moodCategories, name -> name, categories);
-        // 다시 추천(REFINE)은 추천 + 이어짐 예로 읽는다 (OpenAI 프롬프트에서 REFINE을 지우기 전까지)
-        boolean refine = intent == ChatIntent.REFINE;
         // 키워드는 이름만 다듬고 분류로 옮기지 않는다
         List<String> cleanKeywords = keywords == null ? null
                 : cleanNames(keywords, name -> name, null).stream().limit(MAX_KEYWORDS).toList();
         return new IntentResult(
-                refine ? ChatIntent.RECOMMEND : intent == null ? ChatIntent.GENERAL : intent,
+                intent == null ? ChatIntent.GENERAL : intent,
                 cleanNames(wantedTastes, name -> name.toUpperCase(Locale.ROOT), TASTE_NAMES),
                 cleanCategories,
                 maxMinutes == null || maxMinutes <= 0 ? null : maxMinutes,
@@ -177,7 +175,7 @@ public record IntentResult(
                 fridgeScope == null || !SCOPE_NAMES.contains(fridgeScope.strip().toUpperCase(Locale.ROOT))
                         ? null
                         : fridgeScope.strip().toUpperCase(Locale.ROOT),
-                refine ? Boolean.TRUE : followsPrevious
+                followsPrevious
         );
     }
 

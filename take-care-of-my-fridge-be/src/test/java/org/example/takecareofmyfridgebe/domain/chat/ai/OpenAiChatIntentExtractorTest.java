@@ -167,7 +167,7 @@ class OpenAiChatIntentExtractorTest {
     }
 
     @Test
-    @DisplayName("응답 스키마는 strict(OpenAI json_schema)로 보내고, intent는 ChatIntent 값만 고를 수 있으며 비슷한 요리 칸은 없다 (따로 묻는다)")
+    @DisplayName("응답 스키마는 strict(OpenAI json_schema)로 보내고, intent는 ChatIntent 값만(REFINE 없음) 고를 수 있으며 비슷한 요리 칸은 없다 (따로 묻는다)")
     void sendsStrictSchema_withIntentEnum() {
         chatModel.reply = RECOMMEND_JSON;
 
@@ -181,6 +181,8 @@ class OpenAiChatIntentExtractorTest {
         List<String> intents = new ArrayList<>();
         schema.get("properties").get("intent").get("enum").forEach(value -> intents.add(value.asString()));
         assertThat(intents).containsExactlyInAnyOrder(Arrays.stream(ChatIntent.values()).map(Enum::name).toArray(String[]::new));
+        // 이어짐은 의도가 아니라 followsPrevious 칸이다
+        assertThat(intents).doesNotContain("REFINE");
         List<String> required = new ArrayList<>();
         schema.get("required").forEach(value -> required.add(value.asString()));
         assertThat(required).contains("intent", "dishText", "keywords", "followsPrevious").doesNotContain("similarDishes");

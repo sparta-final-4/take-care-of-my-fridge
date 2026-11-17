@@ -231,7 +231,6 @@ public class ChatIntentFacade {
             case RECOMMEND -> result.follows()
                     ? recommendFollowing(memberId, sessionId, request, result, context)
                     : ChatIntentResolution.recommend(Source.AI, toRecipeQuery(memberId, sessionId, request, result));
-            case REFINE -> throw new IllegalStateException("REFINE은 추천 + 이어짐으로 읽는다 (IntentResult.sanitize)");
             case RECIPE_DETAIL -> recipeDetail(memberId, sessionId, result, corrected.detailTarget());
             case FRIDGE -> ChatIntentResolution.fridge(Source.AI, lookupOf(request.content(), result));
             case SHOP -> ChatIntentResolution.shop(Source.AI, lookupOf(request.content(), result));
