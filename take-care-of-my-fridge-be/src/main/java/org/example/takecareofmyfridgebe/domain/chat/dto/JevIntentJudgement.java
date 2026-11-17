@@ -5,7 +5,7 @@ import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 import java.util.Map;
 
 /**
- * Jev 의도 판단 결과. 1차는 모든 메시지, 2차는 1차 의도가 RECOMMEND·REFINE일 때만 묻는다.
+ * Jev 의도 판단 결과. 1차는 모든 메시지, 2차는 1차 의도가 RECOMMEND일 때만 묻는다.
  * 믿을지는 Choice의 confidence(가장 큰 확률과 다를 수 있다), Noul의 "예" 확률로 판단한다.
  * 자르는 기준값은 여기서 정하지 않는다.
  *
@@ -26,10 +26,10 @@ public record JevIntentJudgement(
     /**
      * 1차: 의도, 정보를 묻는 말인지, 냉장고 보기 범위.
      *
-     * @param intent              서비스 규칙을 적용한 의도. 직전 추천이 없는데 RECIPE_DETAIL로 답했으면 RECOMMEND,
-     *                            직전 추천이 있고 추천 + 이어지는 말이면 REFINE (JevIntentClassifier.serviceIntent). 2차를 물을지도 이 값으로 정한다
+     * @param intent              서비스 규칙을 적용한 의도. 직전 추천이 없는데 RECIPE_DETAIL로 답했으면 RECOMMEND
+     *                            (JevIntentClassifier.serviceIntent). 2차를 물을지도 이 값으로 정한다. 이어짐은 JevIntentClassifier.follows
      * @param answeredIntent      Jev가 고른 의도 그대로
-     * @param intentConfidence    고른 의도 선택지의 confidence (추천 + 이어짐이면 "추천" 선택지의 confidence)
+     * @param intentConfidence    고른 의도 선택지의 confidence (이어짐이어도 "추천" 선택지의 confidence)
      * @param intentProbabilities 의도별 확률 (ChatIntent 순서, Jev 답 그대로)
      * @param followsPrevious     직전 추천에 이어지는 말일 확률 (Noul). 직전 추천이 없어 묻지 않았으면 null
      * @param asksQuestion        정보를 묻는 말일 확률 (Noul)

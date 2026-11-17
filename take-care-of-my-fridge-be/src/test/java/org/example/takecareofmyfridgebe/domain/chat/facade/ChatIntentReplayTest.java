@@ -2,7 +2,6 @@ package org.example.takecareofmyfridgebe.domain.chat.facade;
 
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatCandidateProperties;
-import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntent;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntentResolution;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageCreateRequest;
 import org.example.takecareofmyfridgebe.domain.chat.dto.IntentResult;
@@ -136,11 +135,12 @@ class ChatIntentReplayTest {
                 new JevIntentResolver(mock(SimilarDishFinder.class), words));
     }
 
-    // 기록한 칸으로 AI 원래 결과를 다시 만든다 (평가 CSV의 AI 칸과 같은 모양, 목록은 " / "로 이어 씀)
+    // 기록한 칸으로 AI 원래 결과를 다시 만든다 (평가 CSV의 AI 칸과 같은 모양, 목록은 " / "로 이어 씀).
+    // 의도 칸의 +FOLLOWS(예전 기록은 REFINE)는 추천 + 이어짐 예다
     private static IntentResult rawOf(Map<String, String> row) {
         String intent = blankToNull(row.get("aiIntent"));
         return new IntentResult(
-                intent == null ? null : ChatIntent.valueOf(intent),
+                intent == null ? null : ChatIntentEvalManualTest.intentOf(intent),
                 list(row.get("aiWanted")),
                 list(row.get("aiCategories")),
                 integer(row.get("aiMaxMinutes")),
@@ -155,7 +155,8 @@ class ChatIntentReplayTest {
                 list(row.get("aiRemoved")),
                 list(row.get("aiAvoid")),
                 blankToNull(row.get("aiQuestion")),
-                blankToNull(row.get("aiScope")));
+                blankToNull(row.get("aiScope")),
+                intent != null && ChatIntentEvalManualTest.followsOf(intent));
     }
 
     private static List<Map<String, String>> readInputs() throws IOException {
@@ -207,7 +208,7 @@ class ChatIntentReplayTest {
     // 집합 칸은 정렬해서, 목록 칸은 순서대로 적는다
     private static String line(Outcome outcome) {
         return String.join(",", List.of(
-                cell(outcome.intent()), sorted(outcome.wanted()), sorted(outcome.avoid()), sorted(outcome.categories()),
+                cell(ChatIntentEvalManualTest.intentLabel(outcome.intent(), outcome.follows())), sorted(outcome.wanted()), sorted(outcome.avoid()), sorted(outcome.categories()),
                 cell(String.join(LIST_DELIMITER, outcome.keywords())), cell(outcome.dish()), cell(outcome.preference()),
                 cell(outcome.maxMinutes()), sorted(outcome.include()), sorted(outcome.exclude()),
                 cell(outcome.useSelectedOnly()), cell(outcome.scope()), sorted(outcome.names()), cell(outcome.saleOnly()),

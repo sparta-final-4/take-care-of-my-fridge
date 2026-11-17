@@ -61,7 +61,8 @@ import java.util.stream.Stream;
  * <p>
  * 직전 추천 카드가 있으면 의도 판단에 [직전 추천]·[이전 추천]·[직전 조건]을 별도 메시지로 넘겨 이어지는 말을 알아듣는다.
  * <ul>
- *   <li>REFINE(다시 추천): 직전 조건이 없으면(Redis 만료·장애) 이번 말만으로 새 추천</li>
+ *   <li>추천 + 이어짐(직전 조건을 이어받아 일부만 바꾸는 추천): 직전 조건과 이번 말을 합친다.
+ *       직전 조건이 없으면(Redis 만료·장애) 이어짐은 아니오이고 이번 말만으로 새 추천이다 (서비스 규칙, IntentCorrector)</li>
  *   <li>RECIPE_DETAIL(레시피 자세히): 이름이 직전 카드에 있으면 그 카드, 다음은 직전 카드 번호, 다음은 상담 전체 추천에서 이름으로 찾는다.
  *       못 찾으면 일반 답(이전 대화를 보고 AI가 되묻는다)</li>
  * </ul>
@@ -127,7 +128,7 @@ public class ChatIntentFacade {
     public ChatIntentResolution resolve(Long memberId, Long sessionId, ChatMessageCreateRequest request, ChatContext context) {
         Decision decision = decide(memberId, sessionId, request, context);
         ChatIntentResolution resolution = decision.resolution();
-        // 추천이면 이 상담에서 말한 알레르기·못 먹는 재료를 뺄 재료에 더한다 (AI가 놓쳐도, 다시 추천·새 추천 모두. 콕 집은 요리여도 뺀다)
+        // 추천이면 이 상담에서 말한 알레르기·못 먹는 재료를 뺄 재료에 더한다 (AI가 놓쳐도, 이어짐·새 추천 모두. 콕 집은 요리여도 뺀다)
         if (resolution.recommends()) {
             AllergyExclusionFinder.Allergens allergens = allergyExclusionFinder.find(sessionId, request.content());
             if (!allergens.isEmpty()) {
@@ -136,8 +137,8 @@ public class ChatIntentFacade {
                 resolution = resolution.withAllergens(allergens.names(), allergens.ingredientIds());
             }
         }
-        log.info("상담 의도 - memberId: {}, sessionId: {}, 의도: {}, 출처: {}, 조건: {}, 지울 조건(removed): {}, 대상 레시피: {}, 질문 종류: {}",
-                memberId, sessionId, resolution.intent(), resolution.source(), summarize(resolution.recipeQuery()),
+        log.info("상담 의도 - memberId: {}, sessionId: {}, 의도: {}, 이어짐: {}, 출처: {}, 조건: {}, 지울 조건(removed): {}, 대상 레시피: {}, 질문 종류: {}",
+                memberId, sessionId, resolution.intent(), resolution.follows(), resolution.source(), summarize(resolution.recipeQuery()),
                 decision.removed(), resolution.targetRecipeId(), resolution.detailQuestion());
         logJevDecision(memberId, sessionId, request, resolution, decision.jev(), decision.jevDecision());
         return resolution;
@@ -227,8 +228,10 @@ public class ChatIntentFacade {
         IntentCorrector.Corrected corrected = intentCorrector.correct(input, result);
         result = corrected.result();
         ChatIntentResolution resolution = switch (result.intent()) {
-            case RECOMMEND -> ChatIntentResolution.recommend(Source.AI, toRecipeQuery(memberId, sessionId, request, result));
-            case REFINE -> refine(memberId, sessionId, request, result, context);
+            case RECOMMEND -> result.follows()
+                    ? recommendFollowing(memberId, sessionId, request, result, context)
+                    : ChatIntentResolution.recommend(Source.AI, toRecipeQuery(memberId, sessionId, request, result));
+            case REFINE -> throw new IllegalStateException("REFINE은 추천 + 이어짐으로 읽는다 (IntentResult.sanitize)");
             case RECIPE_DETAIL -> recipeDetail(memberId, sessionId, result, corrected.detailTarget());
             case FRIDGE -> ChatIntentResolution.fridge(Source.AI, lookupOf(request.content(), result));
             case SHOP -> ChatIntentResolution.shop(Source.AI, lookupOf(request.content(), result));
@@ -280,25 +283,21 @@ public class ChatIntentFacade {
         return mealkit ? ProductType.MEALKIT : ProductType.INGREDIENT;
     }
 
-    // 다시 추천: 직전 조건과 이번 말을 합친다. 직전 조건이 없으면(Redis 만료·장애, 첫 질문) 이번 말만으로 새 추천
-    private ChatIntentResolution refine(Long memberId, Long sessionId, ChatMessageCreateRequest request, IntentResult result,
-                                        ChatContext context) {
+    // 추천 + 이어짐: 직전 조건과 이번 말을 합친다. 직전 조건이 있을 때만 온다 (없으면 IntentCorrector가 이어짐을 아니오로 둔다)
+    private ChatIntentResolution recommendFollowing(Long memberId, Long sessionId, ChatMessageCreateRequest request,
+                                                    IntentResult result, ChatContext context) {
         RecipeQuery current = toRecipeQuery(memberId, sessionId, request, result);
-        if (context.lastRecommendation() == null) {
-            log.info("상담 다시 추천인데 직전 조건이 없어 새 추천으로 - memberId: {}, sessionId: {}", memberId, sessionId);
-            return ChatIntentResolution.recommend(Source.AI, current);
-        }
         RecipeQuery previous = context.lastRecommendation().query().toRecipeQuery(memberId);
         Set<RefineCondition> removed = result.removedConditions();
         if (!removed.isEmpty()) {
-            log.info("상담 다시 추천에서 뺄 조건 - memberId: {}, sessionId: {}, 조건: {}", memberId, sessionId, removed);
+            log.info("상담 이어짐에서 뺄 조건 - memberId: {}, sessionId: {}, 조건: {}", memberId, sessionId, removed);
         }
         RecipeQuery merged = mergeRefine(previous, current, removed);
-        return ChatIntentResolution.refine(Source.AI, followSpokenTastes(memberId, sessionId, request.content(), merged));
+        return ChatIntentResolution.recommendFollowing(Source.AI, followSpokenTastes(memberId, sessionId, request.content(), merged));
     }
 
     /**
-     * 다시 추천에서 맛이 부딪히면 이번 말에 나온 맛을 따른다 (맛 전체, TasteWordChecker.stances로 이번 말의 맛만 본다).
+     * 이어짐에서 맛이 부딪히면 이번 말에 나온 맛을 따른다 (맛 전체, TasteWordChecker.stances로 이번 말의 맛만 본다).
      * <ul>
      *   <li>이번 말에 원한 맛: 원하는 맛에 넣고 피할 맛에서 빼며, 그 맛과 반대인 맛(app.chat.words.taste-opposites)은 원하는 맛에서 지운다
      *       ("짭짤한 거" → "담백한 거로" → 순한맛만, "매운 거 말고" → "좀 더 매운 걸로" → 매운맛 원함·피할 맛 없음).
@@ -332,20 +331,20 @@ public class ChatIntentFacade {
         }
         RecipeQuery followed = merged.withTastes(List.copyOf(wanted), List.copyOf(avoid));
         if (!followed.wantedTastes().equals(merged.wantedTastes()) || !followed.avoidTastes().equals(merged.avoidTastes())) {
-            log.info("상담 다시 추천 맛이 부딪혀 이번 말을 따름 - memberId: {}, sessionId: {}, 원하는 맛: {} → {}, 피할 맛: {} → {}",
+            log.info("상담 이어짐 맛이 부딪혀 이번 말을 따름 - memberId: {}, sessionId: {}, 원하는 맛: {} → {}, 피할 맛: {} → {}",
                     memberId, sessionId, merged.wantedTastes(), followed.wantedTastes(), merged.avoidTastes(), followed.avoidTastes());
         }
         return followed;
     }
 
     /**
-     * 직전 조건과 이번 말(다시 추천)을 합친다.
+     * 직전 조건과 이번 말(이어짐)을 합친다.
      * <ul>
      *   <li>원하는 맛: 직전 맛에 이번 맛을 쌓고(removed에 TASTE면 이번 맛만), 부딪히는 맛은 followSpokenTastes가 이번 말을 따라 고친다</li>
      *   <li>분류·시간·키워드: AI가 [직전 조건]에 이번 말을 반영한 최종값을 낸다. AI가 비워 둔 칸은 직전 값을 쓴다
      *       ("좀 더 매운 걸로" → 맛만 바뀌고 분류·키워드는 그대로, "국물 말고 볶음으로" → 분류만 바뀜, "다른 거 없어?" → 모두 그대로).
      *       removed에 있는 조건은 직전 값을 지우고 이번 말의 값만 쓴다 ("매운 거 말고" → 맛 조건 없음, "시간 상관없이" → 시간 조건 없음)</li>
-     *   <li>요리 이름·원한 표현: 이어 가지 않는다 (다시 추천에서 "김피탕 레시피는 없어서…" 같은 안내가 다시 나오지 않게)</li>
+     *   <li>요리 이름·원한 표현: 이어 가지 않는다 (이어짐에서 "김피탕 레시피는 없어서…" 같은 안내가 다시 나오지 않게)</li>
      *   <li>피할 맛: 이번에 말한 피할 맛 + 직전 피할 맛을 이어 간다 ("매운 거 말고" 뒤 "다른 거 없어?"도 안 매운 걸로).
      *       이번 원하는 맛에 다시 들어간 맛("다시 매운 걸로")은 직전 피할 맛에서 풀고, 이번에 말한 피할 맛은 원하는 맛보다 앞선다</li>
      *   <li>재료: AI에 넘기지 않으므로 서버가 이어 간다. 직전 선택 재료 + 이번에 고르거나 말한 재료, 뺄 재료는 합친 뒤 선택 재료에서 뺀다.
@@ -462,7 +461,7 @@ public class ChatIntentFacade {
         if (!query.keywords().isEmpty()) {
             parts.add("키워드 " + String.join(NAME_DELIMITER, query.keywords()));
         }
-        // 요리 이름·원한 표현은 다시 추천에서 이어 가지 않으므로 넘기지 않는다
+        // 요리 이름·원한 표현은 이어짐에서 이어 가지 않으므로 넘기지 않는다
         return parts.isEmpty() ? NONE : String.join(" / ", parts);
     }
 

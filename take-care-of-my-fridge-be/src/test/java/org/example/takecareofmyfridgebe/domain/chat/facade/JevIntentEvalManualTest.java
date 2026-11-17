@@ -66,7 +66,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * <p>
  * 비교 칸 (Jev가 판단하지 않는 요리 이름·키워드·시간·재료 등은 비교하지 않는다):
  * <ul>
- *   <li>intent: JevIntentClassifier가 서비스 규칙을 적용한 의도(직전 추천이 없는데 REFINE·RECIPE_DETAIL이면 RECOMMEND, 이때 2차도 묻는다).
+ *   <li>intent: JevIntentClassifier가 서비스 규칙을 적용한 의도와 이어짐(JevIntentClassifier.follows, 직전 추천이 없는데 RECIPE_DETAIL이면 RECOMMEND, 이때 2차도 묻는다).
  *       그 밖의 서버 보정은 하지 않는다</li>
  *   <li>kind: 요청 종류 (기대 칸 kind)</li>
  *   <li>category: 기대 kind가 특정 분류(CATEGORY)나 특정 요리(DISH)이고 기대 분류가 하나인 문장만, Jev 1등 분류와 비교한다.
@@ -90,7 +90,7 @@ class JevIntentEvalManualTest {
     // 입력 100만 토큰당 비용 (USD)
     private static final double USD_PER_MILLION_INPUT = 0.04;
     // 2차(추천 조건)를 묻는 의도 (JevIntentClassifier와 같다)
-    private static final Set<ChatIntent> SECOND_INTENTS = Set.of(ChatIntent.RECOMMEND, ChatIntent.REFINE);
+    private static final Set<ChatIntent> SECOND_INTENTS = Set.of(ChatIntent.RECOMMEND);
     private static final String SPICY = Taste.SPICY.name();
     private static final String MILD = Taste.MILD.name();
 
@@ -155,7 +155,12 @@ class JevIntentEvalManualTest {
      * @param kind     요청 종류. 2차를 묻지 않았거나 OpenAI면 null
      * @param category 1등 분류 ("없음"이면 null)
      */
-    record Answer(ChatIntent intent, Set<String> wanted, Set<String> avoid, RequestKind kind, String category) {
+    record Answer(ChatIntent intent, boolean follows, Set<String> wanted, Set<String> avoid, RequestKind kind, String category) {
+
+        // 의도 칸 글 (추천 + 이어짐이면 RECOMMEND+FOLLOWS)
+        String intentLabel() {
+            return ChatIntentEvalManualTest.intentLabel(intent, follows);
+        }
     }
 
     /**
@@ -164,8 +169,8 @@ class JevIntentEvalManualTest {
     static List<String> mismatches(Map<String, Object> expect, Answer answer, List<String> fields) {
         List<String> result = new ArrayList<>();
         if (fields.contains("intent") && expect.containsKey("intent")
-                && !strings(expect.get("intent")).contains(answer.intent().name())) {
-            result.add("intent: 기대 " + expect.get("intent") + ", 실제 " + answer.intent());
+                && !ChatIntentEvalManualTest.intentMatches(expect, answer.intent(), answer.follows())) {
+            result.add("intent: 기대 " + ChatIntentEvalManualTest.expectedIntentLabel(expect) + ", 실제 " + answer.intentLabel());
         }
         if (fields.contains("kind") && expect.containsKey("kind")
                 && (answer.kind() == null || !answer.kind().name().equals(String.valueOf(expect.get("kind"))))) {
@@ -234,13 +239,13 @@ class JevIntentEvalManualTest {
         // 비교할 답. 1차 실패면 null
         Answer answer() {
             if (blockedIntent != null) {
-                return new Answer(blockedIntent, Set.of(), Set.of(), null, null);
+                return new Answer(blockedIntent, false, Set.of(), Set.of(), null, null);
             }
             if (judgement == null) {
                 return null;
             }
             JevIntentJudgement.Second second = judgement.second();
-            return new Answer(judgement.first().intent(),
+            return new Answer(judgement.first().intent(), JevIntentClassifier.follows(judgement.first()),
                     second == null ? Set.of() : tastes(second, TasteStance.WANTED),
                     second == null ? Set.of() : tastes(second, TasteStance.AVOIDED),
                     second == null ? null : second.requestKind(),
@@ -263,7 +268,7 @@ class JevIntentEvalManualTest {
         String signature() {
             Answer answer = answer();
             return answer == null ? status
-                    : answer.intent() + " " + new TreeSet<>(answer.wanted()) + " " + new TreeSet<>(answer.avoid())
+                    : answer.intentLabel() + " " + new TreeSet<>(answer.wanted()) + " " + new TreeSet<>(answer.avoid())
                     + " " + answer.kind() + " " + answer.category();
         }
 
@@ -288,7 +293,7 @@ class JevIntentEvalManualTest {
         summary.add("Jev 상담 의도 평가 " + stamp + " · 모델 " + model + " · 문장 " + cases.size() + "개 × " + runs
                 + "번 (다수결) · 분류 선택지 " + categoryCount + "개 + 없음");
         summary.add("비교 칸: " + String.join(", ", COMPARED) + " (밀키트는 평가 세트에 기대 칸이 없어 비교하지 않음)");
-        summary.add("- intent: JevIntentClassifier의 서비스 규칙 적용 값 (직전 추천이 없는데 REFINE·RECIPE_DETAIL이면 RECOMMEND, 이때 2차도 묻는다)");
+        summary.add("- intent: JevIntentClassifier의 서비스 규칙 적용 값 (직전 추천이 없는데 RECIPE_DETAIL이면 RECOMMEND, 이때 2차도 묻는다)와 이어짐(+FOLLOWS)");
         summary.add("- kind: 요청 종류(DISH 특정 요리 / CATEGORY 특정 분류 / BROAD 넓은 요청 / NONE 없음)");
         summary.add("- category: 기대 kind가 CATEGORY·DISH이고 기대 분류가 하나인 문장만 Jev 1등 분류와 비교 (넓은 요청의 분류 기대값은 비교하지 않음)");
         summary.add("- wanted·avoid (기준 변경): 매운맛 피함 + 순한맛 원함, 매운맛 원함 + 순한맛 피함으로 답한 순한맛은 틀림으로 세지 않는다"
@@ -443,7 +448,7 @@ class JevIntentEvalManualTest {
         for (Map.Entry<EvalCase, List<JevRun>> entry : byCase.entrySet()) {
             Set<String> signatures = entry.getValue().stream().map(JevRun::signature).collect(Collectors.toSet());
             Set<String> intents = entry.getValue().stream()
-                    .map(row -> row.answer() == null ? row.status() : row.answer().intent().name())
+                    .map(row -> row.answer() == null ? row.status() : row.answer().intentLabel())
                     .collect(Collectors.toSet());
             intentDiffers += intents.size() > 1 ? 1 : 0;
             if (signatures.size() > 1) {
@@ -524,10 +529,10 @@ class JevIntentEvalManualTest {
             return row.status();
         }
         if (!row.judged()) {
-            return answer.intent() + "(" + row.status() + ")";
+            return answer.intentLabel() + "(" + row.status() + ")";
         }
         JevIntentJudgement.Second second = row.judgement().second();
-        return String.format("%s(%.2f) 원함 %s 피함 %s 종류 %s 분류 %s", answer.intent(), row.judgement().first().intentConfidence(),
+        return String.format("%s(%.2f) 원함 %s 피함 %s 종류 %s 분류 %s", answer.intentLabel(), row.judgement().first().intentConfidence(),
                 new TreeSet<>(answer.wanted()), new TreeSet<>(answer.avoid()),
                 second == null ? "-" : second.requestKind() + String.format("(%.2f)", second.requestKindConfidence()),
                 second == null ? "-" : second.category() + String.format("(%.2f)", second.categoryConfidence()));
@@ -553,7 +558,7 @@ class JevIntentEvalManualTest {
             JevIntentJudgement.First first = judgement == null ? null : judgement.first();
             JevIntentJudgement.Second second = judgement == null ? null : judgement.second();
             Answer answer = row.answer();
-            cells.add(csv(answer == null ? null : answer.intent()));
+            cells.add(csv(answer == null ? null : answer.intentLabel()));
             cells.add(csv(first == null ? null : first.answeredIntent()));
             cells.add(first == null ? "" : String.valueOf(first.intentConfidence()));
             cells.add(csv(first == null ? null : first.intentProbabilities().entrySet().stream()
@@ -603,7 +608,7 @@ class JevIntentEvalManualTest {
             lines.add(String.join(",", csv(evalCase.id()), csv(evalCase.group()), csv(evalCase.context()), csv(evalCase.message()),
                     String.valueOf(passRuns), String.valueOf(caseRows.size()), String.valueOf(passRuns * 2 > caseRows.size()),
                     csv(mismatches), csv(comparedExpect(evalCase).toString()),
-                    csv(mostCommon(answers, answer -> String.valueOf(answer.intent()))),
+                    csv(mostCommon(answers, answer -> answer.intentLabel())),
                     csv(mostCommon(answers, answer -> new TreeSet<>(answer.wanted()).toString())),
                     csv(mostCommon(answers, answer -> new TreeSet<>(answer.avoid()).toString())),
                     csv(mostCommon(answers, answer -> String.valueOf(answer.kind()))),
@@ -763,7 +768,8 @@ class JevIntentEvalManualTest {
         }
 
         private static Answer answer(String intent, String wanted, String avoid) {
-            return new Answer(ChatIntent.valueOf(intent), split(wanted), split(avoid), null, null);
+            return new Answer(ChatIntentEvalManualTest.intentOf(intent), ChatIntentEvalManualTest.followsOf(intent), split(wanted),
+                    split(avoid), null, null);
         }
 
         // csv()가 목록을 " / "로 이었다

@@ -278,8 +278,8 @@ public class ChatStreamFacade {
             // 같은 상담에서 이미 추천한 레시피는 뒤로 보낸다
             RecipeQuery query = resolution.recipeQuery()
                     .withAlreadyRecommended(chatMessageService.findRecommendedRecipeIds(sessionId));
-            // 다시 추천이면 직전 카드는 후보에서 뺀다 (모자라면 뒤에 다시 넣는다)
-            RecommendationReply recommendation = resolution.intent() == ChatIntent.REFINE && context.lastRecommendation() != null
+            // 이어짐(직전 조건을 이어받는 추천)이면 직전 카드는 후보에서 뺀다 (모자라면 뒤에 다시 넣는다)
+            RecommendationReply recommendation = resolution.follows() && context.lastRecommendation() != null
                     ? chatRecommendationFacade.recommend(request.content(), query, context.lastRecommendation().recipeIds(), sessionId)
                     : chatRecommendationFacade.recommend(request.content(), query, List.of(), sessionId);
             // 고른 레시피·맞은 방식·카드 이유는 ChatRecommendationFacade가 "상담 추천 후보 -"로 남긴다

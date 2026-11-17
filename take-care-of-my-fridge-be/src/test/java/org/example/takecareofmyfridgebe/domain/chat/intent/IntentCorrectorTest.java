@@ -70,7 +70,7 @@ class IntentCorrectorTest {
     }
 
     @Nested
-    @DisplayName("다시 추천 분류 (후속 질문)")
+    @DisplayName("이어짐 분류 (후속 질문)")
     class CategoryWords {
 
         // 직전 추천: 김피탕 같은 메뉴 (분류 튀김, 키워드 김피탕·탕수육·깐풍기)
@@ -90,26 +90,28 @@ class IntentCorrectorTest {
         }
 
         @Test
-        @DisplayName("디저트 추천 뒤 \"다른 디저트 추천해줘\"는 다시 추천(직전 카드 빼기)이고 분류 디저트다")
-        void refinesWithDessert_whenAnotherDessert() {
-            givenExtracted(new IntentResult(ChatIntent.REFINE, null, List.of(), null, null, null, null, null, null, null));
+        @DisplayName("디저트 추천 뒤 \"다른 디저트 추천해줘\"는 이어짐(직전 카드 빼기)이고 분류 디저트다")
+        void followsWithDessert_whenAnotherDessert() {
+            givenExtracted(new IntentResult(ChatIntent.RECOMMEND, null, List.of(), null, null, null, null, null, null, null).withFollows(true));
 
             ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID,
                     ChatMessageCreateRequest.of("다른 디저트 추천해줘"), afterDessert);
 
-            assertThat(resolution.intent()).isEqualTo(ChatIntent.REFINE);
+            assertThat(resolution.intent()).isEqualTo(ChatIntent.RECOMMEND);
+            assertThat(resolution.follows()).isTrue();
             assertThat(resolution.recipeQuery().moodCategories()).containsExactly("디저트");
         }
 
         @Test
-        @DisplayName("디저트 추천 뒤 \"다른 거 추천해줘\"는 다시 추천이고 직전 분류 디저트를 이어 간다")
+        @DisplayName("디저트 추천 뒤 \"다른 거 추천해줘\"는 이어짐이고 직전 분류 디저트를 이어 간다")
         void keepsPreviousDessert_whenAnotherOne() {
-            givenExtracted(new IntentResult(ChatIntent.REFINE, null, List.of(), null, null, null, null, null, null, null));
+            givenExtracted(new IntentResult(ChatIntent.RECOMMEND, null, List.of(), null, null, null, null, null, null, null).withFollows(true));
 
             ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID,
                     ChatMessageCreateRequest.of("다른 거 추천해줘"), afterDessert);
 
-            assertThat(resolution.intent()).isEqualTo(ChatIntent.REFINE);
+            assertThat(resolution.intent()).isEqualTo(ChatIntent.RECOMMEND);
+            assertThat(resolution.follows()).isTrue();
             assertThat(resolution.recipeQuery().moodCategories()).containsExactly("디저트");
         }
 
@@ -212,8 +214,8 @@ class IntentCorrectorTest {
         @Test
         @DisplayName("피하는 맛만 말했으면 뺄 조건 TASTE를 지우고, 맛 조건을 지우라는 말이 있으면 그대로 둔다")
         void keepsOtherTastes_whenOnlyAvoiding() {
-            IntentResult removesTaste = new IntentResult(ChatIntent.REFINE, List.of(), List.of(), null, null, null, false, null, null, null,
-                    null, null, List.of("TASTE"), List.of("SPICY"), null, null);
+            IntentResult removesTaste = new IntentResult(ChatIntent.RECOMMEND, List.of(), List.of(), null, null, null, false, null, null, null,
+                    null, null, List.of("TASTE"), List.of("SPICY"), null, null).withFollows(true);
 
             assertThat(corrector.correct(input("매운 건 빼줘"), removesTaste).result().removed()).isEmpty();
             assertThat(corrector.correct(input("맛 상관없이 매운 건 빼줘"), removesTaste).result().removed()).containsExactly("TASTE");

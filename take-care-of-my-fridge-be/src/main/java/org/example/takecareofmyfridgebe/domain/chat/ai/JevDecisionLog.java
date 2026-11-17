@@ -29,7 +29,8 @@ import java.util.stream.Collectors;
  *       OPENAI_JEV_FAILED / OPENAI_FAILED), jevUsedKind·jevUsedValues는 Jev로 정했을 때(또는 되돌림에서 넓은 요청 경로를 탔을 때)
  *       쓴 요청 종류와 값(특정 요리면 요리 이름, 특정 분류면 분류, 넓은 요청이면 요리 이름 목록),
  *       jevUsedReason은 Jev 요청 종류나 OpenAI 요리 이름을 바꾼 까닭(JevDecision.Reason. 메시지의 키워드를 요리 이름으로 주웠으면 DISH_FROM_KEYWORD)</li>
- *   <li>jevFollowsPrevious는 직전 추천에 이어지는 말일 확률(직전 추천이 없어 묻지 않았으면 -)</li>
+ *   <li>finalFollows는 최종 이어짐(직전 조건을 이어받은 추천인지, 추천이 아니면 false), jevFollowsPrevious는 Jev가 답한 직전 추천에 이어지는 말일 확률
+ *       (직전 추천이 없어 묻지 않았으면 -). Jev로 정했으면 추천이고 이 확률이 기준(JevIntentClassifier.MIN_FOLLOWS_PREVIOUS) 이상일 때 이어짐이다</li>
  *   <li>final… 칸은 상담 최종 결과다(서비스 규칙·알레르기 반영 후). decision=JEV면 Jev로 정한 결과, 그 밖이면 OpenAI 결과다</li>
  *   <li>메시지 원문·직전 추천 글·넓은 요청 표현·키는 넣지 않는다</li>
  * </ul>
@@ -54,6 +55,7 @@ final class JevDecisionLog {
     /**
      * 상담 최종 결과 (서비스 규칙·알레르기 반영 후).
      *
+     * @param follows 이어짐 (직전 조건을 이어받은 추천인지)
      * @param mealkit 밀키트만 보여 줄 추천인지 (추천이고 밀키트 단어가 부정 없이 있음, ChatRecommendationFacade와 같은 기준)
      */
     record FinalSide(
@@ -61,6 +63,7 @@ final class JevDecisionLog {
             Long sessionId,
             int messageLength,
             ChatIntent intent,
+            boolean follows,
             List<Member.Taste> wanted,
             List<Member.Taste> avoided,
             List<String> categories,
@@ -69,7 +72,7 @@ final class JevDecisionLog {
 
         static FinalSide of(Long memberId, Long sessionId, int messageLength, ChatIntentResolution resolution, boolean mealkit) {
             RecipeQuery query = resolution.recipeQuery();
-            return new FinalSide(memberId, sessionId, messageLength, resolution.intent(),
+            return new FinalSide(memberId, sessionId, messageLength, resolution.intent(), resolution.follows(),
                     query == null ? List.of() : query.wantedTastes(),
                     query == null ? List.of() : query.avoidTastes(),
                     query == null ? List.of() : query.moodCategories(),
@@ -116,6 +119,7 @@ final class JevDecisionLog {
         fields.put("sessionId", result.sessionId());
         fields.put("messageLength", result.messageLength());
         fields.put("finalIntent", result.intent());
+        fields.put("finalFollows", result.follows());
         fields.put("jevIntent", first == null ? null : first.intent());
         fields.put("jevIntentConfidence", first == null ? null : first.intentConfidence());
         fields.put("jevFollowsPrevious", first == null ? null : first.followsPrevious());

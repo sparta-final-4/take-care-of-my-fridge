@@ -336,7 +336,7 @@ class ChatIntentEvalManualTest {
                     cells.add("");
                 }
             } else {
-                cells.addAll(List.of(csv(ai.intent()), csv(ai.wantedTastes()), csv(ai.avoidTastes()), csv(ai.moodCategories()),
+                cells.addAll(List.of(csv(intentLabel(ai.intent(), Boolean.TRUE.equals(ai.followsPrevious()))), csv(ai.wantedTastes()), csv(ai.avoidTastes()), csv(ai.moodCategories()),
                         csv(ai.keywords()), csv(ai.dishText()), csv(ai.preferenceText()), csv(ai.maxMinutes()),
                         csv(ai.includeIngredients()), csv(ai.excludeIngredients()), csv(ai.useSelectedOnly()),
                         csv(ai.fridgeScope()), csv(ai.targetIndex()), csv(ai.targetName()), csv(ai.removed()),
@@ -353,23 +353,60 @@ class ChatIntentEvalManualTest {
         }
     }
 
+    // 의도 칸에서 추천 + 이어짐을 나타내는 끝말 ("RECOMMEND+FOLLOWS", 예전 REFINE과 같은 뜻)
+    static final String FOLLOWS_SUFFIX = "+FOLLOWS";
+    // 예전 기록(평가 CSV·리플레이 입력)의 다시 추천 의도 이름. 추천 + 이어짐으로 읽는다
+    private static final String LEGACY_REFINE = "REFINE";
+
+    // 의도 칸 글: 추천 + 이어짐이면 RECOMMEND+FOLLOWS, 그 밖은 의도 이름 (이어짐은 추천일 때만 붙는다)
+    static String intentLabel(ChatIntent intent, boolean follows) {
+        return intent == null ? null : intent.name() + (follows ? FOLLOWS_SUFFIX : "");
+    }
+
+    // 의도 칸 글의 의도. 예전 기록의 REFINE은 RECOMMEND다
+    static ChatIntent intentOf(String label) {
+        String name = label.endsWith(FOLLOWS_SUFFIX) ? label.substring(0, label.length() - FOLLOWS_SUFFIX.length()) : label;
+        return LEGACY_REFINE.equals(name) ? ChatIntent.RECOMMEND : ChatIntent.valueOf(name);
+    }
+
+    // 의도 칸 글의 이어짐. 예전 기록의 REFINE은 이어짐 예다
+    static boolean followsOf(String label) {
+        return label.endsWith(FOLLOWS_SUFFIX) || LEGACY_REFINE.equals(label);
+    }
+
+    /**
+     * 의도 일치: 의도와 이어짐이 둘 다 맞는지. 기대 이어짐(follows)을 적지 않았으면 아니오를 기대한다
+     * (예전 기대 의도 RECOMMEND는 다시 추천이 아닌 추천이었으므로 예전 점수와 바로 비교된다).
+     */
+    static boolean intentMatches(Map<String, Object> expect, ChatIntent intent, boolean follows) {
+        return Expect.strings(expect.get("intent")).contains(intent.name())
+                && follows == Boolean.TRUE.equals(expect.get("follows"));
+    }
+
+    // 기대 의도 글 (이어짐 예를 기대하면 +FOLLOWS)
+    static String expectedIntentLabel(Map<String, Object> expect) {
+        return expect.get("intent") + (Boolean.TRUE.equals(expect.get("follows")) ? FOLLOWS_SUFFIX : "");
+    }
+
     /**
      * 비교할 최종 값. 재료는 ID 대신 평가 세트 사전의 이름으로 바꿔 둔다.
+     *
+     * @param follows 이어짐 (직전 조건을 이어받은 추천인지)
      */
-    record Outcome(ChatIntent intent, Set<String> wanted, Set<String> avoid, Set<String> categories, List<String> keywords,
+    record Outcome(ChatIntent intent, boolean follows, Set<String> wanted, Set<String> avoid, Set<String> categories, List<String> keywords,
                    String dish, String preference, Integer maxMinutes, Set<String> include, Set<String> exclude,
                    Boolean useSelectedOnly, String scope, Set<String> names, Boolean saleOnly, String productType,
                    Long target, String question) {
 
         static Outcome blocked(ChatIntent intent) {
-            return new Outcome(intent, Set.of(), Set.of(), Set.of(), List.of(), null, null, null, Set.of(), Set.of(),
+            return new Outcome(intent, false, Set.of(), Set.of(), Set.of(), List.of(), null, null, null, Set.of(), Set.of(),
                     null, null, Set.of(), null, null, null, null);
         }
 
         static Outcome of(ChatIntentResolution resolution, EvalSet set) {
             RecipeQuery query = resolution.recipeQuery();
             var lookup = resolution.lookup();
-            return new Outcome(resolution.intent(),
+            return new Outcome(resolution.intent(), resolution.follows(),
                     query == null ? Set.of() : names(query.wantedTastes()),
                     query == null ? Set.of() : names(query.avoidTastes()),
                     query == null ? Set.of() : Set.copyOf(query.moodCategories()),
@@ -393,7 +430,7 @@ class ChatIntentEvalManualTest {
         }
 
         List<String> cells() {
-            return List.of(csv(intent), csv(wanted), csv(avoid), csv(categories), csv(keywords), csv(dish), csv(preference),
+            return List.of(csv(intentLabel(intent, follows)), csv(wanted), csv(avoid), csv(categories), csv(keywords), csv(dish), csv(preference),
                     csv(maxMinutes), csv(include), csv(exclude), csv(useSelectedOnly), csv(scope), csv(names), csv(saleOnly),
                     csv(productType), csv(target), csv(question));
         }
@@ -418,8 +455,10 @@ class ChatIntentEvalManualTest {
 
         private Optional<String> check(String field, Object expected, Outcome actual) {
             return switch (field) {
-                case "intent" -> strings(expected).contains(actual.intent().name())
-                        ? Optional.empty() : diff(field, expected, actual.intent());
+                case "intent" -> intentMatches(raw, actual.intent(), actual.follows())
+                        ? Optional.empty() : diff(field, expectedIntentLabel(raw), intentLabel(actual.intent(), actual.follows()));
+                // 이어짐은 의도와 함께 본다 (intent)
+                case "follows" -> Optional.empty();
                 case "wanted" -> sameSet(field, expected, actual.wanted());
                 case "avoid" -> sameSet(field, expected, actual.avoid());
                 case "categories" -> sameSet(field, expected, actual.categories());
@@ -467,7 +506,7 @@ class ChatIntentEvalManualTest {
             return Optional.of(field + ": 기대 " + expected + ", 실제 " + actual);
         }
 
-        private static List<String> strings(Object value) {
+        static List<String> strings(Object value) {
             if (value instanceof Collection<?> values) {
                 return values.stream().map(String::valueOf).toList();
             }

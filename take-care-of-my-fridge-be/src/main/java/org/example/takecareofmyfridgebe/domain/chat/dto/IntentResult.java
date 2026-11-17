@@ -39,6 +39,8 @@ import java.util.stream.Stream;
  * @param avoidTastes        피할 맛 (Member.Taste 이름, "매운 거 말고" → SPICY). 말하지 않았으면 빈 목록
  * @param detailQuestion     RECIPE_DETAIL일 때 질문 종류 (DetailQuestion 이름: HOW_TO, TIME, INGREDIENTS, TIP, OTHER). 다른 의도면 빈 값
  * @param fridgeScope        FRIDGE일 때 보여 줄 범위 (FridgeScope 이름: ALL, MEALKIT, IMMINENT). 다른 의도면 ALL
+ * @param followsPrevious    이어짐: 추천일 때 [직전 추천]의 조건을 이어받아 일부만 바꾸는 추천인지. 직전 추천이 없거나 추천이 아니면 false.
+ *                           최종 값은 follows()로 읽는다 (추천일 때만 뜻이 있다). 직전 추천이 없으면 아니오로 두는 것은 서비스 규칙이다 (IntentCorrector)
  */
 public record IntentResult(
         ChatIntent intent,
@@ -56,7 +58,8 @@ public record IntentResult(
         List<String> removed,
         List<String> avoidTastes,
         String detailQuestion,
-        String fridgeScope
+        String fridgeScope,
+        Boolean followsPrevious
 ) {
 
     // 레시피 검색에 쓸 요리 이름 키워드 최대 개수
@@ -77,6 +80,14 @@ public record IntentResult(
     private static final Set<String> SCOPE_NAMES = Arrays.stream(FridgeScope.values())
             .map(Enum::name)
             .collect(Collectors.toUnmodifiableSet());
+
+    public IntentResult(ChatIntent intent, List<String> wantedTastes, List<String> moodCategories, Integer maxMinutes,
+                        List<String> includeIngredients, List<String> excludeIngredients, Boolean useSelectedOnly,
+                        List<String> keywords, String dishText, String preferenceText, Integer targetIndex, String targetName,
+                        List<String> removed, List<String> avoidTastes, String detailQuestion, String fridgeScope) {
+        this(intent, wantedTastes, moodCategories, maxMinutes, includeIngredients, excludeIngredients, useSelectedOnly,
+                keywords, dishText, preferenceText, targetIndex, targetName, removed, avoidTastes, detailQuestion, fridgeScope, null);
+    }
 
     public IntentResult(ChatIntent intent, List<String> wantedTastes, List<String> moodCategories, Integer maxMinutes,
                         List<String> includeIngredients, List<String> excludeIngredients, Boolean useSelectedOnly,
@@ -120,7 +131,7 @@ public record IntentResult(
     public IntentResult withLookup(ChatIntent newIntent, FridgeScope scope, List<String> names) {
         return new IntentResult(newIntent, wantedTastes, moodCategories, maxMinutes, names, excludeIngredients,
                 useSelectedOnly, keywords, dishText, preferenceText, targetIndex, targetName, removed, avoidTastes, detailQuestion,
-                scope.name());
+                scope.name(), false);
     }
 
     // 의도만 있고 조건은 하나도 말하지 않은 결과
@@ -140,11 +151,13 @@ public record IntentResult(
     public IntentResult sanitize(Collection<String> allowedCategories) {
         Set<String> categories = Set.copyOf(allowedCategories);
         List<String> cleanCategories = cleanNames(moodCategories, name -> name, categories);
+        // 다시 추천(REFINE)은 추천 + 이어짐 예로 읽는다 (OpenAI 프롬프트에서 REFINE을 지우기 전까지)
+        boolean refine = intent == ChatIntent.REFINE;
         // 키워드는 이름만 다듬고 분류로 옮기지 않는다
         List<String> cleanKeywords = keywords == null ? null
                 : cleanNames(keywords, name -> name, null).stream().limit(MAX_KEYWORDS).toList();
         return new IntentResult(
-                intent == null ? ChatIntent.GENERAL : intent,
+                refine ? ChatIntent.RECOMMEND : intent == null ? ChatIntent.GENERAL : intent,
                 cleanNames(wantedTastes, name -> name.toUpperCase(Locale.ROOT), TASTE_NAMES),
                 cleanCategories,
                 maxMinutes == null || maxMinutes <= 0 ? null : maxMinutes,
@@ -163,7 +176,8 @@ public record IntentResult(
                         : detailQuestion.strip().toUpperCase(Locale.ROOT),
                 fridgeScope == null || !SCOPE_NAMES.contains(fridgeScope.strip().toUpperCase(Locale.ROOT))
                         ? null
-                        : fridgeScope.strip().toUpperCase(Locale.ROOT)
+                        : fridgeScope.strip().toUpperCase(Locale.ROOT),
+                refine ? Boolean.TRUE : followsPrevious
         );
     }
 
@@ -171,28 +185,40 @@ public record IntentResult(
     public IntentResult withCategories(List<String> categories, List<String> keywords, String dishText, List<String> removed) {
         return new IntentResult(intent, wantedTastes, categories, maxMinutes, includeIngredients, excludeIngredients,
                 useSelectedOnly, keywords, dishText, preferenceText, targetIndex, targetName, removed, avoidTastes, detailQuestion,
-                fridgeScope);
+                fridgeScope, followsPrevious);
     }
 
     // 원하는 맛·피할 맛을 바꾼 결과 (말한 맛만 남기기)
     public IntentResult withTastes(List<String> wanted, List<String> avoid) {
         return new IntentResult(intent, wanted, moodCategories, maxMinutes, includeIngredients, excludeIngredients,
                 useSelectedOnly, keywords, dishText, preferenceText, targetIndex, targetName, removed, avoid, detailQuestion,
-                fridgeScope);
+                fridgeScope, followsPrevious);
     }
 
     // 서버가 바로잡은 뺄 조건
     public IntentResult withRemoved(List<String> newRemoved) {
         return new IntentResult(intent, wantedTastes, moodCategories, maxMinutes, includeIngredients, excludeIngredients,
                 useSelectedOnly, keywords, dishText, preferenceText, targetIndex, targetName, newRemoved, avoidTastes, detailQuestion,
-                fridgeScope);
+                fridgeScope, followsPrevious);
     }
 
     // 못 찾은 레시피 자세히 대상으로 채운 추천 (재료 이름, 요리 이름 키워드, 요리 이름)
     public IntentResult withNamed(List<String> includes, List<String> namedKeywords, String dish) {
         return new IntentResult(ChatIntent.RECOMMEND, wantedTastes, moodCategories, maxMinutes, includes, excludeIngredients,
                 useSelectedOnly, namedKeywords, dish, preferenceText, targetIndex, targetName, removed, avoidTastes,
-                detailQuestion, fridgeScope);
+                detailQuestion, fridgeScope, false);
+    }
+
+    // 이어짐을 바꾼 결과 (Jev 판단으로 정한 이어짐, 직전 추천이 없을 때 아니오로 두기)
+    public IntentResult withFollows(boolean follows) {
+        return new IntentResult(intent, wantedTastes, moodCategories, maxMinutes, includeIngredients, excludeIngredients,
+                useSelectedOnly, keywords, dishText, preferenceText, targetIndex, targetName, removed, avoidTastes, detailQuestion,
+                fridgeScope, follows);
+    }
+
+    // 직전 추천의 조건을 이어받는 추천인지 (추천이고 이어짐이 예). 추천이 아니면 이어짐 값이 있어도 아니오다
+    public boolean follows() {
+        return intent == ChatIntent.RECOMMEND && Boolean.TRUE.equals(followsPrevious);
     }
 
     /**

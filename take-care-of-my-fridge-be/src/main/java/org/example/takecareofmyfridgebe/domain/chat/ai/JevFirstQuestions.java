@@ -18,7 +18,7 @@ import java.util.Set;
  * 선택지 설명은 prompts/chat-intent.txt·chat-intent-followup.txt의 의도 설명을 줄인 것이다.
  * <p>
  * 새 추천과 이어서 받는 추천은 둘 다 추천해 달라는 뜻이라 의도 선택지는 "추천" 하나로 묻는다(선택지가 둘이면 확률이 나뉘어 confidence가 낮아진다).
- * 이어짐은 follows_previous로 따로 묻고, 서비스 흐름에는 추천 + 이어짐을 ChatIntent.REFINE으로 넘긴다 (JevIntentClassifier.serviceIntent).
+ * 이어짐은 follows_previous로 따로 묻고, 추천 안의 이어짐 항목으로 넘긴다 (JevIntentClassifier.follows).
  */
 final class JevFirstQuestions {
 
@@ -91,7 +91,7 @@ final class JevFirstQuestions {
 
     /**
      * 답은 모든 선택지(INTENTS)로 읽는다. 직전 추천이 없는데 레시피 자세히가 오면(선택지에 없었어도) 서비스 규칙으로 추천으로 본다(안전망).
-     * 직전 추천이 있으면 follows_previous 답도 읽어 추천 + 이어짐을 REFINE으로 넘긴다.
+     * 직전 추천이 있으면 follows_previous 답도 읽는다 (이어짐은 JevIntentClassifier.follows로 정한다).
      *
      * @param hasFollowUp 직전 추천 정보를 넘겼는지 (서비스 규칙으로 의도를 정할 때 쓴다)
      */
@@ -101,7 +101,7 @@ final class JevFirstQuestions {
         JevAnswers.Choice<FridgeScope> fridgeScope = answers.choice(FRIDGE_SCOPE, FRIDGE_SCOPES);
         Double followsPrevious = hasFollowUp ? answers.noul(FOLLOWS_PREVIOUS) : null;
         return new JevIntentJudgement.First(
-                JevIntentClassifier.serviceIntent(intent.value(), hasFollowUp, followsPrevious), intent.value(),
+                JevIntentClassifier.serviceIntent(intent.value(), hasFollowUp), intent.value(),
                 intent.confidence(), intent.probabilities(), followsPrevious,
                 answers.noul(ASKS_QUESTION),
                 fridgeScope.value(), fridgeScope.confidence(),

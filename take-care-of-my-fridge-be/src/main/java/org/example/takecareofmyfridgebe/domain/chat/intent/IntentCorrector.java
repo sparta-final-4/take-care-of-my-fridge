@@ -27,10 +27,11 @@ import java.util.Set;
 /**
  * 상담 의도 결과(Jev로 정했거나 OpenAI로 되돌린 것)에 서버 서비스 규칙을 적용한다. 아래 순서대로 한 번씩 돈다.
  * <ol>
- *   <li>레시피 자세히 대상 찾기: 직전 카드·상담 추천에서 대상을 찾고, 이름만 못 찾으면 그 요리 추천으로</li>
- *   <li>요리 이름 확인: 추천·다시 추천에서 요리 이름이 메시지에 그대로 없으면 비운다 (단어 목록을 쓰지 않는다)</li>
+ *   <li>이어짐은 직전 추천이 있을 때만: 직전 조건(Redis)이 없으면 AI가 이어짐 예라고 해도 아니오로 둔다 (새 추천)</li>
+ *   <li>레시피 자세히 대상 찾기: 직전 카드·상담 추천에서 대상을 찾고, 이름만 못 찾으면 그 요리 추천으로 (새 추천)</li>
+ *   <li>요리 이름 확인: 추천(이어짐 포함)에서 요리 이름이 메시지에 그대로 없으면 비운다 (단어 목록을 쓰지 않는다)</li>
  *   <li>다른 맛 지키기: 피하는 맛만 말했으면 뺄 조건 TASTE를 지운다</li>
- *   <li>말한 맛만: 새 추천에서 앞 대화에서 따라온 맛을 뺀다</li>
+ *   <li>말한 맛만: 새 추천(이어짐 아님)에서 앞 대화에서 따라온 맛을 뺀다</li>
  * </ol>
  * 의도·맛·분류를 단어로 고치는 "AI 실수 고치기" 단계는 Jev 전환 정리에서 지웠다 (docs/worklogs/work-chat-jev-on.md).
  * 결과를 추천 조건(RecipeQuery)으로 바꾸고 다시 추천을 합치는 일은 ChatIntentFacade가 한다.
@@ -63,6 +64,11 @@ public class IntentCorrector {
      */
     public Corrected correct(CorrectionInput input, IntentResult result) {
         IntentResult corrected = result;
+        // 이어짐은 직전 조건을 이어받는 것이라 직전 조건이 없으면(첫 질문, Redis 만료·장애) 새 추천이다
+        if (corrected.follows() && input.context().lastRecommendation() == null) {
+            log.info("상담 이어짐인데 직전 조건이 없어 새 추천으로 - memberId: {}, sessionId: {}", input.memberId(), input.sessionId());
+            corrected = corrected.withFollows(false);
+        }
         // 레시피 자세히인데 물어본 레시피가 이 상담 추천에 없으면, 그 요리 이름으로 새 추천을 한다 (아래 규칙을 거치게 여기서 바꾼다)
         Long detailTarget = null;
         if (corrected.intent() == ChatIntent.RECIPE_DETAIL) {
@@ -73,12 +79,12 @@ public class IntentCorrector {
                 corrected = corrected.withNamed(corrected.includeIngredients(), List.of(corrected.targetName()), corrected.targetName());
             }
         }
-        if (corrected.intent() == ChatIntent.RECOMMEND || corrected.intent() == ChatIntent.REFINE) {
+        if (corrected.intent() == ChatIntent.RECOMMEND) {
             corrected = keepSpokenDishOnly(input, corrected);
             corrected = keepOtherTastes(input, corrected);
         }
-        // 새 추천은 앞 대화의 맛을 잇지 않는다 (앞 조건 이어 가기는 다시 추천만). 직전 조건에서 따라온 맛만 이번 말에 없으면 뺀다
-        if (corrected.intent() == ChatIntent.RECOMMEND) {
+        // 새 추천은 앞 대화의 맛을 잇지 않는다 (앞 조건 이어 가기는 이어짐만). 직전 조건에서 따라온 맛만 이번 말에 없으면 뺀다
+        if (corrected.intent() == ChatIntent.RECOMMEND && !corrected.follows()) {
             corrected = keepSpokenTastes(input, corrected);
         }
         return new Corrected(corrected, detailTarget);

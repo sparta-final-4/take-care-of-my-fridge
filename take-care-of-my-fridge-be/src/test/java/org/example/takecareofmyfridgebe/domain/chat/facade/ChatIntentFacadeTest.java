@@ -478,29 +478,31 @@ public class ChatIntentFacadeTest {
         }
 
         @Test
-        @DisplayName("다시 추천인데 직전 조건이 없으면(Redis가 비었음) 이번 말만으로 새 추천을 한다")
-        void recommendsNew_whenRefineWithoutLastRecommendation() {
+        @DisplayName("AI가 이어짐 예라고 해도 직전 조건이 없으면(Redis가 비었음) 이어짐 아니오로 이번 말만으로 새 추천을 한다")
+        void recommendsNew_whenFollowsWithoutLastRecommendation() {
             ChatContext withoutRedis = new ChatContext(context.recentMessages(), null, lastCards);
-            givenExtracted(new IntentResult(ChatIntent.REFINE, List.of("SPICY"), null, null, null, null, null, null, null, null));
+            givenExtracted(new IntentResult(ChatIntent.RECOMMEND, List.of("SPICY"), null, null, null, null, null, null, null, null).withFollows(true));
 
             ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID,
                     ChatMessageCreateRequest.of("좀 더 매운 걸로"), withoutRedis);
 
             assertThat(resolution.intent()).isEqualTo(ChatIntent.RECOMMEND);
+            assertThat(resolution.follows()).isFalse();
             assertThat(resolution.recipeQuery().wantedTastes()).containsExactly(Taste.SPICY);
             assertThat(resolution.recipeQuery().moodCategories()).isEmpty();
         }
 
         @Test
-        @DisplayName("다시 추천이고 직전 조건이 있으면 다시 추천으로 정한다")
-        void resolvesRefine_whenLastRecommendationExists() {
-            givenExtracted(new IntentResult(ChatIntent.REFINE, List.of("SPICY"), List.of("튀김"), null, null, null, null,
-                    null, null, null));
+        @DisplayName("추천 + 이어짐이고 직전 조건이 있으면 이어짐 예로 정한다")
+        void resolvesFollows_whenLastRecommendationExists() {
+            givenExtracted(new IntentResult(ChatIntent.RECOMMEND, List.of("SPICY"), List.of("튀김"), null, null, null, null,
+                    null, null, null).withFollows(true));
 
             ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID,
                     ChatMessageCreateRequest.of("좀 더 매운 걸로"), context);
 
-            assertThat(resolution.intent()).isEqualTo(ChatIntent.REFINE);
+            assertThat(resolution.intent()).isEqualTo(ChatIntent.RECOMMEND);
+            assertThat(resolution.follows()).isTrue();
             assertThat(resolution.recommends()).isTrue();
         }
 
@@ -531,8 +533,8 @@ public class ChatIntentFacadeTest {
     }
 
     @Nested
-    @DisplayName("다시 추천 조건 합치기")
-    class Refine {
+    @DisplayName("이어짐 조건 합치기")
+    class Follows {
 
         // 직전 조건: 두부를 꼭 쓰는 매운 국·찌개, 오이 빼기
         private final RecipeQuery previous = new RecipeQuery(MEMBER_ID, List.of(TOFU), List.of(Taste.SPICY), List.of("국", "찌개"),
@@ -543,7 +545,7 @@ public class ChatIntentFacadeTest {
         @Test
         @DisplayName("\"좀 더 매운 걸로\"는 AI가 낸 맛으로 바꾸고 분류·키워드·재료 같은 나머지 조건은 직전 그대로 둔다")
         void changesTasteOnly_whenMoreSpicy() {
-            givenExtracted(refine(List.of("SPICY", "SALTY"), null));
+            givenExtracted(following(List.of("SPICY", "SALTY"), null));
 
             RecipeQuery query = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("좀 더 매운 걸로"), context)
                     .recipeQuery();
@@ -561,7 +563,7 @@ public class ChatIntentFacadeTest {
         void changesCategoryOnly_whenStirFryInstead() {
             when(recipeService.getClassifications())
                     .thenReturn(new RecipeClassificationResponse(List.of("한식"), List.of("국", "볶음", "찌개")));
-            givenExtracted(refine(null, List.of("볶음")));
+            givenExtracted(following(null, List.of("볶음")));
 
             RecipeQuery query = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("국물 말고 볶음으로"), context)
                     .recipeQuery();
@@ -574,11 +576,12 @@ public class ChatIntentFacadeTest {
         @Test
         @DisplayName("\"다른 거 없어?\"처럼 AI 조건이 모두 비면 직전 조건을 그대로 쓴다")
         void keepsPreviousQuery_whenNothingChanged() {
-            givenExtracted(refine(null, null));
+            givenExtracted(following(null, null));
 
             ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("다른 거 없어?"), context);
 
-            assertThat(resolution.intent()).isEqualTo(ChatIntent.REFINE);
+            assertThat(resolution.intent()).isEqualTo(ChatIntent.RECOMMEND);
+            assertThat(resolution.follows()).isTrue();
             // 요리 이름·원한 표현만 이어 가지 않고 나머지는 직전 그대로
             assertThat(resolution.recipeQuery()).isEqualTo(new RecipeQuery(MEMBER_ID, List.of(TOFU), List.of(Taste.SPICY),
                     List.of("국", "찌개"), null, List.of(CUCUMBER), true, List.of("김치찌개"), null, null));
@@ -587,7 +590,7 @@ public class ChatIntentFacadeTest {
         @Test
         @DisplayName("\"맛은 상관없어\"처럼 removed에 맛이 있으면 직전 원하는 맛 조건을 지우고 나머지는 직전 그대로 둔다")
         void removesTaste_whenNotSpicy() {
-            givenExtracted(refine(null, null, List.of("TASTE")));
+            givenExtracted(following(null, null, List.of("TASTE")));
 
             RecipeQuery query = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("맛은 상관없어"), context)
                     .recipeQuery();
@@ -601,7 +604,7 @@ public class ChatIntentFacadeTest {
         @Test
         @DisplayName("removed 없이 맛 칸만 비어 있으면 직전 맛을 그대로 둔다")
         void keepsTaste_whenOnlyEmptyWithoutRemoved() {
-            givenExtracted(refine(List.of(), List.of("국"), List.of()));
+            givenExtracted(following(List.of(), List.of("국"), List.of()));
 
             RecipeQuery query = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("국으로만"), context)
                     .recipeQuery();
@@ -627,8 +630,8 @@ public class ChatIntentFacadeTest {
         }
 
         @Test
-        @DisplayName("다시 추천은 요리 이름·원한 표현을 이어 가지 않아 \"김피탕 레시피는 없어서\" 안내가 다시 나오지 않는다")
-        void doesNotRepeatDishNotice_whenRefine() {
+        @DisplayName("이어짐은 요리 이름·원한 표현을 이어 가지 않아 \"김피탕 레시피는 없어서\" 안내가 다시 나오지 않는다")
+        void doesNotRepeatDishNotice_whenFollows() {
             RecipeQuery kimpi = new RecipeQuery(MEMBER_ID, List.of(), null, List.of("튀김"), null, null, false,
                     List.of("김피탕", "탕수육", "깐풍기"), "김피탕", "김피탕 같은 요리");
             RecipeQuery merged = ChatIntentFacade.mergeRefine(kimpi, RecipeQuery.of(MEMBER_ID, List.of()), Set.of())
@@ -661,7 +664,7 @@ public class ChatIntentFacadeTest {
         @Test
         @DisplayName("이번에 칩으로 고른 재료도 직전 선택 재료에 더한다")
         void addsSelectedChips() {
-            givenExtracted(refine(null, null));
+            givenExtracted(following(null, null));
             ChatMessageCreateRequest request = new ChatMessageCreateRequest("이것도 넣어서 다른 거", ChatMessageMode.AUTO,
                     List.of(MUSHROOM), false);
 
@@ -671,7 +674,7 @@ public class ChatIntentFacadeTest {
         }
 
         @Test
-        @DisplayName("다시 추천에서 \"매운 거 말고\"는 피할 맛 매운맛으로 두고, 직전에 원했던 매운맛은 지운다")
+        @DisplayName("이어짐에서 \"매운 거 말고\"는 피할 맛 매운맛으로 두고, 직전에 원했던 매운맛은 지운다")
         void avoidsSpicy_afterMoreSpicy() {
             givenExtracted(avoid(List.of("SPICY"), List.of("SPICY")));
 
@@ -684,11 +687,11 @@ public class ChatIntentFacadeTest {
         }
 
         @Test
-        @DisplayName("피할 맛은 다시 추천에서 이어 간다 (\"매운 거 말고\" 뒤 \"다른 거 없어?\"도 안 매운 걸로)")
-        void carriesAvoidTastes_whenRefineAgain() {
+        @DisplayName("피할 맛은 이어짐에서 이어 간다 (\"매운 거 말고\" 뒤 \"다른 거 없어?\"도 안 매운 걸로)")
+        void carriesAvoidTastes_whenFollowsAgain() {
             RecipeQuery noSpicy = previous.withAvoidTastes(List.of(Taste.SPICY));
             ChatContext afterAvoid = new ChatContext(List.of(), LastRecommendation.of(noSpicy, List.of(10L)), context.lastCards());
-            givenExtracted(refine(null, null));
+            givenExtracted(following(null, null));
 
             RecipeQuery query = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("다른 거 없어?"), afterAvoid)
                     .recipeQuery();
@@ -728,7 +731,7 @@ public class ChatIntentFacadeTest {
         void releasesAvoidTaste_whenWantedAgain() {
             RecipeQuery noSpicy = previous.withAvoidTastes(List.of(Taste.SPICY));
             ChatContext afterAvoid = new ChatContext(List.of(), LastRecommendation.of(noSpicy, List.of(10L)), context.lastCards());
-            givenExtracted(refine(List.of("SPICY"), null));
+            givenExtracted(following(List.of("SPICY"), null));
 
             RecipeQuery query = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("다시 매운 걸로"), afterAvoid)
                     .recipeQuery();
@@ -770,7 +773,7 @@ public class ChatIntentFacadeTest {
             RecipeQuery kimpi = new RecipeQuery(MEMBER_ID, List.of(), List.of(), List.of("튀김"), null, List.of(), false,
                     List.of("김피탕", "탕수육", "깐풍기"), "김피탕", null);
             ChatContext afterKimpi = new ChatContext(List.of(), LastRecommendation.of(kimpi, List.of(10L)), context.lastCards());
-            for (IntentResult extracted : List.of(refine(List.of("SPICY"), null, List.of("TASTE")), avoid(null, List.of("SPICY")))) {
+            for (IntentResult extracted : List.of(following(List.of("SPICY"), null, List.of("TASTE")), avoid(null, List.of("SPICY")))) {
                 givenExtracted(extracted);
 
                 RecipeQuery query = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("매운 건 빼줘"), afterKimpi)
@@ -788,8 +791,8 @@ public class ChatIntentFacadeTest {
             RecipeQuery salty = new RecipeQuery(MEMBER_ID, List.of(), List.of(Taste.SALTY), List.of("조림"), null, List.of(), false,
                     List.of(), null, null);
             ChatContext afterSalty = new ChatContext(List.of(), LastRecommendation.of(salty, List.of(10L)), context.lastCards());
-            givenExtracted(new IntentResult(ChatIntent.REFINE, null, null, null, null, null, null, null, null, null,
-                    null, null, List.of("TASTE"), List.of("SPICY")));
+            givenExtracted(new IntentResult(ChatIntent.RECOMMEND, null, null, null, null, null, null, null, null, null,
+                    null, null, List.of("TASTE"), List.of("SPICY")).withFollows(true));
 
             ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("매운 건 빼줘"),
                     afterSalty);
@@ -806,7 +809,7 @@ public class ChatIntentFacadeTest {
                     List.of(), null, null);
             ChatContext afterSalty = new ChatContext(List.of(), LastRecommendation.of(salty, List.of(10L)), context.lastCards());
             for (String message : List.of("맛 상관없이", "맛은 아무거나, 매운 것만 빼줘")) {
-                givenExtracted(refine(null, null, List.of("TASTE")));
+                givenExtracted(following(null, null, List.of("TASTE")));
 
                 RecipeQuery query = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of(message), afterSalty)
                         .recipeQuery();
@@ -840,17 +843,17 @@ public class ChatIntentFacadeTest {
         }
 
         private static IntentResult avoid(List<String> tastes, List<String> avoidTastes) {
-            return new IntentResult(ChatIntent.REFINE, tastes, null, null, null, null, null, null, null, null,
-                    null, null, null, avoidTastes);
+            return new IntentResult(ChatIntent.RECOMMEND, tastes, null, null, null, null, null, null, null, null,
+                    null, null, null, avoidTastes).withFollows(true);
         }
 
-        private static IntentResult refine(List<String> tastes, List<String> categories) {
-            return refine(tastes, categories, null);
+        private static IntentResult following(List<String> tastes, List<String> categories) {
+            return following(tastes, categories, null);
         }
 
-        private static IntentResult refine(List<String> tastes, List<String> categories, List<String> removed) {
-            return new IntentResult(ChatIntent.REFINE, tastes, categories, null, null, null, null, null, null, null,
-                    null, null, removed);
+        private static IntentResult following(List<String> tastes, List<String> categories, List<String> removed) {
+            return new IntentResult(ChatIntent.RECOMMEND, tastes, categories, null, null, null, null, null, null, null,
+                    null, null, removed).withFollows(true);
         }
     }
 
@@ -866,13 +869,13 @@ public class ChatIntentFacadeTest {
     }
 
     @Nested
-    @DisplayName("다시 추천에서 맛이 부딪히면 이번 말을 따름")
+    @DisplayName("이어짐에서 맛이 부딪히면 이번 말을 따름")
     class TasteConflict {
 
         @Test
         @DisplayName("\"매운 거 말고\" → \"좀 더 매운 걸로\"면 원하는 맛 SPICY, 피할 맛 없음 (AI가 직전 피할 맛을 이어 써도)")
         void wantsSpicy_whenAvoidedThenAskedSpicier() {
-            RecipeQuery query = refineAfter(tastes(List.of(), List.of(Taste.SPICY)), "좀 더 매운 걸로",
+            RecipeQuery query = followingAfter(tastes(List.of(), List.of(Taste.SPICY)), "좀 더 매운 걸로",
                     List.of("SPICY"), List.of("SPICY"));
 
             assertThat(query.wantedTastes()).containsExactly(Taste.SPICY);
@@ -882,7 +885,7 @@ public class ChatIntentFacadeTest {
         @Test
         @DisplayName("\"매운 거 추천해줘\" → \"매운 거 말고\"면 피할 맛 SPICY, 원하는 맛 없음 (AI가 직전 원하는 맛을 이어 써도)")
         void avoidsSpicy_whenWantedThenSaidNoSpicy() {
-            RecipeQuery query = refineAfter(tastes(List.of(Taste.SPICY), List.of()), "매운 거 말고",
+            RecipeQuery query = followingAfter(tastes(List.of(Taste.SPICY), List.of()), "매운 거 말고",
                     List.of("SPICY"), List.of("SPICY"));
 
             assertThat(query.avoidTastes()).containsExactly(Taste.SPICY);
@@ -892,7 +895,7 @@ public class ChatIntentFacadeTest {
         @Test
         @DisplayName("\"짭짤한 거\" → \"담백한 거로\"면 반대인 짠맛을 지우고 원하는 맛 MILD만")
         void keepsOnlyMild_whenSaltyThenMild() {
-            RecipeQuery query = refineAfter(tastes(List.of(Taste.SALTY), List.of()), "담백한 거로",
+            RecipeQuery query = followingAfter(tastes(List.of(Taste.SALTY), List.of()), "담백한 거로",
                     List.of("SALTY", "MILD"), List.of());
 
             assertThat(query.wantedTastes()).containsExactly(Taste.MILD);
@@ -901,7 +904,7 @@ public class ChatIntentFacadeTest {
         @Test
         @DisplayName("\"매운 걸로\" → \"순한 걸로\"면 반대인 매운맛을 지우고 원하는 맛 MILD만")
         void keepsOnlyMild_whenSpicyThenMild() {
-            RecipeQuery query = refineAfter(tastes(List.of(Taste.SPICY), List.of()), "순한 걸로", List.of("MILD"), List.of());
+            RecipeQuery query = followingAfter(tastes(List.of(Taste.SPICY), List.of()), "순한 걸로", List.of("MILD"), List.of());
 
             assertThat(query.wantedTastes()).containsExactly(Taste.MILD);
         }
@@ -909,7 +912,7 @@ public class ChatIntentFacadeTest {
         @Test
         @DisplayName("\"매운 걸로\" → \"단 것도\"면 반대가 아니라 쌓아서 SPICY + SWEET (AI가 이번 맛만 내도)")
         void stacksNonOppositeTastes() {
-            RecipeQuery query = refineAfter(tastes(List.of(Taste.SPICY), List.of()), "단 것도", List.of("SWEET"), List.of());
+            RecipeQuery query = followingAfter(tastes(List.of(Taste.SPICY), List.of()), "단 것도", List.of("SWEET"), List.of());
 
             assertThat(query.wantedTastes()).containsExactlyInAnyOrder(Taste.SPICY, Taste.SWEET);
         }
@@ -921,8 +924,8 @@ public class ChatIntentFacadeTest {
                     new AllergyExclusionFinder.Allergens(List.of("땅콩"), List.of(101L, 102L)));
             RecipeQuery first = tastes(List.of(), List.of()).withExcludedIngredients(List.of(101L, 102L));
 
-            RecipeQuery spicy = refineAfter(first, "매운 걸로", List.of("SPICY"), List.of());
-            RecipeQuery mild = refineAfter(spicy, "순한 걸로", List.of("MILD"), List.of());
+            RecipeQuery spicy = followingAfter(first, "매운 걸로", List.of("SPICY"), List.of());
+            RecipeQuery mild = followingAfter(spicy, "순한 걸로", List.of("MILD"), List.of());
 
             assertThat(spicy.excludeIngredientIds()).containsExactlyInAnyOrder(101L, 102L);
             assertThat(mild.wantedTastes()).containsExactly(Taste.MILD);
@@ -935,11 +938,11 @@ public class ChatIntentFacadeTest {
         }
 
         // 직전 추천 조건(previous) 뒤에 message를 다시 추천으로 보낸다. AI는 wanted·avoid 맛을 낸다고 본다
-        private RecipeQuery refineAfter(RecipeQuery previous, String message, List<String> wanted, List<String> avoid) {
+        private RecipeQuery followingAfter(RecipeQuery previous, String message, List<String> wanted, List<String> avoid) {
             ChatContext context = new ChatContext(List.of(), LastRecommendation.of(previous, List.of(10L)),
                     List.of(new CardName(10L, "두부조림")));
-            givenExtracted(new IntentResult(ChatIntent.REFINE, wanted, null, null, null, null, null, null, null, null,
-                    null, null, null, avoid, null));
+            givenExtracted(new IntentResult(ChatIntent.RECOMMEND, wanted, null, null, null, null, null, null, null, null,
+                    null, null, null, avoid, null).withFollows(true));
             return facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of(message), context).recipeQuery();
         }
     }
@@ -977,15 +980,15 @@ public class ChatIntentFacadeTest {
         }
 
         @Test
-        @DisplayName("다시 추천에서도 알레르기 재료를 계속 빼고, 뺄 재료를 지우라는 말(오이 넣어도 돼) 뒤에도 뺀다")
-        void keepsAllergyExclusion_whenRefineEvenIfExcludeRemoved() {
+        @DisplayName("이어짐에서도 알레르기 재료를 계속 빼고, 뺄 재료를 지우라는 말(오이 넣어도 돼) 뒤에도 뺀다")
+        void keepsAllergyExclusion_whenFollowsEvenIfExcludeRemoved() {
             RecipeQuery previous = new RecipeQuery(MEMBER_ID, List.of(), List.of(), List.of(), null, List.of(15L, 101L, 102L), false,
                     List.of(), null, null);
             ChatContext context = new ChatContext(List.of(), LastRecommendation.of(previous, List.of(10L)),
                     List.of(new CardName(10L, "두부조림")));
             when(allergyExclusionFinder.find(eq(SESSION_ID), any())).thenReturn(peanut);
-            givenExtracted(new IntentResult(ChatIntent.REFINE, null, null, null, null, null, null, null, null, null,
-                    null, null, List.of("EXCLUDE")));
+            givenExtracted(new IntentResult(ChatIntent.RECOMMEND, null, null, null, null, null, null, null, null, null,
+                    null, null, List.of("EXCLUDE")).withFollows(true));
 
             RecipeQuery query = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("오이 넣어도 돼"), context).recipeQuery();
 
