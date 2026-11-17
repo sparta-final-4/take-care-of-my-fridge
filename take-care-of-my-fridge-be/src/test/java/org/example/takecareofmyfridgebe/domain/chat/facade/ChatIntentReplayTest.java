@@ -10,8 +10,10 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.IntentResult;
 import org.example.takecareofmyfridgebe.domain.chat.facade.ChatIntentEvalManualTest.EvalSet;
 import org.example.takecareofmyfridgebe.domain.chat.facade.ChatIntentEvalManualTest.Outcome;
 import org.example.takecareofmyfridgebe.domain.chat.intent.IntentCorrector;
+import org.example.takecareofmyfridgebe.domain.chat.intent.JevIntentResolver;
 import org.example.takecareofmyfridgebe.domain.chat.safety.AllergyExclusionFinder;
 import org.example.takecareofmyfridgebe.domain.chat.ai.ChatIntentExtractor;
+import org.example.takecareofmyfridgebe.domain.chat.ai.JevIntentRunner;
 import org.example.takecareofmyfridgebe.domain.chat.service.ChatMessageService;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.Ingredient;
 import org.example.takecareofmyfridgebe.domain.ingredient.service.IngredientMatcher;
@@ -64,6 +66,7 @@ class ChatIntentReplayTest {
     private static final Long SESSION_ID = 10L;
     private static final String INPUTS = "chat-intent-replay/inputs.csv";
     private static final Path EXPECTED = Path.of("src", "test", "resources", "chat-intent-replay", "expected.csv");
+    private static final Path ACTUAL = Path.of("build", "reports", "chat-intent-replay", "actual.csv");
     private static final String LIST_DELIMITER = " / ";
 
     @Autowired
@@ -88,6 +91,9 @@ class ChatIntentReplayTest {
             actual.add(row.get("id") + "," + row.get("run") + "," + line(Outcome.of(resolution, set)));
         }
 
+        // 기준값과 비교하기 쉽게 이번 결과를 build 아래에도 남긴다
+        Files.createDirectories(ACTUAL.getParent());
+        Files.writeString(ACTUAL, String.join("\n", actual) + "\n", StandardCharsets.UTF_8);
         if ("true".equals(System.getenv("CHAT_INTENT_REPLAY_RECORD"))) {
             // 운영체제와 상관없이 같은 파일이 되게 줄바꿈은 LF로 쓴다
             Files.writeString(EXPECTED, String.join("\n", actual) + "\n", StandardCharsets.UTF_8);
@@ -126,8 +132,10 @@ class ChatIntentReplayTest {
         ChatCorrectionProperties corrections = EvalCorrectionSwitches.properties(Set.of());
         IntentCorrector corrector = new IntentCorrector(recipeService, ingredientMatcher, mock(ChatMessageService.class),
                 words, corrections);
+        // 기록에는 Jev 판단이 없다. Jev 판단이 오지 않으면 운영과 같게 OpenAI 결과로 되돌리고 서비스 규칙만 거친다
         return new ChatIntentFacade(extractor, recipeService, ingredientMatcher, candidateProperties, words,
-                allergyExclusionFinder, corrections, corrector);
+                allergyExclusionFinder, corrections, corrector, mock(JevIntentRunner.class),
+                new JevIntentResolver(mock(SimilarDishFinder.class), words));
     }
 
     // 기록한 칸으로 AI 원래 결과를 다시 만든다 (평가 CSV의 AI 칸과 같은 모양, 목록은 " / "로 이어 씀)

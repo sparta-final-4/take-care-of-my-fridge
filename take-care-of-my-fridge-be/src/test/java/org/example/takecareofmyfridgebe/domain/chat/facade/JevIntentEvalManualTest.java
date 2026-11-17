@@ -60,7 +60,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * 결과: build/reports/chat-intent-eval/jev-{시각}-runs.csv (회차마다 한 줄), jev-{시각}-cases.csv (문장마다 다수결),
  * jev-{시각}-summary.txt (같은 요약을 콘솔에도 찍는다).
  * <p>
- * 운영 그림자 모드와 같게: 단어 차단(SafetyWordChecker)에 걸리면 Jev를 부르지 않는다(기존 평가처럼 BLOCKED·SELF_HARM으로 본다).
+ * 운영과 같게: 단어 차단(SafetyWordChecker)에 걸리면 Jev를 부르지 않는다(기존 평가처럼 BLOCKED·SELF_HARM으로 본다).
  * 걸리지 않으면 실제 JevIntentClassifier를 부른다. 분류 목록은 OpenAI 의도 판단과 같은 목록(평가 세트 분류에서 후보 제외·기타를 뺀 것),
  * 직전 추천 문맥이 있는 문장은 운영과 같은 직전 추천 글(ChatIntentFacade.followUp)을 넘긴다.
  * <p>

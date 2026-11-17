@@ -1,7 +1,7 @@
 package org.example.takecareofmyfridgebe.domain.chat.facade;
 
 import org.example.takecareofmyfridgebe.domain.chat.ChatIntentFixture;
-import org.example.takecareofmyfridgebe.domain.chat.ai.JevIntentShadow;
+import org.example.takecareofmyfridgebe.domain.chat.ai.JevIntentRunner;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatCandidateProperties;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatCorrectionProperties;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext;
@@ -47,19 +47,18 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-// Jev on 모드: Jev 판단 + OpenAI가 꺼낸 값으로 의도를 정하고, Jev를 못 쓰면 보정 없는 OpenAI 결과를 쓰며, 서비스 규칙만 거친다.
-// Jev 호출(JevIntentShadow)과 넓은 요청 요리 이름(SimilarDishFinder)은 흉내 낸다
+// Jev 판단 + OpenAI가 꺼낸 값으로 의도를 정하고, Jev를 못 쓰면 보정 없는 OpenAI 결과를 쓰며, 서비스 규칙만 거친다.
+// Jev 호출(JevIntentRunner)과 넓은 요청 요리 이름(SimilarDishFinder)은 흉내 낸다
 class ChatIntentFacadeJevOnTest {
 
     private final ChatIntentFixture fixture = new ChatIntentFixture();
-    private final JevIntentShadow jev = mock(JevIntentShadow.class);
-    private final JevIntentShadow.Run run = mock(JevIntentShadow.Run.class);
+    private final JevIntentRunner jev = mock(JevIntentRunner.class);
+    private final JevIntentRunner.Run run = mock(JevIntentRunner.Run.class);
     private final SimilarDishFinder similarDishFinder = mock(SimilarDishFinder.class);
     private ChatIntentFacade facade;
 
     @BeforeEach
     void setUp() {
-        when(jev.on()).thenReturn(true);
         when(jev.start(any(), any(), any())).thenReturn(run);
         ChatCorrectionProperties corrections = ChatCorrectionProperties.ALL_ON;
         facade = new ChatIntentFacade(fixture.extractor, fixture.recipeService, fixture.ingredientMatcher,
@@ -398,20 +397,15 @@ class ChatIntentFacadeJevOnTest {
     class Fallback {
 
         @Test
-        @DisplayName("Jev가 실패하면 OpenAI 결과를 쓰고, 맛·분류 단어 같은 AI 실수 고치기 보정은 거치지 않는다")
+        @DisplayName("Jev가 실패하면 OpenAI 결과를 서비스 규칙만 거쳐 쓰고, 맛·분류 단어로 고치지 않는다")
         void usesOpenAiWithoutFixes_whenJevFails() {
             givenOpenAi(recommend(null, null, List.of("국"), List.of(), null));
             when(jev.await(run)).thenReturn(Optional.empty());
 
             ChatIntentResolution resolution = resolve("칼칼한 국물 요리");
-            fixture.givenExtracted(recommend(null, null, List.of("국"), List.of(), null));
-            ChatIntentResolution off = fixture.facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("칼칼한 국물 요리"));
 
             assertThat(resolution.recipeQuery().wantedTastes()).isEmpty();
             assertThat(resolution.recipeQuery().moodCategories()).containsExactly("국");
-            // off 모드는 맛 단어(칼칼)·분류 묶음 말(국물)로 고친다
-            assertThat(off.recipeQuery().wantedTastes()).containsExactly(Taste.SPICY);
-            assertThat(off.recipeQuery().moodCategories()).contains("국", "찌개");
             verifyDecision(JevDecision.of(Decision.OPENAI_JEV_FAILED));
             verify(similarDishFinder, never()).findBroad(any(), any());
         }
@@ -625,7 +619,7 @@ class ChatIntentFacadeJevOnTest {
     // 비교 로그에 넘긴 결정
     private void verifyDecision(JevDecision expected) {
         ArgumentCaptor<JevDecision> decision = ArgumentCaptor.forClass(JevDecision.class);
-        verify(jev).compareWhenDone(eq(run), eq(MEMBER_ID), eq(SESSION_ID), anyInt(), any(), anyBoolean(), decision.capture());
+        verify(jev).logWhenDone(eq(run), eq(MEMBER_ID), eq(SESSION_ID), anyInt(), any(), anyBoolean(), decision.capture());
         assertThat(decision.getValue()).isEqualTo(expected);
     }
 }

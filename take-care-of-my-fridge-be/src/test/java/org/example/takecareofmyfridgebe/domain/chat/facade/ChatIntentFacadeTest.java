@@ -436,8 +436,8 @@ public class ChatIntentFacadeTest {
         }
 
         @Test
-        @DisplayName("직전 카드가 없는 상담에서 \"매운 닭볶음탕 레시피\"를 자세히로 봐도 닭볶음탕 매운맛 추천으로 바꾼다")
-        void recommendsSpicyDish_whenNoLastCards() {
+        @DisplayName("직전 카드가 없는 상담에서 \"매운 닭볶음탕 레시피\"를 자세히로 봐도 닭볶음탕 추천으로 바꾼다 (맛은 AI 값 그대로)")
+        void recommendsDish_whenNoLastCards() {
             ChatContext noCards = new ChatContext(List.of(), null, List.of());
             givenExtracted(detail(null, "닭볶음탕"));
             when(chatMessageService.findRecentRecommendedRecipeIds(List.of(SESSION_ID), 30)).thenReturn(Map.of());
@@ -448,7 +448,6 @@ public class ChatIntentFacadeTest {
             assertThat(resolution.intent()).isEqualTo(ChatIntent.RECOMMEND);
             assertThat(resolution.recipeQuery().keywords()).containsExactly("닭볶음탕");
             assertThat(resolution.recipeQuery().keywordText()).isEqualTo("닭볶음탕");
-            assertThat(resolution.recipeQuery().wantedTastes()).containsExactly(Taste.SPICY);
         }
 
         @Test
@@ -994,19 +993,6 @@ public class ChatIntentFacadeTest {
         }
 
         @Test
-        @DisplayName("\"매운 거 못 먹어\"는 알레르기 재료가 아니지만, AI가 원하는 맛으로 넣어도 서버가 피할 맛 SPICY로 고친다")
-        void avoidsSpicy_whenCannotEatSpicy() {
-            givenExtracted(new IntentResult(ChatIntent.RECOMMEND, List.of("SPICY"), List.of(), 0, List.of(), List.of(), false,
-                    null, null, null));
-
-            ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("매운 거 못 먹어"));
-
-            assertThat(resolution.recipeQuery().avoidTastes()).containsExactly(Taste.SPICY);
-            assertThat(resolution.recipeQuery().wantedTastes()).isEmpty();
-            assertThat(resolution.allergens()).isEmpty();
-        }
-
-        @Test
         @DisplayName("추천이 아니면(일반 답) 알레르기를 찾지 않는다")
         void skipsAllergy_whenGeneral() {
             givenExtracted(new IntentResult(ChatIntent.GENERAL, List.of(), List.of(), 0, List.of(), List.of(), false, null, null, null));
@@ -1058,51 +1044,6 @@ public class ChatIntentFacadeTest {
             ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("숙제 풀어줘"));
 
             assertThat(resolution.intent()).isEqualTo(ChatIntent.GENERAL);
-            assertThat(resolution.declines()).isFalse();
-        }
-
-        @Test
-        @DisplayName("AI가 OFF_TOPIC이어도 음식 말이 있고 달라는 말이 있으면 추천으로 되살린다 (주식으로 먹을 거 추천해줘)")
-        void revivesAsRecommend_whenFoodWordAndRequestWord() {
-            givenExtracted(intentOnly(ChatIntent.OFF_TOPIC));
-
-            ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("주식으로 먹을 거 추천해줘"));
-
-            assertThat(resolution.intent()).isEqualTo(ChatIntent.RECOMMEND);
-            assertThat(resolution.declines()).isFalse();
-            assertThat(resolution.recipeQuery()).isNotNull();
-        }
-
-        @Test
-        @DisplayName("OFF_TOPIC을 추천으로 되살리면 맛·분류 보정이 돈다 (매운 국 먹을 거 추천해줘 → 원하는 맛 SPICY, 분류 국)")
-        void correctsTastesAndCategories_whenRevivedAsRecommend() {
-            givenExtracted(intentOnly(ChatIntent.OFF_TOPIC));
-
-            RecipeQuery query = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("매운 국 먹을 거 추천해줘")).recipeQuery();
-
-            assertThat(query.wantedTastes()).containsExactly(Taste.SPICY);
-            assertThat(query.moodCategories()).contains("국");
-        }
-
-        @Test
-        @DisplayName("AI가 OFF_TOPIC이어도 음식 말이 있고 달라는 말이 없으면 일반 답으로 되살린다 (장보기 목록 짜줘)")
-        void revivesAsGeneral_whenFoodWordWithoutRequestWord() {
-            givenExtracted(intentOnly(ChatIntent.OFF_TOPIC));
-
-            ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("장보기 목록 짜줘"));
-
-            assertThat(resolution.intent()).isEqualTo(ChatIntent.GENERAL);
-            assertThat(resolution.declines()).isFalse();
-        }
-
-        @Test
-        @DisplayName("음식 말이 없어도 재료 사전 이름이 있으면 OFF_TOPIC을 되살린다")
-        void revives_whenIngredientName() {
-            givenExtracted(intentOnly(ChatIntent.OFF_TOPIC));
-            when(ingredientMatcher.matchAll(anyList())).thenReturn(Map.of("두부", ingredient(TOFU, "ING_TOFU", "두부")));
-
-            ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("두부 값이 왜 올랐어"));
-
             assertThat(resolution.declines()).isFalse();
         }
 
@@ -1184,9 +1125,9 @@ public class ChatIntentFacadeTest {
         }
 
         @Test
-        @DisplayName("AI가 재료를 비웠으면 서버가 말에서 재료 사전 이름을 찾는다")
+        @DisplayName("냉장고 보기인데 AI가 재료를 비웠으면 서버가 말에서 재료 사전 이름을 찾는다")
         void fillsIngredientNames_whenAiLeftEmpty() {
-            givenExtracted(intentOnly(ChatIntent.GENERAL));
+            givenExtracted(intentOnly(ChatIntent.FRIDGE));
             when(ingredientMatcher.matchAll(anyList())).thenReturn(Map.of("두부", ingredient(TOFU, "ING_TOFU", "두부")));
 
             ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("두부 아직 있어?"));
@@ -1310,32 +1251,6 @@ public class ChatIntentFacadeTest {
         }
 
         @Test
-        @DisplayName("AI가 요리 이름을 비웠어도 첫 키워드가 메시지에 그대로 있으면 요리 이름으로 채운다")
-        void fillsDishFromFirstKeyword_whenAiLeftDishEmpty() {
-            givenExtracted(aiDish(ChatIntent.RECOMMEND, "", List.of("김피탕", "탕수육", "깐풍기")));
-
-            RecipeQuery query = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("김피탕 같은 요리 추천해줘"))
-                    .recipeQuery();
-
-            assertThat(query.keywordText()).isEqualTo("김피탕");
-            assertThat(query.keywords()).containsExactly("김피탕", "탕수육", "깐풍기");
-        }
-
-        @Test
-        @DisplayName("AI가 요리 이름과 키워드를 모두 비우면 \"○○ 같은 요리·거·음식\"의 ○○를 요리 이름과 첫 키워드로 쓴다")
-        void fillsDishFromLikePhrase_whenAiLeftAllEmpty() {
-            for (String message : List.of("김피탕 같은 요리 추천해줘", "꿔바로우 같은 거", "마라샹궈같은 음식 먹고 싶어")) {
-                givenExtracted(aiDish(ChatIntent.RECOMMEND, "", List.of()));
-
-                RecipeQuery query = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of(message)).recipeQuery();
-
-                String dish = message.substring(0, message.indexOf("같은")).strip();
-                assertThat(query.keywordText()).as(message).isEqualTo(dish);
-                assertThat(query.keywords()).as(message).containsExactly(dish);
-            }
-        }
-
-        @Test
         @DisplayName("\"○○ 같은 거\"의 ○○가 분류 이름·묶음 말·밀키트 말·가리키는 말이면 요리 이름으로 채우지 않는다")
         void keepsDishEmpty_whenLikePhraseIsNotDish() {
             when(recipeService.getClassifications())
@@ -1370,20 +1285,6 @@ public class ChatIntentFacadeTest {
         }
 
         @Test
-        @DisplayName("AI가 일반 답으로 봐도 요리 이름이 있고 묻는 말이 없으면 추천을 시도하고 출처를 DISH_TRY로 남긴다")
-        void triesRecommend_whenGeneralWithDishAndNoQuestion() {
-            givenExtracted(aiDish(ChatIntent.GENERAL, "김피탕", List.of()));
-
-            ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID,
-                    ChatMessageCreateRequest.of("오늘은 김피탕이 땡기네"));
-
-            assertThat(resolution.intent()).isEqualTo(ChatIntent.RECOMMEND);
-            assertThat(resolution.source()).isEqualTo(Source.DISH_TRY);
-            assertThat(resolution.recipeQuery().keywordText()).isEqualTo("김피탕");
-            assertThat(resolution.recipeQuery().keywords()).containsExactly("김피탕");
-        }
-
-        @Test
         @DisplayName("요리가 무엇인지 묻는 말(\"김피탕이 뭐야?\")은 요리 이름이 있어도 일반 답 그대로다")
         void keepsGeneral_whenAskingAboutDish() {
             givenExtracted(aiDish(ChatIntent.GENERAL, "김피탕", List.of()));
@@ -1394,17 +1295,5 @@ public class ChatIntentFacadeTest {
             assertThat(resolution.recipeQuery()).isNull();
         }
 
-        @Test
-        @DisplayName("AI가 일반 답으로 보고 요리 이름도 비웠으면 짧은 말일 때만 레시피 이름으로 찾아 추천을 시도한다")
-        void triesRecommendByRecipeName_whenGeneralWithoutDish() {
-            when(recipeService.suggestNames("닭볶음탕", 1)).thenReturn(List.of("닭볶음탕"));
-            givenExtracted(IntentResult.general());
-
-            ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("닭볶음탕 레시피"));
-
-            assertThat(resolution.intent()).isEqualTo(ChatIntent.RECOMMEND);
-            assertThat(resolution.source()).isEqualTo(Source.DISH_TRY);
-            assertThat(resolution.recipeQuery().keywordText()).isEqualTo("닭볶음탕");
-        }
     }
 }

@@ -22,7 +22,7 @@ import java.util.Set;
  * <ul>
  *   <li>비슷한 요리 ({@link #find}): 요리 이름 그대로 맞은 레시피가 없을 때 RecipeCandidateFacade가 부른다 (이름 조각·벡터 보충은 그대로 돈다).
  *       같은 호출에서 요리 이름이 줄임말이면 정식 이름도 받는다 (호출은 늘지 않는다)</li>
- *   <li>넓은 요청 요리 ({@link #findBroad}): Jev on 모드에서 요청 종류가 넓은 요청일 때 JevIntentResolver가 부른다</li>
+ *   <li>넓은 요청 요리 ({@link #findBroad}): 상담 의도를 Jev로 정할 때 요청 종류가 넓은 요청이면 JevIntentResolver가 부른다</li>
  * </ul>
  * Redis(캐시)와 AI 두 곳을 조율해서 facade 층에 둔다.
  */

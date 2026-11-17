@@ -29,7 +29,7 @@ import org.example.takecareofmyfridgebe.domain.chat.intent.MealkitWordChecker;
 import org.example.takecareofmyfridgebe.domain.chat.intent.TasteWordChecker;
 import org.example.takecareofmyfridgebe.domain.chat.safety.AllergyExclusionFinder;
 import org.example.takecareofmyfridgebe.domain.chat.ai.ChatIntentExtractor;
-import org.example.takecareofmyfridgebe.domain.chat.ai.JevIntentShadow;
+import org.example.takecareofmyfridgebe.domain.chat.ai.JevIntentRunner;
 import org.example.takecareofmyfridgebe.domain.chat.text.ChatTexts;
 import org.example.takecareofmyfridgebe.domain.ingredient.service.IngredientMatcher;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
@@ -67,13 +67,12 @@ import java.util.stream.Stream;
  *       못 찾으면 일반 답(이전 대화를 보고 AI가 되묻는다)</li>
  * </ul>
  * <p>
- * Jev 그림자 모드(app.chat.jev.mode=shadow)가 켜져 있으면 OpenAI 의도 판단과 함께 Jev를 다른 스레드에서 부르고, 최종 결과와 비교 로그만 남긴다.
- * 상담 결과와 응답 시간은 Jev와 상관없다 (JevIntentShadow).
- * <p>
- * on 모드(app.chat.jev.mode=on)면 OpenAI 의도 판단이 끝난 뒤 Jev 결과를 기다려(제한 시간 안에서) Jev로 의도를 정한다 (JevIntentResolver).
- * Jev가 실패하거나 의도 confidence가 {@value #MIN_JEV_INTENT_CONFIDENCE} 미만이면 OpenAI 결과를 쓴다. 두 경우 모두 서버 보정은
- * 서비스 규칙만 거친다(IntentCorrector.Steps.SERVICE_RULES). confidence가 낮아 되돌릴 때도 OpenAI 의도가 추천 계열이고 Jev 2차 요청 종류가
- * 넓은 요청이면 넓은 요청 요리 이름 경로를 탄다(JevIntentResolver.resolveBroadFallback). 설계: docs/testing/jev-on-design.md
+ * 의도는 Jev로 정한다: OpenAI 의도 판단과 함께 Jev를 다른 스레드에서 시작하고(JevIntentRunner), OpenAI 의도 판단이 끝난 뒤 Jev 결과를 기다려
+ * (제한 시간 안에서) Jev 판단과 OpenAI가 꺼낸 값으로 의도 결과를 만든다 (JevIntentResolver).
+ * Jev가 실패하거나(키 없음·제한 시간 포함) 의도 confidence가 {@value #MIN_JEV_INTENT_CONFIDENCE} 미만이면 OpenAI 결과로 되돌린다.
+ * confidence가 낮아 되돌릴 때도 OpenAI 의도가 추천 계열이고 Jev 2차 요청 종류가 넓은 요청이면 넓은 요청 요리 이름 경로를 탄다
+ * (JevIntentResolver.resolveBroadFallback). 어느 쪽이든 그 뒤 서버 서비스 규칙(IntentCorrector)을 거친다.
+ * 무엇으로 정했는지는 "상담 의도 Jev 결정" 로그로 남긴다. 설계: docs/testing/jev-on-design.md
  */
 @Slf4j
 @Component
@@ -81,7 +80,7 @@ public class ChatIntentFacade {
 
     // AI가 고를 분류 목록에서만 뺄 분류. 뜻이 없어 조건으로 쓸 수 없다 (레시피 후보에서는 빼지 않는다)
     private static final Set<String> PROMPT_EXCLUDED_CATEGORIES = Set.of("기타");
-    // on 모드에서 Jev 의도를 믿을 confidence. 평가로 정함 (jev-v4: 0.8 이상이 회차의 86%, 그중 의도 정답 98.1%)
+    // Jev 의도를 믿을 confidence. 평가로 정함 (jev-v4: 0.8 이상이 회차의 86%, 그중 의도 정답 98.1%)
     static final double MIN_JEV_INTENT_CONFIDENCE = 0.8;
     // 의도 판단에 넘길 [이전 추천] 이름 수
     private static final int EARLIER_CARDS_SHOWN = 6;
@@ -102,16 +101,16 @@ public class ChatIntentFacade {
     private final ChatCorrectionProperties corrections;
     // AI 결과를 서버 단어 규칙으로 고친다
     private final IntentCorrector intentCorrector;
-    // Jev 호출 (shadow: 비교 로그만, on: 결과를 기다려 의도를 정함)
-    private final JevIntentShadow jevIntentShadow;
-    // on 모드에서 Jev 판단으로 의도 결과를 만든다 (on이 아니면 쓰지 않는다)
+    // Jev 호출 (시작·기다리기·결정 로그)
+    private final JevIntentRunner jevIntentRunner;
+    // Jev 판단으로 의도 결과를 만든다
     private final JevIntentResolver jevIntentResolver;
 
     @Autowired
     public ChatIntentFacade(ChatIntentExtractor chatIntentExtractor, RecipeService recipeService, IngredientMatcher ingredientMatcher,
                             ChatCandidateProperties chatCandidateProperties, ChatWordProperties chatWordProperties,
                             AllergyExclusionFinder allergyExclusionFinder, ChatCorrectionProperties corrections,
-                            IntentCorrector intentCorrector, JevIntentShadow jevIntentShadow, JevIntentResolver jevIntentResolver) {
+                            IntentCorrector intentCorrector, JevIntentRunner jevIntentRunner, JevIntentResolver jevIntentResolver) {
         this.chatIntentExtractor = chatIntentExtractor;
         this.recipeService = recipeService;
         this.ingredientMatcher = ingredientMatcher;
@@ -120,26 +119,8 @@ public class ChatIntentFacade {
         this.allergyExclusionFinder = allergyExclusionFinder;
         this.corrections = corrections;
         this.intentCorrector = intentCorrector;
-        this.jevIntentShadow = jevIntentShadow;
+        this.jevIntentRunner = jevIntentRunner;
         this.jevIntentResolver = jevIntentResolver;
-    }
-
-    // on 모드 없이 만든다 (그림자 모드 테스트)
-    public ChatIntentFacade(ChatIntentExtractor chatIntentExtractor, RecipeService recipeService, IngredientMatcher ingredientMatcher,
-                            ChatCandidateProperties chatCandidateProperties, ChatWordProperties chatWordProperties,
-                            AllergyExclusionFinder allergyExclusionFinder, ChatCorrectionProperties corrections,
-                            IntentCorrector intentCorrector, JevIntentShadow jevIntentShadow) {
-        this(chatIntentExtractor, recipeService, ingredientMatcher, chatCandidateProperties, chatWordProperties,
-                allergyExclusionFinder, corrections, intentCorrector, jevIntentShadow, null);
-    }
-
-    // Jev 그림자 모드 없이 만든다 (의도 판단 테스트·평가)
-    public ChatIntentFacade(ChatIntentExtractor chatIntentExtractor, RecipeService recipeService, IngredientMatcher ingredientMatcher,
-                            ChatCandidateProperties chatCandidateProperties, ChatWordProperties chatWordProperties,
-                            AllergyExclusionFinder allergyExclusionFinder, ChatCorrectionProperties corrections,
-                            IntentCorrector intentCorrector) {
-        this(chatIntentExtractor, recipeService, ingredientMatcher, chatCandidateProperties, chatWordProperties,
-                allergyExclusionFinder, corrections, intentCorrector, JevIntentShadow.off());
     }
 
     // 상담 문맥 없이 (첫 질문과 같게) 정한다
@@ -162,13 +143,13 @@ public class ChatIntentFacade {
         log.info("상담 의도 - memberId: {}, sessionId: {}, 의도: {}, 출처: {}, 조건: {}, 지울 조건(removed): {}, 대상 레시피: {}, 질문 종류: {}",
                 memberId, sessionId, resolution.intent(), resolution.source(), summarize(resolution.recipeQuery()),
                 decision.removed(), resolution.targetRecipeId(), resolution.detailQuestion());
-        compareWithJev(memberId, sessionId, request, resolution, decision.jev(), decision.jevDecision());
+        logJevDecision(memberId, sessionId, request, resolution, decision.jev(), decision.jevDecision());
         return resolution;
     }
 
-    // Jev 그림자 판단을 시작했으면 끝난 뒤 최종 결과와 비교 로그를 남긴다. 기다리지 않고, 실패해도 상담 결과에 영향이 없다
-    private void compareWithJev(Long memberId, Long sessionId, ChatMessageCreateRequest request, ChatIntentResolution resolution,
-                                JevIntentShadow.Run jev, JevDecision jevDecision) {
+    // Jev 판단을 시작했으면 끝난 뒤 최종 결과와 결정 로그를 남긴다. 기다리지 않고, 실패해도 상담 결과에 영향이 없다
+    private void logJevDecision(Long memberId, Long sessionId, ChatMessageCreateRequest request, ChatIntentResolution resolution,
+                                JevIntentRunner.Run jev, JevDecision jevDecision) {
         if (jev == null) {
             return;
         }
@@ -177,15 +158,15 @@ public class ChatIntentFacade {
             boolean mealkit = resolution.recommends()
                     && MealkitWordChecker.check(request.content(), chatWordProperties.mealkit(), chatWordProperties.taste())
                     == MealkitWordChecker.Mode.ONLY;
-            jevIntentShadow.compareWhenDone(jev, memberId, sessionId, request.content().length(), resolution, mealkit, jevDecision);
+            jevIntentRunner.logWhenDone(jev, memberId, sessionId, request.content().length(), resolution, mealkit, jevDecision);
         } catch (RuntimeException e) {
-            log.warn("Jev 비교 준비 실패 - memberId: {}, sessionId: {}, 원인: {}", memberId, sessionId, e.getClass().getSimpleName());
+            log.warn("Jev 결정 로그 준비 실패 - memberId: {}, sessionId: {}, 원인: {}", memberId, sessionId, e.getClass().getSimpleName());
         }
     }
 
-    // 정한 결과, 로그에 남길 지울 조건(removed, AI 결과), 시작한 Jev 판단(없으면 null), 비교 로그에 남길 결정
-    private record Decision(ChatIntentResolution resolution, List<String> removed, JevIntentShadow.Run jev, JevDecision jevDecision) {
-        private Decision(ChatIntentResolution resolution, JevIntentShadow.Run jev, JevDecision jevDecision) {
+    // 정한 결과, 로그에 남길 지울 조건(removed, AI 결과), 시작한 Jev 판단(없으면 null), 결정 로그에 남길 결정
+    private record Decision(ChatIntentResolution resolution, List<String> removed, JevIntentRunner.Run jev, JevDecision jevDecision) {
+        private Decision(ChatIntentResolution resolution, JevIntentRunner.Run jev, JevDecision jevDecision) {
             this(resolution, List.of(), jev, jevDecision);
         }
     }
@@ -196,16 +177,16 @@ public class ChatIntentFacade {
                     RecipeQuery.of(memberId, request.selectedIngredientIds(), request.useSelectedOnly())), null, null);
         }
 
-        // on이면 OpenAI가 실패했을 때도 지금 실패 처리를 쓰고 비교 로그에는 OPENAI_FAILED로 남긴다
-        JevDecision fallbackDecision = jevIntentShadow.on() ? JevDecision.of(JevDecision.Decision.OPENAI_FAILED) : JevDecision.SHADOW;
+        // OpenAI가 실패하면 실패 처리(선택 재료 유무)를 쓰고 결정 로그에는 OPENAI_FAILED로 남긴다
+        JevDecision fallbackDecision = JevDecision.of(JevDecision.Decision.OPENAI_FAILED);
         IntentResult result;
         List<String> categories;
-        JevIntentShadow.Run jev = null;
+        JevIntentRunner.Run jev = null;
         try {
             categories = categories();
             String followUp = followUp(context);
-            // Jev 판단을 OpenAI 의도 판단과 함께 시작한다 (여기서는 기다리지 않는다. off면 null)
-            jev = jevIntentShadow.start(request.content(), categories, followUp);
+            // Jev 판단을 OpenAI 의도 판단과 함께 시작한다 (여기서는 기다리지 않는다)
+            jev = jevIntentRunner.start(request.content(), categories, followUp);
             IntentResult raw = chatIntentExtractor.extract(memberId, sessionId, request.content(), categories, followUp);
             log.debug("상담 의도 AI 원본 - memberId: {}, sessionId: {}, 의도: {}, 원하는 맛: {}, 피할 맛: {}, removed: {}",
                     memberId, sessionId, raw.intent(), raw.wantedTastes(), raw.avoidTastes(), raw.removed());
@@ -226,34 +207,28 @@ public class ChatIntentFacade {
         }
 
         CorrectionInput input = new CorrectionInput(memberId, sessionId, request.content(), categories, context);
-        JevDecision jevDecision = JevDecision.SHADOW;
-        IntentCorrector.Corrected corrected;
-        if (jevIntentShadow.on()) {
-            // on: Jev로 정하거나(Jev 결과 + OpenAI가 꺼낸 값) 보정 없는 OpenAI 결과를 쓰고, 서버 보정은 서비스 규칙만 거친다
-            Optional<JevIntentJudgement> judged = jevIntentShadow.await(jev);
-            if (judged.isEmpty()) {
-                jevDecision = JevDecision.of(JevDecision.Decision.OPENAI_JEV_FAILED);
-            } else if (judged.get().first().intentConfidence() < MIN_JEV_INTENT_CONFIDENCE) {
-                // 이미 받아 둔 Jev 2차가 넓은 요청이면 의도는 OpenAI 것으로 두고 넓은 요청 경로만 탄다 (OpenAI를 다시 부르지 않는다)
-                Optional<JevIntentResolver.Resolved> broad = jevIntentResolver.resolveBroadFallback(input, judged.get(), result);
-                if (broad.isPresent()) {
-                    result = broad.get().result();
-                    jevDecision = broad.get().decision();
-                } else {
-                    jevDecision = JevDecision.of(JevDecision.Decision.OPENAI_LOW_CONFIDENCE);
-                }
+        // Jev로 정하거나(Jev 결과 + OpenAI가 꺼낸 값) 보정 없는 OpenAI 결과를 쓰고, 서버는 서비스 규칙만 거친다
+        JevDecision jevDecision;
+        Optional<JevIntentJudgement> judged = jevIntentRunner.await(jev);
+        if (judged.isEmpty()) {
+            jevDecision = JevDecision.of(JevDecision.Decision.OPENAI_JEV_FAILED);
+        } else if (judged.get().first().intentConfidence() < MIN_JEV_INTENT_CONFIDENCE) {
+            // 이미 받아 둔 Jev 2차가 넓은 요청이면 의도는 OpenAI 것으로 두고 넓은 요청 경로만 탄다 (OpenAI를 다시 부르지 않는다)
+            Optional<JevIntentResolver.Resolved> broad = jevIntentResolver.resolveBroadFallback(input, judged.get(), result);
+            if (broad.isPresent()) {
+                result = broad.get().result();
+                jevDecision = broad.get().decision();
             } else {
-                JevIntentResolver.Resolved resolved = jevIntentResolver.resolve(input, judged.get(), result);
-                result = resolved.result();
-                jevDecision = resolved.decision();
+                jevDecision = JevDecision.of(JevDecision.Decision.OPENAI_LOW_CONFIDENCE);
             }
-            log.info("상담 의도 Jev on - memberId: {}, sessionId: {}, 결정: {}, 요청 종류: {}",
-                    memberId, sessionId, jevDecision.decision(), jevDecision.usedKind());
-            corrected = intentCorrector.correct(input, result, IntentCorrector.Steps.SERVICE_RULES);
         } else {
-            // 서버 단어 규칙으로 고친다 (단계 순서와 의존 관계는 IntentCorrector)
-            corrected = intentCorrector.correct(input, result);
+            JevIntentResolver.Resolved resolved = jevIntentResolver.resolve(input, judged.get(), result);
+            result = resolved.result();
+            jevDecision = resolved.decision();
         }
+        log.info("상담 의도 Jev - memberId: {}, sessionId: {}, 결정: {}, 요청 종류: {}",
+                memberId, sessionId, jevDecision.decision(), jevDecision.usedKind());
+        IntentCorrector.Corrected corrected = intentCorrector.correct(input, result, IntentCorrector.Steps.SERVICE_RULES);
         result = corrected.result();
         boolean mealkitRecommend = corrected.mealkitRecommend();
         Long detailTarget = corrected.detailTarget();

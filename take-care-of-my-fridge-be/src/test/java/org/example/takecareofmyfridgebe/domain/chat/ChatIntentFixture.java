@@ -1,15 +1,18 @@
 package org.example.takecareofmyfridgebe.domain.chat;
 
 import org.example.takecareofmyfridgebe.domain.chat.ai.ChatIntentExtractor;
+import org.example.takecareofmyfridgebe.domain.chat.ai.JevIntentRunner;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatCandidateProperties;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatCorrectionProperties;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.dto.IntentResult;
 import org.example.takecareofmyfridgebe.domain.chat.facade.ChatIntentFacade;
+import org.example.takecareofmyfridgebe.domain.chat.facade.SimilarDishFinder;
 import org.example.takecareofmyfridgebe.domain.chat.intent.AskWordCheckerTest;
 import org.example.takecareofmyfridgebe.domain.chat.intent.CategoryWordCheckerTest;
 import org.example.takecareofmyfridgebe.domain.chat.intent.FridgeShopWordCheckerTest;
 import org.example.takecareofmyfridgebe.domain.chat.intent.IntentCorrector;
+import org.example.takecareofmyfridgebe.domain.chat.intent.JevIntentResolver;
 import org.example.takecareofmyfridgebe.domain.chat.intent.MealkitWordCheckerTest;
 import org.example.takecareofmyfridgebe.domain.chat.intent.TasteWordCheckerTest;
 import org.example.takecareofmyfridgebe.domain.chat.recommend.TemperatureWordCheckerTest;
@@ -73,10 +76,20 @@ public class ChatIntentFixture {
         return newFacade(corrections, newCorrector(corrections));
     }
 
+    // Jev 없이(Jev 판단이 오지 않아 OpenAI 결과로 되돌림) 정하는 facade
     public ChatIntentFacade newFacade(ChatCorrectionProperties corrections, IntentCorrector corrector) {
+        return newFacade(corrections, corrector, mock(JevIntentRunner.class));
+    }
+
+    // 주어진 Jev 호출로 정하는 facade (보정 모두 켬)
+    public ChatIntentFacade newFacade(JevIntentRunner jevIntentRunner) {
+        return newFacade(ChatCorrectionProperties.ALL_ON, newCorrector(ChatCorrectionProperties.ALL_ON), jevIntentRunner);
+    }
+
+    private ChatIntentFacade newFacade(ChatCorrectionProperties corrections, IntentCorrector corrector, JevIntentRunner jevIntentRunner) {
         return new ChatIntentFacade(extractor, recipeService, ingredientMatcher,
                 new ChatCandidateProperties(List.of("양념", "음료"), 0.4, List.of(), List.of("백김치", "물김치", "동치미", "나박김치"), List.of(), List.of()),
-                WORDS, allergyExclusionFinder, corrections, corrector);
+                WORDS, allergyExclusionFinder, corrections, corrector, jevIntentRunner, new JevIntentResolver(mock(SimilarDishFinder.class), WORDS));
     }
 
     public IntentCorrector newCorrector(ChatCorrectionProperties corrections) {

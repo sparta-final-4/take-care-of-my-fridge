@@ -21,7 +21,7 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * Jev on 모드: Jev 판단과 OpenAI가 꺼낸 값으로 상담이 쓰는 의도 결과(IntentResult)를 만든다. 결과 모양은 OpenAI 의도 판단과 같아서
+ * Jev 판단과 OpenAI가 꺼낸 값으로 상담이 쓰는 의도 결과(IntentResult)를 만든다. 결과 모양은 OpenAI 의도 판단과 같아서
  * 그 뒤(ChatIntentFacade의 추천·다시 추천·레시피 자세히·냉장고·사기 처리)는 그대로다. 설계: docs/testing/jev-on-design.md
  * <ul>
  *   <li>의도: Jev. 서비스 규칙은 JevIntentClassifier가 이미 적용했다: 직전 추천이 없는 RECIPE_DETAIL → RECOMMEND,
