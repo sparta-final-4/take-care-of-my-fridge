@@ -79,13 +79,23 @@ final class JevSecondQuestions {
         }
         JevAnswers.Choice<RequestKind> requestKind = answers.choice(REQUEST_KIND, REQUEST_KINDS);
         JevAnswers.Choice<String> category = answers.choice(CATEGORY, categoryOptions(categories));
+        Map.Entry<String, Double> runnerUp = runnerUp(category);
         return new JevIntentJudgement.Second(
                 answers.noul(DISH_NAMED), answers.noul(FEATURE_NAMED),
                 answers.noul(INGREDIENT_NAMED), answers.noul(MEALKIT_WANTED),
                 Collections.unmodifiableMap(tastes),
                 requestKind.value(), requestKind.confidence(),
                 NO_CATEGORY.equals(category.value()) ? null : category.value(), category.confidence(),
+                runnerUp == null ? null : runnerUp.getKey(), runnerUp == null ? null : runnerUp.getValue(),
                 answers.call());
+    }
+
+    // 분류 Choice의 2등 (1등을 뺀 가장 높은 확률). 선택지가 하나뿐이면 null
+    private static Map.Entry<String, Double> runnerUp(JevAnswers.Choice<String> category) {
+        return category.probabilities().entrySet().stream()
+                .filter(entry -> !entry.getKey().equals(category.value()))
+                .max(Map.Entry.comparingByValue())
+                .orElse(null);
     }
 
     static String tasteName(Member.Taste taste) {

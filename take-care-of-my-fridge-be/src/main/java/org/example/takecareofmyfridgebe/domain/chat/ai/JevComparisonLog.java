@@ -25,7 +25,7 @@ import java.util.stream.Collectors;
  * <ul>
  *   <li>값이 없으면(Jev 실패, 2차를 묻지 않음) {@value #NONE}, 빈 목록은 빈 값(openaiWanted=)</li>
  *   <li>목록은 쉼표로 잇는다. 맛은 Member.Taste 순서, OpenAI 분류는 고른 순서</li>
- *   <li>Jev 분류는 요청 종류(jevRequestKind)와 1등 분류(jevCategory, "없음"이 1등이면 -)로 남긴다.
+ *   <li>Jev 분류는 요청 종류(jevRequestKind)와 1등 분류(jevCategory, "없음"이 1등이면 -)·확률, 2등 분류(jevCategory2, "없음"일 수 있음)·확률로 남긴다.
  *       categoryMatch는 요청 종류가 특정 분류(CATEGORY)일 때만 OpenAI 분류가 1등 분류 하나와 같은지 본다</li>
  *   <li>decision은 상담 의도를 무엇으로 정했는지(SHADOW / JEV / OPENAI_LOW_CONFIDENCE / OPENAI_LOW_CONFIDENCE_JEV_BROAD /
  *       OPENAI_JEV_FAILED / OPENAI_FAILED), jevUsedKind·jevUsedValues는 Jev로 정했을 때(또는 되돌림에서 넓은 요청 경로를 탔을 때)
@@ -139,6 +139,8 @@ final class JevComparisonLog {
         fields.put("jevRequestKindConfidence", second == null ? null : second.requestKindConfidence());
         fields.put("jevCategory", second == null ? null : second.category());
         fields.put("jevCategoryConfidence", second == null ? null : second.categoryConfidence());
+        fields.put("jevCategory2", second == null ? null : second.secondCategory());
+        fields.put("jevCategory2Confidence", second == null ? null : second.secondCategoryConfidence());
         fields.put("categoryMatch", !categoryKind ? null
                 : new LinkedHashSet<>(openai.categories()).equals(Set.of(String.valueOf(second.category()))));
         fields.put("openaiMealkit", openai.mealkit());

@@ -55,7 +55,9 @@ public record JevIntentJudgement(
      * @param requestKind           요청 종류 (특정 요리 / 특정 분류 / 넓은 요청 / 없음)
      * @param requestKindConfidence 요청 종류 Choice의 confidence
      * @param category              1등 분류. "없음"이 1등이면 null. 요청 종류가 특정 분류일 때만 의미가 있다
-     * @param categoryConfidence    분류 Choice의 confidence
+     * @param categoryConfidence    분류 Choice의 confidence (1등 분류의 확률)
+     * @param secondCategory        2등 분류 선택지 이름 ("없음"일 수 있다). 선택지가 하나뿐이면 null. 비교 로그용
+     * @param secondCategoryConfidence 2등 분류의 확률. 없으면 null
      */
     public record Second(
             double dishNamed,
@@ -67,6 +69,8 @@ public record JevIntentJudgement(
             double requestKindConfidence,
             String category,
             double categoryConfidence,
+            String secondCategory,
+            Double secondCategoryConfidence,
             Call call
     ) {
     }

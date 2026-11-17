@@ -28,7 +28,7 @@ class JevComparisonLogTest {
     static final List<String> FIELDS = List.of("memberId", "sessionId", "messageLength", "openaiIntent", "jevIntent",
             "jevIntentConfidence", "jevFollowsPrevious", "intentMatch", "openaiWanted", "openaiAvoided", "jevWanted", "jevAvoided", "tasteMatch",
             "openaiCategories", "jevRequestKind", "jevRequestKindConfidence", "jevCategory", "jevCategoryConfidence",
-            "categoryMatch", "openaiMealkit", "jevMealkit", "jevAsksQuestion",
+            "jevCategory2", "jevCategory2Confidence", "categoryMatch", "openaiMealkit", "jevMealkit", "jevAsksQuestion",
             "jevDishNamed", "jevModel", "jevRequestIds", "jevLatencyMs", "jevInputTokens", "jevStatus", "decision", "jevUsedKind",
             "jevUsedValues", "jevUsedReason");
 
@@ -100,7 +100,7 @@ class JevComparisonLogTest {
         JevIntentJudgement base = judgement(ChatIntent.RECOMMEND, true);
         JevIntentJudgement.Second second = base.second();
         JevIntentJudgement dish = new JevIntentJudgement(base.first(), new JevIntentJudgement.Second(0.81, second.featureNamed(),
-                second.ingredientNamed(), second.mealkitWanted(), second.tastes(), RequestKind.DISH, 0.77, "면류", 0.83, second.call()),
+                second.ingredientNamed(), second.mealkitWanted(), second.tastes(), RequestKind.DISH, 0.77, "면류", 0.83, "국", 0.1, second.call()),
                 base.totalLatencyMs());
         JevDecision category = new JevDecision(JevDecision.Decision.JEV, RequestKind.CATEGORY, List.of("면류"),
                 JevDecision.Reason.DISH_TO_TOP_CATEGORY);
@@ -165,7 +165,7 @@ class JevComparisonLogTest {
         JevIntentJudgement.Second second = broad.second();
         JevIntentJudgement withBroad = new JevIntentJudgement(broad.first(), new JevIntentJudgement.Second(
                 second.dishNamed(), second.featureNamed(), second.ingredientNamed(), second.mealkitWanted(), second.tastes(),
-                RequestKind.BROAD, 0.77, null, 0.6, second.call()), broad.totalLatencyMs());
+                RequestKind.BROAD, 0.77, null, 0.6, "국", 0.3, second.call()), broad.totalLatencyMs());
 
         Map<String, String> values = values(JevComparisonLog.line(OPENAI, JevSide.finished(Optional.of(withBroad), 520L)));
 
@@ -187,7 +187,7 @@ class JevComparisonLogTest {
         Arrays.stream(Taste.values()).forEach(taste -> tastes.put(taste,
                 new TasteAnswer(taste == Taste.SPICY ? TasteStance.WANTED : TasteStance.NOT_MENTIONED, 0.9)));
         JevIntentJudgement.Second second = new JevIntentJudgement.Second(0.09, 0.74, 0.07, 0.08, tastes,
-                RequestKind.CATEGORY, 0.88, "찌개", 0.81,
+                RequestKind.CATEGORY, 0.88, "찌개", 0.81, "국", 0.12,
                 new JevIntentJudgement.Call("jev-1.14.0", "req_second", 290L, 1893));
         return new JevIntentJudgement(first, second, 520L);
     }

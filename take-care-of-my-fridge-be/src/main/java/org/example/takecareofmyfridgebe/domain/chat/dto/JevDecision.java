@@ -44,6 +44,8 @@ public record JevDecision(
         DISH_FROM_KEYWORD,
         // 특정 요리인데 요리 이름이 없어 Jev 1등 분류로 찾음
         DISH_TO_TOP_CATEGORY,
+        // 1등 분류 확률이 기준 미만이라 분류를 쓰지 않음 (특정 요리는 분류 없이, 특정 분류·요리 이름 없음은 넓은 요청)
+        LOW_CATEGORY_CONFIDENCE,
         // 특정 분류인데 1등 분류가 없음이라 넓은 요청(또는 밀키트면 없음)
         NO_TOP_CATEGORY,
         // 특정 요리인데 요리 이름도 쓸 분류도 없어 넓은 요청

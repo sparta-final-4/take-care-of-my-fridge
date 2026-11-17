@@ -296,6 +296,90 @@ class ChatIntentFacadeJevOnTest {
     }
 
     @Nested
+    @DisplayName("1등 분류 확률 기준")
+    class TopCategoryConfidence {
+
+        @Test
+        @DisplayName("특정 요리이고 1등 분류 확률이 기준(0.7) 이상이면 요리 이름과 함께 그 분류를 넣는다")
+        void addsTopCategory_whenDishAndConfidenceAtThreshold() {
+            givenOpenAi(recommend("김치찌개", List.of("김치찌개"), List.of(), List.of(), null));
+            givenJevWithCategoryConfidence(RequestKind.DISH, "찌개", 0.7);
+
+            ChatIntentResolution resolution = resolve("김치찌개 먹고 싶어");
+
+            assertThat(resolution.recipeQuery().keywordText()).isEqualTo("김치찌개");
+            assertThat(resolution.recipeQuery().moodCategories()).containsExactly("찌개");
+            verifyDecision(new JevDecision(Decision.JEV, RequestKind.DISH, List.of("김치찌개")));
+        }
+
+        @Test
+        @DisplayName("특정 요리이고 1등 분류 확률이 기준 미만이면 분류 없이 요리 이름으로만 찾는다")
+        void skipsTopCategory_whenDishAndConfidenceBelowThreshold() {
+            givenOpenAi(recommend("김피탕", List.of("김피탕"), List.of(), List.of(), null));
+            givenJevWithCategoryConfidence(RequestKind.DISH, "국", 0.69);
+
+            ChatIntentResolution resolution = resolve("김피탕 레시피 추천해줘");
+
+            assertThat(resolution.recipeQuery().keywordText()).isEqualTo("김피탕");
+            assertThat(resolution.recipeQuery().moodCategories()).isEmpty();
+            verifyDecision(new JevDecision(Decision.JEV, RequestKind.DISH, List.of("김피탕"), Reason.LOW_CATEGORY_CONFIDENCE));
+        }
+
+        @Test
+        @DisplayName("특정 분류이고 1등 분류 확률이 기준 이상이면 그 분류로 찾는다")
+        void usesTopCategory_whenCategoryAndConfidenceAtThreshold() {
+            givenOpenAi(recommend(null, List.of(), List.of(), List.of(), null));
+            givenJevWithCategoryConfidence(RequestKind.CATEGORY, "찌개", 0.7);
+
+            ChatIntentResolution resolution = resolve("찌개 추천해줘");
+
+            assertThat(resolution.recipeQuery().moodCategories()).containsExactly("찌개");
+            verify(similarDishFinder, never()).findBroad(anyLong(), anyString());
+            verifyDecision(new JevDecision(Decision.JEV, RequestKind.CATEGORY, List.of("찌개")));
+        }
+
+        @Test
+        @DisplayName("특정 분류이고 1등 분류 확률이 기준 미만이면 넓은 요청으로 간다")
+        void treatsAsBroad_whenCategoryAndConfidenceBelowThreshold() {
+            givenOpenAi(recommend(null, List.of(), List.of(), List.of(), "국물 요리"));
+            givenJevWithCategoryConfidence(RequestKind.CATEGORY, "국", 0.69);
+            when(similarDishFinder.findBroad(MEMBER_ID, "국물 요리")).thenReturn(List.of("된장찌개", "미역국"));
+
+            ChatIntentResolution resolution = resolve("국물 요리 추천해줘");
+
+            assertThat(resolution.recipeQuery().moodCategories()).isEmpty();
+            assertThat(resolution.recipeQuery().keywords()).containsExactly("된장찌개", "미역국");
+            verifyDecision(new JevDecision(Decision.JEV, RequestKind.BROAD, List.of("된장찌개", "미역국"), Reason.LOW_CATEGORY_CONFIDENCE));
+        }
+
+        @Test
+        @DisplayName("특정 요리인데 요리 이름이 없고 1등 분류 확률이 기준 이상이면 그 분류로 찾는다")
+        void usesTopCategory_whenNoDishAndConfidenceAtThreshold() {
+            givenOpenAi(recommend(null, List.of(), List.of(), List.of(), null));
+            givenJevWithCategoryConfidence(RequestKind.DISH, "찌개", 0.7);
+
+            ChatIntentResolution resolution = resolve("얼큰한 거 하나");
+
+            assertThat(resolution.recipeQuery().moodCategories()).containsExactly("찌개");
+            verifyDecision(new JevDecision(Decision.JEV, RequestKind.CATEGORY, List.of("찌개"), Reason.DISH_TO_TOP_CATEGORY));
+        }
+
+        @Test
+        @DisplayName("특정 요리인데 요리 이름이 없고 1등 분류 확률이 기준 미만이면 넓은 요청으로 간다")
+        void treatsAsBroad_whenNoDishAndConfidenceBelowThreshold() {
+            givenOpenAi(recommend(null, List.of(), List.of(), List.of(), "얼큰한 거"));
+            givenJevWithCategoryConfidence(RequestKind.DISH, "국", 0.69);
+            when(similarDishFinder.findBroad(MEMBER_ID, "얼큰한 거")).thenReturn(List.of("육개장", "짬뽕"));
+
+            ChatIntentResolution resolution = resolve("얼큰한 거 하나");
+
+            assertThat(resolution.recipeQuery().moodCategories()).isEmpty();
+            assertThat(resolution.recipeQuery().keywords()).containsExactly("육개장", "짬뽕");
+            verifyDecision(new JevDecision(Decision.JEV, RequestKind.BROAD, List.of("육개장", "짬뽕"), Reason.LOW_CATEGORY_CONFIDENCE));
+        }
+    }
+
+    @Nested
     @DisplayName("OpenAI 결과로 되돌림")
     class Fallback {
 
@@ -490,13 +574,23 @@ class ChatIntentFacadeJevOnTest {
         givenJev(kind, category, confidence, stances);
     }
 
-    // 추천 confidence, 2차: 요청 종류·1등 분류, 맛별 답 (없는 맛은 언급 없음)
+    // 추천 confidence, 2차: 요청 종류·1등 분류(확률 0.9), 맛별 답 (없는 맛은 언급 없음)
     private void givenJev(RequestKind kind, String category, double confidence, Map<Taste, TasteStance> stances) {
+        givenJevWithCategoryConfidence(kind, category, 0.9, confidence, stances);
+    }
+
+    // 추천 0.95, 2차: 요청 종류·1등 분류와 그 확률
+    private void givenJevWithCategoryConfidence(RequestKind kind, String category, double categoryConfidence) {
+        givenJevWithCategoryConfidence(kind, category, categoryConfidence, 0.95, Map.of());
+    }
+
+    private void givenJevWithCategoryConfidence(RequestKind kind, String category, double categoryConfidence, double confidence,
+                                                Map<Taste, TasteStance> stances) {
         Map<Taste, TasteAnswer> tastes = new EnumMap<>(Taste.class);
         Arrays.stream(Taste.values()).forEach(taste -> tastes.put(taste,
                 new TasteAnswer(stances.getOrDefault(taste, TasteStance.NOT_MENTIONED), 0.9)));
-        JevIntentJudgement.Second second = new JevIntentJudgement.Second(0.1, 0.1, 0.1, 0.1, tastes, kind, 0.9, category, 0.9,
-                call("req_second"));
+        JevIntentJudgement.Second second = new JevIntentJudgement.Second(0.1, 0.1, 0.1, 0.1, tastes, kind, 0.9, category,
+                categoryConfidence, "없음", 1 - categoryConfidence, call("req_second"));
         when(jev.await(run)).thenReturn(Optional.of(new JevIntentJudgement(first(ChatIntent.RECOMMEND, confidence), second, 300L)));
     }
 

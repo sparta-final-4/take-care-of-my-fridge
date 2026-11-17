@@ -133,6 +133,7 @@ final class ChatIntentEvalJevOn {
         JevDecision decision = shadow.decision;
         return new Info(decision == null ? null : decision.decision(), shadow.judgement,
                 decision == null ? null : decision.usedKind(), decision == null ? List.of() : decision.usedValues(),
+                decision == null ? null : decision.reason(),
                 broadGenerator.called, broadGenerator.ms, broadGenerator.input, broadGenerator.output);
     }
 
@@ -143,13 +144,19 @@ final class ChatIntentEvalJevOn {
      * @param judgement   Jev 판단 (실패·제한 시간이면 null)
      * @param usedKind    Jev로 정했을 때 쓴 요청 종류
      * @param usedValues  그 요청 종류로 쓴 값 (넓은 요청이면 요리 이름)
+     * @param usedReason  Jev 요청 종류나 OpenAI 요리 이름을 바꾼 까닭 (JevDecision.Reason)
      * @param broadAi     넓은 요청 요리 이름 AI를 불렀는지 (캐시 미스)
      */
     record Info(JevDecision.Decision decision, JevIntentJudgement judgement, RequestKind usedKind, List<String> usedValues,
-                boolean broadAi, long broadMs, long broadInput, long broadOutput) {
+                JevDecision.Reason usedReason, boolean broadAi, long broadMs, long broadInput, long broadOutput) {
 
         static final List<String> HEADER = List.of("decision", "jevIntent", "jevIntentConfidence", "jevFollowsPrevious", "jevRequestKind", "usedKind",
-                "broadDishes", "kindMatch", "broadAi", "broadMs", "broadInputTokens", "broadOutputTokens", "jevInputTokens", "jevMs");
+                "broadDishes", "kindMatch", "broadAi", "broadMs", "broadInputTokens", "broadOutputTokens", "jevInputTokens", "jevMs",
+                "jevCategory", "jevCategoryConfidence", "jevCategory2", "jevCategory2Confidence", "usedReason", "usedValues");
+
+        private JevIntentJudgement.Second second() {
+            return judgement == null || !judgement.hasSecond() ? null : judgement.second();
+        }
 
         long jevInputTokens() {
             if (judgement == null) {
@@ -181,7 +188,13 @@ final class ChatIntentEvalJevOn {
                     ChatIntentEvalManualTest.csv(kindMatch(expect)),
                     String.valueOf(broadAi), String.valueOf(broadMs), String.valueOf(broadInput), String.valueOf(broadOutput),
                     String.valueOf(jevInputTokens()),
-                    judgement == null ? "" : String.valueOf(judgement.totalLatencyMs()));
+                    judgement == null ? "" : String.valueOf(judgement.totalLatencyMs()),
+                    ChatIntentEvalManualTest.csv(second() == null ? null : second().category()),
+                    second() == null ? "" : String.valueOf(second().categoryConfidence()),
+                    ChatIntentEvalManualTest.csv(second() == null ? null : second().secondCategory()),
+                    ChatIntentEvalManualTest.csv(second() == null ? null : second().secondCategoryConfidence()),
+                    ChatIntentEvalManualTest.csv(usedReason),
+                    ChatIntentEvalManualTest.csv(usedValues));
         }
     }
 

@@ -31,12 +31,13 @@ import java.util.Set;
  *       레시피 자세히 대상·질문 종류, 다시 추천 뺄 조건, 냉장고 범위. 버리는 칸: 의도·맛·분류·키워드</li>
  *   <li>추천·다시 추천은 요청 종류로 검색 조건을 정한다
  *     <ul>
+ *       <li>Jev 1등 분류는 확률이 {@value #MIN_CATEGORY_CONFIDENCE} 이상일 때만 쓴다 (아래 "1등 분류"는 모두 이 기준을 넘은 것)</li>
  *       <li>특정 요리: OpenAI 요리 이름과 Jev 1등 분류(없으면 넣지 않는다). 분류는 거르는 조건이 아니라 점수를 올리는 조건이라
  *           이름이 맞는 레시피와 비슷한 요리 중 같은 분류가 앞에 온다. 요리 이름이 메시지에 그대로 없거나 비었으면
  *           메시지에 글자 그대로 있는 첫 OpenAI 키워드를 요리 이름으로 줍는다("○○ 같은 요리"에서 OpenAI가 요리 이름을 비우고 키워드에만 넣음).
  *           그래도 요리 이름이 없으면 1등 분류가 있을 때 특정 분류로,
  *           없으면 넓은 요청으로 본다 (맛·재료 칸은 그대로 넘긴다)</li>
- *       <li>특정 분류: Jev 1등 분류. 1등이 없음이면 밀키트를 원하는 말(MealkitWordChecker)이면 없음,
+ *       <li>특정 분류: Jev 1등 분류. 1등 확률이 기준 미만이면 넓은 요청, 1등이 없음이면 밀키트를 원하는 말(MealkitWordChecker)이면 없음,
  *           아니면 넓은 요청</li>
  *       <li>넓은 요청: 넓은 요청 요리 이름 5개(SimilarDishFinder.findBroad, 캐시)를 키워드로, 원한 표현을 채워 요리 이름을 말한 추천으로 보지 않는다
  *           (카드가 모자라면 냉장고 후보로 채운다)</li>
@@ -55,6 +56,8 @@ public class JevIntentResolver {
 
     // 요청 종류로 검색 조건을 정하는 의도
     private static final Set<ChatIntent> RECIPE_INTENTS = Set.of(ChatIntent.RECOMMEND, ChatIntent.REFINE);
+    // Jev 1등 분류를 쓸 확률 기준. 평가로 정함 (처음 값 0.7, jev-on-v5)
+    static final double MIN_CATEGORY_CONFIDENCE = 0.7;
     // 넓은 요청 표현을 메시지에서 만들 때 끝에서 지울 문장 부호
     private static final String TRAILING_MARKS = "[?!.~…,]+$";
 
@@ -115,7 +118,9 @@ public class JevIntentResolver {
 
     // Jev 요청 종류에 경계 규칙을 더해 쓸 종류를 정한다 (클래스 설명의 순서대로)
     private Used used(CorrectionInput input, JevIntentJudgement.Second second, IntentResult openAi) {
-        String category = second.category();
+        // 1등 분류는 확률이 기준 이상일 때만 쓴다
+        String category = second.category() != null && second.categoryConfidence() >= MIN_CATEGORY_CONFIDENCE ? second.category() : null;
+        boolean lowCategory = second.category() != null && category == null;
         if (second.requestKind() == RequestKind.DISH) {
             Reason reason = Reason.NONE;
             String dish = IntentCorrector.dishInMessage(input.message(), openAi.dishText()) ? openAi.dishText() : null;
@@ -124,14 +129,18 @@ public class JevIntentResolver {
                 reason = dish == null ? Reason.NONE : Reason.DISH_FROM_KEYWORD;
             }
             if (dish != null) {
-                return new Used(RequestKind.DISH, dish, category, reason);
+                return new Used(RequestKind.DISH, dish, category,
+                        reason == Reason.NONE && lowCategory ? Reason.LOW_CATEGORY_CONFIDENCE : reason);
             }
             if (category != null) {
                 return new Used(RequestKind.CATEGORY, null, category, Reason.DISH_TO_TOP_CATEGORY);
             }
-            return new Used(RequestKind.BROAD, null, null, Reason.NO_DISH);
+            return new Used(RequestKind.BROAD, null, null, lowCategory ? Reason.LOW_CATEGORY_CONFIDENCE : Reason.NO_DISH);
         }
         if (second.requestKind() == RequestKind.CATEGORY && category == null) {
+            if (lowCategory) {
+                return new Used(RequestKind.BROAD, null, null, Reason.LOW_CATEGORY_CONFIDENCE);
+            }
             RequestKind kind = MealkitWordChecker.check(input.message(), chatWordProperties.mealkit(), chatWordProperties.taste())
                     == MealkitWordChecker.Mode.ONLY ? RequestKind.NONE : RequestKind.BROAD;
             return new Used(kind, null, null, Reason.NO_TOP_CATEGORY);
