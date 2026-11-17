@@ -239,8 +239,9 @@ class JevIntentClassifierTest {
                 "추천", "일반 질문", "레시피 자세히", "냉장고 보기", "장보기", "상관없는 말", "막을 말", "자해");
         assertThat(map(questions.get("follows_previous")))
                 .containsEntry("type", "noul")
-                .containsEntry("instructions", "[직전 추천]에 이어서 하는 말인가? 직전 추천을 보고 다른 것을 달라거나, "
-                        + "직전 추천의 조건을 조금 바꿔 달라는 말이면 예다. 직전 추천과 상관없이 새로 요리를 정해 달라는 말이면 아니오다");
+                .containsEntry("instructions", "[직전 추천]의 조건(맛, 재료, 종류)을 이어받으면서 일부만 바꿔 달라는 말인가? "
+                        + "직전 추천을 보고 조건을 더하거나 빼거나 바꿔 달라는 말이면 예다. "
+                        + "직전 추천에 덧붙여 말했어도 직전 조건과 상관없이 새로 요리를 정해 달라는 말이면 아니오다");
     }
 
     @Test

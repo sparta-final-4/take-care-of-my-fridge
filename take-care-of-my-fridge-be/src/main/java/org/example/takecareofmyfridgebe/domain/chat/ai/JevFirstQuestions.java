@@ -74,8 +74,9 @@ final class JevFirstQuestions {
         questions.put(FRIDGE_SCOPE, JevAnswers.choiceQuestion("냉장고에서 무엇을 보려 하나?", FRIDGE_SCOPES));
         if (hasFollowUp) {
             questions.put(FOLLOWS_PREVIOUS, SystemOneQuestion.noul(
-                    "[직전 추천]에 이어서 하는 말인가? 직전 추천을 보고 다른 것을 달라거나, 직전 추천의 조건을 조금 바꿔 달라는 말이면 예다. "
-                            + "직전 추천과 상관없이 새로 요리를 정해 달라는 말이면 아니오다"));
+                    "[직전 추천]의 조건(맛, 재료, 종류)을 이어받으면서 일부만 바꿔 달라는 말인가? "
+                            + "직전 추천을 보고 조건을 더하거나 빼거나 바꿔 달라는 말이면 예다. "
+                            + "직전 추천에 덧붙여 말했어도 직전 조건과 상관없이 새로 요리를 정해 달라는 말이면 아니오다"));
         }
         return Collections.unmodifiableMap(questions);
     }
