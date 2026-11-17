@@ -38,8 +38,9 @@ final class JevSecondQuestions {
     static final List<Option<RequestKind>> REQUEST_KINDS = List.of(
             new Option<>("특정 요리", RequestKind.DISH, "요리 하나의 이름을 말했다"),
             new Option<>("특정 분류", RequestKind.CATEGORY,
-                    "요리의 종류를 하나 말했다(찌개, 디저트처럼). 빼거나 피하는 말이 함께 있어도, 원하는 요리 종류를 하나 말했으면 특정 분류다"),
-            new Option<>("넓은 요청", RequestKind.BROAD, "상황이나 쓰임새, 여러 종류에 걸친 말을 했다(술안주, 반찬, 국물, 간단한 한 끼처럼)"),
+                    "요리의 종류를 말했고, 그 종류가 분류 목록의 하나에 맞는다(찌개, 디저트처럼). 빼거나 피하는 말이 함께 있어도 이 기준은 같다"),
+            new Option<>("넓은 요청", RequestKind.BROAD, "상황이나 쓰임새, 여러 종류에 걸친 말을 했다(술안주, 반찬, 국물, 간단한 한 끼처럼). "
+                    + "말한 종류가 여러 분류에 걸치면 넓은 요청이다"),
             new Option<>("없음", RequestKind.NONE, "요리 종류나 이름을 말하지 않았다"));
 
     private JevSecondQuestions() {
