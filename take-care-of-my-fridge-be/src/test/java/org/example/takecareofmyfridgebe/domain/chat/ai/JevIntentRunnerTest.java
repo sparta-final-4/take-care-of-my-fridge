@@ -38,7 +38,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-// 상담 의도 판단의 Jev 호출: 키 없음·실패면 AI 실패 처리, 기다리기, 실행기 자리, 결정 로그
+// 상담 의도 판단의 Jev 호출: 키 없음·실패면 서버 답, 기다리기, 실행기 자리, 결정 로그
 @ExtendWith(OutputCaptureExtension.class)
 class JevIntentRunnerTest {
 
@@ -69,18 +69,18 @@ class JevIntentRunnerTest {
     }
 
     @Test
-    @DisplayName("키가 없으면 Jev를 부르지 않고 AI 실패 처리로 답하며 결정 로그에 SKIPPED와 JEV_FAILED를 남긴다")
+    @DisplayName("키가 없으면 Jev를 부르지 않고 서버 답으로 정하며 결정 로그에 SKIPPED와 JEV_FAILED_SERVER_FALLBACK을 남긴다")
     void answersWithFailure_whenApiKeyBlank(CapturedOutput output) {
         ChatIntentResolution resolution = facade(runner(client(""))).resolve(MEMBER_ID, sessionId, request());
 
         assertThat(resolution).isEqualTo(withoutJev());
         verifyNoInteractions(classifier);
         assertThat(JevDecisionLogTest.values(awaitDecisionLog(output, sessionId)))
-                .containsEntry("jevStatus", "SKIPPED").containsEntry("decision", "JEV_FAILED");
+                .containsEntry("jevStatus", "SKIPPED").containsEntry("decision", "JEV_FAILED_SERVER_FALLBACK");
     }
 
     @Test
-    @DisplayName("키가 없으면 시작할 때 AI 실패 처리로만 답한다는 경고를 남기고, 키가 있으면 남기지 않는다")
+    @DisplayName("키가 없으면 시작할 때 서버 답으로만 답한다는 경고를 남기고, 키가 있으면 남기지 않는다")
     void warnsOnce_whenApiKeyBlankAtStartup(CapturedOutput output) {
         runner(client(FAKE_KEY)).warnIfNoKey();
         assertThat(output.getOut()).doesNotContain("TypeSafe 키");
@@ -106,7 +106,7 @@ class JevIntentRunnerTest {
     }
 
     @Test
-    @DisplayName("Jev가 예외로 끝나면 AI 실패 처리로 답하고 결정 로그를 FIRST_FAILED와 JEV_FAILED로 남긴다")
+    @DisplayName("Jev가 예외로 끝나면 서버 답으로 정하고 결정 로그를 FIRST_FAILED와 JEV_FAILED_SERVER_FALLBACK으로 남긴다")
     void answersWithFailureAndLogsFirstFailed_whenJevThrows(CapturedOutput output) {
         when(classifier.classify(any(), any(), any())).thenThrow(new IllegalStateException("boom"));
 
@@ -114,8 +114,8 @@ class JevIntentRunnerTest {
 
         assertThat(resolution).isEqualTo(withoutJev());
         assertThat(JevDecisionLogTest.values(awaitDecisionLog(output, sessionId)))
-                .containsEntry("jevStatus", "FIRST_FAILED").containsEntry("decision", "JEV_FAILED")
-                .containsEntry("finalIntent", "GENERAL");
+                .containsEntry("jevStatus", "FIRST_FAILED").containsEntry("decision", "JEV_FAILED_SERVER_FALLBACK")
+                .containsEntry("finalIntent", "RECOMMEND");
     }
 
     @Test

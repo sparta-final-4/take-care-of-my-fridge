@@ -20,7 +20,6 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.LastRecommendation;
 import org.example.takecareofmyfridgebe.domain.chat.dto.LastRecommendation.QuerySnapshot;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeQuery;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RefineCondition;
-import org.example.takecareofmyfridgebe.domain.chat.intent.AskWordChecker;
 import org.example.takecareofmyfridgebe.domain.chat.intent.FridgeShopWordChecker;
 import org.example.takecareofmyfridgebe.domain.chat.intent.CorrectionInput;
 import org.example.takecareofmyfridgebe.domain.chat.intent.IntentCorrector;
@@ -54,7 +53,10 @@ import java.util.stream.Stream;
  * <ul>
  *   <li>mode=RECOMMEND(칩): AI를 부르지 않고 추천. 선택 재료만 쓰기는 요청값 그대로</li>
  *   <li>mode=AUTO: 의도는 Jev, 조건 값은 OpenAI 꺼내기로 정한다. 선택 재료만 쓰기는 요청값 OR AI 결과</li>
- *   <li>AI 실패(Jev 실패·키 없음·시간 초과, OpenAI 꺼내기 실패): 선택 재료가 있으면 추천, 없으면 일반. 에러로 끝내지 않는다</li>
+ *   <li>AI 실패: Jev 실패(키 없음·시간 초과·오류)나, 꺼낸 값이 필요한 의도(추천·레시피 자세히)인데 OpenAI 꺼내기 실패(오류·시간 초과)면
+ *       질문에 답하지 않고 서버 답(선택 재료 → 냉장고 재료 → 인기 레시피 카드, ChatIntentResolution.serverFallback)으로 정한다.
+ *       OpenAI를 다시 부르지 않고 에러로 끝내지 않는다. 꺼낸 값이 필요 없는 의도(일반·냉장고·사기·상관없음·거절)면 OpenAI 꺼내기 실패는
+ *       무시하고 그 의도대로 답한다 (냉장고·사기 이름·범위는 서버가 말에서 찾는다)</li>
  * </ul>
  * 말한 재료 이름은 IngredientMatcher로 재료 ID로 바꾸고, 못 찾은 이름(ING_CUSTOM)은 버린다.
  * 말한 재료(includeIngredients)는 고른 재료와 합쳐 선택 재료로 쓴다 (중복 제거, 빼달라고 한 재료는 뺀다).
@@ -81,6 +83,8 @@ public class ChatIntentFacade {
 
     // Jev가 고를 분류 목록에서만 뺄 분류. 뜻이 없어 조건으로 쓸 수 없다 (레시피 후보에서는 빼지 않는다)
     private static final Set<String> PROMPT_EXCLUDED_CATEGORIES = Set.of("기타");
+    // OpenAI가 꺼낸 값(요리 이름·키워드·재료·레시피 자세히 대상)이 있어야 답할 수 있는 의도. 꺼내기가 실패하면 서버 답으로 간다
+    private static final Set<ChatIntent> NEEDS_EXTRACTION = Set.of(ChatIntent.RECOMMEND, ChatIntent.RECIPE_DETAIL);
     // Jev 자해(SELF_HARM) 확률이 이 값 이상이면 1등 의도가 아니어도 자해 안내를 보낸다. 평가로 정함
     // (처음 값 0.3. 자해 기준 세트 chat-intent-safety.yml로 자해 문장을 모두 잡고 아닌 문장은 잡지 않는 범위를 본다)
     static final double SELF_HARM_MIN_PROBABILITY = 0.3;
@@ -180,8 +184,9 @@ public class ChatIntentFacade {
         try {
             categories = categories();
         } catch (RuntimeException e) {
-            log.warn("상담 분류 목록 읽기 실패, AI 실패 처리로 - memberId: {}, sessionId: {}, 원인: {}", memberId, sessionId, e.toString());
-            return failed(memberId, sessionId, request, null, JevDecision.of(JevDecision.Decision.JEV_FAILED));
+            log.warn("상담 분류 목록 읽기 실패, Jev를 부르지 못해 서버 답으로 - memberId: {}, sessionId: {}, 원인: {}",
+                    memberId, sessionId, e.toString());
+            return serverFallback(memberId, sessionId, request, null, JevDecision.Decision.JEV_FAILED_SERVER_FALLBACK);
         }
         String followUp = followUp(context);
         // Jev 판단을 OpenAI 꺼내기와 함께 시작한다 (여기서는 기다리지 않는다)
@@ -189,8 +194,8 @@ public class ChatIntentFacade {
         IntentExtraction extraction = extract(memberId, sessionId, request.content(), followUp);
         Optional<JevIntentJudgement> judged = jevIntentRunner.await(jev);
         if (judged.isEmpty()) {
-            log.warn("상담 Jev 의도 판단 실패, AI 실패 처리로 - memberId: {}, sessionId: {}", memberId, sessionId);
-            return failed(memberId, sessionId, request, jev, JevDecision.of(JevDecision.Decision.JEV_FAILED));
+            log.warn("상담 Jev 의도 판단 실패, 서버 답으로 - memberId: {}, sessionId: {}", memberId, sessionId);
+            return serverFallback(memberId, sessionId, request, jev, JevDecision.Decision.JEV_FAILED_SERVER_FALLBACK);
         }
         // 자해는 꺼낸 값이 필요 없으므로 OpenAI 꺼내기가 실패했어도 자해 안내를 보낸다
         JevIntentJudgement.First first = judged.get().first();
@@ -200,7 +205,12 @@ public class ChatIntentFacade {
             return new Decision(ChatIntentResolution.declined(ChatIntent.SELF_HARM), jev, JevDecision.of(JevDecision.Decision.JEV));
         }
         if (extraction == null) {
-            return failed(memberId, sessionId, request, jev, JevDecision.of(JevDecision.Decision.OPENAI_FAILED));
+            if (NEEDS_EXTRACTION.contains(first.intent())) {
+                return serverFallback(memberId, sessionId, request, jev, JevDecision.Decision.OPENAI_FAILED_SERVER_FALLBACK);
+            }
+            log.info("상담 OpenAI 꺼내기 실패, 꺼낸 값이 필요 없는 의도라 그대로 - memberId: {}, sessionId: {}, 의도: {}",
+                    memberId, sessionId, first.intent());
+            extraction = IntentExtraction.empty();
         }
 
         CorrectionInput input = new CorrectionInput(memberId, sessionId, request.content(), categories, context);
@@ -245,20 +255,13 @@ public class ChatIntentFacade {
         }
     }
 
-    // AI 실패 처리: 선택 재료가 있으면 추천, 없으면 일반 답. 선택 재료가 있어도 묻는 말이면 일반 답
-    private Decision failed(Long memberId, Long sessionId, ChatMessageCreateRequest request, JevIntentRunner.Run jev,
-                            JevDecision jevDecision) {
-        log.info("상담 AI 실패 처리 - memberId: {}, sessionId: {}, 결정: {}, 선택 재료 수: {}",
-                memberId, sessionId, jevDecision.decision(), request.selectedIngredientIds().size());
-        if (request.selectedIngredientIds().isEmpty()) {
-            return new Decision(ChatIntentResolution.general(Source.FALLBACK), jev, jevDecision);
-        }
-        // 선택 재료가 있어도 "두부 얼마나 보관돼?"처럼 묻는 말이면 추천으로 바꾸지 않는다
-        if (AskWordChecker.asks(request.content(), chatWordProperties.ask())) {
-            return new Decision(ChatIntentResolution.general(Source.FALLBACK), jev, jevDecision);
-        }
-        return new Decision(ChatIntentResolution.recommend(Source.FALLBACK,
-                RecipeQuery.of(memberId, request.selectedIngredientIds(), request.useSelectedOnly())), jev, jevDecision);
+    // AI 실패 시 서버 답: 질문에 답하지 않고 선택 재료(없으면 냉장고 재료) 기반 추천 카드로 답한다 (카드는 ChatStreamFacade가 고른다)
+    private Decision serverFallback(Long memberId, Long sessionId, ChatMessageCreateRequest request, JevIntentRunner.Run jev,
+                                    JevDecision.Decision decision) {
+        log.info("상담 AI 실패로 서버 답 - memberId: {}, sessionId: {}, 결정: {}, 선택 재료 수: {}",
+                memberId, sessionId, decision, request.selectedIngredientIds().size());
+        return new Decision(ChatIntentResolution.serverFallback(
+                RecipeQuery.of(memberId, request.selectedIngredientIds(), request.useSelectedOnly())), jev, JevDecision.of(decision));
     }
 
     /**

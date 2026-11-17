@@ -20,6 +20,8 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.RecommendationReply;
 import org.example.takecareofmyfridgebe.domain.chat.recommend.MealkitPicker;
 import org.example.takecareofmyfridgebe.domain.chat.safety.SafetyWordCheckerTest;
 import org.example.takecareofmyfridgebe.domain.chat.service.ChatMessageService;
+import org.example.takecareofmyfridgebe.domain.cooking.dto.PopularRecipeResponse;
+import org.example.takecareofmyfridgebe.domain.cooking.service.PopularRecipeService;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.Ingredient;
 import org.example.takecareofmyfridgebe.domain.ingredient.service.IngredientService;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member.Taste;
@@ -59,6 +61,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 class ChatRecommendationFacadeTest {
@@ -72,6 +75,7 @@ class ChatRecommendationFacadeTest {
     private ProductService productService;
     private SaleEventReader saleEventReader;
     private ChatMessageService chatMessageService;
+    private PopularRecipeService popularRecipeService;
     private ChatRecommendationFacade facade;
 
     @BeforeEach
@@ -83,8 +87,10 @@ class ChatRecommendationFacadeTest {
         productService = mock(ProductService.class);
         saleEventReader = mock(SaleEventReader.class);
         chatMessageService = mock(ChatMessageService.class);
+        popularRecipeService = mock(PopularRecipeService.class);
         facade = new ChatRecommendationFacade(recipeCandidateFacade, recipeCardDescriber, recipeService, ingredientService,
-                productService, saleEventReader, chatMessageService, ChatIntentFixture.WORDS, SafetyWordCheckerTest.ALL);
+                productService, saleEventReader, chatMessageService, ChatIntentFixture.WORDS, SafetyWordCheckerTest.ALL,
+                popularRecipeService);
         when(ingredientService.getIngredientsByIds(any())).thenReturn(Map.of());
     }
 
@@ -639,5 +645,91 @@ class ChatRecommendationFacadeTest {
 
     private RecommendationReply recommend(String content, RecipeQuery query, Collection<Long> previousCardIds) {
         return facade.recommend(content, query, previousCardIds, null);
+    }
+    @Test
+    @DisplayName("서버 답은 선택 재료가 있으면 선택 재료로 찾은 후보를 카드로 만들고, 요리 이름·키워드 없는 조건으로 찾아 AI를 부르지 않는다")
+    void serverFallback_returnsSelectedCards_whenSelected() {
+        RecipeQuery query = RecipeQuery.of(MEMBER_ID, List.of(21L), false);
+        when(recipeCandidateFacade.findCandidates(query)).thenReturn(new RecipeCandidates(List.of(
+                candidate(10L, "두부조림", "조림", 20, reason(List.of())),
+                candidate(20L, "두부전", "전", 15, reason(List.of()))), false, false));
+        when(recipeService.findSummaries(any())).thenReturn(Map.of());
+
+        ChatRecommendationFacade.FallbackCards cards = facade.serverFallback(query);
+
+        assertThat(cards.popular()).isFalse();
+        assertThat(cards.event().recipes()).extracting(RecommendedRecipe::recipeId).containsExactly(10L, 20L);
+        verify(recipeCandidateFacade).findCandidates(argThat(sent -> sent.keywords().isEmpty() && sent.keywordText() == null));
+        verifyNoInteractions(popularRecipeService);
+    }
+
+    @Test
+    @DisplayName("서버 답은 선택 재료가 없으면 냉장고 재료(가진 재료가 있는 후보)로 카드를 만든다")
+    void serverFallback_returnsFridgeCards_whenNoSelected() {
+        RecipeQuery query = RecipeQuery.of(MEMBER_ID, List.of());
+        when(recipeCandidateFacade.findCandidates(query)).thenReturn(new RecipeCandidates(List.of(
+                candidate(10L, "김치찌개", "찌개", 25, reason(List.of()))), true, false));
+        when(recipeService.findSummaries(any())).thenReturn(Map.of());
+
+        ChatRecommendationFacade.FallbackCards cards = facade.serverFallback(query);
+
+        assertThat(cards.popular()).isFalse();
+        assertThat(cards.event().recipes()).extracting(RecommendedRecipe::recipeId).containsExactly(10L);
+        verifyNoInteractions(popularRecipeService);
+    }
+
+    @Test
+    @DisplayName("서버 답은 냉장고 재료가 없으면(가진 재료가 있는 후보가 없으면) 인기 레시피 카드로 답한다")
+    void serverFallback_returnsPopularCards_whenFridgeIsEmpty() {
+        RecipeQuery query = RecipeQuery.of(MEMBER_ID, List.of());
+        RecipeCandidate notOwned = new RecipeCandidate(10L, "김치찌개", "찌개", 25, new Ranking(0, 0, 0, 0, 0, 3, 3),
+                reason(List.of()));
+        when(recipeCandidateFacade.findCandidates(query)).thenReturn(new RecipeCandidates(List.of(notOwned), true, false));
+        givenPopular(30L, 40L);
+
+        ChatRecommendationFacade.FallbackCards cards = facade.serverFallback(query);
+
+        assertThat(cards.popular()).isTrue();
+        assertThat(cards.event().recipes()).extracting(RecommendedRecipe::recipeId).containsExactly(30L, 40L);
+        assertThat(cards.event().recipes()).extracting(RecommendedRecipe::reason)
+                .containsOnly(ChatRecommendationFacade.POPULAR_CARD_REASON);
+    }
+
+    @Test
+    @DisplayName("서버 답은 선택 재료가 있어도 카드가 0장이면 인기 레시피 카드로 답한다")
+    void serverFallback_returnsPopularCards_whenNoCandidate() {
+        RecipeQuery query = RecipeQuery.of(MEMBER_ID, List.of(21L), true);
+        when(recipeCandidateFacade.findCandidates(query)).thenReturn(new RecipeCandidates(List.of(), false, false));
+        givenPopular(30L);
+
+        ChatRecommendationFacade.FallbackCards cards = facade.serverFallback(query);
+
+        assertThat(cards.popular()).isTrue();
+        assertThat(cards.event().recipes()).extracting(RecommendedRecipe::recipeId).containsExactly(30L);
+    }
+
+    @Test
+    @DisplayName("서버 답은 후보 검색이 실패하면 인기 레시피 카드로, 인기 레시피도 없으면 카드 0장으로 답한다")
+    void serverFallback_returnsPopularOrEmpty_whenSearchFails() {
+        RecipeQuery query = RecipeQuery.of(MEMBER_ID, List.of());
+        when(recipeCandidateFacade.findCandidates(query)).thenThrow(new IllegalStateException("db down"));
+        when(popularRecipeService.getPopularRecipes(3)).thenReturn(List.of());
+
+        ChatRecommendationFacade.FallbackCards cards = facade.serverFallback(query);
+
+        assertThat(cards.popular()).isTrue();
+        assertThat(cards.event().empty()).isTrue();
+    }
+
+    // 인기 레시피 순위와 그 레시피의 카드 재료 (지금 냉장고 기준)
+    private void givenPopular(Long... recipeIds) {
+        List<PopularRecipeResponse> popular = Arrays.stream(recipeIds)
+                .map(id -> new PopularRecipeResponse(id, "인기" + id, null, null, 10L, 4.5, 3L))
+                .toList();
+        when(popularRecipeService.getPopularRecipes(3)).thenReturn(popular);
+        Map<Long, RecipeCandidate> described = new HashMap<>();
+        Arrays.stream(recipeIds).forEach(id -> described.put(id, candidate(id, "인기" + id, "찌개", 20, reason(List.of()))));
+        when(recipeCardDescriber.describeRecipes(MEMBER_ID, List.of(recipeIds))).thenReturn(described);
+        when(recipeService.findSummaries(any())).thenReturn(Map.of());
     }
 }

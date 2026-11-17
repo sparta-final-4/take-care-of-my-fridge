@@ -55,6 +55,11 @@ public class ChatStreamFacade {
     static final String NO_RECIPE_REPLY = "조건에 맞는 레시피를 찾지 못했어요. 시간을 늘리거나, 선택 재료를 줄이거나, 다른 요리 종류로 다시 물어봐 주세요.";
     // 물어본 레시피가 지워졌을 때 답 (AI를 부르지 않는다)
     static final String RECIPE_GONE_REPLY = "물어보신 레시피는 지금 볼 수 없어요. 다른 레시피를 물어봐 주세요.";
+    // AI가 실패해(Jev 실패, 꺼내기가 필요한 의도인데 OpenAI 꺼내기 실패) 서버가 카드로 답할 때 글 (AI를 부르지 않는다)
+    static final String SERVER_FALLBACK_FRIDGE_REPLY = "지금은 질문을 정확히 이해하기 어려워요. 대신 냉장고 재료로 만들 수 있는 레시피를 보여 드릴게요.";
+    static final String SERVER_FALLBACK_POPULAR_REPLY = "지금은 질문을 정확히 이해하기 어려워요. 대신 인기 있는 레시피를 보여 드릴게요.";
+    // 서버 답 카드가 하나도 없을 때(인기 레시피도 없거나 읽지 못함) 글
+    static final String SERVER_FALLBACK_EMPTY_REPLY = "지금은 질문을 정확히 이해하기 어려워요. 잠시 후 다시 물어봐 주세요.";
     // 요리와 상관없는 질문(의도 OFF_TOPIC)의 답 (답 생성 AI를 부르지 않는다. 의도 판단 AI를 썼으므로 하루 횟수는 센다)
     static final String OFF_TOPIC_REPLY = "저는 요리, 냉장고 재료, 장보기 상담만 도와드릴 수 있어요. 냉장고 재료로 만들 요리를 추천해 드릴까요?";
     // 사용자가 보낸 말에 건강 관련 말이 있으면 답 끝에 빈 줄 하나를 두고 붙이는 안내 (추천 답은 소개 글 끝, 곧 카드 바로 위)
@@ -160,7 +165,7 @@ public class ChatStreamFacade {
 
     // 5. 의도·조건 뽑기 → (추천이면) 후보 검색 → 카드 (event: recommendations) → 답변 스트리밍 조각 (event: message)
     // 의도 판단·후보 검색은 AI·DB·검색을 부르는 블로킹 작업이라 boundedElastic에서 실행한다.
-    // 의도 판단이 실패하면 일반 답(ChatIntentFacade), 후보 검색이 실패하면 일반 답으로 넘어간다. 하루 횟수는 위에서 센 1회에 포함된다
+    // AI가 실패하면 서버 답(ChatIntentFacade가 정하고 카드·정해진 글은 planServerFallback), 후보 검색이 실패하면 일반 답으로 넘어간다. 하루 횟수는 위에서 센 1회에 포함된다
     private Flux<ServerSentEvent<String>> messageStream(Long memberId, Long sessionId, ChatMessageCreateRequest request,
                                                         ReplyState state) {
         return Mono.fromCallable(() -> planReply(memberId, sessionId, request))
@@ -263,6 +268,9 @@ public class ChatStreamFacade {
             log.info("상담 의도 판단으로 AI 답 없이 안내 - memberId: {}, sessionId: {}, 의도: {}", memberId, sessionId, resolution.intent());
             return ReplyPlan.declined(context, declined);
         }
+        if (resolution != null && resolution.serverFallback()) {
+            return planServerFallback(memberId, sessionId, resolution, context);
+        }
         if (resolution != null && resolution.intent() == ChatIntent.RECIPE_DETAIL) {
             // 사용자 말 대신 질문 종류로 만든 질문을 넘긴다 ("두 번째 거"를 단계 번호로 알아듣지 않게). 저장하는 사용자 메시지는 원래 말
             String question = DetailQuestion.questionFor(resolution.detailQuestion(), request.content());
@@ -288,6 +296,16 @@ public class ChatStreamFacade {
             log.warn("상담 추천 후보 검색 실패, 일반 답으로 - memberId: {}, sessionId: {}", memberId, sessionId, e);
             return ReplyPlan.general(context);
         }
+    }
+
+    // AI 실패 시 서버 답: 선택 재료 → 냉장고 재료 → 인기 레시피 카드와 정해진 글 (AI를 부르지 않는다. 카드를 못 고르면 0장과 정해진 글)
+    private ReplyPlan planServerFallback(Long memberId, Long sessionId, ChatIntentResolution resolution, ChatContext context) {
+        ChatRecommendationFacade.FallbackCards cards = chatRecommendationFacade.serverFallback(resolution.recipeQuery());
+        String reply = cards.event().empty() ? SERVER_FALLBACK_EMPTY_REPLY
+                : cards.popular() ? SERVER_FALLBACK_POPULAR_REPLY : SERVER_FALLBACK_FRIDGE_REPLY;
+        log.info("상담 AI 실패로 서버 답 - memberId: {}, sessionId: {}, 인기 레시피: {}, 카드 {}장", memberId, sessionId,
+                cards.popular(), cards.event().recipes().size());
+        return new ReplyPlan(context, RecommendationReply.fixed(cards.event(), reply), resolution.recipeQuery());
     }
 
     // 냉장고 보기·사기: 냉장고·상품 카드와 서버 문장 (답 생성 AI 없음, 냉장고 카드는 저장하지 않는다). 읽다 실패하면 일반 답

@@ -18,6 +18,7 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.JevIntentJudgement.Reque
 import org.example.takecareofmyfridgebe.domain.chat.dto.JevIntentJudgement.TasteAnswer;
 import org.example.takecareofmyfridgebe.domain.chat.dto.JevIntentJudgement.TasteStance;
 import org.example.takecareofmyfridgebe.domain.chat.dto.LastRecommendation;
+import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageMode;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeQuery;
 import org.example.takecareofmyfridgebe.domain.chat.intent.JevIntentResolver;
 import org.example.takecareofmyfridgebe.domain.chat.safety.AllergyExclusionFinder;
@@ -508,29 +509,59 @@ class ChatIntentFacadeJevOnTest {
         }
 
         @Test
-        @DisplayName("Jev가 실패하면 OpenAI 꺼낸 값을 쓰지 않고 실패 처리(선택 재료 없으면 일반 답)로 정하고 JEV_FAILED로 남긴다")
-        void usesFailureHandling_whenJevFails() {
+        @DisplayName("Jev가 실패하면 OpenAI 꺼낸 값을 쓰지 않고 선택 재료 서버 답으로 정하고 JEV_FAILED_SERVER_FALLBACK으로 남긴다")
+        void answersBySelected_whenJevFails() {
+            givenOpenAi(recommend("김치찌개", List.of("김치찌개"), List.of("찌개"), List.of(), null));
+            when(jev.await(run)).thenReturn(Optional.empty());
+
+            ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID,
+                    new ChatMessageCreateRequest("김치찌개 먹고 싶어", ChatMessageMode.AUTO, List.of(ChatIntentFixture.TOFU), true));
+
+            assertThat(resolution.serverFallback()).isTrue();
+            assertThat(resolution.intent()).isEqualTo(ChatIntent.RECOMMEND);
+            assertThat(resolution.recipeQuery()).isEqualTo(RecipeQuery.of(MEMBER_ID, List.of(ChatIntentFixture.TOFU), true));
+            verifyDecision(JevDecision.of(Decision.JEV_FAILED_SERVER_FALLBACK));
+        }
+
+        @Test
+        @DisplayName("Jev가 실패하고 선택 재료가 없으면 조건 없는(냉장고 재료 기반) 서버 답으로 정한다")
+        void answersByFridge_whenJevFailsWithoutSelected() {
             givenOpenAi(recommend("김치찌개", List.of("김치찌개"), List.of("찌개"), List.of(), null));
             when(jev.await(run)).thenReturn(Optional.empty());
 
             ChatIntentResolution resolution = resolve("김치찌개 먹고 싶어");
 
-            assertThat(resolution.intent()).isEqualTo(ChatIntent.GENERAL);
-            assertThat(resolution.source()).isEqualTo(ChatIntentResolution.Source.FALLBACK);
-            verifyDecision(JevDecision.of(Decision.JEV_FAILED));
+            assertThat(resolution.serverFallback()).isTrue();
+            assertThat(resolution.recipeQuery()).isEqualTo(RecipeQuery.of(MEMBER_ID, List.of(), false));
+            assertThat(resolution.recipeQuery().keywords()).isEmpty();
+            verifyDecision(JevDecision.of(Decision.JEV_FAILED_SERVER_FALLBACK));
         }
 
         @Test
-        @DisplayName("OpenAI 꺼내기가 실패하면 실패 처리(선택 재료 없으면 일반 답)를 쓰고 OPENAI_FAILED로 남긴다")
-        void usesFailureHandling_whenOpenAiFails() {
+        @DisplayName("OpenAI 꺼내기가 실패하고 Jev가 추천이면 꺼낸 값이 없어 서버 답으로 정하고 OPENAI_FAILED_SERVER_FALLBACK으로 남긴다")
+        void answersByServer_whenOpenAiFailsAndJevRecommends() {
             when(fixture.extractor.extract(eq(MEMBER_ID), eq(SESSION_ID), any(), any())).thenThrow(new IllegalStateException("timeout"));
-            givenJev(RequestKind.NONE, null);
+            givenJev(RequestKind.DISH, "찌개");
 
-            ChatIntentResolution resolution = resolve("뭐 먹지");
+            ChatIntentResolution resolution = resolve("김치찌개 먹고 싶어");
+
+            assertThat(resolution.serverFallback()).isTrue();
+            assertThat(resolution.recipeQuery()).isEqualTo(RecipeQuery.of(MEMBER_ID, List.of(), false));
+            verifyDecision(JevDecision.of(Decision.OPENAI_FAILED_SERVER_FALLBACK));
+        }
+
+        @Test
+        @DisplayName("OpenAI 꺼내기가 실패해도 Jev가 일반 질문이면 꺼낸 값이 필요 없어 일반 답으로 정한다")
+        void answersGeneral_whenOpenAiFailsAndJevSaysGeneral() {
+            when(fixture.extractor.extract(eq(MEMBER_ID), eq(SESSION_ID), any(), any())).thenThrow(new IllegalStateException("timeout"));
+            givenJevFirstOnly(ChatIntent.GENERAL, 0.9);
+
+            ChatIntentResolution resolution = resolve("두부는 어떻게 보관해?");
 
             assertThat(resolution.intent()).isEqualTo(ChatIntent.GENERAL);
-            assertThat(resolution.source()).isEqualTo(ChatIntentResolution.Source.FALLBACK);
-            verifyDecision(JevDecision.of(Decision.OPENAI_FAILED));
+            assertThat(resolution.source()).isEqualTo(ChatIntentResolution.Source.AI);
+            assertThat(resolution.serverFallback()).isFalse();
+            verifyDecision(JevDecision.of(Decision.JEV));
         }
     }
 

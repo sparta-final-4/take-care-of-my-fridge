@@ -15,6 +15,7 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.RecommendationReply;
 import org.example.takecareofmyfridgebe.domain.chat.dto.SimilarDishes;
 import org.example.takecareofmyfridgebe.domain.chat.safety.SafetyWordCheckerTest;
 import org.example.takecareofmyfridgebe.domain.chat.service.ChatMessageService;
+import org.example.takecareofmyfridgebe.domain.cooking.service.PopularRecipeService;
 import org.example.takecareofmyfridgebe.domain.fridge.service.FridgeService;
 import org.example.takecareofmyfridgebe.domain.ingredient.service.IngredientService;
 import org.example.takecareofmyfridgebe.domain.member.dto.MyInfoResponse;
@@ -94,7 +95,7 @@ class DishNotFoundFlowTest {
                 ingredientService, RecipeCandidateFacadeTest.CANDIDATE_PROPERTIES, collector, tasteReader, similarDishFinder);
         recommendationFacade = new ChatRecommendationFacade(candidateFacade, mock(RecipeCardDescriber.class), recipeService,
                 ingredientService, mock(ProductService.class), mock(SaleEventReader.class), chatMessageService,
-                ChatIntentFixture.WORDS, SafetyWordCheckerTest.ALL);
+                ChatIntentFixture.WORDS, SafetyWordCheckerTest.ALL, mock(PopularRecipeService.class));
     }
 
     @Test

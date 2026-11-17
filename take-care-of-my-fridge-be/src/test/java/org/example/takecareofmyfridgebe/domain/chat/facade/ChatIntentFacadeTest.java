@@ -154,20 +154,8 @@ public class ChatIntentFacadeTest {
         }
 
         @Test
-        @DisplayName("AI 호출이 실패하면 선택 재료가 있어도 묻는 말(두부 얼마나 보관돼?)은 일반 답으로 둔다")
-        void returnsGeneral_whenExtractorFailsWithSelectedAndQuestion() {
-            when(extractor.extract(any(), any(), any(), any())).thenThrow(new RuntimeException("timeout"));
-
-            ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID,
-                    new ChatMessageCreateRequest("두부 얼마나 보관돼?", ChatMessageMode.AUTO, List.of(TOFU), false));
-
-            assertThat(resolution.intent()).isEqualTo(ChatIntent.GENERAL);
-            assertThat(resolution.source()).isEqualTo(Source.FALLBACK);
-        }
-
-        @Test
-        @DisplayName("AI 호출이 실패하고 선택 재료가 있으면 선택 재료로 추천한다")
-        void recommendsWithSelected_whenExtractorFailsWithSelected() {
+        @DisplayName("AI 호출이 실패하고 선택 재료가 있으면 선택 재료 서버 답으로 정한다")
+        void answersBySelected_whenExtractorFailsWithSelected() {
             when(extractor.extract(any(), any(), any(), any())).thenThrow(new RuntimeException("timeout"));
 
             ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID,
@@ -175,31 +163,31 @@ public class ChatIntentFacadeTest {
 
             assertThat(resolution.intent()).isEqualTo(ChatIntent.RECOMMEND);
             assertThat(resolution.source()).isEqualTo(Source.FALLBACK);
+            assertThat(resolution.serverFallback()).isTrue();
             assertThat(resolution.recipeQuery()).isEqualTo(RecipeQuery.of(MEMBER_ID, List.of(TOFU), true));
         }
 
         @Test
-        @DisplayName("AI 호출이 실패하고 선택 재료가 없으면 일반 답으로 정한다")
-        void returnsGeneral_whenExtractorFailsWithoutSelected() {
+        @DisplayName("AI 호출이 실패하고 선택 재료가 없으면 조건 없는(냉장고 재료 기반) 서버 답으로 정한다")
+        void answersByFridge_whenExtractorFailsWithoutSelected() {
             when(extractor.extract(any(), any(), any(), any())).thenThrow(new IllegalStateException("broken json"));
 
             ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("뭐 먹지?"));
 
-            assertThat(resolution.intent()).isEqualTo(ChatIntent.GENERAL);
-            assertThat(resolution.source()).isEqualTo(Source.FALLBACK);
-            assertThat(resolution.recipeQuery()).isNull();
+            assertThat(resolution.serverFallback()).isTrue();
+            assertThat(resolution.recipeQuery()).isEqualTo(RecipeQuery.of(MEMBER_ID, List.of(), false));
         }
 
         @Test
-        @DisplayName("분류 목록을 못 읽어도 실패로 보고 선택 재료 유무로 정한다")
-        void returnsGeneral_whenCategoriesFail() {
+        @DisplayName("분류 목록을 못 읽으면 Jev·OpenAI를 부르지 않고 서버 답으로 정한다")
+        void answersByServer_whenCategoriesFail() {
             when(recipeService.getClassifications()).thenThrow(new RuntimeException("db down"));
 
             ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("뭐 먹지?"));
 
-            assertThat(resolution.intent()).isEqualTo(ChatIntent.GENERAL);
-            assertThat(resolution.source()).isEqualTo(Source.FALLBACK);
+            assertThat(resolution.serverFallback()).isTrue();
             verify(extractor, never()).extract(any(), any(), any(), any());
+            verify(fixture.jev, never()).start(any(), any(), any());
         }
 
         @Test
@@ -1040,13 +1028,13 @@ public class ChatIntentFacadeTest {
         }
 
         @Test
-        @DisplayName("AI 의도 판단이 실패하면 거절하지 않고 지금처럼 일반 답으로 정한다")
-        void fallsBackToGeneral_whenExtractorFails() {
+        @DisplayName("AI 의도 판단이 실패하면 거절하지 않고 서버 답(추천 카드)으로 정한다")
+        void answersByServer_whenAiFails() {
             when(extractor.extract(any(), any(), any(), any())).thenThrow(new RuntimeException("timeout"));
 
             ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("숙제 풀어줘"));
 
-            assertThat(resolution.intent()).isEqualTo(ChatIntent.GENERAL);
+            assertThat(resolution.serverFallback()).isTrue();
             assertThat(resolution.declines()).isFalse();
         }
 

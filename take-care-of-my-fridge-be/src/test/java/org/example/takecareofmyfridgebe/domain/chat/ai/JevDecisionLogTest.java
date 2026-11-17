@@ -62,7 +62,7 @@ class JevDecisionLogTest {
     }
 
     @Test
-    @DisplayName("Jev로 정하면 decision=JEV와 쓴 요청 종류·값을 남기고 값 안의 공백은 빼며, AI 실패 처리면 쓴 요청 종류·값은 -다")
+    @DisplayName("Jev로 정하면 decision=JEV와 쓴 요청 종류·값을 남기고 값 안의 공백은 빼며, 서버 답이면 쓴 요청 종류·값은 -다")
     void writesDecisionAndUsedValues_whenJevDecides() {
         JevDecision broad = new JevDecision(JevDecision.Decision.JEV, RequestKind.BROAD, List.of("오징어볶음", "토마토 스파게티"));
 
@@ -70,11 +70,11 @@ class JevDecisionLogTest {
                 JevSide.finished(Optional.of(judgement(ChatIntent.RECOMMEND, true)), 520L), broad));
         Map<String, String> openAiFailed = values(JevDecisionLog.line(RESULT,
                 JevSide.finished(Optional.of(judgement(ChatIntent.RECOMMEND, true)), 520L),
-                JevDecision.of(JevDecision.Decision.OPENAI_FAILED)));
+                JevDecision.of(JevDecision.Decision.OPENAI_FAILED_SERVER_FALLBACK)));
 
         assertThat(values).containsEntry("decision", "JEV").containsEntry("jevUsedKind", "BROAD")
                 .containsEntry("jevUsedValues", "오징어볶음,토마토스파게티");
-        assertThat(openAiFailed).containsEntry("decision", "OPENAI_FAILED").containsEntry("jevUsedKind", "-")
+        assertThat(openAiFailed).containsEntry("decision", "OPENAI_FAILED_SERVER_FALLBACK").containsEntry("jevUsedKind", "-")
                 .containsEntry("jevUsedValues", "-").containsEntry("jevUsedReason", "-");
     }
 
@@ -149,7 +149,7 @@ class JevDecisionLogTest {
     @Test
     @DisplayName("추천인데 2차가 없으면 SECOND_FAILED, 1차가 없으면 FIRST_FAILED, 건너뛰면 SKIPPED로 같은 칸을 남긴다")
     void writesStatus_whenJevFailsOrSkips() {
-        JevDecision failed = JevDecision.of(JevDecision.Decision.JEV_FAILED);
+        JevDecision failed = JevDecision.of(JevDecision.Decision.JEV_FAILED_SERVER_FALLBACK);
         Map<String, String> second = values(JevDecisionLog.line(RESULT,
                 JevSide.finished(Optional.of(judgement(ChatIntent.RECOMMEND, false)), 3100L), failed));
         Map<String, String> first = values(JevDecisionLog.line(RESULT, JevSide.finished(Optional.empty(), 3005L), failed));
@@ -157,7 +157,7 @@ class JevDecisionLogTest {
 
         assertThat(second).containsEntry("jevStatus", "SECOND_FAILED").containsEntry("jevWanted", "-");
         assertThat(first).containsEntry("jevStatus", "FIRST_FAILED").containsEntry("jevIntent", "-")
-                .containsEntry("jevLatencyMs", "-/-/3005").containsEntry("decision", "JEV_FAILED")
+                .containsEntry("jevLatencyMs", "-/-/3005").containsEntry("decision", "JEV_FAILED_SERVER_FALLBACK")
                 .containsEntry("finalIntent", "RECOMMEND").containsEntry("finalWanted", "SPICY");
         assertThat(skipped).containsEntry("jevStatus", "SKIPPED").containsEntry("jevLatencyMs", "-");
         assertThat(keys(JevDecisionLog.line(RESULT, JevSide.skipped(), failed))).containsExactlyElementsOf(FIELDS);

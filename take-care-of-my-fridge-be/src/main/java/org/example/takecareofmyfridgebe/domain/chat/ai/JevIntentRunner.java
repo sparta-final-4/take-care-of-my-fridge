@@ -23,7 +23,7 @@ import java.util.concurrent.TimeoutException;
  * 상담 의도 판단의 Jev 호출. OpenAI 꺼내기와 함께 Jev를 다른 스레드에서 시작하고({@link #start}), OpenAI 꺼내기가 끝나면
  * 제한 시간 안에서 결과를 기다린다({@link #await}). 상담 의도를 무엇으로 정했는지는 "상담 의도 Jev 결정" 로그로 남긴다(JevDecisionLog).
  * <ul>
- *   <li>TypeSafe 키가 비었으면 부르지 않고(SKIPPED) 상담은 AI 실패 처리로 답한다. 시작할 때 경고를 한 번 남긴다</li>
+ *   <li>TypeSafe 키가 비었으면 부르지 않고(SKIPPED) 상담은 서버 답(추천 카드)으로 답한다. 시작할 때 경고를 한 번 남긴다</li>
  *   <li>결정 로그는 Jev가 끝난 스레드(이미 끝났으면 부른 스레드)에서 남긴다</li>
  *   <li>예외를 밖으로 내지 않는다. Jev가 실패해도 결정 로그를 같은 형식으로 남긴다(jevStatus)</li>
  *   <li>스레드는 TypeSafeExecutor(크기 고정)를 쓰고, 자리가 없으면 건너뛴다(SKIPPED)</li>
@@ -50,11 +50,11 @@ public class JevIntentRunner {
         }
     }
 
-    // 키가 없으면 상담 의도를 정하지 못해 항상 AI 실패 처리로 답한다는 것을 시작할 때 한 번 알린다
+    // 키가 없으면 상담 의도를 정하지 못해 항상 서버 답으로 답한다는 것을 시작할 때 한 번 알린다
     @PostConstruct
     void warnIfNoKey() {
         if (!typeSafeClient.ready()) {
-            log.warn("TypeSafe 키(app.typesafe.api-key, TYPESAFE_API_KEY)가 비어 있어 상담 의도를 정하지 못하고 항상 AI 실패 처리로 답한다");
+            log.warn("TypeSafe 키(app.typesafe.api-key, TYPESAFE_API_KEY)가 비어 있어 상담 의도를 정하지 못하고 항상 서버 답(추천 카드)으로 답한다");
         }
     }
 

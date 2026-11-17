@@ -47,7 +47,7 @@ public class JevIntentClassifier {
      * @param message    사용자 메시지
      * @param categories 고를 수 있는 레시피 분류 (RecipeService.getClassifications()에서 받은 것)
      * @param followUp   직전 추천 정보 줄 글(ChatIntentFacade.followUp, OpenAI 의도 판단과 같은 것). 첫 질문이면 null
-     * @return 판단 결과. 키가 없거나 1차가 실패하면 빈 값 (부르는 쪽이 AI 실패 처리로 답한다)
+     * @return 판단 결과. 키가 없거나 1차가 실패하면 빈 값 (부르는 쪽이 서버 답으로 답한다)
      */
     public Optional<JevIntentJudgement> classify(String message, List<String> categories, String followUp) {
         long startedAt = System.nanoTime();

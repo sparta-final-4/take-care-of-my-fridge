@@ -55,9 +55,9 @@ public record JevDecision(
     public enum Decision {
         // Jev 판단으로 정함 (confidence와 상관없이 Jev 1등 의도)
         JEV,
-        // Jev가 실패하거나(1차·필요한 2차), 제한 시간 안에 끝나지 않거나, 건너뛰어(키 없음 등) 실패 처리(선택 재료 유무)로 정함
-        JEV_FAILED,
-        // OpenAI 꺼내기가 실패해 실패 처리(선택 재료 유무)로 정함
-        OPENAI_FAILED
+        // Jev가 실패하거나(1차·필요한 2차), 제한 시간 안에 끝나지 않거나, 건너뛰어(키 없음 등) 서버 답으로 정함
+        JEV_FAILED_SERVER_FALLBACK,
+        // Jev가 꺼낸 값이 필요한 의도(추천·레시피 자세히)로 정했는데 OpenAI 꺼내기가 실패해 서버 답으로 정함
+        OPENAI_FAILED_SERVER_FALLBACK
     }
 }
