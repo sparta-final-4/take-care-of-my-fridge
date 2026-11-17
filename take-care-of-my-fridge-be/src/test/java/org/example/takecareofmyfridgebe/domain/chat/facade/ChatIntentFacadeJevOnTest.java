@@ -13,6 +13,7 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.FridgeScope;
 import org.example.takecareofmyfridgebe.domain.chat.dto.IntentResult;
 import org.example.takecareofmyfridgebe.domain.chat.dto.JevDecision;
 import org.example.takecareofmyfridgebe.domain.chat.dto.JevDecision.Decision;
+import org.example.takecareofmyfridgebe.domain.chat.dto.JevDecision.Reason;
 import org.example.takecareofmyfridgebe.domain.chat.dto.JevIntentJudgement;
 import org.example.takecareofmyfridgebe.domain.chat.dto.JevIntentJudgement.RequestKind;
 import org.example.takecareofmyfridgebe.domain.chat.dto.JevIntentJudgement.TasteAnswer;
@@ -203,7 +204,7 @@ class ChatIntentFacadeJevOnTest {
 
             assertThat(resolution.recipeQuery().keywords()).containsExactly("냉면", "오이냉국");
             assertThat(resolution.recipeQuery().moodCategories()).isEmpty();
-            verifyDecision(new JevDecision(Decision.JEV, RequestKind.BROAD, List.of("냉면", "오이냉국")));
+            verifyDecision(new JevDecision(Decision.JEV, RequestKind.BROAD, List.of("냉면", "오이냉국"), Reason.NO_TOP_CATEGORY));
         }
 
         @Test
@@ -218,13 +219,27 @@ class ChatIntentFacadeJevOnTest {
             assertThat(resolution.recipeQuery().keywords()).isEmpty();
             assertThat(resolution.recipeQuery().moodCategories()).isEmpty();
             verify(similarDishFinder, never()).findBroad(any(), any());
-            verifyDecision(new JevDecision(Decision.JEV, RequestKind.NONE, List.of()));
+            verifyDecision(new JevDecision(Decision.JEV, RequestKind.NONE, List.of(), Reason.NO_TOP_CATEGORY));
         }
 
         @Test
-        @DisplayName("특정 요리인데 OpenAI가 요리 이름을 비우면 \"○○ 같은\"·첫 키워드로 채우지 않고 넓은 요청으로 간다")
-        void skipsLikeDishFix_andTreatsAsBroad_whenDishIsEmpty() {
-            givenOpenAi(recommend(null, List.of("김피탕", "탕수육"), List.of(), List.of(), "김피탕 같은 요리"));
+        @DisplayName("특정 요리인데 OpenAI가 요리 이름을 비우고 키워드에만 넣었으면 메시지에 글자 그대로 있는 첫 키워드를 요리 이름으로 줍는다")
+        void picksKeywordInMessageAsDish_whenDishIsEmpty() {
+            givenOpenAi(recommend(null, List.of("탕수육", "김피탕"), List.of(), List.of(), "김피탕 같은 요리"));
+            givenJev(RequestKind.DISH, null);
+
+            ChatIntentResolution resolution = resolve("김피탕 같은 요리 추천해줘");
+
+            assertThat(resolution.recipeQuery().keywordText()).isEqualTo("김피탕");
+            assertThat(resolution.recipeQuery().keywords()).containsExactly("김피탕");
+            verify(similarDishFinder, never()).findBroad(anyLong(), anyString());
+            verifyDecision(new JevDecision(Decision.JEV, RequestKind.DISH, List.of("김피탕"), Reason.DISH_FROM_KEYWORD));
+        }
+
+        @Test
+        @DisplayName("특정 요리인데 OpenAI가 요리 이름을 비우고 키워드가 모두 메시지에 없는 비슷한 요리면 줍지 않고 넓은 요청으로 간다")
+        void skipsKeywordsNotInMessage_whenDishIsEmpty() {
+            givenOpenAi(recommend(null, List.of("탕수육", "깐풍기"), List.of(), List.of(), "김피탕 같은 요리"));
             givenJev(RequestKind.DISH, null);
             when(similarDishFinder.findBroad(MEMBER_ID, "김피탕 같은 요리")).thenReturn(List.of("탕수육", "깐풍기"));
 
@@ -232,7 +247,7 @@ class ChatIntentFacadeJevOnTest {
 
             assertThat(resolution.recipeQuery().keywordText()).isNull();
             assertThat(resolution.recipeQuery().keywords()).containsExactly("탕수육", "깐풍기");
-            verifyDecision(new JevDecision(Decision.JEV, RequestKind.BROAD, List.of("탕수육", "깐풍기")));
+            verifyDecision(new JevDecision(Decision.JEV, RequestKind.BROAD, List.of("탕수육", "깐풍기"), Reason.NO_DISH));
         }
 
         @Test
@@ -249,7 +264,7 @@ class ChatIntentFacadeJevOnTest {
             assertThat(resolution.recipeQuery().moodCategories()).containsExactly("면류");
             assertThat(resolution.recipeQuery().wantedTastes()).containsExactly(Taste.MILD);
             verify(similarDishFinder, never()).findBroad(anyLong(), anyString());
-            verifyDecision(new JevDecision(Decision.JEV, RequestKind.CATEGORY, List.of("면류")));
+            verifyDecision(new JevDecision(Decision.JEV, RequestKind.CATEGORY, List.of("면류"), Reason.DISH_TO_TOP_CATEGORY));
         }
 
         @Test

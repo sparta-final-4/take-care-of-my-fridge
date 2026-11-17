@@ -30,7 +30,7 @@ class JevComparisonLogTest {
             "openaiCategories", "jevRequestKind", "jevRequestKindConfidence", "jevCategory", "jevCategoryConfidence",
             "categoryMatch", "openaiMealkit", "jevMealkit", "jevAsksQuestion",
             "jevDishNamed", "jevModel", "jevRequestIds", "jevLatencyMs", "jevInputTokens", "jevStatus", "decision", "jevUsedKind",
-            "jevUsedValues");
+            "jevUsedValues", "jevUsedReason");
 
     private static final OpenAiSide OPENAI = new OpenAiSide(1L, 10L, 10, ChatIntent.RECOMMEND,
             List.of(Taste.SPICY), List.of(), List.of("찌개"), false);
@@ -102,12 +102,14 @@ class JevComparisonLogTest {
         JevIntentJudgement dish = new JevIntentJudgement(base.first(), new JevIntentJudgement.Second(0.81, second.featureNamed(),
                 second.ingredientNamed(), second.mealkitWanted(), second.tastes(), RequestKind.DISH, 0.77, "면류", 0.83, second.call()),
                 base.totalLatencyMs());
-        JevDecision category = new JevDecision(JevDecision.Decision.JEV, RequestKind.CATEGORY, List.of("면류"));
+        JevDecision category = new JevDecision(JevDecision.Decision.JEV, RequestKind.CATEGORY, List.of("면류"),
+                JevDecision.Reason.DISH_TO_TOP_CATEGORY);
 
         Map<String, String> values = values(JevComparisonLog.line(OPENAI, JevSide.finished(Optional.of(dish), 520L), category));
 
         assertThat(values).containsEntry("jevRequestKind", "DISH").containsEntry("jevCategory", "면류")
-                .containsEntry("decision", "JEV").containsEntry("jevUsedKind", "CATEGORY").containsEntry("jevUsedValues", "면류");
+                .containsEntry("decision", "JEV").containsEntry("jevUsedKind", "CATEGORY").containsEntry("jevUsedValues", "면류")
+                .containsEntry("jevUsedReason", "DISH_TO_TOP_CATEGORY");
     }
 
     @Test

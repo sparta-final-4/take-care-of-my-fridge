@@ -29,7 +29,8 @@ import java.util.stream.Collectors;
  *       categoryMatch는 요청 종류가 특정 분류(CATEGORY)일 때만 OpenAI 분류가 1등 분류 하나와 같은지 본다</li>
  *   <li>decision은 상담 의도를 무엇으로 정했는지(SHADOW / JEV / OPENAI_LOW_CONFIDENCE / OPENAI_LOW_CONFIDENCE_JEV_BROAD /
  *       OPENAI_JEV_FAILED / OPENAI_FAILED), jevUsedKind·jevUsedValues는 Jev로 정했을 때(또는 되돌림에서 넓은 요청 경로를 탔을 때)
- *       쓴 요청 종류와 값(특정 요리면 요리 이름, 특정 분류면 분류, 넓은 요청이면 요리 이름 목록)</li>
+ *       쓴 요청 종류와 값(특정 요리면 요리 이름, 특정 분류면 분류, 넓은 요청이면 요리 이름 목록),
+ *       jevUsedReason은 Jev 요청 종류나 OpenAI 요리 이름을 바꾼 까닭(JevDecision.Reason. 메시지의 키워드를 요리 이름으로 주웠으면 DISH_FROM_KEYWORD)</li>
  *   <li>jevFollowsPrevious는 직전 추천에 이어지는 말일 확률(직전 추천이 없어 묻지 않았으면 -)</li>
  *   <li>openai… 칸은 상담 최종 결과다. on 모드에서 decision=JEV면 Jev로 정한 결과, 그 밖이면 OpenAI 결과다</li>
  *   <li>메시지 원문·직전 추천 글·넓은 요청 표현·키는 넣지 않는다</li>
@@ -157,6 +158,7 @@ final class JevComparisonLog {
         // 한 줄을 공백으로 나눠 읽으므로 이름 안의 공백은 뺀다 ("토마토 스파게티" → 토마토스파게티)
         fields.put("jevUsedValues", decision.usedKind() == null ? null
                 : join(decision.usedValues().stream().map(ChatTexts::removeWhitespace).toList()));
+        fields.put("jevUsedReason", decision.usedKind() == null ? null : decision.reason());
 
         return NAME + " - " + fields.entrySet().stream()
                 .map(entry -> entry.getKey() + "=" + (entry.getValue() == null ? NONE : entry.getValue()))

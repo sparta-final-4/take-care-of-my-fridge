@@ -7,6 +7,7 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntent;
 import org.example.takecareofmyfridgebe.domain.chat.dto.IntentResult;
 import org.example.takecareofmyfridgebe.domain.chat.dto.JevDecision;
 import org.example.takecareofmyfridgebe.domain.chat.dto.JevDecision.Decision;
+import org.example.takecareofmyfridgebe.domain.chat.dto.JevDecision.Reason;
 import org.example.takecareofmyfridgebe.domain.chat.dto.JevIntentJudgement;
 import org.example.takecareofmyfridgebe.domain.chat.dto.JevIntentJudgement.RequestKind;
 import org.example.takecareofmyfridgebe.domain.chat.dto.JevIntentJudgement.TasteStance;
@@ -30,10 +31,13 @@ import java.util.Set;
  *       레시피 자세히 대상·질문 종류, 다시 추천 뺄 조건, 냉장고 범위. 버리는 칸: 의도·맛·분류·키워드</li>
  *   <li>추천·다시 추천은 요청 종류로 검색 조건을 정한다
  *     <ul>
- *       <li>특정 요리: OpenAI 요리 이름과 Jev 1등 분류(없음이면 넣지 않는다). 분류는 거르는 조건이 아니라 점수를 올리는 조건이라
+ *       <li>특정 요리: OpenAI 요리 이름과 Jev 1등 분류(없으면 넣지 않는다). 분류는 거르는 조건이 아니라 점수를 올리는 조건이라
  *           이름이 맞는 레시피와 비슷한 요리 중 같은 분류가 앞에 온다. 요리 이름이 메시지에 그대로 없거나 비었으면
- *           1등 분류가 있을 때 특정 분류로, 없음이면 넓은 요청으로 본다 (맛·재료 칸은 그대로 넘긴다)</li>
- *       <li>특정 분류: Jev 1등 분류. 1등이 없음이면 밀키트를 원하는 말(MealkitWordChecker)이면 없음, 아니면 넓은 요청</li>
+ *           메시지에 글자 그대로 있는 첫 OpenAI 키워드를 요리 이름으로 줍는다("○○ 같은 요리"에서 OpenAI가 요리 이름을 비우고 키워드에만 넣음).
+ *           그래도 요리 이름이 없으면 1등 분류가 있을 때 특정 분류로,
+ *           없으면 넓은 요청으로 본다 (맛·재료 칸은 그대로 넘긴다)</li>
+ *       <li>특정 분류: Jev 1등 분류. 1등이 없음이면 밀키트를 원하는 말(MealkitWordChecker)이면 없음,
+ *           아니면 넓은 요청</li>
  *       <li>넓은 요청: 넓은 요청 요리 이름 5개(SimilarDishFinder.findBroad, 캐시)를 키워드로, 원한 표현을 채워 요리 이름을 말한 추천으로 보지 않는다
  *           (카드가 모자라면 냉장고 후보로 채운다)</li>
  *       <li>없음: 분류·키워드 없이 냉장고 기반</li>
@@ -81,30 +85,66 @@ public class JevIntentResolver {
                     new JevDecision(Decision.JEV, null, List.of()));
         }
 
-        RequestKind kind = second.requestKind();
-        String dish = IntentCorrector.dishInMessage(input.message(), openAi.dishText()) ? openAi.dishText() : null;
-        String category = second.category();
-        if (kind == RequestKind.DISH && dish == null) {
-            kind = category == null ? RequestKind.BROAD : RequestKind.CATEGORY;
-        }
-        if (kind == RequestKind.CATEGORY && category == null) {
-            kind = MealkitWordChecker.check(input.message(), chatWordProperties.mealkit(), chatWordProperties.taste())
-                    == MealkitWordChecker.Mode.ONLY ? RequestKind.NONE : RequestKind.BROAD;
-        }
-        if (kind != second.requestKind()) {
-            log.info("상담 Jev 요청 종류 경계 - memberId: {}, sessionId: {}, Jev: {}, 쓴 종류: {}",
-                    input.memberId(), input.sessionId(), second.requestKind(), kind);
+        Used used = used(input, second, openAi);
+        RequestKind kind = used.kind();
+        if (kind != second.requestKind() || used.reason() != Reason.NONE) {
+            log.info("상담 Jev 요청 종류 경계 - memberId: {}, sessionId: {}, Jev: {}, 쓴 종류: {}, 까닭: {}, 1등 분류: {}({})",
+                    input.memberId(), input.sessionId(), second.requestKind(), kind, used.reason(), second.category(),
+                    String.format("%.2f", second.categoryConfidence()));
         }
 
         return switch (kind) {
-            case DISH -> new Resolved(build(intent, openAi, wanted, avoid, category == null ? null : List.of(category), null, dish,
-                    openAi.preferenceText()), new JevDecision(Decision.JEV, kind, List.of(dish)));
-            case CATEGORY -> new Resolved(build(intent, openAi, wanted, avoid, List.of(category), null, null, openAi.preferenceText()),
-                    new JevDecision(Decision.JEV, kind, List.of(category)));
-            case BROAD -> broad(input, intent, openAi, wanted, avoid, Decision.JEV);
+            case DISH -> new Resolved(build(intent, openAi, wanted, avoid, used.category() == null ? null : List.of(used.category()),
+                    null, used.dish(), openAi.preferenceText()), new JevDecision(Decision.JEV, kind, List.of(used.dish()), used.reason()));
+            case CATEGORY -> new Resolved(build(intent, openAi, wanted, avoid, List.of(used.category()), null, null,
+                    openAi.preferenceText()), new JevDecision(Decision.JEV, kind, List.of(used.category()), used.reason()));
+            case BROAD -> broad(input, intent, openAi, wanted, avoid, Decision.JEV, used.reason());
             case NONE -> new Resolved(build(intent, openAi, wanted, avoid, null, null, null, openAi.preferenceText()),
-                    new JevDecision(Decision.JEV, kind, List.of()));
+                    new JevDecision(Decision.JEV, kind, List.of(), used.reason()));
         };
+    }
+
+    /**
+     * 검색에 쓸 요청 종류와 값.
+     *
+     * @param dish     요리 이름 (특정 요리일 때만)
+     * @param category 분류 (특정 분류일 때, 특정 요리면 함께 넣는 1등 분류. 없으면 null)
+     */
+    private record Used(RequestKind kind, String dish, String category, Reason reason) {
+    }
+
+    // Jev 요청 종류에 경계 규칙을 더해 쓸 종류를 정한다 (클래스 설명의 순서대로)
+    private Used used(CorrectionInput input, JevIntentJudgement.Second second, IntentResult openAi) {
+        String category = second.category();
+        if (second.requestKind() == RequestKind.DISH) {
+            Reason reason = Reason.NONE;
+            String dish = IntentCorrector.dishInMessage(input.message(), openAi.dishText()) ? openAi.dishText() : null;
+            if (dish == null) {
+                dish = keywordInMessage(input.message(), openAi.keywords());
+                reason = dish == null ? Reason.NONE : Reason.DISH_FROM_KEYWORD;
+            }
+            if (dish != null) {
+                return new Used(RequestKind.DISH, dish, category, reason);
+            }
+            if (category != null) {
+                return new Used(RequestKind.CATEGORY, null, category, Reason.DISH_TO_TOP_CATEGORY);
+            }
+            return new Used(RequestKind.BROAD, null, null, Reason.NO_DISH);
+        }
+        if (second.requestKind() == RequestKind.CATEGORY && category == null) {
+            RequestKind kind = MealkitWordChecker.check(input.message(), chatWordProperties.mealkit(), chatWordProperties.taste())
+                    == MealkitWordChecker.Mode.ONLY ? RequestKind.NONE : RequestKind.BROAD;
+            return new Used(kind, null, null, Reason.NO_TOP_CATEGORY);
+        }
+        return new Used(second.requestKind(), null, category, Reason.NONE);
+    }
+
+    // OpenAI 키워드 중 메시지에 글자 그대로(띄어쓰기 무시) 있는 첫 키워드. OpenAI가 덧붙인 비슷한 요리는 메시지에 없어 걸리지 않는다
+    static String keywordInMessage(String message, List<String> keywords) {
+        if (keywords == null) {
+            return null;
+        }
+        return keywords.stream().filter(keyword -> IntentCorrector.dishInMessage(message, keyword)).findFirst().orElse(null);
     }
 
     /**
@@ -119,16 +159,16 @@ public class JevIntentResolver {
             return Optional.empty();
         }
         return Optional.of(broad(input, openAi.intent(), openAi, openAi.wantedTastes(), openAi.avoidTastes(),
-                Decision.OPENAI_LOW_CONFIDENCE_JEV_BROAD));
+                Decision.OPENAI_LOW_CONFIDENCE_JEV_BROAD, Reason.NONE));
     }
 
     // 넓은 요청: 넓은 요청 요리 이름 5개를 키워드로 쓰고, 원한 표현을 채워 요리 이름을 말한 추천으로 보지 않는다 (RecipeCandidateFacade.dishAsked)
     private Resolved broad(CorrectionInput input, ChatIntent intent, IntentResult openAi, List<String> wanted, List<String> avoid,
-                           Decision decision) {
+                           Decision decision, Reason reason) {
         String request = broadRequest(input.message(), openAi.preferenceText());
         List<String> dishes = similarDishFinder.findBroad(input.memberId(), request);
         return new Resolved(build(intent, openAi, wanted, avoid, null, dishes.isEmpty() ? null : dishes, null, request),
-                new JevDecision(decision, RequestKind.BROAD, dishes));
+                new JevDecision(decision, RequestKind.BROAD, dishes, reason));
     }
 
     // 넓은 요청 표현: OpenAI 원한 표현, 없으면 메시지에서 끝 문장 부호를 뺀 것. 넓은 요청 요리 이름의 캐시 키가 된다
