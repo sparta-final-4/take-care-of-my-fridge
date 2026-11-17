@@ -58,6 +58,14 @@ class JevIntentClassifierTest {
     private static final String REQUEST_ID = "x-typesafe-request-id";
     private static final JsonMapper JSON = JsonMapper.builder().build();
 
+    @Test
+    @DisplayName("직전 추천이 있고 추천인데 이어짐 확률이 기준 0.45 이상이면 다시 추천(REFINE), 미만이면 새 추천이다")
+    void returnsRefine_whenFollowsPreviousAtThreshold() {
+        assertThat(JevIntentClassifier.MIN_FOLLOWS_PREVIOUS).isEqualTo(0.45);
+        assertThat(JevIntentClassifier.serviceIntent(ChatIntent.RECOMMEND, true, 0.45)).isEqualTo(ChatIntent.REFINE);
+        assertThat(JevIntentClassifier.serviceIntent(ChatIntent.RECOMMEND, true, 0.44)).isEqualTo(ChatIntent.RECOMMEND);
+    }
+
     private static final List<String> CATEGORIES = List.of(
             "과자", "구이", "국", "그라탕", "기타", "김치", "디저트", "떡", "만두", "말이", "면류", "무침", "밥", "볶음", "빵", "샌드위치",
             "샐러드", "수프", "스튜", "쌈", "양념", "음료", "전", "전골", "절임", "조림", "죽", "찌개", "찜", "튀김", "피자", "한과", "회");

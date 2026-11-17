@@ -39,7 +39,7 @@ public class JevIntentClassifier {
     // 직전 추천이 있어야 뜻이 있는 이어지는 말. 직전 추천이 없으면 새 추천으로 본다
     private static final Set<ChatIntent> FOLLOW_UP_INTENTS = Set.of(ChatIntent.REFINE, ChatIntent.RECIPE_DETAIL);
     // 추천을 직전 추천에 이어지는 말(REFINE)로 볼 follows_previous "예" 확률. 평가로 정함
-    static final double MIN_FOLLOWS_PREVIOUS = 0.5;
+    static final double MIN_FOLLOWS_PREVIOUS = 0.45;
 
     private final TypeSafeClient typeSafeClient;
 

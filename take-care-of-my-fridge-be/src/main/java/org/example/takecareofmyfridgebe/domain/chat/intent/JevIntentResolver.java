@@ -12,6 +12,7 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.JevIntentJudgement;
 import org.example.takecareofmyfridgebe.domain.chat.dto.JevIntentJudgement.RequestKind;
 import org.example.takecareofmyfridgebe.domain.chat.dto.JevIntentJudgement.TasteStance;
 import org.example.takecareofmyfridgebe.domain.chat.facade.SimilarDishFinder;
+import org.example.takecareofmyfridgebe.domain.chat.text.ChatTexts;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -35,7 +36,7 @@ import java.util.Set;
  *       <li>특정 요리: OpenAI 요리 이름과 Jev 1등 분류(없으면 넣지 않는다). 분류는 거르는 조건이 아니라 점수를 올리는 조건이라
  *           이름이 맞는 레시피와 비슷한 요리 중 같은 분류가 앞에 온다. 요리 이름이 메시지에 그대로 없거나 비었으면
  *           메시지에 글자 그대로 있는 첫 OpenAI 키워드를 요리 이름으로 줍는다("○○ 같은 요리"에서 OpenAI가 요리 이름을 비우고 키워드에만 넣음).
- *           그래도 요리 이름이 없으면 1등 분류가 있을 때 특정 분류로,
+ *           요리 이름이 분류 이름과 같으면(죽) 그 분류로 찾는다. 그래도 요리 이름이 없으면 1등 분류가 있을 때 특정 분류로,
  *           없으면 넓은 요청으로 본다 (맛·재료 칸은 그대로 넘긴다)</li>
  *       <li>특정 분류: Jev 1등 분류. 1등 확률이 기준 미만이면 넓은 요청, 1등이 없음이면 밀키트를 원하는 말(MealkitWordChecker)이면 없음,
  *           아니면 넓은 요청</li>
@@ -128,6 +129,10 @@ public class JevIntentResolver {
                 dish = keywordInMessage(input.message(), openAi.keywords());
                 reason = dish == null ? Reason.NONE : Reason.DISH_FROM_KEYWORD;
             }
+            String named = categoryNamed(dish, input.categories());
+            if (named != null) {
+                return new Used(RequestKind.CATEGORY, null, named, Reason.DISH_IS_CATEGORY);
+            }
             if (dish != null) {
                 return new Used(RequestKind.DISH, dish, category,
                         reason == Reason.NONE && lowCategory ? Reason.LOW_CATEGORY_CONFIDENCE : reason);
@@ -154,6 +159,15 @@ public class JevIntentResolver {
             return null;
         }
         return keywords.stream().filter(keyword -> IntentCorrector.dishInMessage(message, keyword)).findFirst().orElse(null);
+    }
+
+    // 요리 이름이 분류 목록(Jev 분류 선택지와 같은 DB 목록)의 이름과 같으면 그 분류 이름 ("죽" → 죽). 아니면 null
+    static String categoryNamed(String dish, List<String> categories) {
+        if (dish == null || categories == null) {
+            return null;
+        }
+        String compact = ChatTexts.removeWhitespace(dish);
+        return categories.stream().filter(category -> ChatTexts.removeWhitespace(category).equals(compact)).findFirst().orElse(null);
     }
 
     /**

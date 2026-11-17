@@ -42,6 +42,8 @@ public record JevDecision(
         NONE,
         // 특정 요리인데 OpenAI 요리 이름이 비어, 메시지에 글자 그대로 있는 OpenAI 키워드를 요리 이름으로 주움
         DISH_FROM_KEYWORD,
+        // 요리 이름이 분류 이름과 같아(죽) 요리 이름으로 쓰지 않고 그 분류로 찾음
+        DISH_IS_CATEGORY,
         // 특정 요리인데 요리 이름이 없어 Jev 1등 분류로 찾음
         DISH_TO_TOP_CATEGORY,
         // 1등 분류 확률이 기준 미만이라 분류를 쓰지 않음 (특정 요리는 분류 없이, 특정 분류·요리 이름 없음은 넓은 요청)

@@ -251,6 +251,20 @@ class ChatIntentFacadeJevOnTest {
         }
 
         @Test
+        @DisplayName("특정 요리인데 OpenAI 요리 이름이 분류 이름과 같으면 요리 이름으로 쓰지 않고 그 분류로 찾는다")
+        void usesCategory_whenDishIsCategoryName() {
+            givenOpenAi(recommend("국", List.of("국"), List.of(), List.of(), null));
+            givenJev(RequestKind.DISH, "찌개");
+
+            ChatIntentResolution resolution = resolve("속이 안 좋아서 국 먹고 싶어");
+
+            assertThat(resolution.recipeQuery().keywordText()).isNull();
+            assertThat(resolution.recipeQuery().keywords()).isEmpty();
+            assertThat(resolution.recipeQuery().moodCategories()).containsExactly("국");
+            verifyDecision(new JevDecision(Decision.JEV, RequestKind.CATEGORY, List.of("국"), Reason.DISH_IS_CATEGORY));
+        }
+
+        @Test
         @DisplayName("특정 요리인데 OpenAI가 요리 이름을 비우고 Jev 1등 분류가 있으면 특정 분류 경로로 그 분류와 맛·재료를 넘기고 넓은 요청 요리 이름을 받지 않는다")
         void usesTopCategory_whenDishIsEmptyWithTopCategory() {
             givenOpenAi(recommend(null, List.of("냉면", "막국수"), List.of("면류", "국"), List.of(), null));
