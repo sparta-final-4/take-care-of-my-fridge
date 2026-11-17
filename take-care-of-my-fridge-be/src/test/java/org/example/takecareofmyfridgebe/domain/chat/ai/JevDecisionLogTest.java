@@ -62,37 +62,36 @@ class JevDecisionLogTest {
     }
 
     @Test
-    @DisplayName("Jev로 정하면 decision=JEV와 쓴 요청 종류·값을 남기고 값 안의 공백은 빼며, OpenAI로 되돌리면 쓴 요청 종류·값은 -다")
+    @DisplayName("Jev로 정하면 decision=JEV와 쓴 요청 종류·값을 남기고 값 안의 공백은 빼며, AI 실패 처리면 쓴 요청 종류·값은 -다")
     void writesDecisionAndUsedValues_whenJevDecides() {
         JevDecision broad = new JevDecision(JevDecision.Decision.JEV, RequestKind.BROAD, List.of("오징어볶음", "토마토 스파게티"));
 
         Map<String, String> values = values(JevDecisionLog.line(RESULT,
                 JevSide.finished(Optional.of(judgement(ChatIntent.RECOMMEND, true)), 520L), broad));
-        Map<String, String> lowConfidence = values(JevDecisionLog.line(RESULT,
+        Map<String, String> openAiFailed = values(JevDecisionLog.line(RESULT,
                 JevSide.finished(Optional.of(judgement(ChatIntent.RECOMMEND, true)), 520L),
-                JevDecision.of(JevDecision.Decision.OPENAI_LOW_CONFIDENCE)));
+                JevDecision.of(JevDecision.Decision.OPENAI_FAILED)));
 
         assertThat(values).containsEntry("decision", "JEV").containsEntry("jevUsedKind", "BROAD")
                 .containsEntry("jevUsedValues", "오징어볶음,토마토스파게티");
-        assertThat(lowConfidence).containsEntry("decision", "OPENAI_LOW_CONFIDENCE").containsEntry("jevUsedKind", "-")
+        assertThat(openAiFailed).containsEntry("decision", "OPENAI_FAILED").containsEntry("jevUsedKind", "-")
                 .containsEntry("jevUsedValues", "-").containsEntry("jevUsedReason", "-");
     }
 
     @Test
-    @DisplayName("되돌림에서 넓은 요청 경로를 타면 그 결정과 넓은 요청 요리 이름을, 직전 추천에 이어지는 말이면 이어짐 확률을 남긴다")
-    void writesBroadFallbackAndFollowsPrevious_whenFallingBackWithBroad() {
+    @DisplayName("Jev가 confidence가 낮은 넓은 요청으로 정해도 그대로 JEV와 넓은 요청 요리 이름을, 직전 추천에 이어지는 말이면 이어짐 확률을 남긴다")
+    void writesBroadAndFollowsPrevious_whenJevDecidesWithLowConfidence() {
         JevIntentJudgement base = judgement(ChatIntent.RECOMMEND, true);
         JevIntentJudgement.First first = base.first();
         JevIntentJudgement following = new JevIntentJudgement(new JevIntentJudgement.First(ChatIntent.RECOMMEND, ChatIntent.RECOMMEND,
                 0.72, first.intentProbabilities(), 0.83, first.asksQuestion(), first.fridgeScope(), first.fridgeScopeConfidence(),
                 first.call()), base.second(), base.totalLatencyMs());
-        JevDecision broadFallback = new JevDecision(JevDecision.Decision.OPENAI_LOW_CONFIDENCE_JEV_BROAD, RequestKind.BROAD,
-                List.of("감자국", "떡국"));
+        JevDecision broad = new JevDecision(JevDecision.Decision.JEV, RequestKind.BROAD, List.of("감자국", "떡국"));
 
-        Map<String, String> values = values(JevDecisionLog.line(RESULT, JevSide.finished(Optional.of(following), 520L), broadFallback));
+        Map<String, String> values = values(JevDecisionLog.line(RESULT, JevSide.finished(Optional.of(following), 520L), broad));
 
         assertThat(values).containsEntry("jevIntent", "RECOMMEND").containsEntry("jevFollowsPrevious", "0.83")
-                .containsEntry("decision", "OPENAI_LOW_CONFIDENCE_JEV_BROAD").containsEntry("jevUsedKind", "BROAD")
+                .containsEntry("jevIntentConfidence", "0.72").containsEntry("decision", "JEV").containsEntry("jevUsedKind", "BROAD")
                 .containsEntry("jevUsedValues", "감자국,떡국");
     }
 
@@ -150,7 +149,7 @@ class JevDecisionLogTest {
     @Test
     @DisplayName("추천인데 2차가 없으면 SECOND_FAILED, 1차가 없으면 FIRST_FAILED, 건너뛰면 SKIPPED로 같은 칸을 남긴다")
     void writesStatus_whenJevFailsOrSkips() {
-        JevDecision failed = JevDecision.of(JevDecision.Decision.OPENAI_JEV_FAILED);
+        JevDecision failed = JevDecision.of(JevDecision.Decision.JEV_FAILED);
         Map<String, String> second = values(JevDecisionLog.line(RESULT,
                 JevSide.finished(Optional.of(judgement(ChatIntent.RECOMMEND, false)), 3100L), failed));
         Map<String, String> first = values(JevDecisionLog.line(RESULT, JevSide.finished(Optional.empty(), 3005L), failed));
@@ -158,7 +157,7 @@ class JevDecisionLogTest {
 
         assertThat(second).containsEntry("jevStatus", "SECOND_FAILED").containsEntry("jevWanted", "-");
         assertThat(first).containsEntry("jevStatus", "FIRST_FAILED").containsEntry("jevIntent", "-")
-                .containsEntry("jevLatencyMs", "-/-/3005").containsEntry("decision", "OPENAI_JEV_FAILED")
+                .containsEntry("jevLatencyMs", "-/-/3005").containsEntry("decision", "JEV_FAILED")
                 .containsEntry("finalIntent", "RECOMMEND").containsEntry("finalWanted", "SPICY");
         assertThat(skipped).containsEntry("jevStatus", "SKIPPED").containsEntry("jevLatencyMs", "-");
         assertThat(keys(JevDecisionLog.line(RESULT, JevSide.skipped(), failed))).containsExactlyElementsOf(FIELDS);
@@ -171,7 +170,7 @@ class JevDecisionLogTest {
                 List.of(), List.of(Taste.SPICY), List.of("국"), true);
 
         Map<String, String> values = values(JevDecisionLog.line(avoidSpicy,
-                JevSide.finished(Optional.of(judgement(ChatIntent.RECOMMEND, true)), 500L), JevDecision.of(JevDecision.Decision.OPENAI_LOW_CONFIDENCE)));
+                JevSide.finished(Optional.of(judgement(ChatIntent.RECOMMEND, true)), 500L), BY_JEV));
 
         assertThat(values).containsEntry("finalAvoided", "SPICY").containsEntry("jevAvoided", "")
                 .containsEntry("jevWanted", "SPICY").containsEntry("finalCategories", "국").containsEntry("finalMealkit", "true");

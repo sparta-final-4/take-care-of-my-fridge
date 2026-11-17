@@ -54,15 +54,15 @@ class IntentCorrectorTest {
     class Keywords {
 
         @Test
-        @DisplayName("AI가 뽑은 요리 이름 키워드와 요리 표현을 검색 조건에 넣는다")
-        void putsKeywordsIntoQuery() {
+        @DisplayName("Jev가 특정 요리로 보면 OpenAI가 꺼낸 요리 이름과 요리 표현을 검색 조건에 넣고, OpenAI 키워드는 버린다")
+        void putsDishIntoQuery() {
             givenExtracted(new IntentResult(ChatIntent.RECOMMEND, null, List.of("국"), null, null, null, null,
                     List.of("냉면", "막국수"), "냉면", "냉면 같은 면 요리"));
 
             RecipeQuery query = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("차가운 냉면 같은 면 요리"))
                     .recipeQuery();
 
-            assertThat(query.keywords()).containsExactly("냉면", "막국수");
+            assertThat(query.keywords()).containsExactly("냉면");
             assertThat(query.keywordText()).isEqualTo("냉면");
             assertThat(query.preferenceText()).isEqualTo("냉면 같은 면 요리");
         }
@@ -118,10 +118,10 @@ class IntentCorrectorTest {
     }
 
     @Test
-    @DisplayName("새 추천에서 \"매운 거 말고\"면 피할 맛 매운맛으로 두고, 원하는 맛과 겹치면 피할 맛이 이긴다")
+    @DisplayName("새 추천에서 Jev가 \"매운 거 말고 단 걸로\"를 매운맛 피함·단맛 원함으로 답하면 피할 맛 매운맛, 원하는 맛 단맛으로 둔다")
     void setsAvoidTastes_whenRecommend() {
-        givenExtracted(new IntentResult(ChatIntent.RECOMMEND, List.of("SPICY", "SWEET"), null, null, null, null, null, null,
-                null, null, null, null, null, List.of("spicy")));
+        givenExtracted(new IntentResult(ChatIntent.RECOMMEND, List.of("SWEET"), null, null, null, null, null, null,
+                null, null, null, null, null, List.of("SPICY")));
 
         RecipeQuery query = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("매운 거 말고 단 걸로")).recipeQuery();
 
@@ -235,7 +235,7 @@ class IntentCorrectorTest {
     }
 
     private void givenExtracted(IntentResult result) {
-        fixture.givenExtracted(result);
+        fixture.givenAi(result);
     }
 
     private static Ingredient ingredient(Long id, String code, String name) {

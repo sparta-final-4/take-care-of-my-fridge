@@ -48,7 +48,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-// Jev 판단 + OpenAI가 꺼낸 값으로 의도를 정하고, Jev를 못 쓰면 보정 없는 OpenAI 결과를 쓰며, 서비스 규칙만 거친다.
+// Jev 판단 + OpenAI가 꺼낸 값으로 의도를 정하고(confidence와 상관없이 Jev 1등 의도), AI가 실패하면 실패 처리로 답하며, 서비스 규칙만 거친다.
 // Jev 호출(JevIntentRunner)과 넓은 요청 요리 이름(SimilarDishFinder)은 흉내 낸다
 class ChatIntentFacadeJevOnTest {
 
@@ -101,24 +101,20 @@ class ChatIntentFacadeJevOnTest {
         }
 
         @Test
-        @DisplayName("직전 추천 없이 \"김치찌개 말고 다른 거\"에 OpenAI가 요리 이름을 비우면 on·off 모두 김치찌개를 검색 기준으로 쓰지 않는다")
+        @DisplayName("직전 추천 없이 \"김치찌개 말고 다른 거\"에 OpenAI가 요리 이름을 비우면 김치찌개를 검색 기준으로 쓰지 않는다")
         void skipsAvoidedDish_whenOpenAiLeavesDishEmpty() {
             givenOpenAi(recommend("", List.of(), List.of(), List.of(), ""));
             givenJev(RequestKind.DISH, "찌개");
             when(similarDishFinder.findBroad(MEMBER_ID, "김치찌개 말고 다른 거 추천해줘")).thenReturn(List.of("된장찌개", "제육볶음"));
 
             ChatIntentResolution resolution = resolve("김치찌개 말고 다른 거 추천해줘");
-            fixture.givenExtracted(recommend("", List.of(), List.of(), List.of(), ""));
-            ChatIntentResolution off = fixture.facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("김치찌개 말고 다른 거 추천해줘"));
 
             assertThat(resolution.recipeQuery().keywordText()).isNull();
             assertThat(resolution.recipeQuery().keywords()).doesNotContain("김치찌개");
-            assertThat(off.recipeQuery().keywordText()).isNull();
-            assertThat(off.recipeQuery().keywords()).doesNotContain("김치찌개");
         }
 
         @Test
-        @DisplayName("\"매운 거 말고 짬뽕 같은 거\"에 OpenAI가 요리 이름 짬뽕을 주면 on·off 모두 요리 이름 짬뽕과 피할 맛 매운맛으로 찾는다")
+        @DisplayName("\"매운 거 말고 짬뽕 같은 거\"에 OpenAI가 요리 이름 짬뽕을 주면 요리 이름 짬뽕과 Jev 피할 맛 매운맛으로 찾는다")
         void usesDishAndAvoidedTaste_whenTasteIsAvoidedBeforeDish() {
             IntentResult openAi = new IntentResult(ChatIntent.RECOMMEND, List.of(), List.of(), 0, List.of(), List.of(), false,
                     List.of("짬뽕"), "짬뽕", "", 0, "", List.of(), List.of("SPICY"), "", "ALL");
@@ -126,13 +122,9 @@ class ChatIntentFacadeJevOnTest {
             givenJev(RequestKind.DISH, null, 0.95, Map.of(Taste.SPICY, TasteStance.AVOIDED));
 
             ChatIntentResolution resolution = resolve("매운 거 말고 짬뽕 같은 거");
-            fixture.givenExtracted(openAi);
-            ChatIntentResolution off = fixture.facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("매운 거 말고 짬뽕 같은 거"));
 
             assertThat(resolution.recipeQuery().keywordText()).isEqualTo("짬뽕");
             assertThat(resolution.recipeQuery().avoidTastes()).containsExactly(Taste.SPICY);
-            assertThat(off.recipeQuery().keywordText()).isEqualTo("짬뽕");
-            assertThat(off.recipeQuery().avoidTastes()).containsExactly(Taste.SPICY);
         }
 
         @Test
@@ -424,21 +416,6 @@ class ChatIntentFacadeJevOnTest {
         }
 
         @Test
-        @DisplayName("Jev로 정한 이어짐은 같은 조건의 OpenAI 이어짐(예전 다시 추천)과 같은 추천 조건이 된다")
-        void matchesOpenAiFollowing_whenJevFollowsPrevious() {
-            givenOpenAi(recommend(null, List.of(), List.of(), List.of("SPICY"), null).withFollows(true));
-            givenJevFollowing(0.8, Taste.SPICY);
-            ChatIntentResolution byJev = resolve("좀 더 매운 걸로", context);
-            when(jev.await(run)).thenReturn(Optional.empty());
-
-            ChatIntentResolution byOpenAi = resolve("좀 더 매운 걸로", context);
-
-            assertThat(byOpenAi.follows()).isTrue();
-            assertThat(byJev.follows()).isTrue();
-            assertThat(byJev.recipeQuery()).isEqualTo(byOpenAi.recipeQuery());
-        }
-
-        @Test
         @DisplayName("직전 추천이 있어도 Jev가 추천 + 이어짐 0.3이면 이어짐 아니오로 직전 조건 없이 새 추천을 한다")
         void recommendsNew_whenJevDoesNotFollowPrevious() {
             givenOpenAi(recommend(null, List.of(), List.of(), List.of(), null));
@@ -457,42 +434,19 @@ class ChatIntentFacadeJevOnTest {
         }
 
         @Test
-        @DisplayName("직전 추천(직전 조건)이 없으면 Jev 이어짐 0.8이어도, OpenAI가 이어짐 예라고 해도 이어짐 아니오로 새 추천을 한다")
+        @DisplayName("직전 추천(직전 조건)이 없으면 Jev 이어짐 0.8이어도 이어짐 아니오로 새 추천을 한다")
         void neverFollows_whenNoLastRecommendation() {
             ChatContext withoutRedis = new ChatContext(List.of(), null, context.lastCards());
-            givenOpenAi(recommend(null, List.of(), List.of(), List.of("SPICY"), null).withFollows(true));
+            givenOpenAi(recommend(null, List.of(), List.of(), List.of(), null));
             givenJevFollowing(0.8, Taste.SPICY);
-            ChatIntentResolution byJev = resolve("좀 더 매운 걸로", withoutRedis);
-            when(jev.await(run)).thenReturn(Optional.empty());
 
-            ChatIntentResolution byOpenAi = resolve("좀 더 매운 걸로", withoutRedis);
+            ChatIntentResolution byJev = resolve("좀 더 매운 걸로", withoutRedis);
             ChatIntentResolution firstQuestion = resolve("좀 더 매운 걸로");
 
             assertThat(byJev.follows()).isFalse();
-            assertThat(byOpenAi.follows()).isFalse();
             assertThat(firstQuestion.follows()).isFalse();
             assertThat(byJev.recipeQuery().moodCategories()).isEmpty();
-            assertThat(byOpenAi.recipeQuery().wantedTastes()).containsExactly(Taste.SPICY);
-        }
-
-        @Test
-        @DisplayName("OpenAI로 되돌리면 OpenAI 이어짐 예는 직전 조건을 이어받고, 아니오는 새 추천이다")
-        void usesOpenAiFollows_whenFallingBack() {
-            when(jev.await(run)).thenReturn(Optional.empty());
-            givenOpenAi(recommend(null, List.of(), List.of(), List.of("SPICY"), null).withFollows(true));
-            ChatIntentResolution follows = resolve("좀 더 매운 걸로", context);
-            givenOpenAi(recommend(null, List.of(), List.of(), List.of("SPICY"), null).withFollows(false));
-
-            ChatIntentResolution fresh = resolve("매운 거 추천해줘", context);
-
-            assertThat(follows.intent()).isEqualTo(ChatIntent.RECOMMEND);
-            assertThat(follows.follows()).isTrue();
-            assertThat(follows.recipeQuery().moodCategories()).containsExactly("국", "찌개");
-            assertThat(follows.recipeQuery().selectedIngredientIds()).containsExactly(ChatIntentFixture.TOFU);
-            assertThat(fresh.intent()).isEqualTo(ChatIntent.RECOMMEND);
-            assertThat(fresh.follows()).isFalse();
-            assertThat(fresh.recipeQuery().moodCategories()).isEmpty();
-            assertThat(fresh.recipeQuery().selectedIngredientIds()).isEmpty();
+            assertThat(byJev.recipeQuery().wantedTastes()).containsExactly(Taste.SPICY);
         }
 
         @Test
@@ -509,96 +463,68 @@ class ChatIntentFacadeJevOnTest {
     }
 
     @Nested
-    @DisplayName("OpenAI 결과로 되돌림")
-    class Fallback {
+    @DisplayName("Jev 1등 의도 그대로와 AI 실패")
+    class JevOnly {
 
         @Test
-        @DisplayName("Jev가 실패하면 OpenAI 결과를 서비스 규칙만 거쳐 쓰고, 맛·분류 단어로 고치지 않는다")
-        void usesOpenAiWithoutFixes_whenJevFails() {
+        @DisplayName("Jev 의도 confidence가 0.5인 추천도 OpenAI로 되돌리지 않고 Jev 추천으로 정한다")
+        void usesJevRecommend_whenConfidenceIsLow() {
             givenOpenAi(recommend(null, null, List.of("국"), List.of(), null));
-            when(jev.await(run)).thenReturn(Optional.empty());
-
-            ChatIntentResolution resolution = resolve("칼칼한 국물 요리");
-
-            assertThat(resolution.recipeQuery().wantedTastes()).isEmpty();
-            assertThat(resolution.recipeQuery().moodCategories()).containsExactly("국");
-            verifyDecision(JevDecision.of(Decision.OPENAI_JEV_FAILED));
-            verify(similarDishFinder, never()).findBroad(any(), any());
-        }
-
-        @Test
-        @DisplayName("Jev 의도 confidence가 0.79면 OpenAI 결과를 쓴다")
-        void usesOpenAi_whenConfidenceBelowThreshold() {
-            givenOpenAi(recommend(null, null, List.of("국"), List.of(), null));
-            givenJev(RequestKind.CATEGORY, "찌개", 0.79);
+            givenJev(RequestKind.CATEGORY, "찌개", 0.5);
 
             ChatIntentResolution resolution = resolve("국 추천해줘");
 
-            assertThat(resolution.recipeQuery().moodCategories()).containsExactly("국");
-            verifyDecision(JevDecision.of(Decision.OPENAI_LOW_CONFIDENCE));
+            assertThat(resolution.intent()).isEqualTo(ChatIntent.RECOMMEND);
+            assertThat(resolution.source()).isEqualTo(ChatIntentResolution.Source.AI);
+            assertThat(resolution.recipeQuery().moodCategories()).containsExactly("찌개");
+            verifyDecision(new JevDecision(Decision.JEV, RequestKind.CATEGORY, List.of("찌개")));
         }
 
         @Test
-        @DisplayName("confidence가 낮아 되돌릴 때 OpenAI가 추천이고 Jev 2차가 넓은 요청이면 의도·맛은 OpenAI 것으로 두고 넓은 요청 요리 이름으로 찾는다")
-        void usesBroadDishesWithOpenAiIntent_whenFallingBackWithJevBroad() {
+        @DisplayName("Jev 의도 confidence가 낮은 넓은 요청도 Jev 맛과 넓은 요청 요리 이름으로 찾는다")
+        void usesJevBroad_whenConfidenceIsLow() {
             givenOpenAi(recommend(null, List.of("밥"), List.of("밥"), List.of("SALTY"), "주식으로 먹을 거"));
             givenJev(RequestKind.BROAD, null, 0.6, Taste.SPICY);
             when(similarDishFinder.findBroad(MEMBER_ID, "주식으로 먹을 거")).thenReturn(List.of("김치볶음밥", "칼국수"));
 
             ChatIntentResolution resolution = resolve("주식으로 먹을 거 추천해줘");
 
-            assertThat(resolution.intent()).isEqualTo(ChatIntent.RECOMMEND);
             assertThat(resolution.recipeQuery().keywords()).containsExactly("김치볶음밥", "칼국수");
-            assertThat(resolution.recipeQuery().moodCategories()).isEmpty();
-            assertThat(resolution.recipeQuery().keywordText()).isNull();
-            assertThat(resolution.recipeQuery().preferenceText()).isEqualTo("주식으로 먹을 거");
-            assertThat(resolution.recipeQuery().wantedTastes()).containsExactly(Taste.SALTY);
-            verifyDecision(new JevDecision(Decision.OPENAI_LOW_CONFIDENCE_JEV_BROAD, RequestKind.BROAD, List.of("김치볶음밥", "칼국수")));
+            assertThat(resolution.recipeQuery().wantedTastes()).containsExactly(Taste.SPICY);
+            verifyDecision(new JevDecision(Decision.JEV, RequestKind.BROAD, List.of("김치볶음밥", "칼국수")));
         }
 
         @Test
-        @DisplayName("confidence가 낮아 되돌릴 때 Jev 2차가 특정 분류면 지금처럼 OpenAI 결과를 쓰고 넓은 요청 요리 이름을 받지 않는다")
-        void usesOpenAi_whenFallingBackWithJevCategory() {
-            givenOpenAi(recommend(null, null, List.of("국"), List.of(), null));
-            givenJev(RequestKind.CATEGORY, "찌개", 0.6);
+        @DisplayName("Jev 의도 confidence가 낮은 일반 질문도 그대로 일반 답으로 정한다")
+        void usesJevGeneral_whenConfidenceIsLow() {
+            givenOpenAi(recommend(null, null, null, null, null));
+            givenJevFirstOnly(ChatIntent.GENERAL, 0.4);
 
-            ChatIntentResolution resolution = resolve("국 추천해줘");
-
-            assertThat(resolution.recipeQuery().moodCategories()).containsExactly("국");
-            verify(similarDishFinder, never()).findBroad(any(), any());
-            verifyDecision(JevDecision.of(Decision.OPENAI_LOW_CONFIDENCE));
-        }
-
-        @Test
-        @DisplayName("confidence가 낮아 되돌릴 때 OpenAI가 일반 질문이면 Jev 2차가 넓은 요청이어도 넓은 요청 경로를 타지 않는다")
-        void keepsOpenAiGeneral_whenFallingBackWithJevBroad() {
-            givenOpenAi(new IntentResult(ChatIntent.GENERAL, List.of(), List.of(), 0, List.of(), List.of(), false, List.of(), "", "",
-                    0, "", List.of(), List.of(), "", "ALL"));
-            givenJev(RequestKind.BROAD, null, 0.6);
-
-            ChatIntentResolution resolution = resolve("두부는 어떻게 보관해?");
+            ChatIntentResolution resolution = resolve("슬슬 처리해야 할 거 있어?");
 
             assertThat(resolution.intent()).isEqualTo(ChatIntent.GENERAL);
+            assertThat(resolution.source()).isEqualTo(ChatIntentResolution.Source.AI);
             verify(similarDishFinder, never()).findBroad(any(), any());
-            verifyDecision(JevDecision.of(Decision.OPENAI_LOW_CONFIDENCE));
         }
 
         @Test
-        @DisplayName("Jev 의도 confidence가 0.8이면 Jev로 정한다")
-        void usesJev_whenConfidenceAtThreshold() {
-            givenOpenAi(recommend(null, null, List.of("국"), List.of(), null));
-            givenJev(RequestKind.CATEGORY, "찌개", 0.8);
+        @DisplayName("Jev가 실패하면 OpenAI 꺼낸 값을 쓰지 않고 실패 처리(선택 재료 없으면 일반 답)로 정하고 JEV_FAILED로 남긴다")
+        void usesFailureHandling_whenJevFails() {
+            givenOpenAi(recommend("김치찌개", List.of("김치찌개"), List.of("찌개"), List.of(), null));
+            when(jev.await(run)).thenReturn(Optional.empty());
 
-            ChatIntentResolution resolution = resolve("국 추천해줘");
+            ChatIntentResolution resolution = resolve("김치찌개 먹고 싶어");
 
-            assertThat(resolution.recipeQuery().moodCategories()).containsExactly("찌개");
-            verifyDecision(new JevDecision(Decision.JEV, RequestKind.CATEGORY, List.of("찌개")));
+            assertThat(resolution.intent()).isEqualTo(ChatIntent.GENERAL);
+            assertThat(resolution.source()).isEqualTo(ChatIntentResolution.Source.FALLBACK);
+            verifyDecision(JevDecision.of(Decision.JEV_FAILED));
         }
 
         @Test
-        @DisplayName("OpenAI 의도 판단이 실패하면 지금 실패 처리(선택 재료 없으면 일반 답)를 쓰고 OPENAI_FAILED로 남긴다")
-        void usesExistingFallback_whenOpenAiFails() {
-            when(fixture.extractor.extract(eq(MEMBER_ID), eq(SESSION_ID), any(), any(), any())).thenThrow(new IllegalStateException("timeout"));
+        @DisplayName("OpenAI 꺼내기가 실패하면 실패 처리(선택 재료 없으면 일반 답)를 쓰고 OPENAI_FAILED로 남긴다")
+        void usesFailureHandling_whenOpenAiFails() {
+            when(fixture.extractor.extract(eq(MEMBER_ID), eq(SESSION_ID), any(), any())).thenThrow(new IllegalStateException("timeout"));
+            givenJev(RequestKind.NONE, null);
 
             ChatIntentResolution resolution = resolve("뭐 먹지");
 
@@ -630,35 +556,10 @@ class ChatIntentFacadeJevOnTest {
         }
 
         @Test
-        @DisplayName("알레르기 재료는 OpenAI로 되돌린 추천에도 뺄 재료로 더한다")
-        void addsAllergens_whenFallingBack() {
-            givenOpenAi(recommend(null, null, null, null, null));
-            when(jev.await(run)).thenReturn(Optional.empty());
-            when(fixture.allergyExclusionFinder.find(eq(SESSION_ID), any())).thenReturn(peanut);
-
-            ChatIntentResolution resolution = resolve("땅콩 알레르기 있어, 뭐 먹지");
-
-            assertThat(resolution.recipeQuery().excludeIngredientIds()).containsExactly(101L, 102L);
-        }
-
-        @Test
         @DisplayName("레시피 자세히 대상은 Jev로 정했을 때도 직전 카드에서 찾는다")
         void findsDetailTarget_whenJevDecides() {
             givenOpenAi(detail(2));
             givenJevFirstOnly(ChatIntent.RECIPE_DETAIL, 0.97);
-
-            ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID,
-                    ChatMessageCreateRequest.of("두 번째 거 어떻게 만들어?"), context);
-
-            assertThat(resolution.intent()).isEqualTo(ChatIntent.RECIPE_DETAIL);
-            assertThat(resolution.targetRecipeId()).isEqualTo(20L);
-        }
-
-        @Test
-        @DisplayName("레시피 자세히 대상은 OpenAI로 되돌렸을 때도 직전 카드에서 찾는다")
-        void findsDetailTarget_whenFallingBack() {
-            givenOpenAi(detail(2));
-            when(jev.await(run)).thenReturn(Optional.empty());
 
             ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID,
                     ChatMessageCreateRequest.of("두 번째 거 어떻게 만들어?"), context);
@@ -681,8 +582,9 @@ class ChatIntentFacadeJevOnTest {
         return facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of(message), context);
     }
 
+    // OpenAI가 꺼낸 값 (결과의 의도·이어짐·맛·분류는 OpenAI가 내지 않으므로 버린다)
     private void givenOpenAi(IntentResult result) {
-        fixture.givenExtracted(result);
+        fixture.givenExtracted(ChatIntentFixture.extractionOf(result));
     }
 
     // OpenAI 추천 결과 (요리 이름, 키워드, 분류, 원하는 맛, 원한 표현)

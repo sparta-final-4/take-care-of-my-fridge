@@ -13,7 +13,7 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntent;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntentResolution;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageCreateRequest;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatSafetyBlock;
-import org.example.takecareofmyfridgebe.domain.chat.dto.IntentResult;
+import org.example.takecareofmyfridgebe.domain.chat.dto.IntentExtraction;
 import org.example.takecareofmyfridgebe.domain.chat.dto.LastRecommendation;
 import org.example.takecareofmyfridgebe.domain.chat.dto.LastRecommendation.QuerySnapshot;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeQuery;
@@ -230,7 +230,7 @@ class ChatIntentEvalManualTest {
         List<String> header = new ArrayList<>(List.of("id", "group", "context", "message", "run", "pass", "mismatch", "source",
                 "intent", "wanted", "avoid", "categories", "keywords", "dish", "preference", "maxMinutes", "include", "exclude",
                 "useSelectedOnly", "scope", "names", "saleOnly", "productType", "target", "question",
-                "aiIntent", "aiWanted", "aiAvoid", "aiCategories", "aiKeywords", "aiDish", "aiPreference", "aiMaxMinutes",
+                "aiKeywords", "aiDish", "aiPreference", "aiMaxMinutes",
                 "aiInclude", "aiExclude", "aiUseSelectedOnly", "aiScope", "aiTargetIndex", "aiTargetName", "aiRemoved",
                 "aiQuestion", "inputTokens", "cachedTokens", "outputTokens", "ms"));
         header.addAll(ChatIntentEvalJevOn.Info.HEADER);
@@ -263,10 +263,10 @@ class ChatIntentEvalManualTest {
         List<RunRow> aiRows = rows.stream().filter(row -> row.inputTokens() > 0).toList();
         List<String> summary = new ArrayList<>();
         // 맨 위: 이번에 끈 서버 보정 (A~E 비교용)
-        summary.add("의도: Jev (되돌림·서비스 규칙)" + (label == null ? "" : " · 이름 " + label)
+        summary.add("의도: Jev 단독 (OpenAI는 꺼내기만, 서비스 규칙)" + (label == null ? "" : " · 이름 " + label)
                 + (EvalSet.MAIN_SET.equals(setResource) ? "" : " · 세트 " + setResource));
         summary.add("AI 상담 의도 평가 " + stamp + " · 모델 " + MODEL + " · 문장 " + cases.size() + "개 × " + runs + "번 (다수결)");
-        summary.add(promptSize(set));
+        summary.add(promptSize());
         summary.add(String.format("전체 일치: %d / %d (%.1f%%)", passedCases, cases.size(), 100.0 * passedCases / cases.size()));
         byGroup.forEach((group, counts) -> summary.add(String.format("  %s: %d / %d", group, counts[0], counts[1])));
         long aiFailures = rows.stream().filter(row -> row.source().startsWith("AI_FAILED")).count();
@@ -296,12 +296,11 @@ class ChatIntentEvalManualTest {
         System.out.println("결과: " + runsFile.toAbsolutePath() + ", " + casesFile.getFileName() + ", " + summaryFile.getFileName());
     }
 
-    // 고정 프롬프트 크기 (분류 목록을 채운 첫 질문, 후속 규칙). 토큰은 gpt-4o-mini의 o200k 기준
-    private static String promptSize(EvalSet set) throws IOException {
-        String intent = new ClassPathResource("prompts/chat-intent.txt").getContentAsString(StandardCharsets.UTF_8)
-                .replace("%CATEGORIES%", String.join(", ", set.promptCategories()));
+    // 고정 프롬프트 크기 (첫 질문, 후속 규칙). 토큰은 gpt-4o-mini의 o200k 기준
+    private static String promptSize() throws IOException {
+        String intent = new ClassPathResource("prompts/chat-intent.txt").getContentAsString(StandardCharsets.UTF_8);
         String followUp = new ClassPathResource("prompts/chat-intent-followup.txt").getContentAsString(StandardCharsets.UTF_8).strip();
-        return String.format("프롬프트: 첫 질문 %d자 / %d토큰 (분류 목록 포함), 후속 규칙 %d자 / %d토큰",
+        return String.format("프롬프트: 첫 질문 %d자 / %d토큰, 후속 규칙 %d자 / %d토큰",
                 intent.codePointCount(0, intent.length()), TOKENS.countTokens(intent),
                 followUp.codePointCount(0, followUp.length()), TOKENS.countTokens(followUp));
     }
@@ -317,7 +316,7 @@ class ChatIntentEvalManualTest {
     }
 
     // 한 번 돌린 결과
-    record RunRow(EvalCase evalCase, int run, Outcome outcome, String source, IntentResult ai,
+    record RunRow(EvalCase evalCase, int run, Outcome outcome, String source, IntentExtraction ai,
                   long inputTokens, long outputTokens, long cachedTokens, long ms, List<String> mismatches,
                   ChatIntentEvalJevOn.Info jev) {
 
@@ -332,12 +331,11 @@ class ChatIntentEvalManualTest {
                     csv(source)));
             cells.addAll(outcome.cells());
             if (ai == null) {
-                for (int i = 0; i < 16; i++) {
+                for (int i = 0; i < 12; i++) {
                     cells.add("");
                 }
             } else {
-                cells.addAll(List.of(csv(intentLabel(ai.intent(), Boolean.TRUE.equals(ai.followsPrevious()))), csv(ai.wantedTastes()), csv(ai.avoidTastes()), csv(ai.moodCategories()),
-                        csv(ai.keywords()), csv(ai.dishText()), csv(ai.preferenceText()), csv(ai.maxMinutes()),
+                cells.addAll(List.of(csv(ai.keywords()), csv(ai.dishText()), csv(ai.preferenceText()), csv(ai.maxMinutes()),
                         csv(ai.includeIngredients()), csv(ai.excludeIngredients()), csv(ai.useSelectedOnly()),
                         csv(ai.fridgeScope()), csv(ai.targetIndex()), csv(ai.targetName()), csv(ai.removed()),
                         csv(ai.detailQuestion())));
@@ -611,11 +609,11 @@ class ChatIntentEvalManualTest {
         }
     }
 
-    // 실제 의도 판단을 부르고 AI가 준 원래 값(정리 전)을 남긴다
+    // 실제 OpenAI 꺼내기를 부르고 AI가 준 원래 값(정리 전)을 남긴다
     static final class RecordingExtractor implements ChatIntentExtractor {
 
         private final ChatIntentExtractor delegate;
-        private IntentResult last;
+        private IntentExtraction last;
         private String failure;
 
         RecordingExtractor(ChatIntentExtractor delegate) {
@@ -623,9 +621,9 @@ class ChatIntentEvalManualTest {
         }
 
         @Override
-        public IntentResult extract(Long memberId, Long sessionId, String message, List<String> categories, String followUp) {
+        public IntentExtraction extract(Long memberId, Long sessionId, String message, String followUp) {
             try {
-                last = delegate.extract(memberId, sessionId, message, categories, followUp);
+                last = delegate.extract(memberId, sessionId, message, followUp);
                 return last;
             } catch (RuntimeException e) {
                 failure = e.toString();

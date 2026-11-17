@@ -1,10 +1,14 @@
 package org.example.takecareofmyfridgebe.domain.chat.facade;
 
+import org.example.takecareofmyfridgebe.domain.chat.ChatIntentFixture;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatCandidateProperties;
+import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntent;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntentResolution;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageCreateRequest;
+import org.example.takecareofmyfridgebe.domain.chat.dto.IntentExtraction;
 import org.example.takecareofmyfridgebe.domain.chat.dto.IntentResult;
+import org.example.takecareofmyfridgebe.domain.chat.facade.ChatIntentEvalManualTest.EvalCase;
 import org.example.takecareofmyfridgebe.domain.chat.facade.ChatIntentEvalManualTest.EvalSet;
 import org.example.takecareofmyfridgebe.domain.chat.facade.ChatIntentEvalManualTest.Outcome;
 import org.example.takecareofmyfridgebe.domain.chat.intent.IntentCorrector;
@@ -33,7 +37,10 @@ import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.TreeSet;
+import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -44,11 +51,13 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
- * 의도 서비스 규칙 기록 재생 테스트. 실제 AI가 낸 원래 결과(평가 before 실행, chat-intent-replay/inputs.csv)를 AI 대신 넣고
- * Jev 판단 없이(OpenAI로 되돌린 경우와 같다) 서비스 규칙(ChatIntentFacade·IntentCorrector)을 거친 최종 결과가
- * 기준값(chat-intent-replay/expected.csv)과 같은지 본다. AI를 부르지 않아 결정적이다.
- * 기준값은 Jev 전환 정리(보정 단계 삭제) 뒤 다시 기록했다. 달라진 줄과 원인: docs/testing/eval-results/cleanup-replay/replay-diff.csv
- * REFINE을 추천 + 이어짐으로 바꾼 뒤(d2) 다시 기록했다. 의도 칸은 추천 + 이어짐이면 RECOMMEND+FOLLOWS다 (달라진 줄: d2-replay/replay-diff.csv)
+ * 꺼내기·서비스 규칙 기록 재생 테스트. 실제 AI가 낸 원래 결과(평가 before 실행, chat-intent-replay/inputs.csv)를 AI 대신 넣고
+ * 서비스 규칙(ChatIntentFacade·JevIntentResolver·IntentCorrector)을 거친 최종 결과가 기준값(chat-intent-replay/expected.csv)과 같은지 본다.
+ * AI를 부르지 않아 결정적이다. 의도는 OpenAI가 정하지 않으므로(Jev 단독) 흉내 낸 Jev가 평가 세트의 기대 의도(목록이면 첫째)와
+ * 기대 이어짐을 답한다. 그래서 이 테스트는 의도 판단이 아니라 꺼낸 값과 서비스 규칙을 지킨다.
+ * Jev의 맛·요청 종류·1등 분류는 기록한 AI 값으로 흉내 낸다 (ChatIntentFixture.judgementOf: 요리 이름이 있으면 특정 요리, 분류가 있으면 특정 분류).
+ * 기준값을 다시 기록한 기록과 달라진 줄: cleanup-replay(보정 단계 삭제), d2-replay(REFINE → 추천 + 이어짐),
+ * jev-only-replay(OpenAI 의도 판단 삭제) (docs/testing/eval-results 아래 replay-diff.csv)
  * <p>
  * 보정 코드를 옮기기만 할 때 결과가 그대로인지 확인하는 안전망이다. 동작을 일부러 바꾸는 커밋에서는 기준값을 다시 기록하고
  * 바뀐 줄을 그 커밋에서 확인한다. 기록하는 법 (take-care-of-my-fridge-be 폴더에서):
@@ -78,14 +87,22 @@ class ChatIntentReplayTest {
     @DisplayName("기록한 AI 원래 결과를 서비스 규칙에 다시 넣으면 최종 결과가 기준값과 같다")
     void replaysRecordedAiResults() throws IOException {
         EvalSet set = EvalSet.load();
+        Map<String, EvalCase> cases = set.cases(Set.of()).stream()
+                .collect(Collectors.toMap(EvalCase::id, evalCase -> evalCase));
         ReplayExtractor extractor = new ReplayExtractor();
-        ChatIntentFacade facade = facade(set, extractor);
+        JevIntentRunner jev = mock(JevIntentRunner.class);
+        JevIntentRunner.Run run = mock(JevIntentRunner.Run.class);
+        when(jev.start(any(), any(), any())).thenReturn(run);
+        ChatIntentFacade facade = facade(set, extractor, jev);
 
         List<String> actual = new ArrayList<>();
         actual.add("id,run,intent,wanted,avoid,categories,keywords,dish,preference,maxMinutes,include,exclude,"
                 + "useSelectedOnly,scope,names,saleOnly,productType,target,question");
         for (Map<String, String> row : readInputs()) {
-            extractor.next = rawOf(row);
+            EvalCase evalCase = cases.get(row.get("id"));
+            IntentResult recorded = withExpectedIntent(rawOf(row), evalCase == null ? Map.of() : evalCase.expect().raw());
+            extractor.next = ChatIntentFixture.extractionOf(recorded);
+            when(jev.await(run)).thenReturn(Optional.of(ChatIntentFixture.judgementOf(recorded)));
             ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID,
                     ChatMessageCreateRequest.of(row.get("message")), set.context(blankToNull(row.get("context"))));
             actual.add(row.get("id") + "," + row.get("run") + "," + line(Outcome.of(resolution, set)));
@@ -112,7 +129,7 @@ class ChatIntentReplayTest {
     }
 
     // 평가(ChatIntentEvalManualTest.facade)와 같은 사전·목으로 만든다
-    private ChatIntentFacade facade(EvalSet set, ChatIntentExtractor extractor) {
+    private ChatIntentFacade facade(EvalSet set, ChatIntentExtractor extractor, JevIntentRunner jev) {
         RecipeService recipeService = mock(RecipeService.class);
         when(recipeService.getClassifications()).thenReturn(new RecipeClassificationResponse(List.of("한식"), set.categories()));
         when(recipeService.suggestNames(anyString(), anyInt())).thenAnswer(invocation -> {
@@ -130,10 +147,9 @@ class ChatIntentReplayTest {
         AllergyExclusionFinder allergyExclusionFinder = mock(AllergyExclusionFinder.class);
         when(allergyExclusionFinder.find(any(), any())).thenReturn(AllergyExclusionFinder.Allergens.NONE);
         IntentCorrector corrector = new IntentCorrector(recipeService, ingredientMatcher, mock(ChatMessageService.class), words);
-        // 기록에는 Jev 판단이 없다. Jev 판단이 오지 않으면 운영과 같게 OpenAI 결과로 되돌리고 서비스 규칙만 거친다
+        // 기록에는 Jev 판단이 없어 흉내 낸 Jev(평가 세트 기대 의도)로 정한다. 넓은 요청 요리 이름은 부르지 않는다(흉내 낸 Jev는 넓은 요청을 답하지 않는다)
         return new ChatIntentFacade(extractor, recipeService, ingredientMatcher, candidateProperties, words,
-                allergyExclusionFinder, corrector, mock(JevIntentRunner.class),
-                new JevIntentResolver(mock(SimilarDishFinder.class), words));
+                allergyExclusionFinder, corrector, jev, new JevIntentResolver(mock(SimilarDishFinder.class), words));
     }
 
     // 기록한 칸으로 AI 원래 결과를 다시 만든다 (평가 CSV의 AI 칸과 같은 모양, 목록은 " / "로 이어 씀).
@@ -158,6 +174,19 @@ class ChatIntentReplayTest {
                 blankToNull(row.get("aiQuestion")),
                 blankToNull(row.get("aiScope")),
                 intent != null && ChatIntentEvalManualTest.followsOf(intent));
+    }
+
+    // 기록한 AI 결과의 의도·이어짐을 평가 세트의 기대 의도(목록이면 첫째)·기대 이어짐으로 바꾼다.
+    // 기대 의도가 없는 문장(T09)과 평가 세트에서 빠진 문장(X01~X05, 모두 추천으로 기록)은 기록한 의도를 둔다
+    private static IntentResult withExpectedIntent(IntentResult recorded, Map<String, Object> expect) {
+        Object intent = expect.get("intent");
+        ChatIntent expected = intent == null ? recorded.intent()
+                : ChatIntent.valueOf(intent instanceof List<?> names ? String.valueOf(names.get(0)) : String.valueOf(intent));
+        boolean follows = Boolean.TRUE.equals(expect.get("follows"));
+        return new IntentResult(expected, recorded.wantedTastes(), recorded.moodCategories(), recorded.maxMinutes(),
+                recorded.includeIngredients(), recorded.excludeIngredients(), recorded.useSelectedOnly(), recorded.keywords(),
+                recorded.dishText(), recorded.preferenceText(), recorded.targetIndex(), recorded.targetName(), recorded.removed(),
+                recorded.avoidTastes(), recorded.detailQuestion(), recorded.fridgeScope(), follows);
     }
 
     private static List<Map<String, String>> readInputs() throws IOException {
@@ -239,13 +268,13 @@ class ChatIntentReplayTest {
         return value == null || value.isBlank() ? null : value;
     }
 
-    // 다음 문장에 돌려줄 AI 원래 결과를 미리 정해 둔다
+    // 다음 문장에 돌려줄 OpenAI 꺼내기 원래 결과를 미리 정해 둔다
     private static final class ReplayExtractor implements ChatIntentExtractor {
 
-        private IntentResult next;
+        private IntentExtraction next;
 
         @Override
-        public IntentResult extract(Long memberId, Long sessionId, String message, List<String> categories, String followUp) {
+        public IntentExtraction extract(Long memberId, Long sessionId, String message, String followUp) {
             return next;
         }
     }

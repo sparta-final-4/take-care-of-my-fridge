@@ -4,7 +4,7 @@ import org.example.takecareofmyfridgebe.domain.chat.ChatIntentFixture;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntent;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntentResolution;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageCreateRequest;
-import org.example.takecareofmyfridgebe.domain.chat.dto.IntentResult;
+import org.example.takecareofmyfridgebe.domain.chat.dto.IntentExtraction;
 import org.example.takecareofmyfridgebe.domain.chat.dto.JevIntentJudgement;
 import org.example.takecareofmyfridgebe.domain.chat.facade.ChatIntentFacade;
 import org.example.takecareofmyfridgebe.global.config.TypeSafeExecutor;
@@ -38,7 +38,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-// 상담 의도 판단의 Jev 호출: 키 없음·실패면 OpenAI로 되돌리기, 기다리기, 실행기 자리, 결정 로그
+// 상담 의도 판단의 Jev 호출: 키 없음·실패면 AI 실패 처리, 기다리기, 실행기 자리, 결정 로그
 @ExtendWith(OutputCaptureExtension.class)
 class JevIntentRunnerTest {
 
@@ -59,8 +59,7 @@ class JevIntentRunnerTest {
 
     @BeforeEach
     void setUp() {
-        when(fixture.extractor.extract(eq(MEMBER_ID), eq(sessionId), any(), any(), any())).thenReturn(new IntentResult(
-                ChatIntent.RECOMMEND, List.of("SPICY"), List.of("찌개"), null, null, null, false, null, null, null));
+        when(fixture.extractor.extract(eq(MEMBER_ID), eq(sessionId), any(), any())).thenReturn(IntentExtraction.empty());
     }
 
     @AfterEach
@@ -70,18 +69,18 @@ class JevIntentRunnerTest {
     }
 
     @Test
-    @DisplayName("키가 없으면 Jev를 부르지 않고 OpenAI 결과로 되돌리며 결정 로그에 SKIPPED와 OPENAI_JEV_FAILED를 남긴다")
-    void fallsBackToOpenAi_whenApiKeyBlank(CapturedOutput output) {
+    @DisplayName("키가 없으면 Jev를 부르지 않고 AI 실패 처리로 답하며 결정 로그에 SKIPPED와 JEV_FAILED를 남긴다")
+    void answersWithFailure_whenApiKeyBlank(CapturedOutput output) {
         ChatIntentResolution resolution = facade(runner(client(""))).resolve(MEMBER_ID, sessionId, request());
 
         assertThat(resolution).isEqualTo(withoutJev());
         verifyNoInteractions(classifier);
         assertThat(JevDecisionLogTest.values(awaitDecisionLog(output, sessionId)))
-                .containsEntry("jevStatus", "SKIPPED").containsEntry("decision", "OPENAI_JEV_FAILED");
+                .containsEntry("jevStatus", "SKIPPED").containsEntry("decision", "JEV_FAILED");
     }
 
     @Test
-    @DisplayName("키가 없으면 시작할 때 OpenAI로만 되돌린다는 경고를 남기고, 키가 있으면 남기지 않는다")
+    @DisplayName("키가 없으면 시작할 때 AI 실패 처리로만 답한다는 경고를 남기고, 키가 있으면 남기지 않는다")
     void warnsOnce_whenApiKeyBlankAtStartup(CapturedOutput output) {
         runner(client(FAKE_KEY)).warnIfNoKey();
         assertThat(output.getOut()).doesNotContain("TypeSafe 키");
@@ -91,7 +90,7 @@ class JevIntentRunnerTest {
     }
 
     @Test
-    @DisplayName("OpenAI와 같은 메시지·분류 목록·직전 추천 정보로 Jev를 부르고, Jev로 정한 결과와 decision=JEV·쓴 요청 종류·값을 결정 로그에 남긴다")
+    @DisplayName("메시지·분류 목록·직전 추천 정보(OpenAI 꺼내기와 같은 것)로 Jev를 부르고, Jev로 정한 결과와 decision=JEV·쓴 요청 종류·값을 결정 로그에 남긴다")
     void decidesWithJevAndLogs_whenJevSucceeds(CapturedOutput output) {
         // 2차: 특정 분류 찌개 (JevDecisionLogTest.judgement)
         when(classifier.classify(any(), any(), any())).thenReturn(Optional.of(JevDecisionLogTest.judgement(ChatIntent.RECOMMEND, true)));
@@ -107,16 +106,16 @@ class JevIntentRunnerTest {
     }
 
     @Test
-    @DisplayName("Jev가 예외로 끝나면 OpenAI 결과로 되돌리고 결정 로그를 FIRST_FAILED와 OPENAI_JEV_FAILED로 남긴다")
-    void fallsBackAndLogsFirstFailed_whenJevThrows(CapturedOutput output) {
+    @DisplayName("Jev가 예외로 끝나면 AI 실패 처리로 답하고 결정 로그를 FIRST_FAILED와 JEV_FAILED로 남긴다")
+    void answersWithFailureAndLogsFirstFailed_whenJevThrows(CapturedOutput output) {
         when(classifier.classify(any(), any(), any())).thenThrow(new IllegalStateException("boom"));
 
         ChatIntentResolution resolution = facade(runner(client(FAKE_KEY))).resolve(MEMBER_ID, sessionId, request());
 
         assertThat(resolution).isEqualTo(withoutJev());
         assertThat(JevDecisionLogTest.values(awaitDecisionLog(output, sessionId)))
-                .containsEntry("jevStatus", "FIRST_FAILED").containsEntry("decision", "OPENAI_JEV_FAILED")
-                .containsEntry("finalIntent", "RECOMMEND");
+                .containsEntry("jevStatus", "FIRST_FAILED").containsEntry("decision", "JEV_FAILED")
+                .containsEntry("finalIntent", "GENERAL");
     }
 
     @Test

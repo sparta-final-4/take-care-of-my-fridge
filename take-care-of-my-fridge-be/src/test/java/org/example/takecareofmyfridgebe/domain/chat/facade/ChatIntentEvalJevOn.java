@@ -199,9 +199,9 @@ final class ChatIntentEvalJevOn {
         return result;
     }
 
-    // Jev 요청 종류로 검색 조건을 정한 결정 (Jev로 정함, 되돌림에서 넓은 요청 경로)
+    // Jev 요청 종류로 검색 조건을 정한 결정 (Jev로 정함)
     static boolean usesJevKind(JevDecision.Decision decision) {
-        return decision == JevDecision.Decision.JEV || decision == JevDecision.Decision.OPENAI_LOW_CONFIDENCE_JEV_BROAD;
+        return decision == JevDecision.Decision.JEV;
     }
 
     // 정한 방법과 Jev 판단을 남기는 JevIntentRunner. 기다리기·결정 로그는 실제 동작 그대로
@@ -266,7 +266,7 @@ final class ChatIntentEvalJevOn {
         List<String> lines = new ArrayList<>();
         List<ChatIntentEvalManualTest.RunRow> judged = rows.stream().filter(row -> row.jev() != null).toList();
         lines.add("");
-        lines.add("[Jev] 의도 confidence 기준 " + ChatIntentFacade.MIN_JEV_INTENT_CONFIDENCE);
+        lines.add("[Jev] 의도는 confidence와 상관없이 Jev 1등 의도");
         Map<String, int[]> byDecision = new LinkedHashMap<>();
         for (JevDecision.Decision decision : JevDecision.Decision.values()) {
             byDecision.put(decision.name(), new int[2]);
