@@ -83,27 +83,12 @@ public class SimilarDishFinder {
         }
         String formalName = generated.formalName() == null
                 || ChatTexts.removeWhitespace(generated.formalName()).equals(ChatTexts.removeWhitespace(text))
-                || !containsInOrder(generated.formalName(), text) ? null : generated.formalName();
+                || !ChatTexts.containsInOrder(generated.formalName(), text) ? null : generated.formalName();
         if (generated.formalName() != null && formalName == null) {
             log.info("상담 비슷한 요리 정식 이름 버림 - 글: {}, 정식 이름: {}", text, generated.formalName());
         }
         List<String> known = formalName == null ? List.of(text) : List.of(text, formalName);
         return new SimilarDishes(formalName, clean(known, generated.dishes()));
-    }
-
-    // 줄임말의 글자가 정식 이름에 순서대로 다 있는지 (띄어쓰기 무시). 김볶밥 → 김치볶음밥은 맞고, 김피탕 → 김치찌개는 맞지 않는다.
-    // AI가 모르는 줄임말에 글자만 보고 엉뚱한 요리를 정식 이름으로 낼 때(김피탕 → 김치찌개) 그 이름이 요리 이름처럼 앞에 오지 않게 한다
-    static boolean containsInOrder(String formalName, String abbreviation) {
-        String formal = ChatTexts.removeWhitespace(formalName);
-        int at = 0;
-        for (char letter : ChatTexts.removeWhitespace(abbreviation).toCharArray()) {
-            at = formal.indexOf(letter, at);
-            if (at < 0) {
-                return false;
-            }
-            at++;
-        }
-        return true;
     }
 
     // 앞뒤 공백·빈 이름을 빼고, 받은 글 자신과 띄어쓰기만 다른 중복을 빼서 최대 5개

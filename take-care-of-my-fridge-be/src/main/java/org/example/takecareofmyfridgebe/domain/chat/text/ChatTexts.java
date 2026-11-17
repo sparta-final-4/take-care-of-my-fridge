@@ -22,4 +22,21 @@ public final class ChatTexts {
     public static String removeWhitespace(String text) {
         return text == null ? "" : WHITESPACE.matcher(text).replaceAll("");
     }
+
+    /**
+     * 줄임말의 글자가 정식 이름에 순서대로 다 있는지 (띄어쓰기 무시). 김볶밥 → 김치볶음밥, 된찌 → 된장찌개는 맞고, 김피탕 → 김치찌개는 맞지 않는다.
+     * 비슷한 요리의 정식 이름 확인(SimilarDishFinder)과 OpenAI 요리 이름 확인(IntentCorrector.dishSpoken)이 같이 쓴다.
+     */
+    public static boolean containsInOrder(String formalName, String abbreviation) {
+        String formal = removeWhitespace(formalName);
+        int at = 0;
+        for (char letter : removeWhitespace(abbreviation).toCharArray()) {
+            at = formal.indexOf(letter, at);
+            if (at < 0) {
+                return false;
+            }
+            at++;
+        }
+        return true;
+    }
 }

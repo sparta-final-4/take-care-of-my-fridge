@@ -67,6 +67,43 @@ class IntentCorrectorTest {
             assertThat(query.preferenceText()).isEqualTo("냉면 같은 면 요리");
         }
 
+
+        @Test
+        @DisplayName("메시지의 단어 \"된찌\"의 글자가 OpenAI 요리 이름 된장찌개에 순서대로 다 있으면 줄임말을 푼 이름으로 받는다")
+        void keepsExpandedDish_whenWordLettersAreInOrder() {
+            givenExtracted(dish("된장찌개"));
+
+            RecipeQuery query = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("된찌 먹고 싶어")).recipeQuery();
+
+            assertThat(query.keywordText()).isEqualTo("된장찌개");
+            assertThat(query.keywords()).containsExactly("된장찌개");
+        }
+
+        @Test
+        @DisplayName("메시지의 단어 \"김피탕\"의 글자가 OpenAI 요리 이름 김치찌개에 순서대로 다 있지 않으면 요리 이름을 버린다")
+        void dropsDish_whenWordLettersAreNotInOrder() {
+            givenExtracted(dish("김치찌개"));
+
+            RecipeQuery query = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("김피탕 먹고 싶어")).recipeQuery();
+
+            assertThat(query.keywordText()).isNull();
+            assertThat(query.keywords()).doesNotContain("김치찌개");
+        }
+
+        @Test
+        @DisplayName("OpenAI 요리 이름이 메시지에 그대로 있으면 지금처럼 받는다")
+        void keepsDish_whenDishIsInMessage() {
+            givenExtracted(dish("김치찌개"));
+
+            RecipeQuery query = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("김치 찌개 먹고 싶어")).recipeQuery();
+
+            assertThat(query.keywordText()).isEqualTo("김치찌개");
+        }
+
+        // 요리 이름만 꺼낸 추천 (Jev는 특정 요리)
+        private static IntentResult dish(String dishText) {
+            return new IntentResult(ChatIntent.RECOMMEND, null, null, null, null, null, null, null, dishText, null);
+        }
     }
 
     @Nested

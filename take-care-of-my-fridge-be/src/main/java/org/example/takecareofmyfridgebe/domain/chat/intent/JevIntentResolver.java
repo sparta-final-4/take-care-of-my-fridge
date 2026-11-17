@@ -120,7 +120,7 @@ public class JevIntentResolver {
         boolean lowCategory = second.category() != null && category == null;
         if (second.requestKind() == RequestKind.DISH) {
             Reason reason = Reason.NONE;
-            String dish = IntentCorrector.dishInMessage(input.message(), openAi.dishText()) ? openAi.dishText() : null;
+            String dish = IntentCorrector.dishSpoken(input.message(), openAi.dishText()) ? openAi.dishText() : null;
             if (dish == null) {
                 dish = keywordInMessage(input.message(), openAi.keywords());
                 reason = dish == null ? Reason.NONE : Reason.DISH_FROM_KEYWORD;
