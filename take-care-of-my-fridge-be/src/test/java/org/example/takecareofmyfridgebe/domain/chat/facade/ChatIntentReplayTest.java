@@ -48,6 +48,7 @@ import static org.mockito.Mockito.when;
  * Jev 판단 없이(OpenAI로 되돌린 경우와 같다) 서비스 규칙(ChatIntentFacade·IntentCorrector)을 거친 최종 결과가
  * 기준값(chat-intent-replay/expected.csv)과 같은지 본다. AI를 부르지 않아 결정적이다.
  * 기준값은 Jev 전환 정리(보정 단계 삭제) 뒤 다시 기록했다. 달라진 줄과 원인: docs/testing/eval-results/cleanup-replay/replay-diff.csv
+ * REFINE을 추천 + 이어짐으로 바꾼 뒤(d2) 다시 기록했다. 의도 칸은 추천 + 이어짐이면 RECOMMEND+FOLLOWS다 (달라진 줄: d2-replay/replay-diff.csv)
  * <p>
  * 보정 코드를 옮기기만 할 때 결과가 그대로인지 확인하는 안전망이다. 동작을 일부러 바꾸는 커밋에서는 기준값을 다시 기록하고
  * 바뀐 줄을 그 커밋에서 확인한다. 기록하는 법 (take-care-of-my-fridge-be 폴더에서):
