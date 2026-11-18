@@ -802,32 +802,6 @@ class ChatStreamFacadeTest {
     }
 
     @Test
-    @DisplayName("일반 답을 추천으로 시도한 것(DISH_TRY)이 카드 0장이면 \"찾지 못했어요\"·못 찾음 문구 대신 일반 답을 보낸다")
-    void sendsGeneralReply_whenDishTryFindsNoCards() {
-        Long sessionId = 10L;
-        ChatMessageCreateRequest request = ChatMessageCreateRequest.of("오늘은 김피탕이 땡기네");
-        RecipeQuery query = new RecipeQuery(1L, List.of(), null, null, null, null, false, List.of("김피탕"), "김피탕");
-        when(chatIntentFacade.resolve(eq(1L), eq(sessionId), eq(request), any()))
-                .thenReturn(ChatIntentResolution.recommend(Source.DISH_TRY, query));
-        when(chatMessageService.findRecommendedRecipeIds(sessionId)).thenReturn(Set.of());
-        when(chatRecommendationFacade.recommend(request.content(), query.withAlreadyRecommended(Set.of()), List.of(), sessionId))
-                .thenReturn(RecommendationReply.fixed(ChatRecommendationsEventResponse.of(List.of()),
-                        "김피탕 레시피는 아직 없어요. 다른 요리를 물어봐 주세요."));
-        when(chatReplyGenerator.generate(1L, sessionId, "오늘은 김피탕이 땡기네", List.of())).thenReturn(Flux.just("김피탕 맛있죠"));
-        when(chatMessageService.saveExchange(sessionId, "오늘은 김피탕이 땡기네", "김피탕 맛있죠")).thenReturn(List.of(
-                new ChatMessageResponse(100L, 1, ChatMessageRole.USER, "오늘은 김피탕이 땡기네", LocalDateTime.now()),
-                new ChatMessageResponse(101L, 2, ChatMessageRole.ASSISTANT, "김피탕 맛있죠", LocalDateTime.now())
-        ));
-
-        List<ServerSentEvent<String>> events = chatStreamFacade.streamMessage(1L, sessionId, request).collectList().block();
-
-        assertThat(events).extracting(ServerSentEvent::event).containsExactly("message", "done");
-        assertThat(events).extracting(ServerSentEvent::data)
-                .noneMatch(data -> data.contains("아직 없어요") || data.contains(ChatStreamFacade.NO_RECIPE_REPLY));
-        verify(chatReplyGenerator, never()).generateRecommendation(any(), any(), any(), any());
-    }
-
-    @Test
     @DisplayName("AI가 처음부터 추천으로 본 요리 이름이 카드 0장이면 지금처럼 못 찾음 문구를 보낸다 (일반 답으로 돌리지 않는다)")
     void sendsNotFoundReply_whenAiRecommendFindsNoCards() {
         Long sessionId = 10L;
@@ -1039,15 +1013,15 @@ class ChatStreamFacadeTest {
     }
 
     @Test
-    @DisplayName("다시 추천이면 직전 카드(Redis)를 후보에서 빼도록 넘기고, 새 추천은 넘기지 않는다")
-    void passesPreviousCards_whenRefine() {
+    @DisplayName("추천 + 이어짐이면 직전 카드(Redis)를 후보에서 빼도록 넘기고, 새 추천은 넘기지 않는다")
+    void passesPreviousCards_whenRecommendFollows() {
         Long sessionId = 10L;
         ChatMessageCreateRequest request = ChatMessageCreateRequest.of("다른 거 없어?");
         RecipeQuery query = RecipeQuery.of(1L, List.of(21L));
         ChatContext context = new ChatContext(List.of(), LastRecommendation.of(query, List.of(314L, 315L, 316L)),
                 List.of(new CardName(314L, "두부조림"), new CardName(315L, "두부전"), new CardName(316L, "두부국")));
         when(chatContextFacade.load(sessionId)).thenReturn(context);
-        when(chatIntentFacade.resolve(1L, sessionId, request, context)).thenReturn(ChatIntentResolution.refine(Source.AI, query));
+        when(chatIntentFacade.resolve(1L, sessionId, request, context)).thenReturn(ChatIntentResolution.recommendFollowing(Source.AI, query));
         when(chatMessageService.findRecommendedRecipeIds(sessionId)).thenReturn(Set.of(314L, 315L, 316L));
         when(chatRecommendationFacade.recommend(any(), any(), any(), any())).thenThrow(new RuntimeException("stop"));
         when(chatReplyGenerator.generate(1L, sessionId, "다른 거 없어?", List.of())).thenReturn(Flux.just("답"));

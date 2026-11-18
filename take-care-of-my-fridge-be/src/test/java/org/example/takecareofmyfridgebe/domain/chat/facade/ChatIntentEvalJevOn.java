@@ -1,10 +1,9 @@
 package org.example.takecareofmyfridgebe.domain.chat.facade;
 
 import org.example.takecareofmyfridgebe.domain.chat.ai.JevIntentClassifier;
-import org.example.takecareofmyfridgebe.domain.chat.ai.JevIntentShadow;
+import org.example.takecareofmyfridgebe.domain.chat.ai.JevIntentRunner;
 import org.example.takecareofmyfridgebe.domain.chat.ai.OpenAiSimilarDishGenerator;
 import org.example.takecareofmyfridgebe.domain.chat.ai.SimilarDishGenerator;
-import org.example.takecareofmyfridgebe.domain.chat.config.ChatJevProperties;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntentResolution;
 import org.example.takecareofmyfridgebe.domain.chat.dto.DishListKind;
@@ -21,7 +20,7 @@ import org.example.takecareofmyfridgebe.domain.chat.service.SimilarDishStore;
 import org.example.takecareofmyfridgebe.domain.chat.text.ChatTexts;
 import org.example.takecareofmyfridgebe.global.config.TypeSafeConfig;
 import org.example.takecareofmyfridgebe.global.config.TypeSafeProperties;
-import org.example.takecareofmyfridgebe.global.config.TypeSafeShadowExecutor;
+import org.example.takecareofmyfridgebe.global.config.TypeSafeExecutor;
 import org.example.takecareofmyfridgebe.global.config.ai.ChatClientConfig;
 import org.example.takecareofmyfridgebe.infra.typesafe.client.TypeSafeClient;
 import org.springframework.ai.chat.client.ChatClient;
@@ -41,9 +40,9 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * ChatIntentEvalManualTest의 Jev on 모드 (OPENAI_INTENT_EVAL_JEV_MODE=on). 설계: docs/testing/jev-on-design.md 8절
+ * ChatIntentEvalManualTest의 Jev 부분 (의도 판단은 늘 Jev로 정한다). 설계: docs/testing/jev-on-design.md 8절
  * <ul>
- *   <li>실제 JevIntentShadow(on)·JevIntentClassifier(TypeSafe)·JevIntentResolver·OpenAiSimilarDishGenerator(넓은 요청 프롬프트)를 만든다.
+ *   <li>실제 JevIntentRunner·JevIntentClassifier(TypeSafe)·JevIntentResolver·OpenAiSimilarDishGenerator(넓은 요청 프롬프트)를 만든다.
  *       넓은 요청 요리 이름 캐시는 메모리에 둔다(운영 Redis처럼 같은 표현이면 다시 부르지 않는다. 그래서 문장마다 첫 회차만 AI를 부른다)</li>
  *   <li>회차마다 정한 방법(decision), Jev 판단, 쓴 요청 종류·값, 넓은 요청 AI 호출 여부·시간·토큰을 남긴다</li>
  *   <li>기대 kind가 넓은 요청(BROAD)인 문장은 분류·키워드 기대값 대신 "Jev로 정했거나 되돌림에서 넓은 요청 경로를 탔고(OPENAI_LOW_CONFIDENCE_JEV_BROAD)
@@ -53,48 +52,32 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 final class ChatIntentEvalJevOn {
 
-    static final String MODE_ENV = "OPENAI_INTENT_EVAL_JEV_MODE";
-    static final String SKIP_TASTE_STEPS_ENV = "OPENAI_INTENT_EVAL_SKIP_TASTE_STEPS";
-    // 맛 단계 건너뛰기 변형에서 끄는 서비스 규칙 (TasteWordChecker로 AI 맛을 거르는 두 단계)
-    static final List<String> TASTE_STEPS = List.of("keep-other-tastes", "spoken-tastes-only");
     // 넓은 요청 기대값을 대신하는 칸 (분류·키워드 기대값은 비교하지 않는다)
     private static final Set<String> BROAD_REPLACED = Set.of("categories", "keywordsEmpty", "keywordsAny");
     private static final String MODEL = "gpt-4o-mini";
     // Jev 입력 100만 토큰당 비용 (USD, JevIntentEvalManualTest와 같다)
     private static final double JEV_USD_PER_MILLION_INPUT = 0.04;
 
-    private final RecordingJevShadow shadow;
+    private final RecordingJevRunner runner;
     private final RecordingDishGenerator broadGenerator;
     private final JevIntentResolver resolver;
-    private final TypeSafeShadowExecutor executor;
+    private final TypeSafeExecutor executor;
 
-    private ChatIntentEvalJevOn(RecordingJevShadow shadow, RecordingDishGenerator broadGenerator, JevIntentResolver resolver,
-                                TypeSafeShadowExecutor executor) {
-        this.shadow = shadow;
+    private ChatIntentEvalJevOn(RecordingJevRunner runner, RecordingDishGenerator broadGenerator, JevIntentResolver resolver,
+                                TypeSafeExecutor executor) {
+        this.runner = runner;
         this.broadGenerator = broadGenerator;
         this.resolver = resolver;
         this.executor = executor;
     }
 
-    // OPENAI_INTENT_EVAL_JEV_MODE: off(기본) / on. 그 밖의 값이면 오타로 보고 멈춘다
-    static boolean on() {
-        String mode = Optional.ofNullable(System.getenv(MODE_ENV)).map(String::strip).orElse("off").toLowerCase(Locale.ROOT);
-        assertThat(mode).as(MODE_ENV + "는 off 또는 on").isIn("off", "on", "");
-        return mode.equals("on");
-    }
-
-    static boolean skipTasteSteps() {
-        return "true".equalsIgnoreCase(Optional.ofNullable(System.getenv(SKIP_TASTE_STEPS_ENV)).map(String::strip).orElse(""));
-    }
-
     static ChatIntentEvalJevOn create(ChatWordProperties words) {
         String typeSafeKey = System.getenv("TYPESAFE_API_KEY");
-        assertThat(typeSafeKey).as("Jev on 모드에는 TYPESAFE_API_KEY가 필요함").isNotBlank();
+        assertThat(typeSafeKey).as("의도 평가에는 TYPESAFE_API_KEY가 필요함 (없으면 모든 메시지가 OpenAI로 되돌아가 평가 뜻이 없다)").isNotBlank();
         TypeSafeProperties properties = new TypeSafeProperties(null, typeSafeKey, null, null);
         TypeSafeClient client = new TypeSafeClient(new TypeSafeConfig().typeSafeRestClient(properties), properties);
-        TypeSafeShadowExecutor executor = new TypeSafeShadowExecutor(2, 4);
-        RecordingJevShadow shadow = new RecordingJevShadow(new ChatJevProperties(ChatJevProperties.Mode.ON),
-                new JevIntentClassifier(client), client, executor);
+        TypeSafeExecutor executor = new TypeSafeExecutor(2, 4);
+        RecordingJevRunner runner = new RecordingJevRunner(new JevIntentClassifier(client), client, executor);
 
         UsageRecorder broadUsage = new UsageRecorder();
         OpenAiChatModel model = OpenAiChatModel.builder()
@@ -104,11 +87,11 @@ final class ChatIntentEvalJevOn {
         RecordingDishGenerator broadGenerator = new RecordingDishGenerator(new OpenAiSimilarDishGenerator(chatClient, broadUsage,
                 new ClassPathResource("prompts/chat-similar-dishes.txt")), broadUsage);
         JevIntentResolver resolver = new JevIntentResolver(new SimilarDishFinder(new MemoryDishStore(), broadGenerator), words);
-        return new ChatIntentEvalJevOn(shadow, broadGenerator, resolver, executor);
+        return new ChatIntentEvalJevOn(runner, broadGenerator, resolver, executor);
     }
 
-    JevIntentShadow shadow() {
-        return shadow;
+    JevIntentRunner runner() {
+        return runner;
     }
 
     JevIntentResolver resolver() {
@@ -121,8 +104,8 @@ final class ChatIntentEvalJevOn {
 
     // 회차마다 지운다
     void clear() {
-        shadow.judgement = null;
-        shadow.decision = null;
+        runner.judgement = null;
+        runner.decision = null;
         broadGenerator.called = false;
         broadGenerator.ms = 0;
         broadGenerator.input = 0;
@@ -130,8 +113,8 @@ final class ChatIntentEvalJevOn {
     }
 
     Info info() {
-        JevDecision decision = shadow.decision;
-        return new Info(decision == null ? null : decision.decision(), shadow.judgement,
+        JevDecision decision = runner.decision;
+        return new Info(decision == null ? null : decision.decision(), runner.judgement,
                 decision == null ? null : decision.usedKind(), decision == null ? List.of() : decision.usedValues(),
                 decision == null ? null : decision.reason(),
                 broadGenerator.called, broadGenerator.ms, broadGenerator.input, broadGenerator.output);
@@ -199,7 +182,7 @@ final class ChatIntentEvalJevOn {
     }
 
     /**
-     * on 모드 비교: 기대 kind가 BROAD면 분류·키워드 기대값 대신 "Jev로 정했고 쓴 종류 BROAD, 요리 이름 있음"으로 본다.
+     * 비교: 기대 kind가 BROAD면 분류·키워드 기대값 대신 "Jev로 정했고 쓴 종류 BROAD, 요리 이름 있음"으로 본다.
      */
     static List<String> mismatches(Expect expect, Outcome outcome, EvalSet set, Info info) {
         if (!"BROAD".equals(String.valueOf(expect.raw().get("kind")))) {
@@ -221,15 +204,14 @@ final class ChatIntentEvalJevOn {
         return decision == JevDecision.Decision.JEV || decision == JevDecision.Decision.OPENAI_LOW_CONFIDENCE_JEV_BROAD;
     }
 
-    // 정한 방법과 Jev 판단을 남기는 JevIntentShadow (on). 기다리기·비교 로그는 실제 동작 그대로
-    static final class RecordingJevShadow extends JevIntentShadow {
+    // 정한 방법과 Jev 판단을 남기는 JevIntentRunner. 기다리기·결정 로그는 실제 동작 그대로
+    static final class RecordingJevRunner extends JevIntentRunner {
 
         private JevIntentJudgement judgement;
         private JevDecision decision;
 
-        RecordingJevShadow(ChatJevProperties properties, JevIntentClassifier classifier, TypeSafeClient client,
-                           TypeSafeShadowExecutor executor) {
-            super(properties, classifier, client, executor);
+        RecordingJevRunner(JevIntentClassifier classifier, TypeSafeClient client, TypeSafeExecutor executor) {
+            super(classifier, client, executor);
         }
 
         @Override
@@ -240,10 +222,10 @@ final class ChatIntentEvalJevOn {
         }
 
         @Override
-        public void compareWhenDone(Run run, Long memberId, Long sessionId, int messageLength, ChatIntentResolution resolution,
+        public void logWhenDone(Run run, Long memberId, Long sessionId, int messageLength, ChatIntentResolution resolution,
                                     boolean mealkit, JevDecision decision) {
             this.decision = decision;
-            super.compareWhenDone(run, memberId, sessionId, messageLength, resolution, mealkit, decision);
+            super.logWhenDone(run, memberId, sessionId, messageLength, resolution, mealkit, decision);
         }
     }
 
@@ -278,15 +260,13 @@ final class ChatIntentEvalJevOn {
     }
 
     /**
-     * 요약에 더할 on 모드 줄: 정한 방법 분포와 정답률, 요청 종류 일치, 넓은 요청 요리 이름, 지연, 비용.
+     * 요약에 더할 Jev 줄: 정한 방법 분포와 정답률, 요청 종류 일치, 넓은 요청 요리 이름, 지연, 비용.
      */
-    static List<String> summary(List<ChatIntentEvalManualTest.EvalCase> cases, List<ChatIntentEvalManualTest.RunRow> rows,
-                                boolean skipTasteSteps) {
+    static List<String> summary(List<ChatIntentEvalManualTest.EvalCase> cases, List<ChatIntentEvalManualTest.RunRow> rows) {
         List<String> lines = new ArrayList<>();
         List<ChatIntentEvalManualTest.RunRow> judged = rows.stream().filter(row -> row.jev() != null).toList();
         lines.add("");
-        lines.add("[Jev on] " + (skipTasteSteps ? "맛 단계(keep-other-tastes·spoken-tastes-only)도 건너뜀" : "서비스 규칙 단계 모두 거침")
-                + " · 의도 confidence 기준 " + ChatIntentFacade.MIN_JEV_INTENT_CONFIDENCE);
+        lines.add("[Jev] 의도 confidence 기준 " + ChatIntentFacade.MIN_JEV_INTENT_CONFIDENCE);
         Map<String, int[]> byDecision = new LinkedHashMap<>();
         for (JevDecision.Decision decision : JevDecision.Decision.values()) {
             byDecision.put(decision.name(), new int[2]);
@@ -297,12 +277,8 @@ final class ChatIntentEvalJevOn {
             counts[1] += row.pass() ? 1 : 0;
         }
         lines.add(String.format("정한 방법 (Jev를 부른 회차 %d, 단어 차단 제외): 회차 수 · 비율 · 그중 기대와 일치", judged.size()));
-        byDecision.forEach((decision, counts) -> {
-            if (counts[0] > 0 || !decision.equals("SHADOW")) {
-                lines.add(String.format("  %-22s %4d · %5.1f%% · 일치 %d (%.1f%%)", decision, counts[0], percent(counts[0], judged.size()),
-                        counts[1], percent(counts[1], counts[0])));
-            }
-        });
+        byDecision.forEach((decision, counts) -> lines.add(String.format("  %-22s %4d · %5.1f%% · 일치 %d (%.1f%%)", decision,
+                counts[0], percent(counts[0], judged.size()), counts[1], percent(counts[1], counts[0]))));
         List<Boolean> kindMatches = judged.stream().map(row -> row.jev().kindMatch(row.evalCase().expect().raw()))
                 .filter(match -> match != null).toList();
         lines.add(String.format("요청 종류 일치 (Jev로 정한 회차 중 기대 kind가 있는 것, 일치 판단에는 넣지 않음): %d / %d",

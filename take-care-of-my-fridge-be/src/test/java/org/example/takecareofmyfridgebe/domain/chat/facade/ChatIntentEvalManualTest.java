@@ -6,7 +6,6 @@ import com.knuddels.jtokkit.api.EncodingType;
 import com.openai.models.completions.CompletionUsage;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatCandidateProperties;
-import org.example.takecareofmyfridgebe.domain.chat.config.ChatCorrectionProperties;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatSafetyProperties;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext.CardName;
@@ -57,7 +56,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -78,15 +76,12 @@ import static org.mockito.Mockito.when;
  * <p>
  * 기본은 꺼져 있다. 켜는 법 (take-care-of-my-fridge-be 폴더에서):
  * <pre>
- * OPENAI_INTENT_EVAL=true OPENAI_INTENT_EVAL_KEY=sk-... ./gradlew cleanTest test --tests '*ChatIntentEvalManualTest' -i
+ * OPENAI_INTENT_EVAL=true OPENAI_INTENT_EVAL_KEY=sk-... TYPESAFE_API_KEY=... ./gradlew cleanTest test --tests '*ChatIntentEvalManualTest' -i
  * (키는 OPENAI_API_KEY가 아니라 OPENAI_INTENT_EVAL_KEY로 넘긴다. build.gradle의 test 작업이 OPENAI_API_KEY를 가짜 키로 덮어쓴다)
+ * (필수) TYPESAFE_API_KEY  의도는 늘 Jev로 정한다 (ChatIntentEvalJevOn). 없으면 멈춘다
  * (선택) OPENAI_INTENT_EVAL_RUNS=3  문장마다 돌릴 횟수 (다수결, 기본 3)
  * (선택) OPENAI_INTENT_EVAL_ONLY=F10,F11  이 id만 돌린다
- * (선택) OPENAI_INTENT_EVAL_OFF=taste-words,spoken-tastes-only  이 서버 보정을 끄고 돌린다
- *        (이름은 application.yml app.chat.corrections = EvalCorrectionSwitches.NAMES. 안전 단어 차단·알레르기는 끄지 않는다)
  * (선택) OPENAI_INTENT_EVAL_LABEL=B  결과 파일 이름에 붙일 이름 (eval-{시각}-B-summary.txt)
- * (선택) OPENAI_INTENT_EVAL_JEV_MODE=on  Jev on 모드로 정한다 (기본 off). TYPESAFE_API_KEY가 필요하다 (ChatIntentEvalJevOn)
- * (선택) OPENAI_INTENT_EVAL_SKIP_TASTE_STEPS=true  on 모드에서 맛 단계(keep-other-tastes·spoken-tastes-only)도 건너뛴다
  * (선택) OPENAI_INTENT_EVAL_SET=holdout  평가 세트 (main: chat-intent-eval.yml, 기본 / holdout: chat-intent-holdout.yml, 과적합 확인용)
  * </pre>
  * 결과: build/reports/chat-intent-eval/eval-{시각}-runs.csv (한 번 돌린 결과마다 한 줄, AI 원래 값과 최종 값),
@@ -124,33 +119,21 @@ class ChatIntentEvalManualTest {
         assertThat(cases).as("평가 세트").isNotEmpty();
         int runs = Integer.parseInt(Optional.ofNullable(System.getenv("OPENAI_INTENT_EVAL_RUNS")).orElse("3"));
 
-        Set<String> off = EvalCorrectionSwitches.parse(System.getenv("OPENAI_INTENT_EVAL_OFF"));
-        boolean jevOn = ChatIntentEvalJevOn.on();
-        boolean skipTasteSteps = jevOn && ChatIntentEvalJevOn.skipTasteSteps();
-        if (skipTasteSteps) {
-            // on 모드의 서비스 규칙 중 맛 단계 둘을 끈다 (보정 스위치로 끈다. main 코드는 그대로)
-            Set<String> withTasteSteps = new LinkedHashSet<>(off);
-            withTasteSteps.addAll(ChatIntentEvalJevOn.TASTE_STEPS);
-            off = EvalCorrectionSwitches.parse(String.join(",", withTasteSteps));
-        }
-
         UsageRecorder usage = new UsageRecorder();
         RecordingExtractor extractor = new RecordingExtractor(openAiExtractor(usage));
-        ChatIntentEvalJevOn jev = jevOn ? ChatIntentEvalJevOn.create(words) : null;
+        ChatIntentEvalJevOn jev = ChatIntentEvalJevOn.create(words);
         List<RunRow> rows = new ArrayList<>();
         try {
-            ChatIntentFacade facade = facade(set, extractor, EvalCorrectionSwitches.properties(off), jev);
+            ChatIntentFacade facade = facade(set, extractor, jev);
             for (EvalCase evalCase : cases) {
                 for (int run = 1; run <= runs; run++) {
                     rows.add(runOnce(set, facade, extractor, usage, jev, evalCase, run));
                 }
             }
         } finally {
-            if (jev != null) {
-                jev.close();
-            }
+            jev.close();
         }
-        write(set, setResource, cases, rows, runs, off, jevOn, skipTasteSteps);
+        write(set, setResource, cases, rows, runs);
 
         // AI 호출이 실패하면 서버가 일반 답으로 정해 결과가 의미 없으므로, 파일을 남긴 뒤 실패시킨다
         List<RunRow> failed = rows.stream().filter(row -> row.source().startsWith("AI_FAILED")).toList();
@@ -169,9 +152,7 @@ class ChatIntentEvalManualTest {
         extractor.last = null;
         extractor.failure = null;
         usage.clear();
-        if (jev != null) {
-            jev.clear();
-        }
+        jev.clear();
         long startedAt = System.nanoTime();
         Outcome outcome;
         String error = null;
@@ -214,9 +195,8 @@ class ChatIntentEvalManualTest {
                 new ClassPathResource("prompts/chat-intent-followup.txt"));
     }
 
-    // jev가 있으면 on 모드 (실제 Jev·넓은 요청 요리 이름 AI)
-    private ChatIntentFacade facade(EvalSet set, ChatIntentExtractor extractor, ChatCorrectionProperties corrections,
-                                    ChatIntentEvalJevOn jev) {
+    // 실제 Jev·넓은 요청 요리 이름 AI로 정한다
+    private ChatIntentFacade facade(EvalSet set, ChatIntentExtractor extractor, ChatIntentEvalJevOn jev) {
         RecipeService recipeService = mock(RecipeService.class);
         when(recipeService.getClassifications()).thenReturn(new RecipeClassificationResponse(List.of("한식"), set.categories()));
         when(recipeService.suggestNames(anyString(), anyInt())).thenAnswer(invocation -> {
@@ -234,18 +214,12 @@ class ChatIntentEvalManualTest {
         AllergyExclusionFinder allergyExclusionFinder = mock(AllergyExclusionFinder.class);
         when(allergyExclusionFinder.find(any(), any()))
                 .thenReturn(AllergyExclusionFinder.Allergens.NONE);
-        IntentCorrector corrector = new IntentCorrector(recipeService, ingredientMatcher, mock(ChatMessageService.class),
-                words, corrections);
-        if (jev != null) {
-            return new ChatIntentFacade(extractor, recipeService, ingredientMatcher, candidateProperties, words,
-                    allergyExclusionFinder, corrections, corrector, jev.shadow(), jev.resolver());
-        }
+        IntentCorrector corrector = new IntentCorrector(recipeService, ingredientMatcher, mock(ChatMessageService.class), words);
         return new ChatIntentFacade(extractor, recipeService, ingredientMatcher, candidateProperties, words,
-                allergyExclusionFinder, corrections, corrector);
+                allergyExclusionFinder, corrector, jev.runner(), jev.resolver());
     }
 
-    private void write(EvalSet set, String setResource, List<EvalCase> cases, List<RunRow> rows, int runs, Set<String> off, boolean jevOn,
-                       boolean skipTasteSteps) throws IOException {
+    private void write(EvalSet set, String setResource, List<EvalCase> cases, List<RunRow> rows, int runs) throws IOException {
         Files.createDirectories(OUT_DIR);
         String label = Optional.ofNullable(System.getenv("OPENAI_INTENT_EVAL_LABEL")).map(String::strip)
                 .filter(value -> !value.isEmpty()).map(value -> value.replaceAll("[^A-Za-z0-9_-]", "_")).orElse(null);
@@ -259,11 +233,9 @@ class ChatIntentEvalManualTest {
                 "aiIntent", "aiWanted", "aiAvoid", "aiCategories", "aiKeywords", "aiDish", "aiPreference", "aiMaxMinutes",
                 "aiInclude", "aiExclude", "aiUseSelectedOnly", "aiScope", "aiTargetIndex", "aiTargetName", "aiRemoved",
                 "aiQuestion", "inputTokens", "cachedTokens", "outputTokens", "ms"));
-        if (jevOn) {
-            header.addAll(ChatIntentEvalJevOn.Info.HEADER);
-        }
+        header.addAll(ChatIntentEvalJevOn.Info.HEADER);
         runLines.add(String.join(",", header));
-        rows.forEach(row -> runLines.add(row.line(jevOn)));
+        rows.forEach(row -> runLines.add(row.line()));
 
         List<String> caseLines = new ArrayList<>();
         caseLines.add(String.join(",", "id", "group", "context", "message", "passRuns", "runs", "pass", "mismatches", "expect"));
@@ -291,7 +263,7 @@ class ChatIntentEvalManualTest {
         List<RunRow> aiRows = rows.stream().filter(row -> row.inputTokens() > 0).toList();
         List<String> summary = new ArrayList<>();
         // 맨 위: 이번에 끈 서버 보정 (A~E 비교용)
-        summary.add(EvalCorrectionSwitches.describe(off) + (label == null ? "" : " · 이름 " + label) + (jevOn ? " · Jev on" : "")
+        summary.add("의도: Jev (되돌림·서비스 규칙)" + (label == null ? "" : " · 이름 " + label)
                 + (EvalSet.MAIN_SET.equals(setResource) ? "" : " · 세트 " + setResource));
         summary.add("AI 상담 의도 평가 " + stamp + " · 모델 " + MODEL + " · 문장 " + cases.size() + "개 × " + runs + "번 (다수결)");
         summary.add(promptSize(set));
@@ -309,9 +281,7 @@ class ChatIntentEvalManualTest {
                 aiRows.stream().mapToLong(RunRow::outputTokens).average().orElse(0),
                 aiRows.stream().mapToLong(RunRow::ms).average().orElse(0),
                 aiRows.stream().mapToLong(RunRow::ms).max().orElse(0)));
-        if (jevOn) {
-            summary.addAll(ChatIntentEvalJevOn.summary(cases, rows, skipTasteSteps));
-        }
+        summary.addAll(ChatIntentEvalJevOn.summary(cases, rows));
         summary.add("틀린 문장:");
         summary.addAll(failedLines);
 
@@ -355,8 +325,8 @@ class ChatIntentEvalManualTest {
             return mismatches.isEmpty();
         }
 
-        // withJev면 Jev on 모드 칸(ChatIntentEvalJevOn.Info.HEADER)을 뒤에 붙인다 (단어 차단 줄은 빈 칸)
-        String line(boolean withJev) {
+        // Jev 칸(ChatIntentEvalJevOn.Info.HEADER)을 뒤에 붙인다 (단어 차단 줄은 빈 칸)
+        String line() {
             List<String> cells = new ArrayList<>(List.of(csv(evalCase.id()), csv(evalCase.group()), csv(evalCase.context()),
                     csv(evalCase.message()), String.valueOf(run), String.valueOf(pass()), csv(String.join(" | ", mismatches)),
                     csv(source)));
@@ -366,7 +336,7 @@ class ChatIntentEvalManualTest {
                     cells.add("");
                 }
             } else {
-                cells.addAll(List.of(csv(ai.intent()), csv(ai.wantedTastes()), csv(ai.avoidTastes()), csv(ai.moodCategories()),
+                cells.addAll(List.of(csv(intentLabel(ai.intent(), Boolean.TRUE.equals(ai.followsPrevious()))), csv(ai.wantedTastes()), csv(ai.avoidTastes()), csv(ai.moodCategories()),
                         csv(ai.keywords()), csv(ai.dishText()), csv(ai.preferenceText()), csv(ai.maxMinutes()),
                         csv(ai.includeIngredients()), csv(ai.excludeIngredients()), csv(ai.useSelectedOnly()),
                         csv(ai.fridgeScope()), csv(ai.targetIndex()), csv(ai.targetName()), csv(ai.removed()),
@@ -374,34 +344,69 @@ class ChatIntentEvalManualTest {
             }
             cells.addAll(List.of(String.valueOf(inputTokens), String.valueOf(cachedTokens), String.valueOf(outputTokens),
                     String.valueOf(ms)));
-            if (withJev) {
-                if (jev == null) {
-                    ChatIntentEvalJevOn.Info.HEADER.forEach(name -> cells.add(""));
-                } else {
-                    cells.addAll(jev.cells(evalCase.expect().raw()));
-                }
+            if (jev == null) {
+                ChatIntentEvalJevOn.Info.HEADER.forEach(name -> cells.add(""));
+            } else {
+                cells.addAll(jev.cells(evalCase.expect().raw()));
             }
             return String.join(",", cells);
         }
     }
 
+    // 의도 칸에서 추천 + 이어짐을 나타내는 끝말 ("RECOMMEND+FOLLOWS", 예전 REFINE과 같은 뜻)
+    static final String FOLLOWS_SUFFIX = "+FOLLOWS";
+    // 예전 기록(평가 CSV·리플레이 입력)의 다시 추천 의도 이름. 추천 + 이어짐으로 읽는다
+    private static final String LEGACY_REFINE = "REFINE";
+
+    // 의도 칸 글: 추천 + 이어짐이면 RECOMMEND+FOLLOWS, 그 밖은 의도 이름 (이어짐은 추천일 때만 붙는다)
+    static String intentLabel(ChatIntent intent, boolean follows) {
+        return intent == null ? null : intent.name() + (follows ? FOLLOWS_SUFFIX : "");
+    }
+
+    // 의도 칸 글의 의도. 예전 기록의 REFINE은 RECOMMEND다
+    static ChatIntent intentOf(String label) {
+        String name = label.endsWith(FOLLOWS_SUFFIX) ? label.substring(0, label.length() - FOLLOWS_SUFFIX.length()) : label;
+        return LEGACY_REFINE.equals(name) ? ChatIntent.RECOMMEND : ChatIntent.valueOf(name);
+    }
+
+    // 의도 칸 글의 이어짐. 예전 기록의 REFINE은 이어짐 예다
+    static boolean followsOf(String label) {
+        return label.endsWith(FOLLOWS_SUFFIX) || LEGACY_REFINE.equals(label);
+    }
+
+    /**
+     * 의도 일치: 의도와 이어짐이 둘 다 맞는지. 기대 이어짐(follows)을 적지 않았으면 아니오를 기대한다
+     * (예전 기대 의도 RECOMMEND는 다시 추천이 아닌 추천이었으므로 예전 점수와 바로 비교된다).
+     */
+    static boolean intentMatches(Map<String, Object> expect, ChatIntent intent, boolean follows) {
+        return Expect.strings(expect.get("intent")).contains(intent.name())
+                && follows == Boolean.TRUE.equals(expect.get("follows"));
+    }
+
+    // 기대 의도 글 (이어짐 예를 기대하면 +FOLLOWS)
+    static String expectedIntentLabel(Map<String, Object> expect) {
+        return expect.get("intent") + (Boolean.TRUE.equals(expect.get("follows")) ? FOLLOWS_SUFFIX : "");
+    }
+
     /**
      * 비교할 최종 값. 재료는 ID 대신 평가 세트 사전의 이름으로 바꿔 둔다.
+     *
+     * @param follows 이어짐 (직전 조건을 이어받은 추천인지)
      */
-    record Outcome(ChatIntent intent, Set<String> wanted, Set<String> avoid, Set<String> categories, List<String> keywords,
+    record Outcome(ChatIntent intent, boolean follows, Set<String> wanted, Set<String> avoid, Set<String> categories, List<String> keywords,
                    String dish, String preference, Integer maxMinutes, Set<String> include, Set<String> exclude,
                    Boolean useSelectedOnly, String scope, Set<String> names, Boolean saleOnly, String productType,
                    Long target, String question) {
 
         static Outcome blocked(ChatIntent intent) {
-            return new Outcome(intent, Set.of(), Set.of(), Set.of(), List.of(), null, null, null, Set.of(), Set.of(),
+            return new Outcome(intent, false, Set.of(), Set.of(), Set.of(), List.of(), null, null, null, Set.of(), Set.of(),
                     null, null, Set.of(), null, null, null, null);
         }
 
         static Outcome of(ChatIntentResolution resolution, EvalSet set) {
             RecipeQuery query = resolution.recipeQuery();
             var lookup = resolution.lookup();
-            return new Outcome(resolution.intent(),
+            return new Outcome(resolution.intent(), resolution.follows(),
                     query == null ? Set.of() : names(query.wantedTastes()),
                     query == null ? Set.of() : names(query.avoidTastes()),
                     query == null ? Set.of() : Set.copyOf(query.moodCategories()),
@@ -425,7 +430,7 @@ class ChatIntentEvalManualTest {
         }
 
         List<String> cells() {
-            return List.of(csv(intent), csv(wanted), csv(avoid), csv(categories), csv(keywords), csv(dish), csv(preference),
+            return List.of(csv(intentLabel(intent, follows)), csv(wanted), csv(avoid), csv(categories), csv(keywords), csv(dish), csv(preference),
                     csv(maxMinutes), csv(include), csv(exclude), csv(useSelectedOnly), csv(scope), csv(names), csv(saleOnly),
                     csv(productType), csv(target), csv(question));
         }
@@ -450,8 +455,10 @@ class ChatIntentEvalManualTest {
 
         private Optional<String> check(String field, Object expected, Outcome actual) {
             return switch (field) {
-                case "intent" -> strings(expected).contains(actual.intent().name())
-                        ? Optional.empty() : diff(field, expected, actual.intent());
+                case "intent" -> intentMatches(raw, actual.intent(), actual.follows())
+                        ? Optional.empty() : diff(field, expectedIntentLabel(raw), intentLabel(actual.intent(), actual.follows()));
+                // 이어짐은 의도와 함께 본다 (intent)
+                case "follows" -> Optional.empty();
                 case "wanted" -> sameSet(field, expected, actual.wanted());
                 case "avoid" -> sameSet(field, expected, actual.avoid());
                 case "categories" -> sameSet(field, expected, actual.categories());
@@ -499,7 +506,7 @@ class ChatIntentEvalManualTest {
             return Optional.of(field + ": 기대 " + expected + ", 실제 " + actual);
         }
 
-        private static List<String> strings(Object value) {
+        static List<String> strings(Object value) {
             if (value instanceof Collection<?> values) {
                 return values.stream().map(String::valueOf).toList();
             }

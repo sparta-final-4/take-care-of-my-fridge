@@ -1,7 +1,7 @@
 package org.example.takecareofmyfridgebe.domain.chat.dto;
 
 /**
- * 다시 추천(REFINE)에서 빼라고 한 조건 종류. 의도 JSON의 removed 칸 값이다 ("매운 거 말고" → TASTE).
+ * 이어짐(직전 조건을 이어받는 추천)에서 빼라고 한 조건 종류. 의도 JSON의 removed 칸 값이다 ("매운 거 말고" → TASTE).
  * 빼라고 한 조건은 직전 값을 지우고 이번 말의 값만 쓴다.
  */
 public enum RefineCondition {

@@ -7,14 +7,16 @@ import java.util.List;
 /**
  * 상담 메시지를 어떻게 처리할지 정한 결과.
  *
- * @param intent         RECOMMEND·REFINE이면 recipeQuery로 후보를 찾고, RECIPE_DETAIL이면 targetRecipeId 레시피를 자세히 답하고,
+ * @param intent         RECOMMEND면 recipeQuery로 후보를 찾고, RECIPE_DETAIL이면 targetRecipeId 레시피를 자세히 답하고,
  *                       FRIDGE면 lookup으로 냉장고를, SHOP이면 살 상품을 보여 주고, GENERAL이면 일반 답을 한다. OFF_TOPIC·BLOCKED·SELF_HARM이면 답 생성 AI 없이 서버 안내로 답한다(declines)
  * @param source         의도를 정한 방법
- * @param recipeQuery    추천 조건 (REFINE이면 직전 조건과 합친 것). RECOMMEND·REFINE이 아니면 null
+ * @param recipeQuery    추천 조건 (이어짐이면 직전 조건과 합친 것). RECOMMEND가 아니면 null
  * @param targetRecipeId RECIPE_DETAIL일 때 물어본 레시피 ID. 그 밖에는 null
  * @param detailQuestion RECIPE_DETAIL일 때 질문 종류 (모르면 null, OTHER처럼 다룬다). 그 밖에는 null
  * @param allergens      이 상담에서 사용자가 말한 알레르기·못 먹는 재료 이름 (추천이면 그 재료를 recipeQuery의 뺄 재료에 더했다). 없으면 빈 목록
  * @param lookup         FRIDGE·SHOP일 때 볼 범위와 말한 재료·상품 이름. 그 밖에는 null
+ * @param follows        이어짐: 직전 추천의 조건을 이어받아 일부만 바꾼 추천인지 (직전 조건과 합쳤고, 후보에서 직전 카드를 뺀다).
+ *                       직전 추천(Redis 직전 조건)이 없으면 늘 false
  */
 public record ChatIntentResolution(
         ChatIntent intent,
@@ -23,7 +25,8 @@ public record ChatIntentResolution(
         Long targetRecipeId,
         DetailQuestion detailQuestion,
         List<String> allergens,
-        ItemLookup lookup
+        ItemLookup lookup,
+        boolean follows
 ) {
 
     public ChatIntentResolution {
@@ -32,7 +35,7 @@ public record ChatIntentResolution(
 
     public ChatIntentResolution(ChatIntent intent, Source source, RecipeQuery recipeQuery, Long targetRecipeId,
                                 DetailQuestion detailQuestion) {
-        this(intent, source, recipeQuery, targetRecipeId, detailQuestion, List.of(), null);
+        this(intent, source, recipeQuery, targetRecipeId, detailQuestion, List.of(), null, false);
     }
 
     /**
@@ -55,11 +58,11 @@ public record ChatIntentResolution(
     }
 
     public static ChatIntentResolution fridge(Source source, ItemLookup lookup) {
-        return new ChatIntentResolution(ChatIntent.FRIDGE, source, null, null, null, List.of(), lookup);
+        return new ChatIntentResolution(ChatIntent.FRIDGE, source, null, null, null, List.of(), lookup, false);
     }
 
     public static ChatIntentResolution shop(Source source, ItemLookup lookup) {
-        return new ChatIntentResolution(ChatIntent.SHOP, source, null, null, null, List.of(), lookup);
+        return new ChatIntentResolution(ChatIntent.SHOP, source, null, null, null, List.of(), lookup, false);
     }
 
     public enum Source {
@@ -67,9 +70,6 @@ public record ChatIntentResolution(
         MODE,
         // AI가 판단
         AI,
-        // AI는 일반 답(GENERAL)으로 봤지만 요리 이름이 있고 묻는 말이 없어 추천을 시도함 (IntentCorrector.tryDish).
-        // 카드가 0장이면 "찾지 못했어요" 대신 일반 답으로 돌린다 (ChatStreamFacade). 사용자가 추천을 원했는지 확실하지 않아서다
-        DISH_TRY,
         // AI 판단이 실패해 선택 재료 유무로 정함 (있으면 추천, 없으면 일반)
         FALLBACK
     }
@@ -82,8 +82,9 @@ public record ChatIntentResolution(
         return new ChatIntentResolution(ChatIntent.RECOMMEND, source, recipeQuery, null, null);
     }
 
-    public static ChatIntentResolution refine(Source source, RecipeQuery recipeQuery) {
-        return new ChatIntentResolution(ChatIntent.REFINE, source, recipeQuery, null, null);
+    // 직전 추천의 조건을 이어받는 추천 (recipeQuery는 직전 조건과 합친 것)
+    public static ChatIntentResolution recommendFollowing(Source source, RecipeQuery recipeQuery) {
+        return new ChatIntentResolution(ChatIntent.RECOMMEND, source, recipeQuery, null, null, List.of(), null, true);
     }
 
     public static ChatIntentResolution recipeDetail(Source source, Long recipeId) {
@@ -107,11 +108,11 @@ public record ChatIntentResolution(
     // 알레르기 재료를 뺄 재료에 더한 결과 (추천이 아니면 이름만 둔다)
     public ChatIntentResolution withAllergens(List<String> names, List<Long> ingredientIds) {
         RecipeQuery query = recipeQuery == null ? null : recipeQuery.withExcludedIngredients(ingredientIds);
-        return new ChatIntentResolution(intent, source, query, targetRecipeId, detailQuestion, names, lookup);
+        return new ChatIntentResolution(intent, source, query, targetRecipeId, detailQuestion, names, lookup, follows);
     }
 
-    // 후보를 찾아 카드로 추천하는지 (새 추천·다시 추천)
+    // 후보를 찾아 카드로 추천하는지 (새 추천·이어짐)
     public boolean recommends() {
-        return (intent == ChatIntent.RECOMMEND || intent == ChatIntent.REFINE) && recipeQuery != null;
+        return intent == ChatIntent.RECOMMEND && recipeQuery != null;
     }
 }

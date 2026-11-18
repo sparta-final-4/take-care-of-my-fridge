@@ -145,7 +145,7 @@ SSE 이벤트
 
 | 의도 | 이벤트 순서 | 자세한 동작 |
 |---|---|---|
-| 추천(`RECOMMEND`, 추천 칩), 다시 추천(`REFINE`) | `recommendations` → `message`(소개) → `recommendation_text`(카드별) → `done` | [이어지는 말](../architecture/domains/chat.md#이어지는-말), [추천 카드](../architecture/domains/chat.md#추천-카드) |
+| 추천(`RECOMMEND`, 추천 칩, 이어짐 포함) | `recommendations` → `message`(소개) → `recommendation_text`(카드별) → `done` | [이어지는 말](../architecture/domains/chat.md#이어지는-말), [추천 카드](../architecture/domains/chat.md#추천-카드) |
 | 추천 후보 없음 | `recommendations`(`empty=true`) → `message`(서버 문장) → `done` | [추천 카드](../architecture/domains/chat.md#추천-카드) |
 | 밀키트만 | `recommendations`(`mealkits`만) → `message`(서버 문장 하나) → `done` | [밀키트 카드](../architecture/domains/chat.md#밀키트-카드) |
 | 일반(`GENERAL`) | `message` 조각 → `done` | [의도 판단](../architecture/domains/chat.md#의도-판단) |

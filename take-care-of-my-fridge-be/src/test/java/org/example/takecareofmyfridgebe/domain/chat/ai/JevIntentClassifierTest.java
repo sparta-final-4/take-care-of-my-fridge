@@ -59,11 +59,20 @@ class JevIntentClassifierTest {
     private static final JsonMapper JSON = JsonMapper.builder().build();
 
     @Test
-    @DisplayName("직전 추천이 있고 추천인데 이어짐 확률이 기준 0.45 이상이면 다시 추천(REFINE), 미만이면 새 추천이다")
-    void returnsRefine_whenFollowsPreviousAtThreshold() {
+    @DisplayName("추천인데 이어짐 확률이 기준 0.45 이상이면 이어짐 예, 미만이거나 묻지 않았거나 추천이 아니면 아니오이고 의도는 추천 그대로다")
+    void followsPrevious_whenFollowsPreviousAtThreshold() {
         assertThat(JevIntentClassifier.MIN_FOLLOWS_PREVIOUS).isEqualTo(0.45);
-        assertThat(JevIntentClassifier.serviceIntent(ChatIntent.RECOMMEND, true, 0.45)).isEqualTo(ChatIntent.REFINE);
-        assertThat(JevIntentClassifier.serviceIntent(ChatIntent.RECOMMEND, true, 0.44)).isEqualTo(ChatIntent.RECOMMEND);
+        assertThat(JevIntentClassifier.serviceIntent(ChatIntent.RECOMMEND, true)).isEqualTo(ChatIntent.RECOMMEND);
+        assertThat(JevIntentClassifier.follows(first(ChatIntent.RECOMMEND, 0.45))).isTrue();
+        assertThat(JevIntentClassifier.follows(first(ChatIntent.RECOMMEND, 0.44))).isFalse();
+        assertThat(JevIntentClassifier.follows(first(ChatIntent.RECOMMEND, null))).isFalse();
+        assertThat(JevIntentClassifier.follows(first(ChatIntent.GENERAL, 0.9))).isFalse();
+    }
+
+    // 의도와 이어짐 확률만 정한 1차 답
+    private static JevIntentJudgement.First first(ChatIntent intent, Double followsPrevious) {
+        return new JevIntentJudgement.First(intent, intent, 0.9, Map.of(intent, 0.9), followsPrevious, 0.05, FridgeScope.ALL, 0.9,
+                new JevIntentJudgement.Call(MODEL, "req_first", 100L, 400));
     }
 
     private static final List<String> CATEGORIES = List.of(
@@ -182,10 +191,9 @@ class JevIntentClassifierTest {
         JevIntentJudgement.First first = judgement.first();
         assertThat(first.intent()).isEqualTo(ChatIntent.RECOMMEND);
         assertThat(first.intentConfidence()).isEqualTo(1.0);
-        // 이어서 다시는 의도 선택지가 아니라(이어짐은 따로 묻는다) 확률에 없다
+        // 이어짐은 의도 선택지가 아니라 따로 묻는다
         assertThat(first.intentProbabilities()).hasSize(8)
-                .containsEntry(ChatIntent.RECOMMEND, 1.0)
-                .doesNotContainKey(ChatIntent.REFINE);
+                .containsEntry(ChatIntent.RECOMMEND, 1.0);
         assertThat(first.followsPrevious()).isNull();
         assertThat(first.asksQuestion()).isEqualTo(0.09);
         assertThat(first.fridgeScope()).isEqualTo(FridgeScope.ALL);
@@ -223,8 +231,8 @@ class JevIntentClassifierTest {
     }
 
     @Test
-    @DisplayName("직전 추천이 있으면 이번 메시지를 붙인 state로 레시피 자세히가 있는 의도 선택지와 이어짐 질문을 보내고, 추천 + 이어짐 0.8이면 REFINE으로 넘기고 2차도 부른다")
-    void passesRefineAndCallsSecond_whenRecommendFollowsPrevious() {
+    @DisplayName("직전 추천이 있으면 이번 메시지를 붙인 state로 레시피 자세히가 있는 의도 선택지와 이어짐 질문을 보내고, 추천 + 이어짐 0.8이면 추천·이어짐 예로 넘기고 2차도 부른다")
+    void passesFollowsAndCallsSecond_whenRecommendFollowsPrevious() {
         JevIntentClassifier classifier = classifier(withKey());
         expectCall(firstResponse(RECOMMEND_ANSWER, 0.8), "req_first");
         expectCall(SECOND, "req_second");
@@ -233,7 +241,8 @@ class JevIntentClassifierTest {
         JevIntentJudgement judgement = classifier.classify("좀 더 매운 걸로", CATEGORIES, followUp).orElseThrow();
 
         server.verify();
-        assertThat(judgement.first().intent()).isEqualTo(ChatIntent.REFINE);
+        assertThat(judgement.first().intent()).isEqualTo(ChatIntent.RECOMMEND);
+        assertThat(JevIntentClassifier.follows(judgement.first())).isTrue();
         assertThat(judgement.first().answeredIntent()).isEqualTo(ChatIntent.RECOMMEND);
         assertThat(judgement.first().intentConfidence()).isEqualTo(0.9);
         assertThat(judgement.first().followsPrevious()).isEqualTo(0.8);
@@ -253,7 +262,7 @@ class JevIntentClassifierTest {
     }
 
     @Test
-    @DisplayName("직전 추천이 있어도 추천 + 이어짐 0.3이면 새 추천(RECOMMEND)으로 두고 2차를 부른다")
+    @DisplayName("직전 추천이 있어도 추천 + 이어짐 0.3이면 이어짐 아니오(새 추천)로 두고 2차를 부른다")
     void keepsRecommendAndCallsSecond_whenRecommendDoesNotFollowPrevious() {
         JevIntentClassifier classifier = classifier(withKey());
         expectCall(firstResponse(RECOMMEND_ANSWER, 0.3), "req_first");
@@ -264,6 +273,7 @@ class JevIntentClassifierTest {
         server.verify();
         assertThat(judgement.first().intent()).isEqualTo(ChatIntent.RECOMMEND);
         assertThat(judgement.first().followsPrevious()).isEqualTo(0.3);
+        assertThat(JevIntentClassifier.follows(judgement.first())).isFalse();
         assertThat(judgement.hasSecond()).isTrue();
     }
 

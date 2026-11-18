@@ -3,6 +3,8 @@
 #
 # expect에 적은 칸만 비교한다 (안 적은 칸은 보지 않는다).
 #   intent          의도 하나 또는 목록(그중 하나면 맞음). 단어 차단에 걸리면 SELF_HARM(자해)·BLOCKED(금지어·탈취)로 본다
+#   follows         이어짐(직전 조건을 이어받아 일부만 바꾸는 추천)이면 true. 적지 않으면 false를 기대한다.
+#                   의도 일치는 의도와 이어짐이 둘 다 맞아야 한다 (2026-11-17 d2: 예전 기대 의도 REFINE을 RECOMMEND + follows: true로 바꿈)
 #   wanted / avoid  원하는 맛·피할 맛 (순서 상관없이 같은 집합)
 #   categories      분류 (같은 집합)
 #   kind            요청 종류 (Jev 평가만 본다): DISH 특정 요리 / CATEGORY 특정 분류 / BROAD 넓은 요청 / NONE 없음.
@@ -206,21 +208,21 @@ cases:
   - { id: P11, group: 사기아님, message: "두부 사서 만들 요리 추천해줘", expect: { kind: NONE, intent: RECOMMEND } }
 
   # ── 이어지는 말 ──
-  - { id: U01, group: 후속, context: jjigae, message: "좀 더 매운 걸로", expect: { kind: NONE, intent: REFINE, wanted: [SPICY], avoid: [], categories: [찌개] } }
-  - { id: U02, group: 후속, context: jjigae, message: "다른 거 없어?", expect: { kind: NONE, intent: REFINE, categories: [찌개] } }
-  - { id: U03, group: 후속, context: jjigae, message: "국물 말고 볶음으로", expect: { kind: CATEGORY, intent: REFINE, categories: [볶음] } }
-  - { id: U04, group: 후속, context: jjigae, message: "매운 거 말고", expect: { kind: NONE, intent: REFINE, wanted: [], avoid: [SPICY] } }
-  - { id: U05, group: 후속, context: jjigae, message: "시간 상관없이", expect: { kind: NONE, intent: REFINE, maxMinutes: none, categories: [찌개] } }
+  - { id: U01, group: 후속, context: jjigae, message: "좀 더 매운 걸로", expect: { kind: NONE, intent: RECOMMEND, follows: true, wanted: [SPICY], avoid: [], categories: [찌개] } }
+  - { id: U02, group: 후속, context: jjigae, message: "다른 거 없어?", expect: { kind: NONE, intent: RECOMMEND, follows: true, categories: [찌개] } }
+  - { id: U03, group: 후속, context: jjigae, message: "국물 말고 볶음으로", expect: { kind: CATEGORY, intent: RECOMMEND, follows: true, categories: [볶음] } }
+  - { id: U04, group: 후속, context: jjigae, message: "매운 거 말고", expect: { kind: NONE, intent: RECOMMEND, follows: true, wanted: [], avoid: [SPICY] } }
+  - { id: U05, group: 후속, context: jjigae, message: "시간 상관없이", expect: { kind: NONE, intent: RECOMMEND, follows: true, maxMinutes: none, categories: [찌개] } }
   - { id: U06, group: 후속, context: jjigae, message: "두 번째 거 어떻게 만들어?", expect: { intent: RECIPE_DETAIL, target: 102, question: HOW_TO } }
   - { id: U07, group: 후속, context: jjigae, message: "아까 그 순두부찌개 시간 얼마나 걸려?", expect: { intent: RECIPE_DETAIL, target: 103, question: TIME } }
   - { id: U08, group: 후속, context: single, message: "그거 재료 뭐 들어가?", expect: { intent: RECIPE_DETAIL, target: 401, question: INGREDIENTS } }
   - { id: U09, group: 후속, context: jjigae, message: "디저트도 추천해줘", expect: { kind: CATEGORY, intent: RECOMMEND, categories: [디저트], wanted: [] } }
   - { id: U10, group: 후속, context: jjigae, message: "냉장고에 두부 남았어?", expect: { intent: FRIDGE, names: [두부] } }
   - { id: U11, group: 후속, context: jjigae, message: "고마워", expect: { intent: GENERAL } }
-  - { id: U12, group: 후속, context: jjigae, message: "김치찌개 말고 다른 찌개", expect: { kind: CATEGORY, intent: REFINE, categories: [찌개] } }
-  - { id: U13, group: 후속, context: dessert, message: "다른 디저트", expect: { kind: CATEGORY, intent: REFINE, categories: [디저트] } }
-  - { id: U14, group: 후속, context: dessert, message: "디저트 말고 국", expect: { kind: CATEGORY, intent: REFINE, categories: [국] } }
-  - { id: U15, group: 후속, context: dessert, message: "매운 거 말고", expect: { kind: NONE, intent: REFINE, categories: [디저트], avoid: [SPICY] } }
+  - { id: U12, group: 후속, context: jjigae, message: "김치찌개 말고 다른 찌개", expect: { kind: CATEGORY, intent: RECOMMEND, follows: true, categories: [찌개] } }
+  - { id: U13, group: 후속, context: dessert, message: "다른 디저트", expect: { kind: CATEGORY, intent: RECOMMEND, follows: true, categories: [디저트] } }
+  - { id: U14, group: 후속, context: dessert, message: "디저트 말고 국", expect: { kind: CATEGORY, intent: RECOMMEND, follows: true, categories: [국] } }
+  - { id: U15, group: 후속, context: dessert, message: "매운 거 말고", expect: { kind: NONE, intent: RECOMMEND, follows: true, categories: [디저트], avoid: [SPICY] } }
   - { id: U16, group: 후속, context: kimpi, message: "디저트 추천해줘", expect: { kind: CATEGORY, intent: RECOMMEND, categories: [디저트], keywordsEmpty: true } }
-  - { id: U17, group: 후속, context: kimpi, message: "매운 건 빼줘", expect: { kind: NONE, intent: REFINE, wanted: [], avoid: [SPICY], keywordsFirst: 김피탕 } }
-  - { id: U18, group: 후속, context: salty, message: "매운 건 빼줘", expect: { kind: NONE, intent: REFINE, wanted: [SALTY], avoid: [SPICY], categories: [조림] } }
+  - { id: U17, group: 후속, context: kimpi, message: "매운 건 빼줘", expect: { kind: NONE, intent: RECOMMEND, follows: true, wanted: [], avoid: [SPICY], keywordsFirst: 김피탕 } }
+  - { id: U18, group: 후속, context: salty, message: "매운 건 빼줘", expect: { kind: NONE, intent: RECOMMEND, follows: true, wanted: [SALTY], avoid: [SPICY], categories: [조림] } }

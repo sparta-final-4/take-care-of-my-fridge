@@ -127,12 +127,15 @@ class ChatIntentPromptTest {
     }
 
     @Test
-    @DisplayName("첫 질문용 고정 프롬프트에는 이어지는 말 규칙이 없고, 이어지는 말 규칙은 따로 다시 추천·레시피 자세히·대상 칸을 지시한다")
+    @DisplayName("첫 질문용 고정 프롬프트에는 이어짐 칸 한 줄만 있고, 이어지는 말 규칙은 따로 이어짐·레시피 자세히·대상 칸을 지시하며 REFINE은 없다")
     void keepsFollowUpRulesSeparate() throws IOException {
         String followUp = new ClassPathResource("prompts/chat-intent-followup.txt").getContentAsString(StandardCharsets.UTF_8);
 
-        assertThat(prompt).doesNotContain("REFINE", "RECIPE_DETAIL", "[직전 추천]");
-        assertThat(followUp).contains("REFINE: 직전 추천을 바꿔 달라는 말(\"다른\", \"또\", \"말고 다른\")",
+        assertThat(prompt).doesNotContain("REFINE", "RECIPE_DETAIL");
+        assertThat(prompt).contains("- followsPrevious: RECOMMEND이고 [직전 추천]의 조건(맛, 재료, 종류)을 이어받으면서 일부만 바꿔 달라는 말이면 true, 그 밖은 false");
+        assertThat(followUp).doesNotContain("REFINE");
+        assertThat(followUp).contains("- followsPrevious true(이어짐): RECOMMEND이고 [직전 추천]의 조건(맛, 재료, 종류)을 이어받으면서 일부만 바꿔 달라는 말.",
+                "직전 추천을 보고 조건을 더하거나 빼거나 바꿔 달라는 말이면 true다. 직전 추천에 덧붙여 말했어도 직전 조건과 상관없이 새로 요리를 정해 달라는 말이면 false다.",
                 "조건 칸에는 [직전 조건]에 이번 말을 반영한 최종 조건을 쓴다(바꾸라고 하지 않은 조건은 그대로",
                 "RECIPE_DETAIL: 이 상담에서 추천한 레시피 하나",
                 "\"아까 그 ○○\"처럼 앞서 추천받은 이름을 말해도 RECIPE_DETAIL이다",
@@ -144,27 +147,27 @@ class ChatIntentPromptTest {
     }
 
     @Test
-    @DisplayName("후속 규칙은 맛·시간·재료만 말한 짧은 말을 다시 추천으로 보고 앞 분류를 잇는다고 한 줄로 정한다 (디저트 → 매운 거 말고)")
+    @DisplayName("후속 규칙은 맛·시간·재료만 말한 짧은 말을 이어짐으로 보고 앞 분류를 잇는다고 한 줄로 정한다 (디저트 → 매운 거 말고)")
     void keepsPreviousCategory_whenOnlyConditionSpoken() throws IOException {
         String followUp = new ClassPathResource("prompts/chat-intent-followup.txt").getContentAsString(StandardCharsets.UTF_8);
 
-        assertThat(followUp).contains("맛·시간·재료만 말한 짧은 말도 REFINE이고 [직전 조건]의 분류를 잇는다(분류와 어울리지 않아 보이는 맛이어도)",
-                "\"매운 거 말고\" → REFINE, 디저트 그대로, 피할 맛 SPICY");
+        assertThat(followUp).contains("맛·시간·재료만 말한 짧은 말도 이어짐이고 [직전 조건]의 분류를 잇는다(분류와 어울리지 않아 보이는 맛이어도)",
+                "\"매운 거 말고\" → 이어짐, 디저트 그대로, 피할 맛 SPICY");
     }
 
     @Test
-    @DisplayName("후속 규칙은 이번 말의 분류를 앞 대화보다 앞세우고, 같은 요청·코스 더하기는 새 추천, 다른 것 요청은 다시 추천으로 예시와 함께 지시한다")
+    @DisplayName("후속 규칙은 이번 말의 분류를 앞 대화보다 앞세우고, 같은 요청·코스 더하기는 새 추천, 다른 것 요청은 이어짐으로 예시와 함께 지시한다")
     void prefersCurrentCategory_inFollowUpRules() throws IOException {
         String followUp = new ClassPathResource("prompts/chat-intent-followup.txt").getContentAsString(StandardCharsets.UTF_8);
 
         assertThat(followUp).contains(
                 "이번 말의 분류·요리 이름이 [직전 조건]보다 앞선다",
-                "그 밖은 첫 질문 규칙대로 정하고 [직전 조건]을 잇지 않는다",
+                "그 밖은 첫 질문 규칙대로 정하고 [직전 조건]을 잇지 않는다(followsPrevious false)",
                 "코스를 더하는 말(\"디저트도\", \"후식으로\")은 RECOMMEND다",
                 "직전이 김피탕일 때 \"디저트 추천해줘\" → RECOMMEND, 디저트, 키워드 없음",
                 "직전이 디저트일 때 \"디저트 추천해줘\" → RECOMMEND, 디저트",
-                "\"다른 디저트\" → REFINE, 디저트",
-                "\"디저트 말고 국\" → REFINE, 국, removed: CATEGORY");
+                "\"다른 디저트\" → 이어짐, 디저트",
+                "\"디저트 말고 국\" → 이어짐, 국, removed: CATEGORY");
     }
 
     @Test
@@ -174,9 +177,11 @@ class ChatIntentPromptTest {
 
         assertThat(followUp).doesNotContain("wantedTastes: SPICY", "avoidTastes: SPICY", "\"맛은 상관없어\"", "\"두부 안 넣어도 돼\"",
                 "\"맛있게 하는 팁\"", "생략", "[다른 제안]", "[이미 안내한 말]");
-        assertThat(followUp.lines().filter(line -> line.contains("예)"))).hasSize(5);
-        // 서버가 하는 일(새 추천의 맛 비우기, 피할 맛 잇기, 키워드 끊기, 대상 칸 정리)을 빼서 1,692자 → 1,200자 아래로 둔다
-        assertThat(followUp.length()).isLessThan(1_200);
+        // 이어짐 뜻을 Jev follows_previous 질문과 같게 쓰면서 다시 추천의 단어·문장 예시 한 줄을 뺐다 (예시 5줄 → 4줄)
+        assertThat(followUp.lines().filter(line -> line.contains("예)"))).hasSize(4);
+        // 서버가 하는 일(새 추천의 맛 비우기, 피할 맛 잇기, 키워드 끊기, 대상 칸 정리)을 빼서 1,692자 → 1,200자 아래로 뒀고,
+        // 이어짐 뜻(Jev 질문과 같은 두 문장)을 더해 1,300자 아래로 둔다
+        assertThat(followUp.length()).isLessThan(1_300);
     }
 
     @Test

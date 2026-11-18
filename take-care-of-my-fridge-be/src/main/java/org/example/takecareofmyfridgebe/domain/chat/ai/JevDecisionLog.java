@@ -4,7 +4,6 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntent;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntentResolution;
 import org.example.takecareofmyfridgebe.domain.chat.dto.JevDecision;
 import org.example.takecareofmyfridgebe.domain.chat.dto.JevIntentJudgement;
-import org.example.takecareofmyfridgebe.domain.chat.dto.JevIntentJudgement.RequestKind;
 import org.example.takecareofmyfridgebe.domain.chat.dto.JevIntentJudgement.TasteStance;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeQuery;
 import org.example.takecareofmyfridgebe.domain.chat.text.ChatTexts;
@@ -12,7 +11,6 @@ import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 
 import java.util.Collection;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -21,24 +19,25 @@ import java.util.TreeSet;
 import java.util.stream.Collectors;
 
 /**
- * "상담 의도 Jev 비교" 로그 한 줄. 감사 페이지에서 읽을 수 있게 칸 이름과 순서를 고정한 key=value 형식이다.
+ * "상담 의도 Jev 결정" 로그 한 줄. 상담 의도를 Jev로 정했는지 OpenAI로 되돌렸는지와 Jev 판단을 남긴다.
+ * 감사 페이지에서 읽을 수 있게 칸 이름과 순서를 고정한 key=value 형식이다.
  * <ul>
- *   <li>값이 없으면(Jev 실패, 2차를 묻지 않음) {@value #NONE}, 빈 목록은 빈 값(openaiWanted=)</li>
- *   <li>목록은 쉼표로 잇는다. 맛은 Member.Taste 순서, OpenAI 분류는 고른 순서</li>
- *   <li>Jev 분류는 요청 종류(jevRequestKind)와 1등 분류(jevCategory, "없음"이 1등이면 -)·확률, 2등 분류(jevCategory2, "없음"일 수 있음)·확률로 남긴다.
- *       categoryMatch는 요청 종류가 특정 분류(CATEGORY)일 때만 OpenAI 분류가 1등 분류 하나와 같은지 본다</li>
- *   <li>decision은 상담 의도를 무엇으로 정했는지(SHADOW / JEV / OPENAI_LOW_CONFIDENCE / OPENAI_LOW_CONFIDENCE_JEV_BROAD /
+ *   <li>값이 없으면(Jev 실패, 2차를 묻지 않음) {@value #NONE}, 빈 목록은 빈 값(finalWanted=)</li>
+ *   <li>목록은 쉼표로 잇는다. 맛은 Member.Taste 순서, 분류는 정한 순서</li>
+ *   <li>Jev 분류는 요청 종류(jevRequestKind)와 1등 분류(jevCategory, "없음"이 1등이면 -)·확률, 2등 분류(jevCategory2, "없음"일 수 있음)·확률로 남긴다</li>
+ *   <li>decision은 상담 의도를 무엇으로 정했는지(JEV / OPENAI_LOW_CONFIDENCE / OPENAI_LOW_CONFIDENCE_JEV_BROAD /
  *       OPENAI_JEV_FAILED / OPENAI_FAILED), jevUsedKind·jevUsedValues는 Jev로 정했을 때(또는 되돌림에서 넓은 요청 경로를 탔을 때)
  *       쓴 요청 종류와 값(특정 요리면 요리 이름, 특정 분류면 분류, 넓은 요청이면 요리 이름 목록),
  *       jevUsedReason은 Jev 요청 종류나 OpenAI 요리 이름을 바꾼 까닭(JevDecision.Reason. 메시지의 키워드를 요리 이름으로 주웠으면 DISH_FROM_KEYWORD)</li>
- *   <li>jevFollowsPrevious는 직전 추천에 이어지는 말일 확률(직전 추천이 없어 묻지 않았으면 -)</li>
- *   <li>openai… 칸은 상담 최종 결과다. on 모드에서 decision=JEV면 Jev로 정한 결과, 그 밖이면 OpenAI 결과다</li>
+ *   <li>finalFollows는 최종 이어짐(직전 조건을 이어받은 추천인지, 추천이 아니면 false), jevFollowsPrevious는 Jev가 답한 직전 추천에 이어지는 말일 확률
+ *       (직전 추천이 없어 묻지 않았으면 -). Jev로 정했으면 추천이고 이 확률이 기준(JevIntentClassifier.MIN_FOLLOWS_PREVIOUS) 이상일 때 이어짐이다</li>
+ *   <li>final… 칸은 상담 최종 결과다(서비스 규칙·알레르기 반영 후). decision=JEV면 Jev로 정한 결과, 그 밖이면 OpenAI 결과다</li>
  *   <li>메시지 원문·직전 추천 글·넓은 요청 표현·키는 넣지 않는다</li>
  * </ul>
  */
-final class JevComparisonLog {
+final class JevDecisionLog {
 
-    static final String NAME = "상담 의도 Jev 비교";
+    static final String NAME = "상담 의도 Jev 결정";
     // 밀키트 Noul을 "예"로 볼 기준. 임시 기준이다 (평가에서 정함)
     static final double YES_THRESHOLD = 0.5;
     static final String NONE = "-";
@@ -49,29 +48,31 @@ final class JevComparisonLog {
         FIRST_FAILED,
         // 1차는 됐지만 물어야 할 2차가 실패
         SECOND_FAILED,
-        // 켜져 있지만 부르지 않음 (키 없음, 실행기 자리 없음)
+        // 부르지 않음 (키 없음, 실행기 자리 없음)
         SKIPPED
     }
 
     /**
-     * OpenAI 의도 판단 쪽 최종 결과 (서버 보정·알레르기 반영 후).
+     * 상담 최종 결과 (서비스 규칙·알레르기 반영 후).
      *
+     * @param follows 이어짐 (직전 조건을 이어받은 추천인지)
      * @param mealkit 밀키트만 보여 줄 추천인지 (추천이고 밀키트 단어가 부정 없이 있음, ChatRecommendationFacade와 같은 기준)
      */
-    record OpenAiSide(
+    record FinalSide(
             Long memberId,
             Long sessionId,
             int messageLength,
             ChatIntent intent,
+            boolean follows,
             List<Member.Taste> wanted,
             List<Member.Taste> avoided,
             List<String> categories,
             boolean mealkit
     ) {
 
-        static OpenAiSide of(Long memberId, Long sessionId, int messageLength, ChatIntentResolution resolution, boolean mealkit) {
+        static FinalSide of(Long memberId, Long sessionId, int messageLength, ChatIntentResolution resolution, boolean mealkit) {
             RecipeQuery query = resolution.recipeQuery();
-            return new OpenAiSide(memberId, sessionId, messageLength, resolution.intent(),
+            return new FinalSide(memberId, sessionId, messageLength, resolution.intent(), resolution.follows(),
                     query == null ? List.of() : query.wantedTastes(),
                     query == null ? List.of() : query.avoidTastes(),
                     query == null ? List.of() : query.moodCategories(),
@@ -104,46 +105,36 @@ final class JevComparisonLog {
         }
     }
 
-    private JevComparisonLog() {
+    private JevDecisionLog() {
     }
 
-    static String line(OpenAiSide openai, JevSide jev) {
-        return line(openai, jev, JevDecision.SHADOW);
-    }
-
-    static String line(OpenAiSide openai, JevSide jev, JevDecision decision) {
+    static String line(FinalSide result, JevSide jev, JevDecision decision) {
         JevIntentJudgement.First first = jev.judgement().map(JevIntentJudgement::first).orElse(null);
         JevIntentJudgement.Second second = jev.judgement().map(JevIntentJudgement::second).orElse(null);
-        Set<Member.Taste> openaiWanted = tastes(openai.wanted());
-        Set<Member.Taste> openaiAvoided = tastes(openai.avoided());
         Set<Member.Taste> jevWanted = second == null ? null : jevTastes(second, TasteStance.WANTED);
         Set<Member.Taste> jevAvoided = second == null ? null : jevTastes(second, TasteStance.AVOIDED);
-        boolean categoryKind = second != null && second.requestKind() == RequestKind.CATEGORY;
 
         Map<String, Object> fields = new LinkedHashMap<>();
-        fields.put("memberId", openai.memberId());
-        fields.put("sessionId", openai.sessionId());
-        fields.put("messageLength", openai.messageLength());
-        fields.put("openaiIntent", openai.intent());
+        fields.put("memberId", result.memberId());
+        fields.put("sessionId", result.sessionId());
+        fields.put("messageLength", result.messageLength());
+        fields.put("finalIntent", result.intent());
+        fields.put("finalFollows", result.follows());
         fields.put("jevIntent", first == null ? null : first.intent());
         fields.put("jevIntentConfidence", first == null ? null : first.intentConfidence());
         fields.put("jevFollowsPrevious", first == null ? null : first.followsPrevious());
-        fields.put("intentMatch", first == null ? null : first.intent() == openai.intent());
-        fields.put("openaiWanted", join(openaiWanted));
-        fields.put("openaiAvoided", join(openaiAvoided));
+        fields.put("finalWanted", join(tastes(result.wanted())));
+        fields.put("finalAvoided", join(tastes(result.avoided())));
         fields.put("jevWanted", jevWanted == null ? null : join(jevWanted));
         fields.put("jevAvoided", jevAvoided == null ? null : join(jevAvoided));
-        fields.put("tasteMatch", second == null ? null : openaiWanted.equals(jevWanted) && openaiAvoided.equals(jevAvoided));
-        fields.put("openaiCategories", join(openai.categories()));
+        fields.put("finalCategories", join(result.categories()));
         fields.put("jevRequestKind", second == null ? null : second.requestKind());
         fields.put("jevRequestKindConfidence", second == null ? null : second.requestKindConfidence());
         fields.put("jevCategory", second == null ? null : second.category());
         fields.put("jevCategoryConfidence", second == null ? null : second.categoryConfidence());
         fields.put("jevCategory2", second == null ? null : second.secondCategory());
         fields.put("jevCategory2Confidence", second == null ? null : second.secondCategoryConfidence());
-        fields.put("categoryMatch", !categoryKind ? null
-                : new LinkedHashSet<>(openai.categories()).equals(Set.of(String.valueOf(second.category()))));
-        fields.put("openaiMealkit", openai.mealkit());
+        fields.put("finalMealkit", result.mealkit());
         fields.put("jevMealkit", second == null ? null : second.mealkitWanted() >= YES_THRESHOLD);
         fields.put("jevAsksQuestion", first == null ? null : first.asksQuestion());
         fields.put("jevDishNamed", second == null ? null : second.dishNamed());

@@ -94,7 +94,7 @@ public class ChatRecommendationFacade {
      *   <li>번거로워하는 말("간단하게·귀찮")만 있음: 레시피 카드 아래 밀키트 한 장 (레시피 카드와 같은 레시피는 빼고)</li>
      *   <li>밀키트를 보여 줄 때는 키워드에서 "밀키트"를 뺀다 (레시피 검색이 "밀키트"를 찾지 않게)</li>
      * </ul>
-     * 다시 추천이면 직전 카드(previousCardIds)는 후보에서 빼고 고른다. 빼서 후보가 3개보다 적어지면 그때만 뒤에 다시 넣는다.
+     * 이어짐(직전 조건을 이어받는 추천)이면 직전 카드(previousCardIds)는 후보에서 빼고 고른다. 빼서 후보가 3개보다 적어지면 그때만 뒤에 다시 넣는다.
      * 새 추천은 previousCardIds 없이 부르고, 이미 추천한 레시피는 정렬에서 뒤로 간다 (RecipeQuery.alreadyRecommendedIds).
      *
      * @param content         사용자 메시지 원문 (설명 프롬프트에 넣는다)

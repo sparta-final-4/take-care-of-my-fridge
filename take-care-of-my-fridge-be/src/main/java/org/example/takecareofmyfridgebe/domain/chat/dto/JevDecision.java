@@ -19,8 +19,6 @@ public record JevDecision(
         Reason reason
 ) {
 
-    public static final JevDecision SHADOW = new JevDecision(Decision.SHADOW, null, List.of());
-
     public JevDecision {
         usedValues = usedValues == null ? List.of() : List.copyOf(usedValues);
         reason = reason == null ? Reason.NONE : reason;
@@ -55,17 +53,15 @@ public record JevDecision(
     }
 
     public enum Decision {
-        // 그림자 모드: OpenAI 결과로 정하고 Jev는 비교만
-        SHADOW,
-        // on: Jev 판단으로 정함
+        // Jev 판단으로 정함
         JEV,
-        // on: Jev 의도 confidence가 기준값보다 낮아 OpenAI 결과로 정함
+        // Jev 의도 confidence가 기준값보다 낮아 OpenAI 결과로 정함
         OPENAI_LOW_CONFIDENCE,
-        // on: Jev 의도 confidence가 낮아 OpenAI 의도(추천 계열)를 쓰되, Jev 2차 요청 종류가 넓은 요청이라 넓은 요청 요리 이름으로 찾음
+        // Jev 의도 confidence가 낮아 OpenAI 의도(추천 계열)를 쓰되, Jev 2차 요청 종류가 넓은 요청이라 넓은 요청 요리 이름으로 찾음
         OPENAI_LOW_CONFIDENCE_JEV_BROAD,
-        // on: Jev가 실패하거나(1차·필요한 2차), 제한 시간 안에 끝나지 않거나, 건너뛰어 OpenAI 결과로 정함
+        // Jev가 실패하거나(1차·필요한 2차), 제한 시간 안에 끝나지 않거나, 건너뛰어(키 없음 등) OpenAI 결과로 정함
         OPENAI_JEV_FAILED,
-        // on: OpenAI 의도 판단이 실패해 지금 실패 처리(선택 재료 유무)로 정함
+        // OpenAI 의도 판단이 실패해 실패 처리(선택 재료 유무)로 정함
         OPENAI_FAILED
     }
 }

@@ -1,15 +1,16 @@
 package org.example.takecareofmyfridgebe.domain.chat;
 
 import org.example.takecareofmyfridgebe.domain.chat.ai.ChatIntentExtractor;
+import org.example.takecareofmyfridgebe.domain.chat.ai.JevIntentRunner;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatCandidateProperties;
-import org.example.takecareofmyfridgebe.domain.chat.config.ChatCorrectionProperties;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.dto.IntentResult;
 import org.example.takecareofmyfridgebe.domain.chat.facade.ChatIntentFacade;
+import org.example.takecareofmyfridgebe.domain.chat.facade.SimilarDishFinder;
 import org.example.takecareofmyfridgebe.domain.chat.intent.AskWordCheckerTest;
-import org.example.takecareofmyfridgebe.domain.chat.intent.CategoryWordCheckerTest;
 import org.example.takecareofmyfridgebe.domain.chat.intent.FridgeShopWordCheckerTest;
 import org.example.takecareofmyfridgebe.domain.chat.intent.IntentCorrector;
+import org.example.takecareofmyfridgebe.domain.chat.intent.JevIntentResolver;
 import org.example.takecareofmyfridgebe.domain.chat.intent.MealkitWordCheckerTest;
 import org.example.takecareofmyfridgebe.domain.chat.intent.TasteWordCheckerTest;
 import org.example.takecareofmyfridgebe.domain.chat.recommend.TemperatureWordCheckerTest;
@@ -46,14 +47,9 @@ public class ChatIntentFixture {
     public static final ChatWordProperties.TasteOpposites TASTE_OPPOSITES = new ChatWordProperties.TasteOpposites(List.of(
             List.of(Taste.MILD, Taste.SPICY), List.of(Taste.MILD, Taste.SALTY)));
 
-    // config/chat-words.yml app.chat.words.food와 같은 목록
-    public static final ChatWordProperties.Food FOOD_WORDS = new ChatWordProperties.Food(List.of("먹", "요리", "레시피", "밥", "반찬",
-            "끼니", "아침", "점심", "저녁", "야식", "간식", "재료", "냉장고", "장보기", "밀키트"));
-
     // 단어 설정 전체. 묶음별 고정값은 각 WordCheckerTest가 가진다
     public static final ChatWordProperties WORDS = new ChatWordProperties(TasteWordCheckerTest.WORDS, TASTE_OPPOSITES,
-            AskWordCheckerTest.WORDS, new ChatWordProperties.Category(CategoryWordCheckerTest.GROUPS), FOOD_WORDS,
-            MealkitWordCheckerTest.WORDS, FridgeShopWordCheckerTest.WORDS, TemperatureWordCheckerTest.WORDS);
+            AskWordCheckerTest.WORDS, MealkitWordCheckerTest.WORDS, FridgeShopWordCheckerTest.WORDS, TemperatureWordCheckerTest.WORDS);
 
     public final ChatIntentExtractor extractor = mock(ChatIntentExtractor.class);
     public final RecipeService recipeService = mock(RecipeService.class);
@@ -64,23 +60,29 @@ public class ChatIntentFixture {
 
     public ChatIntentFixture() {
         when(allergyExclusionFinder.find(any(), any())).thenReturn(AllergyExclusionFinder.Allergens.NONE);
-        facade = newFacade(ChatCorrectionProperties.ALL_ON);
+        facade = newFacade(newCorrector());
         when(recipeService.getClassifications())
                 .thenReturn(new RecipeClassificationResponse(List.of("한식"), List.of("국", "기타", "샐러드", "양념", "음료", "찌개")));
     }
 
-    public ChatIntentFacade newFacade(ChatCorrectionProperties corrections) {
-        return newFacade(corrections, newCorrector(corrections));
+    // Jev 없이(Jev 판단이 오지 않아 OpenAI 결과로 되돌림) 정하는 facade
+    public ChatIntentFacade newFacade(IntentCorrector corrector) {
+        return newFacade(corrector, mock(JevIntentRunner.class));
     }
 
-    public ChatIntentFacade newFacade(ChatCorrectionProperties corrections, IntentCorrector corrector) {
+    // 주어진 Jev 호출로 정하는 facade
+    public ChatIntentFacade newFacade(JevIntentRunner jevIntentRunner) {
+        return newFacade(newCorrector(), jevIntentRunner);
+    }
+
+    private ChatIntentFacade newFacade(IntentCorrector corrector, JevIntentRunner jevIntentRunner) {
         return new ChatIntentFacade(extractor, recipeService, ingredientMatcher,
                 new ChatCandidateProperties(List.of("양념", "음료"), 0.4, List.of(), List.of("백김치", "물김치", "동치미", "나박김치"), List.of(), List.of()),
-                WORDS, allergyExclusionFinder, corrections, corrector);
+                WORDS, allergyExclusionFinder, corrector, jevIntentRunner, new JevIntentResolver(mock(SimilarDishFinder.class), WORDS));
     }
 
-    public IntentCorrector newCorrector(ChatCorrectionProperties corrections) {
-        return new IntentCorrector(recipeService, ingredientMatcher, chatMessageService, WORDS, corrections);
+    public IntentCorrector newCorrector() {
+        return new IntentCorrector(recipeService, ingredientMatcher, chatMessageService, WORDS);
     }
 
     public void givenExtracted(IntentResult result) {
