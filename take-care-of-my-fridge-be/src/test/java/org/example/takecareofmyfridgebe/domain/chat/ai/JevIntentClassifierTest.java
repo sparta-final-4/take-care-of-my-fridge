@@ -1,7 +1,6 @@
 package org.example.takecareofmyfridgebe.domain.chat.ai;
 
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntent;
-import org.example.takecareofmyfridgebe.domain.chat.dto.FridgeScope;
 import org.example.takecareofmyfridgebe.domain.chat.dto.JevIntentJudgement;
 import org.example.takecareofmyfridgebe.domain.chat.dto.JevIntentJudgement.RequestKind;
 import org.example.takecareofmyfridgebe.domain.chat.dto.JevIntentJudgement.TasteAnswer;
@@ -71,7 +70,7 @@ class JevIntentClassifierTest {
 
     // 의도와 이어짐 확률만 정한 1차 답
     private static JevIntentJudgement.First first(ChatIntent intent, Double followsPrevious) {
-        return new JevIntentJudgement.First(intent, intent, 0.9, Map.of(intent, 0.9), followsPrevious, 0.05, FridgeScope.ALL, 0.9,
+        return new JevIntentJudgement.First(intent, intent, 0.9, Map.of(intent, 0.9), followsPrevious, 0.05,
                 new JevIntentJudgement.Call(MODEL, "req_first", 100L, 400));
     }
 
@@ -118,7 +117,7 @@ class JevIntentClassifierTest {
         assertThat(body.get("model")).isEqualTo(MODEL);
         assertThat(body.get("state")).isEqualTo(MESSAGE);
         Map<String, Object> questions = map(body.get("questions"));
-        assertThat(questions).containsOnlyKeys("intent", "asks_question", "fridge_scope");
+        assertThat(questions).containsOnlyKeys("intent", "asks_question");
         assertThat(map(questions.get("intent")).get("type")).isEqualTo("choice");
         // 이어짐은 추천 안의 항목이라 이어서 다시 선택지가 없고, 직전 추천이 없으면 레시피 자세히도 고를 수 없어 뺀다. 이어짐 질문도 없다
         assertThat(map(map(questions.get("intent")).get("criteria")).keySet()).containsExactly(
@@ -131,8 +130,6 @@ class JevIntentClassifierTest {
                 .containsEntry("type", "noul")
                 .containsEntry("instructions", "정보를 묻는 말인가(보관법·손질법·뜻 등). 요리를 정해 달라는 말은 아니다")
                 .doesNotContainKey("criteria");
-        assertThat(map(map(questions.get("fridge_scope")).get("criteria")).keySet())
-                .containsExactly("전체", "밀키트", "임박", "양념");
     }
 
     @Test
@@ -156,7 +153,8 @@ class JevIntentClassifierTest {
                 .containsEntry("instructions", "특정 요리 이름을 말했나");
         Map<String, Object> spicy = map(questions.get("taste_spicy"));
         assertThat(spicy.get("type")).isEqualTo("choice");
-        assertThat(spicy.get("instructions")).isEqualTo("사용자가 매운맛(얼큰하고 칼칼한 맛)을 원하나, 피하고 싶어 하나, 말하지 않았나?");
+        assertThat(spicy.get("instructions")).isEqualTo("사용자가 매운맛(얼큰하고 칼칼한 맛)을 원하나, 피하고 싶어 하나, 말하지 않았나? "
+                + "그 맛을 줄이거나 없애 달라는 뜻이면 피함이다");
         assertThat(map(spicy.get("criteria"))).containsExactly(
                 Map.entry("원함", "매운맛을 원한다"),
                 Map.entry("피함", "매운맛을 피하고 싶다"),
@@ -196,8 +194,6 @@ class JevIntentClassifierTest {
                 .containsEntry(ChatIntent.RECOMMEND, 1.0);
         assertThat(first.followsPrevious()).isNull();
         assertThat(first.asksQuestion()).isEqualTo(0.09);
-        assertThat(first.fridgeScope()).isEqualTo(FridgeScope.ALL);
-        assertThat(first.fridgeScopeConfidence()).isEqualTo(0.9);
         assertThat(first.call()).isEqualTo(new JevIntentJudgement.Call(MODEL, "req_first", first.call().latencyMs(), 417));
 
         JevIntentJudgement.Second second = judgement.second();
@@ -251,7 +247,7 @@ class JevIntentClassifierTest {
         assertThat(parse(sentBodies.get(0)).get("state")).isEqualTo(expectedState);
         assertThat(parse(sentBodies.get(1)).get("state")).isEqualTo(expectedState);
         Map<String, Object> questions = map(parse(sentBodies.get(0)).get("questions"));
-        assertThat(questions).containsOnlyKeys("intent", "asks_question", "fridge_scope", "follows_previous");
+        assertThat(questions).containsOnlyKeys("intent", "asks_question", "follows_previous");
         assertThat(map(map(questions.get("intent")).get("criteria")).keySet()).containsExactly(
                 "추천", "일반 질문", "레시피 자세히", "냉장고 보기", "장보기", "상관없는 말", "막을 말", "자해");
         assertThat(map(questions.get("follows_previous")))
@@ -318,6 +314,35 @@ class JevIntentClassifierTest {
         assertThat(judgement.first().intent()).isEqualTo(ChatIntent.RECIPE_DETAIL);
         assertThat(judgement.first().answeredIntent()).isEqualTo(ChatIntent.RECIPE_DETAIL);
         assertThat(judgement.hasSecond()).isFalse();
+    }
+
+    @Test
+    @DisplayName("1차가 끝난 뒤 끝 시각까지 남은 시간이 2차에 모자라면 2차를 부르지 않고 1차 결과만 돌려준다")
+    void skipsSecond_whenTimeIsShort() {
+        JevIntentClassifier classifier = classifier(withKey());
+        expectCall(FIRST_RECOMMEND, "req_first");
+        long deadline = System.nanoTime() + JevIntentClassifier.MIN_TIME_FOR_SECOND.toNanos() / 5;
+
+        JevIntentJudgement judgement = classifier.classify("매운 찌개 추천해줘", CATEGORIES, null, deadline).orElseThrow();
+
+        // 1차 한 번만 불렀다 (2차를 기대하지 않았으므로 더 부르면 MockRestServiceServer가 실패한다)
+        server.verify();
+        assertThat(judgement.first().intent()).isEqualTo(ChatIntent.RECOMMEND);
+        assertThat(judgement.hasSecond()).isFalse();
+    }
+
+    @Test
+    @DisplayName("끝 시각까지 남은 시간이 넉넉하면 2차를 부른다")
+    void asksSecond_whenTimeIsEnough() {
+        JevIntentClassifier classifier = classifier(withKey());
+        expectCall(FIRST_RECOMMEND, "req_first");
+        expectCall(SECOND, "req_second");
+        long deadline = System.nanoTime() + Duration.ofSeconds(3).toNanos();
+
+        JevIntentJudgement judgement = classifier.classify("매운 찌개 추천해줘", CATEGORIES, null, deadline).orElseThrow();
+
+        server.verify();
+        assertThat(judgement.hasSecond()).isTrue();
     }
 
     @Test
@@ -428,9 +453,7 @@ class JevIntentClassifierTest {
         return "{\"model\":\"jev-1.14.0\",\"answers\":{"
                 + "\"intent\":" + intentAnswer + ","
                 + (followsPrevious == null ? "" : "\"follows_previous\":{\"type\":\"noul\",\"noul\":" + followsPrevious + "},")
-                + "\"asks_question\":{\"type\":\"noul\",\"noul\":0.09},"
-                + "\"fridge_scope\":{\"type\":\"choice\",\"choice\":\"전체\",\"confidence\":0.9,"
-                + "\"probabilities\":{\"전체\":0.92,\"밀키트\":0.06,\"임박\":0.01,\"양념\":0.01}}},"
+                + "\"asks_question\":{\"type\":\"noul\",\"noul\":0.09}},"
                 + "\"usage\":{\"input_tokens\":417,\"output_tokens\":66}}";
     }
 

@@ -70,6 +70,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith({MockitoExtension.class, OutputCaptureExtension.class})
@@ -1129,6 +1130,69 @@ class ChatStreamFacadeTest {
         chatStreamFacade.streamMessage(1L, sessionId, request).collectList().block();
 
         verify(chatRecommendationFacade).recommend("뭐 먹지?", query.withAlreadyRecommended(Set.of(314L, 315L)), List.of(), sessionId);
+    }
+
+    @Test
+    @DisplayName("AI 실패 서버 답이 냉장고 재료 카드면 카드와 정해진 냉장고 글을 보내고, 답 생성 AI·추천 검색을 부르지 않는다")
+    void sendsFridgeCardsWithFixedText_whenServerFallback() {
+        Long sessionId = 10L;
+        ChatMessageCreateRequest request = ChatMessageCreateRequest.of("김치찌개 먹고 싶어");
+        RecipeQuery query = RecipeQuery.of(1L, List.of(), false);
+        givenServerFallback(sessionId, request, query, new ChatRecommendationFacade.FallbackCards(
+                ChatRecommendationsEventResponse.of(List.of(card(314L, "두부조림"))), false));
+
+        List<ServerSentEvent<String>> events = chatStreamFacade.streamMessage(1L, sessionId, request).collectList().block();
+
+        assertThat(events).extracting(ServerSentEvent::event).containsExactly("recommendations", "message", "done");
+        assertThat(events.get(0).data()).contains("\"recipeId\":314");
+        assertThat(events.get(1).data()).contains(ChatStreamFacade.SERVER_FALLBACK_FRIDGE_REPLY);
+        verifyNoInteractions(chatReplyGenerator);
+        verify(chatRecommendationFacade, never()).recommend(any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("AI 실패 서버 답이 인기 레시피 카드면 정해진 인기 레시피 글을 보내고 답 생성 AI를 부르지 않는다")
+    void sendsPopularCardsWithFixedText_whenServerFallbackIsPopular() {
+        Long sessionId = 10L;
+        ChatMessageCreateRequest request = ChatMessageCreateRequest.of("뭐 먹지");
+        RecipeQuery query = RecipeQuery.of(1L, List.of(), false);
+        givenServerFallback(sessionId, request, query, new ChatRecommendationFacade.FallbackCards(
+                ChatRecommendationsEventResponse.of(List.of(card(500L, "김치볶음밥"))), true));
+
+        List<ServerSentEvent<String>> events = chatStreamFacade.streamMessage(1L, sessionId, request).collectList().block();
+
+        assertThat(events).extracting(ServerSentEvent::event).containsExactly("recommendations", "message", "done");
+        assertThat(events.get(1).data()).contains(ChatStreamFacade.SERVER_FALLBACK_POPULAR_REPLY);
+        verifyNoInteractions(chatReplyGenerator);
+    }
+
+    @Test
+    @DisplayName("AI 실패 서버 답 카드가 0장이면 빈 카드와 다시 물어 달라는 정해진 글을 보내고 답 생성 AI를 부르지 않는다")
+    void sendsEmptyCardsWithFixedText_whenServerFallbackHasNoCard() {
+        Long sessionId = 10L;
+        ChatMessageCreateRequest request = ChatMessageCreateRequest.of("뭐 먹지");
+        RecipeQuery query = RecipeQuery.of(1L, List.of(), false);
+        givenServerFallback(sessionId, request, query, new ChatRecommendationFacade.FallbackCards(
+                ChatRecommendationsEventResponse.of(List.of()), true));
+
+        List<ServerSentEvent<String>> events = chatStreamFacade.streamMessage(1L, sessionId, request).collectList().block();
+
+        assertThat(events).extracting(ServerSentEvent::event).containsExactly("recommendations", "message", "done");
+        assertThat(events.get(0).data()).contains("\"empty\":true");
+        assertThat(events.get(1).data()).contains(ChatStreamFacade.SERVER_FALLBACK_EMPTY_REPLY);
+        verifyNoInteractions(chatReplyGenerator);
+    }
+
+    // AI 실패 서버 답: 의도 판단이 서버 답을 내고, 추천 facade가 그 카드를 준다. 저장은 어떤 카드든 받는다
+    private void givenServerFallback(Long sessionId, ChatMessageCreateRequest request, RecipeQuery query,
+                                     ChatRecommendationFacade.FallbackCards cards) {
+        when(chatIntentFacade.resolve(eq(1L), eq(sessionId), eq(request), any())).thenReturn(ChatIntentResolution.serverFallback(query));
+        when(chatRecommendationFacade.serverFallback(query)).thenReturn(cards);
+        List<ChatMessageResponse> saved = List.of(
+                new ChatMessageResponse(100L, 1, ChatMessageRole.USER, request.content(), LocalDateTime.now()),
+                new ChatMessageResponse(101L, 2, ChatMessageRole.ASSISTANT, "서버 답", LocalDateTime.now()));
+        lenient().when(chatMessageService.saveExchange(eq(sessionId), eq(request.content()), any(), any())).thenReturn(saved);
+        lenient().when(chatMessageService.saveExchange(eq(sessionId), eq(request.content()), any())).thenReturn(saved);
     }
 
     private static RecommendedRecipe card(Long recipeId, String name) {

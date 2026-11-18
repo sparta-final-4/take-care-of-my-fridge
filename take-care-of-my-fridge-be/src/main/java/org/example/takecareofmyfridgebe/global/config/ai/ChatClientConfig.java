@@ -1,6 +1,7 @@
 package org.example.takecareofmyfridgebe.global.config.ai;
 
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -22,11 +23,14 @@ public class ChatClientConfig {
     // 재시도 1번을 포함해도 요청 타임아웃(spring.mvc.async.request-timeout 120s) 안에 끝나도록 짧게 둔다
     private static final Duration CHAT_REPLY_TIMEOUT = Duration.ofSeconds(30);
 
-    // 상담 의도·조건 뽑기 옵션. 짧은 JSON만 받으므로 출력 토큰과 타임아웃을 작게 둔다
-    private static final String CHAT_INTENT_MODEL = "gpt-4o-mini";
-    private static final double CHAT_INTENT_TEMPERATURE = 0.0;
-    private static final int CHAT_INTENT_MAX_TOKENS = 200;
-    private static final Duration CHAT_INTENT_TIMEOUT = Duration.ofSeconds(10);
+    // 상담 꺼내기(요리 이름·키워드·재료) 옵션. 짧은 JSON만 받으므로 출력 토큰과 시간 제한을 작게 두고 재시도하지 않는다.
+    // 실패하면 다시 부르지 않고 서버 답으로 간다(ChatIntentFacade). 재시도 수는 호출 옵션이 아니라 OpenAI 클라이언트에 정해지므로
+    // 꺼내기 전용 모델을 따로 만든다 (intentChatModel)
+    static final String CHAT_INTENT_MODEL = "gpt-4o-mini";
+    static final double CHAT_INTENT_TEMPERATURE = 0.0;
+    static final int CHAT_INTENT_MAX_TOKENS = 200;
+    static final Duration CHAT_INTENT_TIMEOUT = Duration.ofSeconds(10);
+    static final int CHAT_INTENT_MAX_RETRIES = 0;
 
     // 비슷한 요리 묻기 옵션. 요리 이름 3~5개만 받으므로 출력 토큰을 작게, 추천 답이 늦어지지 않게 타임아웃을 짧게 둔다
     private static final String CHAT_SIMILAR_DISH_MODEL = "gpt-4o-mini";
@@ -67,22 +71,33 @@ public class ChatClientConfig {
     }
 
     /**
-     * 상담 메시지의 의도·조건 뽑기용 (스트리밍 없음). 시스템 프롬프트는 분류 목록을 넣어 요청마다 만든다(OpenAiChatIntentExtractor).
+     * 상담 메시지에서 요리 이름·키워드·재료 꺼내기용 (스트리밍 없음). 시스템 프롬프트는 OpenAiChatIntentExtractor가 prompts/chat-intent.txt에서 읽는다.
      * 같은 메시지에 같은 결과가 나오도록 temperature를 0으로 두고, 토큰 비용은 CostAdvisor가 기록한다.
+     * 시간 제한 10초, 재시도 없는 꺼내기 전용 모델(intentChatModel)을 쓴다. 다른 호출은 기본 모델 그대로다.
      */
     @Bean("chatIntentChatClient")
     public ChatClient chatIntentChatClient(
-            ChatClient.Builder builder,
+            OpenAiChatModel openAiChatModel,
             LlmCostCalculator llmCostCalculator
     ) {
-        return builder
-                .defaultOptions(OpenAiChatOptions.builder()
-                        .model(CHAT_INTENT_MODEL)
-                        .temperature(CHAT_INTENT_TEMPERATURE)
-                        .maxTokens(CHAT_INTENT_MAX_TOKENS)
-                        .timeout(CHAT_INTENT_TIMEOUT))
+        return ChatClient.builder(intentChatModel(openAiChatModel))
                 .defaultAdvisors(new CostAdvisor(llmCostCalculator, 100))
                 .build();
+    }
+
+    /**
+     * 꺼내기 전용 모델: 기본 모델(spring.ai.openai)과 같은 키·주소에 꺼내기 옵션과 시간 제한 {@code CHAT_INTENT_TIMEOUT}(10초),
+     * 재시도 {@value #CHAT_INTENT_MAX_RETRIES}번을 둔다. 기본 모델의 옵션(시간 제한 60초, 재시도 1번)은 바꾸지 않는다.
+     */
+    static OpenAiChatModel intentChatModel(OpenAiChatModel base) {
+        OpenAiChatOptions options = base.getOptions().mutate()
+                .model(CHAT_INTENT_MODEL)
+                .temperature(CHAT_INTENT_TEMPERATURE)
+                .maxTokens(CHAT_INTENT_MAX_TOKENS)
+                .timeout(CHAT_INTENT_TIMEOUT)
+                .maxRetries(CHAT_INTENT_MAX_RETRIES)
+                .build();
+        return OpenAiChatModel.builder().options(options).build();
     }
 
     /**

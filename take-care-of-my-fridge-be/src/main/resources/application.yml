@@ -90,11 +90,12 @@ app:
     daily-limit: 30
     session-timeout: 30m
     # 한 상담에 답을 동시에 하나만 받도록 거는 잠금의 유지 시간. 요청 타임아웃(120s)보다 길게 둔다.
-    # 상담 AI 호출은 30s 타임아웃·재시도 1번이라 최악이어도 약 61초에 끝난다(ChatClientConfig)
+    # 상담 AI 호출은 꺼내기 10s(재시도 없음)·비슷한 요리 5s(재시도 1번)·답 30s(재시도 1번)라 최악이어도 약 81초에 끝난다(ChatClientConfig)
     reply-lock-ttl: 150s
-    # 요리 이름별 비슷한 요리 이름(의도 판단 AI가 낸 값) 캐시 유지 시간. 같은 요리 이름이면 같은 비슷한 요리로 검색하게 한다
+    # 비슷한 요리·넓은 요청 요리 이름(OpenAiSimilarDishGenerator가 낸 값) 캐시 유지 시간. 같은 글이면 같은 요리 이름으로 검색하게 한다
     similar-dishes-ttl: 7d
-  # TypeSafe(Jev 분류 모델) 호출 설정. 상담 의도 판단은 Jev로 정한다. 키가 비어 있으면 호출하지 않고 항상 OpenAI 결과로 되돌린다(시작할 때 경고)
+  # TypeSafe(Jev 분류 모델) 호출 설정. 상담 의도 판단은 Jev로 정한다. 키가 비어 있으면 호출하지 않고 모든 메시지(추천 칩 제외)를
+  # 서버 답(선택·냉장고 재료 또는 인기 레시피 카드)으로 답한다(시작할 때 경고). 운영에는 키가 꼭 있어야 한다
   typesafe:
     base-url: ${TYPESAFE_BASE_URL:https://api.typesafe.ai}
     api-key: ${TYPESAFE_API_KEY:}

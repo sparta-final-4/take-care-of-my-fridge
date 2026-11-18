@@ -5,6 +5,7 @@ import org.example.takecareofmyfridgebe.domain.chat.ai.JevIntentRunner;
 import org.example.takecareofmyfridgebe.domain.chat.ai.OpenAiSimilarDishGenerator;
 import org.example.takecareofmyfridgebe.domain.chat.ai.SimilarDishGenerator;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatWordProperties;
+import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntent;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntentResolution;
 import org.example.takecareofmyfridgebe.domain.chat.dto.DishListKind;
 import org.example.takecareofmyfridgebe.domain.chat.dto.SimilarDishes;
@@ -18,6 +19,7 @@ import org.example.takecareofmyfridgebe.domain.chat.facade.ChatIntentEvalManualT
 import org.example.takecareofmyfridgebe.domain.chat.intent.JevIntentResolver;
 import org.example.takecareofmyfridgebe.domain.chat.service.SimilarDishStore;
 import org.example.takecareofmyfridgebe.domain.chat.text.ChatTexts;
+import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 import org.example.takecareofmyfridgebe.global.config.TypeSafeConfig;
 import org.example.takecareofmyfridgebe.global.config.TypeSafeProperties;
 import org.example.takecareofmyfridgebe.global.config.TypeSafeExecutor;
@@ -29,6 +31,7 @@ import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.core.io.ClassPathResource;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -36,21 +39,27 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Stream;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assumptions.assumeThat;
 
 /**
  * ChatIntentEvalManualTest의 Jev 부분 (의도 판단은 늘 Jev로 정한다). 설계: docs/testing/jev-on-design.md 8절
  * <ul>
  *   <li>실제 JevIntentRunner·JevIntentClassifier(TypeSafe)·JevIntentResolver·OpenAiSimilarDishGenerator(넓은 요청 프롬프트)를 만든다.
  *       넓은 요청 요리 이름 캐시는 메모리에 둔다(운영 Redis처럼 같은 표현이면 다시 부르지 않는다. 그래서 문장마다 첫 회차만 AI를 부른다)</li>
- *   <li>회차마다 정한 방법(decision), Jev 판단, 쓴 요청 종류·값, 넓은 요청 AI 호출 여부·시간·토큰을 남긴다</li>
- *   <li>기대 kind가 넓은 요청(BROAD)인 문장은 분류·키워드 기대값 대신 "Jev로 정했거나 되돌림에서 넓은 요청 경로를 탔고(OPENAI_LOW_CONFIDENCE_JEV_BROAD)
+ *   <li>회차마다 정한 방법(decision), Jev 판단(의도별 확률 전체, 맛 5개 답 포함), 쓴 요청 종류·값, 넓은 요청 AI 호출 여부·시간·토큰을 남긴다</li>
+ *   <li>자해 기준 세트(OPENAI_INTENT_EVAL_SET=safety)면 요약에 문장별 Jev 자해 확률(회차 최소~최대)·1등 의도를 남긴다</li>
+ *   <li>기대 kind가 넓은 요청(BROAD)인 문장은 분류·키워드 기대값 대신 "Jev로 정했고
  *       쓴 요청 종류가 BROAD이며 요리 이름이 비어 있지 않음"으로 비교한다.
  *       요청 종류 일치(kind)는 따로 세고 일치 판단에는 넣지 않는다(all-on과 같은 칸으로 비교하려고)</li>
  * </ul>
  */
 final class ChatIntentEvalJevOn {
+
+    // 의도별 확률 칸 이름 앞말 (jevProb_SELF_HARM), 맛 답 칸 이름 앞말 (jevTaste_SPICY)
+    static final String PROBABILITY_PREFIX = "jevProb_";
+    static final String TASTE_PREFIX = "jevTaste_";
 
     // 넓은 요청 기대값을 대신하는 칸 (분류·키워드 기대값은 비교하지 않는다)
     private static final Set<String> BROAD_REPLACED = Set.of("categories", "keywordsEmpty", "keywordsAny");
@@ -73,7 +82,8 @@ final class ChatIntentEvalJevOn {
 
     static ChatIntentEvalJevOn create(ChatWordProperties words) {
         String typeSafeKey = System.getenv("TYPESAFE_API_KEY");
-        assertThat(typeSafeKey).as("의도 평가에는 TYPESAFE_API_KEY가 필요함 (없으면 모든 메시지가 OpenAI로 되돌아가 평가 뜻이 없다)").isNotBlank();
+        // 키가 없으면 실패하지 않고 건너뛴다 (없으면 모든 메시지가 서버 답이 되어 평가 뜻이 없다)
+        assumeThat(typeSafeKey).as("의도 평가에는 TYPESAFE_API_KEY가 필요함").isNotBlank();
         TypeSafeProperties properties = new TypeSafeProperties(null, typeSafeKey, null, null);
         TypeSafeClient client = new TypeSafeClient(new TypeSafeConfig().typeSafeRestClient(properties), properties);
         TypeSafeExecutor executor = new TypeSafeExecutor(2, 4);
@@ -133,9 +143,21 @@ final class ChatIntentEvalJevOn {
     record Info(JevDecision.Decision decision, JevIntentJudgement judgement, RequestKind usedKind, List<String> usedValues,
                 JevDecision.Reason usedReason, boolean broadAi, long broadMs, long broadInput, long broadOutput) {
 
-        static final List<String> HEADER = List.of("decision", "jevIntent", "jevIntentConfidence", "jevFollowsPrevious", "jevRequestKind", "usedKind",
-                "broadDishes", "kindMatch", "broadAi", "broadMs", "broadInputTokens", "broadOutputTokens", "jevInputTokens", "jevMs",
-                "jevCategory", "jevCategoryConfidence", "jevCategory2", "jevCategory2Confidence", "usedReason", "usedValues");
+        static final List<String> HEADER = Stream.of(
+                Stream.of("decision", "jevIntent", "jevIntentConfidence", "jevFollowsPrevious", "jevRequestKind", "usedKind",
+                        "broadDishes", "kindMatch", "broadAi", "broadMs", "broadInputTokens", "broadOutputTokens", "jevInputTokens", "jevMs",
+                        "jevCategory", "jevCategoryConfidence", "jevCategory2", "jevCategory2Confidence", "usedReason", "usedValues"),
+                // Jev 1차 의도별 확률 (ChatIntent 순서)
+                Arrays.stream(ChatIntent.values()).map(intent -> PROBABILITY_PREFIX + intent.name()),
+                // Jev 2차 맛 답 (Member.Taste 순서, "WANTED 0.91"처럼 답과 confidence)
+                Arrays.stream(Member.Taste.values()).map(taste -> TASTE_PREFIX + taste.name())
+        ).flatMap(column -> column).toList();
+
+        // 자해 확률 (Jev 판단이 없으면 null)
+        Double selfHarmProbability() {
+            return judgement == null || judgement.first().intentProbabilities() == null ? null
+                    : judgement.first().intentProbabilities().get(ChatIntent.SELF_HARM);
+        }
 
         private JevIntentJudgement.Second second() {
             return judgement == null || !judgement.hasSecond() ? null : judgement.second();
@@ -161,6 +183,20 @@ final class ChatIntentEvalJevOn {
         }
 
         List<String> cells(Map<String, Object> expect) {
+            List<String> cells = new ArrayList<>(baseCells(expect));
+            Map<ChatIntent, Double> probabilities = judgement == null ? null : judgement.first().intentProbabilities();
+            for (ChatIntent intent : ChatIntent.values()) {
+                Double probability = probabilities == null ? null : probabilities.get(intent);
+                cells.add(probability == null ? "" : String.valueOf(probability));
+            }
+            for (Member.Taste taste : Member.Taste.values()) {
+                JevIntentJudgement.TasteAnswer answer = second() == null ? null : second().tastes().get(taste);
+                cells.add(answer == null ? "" : ChatIntentEvalManualTest.csv(answer.stance() + " " + answer.confidence()));
+            }
+            return cells;
+        }
+
+        private List<String> baseCells(Map<String, Object> expect) {
             return List.of(ChatIntentEvalManualTest.csv(decision),
                     ChatIntentEvalManualTest.csv(judgement == null ? null : judgement.first().answeredIntent()),
                     judgement == null ? "" : String.valueOf(judgement.first().intentConfidence()),
@@ -199,9 +235,9 @@ final class ChatIntentEvalJevOn {
         return result;
     }
 
-    // Jev 요청 종류로 검색 조건을 정한 결정 (Jev로 정함, 되돌림에서 넓은 요청 경로)
+    // Jev 요청 종류로 검색 조건을 정한 결정 (Jev로 정함)
     static boolean usesJevKind(JevDecision.Decision decision) {
-        return decision == JevDecision.Decision.JEV || decision == JevDecision.Decision.OPENAI_LOW_CONFIDENCE_JEV_BROAD;
+        return decision == JevDecision.Decision.JEV;
     }
 
     // 정한 방법과 Jev 판단을 남기는 JevIntentRunner. 기다리기·결정 로그는 실제 동작 그대로
@@ -262,11 +298,12 @@ final class ChatIntentEvalJevOn {
     /**
      * 요약에 더할 Jev 줄: 정한 방법 분포와 정답률, 요청 종류 일치, 넓은 요청 요리 이름, 지연, 비용.
      */
-    static List<String> summary(List<ChatIntentEvalManualTest.EvalCase> cases, List<ChatIntentEvalManualTest.RunRow> rows) {
+    static List<String> summary(List<ChatIntentEvalManualTest.EvalCase> cases, List<ChatIntentEvalManualTest.RunRow> rows,
+                                boolean safetySet) {
         List<String> lines = new ArrayList<>();
         List<ChatIntentEvalManualTest.RunRow> judged = rows.stream().filter(row -> row.jev() != null).toList();
         lines.add("");
-        lines.add("[Jev] 의도 confidence 기준 " + ChatIntentFacade.MIN_JEV_INTENT_CONFIDENCE);
+        lines.add("[Jev] 의도는 confidence와 상관없이 Jev 1등 의도");
         Map<String, int[]> byDecision = new LinkedHashMap<>();
         for (JevDecision.Decision decision : JevDecision.Decision.values()) {
             byDecision.put(decision.name(), new int[2]);
@@ -310,10 +347,54 @@ final class ChatIntentEvalJevOn {
         long broadOutput = judged.stream().mapToLong(row -> row.jev().broadOutput()).sum();
         long broadCalls = judged.stream().filter(row -> row.jev().broadAi()).count();
         long jevInput = judged.stream().mapToLong(row -> row.jev().jevInputTokens()).sum();
-        lines.add(String.format("비용 (전체 회차 합, 캐시 할인 전): OpenAI 의도 입력 %d·출력 %d토큰 $%.4f · 넓은 요청 AI %d번 입력 %d·출력 %d토큰 $%.4f"
+        lines.add(String.format("비용 (전체 회차 합, 캐시 할인 전): OpenAI 꺼내기 입력 %d·출력 %d토큰 $%.4f · 넓은 요청 AI %d번 입력 %d·출력 %d토큰 $%.4f"
                         + " · Jev 입력 %d토큰 $%.4f",
                 intentInput, intentOutput, openAiCost(intentInput, intentOutput), broadCalls, broadInput, broadOutput,
                 openAiCost(broadInput, broadOutput), jevInput, jevInput * JEV_USD_PER_MILLION_INPUT / 1_000_000));
+        if (safetySet) {
+            lines.addAll(selfHarmLines(cases, judged));
+        }
+        return lines;
+    }
+
+    /**
+     * 자해 기준 세트 요약: 문장별 Jev 자해 확률(회차 최소~최대)과 1등 의도, 최종 의도. 자해 문장을 모두 잡고 아닌 문장은 잡지 않는 기준값 범위
+     * (자해 문장 최소 확률 이하이고 아닌 문장 최대 확률 초과, 1등 의도가 자해면 확률과 상관없이 잡는다).
+     */
+    private static List<String> selfHarmLines(List<ChatIntentEvalManualTest.EvalCase> cases, List<ChatIntentEvalManualTest.RunRow> judged) {
+        List<String> lines = new ArrayList<>();
+        lines.add("[자해 기준] 지금 기준 SELF_HARM_MIN_PROBABILITY " + ChatIntentFacade.SELF_HARM_MIN_PROBABILITY
+                + " (1등 의도가 자해이거나 자해 확률이 기준 이상이면 자해 안내)");
+        lines.add("  id 묶음 문장 → 자해 확률 최소~최대 · Jev 1등 의도(회차별) · 최종 의도(회차별)");
+        double selfHarmMin = Double.MAX_VALUE;
+        double otherMax = 0;
+        for (ChatIntentEvalManualTest.EvalCase evalCase : cases) {
+            List<ChatIntentEvalManualTest.RunRow> caseRows = judged.stream().filter(row -> row.evalCase() == evalCase).toList();
+            List<Double> probabilities = caseRows.stream().map(row -> row.jev().selfHarmProbability()).filter(p -> p != null).toList();
+            List<String> top = caseRows.stream().map(row -> row.jev().judgement() == null ? "-"
+                    : String.valueOf(row.jev().judgement().first().intent())).toList();
+            List<String> finals = caseRows.stream().map(row -> String.valueOf(row.outcome().intent())).toList();
+            double min = probabilities.stream().mapToDouble(Double::doubleValue).min().orElse(Double.NaN);
+            double max = probabilities.stream().mapToDouble(Double::doubleValue).max().orElse(Double.NaN);
+            boolean selfHarm = "SELF_HARM".equals(String.valueOf(evalCase.expect().raw().get("intent")));
+            // 1등 의도가 자해인 회차는 확률과 상관없이 잡히므로 기준값 범위에서 뺀다
+            for (ChatIntentEvalManualTest.RunRow row : caseRows) {
+                Double probability = row.jev().selfHarmProbability();
+                boolean topSelfHarm = row.jev().judgement() != null && row.jev().judgement().first().intent() == ChatIntent.SELF_HARM;
+                if (probability == null || topSelfHarm) {
+                    continue;
+                }
+                if (selfHarm) {
+                    selfHarmMin = Math.min(selfHarmMin, probability);
+                } else {
+                    otherMax = Math.max(otherMax, probability);
+                }
+            }
+            lines.add(String.format("  %s %s %s → %.3f~%.3f · %s · %s", evalCase.id(), evalCase.group(), evalCase.message(), min, max,
+                    String.join("/", top), String.join("/", finals)));
+        }
+        lines.add(String.format("  기준값 범위 (1등 의도가 자해가 아닌 회차만): 아닌 문장 최대 %.3f 초과 ~ 자해 문장 최소 %s 이하",
+                otherMax, selfHarmMin == Double.MAX_VALUE ? "(모두 1등 의도로 잡힘)" : String.format("%.3f", selfHarmMin)));
         return lines;
     }
 

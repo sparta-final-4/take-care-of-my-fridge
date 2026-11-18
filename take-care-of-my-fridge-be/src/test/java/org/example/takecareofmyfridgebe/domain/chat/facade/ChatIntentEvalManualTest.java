@@ -13,7 +13,7 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntent;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntentResolution;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageCreateRequest;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatSafetyBlock;
-import org.example.takecareofmyfridgebe.domain.chat.dto.IntentResult;
+import org.example.takecareofmyfridgebe.domain.chat.dto.IntentExtraction;
 import org.example.takecareofmyfridgebe.domain.chat.dto.LastRecommendation;
 import org.example.takecareofmyfridgebe.domain.chat.dto.LastRecommendation.QuerySnapshot;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeQuery;
@@ -64,6 +64,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assumptions.assumeThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
@@ -82,7 +83,8 @@ import static org.mockito.Mockito.when;
  * (선택) OPENAI_INTENT_EVAL_RUNS=3  문장마다 돌릴 횟수 (다수결, 기본 3)
  * (선택) OPENAI_INTENT_EVAL_ONLY=F10,F11  이 id만 돌린다
  * (선택) OPENAI_INTENT_EVAL_LABEL=B  결과 파일 이름에 붙일 이름 (eval-{시각}-B-summary.txt)
- * (선택) OPENAI_INTENT_EVAL_SET=holdout  평가 세트 (main: chat-intent-eval.yml, 기본 / holdout: chat-intent-holdout.yml, 과적합 확인용)
+ * (선택) OPENAI_INTENT_EVAL_SET=holdout  평가 세트 (main: chat-intent-eval.yml, 기본 / holdout: chat-intent-holdout.yml, 과적합 확인용 /
+ *                                          safety: chat-intent-safety.yml, 자해 확률 기준값 확인용)
  * </pre>
  * 결과: build/reports/chat-intent-eval/eval-{시각}-runs.csv (한 번 돌린 결과마다 한 줄, AI 원래 값과 최종 값),
  * eval-{시각}-cases.csv (문장마다 다수결 결과), eval-{시각}-summary.txt (묶음별 일치율·토큰·시간). 같은 요약을 콘솔에도 찍는다.
@@ -184,13 +186,14 @@ class ChatIntentEvalManualTest {
     // 운영과 같은 ChatClient 옵션(ChatClientConfig.chatIntentChatClient)과 프롬프트 파일
     private static OpenAiChatIntentExtractor openAiExtractor(UsageRecorder usage) {
         String apiKey = System.getenv("OPENAI_INTENT_EVAL_KEY");
-        assertThat(apiKey).as("OPENAI_INTENT_EVAL_KEY가 없음 (OPENAI_API_KEY는 build.gradle이 가짜 키로 덮어써서 못 씀). "
+        // 키가 없으면 실패하지 않고 건너뛴다 (평가 플래그만 셸에 남아 있는 경우)
+        assumeThat(apiKey).as("OPENAI_INTENT_EVAL_KEY가 없음 (OPENAI_API_KEY는 build.gradle이 가짜 키로 덮어써서 못 씀). "
                 + "Git Bash: OPENAI_INTENT_EVAL=true OPENAI_INTENT_EVAL_KEY=sk-... ./gradlew ... / "
                 + "PowerShell: $env:OPENAI_INTENT_EVAL_KEY='sk-...'; .\\gradlew.bat ...").isNotBlank();
         OpenAiChatModel model = OpenAiChatModel.builder()
                 .options(OpenAiChatOptions.builder().apiKey(apiKey).model(MODEL).build())
                 .build();
-        ChatClient chatClient = new ChatClientConfig().chatIntentChatClient(ChatClient.builder(model), usage);
+        ChatClient chatClient = new ChatClientConfig().chatIntentChatClient(model, usage);
         return new OpenAiChatIntentExtractor(chatClient, usage, new ClassPathResource("prompts/chat-intent.txt"),
                 new ClassPathResource("prompts/chat-intent-followup.txt"));
     }
@@ -230,9 +233,9 @@ class ChatIntentEvalManualTest {
         List<String> header = new ArrayList<>(List.of("id", "group", "context", "message", "run", "pass", "mismatch", "source",
                 "intent", "wanted", "avoid", "categories", "keywords", "dish", "preference", "maxMinutes", "include", "exclude",
                 "useSelectedOnly", "scope", "names", "saleOnly", "productType", "target", "question",
-                "aiIntent", "aiWanted", "aiAvoid", "aiCategories", "aiKeywords", "aiDish", "aiPreference", "aiMaxMinutes",
+                "aiKeywords", "aiDish", "aiPreference", "aiMaxMinutes",
                 "aiInclude", "aiExclude", "aiUseSelectedOnly", "aiScope", "aiTargetIndex", "aiTargetName", "aiRemoved",
-                "aiQuestion", "inputTokens", "cachedTokens", "outputTokens", "ms"));
+                "aiQuestion", "aiSelfHarmRisk", "inputTokens", "cachedTokens", "outputTokens", "ms"));
         header.addAll(ChatIntentEvalJevOn.Info.HEADER);
         runLines.add(String.join(",", header));
         rows.forEach(row -> runLines.add(row.line()));
@@ -263,10 +266,10 @@ class ChatIntentEvalManualTest {
         List<RunRow> aiRows = rows.stream().filter(row -> row.inputTokens() > 0).toList();
         List<String> summary = new ArrayList<>();
         // 맨 위: 이번에 끈 서버 보정 (A~E 비교용)
-        summary.add("의도: Jev (되돌림·서비스 규칙)" + (label == null ? "" : " · 이름 " + label)
+        summary.add("의도: Jev 단독 (OpenAI는 꺼내기만, 서비스 규칙)" + (label == null ? "" : " · 이름 " + label)
                 + (EvalSet.MAIN_SET.equals(setResource) ? "" : " · 세트 " + setResource));
         summary.add("AI 상담 의도 평가 " + stamp + " · 모델 " + MODEL + " · 문장 " + cases.size() + "개 × " + runs + "번 (다수결)");
-        summary.add(promptSize(set));
+        summary.add(promptSize());
         summary.add(String.format("전체 일치: %d / %d (%.1f%%)", passedCases, cases.size(), 100.0 * passedCases / cases.size()));
         byGroup.forEach((group, counts) -> summary.add(String.format("  %s: %d / %d", group, counts[0], counts[1])));
         long aiFailures = rows.stream().filter(row -> row.source().startsWith("AI_FAILED")).count();
@@ -281,7 +284,8 @@ class ChatIntentEvalManualTest {
                 aiRows.stream().mapToLong(RunRow::outputTokens).average().orElse(0),
                 aiRows.stream().mapToLong(RunRow::ms).average().orElse(0),
                 aiRows.stream().mapToLong(RunRow::ms).max().orElse(0)));
-        summary.addAll(ChatIntentEvalJevOn.summary(cases, rows));
+        summary.addAll(ChatIntentEvalJevOn.summary(cases, rows, EvalSet.SAFETY_SET.equals(setResource)));
+        summary.addAll(selfHarmRiskSummary(cases, rows, EvalSet.SAFETY_SET.equals(setResource)));
         summary.add("틀린 문장:");
         summary.addAll(failedLines);
 
@@ -296,12 +300,37 @@ class ChatIntentEvalManualTest {
         System.out.println("결과: " + runsFile.toAbsolutePath() + ", " + casesFile.getFileName() + ", " + summaryFile.getFileName());
     }
 
-    // 고정 프롬프트 크기 (분류 목록을 채운 첫 질문, 후속 규칙). 토큰은 gpt-4o-mini의 o200k 기준
-    private static String promptSize(EvalSet set) throws IOException {
-        String intent = new ClassPathResource("prompts/chat-intent.txt").getContentAsString(StandardCharsets.UTF_8)
-                .replace("%CATEGORIES%", String.join(", ", set.promptCategories()));
+    /**
+     * OpenAI 꺼내기의 자해 뜻(selfHarmRisk). 운영에서는 Jev 1차가 실패했을 때만 쓰므로, 평가에서는 Jev와 상관없이 값만 센다.
+     * 모든 세트: true가 나온 회차 수. 자해 기준 세트: 문장마다 true 회차 수 (단어 차단에 걸린 문장은 OpenAI를 부르지 않는다).
+     */
+    static List<String> selfHarmRiskSummary(List<EvalCase> cases, List<RunRow> rows, boolean safetySet) {
+        List<RunRow> asked = rows.stream().filter(row -> row.ai() != null).toList();
+        long risky = asked.stream().filter(row -> row.ai().hasSelfHarmRisk()).count();
+        List<String> lines = new ArrayList<>();
+        lines.add(String.format("OpenAI selfHarmRisk true: %d / %d회차", risky, asked.size()));
+        if (!safetySet) {
+            asked.stream().filter(row -> row.ai().hasSelfHarmRisk())
+                    .map(row -> row.evalCase().id()).distinct()
+                    .forEach(id -> lines.add("  true가 나온 문장: " + id));
+            return lines;
+        }
+        lines.add("OpenAI selfHarmRisk (문장마다, Jev 실패 때 예비):");
+        lines.add("  id | 묶음 | true 회차 / 부른 회차 | 메시지");
+        for (EvalCase evalCase : cases) {
+            List<RunRow> caseRows = asked.stream().filter(row -> row.evalCase() == evalCase).toList();
+            String count = caseRows.isEmpty() ? "단어 차단"
+                    : caseRows.stream().filter(row -> row.ai().hasSelfHarmRisk()).count() + " / " + caseRows.size();
+            lines.add(String.format("  %s | %s | %s | %s", evalCase.id(), evalCase.group(), count, evalCase.message()));
+        }
+        return lines;
+    }
+
+    // 고정 프롬프트 크기 (첫 질문, 후속 규칙). 토큰은 gpt-4o-mini의 o200k 기준
+    private static String promptSize() throws IOException {
+        String intent = new ClassPathResource("prompts/chat-intent.txt").getContentAsString(StandardCharsets.UTF_8);
         String followUp = new ClassPathResource("prompts/chat-intent-followup.txt").getContentAsString(StandardCharsets.UTF_8).strip();
-        return String.format("프롬프트: 첫 질문 %d자 / %d토큰 (분류 목록 포함), 후속 규칙 %d자 / %d토큰",
+        return String.format("프롬프트: 첫 질문 %d자 / %d토큰, 후속 규칙 %d자 / %d토큰",
                 intent.codePointCount(0, intent.length()), TOKENS.countTokens(intent),
                 followUp.codePointCount(0, followUp.length()), TOKENS.countTokens(followUp));
     }
@@ -317,7 +346,7 @@ class ChatIntentEvalManualTest {
     }
 
     // 한 번 돌린 결과
-    record RunRow(EvalCase evalCase, int run, Outcome outcome, String source, IntentResult ai,
+    record RunRow(EvalCase evalCase, int run, Outcome outcome, String source, IntentExtraction ai,
                   long inputTokens, long outputTokens, long cachedTokens, long ms, List<String> mismatches,
                   ChatIntentEvalJevOn.Info jev) {
 
@@ -332,15 +361,14 @@ class ChatIntentEvalManualTest {
                     csv(source)));
             cells.addAll(outcome.cells());
             if (ai == null) {
-                for (int i = 0; i < 16; i++) {
+                for (int i = 0; i < 13; i++) {
                     cells.add("");
                 }
             } else {
-                cells.addAll(List.of(csv(intentLabel(ai.intent(), Boolean.TRUE.equals(ai.followsPrevious()))), csv(ai.wantedTastes()), csv(ai.avoidTastes()), csv(ai.moodCategories()),
-                        csv(ai.keywords()), csv(ai.dishText()), csv(ai.preferenceText()), csv(ai.maxMinutes()),
+                cells.addAll(List.of(csv(ai.keywords()), csv(ai.dishText()), csv(ai.preferenceText()), csv(ai.maxMinutes()),
                         csv(ai.includeIngredients()), csv(ai.excludeIngredients()), csv(ai.useSelectedOnly()),
                         csv(ai.fridgeScope()), csv(ai.targetIndex()), csv(ai.targetName()), csv(ai.removed()),
-                        csv(ai.detailQuestion())));
+                        csv(ai.detailQuestion()), csv(ai.selfHarmRisk())));
             }
             cells.addAll(List.of(String.valueOf(inputTokens), String.valueOf(cachedTokens), String.valueOf(outputTokens),
                     String.valueOf(ms)));
@@ -522,14 +550,16 @@ class ChatIntentEvalManualTest {
 
         static final String MAIN_SET = "chat-intent-eval.yml";
         static final String HOLDOUT_SET = "chat-intent-holdout.yml";
+        static final String SAFETY_SET = "chat-intent-safety.yml";
 
-        // OPENAI_INTENT_EVAL_SET 값(main|holdout, 없으면 main)을 읽을 평가 세트 파일로 바꾼다
+        // OPENAI_INTENT_EVAL_SET 값(main|holdout|safety, 없으면 main)을 읽을 평가 세트 파일로 바꾼다
         static String resource(String set) {
             String name = set == null ? "" : set.strip();
             return switch (name) {
                 case "", "main" -> MAIN_SET;
                 case "holdout" -> HOLDOUT_SET;
-                default -> throw new IllegalArgumentException("모르는 평가 세트: " + set + " (main|holdout)");
+                case "safety" -> SAFETY_SET;
+                default -> throw new IllegalArgumentException("모르는 평가 세트: " + set + " (main|holdout|safety)");
             };
         }
 
@@ -611,11 +641,11 @@ class ChatIntentEvalManualTest {
         }
     }
 
-    // 실제 의도 판단을 부르고 AI가 준 원래 값(정리 전)을 남긴다
+    // 실제 OpenAI 꺼내기를 부르고 AI가 준 원래 값(정리 전)을 남긴다
     static final class RecordingExtractor implements ChatIntentExtractor {
 
         private final ChatIntentExtractor delegate;
-        private IntentResult last;
+        private IntentExtraction last;
         private String failure;
 
         RecordingExtractor(ChatIntentExtractor delegate) {
@@ -623,9 +653,9 @@ class ChatIntentEvalManualTest {
         }
 
         @Override
-        public IntentResult extract(Long memberId, Long sessionId, String message, List<String> categories, String followUp) {
+        public IntentExtraction extract(Long memberId, Long sessionId, String message, String followUp) {
             try {
-                last = delegate.extract(memberId, sessionId, message, categories, followUp);
+                last = delegate.extract(memberId, sessionId, message, followUp);
                 return last;
             } catch (RuntimeException e) {
                 failure = e.toString();

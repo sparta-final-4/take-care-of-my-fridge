@@ -1,11 +1,11 @@
 package org.example.takecareofmyfridgebe.domain.chat.facade;
 
+import org.example.takecareofmyfridgebe.domain.chat.IntentResults;
 import org.example.takecareofmyfridgebe.domain.chat.ChatIntentFixture;
 import org.example.takecareofmyfridgebe.domain.chat.ai.JevIntentRunner;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntent;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntentResolution;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageCreateRequest;
-import org.example.takecareofmyfridgebe.domain.chat.dto.FridgeScope;
 import org.example.takecareofmyfridgebe.domain.chat.dto.IntentResult;
 import org.example.takecareofmyfridgebe.domain.chat.dto.JevIntentJudgement;
 import org.example.takecareofmyfridgebe.domain.chat.dto.JevIntentJudgement.RequestKind;
@@ -15,6 +15,7 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.RecommendationReply;
 import org.example.takecareofmyfridgebe.domain.chat.dto.SimilarDishes;
 import org.example.takecareofmyfridgebe.domain.chat.safety.SafetyWordCheckerTest;
 import org.example.takecareofmyfridgebe.domain.chat.service.ChatMessageService;
+import org.example.takecareofmyfridgebe.domain.cooking.service.PopularRecipeService;
 import org.example.takecareofmyfridgebe.domain.fridge.service.FridgeService;
 import org.example.takecareofmyfridgebe.domain.ingredient.service.IngredientService;
 import org.example.takecareofmyfridgebe.domain.member.dto.MyInfoResponse;
@@ -52,7 +53,7 @@ import static org.mockito.Mockito.when;
  * 요리 이름만(또는 요리 이름 + 레시피·추천 말) 말했는데 검색이 모두 0건이고 비슷한 요리도 없을 때, 의도 판단부터 추천까지 이어서 본다.
  * 빈 카드 목록만 나가지 않고 요리 이름을 넣은 "아직 레시피가 없다" 안내(서버 글, RecipeCandidateCollector.explainEmpty)가 나가야 한다.
  * 이 안내(fixedReply)를 ChatStreamFacade가 AI 없이 그대로 보내는 것은 ChatStreamFacadeTest가 본다.
- * AI(OpenAI 의도 판단·Jev)와 검색(ES 후보·글자 검색·비슷한 요리)은 흉내 내고, 의도 판단·후보 고르기·추천 답은 실제 객체를 쓴다.
+ * AI(OpenAI 꺼내기·Jev)와 검색(ES 후보·글자 검색·비슷한 요리)은 흉내 내고, 의도 판단·후보 고르기·추천 답은 실제 객체를 쓴다.
  */
 class DishNotFoundFlowTest {
 
@@ -94,7 +95,7 @@ class DishNotFoundFlowTest {
                 ingredientService, RecipeCandidateFacadeTest.CANDIDATE_PROPERTIES, collector, tasteReader, similarDishFinder);
         recommendationFacade = new ChatRecommendationFacade(candidateFacade, mock(RecipeCardDescriber.class), recipeService,
                 ingredientService, mock(ProductService.class), mock(SaleEventReader.class), chatMessageService,
-                ChatIntentFixture.WORDS, SafetyWordCheckerTest.ALL);
+                ChatIntentFixture.WORDS, SafetyWordCheckerTest.ALL, mock(PopularRecipeService.class));
     }
 
     @Test
@@ -134,22 +135,10 @@ class DishNotFoundFlowTest {
     }
 
     @Test
-    @DisplayName("Jev를 못 써 OpenAI 결과로 되돌린 \"김피탕\"도 검색 0건이면 김피탕 레시피가 아직 없다는 안내를 보낸다")
-    void sendsNotFoundNotice_whenFallbackToOpenAiFindsNothing() {
-        givenOpenAi(aiRecommend("김피탕"));
-        when(jev.await(run)).thenReturn(Optional.empty());
-
-        RecommendationReply reply = recommend("김피탕");
-
-        assertThat(reply.event().empty()).isTrue();
-        assertThat(reply.fixedReply()).isEqualTo("김피탕 레시피는 아직 없어요. 다른 요리 이름이나 갖고 있는 재료로 물어봐 주세요.");
-    }
-
-    @Test
     @DisplayName("AI가 \"김피탕\"을 일반 대화로 보면 추천 검색을 하지 않고 일반 답으로 간다")
     void goesGeneral_whenAiSeesDishNameAsGeneral() throws Exception {
-        fixture.givenExtracted(new IntentResult(ChatIntent.GENERAL, List.of(), List.of(), null, null, null, false,
-                List.of(), null, null));
+        fixture.givenExtracted(ChatIntentFixture.extractionOf(IntentResults.of(ChatIntent.GENERAL, List.of(), List.of(), null, null,
+                null, false, List.of(), null, null)));
         givenJevFirst(ChatIntent.GENERAL);
 
         ChatIntentResolution resolution = resolve("김피탕");
@@ -174,12 +163,12 @@ class DishNotFoundFlowTest {
     }
 
     private void givenOpenAi(IntentResult result) {
-        fixture.givenExtracted(result);
+        fixture.givenExtracted(ChatIntentFixture.extractionOf(result));
     }
 
     // OpenAI 추천 결과: 요리 이름과 그 이름 하나뿐인 키워드
     private static IntentResult aiRecommend(String dish) {
-        return new IntentResult(ChatIntent.RECOMMEND, List.of(), List.of(), null, null, null, false, List.of(dish), dish, null);
+        return IntentResults.of(ChatIntent.RECOMMEND, List.of(), List.of(), null, null, null, false, List.of(dish), dish, null);
     }
 
     // Jev: 추천 0.95, 2차는 특정 요리(1등 분류 없음), 맛 언급 없음
@@ -198,7 +187,7 @@ class DishNotFoundFlowTest {
     private static JevIntentJudgement.First first(ChatIntent intent) {
         Map<ChatIntent, Double> probabilities = new EnumMap<>(ChatIntent.class);
         Arrays.stream(ChatIntent.values()).forEach(each -> probabilities.put(each, each == intent ? 0.95 : 0.0));
-        return new JevIntentJudgement.First(intent, intent, 0.95, probabilities, null, 0.05, FridgeScope.ALL, 0.9, call("req_first"));
+        return new JevIntentJudgement.First(intent, intent, 0.95, probabilities, null, 0.05, call("req_first"));
     }
 
     private static JevIntentJudgement.Call call(String requestId) {

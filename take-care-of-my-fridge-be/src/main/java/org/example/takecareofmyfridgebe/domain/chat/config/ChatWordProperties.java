@@ -13,14 +13,13 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
 /**
- * AI 상담 단어 설정 (config/chat-words.yml). 맛·묻는 말·밀키트·냉장고 보기·온도 단어를 묶음마다 중첩 record로 둔다.
+ * AI 상담 단어 설정 (config/chat-words.yml). 맛·밀키트·냉장고 보기·온도 단어를 묶음마다 중첩 record로 둔다.
  * 의도를 단어로 고치던 단계(분류 묶음 말·음식 말·달라는 말 등)는 Jev 전환 정리에서 지웠고, 그 단계만 쓰던 단어도 지웠다.
  * 비교는 모두 공백을 뺀 글로 한다.
  * 목록은 비면 서버가 뜨지 않는다 (@NotEmpty). 온도의 제외 목록(hotDishExclusions)만 비어도 된다.
  *
  * @param taste          맛 단어 (TasteWordChecker)
  * @param tasteOpposites 서로 반대인 맛
- * @param ask            묻는 말 (AskWordChecker)
  * @param mealkit        밀키트 단어 (MealkitWordChecker)
  * @param fridgeShop     냉장고 보기 범위·할인·양념 단어 (FridgeShopWordChecker)
  * @param temperature    온도 말 (TemperatureWordChecker)
@@ -30,7 +29,6 @@ import org.springframework.validation.annotation.Validated;
 public record ChatWordProperties(
         @Valid @NotNull Taste taste,
         @Valid @NotNull TasteOpposites tasteOpposites,
-        @Valid @NotNull Ask ask,
         @Valid @NotNull Mealkit mealkit,
         @Valid @NotNull FridgeShop fridgeShop,
         @Valid @NotNull Temperature temperature
@@ -89,16 +87,6 @@ public record ChatWordProperties(
             }
             return result;
         }
-    }
-
-    /**
-     * 묻는 말 단어 (AskWordChecker). OpenAI 의도 판단이 실패했을 때 선택 재료가 있어도 묻는 말이면 추천으로 바꾸지 않는다.
-     *
-     * @param question 묻는 말 ("추천 기준이 뭐야?", "두부 얼마나 보관돼?", 지난 일을 묻는 "밥 먹었어?")
-     */
-    public record Ask(
-            @NotEmpty List<String> question
-    ) {
     }
 
     /**

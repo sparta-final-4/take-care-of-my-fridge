@@ -33,7 +33,7 @@ on 모드(Jev가 의도·요청 종류·맛을 정하고, Jev 의도 confidence 
 - 맛은 all-on과 같은 엄격한 기준(매운맛-순한맛 반대 답도 틀림)이다.
 - `jev-on-no-taste-steps`: 같은 on 모드에 `OPENAI_INTENT_EVAL_SKIP_TASTE_STEPS=true`(보정 스위치 keep-other-tastes·spoken-tastes-only를 끔. main 코드는 그대로).
 - all-on·all-off는 2026-11-16 결과(121문장, kind·P12 추가 전). 비교 표는 네 결과에 모두 있는 121문장으로 셌다. P12 "지금 세일하는 밀키트 있어?"는 jev-on·no-taste-steps 모두 맞음.
-- 결과 파일: [eval-results/jev-on](eval-results/jev-on/), [eval-results/jev-on-no-taste-steps](eval-results/jev-on-no-taste-steps/) (summary·cases. runs.csv는 커밋하지 않음)
+- 결과 파일: 평가 원본은 로컬 docs/testing/eval-results/{jev-on, jev-on-no-taste-steps}/에만 둔다(저장소에 올리지 않음) (summary·cases. runs.csv는 커밋하지 않음)
 
 ## 칸별 일치 (121문장, 문장 다수결)
 
@@ -156,7 +156,7 @@ jev-on에서 되돌린 문장 중 R15 "오이 빼고 반찬 추천해줘"는 Jev
 - REFINE 이름 "조건 바꾸기" → "이어서 다시". 설명: "[직전 추천]에 이어서 하는 말. 직전 추천을 보고 다른 것을 달라거나, 직전 추천의 조건을 조금 바꿔 달라는 말이다. 무엇을 빼 달라는 말이라도 직전 추천과 상관없이 새로 요리를 정해 달라는 말이면 추천이다"
 - 추천 설명에 "무엇을 빼거나 피해 달라는 조건이 붙어도 추천이다"를 더했다.
 
-평가 조건은 jev-on과 같다(on 모드, 122문장 × 3회). 결과: [eval-results/jev-on-v2](eval-results/jev-on-v2/).
+평가 조건은 jev-on과 같다(on 모드, 122문장 × 3회). 결과: 평가 원본은 로컬 docs/testing/eval-results/jev-on-v2/에만 둔다(저장소에 올리지 않음).
 
 ### 칸별 일치 (121문장, 문장 다수결)
 
@@ -270,7 +270,7 @@ jev-on-v2에서 남은 9문장(R01·R05·R06·T17·R17·N08·F11·P01·U03)과 �
 5. 1차 의도 선택지에서 "이어서 다시"를 뺐다(직전 추천이 있어도). 추천 설명은 새 추천과 이어서 받는 추천을 모두 포함한다. 직전 추천이 있을 때만 Noul `follows_previous`("[직전 추천]에 이어서 하는 말인가? …")를 더 묻고, 추천 + follows_previous ≥ 0.5(평가로 정할 상수)면 REFINE으로 넘긴다. 의도 confidence는 "추천" 선택지의 confidence다. 레시피 자세히는 직전 추천이 있을 때만 선택지로 남는다. 비교 로그에 `jevFollowsPrevious` 칸을 더했다.
 
 평가 비교 기준: 특정 요리 문장은 기대값에 분류가 있으면 1등 분류와 비교하고(R01), 없으면 분류를 비교하지 않는다.
-평가는 all-on-v2(off 모드, 보정 모두 켬 = 지금 서비스, dishText 정의만 바뀜)와 jev-on-v3(on 모드)를 122문장 × 3회 돌렸다. 결과: [eval-results/all-on-v2](eval-results/all-on-v2/), [eval-results/jev-on-v3](eval-results/jev-on-v3/).
+평가는 all-on-v2(off 모드, 보정 모두 켬 = 지금 서비스, dishText 정의만 바뀜)와 jev-on-v3(on 모드)를 122문장 × 3회 돌렸다. 결과: 평가 원본은 로컬 docs/testing/eval-results/{all-on-v2, jev-on-v3}/에만 둔다(저장소에 올리지 않음).
 
 ### 칸별 일치 (121문장, 문장 다수결)
 
@@ -428,7 +428,7 @@ R17(주식 동음이의어)·F11은 실패로 인정하고 고치지 않았다.
 5. 확인용 문장 세트 `src/test/resources/chat-intent-holdout.yml`(새 문장 15개)과 평가 옵션 `OPENAI_INTENT_EVAL_SET=main|holdout`(기본 main)을 더했다. 이 세트 결과를 보고 프롬프트나 설명을 고치지 않는다.
 
 평가: 기본 세트 122문장 × 3회로 all-on-v3(off, 보정 모두 켬)와 jev-on-v4(on), 확인용 세트 15문장 × 3회로 all-on-holdout과 jev-on-holdout.
-결과: [all-on-v3](eval-results/all-on-v3/), [jev-on-v4](eval-results/jev-on-v4/), [all-on-holdout](eval-results/all-on-holdout/), [jev-on-holdout](eval-results/jev-on-holdout/).
+결과: 평가 원본은 로컬 docs/testing/eval-results/{all-on-v3, jev-on-v4, all-on-holdout, jev-on-holdout}/에만 둔다(저장소에 올리지 않음).
 
 ### 칸별 일치 (기본 세트 121문장, 문장 다수결)
 
@@ -593,7 +593,7 @@ Jev 특정 요리 → 1등 분류 없음 → 넓은 요청: 3회차(N03 "두부"
 8. 확인용 세트를 45문장으로 늘렸다(H16~H45 30문장 추가, 기존 15문장 그대로). 구성: 특정 요리 5(줄임말만 친 문장 H16·H17), "○○ 같은 요리" 4(줄임말 H24), 특정 분류 4, 넓은 요청 5(여러 분류 H32·H33), 맛·재료 빼기 4, 이어지는 말 4(이어받기 H38·H39, 새 추천 H40·H41), 추천 아님 4.
 
 평가: 기본 세트 122문장 × 3회로 all-on-v4(off)와 jev-on-v5(on), 확인용 세트 45문장 × 3회로 all-on-holdout-v2와 jev-on-holdout-v2.
-결과: [all-on-v4](eval-results/all-on-v4/), [jev-on-v5](eval-results/jev-on-v5/), [all-on-holdout-v2](eval-results/all-on-holdout-v2/), [jev-on-holdout-v2](eval-results/jev-on-holdout-v2/).
+결과: 평가 원본은 로컬 docs/testing/eval-results/{all-on-v4, jev-on-v5, all-on-holdout-v2, jev-on-holdout-v2}/에만 둔다(저장소에 올리지 않음).
 
 ### 기본 세트 칸별 일치 (121문장, 문장 다수결)
 

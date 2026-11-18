@@ -17,6 +17,7 @@ import org.example.takecareofmyfridgebe.domain.recipe.service.RecipeService;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -25,7 +26,7 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * 상담 의도 결과(Jev로 정했거나 OpenAI로 되돌린 것)에 서버 서비스 규칙을 적용한다. 아래 순서대로 한 번씩 돈다.
+ * Jev로 정한 상담 의도 결과(JevIntentResolver)에 서버 서비스 규칙을 적용한다. 아래 순서대로 한 번씩 돈다.
  * <ol>
  *   <li>이어짐은 직전 추천이 있을 때만: 직전 조건(Redis)이 없으면 AI가 이어짐 예라고 해도 아니오로 둔다 (새 추천)</li>
  *   <li>레시피 자세히 대상 찾기: 직전 카드·상담 추천에서 대상을 찾고, 이름만 못 찾으면 그 요리 추천으로 (새 추천)</li>
@@ -43,6 +44,8 @@ public class IntentCorrector {
 
     // 레시피 자세히 대상을 이름으로 찾을 상담 전체 추천 수 (최근 추천부터)
     private static final int SESSION_RECIPES_SEARCHED = 30;
+    // 줄임말로 볼 메시지 단어의 최소 글자 수
+    private static final int MIN_ABBREVIATION_LENGTH = 2;
 
     private final RecipeService recipeService;
     private final IngredientMatcher ingredientMatcher;
@@ -60,7 +63,7 @@ public class IntentCorrector {
 
     /**
      * @param input  규칙 적용 한 번 동안 바뀌지 않는 입력 (회원·상담·메시지·AI에 준 분류 목록·대화 문맥)
-     * @param result Jev로 정했거나 OpenAI로 되돌린 의도 결과
+     * @param result Jev로 정한 의도 결과
      */
     public Corrected correct(CorrectionInput input, IntentResult result) {
         IntentResult corrected = result;
@@ -96,9 +99,27 @@ public class IntentCorrector {
                 && ChatTexts.removeWhitespace(message).contains(ChatTexts.removeWhitespace(dish));
     }
 
-    // 요리 이름 확인: 메시지에 그대로 없으면 비운다. 분류 옮기기·요리 이름 채우기는 하지 않는다
+    /**
+     * OpenAI 요리 이름을 사용자가 말한 것으로 받을지: 메시지에 그대로 있거나, 메시지의 한 단어(끝 문장 부호를 뺀 두 글자 이상)의 글자가
+     * 요리 이름에 순서대로 다 있으면(줄임말을 푼 이름, "된찌" → 된장찌개) 받는다. 정식 이름 확인과 같은 함수(ChatTexts.containsInOrder)를 쓴다.
+     * 한 글자 단어("면", "국")는 거의 모든 요리 이름에 들어 있어 보지 않는다. 키워드 줍기(JevIntentResolver.keywordInMessage)는 그대로 글자 그대로만 본다.
+     */
+    static boolean dishSpoken(String message, String dish) {
+        if (dishInMessage(message, dish)) {
+            return true;
+        }
+        if (message == null || dish == null || dish.isBlank()) {
+            return false;
+        }
+        return Arrays.stream(message.strip().split("\\s+"))
+                .map(ChatTexts::withoutTrailingMarks)
+                .filter(word -> word.length() >= MIN_ABBREVIATION_LENGTH)
+                .anyMatch(word -> ChatTexts.containsInOrder(dish, word));
+    }
+
+    // 요리 이름 확인: 메시지에 그대로 없고 줄임말을 푼 이름도 아니면 비운다 (dishSpoken). 분류 옮기기·요리 이름 채우기는 하지 않는다
     IntentResult keepSpokenDishOnly(CorrectionInput input, IntentResult result) {
-        if (result.dishText() == null || dishInMessage(input.message(), result.dishText())) {
+        if (result.dishText() == null || dishSpoken(input.message(), result.dishText())) {
             return result;
         }
         log.info("상담 요리 이름이 메시지에 없어 비움 - memberId: {}, sessionId: {}, 요리 이름: {}",

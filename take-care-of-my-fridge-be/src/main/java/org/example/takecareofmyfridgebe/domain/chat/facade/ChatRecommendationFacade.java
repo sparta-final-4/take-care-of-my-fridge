@@ -26,6 +26,8 @@ import org.example.takecareofmyfridgebe.domain.chat.reply.RecommendationPromptBu
 import org.example.takecareofmyfridgebe.domain.chat.reply.RecommendationReasonWriter;
 import org.example.takecareofmyfridgebe.domain.chat.service.ChatMessageService;
 import org.example.takecareofmyfridgebe.domain.chat.text.ChatTexts;
+import org.example.takecareofmyfridgebe.domain.cooking.dto.PopularRecipeResponse;
+import org.example.takecareofmyfridgebe.domain.cooking.service.PopularRecipeService;
 import org.example.takecareofmyfridgebe.domain.ingredient.entity.Ingredient;
 import org.example.takecareofmyfridgebe.domain.ingredient.service.IngredientService;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeCandidateIngredient;
@@ -75,6 +77,10 @@ public class ChatRecommendationFacade {
     private static final String MEALKIT_WORD = "밀키트";
     // 한글 종성 번호의 ㄹ
     private static final int FINAL_RIEUL = 8;
+    // AI 실패 시 서버 답에서 인기 레시피 카드 이유
+    static final String POPULAR_CARD_REASON = "요즘 많이 만드는 레시피예요";
+    // 서버 답에서 읽을 인기 레시피 수. 뺄 재료(알레르기)가 든 레시피를 빼고도 카드 3장을 채울 수 있게 넉넉히 읽는다
+    static final int POPULAR_FETCH_COUNT = 10;
 
     private final RecipeCandidateFacade recipeCandidateFacade;
     private final RecipeCardDescriber recipeCardDescriber;
@@ -85,6 +91,7 @@ public class ChatRecommendationFacade {
     private final ChatMessageService chatMessageService;
     private final ChatWordProperties chatWordProperties;
     private final ChatSafetyProperties chatSafetyProperties;
+    private final PopularRecipeService popularRecipeService;
 
     /**
      * 추천 답. 말에 밀키트 단어가 있으면(MealkitWordChecker) 밀키트를 함께 고른다.
@@ -241,19 +248,11 @@ public class ChatRecommendationFacade {
                     candidates.stream().filter(rule::matchesAll).count(), picked.size());
         }
 
-        Map<Long, RecipeSummary> summaries = recipeService.findSummaries(
-                picked.stream().map(RecipeCandidate::recipeId).toList());
         // 카드 이유는 앞 카드와 겹치지 않게 고른다 (프롬프트 후보 줄도 같은 이유를 쓴다)
         List<String> reasons = RecommendationReasonWriter.withAvoidedTastes(
                 RecommendationReasonWriter.writeDistinct(picked, query.keywordText(), !query.hasRequest()), picked,
                 found.keptAvoidTastes());
-        Map<Long, ShoppingProduct> products = RecommendationCards.shoppingProducts(picked, productService, saleEventReader);
-        List<RecommendedRecipe> recipes = new ArrayList<>();
-        for (int i = 0; i < picked.size(); i++) {
-            RecipeCandidate candidate = picked.get(i);
-            recipes.add(RecommendationCards.toCard(candidate, summaries.get(candidate.recipeId()), reasons.get(i), null,
-                    products));
-        }
+        List<RecommendedRecipe> recipes = toRecipeCards(picked, reasons);
         logPicked(query, picked, recipes);
 
         String candidateInfo = RecommendationPromptBuilder.build(
@@ -263,6 +262,98 @@ public class ChatRecommendationFacade {
                 ? List.of()
                 : RecommendationPromptBuilder.notices(query, picked, found.keywordsNotFound(), unconditioned);
         return new RecommendationReply(ChatRecommendationsEventResponse.of(recipes), candidateInfo, notices);
+    }
+
+    // 레시피 카드 (요약·장볼 상품을 한 번씩 읽는다). 이유는 카드마다 정해 둔 것
+    private List<RecommendedRecipe> toRecipeCards(List<RecipeCandidate> picked, List<String> reasons) {
+        Map<Long, RecipeSummary> summaries = recipeService.findSummaries(
+                picked.stream().map(RecipeCandidate::recipeId).toList());
+        Map<Long, ShoppingProduct> products = RecommendationCards.shoppingProducts(picked, productService, saleEventReader);
+        List<RecommendedRecipe> recipes = new ArrayList<>();
+        for (int i = 0; i < picked.size(); i++) {
+            RecipeCandidate candidate = picked.get(i);
+            recipes.add(RecommendationCards.toCard(candidate, summaries.get(candidate.recipeId()), reasons.get(i), null,
+                    products));
+        }
+        return recipes;
+    }
+
+    /**
+     * AI가 실패했을 때(Jev 실패, 꺼내기가 필요한 의도인데 OpenAI 꺼내기 실패) 서버가 보여 줄 카드. AI를 부르지 않는다.
+     * <ul>
+     *   <li>선택 재료가 있으면 선택 재료 기반 추천 카드</li>
+     *   <li>없으면 냉장고 재료 기반 추천 카드. 냉장고 재료가 없으면(고른 레시피에 가진 재료가 하나도 없으면) 인기 레시피 카드</li>
+     *   <li>카드가 0장이거나 후보 검색이 실패하면 인기 레시피 카드 (인기 레시피도 없거나 읽지 못하면 0장)</li>
+     * </ul>
+     * 뺄 재료(알레르기 재료 포함)가 든 레시피는 어느 카드에서도 빠진다: 선택·냉장고 재료 카드는 후보 검색(RecipeCandidateScorer)이,
+     * 인기 레시피 카드는 popularCards가 뺀다.
+     *
+     * @param query 선택 재료(와 선택 재료만 쓰기)만 있는 조건. 요리 이름·키워드가 없어 비슷한 요리·벡터 검색(AI)을 부르지 않는다
+     */
+    public FallbackCards serverFallback(RecipeQuery query) {
+        boolean selected = !query.selectedIngredientIds().isEmpty();
+        try {
+            RecipeCandidates found = recipeCandidateFacade.findCandidates(query);
+            List<RecipeCandidate> picked = RecommendationPicker.pick(found.candidates(), query.keywords(), PickRule.NONE);
+            boolean fromFridge = picked.stream().anyMatch(candidate -> candidate.ranking().ownedCount() > 0);
+            if (!picked.isEmpty() && (selected || fromFridge)) {
+                List<RecommendedRecipe> recipes = toRecipeCards(picked, RecommendationReasonWriter.writeDistinct(picked, null, true));
+                log.info("상담 서버 답 카드 - memberId: {}, 선택 재료 기반: {}, 고른 레시피: {}", query.memberId(), selected,
+                        recipes.stream().map(RecommendedRecipe::recipeId).toList());
+                return new FallbackCards(ChatRecommendationsEventResponse.of(recipes), false);
+            }
+        } catch (RuntimeException e) {
+            log.warn("상담 서버 답 후보 검색 실패, 인기 레시피로 - memberId: {}, 원인: {}", query.memberId(), e.toString());
+        }
+        return new FallbackCards(ChatRecommendationsEventResponse.of(popularCards(query)), true);
+    }
+
+    /**
+     * 인기 레시피 카드 (최대 {@value RecommendationPicker#PICK_COUNT}장, 카드의 임박·장볼 재료는 지금 냉장고 기준). 읽지 못하면 0장.
+     * 뺄 재료(이 상담에서 말한 알레르기 재료 포함)가 들어간 레시피는 뺀다. 빼고 남은 것이 없으면 0장이다.
+     */
+    private List<RecommendedRecipe> popularCards(RecipeQuery query) {
+        Long memberId = query.memberId();
+        try {
+            Set<Long> excludedRecipeIds = recipesWithExcludedIngredients(query);
+            List<Long> recipeIds = popularRecipeService.getPopularRecipes(POPULAR_FETCH_COUNT).stream()
+                    .map(PopularRecipeResponse::recipeId)
+                    .filter(recipeId -> !excludedRecipeIds.contains(recipeId))
+                    .limit(RecommendationPicker.PICK_COUNT)
+                    .toList();
+            if (!excludedRecipeIds.isEmpty()) {
+                log.info("상담 서버 답 인기 레시피에서 뺄 재료가 든 레시피를 뺌 - memberId: {}, 남은 레시피 수: {}", memberId, recipeIds.size());
+            }
+            Map<Long, RecipeCandidate> described = recipeIds.isEmpty() ? Map.of()
+                    : recipeCardDescriber.describeRecipes(memberId, recipeIds);
+            List<RecipeCandidate> picked = recipeIds.stream().map(described::get).filter(Objects::nonNull).toList();
+            List<RecommendedRecipe> recipes = toRecipeCards(picked, picked.stream().map(candidate -> POPULAR_CARD_REASON).toList());
+            log.info("상담 서버 답 인기 레시피 카드 - memberId: {}, 고른 레시피: {}", memberId,
+                    recipes.stream().map(RecommendedRecipe::recipeId).toList());
+            return recipes;
+        } catch (RuntimeException e) {
+            log.warn("상담 서버 답 인기 레시피 읽기 실패, 카드 없이 - memberId: {}, 원인: {}", memberId, e.toString());
+            return List.of();
+        }
+    }
+
+    // 뺄 재료가 하나라도 들어간 레시피 ID (뺄 재료가 없으면 빈 집합)
+    private Set<Long> recipesWithExcludedIngredients(RecipeQuery query) {
+        if (query.excludeIngredientIds().isEmpty()) {
+            return Set.of();
+        }
+        return recipeService.findCandidateIngredients(query.excludeIngredientIds()).stream()
+                .map(RecipeCandidateIngredient::recipeId)
+                .collect(Collectors.toSet());
+    }
+
+    /**
+     * AI 실패 시 서버 답 카드.
+     *
+     * @param event   카드 이벤트 (0장일 수 있다)
+     * @param popular 인기 레시피 카드인지 (아니면 선택 재료·냉장고 재료 기반)
+     */
+    public record FallbackCards(ChatRecommendationsEventResponse event, boolean popular) {
     }
 
     // 온도 말이 있으면 뺀 찬 요리와 (차가운 것을 원할 때) 뒤로 보낸 뜨거운 국물 요리를 남긴다
@@ -288,9 +379,7 @@ public class ChatRecommendationFacade {
         if (mealkits.isEmpty() || query.excludeIngredientIds().isEmpty()) {
             return mealkits;
         }
-        Set<Long> excludedRecipeIds = recipeService.findCandidateIngredients(query.excludeIngredientIds()).stream()
-                .map(RecipeCandidateIngredient::recipeId)
-                .collect(Collectors.toSet());
+        Set<Long> excludedRecipeIds = recipesWithExcludedIngredients(query);
         List<String> excludedNames = ingredientService.getIngredientsByIds(query.excludeIngredientIds()).values().stream()
                 .map(ingredient -> ChatTexts.removeWhitespace(ingredient.getName()))
                 .filter(name -> name.length() >= 2)

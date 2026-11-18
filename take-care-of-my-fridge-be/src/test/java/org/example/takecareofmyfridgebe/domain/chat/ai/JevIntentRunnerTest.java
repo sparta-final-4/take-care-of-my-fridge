@@ -4,7 +4,7 @@ import org.example.takecareofmyfridgebe.domain.chat.ChatIntentFixture;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntent;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntentResolution;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageCreateRequest;
-import org.example.takecareofmyfridgebe.domain.chat.dto.IntentResult;
+import org.example.takecareofmyfridgebe.domain.chat.dto.IntentExtraction;
 import org.example.takecareofmyfridgebe.domain.chat.dto.JevIntentJudgement;
 import org.example.takecareofmyfridgebe.domain.chat.facade.ChatIntentFacade;
 import org.example.takecareofmyfridgebe.global.config.TypeSafeExecutor;
@@ -30,7 +30,10 @@ import java.util.concurrent.atomic.AtomicLong;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.example.takecareofmyfridgebe.domain.chat.ChatIntentFixture.MEMBER_ID;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.after;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.times;
@@ -38,7 +41,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-// 상담 의도 판단의 Jev 호출: 키 없음·실패면 OpenAI로 되돌리기, 기다리기, 실행기 자리, 결정 로그
+// 상담 의도 판단의 Jev 호출: 키 없음·실패면 서버 답, 기다리기, 실행기 자리, 결정 로그
 @ExtendWith(OutputCaptureExtension.class)
 class JevIntentRunnerTest {
 
@@ -59,8 +62,7 @@ class JevIntentRunnerTest {
 
     @BeforeEach
     void setUp() {
-        when(fixture.extractor.extract(eq(MEMBER_ID), eq(sessionId), any(), any(), any())).thenReturn(new IntentResult(
-                ChatIntent.RECOMMEND, List.of("SPICY"), List.of("찌개"), null, null, null, false, null, null, null));
+        when(fixture.extractor.extract(eq(MEMBER_ID), eq(sessionId), any(), any())).thenReturn(IntentExtraction.empty());
     }
 
     @AfterEach
@@ -70,18 +72,18 @@ class JevIntentRunnerTest {
     }
 
     @Test
-    @DisplayName("키가 없으면 Jev를 부르지 않고 OpenAI 결과로 되돌리며 결정 로그에 SKIPPED와 OPENAI_JEV_FAILED를 남긴다")
-    void fallsBackToOpenAi_whenApiKeyBlank(CapturedOutput output) {
+    @DisplayName("키가 없으면 Jev를 부르지 않고 서버 답으로 정하며 결정 로그에 SKIPPED와 JEV_FAILED_SERVER_FALLBACK을 남긴다")
+    void answersWithFailure_whenApiKeyBlank(CapturedOutput output) {
         ChatIntentResolution resolution = facade(runner(client(""))).resolve(MEMBER_ID, sessionId, request());
 
         assertThat(resolution).isEqualTo(withoutJev());
         verifyNoInteractions(classifier);
         assertThat(JevDecisionLogTest.values(awaitDecisionLog(output, sessionId)))
-                .containsEntry("jevStatus", "SKIPPED").containsEntry("decision", "OPENAI_JEV_FAILED");
+                .containsEntry("jevStatus", "SKIPPED").containsEntry("decision", "JEV_FAILED_SERVER_FALLBACK");
     }
 
     @Test
-    @DisplayName("키가 없으면 시작할 때 OpenAI로만 되돌린다는 경고를 남기고, 키가 있으면 남기지 않는다")
+    @DisplayName("키가 없으면 시작할 때 서버 답으로만 답한다는 경고를 남기고, 키가 있으면 남기지 않는다")
     void warnsOnce_whenApiKeyBlankAtStartup(CapturedOutput output) {
         runner(client(FAKE_KEY)).warnIfNoKey();
         assertThat(output.getOut()).doesNotContain("TypeSafe 키");
@@ -91,14 +93,14 @@ class JevIntentRunnerTest {
     }
 
     @Test
-    @DisplayName("OpenAI와 같은 메시지·분류 목록·직전 추천 정보로 Jev를 부르고, Jev로 정한 결과와 decision=JEV·쓴 요청 종류·값을 결정 로그에 남긴다")
+    @DisplayName("메시지·분류 목록·직전 추천 정보(OpenAI 꺼내기와 같은 것)로 Jev를 부르고, Jev로 정한 결과와 decision=JEV·쓴 요청 종류·값을 결정 로그에 남긴다")
     void decidesWithJevAndLogs_whenJevSucceeds(CapturedOutput output) {
         // 2차: 특정 분류 찌개 (JevDecisionLogTest.judgement)
-        when(classifier.classify(any(), any(), any())).thenReturn(Optional.of(JevDecisionLogTest.judgement(ChatIntent.RECOMMEND, true)));
+        when(classifier.classify(any(), any(), any(), anyLong())).thenReturn(Optional.of(JevDecisionLogTest.judgement(ChatIntent.RECOMMEND, true)));
 
         ChatIntentResolution resolution = facade(runner(client(FAKE_KEY))).resolve(MEMBER_ID, sessionId, request());
 
-        verify(classifier).classify(MESSAGE, CATEGORIES, null);
+        verify(classifier).classify(eq(MESSAGE), eq(CATEGORIES), isNull(), anyLong());
         assertThat(resolution.recipeQuery().moodCategories()).containsExactly("찌개");
         String line = awaitDecisionLog(output, sessionId);
         assertThat(JevDecisionLogTest.keys(line)).containsExactlyElementsOf(JevDecisionLogTest.FIELDS);
@@ -107,22 +109,22 @@ class JevIntentRunnerTest {
     }
 
     @Test
-    @DisplayName("Jev가 예외로 끝나면 OpenAI 결과로 되돌리고 결정 로그를 FIRST_FAILED와 OPENAI_JEV_FAILED로 남긴다")
-    void fallsBackAndLogsFirstFailed_whenJevThrows(CapturedOutput output) {
-        when(classifier.classify(any(), any(), any())).thenThrow(new IllegalStateException("boom"));
+    @DisplayName("Jev가 예외로 끝나면 서버 답으로 정하고 결정 로그를 FIRST_FAILED와 JEV_FAILED_SERVER_FALLBACK으로 남긴다")
+    void answersWithFailureAndLogsFirstFailed_whenJevThrows(CapturedOutput output) {
+        when(classifier.classify(any(), any(), any(), anyLong())).thenThrow(new IllegalStateException("boom"));
 
         ChatIntentResolution resolution = facade(runner(client(FAKE_KEY))).resolve(MEMBER_ID, sessionId, request());
 
         assertThat(resolution).isEqualTo(withoutJev());
         assertThat(JevDecisionLogTest.values(awaitDecisionLog(output, sessionId)))
-                .containsEntry("jevStatus", "FIRST_FAILED").containsEntry("decision", "OPENAI_JEV_FAILED")
+                .containsEntry("jevStatus", "FIRST_FAILED").containsEntry("decision", "JEV_FAILED_SERVER_FALLBACK")
                 .containsEntry("finalIntent", "RECOMMEND");
     }
 
     @Test
     @DisplayName("결정 로그는 정해진 칸 이름으로 남고 메시지 원문과 키가 없다")
     void logsFixedFieldsWithoutMessageAndKey_whenJevSucceeds(CapturedOutput output) {
-        when(classifier.classify(any(), any(), any())).thenReturn(Optional.of(JevDecisionLogTest.judgement(ChatIntent.RECOMMEND, true)));
+        when(classifier.classify(any(), any(), any(), anyLong())).thenReturn(Optional.of(JevDecisionLogTest.judgement(ChatIntent.RECOMMEND, true)));
 
         facade(runner(client(FAKE_KEY))).resolve(MEMBER_ID, sessionId, request());
 
@@ -140,21 +142,21 @@ class JevIntentRunnerTest {
     @DisplayName("실행기 스레드와 대기 줄이 차면 기다리지 않고 건너뛴다")
     void skipsWithoutWaiting_whenExecutorIsFull() {
         TypeSafeExecutor small = new TypeSafeExecutor(1, 1);
-        when(classifier.classify(any(), any(), any())).thenAnswer(invocation -> {
+        when(classifier.classify(any(), any(), any(), anyLong())).thenAnswer(invocation -> {
             release.await(5, TimeUnit.SECONDS);
             return Optional.empty();
         });
         JevIntentRunner runner = new JevIntentRunner(classifier, client(FAKE_KEY), small);
         try {
             JevIntentRunner.Run running = runner.start(MESSAGE, CATEGORIES, null);
-            verify(classifier, timeout(1_000)).classify(any(), any(), any());
+            verify(classifier, timeout(1_000)).classify(any(), any(), any(), anyLong());
             JevIntentRunner.Run queued = runner.start(MESSAGE, CATEGORIES, null);
             JevIntentRunner.Run skipped = runner.start(MESSAGE, CATEGORIES, null);
 
             assertThat(running.jev()).isNotDone();
             assertThat(queued.jev()).isNotDone();
             assertThat(skipped.jev()).isCompletedWithValue(JevDecisionLog.JevSide.skipped());
-            verify(classifier, times(1)).classify(any(), any(), any());
+            verify(classifier, times(1)).classify(any(), any(), any(), anyLong());
         } finally {
             release.countDown();
             small.close();
@@ -165,27 +167,30 @@ class JevIntentRunnerTest {
     @DisplayName("1차·2차까지 성공한 Jev 판단을 기다려 돌려준다")
     void awaitsJudgement_whenJevSucceeds() {
         JevIntentJudgement judgement = JevDecisionLogTest.judgement(ChatIntent.RECOMMEND, true);
-        when(classifier.classify(any(), any(), any())).thenReturn(Optional.of(judgement));
+        when(classifier.classify(any(), any(), any(), anyLong())).thenReturn(Optional.of(judgement));
         JevIntentRunner runner = runner(client(FAKE_KEY));
 
         assertThat(runner.await(runner.start(MESSAGE, CATEGORIES, null))).contains(judgement);
     }
 
     @Test
-    @DisplayName("추천인데 2차가 실패했으면 Jev 실패로 보고 빈 값이다")
-    void returnsEmpty_whenSecondFailed() {
-        when(classifier.classify(any(), any(), any()))
-                .thenReturn(Optional.of(JevDecisionLogTest.judgement(ChatIntent.RECOMMEND, false)));
+    @DisplayName("추천인데 2차가 실패했으면 1차 자해 판단을 볼 수 있게 2차 없는 판단을 돌려주고, 시작하지 않았으면 빈 값이다")
+    void returnsFirstOnly_whenSecondFailed() {
+        JevIntentJudgement firstOnly = JevDecisionLogTest.judgement(ChatIntent.RECOMMEND, false);
+        when(classifier.classify(any(), any(), any(), anyLong())).thenReturn(Optional.of(firstOnly));
         JevIntentRunner runner = runner(client(FAKE_KEY));
 
-        assertThat(runner.await(runner.start(MESSAGE, CATEGORIES, null))).isEmpty();
+        Optional<JevIntentJudgement> judged = runner.await(runner.start(MESSAGE, CATEGORIES, null));
+
+        assertThat(judged).contains(firstOnly);
+        assertThat(judged.orElseThrow().hasSecond()).isFalse();
         assertThat(runner.await(null)).isEmpty();
     }
 
     @Test
     @DisplayName("Jev를 시작한 때부터 TypeSafe 제한 시간이 지나도 끝나지 않으면 더 기다리지 않고 빈 값이다")
     void returnsEmpty_whenJevExceedsTimeout() {
-        when(classifier.classify(any(), any(), any())).thenAnswer(invocation -> {
+        when(classifier.classify(any(), any(), any(), anyLong())).thenAnswer(invocation -> {
             release.await(5, TimeUnit.SECONDS);
             return Optional.of(JevDecisionLogTest.judgement(ChatIntent.RECOMMEND, true));
         });
@@ -197,6 +202,79 @@ class JevIntentRunnerTest {
 
         assertThat(judged).isEmpty();
         assertThat(Duration.ofNanos(System.nanoTime() - startedAt)).isLessThan(Duration.ofSeconds(2));
+    }
+
+    @Test
+    @DisplayName("제한 시간이 지나면 돌고 있는 Jev 작업을 취소해 스레드를 인터럽트한다")
+    void cancelsRunningJev_whenTimeoutPasses() throws InterruptedException {
+        CountDownLatch interrupted = new CountDownLatch(1);
+        when(classifier.classify(any(), any(), any(), anyLong())).thenAnswer(invocation -> {
+            try {
+                release.await(5, TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                interrupted.countDown();
+            }
+            return Optional.empty();
+        });
+        JevIntentRunner runner = runner(new TypeSafeClient(RestClient.create(),
+                new TypeSafeProperties(null, FAKE_KEY, null, Duration.ofMillis(200))));
+
+        JevIntentRunner.Run run = runner.start(MESSAGE, CATEGORIES, null);
+        verify(classifier, timeout(1_000)).classify(any(), any(), any(), anyLong());
+
+        assertThat(runner.await(run)).isEmpty();
+        assertThat(run.jev()).isCancelled();
+        assertThat(interrupted.await(2, TimeUnit.SECONDS)).isTrue();
+    }
+
+    @Test
+    @DisplayName("제한 시간이 지나 취소한 작업이 대기 줄에 있었으면 Jev를 부르지 않는다")
+    void dropsQueuedJev_whenTimeoutPasses() {
+        TypeSafeExecutor single = new TypeSafeExecutor(1, 1);
+        when(classifier.classify(any(), any(), any(), anyLong())).thenAnswer(invocation -> {
+            release.await(5, TimeUnit.SECONDS);
+            return Optional.empty();
+        });
+        JevIntentRunner runner = new JevIntentRunner(classifier, new TypeSafeClient(RestClient.create(),
+                new TypeSafeProperties(null, FAKE_KEY, null, Duration.ofMillis(200))), single);
+        try {
+            runner.start(MESSAGE, CATEGORIES, null);
+            verify(classifier, timeout(1_000)).classify(any(), any(), any(), anyLong());
+            JevIntentRunner.Run queued = runner.start(MESSAGE, CATEGORIES, null);
+
+            assertThat(runner.await(queued)).isEmpty();
+            release.countDown();
+
+            assertThat(queued.jev()).isCancelled();
+            verify(classifier, after(300).times(1)).classify(any(), any(), any(), anyLong());
+        } finally {
+            single.close();
+        }
+    }
+
+    @Test
+    @DisplayName("실행기 스레드와 대기 줄이 차 있으면 기다리지 않고 바로 Jev 실패(빈 값)다")
+    void failsImmediately_whenExecutorIsFull() {
+        TypeSafeExecutor small = new TypeSafeExecutor(1, 1);
+        when(classifier.classify(any(), any(), any(), anyLong())).thenAnswer(invocation -> {
+            release.await(5, TimeUnit.SECONDS);
+            return Optional.empty();
+        });
+        JevIntentRunner runner = new JevIntentRunner(classifier, client(FAKE_KEY), small);
+        try {
+            runner.start(MESSAGE, CATEGORIES, null);
+            verify(classifier, timeout(1_000)).classify(any(), any(), any(), anyLong());
+            runner.start(MESSAGE, CATEGORIES, null);
+
+            long startedAt = System.nanoTime();
+            Optional<JevIntentJudgement> judged = runner.await(runner.start(MESSAGE, CATEGORIES, null));
+
+            assertThat(judged).isEmpty();
+            assertThat(Duration.ofNanos(System.nanoTime() - startedAt)).isLessThan(Duration.ofMillis(100));
+        } finally {
+            release.countDown();
+            small.close();
+        }
     }
 
     private JevIntentRunner runner(TypeSafeClient client) {

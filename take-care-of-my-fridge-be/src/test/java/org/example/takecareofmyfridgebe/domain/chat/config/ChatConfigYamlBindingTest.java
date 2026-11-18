@@ -30,7 +30,7 @@ class ChatConfigYamlBindingTest {
     private ChatCandidateProperties candidate;
 
     @Test
-    @DisplayName("단어 설정(chat-words.yml)이 app.chat.words 아래로 묶인다: 맛 반대 쌍, 온도 말, 묻는 말, 냉장고 보기 범위·할인 말")
+    @DisplayName("단어 설정(chat-words.yml)이 app.chat.words 아래로 묶인다: 맛 반대 쌍, 온도 말, 냉장고 보기 범위·할인 말")
     void bindsWords() {
         assertThat(words.tasteOpposites().oppositesOf(Taste.MILD)).containsExactlyInAnyOrder(Taste.SPICY, Taste.SALTY);
         assertThat(words.temperature().warm()).contains("따뜻", "뜨끈");
@@ -38,7 +38,6 @@ class ChatConfigYamlBindingTest {
         assertThat(words.temperature().coldDishes()).contains("냉국", "냉면", "빙수").doesNotContain("냉");
         assertThat(words.temperature().hotDishEndings()).containsExactly("탕", "전골", "찌개", "국밥");
         assertThat(words.temperature().hotDishExclusions()).containsExactly("그라탕", "냉탕");
-        assertThat(words.ask().question()).contains("기준", "어떻게", "뭐야");
         assertThat(words.fridgeShop().seasoning()).containsExactly("기본양념", "조미료");
         assertThat(words.fridgeShop().sale()).containsExactly("세일", "할인", "특가", "번개");
     }
