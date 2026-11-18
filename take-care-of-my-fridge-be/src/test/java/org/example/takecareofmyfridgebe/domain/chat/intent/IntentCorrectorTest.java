@@ -101,18 +101,18 @@ class IntentCorrectorTest {
             assertThat(query.keywordText()).isEqualTo("김치찌개");
         }
 
-        // 알려진 문제 (고치지 않음, 2026-11-18 점검): 줄임말 확인은 두 글자 이상 단어의 글자가 요리 이름에 순서대로 있는지만 봐서,
-        // 일반 말 "고기"도 "돼지고기김치찌개"에 들어 있어 사용자가 말한 요리 이름으로 받는다.
-        // Jev가 특정 요리로 보고 OpenAI가 요리 이름을 지어 넣은 경우에만 생긴다. 고치면 이 테스트의 기대값을 바꾼다
+        // 2026-11-18 점검에서 찾은 문제: 줄임말 확인이 글자 순서만 봐서 일반 말 "고기"도 "돼지고기김치찌개"로 받았다.
+        // 줄임말은 정식 이름의 첫 글자로 시작해야 받는다 (ChatTexts.containsInOrder)
         @Test
-        @DisplayName("지금은 메시지의 일반 말 \"고기\"의 글자가 OpenAI 요리 이름 돼지고기김치찌개에 순서대로 있어 그 이름을 받는다 (알려진 문제)")
-        void keepsDish_whenCommonWordIsInsideDishName() {
+        @DisplayName("메시지의 일반 말 \"고기\"가 OpenAI 요리 이름 돼지고기김치찌개의 가운데에 있으면 첫 글자가 달라 요리 이름을 버린다")
+        void dropsDish_whenCommonWordIsInsideDishName() {
             givenExtracted(dish("돼지고기김치찌개"));
 
             RecipeQuery query = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("고기 요리 추천해줘")).recipeQuery();
 
-            assertThat(IntentCorrector.dishSpoken("고기 요리 추천해줘", "돼지고기김치찌개")).isTrue();
-            assertThat(query.keywordText()).isEqualTo("돼지고기김치찌개");
+            assertThat(IntentCorrector.dishSpoken("고기 요리 추천해줘", "돼지고기김치찌개")).isFalse();
+            assertThat(query.keywordText()).isNull();
+            assertThat(query.keywords()).doesNotContain("돼지고기김치찌개");
         }
 
         // 요리 이름만 꺼낸 추천 (Jev는 특정 요리)

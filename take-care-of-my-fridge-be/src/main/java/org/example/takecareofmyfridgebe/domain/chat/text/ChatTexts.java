@@ -40,13 +40,19 @@ public final class ChatTexts {
     }
 
     /**
-     * 줄임말의 글자가 정식 이름에 순서대로 다 있는지 (띄어쓰기 무시). 김볶밥 → 김치볶음밥, 된찌 → 된장찌개는 맞고, 김피탕 → 김치찌개는 맞지 않는다.
+     * 줄임말이 정식 이름의 첫 글자로 시작하고 줄임말의 글자가 정식 이름에 순서대로 다 있는지 (띄어쓰기 무시).
+     * 김볶밥 → 김치볶음밥, 된찌 → 된장찌개는 맞고, 김피탕 → 김치찌개(피 없음), 고기 → 돼지고기김치찌개(첫 글자 다름)는 맞지 않는다.
      * 비슷한 요리의 정식 이름 확인(SimilarDishFinder)과 OpenAI 요리 이름 확인(IntentCorrector.dishSpoken)이 같이 쓴다.
      */
     public static boolean containsInOrder(String formalName, String abbreviation) {
         String formal = removeWhitespace(formalName);
+        String shortName = removeWhitespace(abbreviation);
+        // 줄임말은 정식 이름의 첫 글자로 시작한다. 일반 말이 긴 이름 가운데에 든 경우("고기" → 돼지고기김치찌개)는 줄임말이 아니다
+        if (!shortName.isEmpty() && (formal.isEmpty() || formal.charAt(0) != shortName.charAt(0))) {
+            return false;
+        }
         int at = 0;
-        for (char letter : removeWhitespace(abbreviation).toCharArray()) {
+        for (char letter : shortName.toCharArray()) {
             at = formal.indexOf(letter, at);
             if (at < 0) {
                 return false;
