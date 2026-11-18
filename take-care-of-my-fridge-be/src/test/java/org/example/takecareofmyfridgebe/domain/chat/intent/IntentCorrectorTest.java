@@ -1,5 +1,6 @@
 package org.example.takecareofmyfridgebe.domain.chat.intent;
 
+import org.example.takecareofmyfridgebe.domain.chat.IntentResults;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext.CardName;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntent;
@@ -54,19 +55,70 @@ class IntentCorrectorTest {
     class Keywords {
 
         @Test
-        @DisplayName("AI가 뽑은 요리 이름 키워드와 요리 표현을 검색 조건에 넣는다")
-        void putsKeywordsIntoQuery() {
-            givenExtracted(new IntentResult(ChatIntent.RECOMMEND, null, List.of("국"), null, null, null, null,
+        @DisplayName("Jev가 특정 요리로 보면 OpenAI가 꺼낸 요리 이름과 요리 표현을 검색 조건에 넣고, OpenAI 키워드는 버린다")
+        void putsDishIntoQuery() {
+            givenExtracted(IntentResults.of(ChatIntent.RECOMMEND, null, List.of("국"), null, null, null, null,
                     List.of("냉면", "막국수"), "냉면", "냉면 같은 면 요리"));
 
             RecipeQuery query = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("차가운 냉면 같은 면 요리"))
                     .recipeQuery();
 
-            assertThat(query.keywords()).containsExactly("냉면", "막국수");
+            assertThat(query.keywords()).containsExactly("냉면");
             assertThat(query.keywordText()).isEqualTo("냉면");
             assertThat(query.preferenceText()).isEqualTo("냉면 같은 면 요리");
         }
 
+
+        @Test
+        @DisplayName("메시지의 단어 \"된찌\"의 글자가 OpenAI 요리 이름 된장찌개에 순서대로 다 있으면 줄임말을 푼 이름으로 받는다")
+        void keepsExpandedDish_whenWordLettersAreInOrder() {
+            givenExtracted(dish("된장찌개"));
+
+            RecipeQuery query = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("된찌 먹고 싶어")).recipeQuery();
+
+            assertThat(query.keywordText()).isEqualTo("된장찌개");
+            assertThat(query.keywords()).containsExactly("된장찌개");
+        }
+
+        @Test
+        @DisplayName("메시지의 단어 \"김피탕\"의 글자가 OpenAI 요리 이름 김치찌개에 순서대로 다 있지 않으면 요리 이름을 버린다")
+        void dropsDish_whenWordLettersAreNotInOrder() {
+            givenExtracted(dish("김치찌개"));
+
+            RecipeQuery query = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("김피탕 먹고 싶어")).recipeQuery();
+
+            assertThat(query.keywordText()).isNull();
+            assertThat(query.keywords()).doesNotContain("김치찌개");
+        }
+
+        @Test
+        @DisplayName("OpenAI 요리 이름이 메시지에 그대로 있으면 지금처럼 받는다")
+        void keepsDish_whenDishIsInMessage() {
+            givenExtracted(dish("김치찌개"));
+
+            RecipeQuery query = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("김치 찌개 먹고 싶어")).recipeQuery();
+
+            assertThat(query.keywordText()).isEqualTo("김치찌개");
+        }
+
+        // 2026-11-18 점검에서 찾은 문제: 줄임말 확인이 글자 순서만 봐서 일반 말 "고기"도 "돼지고기김치찌개"로 받았다.
+        // 줄임말은 정식 이름의 첫 글자로 시작해야 받는다 (ChatTexts.containsInOrder)
+        @Test
+        @DisplayName("메시지의 일반 말 \"고기\"가 OpenAI 요리 이름 돼지고기김치찌개의 가운데에 있으면 첫 글자가 달라 요리 이름을 버린다")
+        void dropsDish_whenCommonWordIsInsideDishName() {
+            givenExtracted(dish("돼지고기김치찌개"));
+
+            RecipeQuery query = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("고기 요리 추천해줘")).recipeQuery();
+
+            assertThat(IntentCorrector.dishSpoken("고기 요리 추천해줘", "돼지고기김치찌개")).isFalse();
+            assertThat(query.keywordText()).isNull();
+            assertThat(query.keywords()).doesNotContain("돼지고기김치찌개");
+        }
+
+        // 요리 이름만 꺼낸 추천 (Jev는 특정 요리)
+        private static IntentResult dish(String dishText) {
+            return IntentResults.of(ChatIntent.RECOMMEND, null, null, null, null, null, null, null, dishText, null);
+        }
     }
 
     @Nested
@@ -92,7 +144,7 @@ class IntentCorrectorTest {
         @Test
         @DisplayName("디저트 추천 뒤 \"다른 디저트 추천해줘\"는 이어짐(직전 카드 빼기)이고 분류 디저트다")
         void followsWithDessert_whenAnotherDessert() {
-            givenExtracted(new IntentResult(ChatIntent.RECOMMEND, null, List.of(), null, null, null, null, null, null, null).withFollows(true));
+            givenExtracted(IntentResults.of(ChatIntent.RECOMMEND, null, List.of(), null, null, null, null, null, null, null).withFollows(true));
 
             ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID,
                     ChatMessageCreateRequest.of("다른 디저트 추천해줘"), afterDessert);
@@ -105,7 +157,7 @@ class IntentCorrectorTest {
         @Test
         @DisplayName("디저트 추천 뒤 \"다른 거 추천해줘\"는 이어짐이고 직전 분류 디저트를 이어 간다")
         void keepsPreviousDessert_whenAnotherOne() {
-            givenExtracted(new IntentResult(ChatIntent.RECOMMEND, null, List.of(), null, null, null, null, null, null, null).withFollows(true));
+            givenExtracted(IntentResults.of(ChatIntent.RECOMMEND, null, List.of(), null, null, null, null, null, null, null).withFollows(true));
 
             ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID,
                     ChatMessageCreateRequest.of("다른 거 추천해줘"), afterDessert);
@@ -118,10 +170,10 @@ class IntentCorrectorTest {
     }
 
     @Test
-    @DisplayName("새 추천에서 \"매운 거 말고\"면 피할 맛 매운맛으로 두고, 원하는 맛과 겹치면 피할 맛이 이긴다")
+    @DisplayName("새 추천에서 Jev가 \"매운 거 말고 단 걸로\"를 매운맛 피함·단맛 원함으로 답하면 피할 맛 매운맛, 원하는 맛 단맛으로 둔다")
     void setsAvoidTastes_whenRecommend() {
-        givenExtracted(new IntentResult(ChatIntent.RECOMMEND, List.of("SPICY", "SWEET"), null, null, null, null, null, null,
-                null, null, null, null, null, List.of("spicy")));
+        givenExtracted(IntentResults.of(ChatIntent.RECOMMEND, List.of("SWEET"), null, null, null, null, null, null,
+                null, null, null, null, null, List.of("SPICY")));
 
         RecipeQuery query = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("매운 거 말고 단 걸로")).recipeQuery();
 
@@ -142,7 +194,7 @@ class IntentCorrectorTest {
         @Test
         @DisplayName("직전 조건이 없으면 맛 단어 목록에 없는 말(\"맵고\")이어도 AI가 넣은 맛을 그대로 둔다")
         void keepsAiTastes_whenNoPreviousCondition() {
-            givenExtracted(new IntentResult(ChatIntent.RECOMMEND, List.of("SPICY"), null, null, null, null, false, null, null, null));
+            givenExtracted(IntentResults.of(ChatIntent.RECOMMEND, List.of("SPICY"), null, null, null, null, false, null, null, null));
 
             RecipeQuery query = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("맵고 따뜻한 스프")).recipeQuery();
 
@@ -152,7 +204,7 @@ class IntentCorrectorTest {
         @Test
         @DisplayName("직전 피할 맛 매운맛 뒤 \"김치찌개\"면 따라온 피할 맛을 뺀다")
         void dropsCarriedAvoid() {
-            givenExtracted(new IntentResult(ChatIntent.RECOMMEND, null, null, 0, List.of(), List.of(), false,
+            givenExtracted(IntentResults.of(ChatIntent.RECOMMEND, null, null, 0, List.of(), List.of(), false,
                     List.of("김치찌개"), null, null, null, null, List.of(), List.of("SPICY")));
 
             RecipeQuery query = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("김치찌개"),
@@ -164,7 +216,7 @@ class IntentCorrectorTest {
         @Test
         @DisplayName("직전 원하는 맛 매운맛 뒤 \"디저트\"면 따라온 원하는 맛을 뺀다")
         void dropsCarriedWanted() {
-            givenExtracted(new IntentResult(ChatIntent.RECOMMEND, List.of("SPICY"), List.of("디저트"), null, null, null, false, null, null, null));
+            givenExtracted(IntentResults.of(ChatIntent.RECOMMEND, List.of("SPICY"), List.of("디저트"), null, null, null, false, null, null, null));
 
             RecipeQuery query = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("디저트"),
                     after(List.of(Taste.SPICY), List.of())).recipeQuery();
@@ -175,7 +227,7 @@ class IntentCorrectorTest {
         @Test
         @DisplayName("직전 원하는 맛 매운맛이어도 이번 말에 그 맛 단어가 있으면 남긴다")
         void keepsSpokenTaste_whenAlsoPrevious() {
-            givenExtracted(new IntentResult(ChatIntent.RECOMMEND, List.of("SPICY"), null, null, null, null, false, null, null, null));
+            givenExtracted(IntentResults.of(ChatIntent.RECOMMEND, List.of("SPICY"), null, null, null, null, false, null, null, null));
 
             RecipeQuery query = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("매운 볶음 추천해줘"),
                     after(List.of(Taste.SPICY), List.of())).recipeQuery();
@@ -202,9 +254,9 @@ class IntentCorrectorTest {
         @Test
         @DisplayName("추천에서 요리 이름이 메시지에 띄어쓰기와 상관없이 그대로 있으면 두고, 없으면 비운다")
         void keepsSpokenDishOnly() {
-            IntentResult inMessage = new IntentResult(ChatIntent.RECOMMEND, null, null, null, null, null, false,
+            IntentResult inMessage = IntentResults.of(ChatIntent.RECOMMEND, null, null, null, null, null, false,
                     List.of("나가사키짬뽕"), "나가사키짬뽕", null);
-            IntentResult notInMessage = new IntentResult(ChatIntent.RECOMMEND, null, null, null, null, null, false,
+            IntentResult notInMessage = IntentResults.of(ChatIntent.RECOMMEND, null, null, null, null, null, false,
                     List.of("탕수육"), "탕수육", null);
 
             assertThat(corrector.correct(input("나가사키 짬뽕 먹고 싶어"), inMessage).result().dishText()).isEqualTo("나가사키짬뽕");
@@ -214,7 +266,7 @@ class IntentCorrectorTest {
         @Test
         @DisplayName("피하는 맛만 말했으면 뺄 조건 TASTE를 지우고, 맛 조건을 지우라는 말이 있으면 그대로 둔다")
         void keepsOtherTastes_whenOnlyAvoiding() {
-            IntentResult removesTaste = new IntentResult(ChatIntent.RECOMMEND, List.of(), List.of(), null, null, null, false, null, null, null,
+            IntentResult removesTaste = IntentResults.of(ChatIntent.RECOMMEND, List.of(), List.of(), null, null, null, false, null, null, null,
                     null, null, List.of("TASTE"), List.of("SPICY"), null, null).withFollows(true);
 
             assertThat(corrector.correct(input("매운 건 빼줘"), removesTaste).result().removed()).isEmpty();
@@ -224,7 +276,7 @@ class IntentCorrectorTest {
         @Test
         @DisplayName("일반 답·냉장고 보기는 규칙을 거치지 않고 그대로 둔다")
         void keepsResult_whenNotRecommend() {
-            IntentResult general = new IntentResult(ChatIntent.GENERAL, null, null, null, null, null, false,
+            IntentResult general = IntentResults.of(ChatIntent.GENERAL, null, null, null, null, null, false,
                     List.of("탕수육"), "탕수육", null);
 
             IntentCorrector.Corrected corrected = corrector.correct(input("김피탕이 뭐야?"), general);
@@ -235,7 +287,7 @@ class IntentCorrectorTest {
     }
 
     private void givenExtracted(IntentResult result) {
-        fixture.givenExtracted(result);
+        fixture.givenAi(result);
     }
 
     private static Ingredient ingredient(Long id, String code, String name) {

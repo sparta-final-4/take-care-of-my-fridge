@@ -9,6 +9,7 @@ import org.example.takecareofmyfridgebe.infra.typesafe.client.TypeSafeClient;
 import org.example.takecareofmyfridgebe.infra.typesafe.dto.SystemOneCall;
 import org.springframework.stereotype.Component;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -17,7 +18,7 @@ import java.util.function.Function;
 /**
  * Jev(TypeSafe 분류 모델)로 상담 메시지의 의도 판단 질문에 답을 받는다. 상담 의도는 이 판단으로 정한다 (JevIntentRunner·JevIntentResolver).
  * <ol>
- *   <li>1차(모든 메시지): 의도, 정보를 묻는 말인지, 냉장고 보기 범위, 직전 추천이 있으면 이어지는 말인지 (JevFirstQuestions)</li>
+ *   <li>1차(모든 메시지): 의도, 정보를 묻는 말인지, 직전 추천이 있으면 이어지는 말인지 (JevFirstQuestions)</li>
  *   <li>2차(1차 의도가 RECOMMEND일 때만): 요리 이름·특징·재료·밀키트, 맛 5개, 요청 종류, 1등 분류 (JevSecondQuestions)</li>
  * </ol>
  * 1차 의도에는 서비스 규칙을 적용한다 (serviceIntent): 직전 추천이 없는데 RECIPE_DETAIL로 답하면 RECOMMEND로 보고(ChatIntentFacade와 같다) 2차도 묻는다.
@@ -40,6 +41,11 @@ public class JevIntentClassifier {
     private static final Set<ChatIntent> FOLLOW_UP_INTENTS = Set.of(ChatIntent.RECIPE_DETAIL);
     // 추천을 직전 추천에 이어지는 추천(이어짐)으로 볼 follows_previous "예" 확률. 평가로 정함
     static final double MIN_FOLLOWS_PREVIOUS = 0.45;
+    // 2차를 부르려면 끝 시각까지 남아 있어야 할 시간. 2차 한 번은 보통 0.2초 안팎(jev-v4 1·2차 합계 95% 417ms)이라
+    // 이보다 적게 남았으면 부르더라도 상담이 기다리지 못하고 비용만 든다
+    static final Duration MIN_TIME_FOR_SECOND = Duration.ofMillis(500);
+    // 끝 시각 없음 (평가처럼 기다리는 쪽이 없을 때)
+    static final long NO_DEADLINE = Long.MAX_VALUE;
 
     private final TypeSafeClient typeSafeClient;
 
@@ -47,9 +53,19 @@ public class JevIntentClassifier {
      * @param message    사용자 메시지
      * @param categories 고를 수 있는 레시피 분류 (RecipeService.getClassifications()에서 받은 것)
      * @param followUp   직전 추천 정보 줄 글(ChatIntentFacade.followUp, OpenAI 의도 판단과 같은 것). 첫 질문이면 null
-     * @return 판단 결과. 키가 없거나 1차가 실패하면 빈 값 (부르는 쪽이 OpenAI 결과로 되돌린다)
+     * @return 판단 결과. 키가 없거나 1차가 실패하면 빈 값 (부르는 쪽이 서버 답으로 답한다)
      */
     public Optional<JevIntentJudgement> classify(String message, List<String> categories, String followUp) {
+        return classify(message, categories, followUp, NO_DEADLINE);
+    }
+
+    /**
+     * 끝 시각이 있는 판단. 1차가 끝난 뒤 끝 시각까지 {@link #MIN_TIME_FOR_SECOND} 넘게 남지 않았거나 스레드가 인터럽트됐으면
+     * 2차를 부르지 않고 2차 실패와 같게 1차만 돌려준다 (부르는 쪽은 1차 자해 판단을 본 뒤 Jev 실패로 처리한다).
+     *
+     * @param deadline 상담이 Jev를 기다리는 끝 시각 (System.nanoTime 기준)
+     */
+    public Optional<JevIntentJudgement> classify(String message, List<String> categories, String followUp, long deadline) {
         long startedAt = System.nanoTime();
         String state = state(message, followUp);
         boolean hasFollowUp = followUp != null && !followUp.isBlank();
@@ -61,7 +77,9 @@ public class JevIntentClassifier {
         }
 
         JevIntentJudgement.Second second = null;
-        if (asksSecond(first.get().intent())) {
+        if (asksSecond(first.get().intent()) && !enoughTimeForSecond(deadline)) {
+            log.warn("Jev 2차를 부르지 않음 - 남은 시간 부족 또는 취소, 메시지 길이: {}", message.length());
+        } else if (asksSecond(first.get().intent())) {
             second = typeSafeClient.ask(SECOND, state, JevSecondQuestions.questions(categories))
                     .flatMap(call -> read(SECOND, call, answered -> JevSecondQuestions.read(answered, categories)))
                     .orElse(null);
@@ -95,8 +113,16 @@ public class JevIntentClassifier {
                 && first.followsPrevious() >= MIN_FOLLOWS_PREVIOUS;
     }
 
+    // 끝 시각까지 2차를 부를 시간이 남았는지. 상담이 이미 포기했으면(인터럽트) 부르지 않는다
+    static boolean enoughTimeForSecond(long deadline) {
+        if (Thread.currentThread().isInterrupted()) {
+            return false;
+        }
+        return deadline == NO_DEADLINE || deadline - System.nanoTime() > MIN_TIME_FOR_SECOND.toNanos();
+    }
+
     // 2차(추천 조건)를 묻는 의도인지 (서비스 규칙을 적용한 의도로 본다)
-    static boolean asksSecond(ChatIntent intent) {
+    public static boolean asksSecond(ChatIntent intent) {
         return NEEDS_SECOND.contains(intent);
     }
 

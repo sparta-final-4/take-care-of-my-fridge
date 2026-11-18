@@ -3,3 +3,5 @@
 .vscode/
 .DS_Store
 .env
+# 평가 원본(요약·문장별·회차별 CSV)은 로컬에만 둔다
+docs/testing/eval-results/

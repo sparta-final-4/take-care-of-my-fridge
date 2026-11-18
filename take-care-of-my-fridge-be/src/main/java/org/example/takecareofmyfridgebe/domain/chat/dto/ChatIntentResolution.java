@@ -70,8 +70,19 @@ public record ChatIntentResolution(
         MODE,
         // AI가 판단
         AI,
-        // AI 판단이 실패해 선택 재료 유무로 정함 (있으면 추천, 없으면 일반)
+        // AI가 실패해(Jev 실패, 꺼내기가 필요한 의도인데 OpenAI 꺼내기 실패) 질문에 답하지 않고 서버가 추천 카드로 답함.
+        // 선택 재료 → 냉장고 재료 → 인기 레시피 순 (ChatRecommendationFacade.serverFallback). AI를 다시 부르지 않는다
         FALLBACK
+    }
+
+    // AI 실패 시 서버 답 (선택 재료와 선택 재료만 쓰기만 있는 조건)
+    public static ChatIntentResolution serverFallback(RecipeQuery recipeQuery) {
+        return new ChatIntentResolution(ChatIntent.RECOMMEND, Source.FALLBACK, recipeQuery, null, null);
+    }
+
+    // AI 실패 시 서버 답인지 (질문에 답하지 않고 서버 카드와 정해진 글로 답한다)
+    public boolean serverFallback() {
+        return source == Source.FALLBACK;
     }
 
     public static ChatIntentResolution general(Source source) {

@@ -3,6 +3,7 @@ package org.example.takecareofmyfridgebe.domain.chat.service;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatProperties;
 import org.example.takecareofmyfridgebe.domain.chat.dto.DishListKind;
 import org.example.takecareofmyfridgebe.domain.chat.dto.SimilarDishes;
+import org.example.takecareofmyfridgebe.domain.chat.text.ChatTexts;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -41,10 +42,10 @@ class SimilarDishStoreTest {
     }
 
     @Test
-    @DisplayName("요리 이름(공백 제거·소문자) 키에 저장된 정식 이름과 비슷한 요리를 읽는다")
+    @DisplayName("요리 이름(공백 제거·소문자)의 해시 키에 저장된 정식 이름과 비슷한 요리를 읽는다")
     void findsCachedDishes() {
-        when(values.get("chat:similar-dishes:v4:나가사키짬뽕")).thenReturn("{\"formalName\":null,\"dishes\":[\"짬뽕\",\"짬뽕밥\"]}");
-        when(values.get("chat:similar-dishes:v4:김피탕")).thenReturn("{\"formalName\":\"김치피자탕수육\",\"dishes\":[\"탕수육\"]}");
+        when(values.get(similarKey("나가사키짬뽕"))).thenReturn("{\"formalName\":null,\"dishes\":[\"짬뽕\",\"짬뽕밥\"]}");
+        when(values.get(similarKey("김피탕"))).thenReturn("{\"formalName\":\"김치피자탕수육\",\"dishes\":[\"탕수육\"]}");
 
         assertThat(store.find(MEMBER_ID, DishListKind.SIMILAR, "나가사키 짬뽕")).contains(SimilarDishes.of(List.of("짬뽕", "짬뽕밥")));
         assertThat(store.find(MEMBER_ID, DishListKind.SIMILAR, "김피탕"))
@@ -56,10 +57,10 @@ class SimilarDishStoreTest {
     void returnsEmpty_whenNotCachedOrEmptyList() {
         assertThat(store.find(MEMBER_ID, DishListKind.SIMILAR, "김피탕")).isEmpty();
 
-        when(values.get("chat:similar-dishes:v4:김피탕")).thenReturn("{\"formalName\":null,\"dishes\":[]}");
+        when(values.get(similarKey("김피탕"))).thenReturn("{\"formalName\":null,\"dishes\":[]}");
         assertThat(store.find(MEMBER_ID, DishListKind.SIMILAR, "김피탕")).isEmpty();
 
-        when(values.get("chat:similar-dishes:v4:김피탕")).thenReturn("[\"탕수육\"]");
+        when(values.get(similarKey("김피탕"))).thenReturn("[\"탕수육\"]");
         assertThat(store.find(MEMBER_ID, DishListKind.SIMILAR, "김피탕")).isEmpty();
     }
 
@@ -68,17 +69,17 @@ class SimilarDishStoreTest {
     void savesWithTtl_inLowercaseKey() {
         store.save(MEMBER_ID, DishListKind.SIMILAR, "Fish Taco", SimilarDishes.of(List.of("타코", "부리토")));
 
-        verify(values).set("chat:similar-dishes:v4:fishtaco", "{\"formalName\":null,\"dishes\":[\"타코\",\"부리토\"]}", TTL);
+        verify(values).set(similarKey("fishtaco"), "{\"formalName\":null,\"dishes\":[\"타코\",\"부리토\"]}", TTL);
     }
 
     @Test
-    @DisplayName("넓은 요청 요리는 chat:broad-dishes:v2: 키(요청 표현, 공백 제거·소문자)에 같은 유지 시간으로 두고 읽는다")
+    @DisplayName("넓은 요청 요리는 chat:broad-dishes:v3: 키(요청 표현을 공백 제거·소문자로 한 해시)에 같은 유지 시간으로 두고 읽는다")
     void savesAndFindsBroadDishes_inBroadKey() {
         String json = "{\"formalName\":null,\"dishes\":[\"김치볶음밥\",\"비빔국수\"]}";
         store.save(MEMBER_ID, DishListKind.BROAD, "간단한 한 끼 Menu", SimilarDishes.of(List.of("김치볶음밥", "비빔국수")));
-        when(values.get("chat:broad-dishes:v2:간단한한끼menu")).thenReturn(json);
+        when(values.get(broadKey("간단한한끼menu"))).thenReturn(json);
 
-        verify(values).set("chat:broad-dishes:v2:간단한한끼menu", json, TTL);
+        verify(values).set(broadKey("간단한한끼menu"), json, TTL);
         assertThat(store.find(MEMBER_ID, DishListKind.BROAD, "간단한 한 끼 Menu"))
                 .contains(SimilarDishes.of(List.of("김치볶음밥", "비빔국수")));
         assertThat(store.find(MEMBER_ID, DishListKind.SIMILAR, "간단한 한 끼 Menu")).isEmpty();
@@ -109,5 +110,26 @@ class SimilarDishStoreTest {
         when(values.get(anyString())).thenReturn("[\"탕수육\"");
 
         assertThat(store.find(MEMBER_ID, DishListKind.SIMILAR, "김피탕")).isEmpty();
+    }
+
+    @Test
+    @DisplayName("넓은 요청 캐시 키에는 메시지 원문이 없고, 띄어쓰기·대소문자만 다른 같은 문장은 같은 키가 된다")
+    void buildsBroadKeyWithoutOriginalText_whenMessageIsWholeSentence() {
+        String message = "오늘 회사에서 너무 힘들었는데 위로가 되는 저녁 메뉴";
+
+        String key = SimilarDishStore.key(DishListKind.BROAD, message);
+
+        assertThat(key).startsWith("chat:broad-dishes:v3:").doesNotContain("회사").doesNotContain("저녁");
+        assertThat(key.substring("chat:broad-dishes:v3:".length())).hasSize(16).matches("[0-9a-f]+");
+        assertThat(SimilarDishStore.key(DishListKind.BROAD, "오늘 회사에서  너무 힘들었는데 위로가 되는 저녁메뉴")).isEqualTo(key);
+        assertThat(SimilarDishStore.key(DishListKind.BROAD, "술안주")).isNotEqualTo(key);
+    }
+
+    private static String similarKey(String compact) {
+        return "chat:similar-dishes:v5:" + ChatTexts.shortHash(compact);
+    }
+
+    private static String broadKey(String compact) {
+        return "chat:broad-dishes:v3:" + ChatTexts.shortHash(compact);
     }
 }

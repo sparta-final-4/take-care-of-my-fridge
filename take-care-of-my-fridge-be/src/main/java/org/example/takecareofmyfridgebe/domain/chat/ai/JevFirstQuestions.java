@@ -2,7 +2,6 @@ package org.example.takecareofmyfridgebe.domain.chat.ai;
 
 import org.example.takecareofmyfridgebe.domain.chat.ai.JevAnswers.Option;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntent;
-import org.example.takecareofmyfridgebe.domain.chat.dto.FridgeScope;
 import org.example.takecareofmyfridgebe.domain.chat.dto.JevIntentJudgement;
 import org.example.takecareofmyfridgebe.infra.typesafe.dto.SystemOneCall;
 import org.example.takecareofmyfridgebe.infra.typesafe.dto.SystemOneQuestion;
@@ -14,8 +13,9 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Jev 1차 질문(모든 메시지): 의도, 정보를 묻는 말인지, 냉장고 보기 범위. 직전 추천이 있으면 그에 이어지는 말인지(follows_previous)도 묻는다.
- * 선택지 설명은 prompts/chat-intent.txt·chat-intent-followup.txt의 의도 설명을 줄인 것이다.
+ * Jev 1차 질문(모든 메시지): 의도, 정보를 묻는 말인지. 직전 추천이 있으면 그에 이어지는 말인지(follows_previous)도 묻는다.
+ * 냉장고 보기 범위는 묻지 않는다 (OpenAI 꺼내기의 fridgeScope와 서버 단어로 정한다. 답을 쓰지 않아 질문을 지웠다).
+ * 선택지 설명은 OpenAI가 의도를 고르던 때의 프롬프트 설명을 줄인 것이다.
  * <p>
  * 새 추천과 이어서 받는 추천은 둘 다 추천해 달라는 뜻이라 의도 선택지는 "추천" 하나로 묻는다(선택지가 둘이면 확률이 나뉘어 confidence가 낮아진다).
  * 이어짐은 follows_previous로 따로 묻고, 추천 안의 이어짐 항목으로 넘긴다 (JevIntentClassifier.follows).
@@ -24,7 +24,6 @@ final class JevFirstQuestions {
 
     static final String INTENT = "intent";
     static final String ASKS_QUESTION = "asks_question";
-    static final String FRIDGE_SCOPE = "fridge_scope";
     static final String FOLLOWS_PREVIOUS = "follows_previous";
 
     static final List<Option<ChatIntent>> INTENTS = List.of(
@@ -52,12 +51,6 @@ final class JevFirstQuestions {
     // 직전 추천이 있어야 고를 수 있는 의도
     private static final Set<ChatIntent> FOLLOW_UP_ONLY = Set.of(ChatIntent.RECIPE_DETAIL);
 
-    static final List<Option<FridgeScope>> FRIDGE_SCOPES = List.of(
-            new Option<>("전체", FridgeScope.ALL, "기본 양념을 뺀 냉장고 전체. 아래 셋이 아니면 이것이다"),
-            new Option<>("밀키트", FridgeScope.MEALKIT, "밀키트만"),
-            new Option<>("임박", FridgeScope.IMMINENT, "소비기한이 곧 끝나거나 지났거나 오래된 것"),
-            new Option<>("양념", FridgeScope.SEASONING, "기본 양념·조미료만"));
-
     private JevFirstQuestions() {
     }
 
@@ -71,7 +64,6 @@ final class JevFirstQuestions {
                 "이 말은 무엇을 원하나? [직전 추천]이 있으면 그에 이어지는 말인지 먼저 본다", intents(hasFollowUp)));
         questions.put(ASKS_QUESTION, SystemOneQuestion.noul(
                 "정보를 묻는 말인가(보관법·손질법·뜻 등). 요리를 정해 달라는 말은 아니다"));
-        questions.put(FRIDGE_SCOPE, JevAnswers.choiceQuestion("냉장고에서 무엇을 보려 하나?", FRIDGE_SCOPES));
         if (hasFollowUp) {
             questions.put(FOLLOWS_PREVIOUS, SystemOneQuestion.noul(
                     "[직전 추천]의 조건(맛, 재료, 종류)을 이어받으면서 일부만 바꿔 달라는 말인가? "
@@ -98,13 +90,11 @@ final class JevFirstQuestions {
     static JevIntentJudgement.First read(SystemOneCall call, boolean hasFollowUp) {
         JevAnswers answers = new JevAnswers(call);
         JevAnswers.Choice<ChatIntent> intent = answers.choice(INTENT, INTENTS);
-        JevAnswers.Choice<FridgeScope> fridgeScope = answers.choice(FRIDGE_SCOPE, FRIDGE_SCOPES);
         Double followsPrevious = hasFollowUp ? answers.noul(FOLLOWS_PREVIOUS) : null;
         return new JevIntentJudgement.First(
                 JevIntentClassifier.serviceIntent(intent.value(), hasFollowUp), intent.value(),
                 intent.confidence(), intent.probabilities(), followsPrevious,
                 answers.noul(ASKS_QUESTION),
-                fridgeScope.value(), fridgeScope.confidence(),
                 answers.call());
     }
 }

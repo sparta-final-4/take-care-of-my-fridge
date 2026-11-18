@@ -14,11 +14,11 @@ import java.util.Locale;
 import java.util.Optional;
 
 /**
- * AI가 낸 요리 이름 목록을 Redis에 둔다. 키는 {종류 접두어}{받은 글, 공백 제거·소문자},
+ * AI가 낸 요리 이름 목록을 Redis에 둔다. 키는 {종류 접두어}{받은 글(공백 제거·소문자)의 SHA-256 앞 16자},
  * 값은 JSON 객체 {"formalName": 정식 이름 또는 null, "dishes": [요리 이름]} (SimilarDishes).
  * <ul>
- *   <li>비슷한 요리: chat:similar-dishes:v4:{요리 이름}</li>
- *   <li>넓은 요청 요리: chat:broad-dishes:v2:{요청 표현}</li>
+ *   <li>비슷한 요리: chat:similar-dishes:v5:{요리 이름 해시}</li>
+ *   <li>넓은 요청 요리: chat:broad-dishes:v3:{요청 표현 해시}. 요청 표현은 메시지 전체일 수 있어 원문을 키·로그에 쓰지 않는다</li>
  * </ul>
  * 같은 글이면 AI를 다시 부르지 않고 같은 목록으로 검색하게 한다 (SimilarDishFinder).
  * 유지 시간은 app.chat.similar-dishes-ttl (기본 7일)이고, 읽어도 늘리지 않는다.
@@ -52,7 +52,8 @@ public class SimilarDishStore {
             SimilarDishes dishes = JSON.readValue(cached, SimilarDishes.class);
             return dishes.isEmpty() ? Optional.empty() : Optional.of(dishes);
         } catch (RuntimeException e) {
-            log.warn("상담 {} 캐시 읽기 실패, 캐시 없이 - memberId: {}, 글: {}, 원인: {}", kind.label(), memberId, dishText, e.toString());
+            log.warn("상담 {} 캐시 읽기 실패, 캐시 없이 - memberId: {}, 글 길이: {}, 원인: {}",
+                    kind.label(), memberId, dishText.length(), e.getClass().getSimpleName());
             return Optional.empty();
         }
     }
@@ -69,12 +70,14 @@ public class SimilarDishStore {
         try {
             stringRedisTemplate.opsForValue().set(key, JSON.writeValueAsString(dishes), chatProperties.similarDishesTtl());
         } catch (RuntimeException e) {
-            log.warn("상담 {} 캐시 저장 실패 - memberId: {}, 글: {}, 원인: {}", kind.label(), memberId, dishText, e.toString());
+            log.warn("상담 {} 캐시 저장 실패 - memberId: {}, 글 길이: {}, 원인: {}",
+                    kind.label(), memberId, dishText.length(), e.getClass().getSimpleName());
         }
     }
 
-    private static String key(DishListKind kind, String dishText) {
+    // 키 끝은 받은 글(공백 제거·소문자)의 해시다. 넓은 요청은 메시지 전체가 올 수 있어 원문을 키에 남기지 않는다
+    static String key(DishListKind kind, String dishText) {
         String compact = ChatTexts.removeWhitespace(dishText).toLowerCase(Locale.ROOT);
-        return compact.isEmpty() ? null : kind.keyPrefix() + compact;
+        return compact.isEmpty() ? null : kind.keyPrefix() + ChatTexts.shortHash(compact);
     }
 }

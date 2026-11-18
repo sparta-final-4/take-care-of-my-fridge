@@ -4,26 +4,20 @@ import org.example.takecareofmyfridgebe.domain.chat.text.ChatTexts;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
-import java.util.Objects;
 import java.util.Set;
-import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
- * 상담 메시지에서 AI가 뽑은 의도와 추천 조건.
- * 응답 JSON 스키마가 null을 허용하지 않아, 사용자가 말하지 않은 조건은 시간 0·빈 목록·false로 온다 (프롬프트로 정함).
- * 0은 sanitize에서 null로 바꾸고, 빈 목록은 말하지 않은 것과 같게 다룬다. 테스트·스텁에서는 null로 올 수도 있다.
- * AI 응답을 그대로 받는 모양이라 값이 틀릴 수 있으므로 sanitize로 정리해서 쓴다.
+ * 상담이 쓰는 의도와 추천 조건. Jev 판단(의도·이어짐·맛·분류·요청 종류)과 OpenAI가 꺼낸 값(IntentExtraction, 정리한 것)으로
+ * JevIntentResolver가 만들고, 서비스 규칙(IntentCorrector)이 고친다. 말하지 않은 조건은 null이고 빈 목록도 말하지 않은 것과 같게 다룬다.
  *
- * @param intent             RECOMMEND / GENERAL / RECIPE_DETAIL / FRIDGE / SHOP / OFF_TOPIC / BLOCKED / SELF_HARM (ChatIntent)
- * @param wantedTastes       원하는 맛 (Member.Taste 이름)
- * @param moodCategories     원하는 레시피 분류 (recipes.category 값)
- * @param maxMinutes         최대 조리 시간(분). 말하지 않았으면 0
+ * @param intent             RECOMMEND / GENERAL / RECIPE_DETAIL / FRIDGE / SHOP / OFF_TOPIC / BLOCKED / SELF_HARM (ChatIntent, Jev)
+ * @param wantedTastes       원하는 맛 (Member.Taste 이름, Jev)
+ * @param moodCategories     원하는 레시피 분류 (recipes.category 값, Jev 1등 분류)
+ * @param maxMinutes         최대 조리 시간(분). 말하지 않았으면 null
  * @param includeIngredients 꼭 넣고 싶은 재료 이름 (말한 그대로)
  * @param excludeIngredients 빼고 싶은 재료 이름 (말한 그대로)
  * @param useSelectedOnly    고른·말한 재료를 꼭 쓰는 레시피만 원하는지
@@ -36,10 +30,10 @@ import java.util.stream.Stream;
  * @param targetIndex        RECIPE_DETAIL일 때 직전 추천 카드 번호(1부터). 모르면 0
  * @param targetName         RECIPE_DETAIL일 때 말한 레시피 이름 (예: "깐풍기"). 없으면 빈 문자열
  * @param removed            이어짐일 때 지우라고 한 조건 종류 (RefineCondition 이름, "시간 상관없이" → MAX_MINUTES). 없으면 빈 목록
- * @param avoidTastes        피할 맛 (Member.Taste 이름, "매운 거 말고" → SPICY). 말하지 않았으면 빈 목록
+ * @param avoidTastes        피할 맛 (Member.Taste 이름, Jev, "매운 거 말고" → SPICY). 말하지 않았으면 빈 목록
  * @param detailQuestion     RECIPE_DETAIL일 때 질문 종류 (DetailQuestion 이름: HOW_TO, TIME, INGREDIENTS, TIP, OTHER). 다른 의도면 빈 값
- * @param fridgeScope        FRIDGE일 때 보여 줄 범위 (FridgeScope 이름: ALL, MEALKIT, IMMINENT). 다른 의도면 ALL
- * @param followsPrevious    이어짐: 추천일 때 [직전 추천]의 조건을 이어받아 일부만 바꾸는 추천인지. 직전 추천이 없거나 추천이 아니면 false.
+ * @param fridgeScope        FRIDGE일 때 보여 줄 범위 (FridgeScope 이름: ALL, MEALKIT, IMMINENT, SEASONING). 다른 의도면 ALL
+ * @param followsPrevious    이어짐(Jev): 추천일 때 [직전 추천]의 조건을 이어받아 일부만 바꾸는 추천인지. 직전 추천이 없거나 추천이 아니면 false.
  *                           최종 값은 follows()로 읽는다 (추천일 때만 뜻이 있다). 직전 추천이 없으면 아니오로 두는 것은 서비스 규칙이다 (IntentCorrector)
  */
 public record IntentResult(
@@ -80,104 +74,6 @@ public record IntentResult(
     private static final Set<String> SCOPE_NAMES = Arrays.stream(FridgeScope.values())
             .map(Enum::name)
             .collect(Collectors.toUnmodifiableSet());
-
-    public IntentResult(ChatIntent intent, List<String> wantedTastes, List<String> moodCategories, Integer maxMinutes,
-                        List<String> includeIngredients, List<String> excludeIngredients, Boolean useSelectedOnly,
-                        List<String> keywords, String dishText, String preferenceText, Integer targetIndex, String targetName,
-                        List<String> removed, List<String> avoidTastes, String detailQuestion, String fridgeScope) {
-        this(intent, wantedTastes, moodCategories, maxMinutes, includeIngredients, excludeIngredients, useSelectedOnly,
-                keywords, dishText, preferenceText, targetIndex, targetName, removed, avoidTastes, detailQuestion, fridgeScope, null);
-    }
-
-    public IntentResult(ChatIntent intent, List<String> wantedTastes, List<String> moodCategories, Integer maxMinutes,
-                        List<String> includeIngredients, List<String> excludeIngredients, Boolean useSelectedOnly,
-                        List<String> keywords, String dishText, String preferenceText, Integer targetIndex, String targetName,
-                        List<String> removed, List<String> avoidTastes, String detailQuestion) {
-        this(intent, wantedTastes, moodCategories, maxMinutes, includeIngredients, excludeIngredients, useSelectedOnly,
-                keywords, dishText, preferenceText, targetIndex, targetName, removed, avoidTastes, detailQuestion, null);
-    }
-
-    public IntentResult(ChatIntent intent, List<String> wantedTastes, List<String> moodCategories, Integer maxMinutes,
-                        List<String> includeIngredients, List<String> excludeIngredients, Boolean useSelectedOnly,
-                        List<String> keywords, String dishText, String preferenceText) {
-        this(intent, wantedTastes, moodCategories, maxMinutes, includeIngredients, excludeIngredients, useSelectedOnly,
-                keywords, dishText, preferenceText, null, null);
-    }
-
-    public IntentResult(ChatIntent intent, List<String> wantedTastes, List<String> moodCategories, Integer maxMinutes,
-                        List<String> includeIngredients, List<String> excludeIngredients, Boolean useSelectedOnly,
-                        List<String> keywords, String dishText, String preferenceText, Integer targetIndex, String targetName) {
-        this(intent, wantedTastes, moodCategories, maxMinutes, includeIngredients, excludeIngredients, useSelectedOnly,
-                keywords, dishText, preferenceText, targetIndex, targetName, null);
-    }
-
-    public IntentResult(ChatIntent intent, List<String> wantedTastes, List<String> moodCategories, Integer maxMinutes,
-                        List<String> includeIngredients, List<String> excludeIngredients, Boolean useSelectedOnly,
-                        List<String> keywords, String dishText, String preferenceText, Integer targetIndex, String targetName,
-                        List<String> removed) {
-        this(intent, wantedTastes, moodCategories, maxMinutes, includeIngredients, excludeIngredients, useSelectedOnly,
-                keywords, dishText, preferenceText, targetIndex, targetName, removed, null);
-    }
-
-    public IntentResult(ChatIntent intent, List<String> wantedTastes, List<String> moodCategories, Integer maxMinutes,
-                        List<String> includeIngredients, List<String> excludeIngredients, Boolean useSelectedOnly,
-                        List<String> keywords, String dishText, String preferenceText, Integer targetIndex, String targetName,
-                        List<String> removed, List<String> avoidTastes) {
-        this(intent, wantedTastes, moodCategories, maxMinutes, includeIngredients, excludeIngredients, useSelectedOnly,
-                keywords, dishText, preferenceText, targetIndex, targetName, removed, avoidTastes, null);
-    }
-
-    // 서버가 냉장고 보기·사기로 바꾼 결과. 범위와 말한 재료를 서버가 정한 값으로 바꾼다
-    public IntentResult withLookup(ChatIntent newIntent, FridgeScope scope, List<String> names) {
-        return new IntentResult(newIntent, wantedTastes, moodCategories, maxMinutes, names, excludeIngredients,
-                useSelectedOnly, keywords, dishText, preferenceText, targetIndex, targetName, removed, avoidTastes, detailQuestion,
-                scope.name(), false);
-    }
-
-    // 의도만 있고 조건은 하나도 말하지 않은 결과
-    public static IntentResult general() {
-        return new IntentResult(ChatIntent.GENERAL, null, null, null, null, null, null, null, null, null);
-    }
-
-    /**
-     * 값을 정리한다. 말하지 않은 칸(null)은 null로 둔다.
-     * 의도가 없으면 GENERAL, 맛은 Member.Taste에 있는 값만, 분류는 allowedCategories에 있는 값만 남긴다.
-     * 조리 시간이 0 이하면 null, 재료 이름·키워드는 앞뒤 공백을 지우고 빈 이름을 뺀다. 목록은 중복을 빼고, 키워드는 6개까지.
-     * 요리 이름(dishText)·원한 표현(preferenceText)·대상 레시피 이름(targetName)이 비어 있으면 null, 대상 카드 번호가 0 이하면 null.
-     * 뺄 조건(removed)은 RefineCondition에 있는 이름만 남긴다 (소문자는 대문자로).
-     *
-     * @param allowedCategories 고를 수 있는 레시피 분류
-     */
-    public IntentResult sanitize(Collection<String> allowedCategories) {
-        Set<String> categories = Set.copyOf(allowedCategories);
-        List<String> cleanCategories = cleanNames(moodCategories, name -> name, categories);
-        // 키워드는 이름만 다듬고 분류로 옮기지 않는다
-        List<String> cleanKeywords = keywords == null ? null
-                : cleanNames(keywords, name -> name, null).stream().limit(MAX_KEYWORDS).toList();
-        return new IntentResult(
-                intent == null ? ChatIntent.GENERAL : intent,
-                cleanNames(wantedTastes, name -> name.toUpperCase(Locale.ROOT), TASTE_NAMES),
-                cleanCategories,
-                maxMinutes == null || maxMinutes <= 0 ? null : maxMinutes,
-                cleanNames(includeIngredients, name -> name, null),
-                cleanNames(excludeIngredients, name -> name, null),
-                useSelectedOnly,
-                cleanKeywords,
-                dishText == null || dishText.isBlank() ? null : dishText.strip(),
-                preferenceText == null || preferenceText.isBlank() ? null : preferenceText.strip(),
-                targetIndex == null || targetIndex <= 0 ? null : targetIndex,
-                targetName == null || targetName.isBlank() ? null : targetName.strip(),
-                cleanNames(removed, name -> name.toUpperCase(Locale.ROOT), CONDITION_NAMES),
-                cleanNames(avoidTastes, name -> name.toUpperCase(Locale.ROOT), TASTE_NAMES),
-                detailQuestion == null || !QUESTION_NAMES.contains(detailQuestion.strip().toUpperCase(Locale.ROOT))
-                        ? null
-                        : detailQuestion.strip().toUpperCase(Locale.ROOT),
-                fridgeScope == null || !SCOPE_NAMES.contains(fridgeScope.strip().toUpperCase(Locale.ROOT))
-                        ? null
-                        : fridgeScope.strip().toUpperCase(Locale.ROOT),
-                followsPrevious
-        );
-    }
 
     // 분류·키워드·요리 이름·뺄 조건을 바꾼 결과 (요리 이름 확인, Jev 판단으로 만든 결과)
     public IntentResult withCategories(List<String> categories, List<String> keywords, String dishText, List<String> removed) {
@@ -237,12 +133,12 @@ public record IntentResult(
                 .toList();
     }
 
-    // 냉장고 보기 범위. sanitize한 뒤에 쓴다 (없거나 모르는 값이면 ALL)
+    // 냉장고 보기 범위 (없거나 모르는 값이면 ALL)
     public FridgeScope scope() {
         return fridgeScope == null || !SCOPE_NAMES.contains(fridgeScope) ? FridgeScope.ALL : FridgeScope.valueOf(fridgeScope);
     }
 
-    // 빼라고 한 조건 종류. sanitize한 뒤에 쓴다 (없으면 빈 집합)
+    // 빼라고 한 조건 종류 (없으면 빈 집합)
     public Set<RefineCondition> removedConditions() {
         if (removed == null) {
             return Set.of();
@@ -253,12 +149,12 @@ public record IntentResult(
                 .collect(Collectors.toUnmodifiableSet());
     }
 
-    // 레시피 자세히 질문 종류. sanitize한 뒤에 쓴다 (없으면 null)
+    // 레시피 자세히 질문 종류 (없으면 null)
     public DetailQuestion question() {
         return detailQuestion == null || !QUESTION_NAMES.contains(detailQuestion) ? null : DetailQuestion.valueOf(detailQuestion);
     }
 
-    // 피할 맛을 Member.Taste로 바꾼다. sanitize한 뒤에 쓴다 (말하지 않았으면 빈 목록)
+    // 피할 맛을 Member.Taste로 바꾼다 (말하지 않았으면 빈 목록)
     public List<Member.Taste> avoidedTastes() {
         if (avoidTastes == null) {
             return List.of();
@@ -269,7 +165,7 @@ public record IntentResult(
                 .toList();
     }
 
-    // 맛 이름을 Member.Taste로 바꾼다. sanitize한 뒤에 쓴다 (말하지 않았으면 빈 목록)
+    // 맛 이름을 Member.Taste로 바꾼다 (말하지 않았으면 빈 목록)
     public List<Member.Taste> tastes() {
         if (wantedTastes == null) {
             return List.of();
@@ -277,24 +173,6 @@ public record IntentResult(
         return wantedTastes.stream()
                 .filter(TASTE_NAMES::contains)
                 .map(Member.Taste::valueOf)
-                .toList();
-    }
-
-    private static List<String> cleanNames(
-            List<String> names,
-            UnaryOperator<String> transform,
-            Set<String> allowed
-    ) {
-        if (names == null) {
-            return null;
-        }
-        return names.stream()
-                .filter(Objects::nonNull)
-                .map(String::trim)
-                .filter(name -> !name.isEmpty())
-                .map(transform)
-                .filter(name -> allowed == null || allowed.contains(name))
-                .distinct()
                 .toList();
     }
 }

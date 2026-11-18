@@ -21,7 +21,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assumptions.assumeThat;
 
 /**
  * 비슷한 요리 AI 평가 (수동, 실제 OpenAI 호출). 정한 요리 이름마다 비슷한 요리 목록과 개수를 CSV로만 남긴다 (일치 판정 없음).
@@ -46,7 +46,8 @@ class SimilarDishEvalManualTest {
     @DisplayName("정한 요리 이름마다 실제 AI로 비슷한 요리를 묻고 목록과 개수를 CSV로 남긴다")
     void runsSimilarDishes() throws IOException {
         String apiKey = System.getenv("OPENAI_INTENT_EVAL_KEY");
-        assertThat(apiKey).as("OPENAI_INTENT_EVAL_KEY가 없음").isNotBlank();
+        // 키가 없으면 실패하지 않고 건너뛴다 (평가 플래그만 셸에 남아 있는 경우)
+        assumeThat(apiKey).as("OPENAI_INTENT_EVAL_KEY가 없음").isNotBlank();
         int runs = Integer.parseInt(Optional.ofNullable(System.getenv("OPENAI_INTENT_EVAL_RUNS")).orElse("3"));
         UsageRecorder usage = new UsageRecorder();
         OpenAiChatModel model = OpenAiChatModel.builder()
