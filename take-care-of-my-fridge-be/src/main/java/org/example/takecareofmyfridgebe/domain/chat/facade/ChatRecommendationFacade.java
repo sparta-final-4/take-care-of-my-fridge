@@ -79,6 +79,8 @@ public class ChatRecommendationFacade {
     private static final int FINAL_RIEUL = 8;
     // AI 실패 시 서버 답에서 인기 레시피 카드 이유
     static final String POPULAR_CARD_REASON = "요즘 많이 만드는 레시피예요";
+    // 서버 답에서 읽을 인기 레시피 수. 뺄 재료(알레르기)가 든 레시피를 빼고도 카드 3장을 채울 수 있게 넉넉히 읽는다
+    static final int POPULAR_FETCH_COUNT = 10;
 
     private final RecipeCandidateFacade recipeCandidateFacade;
     private final RecipeCardDescriber recipeCardDescriber;
@@ -283,6 +285,8 @@ public class ChatRecommendationFacade {
      *   <li>없으면 냉장고 재료 기반 추천 카드. 냉장고 재료가 없으면(고른 레시피에 가진 재료가 하나도 없으면) 인기 레시피 카드</li>
      *   <li>카드가 0장이거나 후보 검색이 실패하면 인기 레시피 카드 (인기 레시피도 없거나 읽지 못하면 0장)</li>
      * </ul>
+     * 뺄 재료(알레르기 재료 포함)가 든 레시피는 어느 카드에서도 빠진다: 선택·냉장고 재료 카드는 후보 검색(RecipeCandidateScorer)이,
+     * 인기 레시피 카드는 popularCards가 뺀다.
      *
      * @param query 선택 재료(와 선택 재료만 쓰기)만 있는 조건. 요리 이름·키워드가 없어 비슷한 요리·벡터 검색(AI)을 부르지 않는다
      */
@@ -301,15 +305,25 @@ public class ChatRecommendationFacade {
         } catch (RuntimeException e) {
             log.warn("상담 서버 답 후보 검색 실패, 인기 레시피로 - memberId: {}, 원인: {}", query.memberId(), e.toString());
         }
-        return new FallbackCards(ChatRecommendationsEventResponse.of(popularCards(query.memberId())), true);
+        return new FallbackCards(ChatRecommendationsEventResponse.of(popularCards(query)), true);
     }
 
-    // 인기 레시피 카드 (최대 {@value RecommendationPicker#PICK_COUNT}장, 카드의 임박·장볼 재료는 지금 냉장고 기준). 읽지 못하면 0장
-    private List<RecommendedRecipe> popularCards(Long memberId) {
+    /**
+     * 인기 레시피 카드 (최대 {@value RecommendationPicker#PICK_COUNT}장, 카드의 임박·장볼 재료는 지금 냉장고 기준). 읽지 못하면 0장.
+     * 뺄 재료(이 상담에서 말한 알레르기 재료 포함)가 들어간 레시피는 뺀다. 빼고 남은 것이 없으면 0장이다.
+     */
+    private List<RecommendedRecipe> popularCards(RecipeQuery query) {
+        Long memberId = query.memberId();
         try {
-            List<Long> recipeIds = popularRecipeService.getPopularRecipes(RecommendationPicker.PICK_COUNT).stream()
+            Set<Long> excludedRecipeIds = recipesWithExcludedIngredients(query);
+            List<Long> recipeIds = popularRecipeService.getPopularRecipes(POPULAR_FETCH_COUNT).stream()
                     .map(PopularRecipeResponse::recipeId)
+                    .filter(recipeId -> !excludedRecipeIds.contains(recipeId))
+                    .limit(RecommendationPicker.PICK_COUNT)
                     .toList();
+            if (!excludedRecipeIds.isEmpty()) {
+                log.info("상담 서버 답 인기 레시피에서 뺄 재료가 든 레시피를 뺌 - memberId: {}, 남은 레시피 수: {}", memberId, recipeIds.size());
+            }
             Map<Long, RecipeCandidate> described = recipeIds.isEmpty() ? Map.of()
                     : recipeCardDescriber.describeRecipes(memberId, recipeIds);
             List<RecipeCandidate> picked = recipeIds.stream().map(described::get).filter(Objects::nonNull).toList();
@@ -321,6 +335,16 @@ public class ChatRecommendationFacade {
             log.warn("상담 서버 답 인기 레시피 읽기 실패, 카드 없이 - memberId: {}, 원인: {}", memberId, e.toString());
             return List.of();
         }
+    }
+
+    // 뺄 재료가 하나라도 들어간 레시피 ID (뺄 재료가 없으면 빈 집합)
+    private Set<Long> recipesWithExcludedIngredients(RecipeQuery query) {
+        if (query.excludeIngredientIds().isEmpty()) {
+            return Set.of();
+        }
+        return recipeService.findCandidateIngredients(query.excludeIngredientIds()).stream()
+                .map(RecipeCandidateIngredient::recipeId)
+                .collect(Collectors.toSet());
     }
 
     /**
@@ -355,9 +379,7 @@ public class ChatRecommendationFacade {
         if (mealkits.isEmpty() || query.excludeIngredientIds().isEmpty()) {
             return mealkits;
         }
-        Set<Long> excludedRecipeIds = recipeService.findCandidateIngredients(query.excludeIngredientIds()).stream()
-                .map(RecipeCandidateIngredient::recipeId)
-                .collect(Collectors.toSet());
+        Set<Long> excludedRecipeIds = recipesWithExcludedIngredients(query);
         List<String> excludedNames = ingredientService.getIngredientsByIds(query.excludeIngredientIds()).values().stream()
                 .map(ingredient -> ChatTexts.removeWhitespace(ingredient.getName()))
                 .filter(name -> name.length() >= 2)

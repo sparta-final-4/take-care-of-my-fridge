@@ -713,7 +713,7 @@ class ChatRecommendationFacadeTest {
     void serverFallback_returnsPopularOrEmpty_whenSearchFails() {
         RecipeQuery query = RecipeQuery.of(MEMBER_ID, List.of());
         when(recipeCandidateFacade.findCandidates(query)).thenThrow(new IllegalStateException("db down"));
-        when(popularRecipeService.getPopularRecipes(3)).thenReturn(List.of());
+        when(popularRecipeService.getPopularRecipes(ChatRecommendationFacade.POPULAR_FETCH_COUNT)).thenReturn(List.of());
 
         ChatRecommendationFacade.FallbackCards cards = facade.serverFallback(query);
 
@@ -721,12 +721,53 @@ class ChatRecommendationFacadeTest {
         assertThat(cards.event().empty()).isTrue();
     }
 
+    @Test
+    @DisplayName("서버 답 인기 레시피 카드에서 뺄 재료(알레르기)가 든 레시피를 빼고 남은 인기 레시피로 채운다")
+    void serverFallback_dropsPopularWithExcludedIngredients_whenAllergic() {
+        RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, null, null, List.of(101L), false, null, null);
+        when(recipeCandidateFacade.findCandidates(query)).thenReturn(new RecipeCandidates(List.of(), false, false));
+        when(recipeService.findCandidateIngredients(List.of(101L))).thenReturn(List.of(
+                new RecipeCandidateIngredient(30L, 101L, "땅콩", false)));
+        when(popularRecipeService.getPopularRecipes(ChatRecommendationFacade.POPULAR_FETCH_COUNT)).thenReturn(List.of(
+                popular(30L), popular(40L), popular(50L), popular(60L)));
+        when(recipeCardDescriber.describeRecipes(MEMBER_ID, List.of(40L, 50L, 60L))).thenReturn(Map.of(
+                40L, candidate(40L, "인기40", "찌개", 20, reason(List.of())),
+                50L, candidate(50L, "인기50", "찌개", 20, reason(List.of())),
+                60L, candidate(60L, "인기60", "찌개", 20, reason(List.of()))));
+        when(recipeService.findSummaries(any())).thenReturn(Map.of());
+
+        ChatRecommendationFacade.FallbackCards cards = facade.serverFallback(query);
+
+        assertThat(cards.popular()).isTrue();
+        assertThat(cards.event().recipes()).extracting(RecommendedRecipe::recipeId).containsExactly(40L, 50L, 60L);
+    }
+
+    @Test
+    @DisplayName("서버 답 인기 레시피가 모두 뺄 재료(알레르기)를 쓰면 카드 0장으로 답한다")
+    void serverFallback_returnsEmpty_whenAllPopularHaveExcludedIngredients() {
+        RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, null, null, List.of(101L), false, null, null);
+        when(recipeCandidateFacade.findCandidates(query)).thenReturn(new RecipeCandidates(List.of(), false, false));
+        when(recipeService.findCandidateIngredients(List.of(101L))).thenReturn(List.of(
+                new RecipeCandidateIngredient(30L, 101L, "땅콩", false),
+                new RecipeCandidateIngredient(40L, 101L, "땅콩", false)));
+        when(popularRecipeService.getPopularRecipes(ChatRecommendationFacade.POPULAR_FETCH_COUNT)).thenReturn(List.of(
+                popular(30L), popular(40L)));
+
+        ChatRecommendationFacade.FallbackCards cards = facade.serverFallback(query);
+
+        assertThat(cards.popular()).isTrue();
+        assertThat(cards.event().empty()).isTrue();
+        verifyNoInteractions(recipeCardDescriber);
+    }
+
+    private static PopularRecipeResponse popular(Long id) {
+        return new PopularRecipeResponse(id, "인기" + id, null, null, 10L, 4.5, 3L);
+    }
+
     // 인기 레시피 순위와 그 레시피의 카드 재료 (지금 냉장고 기준)
     private void givenPopular(Long... recipeIds) {
-        List<PopularRecipeResponse> popular = Arrays.stream(recipeIds)
-                .map(id -> new PopularRecipeResponse(id, "인기" + id, null, null, 10L, 4.5, 3L))
-                .toList();
-        when(popularRecipeService.getPopularRecipes(3)).thenReturn(popular);
+        List<PopularRecipeResponse> popular = Arrays.stream(recipeIds).map(ChatRecommendationFacadeTest::popular).toList();
+        when(popularRecipeService.getPopularRecipes(ChatRecommendationFacade.POPULAR_FETCH_COUNT)).thenReturn(popular);
         Map<Long, RecipeCandidate> described = new HashMap<>();
         Arrays.stream(recipeIds).forEach(id -> described.put(id, candidate(id, "인기" + id, "찌개", 20, reason(List.of()))));
         when(recipeCardDescriber.describeRecipes(MEMBER_ID, List.of(recipeIds))).thenReturn(described);
