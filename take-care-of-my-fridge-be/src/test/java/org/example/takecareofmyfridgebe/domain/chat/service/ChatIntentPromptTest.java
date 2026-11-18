@@ -25,7 +25,7 @@ class ChatIntentPromptTest {
     void instructsFeatureToDishKeywords() {
         assertThat(prompt).contains("특징도 빼지 말고 그런 요리 이름으로 바꾼다",
                 "keywords: 특징만 말했을 때(\"차가운 요리\", \"시원한 국물\") 그 특징에 맞는 구체적인 요리 이름을 넣는다",
-                "\"차가운 요리 추천해줘\" → dishText: 빈 문자열 / keywords: 샐러드, 냉채, 냉국, 무침, 냉파스타, 냉면",
+                "\"차가운 요리 추천해줘\" → dishText는 비운다 / keywords: 샐러드, 냉채, 냉국, 무침, 냉파스타, 냉면",
                 "\"차가운 면\" → keywords: 냉면, 막국수, 콩국수, 냉메밀 / moodCategories: 면류",
                 "분류로 딱 맞게 나뉘는 말(\"따뜻한 국물\")은 moodCategories로만 쓴다")
                 .doesNotContain("넓은 말");
@@ -39,17 +39,18 @@ class ChatIntentPromptTest {
     }
 
     @Test
-    @DisplayName("요리 이름은 \"○○ 같은 요리·거\"에서도, 처음 듣는 이름이어도 말한 그대로 dishText에 쓰고, 레시피·만드는 법 같은 말과 분류·특징은 넣지 않는다고 일반 예시로 지시한다")
+    @DisplayName("dishText는 원하는 요리와 비슷한 것을 찾을 기준 요리의 이름이고, 뺄 요리·분류·재료와 레시피·만드는 법 같은 말은 넣지 않으며, 맛·재료에 붙은 말고·빼고는 요리 이름을 지우지 않는다고 일반 예시로 지시한다")
     void instructsDishText() {
         assertThat(prompt).contains(
-                "- dishText: 요리 이름을 말했으면 말한 그대로 쓴다. \"○○ 같은 요리\", \"○○ 같은 거\"에서도 ○○이 요리 이름이다",
-                "처음 듣는 이름이어도 말한 그대로 쓴다",
+                "- dishText: 사용자가 원하는 요리이거나, 비슷한 것을 찾을 기준으로 말한 요리의 이름. 처음 듣는 요리 이름이어도 사용자가 말한 그대로 쓴다. \"○○ 같은 것\"의 ○○도 여기에 쓴다.",
+                "빼 달라거나 피하고 싶다고 말한 요리는 쓰지 않는다. \"말고\"·\"빼고\"가 맛이나 재료에 붙었으면 요리 이름은 그대로 쓴다.",
+                "분류나 종류(찌개, 국물, 디저트)와 재료 이름은 요리 이름이 아니다.",
+                "\"짠 거 말고 된장찌개 같은 거\" → dishText: 된장찌개 / \"된장찌개 말고 다른 거\" → dishText는 비운다",
                 "\"레시피\", \"만드는 법\", \"추천\" 같은 말은 요리 이름에 넣지 않는다",
-                "분류·요리 종류(\"디저트\", \"국물\", \"반찬\")나 특징(\"따뜻한 국물\", \"매운 요리\")은 요리 이름이 아니라 빈 문자열이다",
                 "\"○○ 같은 요리 추천해줘\" → dishText: ○○ / keywords: ○○",
                 "\"닭볶음탕 레시피 알려줘\" → dishText: 닭볶음탕 / keywords: 닭볶음탕",
-                "\"시원한 국물 요리\" → dishText: 빈 문자열 / keywords: 냉국, 오이냉국, 냉면, 물회",
-                "\"디저트 추천해줘\" → dishText: 빈 문자열 / keywords: 빈 목록 / moodCategories: 디저트",
+                "\"시원한 국물 요리\" → dishText는 비운다 / keywords: 냉국, 오이냉국, 냉면, 물회",
+                "\"디저트 추천해줘\" → dishText는 비운다 / keywords: 빈 목록 / moodCategories: 디저트",
                 "dishText·preferenceText 빈 문자열");
     }
 
@@ -118,7 +119,7 @@ class ChatIntentPromptTest {
     void dropsCaseSpecificDishRules() throws IOException {
         String followUp = new ClassPathResource("prompts/chat-intent-followup.txt").getContentAsString(StandardCharsets.UTF_8);
 
-        assertThat(prompt).doesNotContain("레시피에 없을 법하면", "\"같은\"이 없어도", "세트 메뉴", "그 이름을 맨 앞에",
+        assertThat(prompt).doesNotContain("짬뽕", "레시피에 없을 법하면", "\"같은\"이 없어도", "세트 메뉴", "그 이름을 맨 앞에",
                 "김피탕", "탕수육", "깐풍기", "튀김 요리다", "탕짜면", "짬짜면");
         assertThat(prompt).contains("moodCategories는 요리의 분류가 확실할 때만 넣는다");
         // 후속 규칙은 요리 이름 늘리기를 되풀이하지 않고 첫 질문 규칙을 따르게 한다

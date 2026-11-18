@@ -7,6 +7,7 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.KeywordMatch;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidate;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeCandidates;
 import org.example.takecareofmyfridgebe.domain.chat.dto.RecipeQuery;
+import org.example.takecareofmyfridgebe.domain.chat.dto.SimilarDishes;
 import org.example.takecareofmyfridgebe.domain.chat.facade.RecipeCandidateCollector.CandidatePool;
 import org.example.takecareofmyfridgebe.domain.chat.facade.RecipeTasteReader.SpicyRecipes;
 import org.example.takecareofmyfridgebe.domain.chat.facade.RecipeTasteReader.TasteDetails;
@@ -132,9 +133,10 @@ public class RecipeCandidateFacade {
      *
      * @param query        선택 재료 묶음을 채운 검색 조건
      * @param memberTastes 정렬에 쓸 회원 선호 맛 (원하는 맛을 말했으면 비고, 피할 맛은 뺐다)
+     * @param formalName   요리 이름이 줄임말일 때의 정식 이름 (비슷한 요리 단계에서 채운다. 없으면 null). 이 이름으로 맞은 레시피는 요리 이름과 같은 순위다
      */
     private record Context(RecipeQuery query, RecipeCandidateScorer scorer, List<FridgeStock> fridge,
-                           List<Member.Taste> memberTastes) {
+                           List<Member.Taste> memberTastes, String formalName) {
     }
 
     /**
@@ -151,8 +153,8 @@ public class RecipeCandidateFacade {
 
     // 모은 후보로 키워드 맞은 방식을 가른다 (정렬은 하지 않는다)
     private static Collected classified(Context context, CandidatePool pool, PoolDetails details) {
-        RecipeQuery query = context.query().withKeywordMatches(
-                classifyKeywordHits(context.query(), pool.keywordHits(), pool.fragments(), pool.rows(), details.infos()));
+        RecipeQuery query = context.query().withKeywordMatches(classifyKeywordHits(context.query(), context.formalName(),
+                pool.keywordHits(), pool.fragments(), pool.rows(), details.infos()));
         return new Collected(pool, details, query, Set.of(), 0, 0);
     }
 
@@ -179,7 +181,7 @@ public class RecipeCandidateFacade {
                 .filter(taste -> !grouped.avoidTastes().contains(taste))
                 .toList()
                 : List.of();
-        return new Context(grouped, scorer, fridge, memberTastes);
+        return new Context(grouped, scorer, fridge, memberTastes, null);
     }
 
     // 1. 모으기: ES(실패하면 DB) 경로로 모아 정보·맛을 읽고 키워드 맞은 방식을 가른다
@@ -194,7 +196,9 @@ public class RecipeCandidateFacade {
 
     // 1-1. 비슷한 요리: ES 경로에서 요리 이름이 있고 그 이름 그대로 맞은 레시피(KeywordMatch NAME)가 없을 때만,
     // 비슷한 요리(캐시가 없으면 AI 호출 한 번)를 키워드 뒤에 더하고 글자로 찾아 후보에 더한다. 맞은 방식(늘린 이름)은 더한 키워드로 가른다.
-    // 비슷한 요리가 없거나(AI 실패 포함) 이미 키워드에 있으면 그대로 둔다. "김치찌개"처럼 이름 그대로 찾히면 부르지 않는다
+    // 같은 호출이 요리 이름의 정식 이름(줄임말일 때)도 준다. 찾는 순서는 요리 이름(이미 찾음) → 정식 이름 → 비슷한 요리이고,
+    // 정식 이름으로 맞은 레시피는 요리 이름과 같은 순위(NAME)다. 정식 이름이 필요한 경우도 요리 이름이 그대로 맞지 않은 경우라 호출 조건은 같다.
+    // 정식 이름·비슷한 요리가 없거나(AI 실패 포함) 이미 키워드에 있으면 그대로 둔다. "김치찌개"처럼 이름 그대로 찾히면 부르지 않는다
     private Expanded addSimilarDishes(Context context, Collected collected) {
         RecipeQuery query = context.query();
         if (!collected.pool().rowsNonBasicComplete() || query.keywordText() == null || hasNameMatch(collected)) {
@@ -202,17 +206,21 @@ public class RecipeCandidateFacade {
         }
         Set<String> known = query.keywords().stream().map(ChatTexts::removeWhitespace).collect(Collectors.toSet());
         known.add(ChatTexts.removeWhitespace(query.keywordText()));
-        List<String> similar = similarDishFinder.find(query.memberId(), query.keywordText()).stream()
-                .filter(dish -> !known.contains(ChatTexts.removeWhitespace(dish)))
+        SimilarDishes found = similarDishFinder.find(query.memberId(), query.keywordText());
+        String formalName = found.formalName() != null && !known.contains(ChatTexts.removeWhitespace(found.formalName()))
+                ? found.formalName() : null;
+        List<String> names = Stream.concat(Stream.ofNullable(formalName), found.dishes().stream())
+                .filter(dish -> known.add(ChatTexts.removeWhitespace(dish)))
                 .toList();
-        if (similar.isEmpty()) {
+        if (names.isEmpty()) {
             return new Expanded(context, collected);
         }
-        RecipeQuery expandedQuery = query.withKeywords(Stream.concat(query.keywords().stream(), similar.stream()).toList());
-        Context expandedContext = new Context(expandedQuery, context.scorer(), context.fridge(), context.memberTastes());
-        CandidatePool found = recipeCandidateCollector.searchSimilarDishes(expandedQuery, similar, collected.pool().recipeIds());
-        return new Expanded(expandedContext, merge(expandedContext, collected, found, "+비슷한 요리",
-                ", 비슷한 요리 " + similar + " 새로 " + found.recipeIds().size()));
+        RecipeQuery expandedQuery = query.withKeywords(Stream.concat(query.keywords().stream(), names.stream()).toList());
+        Context expandedContext = new Context(expandedQuery, context.scorer(), context.fridge(), context.memberTastes(), formalName);
+        CandidatePool pool = recipeCandidateCollector.searchSimilarDishes(expandedQuery, names, collected.pool().recipeIds());
+        return new Expanded(expandedContext, merge(expandedContext, collected, pool, "+비슷한 요리",
+                (formalName == null ? "" : ", 정식 이름 " + formalName) + ", 비슷한 요리 " + found.dishes()
+                        + " 새로 " + pool.recipeIds().size()));
     }
 
     // 요리 이름 그대로 맞은 레시피(KeywordMatch NAME)가 있는지
@@ -413,6 +421,7 @@ public class RecipeCandidateFacade {
     // 키워드로 찾은 레시피가 이름·늘린 이름·재료·이름 조각·쪼개짐·벡터 중 어떻게 맞았는지 가른다 (레시피 정보·재료는 후보 전체를 읽은 것을 쓴다)
     private static Map<Long, KeywordMatch> classifyKeywordHits(
             RecipeQuery query,
+            String formalName,
             Map<Long, Boolean> keywordHits,
             List<String> fragments,
             List<RecipeCandidateIngredient> rows,
@@ -429,7 +438,7 @@ public class RecipeCandidateFacade {
         keywordHits.forEach((recipeId, vectorOnly) -> {
             RecipeCandidateInfo info = infos.get(recipeId);
             if (info != null) {
-                matches.put(recipeId, KeywordMatchClassifier.classify(query.keywordText(), query.keywords(), fragments,
+                matches.put(recipeId, KeywordMatchClassifier.classify(query.keywordText(), formalName, query.keywords(), fragments,
                         vectorOnly, info.name(), ingredientNames.getOrDefault(recipeId, List.of())));
             }
         });

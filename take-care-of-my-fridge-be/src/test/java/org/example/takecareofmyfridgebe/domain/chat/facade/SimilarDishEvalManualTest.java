@@ -65,7 +65,7 @@ class SimilarDishEvalManualTest {
                 String source = "AI";
                 List<String> generated = List.of();
                 try {
-                    generated = generator.generate(1L, dish);
+                    generated = generator.generate(1L, dish).dishes();
                 } catch (RuntimeException e) {
                     source = "AI_FAILED " + e;
                 }
