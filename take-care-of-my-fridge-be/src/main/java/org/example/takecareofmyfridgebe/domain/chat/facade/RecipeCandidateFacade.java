@@ -33,6 +33,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -77,29 +78,31 @@ public class RecipeCandidateFacade {
         collected = needsKeywordSupplement(context, collected)
                 ? supplementKeywords(context, collected)
                 : supplementDishFragments(context, collected);
-        collected = refillAvoided(context, collected);
-        logCollected(context, collected, started);
-        RecipeCandidates result = toResult(context, collected);
+        // 정렬은 여기서 한 번 한다. 피할 맛 때문에 3개가 안 되면 피할 맛 레시피를 더해 다시 정렬한다
+        RecipeCandidates ranked = rankPool(context, collected);
+        if (needsAvoidedRefill(context, collected, ranked)) {
+            collected = refillAvoided(context, collected);
+            ranked = collected.refilled() > 0 ? rankPool(context, collected) : ranked;
+        }
+        logCollected(context, collected, ranked, started);
         RecipeQuery query = context.query();
-        if (!dishAsked(query) || hasStrongCandidate(result)) {
-            return result;
-        }
         // 요리 이름을 말했는데 제대로 맞은 후보가 없으면(벡터 후보만 남음, 또는 0장) 못 찾은 것으로 알린다
-        RecipeCandidates notFound = new RecipeCandidates(result.candidates(), result.fallback(), true, result.keptAvoidTastes())
-                .withTasteDetails(result.recipeTastes(), result.maybeSpicyIds());
-        if (!notFound.candidates().isEmpty()) {
-            log.info("상담 후보 요리 이름이 맞은 레시피가 없어 벡터 후보만 씀 - memberId: {}, 요리 이름: {}, 키워드: {}, 후보 {}건",
-                    query.memberId(), query.keywordText(), query.keywords(), notFound.candidates().size());
-            return notFound;
+        boolean dishNotFound = dishAsked(query)
+                && !anyStrong(ranked.candidates().stream().map(candidate -> candidate.reason().keywordMatch()));
+        RecipeCandidates result = toResult(context, collected, ranked, dishNotFound);
+        if (dishNotFound && result.candidates().isEmpty()) {
+            return withEmptyReason(query, result);
         }
-        return withEmptyReason(query, notFound);
+        if (dishNotFound) {
+            log.info("상담 후보 요리 이름이 맞은 레시피가 없어 벡터 후보만 씀 - memberId: {}, 요리 이름: {}, 키워드: {}, 후보 {}건",
+                    query.memberId(), query.keywordText(), query.keywords(), result.candidates().size());
+        }
+        return result;
     }
 
-    // 키워드로 제대로 맞은(이름·늘린 이름·재료·이름 조각) 후보가 있는지
-    private static boolean hasStrongCandidate(RecipeCandidates result) {
-        return result.candidates().stream()
-                .map(candidate -> candidate.reason().keywordMatch())
-                .anyMatch(match -> match != null && match.strong());
+    // 키워드로 제대로 맞은(이름·늘린 이름·재료·이름 조각) 것이 있는지 (쪼개짐·벡터는 맞은 것으로 치지 않는다)
+    private static boolean anyStrong(Stream<KeywordMatch> matches) {
+        return matches.anyMatch(match -> match != null && match.strong());
     }
 
     // 요리 이름을 말했는지 (요리 이름, 또는 특징 없이 키워드만).
@@ -137,10 +140,28 @@ public class RecipeCandidateFacade {
     /**
      * 단계마다 쌓이는 후보.
      *
-     * @param refilled    피할 맛 없이 다시 검색해서 채운 레시피 수. 로그용
-     * @param refillCalls 피할 맛 다시 검색의 ES 호출 수. 로그용
+     * @param query        키워드로 찾은 레시피가 어떻게 맞았는지(이름·재료 등)를 채운 검색 조건
+     * @param knownAvoided 피할 맛 없이 다시 검색해서 새로 나온 레시피 (피할 맛 레시피로 본다)
+     * @param refilled     피할 맛 없이 다시 검색해서 채운 레시피 수. 로그용
+     * @param refillCalls  피할 맛 다시 검색의 ES 호출 수. 로그용
      */
-    private record Collected(CandidatePool pool, PoolDetails details, Ranked ranked, int refilled, int refillCalls) {
+    private record Collected(CandidatePool pool, PoolDetails details, RecipeQuery query, Set<Long> knownAvoided,
+                             int refilled, int refillCalls) {
+    }
+
+    // 모은 후보로 키워드 맞은 방식을 가른다 (정렬은 하지 않는다)
+    private static Collected classified(Context context, CandidatePool pool, PoolDetails details) {
+        RecipeQuery query = context.query().withKeywordMatches(
+                classifyKeywordHits(context.query(), pool.keywordHits(), pool.fragments(), pool.rows(), details.infos()));
+        return new Collected(pool, details, query, Set.of(), 0, 0);
+    }
+
+    // 찾은 후보를 뒤에 합치고 새 레시피의 정보·맛을 읽어 맞은 방식을 다시 가른다. 로그용 경로·검색별 수는 뒤에 붙인다
+    private Collected merge(Context context, Collected collected, CandidatePool found, String route, String counts) {
+        CandidatePool pool = collected.pool();
+        CandidatePool merged = pool.plus(found).withLog(pool.route() + route, pool.counts() + counts);
+        return classified(context, merged,
+                collected.details().plus(loadDetails(found, context.query(), context.memberTastes())));
     }
 
     private Context prepare(RecipeQuery request) {
@@ -161,11 +182,10 @@ public class RecipeCandidateFacade {
         return new Context(grouped, scorer, fridge, memberTastes);
     }
 
-    // 1. 모으기: ES(실패하면 DB) 경로로 모아 정보·맛을 읽고 정렬한다
+    // 1. 모으기: ES(실패하면 DB) 경로로 모아 정보·맛을 읽고 키워드 맞은 방식을 가른다
     private Collected collect(Context context) {
         CandidatePool pool = recipeCandidateCollector.collectCandidates(context.query(), context.fridge(), context.scorer());
-        PoolDetails details = loadDetails(pool, context.query(), context.memberTastes());
-        return new Collected(pool, details, rankPool(context, pool, details, Set.of()), 0, 0);
+        return classified(context, pool, loadDetails(pool, context.query(), context.memberTastes()));
     }
 
     // 비슷한 요리를 더한 검색 조건과 후보
@@ -190,18 +210,14 @@ public class RecipeCandidateFacade {
         }
         RecipeQuery expandedQuery = query.withKeywords(Stream.concat(query.keywords().stream(), similar.stream()).toList());
         Context expandedContext = new Context(expandedQuery, context.scorer(), context.fridge(), context.memberTastes());
-        CandidatePool pool = collected.pool();
-        CandidatePool found = recipeCandidateCollector.searchSimilarDishes(expandedQuery, similar, pool.recipeIds());
-        CandidatePool merged = pool.plus(found).withLog(pool.route() + "+비슷한 요리",
-                pool.counts() + ", 비슷한 요리 " + similar + " 새로 " + found.recipeIds().size());
-        PoolDetails details = collected.details().plus(loadDetails(found, expandedQuery, context.memberTastes()));
-        return new Expanded(expandedContext, new Collected(merged, details, rankPool(expandedContext, merged, details, Set.of()),
-                collected.refilled(), collected.refillCalls()));
+        CandidatePool found = recipeCandidateCollector.searchSimilarDishes(expandedQuery, similar, collected.pool().recipeIds());
+        return new Expanded(expandedContext, merge(expandedContext, collected, found, "+비슷한 요리",
+                ", 비슷한 요리 " + similar + " 새로 " + found.recipeIds().size()));
     }
 
     // 요리 이름 그대로 맞은 레시피(KeywordMatch NAME)가 있는지
     private static boolean hasNameMatch(Collected collected) {
-        return collected.ranked().query().keywordMatches().values().stream()
+        return collected.query().keywordMatches().values().stream()
                 .anyMatch(match -> match.type() == KeywordMatch.Type.NAME);
     }
 
@@ -212,25 +228,16 @@ public class RecipeCandidateFacade {
     // 분석기가 고쳐지면 ES 키워드 표시만으로 정하도록 걷어낸다
     private static boolean needsKeywordSupplement(Context context, Collected collected) {
         return collected.pool().rowsNonBasicComplete() && !context.query().keywords().isEmpty()
-                && !hasStrongKeywordMatch(collected.ranked().query());
+                && !anyStrong(collected.query().keywordMatches().values().stream());
     }
 
     private Collected supplementKeywords(Context context, Collected collected) {
         CandidatePool pool = collected.pool();
-        RecipeQuery query = context.query();
-        CandidatePool supplement = recipeCandidateCollector.searchKeywordsOnce(query, pool.recipeIds());
-        String route = pool.route() + "+벡터";
-        String counts = pool.counts() + ", 벡터 보충 새로 " + supplement.recipeIds().size()
+        CandidatePool supplement = recipeCandidateCollector.searchKeywordsOnce(context.query(), pool.recipeIds());
+        String counts = ", 벡터 보충 새로 " + supplement.recipeIds().size()
                 + (supplement.fragments().isEmpty() ? "" : " (이름 조각 " + supplement.fragments() + ")");
-        // 새로 찾은 게 없어도 합친다 (벡터를 불렀는지 로그에 남기려고)
-        CandidatePool merged = pool.plus(supplement);
-        PoolDetails details = collected.details();
-        Ranked ranked = collected.ranked();
-        if (!supplement.recipeIds().isEmpty()) {
-            details = details.plus(loadDetails(supplement, query, context.memberTastes()));
-            ranked = rankPool(context, merged, details, Set.of());
-        }
-        return new Collected(merged.withLog(route, counts), details, ranked, collected.refilled(), collected.refillCalls());
+        // 새로 찾은 게 없어도 합친다 (벡터를 불렀는지 로그에 남기고, 이미 모은 후보를 다시 찾았으면 키워드 결과로 표시하려고)
+        return merge(context, collected, supplement, "+벡터", counts);
     }
 
     // 2-1. 이름 조각: 키워드 보충을 하지 않았어도(비슷한 요리가 맞음) 요리 이름 그대로 맞은 레시피(KeywordMatch NAME)가 없으면
@@ -238,71 +245,61 @@ public class RecipeCandidateFacade {
     // "김치찌개"처럼 이름 그대로 찾히면 하지 않는다. ES 호출은 분석 1번 + 조각마다 1번
     private Collected supplementDishFragments(Context context, Collected collected) {
         CandidatePool pool = collected.pool();
-        RecipeQuery query = context.query();
-        if (!pool.rowsNonBasicComplete() || query.keywordText() == null || hasNameMatch(collected)) {
+        if (!pool.rowsNonBasicComplete() || context.query().keywordText() == null || hasNameMatch(collected)) {
             return collected;
         }
-        CandidatePool fragments = recipeCandidateCollector.searchDishFragmentsOnly(query, pool.recipeIds());
+        CandidatePool fragments = recipeCandidateCollector.searchDishFragmentsOnly(context.query(), pool.recipeIds());
         if (fragments.fragments().isEmpty()) {
             return collected;
         }
-        CandidatePool merged = pool.plus(fragments).withLog(pool.route() + "+이름 조각",
-                pool.counts() + ", 이름 조각 " + fragments.fragments() + " 새로 " + fragments.recipeIds().size());
-        PoolDetails details = collected.details().plus(loadDetails(fragments, query, context.memberTastes()));
-        return new Collected(merged, details, rankPool(context, merged, details, Set.of()), collected.refilled(),
-                collected.refillCalls());
+        return merge(context, collected, fragments, "+이름 조각",
+                ", 이름 조각 " + fragments.fragments() + " 새로 " + fragments.recipeIds().size());
     }
 
-    // 3. 피할 맛: ES 경로는 피할 맛을 검색에서 뺐으므로, 3개가 안 되면 피할 맛 없이 다시 검색해 새로 나온 레시피(피할 맛 레시피)를 뒤에 채운다
+    // 3. 피할 맛: ES 경로는 피할 맛을 검색에서 뺐으므로, 정렬해서 3개가 안 되면 피할 맛 없이 다시 검색한다
+    private static boolean needsAvoidedRefill(Context context, Collected collected, RecipeCandidates ranked) {
+        return collected.pool().rowsNonBasicComplete() && !context.query().avoidTastes().isEmpty()
+                && ranked.candidates().size() < RecommendationPicker.PICK_COUNT;
+    }
+
+    // 새로 나온 레시피(피할 맛 레시피)를 뒤에 합쳐 knownAvoided로 표시한다. 새로 나온 게 없으면 ES 호출 수만 남긴다
     private Collected refillAvoided(Context context, Collected collected) {
-        CandidatePool pool = collected.pool();
-        RecipeQuery query = context.query();
-        if (!pool.rowsNonBasicComplete() || query.avoidTastes().isEmpty()
-                || collected.ranked().candidates().candidates().size() >= RecommendationPicker.PICK_COUNT) {
-            return collected;
-        }
-        CandidatePool avoided = recipeCandidateCollector.searchAvoided(query, context.fridge(), pool.recipeIds());
-        if (avoided.recipeIds().isEmpty()) {
-            return new Collected(pool, collected.details(), collected.ranked(), collected.refilled(), avoided.esCalls());
-        }
-        CandidatePool merged = pool.plus(avoided);
-        PoolDetails details = collected.details().plus(loadDetails(avoided, query, context.memberTastes()));
-        Ranked ranked = rankPool(context, merged, details, avoided.recipeIds());
-        return new Collected(merged, details, ranked, avoided.recipeIds().size(), avoided.esCalls());
+        CandidatePool avoided = recipeCandidateCollector.searchAvoided(context.query(), context.fridge(),
+                collected.pool().recipeIds());
+        Collected merged = avoided.recipeIds().isEmpty() ? collected : merge(context, collected, avoided, "", "");
+        return new Collected(merged.pool(), merged.details(), merged.query(), avoided.recipeIds(),
+                avoided.recipeIds().size(), avoided.esCalls());
     }
 
     // 4. 로그: ES 호출은 전체 검색(ES 경로면 1)·요청만 검색·피할 맛 다시 검색, 벡터는 레시피 검색에서 벡터를 불렀는지
-    private static void logCollected(Context context, Collected collected, long started) {
+    private static void logCollected(Context context, Collected collected, RecipeCandidates ranked, long started) {
         CandidatePool pool = collected.pool();
         int fullCalls = Math.min(pool.esCalls(), 1);
         log.info("상담 후보 모으기 - memberId: {}, 경로: {}, 후보 {}건 ({}){}, 고른 후보 {}건, ES 호출 전체 {}·요청만 {}·피할 맛 재검색 {}, "
                         + "벡터 {}, {}ms",
                 context.query().memberId(), pool.route(), pool.recipeIds().size(), pool.counts(),
                 collected.refilled() > 0 ? ", 피할 맛 다시 채움 " + collected.refilled() + "건" : "",
-                collected.ranked().candidates().candidates().size(),
+                ranked.candidates().size(),
                 fullCalls, pool.esCalls() - fullCalls, collected.refillCalls(), pool.vectorCalled() ? "호출" : "안 함",
                 (System.nanoTime() - started) / 1_000_000);
     }
 
-    // 5. 결과: 고른 후보에 부족한 재료와 후보의 맛을 채운다
-    private RecipeCandidates toResult(Context context, Collected collected) {
+    // 5. 결과: 고른 후보에 부족한 재료와 후보의 맛을 채운다. 요리 이름을 못 찾았으면(dishNotFound) 못 찾음으로 표시한다
+    private RecipeCandidates toResult(Context context, Collected collected, RecipeCandidates ranked, boolean dishNotFound) {
         CandidatePool pool = collected.pool();
-        Ranked ranked = collected.ranked();
         // 부족한 재료: ES 경로는 후보의 기본 양념 뺀 재료를 이미 다 읽었고, DB 경로는 고른 10개만 조회한다
         List<RecipeCandidateIngredient> nonBasicRows = pool.rowsNonBasicComplete()
                 ? pool.rows()
-                : recipeCandidateCollector.readNonBasicRows(
-                ranked.candidates().candidates().stream().map(RecipeCandidate::recipeId).toList());
-        RecipeCandidates result = RecipeCandidateScorer.withMissingIngredients(ranked.candidates(), context.fridge(),
-                nonBasicRows);
+                : recipeCandidateCollector.readNonBasicRows(ranked.candidates().stream().map(RecipeCandidate::recipeId).toList());
+        RecipeCandidates result = RecipeCandidateScorer.withMissingIngredients(ranked, context.fridge(), nonBasicRows);
         // 요청 조건이 있는 추천에서 빈자리를 채울 때 반대 맛·매운 정도를 보도록 후보의 맛을 함께 넘긴다
         Map<Long, Set<Member.Taste>> candidateTastes = new HashMap<>();
         for (RecipeCandidate candidate : result.candidates()) {
             candidateTastes.put(candidate.recipeId(),
                     collected.details().tastes().getOrDefault(candidate.recipeId(), Set.of()));
         }
-        return new RecipeCandidates(result.candidates(), result.fallback(), ranked.query().keywordsNotFound(),
-                ranked.candidates().keptAvoidTastes())
+        return new RecipeCandidates(result.candidates(), result.fallback(), dishNotFound || collected.query().keywordsNotFound(),
+                ranked.keptAvoidTastes())
                 .withTasteDetails(candidateTastes, collected.details().spicy().maybe());
     }
 
@@ -338,18 +335,6 @@ public class RecipeCandidateFacade {
         return new PoolDetails(infos, tastes.tastes(), tastes.spicy());
     }
 
-    // 정렬한 후보와, 키워드 결과(이름·재료 등으로 맞은 방식)를 채운 검색 조건
-    private record Ranked(RecipeQuery query, RecipeCandidates candidates) {
-    }
-
-    private static Ranked rankPool(Context context, CandidatePool pool, PoolDetails details, Set<Long> knownAvoided) {
-        RecipeQuery query = context.query().withKeywordMatches(
-                classifyKeywordHits(context.query(), pool.keywordHits(), pool.fragments(), pool.rows(), details.infos()));
-        RankInput input = new RankInput(query, context.fridge(), context.memberTastes(), pool.rows(),
-                rankableInfos(query, details.infos()), details.tastes(), details.spicy(), knownAvoided, pool.recipeIds());
-        return new Ranked(query, rankAvoiding(context.scorer(), input));
-    }
-
     // 정렬할 후보. 요리 이름을 말했으면 키워드로 찾은 후보만 (정렬 상위 10개에서 자르기 전에 빼야 키워드 후보가 밀려 잘리지 않는다)
     private static Map<Long, RecipeCandidateInfo> rankableInfos(RecipeQuery query, Map<Long, RecipeCandidateInfo> infos) {
         if (!dishAsked(query)) {
@@ -362,88 +347,67 @@ public class RecipeCandidateFacade {
         return kept;
     }
 
-    // 키워드로 이름·늘린 이름·재료가 맞은 레시피가 있는지 (쪼개짐·벡터는 맞은 것으로 치지 않는다)
-    private static boolean hasStrongKeywordMatch(RecipeQuery query) {
-        return query.keywordMatches().values().stream().anyMatch(KeywordMatch::strong);
-    }
-
     /**
-     * 정렬에 넣는 값.
-     *
-     * @param recipeTastes 레시피 ID별 맛 (확실히 매운 레시피면 SPICY가 들어 있다)
-     * @param knownAvoided 검색에서 피할 맛 레시피로 판단한 레시피 (피할 맛 없이 다시 검색해서 새로 나온 것)
-     * @param candidateIds 후보 레시피 ID
-     */
-    private record RankInput(
-            RecipeQuery query,
-            List<FridgeStock> fridge,
-            List<Member.Taste> memberTastes,
-            List<RecipeCandidateIngredient> rows,
-            Map<Long, RecipeCandidateInfo> infos,
-            Map<Long, Set<Member.Taste>> recipeTastes,
-            SpicyRecipes spicy,
-            Set<Long> knownAvoided,
-            Set<Long> candidateIds
-    ) {
-        // 정보가 있는 레시피만 정렬한다 (infos로 피할 맛 레시피를 빼거나 그것만 남긴다)
-        RecipeCandidates rank(RecipeCandidateScorer scorer, Map<Long, RecipeCandidateInfo> rankedInfos) {
-            return scorer.rank(ScoringContext.of(query, fridge, memberTastes, rows, recipeTastes), rankedInfos, candidateIds);
-        }
-    }
-
-    /**
+     * 정보가 있는 레시피만 순위를 매긴다 (요리 이름을 말했으면 키워드로 찾은 후보만, rankableInfos).
      * 피할 맛인 레시피는 빼고 순위를 매긴다. 빼서 3개가 안 되면 그때만 피할 맛 레시피를 순위대로 뒤에 채운다 (요리 이름을 말한 추천은 채우지 않는다).
+     * 피할 맛 레시피는 맛 데이터(확실히 매운 레시피면 SPICY가 들어 있다)로 보거나, 피할 맛 없이 다시 검색해서 새로 나온 것(knownAvoided)이다.
      * 피할 맛이 매운맛이면 확실히 매운 레시피에 더해 매울 수 있는 레시피(홍고추·청고추)까지 뺀다.
      * 단 사용자가 콕 집은 요리(요리 이름이 레시피 이름에 통째로 맞음, KeywordMatch NAME)는 피할 맛이어도 빼지 않고 남기며,
      * 남긴 레시피와 그 맛을 결과에 담아 카드 이유에 알린다 ("매운 거 말고 김치찌개 줘" → 김치찌개 카드 + "매운 요리예요").
      */
-    private static RecipeCandidates rankAvoiding(RecipeCandidateScorer scorer, RankInput input) {
-        RecipeQuery query = input.query();
+    private static RecipeCandidates rankPool(Context context, Collected collected) {
+        RecipeQuery query = collected.query();
+        PoolDetails details = collected.details();
+        Map<Long, RecipeCandidateInfo> infos = rankableInfos(query, details.infos());
+        ScoringContext scoring = ScoringContext.of(query, context.fridge(), context.memberTastes(), collected.pool().rows(),
+                details.tastes());
+        Function<Map<Long, RecipeCandidateInfo>, RecipeCandidates> rank =
+                rankedInfos -> context.scorer().rank(scoring, rankedInfos, collected.pool().recipeIds());
         if (query.avoidTastes().isEmpty()) {
-            return input.rank(scorer, input.infos());
+            return rank.apply(infos);
         }
         boolean avoidSpicy = query.avoidTastes().contains(Member.Taste.SPICY);
-        Set<Long> avoided = input.infos().keySet().stream()
-                .filter(id -> input.knownAvoided().contains(id)
-                        || input.recipeTastes().getOrDefault(id, Set.of()).stream().anyMatch(query.avoidTastes()::contains)
-                        || (avoidSpicy && input.spicy().maybe().contains(id)))
+        Set<Long> avoided = infos.keySet().stream()
+                .filter(id -> collected.knownAvoided().contains(id)
+                        || details.tastes().getOrDefault(id, Set.of()).stream().anyMatch(query.avoidTastes()::contains)
+                        || (avoidSpicy && details.spicy().maybe().contains(id)))
                 .collect(Collectors.toSet());
         // 콕 집은 요리는 피할 맛보다 앞선다
         Map<Long, List<Member.Taste>> keptAvoid = new HashMap<>();
         for (Long id : avoided) {
             KeywordMatch match = query.keywordMatches().get(id);
             if (match != null && match.type() == KeywordMatch.Type.NAME) {
-                keptAvoid.put(id, avoidedTastesOf(id, input));
+                keptAvoid.put(id, avoidedTastesOf(id, query, details));
             }
         }
         avoided.removeAll(keptAvoid.keySet());
         if (!keptAvoid.isEmpty()) {
             log.info("상담 후보 피할 맛이지만 콕 집은 요리라 남김 - 피할 맛: {}, 레시피: {}", query.avoidTastes(), keptAvoid);
         }
-        Map<Long, RecipeCandidateInfo> kept = new HashMap<>(input.infos());
+        Map<Long, RecipeCandidateInfo> kept = new HashMap<>(infos);
         kept.keySet().removeAll(avoided);
-        RecipeCandidates ranked = input.rank(scorer, kept).withKeptAvoidTastes(keptAvoid);
+        RecipeCandidates ranked = rank.apply(kept).withKeptAvoidTastes(keptAvoid);
         log.debug("상담 후보 피할 맛 - 맛: {}, 뺀 레시피 수: {}, 남은 후보 수: {}", query.avoidTastes(), avoided.size(),
                 ranked.candidates().size());
         // 요리 이름을 말한 추천은 1~2장이어도 그대로 보낸다 (피할 맛 레시피로 채우지 않는다. 콕 집은 요리는 위에서 이미 남겼다)
         if (ranked.candidates().size() >= RecommendationPicker.PICK_COUNT || avoided.isEmpty() || dishAsked(query)) {
             return ranked;
         }
-        Map<Long, RecipeCandidateInfo> onlyAvoided = new HashMap<>(input.infos());
+        Map<Long, RecipeCandidateInfo> onlyAvoided = new HashMap<>(infos);
         onlyAvoided.keySet().retainAll(avoided);
-        List<RecipeCandidate> refill = input.rank(scorer, onlyAvoided).candidates();
+        List<RecipeCandidate> refill = rank.apply(onlyAvoided).candidates();
         return new RecipeCandidates(Stream.concat(ranked.candidates().stream(), refill.stream())
                 .limit(RecipeCandidateScorer.LIMIT)
                 .toList(), ranked.fallback(), false, keptAvoid);
     }
 
     // 콕 집어 남긴 레시피가 어떤 피할 맛인지. 맛 데이터·매운 재료로 모르면(피할 맛 없이 다시 검색해서 찾음) 피할 맛 전체
-    private static List<Member.Taste> avoidedTastesOf(Long id, RankInput input) {
-        List<Member.Taste> tastes = input.query().avoidTastes().stream()
-                .filter(taste -> input.recipeTastes().getOrDefault(id, Set.of()).contains(taste)
-                        || (taste == Member.Taste.SPICY && input.spicy().maybe().contains(id)))
+    private static List<Member.Taste> avoidedTastesOf(Long id, RecipeQuery query, PoolDetails details) {
+        List<Member.Taste> tastes = query.avoidTastes().stream()
+                .filter(taste -> details.tastes().getOrDefault(id, Set.of()).contains(taste)
+                        || (taste == Member.Taste.SPICY && details.spicy().maybe().contains(id)))
                 .toList();
-        return tastes.isEmpty() ? input.query().avoidTastes() : tastes;
+        return tastes.isEmpty() ? query.avoidTastes() : tastes;
     }
 
     // 키워드로 찾은 레시피가 이름·늘린 이름·재료·이름 조각·쪼개짐·벡터 중 어떻게 맞았는지 가른다 (레시피 정보·재료는 후보 전체를 읽은 것을 쓴다)

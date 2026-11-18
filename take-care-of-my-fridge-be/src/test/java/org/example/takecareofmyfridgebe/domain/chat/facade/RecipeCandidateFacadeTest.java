@@ -750,6 +750,28 @@ class RecipeCandidateFacadeTest {
     }
 
     @Test
+    @DisplayName("ES 경로: 냉장고 점수로 이미 후보에 있는 레시피(김치찌개)를 벡터 보충이 다시 찾으면 요리 이름 추천에서 벡터로 찾은 후보로 카드에 남는다")
+    void keepsPooledRecipeAsVector_whenVectorSupplementFindsItAgain() throws Exception {
+        when(memberService.getMyInfo(MEMBER_ID)).thenReturn(mock(MyInfoResponse.class));
+        when(fridgeService.getItems(any(), any())).thenReturn(List.of(fridgeItem(1L, "두부", 5)));
+        when(candidateSearchService.search(any())).thenReturn(List.of(
+                hit(12L, RecipeCandidateSearchService.MATCH_FRIDGE), hit(40L, RecipeCandidateSearchService.MATCH_FRIDGE)));
+        when(recipeSearchService.search(any(RecipeListRequest.class))).thenReturn(new RecipeSearchResult(List.of(40L), 1, true));
+        when(recipeSearchService.analyzeTokens("김치찌게")).thenReturn(List.of("김치찌게"));
+        givenEsRecipes(Map.of(
+                12L, new RecipeCandidateInfo(12L, "두부조림", "조림", 20, 1),
+                40L, new RecipeCandidateInfo(40L, "김치찌개", "찌개", 30, 1)));
+        RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, null, null, null, false,
+                List.of("김치찌게"), "김치찌게");
+
+        RecipeCandidates result = esFacade.findCandidates(query);
+
+        assertThat(result.candidates()).extracting(RecipeCandidate::recipeId).containsExactly(40L);
+        assertThat(matchOf(result, 40L).type()).isEqualTo(KeywordMatch.Type.VECTOR);
+        assertThat(result.keywordsNotFound()).isTrue();
+    }
+
+    @Test
     @DisplayName("특징만 말한 추천(원한 표현 있음, 요리 이름 없음)은 키워드로 맞은 레시피가 없어도 냉장고 후보로 카드를 채운다")
     void keepsFridgeCandidates_whenOnlyFeatureAsked() throws Exception {
         givenNoKeywordMatchInEs();
@@ -908,6 +930,38 @@ class RecipeCandidateFacadeTest {
         verify(recipeSearchService).search(any(RecipeListRequest.class));
         assertThat(result.candidates()).extracting(RecipeCandidate::recipeId).containsExactly(80L);
         assertThat(matchOf(result, 80L).type()).isEqualTo(KeywordMatch.Type.VECTOR);
+    }
+
+    @Test
+    @DisplayName("ES 경로: 비슷한 요리가 이름에 없는 레시피만 찾으면 벡터 보충·이름 조각까지 거쳐 늘린 이름·이름 조각·벡터 후보를 정해진 순서로 돌려주고 쪼개짐 후보는 뺀다")
+    void ordersExpandedFragmentAndVectorHits_whenAllSupplementsRun() throws Exception {
+        when(memberService.getMyInfo(MEMBER_ID)).thenReturn(mock(MyInfoResponse.class));
+        when(fridgeService.getItems(any(), any())).thenReturn(List.of(fridgeItem(1L, "두부", 1)));
+        when(candidateSearchService.search(any())).thenReturn(List.of(hit(12L, RecipeCandidateSearchService.MATCH_FRIDGE)));
+        // 비슷한 요리 "우동"은 이름에 우동이 없는 레시피(쪼개짐)만 찾아 키워드로 맞은 것이 없으므로 키워드 보충을 한다
+        when(similarDishFinder.find(MEMBER_ID, "나가사키짬뽕")).thenReturn(List.of("우동"));
+        when(recipeSearchService.search(any(RecipeListRequest.class))).thenReturn(new RecipeSearchResult(List.of(80L), 1, true));
+        when(recipeSearchService.analyzeTokens("나가사키짬뽕")).thenReturn(List.of("나가사키", "짬뽕"));
+        givenTextSearch(Map.of("우동", List.of(93L), "짬뽕", List.of(91L), "나가사키", List.of(90L)));
+        givenEsRecipes(Map.of(
+                12L, new RecipeCandidateInfo(12L, "두부조림", "조림", 20, 1),
+                80L, new RecipeCandidateInfo(80L, "해물라면", "면류", 30, 1),
+                90L, new RecipeCandidateInfo(90L, "나가사키부대찌개", "찌개", 30, 1),
+                91L, new RecipeCandidateInfo(91L, "짬뽕해물탕밥", "밥", 30, 1),
+                93L, new RecipeCandidateInfo(93L, "해물볶음면", "면류", 30, 1)));
+        RecipeQuery query = new RecipeQuery(MEMBER_ID, List.of(), null, null, null, null, false,
+                List.of("나가사키짬뽕", "짬뽕"), "나가사키짬뽕");
+
+        RecipeCandidates result = esFacade.findCandidates(query);
+
+        // 비슷한 요리(우동) → 키워드 보충(나가사키짬뽕은 벡터, 짬뽕·우동은 글자로만) → 키워드에 없는 조각(나가사키)
+        assertThat(textSearchedKeywords()).containsExactly("우동", "짬뽕", "우동", "나가사키");
+        // 키워드로 맞은(늘린 이름·이름 조각) 후보가 먼저(둘은 정렬 기준이 같아 id 순), 벡터 후보는 뒤. 쪼개짐(해물볶음면)과 냉장고로만 걸린 후보는 없다
+        assertThat(result.candidates()).extracting(RecipeCandidate::recipeId).containsExactly(90L, 91L, 80L);
+        assertThat(matchOf(result, 91L)).isEqualTo(new KeywordMatch(KeywordMatch.Type.EXPANDED, "짬뽕", null));
+        assertThat(matchOf(result, 90L)).isEqualTo(new KeywordMatch(KeywordMatch.Type.FRAGMENT, "나가사키", null));
+        assertThat(matchOf(result, 80L).type()).isEqualTo(KeywordMatch.Type.VECTOR);
+        assertThat(result.keywordsNotFound()).isTrue();
     }
 
     @Test
