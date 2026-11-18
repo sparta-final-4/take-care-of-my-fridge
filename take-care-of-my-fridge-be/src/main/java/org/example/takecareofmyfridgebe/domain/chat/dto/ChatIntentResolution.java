@@ -67,6 +67,9 @@ public record ChatIntentResolution(
         MODE,
         // AI가 판단
         AI,
+        // AI는 일반 답(GENERAL)으로 봤지만 요리 이름이 있고 묻는 말이 없어 추천을 시도함 (IntentCorrector.tryDish).
+        // 카드가 0장이면 "찾지 못했어요" 대신 일반 답으로 돌린다 (ChatStreamFacade). 사용자가 추천을 원했는지 확실하지 않아서다
+        DISH_TRY,
         // AI 판단이 실패해 선택 재료 유무로 정함 (있으면 추천, 없으면 일반)
         FALLBACK
     }

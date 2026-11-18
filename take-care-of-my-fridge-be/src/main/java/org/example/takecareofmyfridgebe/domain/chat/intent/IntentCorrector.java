@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -36,9 +37,10 @@ import java.util.stream.Stream;
  *   <li>레시피 자세히 대상 찾기: 직전 카드·상담 추천에서 대상을 찾고, 이름만 못 찾으면 그 요리 추천으로</li>
  *   <li>냉장고 보기·사기 말 (fridgeShopWords): 의도를 FRIDGE·SHOP·RECOMMEND·GENERAL로. 4·5보다 먼저</li>
  *   <li>밀키트 요청 (mealkitRequest): 일반 답이지만 밀키트를 달라는 말이면 추천으로 표시 (의도는 GENERAL 그대로)</li>
- *   <li>이름만 말하기 (nameOnly): 일반 답인 짧은 이름 → 추천 (4가 아닐 때)</li>
+ *   <li>이름만 말하기 (nameOnly): 일반 답인 짧은 밀키트·분류·재료 이름 → 추천 (4가 아닐 때). 아니면 추천 시도 (tryDish):
+ *       요리 이름이 있고 묻는 말이 없으면 추천 (카드가 0장이면 일반 답으로 돌림). 둘 다 스위치 nameOnly</li>
  *   <li>요리 이름·분류 키워드 확인 (checkDishAndKeywords, 스위치 dishCheck): AI 요리 이름은 메시지에 그대로 있고 분류 이름·묶음 말이
- *       아닐 때만 두고, 분류 이름·묶음 말인 키워드는 분류로 옮김 (추천·다시 추천·밀키트 추천)</li>
+ *       아닐 때만 두고(비었으면 메시지에 있는 첫 키워드로 채움), 분류 이름·묶음 말인 키워드는 분류로 옮김 (추천·다시 추천·밀키트 추천)</li>
  *   <li>다른 맛 지키기 (keepOtherTastes): 피하는 맛만 말했으면 뺄 조건 TASTE를 지움</li>
  *   <li>맛 단어 (tasteWords): 원하는 맛·피할 맛</li>
  *   <li>분류 단어 (categoryWords): 분류, 앞 대화에서 이어진 키워드·요리 이름</li>
@@ -58,6 +60,10 @@ public class IntentCorrector {
     static final int NAME_ONLY_MAX_LENGTH = 15;
     // 분류 이름 뒤에 붙어도 분류 이름으로 보는 말 ("디저트 메뉴", "국물 요리")
     private static final List<String> CATEGORY_SUFFIXES = List.of("요리", "메뉴", "종류");
+    // "○○ 같은 요리·거·것·음식·메뉴"의 ○○ (바로 앞 낱말)
+    private static final Pattern LIKE_DISH = Pattern.compile("([가-힣A-Za-z0-9]+)\\s*같은\\s*(?:요리|거|것|음식|메뉴)");
+    // "이런 같은 거", "매운 거 같은 거"처럼 요리 이름이 아니라 가리키는 말
+    private static final Set<String> POINTING_WORDS = Set.of("이런", "그런", "저런", "이거", "그거", "저거", "이것", "그것", "저것", "거", "것");
 
     private final RecipeService recipeService;
     private final IngredientMatcher ingredientMatcher;
@@ -72,8 +78,10 @@ public class IntentCorrector {
      * @param result           고친 의도·조건
      * @param mealkitRecommend 일반 답이지만 밀키트를 달라는 말이라 추천으로 처리할지
      * @param detailTarget     레시피 자세히 대상 레시피 ID (못 찾았으면 null)
+     * @param dishTry          AI는 일반 답으로 봤지만 요리 이름이 있고 묻는 말이 없어 추천을 시도하는지 (tryDish).
+     *                         카드가 0장이면 "찾지 못했어요" 대신 일반 답으로 돌린다
      */
-    public record Corrected(IntentResult result, boolean mealkitRecommend, Long detailTarget) {
+    public record Corrected(IntentResult result, boolean mealkitRecommend, Long detailTarget, boolean dishTry) {
     }
 
     /**
@@ -103,11 +111,17 @@ public class IntentCorrector {
         }
         boolean mealkitRecommend = corrections.mealkitRequest() && result.intent() == ChatIntent.GENERAL
                 && mealkitRequested(input);
-        // "국물 밀키트", "김치찌개", "두부"처럼 이름만 말한 짧은 말은 보여 달라는 뜻으로 보고 추천으로 바꾼다
+        // "국물 밀키트", "디저트", "두부"처럼 이름만 말한 짧은 말은 보여 달라는 뜻으로 보고 추천으로 바꾼다.
+        // 그 밖에 요리 이름이 있고 묻는 말이 없으면 추천을 시도한다 ("김피탕" / "김피탕 같은 거"를 AI가 일반 답으로 봐도)
+        boolean dishTry = false;
         if (corrections.nameOnly() && result.intent() == ChatIntent.GENERAL && !mealkitRecommend) {
             Optional<IntentResult> named = nameOnly(input, result);
+            Optional<IntentResult> tried = named.isPresent() ? Optional.empty() : tryDish(input, result);
             if (named.isPresent()) {
                 result = named.get();
+            } else if (tried.isPresent()) {
+                result = tried.get();
+                dishTry = true;
             }
         }
         // 맛·분류 단어로 조건을 고치는 것은 추천·다시 추천일 때만 한다. 일반 답·레시피 자세히는 AI 결과를 그대로 쓴다
@@ -128,7 +142,7 @@ public class IntentCorrector {
         if ((result.intent() == ChatIntent.RECOMMEND || mealkitRecommend) && corrections.spokenTastesOnly()) {
             result = keepSpokenTastes(input, result);
         }
-        return new Corrected(result, mealkitRecommend, detailTarget);
+        return new Corrected(result, mealkitRecommend, detailTarget, dishTry);
     }
 
     /**
@@ -137,6 +151,9 @@ public class IntentCorrector {
      *   <li>요리 이름(dishText)은 메시지에 그대로 있고(공백 무시) 분류 이름·묶음 말이 아닐 때만 둔다. 아니면 비운다
      *       ("김피탕 같은 요리 추천해줘" → 김피탕 그대로, AI가 "디저트"·메시지에 없는 "냉채"를 내면 없음).
      *       스위치 dishCheck를 끄면 AI 값을 그대로 쓴다 (평가 비교용)</li>
+     *   <li>AI가 요리 이름을 비웠는데 AI 키워드의 첫 값이 메시지에 그대로 있고(공백 무시) 분류 이름·묶음 말이 아니면 그 값을 요리 이름으로 쓴다
+     *       ("김피탕 같은 요리 추천해줘"에서 AI가 요리 이름 없이 키워드 [김피탕, 탕수육, 깐풍기]를 냄 → 김피탕). 스위치 dishCheck를 따른다</li>
+     *   <li>그래도 비었으면 "○○ 같은 요리·같은 거"의 ○○를 요리 이름으로 쓴다 ({@link #likeDish}). AI가 요리 이름·키워드를 모두 비우는 경우가 있다</li>
      *   <li>"차가운 요리"의 키워드 [샐러드, 냉채, 냉국] → 키워드 [냉채, 냉국], 분류에 샐러드를 더함 (이미 있으면 그대로)</li>
      *   <li>묶음 말("국물", "반찬")은 묶음의 분류(분류 목록에 있는 것)로 옮긴다</li>
      *   <li>이번 말에서 피하는 분류("디저트 말고")는 옮기지 않고 빼기만 한다 (CategoryWordChecker)</li>
@@ -164,10 +181,14 @@ public class IntentCorrector {
             mapped.get().stream().filter(category -> !avoided.contains(category)).forEach(category -> addOnce(moved, category));
         }
         String dishText = result.dishText();
-        if (corrections.dishCheck() && dishText != null
-                && (!ChatTexts.removeWhitespace(input.message()).contains(ChatTexts.removeWhitespace(dishText))
-                || categoriesOf(dishText, input.categories()).isPresent())) {
+        if (corrections.dishCheck() && dishText != null && !spokenDish(input, dishText)) {
             dishText = null;
+        }
+        if (corrections.dishCheck() && result.dishText() == null && !keywords.isEmpty() && keywordAsDish(input, keywords.get(0))) {
+            dishText = keywords.get(0);
+        }
+        if (corrections.dishCheck() && result.dishText() == null && dishText == null) {
+            dishText = likeDish(input).orElse(null);
         }
         if (kept.size() == keywords.size() && moved.size() == aiCategories.size() && Objects.equals(dishText, result.dishText())) {
             return result;
@@ -176,6 +197,44 @@ public class IntentCorrector {
                 input.memberId(), input.sessionId(), result.dishText(), dishText, keywords, kept, aiCategories, moved);
         return result.withCategories(result.moodCategories() == null && moved.isEmpty() ? null : moved,
                 result.keywords() == null ? null : kept, dishText, result.removed());
+    }
+
+    /**
+     * "○○ 같은 요리 / 같은 거 / 같은 것 / 같은 음식 / 같은 메뉴"의 ○○ (바로 앞 낱말 하나). AI가 요리 이름과 키워드를 모두 비웠을 때 쓴다
+     * ("김피탕 같은 요리 추천해줘" → 김피탕). 분류 이름·묶음 말("국물 같은 거"), 밀키트 말, 이런·그런 같은 가리키는 말이면 비어 있음.
+     * 띄어 쓴 두 낱말 이름("나가사키 짬뽕 같은 거")은 뒤 낱말만 잡는다.
+     */
+    Optional<String> likeDish(CorrectionInput input) {
+        if (input.message() == null) {
+            return Optional.empty();
+        }
+        Matcher matcher = LIKE_DISH.matcher(input.message());
+        if (!matcher.find()) {
+            return Optional.empty();
+        }
+        String dish = matcher.group(1);
+        if (POINTING_WORDS.contains(dish) || !keywordAsDish(input, dish)) {
+            return Optional.empty();
+        }
+        return Optional.of(dish);
+    }
+
+    // 메시지에 그대로 있고(공백 무시) 분류 이름·묶음 말이 아닌 요리 이름인지
+    private boolean spokenDish(CorrectionInput input, String dish) {
+        return ChatTexts.removeWhitespace(input.message()).contains(ChatTexts.removeWhitespace(dish))
+                && categoriesOf(dish, input.categories()).isEmpty();
+    }
+
+    // AI 첫 키워드를 요리 이름으로 쓸 수 있는지: spokenDish에 더해 밀키트 말("국물 밀키트", "밀키트")이 아니고,
+    // 맛 단어로 꾸민 특징("칼칼한 국물")이 아니어야 한다. 낱말 하나인 이름("매운탕")은 맛 단어로 시작해도 요리 이름으로 본다
+    private boolean keywordAsDish(CorrectionInput input, String keyword) {
+        String compact = ChatTexts.removeWhitespace(keyword);
+        boolean mealkit = chatWordProperties.mealkit().mealkit().stream()
+                .map(ChatTexts::removeWhitespace)
+                .anyMatch(word -> !word.isEmpty() && compact.contains(word));
+        String spaced = keyword.strip().replaceAll("\\s+", " ");
+        boolean tasteModified = spaced.contains(" ") && !withoutTasteWords(spaced).equals(spaced);
+        return !mealkit && !tasteModified && spokenDish(input, keyword);
     }
 
     /**
@@ -310,18 +369,51 @@ public class IntentCorrector {
     }
 
     /**
-     * 이름만 말한 짧은 말("국물 밀키트", "디저트", "두부", "김치찌개")은 그걸 보여 달라는 뜻이라 AI가 GENERAL이어도 추천으로 바꾼다.
+     * 이름만 말한 짧은 말("국물 밀키트", "디저트", "두부")은 그걸 보여 달라는 뜻이라 AI가 GENERAL이어도 추천으로 바꾼다.
      * <ul>
      *   <li>묻는 말이 없고(AskWordChecker), 공백·끝 문장 부호를 뺀 글이 {@value #NAME_ONLY_MAX_LENGTH}자 이하일 때만 본다</li>
-     *   <li>밀키트 단어, 분류 단어(묶음 말 포함), 재료 사전 이름, 레시피 이름 중 하나가 있으면 바꾼다 (앞에서 찾으면 뒤는 보지 않는다).
-     *       재료 이름이면 그 재료를 말한 재료로, 레시피 이름이면 그 이름을 키워드와 요리 이름으로 채운다.
-     *       재료·레시피 이름은 요리를 달라는 말("레시피", "만드는 법")을 지우고 찾고, 레시피 이름은 맛 단어 낱말을 뺀 이름으로도 찾는다
-     *       ("매운 닭볶음탕 레시피" → 닭볶음탕). 분류·맛은 추천 조건 보정(correctCategories·correctTastes)이 채운다</li>
+     *   <li>밀키트 단어, 분류 단어(묶음 말 포함), 재료 사전 이름 중 하나가 있으면 바꾼다 (앞에서 찾으면 뒤는 보지 않는다).
+     *       재료 이름이면 그 재료를 말한 재료로 채운다. 재료 이름은 요리를 달라는 말("레시피", "만드는 법")을 지우고 찾는다.
+     *       분류·맛은 추천 조건 보정(correctCategories·correctTastes)이 채운다</li>
+     *   <li>요리 이름("김치찌개")은 여기서 보지 않고 추천 시도(tryDish)가 본다</li>
      *   <li>인사 말("안녕 밥은?")이 있거나 지난 일을 묻는 말("밥 먹었어?")이면 바꾸지 않는다</li>
      *   <li>"안녕"처럼 음식 말이 없으면 그대로 일반 답이다</li>
      * </ul>
      */
     Optional<IntentResult> nameOnly(CorrectionInput input, IntentResult result) {
+        Optional<String> text = shortNameText(input);
+        if (text.isEmpty()) {
+            return Optional.empty();
+        }
+        String found = null;
+        List<String> includes = List.of();
+        if (MealkitWordChecker.check(input.message(), chatWordProperties.mealkit(), chatWordProperties.taste())
+                == MealkitWordChecker.Mode.ONLY) {
+            found = "밀키트";
+        } else if (CategoryWordChecker.check(input.message(), input.categories(), chatWordProperties.taste(),
+                        chatWordProperties.category().groups())
+                .stream().anyMatch(stance -> stance.stance() == CategoryWordChecker.Stance.WANT)) {
+            found = "분류";
+        } else {
+            // "두부 레시피"의 "레시피"처럼 요리를 달라는 말은 지우고 찾는다
+            String name = withoutRecipeWords(text.get());
+            List<String> ingredients = name.isEmpty() ? List.of() : ingredientNames(List.of(name.split("\\s+")));
+            if (!ingredients.isEmpty()) {
+                found = "재료";
+                includes = ingredients;
+            }
+        }
+        if (found == null) {
+            return Optional.empty();
+        }
+        log.info("상담 이름만 말해 일반 대화를 추천으로 - memberId: {}, sessionId: {}, 찾은 것: {}, 재료: {}",
+                input.memberId(), input.sessionId(), found, includes);
+        return Optional.of(result.withNamed(includes.isEmpty() ? result.includeIngredients() : includes, result.keywords(),
+                result.dishText()));
+    }
+
+    // 이름만 말한 짧은 말로 볼 글 (묻는 말·인사 말이 없고, 공백·끝 문장 부호를 뺀 글이 짧을 때). 아니면 비어 있음
+    private Optional<String> shortNameText(CorrectionInput input) {
         if (input.message() == null || AskWordChecker.asks(input.message(), chatWordProperties.ask())
                 || AskWordChecker.greets(input.message(), chatWordProperties.ask())) {
             return Optional.empty();
@@ -331,37 +423,36 @@ public class IntentCorrector {
         if (compact.isEmpty() || compact.length() > NAME_ONLY_MAX_LENGTH) {
             return Optional.empty();
         }
-        String found = null;
-        List<String> includes = List.of();
-        List<String> keywords = List.of();
-        if (MealkitWordChecker.check(input.message(), chatWordProperties.mealkit(), chatWordProperties.taste())
-                == MealkitWordChecker.Mode.ONLY) {
-            found = "밀키트";
-        } else if (CategoryWordChecker.check(input.message(), input.categories(), chatWordProperties.taste(),
-                        chatWordProperties.category().groups())
-                .stream().anyMatch(stance -> stance.stance() == CategoryWordChecker.Stance.WANT)) {
-            found = "분류";
-        } else {
-            // "닭볶음탕 레시피"의 "레시피"처럼 요리를 달라는 말은 지우고 찾는다
-            String name = withoutRecipeWords(text);
-            List<String> ingredients = name.isEmpty() ? List.of() : ingredientNames(List.of(name.split("\\s+")));
-            Optional<String> recipeName = ingredients.isEmpty() ? recipeNameIn(name) : Optional.empty();
-            if (!ingredients.isEmpty()) {
-                found = "재료";
-                includes = ingredients;
-            } else if (recipeName.isPresent()) {
-                found = "레시피 이름";
-                keywords = List.of(recipeName.get());
-            }
-        }
-        if (found == null) {
+        return Optional.of(text);
+    }
+
+    /**
+     * 추천 시도: AI가 일반 답(GENERAL)으로 봤어도 요리 이름이 있고 묻는 말이 없으면(AskWordChecker.asks) 추천으로 바꾼다.
+     * 비슷한 요리를 늘릴지("같은"이 있을 때만)를 AI 판단에 맡기지 않고, "김피탕"·"김피탕 같은 거"를 같은 추천으로 보기 위해서다.
+     * <ul>
+     *   <li>요리 이름은 AI 요리 이름(없으면 첫 키워드)을 checkDishAndKeywords로 확인한 것 (메시지에 그대로 있고 분류 이름·묶음 말이 아님)</li>
+     *   <li>그래도 없으면 짧은 말(이름만 말하기와 같은 기준)일 때만 레시피 이름으로 찾는다. 요리를 달라는 말("레시피")을 지우고,
+     *       맛 단어 낱말을 뺀 이름으로도 찾는다 ("매운 닭볶음탕 레시피" → 닭볶음탕). 레시피 이름 찾기가 실패하면 찾지 못한 것으로 본다</li>
+     *   <li>"김피탕이 뭐야?"처럼 묻는 말이면 바꾸지 않는다</li>
+     * </ul>
+     * 사용자가 추천을 원했는지 확실하지 않으므로, 카드가 0장이면 "찾지 못했어요" 대신 일반 답으로 돌린다 (ChatStreamFacade, Source.DISH_TRY).
+     */
+    Optional<IntentResult> tryDish(CorrectionInput input, IntentResult result) {
+        if (input.message() == null || AskWordChecker.asks(input.message(), chatWordProperties.ask())) {
             return Optional.empty();
         }
-        log.info("상담 이름만 말해 일반 대화를 추천으로 - memberId: {}, sessionId: {}, 찾은 것: {}, 재료: {}, 키워드: {}",
-                input.memberId(), input.sessionId(), found, includes, keywords);
-        // 레시피 이름을 찾았으면 그 이름이 요리 이름이다 (AI는 일반 답으로 봐서 요리 이름을 내지 않았다)
-        return Optional.of(result.withNamed(includes.isEmpty() ? result.includeIngredients() : includes,
-                keywords.isEmpty() ? result.keywords() : keywords, keywords.isEmpty() ? result.dishText() : keywords.get(0)));
+        IntentResult checked = checkDishAndKeywords(input, result);
+        String dish = checked.dishText();
+        if (dish == null) {
+            dish = shortNameText(input).map(this::withoutRecipeWords).flatMap(this::recipeNameIn).orElse(null);
+            if (dish == null) {
+                return Optional.empty();
+            }
+            checked = checked.withNamed(checked.includeIngredients(), List.of(dish), dish);
+        }
+        log.info("상담 요리 이름이 있고 묻는 말이 없어 일반 대화를 추천으로 시도 - memberId: {}, sessionId: {}, 요리 이름: {}",
+                input.memberId(), input.sessionId(), dish);
+        return Optional.of(checked.withIntent(ChatIntent.RECOMMEND));
     }
 
     // 재료 사전에 있는 이름만 (직접 입력·밀키트 재료로 잡힌 이름은 뺀다). 매칭이 실패하면(DB·검색 장애) 빈 목록
@@ -435,10 +526,14 @@ public class IntentCorrector {
      * "매운탕"은 그대로 찾고, "매운 닭볶음탕"은 "매운"을 빼고 "닭볶음탕"으로 찾는다 (레시피 검색은 모든 낱말이 이름에 있어야 한다).
      */
     private Optional<String> recipeNameIn(String name) {
-        for (String candidate : new LinkedHashSet<>(List.of(name, withoutTasteWords(name)))) {
-            if (!candidate.isEmpty() && !recipeService.suggestNames(candidate, 1).isEmpty()) {
-                return Optional.of(candidate);
+        try {
+            for (String candidate : new LinkedHashSet<>(List.of(name, withoutTasteWords(name)))) {
+                if (!candidate.isEmpty() && !recipeService.suggestNames(candidate, 1).isEmpty()) {
+                    return Optional.of(candidate);
+                }
             }
+        } catch (RuntimeException e) {
+            log.warn("상담 추천 시도의 레시피 이름 찾기 실패, 찾지 못한 것으로 - 원인: {}", e.toString());
         }
         return Optional.empty();
     }

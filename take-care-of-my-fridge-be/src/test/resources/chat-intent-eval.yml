@@ -78,7 +78,7 @@ cases:
   - { id: R03, group: 추천, message: "저녁 뭐 해 먹을까", expect: { intent: RECOMMEND, categories: [], keywordsEmpty: true } }
   - { id: R04, group: 추천, message: "차가운 요리 추천해줘", expect: { intent: RECOMMEND, keywordsAny: [샐러드, 냉채, 냉국, 무침, 냉파스타, 냉면], preference: 차가운, dishEmpty: true } }
   - { id: R05, group: 추천, message: "차가운 면", expect: { intent: RECOMMEND, categories: [면류], keywordsAny: [냉면, 막국수, 콩국수, 냉메밀] } }
-  - { id: R06, group: 추천, message: "김피탕 같은 요리 추천해줘", expect: { intent: RECOMMEND, categories: [튀김], keywordsFirst: 김피탕, keywordsAny: [탕수육, 깐풍기], dish: 김피탕 } }
+  - { id: R06, group: 추천, message: "김피탕 같은 요리 추천해줘", expect: { intent: RECOMMEND, dish: 김피탕 } }
   - { id: R07, group: 추천, message: "따뜻한 국물 요리", expect: { intent: RECOMMEND, categories: [국, 찌개, 전골, 수프, 스튜], keywordsEmpty: true } }
   - { id: R08, group: 추천, message: "30분 안에 만들 수 있는 거", expect: { intent: RECOMMEND, maxMinutes: 30 } }
   - { id: R09, group: 추천, message: "빨리 먹을 수 있는 거 추천해줘", expect: { intent: RECOMMEND, maxMinutes: 30 } }
@@ -134,6 +134,7 @@ cases:
   # 레시피 색인에 이름이 그대로 없는 요리 이름만 말해도 요리 이름으로 낸다 ("김피탕 같은 요리 추천해줘"는 R06)
   - { id: N09, group: 이름만, message: "나가사키 짬뽕", expect: { intent: RECOMMEND, dish: 나가사키 짬뽕 } }
   - { id: N10, group: 이름만, message: "김피탕", expect: { intent: RECOMMEND, dish: 김피탕 } }
+  - { id: N11, group: 이름만, message: "나가사키짬뽕 레시피 추천해줘", expect: { intent: RECOMMEND, dish: 나가사키짬뽕 } }
 
   # ── 일반 답 ──
   - { id: G01, group: 일반, message: "안녕", expect: { intent: GENERAL } }

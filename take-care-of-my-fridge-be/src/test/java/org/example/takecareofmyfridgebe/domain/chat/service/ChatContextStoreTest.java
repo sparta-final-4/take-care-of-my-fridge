@@ -104,7 +104,7 @@ class ChatContextStoreTest extends RedisContainerSupport {
         StringRedisTemplate broken = mock(StringRedisTemplate.class);
         when(broken.opsForValue()).thenThrow(new IllegalStateException("Redis 끊김"));
         when(broken.expire(KEY, Duration.ofMinutes(30))).thenThrow(new IllegalStateException("Redis 끊김"));
-        ChatContextStore store = new ChatContextStore(broken, new ChatProperties(30, Duration.ofMinutes(30), Duration.ofSeconds(150)));
+        ChatContextStore store = new ChatContextStore(broken, new ChatProperties(30, Duration.ofMinutes(30), Duration.ofSeconds(150), null));
 
         store.saveRecommendation(SESSION_ID, RecipeQuery.of(1L, List.of()), List.of(10L));
         store.touch(SESSION_ID);

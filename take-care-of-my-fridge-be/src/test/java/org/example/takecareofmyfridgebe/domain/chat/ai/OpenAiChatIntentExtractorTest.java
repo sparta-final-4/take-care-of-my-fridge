@@ -16,10 +16,15 @@ import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.model.tool.StructuredOutputChatOptions;
+import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.core.io.ByteArrayResource;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -143,6 +148,28 @@ class OpenAiChatIntentExtractorTest {
 
         String schema = ((StructuredOutputChatOptions) chatModel.lastPrompt.getOptions()).getOutputSchema();
         assertThat(schema).contains("\"targetIndex\"", "\"targetName\"", "\"removed\"", "RECIPE_DETAIL", "REFINE");
+    }
+
+    @Test
+    @DisplayName("응답 스키마는 strict(OpenAI json_schema)로 보내고, intent는 ChatIntent 값만 고를 수 있으며 비슷한 요리 칸은 없다 (따로 묻는다)")
+    void sendsStrictSchema_withIntentEnum() {
+        chatModel.reply = RECOMMEND_JSON;
+
+        extractor.extract(1L, 10L, "김피탕", List.of("국"), null);
+
+        OpenAiChatOptions options = (OpenAiChatOptions) chatModel.lastPrompt.getOptions();
+        // Spring AI 2.0.1은 strict를 따로 정하지 않으면 json_schema를 strict=true로 보낸다 (OpenAiChatModel)
+        assertThat(options.getResponseFormat().getType()).isEqualTo(OpenAiChatModel.ResponseFormat.Type.JSON_SCHEMA);
+        assertThat(options.getResponseFormat().getStrict()).isNotEqualTo(Boolean.FALSE);
+        JsonNode schema = JsonMapper.builder().build().readTree(options.getOutputSchema());
+        List<String> intents = new ArrayList<>();
+        schema.get("properties").get("intent").get("enum").forEach(value -> intents.add(value.asString()));
+        assertThat(intents).containsExactlyInAnyOrder(Arrays.stream(ChatIntent.values()).map(Enum::name).toArray(String[]::new));
+        List<String> required = new ArrayList<>();
+        schema.get("required").forEach(value -> required.add(value.asString()));
+        assertThat(required).contains("intent", "dishText", "keywords").doesNotContain("similarDishes");
+        assertThat(schema.get("properties").has("similarDishes")).isFalse();
+        assertThat(schema.get("additionalProperties").asBoolean()).isFalse();
     }
 
     // 마지막으로 받은 프롬프트를 기억하고 정해 둔 글을 답하는 가짜 모델

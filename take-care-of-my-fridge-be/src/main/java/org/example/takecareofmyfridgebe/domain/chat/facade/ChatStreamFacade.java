@@ -282,6 +282,13 @@ public class ChatStreamFacade {
             RecommendationReply recommendation = resolution.intent() == ChatIntent.REFINE && context.lastRecommendation() != null
                     ? chatRecommendationFacade.recommend(request.content(), query, context.lastRecommendation().recipeIds(), sessionId)
                     : chatRecommendationFacade.recommend(request.content(), query, List.of(), sessionId);
+            // 일반 답을 추천으로 시도한 것(요리 이름만 있고 묻는 말 없음)은 카드가 0장이면 "찾지 못했어요" 대신 일반 답으로 돌린다
+            // (사용자가 추천을 원했는지 확실하지 않아서다)
+            if (resolution.source() == ChatIntentResolution.Source.DISH_TRY && recommendation.event().empty()) {
+                log.info("상담 추천 시도 카드가 0장이라 일반 답으로 - memberId: {}, sessionId: {}, 요리 이름: {}",
+                        memberId, sessionId, query.keywordText());
+                return ReplyPlan.general(context);
+            }
             // 고른 레시피·맞은 방식·카드 이유는 ChatRecommendationFacade가 "상담 추천 후보 -"로 남긴다
             return new ReplyPlan(context, recommendation, resolution.recipeQuery(), null, false, null, resolution.allergens());
         } catch (RuntimeException e) {

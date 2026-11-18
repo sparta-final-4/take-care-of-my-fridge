@@ -1265,4 +1265,127 @@ public class ChatIntentFacadeTest {
     private static List<String> notices(RecipeQuery query, List<RecipeCandidate> picked, boolean keywordsNotFound) {
         return RecommendationPromptBuilder.notices(query, picked, keywordsNotFound, false);
     }
+
+    @Nested
+    @DisplayName("요리 이름")
+    class DishName {
+
+        // AI가 요리 이름·키워드를 낸 결과 (나머지 칸은 말하지 않음)
+        private IntentResult aiDish(ChatIntent intent, String dish, List<String> keywords) {
+            return new IntentResult(intent, List.of(), List.of(), 0, List.of(), List.of(), false, keywords, dish, "",
+                    0, "", List.of(), List.of(), "", "ALL");
+        }
+
+        @Test
+        @DisplayName("\"김피탕\"과 \"김피탕 같은 요리 추천해줘\"에 같은 AI 결과가 오면 추천 조건이 같다")
+        void buildsSameQuery_whenSameAiResult() {
+            givenExtracted(aiDish(ChatIntent.RECOMMEND, "김피탕", List.of("김피탕")));
+
+            RecipeQuery nameOnly = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("김피탕")).recipeQuery();
+            RecipeQuery like = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("김피탕 같은 요리 추천해줘"))
+                    .recipeQuery();
+
+            assertThat(like).isEqualTo(nameOnly);
+            assertThat(like.keywordText()).isEqualTo("김피탕");
+            assertThat(like.keywords()).containsExactly("김피탕");
+        }
+
+        @Test
+        @DisplayName("AI가 요리 이름을 비웠어도 첫 키워드가 메시지에 그대로 있으면 요리 이름으로 채운다")
+        void fillsDishFromFirstKeyword_whenAiLeftDishEmpty() {
+            givenExtracted(aiDish(ChatIntent.RECOMMEND, "", List.of("김피탕", "탕수육", "깐풍기")));
+
+            RecipeQuery query = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("김피탕 같은 요리 추천해줘"))
+                    .recipeQuery();
+
+            assertThat(query.keywordText()).isEqualTo("김피탕");
+            assertThat(query.keywords()).containsExactly("김피탕", "탕수육", "깐풍기");
+        }
+
+        @Test
+        @DisplayName("AI가 요리 이름과 키워드를 모두 비우면 \"○○ 같은 요리·거·음식\"의 ○○를 요리 이름과 첫 키워드로 쓴다")
+        void fillsDishFromLikePhrase_whenAiLeftAllEmpty() {
+            for (String message : List.of("김피탕 같은 요리 추천해줘", "꿔바로우 같은 거", "마라샹궈같은 음식 먹고 싶어")) {
+                givenExtracted(aiDish(ChatIntent.RECOMMEND, "", List.of()));
+
+                RecipeQuery query = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of(message)).recipeQuery();
+
+                String dish = message.substring(0, message.indexOf("같은")).strip();
+                assertThat(query.keywordText()).as(message).isEqualTo(dish);
+                assertThat(query.keywords()).as(message).containsExactly(dish);
+            }
+        }
+
+        @Test
+        @DisplayName("\"○○ 같은 거\"의 ○○가 분류 이름·묶음 말·밀키트 말·가리키는 말이면 요리 이름으로 채우지 않는다")
+        void keepsDishEmpty_whenLikePhraseIsNotDish() {
+            when(recipeService.getClassifications())
+                    .thenReturn(new RecipeClassificationResponse(List.of("한식"), List.of("국", "디저트", "찌개")));
+            for (String message : List.of("디저트 같은 거 추천해줘", "국물 같은 요리", "밀키트 같은 거 추천해줘", "이런 같은 거",
+                    "매운 거 같은 거")) {
+                givenExtracted(aiDish(ChatIntent.RECOMMEND, "", List.of()));
+
+                RecipeQuery query = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of(message)).recipeQuery();
+
+                assertThat(query.keywordText()).as(message).isNull();
+            }
+        }
+
+        @Test
+        @DisplayName("AI가 요리 이름을 비우고 첫 키워드가 분류 이름(디저트)·밀키트 말·맛으로 꾸민 특징이면 요리 이름으로 채우지 않는다")
+        void keepsDishEmpty_whenFirstKeywordIsNotDish() {
+            when(recipeService.getClassifications())
+                    .thenReturn(new RecipeClassificationResponse(List.of("한식"), List.of("국", "디저트", "찌개")));
+
+            givenExtracted(aiDish(ChatIntent.RECOMMEND, "", List.of("디저트")));
+            assertThat(facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("디저트 추천해줘"))
+                    .recipeQuery().keywordText()).isNull();
+
+            givenExtracted(aiDish(ChatIntent.RECOMMEND, "", List.of("칼칼한 국물", "얼큰한 국물")));
+            assertThat(facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("칼칼한 국물 요리"))
+                    .recipeQuery().keywordText()).isNull();
+
+            givenExtracted(aiDish(ChatIntent.RECOMMEND, "", List.of("밀키트")));
+            assertThat(facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("밀키트 추천해줘"))
+                    .recipeQuery().keywordText()).isNull();
+        }
+
+        @Test
+        @DisplayName("AI가 일반 답으로 봐도 요리 이름이 있고 묻는 말이 없으면 추천을 시도하고 출처를 DISH_TRY로 남긴다")
+        void triesRecommend_whenGeneralWithDishAndNoQuestion() {
+            givenExtracted(aiDish(ChatIntent.GENERAL, "김피탕", List.of()));
+
+            ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID,
+                    ChatMessageCreateRequest.of("오늘은 김피탕이 땡기네"));
+
+            assertThat(resolution.intent()).isEqualTo(ChatIntent.RECOMMEND);
+            assertThat(resolution.source()).isEqualTo(Source.DISH_TRY);
+            assertThat(resolution.recipeQuery().keywordText()).isEqualTo("김피탕");
+            assertThat(resolution.recipeQuery().keywords()).containsExactly("김피탕");
+        }
+
+        @Test
+        @DisplayName("요리가 무엇인지 묻는 말(\"김피탕이 뭐야?\")은 요리 이름이 있어도 일반 답 그대로다")
+        void keepsGeneral_whenAskingAboutDish() {
+            givenExtracted(aiDish(ChatIntent.GENERAL, "김피탕", List.of()));
+
+            ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("김피탕이 뭐야?"));
+
+            assertThat(resolution.intent()).isEqualTo(ChatIntent.GENERAL);
+            assertThat(resolution.recipeQuery()).isNull();
+        }
+
+        @Test
+        @DisplayName("AI가 일반 답으로 보고 요리 이름도 비웠으면 짧은 말일 때만 레시피 이름으로 찾아 추천을 시도한다")
+        void triesRecommendByRecipeName_whenGeneralWithoutDish() {
+            when(recipeService.suggestNames("닭볶음탕", 1)).thenReturn(List.of("닭볶음탕"));
+            givenExtracted(IntentResult.general());
+
+            ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("닭볶음탕 레시피"));
+
+            assertThat(resolution.intent()).isEqualTo(ChatIntent.RECOMMEND);
+            assertThat(resolution.source()).isEqualTo(Source.DISH_TRY);
+            assertThat(resolution.recipeQuery().keywordText()).isEqualTo("닭볶음탕");
+        }
+    }
 }

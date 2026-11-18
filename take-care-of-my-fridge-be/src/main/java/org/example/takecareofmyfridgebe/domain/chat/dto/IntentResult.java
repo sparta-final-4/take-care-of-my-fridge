@@ -1,15 +1,18 @@
 package org.example.takecareofmyfridgebe.domain.chat.dto;
 
+import org.example.takecareofmyfridgebe.domain.chat.text.ChatTexts;
 import org.example.takecareofmyfridgebe.domain.member.entity.Member;
 
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * 상담 메시지에서 AI가 뽑은 의도와 추천 조건.
@@ -24,10 +27,11 @@ import java.util.stream.Collectors;
  * @param includeIngredients 꼭 넣고 싶은 재료 이름 (말한 그대로)
  * @param excludeIngredients 빼고 싶은 재료 이름 (말한 그대로)
  * @param useSelectedOnly    고른·말한 재료를 꼭 쓰는 레시피만 원하는지
- * @param keywords           레시피 이름에 나올 만한 구체적인 요리 이름 (예: 냉면, 막국수). 특징("차가운")도 요리 이름으로 바꾼 것
+ * @param keywords           특징만 말했을 때("차가운 요리") 그 특징에 맞는 요리 이름 (예: 냉면, 막국수). 요리 이름을 말했으면 그 이름만.
+ *                           예전 기록에는 요리 이름과 비슷한 요리도 들어 있다. 비슷한 요리는 후보 검색 단계에서 따로 묻는다(SimilarDishFinder)
  * @param dishText           사용자가 말한 요리 이름 그대로 (예: "냉면"). 레시피 이름 비교와 카드 이유에 쓴다.
- *                           AI가 뽑고(분류·특징이면 빈 문자열), 서버는 메시지에 그대로 있고 분류 이름·묶음 말이 아닌지만 확인한다
- *                           (IntentCorrector.checkDishAndKeywords)
+ *                           AI가 뽑고(분류·특징이면 빈 문자열), 서버는 메시지에 그대로 있고 분류 이름·묶음 말이 아닌지만 확인한다.
+ *                           AI가 비웠으면 첫 키워드나 "○○ 같은 요리"의 ○○로 채운다 (IntentCorrector.checkDishAndKeywords)
  * @param preferenceText     사용자가 원한 특징·요리 표현 그대로 (예: "차가운 요리", "냉면 같은 면 요리"). 요청에 못 맞췄을 때 안내에 쓴다
  * @param targetIndex        RECIPE_DETAIL일 때 직전 추천 카드 번호(1부터). 모르면 0
  * @param targetName         RECIPE_DETAIL일 때 말한 레시피 이름 (예: "깐풍기"). 없으면 빈 문자열
@@ -196,6 +200,24 @@ public record IntentResult(
         return new IntentResult(ChatIntent.RECOMMEND, wantedTastes, moodCategories, maxMinutes, includes, excludeIngredients,
                 useSelectedOnly, namedKeywords, dish, preferenceText, targetIndex, targetName, removed, avoidTastes,
                 detailQuestion, fridgeScope);
+    }
+
+    /**
+     * 레시피 검색에 쓸 키워드: [요리 이름] + AI 키워드 중 남은 것 (순서 유지, 띄어쓰기만 다른 이름은 한 번, 최대 {@value #MAX_KEYWORDS}개).
+     * 요리 이름이 없으면 AI 키워드 그대로다 (특징만 말한 추천). 요리 이름이 키워드 맨 앞에 오게 해 "김피탕"과 "김피탕 같은 요리 추천해줘"가
+     * 같은 요리 이름을 받으면 같은 키워드가 되게 한다.
+     */
+    public List<String> searchKeywords() {
+        if (dishText == null) {
+            return keywords;
+        }
+        Set<String> seen = new HashSet<>();
+        return Stream.concat(Stream.of(dishText), keywords == null ? Stream.empty() : keywords.stream())
+                .filter(name -> name != null && !name.isBlank())
+                .map(String::strip)
+                .filter(name -> seen.add(ChatTexts.removeWhitespace(name)))
+                .limit(MAX_KEYWORDS)
+                .toList();
     }
 
     // 냉장고 보기 범위. sanitize한 뒤에 쓴다 (없거나 모르는 값이면 ALL)

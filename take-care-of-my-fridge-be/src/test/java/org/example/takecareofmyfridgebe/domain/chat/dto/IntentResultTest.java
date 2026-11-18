@@ -159,4 +159,37 @@ class IntentResultTest {
         assertThat(result.keywords()).containsExactly("닭볶음탕");
         assertThat(result.dishText()).isEqualTo("닭볶음탕");
     }
+
+    // 요리 이름·키워드만 정한 AI 결과 (나머지 칸은 말하지 않음)
+    private static IntentResult dish(String dishText, List<String> keywords) {
+        return new IntentResult(ChatIntent.RECOMMEND, null, null, null, null, null, null, keywords, dishText, null);
+    }
+
+    @Test
+    @DisplayName("검색 키워드는 요리 이름을 맨 앞에 두고 나머지 AI 키워드를 순서대로 붙인다")
+    void putsDishFirst_inSearchKeywords() {
+        assertThat(dish("김피탕", List.of("탕수육", "김피탕", "깐풍기")).searchKeywords())
+                .containsExactly("김피탕", "탕수육", "깐풍기");
+    }
+
+    @Test
+    @DisplayName("검색 키워드에서 띄어쓰기만 다른 이름은 앞의 것 하나만 남기고 최대 6개까지 둔다")
+    void dropsDuplicatesAndLimits_inSearchKeywords() {
+        assertThat(dish("나가사키 짬뽕", List.of("나가사키짬뽕", "짬뽕")).searchKeywords()).containsExactly("나가사키 짬뽕", "짬뽕");
+        assertThat(dish("김치찌개", List.of("부대찌개", "순두부찌개", "김치전골", "김치찜", "참치찌개", "된장찌개")).searchKeywords())
+                .hasSize(IntentResult.MAX_KEYWORDS).startsWith("김치찌개").doesNotContain("된장찌개");
+    }
+
+    @Test
+    @DisplayName("요리 이름이 없으면 AI 키워드를 그대로 검색 키워드로 쓴다")
+    void usesAiKeywords_whenNoDish() {
+        assertThat(dish(null, List.of("냉국", "냉면")).searchKeywords()).containsExactly("냉국", "냉면");
+    }
+
+    @Test
+    @DisplayName("\"김피탕\"과 \"김피탕 같은 요리 추천해줘\"의 AI 키워드가 달라도 요리 이름이 같으면 검색 키워드 맨 앞은 같다")
+    void startsWithSameDish_whenOnlyKeywordsDiffer() {
+        assertThat(dish("김피탕", List.of()).searchKeywords()).containsExactly("김피탕");
+        assertThat(dish("김피탕", List.of("김피탕")).searchKeywords()).containsExactly("김피탕");
+    }
 }
