@@ -235,7 +235,7 @@ class ChatIntentEvalManualTest {
                 "useSelectedOnly", "scope", "names", "saleOnly", "productType", "target", "question",
                 "aiKeywords", "aiDish", "aiPreference", "aiMaxMinutes",
                 "aiInclude", "aiExclude", "aiUseSelectedOnly", "aiScope", "aiTargetIndex", "aiTargetName", "aiRemoved",
-                "aiQuestion", "inputTokens", "cachedTokens", "outputTokens", "ms"));
+                "aiQuestion", "aiSelfHarmRisk", "inputTokens", "cachedTokens", "outputTokens", "ms"));
         header.addAll(ChatIntentEvalJevOn.Info.HEADER);
         runLines.add(String.join(",", header));
         rows.forEach(row -> runLines.add(row.line()));
@@ -285,6 +285,7 @@ class ChatIntentEvalManualTest {
                 aiRows.stream().mapToLong(RunRow::ms).average().orElse(0),
                 aiRows.stream().mapToLong(RunRow::ms).max().orElse(0)));
         summary.addAll(ChatIntentEvalJevOn.summary(cases, rows, EvalSet.SAFETY_SET.equals(setResource)));
+        summary.addAll(selfHarmRiskSummary(cases, rows, EvalSet.SAFETY_SET.equals(setResource)));
         summary.add("틀린 문장:");
         summary.addAll(failedLines);
 
@@ -297,6 +298,32 @@ class ChatIntentEvalManualTest {
         Files.writeString(summaryFile, String.join("\n", summary) + "\n", StandardCharsets.UTF_8);
         summary.forEach(System.out::println);
         System.out.println("결과: " + runsFile.toAbsolutePath() + ", " + casesFile.getFileName() + ", " + summaryFile.getFileName());
+    }
+
+    /**
+     * OpenAI 꺼내기의 자해 뜻(selfHarmRisk). 운영에서는 Jev 1차가 실패했을 때만 쓰므로, 평가에서는 Jev와 상관없이 값만 센다.
+     * 모든 세트: true가 나온 회차 수. 자해 기준 세트: 문장마다 true 회차 수 (단어 차단에 걸린 문장은 OpenAI를 부르지 않는다).
+     */
+    static List<String> selfHarmRiskSummary(List<EvalCase> cases, List<RunRow> rows, boolean safetySet) {
+        List<RunRow> asked = rows.stream().filter(row -> row.ai() != null).toList();
+        long risky = asked.stream().filter(row -> row.ai().hasSelfHarmRisk()).count();
+        List<String> lines = new ArrayList<>();
+        lines.add(String.format("OpenAI selfHarmRisk true: %d / %d회차", risky, asked.size()));
+        if (!safetySet) {
+            asked.stream().filter(row -> row.ai().hasSelfHarmRisk())
+                    .map(row -> row.evalCase().id()).distinct()
+                    .forEach(id -> lines.add("  true가 나온 문장: " + id));
+            return lines;
+        }
+        lines.add("OpenAI selfHarmRisk (문장마다, Jev 실패 때 예비):");
+        lines.add("  id | 묶음 | true 회차 / 부른 회차 | 메시지");
+        for (EvalCase evalCase : cases) {
+            List<RunRow> caseRows = asked.stream().filter(row -> row.evalCase() == evalCase).toList();
+            String count = caseRows.isEmpty() ? "단어 차단"
+                    : caseRows.stream().filter(row -> row.ai().hasSelfHarmRisk()).count() + " / " + caseRows.size();
+            lines.add(String.format("  %s | %s | %s | %s", evalCase.id(), evalCase.group(), count, evalCase.message()));
+        }
+        return lines;
     }
 
     // 고정 프롬프트 크기 (첫 질문, 후속 규칙). 토큰은 gpt-4o-mini의 o200k 기준
@@ -334,14 +361,14 @@ class ChatIntentEvalManualTest {
                     csv(source)));
             cells.addAll(outcome.cells());
             if (ai == null) {
-                for (int i = 0; i < 12; i++) {
+                for (int i = 0; i < 13; i++) {
                     cells.add("");
                 }
             } else {
                 cells.addAll(List.of(csv(ai.keywords()), csv(ai.dishText()), csv(ai.preferenceText()), csv(ai.maxMinutes()),
                         csv(ai.includeIngredients()), csv(ai.excludeIngredients()), csv(ai.useSelectedOnly()),
                         csv(ai.fridgeScope()), csv(ai.targetIndex()), csv(ai.targetName()), csv(ai.removed()),
-                        csv(ai.detailQuestion())));
+                        csv(ai.detailQuestion()), csv(ai.selfHarmRisk())));
             }
             cells.addAll(List.of(String.valueOf(inputTokens), String.valueOf(cachedTokens), String.valueOf(outputTokens),
                     String.valueOf(ms)));
