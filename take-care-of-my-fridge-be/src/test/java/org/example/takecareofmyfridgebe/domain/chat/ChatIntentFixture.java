@@ -126,7 +126,7 @@ public class ChatIntentFixture {
     public static IntentExtraction extractionOf(IntentResult result) {
         return new IntentExtraction(result.maxMinutes(), result.includeIngredients(), result.excludeIngredients(),
                 result.useSelectedOnly(), result.keywords(), result.dishText(), result.preferenceText(), result.targetIndex(),
-                result.targetName(), result.removed(), result.detailQuestion(), result.fridgeScope());
+                result.targetName(), result.removed(), result.detailQuestion(), result.fridgeScope(), null);
     }
 
     public static JevIntentJudgement judgementOf(IntentResult result) {

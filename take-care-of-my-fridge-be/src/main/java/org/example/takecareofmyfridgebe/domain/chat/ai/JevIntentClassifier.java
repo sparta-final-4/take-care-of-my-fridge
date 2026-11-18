@@ -96,7 +96,7 @@ public class JevIntentClassifier {
     }
 
     // 2차(추천 조건)를 묻는 의도인지 (서비스 규칙을 적용한 의도로 본다)
-    static boolean asksSecond(ChatIntent intent) {
+    public static boolean asksSecond(ChatIntent intent) {
         return NEEDS_SECOND.contains(intent);
     }
 

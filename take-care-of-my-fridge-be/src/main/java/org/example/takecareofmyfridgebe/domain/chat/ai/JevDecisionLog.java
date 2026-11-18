@@ -27,7 +27,8 @@ import java.util.stream.Collectors;
  *   <li>Jev 분류는 요청 종류(jevRequestKind)와 1등 분류(jevCategory, "없음"이 1등이면 -)·확률, 2등 분류(jevCategory2, "없음"일 수 있음)·확률로 남긴다</li>
  *   <li>decision은 상담 의도를 무엇으로 정했는지(JevDecision.Decision), jevUsedKind·jevUsedValues는 Jev로 정한 추천에서
  *       쓴 요청 종류와 값(특정 요리면 요리 이름, 특정 분류면 분류, 넓은 요청이면 요리 이름 목록),
- *       jevUsedReason은 Jev 요청 종류나 OpenAI 요리 이름을 바꾼 까닭(JevDecision.Reason. 메시지의 키워드를 요리 이름으로 주웠으면 DISH_FROM_KEYWORD)</li>
+ *       jevUsedReason은 Jev 요청 종류나 OpenAI 요리 이름을 바꾼 까닭(JevDecision.Reason. 메시지의 키워드를 요리 이름으로 주웠으면 DISH_FROM_KEYWORD),
+ *       selfHarmBy는 자해 안내를 보낸 조건(JevDecision.SelfHarmBy)</li>
  *   <li>finalFollows는 최종 이어짐(직전 조건을 이어받은 추천인지, 추천이 아니면 false), jevFollowsPrevious는 Jev가 답한 직전 추천에 이어지는 말일 확률
  *       (직전 추천이 없어 묻지 않았으면 -). Jev로 정했으면 추천이고 이 확률이 기준(JevIntentClassifier.MIN_FOLLOWS_PREVIOUS) 이상일 때 이어짐이다</li>
  *   <li>final… 칸은 상담 최종 결과다(서비스 규칙·알레르기 반영 후)</li>
@@ -151,6 +152,8 @@ final class JevDecisionLog {
         fields.put("jevUsedValues", decision.usedKind() == null ? null
                 : join(decision.usedValues().stream().map(ChatTexts::removeWhitespace).toList()));
         fields.put("jevUsedReason", decision.usedKind() == null ? null : decision.reason());
+        // 자해 안내를 보낸 조건 (JEV_TOP_INTENT·JEV_PROBABILITY·OPENAI_RISK). 자해 안내가 아니면 -
+        fields.put("selfHarmBy", decision.selfHarmBy());
 
         return NAME + " - " + fields.entrySet().stream()
                 .map(entry -> entry.getKey() + "=" + (entry.getValue() == null ? NONE : entry.getValue()))

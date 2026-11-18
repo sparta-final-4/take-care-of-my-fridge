@@ -30,7 +30,7 @@ class JevDecisionLogTest {
             "finalCategories", "jevRequestKind", "jevRequestKindConfidence", "jevCategory", "jevCategoryConfidence",
             "jevCategory2", "jevCategory2Confidence", "finalMealkit", "jevMealkit", "jevAsksQuestion",
             "jevDishNamed", "jevModel", "jevRequestIds", "jevLatencyMs", "jevInputTokens", "jevStatus", "decision", "jevUsedKind",
-            "jevUsedValues", "jevUsedReason");
+            "jevUsedValues", "jevUsedReason", "selfHarmBy");
 
     private static final FinalSide RESULT = new FinalSide(1L, 10L, 10, ChatIntent.RECOMMEND, false,
             List.of(Taste.SPICY), List.of(), List.of("찌개"), false);

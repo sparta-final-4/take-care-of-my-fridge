@@ -27,6 +27,7 @@ import java.util.stream.Collectors;
  * @param removed            이어짐일 때 지우라고 한 조건 종류 (RefineCondition 이름). 없으면 빈 목록
  * @param detailQuestion     레시피 자세히일 때 질문 종류 (DetailQuestion 이름). 다른 말이면 빈 값
  * @param fridgeScope        냉장고 보기 범위 (FridgeScope 이름). 다른 말이면 ALL
+ * @param selfHarmRisk       스스로를 해치거나 삶을 끝내려는 뜻이 있는지. Jev 1차가 실패했을 때만 자해 판단에 쓴다 (ChatIntentFacade)
  */
 public record IntentExtraction(
         Integer maxMinutes,
@@ -40,7 +41,8 @@ public record IntentExtraction(
         String targetName,
         List<String> removed,
         String detailQuestion,
-        String fridgeScope
+        String fridgeScope,
+        Boolean selfHarmRisk
 ) {
 
     private static final Set<String> QUESTION_NAMES = names(DetailQuestion.values());
@@ -49,7 +51,7 @@ public record IntentExtraction(
 
     // 아무것도 꺼내지 않은 결과 (스텁, OpenAI 꺼내기가 실패했지만 꺼낼 값이 필요 없는 의도)
     public static IntentExtraction empty() {
-        return new IntentExtraction(null, null, null, null, null, null, null, null, null, null, null, null);
+        return new IntentExtraction(null, null, null, null, null, null, null, null, null, null, null, null, null);
     }
 
     /**
@@ -71,8 +73,14 @@ public record IntentExtraction(
                 blankToNull(targetName),
                 cleanNames(removed, name -> name.toUpperCase(Locale.ROOT), CONDITION_NAMES),
                 named(detailQuestion, QUESTION_NAMES),
-                named(fridgeScope, SCOPE_NAMES)
+                named(fridgeScope, SCOPE_NAMES),
+                selfHarmRisk
         );
+    }
+
+    // OpenAI가 자해 뜻이 있다고 봤는지 (값이 없으면 아니오)
+    public boolean hasSelfHarmRisk() {
+        return Boolean.TRUE.equals(selfHarmRisk);
     }
 
     private static String blankToNull(String text) {

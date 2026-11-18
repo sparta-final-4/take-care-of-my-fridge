@@ -28,6 +28,7 @@ import org.example.takecareofmyfridgebe.domain.chat.intent.MealkitWordChecker;
 import org.example.takecareofmyfridgebe.domain.chat.intent.TasteWordChecker;
 import org.example.takecareofmyfridgebe.domain.chat.safety.AllergyExclusionFinder;
 import org.example.takecareofmyfridgebe.domain.chat.ai.ChatIntentExtractor;
+import org.example.takecareofmyfridgebe.domain.chat.ai.JevIntentClassifier;
 import org.example.takecareofmyfridgebe.domain.chat.ai.JevIntentRunner;
 import org.example.takecareofmyfridgebe.domain.chat.text.ChatTexts;
 import org.example.takecareofmyfridgebe.domain.ingredient.service.IngredientMatcher;
@@ -73,7 +74,9 @@ import java.util.stream.Stream;
  * 의도는 Jev 하나가 정한다: OpenAI 꺼내기와 함께 Jev를 다른 스레드에서 시작하고(JevIntentRunner), 꺼내기가 끝난 뒤 Jev 결과를 기다려
  * (제한 시간 안에서) Jev 1등 의도(confidence와 상관없이)와 OpenAI가 꺼낸 값으로 의도 결과를 만든다 (JevIntentResolver).
  * 그 뒤 서버 서비스 규칙(IntentCorrector)을 거친다.
- * Jev 1등 의도가 자해(SELF_HARM)이거나 자해 확률이 {@value #SELF_HARM_MIN_PROBABILITY} 이상이면 자해 안내를 보낸다 (OpenAI 꺼내기가 실패했어도).
+ * Jev 1차 1등 의도가 자해(SELF_HARM)이거나 자해 확률이 {@value #SELF_HARM_MIN_PROBABILITY} 이상이면 자해 안내를 보낸다
+ * (OpenAI 꺼내기나 Jev 2차가 실패했어도). Jev 1차가 실패하면 OpenAI 꺼내기의 자해 뜻(selfHarmRisk)이 true일 때 자해 안내를 보내고,
+ * 아니면 서버 답이다. Jev 1차가 성공하면 selfHarmRisk는 쓰지 않는다.
  * 단어 차단(SafetyWordChecker)은 이보다 먼저 ChatStreamFacade가 본다.
  * 무엇으로 정했는지는 "상담 의도 Jev 결정" 로그로 남긴다. 설계: docs/testing/jev-on-design.md
  */
@@ -194,15 +197,28 @@ public class ChatIntentFacade {
         IntentExtraction extraction = extract(memberId, sessionId, request.content(), followUp);
         Optional<JevIntentJudgement> judged = jevIntentRunner.await(jev);
         if (judged.isEmpty()) {
+            // Jev 1차가 실패하면 OpenAI 꺼내기의 자해 뜻만 예비로 본다 (Jev가 성공하면 이 값은 쓰지 않는다)
+            if (extraction != null && extraction.hasSelfHarmRisk()) {
+                log.info("상담 Jev 실패, OpenAI 자해 뜻으로 자해 안내 - memberId: {}, sessionId: {}", memberId, sessionId);
+                return new Decision(ChatIntentResolution.declined(ChatIntent.SELF_HARM), jev,
+                        JevDecision.selfHarm(JevDecision.Decision.JEV_FAILED_OPENAI_SELF_HARM, JevDecision.SelfHarmBy.OPENAI_RISK));
+            }
             log.warn("상담 Jev 의도 판단 실패, 서버 답으로 - memberId: {}, sessionId: {}", memberId, sessionId);
             return serverFallback(memberId, sessionId, request, jev, JevDecision.Decision.JEV_FAILED_SERVER_FALLBACK);
         }
-        // 자해는 꺼낸 값이 필요 없으므로 OpenAI 꺼내기가 실패했어도 자해 안내를 보낸다
+        // 자해는 꺼낸 값도 2차도 필요 없으므로 OpenAI 꺼내기나 Jev 2차가 실패했어도 1차 판단으로 자해 안내를 보낸다
         JevIntentJudgement.First first = judged.get().first();
-        if (selfHarm(first)) {
-            log.info("상담 Jev 자해 판단으로 자해 안내 - memberId: {}, sessionId: {}, 1등 의도: {}, 자해 확률: {}",
-                    memberId, sessionId, first.intent(), selfHarmProbability(first));
-            return new Decision(ChatIntentResolution.declined(ChatIntent.SELF_HARM), jev, JevDecision.of(JevDecision.Decision.JEV));
+        Optional<JevDecision.SelfHarmBy> selfHarmBy = selfHarmBy(first);
+        if (selfHarmBy.isPresent()) {
+            log.info("상담 Jev 자해 판단으로 자해 안내 - memberId: {}, sessionId: {}, 1등 의도: {}, 자해 확률: {}, 조건: {}",
+                    memberId, sessionId, first.intent(), selfHarmProbability(first), selfHarmBy.get());
+            return new Decision(ChatIntentResolution.declined(ChatIntent.SELF_HARM), jev,
+                    JevDecision.selfHarm(JevDecision.Decision.JEV, selfHarmBy.get()));
+        }
+        // 2차(추천 조건)가 필요한데 실패했으면 Jev 실패로 서버 답 (자해 판단은 위에서 1차로 봤다)
+        if (JevIntentClassifier.asksSecond(first.intent()) && !judged.get().hasSecond()) {
+            log.warn("상담 Jev 2차 실패, 서버 답으로 - memberId: {}, sessionId: {}, 의도: {}", memberId, sessionId, first.intent());
+            return serverFallback(memberId, sessionId, request, jev, JevDecision.Decision.JEV_FAILED_SERVER_FALLBACK);
         }
         if (extraction == null) {
             if (NEEDS_EXTRACTION.contains(first.intent())) {
@@ -234,9 +250,18 @@ public class ChatIntentFacade {
         return new Decision(resolution, result.removed() == null ? List.of() : result.removed(), jev, jevDecision);
     }
 
-    // 자해 안내를 보낼지: Jev 1등 의도가 자해이거나 자해 확률이 기준 이상
+    // 자해 안내를 보낼 조건: Jev 1등 의도가 자해이거나 자해 확률이 기준 이상. 아니면 빈 값
+    static Optional<JevDecision.SelfHarmBy> selfHarmBy(JevIntentJudgement.First first) {
+        if (first.intent() == ChatIntent.SELF_HARM) {
+            return Optional.of(JevDecision.SelfHarmBy.JEV_TOP_INTENT);
+        }
+        return selfHarmProbability(first) >= SELF_HARM_MIN_PROBABILITY
+                ? Optional.of(JevDecision.SelfHarmBy.JEV_PROBABILITY) : Optional.empty();
+    }
+
+    // 자해 안내를 보낼지 (selfHarmBy가 있는지)
     static boolean selfHarm(JevIntentJudgement.First first) {
-        return first.intent() == ChatIntent.SELF_HARM || selfHarmProbability(first) >= SELF_HARM_MIN_PROBABILITY;
+        return selfHarmBy(first).isPresent();
     }
 
     // Jev 의도별 확률의 자해 확률 (답에 없으면 0)

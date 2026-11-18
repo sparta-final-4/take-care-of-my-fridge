@@ -29,11 +29,20 @@ class IntentExtractionTest {
     @DisplayName("재료 이름은 앞뒤 공백을 지우고 빈 이름·null·중복을 뺀다")
     void trimsIngredientNames() {
         IntentExtraction result = new IntentExtraction(null, Arrays.asList(" 두부 ", "", null, "두부", "버섯"), List.of("오이 "),
-                true, null, null, null, null, null, null, null, null).sanitize();
+                true, null, null, null, null, null, null, null, null, null).sanitize();
 
         assertThat(result.includeIngredients()).containsExactly("두부", "버섯");
         assertThat(result.excludeIngredients()).containsExactly("오이");
         assertThat(result.useSelectedOnly()).isTrue();
+    }
+
+    @Test
+    @DisplayName("자해 뜻은 정리해도 그대로 두고, 값이 없으면 자해 뜻이 없는 것으로 본다")
+    void keepsSelfHarmRisk_whenSanitizing() {
+        IntentExtraction risky = new IntentExtraction(null, null, null, null, null, null, null, null, null, null, null, null, true);
+
+        assertThat(risky.sanitize().hasSelfHarmRisk()).isTrue();
+        assertThat(IntentExtraction.empty().sanitize().hasSelfHarmRisk()).isFalse();
     }
 
     @Test
@@ -85,14 +94,14 @@ class IntentExtractionTest {
     // 시간·키워드·요리 이름·원한 표현·뺄 조건만 정한 꺼내기 결과
     private static IntentExtraction extraction(Integer maxMinutes, List<String> keywords, String dishText, String preferenceText,
                                                List<String> removed) {
-        return new IntentExtraction(maxMinutes, null, null, null, keywords, dishText, preferenceText, null, null, removed, null, null);
+        return new IntentExtraction(maxMinutes, null, null, null, keywords, dishText, preferenceText, null, null, removed, null, null, null);
     }
 
     private static IntentExtraction detail(Integer targetIndex, String targetName, String question) {
-        return new IntentExtraction(null, null, null, null, null, null, null, targetIndex, targetName, null, question, null);
+        return new IntentExtraction(null, null, null, null, null, null, null, targetIndex, targetName, null, question, null, null);
     }
 
     private static IntentExtraction scope(String fridgeScope) {
-        return new IntentExtraction(null, null, null, null, null, null, null, null, null, null, null, fridgeScope);
+        return new IntentExtraction(null, null, null, null, null, null, null, null, null, null, null, fridgeScope, null);
     }
 }

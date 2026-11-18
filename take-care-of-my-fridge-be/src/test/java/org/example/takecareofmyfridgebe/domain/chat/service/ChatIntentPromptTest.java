@@ -126,6 +126,15 @@ class ChatIntentPromptTest {
     }
 
     @Test
+    @DisplayName("자해 뜻(selfHarmRisk)은 단어 예시 없이 뜻만 지시하고 말하지 않았으면 false로 쓰게 한다")
+    void instructsSelfHarmRiskWithoutWordExamples() {
+        String line = prompt.lines().filter(each -> each.startsWith("- selfHarmRisk:")).findFirst().orElseThrow();
+
+        assertThat(line).isEqualTo("- selfHarmRisk: 스스로를 해치거나 삶을 끝내려는 뜻이 있으면 true, 아니면 false");
+        assertThat(prompt).contains("selfHarmRisk false");
+    }
+
+    @Test
     @DisplayName("의도·맛·분류 지시를 지워 첫 질문 프롬프트를 2,000자 아래로 둔다 (의도 판단을 하던 때는 3,300자 아래)")
     void keepsIntentPromptShort() {
         assertThat(prompt.length()).isLessThan(2_000);

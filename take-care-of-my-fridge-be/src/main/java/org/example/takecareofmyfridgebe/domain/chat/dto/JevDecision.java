@@ -7,21 +7,27 @@ import java.util.List;
 /**
  * 상담 의도를 무엇으로 정했는지 (Jev 비교 로그에 남긴다).
  *
- * @param decision   정한 방법
- * @param usedKind   Jev로 정한 추천에서 쓴 요청 종류 (경계 규칙 적용 뒤). 그 밖이면 null
- * @param usedValues 그 요청 종류로 쓴 값: 특정 요리면 요리 이름, 특정 분류면 분류, 넓은 요청이면 요리 이름 목록. 없으면 빈 목록
- * @param reason     Jev 요청 종류나 OpenAI 요리 이름을 그대로 쓰지 않고 바꾼 까닭 (바꾸지 않았으면 NONE)
+ * @param decision    정한 방법
+ * @param usedKind    Jev로 정한 추천에서 쓴 요청 종류 (경계 규칙 적용 뒤). 그 밖이면 null
+ * @param usedValues  그 요청 종류로 쓴 값: 특정 요리면 요리 이름, 특정 분류면 분류, 넓은 요청이면 요리 이름 목록. 없으면 빈 목록
+ * @param reason      Jev 요청 종류나 OpenAI 요리 이름을 그대로 쓰지 않고 바꾼 까닭 (바꾸지 않았으면 NONE)
+ * @param selfHarmBy  자해 안내를 보낸 조건. 자해 안내가 아니면 null
  */
 public record JevDecision(
         Decision decision,
         RequestKind usedKind,
         List<String> usedValues,
-        Reason reason
+        Reason reason,
+        SelfHarmBy selfHarmBy
 ) {
 
     public JevDecision {
         usedValues = usedValues == null ? List.of() : List.copyOf(usedValues);
         reason = reason == null ? Reason.NONE : reason;
+    }
+
+    public JevDecision(Decision decision, RequestKind usedKind, List<String> usedValues, Reason reason) {
+        this(decision, usedKind, usedValues, reason, null);
     }
 
     public JevDecision(Decision decision, RequestKind usedKind, List<String> usedValues) {
@@ -30,6 +36,11 @@ public record JevDecision(
 
     public static JevDecision of(Decision decision) {
         return new JevDecision(decision, null, List.of());
+    }
+
+    // 자해 안내로 정한 결정
+    public static JevDecision selfHarm(Decision decision, SelfHarmBy by) {
+        return new JevDecision(decision, null, List.of(), Reason.NONE, by);
     }
 
     /**
@@ -53,11 +64,25 @@ public record JevDecision(
     }
 
     public enum Decision {
-        // Jev 판단으로 정함 (confidence와 상관없이 Jev 1등 의도)
+        // Jev 판단으로 정함 (confidence와 상관없이 Jev 1등 의도). Jev 1차 자해 판단으로 자해 안내를 보낸 경우도 여기다
         JEV,
         // Jev가 실패하거나(1차·필요한 2차), 제한 시간 안에 끝나지 않거나, 건너뛰어(키 없음 등) 서버 답으로 정함
         JEV_FAILED_SERVER_FALLBACK,
+        // Jev 1차가 실패해 OpenAI 꺼내기의 자해 뜻(selfHarmRisk)으로 자해 안내를 보냄
+        JEV_FAILED_OPENAI_SELF_HARM,
         // Jev가 꺼낸 값이 필요한 의도(추천·레시피 자세히)로 정했는데 OpenAI 꺼내기가 실패해 서버 답으로 정함
         OPENAI_FAILED_SERVER_FALLBACK
+    }
+
+    /**
+     * 자해 안내를 보낸 조건 (비교 로그 selfHarmBy). 단어 차단(SafetyWordChecker)은 이 전에 따로 돈다.
+     */
+    public enum SelfHarmBy {
+        // Jev 1차 1등 의도가 SELF_HARM
+        JEV_TOP_INTENT,
+        // Jev 1차 자해 확률이 기준(ChatIntentFacade.SELF_HARM_MIN_PROBABILITY) 이상
+        JEV_PROBABILITY,
+        // Jev 1차가 실패해 OpenAI 꺼내기의 selfHarmRisk가 true
+        OPENAI_RISK
     }
 }

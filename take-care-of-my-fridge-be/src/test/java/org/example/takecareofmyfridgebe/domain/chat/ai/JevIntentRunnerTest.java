@@ -171,13 +171,16 @@ class JevIntentRunnerTest {
     }
 
     @Test
-    @DisplayName("추천인데 2차가 실패했으면 Jev 실패로 보고 빈 값이다")
-    void returnsEmpty_whenSecondFailed() {
-        when(classifier.classify(any(), any(), any()))
-                .thenReturn(Optional.of(JevDecisionLogTest.judgement(ChatIntent.RECOMMEND, false)));
+    @DisplayName("추천인데 2차가 실패했으면 1차 자해 판단을 볼 수 있게 2차 없는 판단을 돌려주고, 시작하지 않았으면 빈 값이다")
+    void returnsFirstOnly_whenSecondFailed() {
+        JevIntentJudgement firstOnly = JevDecisionLogTest.judgement(ChatIntent.RECOMMEND, false);
+        when(classifier.classify(any(), any(), any())).thenReturn(Optional.of(firstOnly));
         JevIntentRunner runner = runner(client(FAKE_KEY));
 
-        assertThat(runner.await(runner.start(MESSAGE, CATEGORIES, null))).isEmpty();
+        Optional<JevIntentJudgement> judged = runner.await(runner.start(MESSAGE, CATEGORIES, null));
+
+        assertThat(judged).contains(firstOnly);
+        assertThat(judged.orElseThrow().hasSecond()).isFalse();
         assertThat(runner.await(null)).isEmpty();
     }
 

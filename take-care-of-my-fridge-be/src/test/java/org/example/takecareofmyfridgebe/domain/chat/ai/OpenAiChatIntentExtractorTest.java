@@ -38,7 +38,9 @@ class OpenAiChatIntentExtractorTest {
             """;
     // 꺼내기 응답 칸 (IntentExtraction 순서). 의도·이어짐·맛·분류는 Jev가 정하므로 없다
     private static final List<String> FIELDS = List.of("maxMinutes", "includeIngredients", "excludeIngredients", "useSelectedOnly",
-            "keywords", "dishText", "preferenceText", "targetIndex", "targetName", "removed", "detailQuestion", "fridgeScope");
+            "keywords", "dishText", "preferenceText", "targetIndex", "targetName", "removed", "detailQuestion", "fridgeScope",
+            // Jev 1차가 실패했을 때만 쓰는 자해 뜻 (ChatIntentFacade)
+            "selfHarmRisk");
 
     private CapturingChatModel chatModel;
     private OpenAiChatIntentExtractor extractor;
@@ -100,7 +102,7 @@ class OpenAiChatIntentExtractorTest {
         IntentExtraction result = extractor.extract(1L, 10L, "두부로 할 수 있는 냉면 30분 안에", null);
 
         assertThat(result).isEqualTo(new IntentExtraction(30, List.of("두부"), null, true, List.of("냉면"), "냉면",
-                "냉면 같은 면 요리", null, null, null, null, null));
+                "냉면 같은 면 요리", null, null, null, null, null, null));
     }
 
     @Test

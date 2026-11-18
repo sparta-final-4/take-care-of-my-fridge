@@ -88,8 +88,8 @@ public class JevIntentRunner {
      * Jev 결과를 기다린다. Jev를 시작한 때부터 TypeSafe 제한 시간(app.typesafe.timeout)이 지나면 더 기다리지 않는다.
      *
      * @param run start의 결과
-     * @return 1차와 (필요하면) 2차까지 성공한 Jev 판단. run이 없거나, Jev가 실패·건너뜀이거나, 2차가 필요한데 실패했거나,
-     *         제한 시간 안에 끝나지 않았으면 빈 값 (Jev 실패로 본다)
+     * @return 1차가 성공한 Jev 판단. 2차가 필요한데 실패했으면 2차 없이 돌려준다(부르는 쪽이 1차 자해 판단을 본 뒤 Jev 실패로 처리한다).
+     *         run이 없거나, 1차가 실패·건너뜀이거나, 제한 시간 안에 끝나지 않았으면 빈 값 (Jev 실패로 본다)
      */
     public Optional<JevIntentJudgement> await(Run run) {
         if (run == null) {
@@ -98,7 +98,8 @@ public class JevIntentRunner {
         long remainingNanos = typeSafeClient.timeout().toNanos() - (System.nanoTime() - run.startedAt());
         try {
             JevSide side = run.jev().get(Math.max(0, remainingNanos), TimeUnit.NANOSECONDS);
-            return side.status() == JevDecisionLog.Status.OK ? side.judgement() : Optional.empty();
+            return side.status() == JevDecisionLog.Status.OK || side.status() == JevDecisionLog.Status.SECOND_FAILED
+                    ? side.judgement() : Optional.empty();
         } catch (TimeoutException e) {
             log.warn("Jev 판단이 제한 시간 안에 끝나지 않아 Jev 실패로 - 제한 시간: {}ms", typeSafeClient.timeout().toMillis());
             return Optional.empty();

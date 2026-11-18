@@ -9,6 +9,7 @@ import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntent;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntentResolution;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageCreateRequest;
 import org.example.takecareofmyfridgebe.domain.chat.dto.FridgeScope;
+import org.example.takecareofmyfridgebe.domain.chat.dto.IntentExtraction;
 import org.example.takecareofmyfridgebe.domain.chat.dto.IntentResult;
 import org.example.takecareofmyfridgebe.domain.chat.dto.JevDecision;
 import org.example.takecareofmyfridgebe.domain.chat.dto.JevDecision.Decision;
@@ -615,6 +616,86 @@ class ChatIntentFacadeJevOnTest {
 
             assertThat(resolution.intent()).isEqualTo(ChatIntent.SELF_HARM);
             assertThat(resolution.declines()).isTrue();
+        }
+
+        @Test
+        @DisplayName("Jev 2차가 실패해도 1차 1등 의도가 자해면 자해 안내로 정하고 결정 로그에 JEV_TOP_INTENT를 남긴다")
+        void declinesSelfHarm_whenSecondFailsAndFirstSaysSelfHarm() {
+            givenOpenAi(IntentResult.general());
+            givenJevWithSelfHarm(ChatIntent.SELF_HARM, 0.8, 0.8);
+
+            ChatIntentResolution resolution = resolve("요즘 살 이유가 없는 것 같아");
+
+            assertThat(resolution.intent()).isEqualTo(ChatIntent.SELF_HARM);
+            verifyDecision(JevDecision.selfHarm(Decision.JEV, JevDecision.SelfHarmBy.JEV_TOP_INTENT));
+        }
+
+        @Test
+        @DisplayName("Jev 1등 의도가 추천인데 2차가 실패해도 1차 자해 확률이 기준 이상이면 자해 안내로 정한다")
+        void declinesSelfHarm_whenSecondFailsAndSelfHarmProbabilityAboveThreshold() {
+            givenOpenAi(IntentResult.general());
+            // 추천이라 2차가 필요한데 2차가 없다 (2차 실패)
+            givenJevWithSelfHarm(ChatIntent.RECOMMEND, 0.5, 0.4);
+
+            ChatIntentResolution resolution = resolve("마지막으로 먹을 거 추천해줘");
+
+            assertThat(resolution.intent()).isEqualTo(ChatIntent.SELF_HARM);
+            verifyDecision(JevDecision.selfHarm(Decision.JEV, JevDecision.SelfHarmBy.JEV_PROBABILITY));
+        }
+
+        @Test
+        @DisplayName("Jev 1등 의도가 추천인데 2차가 실패하고 자해 확률이 기준 미만이면 Jev 실패로 서버 답이다")
+        void answersByServer_whenSecondFailsWithoutSelfHarm() {
+            givenOpenAi(IntentResult.general());
+            givenJevWithSelfHarm(ChatIntent.RECOMMEND, 0.9, 0.01);
+
+            ChatIntentResolution resolution = resolve("김치찌개 먹고 싶어");
+
+            assertThat(resolution.serverFallback()).isTrue();
+            verifyDecision(JevDecision.of(Decision.JEV_FAILED_SERVER_FALLBACK));
+        }
+
+        @Test
+        @DisplayName("Jev 1차가 실패하고 OpenAI 꺼내기의 자해 뜻이 true면 자해 안내로 정하고 결정 로그에 OPENAI_RISK를 남긴다")
+        void declinesSelfHarm_whenJevFailsAndOpenAiSeesRisk() {
+            fixture.givenExtracted(withSelfHarmRisk(true));
+            when(jev.await(run)).thenReturn(Optional.empty());
+
+            ChatIntentResolution resolution = resolve("오늘 밤에 다 끝내 버리려고");
+
+            assertThat(resolution.intent()).isEqualTo(ChatIntent.SELF_HARM);
+            assertThat(resolution.declines()).isTrue();
+            verifyDecision(JevDecision.selfHarm(Decision.JEV_FAILED_OPENAI_SELF_HARM, JevDecision.SelfHarmBy.OPENAI_RISK));
+        }
+
+        @Test
+        @DisplayName("Jev 1차가 실패하고 OpenAI 꺼내기의 자해 뜻이 false면 서버 답이다")
+        void answersByServer_whenJevFailsAndOpenAiSeesNoRisk() {
+            fixture.givenExtracted(withSelfHarmRisk(false));
+            when(jev.await(run)).thenReturn(Optional.empty());
+
+            ChatIntentResolution resolution = resolve("김치찌개 먹고 싶어");
+
+            assertThat(resolution.serverFallback()).isTrue();
+            verifyDecision(JevDecision.of(Decision.JEV_FAILED_SERVER_FALLBACK));
+        }
+
+        @Test
+        @DisplayName("Jev가 성공하고 자해가 아니라고 보면 OpenAI 꺼내기의 자해 뜻이 true여도 자해 안내가 아니다")
+        void answersGeneral_whenJevSucceedsAndOpenAiSeesRisk() {
+            fixture.givenExtracted(withSelfHarmRisk(true));
+            givenJevWithSelfHarm(ChatIntent.GENERAL, 0.9, 0.01);
+
+            ChatIntentResolution resolution = resolve("배고파 죽겠어");
+
+            assertThat(resolution.intent()).isEqualTo(ChatIntent.GENERAL);
+            assertThat(resolution.declines()).isFalse();
+            verifyDecision(JevDecision.of(Decision.JEV));
+        }
+
+        // 아무것도 꺼내지 않고 자해 뜻만 정한 OpenAI 꺼내기 결과
+        private IntentExtraction withSelfHarmRisk(boolean risk) {
+            return new IntentExtraction(null, null, null, null, null, null, null, null, null, null, null, null, risk);
         }
 
         // 1차만: 1등 의도와 confidence, 자해 확률 (1등 의도 확률은 confidence)
