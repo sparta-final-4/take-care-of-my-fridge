@@ -29,6 +29,24 @@ class KeywordMatchClassifierTest {
     }
 
     @Test
+    @DisplayName("요리 이름·키워드는 이름에 없고 요리 이름 조각(두 글자 이상)이 이름에 있으면 이름 조각으로 맞았고 그 조각을 담는다")
+    void classifiesFragment() {
+        KeywordMatch match = KeywordMatchClassifier.classify("나가사키 짬뽕", List.of("나가사키 짬뽕"), List.of("나가사키", "짬뽕"),
+                false, "짬뽕해물탕밥", List.of("오징어"));
+
+        assertThat(match).isEqualTo(new KeywordMatch(Type.FRAGMENT, "짬뽕", null));
+    }
+
+    @Test
+    @DisplayName("이름 조각이 있어도 늘린 키워드가 이름에 있으면 늘린 이름으로 가른다")
+    void prefersExpanded_overFragment() {
+        KeywordMatch match = KeywordMatchClassifier.classify("나가사키 짬뽕", List.of("나가사키 짬뽕", "짬뽕"), List.of("나가사키"),
+                false, "짬뽕해물탕밥", List.of());
+
+        assertThat(match).isEqualTo(new KeywordMatch(Type.EXPANDED, "짬뽕", null));
+    }
+
+    @Test
     @DisplayName("키워드가 레시피 재료 이름과 같으면 재료로 맞았고 그 키워드와 재료 이름을 담는다")
     void classifiesIngredient_whenSameName() {
         KeywordMatch match = KeywordMatchClassifier.classify("냉면", List.of("냉면", "메밀면"), false,

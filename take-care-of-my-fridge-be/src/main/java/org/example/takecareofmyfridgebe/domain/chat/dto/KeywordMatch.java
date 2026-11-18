@@ -4,7 +4,7 @@ package org.example.takecareofmyfridgebe.domain.chat.dto;
  * 요리 이름 키워드로 찾은 레시피가 어떻게 맞았는지. 카드 이유와 정렬 1단계(키워드 일치)에 쓴다.
  *
  * @param type           맞은 방식
- * @param keyword        이름에 통째로 있는 키워드 (EXPANDED일 때)
+ * @param keyword        이름에 통째로 있는 키워드 (EXPANDED일 때) 또는 요리 이름 조각 (FRAGMENT일 때)
  * @param ingredientName 키워드와 겹치는 레시피 재료 이름 (INGREDIENT일 때)
  */
 public record KeywordMatch(
@@ -20,6 +20,9 @@ public record KeywordMatch(
         EXPANDED("늘린 이름"),
         // 키워드 속 재료(메밀면 등)가 레시피 재료에 있음
         INGREDIENT("재료"),
+        // 요리 이름이 레시피 이름에 그대로 없어 분석기로 나눈 조각(두 글자 이상)이 레시피 이름에 통째로 있음
+        // ("나가사키 짬뽕" → 조각 "짬뽕" → "짬뽕해물탕밥"). 말한 요리 그 자체는 아니어서 카드 이유를 "찾으신 ○○"로 쓰지 않는다
+        FRAGMENT("이름 조각"),
         // 검색(단어 단위)으로 걸렸지만 이름·재료에 통째로는 없음 (예: 비빔국수 → 비빔쌀국수)
         SPLIT("쪼개짐"),
         // 키워드 검색이 0건이라 벡터 검색으로만 찾음
@@ -36,9 +39,9 @@ public record KeywordMatch(
         }
     }
 
-    // 이름·재료로 맞았는지. 정렬 1단계 키워드 일치, 1차 후보, "못 찾았어요" 안내는 이것만 센다
+    // 이름·재료·이름 조각으로 맞았는지. 정렬 1단계 키워드 일치, 1차 후보, "못 찾았어요" 안내는 이것만 센다
     public boolean strong() {
-        return type == Type.NAME || type == Type.EXPANDED || type == Type.INGREDIENT;
+        return type == Type.NAME || type == Type.EXPANDED || type == Type.INGREDIENT || type == Type.FRAGMENT;
     }
 
     public static KeywordMatch of(Type type) {

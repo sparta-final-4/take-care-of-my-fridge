@@ -15,6 +15,7 @@ import java.util.List;
  *   <li>EXPANDED: AI가 늘린 키워드가 레시피 이름에 통째로 있음 ("막국수" → "들기름 막국수")</li>
  *   <li>INGREDIENT: 키워드(두 글자 이상)가 레시피 재료 이름과 같거나 재료 이름에 통째로 있음 ("메밀면" ↔ "메밀면", "버섯" ↔ "표고버섯").
  *       글자 일부만 겹치는 것("중국음식" ↔ "중국부추", "냉메밀" ↔ "메밀면")은 검색이 키워드를 쪼개 걸린 것이라 재료로 맞은 것으로 보지 않는다</li>
+ *   <li>FRAGMENT: 요리 이름 조각(보충 단계에서 분석기로 나눈 두 글자 이상 토큰)이 레시피 이름에 통째로 있음 ("나가사키 짬뽕"의 "짬뽕" → "짬뽕해물탕밥")</li>
  *   <li>SPLIT: 키워드 검색으로 걸렸지만 위에 해당하지 않음 ("비빔국수" → "비빔쌀국수", "중국음식" → 재료 "중국부추"인 기스면)</li>
  *   <li>VECTOR: 키워드 검색이 0건이라 벡터 검색으로만 찾음</li>
  * </ol>
@@ -27,14 +28,21 @@ public final class KeywordMatchClassifier {
     private KeywordMatchClassifier() {
     }
 
+    // 요리 이름 조각 없이 가른다
+    public static KeywordMatch classify(String dishText, List<String> keywords, boolean vectorOnly,
+                                        String recipeName, Collection<String> ingredientNames) {
+        return classify(dishText, keywords, List.of(), vectorOnly, recipeName, ingredientNames);
+    }
+
     /**
      * @param dishText        사용자가 말한 요리 이름 (없으면 null)
      * @param keywords        AI가 늘린 키워드 전체
+     * @param fragments       요리 이름 조각 (보충 단계에서 분석기로 나눈 것. 없으면 빈 목록)
      * @param vectorOnly      키워드 검색이 아니라 벡터 검색으로만 찾았는지
      * @param recipeName      레시피 이름
      * @param ingredientNames 레시피 재료 이름 (기본 양념 제외)
      */
-    public static KeywordMatch classify(String dishText, List<String> keywords, boolean vectorOnly,
+    public static KeywordMatch classify(String dishText, List<String> keywords, List<String> fragments, boolean vectorOnly,
                                         String recipeName, Collection<String> ingredientNames) {
         String name = ChatTexts.removeWhitespace(recipeName);
         if (dishText != null && !ChatTexts.removeWhitespace(dishText).isEmpty() && name.contains(ChatTexts.removeWhitespace(dishText))) {
@@ -54,6 +62,13 @@ public final class KeywordMatchClassifier {
                 if (ChatTexts.removeWhitespace(ingredient).contains(word)) {
                     return new KeywordMatch(Type.INGREDIENT, keyword, ingredient);
                 }
+            }
+        }
+        // 이름 조각은 이름·늘린 이름·재료로 맞지 않았을 때만 본다 (조각은 원래 이름이 0건일 때만 있다)
+        for (String fragment : fragments) {
+            String word = ChatTexts.removeWhitespace(fragment);
+            if (word.length() >= MIN_KEYWORD_LENGTH && name.contains(word)) {
+                return new KeywordMatch(Type.FRAGMENT, fragment, null);
             }
         }
         // 쪼개짐: 레시피 인덱스 분석기가 키워드를 글자 단위까지 쪼개 ES가 넓게 건 것("탕짜면" → "짜"로 간장게장,

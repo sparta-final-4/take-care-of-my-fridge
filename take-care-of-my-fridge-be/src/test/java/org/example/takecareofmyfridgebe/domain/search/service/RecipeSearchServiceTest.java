@@ -12,6 +12,10 @@ import co.elastic.clients.elasticsearch.core.SearchRequest;
 import co.elastic.clients.elasticsearch.core.SearchResponse;
 import co.elastic.clients.elasticsearch.core.search.Hit;
 import co.elastic.clients.elasticsearch.core.search.TotalHitsRelation;
+import co.elastic.clients.elasticsearch.indices.AnalyzeRequest;
+import co.elastic.clients.elasticsearch.indices.AnalyzeResponse;
+import co.elastic.clients.elasticsearch.indices.ElasticsearchIndicesClient;
+import co.elastic.clients.elasticsearch.indices.analyze.AnalyzeToken;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeListRequest;
 import org.example.takecareofmyfridgebe.domain.recipe.dto.RecipeSort;
 import org.example.takecareofmyfridgebe.domain.search.config.RecipeSearchProperties;
@@ -205,6 +209,44 @@ class RecipeSearchServiceTest {
         assertThat(result.recipeIds()).isEqualTo(List.of(7L));
         verify(queryEmbedding, never()).embed(anyString());
         verify(esClient, times(1)).search(any(SearchRequest.class), eq(Void.class));
+    }
+
+    @Test
+    @DisplayName("글자 검색만 하면 0건이어도 임베딩·벡터 검색을 하지 않는다")
+    void searchKeywordOnly_skipsVector_whenNoKeywordHits() throws IOException {
+        // Given
+        when(esClient.search(any(SearchRequest.class), eq(Void.class))).thenReturn(response(0));
+
+        // When
+        RecipeSearchResult result = service.searchKeywordOnly(
+                new RecipeListRequest(null, "나가사키", null, null, null, null, null, null));
+
+        // Then
+        assertThat(result.recipeIds()).isEmpty();
+        assertThat(result.vectorFallback()).isFalse();
+        verify(esClient, times(1)).search(any(SearchRequest.class), eq(Void.class));
+        verify(queryEmbedding, never()).embed(anyString());
+    }
+
+    @Test
+    @DisplayName("요리 이름 분석은 레시피 인덱스의 korean_search 분석기로 하고, 토큰을 순서대로 돌려준다")
+    void analyzeTokens_usesRecipeSearchAnalyzer() throws IOException {
+        // Given
+        ElasticsearchIndicesClient indices = mock(ElasticsearchIndicesClient.class);
+        when(esClient.indices()).thenReturn(indices);
+        when(indices.analyze(any(AnalyzeRequest.class))).thenReturn(AnalyzeResponse.of(r -> r.tokens(
+                AnalyzeToken.of(t -> t.token("나가사키").startOffset(0).endOffset(4).position(0).type("NNP")),
+                AnalyzeToken.of(t -> t.token("짬뽕").startOffset(5).endOffset(7).position(1).type("NNG")))));
+
+        // When
+        List<String> tokens = service.analyzeTokens("나가사키 짬뽕");
+        AnalyzeRequest request = service.analyzeRequest("나가사키 짬뽕");
+
+        // Then
+        assertThat(tokens).containsExactly("나가사키", "짬뽕");
+        assertThat(request.index()).isEqualTo("recipes");
+        assertThat(request.analyzer()).isEqualTo("korean_search");
+        assertThat(request.text()).containsExactly("나가사키 짬뽕");
     }
 
     @Test

@@ -353,7 +353,8 @@ public class ChatStreamFacade {
             // 일반 답에만 이전 대화(최근 3턴)를 넣는다. 추천 설명은 후보 정보로 충분하다
             return withoutLinks(chatReplyGenerator.generate(memberId, sessionId, content, plan.context().recentMessages()));
         }
-        // 밀키트만 보여 주는 답은 AI를 부르지 않고 서버 글을 보낸다 (레시피 카드가 없어 AI가 레시피를 소개하지 않게)
+        // 밀키트만 보여 주는 답, 말한 요리를 못 찾았거나 뺄 재료 때문에 뺀 답은 AI를 부르지 않고 서버 글을 보낸다
+        // (레시피 카드가 없어 AI가 레시피를 소개하지 않게)
         if (plan.recommendation().fixedReply() != null) {
             return Flux.just(plan.recommendation().fixedReply());
         }

@@ -116,6 +116,9 @@ cases:
   - { id: T15, group: 맛, message: "맵고 따뜻한 국물 레시피 추천해줘", expect: { intent: RECOMMEND, wanted: [SPICY] } }
   # "시원한"은 차가운 국물 쪽 요리 이름으로 바꾸고 원한 표현에 남긴다
   - { id: T16, group: 맛, message: "시원한 국물 요리", expect: { intent: RECOMMEND, preference: 시원한, keywordsAny: [냉국, 오이냉국, 냉면, 물냉면, 콩국수, 냉모밀, 냉메밀, 물회, 냉채] } }
+  # 피할 맛 + 요리 이름. 콕 집은 요리는 피할 맛이어도 요리 이름으로 남는다 (기준 기록: docs/testing/chat-recipe-search-baseline.md)
+  - { id: T17, group: 맛, message: "매운 거 말고 짬뽕 같은 거", expect: { intent: RECOMMEND, avoid: [SPICY], dish: 짬뽕 } }
+  - { id: T18, group: 맛, message: "매운 거 말고 김치찌개", expect: { intent: RECOMMEND, avoid: [SPICY], dish: 김치찌개 } }
 
   # ── 이름만 말하기 ──
   - { id: N01, group: 이름만, message: "국물 밀키트", expect: { intent: RECOMMEND } }
@@ -128,6 +131,9 @@ cases:
   # 맛 단어 + 분류 이름, 묶음 말만 말해도 분류로만 쓰고 요리 이름은 비운다
   - { id: N07, group: 이름만, message: "달달한 디저트", expect: { intent: RECOMMEND, wanted: [SWEET], categories: [디저트], dishEmpty: true } }
   - { id: N08, group: 이름만, message: "국물", expect: { intent: RECOMMEND, categories: [국, 찌개, 전골, 수프, 스튜], dishEmpty: true } }
+  # 레시피 색인에 이름이 그대로 없는 요리 이름만 말해도 요리 이름으로 낸다 ("김피탕 같은 요리 추천해줘"는 R06)
+  - { id: N09, group: 이름만, message: "나가사키 짬뽕", expect: { intent: RECOMMEND, dish: 나가사키 짬뽕 } }
+  - { id: N10, group: 이름만, message: "김피탕", expect: { intent: RECOMMEND, dish: 김피탕 } }
 
   # ── 일반 답 ──
   - { id: G01, group: 일반, message: "안녕", expect: { intent: GENERAL } }
@@ -143,6 +149,8 @@ cases:
   - { id: G11, group: 일반, message: "배고파 죽겠어", expect: { intent: [GENERAL, RECOMMEND] } }
   - { id: G12, group: 일반, message: "맛있어 죽겠다", expect: { intent: [GENERAL, RECOMMEND] } }
   - { id: G13, group: 일반, message: "죽여주는 맛 레시피 추천해줘", expect: { intent: RECOMMEND } }
+  # 요리가 무엇인지 묻는 말은 추천이 아니다
+  - { id: G14, group: 일반, message: "김피탕이 뭐야?", expect: { intent: GENERAL } }
 
   # ── 상관없는 질문·거절 ──
   - { id: O01, group: 상관없음, message: "주식 추천해줘", expect: { intent: OFF_TOPIC } }
