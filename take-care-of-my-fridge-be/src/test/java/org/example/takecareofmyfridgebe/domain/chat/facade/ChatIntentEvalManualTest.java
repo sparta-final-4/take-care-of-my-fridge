@@ -64,6 +64,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assumptions.assumeThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
@@ -185,7 +186,8 @@ class ChatIntentEvalManualTest {
     // 운영과 같은 ChatClient 옵션(ChatClientConfig.chatIntentChatClient)과 프롬프트 파일
     private static OpenAiChatIntentExtractor openAiExtractor(UsageRecorder usage) {
         String apiKey = System.getenv("OPENAI_INTENT_EVAL_KEY");
-        assertThat(apiKey).as("OPENAI_INTENT_EVAL_KEY가 없음 (OPENAI_API_KEY는 build.gradle이 가짜 키로 덮어써서 못 씀). "
+        // 키가 없으면 실패하지 않고 건너뛴다 (평가 플래그만 셸에 남아 있는 경우)
+        assumeThat(apiKey).as("OPENAI_INTENT_EVAL_KEY가 없음 (OPENAI_API_KEY는 build.gradle이 가짜 키로 덮어써서 못 씀). "
                 + "Git Bash: OPENAI_INTENT_EVAL=true OPENAI_INTENT_EVAL_KEY=sk-... ./gradlew ... / "
                 + "PowerShell: $env:OPENAI_INTENT_EVAL_KEY='sk-...'; .\\gradlew.bat ...").isNotBlank();
         OpenAiChatModel model = OpenAiChatModel.builder()

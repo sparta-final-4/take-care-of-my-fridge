@@ -41,7 +41,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assumptions.assumeThat;
 
 /**
  * ChatIntentEvalManualTest의 Jev 부분 (의도 판단은 늘 Jev로 정한다). 설계: docs/testing/jev-on-design.md 8절
@@ -82,7 +82,8 @@ final class ChatIntentEvalJevOn {
 
     static ChatIntentEvalJevOn create(ChatWordProperties words) {
         String typeSafeKey = System.getenv("TYPESAFE_API_KEY");
-        assertThat(typeSafeKey).as("의도 평가에는 TYPESAFE_API_KEY가 필요함 (없으면 모든 메시지가 OpenAI로 되돌아가 평가 뜻이 없다)").isNotBlank();
+        // 키가 없으면 실패하지 않고 건너뛴다 (없으면 모든 메시지가 서버 답이 되어 평가 뜻이 없다)
+        assumeThat(typeSafeKey).as("의도 평가에는 TYPESAFE_API_KEY가 필요함").isNotBlank();
         TypeSafeProperties properties = new TypeSafeProperties(null, typeSafeKey, null, null);
         TypeSafeClient client = new TypeSafeClient(new TypeSafeConfig().typeSafeRestClient(properties), properties);
         TypeSafeExecutor executor = new TypeSafeExecutor(2, 4);

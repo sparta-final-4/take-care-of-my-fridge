@@ -43,6 +43,7 @@ import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assumptions.assumeThat;
 
 /**
  * Jev(TypeSafe 분류 모델) 상담 의도 판단 평가 (수동, 실제 TypeSafe 호출). ChatIntentEvalManualTest와 같은 평가 세트(chat-intent-eval.yml)로
@@ -105,7 +106,8 @@ class JevIntentEvalManualTest {
         assertThat(cases).as("평가 세트").isNotEmpty();
         int runs = Integer.parseInt(Optional.ofNullable(System.getenv("JEV_INTENT_EVAL_RUNS")).orElse("3"));
         String apiKey = System.getenv("TYPESAFE_API_KEY");
-        assertThat(apiKey).as("TYPESAFE_API_KEY가 없음. Git Bash: JEV_INTENT_EVAL=true TYPESAFE_API_KEY=... ./gradlew ...").isNotBlank();
+        // 키가 없으면 실패하지 않고 건너뛴다 (평가 플래그만 셸에 남아 있는 경우)
+        assumeThat(apiKey).as("TYPESAFE_API_KEY가 없음. Git Bash: JEV_INTENT_EVAL=true TYPESAFE_API_KEY=... ./gradlew ...").isNotBlank();
 
         TypeSafeProperties properties = new TypeSafeProperties(null, apiKey, null, null);
         JevIntentClassifier classifier = new JevIntentClassifier(
