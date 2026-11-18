@@ -26,7 +26,8 @@ import java.util.concurrent.TimeoutException;
  *   <li>TypeSafe 키가 비었으면 부르지 않고(SKIPPED) 상담은 서버 답(추천 카드)으로 답한다. 시작할 때 경고를 한 번 남긴다</li>
  *   <li>결정 로그는 Jev가 끝난 스레드(이미 끝났으면 부른 스레드)에서 남긴다</li>
  *   <li>예외를 밖으로 내지 않는다. Jev가 실패해도 결정 로그를 같은 형식으로 남긴다(jevStatus)</li>
- *   <li>스레드는 TypeSafeExecutor(크기 고정)를 쓰고, 자리가 없으면 건너뛴다(SKIPPED)</li>
+ *   <li>스레드는 TypeSafeExecutor(크기 고정)를 쓰고, 자리가 없으면 기다리지 않고 건너뛴다(SKIPPED, Jev 실패)</li>
+ *   <li>제한 시간이 지나면 작업을 취소한다. 2차는 끝 시각까지 남은 시간이 모자라면 부르지 않는다(JevIntentClassifier)</li>
  * </ul>
  */
 @Slf4j
@@ -71,10 +72,14 @@ public class JevIntentRunner {
                 return skipped();
             }
             long startedAt = System.nanoTime();
+            // 상담이 기다리는 끝 시각. 대기 줄에서 기다린 시간도 포함한다 (2차를 부를지 이 시각으로 정한다)
+            long deadline = startedAt + typeSafeClient.timeout().toNanos();
             return typeSafeExecutor
-                    .trySupply(() -> JevSide.finished(jevIntentClassifier.classify(message, categories, followUp), elapsedMs(startedAt)))
+                    .trySupply(() -> JevSide.finished(jevIntentClassifier.classify(message, categories, followUp, deadline),
+                            elapsedMs(startedAt)))
                     .map(future -> new Run(future, startedAt))
                     .orElseGet(() -> {
+                        // 기다리지 않고 바로 Jev 실패(서버 답)다
                         log.warn("Jev 판단 건너뜀 - 실행기 자리 없음, 메시지 길이: {}", message.length());
                         return skipped();
                     });
@@ -101,7 +106,9 @@ public class JevIntentRunner {
             return side.status() == JevDecisionLog.Status.OK || side.status() == JevDecisionLog.Status.SECOND_FAILED
                     ? side.judgement() : Optional.empty();
         } catch (TimeoutException e) {
-            log.warn("Jev 판단이 제한 시간 안에 끝나지 않아 Jev 실패로 - 제한 시간: {}ms", typeSafeClient.timeout().toMillis());
+            // 더 기다리지 않으므로 작업을 취소한다: 대기 줄에 있으면 돌지 않고, 돌고 있으면 인터럽트한다 (TypeSafeExecutor)
+            run.jev().cancel(true);
+            log.warn("Jev 판단이 제한 시간 안에 끝나지 않아 취소하고 Jev 실패로 - 제한 시간: {}ms", typeSafeClient.timeout().toMillis());
             return Optional.empty();
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();

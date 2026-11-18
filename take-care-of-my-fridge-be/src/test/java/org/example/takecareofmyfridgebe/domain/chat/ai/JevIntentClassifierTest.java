@@ -322,6 +322,35 @@ class JevIntentClassifierTest {
     }
 
     @Test
+    @DisplayName("1차가 끝난 뒤 끝 시각까지 남은 시간이 2차에 모자라면 2차를 부르지 않고 1차 결과만 돌려준다")
+    void skipsSecond_whenTimeIsShort() {
+        JevIntentClassifier classifier = classifier(withKey());
+        expectCall(FIRST_RECOMMEND, "req_first");
+        long deadline = System.nanoTime() + JevIntentClassifier.MIN_TIME_FOR_SECOND.toNanos() / 5;
+
+        JevIntentJudgement judgement = classifier.classify("매운 찌개 추천해줘", CATEGORIES, null, deadline).orElseThrow();
+
+        // 1차 한 번만 불렀다 (2차를 기대하지 않았으므로 더 부르면 MockRestServiceServer가 실패한다)
+        server.verify();
+        assertThat(judgement.first().intent()).isEqualTo(ChatIntent.RECOMMEND);
+        assertThat(judgement.hasSecond()).isFalse();
+    }
+
+    @Test
+    @DisplayName("끝 시각까지 남은 시간이 넉넉하면 2차를 부른다")
+    void asksSecond_whenTimeIsEnough() {
+        JevIntentClassifier classifier = classifier(withKey());
+        expectCall(FIRST_RECOMMEND, "req_first");
+        expectCall(SECOND, "req_second");
+        long deadline = System.nanoTime() + Duration.ofSeconds(3).toNanos();
+
+        JevIntentJudgement judgement = classifier.classify("매운 찌개 추천해줘", CATEGORIES, null, deadline).orElseThrow();
+
+        server.verify();
+        assertThat(judgement.hasSecond()).isTrue();
+    }
+
+    @Test
     @DisplayName("2차 호출이 실패하면 예외 없이 1차 결과만 돌려준다")
     void returnsFirstOnly_whenSecondFails() {
         JevIntentClassifier classifier = classifier(withKey());
