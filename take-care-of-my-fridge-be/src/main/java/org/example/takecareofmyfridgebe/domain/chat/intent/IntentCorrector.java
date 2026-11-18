@@ -26,7 +26,7 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * 상담 의도 결과(Jev로 정했거나 OpenAI로 되돌린 것)에 서버 서비스 규칙을 적용한다. 아래 순서대로 한 번씩 돈다.
+ * Jev로 정한 상담 의도 결과(JevIntentResolver)에 서버 서비스 규칙을 적용한다. 아래 순서대로 한 번씩 돈다.
  * <ol>
  *   <li>이어짐은 직전 추천이 있을 때만: 직전 조건(Redis)이 없으면 AI가 이어짐 예라고 해도 아니오로 둔다 (새 추천)</li>
  *   <li>레시피 자세히 대상 찾기: 직전 카드·상담 추천에서 대상을 찾고, 이름만 못 찾으면 그 요리 추천으로 (새 추천)</li>
@@ -46,8 +46,6 @@ public class IntentCorrector {
     private static final int SESSION_RECIPES_SEARCHED = 30;
     // 줄임말로 볼 메시지 단어의 최소 글자 수
     private static final int MIN_ABBREVIATION_LENGTH = 2;
-    // 메시지 단어 끝에서 지울 문장 부호
-    private static final String TRAILING_MARKS = "[?!.~…,]+$";
 
     private final RecipeService recipeService;
     private final IngredientMatcher ingredientMatcher;
@@ -65,7 +63,7 @@ public class IntentCorrector {
 
     /**
      * @param input  규칙 적용 한 번 동안 바뀌지 않는 입력 (회원·상담·메시지·AI에 준 분류 목록·대화 문맥)
-     * @param result Jev로 정했거나 OpenAI로 되돌린 의도 결과
+     * @param result Jev로 정한 의도 결과
      */
     public Corrected correct(CorrectionInput input, IntentResult result) {
         IntentResult corrected = result;
@@ -114,7 +112,7 @@ public class IntentCorrector {
             return false;
         }
         return Arrays.stream(message.strip().split("\\s+"))
-                .map(word -> word.replaceAll(TRAILING_MARKS, ""))
+                .map(ChatTexts::withoutTrailingMarks)
                 .filter(word -> word.length() >= MIN_ABBREVIATION_LENGTH)
                 .anyMatch(word -> ChatTexts.containsInOrder(dish, word));
     }

@@ -1,5 +1,6 @@
 package org.example.takecareofmyfridgebe.domain.chat.facade;
 
+import org.example.takecareofmyfridgebe.domain.chat.IntentResults;
 import org.example.takecareofmyfridgebe.domain.chat.ChatIntentFixture;
 import org.example.takecareofmyfridgebe.domain.chat.ai.JevIntentRunner;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatCandidateProperties;
@@ -118,7 +119,7 @@ class ChatIntentFacadeJevOnTest {
         @Test
         @DisplayName("\"매운 거 말고 짬뽕 같은 거\"에 OpenAI가 요리 이름 짬뽕을 주면 요리 이름 짬뽕과 Jev 피할 맛 매운맛으로 찾는다")
         void usesDishAndAvoidedTaste_whenTasteIsAvoidedBeforeDish() {
-            IntentResult openAi = new IntentResult(ChatIntent.RECOMMEND, List.of(), List.of(), 0, List.of(), List.of(), false,
+            IntentResult openAi = IntentResults.of(ChatIntent.RECOMMEND, List.of(), List.of(), 0, List.of(), List.of(), false,
                     List.of("짬뽕"), "짬뽕", "", 0, "", List.of(), List.of("SPICY"), "", "ALL");
             givenOpenAi(openAi);
             givenJev(RequestKind.DISH, null, 0.95, Map.of(Taste.SPICY, TasteStance.AVOIDED));
@@ -289,7 +290,7 @@ class ChatIntentFacadeJevOnTest {
         @Test
         @DisplayName("추천이 아닌 의도는 Jev 의도와 OpenAI가 꺼낸 값(냉장고 범위·이름)으로 정한다")
         void usesJevIntentWithOpenAiLookup_whenFridge() {
-            givenOpenAi(new IntentResult(ChatIntent.GENERAL, List.of(), List.of(), 0, List.of("두부"), List.of(), false, List.of(), "", "",
+            givenOpenAi(IntentResults.of(ChatIntent.GENERAL, List.of(), List.of(), 0, List.of("두부"), List.of(), false, List.of(), "", "",
                     0, "", List.of(), List.of(), "", "ALL"));
             givenJevFirstOnly(ChatIntent.FRIDGE, 0.95);
 
@@ -454,7 +455,7 @@ class ChatIntentFacadeJevOnTest {
         @Test
         @DisplayName("Jev가 추천이 아닌 의도면 이어짐 확률이 높아도 이어짐 아니오다")
         void neverFollows_whenJevIntentIsNotRecommend() {
-            givenOpenAi(IntentResult.general());
+            givenOpenAi(IntentResults.general());
             givenJevFirstOnly(ChatIntent.GENERAL, 0.95, 0.9);
 
             ChatIntentResolution resolution = resolve("고마워", context);
@@ -573,7 +574,7 @@ class ChatIntentFacadeJevOnTest {
         @Test
         @DisplayName("Jev 1등 의도가 자해면 자해 안내로 정한다")
         void declinesSelfHarm_whenTopIntentIsSelfHarm() {
-            givenOpenAi(IntentResult.general());
+            givenOpenAi(IntentResults.general());
             givenJevWithSelfHarm(ChatIntent.SELF_HARM, 0.66, 0.66);
 
             ChatIntentResolution resolution = resolve("요즘 살 이유가 없는 것 같아");
@@ -585,7 +586,7 @@ class ChatIntentFacadeJevOnTest {
         @Test
         @DisplayName("Jev 1등 의도가 일반 질문이어도 자해 확률이 0.35(기준 0.3 이상)면 자해 안내로 정한다")
         void declinesSelfHarm_whenSelfHarmProbabilityAboveThreshold() {
-            givenOpenAi(IntentResult.general());
+            givenOpenAi(IntentResults.general());
             givenJevWithSelfHarm(ChatIntent.GENERAL, 0.6, 0.35);
 
             ChatIntentResolution resolution = resolve("다 그만두고 싶어");
@@ -597,7 +598,7 @@ class ChatIntentFacadeJevOnTest {
         @Test
         @DisplayName("Jev 1등 의도가 일반 질문이고 자해 확률이 0.2(기준 미만)면 일반 질문으로 정한다")
         void answersGeneral_whenSelfHarmProbabilityBelowThreshold() {
-            givenOpenAi(IntentResult.general());
+            givenOpenAi(IntentResults.general());
             givenJevWithSelfHarm(ChatIntent.GENERAL, 0.75, 0.2);
 
             ChatIntentResolution resolution = resolve("배고파 죽겠어");
@@ -621,7 +622,7 @@ class ChatIntentFacadeJevOnTest {
         @Test
         @DisplayName("Jev 2차가 실패해도 1차 1등 의도가 자해면 자해 안내로 정하고 결정 로그에 JEV_TOP_INTENT를 남긴다")
         void declinesSelfHarm_whenSecondFailsAndFirstSaysSelfHarm() {
-            givenOpenAi(IntentResult.general());
+            givenOpenAi(IntentResults.general());
             givenJevWithSelfHarm(ChatIntent.SELF_HARM, 0.8, 0.8);
 
             ChatIntentResolution resolution = resolve("요즘 살 이유가 없는 것 같아");
@@ -633,7 +634,7 @@ class ChatIntentFacadeJevOnTest {
         @Test
         @DisplayName("Jev 1등 의도가 추천인데 2차가 실패해도 1차 자해 확률이 기준 이상이면 자해 안내로 정한다")
         void declinesSelfHarm_whenSecondFailsAndSelfHarmProbabilityAboveThreshold() {
-            givenOpenAi(IntentResult.general());
+            givenOpenAi(IntentResults.general());
             // 추천이라 2차가 필요한데 2차가 없다 (2차 실패)
             givenJevWithSelfHarm(ChatIntent.RECOMMEND, 0.5, 0.4);
 
@@ -646,7 +647,7 @@ class ChatIntentFacadeJevOnTest {
         @Test
         @DisplayName("Jev 1등 의도가 추천인데 2차가 실패하고 자해 확률이 기준 미만이면 Jev 실패로 서버 답이다")
         void answersByServer_whenSecondFailsWithoutSelfHarm() {
-            givenOpenAi(IntentResult.general());
+            givenOpenAi(IntentResults.general());
             givenJevWithSelfHarm(ChatIntent.RECOMMEND, 0.9, 0.01);
 
             ChatIntentResolution resolution = resolve("김치찌개 먹고 싶어");
@@ -744,7 +745,7 @@ class ChatIntentFacadeJevOnTest {
         }
 
         private IntentResult detail(int index) {
-            return new IntentResult(ChatIntent.RECIPE_DETAIL, null, null, null, null, null, null, null, null, null, index, null,
+            return IntentResults.of(ChatIntent.RECIPE_DETAIL, null, null, null, null, null, null, null, null, null, index, null,
                     null, null, "HOW_TO");
         }
     }
@@ -765,7 +766,7 @@ class ChatIntentFacadeJevOnTest {
     // OpenAI 추천 결과 (요리 이름, 키워드, 분류, 원하는 맛, 원한 표현)
     private static IntentResult recommend(String dish, List<String> keywords, List<String> categories, List<String> wanted,
                                           String preference) {
-        return new IntentResult(ChatIntent.RECOMMEND, wanted, categories, null, null, null, false, keywords, dish, preference);
+        return IntentResults.of(ChatIntent.RECOMMEND, wanted, categories, null, null, null, false, keywords, dish, preference);
     }
 
     private void givenJev(RequestKind kind, String category, Taste... wanted) {
@@ -826,7 +827,7 @@ class ChatIntentFacadeJevOnTest {
     private static JevIntentJudgement.First first(ChatIntent intent, double confidence, Double followsPrevious) {
         Map<ChatIntent, Double> probabilities = new EnumMap<>(ChatIntent.class);
         Arrays.stream(ChatIntent.values()).forEach(each -> probabilities.put(each, each == intent ? confidence : 0.0));
-        return new JevIntentJudgement.First(intent, intent, confidence, probabilities, followsPrevious, 0.05, FridgeScope.ALL, 0.9,
+        return new JevIntentJudgement.First(intent, intent, confidence, probabilities, followsPrevious, 0.05,
                 call("req_first"));
     }
 

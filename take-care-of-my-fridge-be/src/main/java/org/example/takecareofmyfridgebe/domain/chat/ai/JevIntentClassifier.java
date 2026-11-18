@@ -18,7 +18,7 @@ import java.util.function.Function;
 /**
  * Jev(TypeSafe 분류 모델)로 상담 메시지의 의도 판단 질문에 답을 받는다. 상담 의도는 이 판단으로 정한다 (JevIntentRunner·JevIntentResolver).
  * <ol>
- *   <li>1차(모든 메시지): 의도, 정보를 묻는 말인지, 냉장고 보기 범위, 직전 추천이 있으면 이어지는 말인지 (JevFirstQuestions)</li>
+ *   <li>1차(모든 메시지): 의도, 정보를 묻는 말인지, 직전 추천이 있으면 이어지는 말인지 (JevFirstQuestions)</li>
  *   <li>2차(1차 의도가 RECOMMEND일 때만): 요리 이름·특징·재료·밀키트, 맛 5개, 요청 종류, 1등 분류 (JevSecondQuestions)</li>
  * </ol>
  * 1차 의도에는 서비스 규칙을 적용한다 (serviceIntent): 직전 추천이 없는데 RECIPE_DETAIL로 답하면 RECOMMEND로 보고(ChatIntentFacade와 같다) 2차도 묻는다.

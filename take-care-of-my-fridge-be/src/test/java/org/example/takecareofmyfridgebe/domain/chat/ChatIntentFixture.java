@@ -5,7 +5,6 @@ import org.example.takecareofmyfridgebe.domain.chat.ai.JevIntentRunner;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatCandidateProperties;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntent;
-import org.example.takecareofmyfridgebe.domain.chat.dto.FridgeScope;
 import org.example.takecareofmyfridgebe.domain.chat.dto.IntentExtraction;
 import org.example.takecareofmyfridgebe.domain.chat.dto.IntentResult;
 import org.example.takecareofmyfridgebe.domain.chat.dto.JevIntentJudgement;
@@ -166,7 +165,7 @@ public class ChatIntentFixture {
     // 1차: 의도와 confidence, 의도별 확률
     public static JevIntentJudgement.First first(ChatIntent intent, double confidence, Map<ChatIntent, Double> probabilities,
                                                  Double followsPrevious) {
-        return new JevIntentJudgement.First(intent, intent, confidence, probabilities, followsPrevious, 0.05, FridgeScope.ALL, 0.9,
+        return new JevIntentJudgement.First(intent, intent, confidence, probabilities, followsPrevious, 0.05,
                 call("req_first"));
     }
 

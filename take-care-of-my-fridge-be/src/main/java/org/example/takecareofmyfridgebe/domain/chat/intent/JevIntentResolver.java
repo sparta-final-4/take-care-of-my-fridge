@@ -54,8 +54,6 @@ public class JevIntentResolver {
 
     // Jev 1등 분류를 쓸 확률 기준. 평가로 정함 (처음 값 0.7, jev-on-v5)
     static final double MIN_CATEGORY_CONFIDENCE = 0.7;
-    // 넓은 요청 표현을 메시지에서 만들 때 끝에서 지울 문장 부호
-    private static final String TRAILING_MARKS = "[?!.~…,]+$";
 
     private final SimilarDishFinder similarDishFinder;
     private final ChatWordProperties chatWordProperties;
@@ -71,7 +69,7 @@ public class JevIntentResolver {
 
     /**
      * @param input  메시지·회원 (CorrectionInput)
-     * @param jev    1차와 (필요하면) 2차까지 성공한 Jev 판단
+     * @param jev    1차와 (추천이면) 2차까지 성공한 Jev 판단
      * @param openAi sanitize한 OpenAI 꺼내기 결과
      */
     public Resolved resolve(CorrectionInput input, JevIntentJudgement jev, IntentExtraction openAi) {
@@ -80,7 +78,8 @@ public class JevIntentResolver {
         JevIntentJudgement.Second second = jev.second();
         List<String> wanted = second == null ? null : tastes(second, TasteStance.WANTED);
         List<String> avoid = second == null ? null : tastes(second, TasteStance.AVOIDED);
-        if (intent != ChatIntent.RECOMMEND || second == null) {
+        // 추천이면 2차가 늘 있다 (2차가 없는 추천은 ChatIntentFacade가 Jev 실패로 서버 답을 준다)
+        if (intent != ChatIntent.RECOMMEND) {
             return new Resolved(build(intent, follows, openAi, wanted, avoid, null, null, null, openAi.preferenceText()),
                     new JevDecision(Decision.JEV, null, List.of()));
         }
@@ -180,7 +179,7 @@ public class JevIntentResolver {
         if (preferenceText != null && !preferenceText.isBlank()) {
             return preferenceText.strip();
         }
-        return message == null ? "" : message.strip().replaceAll(TRAILING_MARKS, "").strip();
+        return ChatTexts.withoutTrailingMarks(message);
     }
 
     // OpenAI가 꺼낸 값에 의도·이어짐·맛·분류·키워드·요리 이름·원한 표현을 정한 값으로 채운다

@@ -1,5 +1,6 @@
 package org.example.takecareofmyfridgebe.domain.chat.facade;
 
+import org.example.takecareofmyfridgebe.domain.chat.IntentResults;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext.CardName;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext.ContextMessage;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatContext;
@@ -104,7 +105,7 @@ public class ChatIntentFacadeTest {
         @Test
         @DisplayName("말하지 않은 조건이 시간 0·빈 목록·false로 오면 시간은 null, 나머지는 조건 없음으로 만든다")
         void leavesConditionsEmpty_whenAiReturnsZeroAndEmptyLists() {
-            givenAi(new IntentResult(ChatIntent.RECOMMEND, List.of(), List.of(), 0, List.of(), List.of(), false, null, null, null));
+            givenAi(IntentResults.of(ChatIntent.RECOMMEND, List.of(), List.of(), 0, List.of(), List.of(), false, null, null, null));
 
             RecipeQuery query = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("뭐 먹지?")).recipeQuery();
 
@@ -116,7 +117,7 @@ public class ChatIntentFacadeTest {
         @Test
         @DisplayName("AI가 RECOMMEND라고 하면 정리한 맛·분류·시간으로 검색 조건을 만든다")
         void buildsRecipeQuery_whenIntentIsRecommend() {
-            givenAi(new IntentResult(ChatIntent.RECOMMEND,
+            givenAi(IntentResults.of(ChatIntent.RECOMMEND,
                     List.of("SPICY", "BITTER"), List.of("국", "디저트"), 30, null, null, null, null, null, null));
 
             ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("매운 국"));
@@ -133,7 +134,7 @@ public class ChatIntentFacadeTest {
         @Test
         @DisplayName("Jev에 넘기는 분류 목록은 레시피 분류에서 후보 제외 분류(양념·음료)와 기타를 뺀 것이다")
         void passesCategoriesWithoutExcluded() {
-            givenAi(IntentResult.general());
+            givenAi(IntentResults.general());
 
             facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("뭐 먹지?"));
 
@@ -143,7 +144,7 @@ public class ChatIntentFacadeTest {
         @Test
         @DisplayName("AI가 GENERAL이라고 하면 검색 조건 없이 일반 답으로 정한다")
         void returnsGeneral_whenIntentIsGeneral() {
-            givenAi(IntentResult.general());
+            givenAi(IntentResults.general());
 
             ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID,
                     new ChatMessageCreateRequest("두부 보관 어떻게 해?", ChatMessageMode.AUTO, List.of(TOFU), false));
@@ -193,7 +194,7 @@ public class ChatIntentFacadeTest {
         @Test
         @DisplayName("선택 재료만 쓰기는 요청값이 true면 AI가 false라고 해도 true다")
         void keepsUseSelectedOnly_whenRequestIsTrue() {
-            givenAi(new IntentResult(ChatIntent.RECOMMEND, null, null, null, null, null, false, null, null, null));
+            givenAi(IntentResults.of(ChatIntent.RECOMMEND, null, null, null, null, null, false, null, null, null));
 
             ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID,
                     new ChatMessageCreateRequest("추천해줘", ChatMessageMode.AUTO, List.of(TOFU), true));
@@ -209,7 +210,7 @@ public class ChatIntentFacadeTest {
         @Test
         @DisplayName("말한 재료 이름을 재료 ID로 바꾸고, 못 찾은 이름(ING_CUSTOM)은 버린다")
         void mapsNamesToIds_andDropsCustom() {
-            givenAi(new IntentResult(ChatIntent.RECOMMEND, null, null, null,
+            givenAi(IntentResults.of(ChatIntent.RECOMMEND, null, null, null,
                     List.of("두부", "용과즙"), List.of("오이"), true, null, null, null));
             when(ingredientMatcher.matchAll(List.of("두부", "용과즙", "오이"))).thenReturn(Map.of(
                     "두부", ingredient(TOFU, "ING_TOFU", "두부"),
@@ -227,7 +228,7 @@ public class ChatIntentFacadeTest {
         @Test
         @DisplayName("\"두부도 넣어서\"처럼 AI가 선택 재료만 쓰기를 false로 주면 재료는 담되 false로 둔다")
         void keepsUseSelectedOnlyFalse_whenIngredientIsOptional() {
-            givenAi(new IntentResult(ChatIntent.RECOMMEND, List.of("SPICY"), null, null,
+            givenAi(IntentResults.of(ChatIntent.RECOMMEND, List.of("SPICY"), null, null,
                     List.of("두부"), null, false, null, null, null));
             when(ingredientMatcher.matchAll(List.of("두부"))).thenReturn(Map.of("두부", ingredient(TOFU, "ING_TOFU", "두부")));
 
@@ -241,7 +242,7 @@ public class ChatIntentFacadeTest {
         @Test
         @DisplayName("칩 없이 말로만 재료를 정하면 그 재료가 선택 재료가 된다")
         void usesSpokenIngredientsAsSelected_whenNoChip() {
-            givenAi(new IntentResult(ChatIntent.RECOMMEND, null, null, null, List.of("버섯", "두부"), null, true, null, null, null));
+            givenAi(IntentResults.of(ChatIntent.RECOMMEND, null, null, null, List.of("버섯", "두부"), null, true, null, null, null));
             when(ingredientMatcher.matchAll(List.of("버섯", "두부"))).thenReturn(Map.of(
                     "버섯", ingredient(MUSHROOM, "ING_MUSHROOM", "표고버섯"),
                     "두부", ingredient(TOFU, "ING_TOFU", "두부")));
@@ -256,7 +257,7 @@ public class ChatIntentFacadeTest {
         @Test
         @DisplayName("칩으로 고른 재료와 말한 재료를 합치고 중복은 뺀다 (고른 재료가 앞)")
         void mergesChipAndSpokenIngredients_withoutDuplicates() {
-            givenAi(new IntentResult(ChatIntent.RECOMMEND, null, null, null, List.of("두부", "버섯"), null, null, null, null, null));
+            givenAi(IntentResults.of(ChatIntent.RECOMMEND, null, null, null, List.of("두부", "버섯"), null, null, null, null, null));
             when(ingredientMatcher.matchAll(List.of("두부", "버섯"))).thenReturn(Map.of(
                     "두부", ingredient(TOFU, "ING_TOFU", "두부"),
                     "버섯", ingredient(MUSHROOM, "ING_MUSHROOM", "표고버섯")));
@@ -272,7 +273,7 @@ public class ChatIntentFacadeTest {
         @Test
         @DisplayName("빼달라고 한 재료는 고른 재료에 있어도 선택 재료에서 뺀다")
         void removesExcludedFromSelected() {
-            givenAi(new IntentResult(ChatIntent.RECOMMEND, null, null, null, null, List.of("오이"), null, null, null, null));
+            givenAi(IntentResults.of(ChatIntent.RECOMMEND, null, null, null, null, List.of("오이"), null, null, null, null));
             when(ingredientMatcher.matchAll(List.of("오이"))).thenReturn(Map.of("오이", ingredient(CUCUMBER, "ING_CUCUMBER", "오이")));
 
             RecipeQuery query = facade.resolve(MEMBER_ID, SESSION_ID,
@@ -286,7 +287,7 @@ public class ChatIntentFacadeTest {
         @Test
         @DisplayName("재료 이름 매칭이 실패하면 재료 조건 없이 나머지 조건으로 추천한다")
         void dropsIngredients_whenMatcherFails() {
-            givenAi(new IntentResult(ChatIntent.RECOMMEND, List.of("SPICY"), null, null,
+            givenAi(IntentResults.of(ChatIntent.RECOMMEND, List.of("SPICY"), null, null,
                     List.of("두부"), null, null, null, null, null));
             when(ingredientMatcher.matchAll(eq(List.of("두부")))).thenThrow(new RuntimeException("es down"));
 
@@ -318,7 +319,7 @@ public class ChatIntentFacadeTest {
         @Test
         @DisplayName("직전 추천이 없으면(첫 질문) 의도 판단에 직전 추천 정보를 넘기지 않는다")
         void passesNoFollowUp_whenNoLastCards() {
-            givenAi(IntentResult.general());
+            givenAi(IntentResults.general());
 
             facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("뭐 먹지?"), ChatContext.empty());
 
@@ -328,7 +329,7 @@ public class ChatIntentFacadeTest {
         @Test
         @DisplayName("직전 추천이 있으면 직전 카드 번호·이름, 최근 대화의 다른 카드, 직전 조건을 줄 글로 넘긴다")
         void passesFollowUpLines_whenLastCardsExist() {
-            givenAi(IntentResult.general());
+            givenAi(IntentResults.general());
 
             facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("고마워"), context);
 
@@ -469,7 +470,7 @@ public class ChatIntentFacadeTest {
         @DisplayName("AI가 이어짐 예라고 해도 직전 조건이 없으면(Redis가 비었음) 이어짐 아니오로 이번 말만으로 새 추천을 한다")
         void recommendsNew_whenFollowsWithoutLastRecommendation() {
             ChatContext withoutRedis = new ChatContext(context.recentMessages(), null, lastCards);
-            givenAi(new IntentResult(ChatIntent.RECOMMEND, List.of("SPICY"), null, null, null, null, null, null, null, null).withFollows(true));
+            givenAi(IntentResults.of(ChatIntent.RECOMMEND, List.of("SPICY"), null, null, null, null, null, null, null, null).withFollows(true));
 
             ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID,
                     ChatMessageCreateRequest.of("좀 더 매운 걸로"), withoutRedis);
@@ -483,7 +484,7 @@ public class ChatIntentFacadeTest {
         @Test
         @DisplayName("추천 + 이어짐이고 직전 조건이 있으면 이어짐 예로 정한다")
         void resolvesFollows_whenLastRecommendationExists() {
-            givenAi(new IntentResult(ChatIntent.RECOMMEND, List.of("SPICY"), List.of("튀김"), null, null, null, null,
+            givenAi(IntentResults.of(ChatIntent.RECOMMEND, List.of("SPICY"), List.of("튀김"), null, null, null, null,
                     null, null, null).withFollows(true));
 
             ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID,
@@ -515,7 +516,7 @@ public class ChatIntentFacadeTest {
         }
 
         private static IntentResult detail(Integer index, String name, String question) {
-            return new IntentResult(ChatIntent.RECIPE_DETAIL, null, null, null, null, null, null, null, null, null, index, name,
+            return IntentResults.of(ChatIntent.RECIPE_DETAIL, null, null, null, null, null, null, null, null, null, index, name,
                     null, null, question);
         }
     }
@@ -693,7 +694,7 @@ public class ChatIntentFacadeTest {
         void dropsCarriedTastes_whenNewRecommend() {
             RecipeQuery noSpicy = previous.withAvoidTastes(List.of(Taste.SPICY));
             ChatContext afterAvoid = new ChatContext(List.of(), LastRecommendation.of(noSpicy, List.of(10L)), context.lastCards());
-            givenAi(new IntentResult(ChatIntent.RECOMMEND, List.of("SWEET"), List.of("찌개"), 0, List.of(), List.of(), false,
+            givenAi(IntentResults.of(ChatIntent.RECOMMEND, List.of("SWEET"), List.of("찌개"), 0, List.of(), List.of(), false,
                     List.of("김치찌개"), "김치찌개", null, null, null, List.of(), List.of("SPICY")));
 
             RecipeQuery stew = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("김치찌개"), afterAvoid)
@@ -703,12 +704,12 @@ public class ChatIntentFacadeTest {
             assertThat(stew.wantedTastes()).as("직전 조건에 없던 맛은 AI 값 그대로").containsExactly(Taste.SWEET);
             assertThat(stew.keywords()).containsExactly("김치찌개");
 
-            givenAi(new IntentResult(ChatIntent.RECOMMEND, List.of("SPICY"), null, 0, List.of(), List.of(), false,
+            givenAi(IntentResults.of(ChatIntent.RECOMMEND, List.of("SPICY"), null, 0, List.of(), List.of(), false,
                     List.of(), null, null, null, null, List.of(), List.of()));
             assertThat(facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("매운 거 추천해줘"), afterAvoid)
                     .recipeQuery().wantedTastes()).containsExactly(Taste.SPICY);
 
-            givenAi(new IntentResult(ChatIntent.RECOMMEND, null, null, 0, List.of(), List.of(), false,
+            givenAi(IntentResults.of(ChatIntent.RECOMMEND, null, null, 0, List.of(), List.of(), false,
                     List.of("김치찌개"), "김치찌개", null, null, null, List.of(), List.of("SPICY")));
             assertThat(facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("매운 거 말고 김치찌개 줘"), afterAvoid)
                     .recipeQuery().avoidTastes()).containsExactly(Taste.SPICY);
@@ -779,7 +780,7 @@ public class ChatIntentFacadeTest {
             RecipeQuery salty = new RecipeQuery(MEMBER_ID, List.of(), List.of(Taste.SALTY), List.of("조림"), null, List.of(), false,
                     List.of(), null, null);
             ChatContext afterSalty = new ChatContext(List.of(), LastRecommendation.of(salty, List.of(10L)), context.lastCards());
-            givenAi(new IntentResult(ChatIntent.RECOMMEND, null, null, null, null, null, null, null, null, null,
+            givenAi(IntentResults.of(ChatIntent.RECOMMEND, null, null, null, null, null, null, null, null, null,
                     null, null, List.of("TASTE"), List.of("SPICY")).withFollows(true));
 
             ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("매운 건 빼줘"),
@@ -831,7 +832,7 @@ public class ChatIntentFacadeTest {
         }
 
         private static IntentResult avoid(List<String> tastes, List<String> avoidTastes) {
-            return new IntentResult(ChatIntent.RECOMMEND, tastes, null, null, null, null, null, null, null, null,
+            return IntentResults.of(ChatIntent.RECOMMEND, tastes, null, null, null, null, null, null, null, null,
                     null, null, null, avoidTastes).withFollows(true);
         }
 
@@ -840,7 +841,7 @@ public class ChatIntentFacadeTest {
         }
 
         private static IntentResult following(List<String> tastes, List<String> categories, List<String> removed) {
-            return new IntentResult(ChatIntent.RECOMMEND, tastes, categories, null, null, null, null, null, null, null,
+            return IntentResults.of(ChatIntent.RECOMMEND, tastes, categories, null, null, null, null, null, null, null,
                     null, null, removed).withFollows(true);
         }
     }
@@ -929,7 +930,7 @@ public class ChatIntentFacadeTest {
         private RecipeQuery followingAfter(RecipeQuery previous, String message, List<String> wanted, List<String> avoid) {
             ChatContext context = new ChatContext(List.of(), LastRecommendation.of(previous, List.of(10L)),
                     List.of(new CardName(10L, "두부조림")));
-            givenAi(new IntentResult(ChatIntent.RECOMMEND, wanted, null, null, null, null, null, null, null, null,
+            givenAi(IntentResults.of(ChatIntent.RECOMMEND, wanted, null, null, null, null, null, null, null, null,
                     null, null, null, avoid, null).withFollows(true));
             return facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of(message), context).recipeQuery();
         }
@@ -944,7 +945,7 @@ public class ChatIntentFacadeTest {
         @Test
         @DisplayName("추천이면 이 상담에서 말한 알레르기 재료를 뺄 재료에 더하고 이름을 남긴다 (AI가 뺄 재료로 넣지 않았어도)")
         void addsAllergyIngredientsToExcluded_whenRecommend() {
-            givenAi(new IntentResult(ChatIntent.RECOMMEND, List.of(), List.of(), 0, List.of(), List.of(), false, null, null, null));
+            givenAi(IntentResults.of(ChatIntent.RECOMMEND, List.of(), List.of(), 0, List.of(), List.of(), false, null, null, null));
             when(allergyExclusionFinder.find(SESSION_ID, "땅콩 알레르기 있어, 뭐 먹지")).thenReturn(peanut);
 
             ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("땅콩 알레르기 있어, 뭐 먹지"));
@@ -975,7 +976,7 @@ public class ChatIntentFacadeTest {
             ChatContext context = new ChatContext(List.of(), LastRecommendation.of(previous, List.of(10L)),
                     List.of(new CardName(10L, "두부조림")));
             when(allergyExclusionFinder.find(eq(SESSION_ID), any())).thenReturn(peanut);
-            givenAi(new IntentResult(ChatIntent.RECOMMEND, null, null, null, null, null, null, null, null, null,
+            givenAi(IntentResults.of(ChatIntent.RECOMMEND, null, null, null, null, null, null, null, null, null,
                     null, null, List.of("EXCLUDE")).withFollows(true));
 
             RecipeQuery query = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("오이 넣어도 돼"), context).recipeQuery();
@@ -986,7 +987,7 @@ public class ChatIntentFacadeTest {
         @Test
         @DisplayName("추천이 아니면(일반 답) 알레르기를 찾지 않는다")
         void skipsAllergy_whenGeneral() {
-            givenAi(new IntentResult(ChatIntent.GENERAL, List.of(), List.of(), 0, List.of(), List.of(), false, null, null, null));
+            givenAi(IntentResults.of(ChatIntent.GENERAL, List.of(), List.of(), 0, List.of(), List.of(), false, null, null, null));
 
             ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("땅콩 알레르기 있어"));
 
@@ -1095,7 +1096,7 @@ public class ChatIntentFacadeTest {
         }
 
         private static IntentResult intentOnly(ChatIntent intent) {
-            return new IntentResult(intent, List.of(), List.of(), 0, List.of(), List.of(), false, null, null, null);
+            return IntentResults.of(intent, List.of(), List.of(), 0, List.of(), List.of(), false, null, null, null);
         }
     }
 
@@ -1163,12 +1164,12 @@ public class ChatIntentFacadeTest {
         }
 
         private static IntentResult fridge(List<String> names, String scope) {
-            return new IntentResult(ChatIntent.FRIDGE, List.of(), List.of(), 0, names, List.of(), false, List.of(), "", "",
+            return IntentResults.of(ChatIntent.FRIDGE, List.of(), List.of(), 0, names, List.of(), false, List.of(), "", "",
                     0, "", List.of(), List.of(), "", scope);
         }
 
         private static IntentResult intentOnly(ChatIntent intent) {
-            return new IntentResult(intent, List.of(), List.of(), 0, List.of(), List.of(), false, null, null, null);
+            return IntentResults.of(intent, List.of(), List.of(), 0, List.of(), List.of(), false, null, null, null);
         }
     }
 
@@ -1178,7 +1179,7 @@ public class ChatIntentFacadeTest {
         @Test
         @DisplayName("할인 말이 없는 사기는 할인 질문으로 보지 않는다")
         void keepsNormalShop_whenNoSaleWord() {
-            givenAi(new IntentResult(ChatIntent.SHOP, List.of(), List.of(), 0, List.of("당근"), List.of(), false, null, null, null));
+            givenAi(IntentResults.of(ChatIntent.SHOP, List.of(), List.of(), 0, List.of("당근"), List.of(), false, null, null, null));
 
             ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of("당근 사고 싶어"));
 
@@ -1193,7 +1194,7 @@ public class ChatIntentFacadeTest {
                     "지금 세일하는 재료 있어?", ProductType.INGREDIENT,
                     "지금 세일하는 밀키트 있어?", ProductType.MEALKIT);
             messages.forEach((message, productType) -> {
-                givenAi(new IntentResult(ChatIntent.SHOP, List.of(), List.of(), 0, List.of(), List.of(), false, null, null, null));
+                givenAi(IntentResults.of(ChatIntent.SHOP, List.of(), List.of(), 0, List.of(), List.of(), false, null, null, null));
 
                 ChatIntentResolution resolution = facade.resolve(MEMBER_ID, SESSION_ID, ChatMessageCreateRequest.of(message));
 
@@ -1223,7 +1224,7 @@ public class ChatIntentFacadeTest {
 
         // AI가 요리 이름·키워드를 낸 결과 (나머지 칸은 말하지 않음)
         private IntentResult aiDish(ChatIntent intent, String dish, List<String> keywords) {
-            return new IntentResult(intent, List.of(), List.of(), 0, List.of(), List.of(), false, keywords, dish, "",
+            return IntentResults.of(intent, List.of(), List.of(), 0, List.of(), List.of(), false, keywords, dish, "",
                     0, "", List.of(), List.of(), "", "ALL");
         }
 

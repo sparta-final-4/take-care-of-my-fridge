@@ -61,10 +61,6 @@ public final class TypeSafeExecutor implements AutoCloseable {
         return Optional.of(result);
     }
 
-    // 대기 줄에 있는 작업 수 (테스트·확인용)
-    int queued() {
-        return pool.getQueue().size();
-    }
 
     // 앱을 끌 때 남은 작업을 기다리지 않는다 (기다리던 상담은 제한 시간 뒤 서버 답으로 간다)
     @Override

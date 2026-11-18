@@ -126,7 +126,7 @@ final class JevSecondQuestions {
         };
     }
 
-    // chat-intent.txt wantedTastes·avoidTastes의 맛 설명을 줄인 것
+    // 맛 설명 (OpenAI가 맛을 고르던 때의 프롬프트 설명을 줄인 것)
     private static String tasteDescription(Member.Taste taste) {
         return switch (taste) {
             case SALTY -> "짭짤한 맛";

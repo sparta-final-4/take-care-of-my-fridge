@@ -1,11 +1,11 @@
 package org.example.takecareofmyfridgebe.domain.chat.facade;
 
+import org.example.takecareofmyfridgebe.domain.chat.IntentResults;
 import org.example.takecareofmyfridgebe.domain.chat.ChatIntentFixture;
 import org.example.takecareofmyfridgebe.domain.chat.ai.JevIntentRunner;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntent;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntentResolution;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatMessageCreateRequest;
-import org.example.takecareofmyfridgebe.domain.chat.dto.FridgeScope;
 import org.example.takecareofmyfridgebe.domain.chat.dto.IntentResult;
 import org.example.takecareofmyfridgebe.domain.chat.dto.JevIntentJudgement;
 import org.example.takecareofmyfridgebe.domain.chat.dto.JevIntentJudgement.RequestKind;
@@ -137,7 +137,7 @@ class DishNotFoundFlowTest {
     @Test
     @DisplayName("AI가 \"김피탕\"을 일반 대화로 보면 추천 검색을 하지 않고 일반 답으로 간다")
     void goesGeneral_whenAiSeesDishNameAsGeneral() throws Exception {
-        fixture.givenExtracted(ChatIntentFixture.extractionOf(new IntentResult(ChatIntent.GENERAL, List.of(), List.of(), null, null,
+        fixture.givenExtracted(ChatIntentFixture.extractionOf(IntentResults.of(ChatIntent.GENERAL, List.of(), List.of(), null, null,
                 null, false, List.of(), null, null)));
         givenJevFirst(ChatIntent.GENERAL);
 
@@ -168,7 +168,7 @@ class DishNotFoundFlowTest {
 
     // OpenAI 추천 결과: 요리 이름과 그 이름 하나뿐인 키워드
     private static IntentResult aiRecommend(String dish) {
-        return new IntentResult(ChatIntent.RECOMMEND, List.of(), List.of(), null, null, null, false, List.of(dish), dish, null);
+        return IntentResults.of(ChatIntent.RECOMMEND, List.of(), List.of(), null, null, null, false, List.of(dish), dish, null);
     }
 
     // Jev: 추천 0.95, 2차는 특정 요리(1등 분류 없음), 맛 언급 없음
@@ -187,7 +187,7 @@ class DishNotFoundFlowTest {
     private static JevIntentJudgement.First first(ChatIntent intent) {
         Map<ChatIntent, Double> probabilities = new EnumMap<>(ChatIntent.class);
         Arrays.stream(ChatIntent.values()).forEach(each -> probabilities.put(each, each == intent ? 0.95 : 0.0));
-        return new JevIntentJudgement.First(intent, intent, 0.95, probabilities, null, 0.05, FridgeScope.ALL, 0.9, call("req_first"));
+        return new JevIntentJudgement.First(intent, intent, 0.95, probabilities, null, 0.05, call("req_first"));
     }
 
     private static JevIntentJudgement.Call call(String requestId) {

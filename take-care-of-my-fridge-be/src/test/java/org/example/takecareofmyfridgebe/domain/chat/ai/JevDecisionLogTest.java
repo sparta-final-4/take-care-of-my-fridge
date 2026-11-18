@@ -3,7 +3,6 @@ package org.example.takecareofmyfridgebe.domain.chat.ai;
 import org.example.takecareofmyfridgebe.domain.chat.ai.JevDecisionLog.JevSide;
 import org.example.takecareofmyfridgebe.domain.chat.ai.JevDecisionLog.FinalSide;
 import org.example.takecareofmyfridgebe.domain.chat.dto.ChatIntent;
-import org.example.takecareofmyfridgebe.domain.chat.dto.FridgeScope;
 import org.example.takecareofmyfridgebe.domain.chat.dto.JevDecision;
 import org.example.takecareofmyfridgebe.domain.chat.dto.JevIntentJudgement;
 import org.example.takecareofmyfridgebe.domain.chat.dto.JevIntentJudgement.RequestKind;
@@ -84,7 +83,7 @@ class JevDecisionLogTest {
         JevIntentJudgement base = judgement(ChatIntent.RECOMMEND, true);
         JevIntentJudgement.First first = base.first();
         JevIntentJudgement following = new JevIntentJudgement(new JevIntentJudgement.First(ChatIntent.RECOMMEND, ChatIntent.RECOMMEND,
-                0.72, first.intentProbabilities(), 0.83, first.asksQuestion(), first.fridgeScope(), first.fridgeScopeConfidence(),
+                0.72, first.intentProbabilities(), 0.83, first.asksQuestion(),
                 first.call()), base.second(), base.totalLatencyMs());
         JevDecision broad = new JevDecision(JevDecision.Decision.JEV, RequestKind.BROAD, List.of("감자국", "떡국"));
 
@@ -101,7 +100,7 @@ class JevDecisionLogTest {
         JevIntentJudgement base = judgement(ChatIntent.RECOMMEND, true);
         JevIntentJudgement.First first = base.first();
         JevIntentJudgement following = new JevIntentJudgement(new JevIntentJudgement.First(ChatIntent.RECOMMEND, ChatIntent.RECOMMEND,
-                0.97, first.intentProbabilities(), 0.8, first.asksQuestion(), first.fridgeScope(), first.fridgeScopeConfidence(),
+                0.97, first.intentProbabilities(), 0.8, first.asksQuestion(),
                 first.call()), base.second(), base.totalLatencyMs());
         FinalSide follows = new FinalSide(1L, 10L, 10, ChatIntent.RECOMMEND, true, List.of(Taste.SPICY), List.of(), List.of("찌개"), false);
 
@@ -196,7 +195,7 @@ class JevDecisionLogTest {
     static JevIntentJudgement judgement(ChatIntent intent, boolean withSecond) {
         Map<ChatIntent, Double> probabilities = new EnumMap<>(ChatIntent.class);
         Arrays.stream(ChatIntent.values()).forEach(each -> probabilities.put(each, each == intent ? 0.98 : 0.0));
-        JevIntentJudgement.First first = new JevIntentJudgement.First(intent, intent, 0.97, probabilities, null, 0.05, FridgeScope.ALL, 0.9,
+        JevIntentJudgement.First first = new JevIntentJudgement.First(intent, intent, 0.97, probabilities, null, 0.05,
                 new JevIntentJudgement.Call("jev-1.14.0", "req_first", 210L, 417));
         if (!withSecond) {
             return new JevIntentJudgement(first, null, 230L);

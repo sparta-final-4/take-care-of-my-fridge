@@ -15,6 +15,8 @@ public final class ChatTexts {
 
     // 스페이스·탭·줄바꿈(\n, \r)·\f·\x0B. 전각 공백(U+3000)은 지우지 않는다
     private static final Pattern WHITESPACE = Pattern.compile("\\s+");
+    // 끝 문장 부호
+    private static final Pattern TRAILING_MARKS = Pattern.compile("[?!.~…,]+$");
     // 해시 앞 16자(64비트). 캐시 키가 겹칠 일은 사실상 없고 키가 짧다
     static final int SHORT_HASH_LENGTH = 16;
 
@@ -27,6 +29,14 @@ public final class ChatTexts {
      */
     public static String removeWhitespace(String text) {
         return text == null ? "" : WHITESPACE.matcher(text).replaceAll("");
+    }
+
+    /**
+     * 앞뒤 공백과 끝 문장 부호(? ! . ~ … ,)를 지운다. null이면 빈 글을 돌려준다.
+     * 예) "두부 있어?" → "두부 있어", "된찌!!" → "된찌"
+     */
+    public static String withoutTrailingMarks(String text) {
+        return text == null ? "" : TRAILING_MARKS.matcher(text.strip()).replaceAll("").strip();
     }
 
     /**

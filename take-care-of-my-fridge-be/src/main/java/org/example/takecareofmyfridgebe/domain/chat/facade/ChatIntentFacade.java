@@ -308,7 +308,7 @@ public class ChatIntentFacade {
             names = names.stream().filter(name -> !FridgeShopWordChecker.seasoningWord(name, chatWordProperties.fridgeShop())).toList();
         }
         if (names.isEmpty() && scope == FridgeScope.ALL && message != null) {
-            String text = message.strip().replaceAll("[?!.~…,]+$", "").strip();
+            String text = ChatTexts.withoutTrailingMarks(message);
             names = intentCorrector.ingredientNames(List.of(text.split("\\s+")));
         }
         if (result.intent() != ChatIntent.SHOP) {
@@ -389,7 +389,7 @@ public class ChatIntentFacade {
      * 직전 조건과 이번 말(이어짐)을 합친다.
      * <ul>
      *   <li>원하는 맛: 직전 맛에 이번 맛을 쌓고(removed에 TASTE면 이번 맛만), 부딪히는 맛은 followSpokenTastes가 이번 말을 따라 고친다</li>
-     *   <li>분류·시간·키워드: AI가 [직전 조건]에 이번 말을 반영한 최종값을 낸다. AI가 비워 둔 칸은 직전 값을 쓴다
+     *   <li>분류·시간·키워드: 이번 말의 값(분류는 Jev, 시간은 OpenAI가 [직전 조건]을 반영해 꺼낸 값, 키워드는 요청 종류로 정한 값)을 쓰고, 비어 있으면 직전 값을 쓴다
      *       ("좀 더 매운 걸로" → 맛만 바뀌고 분류·키워드는 그대로, "국물 말고 볶음으로" → 분류만 바뀜, "다른 거 없어?" → 모두 그대로).
      *       removed에 있는 조건은 직전 값을 지우고 이번 말의 값만 쓴다 ("매운 거 말고" → 맛 조건 없음, "시간 상관없이" → 시간 조건 없음)</li>
      *   <li>요리 이름·원한 표현: 이어 가지 않는다 (이어짐에서 "김피탕 레시피는 없어서…" 같은 안내가 다시 나오지 않게)</li>
@@ -491,7 +491,7 @@ public class ChatIntentFacade {
         return text.toString();
     }
 
-    // 직전 조건 한 줄. 맛은 응답 값과 같은 이름(SPICY)으로 쓴다. 재료 조건은 서버가 이어 가므로 넣지 않는다
+    // 직전 조건 한 줄. 맛은 Member.Taste 이름(SPICY)으로 쓴다. 재료 조건은 서버가 이어 가므로 넣지 않는다
     private static String conditionLine(QuerySnapshot query) {
         List<String> parts = new ArrayList<>();
         if (!query.wantedTastes().isEmpty()) {

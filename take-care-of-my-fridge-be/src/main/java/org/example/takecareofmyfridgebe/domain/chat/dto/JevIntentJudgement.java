@@ -24,7 +24,7 @@ public record JevIntentJudgement(
     }
 
     /**
-     * 1차: 의도, 정보를 묻는 말인지, 냉장고 보기 범위.
+     * 1차: 의도, 정보를 묻는 말인지, (직전 추천이 있으면) 이어지는 말인지.
      *
      * @param intent              서비스 규칙을 적용한 의도. 직전 추천이 없는데 RECIPE_DETAIL로 답했으면 RECOMMEND
      *                            (JevIntentClassifier.serviceIntent). 2차를 물을지도 이 값으로 정한다. 이어짐은 JevIntentClassifier.follows
@@ -33,7 +33,6 @@ public record JevIntentJudgement(
      * @param intentProbabilities 의도별 확률 (ChatIntent 순서, Jev 답 그대로)
      * @param followsPrevious     직전 추천에 이어지는 말일 확률 (Noul). 직전 추천이 없어 묻지 않았으면 null
      * @param asksQuestion        정보를 묻는 말일 확률 (Noul)
-     * @param fridgeScope         냉장고 보기 범위. FRIDGE가 아닐 때도 답이 온다
      */
     public record First(
             ChatIntent intent,
@@ -42,8 +41,6 @@ public record JevIntentJudgement(
             Map<ChatIntent, Double> intentProbabilities,
             Double followsPrevious,
             double asksQuestion,
-            FridgeScope fridgeScope,
-            double fridgeScopeConfidence,
             Call call
     ) {
     }

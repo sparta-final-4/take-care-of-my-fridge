@@ -541,7 +541,7 @@ class JevIntentEvalManualTest {
     private static List<String> runLines(List<JevRun> rows) {
         List<String> lines = new ArrayList<>();
         List<String> header = new ArrayList<>(List.of("id", "group", "context", "message", "run", "pass", "mismatch", "status",
-                "intent", "jevIntent", "intentConfidence", "intentTop3", "asksQuestion", "fridgeScope", "fridgeScopeConfidence"));
+                "intent", "jevIntent", "intentConfidence", "intentTop3", "asksQuestion"));
         for (Taste taste : Taste.values()) {
             header.add("taste" + taste.name());
         }
@@ -565,8 +565,6 @@ class JevIntentEvalManualTest {
                     .sorted(Map.Entry.<ChatIntent, Double>comparingByValue().reversed()).limit(3)
                     .map(entry -> entry.getKey() + "=" + entry.getValue()).toList()));
             cells.add(first == null ? "" : String.valueOf(first.asksQuestion()));
-            cells.add(csv(first == null ? null : first.fridgeScope()));
-            cells.add(first == null ? "" : String.valueOf(first.fridgeScopeConfidence()));
             for (Taste taste : Taste.values()) {
                 cells.add(csv(second == null ? null : second.tastes().get(taste).stance() + "=" + second.tastes().get(taste).confidence()));
             }

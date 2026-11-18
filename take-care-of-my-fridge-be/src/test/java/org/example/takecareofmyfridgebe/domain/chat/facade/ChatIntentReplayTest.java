@@ -1,5 +1,6 @@
 package org.example.takecareofmyfridgebe.domain.chat.facade;
 
+import org.example.takecareofmyfridgebe.domain.chat.IntentResults;
 import org.example.takecareofmyfridgebe.domain.chat.ChatIntentFixture;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatWordProperties;
 import org.example.takecareofmyfridgebe.domain.chat.config.ChatCandidateProperties;
@@ -156,7 +157,7 @@ class ChatIntentReplayTest {
     // 의도 칸의 +FOLLOWS(예전 기록은 REFINE)는 추천 + 이어짐 예다
     private static IntentResult rawOf(Map<String, String> row) {
         String intent = blankToNull(row.get("aiIntent"));
-        return new IntentResult(
+        return IntentResults.of(
                 intent == null ? null : ChatIntentEvalManualTest.intentOf(intent),
                 list(row.get("aiWanted")),
                 list(row.get("aiCategories")),
@@ -183,7 +184,7 @@ class ChatIntentReplayTest {
         ChatIntent expected = intent == null ? recorded.intent()
                 : ChatIntent.valueOf(intent instanceof List<?> names ? String.valueOf(names.get(0)) : String.valueOf(intent));
         boolean follows = Boolean.TRUE.equals(expect.get("follows"));
-        return new IntentResult(expected, recorded.wantedTastes(), recorded.moodCategories(), recorded.maxMinutes(),
+        return IntentResults.of(expected, recorded.wantedTastes(), recorded.moodCategories(), recorded.maxMinutes(),
                 recorded.includeIngredients(), recorded.excludeIngredients(), recorded.useSelectedOnly(), recorded.keywords(),
                 recorded.dishText(), recorded.preferenceText(), recorded.targetIndex(), recorded.targetName(), recorded.removed(),
                 recorded.avoidTastes(), recorded.detailQuestion(), recorded.fridgeScope(), follows);

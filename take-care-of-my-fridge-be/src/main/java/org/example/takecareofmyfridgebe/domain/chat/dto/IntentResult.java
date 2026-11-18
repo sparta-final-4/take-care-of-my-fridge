@@ -32,7 +32,7 @@ import java.util.stream.Stream;
  * @param removed            이어짐일 때 지우라고 한 조건 종류 (RefineCondition 이름, "시간 상관없이" → MAX_MINUTES). 없으면 빈 목록
  * @param avoidTastes        피할 맛 (Member.Taste 이름, Jev, "매운 거 말고" → SPICY). 말하지 않았으면 빈 목록
  * @param detailQuestion     RECIPE_DETAIL일 때 질문 종류 (DetailQuestion 이름: HOW_TO, TIME, INGREDIENTS, TIP, OTHER). 다른 의도면 빈 값
- * @param fridgeScope        FRIDGE일 때 보여 줄 범위 (FridgeScope 이름: ALL, MEALKIT, IMMINENT). 다른 의도면 ALL
+ * @param fridgeScope        FRIDGE일 때 보여 줄 범위 (FridgeScope 이름: ALL, MEALKIT, IMMINENT, SEASONING). 다른 의도면 ALL
  * @param followsPrevious    이어짐(Jev): 추천일 때 [직전 추천]의 조건을 이어받아 일부만 바꾸는 추천인지. 직전 추천이 없거나 추천이 아니면 false.
  *                           최종 값은 follows()로 읽는다 (추천일 때만 뜻이 있다). 직전 추천이 없으면 아니오로 두는 것은 서비스 규칙이다 (IntentCorrector)
  */
@@ -74,64 +74,6 @@ public record IntentResult(
     private static final Set<String> SCOPE_NAMES = Arrays.stream(FridgeScope.values())
             .map(Enum::name)
             .collect(Collectors.toUnmodifiableSet());
-
-    public IntentResult(ChatIntent intent, List<String> wantedTastes, List<String> moodCategories, Integer maxMinutes,
-                        List<String> includeIngredients, List<String> excludeIngredients, Boolean useSelectedOnly,
-                        List<String> keywords, String dishText, String preferenceText, Integer targetIndex, String targetName,
-                        List<String> removed, List<String> avoidTastes, String detailQuestion, String fridgeScope) {
-        this(intent, wantedTastes, moodCategories, maxMinutes, includeIngredients, excludeIngredients, useSelectedOnly,
-                keywords, dishText, preferenceText, targetIndex, targetName, removed, avoidTastes, detailQuestion, fridgeScope, null);
-    }
-
-    public IntentResult(ChatIntent intent, List<String> wantedTastes, List<String> moodCategories, Integer maxMinutes,
-                        List<String> includeIngredients, List<String> excludeIngredients, Boolean useSelectedOnly,
-                        List<String> keywords, String dishText, String preferenceText, Integer targetIndex, String targetName,
-                        List<String> removed, List<String> avoidTastes, String detailQuestion) {
-        this(intent, wantedTastes, moodCategories, maxMinutes, includeIngredients, excludeIngredients, useSelectedOnly,
-                keywords, dishText, preferenceText, targetIndex, targetName, removed, avoidTastes, detailQuestion, null);
-    }
-
-    public IntentResult(ChatIntent intent, List<String> wantedTastes, List<String> moodCategories, Integer maxMinutes,
-                        List<String> includeIngredients, List<String> excludeIngredients, Boolean useSelectedOnly,
-                        List<String> keywords, String dishText, String preferenceText) {
-        this(intent, wantedTastes, moodCategories, maxMinutes, includeIngredients, excludeIngredients, useSelectedOnly,
-                keywords, dishText, preferenceText, null, null);
-    }
-
-    public IntentResult(ChatIntent intent, List<String> wantedTastes, List<String> moodCategories, Integer maxMinutes,
-                        List<String> includeIngredients, List<String> excludeIngredients, Boolean useSelectedOnly,
-                        List<String> keywords, String dishText, String preferenceText, Integer targetIndex, String targetName) {
-        this(intent, wantedTastes, moodCategories, maxMinutes, includeIngredients, excludeIngredients, useSelectedOnly,
-                keywords, dishText, preferenceText, targetIndex, targetName, null);
-    }
-
-    public IntentResult(ChatIntent intent, List<String> wantedTastes, List<String> moodCategories, Integer maxMinutes,
-                        List<String> includeIngredients, List<String> excludeIngredients, Boolean useSelectedOnly,
-                        List<String> keywords, String dishText, String preferenceText, Integer targetIndex, String targetName,
-                        List<String> removed) {
-        this(intent, wantedTastes, moodCategories, maxMinutes, includeIngredients, excludeIngredients, useSelectedOnly,
-                keywords, dishText, preferenceText, targetIndex, targetName, removed, null);
-    }
-
-    public IntentResult(ChatIntent intent, List<String> wantedTastes, List<String> moodCategories, Integer maxMinutes,
-                        List<String> includeIngredients, List<String> excludeIngredients, Boolean useSelectedOnly,
-                        List<String> keywords, String dishText, String preferenceText, Integer targetIndex, String targetName,
-                        List<String> removed, List<String> avoidTastes) {
-        this(intent, wantedTastes, moodCategories, maxMinutes, includeIngredients, excludeIngredients, useSelectedOnly,
-                keywords, dishText, preferenceText, targetIndex, targetName, removed, avoidTastes, null);
-    }
-
-    // 서버가 냉장고 보기·사기로 바꾼 결과. 범위와 말한 재료를 서버가 정한 값으로 바꾼다
-    public IntentResult withLookup(ChatIntent newIntent, FridgeScope scope, List<String> names) {
-        return new IntentResult(newIntent, wantedTastes, moodCategories, maxMinutes, names, excludeIngredients,
-                useSelectedOnly, keywords, dishText, preferenceText, targetIndex, targetName, removed, avoidTastes, detailQuestion,
-                scope.name(), false);
-    }
-
-    // 의도만 있고 조건은 하나도 말하지 않은 결과
-    public static IntentResult general() {
-        return new IntentResult(ChatIntent.GENERAL, null, null, null, null, null, null, null, null, null);
-    }
 
     // 분류·키워드·요리 이름·뺄 조건을 바꾼 결과 (요리 이름 확인, Jev 판단으로 만든 결과)
     public IntentResult withCategories(List<String> categories, List<String> keywords, String dishText, List<String> removed) {
