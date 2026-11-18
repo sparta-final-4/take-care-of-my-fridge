@@ -1,5 +1,9 @@
 package org.example.takecareofmyfridgebe.domain.chat.text;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 import java.util.regex.Pattern;
 
 /**
@@ -11,6 +15,8 @@ public final class ChatTexts {
 
     // 스페이스·탭·줄바꿈(\n, \r)·\f·\x0B. 전각 공백(U+3000)은 지우지 않는다
     private static final Pattern WHITESPACE = Pattern.compile("\\s+");
+    // 해시 앞 16자(64비트). 캐시 키가 겹칠 일은 사실상 없고 키가 짧다
+    static final int SHORT_HASH_LENGTH = 16;
 
     private ChatTexts() {
     }
@@ -38,5 +44,19 @@ public final class ChatTexts {
             at++;
         }
         return true;
+    }
+
+    /**
+     * 글의 SHA-256 해시 앞 {@value #SHORT_HASH_LENGTH}자(16진수). 사용자 말을 그대로 남기면 안 되는 Redis 키에 쓴다.
+     * 같은 글이면 같은 값이다. null이면 빈 글의 해시다.
+     */
+    public static String shortHash(String text) {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256")
+                    .digest((text == null ? "" : text).getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(digest).substring(0, SHORT_HASH_LENGTH);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 is unavailable", e);
+        }
     }
 }

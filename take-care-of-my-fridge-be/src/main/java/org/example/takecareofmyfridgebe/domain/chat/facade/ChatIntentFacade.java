@@ -573,6 +573,7 @@ public class ChatIntentFacade {
                 + ", 선택 재료만=" + query.useSelectedOnly()
                 + ", 키워드=" + query.keywords()
                 + ", 요리 이름=" + query.keywordText()
-                + ", 원한 표현=" + query.preferenceText();
+                // 원한 표현은 메시지 전체일 수 있어(넓은 요청) 길이만 남긴다
+                + ", 원한 표현 길이=" + (query.preferenceText() == null ? 0 : query.preferenceText().length());
     }
 }

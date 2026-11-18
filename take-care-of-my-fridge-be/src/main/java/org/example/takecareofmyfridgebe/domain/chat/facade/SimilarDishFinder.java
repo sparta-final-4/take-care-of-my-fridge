@@ -59,18 +59,19 @@ public class SimilarDishFinder {
         }
         Optional<SimilarDishes> cached = similarDishStore.find(memberId, kind, text);
         if (cached.isPresent()) {
-            log.info("상담 {} 캐시 사용 - memberId: {}, 글: {}, 요리: {}", kind.label(), memberId, text, cached.get());
+            log.info("상담 {} 캐시 사용 - memberId: {}, 글 길이: {}, 요리: {}", kind.label(), memberId, text.length(), cached.get());
             return cached.get();
         }
         SimilarDishes generated;
         try {
             generated = similarDishGenerator.generate(memberId, kind, text);
         } catch (RuntimeException e) {
-            log.warn("상담 {} AI 실패, 빈 목록으로 - memberId: {}, 글: {}, 원인: {}", kind.label(), memberId, text, e.toString());
+            log.warn("상담 {} AI 실패, 빈 목록으로 - memberId: {}, 글 길이: {}, 원인: {}",
+                    kind.label(), memberId, text.length(), e.getClass().getSimpleName());
             return SimilarDishes.NONE;
         }
         SimilarDishes dishes = clean(text, generated);
-        log.info("상담 {} AI - memberId: {}, 글: {}, AI: {}, 쓴 값: {}", kind.label(), memberId, text, generated, dishes);
+        log.info("상담 {} AI - memberId: {}, 글 길이: {}, AI: {}, 쓴 값: {}", kind.label(), memberId, text.length(), generated, dishes);
         similarDishStore.save(memberId, kind, text, dishes);
         return dishes;
     }
@@ -85,7 +86,7 @@ public class SimilarDishFinder {
                 || ChatTexts.removeWhitespace(generated.formalName()).equals(ChatTexts.removeWhitespace(text))
                 || !ChatTexts.containsInOrder(generated.formalName(), text) ? null : generated.formalName();
         if (generated.formalName() != null && formalName == null) {
-            log.info("상담 비슷한 요리 정식 이름 버림 - 글: {}, 정식 이름: {}", text, generated.formalName());
+            log.info("상담 비슷한 요리 정식 이름 버림 - 글 길이: {}, 정식 이름: {}", text.length(), generated.formalName());
         }
         List<String> known = formalName == null ? List.of(text) : List.of(text, formalName);
         return new SimilarDishes(formalName, clean(known, generated.dishes()));
