@@ -78,19 +78,25 @@ public class ChatClientConfig {
     @Bean("chatIntentChatClient")
     public ChatClient chatIntentChatClient(
             OpenAiChatModel openAiChatModel,
-            LlmCostCalculator llmCostCalculator
+            LlmCostCalculator llmCostCalculator,
+            @Value("${spring.ai.openai.api-key}") String openAiApiKey
     ) {
-        return ChatClient.builder(intentChatModel(openAiChatModel))
+        return ChatClient.builder(intentChatModel(openAiChatModel.getOptions(), openAiApiKey))
                 .defaultAdvisors(new CostAdvisor(llmCostCalculator, 100))
                 .build();
     }
 
     /**
-     * 꺼내기 전용 모델: 기본 모델(spring.ai.openai)과 같은 키·주소에 꺼내기 옵션과 시간 제한 {@code CHAT_INTENT_TIMEOUT}(10초),
+     * 꺼내기 전용 모델: 기본 모델(spring.ai.openai)과 같은 키에 꺼내기 옵션과 시간 제한 {@code CHAT_INTENT_TIMEOUT}(10초),
      * 재시도 {@value #CHAT_INTENT_MAX_RETRIES}번을 둔다. 기본 모델의 옵션(시간 제한 60초, 재시도 1번)은 바꾸지 않는다.
+     * <p>
+     * 키는 따로 받아 넣는다. 자동 설정은 키를 OpenAI 클라이언트에만 넣고 기본 모델 옵션에는 넣지 않아서,
+     * 옵션만 복사하면 키가 없다. 키 없이 만들면 Spring AI가 OS 환경변수 OPENAI_API_KEY만 찾으므로,
+     * 키가 Parameter Store(Spring 속성)에만 있는 배포 서버에서는 시작할 때 실패한다.
      */
-    static OpenAiChatModel intentChatModel(OpenAiChatModel base) {
-        OpenAiChatOptions options = base.getOptions().mutate()
+    static OpenAiChatModel intentChatModel(OpenAiChatOptions baseOptions, String apiKey) {
+        OpenAiChatOptions options = baseOptions.mutate()
+                .apiKey(apiKey)
                 .model(CHAT_INTENT_MODEL)
                 .temperature(CHAT_INTENT_TEMPERATURE)
                 .maxTokens(CHAT_INTENT_MAX_TOKENS)

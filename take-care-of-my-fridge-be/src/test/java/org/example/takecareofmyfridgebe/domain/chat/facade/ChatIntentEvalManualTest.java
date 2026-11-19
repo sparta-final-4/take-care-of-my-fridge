@@ -193,7 +193,7 @@ class ChatIntentEvalManualTest {
         OpenAiChatModel model = OpenAiChatModel.builder()
                 .options(OpenAiChatOptions.builder().apiKey(apiKey).model(MODEL).build())
                 .build();
-        ChatClient chatClient = new ChatClientConfig().chatIntentChatClient(model, usage);
+        ChatClient chatClient = new ChatClientConfig().chatIntentChatClient(model, usage, apiKey);
         return new OpenAiChatIntentExtractor(chatClient, usage, new ClassPathResource("prompts/chat-intent.txt"),
                 new ClassPathResource("prompts/chat-intent-followup.txt"));
     }
